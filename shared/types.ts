@@ -313,6 +313,9 @@ export type UsageLogRow = {
   credits: number
   source: "free" | "credit" | "mixed"
   summary: string
+  /** what the summary IS: an action taken (team-visible) or the author's prompt
+   * (their own). NULL on back-filled rows → treated as private. */
+  kind?: "action" | "prompt" | null
 }
 
 /** One column an import maps a file onto (matches a catalog target's columns). */

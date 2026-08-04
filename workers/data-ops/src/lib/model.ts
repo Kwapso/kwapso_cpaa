@@ -6,6 +6,12 @@
 
 import type { Env } from "../env"
 
+/** The agent's output budget per model turn — ONE constant for BOTH providers
+ * (Claude + Workers AI). Sized for tool turns: a bulk call carrying up to
+ * BULK_IDS_LIMIT ids must fit in one reply, or the model silently truncates
+ * mid-JSON and the "bulk" promise breaks at runtime. */
+export const AGENT_MAX_TOKENS = 4096
+
 export type ChatMessage = {
   role: "system" | "user" | "assistant" | "tool"
   content: string
@@ -112,7 +118,11 @@ class ClaudeModel implements Model {
       .join("\n\n")
     return {
       model: this.name,
-      max_tokens: 1024,
+      // Tool turns must be able to EMIT a whole bulk call — the old 1024 cap
+      // silently truncated mid-JSON (a promise the runtime cannot keep is worse
+      // than a smaller one). AGENT_MAX_TOKENS is the one constant both providers
+      // use, sized so a BULK_IDS_LIMIT id list physically fits.
+      max_tokens: AGENT_MAX_TOKENS,
       // Effort controls reasoning depth + overall token spend (GA on the Sonnet-5 /
       // Opus-4.7+ family, no beta header). "low" = terse, consolidated tool calls —
       // the cheap setting. We leave `thinking` unset on purpose: those models run
@@ -311,7 +321,7 @@ class WorkersAiModel implements Model {
       })
       .filter((m): m is { role: "system" | "user" | "assistant"; content: string } => m !== null)
 
-    const body: Record<string, unknown> = { messages: msgs, max_tokens: 1024, temperature: 0.3 }
+    const body: Record<string, unknown> = { messages: msgs, max_tokens: AGENT_MAX_TOKENS, temperature: 0.3 }
     if (tools.length)
       body.tools = tools.map((t) => ({
         type: "function",

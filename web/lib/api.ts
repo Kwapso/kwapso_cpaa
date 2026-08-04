@@ -50,14 +50,17 @@ export type ImportResultView = { created: number; skipped: number; failed: numbe
 export type ImportTargetView = { tableKey: string; displayName: string; columns: ImportColumn[] }
 
 /** One row of the agent usage log (written once per turn): who ran it, when, how
- * many AI units it used, whether that was free / credit / mixed, and a short line. */
+ * many AI units it used, whether that was free / credit / mixed, and a short line.
+ * `kind` says what the summary IS — an action taken (team-visible) or the author's
+ * own prompt (redacted to null on teammates' rows; NULL kind = legacy, private). */
 export type UsageLogRow = {
   id: string
   createdAt: string
   actorName?: string
   credits: number
   source: string
-  summary: string
+  summary: string | null
+  kind?: "action" | "prompt" | null
 }
 
 export class ApiFailure extends Error {

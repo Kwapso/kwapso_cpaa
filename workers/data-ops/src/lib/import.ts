@@ -75,20 +75,46 @@ function toSummary(r: SessionRow, tableKey: string): ImportSessionSummary {
 
 /* ------------------------------ the catalog (core DB) ------------------------------ */
 
+/** R13: SHIPPING THE CODE SHIPS THE CAPABILITY. A TargetDef only becomes a
+ * target the picker OFFERS once a ROW exists in the core catalogue table — and
+ * rows are data, which no deploy carries. That let staging import modules that
+ * production, running byte-identical code, could not, and nothing said so. So
+ * the catalogue RECONCILES itself against the code on READ: INSERT-only
+ * (ON CONFLICT DO NOTHING) — a target an owner deliberately switched OFF (its
+ * row exists, is_active=0) stays off; only a target with NO row at all gets one.
+ * The owner seed door remains for refreshing labels; it is no longer a step
+ * anyone must remember. */
+export async function reconcileCatalog(env: Env): Promise<void> {
+  const now = new Date().toISOString()
+  for (const t of Object.values(TARGETS)) {
+    await env.DB.prepare(
+      `INSERT INTO importable_databases (id, table_key, display_name, description, required_columns_json, is_active, created_at, creator_id, creator_email, creator_name)
+       VALUES (?, ?, ?, ?, ?, 1, ?, 'system', 'system', 'System')
+       ON CONFLICT(table_key) DO NOTHING`
+    )
+      .bind(ulid(), t.tableKey, t.displayName, t.description, JSON.stringify(t.columns), now)
+      .run()
+  }
+}
+
 /** The active, code-supported import targets (catalog rows whose table_key has a
- * TargetDef and is active). Read from the global core DB. */
+ * TargetDef and is active). Read from the global core DB, self-healed first (R13). */
 export async function getActiveCatalog(env: Env): Promise<CatalogTarget[]> {
+  await reconcileCatalog(env)
+  // NO is_active pre-filter in SQL (R13): filter in memory, or "switched off"
+  // and "never existed" look identical and the reconcile can't tell them apart.
   const { results } = await env.DB.prepare(
-    "SELECT id, table_key, display_name, description, required_columns_json FROM importable_databases WHERE is_active = 1"
+    "SELECT id, table_key, display_name, description, required_columns_json, is_active FROM importable_databases"
   ).all<{
     id: string
     table_key: string
     display_name: string
     description: string | null
     required_columns_json: string | null
+    is_active: number
   }>()
   return (results ?? [])
-    .filter((r) => TARGETS[r.table_key])
+    .filter((r) => r.is_active === 1 && TARGETS[r.table_key])
     .map((r) => ({
       id: r.id,
       tableKey: r.table_key,
@@ -115,11 +141,20 @@ async function catalogById(env: Env, id: string): Promise<CatalogTarget | null> 
 }
 
 async function catalogByKey(env: Env, tableKey: string): Promise<CatalogTarget | null> {
-  const row = await env.DB.prepare(
-    "SELECT id, table_key, display_name, description FROM importable_databases WHERE table_key = ? AND is_active = 1"
-  )
-    .bind(tableKey)
-    .first<{ id: string; table_key: string; display_name: string; description: string | null }>()
+  const read = () =>
+    env.DB.prepare(
+      "SELECT id, table_key, display_name, description FROM importable_databases WHERE table_key = ? AND is_active = 1"
+    )
+      .bind(tableKey)
+      .first<{ id: string; table_key: string; display_name: string; description: string | null }>()
+  let row = await read()
+  // R13: heal ONLY on a miss — a fresh environment whose row was never seeded
+  // gets one; the per-import happy path pays nothing, and a row the owner
+  // switched OFF still comes back null (deliberately off, not missing).
+  if (!row && TARGETS[tableKey]) {
+    await reconcileCatalog(env)
+    row = await read()
+  }
   if (!row || !TARGETS[row.table_key]) return null
   return {
     id: row.id,
@@ -130,8 +165,11 @@ async function catalogByKey(env: Env, tableKey: string): Promise<CatalogTarget |
   }
 }
 
-/** Owner-only: upsert the default catalog rows (member roles + learning). Idempotent
- * — re-running refreshes display name / description / schema, never duplicates. */
+/** Owner-only: upsert the default catalog rows — a LABEL refresh (display name /
+ * description / schema), idempotent, never duplicating. R13: it deliberately
+ * does NOT touch is_active on conflict — a re-seed used to silently REACTIVATE a
+ * target the owner had switched off. Existence now self-heals on read
+ * (reconcileCatalog), so running this is never a step anyone must remember. */
 export async function seedDefaultCatalog(
   env: Env,
   actor: Actor,
@@ -147,7 +185,6 @@ export async function seedDefaultCatalog(
          display_name = excluded.display_name,
          description = excluded.description,
          required_columns_json = excluded.required_columns_json,
-         is_active = 1,
          updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ?`
     )
       .bind(
