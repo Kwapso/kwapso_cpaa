@@ -1,8 +1,9 @@
 // Guards on the agent's safety surface (pure logic — no model/DB/network):
-//  • the confirm rule (destructive-only) — removals (remove a member, revoke an invite),
+//  • the confirm rule — removals (remove a member, revoke an invite), the four PRIVILEGE
+//    GRANTS (who-can-do-what never changes silently),
 //    deactivations (a role/article/dropdown value, only when switching OFF), and
-//    bulk/import writes pause for the yes/no panel; every constructive write (create,
-//    edit, invite, grant a role, set permissions, reactivate) runs straight away,
+//    deactivations and bulk/import writes pause for the yes/no panel; every OTHER
+//    constructive write (article, ticket, reply, team details, reactivate) runs free,
 //  • the catalog is OPT-IN (only listed actions are tools), and
 //  • the agent acts AS the user with the user's EXACT rights (the server re-checks each
 //    call); it still cannot control device sessions or delete the team. Managing
@@ -40,30 +41,44 @@ describe("step/confirm summaries resolve ids to human names", () => {
   })
 })
 
-describe("agent tool catalog + confirm rule (destructive-only)", () => {
-  it("confirms ONLY destructive acts — removals + deactivations; constructive writes run freely", () => {
-    // THE RULE: confirm only when an action removes/withdraws access or deactivates an
-    // existing record. Removing a member and revoking an invite always confirm.
-    for (const name of ["remove_member", "revoke_invite"]) {
+describe("agent tool catalog + confirm rule (destructive + privilege grants)", () => {
+  // THE RULE, in two halves. (1) DESTRUCTIVE acts confirm — removing a member,
+  // revoking an invite, deactivating a record. (2) So do PRIVILEGE GRANTS, and
+  // only these four: the model reaches them while reading team data an attacker
+  // can author (a ticket description is 20,000 characters of someone else's
+  // text), so a silent grant is a silent privilege escalation. Everything else
+  // constructive still runs straight away — that is the deliberate UX.
+  // The set is written out so it cannot quietly GROW back into "confirm
+  // everything", which is the friction this rule was written to remove.
+  const DESTRUCTIVE = ["remove_member", "revoke_invite"]
+  const PRIVILEGE_GRANTS = ["create_role", "set_role_permissions", "invite_member", "set_member_role"]
+  const RUNS_FREELY = [
+    "update_role",
+    "update_team",
+    "create_learning",
+    "update_learning",
+    "raise_help_ticket",
+    "reply_help_ticket",
+    "create_dropdown_value",
+    "update_dropdown_value",
+  ]
+
+  it("confirms destructive acts", () => {
+    for (const name of DESTRUCTIVE)
       expect(requiresConfirm(getTool(name)!), `${name} must confirm (destructive)`).toBe(true)
-    }
-    // Constructive writes — create, edit, invite, grant a role, set permissions, change
-    // a member's role, rename the team — run straight away now (reversible + re-gated +
-    // audited). This is the change: privilege writes no longer pause.
-    for (const name of [
-      "create_role",
-      "update_role",
-      "set_role_permissions",
-      "invite_member",
-      "set_member_role",
-      "update_team",
-      "create_learning",
-      "update_learning",
-      "raise_help_ticket",
-      "reply_help_ticket",
-    ]) {
+  })
+
+  it("confirms privilege GRANTS — who-can-do-what never changes silently", () => {
+    for (const name of PRIVILEGE_GRANTS)
+      expect(
+        requiresConfirm(getTool(name)!),
+        `${name} decides who can do what — it must stop for the confirm panel`
+      ).toBe(true)
+  })
+
+  it("every OTHER constructive write still runs freely (the friction stays gone)", () => {
+    for (const name of RUNS_FREELY)
       expect(requiresConfirm(getTool(name)!), `${name} runs freely (constructive)`).toBe(false)
-    }
   })
 
   it("(de)activate toggles confirm ONLY when turning something OFF (input-aware)", () => {
@@ -118,12 +133,12 @@ describe("agent tool catalog + confirm rule (destructive-only)", () => {
 
   it("manages members AS the user — set_member_role + remove_member are present", () => {
     // The agent acts AS the user with their EXACT rights (the server re-checks each
-    // call), so member management is allowed. Removing a member is destructive → it
-    // confirms; re-assigning a role is constructive + reversible → it runs freely.
+    // call), so member management is allowed. Removing a member is destructive and
+    // re-assigning a role is a privilege grant — both stop for the confirm panel.
     expect(getTool("remove_member")).toBeDefined()
     expect(getTool("set_member_role")).toBeDefined()
     expect(requiresConfirm(getTool("remove_member")!)).toBe(true)
-    expect(requiresConfirm(getTool("set_member_role")!)).toBe(false)
+    expect(requiresConfirm(getTool("set_member_role")!)).toBe(true)
   })
 
   it("exposes a spec for every catalogued tool, and nothing else is callable", () => {

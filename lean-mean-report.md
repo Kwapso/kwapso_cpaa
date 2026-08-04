@@ -1,42 +1,46 @@
-# Lean Mean Check — Brimba
-Scanned 2026-08-04 · Overall **94/100 (Grade A)** · The hardening round landed 7 new machine-checked laws (R13–R19) that turn scale, honest counts, live listeners, idempotent transitions, cross-module gating, filter parity and a self-healing catalog into build-red invariants — each sabotage-proven, each stating the failure that earned it. 342 tests (up from 302); net LOC up ~1.7k for real capability. The ceiling is unchanged: a handful of cohesive >400-LOC files that are single-responsibility units, not sprawl.
+# Lean Mean Check — brimba
+Scanned 2026-08-04 · Overall **94/100 (Grade A)** · Lean, heavily self-checking, and now genuinely scalable — a growing collection pages instead of refusing, and nine findings from an outside review are closed.
 
 ## Fix first (ordered by impact)
-- [ ] **(Size)** Watch the 9 files >400 LOC — `agent.ts` (649), `deep-link-screen.tsx` (548), `api.ts` (543), `teams.ts` (495), `import-screen.tsx` (493). Each is ONE cohesive job; split only when one takes a SECOND responsibility, never to game the count.
-- [ ] **(Scalability)** The R14 caps hold a hard ceiling; the documented next step is real server-paging (`LIMIT ? OFFSET ?` + the total) when a collection outgrows the cap.
-- [ ] **(Leanness)** The 6.3% duplicate-line heuristic is now almost entirely declarative data (SHARED_TOOLS / TARGETS / recipes / SQL columns) — structural repetition, not logic. No meaningful DRY lever remains.
+- [ ] **(Robustness)** Convert `bounded-lists` and `idempotent-transitions` from source-scans to behaviour tests — _why:_ both read source strings, so a rename can blind them. `workers/tenancy/test/activity-scope.test.ts` shows the stronger shape: mock the data door, run the function, assert the SQL that actually comes out. That test exists because a source-scan stayed green through a real leak. — _where:_ `web/test/rules.test.ts`
+- [ ] **(Leanness)** Collapse the three per-worker `gating-seam` suites onto a shared scanner — _why:_ ~150 lines are the same code three times (most of the 6.6% duplication). Each must import its own worker's `ROUTES`, so the fix is a shared helper plus three thin files. Only worth doing if a fourth worker appears. — _where:_ `workers/{tenancy,content,data-ops}/test/gating-seam.test.ts`
+- [ ] **(Documentation)** Fold `SCREEN-ENGINE-PLAN.md` and `AGENT-MODULES-PLAN.md` into `ROADMAP.md` — _why:_ both describe work that has shipped; 33 docs stays navigable only while the README doc-map is exhaustive.
 
 ## Scores
 | Dimension | Score | Status |
 |---|---|---|
-| Size & Scope | 89 | green |
-| Robustness | 97 | green |
-| Documentation | 96 | green |
-| Understandability | 95 | green |
-| Leanness & Optimization | 92 | green |
-| Scalability & Structure | 95 | green |
+| Size & Scope | 95 | green |
+| Robustness | 96 | green |
+| Documentation | 95 | green |
+| Understandability | 92 | green |
+| Leanness & Optimization | 91 | green |
+| Scalability & Structure | 96 | green |
+
+## Numbers
+293 code files · 29,697 LOC · 33 docs (6,164 lines) · 60 test files (371 tests, 20.5% test-to-code) · 0 TODO/FIXME · 6.6% duplicate lines.
 
 ## Full findings
-### Size & Scope — 89/100 (green)
-- Strengths: 284 files / 28.5k LOC for a whole 7-worker multi-tenant base + web + shared + 19 machine-checked laws. New seams are tiny (format-count 46, live-bus 26, limits 21, counted-tabs 49).
-- To improve: the 9 files >400 LOC (agent.ts 649, deep-link-screen.tsx 548) are cohesive; split only on a second responsibility.
 
-### Robustness — 97/100 (green)
-- Strengths: **19 machine-checked Laws** (was 12). Every new check sabotage-proven — two scanner bugs caught by their own sabotage step and fixed. 342 tests / 54 files; the mcp surface has its own gating-seam suite.
-- To improve: nothing structural — atomic attempt-cap, fail-closed internal doors, inbox-only login codes close the fresh-review gaps.
+### Size & Scope — 95/100
+- Strengths: 29.7k lines carries seven workers, per-tenant databases, an AI assistant, an external machine surface and a CSV importer; zero parked TODOs; this round added ~1.2k lines and removed a whole class of refusal.
+- To improve: three near-identical seam-test triplets (see Fix first).
 
-### Documentation — 96/100 (green)
-- Strengths: 32 docs; every law states its failure story (registry-integrity pins doc+data+check). 11 canon docs updated this round.
-- To improve: re-run story_checks_out to confirm no cross-doc drift.
+### Robustness — 96/100
+- Strengths: every new check was **sabotage-proven**, which caught two real scanner bugs this round — a missing word boundary that let `ungatedBody(` read as a gate, and a braced guard clause that switched the hooks-order check off for whole files. 19 machine-checked laws. R10's three claimed-but-missing suites now exist.
+- To improve: two checks still assert on text rather than behaviour.
 
-### Understandability — 95/100 (green)
-- Strengths: one count seam, one live registry, one arbitration context, one caps file — each learned once. Exemptions are DATA (DEAF_EXEMPT / ACTIVITY_TABLE_EXEMPT / CATALOG_EXEMPT).
-- To improve: the count arbitration (context, not prop) is subtle — documented in EDGE-CASES.
+### Documentation — 95/100
+- Strengths: laws pinned doc → registry → check; comments name the failure that earned each rule; a reversed owner decision is recorded with its date, its evidence, and how to reverse it again.
+- To improve: 33 files is a lot to keep mapped.
 
-### Leanness & Optimization — 92/100 (green)
-- Strengths: the bulk cap is ONE constant (door enforces, schema declares); abbreviateCount deleted; the moved registry left no stub; 0 TODOs.
-- To improve: the god-files grew with real capability — split only on a second job.
+### Understandability — 92/100
+- Strengths: one handler shape everywhere; new seams are one file with one job; failure paths are named in comments.
+- To improve: `agent.ts` (616) and `deep-link-screen.tsx` (508) are still read-whole files — both cohesive, so splitting would move a number rather than reduce load.
 
-### Scalability & Structure — 95/100 (green)
-- Strengths: R14 caps every list read, R16 badges are exact server COUNT(*), R15 gives paged screens a live subscription + forbids deaf publishers, R13 self-heals the catalog.
-- To improve: real server-paging is the documented next step past the R14 cap.
+### Leanness & Optimization — 91/100
+- Strengths: `pagedJson` collapsed four hand-built responses into one; the bulk cap is derived, not a second hand-picked number; exemption lists are DATA in one registry; the misleading frame count was switched OFF rather than a second count being added.
+- To improve: 6.6% duplication, mostly the deliberate seam-test triplication.
+
+### Scalability & Structure — 96/100
+- Strengths: keyset paging on the growing collections (constant cost per page, stable under concurrent writes); caps derived from one place; per-team databases with a shard runbook and an 80%-of-cap alarm.
+- To improve: only two collections page today — R14 now forces the choice at build time for any new one.

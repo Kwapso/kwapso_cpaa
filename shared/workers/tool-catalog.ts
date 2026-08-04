@@ -91,6 +91,18 @@ export type SharedTool = {
 
 /* -------------------------------- the catalog --------------------------------- */
 
+/** WHY SOME CONSTRUCTIVE WRITES STILL CONFIRM. The rule is that only DESTRUCTIVE
+ * acts stop for a yes/no panel — creating an article or replying to a ticket just
+ * runs. Privilege GRANTS are the reviewed exception: create_role,
+ * set_role_permissions, set_member_role and invite_member decide WHO CAN DO WHAT,
+ * and the model reaches them while reading team data an attacker can author (a
+ * ticket description is up to 20,000 characters of someone else's text). Fenced
+ * tool output plus one system-prompt sentence is a soft defence; a confirm panel
+ * the admin must click is a hard one. So these four confirm — not because they are
+ * destructive, but because a silent one is a silent privilege escalation.
+ * The MCP surface ignores `agent.confirm` — it has no panel to show, and the
+ * confirming UI belongs to the connecting client. Same door, same gate, same
+ * audit row; the asymmetry is documented in MCP.md, not a capability gap. */
 export const SHARED_TOOLS: SharedTool[] = [
   /* --------------------------------- reads --------------------------------- */
   {
@@ -137,12 +149,14 @@ export const SHARED_TOOLS: SharedTool[] = [
   },
   {
     name: "list_help_tickets",
-    summary: "List the team's support tickets. scope: 'mine' (yours) or 'all' (default all); pass `id` to fetch just one ticket.",
+    summary:
+      "List the team's support tickets. scope: 'mine' (yours) or 'all' (default all); pass `id` to fetch just one ticket. Returns ONE page plus the exact `total`, `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
     binding: "CONTENT", method: "GET", path: "/api/content/help",
-    schema: obj({ scope: S, id: S }),
+    schema: obj({ scope: S, id: S, cursor: S }),
     buildQuery: (i) => {
       const q = [str(i, "scope") === "mine" ? "scope=mine" : "scope=all"]
       if (str(i, "id")) q.push(`id=${encodeURIComponent(str(i, "id"))}`)
+      if (str(i, "cursor")) q.push(`cursor=${encodeURIComponent(str(i, "cursor"))}`)
       return `?${q.join("&")}`
     },
     agent: { write: false, summarize: (i) => (str(i, "id") ? "Look up one ticket" : "List support tickets") },
@@ -155,7 +169,8 @@ export const SHARED_TOOLS: SharedTool[] = [
     binding: "TENANCY", method: "POST", path: "/api/tenancy/roles",
     schema: obj({ title: S, description: S }, ["title"]),
     buildBody: (i) => ({ title: str(i, "title"), description: str(i, "description") || "" }),
-    agent: { write: true, confirm: false, summarize: (i) => `Create the role "${str(i, "title")}"` },
+    // PRIVILEGE GRANT → confirm (see the note above SHARED_TOOLS).
+    agent: { write: true, confirm: true, summarize: (i) => `Create the role "${str(i, "title")}"` },
   },
   {
     name: "update_role",
@@ -184,7 +199,8 @@ export const SHARED_TOOLS: SharedTool[] = [
     binding: "TENANCY", method: "POST", path: "/api/tenancy/roles/permissions",
     schema: obj({ roleId: S, value: { type: "object" } }, ["roleId", "value"]),
     buildBody: (i) => ({ roleId: str(i, "roleId"), value: i.value }),
-    agent: { write: true, confirm: false, summarize: (i, names) => `Set access rights for ${roleLabel(i, names)}` },
+    // PRIVILEGE GRANT → confirm (see the note above SHARED_TOOLS).
+    agent: { write: true, confirm: true, summarize: (i, names) => `Set access rights for ${roleLabel(i, names)}` },
   },
 
   /* -------------------------------- members -------------------------------- */
@@ -195,7 +211,7 @@ export const SHARED_TOOLS: SharedTool[] = [
     schema: obj({ userId: S, roleId: S }, ["userId", "roleId"]),
     buildBody: (i) => ({ userId: str(i, "userId"), roleId: str(i, "roleId") }),
     agent: {
-      write: true, confirm: false,
+      write: true, confirm: true, // PRIVILEGE GRANT → confirm
       summarize: (i, names) => {
         const id = str(i, "roleId")
         return `Change ${memberLabel(i, names)} to ${names?.[id] ?? `role ${id}`}`
@@ -221,7 +237,7 @@ export const SHARED_TOOLS: SharedTool[] = [
     schema: obj({ email: S, roleId: S }, ["email", "roleId"]),
     buildBody: (i) => ({ email: str(i, "email"), roleId: str(i, "roleId") }),
     agent: {
-      write: true, confirm: false,
+      write: true, confirm: true, // PRIVILEGE GRANT → confirm
       summarize: (i, names) => {
         const id = str(i, "roleId")
         return `Invite ${str(i, "email")} as ${names?.[id] ?? `role ${id}`}`
@@ -240,7 +256,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   /* --------------------------- dropdown values ----------------------------- */
   {
     name: "create_dropdown_value",
-    summary: "Add a dropdown value: type = the group name, value = the option. A dropdown write NEVER invents an option — for 'create X and move things onto it', call THIS first, then write the rows.",
+    summary:
+      "Add a dropdown value: type = the group name, value = the option. A dropdown write NEVER invents an option — for 'create X and move things onto it', call THIS first and the write second, in the SAME turn.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/selectable",
     schema: obj({ type: S, value: S }, ["type", "value"]),
     buildBody: (i) => ({ type: str(i, "type"), value: str(i, "value") }),

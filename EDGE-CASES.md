@@ -218,23 +218,38 @@ nowhere.
 
 ---
 
-## 5 · The confirm model: destructive-only (removals + deactivations) + bulk
+## 5 · The confirm model: destructive + privilege grants (+ bulk)
 
 **The trap.** It's tempting to make the agent "ask before every write," or to
 confirm every privilege change. That's the wrong model here — it double-checks
 the user on ordinary, reversible building. The confirm behaviour is narrow and
-specific: **only destructive acts pause.**
+specific: **destructive acts pause — and so do the four writes that decide who
+can do what.** Nothing else does.
 
 **Why.** Since every write is **already gated** as the user (§4) and every write
 is **reversible + audited**, the confirm panel isn't a permission check — it's
 the app double-checking an act that *removes or overwrites at scale*, the same
 way the manual UI reserves its red confirm for Remove / Revoke / Deactivate.
-Over-confirming turns a helpful agent into a nagging one, so constructive work —
-creating a role, inviting a member, setting permissions, renaming the team —
-runs straight away. (This intentionally trades the earlier privilege-write
-defense-in-depth for a smoother agent; the primary defense against a
-prompt-injected write remains — untrusted content is fenced as DATA, and every
-call is still gated AS the user + audited. Owner decision, 2026-07-10.)
+Over-confirming turns a helpful agent into a nagging one, so ordinary
+constructive work — writing an article, replying to a ticket, renaming the team,
+adding a dropdown value — runs straight away.
+
+**The one carve-out, and why it changed (2026-08-04).** The rule was
+destructive-ONLY: privilege writes ran free, trading defence-in-depth for a
+smoother agent (owner decision, 2026-07-10). A fresh no-prior-context security
+review rated the result HIGH, with a concrete chain: any member with
+`help:create` writes instructions into a ticket description (20,000 characters
+of someone else's text); an admin later asks the assistant anything that calls
+`list_help_tickets`; that text lands in the model's context, and
+`set_role_permissions` / `set_member_role` / `create_role` / `invite_member` all
+execute AS the admin with no panel. Fencing untrusted content as DATA and one
+system-prompt sentence are soft defences against that; a panel the admin must
+click is a hard one. So those FOUR — and only those four — now confirm. They are
+not destructive; they are the writes where a silent success is a silent
+privilege escalation. Everything else constructive still runs free, so the
+friction the 2026-07-10 decision removed stays removed. Reversible: flip
+`agent.confirm` in `shared/workers/tool-catalog.ts` (the set is asserted by name
+in `workers/data-ops/test/agent.test.ts`, so it can't quietly grow back).
 
 **The rule** (`requiresConfirm` in `workers/data-ops/src/lib/tools.ts` — the one
 place it's decided; a tool's `confirm` is a boolean, or a predicate for the
@@ -243,8 +258,9 @@ input-aware toggles):
 | Behaviour | Tools | Why |
 |---|---|---|
 | **Pause for a yes/no panel** | the destructive acts — `remove_member`, `revoke_invite` — plus `set_role_active` / `set_learning_active` / `set_dropdown_active` **only when deactivating** (`active !== true`) | It removes/withdraws access, or switches an existing record OFF. Reversible, but destructive-feeling — the app double-checks, exactly as the red UI action does. |
+| **Pause for a yes/no panel (privilege grants)** | `create_role`, `set_role_permissions`, `set_member_role`, `invite_member` | They decide WHO CAN DO WHAT, and the model reaches them while reading team data an attacker can author. A silent grant is a silent privilege escalation. |
 | **Confirm-with-a-count** | `bulk_set_help_status`, `bulk_set_learning_active`, `run_import_batch` | High-blast: "Set 12 tickets to resolved" / a whole imported file is confirmed by the count before it runs. |
-| **Run straight away** | every constructive write — `create_role`, `update_role`, `set_role_permissions`, `invite_member`, `set_member_role`, `update_team`, the (re)activations, and all single content edits | Ordinary re-gated + reversible + audited CRUD; the server gates each call, so no panel. |
+| **Run straight away** | every OTHER constructive write — `update_role`, `update_team`, `create_dropdown_value`, `update_dropdown_value`, the (re)activations, and all single content edits | Ordinary re-gated + reversible + audited CRUD; the server gates each call, so no panel. |
 
 The system prompt (`agent.ts`) tells the model **not** to also ask in
 chat for a confirmed action — the app shows one yes/no panel, and a chat-level
@@ -496,7 +512,7 @@ last) fails, and deploying a worker before its migration 500s at runtime.
 | Loop `await d1Query(...)` N times | Each is an HTTP round-trip | Multi-statement `d1ExecScript`, or `Promise.all` independent reads |
 | `Promise.all([requireRight, d1Query])` | Races the read against its own gate | Gate first, read second |
 | Build an email link from `new URL(request.url)` | Agent's request host is `https://internal` | `env.PUBLIC_APP_URL` first |
-| Make the agent confirm every write (or every privilege write) | Every write is already gated as the user + reversible | Destructive-only: `remove_member` / `revoke_invite` + deactivations pause; bulk confirms with a count; constructive writes run free |
+| Make the agent confirm EVERY write | Every write is already gated as the user + reversible | Destructive acts + the four privilege GRANTS pause; bulk confirms with a count; every other constructive write runs free (§5) |
 | `await` the run before returning the stream | Kills streaming; isolate may drop | Return the readable, write async (`streamRun`) |
 | Guard an invariant with a pre-write `COUNT` only | TOCTOU race | Re-check in the `UPDATE … WHERE`; count is just the friendly error |
 | Assume hot reads route through sharding | They query `guard.databaseId` directly | Fine today; revisit any batched script if a module is split |

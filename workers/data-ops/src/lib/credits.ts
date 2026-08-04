@@ -52,27 +52,25 @@ export type ConsumeResult = {
 
 /** Spend one AI unit for a team: the free daily allowance first, then a purchased
  * credit. The credit decrement is race-safe (`WHERE balance > 0`, so it can never go
- * negative — that's real money). The free counter may overshoot by a hair under heavy
- * concurrency, which is fine (free units cost nothing). Returns ok:false when both are
- * exhausted — the caller hard-stops and tells the user they're out for the day. */
+ * negative — that's real money). The FREE counter claims its slot the same way: the
+ * cap rides the UPDATE, so N simultaneous chats can't each read `used < cap` and all
+ * proceed (that read-then-write is how a daily allowance becomes advisory). Returns
+ * ok:false when both are exhausted — the caller hard-stops and says so. */
 export async function consumeAiUnit(env: Env, teamId: string): Promise<ConsumeResult> {
   const now = new Date().toISOString()
   const period = today()
-  const usage = await env.DB.prepare(
-    "SELECT used FROM agent_usage WHERE team_id = ? AND period = ?"
-  )
-    .bind(teamId, period)
-    .first<{ used: number }>()
-  const freeUsed = usage?.used ?? 0
-
   const cap = Number(env.AGENT_FREE_DAILY) || FREE_DAILY
-  if (freeUsed < cap) {
-    await env.DB.prepare(
-      `INSERT INTO agent_usage (team_id, period, used, updated_at) VALUES (?, ?, 1, ?)
-       ON CONFLICT(team_id, period) DO UPDATE SET used = used + 1, updated_at = ?`
-    )
-      .bind(teamId, period, now, now)
-      .run()
+  // ONE statement checks the cap AND consumes the slot: the row is created at
+  // used = 1, or incremented only while it is still under the cap. Zero rows
+  // changed = the free allowance is spent, and we fall through to paid credits.
+  const claimed = await env.DB.prepare(
+    `INSERT INTO agent_usage (team_id, period, used, updated_at) VALUES (?, ?, 1, ?)
+     ON CONFLICT(team_id, period) DO UPDATE SET used = used + 1, updated_at = ?
+     WHERE agent_usage.used < ?`
+  )
+    .bind(teamId, period, now, now, cap)
+    .run()
+  if ((claimed.meta.changes ?? 0) > 0) {
     const quota = await getQuota(env, teamId)
     return { ok: true, source: "free", warn: quota.remaining === 0, quota }
   }

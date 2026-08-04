@@ -186,6 +186,27 @@ The agent + modules build adds these resources; each follows the rules above.
   is the one that fires the row-level ping. So a private turn stays private, but
   the moment it changes a real row, that row's ping fans out like any other write.
 
+### 12 · Paged collections — the cache holds a PREFIX, not the list (R14)
+
+A growing collection (support tickets, the team activity feed) doesn't load in one
+go; its cache key holds the rows loaded **so far**, newest first, and a sidecar
+`cursor:<listKey>` holds the opaque cursor for the next page (`null` = that was the
+last page, `undefined` = nothing loaded yet).
+
+- **`<LoadMore>` APPENDS** the next page to the cache — it never refetches what's
+  already on screen. That is the whole difference between paging and a bigger cap.
+- **Row-level live-sync is unchanged**: a ping patches the changed row inside the
+  loaded prefix, exactly as before. Nothing about paging weakens rule 3.
+- **A reconnect catch-up re-pulls page ONE** (`fetchList`), which is what a
+  reconnect should do — you come back to the freshest rows, and can page again.
+- **Tabs over a paged list must be SERVER scopes**, each with its own cache key
+  (`help:<teamId>` / `help-mine:<teamId>`). Filtering a loaded page client-side
+  would show "my tickets among the newest 50" beneath a badge counting all of
+  them — the count is exact (R16), so the list must be too.
+- **The cursor is opaque.** It travels cache → door → cache and is never built,
+  parsed, or stored anywhere else. A malformed one is a clean 400, so a stale
+  link fails loudly instead of quietly re-serving page one forever.
+
 ## Checklist for a new screen / module
 1. Read with `useCached("<resource>:<scopeId>", fetcher)`.
 2. On every server write, `publishChange(env.REALTIME, teamId, "<resource>", id, op)`
@@ -194,6 +215,9 @@ The agent + modules build adds these resources; each follows the rules above.
    generic handler does row-level patch + reconnect catch-up; no bespoke code.
 4. After a client mutation, `primeCache` the fresh result.
 5. Never cache cross-tenant; never trust the ping for data — always re-pull through the gated endpoint.
+6. If the collection GROWS with ordinary use, page it (rule 12): register it in
+   `GROWING_COLLECTIONS`, prime the `cursor:` sidecar in its fetcher, and render
+   `<LoadMore>`.
 
 ## Loading & feedback (the rule for "something's happening")
 

@@ -10,6 +10,41 @@ Keep this current: when an item ships, move it to **Fixed** with the commit.
 
 ---
 
+## Fixed (2026-08-04, follow-up) — the independent security review
+
+Three no-prior-context auditors read a clean clone (no session notes, no prior
+reports, no explanation of why anything was built) and refuted by default. Nine
+findings survived; all nine are fixed below. 371 tests.
+
+| Sev | Issue | Fix |
+|---|---|---|
+| HIGH | **Stored prompt injection reached UNCONFIRMED privilege grants.** Any member with `help:create` writes instructions into a 20,000-character ticket description; an admin later asks the assistant anything that lists tickets; `set_role_permissions` / `set_member_role` / `create_role` / `invite_member` then run AS the admin with no panel. | Those four now confirm — see EDGE-CASES §5 (this REVERSES the 2026-07-10 destructive-only decision, narrowly: every other constructive write still runs free). |
+| MED | **`?scope=user` with no `id` returned the WHOLE team feed, unfiltered** — it matched no branch, leaving an empty WHERE. Exactly the leak R18 exists to stop, arrived at by omission; the source-scan stayed green because the clause still *existed*. | Fails closed at both layers (the route validates the scope and refuses an id-scope with no id; the reader returns nothing rather than widening), locked by `activity-scope.test.ts`, which RUNS the reader over every scope shape. |
+| MED | **A role could grant ITSELF every right** — `member_roles:edit` + your own role id = admin in one call. | `setRolePermissions` refuses a self-grant, matching the sibling "you can't change your own role" invariant. |
+| MED | **An unauthenticated request could write into the GLOBAL core DB** — the client-error beacon's gate was `Cookie.includes("session")`, a substring test on an attacker-controlled header, next to a comment claiming a drive-by couldn't fill the table. | The gateway resolves the session with auth before forwarding; a forged cookie now writes nothing (verified live on staging). |
+| MED | **The daily AI allowance was advisory** — read-then-check, so N simultaneous chats all passed. | The cap rides the UPDATE, like the paid-credit path beside it. |
+| MED | **The impersonation door shared a name with the maintenance key.** `ADMIN_KEY` is set on tenancy + data-ops in BOTH environments, so one mistyped `wrangler secret put` directory would have armed sign-in-as-anyone on production. | Its own `TEST_LOGIN_KEY` secret **and** a hard refusal when `ENVIRONMENT` is production — two independent locks, neither a runbook sentence. `ADMIN_KEY` deleted from staging auth. |
+| LOW | **R10 claimed three gating-seam suites that did not exist** (tenancy, content, data-ops) — a documented control, absent. | The three suites now exist and are sabotage-proven. (Writing them found a bug in my own scanner: no word boundary, so `ungatedBody(` matched `gatedBody(` and the check passed its own sabotage.) |
+| LOW | **The email-change door was an enumeration oracle** — the "already in use?" check ran before the throttle, and a rejected probe counted toward nothing. | Throttle first; probes count. |
+| LOW | **A double-clicked CSV import could write every row twice** — read-then-write, while CONCURRENCY.md claimed it was guarded. | The session is claimed atomically, like its batch sibling. |
+| LOW | **Learning `body` + `contentLink` skipped the boundary seam** — a NUL byte was a 500, and the body had no length cap. | Both go through `optionalText` first, then the XSS scrub. |
+
+---
+
+## Fixed (2026-08-04, follow-up) — the five close-out items
+
+The hardening round's own review found five loose ends. 354 tests (up from 342).
+
+| Sev | Issue | Fix |
+|---|---|---|
+| SCALE | **A hard cap is an honest refusal, not an answer.** R14 capped growing collections at 1,000 rows and called cursor paging a "next step"; a downstream product had already shipped keyset paging on its growing collections and proved it at 24,000 rows. | R14 WIDENED: a collection that grows with ordinary use must PAGE by key — `shared/workers/paging.ts` (opaque cursor, id tiebreak, `LIMIT+1` for `hasMore`) answered through the one `pagedJson` seam. Support tickets + the team activity feed page end to end; the My/All tabs became SERVER scopes (a client filter over a page disagrees with its exact badge). `GROWING_COLLECTIONS` is registry DATA; the check asserts the lib seam, the response, and that the client can reach page two. |
+| BUG | **The agent was told a bulk cap it could not physically write.** The reply ceiling was 4,096 tokens while the declared cap was 500 ids (~8,000 tokens) — the tool call truncates mid-JSON, the turn dies, nothing changed, no error. | `AGENT_MAX_TOKENS` raised to 8,192 and `BULK_IDS_LIMIT` DERIVED from it (512). `reply-ceiling.test.ts` asserts the arithmetic and that every bulk schema declares the derived number. |
+| BUG | **The hooks-order scanner had a third blind spot**: a guard written the ordinary way (`if (!ready) {` newline `return null` newline `}`) put its return at brace depth 2, so it never registered as an early return — switching the white-screen check OFF for that whole file. | Rewritten around the real semantic: a return counts unless it is inside a NESTED FUNCTION. Arrow components are scanned too, and fixtures now lock the scanner's own blind spots (a check that cannot fail is not a check). |
+| BUG | **The dropdown-ordering rule was stated but not locked** — nothing stopped either surface losing it. | The rule is pinned as `DROPDOWN_ORDER_RULE` and asserted on BOTH surfaces the model reads (the tool description and the system rule wall), including that CREATE is the step named first (R9's vocabulary half). |
+| OPS | **Staging's smoke was red (16/18)** on a stale team-database pointer — indistinguishable, to the next reader, from a real regression. | Staging reset (3 of 4 team-DB pointers were dangling), re-deployed, smoke back to **18/18**. |
+
+---
+
 ## Fixed (2026-08-04) — the base hardening round (7 new laws + security/UI)
 
 Ported the twenty defects a downstream product (Acrymold) found under real load —
@@ -19,7 +54,7 @@ sabotage-proven; the rest are security/agent/UI fixes. 342 tests (up from 302).
 | Sev | Issue | Fix |
 |---|---|---|
 | DESIGN | **A capability shipped in code was invisible until a catalogue ROW existed** — staging could import modules production (byte-identical code) could not. | R13 widened: the import catalogue reconciles itself against the code on READ (INSERT-only; an owner's OFF stays off; the picker filters is_active in memory). Shipping the code now ships the capability. (`catalog-coverage`) |
-| SCALE | **Unbounded list reads** would stall a worker at 100k rows. | R14: every `list*`/`search*` pages or carries a hard cap from `shared/workers/limits.ts` with its comment. (`bounded-lists`) |
+| SCALE | **Unbounded list reads** would stall a worker at 100k rows. | R14: every `list*`/`search*` carries a hard cap from `shared/workers/limits.ts` with its comment (`bounded-lists`). *Widened in the follow-up round above: a GROWING collection must page, not cap.* |
 | BUG | **Deaf publishers / stale paged screens** — a worker pinged `selectable_data` and nothing listened; paged rows live outside the row caches. | R15: the live registry (`web/lib/live-resources.ts`) + a ping bus + `useLiveRefetch`; every published resource reaches a listener or a reasoned `DEAF_EXEMPT`. (`live-collections`) |
 | BUG | **A 24,011-row catalogue advertised "1000"** (a capped list's length) and the same count showed twice on one screen. | R16: exact server COUNT(*) through the one `formatCount` seam; tab-vs-heading arbitration by React context. (`counted-collections`) |
 | BUG | **A double-clicked Deactivate wrote two history rows** 2s apart. | R17: the current-status predicate rides the UPDATE; zero rows moved = no activity, no ping. (`idempotent-transitions`) |
@@ -30,7 +65,7 @@ sabotage-proven; the rest are security/agent/UI fixes. 342 tests (up from 302).
 | SEC | **The 5-try attempt cap was burstable** (read-then-write). | B3: one atomic UPDATE checks + consumes a slot (login + email-change). |
 | SEC | **Preview URLs were a second public door.** | B4: `preview_urls: false` beside `workers_dev: false` on every non-gateway worker. |
 | CRASH | **A hook below an early return white-screened the app** (React #310), and the ErrorBoundary was never mounted. | C1: the boundary is mounted at the root; `hooks-order.test.ts` makes the class unshippable. |
-| AGENT | **Bulk tool JSON truncated mid-call** (1024 max_tokens); no set-shaped tool. | C2: `AGENT_MAX_TOKENS` 4096; a filter-shaped `set_help_status_by_filter` (dry-run counts first, idempotent); the bulk cap is one declared constant; dropdown-never-invents rule. |
+| AGENT | **Bulk tool JSON truncated mid-call** (1024 max_tokens); no set-shaped tool. | C2: `AGENT_MAX_TOKENS` 4096 *(superseded — see the follow-up round above: 8,192, with the bulk cap derived from it)*; a filter-shaped `set_help_status_by_filter` (dry-run counts first, idempotent); the bulk cap is one declared constant; dropdown-never-invents rule. |
 | BUG | **The usage log showed an admin four blank rows** with a teammate's name. | C3: `agent_usage_log.kind` (0014) — action rows team-visible, prompt rows the author's; the fold APPENDS its actions, never replaces. |
 | UI | **Action rows clipped off the left edge**; the brand mark lost its corners. | C4/C5: flex-wrap + ml-auto; object-contain at `LOGO_SAFE_RATIO` 0.76. |
 

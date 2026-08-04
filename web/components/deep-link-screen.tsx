@@ -146,6 +146,11 @@ export function DeepLinkScreen() {
   const enabled = Boolean(teamId && onTeam)
   const { perms, can } = usePermissions(enabled ? teamId : null)
 
+  // Which ticket set the help screen shows. It is a SERVER scope (R14: the list
+  // is paged, so the door filters by raiser — not a client filter over a page),
+  // so it must be declared ABOVE the reads that key off it.
+  const [helpScope, setHelpScope] = React.useState<"mine" | "all">("all")
+
   // Per-module data — cache-first + null-keyed (a screen fetches only the modules
   // it shows). Lifted into one hook so the host reads as "fetch, then render".
   const {
@@ -156,6 +161,7 @@ export function DeepLinkScreen() {
     metaQ,
     learningQ,
     helpQ,
+    helpMineQ,
     formSelectableQ,
     totals,
     selectableValues,
@@ -166,10 +172,7 @@ export function DeepLinkScreen() {
     activityKey,
     activityQ,
     inviteAuditQ,
-  } = useScreenData({ teamId, enabled, module, recordId })
-
-  // The help My/All toggle filters the one cached ticket set client-side by raiser.
-  const [helpScope, setHelpScope] = React.useState<"mine" | "all">("all")
+  } = useScreenData({ teamId, enabled, module, recordId, helpScope })
 
   const roles = rolesQ.data ?? []
   const activeRoles = roles.filter((r) => r.active)
@@ -446,7 +449,7 @@ export function DeepLinkScreen() {
             noAccess, enabled, perms, can, module, recordId, teamId, canImport, go,
             overridesQ, metaQ, membersQ, rolesQ, roles, invitesQ, learningQ, helpQ, totals,
             activityQ, inviteAuditQ, teamName, active, rights, onAction, onIntent,
-            sectionPath, helpScope, setHelpScope, myUserId, query,
+            sectionPath, helpScope, setHelpScope, myUserId, query, helpMineQ,
           })}
         </CountedTabs>
       </div>

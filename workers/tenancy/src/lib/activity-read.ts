@@ -6,6 +6,7 @@
 import type { ActivityItem } from "../../../../shared/types"
 import { d1Query, type D1Rest } from "../../../../shared/workers/d1-rest"
 import type { MemberGuard } from "./permissions"
+import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "../../../../shared/workers/paging"
 
 type ActivityRow = {
   id: string
@@ -14,8 +15,6 @@ type ActivityRow = {
   created_at: string
   creator_name: string | null
 }
-
-const LIMIT = 50
 
 /** R18 — the ONE visibility clause for the cross-module team feed. The feed's
  * rows name records and their before/after, so the team scope must subtract the
@@ -50,36 +49,68 @@ export async function getActivity(
   scope: "team" | "user" | "role" | "invite" | "record",
   id?: string,
   table?: string,
-  allowedTables: string[] | null = null
-): Promise<ActivityItem[]> {
-  let sql = "SELECT id, type, description, created_at, creator_name FROM activity"
-  const params: (string | number)[] = []
+  allowedTables: string[] | null = null,
+  cursor?: string | null
+): Promise<Page<ActivityItem> & { total: number }> {
+  // FAIL CLOSED. An id-scope with no id used to match NO branch below, leaving the
+  // WHERE empty — so `?scope=user` with no `id` returned the entire team's
+  // cross-module history, unfiltered, to anyone with team_members:read. That is
+  // precisely the leak R18 exists to stop, arrived at by omission rather than by
+  // a missing gate. An unresolved scope now returns nothing at all.
+  if (scope !== "team" && !id) return { rows: [], hasMore: false, nextCursor: null, total: 0 }
+  if (scope === "record" && !table) return { rows: [], hasMore: false, nextCursor: null, total: 0 }
+
+  // ONE where-clause, shared by the page read and the COUNT — a total that didn't
+  // pass through the same visibility filter would over-count what it can't show.
+  const clauses: string[] = []
+  const params: string[] = []
   if (scope === "user" && id) {
-    sql += " WHERE related_table = 'users' AND related_row_id = ?"
+    clauses.push("related_table = 'users' AND related_row_id = ?")
     params.push(id)
   } else if (scope === "role" && id) {
-    sql += " WHERE related_table = 'member_roles' AND related_row_id = ?"
+    clauses.push("related_table = 'member_roles' AND related_row_id = ?")
     params.push(id)
   } else if (scope === "invite" && id) {
-    sql += " WHERE related_table = 'invite_logs' AND related_row_id = ?"
+    clauses.push("related_table = 'invite_logs' AND related_row_id = ?")
     params.push(id)
   } else if (scope === "record" && id && table) {
-    sql += " WHERE related_table = ? AND related_row_id = ?"
+    clauses.push("related_table = ? AND related_row_id = ?")
     params.push(table, id)
-  } else if (scope === "team") {
+  } else {
+    // `else`, not `else if (scope === "team")` — anything that reaches here is
+    // the whole-team read and MUST carry the R18 filter. A scope string the route
+    // didn't recognise must never widen into an unfiltered feed.
     const clause = activityVisibilityClause(allowedTables)
-    sql += clause.sql
+    if (clause.sql) clauses.push(clause.sql.replace(/^\s*WHERE\s*/, ""))
     params.push(...clause.params)
   }
-  sql += " ORDER BY created_at DESC LIMIT ?"
-  params.push(LIMIT)
+  const where = clauses.length ? ` WHERE ${clauses.join(" AND ")}` : ""
 
-  const rows = await d1Query<ActivityRow>(cfg, guard.databaseId, sql, params)
-  return rows.map((r) => ({
-    id: r.id,
-    type: r.type,
-    description: r.description,
-    actorName: r.creator_name,
-    createdAt: r.created_at,
-  }))
+  // R14 GROWING collection: the feed gains a row on EVERY mutation, so it pages by
+  // key rather than stopping at a ceiling. PAGE_SIZE + 1 reveals hasMore.
+  const after = keysetAfter(decodeCursor(cursor), "created_at")
+  const pageWhere = after.sql ? `${where ? `${where} AND` : " WHERE"} ${after.sql}` : where
+  const [rows, counted] = await Promise.all([
+    d1Query<ActivityRow>(
+      cfg,
+      guard.databaseId,
+      `SELECT id, type, description, created_at, creator_name FROM activity${pageWhere}
+       ORDER BY created_at DESC, id DESC LIMIT ${PAGE_SIZE + 1}`,
+      [...params, ...after.params]
+    ),
+    // R16: the exact total of what this caller may see — never the page's length.
+    d1Query<{ n: number }>(cfg, guard.databaseId, `SELECT COUNT(*) AS n FROM activity${where}`, params),
+  ])
+  const page = toPage(rows, PAGE_SIZE, (r) => [r.created_at, r.id])
+  return {
+    ...page,
+    rows: page.rows.map((r) => ({
+      id: r.id,
+      type: r.type,
+      description: r.description,
+      actorName: r.creator_name,
+      createdAt: r.created_at,
+    })),
+    total: counted[0]?.n ?? 0,
+  }
 }

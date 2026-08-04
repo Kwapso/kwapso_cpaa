@@ -52,13 +52,21 @@ export default {
     // Client error beacon → console (Cloudflare observability, live tails) AND
     // the central error_logs table via auth's internal door, so a crash on a
     // user's phone is queryable + resolvable later, not just visible for a week.
-    // Only forwarded when the browser carries a session cookie — an anonymous
-    // drive-by can't fill the table (it still lands in the console line). The
-    // swappable client seam is web/lib/log.ts; the ruleset is ERROR-HANDLING.md.
+    // Only forwarded once the session is VERIFIED with auth — a cookie header is
+    // attacker-controlled, so `Cookie: session=x` used to be enough to write a
+    // row into the GLOBAL core database from an anonymous request. Recording is
+    // best-effort, so a failed lookup simply drops it (the console line stays).
+    // The swappable client seam is web/lib/log.ts; the ruleset is ERROR-HANDLING.md.
     if (pathname === "/api/log/client" && request.method === "POST") {
       const raw = await request.text().catch(() => "")
       console.error("client_error", raw.slice(0, 4000))
-      if (request.headers.get("Cookie")?.includes("session")) {
+      const cookie = request.headers.get("Cookie") ?? ""
+      const signedIn =
+        cookie.includes("brimba_session=") &&
+        (await env.AUTH.fetch("https://internal/api/auth/me", { headers: { Cookie: cookie } })
+          .then((r) => r.ok)
+          .catch(() => false))
+      if (signedIn) {
         let b: { where?: string; message?: string; stack?: string; url?: string } = {}
         try {
           b = JSON.parse(raw)

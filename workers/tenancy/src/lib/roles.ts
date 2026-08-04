@@ -193,6 +193,17 @@ export async function setRolePermissions(
       "locked_role",
       "The Admin role is locked — its permissions can't be changed."
     )
+  // NO SELF-GRANT. member_roles:edit lets you shape OTHER people's access; it
+  // must not be a ladder to every right you weren't given. Without this, a
+  // custom role holding member_roles:edit could POST its OWN role id with every
+  // module true and become an admin in one call. Same invariant as "you can't
+  // change your own role" on the members path.
+  if (roleId === guard.roleId)
+    throw new GuardError(
+      403,
+      "self_grant",
+      "You can't change your own role's access rights — ask an admin."
+    )
 
   const statements = TEAM_MODULE_CATALOG.map((m) => {
     const n = normalizeRights(value?.[m.key])

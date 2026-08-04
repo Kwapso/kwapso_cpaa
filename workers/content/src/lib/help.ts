@@ -15,7 +15,8 @@ import { ulid } from "../../../../shared/workers/id"
 import type { HelpMessage, HelpTicket } from "../../../../shared/types"
 import { GuardError, type MemberGuard } from "../../../../shared/workers/gating"
 import { optionalText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
-import { BULK_IDS_LIMIT, LIST_HARD_CAP, THREAD_HARD_CAP } from "../../../../shared/workers/limits"
+import { BULK_IDS_LIMIT, THREAD_HARD_CAP } from "../../../../shared/workers/limits"
+import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "../../../../shared/workers/paging"
 
 /** The fixed status lifecycle the code trusts (the team-editable dropdown is
  * display-only). Anything outside this set is rejected. */
@@ -108,23 +109,34 @@ async function ticketOrThrow(cfg: D1Rest, guard: MemberGuard, id: string): Promi
   return rows[0]
 }
 
+/** The sort a ticket list is keyed by: newest activity first, id breaking ties. */
+const TICKET_ORDER = "COALESCE(updated_at, created_at)"
+
 /** Tickets for the team, newest-activity first. `scope: "mine"` returns only the
- * caller's own raised tickets (the My tab); "all" returns everyone's (All tab). */
+ * caller's own raised tickets (the My tab); "all" returns everyone's (All tab).
+ * R14 GROWING collection: keyset-PAGED, not capped — tickets accumulate forever,
+ * so the door answers "here's a page and where the next one starts" instead of
+ * refusing past a ceiling. `cursor` is the opaque one from the previous page. */
 export async function listTickets(
   cfg: D1Rest,
   guard: MemberGuard,
-  scope: "mine" | "all"
-): Promise<HelpTicket[]> {
-  const where = scope === "mine" ? "WHERE creator_id = ?" : ""
-  const params = scope === "mine" ? [guard.userId] : []
+  scope: "mine" | "all",
+  cursor?: string | null
+): Promise<Page<HelpTicket>> {
+  const pos = decodeCursor(cursor)
+  const after = keysetAfter(pos, TICKET_ORDER)
+  const clauses = [...(scope === "mine" ? ["creator_id = ?"] : []), ...(after.sql ? [after.sql] : [])]
+  const params = [...(scope === "mine" ? [guard.userId] : []), ...after.params]
   const rows = await d1Query<TicketRow>(
     cfg,
     guard.databaseId,
-    // R14 hard cap — never unbounded; move to real paging before this bites.
-    `SELECT ${TICKET_COLS} FROM help ${where} ORDER BY COALESCE(updated_at, created_at) DESC LIMIT ${LIST_HARD_CAP}`,
+    // LIMIT is PAGE_SIZE + 1 — the extra row is how hasMore is known (R14).
+    `SELECT ${TICKET_COLS} FROM help ${clauses.length ? `WHERE ${clauses.join(" AND ")}` : ""}
+     ORDER BY ${TICKET_ORDER} DESC, id DESC LIMIT ${PAGE_SIZE + 1}`,
     params
   )
-  return rows.map(toTicket)
+  const page = toPage(rows, PAGE_SIZE, (r) => [r.updated_at ?? r.created_at, r.id])
+  return { ...page, rows: page.rows.map(toTicket) }
 }
 
 /** R16: exact server COUNT(*) for the badges — the All total and the caller's

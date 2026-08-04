@@ -43,7 +43,8 @@ export default {
           return await emailStart(request, env)
         case "POST /api/auth/email/verify":
           return await emailVerify(request, env)
-        // STAGING-ONLY test door (ADMIN_KEY-gated, fails closed): mints a normal
+        // NON-PRODUCTION test door (its OWN TEST_LOGIN_KEY secret, fails closed,
+        // and refused outright when ENVIRONMENT is "production"): mints a normal
         // login code and returns it ONCE, so automated tests can sign in without
         // any code ever being echoed by the real send door. See adminTestLogin.
         case "POST /api/auth/admin/test-login":
@@ -183,15 +184,23 @@ async function emailStart(request: Request, env: Env): Promise<Response> {
   return fail(503, "email_not_configured", "Email sending isn't set up yet.")
 }
 
-/** STAGING-ONLY: mint a login code through the SAME path as the real send door
- * (hashed at rest, same TTL, same per-hour throttle) and return it ONCE instead
- * of emailing — the sign-in door for automated tests now that no code is ever
- * echoed anywhere. Gated by the ADMIN_KEY secret and FAILS CLOSED when it's
- * unset: production never sets ADMIN_KEY on the auth worker, so this door does
- * not exist there. The holder can sign in as ANY account on the environment —
- * that is why it is staging-only (OPERATIONS.md § secrets). */
+/** NON-PRODUCTION ONLY: mint a login code through the SAME path as the real send
+ * door (hashed at rest, same TTL, same per-hour throttle) and return it ONCE
+ * instead of emailing — the sign-in door for automated tests now that no code is
+ * ever echoed anywhere. Its holder can sign in as ANY account on the
+ * environment, so it carries two independent locks (below) and production has
+ * neither. See OPERATIONS.md § secrets. */
 async function adminTestLogin(request: Request, env: Env): Promise<Response> {
-  if (!env.ADMIN_KEY || request.headers.get("x-admin-key") !== env.ADMIN_KEY)
+  // TWO independent locks, because this door's holder can sign in AS ANYONE:
+  //  1. its OWN secret. It deliberately does NOT reuse ADMIN_KEY — that name is
+  //     the maintenance key OPERATIONS.md tells an operator to set on tenancy and
+  //     data-ops in BOTH environments, so sharing it would turn one mistyped
+  //     `wrangler secret put` directory into universal impersonation.
+  //  2. the environment itself. Even if the secret were somehow set on
+  //     production, the code refuses — the isolation is structural, not a
+  //     sentence in a runbook.
+  if (env.ENVIRONMENT === "production") return fail(403, "forbidden", "Not available.")
+  if (!env.TEST_LOGIN_KEY || request.headers.get("x-admin-key") !== env.TEST_LOGIN_KEY)
     return fail(403, "forbidden", "Not available.")
   const body = (await request.json().catch(() => ({}))) as { email?: string }
   const email = normalizeEmail(body.email ?? "")
@@ -199,7 +208,7 @@ async function adminTestLogin(request: Request, env: Env): Promise<Response> {
     return fail(400, "invalid_email", "Enter a valid email address.")
   const minted = await mintLoginCode(env, email)
   if ("error" in minted) return fail(minted.status, minted.error, minted.message)
-  // Returned exactly once, to the ADMIN_KEY holder; the normal verify door
+  // Returned exactly once, to the TEST_LOGIN_KEY holder; the normal verify door
   // consumes it like any other code (attempt cap + TTL apply unchanged).
   return json({ ok: true, code: minted.code })
 }

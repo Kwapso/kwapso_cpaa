@@ -7,10 +7,11 @@
 import type { Env } from "../env"
 
 /** The agent's output budget per model turn — ONE constant for BOTH providers
- * (Claude + Workers AI). Sized for tool turns: a bulk call carrying up to
- * BULK_IDS_LIMIT ids must fit in one reply, or the model silently truncates
- * mid-JSON and the "bulk" promise breaks at runtime. */
-export const AGENT_MAX_TOKENS = 4096
+ * (Claude + Workers AI), and the number BULK_IDS_LIMIT is DERIVED from, so the cap
+ * the model is told is one it can physically write. Lives in shared/workers/limits
+ * with the caps it governs; re-exported here because this is where it is spent. */
+export { AGENT_MAX_TOKENS } from "../../../../shared/workers/limits"
+import { AGENT_MAX_TOKENS } from "../../../../shared/workers/limits"
 
 export type ChatMessage = {
   role: "system" | "user" | "assistant" | "tool"

@@ -15,7 +15,27 @@ export const EXPORT_HARD_CAP = 10_000
  * messages, a per-member progress matrix). */
 export const THREAD_HARD_CAP = 500
 
-/** Max ids in one bulk write (the bulk doors + the agent's bulk tools declare
- * THIS constant in their schemas, so the number the model is told can never
- * drift from the number that physically fits). */
-export const BULK_IDS_LIMIT = 500
+// ── the agent's reply ceiling, and the bulk cap DERIVED from it ───────────────
+// A cap the model is TOLD but cannot physically EMIT is a promise the runtime
+// breaks silently, mid-JSON: the tool call truncates, the turn dies, nothing
+// changed. So the two numbers come from ONE place and the relationship below is
+// asserted by workers/data-ops/test/reply-ceiling.test.ts.
+
+/** The agent's output budget per model turn (both providers). Raised from 4,096
+ * after a downstream run proved a full bulk call doesn't fit under it. */
+export const AGENT_MAX_TOKENS = 8192
+
+/** What one id costs the model to emit inside a JSON array: a 26-char ULID plus
+ * its quotes, comma and space. ~12 in practice; budgeted generously because the
+ * failure it prevents is silent. */
+export const TOKENS_PER_EMITTED_ID = 15
+
+/** Everything else in that same reply: the tool-call envelope, the argument
+ * names, and the sentence the assistant says alongside the call. */
+export const AGENT_REPLY_ENVELOPE_TOKENS = 512
+
+/** Max ids in one bulk write — DERIVED, not hand-picked: it is what the model can
+ * actually write at AGENT_MAX_TOKENS. The bulk doors and the agent's tool schemas
+ * both declare THIS constant, so the number the model is told, the number the door
+ * enforces, and the number that physically fits are one number. */
+export const BULK_IDS_LIMIT = Math.floor((AGENT_MAX_TOKENS - AGENT_REPLY_ENVELOPE_TOKENS) / TOKENS_PER_EMITTED_ID)

@@ -38,11 +38,11 @@ async function expectSentinelSurvived(page: Page): Promise<void> {
  * (no response field, no toast, in any environment) — automated runs instead
  * mint a code through POST /api/auth/admin/test-login with the x-admin-key
  * header (staging-only secret; the door fails closed where it's unset). Export
- * ADMIN_KEY before running the e2e suite.
+ * TEST_LOGIN_KEY before running the e2e suite.
  */
 async function signIn(page: Page, email: string): Promise<void> {
-  const adminKey = process.env.ADMIN_KEY ?? ""
-  expect(adminKey, "export ADMIN_KEY — the e2e suite signs in through the admin test-login door").not.toBe("")
+  const adminKey = process.env.TEST_LOGIN_KEY ?? ""
+  expect(adminKey, "export TEST_LOGIN_KEY — the e2e suite signs in through the test-login door").not.toBe("")
 
   await page.goto("/login")
   await page.locator("#email").fill(email)
@@ -58,7 +58,7 @@ async function signIn(page: Page, email: string): Promise<void> {
     data: { email },
   })
   const body = (await minted.json()) as { code?: string }
-  expect(body.code, "admin test-login should mint a code (is ADMIN_KEY set on this env's auth worker?)").toMatch(/^\d{6}$/)
+  expect(body.code, "test-login should mint a code (is TEST_LOGIN_KEY set on this env's auth worker?)").toMatch(/^\d{6}$/)
 
   await fillCode(page, body.code!)
 

@@ -250,7 +250,10 @@ export async function createLearning(
   if (category) await ensureCategory(cfg, guard, actor, category)
 
   const contentType = optionalText(input.contentType, "Content type", TEXT_LIMITS.short) ?? null
-  const body = safeBody(input.body)
+  // Through the boundary seam FIRST (NUL strip + length cap — a NUL reaching D1
+  // is a 500, and every sibling field on this same statement already does it),
+  // then the XSS scrub. Two different jobs; both are required.
+  const body = safeBody(optionalText(input.body, "Body", TEXT_LIMITS.long))
   // Description is now DERIVED from the body (the form merged them) — a short
   // plain-text preview for list cards; an explicit description (e.g. import) wins.
   const description = optionalText(input.description, "Description", TEXT_LIMITS.long) ?? previewFromBody(body)
@@ -261,7 +264,7 @@ export async function createLearning(
     cfg,
     guard.databaseId,
     `INSERT INTO learning (id, category, content_title, content_description, content_type, content_link, content_body, sequence, is_required, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString(category)}, ${sqlString(title)}, ${sqlString(description)}, ${sqlString(contentType)}, ${sqlString(safeLink(input.contentLink))}, ${sqlString(body)}, ${intOr(input.sequence, 0)}, ${input.required ? 1 : 0}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+VALUES (${sqlString(id)}, ${sqlString(category)}, ${sqlString(title)}, ${sqlString(description)}, ${sqlString(contentType)}, ${sqlString(safeLink(optionalText(input.contentLink, "Link", TEXT_LIMITS.link)))}, ${sqlString(body)}, ${intOr(input.sequence, 0)}, ${input.required ? 1 : 0}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
   )
 
   await logActivity(cfg, guard.databaseId, actor, {
@@ -290,14 +293,17 @@ export async function updateLearning(
   if (category) await ensureCategory(cfg, guard, actor, category)
 
   const contentType = optionalText(input.contentType, "Content type", TEXT_LIMITS.short) ?? null
-  const body = safeBody(input.body)
+  // Through the boundary seam FIRST (NUL strip + length cap — a NUL reaching D1
+  // is a 500, and every sibling field on this same statement already does it),
+  // then the XSS scrub. Two different jobs; both are required.
+  const body = safeBody(optionalText(input.body, "Body", TEXT_LIMITS.long))
   const description = optionalText(input.description, "Description", TEXT_LIMITS.long) ?? previewFromBody(body)
 
   const now = new Date().toISOString()
   await d1ExecScript(
     cfg,
     guard.databaseId,
-    `UPDATE learning SET category = ${sqlString(category)}, content_title = ${sqlString(title)}, content_description = ${sqlString(description)}, content_type = ${sqlString(contentType)}, content_link = ${sqlString(safeLink(input.contentLink))}, content_body = ${sqlString(body)}, sequence = ${intOr(input.sequence, 0)}, is_required = ${input.required ? 1 : 0}, updated_at = ${sqlString(now)}, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE id = ${sqlString(id)};`
+    `UPDATE learning SET category = ${sqlString(category)}, content_title = ${sqlString(title)}, content_description = ${sqlString(description)}, content_type = ${sqlString(contentType)}, content_link = ${sqlString(safeLink(optionalText(input.contentLink, "Link", TEXT_LIMITS.link)))}, content_body = ${sqlString(body)}, sequence = ${intOr(input.sequence, 0)}, is_required = ${input.required ? 1 : 0}, updated_at = ${sqlString(now)}, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE id = ${sqlString(id)};`
   )
 
   const changes = describeChanges([

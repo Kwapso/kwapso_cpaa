@@ -36,6 +36,11 @@ import type {
 } from "@shared/types"
 
 /** The import session as the data-ops worker returns it (a view, not the raw row). */
+/** R14: what every PAGED door returns — the rows, the exact server `total`, and
+ * the pair that says whether there's another page. `nextCursor` is OPAQUE: hand
+ * it straight back, never build or parse one. */
+export type PagedResponse<T> = T & { total: number; hasMore: boolean; nextCursor: string | null }
+
 export type ImportSessionView = {
   id: string
   tableKey: string
@@ -382,10 +387,14 @@ export const tenancy = {
     ),
 
   /** The team's activity feed, or one record's (scope = team | user | role |
-   * invite). For invite scope, `id` is the GLOBAL invite id (server maps it). */
-  activity: (scope: "team" | "user" | "role" | "invite" = "team", id?: string) =>
-    api<{ activity: ActivityItem[] }>(
-      `/api/tenancy/activity?scope=${scope}${id ? `&id=${encodeURIComponent(id)}` : ""}`
+   * invite). For invite scope, `id` is the GLOBAL invite id (server maps it).
+   * R14: a PAGE — `cursor` is the opaque one the previous response returned, and
+   * `total` is the exact server count of what this caller may see. */
+  activity: (scope: "team" | "user" | "role" | "invite" = "team", id?: string, cursor?: string | null) =>
+    api<PagedResponse<{ activity: ActivityItem[] }>>(
+      `/api/tenancy/activity?scope=${scope}${id ? `&id=${encodeURIComponent(id)}` : ""}${
+        cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""
+      }`
     ),
 
   /** One record's activity slice (generic — any module's rows by table+id; e.g.
@@ -438,8 +447,12 @@ export const content = {
   learningProgress: () =>
     api<{ progress: LearningProgressEntry[] }>("/api/content/learning/progress"),
 
-  help: (scope: "mine" | "all" = "all") =>
-    api<{ tickets: HelpTicket[]; total: number; mineTotal: number }>(`/api/content/help?scope=${scope}`),
+  /** R14: a PAGE of tickets (a GROWING collection) — hand back `nextCursor` from
+   * the previous response to get the next one. `total`/`mineTotal` are exact. */
+  help: (scope: "mine" | "all" = "all", cursor?: string | null) =>
+    api<PagedResponse<{ tickets: HelpTicket[]; mineTotal: number }>>(
+      `/api/content/help?scope=${scope}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`
+    ),
   helpOne: (id: string) =>
     api<{ tickets: HelpTicket[] }>(`/api/content/help?id=${enc(id)}`).then((r) => r.tickets[0] ?? null),
   helpThread: (id: string) =>
