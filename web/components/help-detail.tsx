@@ -42,7 +42,8 @@ import { auditItems } from "@/lib/audit-overview"
 import { formatActivityWhen, formatRelative } from "@/lib/format"
 import { personName } from "@/lib/identity"
 import { usePermissions } from "@/lib/perms"
-import { invalidate, primeCache, useCached } from "@/lib/store"
+import { invalidate, primeCache, useCached, useCachedValue } from "@/lib/store"
+import { formatCount } from "@/lib/format-count"
 import { HelpFormDialog } from "@/components/help-form-dialog"
 import { HelpStakeholders } from "@/components/help-stakeholders"
 import { HelpStatusStepper, type HelpStatusValue } from "@/components/help-status-stepper"
@@ -82,8 +83,13 @@ export function HelpDetailScreen({
   const ticket = ticketsQ.data?.find((t) => t.id === helpId) ?? null
 
   const repliesQ = useCached<HelpMessage[]>(`help-thread:${helpId}`, () =>
-    content.helpThread(helpId).then((r) => r.replies)
+    content.helpThread(helpId).then((r) => {
+      // R16: the badge shows the door's exact COUNT(*), never the (capped) list length.
+      primeCache(`total:help-thread:${helpId}`, r.total)
+      return r.replies
+    })
   )
+  const threadTotal = useCachedValue<number>(`total:help-thread:${helpId}`)
   const membersQ = useCached<TeamMember[]>(`members:${teamId}`, () =>
     tenancy.members().then((r) => r.members)
   )
@@ -97,6 +103,7 @@ export function HelpDetailScreen({
     content.helpStakeholders(helpId).then((r) => r.stakeholders)
   )
 
+  const stakeholderBadge = formatCount(stakeholdersQ.data?.length)
   const { can } = usePermissions(teamId)
   const canEdit = can("help", "edit") // single source — gates Edit, the stepper, and the thread's resolve
 
@@ -211,7 +218,7 @@ export function HelpDetailScreen({
         value: "conversation",
         label: "Conversation",
         icon: "messages-square",
-        badge: String(replies.length || ""),
+        badge: formatCount(threadTotal),
         badgeVariant: "" as const,
       },
       { value: "overview", label: "Overview", icon: "info", badge: "", badgeVariant: "" as const },
@@ -220,7 +227,9 @@ export function HelpDetailScreen({
         value: "stakeholders",
         label: "Stakeholders",
         icon: "users",
-        badge: String(stakeholdersQ.data?.length || ""),
+        // The stakeholder set is COMPUTED in full (raiser + admins + mentions + adds),
+        // not a capped table read — its size IS the true total, shown via the one seam.
+        badge: stakeholderBadge,
         badgeVariant: "" as const,
       },
     ],

@@ -18,7 +18,7 @@ export function BrandMark({
           <img
             src={brand.logoUrl}
             alt={brand.name}
-            className="size-full object-cover"
+            className="size-full object-contain p-1"
           />
         ) : (
           brand.name[0]?.toUpperCase()

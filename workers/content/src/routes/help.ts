@@ -24,6 +24,8 @@ import {
   updateTicket,
   type HelpStatus,
   type TicketInput,
+  countTickets,
+  countReplies,
 } from "../lib/help"
 import { notifyReplyAndMentions } from "../lib/notify"
 import { addStakeholder, listStakeholders } from "../lib/stakeholders"
@@ -36,7 +38,8 @@ export async function getHelp(request: Request, env: Env): Promise<Response> {
   const scope = url.searchParams.get("scope") === "mine" ? "mine" : "all"
   const tickets = await listTickets(cfg, guard, scope)
   const id = url.searchParams.get("id")
-  return json({ tickets: id ? tickets.filter((t) => t.id === id) : tickets })
+  // R16: the exact server totals ride every list response (All + the caller's My).
+  return json({ tickets: id ? tickets.filter((t) => t.id === id) : tickets, ...(await countTickets(cfg, guard)) })
 }
 
 /** GET /api/content/help/thread?id=<ticketId> → the ticket's replies (oldest first). */
@@ -44,7 +47,7 @@ export async function getHelpThread(request: Request, env: Env): Promise<Respons
   const { cfg, guard } = await gated(request, env, "help", "read")
   const id = new URL(request.url).searchParams.get("id")
   if (!id) return fail(400, "invalid_input", "A ticket id is required.")
-  return json({ replies: await listReplies(cfg, guard, id) })
+  return json({ replies: await listReplies(cfg, guard, id) , total: await countReplies(cfg, guard, id) })
 }
 
 /** POST /api/content/help — raise a ticket (help:create). */
@@ -56,7 +59,7 @@ export async function postCreateHelp(request: Request, env: Env): Promise<Respon
   // HOOK (Phase 3): the agent drafts the first reply here; a no-op today, so the
   // ticket simply opens awaiting a human (per "ticket always opens").
   await maybeDraftFirstReply(cfg, guard, id, description)
-  return json({ tickets: await listTickets(cfg, guard, "all") })
+  return json({ tickets: await listTickets(cfg, guard, "all"), ...(await countTickets(cfg, guard)) })
 }
 
 /** POST /api/content/help/update — edit a ticket (help:edit). */
@@ -66,7 +69,7 @@ export async function postUpdateHelp(request: Request, env: Env): Promise<Respon
   requireText(body.description, "Description", TEXT_LIMITS.long)
   await updateTicket(cfg, guard, actor, body.id, body)
   await publishChange(env.REALTIME, guard.teamId, "help", body.id)
-  return json({ tickets: await listTickets(cfg, guard, "all") })
+  return json({ tickets: await listTickets(cfg, guard, "all"), ...(await countTickets(cfg, guard)) })
 }
 
 /** POST /api/content/help/status — move a ticket along its fixed lifecycle.
@@ -83,7 +86,7 @@ export async function postHelpStatus(request: Request, env: Env): Promise<Respon
   // R17: already at that status → zero rows moved → no ping, no duplicate history.
   const changed = await setStatus(cfg, guard, actor, body.id, status)
   if (changed) await publishChange(env.REALTIME, guard.teamId, "help", body.id)
-  return json({ tickets: await listTickets(cfg, guard, "all") })
+  return json({ tickets: await listTickets(cfg, guard, "all"), ...(await countTickets(cfg, guard)) })
 }
 
 /** POST /api/content/help/bulk-status — move MANY tickets to the same status in one
@@ -137,7 +140,7 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
     replyBody,
     tagged
   )
-  return json({ replies: await listReplies(cfg, guard, body.helpId) })
+  return json({ replies: await listReplies(cfg, guard, body.helpId), total: await countReplies(cfg, guard, body.helpId) })
 }
 
 /** GET /api/content/help/stakeholders?id=<ticketId> — the full derived ∪ added

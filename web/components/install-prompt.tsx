@@ -138,7 +138,10 @@ export function InstallPrompt() {
             </ol>
           ) : null}
 
-          <SheetFooter className="flex-row justify-end gap-2">
+          {/* Action rows never clip (UI-CONVENTIONS): flex-wrap so a narrow phone
+              REFLOWS, and ml-auto on the first action (not justify-end on the
+              parent — that pushes overflow off the LEFT edge where it hides). */}
+          <SheetFooter className="flex-row flex-wrap gap-2 [&>*:first-child]:ml-auto">
             <Button variant="ghost" onClick={dismiss}>
               Not now
             </Button>

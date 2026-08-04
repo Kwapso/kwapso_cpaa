@@ -17,10 +17,15 @@ import { toast } from "@swift-struck/ui/registry/primitives/sonner/sonner"
 import { Home, Settings, GraduationCap, LifeBuoy, PanelLeftClose, PanelLeftOpen } from "lucide-react"
 
 import type { ActiveTeam } from "@/lib/use-active-team"
-import { auth, content, tenancy } from "@/lib/api"
+import { auth } from "@/lib/api"
 import { softNavigate } from "@/lib/nav"
+import { emitLive } from "@/lib/live-bus"
 import { useRealtime, useUserRealtime } from "@/lib/realtime"
-import { invalidate, patchRow, reconcile } from "@/lib/store"
+// The row-level registry + coarse invalidations moved to lib (R15): they're DATA
+// the live-collections check imports, and the thread/help_threads + agent_usage
+// deaf-exemptions live beside them in the rules registry.
+import { SIMPLE_INVALIDATIONS, TEAM_RESOURCES, totalKey } from "@/lib/live-resources"
+import { invalidate, patchRow, primeCache, readCache, reconcile } from "@/lib/store"
 import { NAV, TEAM_SECTIONS, bottomNavItems, isNavActive, type Crumb } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useTeamPrewarm } from "@/lib/use-team-prewarm"
@@ -31,73 +36,6 @@ import { TeamSwitcher } from "@/components/team-switcher"
 const NAV_ICONS = { home: Home, settings: Settings } as const
 // The lucide component for each team SIDEBAR page (Learning / Help) in the rail.
 const SECTION_ICONS: Record<string, typeof Home> = { learning: GraduationCap, help: LifeBuoy }
-
-// Row-level live registry: a "<resource> row <id> changed" ping → re-pull JUST
-// that row and patch it into the cached list (never refetch the whole list);
-// then refresh the small dependent aggregations/feeds coarsely (cheap — a 50-row
-// feed or a role-count list, not the big collection). Adding a module = ONE
-// entry here; the handler stays generic (no bespoke per-resource code).
-const TEAM_RESOURCES: Record<
-  string,
-  {
-    key: (teamId: string) => string
-    idField: string
-    fetchOne: (id: string) => Promise<Record<string, unknown> | null>
-    /** re-pull the WHOLE list — used by reconnect catch-up to diff-patch it. */
-    fetchList: () => Promise<Record<string, unknown>[]>
-    /** small dependent caches to coarse-invalidate (aggregations / feeds). */
-    deps?: (teamId: string, id: string) => string[]
-    /** refresh the active-team context (e.g. the section member count). */
-    refreshCtx?: boolean
-  }
-> = {
-  members: {
-    key: (t) => `members:${t}`,
-    idField: "userId",
-    fetchOne: (id) => tenancy.member(id),
-    fetchList: () => tenancy.members().then((r) => r.members),
-    deps: (t, id) => [`member_roles:${t}`, `activity:user:${id}`],
-    refreshCtx: true,
-  },
-  member_roles: {
-    key: (t) => `member_roles:${t}`,
-    idField: "id",
-    fetchOne: (id) => tenancy.role(id),
-    fetchList: () => tenancy.roles().then((r) => r.roles),
-    deps: (t, id) => [`my-perms:${t}`, `role-perms:${id}`],
-  },
-  invites: {
-    key: (t) => `invites:${t}`,
-    idField: "id",
-    fetchOne: (id) => tenancy.invite(id),
-    fetchList: () => tenancy.invites().then((r) => r.invites),
-    // The invite detail also shows the invite_logs audit + that invite's activity;
-    // refresh both when the invite row changes (revoke/accept) so the detail stays live.
-    deps: (_t, id) => [`invite-audit:${id}`, `activity:invite:${id}`],
-  },
-  // Learning content — row-level live. An edit / (de)activate elsewhere patches
-  // just that article in the cached list; the row read passes the team filter so a
-  // genuinely-gone item drops out. (Done toggles are personal, not broadcast.)
-  learning: {
-    key: (t) => `learning:${t}`,
-    idField: "id",
-    fetchOne: (id) => content.learningOne(id),
-    fetchList: () => content.learning().then((r) => r.learning),
-  },
-  // Help tickets — row-level live. A status change / new reply (postHelpReply
-  // pings `help` too) patches just that ticket in the cached "all" set. The
-  // thread (help_threads) isn't in the registry — it refreshes when the detail is
-  // (re)opened; the brief defers live thread patching.
-  help: {
-    key: (t) => `help:${t}`,
-    idField: "id",
-    fetchOne: (id) => content.helpOne(id),
-    fetchList: () => content.help().then((r) => r.tickets),
-    // A status change / edit / reply / stakeholder-add on a ticket also refreshes
-    // its Activity tab + Stakeholders tab.
-    deps: (_t, id) => [`activity:record:help:${id}`, `help-stakeholders:${id}`],
-  },
-}
 
 export function AppShell({
   active,
@@ -183,15 +121,27 @@ export function AppShell({
     teamId,
     (event) => {
       if (!teamId) return
+      // Fan the ping to any paged-screen subscribers (useLiveRefetch — R15)
+      // BEFORE the cache handling: their page state lives outside these caches.
+      emitLive({ kind: "ping", resource: event.resource, id: event.id, op: event.op })
       // The team activity feed is append-only + small — refresh it on any change.
       invalidate(`activity:team:${teamId}`)
-      if (event.resource === "team") {
-        invalidate(`team-meta:${teamId}`)
-        void active.refresh() // team name/logo
+      // Coarse listeners (team meta, screen recipes) — data-driven, R15.
+      const simple = SIMPLE_INVALIDATIONS[event.resource]
+      if (simple) {
+        for (const k of simple(teamId)) invalidate(k)
+        if (event.resource === "team") void active.refresh() // team name/logo
         return
       }
       const r = TEAM_RESOURCES[event.resource]
       if (!r) return
+      // R16: an add/remove moves the collection's exact total by one — bump the
+      // primed sidecar so badges stay honest between full refetches.
+      if (event.op === "add" || event.op === "remove") {
+        const tk = totalKey(event.resource === "selectable_data" ? "selectable" : event.resource, teamId)
+        const t = readCache<number>(tk)
+        if (typeof t === "number") primeCache(tk, Math.max(0, t + (event.op === "add" ? 1 : -1)))
+      }
       if (!event.id) {
         // No row id on the ping → coarse-refetch just that collection (still
         // scoped, never a page reload). Row-level kicks in once the publisher
@@ -213,11 +163,13 @@ export function AppShell({
       // Reconnect after a dropped link: catch up on everything we missed, with
       // no page reload. The row-level lists are DIFF-PATCHED in place (reconcile:
       // only changed rows re-render, new rows appear in order, gone rows drop) —
-      // catching adds too, not just edits. The small derived feeds/gates are
-      // cheap, so coarse-invalidate them; active.refresh() re-pulls team name,
-      // member count + my role.
+      // catching adds too, not just edits; the total-priming fetchers re-prime
+      // the badges as they run. Paged screens replay via the bus. The small
+      // derived feeds/gates are cheap, so coarse-invalidate them.
       if (!teamId) return
-      for (const r of Object.values(TEAM_RESOURCES)) void reconcile(r.key(teamId), r.idField, r.fetchList)
+      emitLive({ kind: "reconnect" })
+      for (const r of Object.values(TEAM_RESOURCES))
+        void reconcile(r.key(teamId), r.idField, () => r.fetchList(teamId))
       invalidate(`activity:team:${teamId}`)
       invalidate(`my-perms:${teamId}`)
       void active.refresh()

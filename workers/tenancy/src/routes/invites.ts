@@ -8,6 +8,7 @@ import {
   getInviteAudit as readInviteAudit,
   listInvites,
   revokeInvite,
+  countInvites,
 } from "../lib/invites"
 import { acceptInvite, listReceivedInvites } from "../lib/teams"
 import { gated, gatedBody } from "../../../../shared/workers/route"
@@ -18,7 +19,8 @@ export async function getInvites(request: Request, env: Env): Promise<Response> 
   const { cfg, guard } = await gated(request, env, "team_members", "read")
   const invites = await listInvites(env, cfg, guard)
   const id = new URL(request.url).searchParams.get("id") // ?id= → one invite
-  return json({ invites: id ? invites.filter((i) => i.id === id) : invites })
+  // R16: the exact server total rides every list response (badges never use rows.length).
+  return json({ invites: id ? invites.filter((i) => i.id === id) : invites, total: await countInvites(env, guard) })
 }
 
 export async function postCreateInvite(request: Request, env: Env): Promise<Response> {
@@ -34,7 +36,7 @@ export async function postCreateInvite(request: Request, env: Env): Promise<Resp
   await publishChange(env.REALTIME, guard.teamId, "invites", inviteId, "add")
   // `emailSent` first + honest: the invite always succeeds (the row routes acceptance),
   // but the branded email is best-effort — the client + the agent report the real outcome.
-  return json({ emailSent, invites: await listInvites(env, cfg, guard) })
+  return json({ emailSent, invites: await listInvites(env, cfg, guard), total: await countInvites(env, guard) })
 }
 
 export async function postRevokeInvite(request: Request, env: Env): Promise<Response> {
@@ -46,7 +48,7 @@ export async function postRevokeInvite(request: Request, env: Env): Promise<Resp
   // Revoke is an in-place edit (the row stays, status → 'revoked'), so re-pulling
   // this one id keeps the list live without a full refetch.
   await publishChange(env.REALTIME, guard.teamId, "invites", body.inviteId, "edit")
-  return json({ invites: await listInvites(env, cfg, guard) })
+  return json({ invites: await listInvites(env, cfg, guard), total: await countInvites(env, guard) })
 }
 
 /** The per-team invite_logs audit for one invite (M4): inviter snapshot +

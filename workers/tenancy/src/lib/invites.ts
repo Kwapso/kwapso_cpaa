@@ -107,6 +107,14 @@ export async function getInviteAudit(
   }
 }
 
+/** R16: exact server COUNT(*) for the badge — never rows.length. */
+export async function countInvites(env: Env, guard: MemberGuard): Promise<number> {
+  const row = await env.DB.prepare("SELECT COUNT(*) AS n FROM invite_index WHERE team_id = ?")
+    .bind(guard.teamId)
+    .first<{ n: number }>()
+  return row?.n ?? 0
+}
+
 /** Create a pending invite + send the branded email. Guards: valid email, NOT
  * yourself, role exists, not already a member, no existing pending invite. Returns
  * the new invite id (so the caller can publish a row-level live update for just that

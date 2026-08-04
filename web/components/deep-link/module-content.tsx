@@ -24,6 +24,9 @@ import { HelpDetailScreen } from "@/components/help-detail"
 import { ImportScreen } from "@/components/import-screen"
 import { SelectableScreen } from "@/components/selectable-screen"
 import { NoAccess, NotFound, LoadError, SectionWithCreate, CollectionCard } from "@/components/deep-link/screen-bits"
+import { CollectionHeading } from "@/components/collection-heading"
+import { CountedAbove } from "@/components/counted-tabs"
+import { formatCount } from "@/lib/format-count"
 import {
   shapeHelpList,
   shapeInviteDetail,
@@ -47,7 +50,7 @@ type ScreenData = ReturnType<typeof useScreenData>
  * The host owns all of it; this bundle is how it hands the render half a snapshot. */
 export type ModuleContentCtx = Pick<
   ScreenData,
-  "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "learningQ" | "helpQ" | "activityQ" | "inviteAuditQ"
+  "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "learningQ" | "helpQ" | "totals" | "activityQ" | "inviteAuditQ"
 > & {
   noAccess: boolean
   enabled: boolean
@@ -90,6 +93,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     invitesQ,
     learningQ,
     helpQ,
+    totals,
     activityQ,
     inviteAuditQ,
     teamName,
@@ -228,10 +232,22 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
             <ScreenRenderer recipe={learningRecipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
           </SectionWithCreate>
         )
+        // R16: the badge is the exact server total through the ONE seam — never
+        // rows.length (a capped list's length is a ceiling, not a total).
+        const learningBadge = formatCount(totals.learning)
         // Articles / Team progress as a REAL tab strip (library TabsView, URL-driven
-        // via ?tab so Back works). The completion grid is for curators (learning:edit);
-        // everyone else just sees Articles, no tabs.
-        if (!can("learning", "edit")) return articlesPanel
+        // via ?tab so Back works). The completion grid is for curators (learning:edit).
+        // NON-curators see no strip — so the count lives in the CollectionHeading
+        // instead (R16: a count must never depend on an unrelated permission; it
+        // used to vanish for anyone without the edit right, because the strip
+        // carrying it was the curator's).
+        if (!can("learning", "edit"))
+          return (
+            <div className="flex flex-col gap-4">
+              <CollectionHeading sectionKey="learning" total={totals.learning} />
+              {articlesPanel}
+            </div>
+          )
         const learnTab = query.tab === "progress" ? "progress" : "articles"
         const learnTabsConfig = {
           ...defaultTabsConfig,
@@ -241,21 +257,28 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
               value: "articles",
               label: "Articles",
               icon: "book-open",
-              badge: String(learningQ.data.length || ""),
+              badge: learningBadge,
               badgeVariant: "" as const,
             },
             { value: "progress", label: "Team progress", icon: "users", badge: "", badgeVariant: "" as const },
           ],
         }
+        // ARBITRATION (R16 iii): the counted strip is the heading's SIBLING here,
+        // so CountedAbove marks it — the badged tab WINS, the heading stands down.
         return (
-          <TabsView
-            config={learnTabsConfig}
-            value={learnTab}
-            onValueChange={(v) => go(sectionPath, v === "progress" ? { tab: "progress" } : {})}
-            renderPanel={(t) =>
-              t.value === "progress" ? <LearningProgressScreen teamId={teamId as string} /> : articlesPanel
-            }
-          />
+          <CountedAbove active={learningBadge !== ""}>
+            <div className="flex flex-col gap-4">
+              <CollectionHeading sectionKey="learning" total={totals.learning} />
+              <TabsView
+                config={learnTabsConfig}
+                value={learnTab}
+                onValueChange={(v) => go(sectionPath, v === "progress" ? { tab: "progress" } : {})}
+                renderPanel={(t) =>
+                  t.value === "progress" ? <LearningProgressScreen teamId={teamId as string} /> : articlesPanel
+                }
+              />
+            </div>
+          </CountedAbove>
         )
       }
       if (module === "help") {
@@ -269,7 +292,13 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
             : helpQ.data
         const data = shapeHelpList(visible)
         const helpRecipe = withDataDrivenCollection(recipe, data.rows ?? [])
+        // R16: both scope badges are exact server totals (All + My come back from
+        // the door's one COUNT read) through the ONE seam — never a filter's length.
+        const helpBadge = formatCount(totals.help)
         return (
+          <CountedAbove active={helpBadge !== ""}>
+          <div className="flex flex-col gap-4">
+          <CollectionHeading sectionKey="help" total={totals.help} />
           <SectionWithCreate
             show={can("help", "create")}
             label="Raise ticket"
@@ -287,16 +316,14 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
                       value: "all",
                       label: "All tickets",
                       icon: "inbox",
-                      badge: String(helpQ.data.length || ""),
+                      badge: helpBadge,
                       badgeVariant: "",
                     },
                     {
                       value: "mine",
                       label: "My tickets",
                       icon: "user",
-                      badge: String(
-                        (myUserId ? helpQ.data.filter((t) => t.raiserId === myUserId).length : 0) || ""
-                      ),
+                      badge: formatCount(totals.helpMine),
                       badgeVariant: "",
                     },
                   ],
@@ -308,6 +335,8 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
           >
             <ScreenRenderer recipe={helpRecipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
           </SectionWithCreate>
+          </div>
+          </CountedAbove>
         )
       }
       return <NotFound />

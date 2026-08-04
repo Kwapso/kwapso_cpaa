@@ -13,8 +13,9 @@
 
 import * as React from "react"
 
-import { content as contentApi, tenancy } from "@/lib/api"
-import { useCached } from "@/lib/store"
+import { tenancy } from "@/lib/api"
+import { listFetch, totalKey } from "@/lib/live-resources"
+import { useCached, useCachedValue } from "@/lib/store"
 
 /** What the host needs to drive the reads: the resolved team, whether reads are
  * enabled (on-team + signed-in), the active module and the record id in view. */
@@ -35,14 +36,15 @@ export function useScreenData({ teamId, enabled, module, recordId }: ScreenDataI
     () => tenancy.members().then((r) => r.members)
   )
   // Roles back the roles list, the breadcrumb label, the change-role picker and
-  // the invite form's role options — load them for the whole team area.
+  // the invite form's role options — load them for the whole team area. The
+  // listFetch fetchers ALSO prime each collection's exact `total:` sidecar (R16).
   const rolesQ = useCached(enabled ? `member_roles:${teamId}` : null, () =>
-    tenancy.roles().then((r) => r.roles)
+    listFetch.roles(teamId as string)
   )
   // Invites back the invites list AND the section-tab count badge, so load them
   // across the team area (cache-first + live, so the count stays honest).
   const invitesQ = useCached(enabled ? `invites:${teamId}` : null, () =>
-    tenancy.invites().then((r) => r.invites)
+    listFetch.invites(teamId as string)
   )
   const metaQ = useCached(enabled && module === "team" ? `team-meta:${teamId}` : null, () =>
     tenancy.teamMeta()
@@ -50,21 +52,31 @@ export function useScreenData({ teamId, enabled, module, recordId }: ScreenDataI
   // Learning backs its list, the breadcrumb label and the article detail; load it
   // for the whole learning area (cache-first + row-level live, decision below).
   const learningQ = useCached(enabled && module === "learning" ? `learning:${teamId}` : null, () =>
-    contentApi.learning().then((r) => r.learning)
+    listFetch.learning(teamId as string)
   )
   // Help backs its list (All set), the breadcrumb label and the ticket thread.
   // ONE cache holds the whole team's tickets (the live registry patches it
   // row-by-row); the My/All toggle filters that set client-side by raiser.
   const helpQ = useCached(enabled && module === "help" ? `help:${teamId}` : null, () =>
-    contentApi.help("all").then((r) => r.tickets)
+    listFetch.help(teamId as string)
   )
   // The team's dropdown values — feed the help/learning forms' Type/Category pickers
   // AND the Dropdown-values tab's count badge, so load them across the team area
   // (cache-first + live, like roles/invites, so the count stays honest).
   const formSelectableQ = useCached(
     enabled ? `selectable:${teamId}` : null,
-    () => tenancy.selectable().then((r) => r.values)
+    () => listFetch.selectable(teamId as string)
   )
+  // R16: the exact server totals the badges show (primed by the fetchers above;
+  // bumped ±1 by add/remove pings; re-primed on reconnect). NEVER rows.length.
+  const totals = {
+    member_roles: useCachedValue<number>(enabled ? totalKey("member_roles", teamId as string) : null),
+    invites: useCachedValue<number>(enabled ? totalKey("invites", teamId as string) : null),
+    selectable: useCachedValue<number>(enabled ? totalKey("selectable", teamId as string) : null),
+    learning: useCachedValue<number>(enabled ? totalKey("learning", teamId as string) : null),
+    help: useCachedValue<number>(enabled ? totalKey("help", teamId as string) : null),
+    helpMine: useCachedValue<number>(enabled ? totalKey("help-mine", teamId as string) : null),
+  }
   const selectableValues = formSelectableQ.data ?? []
   // The list now includes DEACTIVATED values (so the manager can reactivate them),
   // so every form PICKER filters to `active` — a retired value never appears as a
@@ -113,6 +125,7 @@ export function useScreenData({ teamId, enabled, module, recordId }: ScreenDataI
     metaQ,
     learningQ,
     helpQ,
+    totals,
     formSelectableQ,
     selectableValues,
     helpTypeOptions,
