@@ -48,7 +48,17 @@ function findOffenders(): string[] {
     const fnRe = /function ((?:[A-Z]|use[A-Z])\w*)\s*\(/g
     let fm: RegExpExecArray | null
     while ((fm = fnRe.exec(src))) {
-      const bodyStart = src.indexOf("{", fnRe.lastIndex)
+      // The body brace is the first `{` AFTER the parameter list closes — a
+      // destructured param (`({ off }: …)`) has braces of its own, and taking
+      // the first `{` blindly would "scan" the param object and skip the body.
+      let paren = 1 // fnRe.lastIndex sits just past the opening `(`
+      let p = fnRe.lastIndex
+      while (p < src.length && paren > 0) {
+        if (src[p] === "(") paren++
+        else if (src[p] === ")") paren--
+        p++
+      }
+      const bodyStart = src.indexOf("{", p)
       if (bodyStart === -1) continue
       // Walk the body tracking brace depth; note depth-1 returns + hook calls.
       // A hook ON the return statement itself (`return useX(...)`) is legal — a
