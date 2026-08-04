@@ -409,20 +409,6 @@ export async function confirmImport(
   const { row, target } = await targetForSession(env, cfg, guard, id)
   if (row.import_complete === 1)
     throw new GuardError(409, "already_imported", "This import has already been run.")
-  // CLAIM the session in the same statement that checks it (the batch sibling
-  // already does this). Read-then-write let a double-click or a retry pass the
-  // check twice and write every mapped row twice — CONCURRENCY.md's rule for a
-  // retryable write is an atomic claim, not a prior read.
-  // The session lives in the TEAM database (like every other write here), so the
-  // claim goes through the same door — RETURNING id tells us whether WE won it.
-  const claimed = await d1Query<{ id: string }>(
-    cfg,
-    guard.databaseId,
-    "UPDATE data_import_sessions SET import_initiated = 1 WHERE id = ? AND import_complete = 0 AND import_initiated = 0 RETURNING id",
-    [id]
-  )
-  if (!claimed[0])
-    throw new GuardError(409, "already_imported", "This import is already running or has been run.")
   if (!row.extraction_response)
     throw new GuardError(409, "no_file", "Upload a file before importing.")
 
@@ -439,7 +425,23 @@ export async function confirmImport(
   parsed.headers.forEach((h, i) => {
     if (!(h in idx)) idx[h] = i
   })
+  // CLAIM the session in the same statement that checks it (the batch sibling
+  // already does this): read-then-write let a double-click or a retry pass the
+  // check twice and write every mapped row twice. It sits HERE, below every
+  // validation — claiming before them would let one unmapped column brick the
+  // session for good — and is RELEASED if the run fails, so a genuine retry is
+  // still possible. RETURNING id is how we know WE won it.
+  const claimed = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    "UPDATE data_import_sessions SET import_initiated = 1 WHERE id = ? AND import_complete = 0 AND import_initiated = 0 RETURNING id",
+    [id]
+  )
+  if (!claimed[0])
+    throw new GuardError(409, "already_imported", "This import is already running or has already been run.")
+
   const result: ImportResult = { created: 0, skipped: 0, failed: 0, errors: [] }
+  try {
   for (const r of parsed.rows) {
     const mappedRow: Record<string, string> = {}
     for (const col of target.columns) {
@@ -456,6 +458,18 @@ export async function confirmImport(
       result.failed++
       if (out.error && result.errors.length < 5) result.errors.push(out.error)
     }
+  }
+
+  } catch (e) {
+    // Release the claim so the run can be retried — a failed import must not
+    // leave the session permanently unrunnable.
+    await d1Query(
+      cfg,
+      guard.databaseId,
+      "UPDATE data_import_sessions SET import_initiated = 0 WHERE id = ? AND import_complete = 0",
+      [id]
+    ).catch(() => null)
+    throw e
   }
 
   const now = new Date().toISOString()

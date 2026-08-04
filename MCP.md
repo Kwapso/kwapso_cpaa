@@ -124,6 +124,15 @@ Today it covers:
   one record instead of pulling the whole collection (`list_help_tickets` also takes
   `scope`).
 
+  **One asymmetry worth stating plainly.** The in-app assistant now stops for a yes/no
+  panel before the four writes that decide who-can-do-what (`create_role`,
+  `set_role_permissions`, `set_member_role`, `invite_member` — EDGE-CASES §5). The MCP
+  surface has **no such panel and cannot have one**: the confirming UI belongs to your
+  client, not to Brimba. That is not a capability gap — the same door, the same gate, the
+  same audit row — but it means the operator of an MCP client is the one deciding when to
+  confirm. If your client drives an LLM that reads team data (tickets, articles), treat
+  those four tools the way Brimba does and put a human in front of them.
+
   **`list_help_tickets` is PAGED** (R14 — tickets are a growing collection). One call
   returns one page plus `total` (the exact server count, not the page length),
   `hasMore`, and an opaque `nextCursor`. To read further, call again passing that

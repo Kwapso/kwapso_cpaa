@@ -400,10 +400,13 @@ follow the golden path.
 5. Keep `npm run check` green and obey the Laws; they're what stop a fast-growing
    product from drifting.
 
-**Two fork gotchas worth naming.** (1) `ADMIN_KEY` on the **auth** worker is a
-STAGING-ONLY secret — it enables the test-login door (sign in as any account), so never
-set it on production auth; the other workers' `ADMIN_KEY` (maintenance endpoints) is set
-on both envs as before. (2) The import catalog **self-heals on read** (R13) — a fresh
+**Two fork gotchas worth naming.** (1) `TEST_LOGIN_KEY` on the **auth** worker is a
+NON-PRODUCTION secret — it enables the test-login door (sign in as any account). It is
+deliberately NOT called `ADMIN_KEY`: that name is the maintenance key you set on tenancy
+and data-ops in BOTH environments, and sharing it would mean one mistyped
+`wrangler secret put` directory armed impersonation on production. The door also refuses
+outright when the worker's `ENVIRONMENT` var is `production`, so the isolation survives a
+mistake rather than depending on this paragraph being read. (2) The import catalog **self-heals on read** (R13) — a fresh
 fork's target picker works with no seed step; `seed-targets` only refreshes labels.
 
 **What a new product must NOT do.** Don't fork the UI library into the app (fix it in

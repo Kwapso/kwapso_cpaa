@@ -200,9 +200,10 @@ curl -X POST https://<gateway-url>/api/data-ops/admin/seed-targets -H "x-admin-k
 ## 7 · Create the first team + migrate-teams
 
 1. Open the gateway URL and sign in with an email code (a code appears ONLY in the
-   inbox now, in every environment — set `RESEND_API_KEY`; for automated/dev sign-in on
-   STAGING use the admin test-login door `POST /api/auth/admin/test-login` + `x-admin-key`,
-   gated by `ADMIN_KEY` on the **auth** worker, staging-only). Complete onboarding — this
+   inbox now, in every environment — set `RESEND_API_KEY`; for automated/dev sign-in on a
+   NON-PRODUCTION environment use the test-login door `POST /api/auth/admin/test-login` +
+   `x-admin-key`, gated by the auth worker's own `TEST_LOGIN_KEY` secret and refused
+   outright when its `ENVIRONMENT` var is `production`). Complete onboarding — this
    creates your first
    **team**, which creates that team's own D1 database and runs every `TEAM_MIGRATIONS`
    entry on it.

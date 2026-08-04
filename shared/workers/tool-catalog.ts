@@ -99,7 +99,10 @@ export type SharedTool = {
  * ticket description is up to 20,000 characters of someone else's text). Fenced
  * tool output plus one system-prompt sentence is a soft defence; a confirm panel
  * the admin must click is a hard one. So these four confirm — not because they are
- * destructive, but because a silent one is a silent privilege escalation. */
+ * destructive, but because a silent one is a silent privilege escalation.
+ * The MCP surface ignores `agent.confirm` — it has no panel to show, and the
+ * confirming UI belongs to the connecting client. Same door, same gate, same
+ * audit row; the asymmetry is documented in MCP.md, not a capability gap. */
 export const SHARED_TOOLS: SharedTool[] = [
   /* --------------------------------- reads --------------------------------- */
   {
