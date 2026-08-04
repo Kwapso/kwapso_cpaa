@@ -44,16 +44,33 @@ const api = async (path, opts = {}, cookie = "") => {
   ok("mcp health", m.body?.ok === true)
 }
 
-// 2 · Login: request a code (staging echoes it until Resend is wired).
-const start = await api("/api/auth/email/start", {
+// 2 · Login: mint a code through the ADMIN TEST-LOGIN door (staging-only,
+// ADMIN_KEY-gated, fails closed). Login codes are NEVER echoed by the real send
+// door in any environment, so the smoke needs ADMIN_KEY in its environment.
+const ADMIN_KEY = process.env.ADMIN_KEY ?? ""
+if (!ADMIN_KEY) {
+  console.log("FAIL no ADMIN_KEY in the environment — cannot sign in (export ADMIN_KEY before running the smoke)")
+  process.exit(1)
+}
+const start = await api("/api/auth/admin/test-login", {
   method: "POST",
+  headers: { "x-admin-key": ADMIN_KEY },
   body: JSON.stringify({ email: EMAIL }),
 })
-ok("code issued", start.res.ok, JSON.stringify(start.body))
-const code = start.body?.devCode
-if (!code) {
-  console.log("note: no devCode in response (Resend live?) — smoke stops at login")
-  process.exit(failures ? 1 : 0)
+ok("test-login code minted (admin door)", start.res.ok && typeof start.body?.code === "string", JSON.stringify({ status: start.res.status }))
+const code = start.body?.code
+if (!code) process.exit(1)
+
+// 2b · The REAL send door must never carry a code in its response. A unique
+// +label keeps this outside the fixed account's 5-codes-per-hour throttle
+// (Resend's test inbox accepts delivered+anything@resend.dev).
+{
+  const real = await api("/api/auth/email/start", {
+    method: "POST",
+    body: JSON.stringify({ email: `delivered+noecho${Date.now()}@resend.dev` }),
+  })
+  const bodyText = JSON.stringify(real.body ?? {})
+  ok("send door response carries NO code", real.res.ok && !/\d{6}/.test(bodyText), bodyText)
 }
 
 // 3 · Verify the code → session cookie.

@@ -147,9 +147,9 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const auth = {
-  /** Request a 6-digit code. devCode comes back only on staging/dev (TEMP). */
+  /** Request a 6-digit code. The code goes ONLY to the inbox — never the response. */
   startEmail: (email: string) =>
-    api<{ ok: true; devCode?: string }>("/api/auth/email/start", {
+    api<{ ok: true }>("/api/auth/email/start", {
       method: "POST",
       body: JSON.stringify({ email }),
     }),
@@ -177,10 +177,10 @@ export const auth = {
       body: JSON.stringify(input),
     }),
 
-  /** Change email, step 1: send a 6-digit code to the NEW address. devCode
-   * comes back only on staging/dev (same as login). */
+  /** Change email, step 1: send a 6-digit code to the NEW address (inbox only —
+   * same law as login, the code never rides the response). */
   startEmailChange: (email: string) =>
-    api<{ ok: true; devCode?: string }>("/api/auth/email/change/start", {
+    api<{ ok: true }>("/api/auth/email/change/start", {
       method: "POST",
       body: JSON.stringify({ email }),
     }),

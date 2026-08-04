@@ -12,11 +12,15 @@ export type Env = {
   /** Verified-sender from-address for transactional email
    * (e.g. "noreply@updates.swiftstruck.com"). */
   EMAIL_FROM: string
-  /** "1" = include the login code in the API response (staging/dev ONLY). */
-  DEV_ECHO_CODES: string
 
   // Secrets (wrangler secret put) — optional until the user provides them.
   RESEND_API_KEY?: string
+  /** STAGING ONLY — gates the /api/auth/admin/test-login door (mints a login
+   * code and returns it once, so automated tests can sign in now that codes are
+   * never echoed anywhere). The holder can sign in as ANY account on the
+   * environment: NEVER set this on the production auth worker. Fails closed
+   * when unset — production simply has no test door. */
+  ADMIN_KEY?: string
   /** Shared secret guarding /internal/send-email (defense-in-depth alongside
    * workers_dev:false). When set, the route rejects callers lacking the header. */
   INTERNAL_KEY?: string

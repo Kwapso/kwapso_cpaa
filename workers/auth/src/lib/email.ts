@@ -70,7 +70,7 @@ export async function sendEmail(
 
 /**
  * Send the 6-digit login code (branded). Returns false when no RESEND_API_KEY
- * is configured yet (callers then fall back to DEV_ECHO_CODES or an error).
+ * is configured yet (callers then refuse with a clean error).
  */
 export async function sendLoginCode(
   env: Env,
@@ -93,7 +93,7 @@ export async function sendLoginCode(
 
 /**
  * Send the 6-digit code to confirm a NEW email address (branded). Returns false
- * when no RESEND_API_KEY is configured yet (callers fall back to DEV_ECHO_CODES).
+ * when no RESEND_API_KEY is configured yet (callers refuse with a clean error).
  */
 export async function sendEmailChangeCode(
   env: Env,

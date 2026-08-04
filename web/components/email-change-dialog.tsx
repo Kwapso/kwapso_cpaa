@@ -57,17 +57,11 @@ export function EmailChangeDialog({
     setBusy(true)
     setError(undefined)
     try {
-      const res = await auth.startEmailChange(email.trim())
+      await auth.startEmailChange(email.trim())
       setStep("code")
       setCode("")
-      if (res.devCode) {
-        // TEMP until the Resend key is wired: staging shows the code here.
-        toast.info(`TEMP (staging only): your code is ${res.devCode}`, {
-          duration: 30000,
-        })
-      } else {
-        toast.success(`Code sent — check ${email.trim()}.`)
-      }
+      // The code goes ONLY to the new inbox — never the response or a toast.
+      toast.success(`Code sent — check ${email.trim()}.`)
     } catch (e) {
       setError(e instanceof ApiFailure ? e.message : "Couldn't send the code.")
     } finally {
