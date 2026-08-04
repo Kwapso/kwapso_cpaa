@@ -102,39 +102,25 @@
 <script>
 /* DATA:START — the lean_mean_check skill replaces this whole block with the real report data */
 window.LEAN_MEAN_DATA = {
-  project: "Brimba", scannedAt: "2026-07-10",
-  overall: { score: 94, grade: "A", verdict: "The two levers to 95 both landed — one tool catalog, one app shell.",
-    sub: "The agent + MCP now project ONE shared tool catalog (no drift), and the whole app is ONE client-shell (no reload anywhere). Net LOC fell despite the additions; a 3-agent adversarial review couldn't refute either change." },
+  project: "Sample Project", scannedAt: "—",
+  overall: { score: 72, grade: "C", verdict: "Solid foundation; documentation and tests are the weak spots.",
+    sub: "Open this template via the skill to see your own project here." },
   dimensions: [
-    { key:"size", title:"Size & Scope", icon:"📦", score:90, status:"green", headline:"Lean, and LOC fell",
-      metrics:[{label:"Files",value:"268"},{label:"Lines",value:"26.8k"},{label:"Docs",value:"32"}],
-      strengths:["Net LOC dropped this round — the catalog unification removed more than the routing added.","The 7 files >400 LOC are cohesive units, not sprawl."],
-      improvements:[{what:"Two files stay large.",why:"agent.ts (563) + the deep-link shell (496) — split only when one takes a second responsibility."}] },
-    { key:"robustness", title:"Robustness", icon:"🛡️", score:96, status:"green", headline:"Drift now impossible",
-      metrics:[{label:"Machine-checked Laws",value:"R1–R12"},{label:"Test files",value:"47"},{label:"Adversarial review",value:"passed"}],
-      strengths:["Catalog drift is impossible by construction (agent + MCP project one source; a path typo reddens catalog.test on both).","No in-app router.push (the reload that killed the agent) is locked by shell-nav.test.","Both refactors survived a 3-agent adversarial verification."],
-      improvements:[] },
-    { key:"documentation", title:"Documentation", icon:"📖", score:96, status:"green", headline:"Airtight, story-checked",
-      metrics:[{label:"Docs",value:"32"},{label:"Story check",value:"clean"}],
-      strengths:["EDGE-CASES §1 rewritten to one-shell; CACHING reconciled; BASE-MANUAL/CONVENTIONS/BASE-IMPROVEMENTS updated + the superseded note added."],
-      improvements:[] },
-    { key:"understandability", title:"Understandability", icon:"🧭", score:95, status:"green", headline:"One shell, one catalog",
-      metrics:[{label:"App",value:"one shell"},{label:"Tools",value:"declared once"}],
-      strengths:["No reload boundary or isInAppPath edge to reason about — all nav is go()/softNavigate.","A capability is declared ONCE in shared/workers/tool-catalog.ts — no 'which catalog?' split."],
-      improvements:[{what:"One small indirection.",why:"toAgentTool/toMcpTool projection — learned once."}] },
-    { key:"leanness", title:"Leanness & Optimization", icon:"♻️", score:92, status:"green", headline:"The last DRY win landed",
-      metrics:[{label:"Duplication",value:"6.4% (data)"},{label:"TODOs",value:"1"}],
-      strengths:["The flagged 'last real DRY win' shipped — ~two dozen endpoints the agent + MCP each re-declared are now one SHARED_TOOLS table (one edit to add a tool).","The one-shell collapse removed the per-route AppShell duplication (3 account pages → thin shells)."],
-      improvements:[{what:"No real DRY lever left.",why:"The 6.4% duplicate-line heuristic is now mostly declarative catalog/recipe data, not logic to dedupe."}] },
-    { key:"scalability", title:"Scalability & Structure", icon:"📐", score:94, status:"green", headline:"Sharded + single-seam",
-      metrics:[{label:"Tenancy",value:"per-team D1"},{label:"Extend",value:"one place"}],
-      strengths:["Per-team D1 + d1QueryAcross (allSettled + shard diagnostics); the hibernating TeamChannel DO; the credit quota.","The shared tool catalog + one-shell are both single-seam extension points."],
-      improvements:[] }
+    { key:"size", title:"Size & Scope", icon:"📦", score:84, status:"green", headline:"Compact & focused",
+      metrics:[{label:"Files",value:"—"},{label:"Lines",value:"—"}],
+      strengths:["Every file earns its place."], improvements:[{what:"A few long files.",why:"Split large modules to ease review."}] },
+    { key:"robustness", title:"Robustness", icon:"🛡️", score:48, status:"red", headline:"Few safety nets",
+      metrics:[{label:"Tests",value:"0"}], strengths:[], improvements:[{what:"No automated tests.",why:"Regressions can ship silently."}] },
+    { key:"documentation", title:"Documentation", icon:"📖", score:55, status:"orange", headline:"Thin but tidy",
+      metrics:[{label:"README",value:"yes"}], strengths:["No duplicated docs."], improvements:[{what:"No architecture overview.",why:"New devs/agents lack a map."}] },
+    { key:"understandability", title:"Understandability", icon:"🧭", score:80, status:"green", headline:"Easy to follow",
+      metrics:[{label:"Naming",value:"clear"}], strengths:["Predictable layout."], improvements:[] },
+    { key:"leanness", title:"Leanness & Optimization", icon:"♻️", score:88, status:"green", headline:"Very DRY",
+      metrics:[{label:"Duplication",value:"low"}], strengths:["Central shared library."], improvements:[] },
+    { key:"scalability", title:"Scalability & Structure", icon:"📐", score:76, status:"green", headline:"Room to grow",
+      metrics:[{label:"Layers",value:"clean"}], strengths:["Clear data seam."], improvements:[{what:"Some coupling.",why:"Add interfaces at module edges."}] }
   ],
-  callouts:{
-    strong:["One shared tool catalog — the agent + MCP can't drift; adding a tool is one edit.","One app shell — no reload on ANY in-app navigation; the agent's trace drives from anywhere."],
-    watch:["A few cohesive >400-LOC files (the agent loop, the deep-link shell) — split only if one grows a second job."],
-    fix:["Nothing critical — the two structural levers to 95 both landed; the remaining ceiling is file size, not debt."] }
+  callouts:{ strong:["Central design system."], watch:["No architecture notes."], fix:["No automated tests."] }
 };
 /* DATA:END */
 </script>

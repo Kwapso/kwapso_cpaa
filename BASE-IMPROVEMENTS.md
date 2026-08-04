@@ -10,6 +10,32 @@ Keep this current: when an item ships, move it to **Fixed** with the commit.
 
 ---
 
+## Fixed (2026-08-04) — the base hardening round (7 new laws + security/UI)
+
+Ported the twenty defects a downstream product (Acrymold) found under real load —
+each was a base defect. Seven became machine-checked Laws (R13–R19), each
+sabotage-proven; the rest are security/agent/UI fixes. 342 tests (up from 302).
+
+| Sev | Issue | Fix |
+|---|---|---|
+| DESIGN | **A capability shipped in code was invisible until a catalogue ROW existed** — staging could import modules production (byte-identical code) could not. | R13 widened: the import catalogue reconciles itself against the code on READ (INSERT-only; an owner's OFF stays off; the picker filters is_active in memory). Shipping the code now ships the capability. (`catalog-coverage`) |
+| SCALE | **Unbounded list reads** would stall a worker at 100k rows. | R14: every `list*`/`search*` pages or carries a hard cap from `shared/workers/limits.ts` with its comment. (`bounded-lists`) |
+| BUG | **Deaf publishers / stale paged screens** — a worker pinged `selectable_data` and nothing listened; paged rows live outside the row caches. | R15: the live registry (`web/lib/live-resources.ts`) + a ping bus + `useLiveRefetch`; every published resource reaches a listener or a reasoned `DEAF_EXEMPT`. (`live-collections`) |
+| BUG | **A 24,011-row catalogue advertised "1000"** (a capped list's length) and the same count showed twice on one screen. | R16: exact server COUNT(*) through the one `formatCount` seam; tab-vs-heading arbitration by React context. (`counted-collections`) |
+| BUG | **A double-clicked Deactivate wrote two history rows** 2s apart. | R17: the current-status predicate rides the UPDATE; zero rows moved = no activity, no ping. (`idempotent-transitions`) |
+| LEAK | **The team activity feed showed every module's before/after behind one gate.** | R18: it subtracts the caller's denied modules through one clause; every relatedTable resolves through `ACTIVITY_GATE_MAP` or a pinned exemption. (`activity-gate-coverage`) |
+| BUG | **The agent answered a DIFFERENT question** — free-text fallback matched 3,465 mentions instead of 134 records. | R19: every list tool exposes + forwards its door's filters, derived from the door's own source. (`agent-filter-parity`) |
+| SEC | **Login codes echoed in API responses + a toast** on staging. | B1: echo + var DELETED (inbox-only, every env); ADMIN_KEY-gated staging test-login door mints a normal code for tests. |
+| SEC | **Internal doors waved callers through** when `INTERNAL_KEY` was unset. | B2: send-email / log-error / mcp-session all FAIL CLOSED. |
+| SEC | **The 5-try attempt cap was burstable** (read-then-write). | B3: one atomic UPDATE checks + consumes a slot (login + email-change). |
+| SEC | **Preview URLs were a second public door.** | B4: `preview_urls: false` beside `workers_dev: false` on every non-gateway worker. |
+| CRASH | **A hook below an early return white-screened the app** (React #310), and the ErrorBoundary was never mounted. | C1: the boundary is mounted at the root; `hooks-order.test.ts` makes the class unshippable. |
+| AGENT | **Bulk tool JSON truncated mid-call** (1024 max_tokens); no set-shaped tool. | C2: `AGENT_MAX_TOKENS` 4096; a filter-shaped `set_help_status_by_filter` (dry-run counts first, idempotent); the bulk cap is one declared constant; dropdown-never-invents rule. |
+| BUG | **The usage log showed an admin four blank rows** with a teammate's name. | C3: `agent_usage_log.kind` (0014) — action rows team-visible, prompt rows the author's; the fold APPENDS its actions, never replaces. |
+| UI | **Action rows clipped off the left edge**; the brand mark lost its corners. | C4/C5: flex-wrap + ml-auto; object-contain at `LOGO_SAFE_RATIO` 0.76. |
+
+Also this round: R10 widened with an mcp gating-seam suite (identity-gated writes); every exemption is DATA in the rules registry (B5). Core migration **0014** (`agent_usage_log.kind`) applies before deploy.
+
 ## Fixed (2026-07-13) — the invite + credit-fairness round (team testing on staging)
 
 Three real bugs a teammate (chilavert) hit exercising the AI co-pilot's invite flow.
@@ -73,7 +99,7 @@ A sweep of real bugs surfaced by the team exercising the AI co-pilot on staging.
 
 ### P2 · deploy + docs
 6. **realtime↔auth cold-start cut.** A genuinely fresh-account first deploy dies `code 10143` (realtime binds auth, auth binds realtime). Document the one-time binding cut as a first-class BOOTSTRAP step AND make `deploy:*` tolerate it — not the current footnote ("in practice auth already exists" — false for `new-app`).
-7. **`DEV_ECHO_CODES=1` on staging** echoes login codes in API responses even with Resend live. Fine for a test rig — add a one-line note that it's a staging-only convenience, never a real-user staging.
+7. ~~**`DEV_ECHO_CODES=1` on staging** echoes login codes in API responses.~~ **DONE 2026-08-04** — the echo (code path + config var) is DELETED, code appears inbox-only in every env; automated sign-in uses the ADMIN_KEY-gated staging test-login door (B1, see Fixed below).
 
 ### P3 · structure / honesty
 8. **Eight god-files >400 LOC** (`agent.ts` ~570, both `tools.ts`, `api.ts` ~535…) — split by seam. Largely dissolved by #1 + #2.
