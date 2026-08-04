@@ -82,7 +82,8 @@ function findOffenders(): string[] {
             i += 5
             continue
           }
-          const hook = /^use[A-Z]\w*(?=[(<])/.exec(src.slice(i, i + 60))
+          // Bare hooks AND namespaced ones (React.useState) both count.
+          const hook = /^(?:React\.)?use[A-Z]\w*(?=[(<])/.exec(src.slice(i, i + 60))
           if (hook && !/[\w$.]/.test(src[i - 1] ?? " ")) {
             if (sawReturn) offenders.push(`${file.slice(WEB.length)} → ${fm[1]} calls ${hook[0]} after an early return`)
             i += hook[0].length - 1
