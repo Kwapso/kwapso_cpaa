@@ -18,6 +18,7 @@
 //   POST /api/content/help/update         -> edit a ticket
 //   POST /api/content/help/status         -> move a ticket along its fixed lifecycle
 //   POST /api/content/help/bulk-status    -> move MANY tickets to one status → {updated,skipped}
+//   POST /api/content/help/bulk-status-by-filter -> the SET-shaped bulk (facets → status)
 //   POST /api/content/help/reply          -> add a reply to a ticket's thread
 //   GET  /api/content/help/stakeholders   -> a ticket's stakeholders (?id=<ticketId>)
 //   POST /api/content/help/stakeholders   -> manually add a stakeholder (add-only)
@@ -49,6 +50,7 @@ import {
   postHelpReply,
   postHelpStatus,
   postUpdateHelp,
+  postBulkHelpStatusByFilter,
 } from "./routes/help"
 
 /**
@@ -82,6 +84,8 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/content/help/update": { handler: postUpdateHelp, kind: "mutation" },
   "POST /api/content/help/status": { handler: postHelpStatus, kind: "mutation" },
   "POST /api/content/help/bulk-status": { handler: postBulkHelpStatus, kind: "mutation" },
+  // The SET-shaped bulk: facet filter → one status (counts first; publishes only when moved).
+  "POST /api/content/help/bulk-status-by-filter": { handler: postBulkHelpStatusByFilter, kind: "mutation" },
   "POST /api/content/help/reply": { handler: postHelpReply, kind: "mutation" },
   "GET /api/content/help/stakeholders": { handler: getHelpStakeholders, kind: "read" },
   "POST /api/content/help/stakeholders": { handler: postAddStakeholder, kind: "mutation" },

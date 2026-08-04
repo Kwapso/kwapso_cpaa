@@ -5,10 +5,13 @@
 // GuardError the worker already maps (bad input is a 400, never a 500).
 
 import { GuardError } from "../../../../shared/workers/gating"
+import { BULK_IDS_LIMIT } from "../../../../shared/workers/limits"
 import { requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
 
-/** The most ids a single batch may carry (a bulk change is high-blast). */
-export const BULK_IDS_LIMIT = 500
+// The cap itself lives in shared/workers/limits.ts — ONE constant that the door
+// enforces AND the agent's tool schemas declare (maxItems + description), so the
+// number the model is told can never drift from the number that physically fits.
+export { BULK_IDS_LIMIT }
 
 /** Validate an untrusted `ids` value into a clean string[]: must be a non-empty
  * array, at most BULK_IDS_LIMIT entries, each a non-empty string (NULs stripped,

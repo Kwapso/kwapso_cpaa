@@ -102,6 +102,13 @@ export const RULES_REGISTRY: Rule[] = [
     status: "enforced",
   },
   {
+    id: "R13",
+    dimension: "arch",
+    law: "Shipping the code ships the capability: every module is a TargetDef in the import/export catalog or a reviewed CATALOG_EXEMPT entry — AND the core catalogue table reconciles itself against the code on READ (INSERT-only, ON CONFLICT DO NOTHING: a target the owner switched OFF stays off; only a row that never existed is created; the picker never pre-filters is_active in SQL). Earned by: staging importing two modules that production, running byte-identical code, could not — rows are data, and no deploy carries data.",
+    checkId: "catalog-coverage",
+    status: "enforced",
+  },
+  {
     id: "R14",
     dimension: "arch",
     law: "No unbounded list endpoint: every exported list*/search* function backing a collection route either PAGES (LIMIT ? OFFSET ? + a total) or applies a HARD CAP (LIMIT n) with a comment saying so. Earned by: one unbounded read stalling a worker under a 24,000-row catalogue — scale is a law, not a per-screen choice.",
@@ -136,7 +143,24 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "activity-gate-coverage",
     status: "enforced",
   },
+  {
+    id: "R19",
+    dimension: "ai",
+    law: "Agent/MCP filter parity: any tool sitting on a screen's list/search door EXPOSES and FORWARDS every filter that door parses — the required set is DERIVED from the door's own parameter parsing, never hand-listed. Earned by: the assistant falling back to free text and answering a DIFFERENT question — 3,465 descriptions that mentioned the words instead of the 134 records actually carrying the value.",
+    checkId: "agent-filter-parity",
+    status: "enforced",
+  },
 ]
+
+/** R13 — reviewed exemptions: modules that are deliberately NOT import targets,
+ * each with its reason. Every other module must have a TargetDef in the catalog. */
+export const CATALOG_EXEMPT: Record<string, string> = {
+  teams: "team metadata is created by the team factory (one row per team), never imported",
+  team_members: "membership arrives through invites (an identity flow) — a CSV cannot consent for a person",
+  help: "tickets are conversations raised in-app; importing them would forge authorship and timelines",
+  screens: "screen recipes are app furniture (config), not team data",
+  agent: "the assistant's threads/usage are system records, not importable content",
+}
 
 /** R18 — which permission module gates each activity `relatedTable` a worker
  * writes. The team feed (the ONE cross-module read) subtracts the caller's denied

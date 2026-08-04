@@ -94,48 +94,57 @@ export const SHARED_TOOLS: SharedTool[] = [
   /* --------------------------------- reads --------------------------------- */
   {
     name: "list_members",
-    summary: "List the team's members, with their roles.",
+    summary: "List the team's members, with their roles. Pass `id` (a member's user id) to fetch just that one member.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/members",
-    schema: obj({}),
-    agent: { write: false, summarize: () => "List members" },
+    schema: obj({ id: S }),
+    buildQuery: (i) => (str(i, "id") ? `?id=${encodeURIComponent(str(i, "id"))}` : ""),
+    agent: { write: false, summarize: (i) => (str(i, "id") ? "Look up one member" : "List members") },
   },
   {
     name: "list_roles",
-    summary: "List the team's roles.",
+    summary: "List the team's roles. Pass `id` (a role id) to fetch just that one role.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/roles",
-    schema: obj({}),
-    agent: { write: false, summarize: () => "List roles" },
+    schema: obj({ id: S }),
+    buildQuery: (i) => (str(i, "id") ? `?id=${encodeURIComponent(str(i, "id"))}` : ""),
+    agent: { write: false, summarize: (i) => (str(i, "id") ? "Look up one role" : "List roles") },
   },
   {
     name: "list_invites",
     summary:
       "List the team's invites — each one's email, role, status (pending / accepted / revoked) and its invite id. Use this to find a PENDING invite's id before revoking it (list_members only shows people who've already joined, so an unaccepted invite won't be there).",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/invites",
-    schema: obj({}),
-    agent: { write: false, summarize: () => "List invites" },
+    schema: obj({ id: S }),
+    buildQuery: (i) => (str(i, "id") ? `?id=${encodeURIComponent(str(i, "id"))}` : ""),
+    agent: { write: false, summarize: (i) => (str(i, "id") ? "Look up one invite" : "List invites") },
   },
   {
     name: "list_dropdown_values",
     summary:
       "List the team's dropdown values (selectable data), active first then deactivated — each carries `active`. Deactivated values are listed too, so you can find one's id and reactivate it.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/selectable",
-    schema: obj({}),
-    agent: { write: false, summarize: () => "List dropdown values" },
+    schema: obj({ id: S }),
+    buildQuery: (i) => (str(i, "id") ? `?id=${encodeURIComponent(str(i, "id"))}` : ""),
+    agent: { write: false, summarize: (i) => (str(i, "id") ? "Look up one dropdown value" : "List dropdown values") },
   },
   {
     name: "list_learning",
-    summary: "List the team's learning / how-to articles.",
+    summary: "List the team's learning / how-to articles. Pass `id` to fetch just one article.",
     binding: "CONTENT", method: "GET", path: "/api/content/learning",
-    schema: obj({}),
-    agent: { write: false, summarize: () => "List learning articles" },
+    schema: obj({ id: S }),
+    buildQuery: (i) => (str(i, "id") ? `?id=${encodeURIComponent(str(i, "id"))}` : ""),
+    agent: { write: false, summarize: (i) => (str(i, "id") ? "Look up one article" : "List learning articles") },
   },
   {
     name: "list_help_tickets",
-    summary: "List the team's support tickets. scope: 'mine' (yours) or 'all' (default all).",
+    summary: "List the team's support tickets. scope: 'mine' (yours) or 'all' (default all); pass `id` to fetch just one ticket.",
     binding: "CONTENT", method: "GET", path: "/api/content/help",
-    schema: obj({ scope: S }),
-    buildQuery: (i) => (str(i, "scope") === "mine" ? "?scope=mine" : "?scope=all"),
-    agent: { write: false, summarize: () => "List support tickets" },
+    schema: obj({ scope: S, id: S }),
+    buildQuery: (i) => {
+      const q = [str(i, "scope") === "mine" ? "scope=mine" : "scope=all"]
+      if (str(i, "id")) q.push(`id=${encodeURIComponent(str(i, "id"))}`)
+      return `?${q.join("&")}`
+    },
+    agent: { write: false, summarize: (i) => (str(i, "id") ? "Look up one ticket" : "List support tickets") },
   },
 
   /* --------------------------------- roles --------------------------------- */
@@ -230,7 +239,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   /* --------------------------- dropdown values ----------------------------- */
   {
     name: "create_dropdown_value",
-    summary: "Add a dropdown value: type = the group name, value = the option.",
+    summary: "Add a dropdown value: type = the group name, value = the option. A dropdown write NEVER invents an option — for 'create X and move things onto it', call THIS first, then write the rows.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/selectable",
     schema: obj({ type: S, value: S }, ["type", "value"]),
     buildBody: (i) => ({ type: str(i, "type"), value: str(i, "value") }),

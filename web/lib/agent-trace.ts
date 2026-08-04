@@ -109,6 +109,7 @@ export function traceFor(
     case "run_import_batch":
       return { path: seg(teamId, "import"), highlight: "main" }
     case "bulk_set_help_status":
+    case "set_help_status_by_filter":
       return { path: seg(teamId, "help"), highlight: "main" }
     case "bulk_set_learning_active":
       return { path: seg(teamId, "learning"), highlight: "main" }

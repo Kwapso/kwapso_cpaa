@@ -408,6 +408,8 @@ describe("RULES — the laws of the base", () => {
       "activity-gate-coverage", // R18: the source-scan above
       "live-collections", // R15: the deaf-publisher + paged-subscription scan above
       "counted-collections", // R16: the seam/place/arbitration scan above + format-count.test.ts
+      "catalog-coverage", // R13: workers/data-ops/test/catalog-coverage.test.ts
+      "agent-filter-parity", // R19: workers/mcp/test/filter-parity.test.ts
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

@@ -23,6 +23,7 @@
 
 import { GuardError, requireRight, teamContext } from "../../../../shared/workers/gating"
 import { forwardToDoor } from "../../../../shared/workers/http"
+import { BULK_IDS_LIMIT } from "../../../../shared/workers/limits"
 import { publishChange } from "../../../../shared/workers/realtime"
 import {
   obj,
@@ -106,12 +107,45 @@ const AGENT_ONLY: AgentTool[] = [
     summarize: (i) => `Rename the team to "${str(i, "name")}"`,
   },
   {
+    name: "set_help_status_by_filter",
+    description:
+      "The SET-shaped bulk: move EVERY support ticket matching a facet filter (status and/or type — the " +
+      "same facets the Help screen sends; free text is NOT accepted for a write) to one status, in one " +
+      "call. Call it FIRST with dryRun:true to learn the TRUE match count, then again for real — the " +
+      `count you state must come from that dry run. Refuses a filter matching more than ${BULK_IDS_LIMIT} ` +
+      "tickets; a re-run changes nothing (idempotent).",
+    schema: obj(
+      { toStatus: S, status: S, helpType: S, dryRun: { type: "boolean" } },
+      ["toStatus"]
+    ),
+    binding: "CONTENT",
+    method: "POST",
+    path: "/api/content/help/bulk-status-by-filter",
+    write: true,
+    // The count-first step (dryRun) reads; only the real write pauses for yes/no.
+    confirm: (i) => i.dryRun !== true,
+    buildBody: (i) => ({
+      toStatus: str(i, "toStatus"),
+      ...(str(i, "status") ? { status: str(i, "status") } : {}),
+      ...(str(i, "helpType") ? { helpType: str(i, "helpType") } : {}),
+      ...(i.dryRun === true ? { dryRun: true } : {}),
+    }),
+    summarize: (i) =>
+      i.dryRun === true
+        ? `Count tickets matching the filter${str(i, "helpType") ? ` (type "${str(i, "helpType")}")` : ""}${str(i, "status") ? ` in ${str(i, "status")}` : ""}`
+        : `Set every${str(i, "helpType") ? ` "${str(i, "helpType")}"` : ""} ticket${str(i, "status") ? ` in ${str(i, "status")}` : ""} to ${str(i, "toStatus")}`,
+  },
+  {
     name: "bulk_set_help_status",
     description:
       "Move MANY support tickets to the same status at once (open, in_progress, resolved, reopened). " +
-      "First list the tickets (a read) to get their ids, then call this with those ids. A bulk change " +
-      "is confirmed with a count before it runs.",
-    schema: obj({ ids: { type: "array", items: S }, status: S }, ["ids", "status"]),
+      "First list the tickets (a read) to get their ids, then call this with those ids — at most " +
+      `${BULK_IDS_LIMIT} per call (the door refuses more). A bulk change is confirmed with a count ` +
+      "before it runs. For a filter-shaped job prefer set_help_status_by_filter (one call, true count).",
+    schema: obj(
+      { ids: { type: "array", items: S, maxItems: BULK_IDS_LIMIT }, status: S },
+      ["ids", "status"]
+    ),
     binding: "CONTENT",
     method: "POST",
     path: "/api/content/help/bulk-status",
@@ -124,9 +158,13 @@ const AGENT_ONLY: AgentTool[] = [
     name: "bulk_set_learning_active",
     description:
       "Switch MANY learning articles off (deactivate) or back on (reactivate) at once — never deleted. " +
-      "First list the articles (a read) to get their ids, then call this with those ids. A bulk change " +
-      "is confirmed with a count before it runs.",
-    schema: obj({ ids: { type: "array", items: S }, active: { type: "boolean" } }, ["ids", "active"]),
+      "First list the articles (a read) to get their ids, then call this with those ids — at most " +
+      `${BULK_IDS_LIMIT} per call (the door refuses more). A bulk change is confirmed with a count ` +
+      "before it runs.",
+    schema: obj(
+      { ids: { type: "array", items: S, maxItems: BULK_IDS_LIMIT }, active: { type: "boolean" } },
+      ["ids", "active"]
+    ),
     binding: "CONTENT",
     method: "POST",
     path: "/api/content/learning/bulk-active",

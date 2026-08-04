@@ -15,7 +15,7 @@ import { ulid } from "../../../../shared/workers/id"
 import type { HelpMessage, HelpTicket } from "../../../../shared/types"
 import { GuardError, type MemberGuard } from "../../../../shared/workers/gating"
 import { optionalText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
-import { LIST_HARD_CAP, THREAD_HARD_CAP } from "../../../../shared/workers/limits"
+import { BULK_IDS_LIMIT, LIST_HARD_CAP, THREAD_HARD_CAP } from "../../../../shared/workers/limits"
 
 /** The fixed status lifecycle the code trusts (the team-editable dropdown is
  * display-only). Anything outside this set is rejected. */
@@ -326,6 +326,75 @@ export async function bulkSetStatus(
     }
   }
   return { changed, skipped }
+}
+
+/** The FILTER-shaped bulk (the set-shaped job): "move every ticket matching
+ * these facets to <toStatus>" in ONE call — the agent has no variables, only
+ * words, so passing it rows means re-saying every id; passing the FILTER is 2
+ * calls where 10 round-trips were. It counts FIRST (so a confirm can state the
+ * TRUE number), refuses past BULK_IDS_LIMIT, is idempotent by construction
+ * (`status <> ?` — a re-run matches nothing), writes ONE activity row for the
+ * whole set, and the route publishes only when something moved. Facets ONLY,
+ * never free text — a fuzzy ranked match is not something a person can approve
+ * honestly. `dryRun` returns the count without writing (the count-first step). */
+export async function bulkSetStatusByFilter(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor,
+  filter: { status?: HelpStatus; helpType?: string },
+  toStatus: HelpStatus,
+  dryRun: boolean
+): Promise<{ matched: number; changed: number }> {
+  // The same facet set the Help screen sends (status / type). The R17 predicate
+  // (`status <> ?`) is INLINE in both statements below — source-visible for the
+  // idempotent-transitions scan — so "matched" is already "would change".
+  const extra: string[] = []
+  const extraParams: (string | number)[] = []
+  if (filter.status) {
+    extra.push("status = ?")
+    extraParams.push(filter.status)
+  }
+  if (filter.helpType) {
+    extra.push("help_type = ?")
+    extraParams.push(filter.helpType)
+  }
+  const extraSql = extra.length ? ` AND ${extra.join(" AND ")}` : ""
+
+  const countRows = await d1Query<{ n: number }>(
+    cfg,
+    guard.databaseId,
+    `SELECT COUNT(*) AS n FROM help WHERE status <> ?${extraSql}`,
+    [toStatus, ...extraParams]
+  )
+  const matched = countRows[0]?.n ?? 0
+  if (dryRun || matched === 0) return { matched, changed: 0 }
+  if (matched > BULK_IDS_LIMIT)
+    throw new GuardError(
+      400,
+      "too_many",
+      `That filter matches ${matched} tickets — the bulk ceiling is ${BULK_IDS_LIMIT}. Narrow the filter.`
+    )
+
+  const now = new Date().toISOString()
+  const resolved = toStatus === "resolved"
+  const resolveBlock = resolved
+    ? `resolved = 1, resolved_at = ${sqlString(now)}, resolver_id = ${sqlString(actor.id)}, resolver_email = ${sqlString(actor.email)}, resolver_name = ${sqlString(actor.name)}`
+    : "resolved = 0, resolved_at = NULL, resolver_id = NULL, resolver_email = NULL, resolver_name = NULL"
+  const changedRows = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    `UPDATE help SET status = ?, ${resolveBlock}, updated_at = ?, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE status <> ?${extraSql} RETURNING id`,
+    [toStatus, now, toStatus, ...extraParams]
+  )
+  const changed = changedRows.length
+  if (changed > 0)
+    // ONE activity row for the set — history says what happened, not per-row noise.
+    await logActivity(cfg, guard.databaseId, actor, {
+      type: `Help tickets ${toStatus === "resolved" ? "resolved" : "updated"} (bulk)`,
+      description: `${actor.name} set ${changed} support ticket${changed === 1 ? "" : "s"}${filter.helpType ? ` of type "${filter.helpType}"` : ""}${filter.status ? ` from ${filter.status.replace("_", " ")}` : ""} to ${toStatus.replace("_", " ")}`,
+      relatedTable: "help",
+    })
+  return { matched, changed }
 }
 
 /** Add a reply to a ticket's thread, and bump the ticket's updated_at so it

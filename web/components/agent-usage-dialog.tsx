@@ -1,8 +1,13 @@
 "use client"
 
-// The assistant's usage view (behind the quota badge): where credits went + why.
-// Self-contained: lazily loads the team-scoped usage log each time it opens, so
-// it always reflects the turns just run.
+// The assistant's usage view (behind the quota badge): where the TEAM's credits
+// went + why. Self-contained: lazily loads the team-scoped usage log each time it
+// opens, so it always reflects the turns just run. Rendered through the library
+// ActivityFeed — the same timeline every other history in the app uses, not a
+// hand-rolled list. Visibility rides each row's `kind` (decided server-side):
+// an ACTION row reads as what the assistant did (team-visible); a teammate's
+// PROMPT row arrives with its summary redacted, and we say so plainly instead
+// of showing a blank line with their name on it.
 
 import * as React from "react"
 
@@ -14,9 +19,21 @@ import {
   DialogDescription,
 } from "@swift-struck/ui/registry/primitives/dialog/dialog"
 import { ScrollArea } from "@swift-struck/ui/registry/primitives/scroll-area/scroll-area"
+import {
+  ActivityFeed,
+  defaultActivityFeedConfig,
+  type ActivityItem as ActivityFeedItem,
+} from "@swift-struck/ui/registry/collections/activity-feed/activity-feed"
 
 import { dataOps, type UsageLogRow } from "@/lib/api"
 import { formatActivityWhen } from "@/lib/format"
+
+/** A redacted row's stand-in line: the row is real (who + when + credits), only
+ * the TEXT is theirs. Never a blank bubble with a teammate's name on it. */
+function rowDescription(row: UsageLogRow): string {
+  if (row.summary) return `${row.summary} · ${row.credits} ${row.credits === 1 ? "credit" : "credits"}`
+  return `A question they asked (private) · ${row.credits} ${row.credits === 1 ? "credit" : "credits"}`
+}
 
 export function AgentUsageDialog({
   open,
@@ -47,6 +64,13 @@ export function AgentUsageDialog({
     }
   }, [open])
 
+  const items: ActivityFeedItem[] = (rows ?? []).map((row) => ({
+    id: row.id,
+    description: rowDescription(row),
+    actor: row.actorName ?? undefined,
+    timestamp: formatActivityWhen(row.createdAt),
+  }))
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -60,20 +84,11 @@ export function AgentUsageDialog({
           <p className="text-muted-foreground py-6 text-center text-sm">
             Couldn&apos;t load usage. Try again.
           </p>
-        ) : rows && rows.length > 0 ? (
+        ) : items.length > 0 ? (
           <ScrollArea className="max-h-80">
-            <ul className="flex flex-col gap-3 pr-3">
-              {rows.map((row) => (
-                <li key={row.id} className="border-b pb-3 text-sm last:border-0 last:pb-0">
-                  <p className="text-muted-foreground text-xs">
-                    {formatActivityWhen(row.createdAt)}
-                    {row.actorName ? ` · ${row.actorName}` : ""} · {row.credits}{" "}
-                    {row.credits === 1 ? "credit" : "credits"}
-                  </p>
-                  <p className="mt-0.5">{row.summary}</p>
-                </li>
-              ))}
-            </ul>
+            <div className="pr-3">
+              <ActivityFeed config={defaultActivityFeedConfig} items={items} />
+            </div>
           </ScrollArea>
         ) : (
           <p className="text-muted-foreground py-6 text-center text-sm">No usage yet today.</p>

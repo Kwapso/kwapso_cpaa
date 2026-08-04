@@ -7,7 +7,7 @@
 // best-effort in lib/notify.
 
 import { fail, json } from "../../../../shared/workers/http"
-import { requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
+import { optionalText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
 import { publishChange } from "../../../../shared/workers/realtime"
 import { gated, gatedBody } from "../../../../shared/workers/route"
 import { requireIdList } from "../lib/bulk"
@@ -26,6 +26,7 @@ import {
   type TicketInput,
   countTickets,
   countReplies,
+  bulkSetStatusByFilter,
 } from "../lib/help"
 import { notifyReplyAndMentions } from "../lib/notify"
 import { addStakeholder, listStakeholders } from "../lib/stakeholders"
@@ -87,6 +88,37 @@ export async function postHelpStatus(request: Request, env: Env): Promise<Respon
   const changed = await setStatus(cfg, guard, actor, body.id, status)
   if (changed) await publishChange(env.REALTIME, guard.teamId, "help", body.id)
   return json({ tickets: await listTickets(cfg, guard, "all"), ...(await countTickets(cfg, guard)) })
+}
+
+/** POST /api/content/help/bulk-status-by-filter — the SET-shaped bulk: move every
+ * ticket matching the facet filter (status / type) to one status, in one call.
+ * Counts first (dryRun returns just the count), refuses past the bulk ceiling,
+ * idempotent by construction, ONE activity row, and publishes ONE coarse ping
+ * only when something moved (R17: a no-op publishes nothing). Facets only —
+ * free text is deliberately NOT a filter for a write. Gated by help:edit. */
+export async function postBulkHelpStatusByFilter(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{
+    toStatus?: unknown
+    status?: unknown
+    helpType?: unknown
+    dryRun?: unknown
+  }>(request, env, "help", "edit")
+  if (typeof body.toStatus !== "string" || !(HELP_STATUSES as readonly string[]).includes(body.toStatus))
+    return fail(400, "invalid_input", "A valid toStatus is required.")
+  const filter: { status?: HelpStatus; helpType?: string } = {}
+  if (body.status !== undefined) {
+    if (typeof body.status !== "string" || !(HELP_STATUSES as readonly string[]).includes(body.status))
+      return fail(400, "invalid_input", "status must be a valid status facet.")
+    filter.status = body.status as HelpStatus
+  }
+  const helpType = optionalText(body.helpType, "Type", TEXT_LIMITS.short)
+  if (helpType) filter.helpType = helpType
+  const result = await bulkSetStatusByFilter(
+    cfg, guard, actor, filter, body.toStatus as HelpStatus, body.dryRun === true
+  )
+  // ONE coarse list-ping for the whole set — and only when something moved.
+  if (result.changed > 0) await publishChange(env.REALTIME, guard.teamId, "help")
+  return json(result)
 }
 
 /** POST /api/content/help/bulk-status — move MANY tickets to the same status in one

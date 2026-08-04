@@ -42,15 +42,31 @@ describe("credit history reconciles with the balance (one row per command)", () 
 
   // A row is TITLED by what the assistant DID (the WRITE actions run), falling back to the
   // user's prompt for a read-only / no-action turn — so a clarifying reply reads as the
-  // question, not "List roles" (the credit-log-clarity feedback).
-  it("the usage row is titled by the ACTION taken, and the fold re-titles the row", () => {
+  // question, not "List roles" (the credit-log-clarity feedback). And a fold APPENDS the
+  // confirm's actions to the command's title — NEVER replaces: one command can pause for
+  // confirmation more than once, and replacing left a 10-credit turn titled by its last
+  // step alone (C3).
+  it("the usage row is titled by the ACTION taken, and the fold APPENDS (never replaces)", () => {
     // agent.ts derives the title from the tally's actions, falling back to the prompt.
     expect(/function usageTitle/.test(agent), "usageTitle must exist").toBe(true)
     expect(/tally\.actions\.push/.test(agent), "each ran WRITE must be recorded as an action").toBe(true)
-    // foldUsageIntoLatest re-titles the propose row to the confirmed action (SET summary).
     const start = credits.indexOf("export async function foldUsageIntoLatest")
     const body = credits.slice(start, credits.indexOf("\nexport ", start + 1))
-    expect(/SET[\s\S]*summary = \?/.test(body), "fold must re-title the row (SET summary)").toBe(true)
+    // APPEND semantics: the new actions concatenate onto the existing summary…
+    expect(/summary \|\| ' · ' \|\|/.test(body), "fold must APPEND to the title (summary || ' · ' || …)").toBe(true)
+    // …and a bare replacement must not sneak back in.
+    expect(/summary = \?,/.test(body), "fold must never REPLACE the title outright").toBe(false)
+    // Folding real actions makes the row team-visible ('action' kind).
+    expect(/kind = CASE/.test(body), "fold must mark the row an action row").toBe(true)
+  })
+
+  // C3: the row records WHICH kind of title it carries — an action (team-visible)
+  // or the author's prompt (their own; back-filled NULL rows stay private).
+  it("visibility rides the recorded kind — actions team-visible, prompts author-only", () => {
+    const start = credits.indexOf("export async function readUsageLog")
+    const body = credits.slice(start, credits.indexOf("\nexport ", start + 1) === -1 ? undefined : credits.indexOf("\nexport ", start + 1))
+    expect(/kind = 'action' OR actor_id = \?/.test(body), "an action row's summary is team-visible; a prompt row's is the author's own").toBe(true)
+    expect(/\bkind\b/.test(credits.slice(credits.indexOf("export async function logUsage"))), "logUsage must record the kind").toBe(true)
   })
 
   // A READ is not an action the user "did", so it must not title the row — only writes are

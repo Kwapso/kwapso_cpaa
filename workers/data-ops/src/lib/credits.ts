@@ -138,6 +138,12 @@ export async function grantCredits(env: Env, teamId: string, amount: number): Pr
 /** Where a turn's AI units came from: all free, all paid credit, or a bit of each. */
 export type UsageSource = "free" | "credit" | "mixed"
 
+/** What a usage row's summary IS: an ACTION the assistant took (team-visible —
+ * the team is entitled to see actions taken in its name) or the PROMPT the
+ * person typed (the author's own — showing a teammate's question would publish
+ * it). Recorded per row so visibility never guesses. */
+export type UsageKind = "action" | "prompt"
+
 /** Record ONE agent turn in the usage log (the human trail, not the metering counter).
  * Best-effort by design: any error — a missing table, a write hiccup — is swallowed so a
  * logging failure can never break the turn the user actually cares about. */
@@ -147,14 +153,15 @@ export async function logUsage(
   actor: Actor,
   credits: number,
   source: UsageSource,
-  summary: string
+  summary: string,
+  kind: UsageKind
 ): Promise<void> {
   try {
     await env.DB.prepare(
-      `INSERT INTO agent_usage_log (id, team_id, actor_id, actor_name, created_at, credits, source, summary)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO agent_usage_log (id, team_id, actor_id, actor_name, created_at, credits, source, summary, kind)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-      .bind(ulid(), teamId, actor.id, actor.name, new Date().toISOString(), credits, source, summary)
+      .bind(ulid(), teamId, actor.id, actor.name, new Date().toISOString(), credits, source, summary, kind)
       .run()
   } catch {
     /* logging is never fatal — a missing table or write error must not break the turn */
@@ -176,37 +183,45 @@ export async function foldUsageIntoLatest(
   actor: Actor,
   addCredits: number,
   addSource: UsageSource,
-  title: string
+  actions: string
 ): Promise<void> {
   if (addCredits <= 0) return
   try {
-    // Fold the units in AND re-title the row to what the confirm actually did — so a
-    // confirmed command reads "Remove Jane Doe", never the propose prompt or "(continued)".
+    // Fold the units in AND APPEND the confirm's actions to the command's title —
+    // never replace. One command can pause for confirmation MORE THAN ONCE, and
+    // replacing left a 10-credit turn titled by its last step alone (the actions
+    // taken before the pause vanished from the log). Appending actions also makes
+    // the row an 'action' row (team-visible): the folded turn DID something.
     const res = await env.DB.prepare(
       `UPDATE agent_usage_log
          SET credits = credits + ?,
              source = CASE WHEN source = ? THEN source ELSE 'mixed' END,
-             summary = ?
+             summary = substr(CASE WHEN ? = '' THEN summary ELSE summary || ' · ' || ? END, 1, 300),
+             kind = CASE WHEN ? = '' THEN kind ELSE 'action' END
        WHERE id = (
          SELECT id FROM agent_usage_log
          WHERE team_id = ? AND actor_id = ? ORDER BY created_at DESC LIMIT 1
        )`
     )
-      .bind(addCredits, addSource, title, teamId, actor.id)
+      .bind(addCredits, addSource, actions, actions, actions, teamId, actor.id)
       .run()
     // No prior row to fold into (propose log failed) → don't lose the units.
     if ((res.meta.changes ?? 0) === 0)
-      await logUsage(env, teamId, actor, addCredits, addSource, title)
+      await logUsage(env, teamId, actor, addCredits, addSource, actions || "assistant action", "action")
   } catch {
     /* best-effort — a fold failure must never break the turn */
   }
 }
 
 /** The team's usage log, newest-first (the panel's "N left today" badge opens this).
- * PRIVACY: the `summary` is the actor's own (truncated) AI prompt, so it's shown ONLY on
- * the viewer's OWN rows — a teammate sees who spent how many credits and when, but never
- * another person's prompt text. (Everything else — actor, credits, source, time — is
- * team-visible billing detail.) */
+ * VISIBILITY (C3 — the log tells the team where its credits went): an ACTION row's
+ * summary is team-visible — the team is entitled to see what was done in its name;
+ * a PROMPT row's summary is the author's own — a teammate sees who spent how many
+ * credits and when, never the question they typed. Hiding BOTH (the old naive
+ * "only my own rows" rule) showed an admin four blank rows with a teammate's name
+ * on them, withholding the one thing the team is entitled to. Back-filled rows
+ * (kind NULL) stay PRIVATE — they can't be classified after the fact, and a wrong
+ * guess publishes somebody's question. */
 export async function readUsageLog(
   env: Env,
   teamId: string,
@@ -214,8 +229,8 @@ export async function readUsageLog(
   limit: number
 ): Promise<UsageLogRow[]> {
   const res = await env.DB.prepare(
-    `SELECT id, created_at AS createdAt, actor_name AS actorName, credits, source,
-            CASE WHEN actor_id = ? THEN summary ELSE NULL END AS summary
+    `SELECT id, created_at AS createdAt, actor_name AS actorName, credits, source, kind,
+            CASE WHEN kind = 'action' OR actor_id = ? THEN summary ELSE NULL END AS summary
      FROM agent_usage_log WHERE team_id = ? ORDER BY created_at DESC LIMIT ?`
   )
     .bind(viewerId, teamId, limit)
