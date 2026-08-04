@@ -187,13 +187,14 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
  * DATA, not a hand-list in a test: adding a growing module means adding a line here. */
 export const GROWING_COLLECTIONS: Record<
   string,
-  { lib: string; fn: string; routes: string; rowsKey: string; webKey: string; why: string }
+  { lib: string; fn: string; routes: string; rowsKey: string; webKey: string; listRecipe?: string; why: string }
 > = {
   help: {
     lib: "workers/content/src/lib/help.ts",
     fn: "listTickets",
     routes: "workers/content/src/routes/help.ts",
     rowsKey: "tickets",
+    listRecipe: "help.list",
     webKey: "helpKey(",
     why: "support tickets accumulate forever — a team that has raised 3,000 must still reach the oldest",
   },

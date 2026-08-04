@@ -21,6 +21,7 @@ import {
 } from "@shared/rules/registry"
 import { SIMPLE_INVALIDATIONS, TEAM_RESOURCES } from "../lib/live-resources"
 import { TEAM_SECTIONS } from "../lib/pages"
+import { BASE_RECIPES } from "../lib/screens"
 
 /** Every worker's src .ts file (recursively), as [repo-relative path, source]. */
 function workerSources(): [string, string][] {
@@ -263,6 +264,18 @@ describe("RULES — the laws of the base", () => {
         return src.includes("<LoadMore") && src.includes(c.webKey)
       })
       expect(wired, `${name} pages on the server but nothing in web can reach page two`).toBe(true)
+
+      // R14 meets R16: the collection frame's own "Showing X of Y" counts the
+      // LOADED prefix, so on a paged screen it under-reports — and it is a
+      // second count besides. The exact one above is the only one.
+      if (c.listRecipe) {
+        const recipe = BASE_RECIPES[c.listRecipe]
+        expect(recipe, `${name}: recipe ${c.listRecipe} must exist`).toBeDefined()
+        expect(
+          recipe.collection?.showCount,
+          `${name} is paged, so its recipe must not render the frame's own "Showing X of Y" (it counts the loaded prefix)`
+        ).toBe(false)
+      }
     }
   })
 

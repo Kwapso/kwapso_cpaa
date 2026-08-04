@@ -142,9 +142,10 @@ ARCHITECTURE.md `/media/*` note before storing anything sensitive.
 
 | Secret | On workers | Why |
 |---|---|---|
-| `RESEND_API_KEY` | auth | send login codes + notifications. Until it's set, staging echoes login codes in the API response and production refuses email login. |
+| `RESEND_API_KEY` | auth | send login codes + notifications. Login codes are NEVER echoed in an API response, in any environment — until this is set, sign-in emails simply don't send. Automated tests sign in through the non-production test-login door (`POST /api/auth/admin/test-login`, its own `TEST_LOGIN_KEY` secret; see OPERATIONS.md § secrets).
 | `CF_D1_TOKEN` | tenancy, content, data-ops | the scoped D1 REST token (Cloudflare → D1 → Edit) that reaches per-team databases. |
-| `ADMIN_KEY` | tenancy, data-ops, **+ auth (STAGING ONLY)** | guards the maintenance endpoints (migrate-teams, db-sizes, grant credits) — and, on the auth worker, the staging test-login door. NEVER set it on production auth (its holder can sign in as any account). |
+| `ADMIN_KEY` | tenancy, data-ops | guards the maintenance endpoints (migrate-teams, db-sizes, grant credits). Set it in both environments. |
+| `TEST_LOGIN_KEY` | auth (**NON-PRODUCTION ONLY**) | the test-login door's own secret — its holder can sign in as ANY account on that environment. Deliberately a different name from `ADMIN_KEY` so the maintenance-key rollout can never arm it, and the door refuses outright when the worker's `ENVIRONMENT` var is `production`. |
 | `INTERNAL_KEY` | auth, tenancy, content, gateway, mcp | shared secret gating auth's `/internal/*` doors. tenancy + content call `/internal/send-email`; the **gateway** forwards client error beacons to `/internal/log-error` (a DIFFERENT reason — the gateway sends no email but still needs the key, or web errors never reach `error_logs`). The **mcp** worker uses it to mint team-pinned sessions (`/internal/mcp-session`). MUST match across all five. |
 | `ANTHROPIC_API_KEY` | data-ops | *optional* — when set, the agent's brain is Claude; unset falls back to Workers AI. Both do full tool use. |
 
@@ -311,7 +312,7 @@ transient auth error; just retry.)
 prereqs → npm install → wrangler login → npm run check
   → d1 create (core, both envs) → migrations apply (core 0001–00NN)
   → r2 bucket create (media × 3 × 2 envs)
-  → secret put (RESEND, CF_D1_TOKEN, ADMIN_KEY [+ auth-staging-only for test-login], INTERNAL_KEY, [ANTHROPIC]) + set vars (PUBLIC_APP_URL, AGENT_*)
+  → secret put (RESEND, CF_D1_TOKEN, ADMIN_KEY, INTERNAL_KEY, [ANTHROPIC], [TEST_LOGIN_KEY on non-prod auth]) + set vars (PUBLIC_APP_URL, AGENT_*)
   → npm run deploy:staging  (realtime→auth→tenancy→content→data-ops→mcp→gateway) → smoke
   → sign in (test-login on staging) → first team (creates its DB) → migrate-teams as needed  (catalog self-heals; seed-targets optional)
   → verify → (repeat for production, owner-gated)

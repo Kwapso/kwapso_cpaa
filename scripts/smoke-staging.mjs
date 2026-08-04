@@ -45,16 +45,17 @@ const api = async (path, opts = {}, cookie = "") => {
 }
 
 // 2 · Login: mint a code through the ADMIN TEST-LOGIN door (staging-only,
-// ADMIN_KEY-gated, fails closed). Login codes are NEVER echoed by the real send
-// door in any environment, so the smoke needs ADMIN_KEY in its environment.
-const ADMIN_KEY = process.env.ADMIN_KEY ?? ""
-if (!ADMIN_KEY) {
-  console.log("FAIL no ADMIN_KEY in the environment — cannot sign in (export ADMIN_KEY before running the smoke)")
+// gated by its OWN TEST_LOGIN_KEY secret, fails closed, and refused outright on
+// production). Login codes are NEVER echoed by the real send door in any
+// environment, so the smoke needs TEST_LOGIN_KEY in its environment.
+const TEST_LOGIN_KEY = process.env.TEST_LOGIN_KEY ?? ""
+if (!TEST_LOGIN_KEY) {
+  console.log("FAIL no TEST_LOGIN_KEY in the environment — cannot sign in (export TEST_LOGIN_KEY before running the smoke)")
   process.exit(1)
 }
 const start = await api("/api/auth/admin/test-login", {
   method: "POST",
-  headers: { "x-admin-key": ADMIN_KEY },
+  headers: { "x-admin-key": TEST_LOGIN_KEY },
   body: JSON.stringify({ email: EMAIL }),
 })
 ok("test-login code minted (admin door)", start.res.ok && typeof start.body?.code === "string", JSON.stringify({ status: start.res.status }))

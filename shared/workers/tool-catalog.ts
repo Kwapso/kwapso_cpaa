@@ -91,6 +91,15 @@ export type SharedTool = {
 
 /* -------------------------------- the catalog --------------------------------- */
 
+/** WHY SOME CONSTRUCTIVE WRITES STILL CONFIRM. The rule is that only DESTRUCTIVE
+ * acts stop for a yes/no panel — creating an article or replying to a ticket just
+ * runs. Privilege GRANTS are the reviewed exception: create_role,
+ * set_role_permissions, set_member_role and invite_member decide WHO CAN DO WHAT,
+ * and the model reaches them while reading team data an attacker can author (a
+ * ticket description is up to 20,000 characters of someone else's text). Fenced
+ * tool output plus one system-prompt sentence is a soft defence; a confirm panel
+ * the admin must click is a hard one. So these four confirm — not because they are
+ * destructive, but because a silent one is a silent privilege escalation. */
 export const SHARED_TOOLS: SharedTool[] = [
   /* --------------------------------- reads --------------------------------- */
   {
@@ -157,7 +166,8 @@ export const SHARED_TOOLS: SharedTool[] = [
     binding: "TENANCY", method: "POST", path: "/api/tenancy/roles",
     schema: obj({ title: S, description: S }, ["title"]),
     buildBody: (i) => ({ title: str(i, "title"), description: str(i, "description") || "" }),
-    agent: { write: true, confirm: false, summarize: (i) => `Create the role "${str(i, "title")}"` },
+    // PRIVILEGE GRANT → confirm (see the note above SHARED_TOOLS).
+    agent: { write: true, confirm: true, summarize: (i) => `Create the role "${str(i, "title")}"` },
   },
   {
     name: "update_role",
@@ -186,7 +196,8 @@ export const SHARED_TOOLS: SharedTool[] = [
     binding: "TENANCY", method: "POST", path: "/api/tenancy/roles/permissions",
     schema: obj({ roleId: S, value: { type: "object" } }, ["roleId", "value"]),
     buildBody: (i) => ({ roleId: str(i, "roleId"), value: i.value }),
-    agent: { write: true, confirm: false, summarize: (i, names) => `Set access rights for ${roleLabel(i, names)}` },
+    // PRIVILEGE GRANT → confirm (see the note above SHARED_TOOLS).
+    agent: { write: true, confirm: true, summarize: (i, names) => `Set access rights for ${roleLabel(i, names)}` },
   },
 
   /* -------------------------------- members -------------------------------- */
@@ -197,7 +208,7 @@ export const SHARED_TOOLS: SharedTool[] = [
     schema: obj({ userId: S, roleId: S }, ["userId", "roleId"]),
     buildBody: (i) => ({ userId: str(i, "userId"), roleId: str(i, "roleId") }),
     agent: {
-      write: true, confirm: false,
+      write: true, confirm: true, // PRIVILEGE GRANT → confirm
       summarize: (i, names) => {
         const id = str(i, "roleId")
         return `Change ${memberLabel(i, names)} to ${names?.[id] ?? `role ${id}`}`
@@ -223,7 +234,7 @@ export const SHARED_TOOLS: SharedTool[] = [
     schema: obj({ email: S, roleId: S }, ["email", "roleId"]),
     buildBody: (i) => ({ email: str(i, "email"), roleId: str(i, "roleId") }),
     agent: {
-      write: true, confirm: false,
+      write: true, confirm: true, // PRIVILEGE GRANT → confirm
       summarize: (i, names) => {
         const id = str(i, "roleId")
         return `Invite ${str(i, "email")} as ${names?.[id] ?? `role ${id}`}`

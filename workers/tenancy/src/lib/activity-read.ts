@@ -52,6 +52,14 @@ export async function getActivity(
   allowedTables: string[] | null = null,
   cursor?: string | null
 ): Promise<Page<ActivityItem> & { total: number }> {
+  // FAIL CLOSED. An id-scope with no id used to match NO branch below, leaving the
+  // WHERE empty — so `?scope=user` with no `id` returned the entire team's
+  // cross-module history, unfiltered, to anyone with team_members:read. That is
+  // precisely the leak R18 exists to stop, arrived at by omission rather than by
+  // a missing gate. An unresolved scope now returns nothing at all.
+  if (scope !== "team" && !id) return { rows: [], hasMore: false, nextCursor: null, total: 0 }
+  if (scope === "record" && !table) return { rows: [], hasMore: false, nextCursor: null, total: 0 }
+
   // ONE where-clause, shared by the page read and the COUNT — a total that didn't
   // pass through the same visibility filter would over-count what it can't show.
   const clauses: string[] = []
@@ -68,8 +76,10 @@ export async function getActivity(
   } else if (scope === "record" && id && table) {
     clauses.push("related_table = ? AND related_row_id = ?")
     params.push(table, id)
-  } else if (scope === "team") {
-    // R18: the caller's denied modules are subtracted here (the ONE builder).
+  } else {
+    // `else`, not `else if (scope === "team")` — anything that reaches here is
+    // the whole-team read and MUST carry the R18 filter. A scope string the route
+    // didn't recognise must never widen into an unfiltered feed.
     const clause = activityVisibilityClause(allowedTables)
     if (clause.sql) clauses.push(clause.sql.replace(/^\s*WHERE\s*/, ""))
     params.push(...clause.params)

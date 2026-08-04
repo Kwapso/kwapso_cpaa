@@ -45,7 +45,7 @@ the concrete form of the planning ritual's step 4 (CLAUDE.md).
   (`toAgentTool`) and MCP (`toMcpTool`) both pick it up, so they can't drift. A tool for
   only ONE surface stays in that surface's file (the agent's bulk/SELF tools; the MCP's
   exports/import/agent-bridge). The agent's confirm is `true` — or an input-aware
-  predicate — only if the act is DESTRUCTIVE or bulk (constructive runs free, EDGE-CASES
+  predicate — if the act is DESTRUCTIVE, a PRIVILEGE GRANT, or bulk (other constructive writes run free, EDGE-CASES
   §5). Both forward through the SAME gated door — never a second, ungated path.
 - **A new invariant → a machine-checked Law if it can be source-scanned; else a
   convention + a targeted test.** Rule + registry entry + check land together (R-law

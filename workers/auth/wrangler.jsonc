@@ -28,7 +28,9 @@
   "services": [{ "binding": "REALTIME", "service": "brimba-realtime" }],
   "vars": {
     "APP_ORIGIN": "https://brimba.swift-struck.workers.dev",
-    "EMAIL_FROM": "noreply@updates.swiftstruck.com"
+    "EMAIL_FROM": "noreply@updates.swiftstruck.com",
+    // Ships with the deploy: the test-login door refuses outright here.
+    "ENVIRONMENT": "production"
   },
   "env": {
     "staging": {
@@ -50,7 +52,8 @@
       "services": [{ "binding": "REALTIME", "service": "brimba-realtime-staging" }],
       "vars": {
         "APP_ORIGIN": "https://brimba-staging.swift-struck.workers.dev",
-        "EMAIL_FROM": "noreply@updates.swiftstruck.com"
+        "EMAIL_FROM": "noreply@updates.swiftstruck.com",
+        "ENVIRONMENT": "staging"
       }
     }
   }

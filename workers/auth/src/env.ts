@@ -20,7 +20,16 @@ export type Env = {
    * never echoed anywhere). The holder can sign in as ANY account on the
    * environment: NEVER set this on the production auth worker. Fails closed
    * when unset — production simply has no test door. */
+  /** Owner-only maintenance key (shared name across workers — NEVER the
+   * test-login door's key; see TEST_LOGIN_KEY). */
   ADMIN_KEY?: string
+  /** The test-login door's OWN secret. Its holder can sign in as any account, so
+   * it is set on NON-PRODUCTION environments only — and the door additionally
+   * refuses outright when ENVIRONMENT is "production". */
+  TEST_LOGIN_KEY?: string
+  /** Which environment this worker is: "production" | "staging" | … Set as a var
+   * in wrangler.jsonc, so it ships with the deploy and can't be forgotten. */
+  ENVIRONMENT?: string
   /** Shared secret guarding /internal/send-email (defense-in-depth alongside
    * workers_dev:false). When set, the route rejects callers lacking the header. */
   INTERNAL_KEY?: string

@@ -127,12 +127,14 @@ export async function getActivityFeed(request: Request, env: Env): Promise<Respo
   const emptyFeed = () => pagedJson("activity", { rows: [], total: 0, hasMore: false, nextCursor: null })
   const { cfg, guard } = await teamContext(request, env)
   const url = new URL(request.url)
-  const scope = (url.searchParams.get("scope") ?? "team") as
-    | "team"
-    | "user"
-    | "role"
-    | "invite"
-    | "record"
+  // VALIDATED, not cast: an unrecognised scope used to fall past every branch
+  // here AND in getActivity, leaving an unfiltered whole-feed read behind.
+  const SCOPES = ["team", "user", "role", "invite", "record"] as const
+  const raw = url.searchParams.get("scope") ?? "team"
+  const scope = (SCOPES as readonly string[]).includes(raw)
+    ? (raw as (typeof SCOPES)[number])
+    : null
+  if (!scope) return fail(400, "invalid_input", "Unknown activity scope.")
   let id = url.searchParams.get("id") ?? undefined
   // The OPAQUE cursor from the previous page (R14) — decoded (and 400-checked)
   // inside getActivity, never parsed here.
@@ -151,6 +153,10 @@ export async function getActivityFeed(request: Request, env: Env): Promise<Respo
   }
 
   await requireRight(cfg, guard, scope === "role" ? "member_roles" : "team_members", "read")
+
+  // An id-scope with no id is a request for one record's history that names no
+  // record — answer with nothing, never with everyone's.
+  if (scope !== "team" && !id) return emptyFeed()
 
   // R18: the team feed carries the caller's module rights — build the allowed
   // related_table list from their per-module read rights + the pinned exemptions.

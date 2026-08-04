@@ -36,12 +36,11 @@ export async function startEmailChange(
   if (shape) return { ...shape, status: 400 }
   const newEmail = normalizeEmail(newEmailRaw)
 
-  // Already used by someone else? users.email is UNIQUE — fail kindly here
-  // rather than letting the constraint blow up on verify.
-  const existing = await findUserByEmail(env, newEmail)
-  if (existing && existing.id !== user.id)
-    return { error: "email_taken", message: "That email is already in use.", status: 409 }
-
+  // Throttle FIRST, and count every ATTEMPT — not just issued codes. The
+  // "already in use" answer below is a yes/no oracle on any address in the
+  // platform, so an unthrottled probe would enumerate the whole user base at
+  // full request rate (the login door is deliberately non-enumerable; this
+  // door must not undo that).
   // Throttle: at most 5 change-codes per user per hour.
   const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
   const recent = await env.DB.prepare(

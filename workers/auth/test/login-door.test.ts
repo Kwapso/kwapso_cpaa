@@ -60,8 +60,14 @@ describe("no login code ever leaves through anything but the inbox", () => {
 
   it("the admin test-login door exists, shares the mint, and FAILS CLOSED", () => {
     const door = index.slice(index.indexOf("async function adminTestLogin"), index.indexOf("async function emailVerify"))
-    // Fails closed: no ADMIN_KEY configured = the door does not exist.
-    expect(door).toContain("!env.ADMIN_KEY ||")
+    // Fails closed on its OWN secret — deliberately NOT the shared ADMIN_KEY
+    // maintenance key, which an operator sets on other workers in BOTH
+    // environments (one mistyped directory would otherwise arm impersonation).
+    expect(door).toContain("!env.TEST_LOGIN_KEY ||")
+    expect(door, "the impersonation door must never share the maintenance key's name").not.toContain("env.ADMIN_KEY")
+    // …and refuses outright on production, so the isolation is structural
+    // rather than a sentence in a runbook.
+    expect(door).toContain('env.ENVIRONMENT === "production"')
     // Same mint as the real send door — TTL/throttle/hashing can never drift.
     expect(door).toContain("mintLoginCode(")
     const start = index.slice(index.indexOf("async function emailStart"), index.indexOf("async function adminTestLogin"))

@@ -36,7 +36,8 @@ function field(column: string, label: string): RecipeField {
 function listCollection(
   emptyText: string,
   searchPlaceholder: string,
-  filterFacets: FilterFacet[] = []
+  filterFacets: FilterFacet[] = [],
+  opts: { paged?: boolean } = {}
 ): CollectionConfig {
   return {
     ...defaultCollectionConfig,
@@ -46,6 +47,11 @@ function listCollection(
     userFilter: filterFacets.length > 0,
     filterFacets,
     emptyText,
+    // R14 meets R16: on a PAGED collection the frame's own "Showing X of Y" is
+    // wrong in both numbers — it counts the loaded PREFIX, so it reads
+    // "Showing 50 of 50" beside a badge that correctly says 55. The count is
+    // shown exactly once, above, through the formatCount seam.
+    showCount: !opts.paged,
   }
 }
 
@@ -283,9 +289,12 @@ export const helpListRecipe: ScreenRecipe = {
   gate: { module: "help", right: "read" },
   fields: [field("name", "Ticket"), field("detail", "Details")],
   actions: [],
-  collection: listCollection("No tickets yet.", "Search tickets…", [
-    { field: "status", label: "Status", control: "select" },
-  ]),
+  collection: listCollection(
+    "No tickets yet.",
+    "Search tickets…",
+    [{ field: "status", label: "Status", control: "select" }],
+    { paged: true }
+  ),
 }
 
 /* ------------------------------ the registry ------------------------------ */
