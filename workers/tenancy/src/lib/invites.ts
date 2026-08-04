@@ -12,6 +12,7 @@ import type { Invite, InviteAudit } from "../../../../shared/types"
 import type { Env } from "../env"
 import { GuardError, type MemberGuard } from "./permissions"
 import { notifyInviteRevoked } from "./notify"
+import { LIST_HARD_CAP } from "../../../../shared/workers/limits"
 
 const INVITE_TTL_DAYS = 7
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
@@ -32,7 +33,7 @@ export async function listInvites(
   guard: MemberGuard
 ): Promise<Invite[]> {
   const rows = await env.DB.prepare(
-    "SELECT id, email, role_id, status, expires_at, created_at FROM invite_index WHERE team_id = ? ORDER BY created_at DESC"
+    `SELECT id, email, role_id, status, expires_at, created_at FROM invite_index WHERE team_id = ? ORDER BY created_at DESC LIMIT ${LIST_HARD_CAP}` // R14 hard cap
   )
     .bind(guard.teamId)
     .all<InviteRow>()

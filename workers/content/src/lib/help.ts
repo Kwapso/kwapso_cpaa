@@ -15,6 +15,7 @@ import { ulid } from "../../../../shared/workers/id"
 import type { HelpMessage, HelpTicket } from "../../../../shared/types"
 import { GuardError, type MemberGuard } from "../../../../shared/workers/gating"
 import { optionalText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
+import { LIST_HARD_CAP, THREAD_HARD_CAP } from "../../../../shared/workers/limits"
 
 /** The fixed status lifecycle the code trusts (the team-editable dropdown is
  * display-only). Anything outside this set is rejected. */
@@ -119,7 +120,8 @@ export async function listTickets(
   const rows = await d1Query<TicketRow>(
     cfg,
     guard.databaseId,
-    `SELECT ${TICKET_COLS} FROM help ${where} ORDER BY COALESCE(updated_at, created_at) DESC`,
+    // R14 hard cap — never unbounded; move to real paging before this bites.
+    `SELECT ${TICKET_COLS} FROM help ${where} ORDER BY COALESCE(updated_at, created_at) DESC LIMIT ${LIST_HARD_CAP}`,
     params
   )
   return rows.map(toTicket)
@@ -149,7 +151,7 @@ export async function listReplies(
   const rows = await d1Query<ReplyRow>(
     cfg,
     guard.databaseId,
-    "SELECT id, help_id, message_body, tagged_user_ids, is_agent, creator_id, creator_name, created_at FROM help_threads WHERE help_id = ? ORDER BY created_at ASC",
+    `SELECT id, help_id, message_body, tagged_user_ids, is_agent, creator_id, creator_name, created_at FROM help_threads WHERE help_id = ? ORDER BY created_at ASC LIMIT ${THREAD_HARD_CAP}`, // R14 hard cap
     [ticketId]
   )
   return rows.map(toMessage)
@@ -241,18 +243,23 @@ export async function setStatus(
   actor: Actor,
   id: string,
   status: HelpStatus
-): Promise<void> {
+): Promise<boolean> {
   await ticketOrThrow(cfg, guard, id)
+  // R17: the `status <> ?` predicate makes the move idempotent — re-resolving an
+  // already-resolved ticket moves zero rows, so it writes no duplicate history,
+  // re-stamps no editor/updated_at (no phantom re-sort), and pings nothing.
   const now = new Date().toISOString()
   const resolved = status === "resolved"
   const resolveBlock = resolved
     ? `resolved = 1, resolved_at = ${sqlString(now)}, resolver_id = ${sqlString(actor.id)}, resolver_email = ${sqlString(actor.email)}, resolver_name = ${sqlString(actor.name)}`
     : "resolved = 0, resolved_at = NULL, resolver_id = NULL, resolver_email = NULL, resolver_name = NULL"
-  await d1ExecScript(
+  const changed = await d1Query<{ id: string }>(
     cfg,
     guard.databaseId,
-    `UPDATE help SET status = ${sqlString(status)}, ${resolveBlock}, updated_at = ${sqlString(now)}, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE id = ${sqlString(id)};`
+    `UPDATE help SET status = ?, ${resolveBlock}, updated_at = ?, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE id = ? AND status <> ? RETURNING id`,
+    [status, now, id, status]
   )
+  if (!changed[0]) return false
 
   await logActivity(cfg, guard.databaseId, actor, {
     type: `Help ticket ${status === "resolved" ? "resolved" : status === "reopened" ? "reopened" : "updated"}`,
@@ -260,14 +267,15 @@ export async function setStatus(
     relatedTable: "help",
     relatedRowId: id,
   })
+  return true
 }
 
 /** Move MANY tickets to the same status in one call (the bulk sibling of
  * setStatus). Applies the SAME per-row change — same UPDATE, same resolver block,
- * same activity row — to each id that names a real ticket, and reports how many
- * changed vs. were skipped (an id with no matching ticket). Returns the list of
- * ids that actually changed so the route can publish one row-level ping EACH (the
- * live-sync law: patch the changed row, never refetch the list). */
+ * same activity row — and reports how many actually changed vs. were skipped
+ * (an id with no matching ticket, or one ALREADY at the target status — R17:
+ * a re-run bulk writes no duplicate history and pings nothing). Returns the ids
+ * that really changed so the route publishes one row-level ping EACH. */
 export async function bulkSetStatus(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -279,8 +287,8 @@ export async function bulkSetStatus(
   let skipped = 0
   for (const id of ids) {
     try {
-      await setStatus(cfg, guard, actor, id, status)
-      changed.push(id)
+      if (await setStatus(cfg, guard, actor, id, status)) changed.push(id)
+      else skipped++ // already at the target status — a no-op, not an event
     } catch (e) {
       // A missing ticket is skipped, not fatal — the rest of the batch still applies.
       if (e instanceof GuardError && e.status === 404) {

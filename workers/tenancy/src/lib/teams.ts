@@ -18,6 +18,7 @@ import { d1ConfigFrom } from "../../../../shared/workers/gating"
 import type { Env } from "../env"
 import { GuardError } from "./permissions"
 import { buildTeamSeed, TEAM_MIGRATIONS, type Actor } from "../team-schema"
+import { LIST_HARD_CAP } from "../../../../shared/workers/limits"
 
 export function d1Config(env: Env): D1Rest {
   return d1ConfigFrom(env)
@@ -265,7 +266,7 @@ export async function listReceivedInvites(
      FROM invite_index i
      JOIN teams t ON t.id = i.team_id AND t.deactivated_at IS NULL AND t.db_status = 'ready'
      WHERE i.email = ? AND i.status = 'pending' AND i.expires_at > ?
-     ORDER BY i.created_at DESC`
+     ORDER BY i.created_at DESC LIMIT ${LIST_HARD_CAP}` // R14 hard cap
   )
     .bind(email, now)
     .all<{
@@ -450,7 +451,7 @@ export async function listMyTeams(
      FROM team_members tm
      JOIN teams t ON t.id = tm.team_id AND t.deactivated_at IS NULL
      WHERE tm.user_id = ? AND tm.deactivated_at IS NULL
-     ORDER BY t.created_at`
+     ORDER BY t.created_at LIMIT ${LIST_HARD_CAP}` // R14 hard cap
   )
     .bind(userId)
     .all<{

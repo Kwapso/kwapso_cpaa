@@ -9,6 +9,7 @@ import { d1ExecScript, d1Query, sqlString, type D1Rest } from "../../../../share
 import { ulid } from "../../../../shared/workers/id"
 import type { SelectableValue } from "../../../../shared/types"
 import { GuardError, type MemberGuard } from "./permissions"
+import { EXPORT_HARD_CAP, LIST_HARD_CAP } from "../../../../shared/workers/limits"
 
 type Row = { id: string; type: string; value: string; is_default: number; deactivated_at: string | null }
 
@@ -25,7 +26,8 @@ export async function listSelectable(cfg: D1Rest, guard: MemberGuard): Promise<S
   const rows = await d1Query<Row>(
     cfg,
     guard.databaseId,
-    "SELECT id, type, value, is_default, deactivated_at FROM selectable_data ORDER BY type ASC, (deactivated_at IS NULL) DESC, value ASC",
+    // R14 hard cap — never unbounded; move to real paging before this bites.
+    `SELECT id, type, value, is_default, deactivated_at FROM selectable_data ORDER BY type ASC, (deactivated_at IS NULL) DESC, value ASC LIMIT ${LIST_HARD_CAP}`,
     []
   )
   return rows.map(toValue)
@@ -46,7 +48,8 @@ export async function listSelectableForExport(cfg: D1Rest, guard: MemberGuard): 
   return d1Query<SelectableExportRow>(
     cfg,
     guard.databaseId,
-    "SELECT type, value, is_default, deactivated_at, created_at, creator_name FROM selectable_data ORDER BY type ASC, value ASC"
+    // R14 hard cap — never unbounded; move to real paging before this bites (exports get the larger deliberate-download cap).
+    `SELECT type, value, is_default, deactivated_at, created_at, creator_name FROM selectable_data ORDER BY type ASC, value ASC LIMIT ${EXPORT_HARD_CAP}`
   )
 }
 
@@ -127,7 +130,7 @@ export async function setSelectableActive(
   actor: Actor,
   id: string,
   active: boolean
-): Promise<void> {
+): Promise<boolean> {
   const rows = await d1Query<Row>(
     cfg,
     guard.databaseId,
@@ -137,11 +140,18 @@ export async function setSelectableActive(
   const row = rows[0]
   if (!row) throw new GuardError(404, "not_found", "That dropdown value doesn't exist.")
 
+  // R17: current-status predicate → a repeat moves zero rows → no activity row,
+  // no publish (the route reads the boolean). History records events, not clicks.
   const now = new Date().toISOString()
-  const sql = active
-    ? `UPDATE selectable_data SET deactivated_at = NULL, deactivator_id = NULL, deactivator_email = NULL, deactivator_name = NULL, updated_at = ${sqlString(now)} WHERE id = ${sqlString(id)};`
-    : `UPDATE selectable_data SET deactivated_at = ${sqlString(now)}, deactivator_id = ${sqlString(actor.id)}, deactivator_email = ${sqlString(actor.email)}, deactivator_name = ${sqlString(actor.name)} WHERE id = ${sqlString(id)};`
-  await d1ExecScript(cfg, guard.databaseId, sql)
+  const changed = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    active
+      ? `UPDATE selectable_data SET deactivated_at = NULL, deactivator_id = NULL, deactivator_email = NULL, deactivator_name = NULL, updated_at = ? WHERE id = ? AND deactivated_at IS NOT NULL RETURNING id`
+      : `UPDATE selectable_data SET deactivated_at = ?, deactivator_id = ${sqlString(actor.id)}, deactivator_email = ${sqlString(actor.email)}, deactivator_name = ${sqlString(actor.name)}, updated_at = ? WHERE id = ? AND deactivated_at IS NULL RETURNING id`,
+    active ? [now, id] : [now, now, id]
+  )
+  if (!changed[0]) return false
 
   await logActivity(cfg, guard.databaseId, actor, {
     type: active ? "Dropdown value activated" : "Dropdown value deactivated",
@@ -149,4 +159,5 @@ export async function setSelectableActive(
     relatedTable: "selectable_data",
     relatedRowId: id,
   })
+  return true
 }

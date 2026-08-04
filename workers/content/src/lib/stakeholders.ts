@@ -14,6 +14,7 @@ import { GuardError, type MemberGuard } from "../../../../shared/workers/gating"
 import type { HelpStakeholder } from "../../../../shared/types"
 import { getTicket } from "./help"
 import type { Env } from "../env"
+import { THREAD_HARD_CAP } from "../../../../shared/workers/limits" // R14 hard cap
 
 /** The four origins a stakeholder can have — drives the chip label in the UI. */
 export type StakeholderOrigin = "raiser" | "admin" | "mentioned" | "added"
@@ -74,7 +75,7 @@ async function lookupUsers(
     `SELECT u.id, u.email, u.first_name, u.last_name, u.image_url
        FROM users u
        JOIN team_members tm ON tm.user_id = u.id
-      WHERE tm.team_id = ? AND tm.deactivated_at IS NULL AND u.id IN (${placeholders})`
+      WHERE tm.team_id = ? AND tm.deactivated_at IS NULL AND u.id IN (${placeholders}) LIMIT ${THREAD_HARD_CAP}`
   )
     .bind(teamId, ...unique)
     .all<{
@@ -133,14 +134,14 @@ export async function listStakeholders(
     d1Query<{ tagged_user_ids: string | null }>(
       cfg,
       guard.databaseId,
-      "SELECT tagged_user_ids FROM help_threads WHERE help_id = ?",
+      `SELECT tagged_user_ids FROM help_threads WHERE help_id = ? LIMIT ${THREAD_HARD_CAP}`, // R14 hard cap
       [ticketId]
     ),
     // 3. manual adds (stored, add-only).
     d1Query<{ user_id: string }>(
       cfg,
       guard.databaseId,
-      "SELECT user_id FROM help_stakeholders WHERE help_id = ?",
+      `SELECT user_id FROM help_stakeholders WHERE help_id = ? LIMIT ${THREAD_HARD_CAP}`, // R14 hard cap
       [ticketId]
     ),
     // 4. the team's Admin role id (TEAM DB).

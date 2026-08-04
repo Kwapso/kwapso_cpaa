@@ -131,19 +131,41 @@ describe("setRoleActive (deactivate / reactivate)", () => {
     ).rejects.toMatchObject({ code: "role_not_found" })
   })
 
-  it("deactivates a non-default role (stamps deactivated_at, never deletes)", async () => {
-    roleLookup({ id: "R", title: "Editor", is_default: 0 })
-    await setRoleActive(cfg, guard, actor, "R", false)
-    const script = d1ExecScript.mock.calls[0][2] as string
-    expect(script).toContain("UPDATE member_roles SET deactivated_at = '")
-    expect(script).not.toContain("DELETE")
+  /** Lookup finds the role; the UPDATE (R17: RETURNING id) reports one moved row. */
+  function roleAndUpdate(role: { id: string; title: string; is_default: number }) {
+    d1Query.mockImplementation(async (_c, _db, sql: string) =>
+      sql.startsWith("UPDATE") ? [{ id: role.id }] : sql.includes("FROM member_roles") ? [role] : []
+    )
+  }
+
+  it("deactivates a non-default role — the UPDATE carries the R17 status predicate", async () => {
+    roleAndUpdate({ id: "R", title: "Editor", is_default: 0 })
+    expect(await setRoleActive(cfg, guard, actor, "R", false)).toBe(true)
+    const sql = d1Query.mock.calls[1][2] as string // 0 = lookup, 1 = the UPDATE
+    expect(sql).toContain("UPDATE member_roles SET deactivated_at = ?")
+    expect(sql).toContain("AND deactivated_at IS NULL") // idempotent: a repeat moves 0 rows
+    expect(sql).toContain("RETURNING id")
+    expect(sql).not.toContain("DELETE")
   })
 
-  it("reactivates a role (clears deactivated_at)", async () => {
-    roleLookup({ id: "R", title: "Editor", is_default: 0 })
-    await setRoleActive(cfg, guard, actor, "R", true)
-    const script = d1ExecScript.mock.calls[0][2] as string
-    expect(script).toContain("deactivated_at = NULL")
+  it("reactivates a role (clears deactivated_at, predicate inverted)", async () => {
+    roleAndUpdate({ id: "R", title: "Editor", is_default: 0 })
+    expect(await setRoleActive(cfg, guard, actor, "R", true)).toBe(true)
+    const sql = d1Query.mock.calls[1][2] as string
+    expect(sql).toContain("deactivated_at = NULL")
+    expect(sql).toContain("AND deactivated_at IS NOT NULL")
+  })
+
+  it("a repeat that moves ZERO rows returns false and writes NO activity row (R17)", async () => {
+    // Lookup finds the role, but the predicated UPDATE matches nothing (already
+    // deactivated) — the double-click case that used to write duplicate history.
+    d1Query.mockImplementation(async (_c, _db, sql: string) =>
+      sql.startsWith("UPDATE") ? [] : [{ id: "R", title: "Editor", is_default: 0 }]
+    )
+    const { logActivity } = await import("../../../shared/workers/activity")
+    vi.mocked(logActivity).mockClear()
+    expect(await setRoleActive(cfg, guard, actor, "R", false)).toBe(false)
+    expect(logActivity).not.toHaveBeenCalled()
   })
 })
 

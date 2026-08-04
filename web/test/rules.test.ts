@@ -10,12 +10,29 @@ import { describe, expect, it } from "vitest"
 
 import { GLOSSARY } from "@shared/glossary"
 import {
+  ACTIVITY_GATE_MAP,
+  ACTIVITY_TABLE_EXEMPT,
   FORM_DIALOGS,
   RECORD_DETAIL_COMPONENTS,
   RULES_REGISTRY,
   TAB_COUNT_EXCEPTIONS,
 } from "@shared/rules/registry"
 import { TEAM_SECTIONS } from "../lib/pages"
+
+/** Every worker's src .ts file (recursively), as [repo-relative path, source]. */
+function workerSources(): [string, string][] {
+  const out: [string, string][] = []
+  const walk = (d: string) => {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      const p = join(d, e.name)
+      if (e.isDirectory()) walk(p)
+      else if (e.name.endsWith(".ts")) out.push([p.slice(ROOT.length), read(p)])
+    }
+  }
+  for (const w of readdirSync(join(ROOT, "workers"), { withFileTypes: true }))
+    if (w.isDirectory()) walk(join(ROOT, "workers", w.name, "src"))
+  return out
+}
 
 const HERE = dirname(fileURLToPath(import.meta.url)) // web/test
 const WEB = join(HERE, "..") // web/
@@ -185,12 +202,105 @@ describe("RULES — the laws of the base", () => {
     expect(offenders, `cron handler that swallows failures without recording (R12): ${offenders.join(", ")}`).toEqual([])
   })
 
+  // R14 — no unbounded list endpoint: every exported list*/search* function in a
+  // worker lib either pages or carries a hard-cap LIMIT (one unbounded read
+  // stalls a worker at 100k rows — the 24k-catalogue failure).
+  it("bounded-lists: every exported list*/search* function carries a LIMIT", () => {
+    const offenders: string[] = []
+    for (const [path, src] of workerSources()) {
+      if (!path.includes("/src/lib/")) continue
+      const re = /export (?:async )?function ((?:list|search)\w*)/g
+      let m: RegExpExecArray | null
+      while ((m = re.exec(src))) {
+        const next = src.indexOf("\nexport ", m.index + 1)
+        const body = src.slice(m.index, next === -1 ? undefined : next)
+        if (/SELECT/.test(body) && !/LIMIT\s/.test(body)) offenders.push(`${path} → ${m[1]}`)
+      }
+    }
+    expect(
+      offenders,
+      `unbounded list read (R14) — add a hard-cap LIMIT (with its comment) or real paging: ${offenders.join(", ")}`
+    ).toEqual([])
+  })
+
+  // R17 — state transitions are idempotent: every deactivate/reactivate UPDATE
+  // carries the current-status predicate (a double click must move ZERO rows and
+  // write no duplicate history), and the writers read the changed count back.
+  it("idempotent-transitions: every deactivate/reactivate UPDATE carries the status predicate", () => {
+    const offenders: string[] = []
+    for (const [path, src] of workerSources()) {
+      let idx = -1
+      while ((idx = src.indexOf("SET deactivated_at =", idx + 1)) !== -1) {
+        // The statement window: from its UPDATE keyword to just past the match.
+        const from = src.lastIndexOf("UPDATE", idx)
+        const stmt = src.slice(from, Math.min(src.length, idx + 500))
+        // An upsert's DO UPDATE (excluded.*) re-activates by design — exempt.
+        if (/excluded\./.test(stmt)) continue
+        if (!/deactivated_at IS (NOT )?NULL/.test(stmt)) offenders.push(`${path} @${idx}`)
+      }
+      // Status moves too: a help status UPDATE must carry `status <> ?`.
+      let s = -1
+      while ((s = src.indexOf("UPDATE help SET status", s + 1)) !== -1) {
+        const stmt = src.slice(s, Math.min(src.length, s + 500))
+        if (!/status <>/.test(stmt)) offenders.push(`${path} @${s} (status move without <> predicate)`)
+      }
+    }
+    expect(
+      offenders,
+      `state transition without the current-status predicate (R17): ${offenders.join(", ")}`
+    ).toEqual([])
+    // The three transition writers read the changed count back (RETURNING id) so
+    // a zero-row move can skip the activity row + the publish.
+    for (const [file, fn] of [
+      ["workers/tenancy/src/lib/roles.ts", "setRoleActive"],
+      ["workers/tenancy/src/lib/selectable.ts", "setSelectableActive"],
+      ["workers/content/src/lib/learning.ts", "setLearningActive"],
+      ["workers/content/src/lib/help.ts", "setStatus"],
+    ] as const) {
+      const src = read(join(ROOT, ...file.split("/")))
+      const body = src.slice(src.indexOf(`export async function ${fn}`))
+      expect(/RETURNING id/.test(body), `${fn} must read the changed-row count (RETURNING id)`).toBe(true)
+      expect(/return false/.test(body), `${fn} must skip activity/publish when zero rows moved`).toBe(true)
+    }
+  })
+
+  // R18 — a cross-module read carries the caller's module rights. Every
+  // relatedTable any worker writes must resolve through the gate map (or a
+  // pinned, reasoned exemption); the team feed subtracts denied modules through
+  // ONE shared clause any count must reuse.
+  it("activity-gate-coverage: every relatedTable resolves to a gated module or a pinned exemption", () => {
+    const known = new Set([...Object.keys(ACTIVITY_GATE_MAP), ...Object.keys(ACTIVITY_TABLE_EXEMPT)])
+    const offenders: string[] = []
+    for (const [path, src] of workerSources()) {
+      for (const m of src.matchAll(/relatedTable: "([a-z_]+)"/g))
+        if (!known.has(m[1])) offenders.push(`${path} writes relatedTable "${m[1]}"`)
+    }
+    // Dynamic writer: the import engine logs relatedTable: target.tableKey — so
+    // every TargetDef key must be in the gate map (imports write real module rows).
+    const targetsSrc = read(join(ROOT, "workers", "data-ops", "src", "lib", "targets.ts"))
+    for (const m of targetsSrc.matchAll(/tableKey: "([a-z_]+)"/g))
+      if (!(m[1] in ACTIVITY_GATE_MAP)) offenders.push(`targets.ts TargetDef "${m[1]}" not in ACTIVITY_GATE_MAP`)
+    expect(
+      offenders,
+      `a table the feed cannot NAME is a table it cannot withhold (R18) — add it to ACTIVITY_GATE_MAP or (with a reason) ACTIVITY_TABLE_EXEMPT: ${offenders.join(", ")}`
+    ).toEqual([])
+
+    // The ONE clause: the reader exposes the shared builder, the team scope uses
+    // it, and the route builds `allowed` from the registry map + the caller's rights.
+    const reader = read(join(ROOT, "workers", "tenancy", "src", "lib", "activity-read.ts"))
+    expect(reader).toContain("export function activityVisibilityClause")
+    expect(reader).toContain('scope === "team"')
+    const route = read(join(ROOT, "workers", "tenancy", "src", "routes", "team.ts"))
+    expect(route).toContain("ACTIVITY_GATE_MAP")
+    expect(route).toContain("getMyPermissions")
+  })
+
   // Every enforced law in the registry maps to one of the checks above (or a
   // per-worker seam test) — a law can't exist without a check.
   it("every enforced law has a known check", () => {
     const known = new Set([
       "publish-seam", // the 3 per-worker publish-seam.test.ts suites
-      "gating-seam", // R10: the 3 per-worker gating-seam suites (beside publish-seam)
+      "gating-seam", // R10: the 3 per-worker gating-seam suites + the mcp identity-gate suite
       "fetch-timeout", // R11: the source-scan below
       "cron-records", // R12: the scheduled-handler scan below
       "record-detail-tabs",
@@ -201,6 +311,9 @@ describe("RULES — the laws of the base", () => {
       "forms-persist-drafts",
       "tab-counts-derived",
       "agent-app-parity", // workers/data-ops/test/agent-parity.test.ts
+      "bounded-lists", // R14: the source-scan above
+      "idempotent-transitions", // R17: the source-scan above
+      "activity-gate-coverage", // R18: the source-scan above
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

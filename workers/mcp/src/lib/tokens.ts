@@ -7,6 +7,7 @@
 import { GuardError } from "../../../../shared/workers/gating"
 import { ulid } from "../../../../shared/workers/id"
 import type { Env } from "../env"
+import { LIST_HARD_CAP } from "../../../../shared/workers/limits" // R14 hard cap
 
 export type McpTokenRow = {
   id: string
@@ -56,7 +57,7 @@ export async function createToken(
 export async function listTokens(env: Env, userId: string): Promise<McpTokenRow[]> {
   const rows = await env.DB.prepare(
     `SELECT id, user_id, team_id, label, created_at, last_used_at, revoked_at
-     FROM mcp_tokens WHERE user_id = ? ORDER BY created_at DESC`
+     FROM mcp_tokens WHERE user_id = ? ORDER BY created_at DESC LIMIT ${LIST_HARD_CAP}`
   )
     .bind(userId)
     .all<McpTokenRow>()

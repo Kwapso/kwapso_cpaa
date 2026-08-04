@@ -6,6 +6,8 @@ import { requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
 import { publishChange } from "../../../../shared/workers/realtime"
 import { logActivity } from "../../../../shared/workers/activity"
 import { getActivity } from "../lib/activity-read"
+import { getMyPermissions } from "../lib/roles"
+import { ACTIVITY_GATE_MAP, ACTIVITY_TABLE_EXEMPT } from "../../../../shared/rules/registry"
 import { requireRight } from "../lib/permissions"
 import {
   acceptPendingInvites,
@@ -111,16 +113,11 @@ export async function postUpdateTeam(request: Request, env: Env): Promise<Respon
 
 /** The activity feed for the active team, or one record (?scope=team|user|role
  * &id=). Gated by read-right: role scope needs member_roles:read, the rest
- * team_members:read — so a viewer with read access can see the history. */
-/** Which permission module gates a generic record-activity read, keyed by the row's
- * related_table. (member_roles / users / invite_logs keep their own fixed scopes.)
- * A NEW module surfaces its record activity by adding one line here. */
-const TABLE_TO_MODULE: Record<string, string> = {
-  help: "help",
-  learning: "learning",
-  selectable_data: "selectable_data",
-}
-
+ * team_members:read — and the TEAM scope additionally subtracts the caller's
+ * denied modules (R18): the feed is the one read that returns every module's
+ * rows behind a single gate, and its rows name records and their before/after,
+ * so a caller who can't read a module can't read its history either. The
+ * table→module map + the pinned exemptions live as DATA in the rules registry. */
 export async function getActivityFeed(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await teamContext(request, env)
   const url = new URL(request.url)
@@ -133,18 +130,31 @@ export async function getActivityFeed(request: Request, env: Env): Promise<Respo
   let id = url.searchParams.get("id") ?? undefined
 
   // Generic record scope: any module's activity by (table, id), gated by THAT
-  // module's read right (resolved from the table — an unknown table returns empty,
-  // never the whole-team feed).
+  // module's read right (resolved from the SAME registry map the team scope
+  // subtracts through — an unknown table returns empty, never the whole feed).
   if (scope === "record") {
     const table = url.searchParams.get("table") ?? undefined
     if (!id || !table) return json({ activity: [] })
-    const module = TABLE_TO_MODULE[table]
+    const module = ACTIVITY_GATE_MAP[table]
     if (!module) return json({ activity: [] })
     await requireRight(cfg, guard, module, "read")
     return json({ activity: await getActivity(cfg, guard, "record", id, table) })
   }
 
   await requireRight(cfg, guard, scope === "role" ? "member_roles" : "team_members", "read")
+
+  // R18: the team feed carries the caller's module rights — build the allowed
+  // related_table list from their per-module read rights + the pinned exemptions.
+  if (scope === "team") {
+    const perms = await getMyPermissions(cfg, guard)
+    const allowed = [
+      ...Object.entries(ACTIVITY_GATE_MAP)
+        .filter(([, module]) => perms[module]?.read)
+        .map(([table]) => table),
+      ...Object.keys(ACTIVITY_TABLE_EXEMPT),
+    ]
+    return json({ activity: await getActivity(cfg, guard, "team", undefined, undefined, allowed) })
+  }
   // Invite scope: the client passes the GLOBAL invite id; map it to the team-local
   // invite_logs row id the activity rows reference. Bail to an empty feed if it
   // doesn't resolve, so a bad/missing id never falls through to the whole-team feed.

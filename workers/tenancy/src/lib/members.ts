@@ -10,6 +10,7 @@ import { d1Query, type D1Rest } from "../../../../shared/workers/d1-rest"
 import type { Env } from "../env"
 import { GuardError, type MemberGuard } from "./permissions"
 import { notifyRemoved, notifyRoleChanged } from "./notify"
+import { LIST_HARD_CAP } from "../../../../shared/workers/limits"
 
 type RoleRow = {
   id: string
@@ -50,7 +51,7 @@ export async function listMembers(
      FROM team_members tm
      JOIN users u ON u.id = tm.user_id
      WHERE tm.team_id = ? AND tm.deactivated_at IS NULL
-     ORDER BY tm.created_at`
+     ORDER BY tm.created_at LIMIT ${LIST_HARD_CAP}` // R14 hard cap
   )
     .bind(guard.teamId)
     .all<{
@@ -108,7 +109,7 @@ export async function listRoles(
   }>(
     cfg,
     guard.databaseId,
-    "SELECT id, title, description, is_default, deactivated_at, created_at, creator_name, updated_at, editor_name FROM member_roles ORDER BY (deactivated_at IS NULL) DESC, is_default DESC, title"
+    `SELECT id, title, description, is_default, deactivated_at, created_at, creator_name, updated_at, editor_name FROM member_roles ORDER BY (deactivated_at IS NULL) DESC, is_default DESC, title LIMIT ${LIST_HARD_CAP}` // R14 hard cap
   )
   const counts = await env.DB.prepare(
     "SELECT role_id, COUNT(*) AS n FROM team_members WHERE team_id = ? AND deactivated_at IS NULL GROUP BY role_id"

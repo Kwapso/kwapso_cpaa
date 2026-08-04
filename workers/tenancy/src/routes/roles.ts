@@ -157,7 +157,9 @@ export async function postSetRoleActive(request: Request, env: Env): Promise<Res
   }
   if (!body.roleId || typeof body.active !== "boolean")
     return fail(400, "invalid_input", "roleId and active are required.")
-  await setRoleActive(cfg, guard, actor, body.roleId, body.active)
-  await publishChange(env.REALTIME, guard.teamId, "member_roles", body.roleId)
+  // R17: a repeat (double click / retry) moves zero rows — then nothing is
+  // published and no duplicate history exists; the response is still the list.
+  const changed = await setRoleActive(cfg, guard, actor, body.roleId, body.active)
+  if (changed) await publishChange(env.REALTIME, guard.teamId, "member_roles", body.roleId)
   return json({ roles: await listRoles(env, cfg, guard) })
 }

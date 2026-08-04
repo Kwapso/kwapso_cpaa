@@ -58,7 +58,8 @@ export async function postSetSelectableActive(request: Request, env: Env): Promi
   const { actor, cfg, guard, body } = await gatedBody<{ id?: string; active?: boolean }>(request, env, "selectable_data", "delete")
   if (!body.id || typeof body.active !== "boolean")
     return fail(400, "invalid_input", "id and active are required.")
-  await setSelectableActive(cfg, guard, actor, body.id, body.active)
-  await publishChange(env.REALTIME, guard.teamId, "selectable_data", body.id)
+  // R17: no-op repeat → no ping, no duplicate history (see setSelectableActive).
+  const changed = await setSelectableActive(cfg, guard, actor, body.id, body.active)
+  if (changed) await publishChange(env.REALTIME, guard.teamId, "selectable_data", body.id)
   return json({ values: await listSelectable(cfg, guard) })
 }
