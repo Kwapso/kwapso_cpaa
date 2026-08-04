@@ -6,7 +6,7 @@
 // Locked module rules live in lib/help; the reply notify (raiser + @mentions) is
 // best-effort in lib/notify.
 
-import { fail, json } from "../../../../shared/workers/http"
+import { fail, json, pagedJson } from "../../../../shared/workers/http"
 import { optionalText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
 import { publishChange } from "../../../../shared/workers/realtime"
 import { gated, gatedBody } from "../../../../shared/workers/route"
@@ -32,15 +32,40 @@ import { notifyReplyAndMentions } from "../lib/notify"
 import { addStakeholder, listStakeholders } from "../lib/stakeholders"
 import type { Env } from "../env"
 
+/** EVERY ticket response is a PAGE (R14) — including the one a mutation returns,
+ * so a client re-priming its list from a write still learns where page two
+ * starts. One seam: rows + exact totals + hasMore + the opaque cursor. */
+async function ticketPage(
+  cfg: Parameters<typeof listTickets>[0],
+  guard: Parameters<typeof listTickets>[1],
+  scope: "mine" | "all",
+  cursor: string | null = null
+): Promise<Response> {
+  const [page, counts] = await Promise.all([listTickets(cfg, guard, scope, cursor), countTickets(cfg, guard)])
+  return pagedJson("tickets", { ...page, total: counts.total }, { mineTotal: counts.mineTotal })
+}
+
 /** GET /api/content/help?scope=mine|all  (?id=<ticketId> → just that one). */
 export async function getHelp(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "help", "read")
   const url = new URL(request.url)
   const scope = url.searchParams.get("scope") === "mine" ? "mine" : "all"
-  const tickets = await listTickets(cfg, guard, scope)
   const id = url.searchParams.get("id")
-  // R16: the exact server totals ride every list response (All + the caller's My).
-  return json({ tickets: id ? tickets.filter((t) => t.id === id) : tickets, ...(await countTickets(cfg, guard)) })
+  // One ticket by id is a LOOKUP, not a page — answer it directly rather than
+  // filtering a page (which could legitimately not contain it once paged).
+  if (id) {
+    const one = await getTicket(cfg, guard, id)
+    const counts = await countTickets(cfg, guard)
+    return pagedJson(
+      "tickets",
+      { rows: one ? [one] : [], total: counts.total, hasMore: false, nextCursor: null },
+      { mineTotal: counts.mineTotal }
+    )
+  }
+  // R14: tickets are a GROWING collection, so the door pages by key — the opaque
+  // cursor comes straight back from the previous response. R16: the exact server
+  // totals (All + the caller's My) ride every list response.
+  return ticketPage(cfg, guard, scope, url.searchParams.get("cursor"))
 }
 
 /** GET /api/content/help/thread?id=<ticketId> → the ticket's replies (oldest first). */
@@ -60,7 +85,7 @@ export async function postCreateHelp(request: Request, env: Env): Promise<Respon
   // HOOK (Phase 3): the agent drafts the first reply here; a no-op today, so the
   // ticket simply opens awaiting a human (per "ticket always opens").
   await maybeDraftFirstReply(cfg, guard, id, description)
-  return json({ tickets: await listTickets(cfg, guard, "all"), ...(await countTickets(cfg, guard)) })
+  return ticketPage(cfg, guard, "all")
 }
 
 /** POST /api/content/help/update — edit a ticket (help:edit). */
@@ -70,7 +95,7 @@ export async function postUpdateHelp(request: Request, env: Env): Promise<Respon
   requireText(body.description, "Description", TEXT_LIMITS.long)
   await updateTicket(cfg, guard, actor, body.id, body)
   await publishChange(env.REALTIME, guard.teamId, "help", body.id)
-  return json({ tickets: await listTickets(cfg, guard, "all"), ...(await countTickets(cfg, guard)) })
+  return ticketPage(cfg, guard, "all")
 }
 
 /** POST /api/content/help/status — move a ticket along its fixed lifecycle.
@@ -87,7 +112,7 @@ export async function postHelpStatus(request: Request, env: Env): Promise<Respon
   // R17: already at that status → zero rows moved → no ping, no duplicate history.
   const changed = await setStatus(cfg, guard, actor, body.id, status)
   if (changed) await publishChange(env.REALTIME, guard.teamId, "help", body.id)
-  return json({ tickets: await listTickets(cfg, guard, "all"), ...(await countTickets(cfg, guard)) })
+  return ticketPage(cfg, guard, "all")
 }
 
 /** POST /api/content/help/bulk-status-by-filter — the SET-shaped bulk: move every

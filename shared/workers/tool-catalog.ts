@@ -137,12 +137,14 @@ export const SHARED_TOOLS: SharedTool[] = [
   },
   {
     name: "list_help_tickets",
-    summary: "List the team's support tickets. scope: 'mine' (yours) or 'all' (default all); pass `id` to fetch just one ticket.",
+    summary:
+      "List the team's support tickets. scope: 'mine' (yours) or 'all' (default all); pass `id` to fetch just one ticket. Returns ONE page plus the exact `total`, `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
     binding: "CONTENT", method: "GET", path: "/api/content/help",
-    schema: obj({ scope: S, id: S }),
+    schema: obj({ scope: S, id: S, cursor: S }),
     buildQuery: (i) => {
       const q = [str(i, "scope") === "mine" ? "scope=mine" : "scope=all"]
       if (str(i, "id")) q.push(`id=${encodeURIComponent(str(i, "id"))}`)
+      if (str(i, "cursor")) q.push(`cursor=${encodeURIComponent(str(i, "cursor"))}`)
       return `?${q.join("&")}`
     },
     agent: { write: false, summarize: (i) => (str(i, "id") ? "Look up one ticket" : "List support tickets") },
@@ -240,7 +242,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   /* --------------------------- dropdown values ----------------------------- */
   {
     name: "create_dropdown_value",
-    summary: "Add a dropdown value: type = the group name, value = the option. A dropdown write NEVER invents an option — for 'create X and move things onto it', call THIS first, then write the rows.",
+    summary:
+      "Add a dropdown value: type = the group name, value = the option. A dropdown write NEVER invents an option — for 'create X and move things onto it', call THIS first and the write second, in the SAME turn.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/selectable",
     schema: obj({ type: S, value: S }, ["type", "value"]),
     buildBody: (i) => ({ type: str(i, "type"), value: str(i, "value") }),

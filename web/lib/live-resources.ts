@@ -13,11 +13,34 @@
 // a list primes its total in the same round-trip.
 
 import { content as contentApi, tenancy } from "@/lib/api"
-import { primeCache } from "@/lib/store"
+import { primeCache, readCache } from "@/lib/store"
 
 /** The sidecar cache key holding a collection's exact server total (R16). */
 export function totalKey(prefix: string, teamId: string): string {
   return `total:${prefix}:${teamId}`
+}
+
+/** The sidecar holding a PAGED collection's next opaque cursor (R14), keyed off
+ * the list's own cache key. `null` in the sidecar means "that was the last page";
+ * `undefined` means nothing has loaded yet. */
+export function cursorKey(listKey: string): string {
+  return `cursor:${listKey}`
+}
+
+/** Fetch the NEXT page of a paged collection and APPEND it to the loaded prefix —
+ * never a refetch of what's already on screen. Returns false when there was
+ * nothing more to load (so the caller can stop asking). The cursor is opaque: it
+ * only ever travels cache → door → cache. */
+export async function loadMore<T>(
+  listKey: string,
+  fetchPage: (cursor: string) => Promise<{ rows: T[]; nextCursor: string | null }>
+): Promise<boolean> {
+  const cursor = readCache<string | null>(cursorKey(listKey))
+  if (!cursor) return false
+  const next = await fetchPage(cursor)
+  primeCache(listKey, [...(readCache<T[]>(listKey) ?? []), ...next.rows])
+  primeCache(cursorKey(listKey), next.nextCursor)
+  return true
 }
 
 /** List fetchers that prime their collection's `total:` sidecar as they load —
@@ -44,12 +67,30 @@ export const listFetch = {
       primeCache(totalKey("learning", teamId), r.total)
       return r.learning
     }),
+  // R14: help is PAGED — the fetchers below load page ONE and park the next
+  // cursor in its sidecar; <LoadMore> appends from there. A fresh load (or a
+  // reconnect catch-up) resets to page one, which is what a reconnect should do.
   help: (teamId: string) =>
     contentApi.help("all").then((r) => {
       primeCache(totalKey("help", teamId), r.total)
       primeCache(totalKey("help-mine", teamId), r.mineTotal)
+      primeCache(cursorKey(helpKey(teamId, "all")), r.nextCursor)
       return r.tickets
     }),
+  helpMine: (teamId: string) =>
+    contentApi.help("mine").then((r) => {
+      primeCache(totalKey("help", teamId), r.total)
+      primeCache(totalKey("help-mine", teamId), r.mineTotal)
+      primeCache(cursorKey(helpKey(teamId, "mine")), r.nextCursor)
+      return r.tickets
+    }),
+}
+
+/** The ticket list's cache key. My/All is a SERVER scope, not a client filter:
+ * once a list is paged, filtering the loaded page by raiser would show "my
+ * tickets in the newest 50" under a badge counting all of them (R16). */
+export function helpKey(teamId: string, scope: "mine" | "all"): string {
+  return scope === "mine" ? `help-mine:${teamId}` : `help:${teamId}`
 }
 
 /** Row-level live registry: a "<resource> row <id> changed" ping → re-pull JUST
@@ -120,8 +161,9 @@ export const TEAM_RESOURCES: Record<
     fetchOne: (id) => contentApi.helpOne(id),
     fetchList: (t) => listFetch.help(t),
     // A status change / edit / reply / stakeholder-add on a ticket also refreshes
-    // its Activity tab + Stakeholders tab.
-    deps: (_t, id) => [`activity:record:help:${id}`, `help-stakeholders:${id}`],
+    // its Activity tab + Stakeholders tab. The My list is a SERVER-scoped page, so
+    // it can't be row-patched from here — drop it and it reloads page one.
+    deps: (t, id) => [`activity:record:help:${id}`, `help-stakeholders:${id}`, `help-mine:${t}`],
   },
 }
 

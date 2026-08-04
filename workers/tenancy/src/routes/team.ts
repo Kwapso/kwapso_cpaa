@@ -1,7 +1,7 @@
 // Team + session routes: onboarding bootstrap, the active context, the team
 // switcher, creating a team, editing it, the Overview metadata + Activity feed.
 
-import { fail, json } from "../../../../shared/workers/http"
+import { fail, json, pagedJson } from "../../../../shared/workers/http"
 import { requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
 import { publishChange } from "../../../../shared/workers/realtime"
 import { logActivity } from "../../../../shared/workers/activity"
@@ -119,6 +119,12 @@ export async function postUpdateTeam(request: Request, env: Env): Promise<Respon
  * so a caller who can't read a module can't read its history either. The
  * table→module map + the pinned exemptions live as DATA in the rules registry. */
 export async function getActivityFeed(request: Request, env: Env): Promise<Response> {
+  // ONE response shape for every scope (R14): the rows, the TRUE total, hasMore,
+  // and the opaque cursor the client hands straight back for the next page. A
+  // scope that resolves to nothing answers in the same shape — never a bare [].
+  const feed = (p: { rows: unknown[]; total: number; hasMore: boolean; nextCursor: string | null }) =>
+    pagedJson("activity", p)
+  const emptyFeed = () => pagedJson("activity", { rows: [], total: 0, hasMore: false, nextCursor: null })
   const { cfg, guard } = await teamContext(request, env)
   const url = new URL(request.url)
   const scope = (url.searchParams.get("scope") ?? "team") as
@@ -128,17 +134,20 @@ export async function getActivityFeed(request: Request, env: Env): Promise<Respo
     | "invite"
     | "record"
   let id = url.searchParams.get("id") ?? undefined
+  // The OPAQUE cursor from the previous page (R14) — decoded (and 400-checked)
+  // inside getActivity, never parsed here.
+  const cursor = url.searchParams.get("cursor")
 
   // Generic record scope: any module's activity by (table, id), gated by THAT
   // module's read right (resolved from the SAME registry map the team scope
   // subtracts through — an unknown table returns empty, never the whole feed).
   if (scope === "record") {
     const table = url.searchParams.get("table") ?? undefined
-    if (!id || !table) return json({ activity: [] })
+    if (!id || !table) return emptyFeed()
     const module = ACTIVITY_GATE_MAP[table]
-    if (!module) return json({ activity: [] })
+    if (!module) return emptyFeed()
     await requireRight(cfg, guard, module, "read")
-    return json({ activity: await getActivity(cfg, guard, "record", id, table) })
+    return feed((await getActivity(cfg, guard, "record", id, table, null, cursor)))
   }
 
   await requireRight(cfg, guard, scope === "role" ? "member_roles" : "team_members", "read")
@@ -153,22 +162,22 @@ export async function getActivityFeed(request: Request, env: Env): Promise<Respo
         .map(([table]) => table),
       ...Object.keys(ACTIVITY_TABLE_EXEMPT),
     ]
-    return json({ activity: await getActivity(cfg, guard, "team", undefined, undefined, allowed) })
+    return feed((await getActivity(cfg, guard, "team", undefined, undefined, allowed, cursor)))
   }
   // Invite scope: the client passes the GLOBAL invite id; map it to the team-local
   // invite_logs row id the activity rows reference. Bail to an empty feed if it
   // doesn't resolve, so a bad/missing id never falls through to the whole-team feed.
   if (scope === "invite") {
-    if (!id) return json({ activity: [] })
+    if (!id) return emptyFeed()
     const idx = await env.DB.prepare(
       "SELECT invite_row_id FROM invite_index WHERE id = ? AND team_id = ?"
     )
       .bind(id, guard.teamId)
       .first<{ invite_row_id: string }>()
-    if (!idx?.invite_row_id) return json({ activity: [] })
+    if (!idx?.invite_row_id) return emptyFeed()
     id = idx.invite_row_id
   }
-  return json({ activity: await getActivity(cfg, guard, scope, id) })
+  return feed((await getActivity(cfg, guard, scope, id, undefined, null, cursor)))
 }
 
 /** The active team's Overview metadata (any member may read it). */

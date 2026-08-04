@@ -25,6 +25,9 @@ import { ImportScreen } from "@/components/import-screen"
 import { SelectableScreen } from "@/components/selectable-screen"
 import { NoAccess, NotFound, LoadError, SectionWithCreate, CollectionCard } from "@/components/deep-link/screen-bits"
 import { CollectionHeading } from "@/components/collection-heading"
+import { LoadMore } from "@/components/load-more"
+import { content as contentApi, tenancy } from "@/lib/api"
+import { helpKey } from "@/lib/live-resources"
 import { CountedAbove } from "@/components/counted-tabs"
 import { formatCount } from "@/lib/format-count"
 import {
@@ -50,7 +53,7 @@ type ScreenData = ReturnType<typeof useScreenData>
  * The host owns all of it; this bundle is how it hands the render half a snapshot. */
 export type ModuleContentCtx = Pick<
   ScreenData,
-  "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "learningQ" | "helpQ" | "totals" | "activityQ" | "inviteAuditQ"
+  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "learningQ" | "helpQ" | "helpMineQ" | "totals" | "activityQ" | "inviteAuditQ"
 > & {
   noAccess: boolean
   enabled: boolean
@@ -103,6 +106,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     onIntent,
     sectionPath,
     helpScope,
+    helpMineQ,
     setHelpScope,
     myUserId,
     query,
@@ -146,7 +150,18 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
         activity: activityQ.data ?? [],
       })
       return (
-        <ScreenRenderer recipe={recipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
+        <div className="flex flex-col gap-4">
+          <ScreenRenderer recipe={recipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
+          {/* R14: the team feed is the fastest-growing collection in the base —
+              every mutation writes a row — so it pages instead of stopping at 50. */}
+          <LoadMore
+            listKey={`activity:team:${teamId}`}
+            label="Load more activity"
+            fetchPage={(c: string) =>
+              tenancy.activity("team", undefined, c).then((r) => ({ rows: r.activity, nextCursor: r.nextCursor }))
+            }
+          />
+        </div>
       )
     }
 
@@ -282,15 +297,12 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
         )
       }
       if (module === "help") {
-        if (helpQ.error) return <LoadError what="tickets" />
-        if (helpQ.data === undefined) return <Skeleton variant="list" lines={4} />
-        // My/All is a client-side raiser filter over the one cached set (so it
-        // never desyncs from the live-patched detail). "Mine" needs my id.
-        const visible =
-          helpScope === "mine" && myUserId
-            ? helpQ.data.filter((t) => t.raiserId === myUserId)
-            : helpQ.data
-        const data = shapeHelpList(visible)
+        // R14: My/All is a SERVER scope, each its own paged cache — filtering a
+        // loaded PAGE by raiser would disagree with the exact badge above it.
+        const scopedQ = helpScope === "mine" ? helpMineQ : helpQ
+        if (scopedQ.error) return <LoadError what="tickets" />
+        if (scopedQ.data === undefined) return <Skeleton variant="list" lines={4} />
+        const data = shapeHelpList(scopedQ.data)
         const helpRecipe = withDataDrivenCollection(recipe, data.rows ?? [])
         // R16: both scope badges are exact server totals (All + My come back from
         // the door's one COUNT read) through the ONE seam — never a filter's length.
@@ -335,6 +347,11 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
           >
             <ScreenRenderer recipe={helpRecipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
           </SectionWithCreate>
+          <LoadMore
+            listKey={helpKey(teamId as string, helpScope)}
+            label="Load more tickets"
+            fetchPage={(c: string) => contentApi.help(helpScope, c).then((r) => ({ rows: r.tickets, nextCursor: r.nextCursor }))}
+          />
           </div>
           </CountedAbove>
         )

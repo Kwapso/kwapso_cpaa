@@ -9,8 +9,9 @@ import { describe, expect, it } from "vitest"
 
 import { GLOSSARY } from "../../../shared/glossary"
 import { capabilityBrief } from "../src/lib/app-brief"
-import { SYSTEM } from "../src/lib/agent"
+import { DROPDOWN_ORDER_RULE, SYSTEM } from "../src/lib/agent"
 import { TARGETS } from "../src/lib/targets"
+import { sharedByName } from "../../../shared/workers/tool-catalog"
 
 describe("agent-app parity (Law R9): the agent knows what the app can do", () => {
   it("the system prompt carries the generated capability brief", () => {
@@ -42,5 +43,38 @@ describe("agent-app parity (Law R9): the agent knows what the app can do", () =>
     for (const g of Object.values(GLOSSARY)) {
       expect(SYSTEM, `glossary term "${g.term}"`).toContain(g.term)
     }
+  })
+
+  // R9, the vocabulary half: a dropdown write is gated on the option EXISTING, so
+  // "create X and move everything onto it" is two calls whose ORDER is not
+  // optional — create_dropdown_value first, the write second, same turn. The
+  // model reads two surfaces and only obeys what BOTH say, so both are asserted:
+  // drop it from either and a perfectly-planned turn ends having changed nothing
+  // (the door refuses the write, the user has to say "go ahead" for a second turn).
+  it("both surfaces state the dropdown ordering — create first, write second, same turn", () => {
+    const create = sharedByName("create_dropdown_value")
+    expect(create, "the create_dropdown_value tool must exist").toBeDefined()
+    expect(SYSTEM, "the system rule wall must carry the dropdown-ordering rule").toContain(DROPDOWN_ORDER_RULE)
+
+    for (const [surface, text] of [
+      ["the tool's own description", create!.summary],
+      ["the system rule wall", DROPDOWN_ORDER_RULE],
+    ] as const) {
+      const t = text.toLowerCase()
+      expect(t, `${surface} must say the option is never invented`).toMatch(/never invents? (an|the) option/)
+      expect(t, `${surface} must say both calls ride ONE turn`).toMatch(/(same|one) turn/)
+      // The ordering is the whole point, so it is asserted structurally: whatever
+      // is named FIRST must be the create call, and what follows must be the write.
+      const at = t.indexOf("first")
+      expect(at, `${surface} must name a first step`).toBeGreaterThan(-1)
+      expect(
+        t.slice(0, at),
+        `${surface} states the order backwards — the CREATE call is the one that goes first`
+      ).toMatch(/create_dropdown_value|call this|create the dropdown value/)
+      expect(t.slice(at), `${surface} must name the write as the second step`).toMatch(/write|rows/)
+      expect(t.slice(at), `${surface} must mark the write as the SECOND call`).toMatch(/second|then/)
+    }
+    // The rule is worthless if it doesn't name the tool the model must reach for.
+    expect(DROPDOWN_ORDER_RULE).toContain("create_dropdown_value")
   })
 })

@@ -76,7 +76,7 @@ export const RULES_REGISTRY: Rule[] = [
   {
     id: "R9",
     dimension: "arch",
-    law: "The agent knows what the app can do — its system prompt carries a capability brief GENERATED from the import/export catalog (+ the glossary), so the UI and the agent can never disagree about a capability.",
+    law: "The agent knows what the app can do — its system prompt carries a capability brief GENERATED from the import/export catalog (+ the glossary), so the UI and the agent can never disagree about a capability. And it knows what the app REFUSES: a vocabulary-gated write states its call ORDER (create the dropdown value first, write the rows second, one turn) on BOTH surfaces the model reads — the tool's own description and the system rule wall. Earned by: a perfectly-planned single call refused by the vocabulary gate, ending a turn having changed nothing.",
     checkId: "agent-app-parity",
     status: "enforced",
   },
@@ -111,7 +111,7 @@ export const RULES_REGISTRY: Rule[] = [
   {
     id: "R14",
     dimension: "arch",
-    law: "No unbounded list endpoint: every exported list*/search* function backing a collection route either PAGES (LIMIT ? OFFSET ? + a total) or applies a HARD CAP (LIMIT n) with a comment saying so. Earned by: one unbounded read stalling a worker under a 24,000-row catalogue — scale is a law, not a per-screen choice.",
+    law: "No unbounded list endpoint, and no capped GROWING one: every exported list*/search* function backing a collection route applies a HARD CAP (LIMIT n, said in a comment) — but a collection that GROWS with ordinary use (GROWING_COLLECTIONS) must PAGE instead, by KEY not offset: an opaque cursor, an exact total, and hasMore, with a client that can actually reach page two. A cap is an honest refusal to answer; paging is an answer. Earned by: one unbounded read stalling a worker under a 24,000-row catalogue — then the same catalogue proving a 1,000-row ceiling is just a slower refusal.",
     checkId: "bounded-lists",
     status: "enforced",
   },
@@ -179,6 +179,34 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
 /** R15 — reviewed DEAF exemptions: resources a worker publishes that reach NO
  * listener, each with its reason. Publishing to nobody is the silent half of the
  * stale-screen bug, so every exemption is a visible, conscious line. */
+/** R14 — the GROWING collections: the ones that get bigger with ordinary use, so
+ * a hard cap would eventually become a refusal to answer. Each must PAGE through
+ * shared/workers/paging.ts (keyset cursor + exact total + hasMore) AND be reachable
+ * past page one from the client. Every OTHER list may still cap — a bounded
+ * collection (roles, members, dropdown values) doesn't need a cursor to be honest.
+ * DATA, not a hand-list in a test: adding a growing module means adding a line here. */
+export const GROWING_COLLECTIONS: Record<
+  string,
+  { lib: string; fn: string; routes: string; rowsKey: string; webKey: string; why: string }
+> = {
+  help: {
+    lib: "workers/content/src/lib/help.ts",
+    fn: "listTickets",
+    routes: "workers/content/src/routes/help.ts",
+    rowsKey: "tickets",
+    webKey: "helpKey(",
+    why: "support tickets accumulate forever — a team that has raised 3,000 must still reach the oldest",
+  },
+  activity: {
+    lib: "workers/tenancy/src/lib/activity-read.ts",
+    fn: "getActivity",
+    routes: "workers/tenancy/src/routes/team.ts",
+    rowsKey: "activity",
+    webKey: "activity:team:",
+    why: "the fastest-growing table in the base — EVERY mutation writes a row",
+  },
+}
+
 export const DEAF_EXEMPT: Record<string, string> = {
   help_threads:
     "a reply pings the parent help row too (op edit), whose row-level patch refreshes the open ticket's deps; the thread list itself re-pulls when the detail (re)opens",

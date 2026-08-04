@@ -19,6 +19,19 @@ export const fail = (
   message: string
 ): Response => json({ error, message } satisfies ApiError, status)
 
+/** R14 — the ONE paged response. A growing collection's door answers through
+ * this and only this, so it cannot half-implement the contract: the rows under
+ * their own key, the EXACT server total, hasMore, and the opaque nextCursor the
+ * client hands straight back. `extra` carries a door's own additions (help's
+ * mineTotal). Drop the seam and the client silently loses page two, so the
+ * bounded-lists check asserts every growing door still goes through it. */
+export const pagedJson = (
+  rowsKey: string,
+  page: { rows: unknown[]; total: number; hasMore: boolean; nextCursor: string | null },
+  extra: Record<string, unknown> = {}
+): Response =>
+  json({ [rowsKey]: page.rows, total: page.total, hasMore: page.hasMore, nextCursor: page.nextCursor, ...extra })
+
 /** Forward a request to a gated door over a service binding, carrying the caller's
  * session cookie so the door re-checks permissions + validates AS them. Returns the
  * raw Response — the caller shapes it (the agent → {ok,status,data}; MCP → {ok,text}).

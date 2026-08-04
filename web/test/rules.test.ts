@@ -14,6 +14,7 @@ import {
   ACTIVITY_TABLE_EXEMPT,
   DEAF_EXEMPT,
   FORM_DIALOGS,
+  GROWING_COLLECTIONS,
   RECORD_DETAIL_COMPONENTS,
   RULES_REGISTRY,
   TAB_COUNT_EXCEPTIONS,
@@ -223,6 +224,46 @@ describe("RULES — the laws of the base", () => {
       offenders,
       `unbounded list read (R14) — add a hard-cap LIMIT (with its comment) or real paging: ${offenders.join(", ")}`
     ).toEqual([])
+  })
+
+  // R14, the other half — a cap is an honest REFUSAL to answer, so a collection
+  // that grows with ordinary use must PAGE instead: keyset (never OFFSET, which
+  // re-scans everything skipped and duplicates rows under concurrent writes), an
+  // exact total, hasMore, an opaque cursor — and a client that can actually reach
+  // page two. Paging no one can reach is dead code wearing a law's clothes.
+  it("bounded-lists: every GROWING collection pages by key, end to end", () => {
+    for (const [name, c] of Object.entries(GROWING_COLLECTIONS)) {
+      const lib = read(join(ROOT, c.lib))
+      const at = lib.indexOf(`export async function ${c.fn}`)
+      expect(at, `${name}: ${c.fn} must exist in ${c.lib}`).toBeGreaterThan(-1)
+      const next = lib.indexOf("\nexport ", at + 1)
+      const body = lib.slice(at, next === -1 ? undefined : next)
+      for (const seam of ["decodeCursor", "keysetAfter", "toPage"])
+        expect(body, `${name} (${c.why}) must page through the ${seam} seam, not a hard cap`).toContain(seam)
+      expect(body, `${name} must not page by OFFSET — keyset only`).not.toMatch(/OFFSET/i)
+
+      // The door must hand the WHOLE contract back, through the one pagedJson
+      // seam — a door assembling its own response literal can (and did) ship with
+      // half the contract, and the client then silently loses page two.
+      const routes = read(join(ROOT, c.routes))
+      expect(routes, `${c.routes} must answer ${name} through the pagedJson seam`).toContain("pagedJson")
+      // …and NOTHING may hand these rows back any other way: a response built by
+      // hand is how a door ships half the contract (rows + total, no cursor).
+      const handBuilt = [...routes.matchAll(/(?<![A-Za-z])json\(/g)].filter((m) =>
+        new RegExp(`\\b${c.rowsKey}\\s*:`).test(routes.slice(m.index, (m.index ?? 0) + 300))
+      )
+      expect(
+        handBuilt.length,
+        `${c.routes} hands \`${c.rowsKey}\` back through a hand-built json() — every page must go through pagedJson`
+      ).toBe(0)
+
+      // …and something in web must be able to ask for page two.
+      const wired = componentFiles().some((f) => {
+        const src = read(f)
+        return src.includes("<LoadMore") && src.includes(c.webKey)
+      })
+      expect(wired, `${name} pages on the server but nothing in web can reach page two`).toBe(true)
+    }
   })
 
   // R17 — state transitions are idempotent: every deactivate/reactivate UPDATE
