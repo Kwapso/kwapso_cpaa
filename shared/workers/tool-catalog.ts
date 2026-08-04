@@ -10,7 +10,8 @@
 // Both forward to the SAME gated door (the real doors gate + validate + audit + publish),
 // so the wiring here (path · method · binding · schema · buildBody) must match the door.
 // Surface-ONLY tools stay in each surface's own file: the agent's run_import_batch (SELF)
-// + bulk_* + get_role_permissions + update_team + mark_learning_done; the MCP's whoami +
+// + bulk_* + set_help_status_by_filter (all confirm-gated, no MCP confirm panel) +
+// get_role_permissions + update_team + mark_learning_done; the MCP's whoami +
 // exports + the agentic-import batch tools + agent_chat/agent_confirm.
 
 /* ------------------------------- schema helpers ------------------------------- */

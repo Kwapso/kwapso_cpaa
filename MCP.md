@@ -137,6 +137,15 @@ Today it covers:
   `plan_import` → `run_import`.
 - **The in-app assistant:** `agent_chat`, `agent_confirm`.
 
+**Intentionally NOT on the machine surface (a reasoned exclusion, not a gap):** the
+multi-row *mutation* tools the in-app assistant uses — `bulk_set_help_status`,
+`bulk_set_learning_active`, and the set-shaped `set_help_status_by_filter` — are
+agent-only. They're built around the app's yes/no CONFIRM panel (a person approves the
+true count before a high-blast write runs); a headless MCP client has no such panel, so
+exposing them would be a blind mass-write. A machine client that needs the same effect
+composes the single-record writes above (each gated + audited identically). The bulk
+READ path — filtering a list to one record via `id` — IS on MCP (R19 parity).
+
 Every tool is a thin forward to the **same gated door the app's own screens use** — so
 input is validated, **your live role is re-checked** (a Viewer's `create_role` is
 refused, exactly as in the UI), and the change gets the same audit trail and live-sync
