@@ -1,8 +1,8 @@
 # Lean Mean Check — brimba
-Scanned 2026-08-04 · Overall **94/100 (Grade A)** · Lean, heavily self-checking, and now genuinely scalable — a growing collection pages instead of refusing, and nine findings from an outside review are closed.
+Scanned 2026-08-04 · Overall **95/100 (Grade A)** · Lean, heavily self-checking, and now genuinely scalable — a growing collection pages instead of refusing, and nine findings from an outside review are closed.
 
 ## Fix first (ordered by impact)
-- [ ] **(Robustness)** Convert `bounded-lists` and `idempotent-transitions` from source-scans to behaviour tests — _why:_ both read source strings, so a rename can blind them. `workers/tenancy/test/activity-scope.test.ts` shows the stronger shape: mock the data door, run the function, assert the SQL that actually comes out. That test exists because a source-scan stayed green through a real leak. — _where:_ `web/test/rules.test.ts`
+- [ ] **(Robustness)** Convert `idempotent-transitions` from a source-scan to a behaviour test — _why:_ both read source strings, so a rename can blind them. `workers/tenancy/test/activity-scope.test.ts` shows the stronger shape: mock the data door, run the function, assert the SQL that actually comes out. That test exists because a source-scan stayed green through a real leak. — _where:_ `web/test/rules.test.ts`
 - [ ] **(Leanness)** Collapse the three per-worker `gating-seam` suites onto a shared scanner — _why:_ ~150 lines are the same code three times (most of the 6.6% duplication). Each must import its own worker's `ROUTES`, so the fix is a shared helper plus three thin files. Only worth doing if a fourth worker appears. — _where:_ `workers/{tenancy,content,data-ops}/test/gating-seam.test.ts`
 - [ ] **(Documentation)** Fold `SCREEN-ENGINE-PLAN.md` and `AGENT-MODULES-PLAN.md` into `ROADMAP.md` — _why:_ both describe work that has shipped; 33 docs stays navigable only while the README doc-map is exhaustive.
 
@@ -10,14 +10,14 @@ Scanned 2026-08-04 · Overall **94/100 (Grade A)** · Lean, heavily self-checkin
 | Dimension | Score | Status |
 |---|---|---|
 | Size & Scope | 95 | green |
-| Robustness | 96 | green |
-| Documentation | 95 | green |
+| Robustness | 97 | green |
+| Documentation | 96 | green |
 | Understandability | 92 | green |
 | Leanness & Optimization | 91 | green |
 | Scalability & Structure | 96 | green |
 
 ## Numbers
-293 code files · 29,697 LOC · 33 docs (6,164 lines) · 60 test files (371 tests, 20.5% test-to-code) · 0 TODO/FIXME · 6.6% duplicate lines.
+293 code files · 29,697 LOC · 33 docs (6,164 lines) · 62 test files (379 tests, 21% test-to-code) · 0 TODO/FIXME · 6.6% duplicate lines.
 
 ## Full findings
 
@@ -25,11 +25,11 @@ Scanned 2026-08-04 · Overall **94/100 (Grade A)** · Lean, heavily self-checkin
 - Strengths: 29.7k lines carries seven workers, per-tenant databases, an AI assistant, an external machine surface and a CSV importer; zero parked TODOs; this round added ~1.2k lines and removed a whole class of refusal.
 - To improve: three near-identical seam-test triplets (see Fix first).
 
-### Robustness — 96/100
-- Strengths: every new check was **sabotage-proven**, which caught two real scanner bugs this round — a missing word boundary that let `ungatedBody(` read as a gate, and a braced guard clause that switched the hooks-order check off for whole files. 19 machine-checked laws. R10's three claimed-but-missing suites now exist.
+### Robustness — 97/100
+- Strengths: all 20 source-scanning checks were swept for the two flaw classes (unbounded substring match; silent skip of an unrecognised shape) — three were blind and are fixed. Every new check was **sabotage-proven**, which caught three real scanner bugs this round — a missing word boundary that let `ungatedBody(` read as a gate, and a braced guard clause that switched the hooks-order check off for whole files. 19 machine-checked laws. R10's three claimed-but-missing suites now exist.
 - To improve: two checks still assert on text rather than behaviour.
 
-### Documentation — 95/100
+### Documentation — 96/100
 - Strengths: laws pinned doc → registry → check; comments name the failure that earned each rule; a reversed owner decision is recorded with its date, its evidence, and how to reverse it again.
 - To improve: 33 files is a lot to keep mapped.
 

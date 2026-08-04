@@ -18,7 +18,7 @@ Scope: WHOLE APP · 2026-08-04 · **96/100 (green)** · Every capability still r
 
 ## Intentional exclusions (documented, not counted against the score)
 - **Confirm-gated bulk writes** (`set_help_status_by_filter`, `bulk_*`) are agent-only — there is no MCP confirm panel. *(MCP.md, tool-catalog header.)*
-- **The four privilege grants confirm on the agent but not on MCP** — the confirming UI belongs to the connecting client; the door, gate and audit row are identical. Newly documented this round in MCP.md and the tool-catalog header, with the recommendation that an MCP client driving an LLM over team data put a human in front of those four.
+- **Privilege writes confirm on the agent but not on MCP** (the set is derived from the gate map — anything on `member_roles:` / `team_members:`) — the confirming UI belongs to the connecting client; the door, gate and audit row are identical. Newly documented this round in MCP.md and the tool-catalog header, with the recommendation that an MCP client driving an LLM over team data put a human in front of those four.
 
 ## Findings
 None outstanding. No re-implemented function, no bespoke MCP-only route, no missing gate re-check.

@@ -93,8 +93,8 @@ export type SharedTool = {
 
 /** WHY SOME CONSTRUCTIVE WRITES STILL CONFIRM. The rule is that only DESTRUCTIVE
  * acts stop for a yes/no panel — creating an article or replying to a ticket just
- * runs. Privilege GRANTS are the reviewed exception: create_role,
- * set_role_permissions, set_member_role and invite_member decide WHO CAN DO WHAT,
+ * runs. Privilege WRITES are the reviewed exception: anything gated on
+ * member_roles: or team_members: decides WHO CAN DO WHAT,
  * and the model reaches them while reading team data an attacker can author (a
  * ticket description is up to 20,000 characters of someone else's text). Fenced
  * tool output plus one system-prompt sentence is a soft defence; a confirm panel

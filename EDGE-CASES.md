@@ -223,8 +223,8 @@ nowhere.
 **The trap.** It's tempting to make the agent "ask before every write," or to
 confirm every privilege change. That's the wrong model here — it double-checks
 the user on ordinary, reversible building. The confirm behaviour is narrow and
-specific: **destructive acts pause — and so do the four writes that decide who
-can do what.** Nothing else does.
+specific: **destructive acts pause — and so does every write that decides who can
+do what.** Nothing else does.
 
 **Why.** Since every write is **already gated** as the user (§4) and every write
 is **reversible + audited**, the confirm panel isn't a permission check — it's
@@ -244,12 +244,22 @@ of someone else's text); an admin later asks the assistant anything that calls
 `set_role_permissions` / `set_member_role` / `create_role` / `invite_member` all
 execute AS the admin with no panel. Fencing untrusted content as DATA and one
 system-prompt sentence are soft defences against that; a panel the admin must
-click is a hard one. So those FOUR — and only those four — now confirm. They are
-not destructive; they are the writes where a silent success is a silent
-privilege escalation. Everything else constructive still runs free, so the
-friction the 2026-07-10 decision removed stays removed. Reversible: flip
-`agent.confirm` in `shared/workers/tool-catalog.ts` (the set is asserted by name
-in `workers/data-ops/test/agent.test.ts`, so it can't quietly grow back).
+click is a hard one.
+
+So privilege writes confirm — and the set is **DERIVED, never listed**:
+`isPrivilegeWrite()` reads each tool's own entry in `TOOL_GATES` and returns true
+for anything gated on `member_roles:` or `team_members:` (falling back to the
+door it posts to, so an agent-only tool can't slip through by being absent from
+the map). Today that resolves to eight: `create_role`, `update_role`,
+`set_role_active`, `set_role_permissions`, `set_member_role`, `remove_member`,
+`invite_member`, `revoke_invite`. Deriving it is not tidiness — a hand-written
+list of four had already waved through `update_role`, which sat at
+`confirm: false` beside the four that confirmed. A write added tomorrow to either
+table confirms the moment it exists: `requiresConfirm` derives it at runtime, so
+the safe behaviour doesn't wait for anyone to remember, and
+`workers/data-ops/test/agent.test.ts` still requires the catalog to DECLARE
+`confirm: true` so it reads honestly. Everything else constructive runs free, so
+the friction the 2026-07-10 decision removed stays removed.
 
 **The rule** (`requiresConfirm` in `workers/data-ops/src/lib/tools.ts` — the one
 place it's decided; a tool's `confirm` is a boolean, or a predicate for the
@@ -258,7 +268,7 @@ input-aware toggles):
 | Behaviour | Tools | Why |
 |---|---|---|
 | **Pause for a yes/no panel** | the destructive acts — `remove_member`, `revoke_invite` — plus `set_role_active` / `set_learning_active` / `set_dropdown_active` **only when deactivating** (`active !== true`) | It removes/withdraws access, or switches an existing record OFF. Reversible, but destructive-feeling — the app double-checks, exactly as the red UI action does. |
-| **Pause for a yes/no panel (privilege grants)** | `create_role`, `set_role_permissions`, `set_member_role`, `invite_member` | They decide WHO CAN DO WHAT, and the model reaches them while reading team data an attacker can author. A silent grant is a silent privilege escalation. |
+| **Pause for a yes/no panel (privilege writes)** | DERIVED — every write gated on `member_roles:` or `team_members:` (today: `create_role`, `update_role`, `set_role_active`, `set_role_permissions`, `set_member_role`, `remove_member`, `invite_member`, `revoke_invite`) | They decide WHO CAN DO WHAT, and the model reaches them while reading team data an attacker can author. A silent one is a silent privilege escalation. Derived, so the next such tool is covered the day it lands. |
 | **Confirm-with-a-count** | `bulk_set_help_status`, `bulk_set_learning_active`, `run_import_batch` | High-blast: "Set 12 tickets to resolved" / a whole imported file is confirmed by the count before it runs. |
 | **Run straight away** | every OTHER constructive write — `update_role`, `update_team`, `create_dropdown_value`, `update_dropdown_value`, the (re)activations, and all single content edits | Ordinary re-gated + reversible + audited CRUD; the server gates each call, so no panel. |
 
@@ -512,7 +522,7 @@ last) fails, and deploying a worker before its migration 500s at runtime.
 | Loop `await d1Query(...)` N times | Each is an HTTP round-trip | Multi-statement `d1ExecScript`, or `Promise.all` independent reads |
 | `Promise.all([requireRight, d1Query])` | Races the read against its own gate | Gate first, read second |
 | Build an email link from `new URL(request.url)` | Agent's request host is `https://internal` | `env.PUBLIC_APP_URL` first |
-| Make the agent confirm EVERY write | Every write is already gated as the user + reversible | Destructive acts + the four privilege GRANTS pause; bulk confirms with a count; every other constructive write runs free (§5) |
+| Make the agent confirm EVERY write | Every write is already gated as the user + reversible | Destructive acts + every privilege write (derived from the gate map) pause; bulk confirms with a count; every other constructive write runs free (§5) |
 | `await` the run before returning the stream | Kills streaming; isolate may drop | Return the readable, write async (`streamRun`) |
 | Guard an invariant with a pre-write `COUNT` only | TOCTOU race | Re-check in the `UPDATE … WHERE`; count is just the friendly error |
 | Assume hot reads route through sharding | They query `guard.databaseId` directly | Fine today; revisit any batched script if a module is split |
