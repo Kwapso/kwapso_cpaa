@@ -6,7 +6,7 @@
 
 import { ulid } from "../../../../shared/workers/id"
 import type { Env } from "../env"
-import { CODE_TTL_MINUTES, MAX_CODES_PER_HOUR } from "./constants"
+import { CODE_TTL_MINUTES, MAX_CODES_PER_HOUR, RESEND_COOLDOWN_SECONDS } from "./constants"
 import { randomCode, sha256Hex } from "./crypto"
 
 export type MintFail = { error: string; message: string; status: number }
@@ -19,30 +19,61 @@ export async function mintLoginCode(
   env: Env,
   email: string
 ): Promise<{ code: string } | MintFail> {
-  // Throttle: at most MAX_CODES_PER_HOUR codes per email per hour — shared by
-  // BOTH doors, so the test door can't be used to spray codes either.
-  const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+  // THROTTLE THE SEND, NEVER THE SIGN-IN. The old rule refused for an HOUR once
+  // five codes had been asked for — so an anonymous caller could burn a real
+  // person's five and lock them out of their own account, and a legitimate
+  // operator retrying a flaky email locked themselves out. Now:
+  //   • a short cooldown limits how often an email goes out at all;
+  //   • past the hourly cap the request ROTATES the live code in place instead of
+  //     being refused, so the row count stays bounded and the person who owns the
+  //     inbox can always get in.
+  // Rotation is the only option regardless: codes are hashed at rest, so nobody —
+  // including this function — can re-send digits that already went out.
+  const now = new Date()
+  const cooldownFrom = new Date(now.getTime() - RESEND_COOLDOWN_SECONDS * 1000).toISOString()
+  const justSent = await env.DB.prepare(
+    "SELECT id FROM login_codes WHERE email = ? AND created_at > ? LIMIT 1"
+  )
+    .bind(email, cooldownFrom)
+    .first<{ id: string }>()
+  if (justSent)
+    return {
+      error: "too_soon",
+      message: `A code was just sent. Give it a moment, then ask again.`,
+      status: 429,
+    }
+
+  const hourAgo = new Date(now.getTime() - 60 * 60 * 1000).toISOString()
   const recent = await env.DB.prepare(
     "SELECT COUNT(*) AS n FROM login_codes WHERE email = ? AND created_at > ?"
   )
     .bind(email, hourAgo)
     .first<{ n: number }>()
-  if ((recent?.n ?? 0) >= MAX_CODES_PER_HOUR)
-    return { error: "too_many_codes", message: "Too many codes requested. Try again in an hour.", status: 429 }
 
   const code = randomCode()
-  const now = new Date()
+  const hash = await sha256Hex(`${code}:${email}`)
+  const expires = new Date(now.getTime() + CODE_TTL_MINUTES * 60 * 1000).toISOString()
+
+  if ((recent?.n ?? 0) >= MAX_CODES_PER_HOUR) {
+    // At the cap: replace the newest unconsumed code rather than adding a row —
+    // a fresh secret, a fresh TTL, a fresh attempt budget, no growth.
+    const rotated = await env.DB.prepare(
+      `UPDATE login_codes SET code_hash = ?, expires_at = ?, created_at = ?, attempts = 0
+       WHERE id = (SELECT id FROM login_codes WHERE email = ? AND consumed_at IS NULL
+                   ORDER BY created_at DESC LIMIT 1)`
+    )
+      .bind(hash, expires, now.toISOString(), email)
+      .run()
+    if ((rotated.meta.changes ?? 0) > 0) return { code }
+    // Nothing live to rotate (all consumed): fall through and mint one. The
+    // cooldown above is what bounds this path.
+  }
+
   await env.DB.prepare(
     `INSERT INTO login_codes (id, email, code_hash, expires_at, created_at)
      VALUES (?, ?, ?, ?, ?)`
   )
-    .bind(
-      ulid(),
-      email,
-      await sha256Hex(`${code}:${email}`),
-      new Date(now.getTime() + CODE_TTL_MINUTES * 60 * 1000).toISOString(),
-      now.toISOString()
-    )
+    .bind(ulid(), email, hash, expires, now.toISOString())
     .run()
   return { code }
 }

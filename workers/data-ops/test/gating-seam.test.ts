@@ -40,7 +40,8 @@ const GATE_RE =
 
 /** The reviewed IDENTITY-gated writes: they can't ask "does your ROLE allow
  * this?" because the answer is about WHO you are, not what you may do. Each
- * gates on whoAmI and proves ownership itself. Adding a line here is a conscious
+ * gates on whoAmI and proves ownership itself (matched with a leading boundary,
+ * so a `notWhoAmI(` wrapper can't read as the real thing). Adding a line here is a conscious
  * decision — that's the point: you can't dodge the gate by quietly listing a
  * route as an exception without saying why. */
 const IDENTITY_GATED: Record<string, string> = {}
@@ -59,7 +60,7 @@ describe("gating-seam (data-ops): no ungated door can ship", () => {
       expect(body, `handler ${name} (${route}) must be an exported async function in routes/`).toBeDefined()
       if (IDENTITY_GATED[route]) {
         expect(
-          /whoAmI\s*\(/.test(body as string),
+          /(?<![A-Za-z0-9_$.])whoAmI\s*\(/.test(body as string),
           `${route} is a reviewed identity-gated write (${IDENTITY_GATED[route]}) — it must still verify WHO the caller is via whoAmI`
         ).toBe(true)
         continue

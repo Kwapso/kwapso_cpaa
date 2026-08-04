@@ -25,7 +25,7 @@ import { GuardError, requireRight, teamContext } from "../../../../shared/worker
 import { forwardToDoor } from "../../../../shared/workers/http"
 import { BULK_IDS_LIMIT } from "../../../../shared/workers/limits"
 import { publishChange } from "../../../../shared/workers/realtime"
-import {
+import { isPrivilegeWrite,
   obj,
   roleLabel,
   S,
@@ -261,6 +261,12 @@ export function toolSpecs(): ToolSpec[] {
  * straight away. `input` lets the (de)activate toggles confirm only when turning OFF. */
 export function requiresConfirm(tool: AgentTool, input: Record<string, unknown> = {}): boolean {
   if (!tool.write) return false
+  // A PRIVILEGE write always confirms, DERIVED from its own gate rather than
+  // read off its flag — so a tool added tomorrow that writes to member_roles or
+  // team_members is safe the moment it exists, even if whoever added it forgot.
+  // (The catalog must still DECLARE confirm:true; agent.test.ts asserts that, so
+  // the catalog reads honestly instead of relying on this line.)
+  if (isPrivilegeWrite(tool)) return true
   return typeof tool.confirm === "function" ? tool.confirm(input) : tool.confirm === true
 }
 

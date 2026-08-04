@@ -39,3 +39,9 @@ export const AGENT_REPLY_ENVELOPE_TOKENS = 512
  * both declare THIS constant, so the number the model is told, the number the door
  * enforces, and the number that physically fits are one number. */
 export const BULK_IDS_LIMIT = Math.floor((AGENT_MAX_TOKENS - AGENT_REPLY_ENVELOPE_TOKENS) / TOKENS_PER_EMITTED_ID)
+
+/** Per-user ceiling on CREATED teams. Every team provisions a REAL database, so
+ * an uncapped create door lets one signed-up account exhaust the platform's
+ * database quota. Low on purpose — a person runs a handful of teams, not fifty;
+ * the owner raises it per environment with MAX_TEAMS_PER_USER. */
+export const MAX_TEAMS_PER_USER = 5

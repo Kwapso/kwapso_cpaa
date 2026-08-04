@@ -12,6 +12,7 @@
 import { describe, expect, it } from "vitest"
 
 import { getTool, requiresConfirm, toolSpecs, TOOL_CATALOG } from "../src/lib/tools"
+import { isPrivilegeWrite, TOOL_GATES } from "../../../shared/workers/tool-catalog"
 
 describe("step/confirm summaries resolve ids to human names", () => {
   const names = { "01ROLE": "Sub Admin", "01USER": "Jane Doe" }
@@ -51,9 +52,7 @@ describe("agent tool catalog + confirm rule (destructive + privilege grants)", (
   // The set is written out so it cannot quietly GROW back into "confirm
   // everything", which is the friction this rule was written to remove.
   const DESTRUCTIVE = ["remove_member", "revoke_invite"]
-  const PRIVILEGE_GRANTS = ["create_role", "set_role_permissions", "invite_member", "set_member_role"]
   const RUNS_FREELY = [
-    "update_role",
     "update_team",
     "create_learning",
     "update_learning",
@@ -68,12 +67,24 @@ describe("agent tool catalog + confirm rule (destructive + privilege grants)", (
       expect(requiresConfirm(getTool(name)!), `${name} must confirm (destructive)`).toBe(true)
   })
 
-  it("confirms privilege GRANTS — who-can-do-what never changes silently", () => {
-    for (const name of PRIVILEGE_GRANTS)
+  // DERIVED, never a name list: every catalogued WRITE whose gate lands on
+  // member_roles or team_members must confirm. A name list locks the tools you
+  // thought of and waves through the next one — deriving it is what caught
+  // update_role sitting at confirm:false beside four that confirmed.
+  it("confirms every write that touches who-can-do-what — derived from the catalog", () => {
+    const privilege = TOOL_CATALOG.filter((t) => isPrivilegeWrite(t))
+    expect(privilege.length, "the derivation must actually find the privilege writes").toBeGreaterThanOrEqual(6)
+    for (const t of privilege) {
       expect(
-        requiresConfirm(getTool(name)!),
-        `${name} decides who can do what — it must stop for the confirm panel`
+        t.confirm,
+        `${t.name} writes to a privilege table (${TOOL_GATES[t.name] ?? t.path}) — it must DECLARE confirm: true, not a predicate and not false`
       ).toBe(true)
+      expect(requiresConfirm(t, { active: true }), `${t.name} must confirm whatever its input`).toBe(true)
+      expect(requiresConfirm(t, { active: false }), `${t.name} must confirm whatever its input`).toBe(true)
+    }
+    // …and the derivation must not sweep up ordinary content writes.
+    for (const name of RUNS_FREELY)
+      expect(isPrivilegeWrite(getTool(name)!), `${name} is not a privilege write`).toBe(false)
   })
 
   it("every OTHER constructive write still runs freely (the friction stays gone)", () => {
@@ -83,7 +94,10 @@ describe("agent tool catalog + confirm rule (destructive + privilege grants)", (
 
   it("(de)activate toggles confirm ONLY when turning something OFF (input-aware)", () => {
     // Deactivating an existing record is destructive → confirm; reactivating is not.
-    for (const name of ["set_role_active", "set_learning_active", "set_dropdown_active"]) {
+    // set_role_active is NOT in this list: it writes to member_roles, so the
+    // derived privilege rule makes it confirm both ways (a reactivated role hands
+    // its rights back to everyone holding it).
+    for (const name of ["set_learning_active", "set_dropdown_active"]) {
       const t = getTool(name)!
       expect(requiresConfirm(t, { active: false }), `${name} deactivate must confirm`).toBe(true)
       expect(requiresConfirm(t, { active: true }), `${name} activate runs freely`).toBe(false)

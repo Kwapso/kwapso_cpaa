@@ -24,4 +24,7 @@ export type Env = {
   /** Shared secret sent to auth's /internal/send-email (must match auth's
    * INTERNAL_KEY). Defense-in-depth alongside workers_dev:false. */
   INTERNAL_KEY?: string
+  /** Per-user ceiling on CREATED teams (each provisions a database). The owner's
+   * override: set it higher per environment; unset falls back to the code default. */
+  MAX_TEAMS_PER_USER?: string
 }

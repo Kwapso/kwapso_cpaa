@@ -53,11 +53,11 @@ describe("catalog-coverage (R13): the catalogue reconciles itself against the co
   })
 
   it("the reconcile is reachable from BOTH doors (the picker + the by-key lookup)", () => {
-    expect(fnBody("getActiveCatalog"), "the picker heals on read").toContain("reconcileCatalog(")
+    expect(fnBody("getActiveCatalog"), "the picker heals on read").toMatch(/(?<![A-Za-z0-9_$.])reconcileCatalog\(/)
     const byKey = fnBody("catalogByKey")
-    expect(byKey, "the by-key door heals on a miss").toContain("reconcileCatalog(")
+    expect(byKey, "the by-key door heals on a miss").toMatch(/(?<![A-Za-z0-9_$.])reconcileCatalog\(/)
     // …but only on a MISS — the per-import happy path pays nothing.
-    expect(byKey.indexOf("reconcileCatalog")).toBeGreaterThan(byKey.indexOf("await read()"))
+    expect(byKey.search(/(?<![A-Za-z0-9_$.])reconcileCatalog\(/)).toBeGreaterThan(byKey.indexOf("await read()"))
   })
 
   it("the picker does NOT pre-filter is_active in SQL (off ≠ never-existed)", () => {

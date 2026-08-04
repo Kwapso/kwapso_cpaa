@@ -19,6 +19,7 @@ import {
   switchTeam,
   updateTeamDetails,
 } from "../lib/teams"
+import { MAX_TEAMS_PER_USER } from "../../../../shared/workers/limits"
 import { gatedBody } from "../../../../shared/workers/route"
 import { teamContext, toActor, whoAmI } from "../context"
 import type { Env } from "../env"
@@ -89,6 +90,23 @@ export async function createNamedTeam(request: Request, env: Env): Promise<Respo
   // Validate at the boundary: a non-string name would otherwise crash .trim() → 500.
   // requireText type-checks + trims + caps, throwing the clean 400 the catch maps.
   const name = requireText(body.name, "Team name", TEXT_LIMITS.short)
+
+  // CAP the door. Every team provisions a REAL database, so an uncapped create
+  // is an unbounded resource-creation door for anyone who can sign up — one
+  // account could exhaust the Cloudflare account's database quota. Counted by
+  // who CREATED the team (that's what provisions), never by membership, so
+  // being invited to many teams costs nobody anything. The owner raises it per
+  // deploy with MAX_TEAMS_PER_USER; onboarding's first team is far below it.
+  const cap = Number(env.MAX_TEAMS_PER_USER) || MAX_TEAMS_PER_USER
+  const mine = await env.DB.prepare("SELECT COUNT(*) AS n FROM teams WHERE creator_id = ?")
+    .bind(user.id)
+    .first<{ n: number }>()
+  if ((mine?.n ?? 0) >= cap)
+    return fail(
+      403,
+      "team_limit",
+      `You've created ${cap} teams, which is the limit on this account. Ask an admin if you need more.`
+    )
 
   await createTeam(env, toActor(user), name, null)
   return json(await getActiveContext(env, d1Config(env), user.id))

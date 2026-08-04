@@ -10,6 +10,22 @@ Keep this current: when an item ships, move it to **Fixed** with the commit.
 
 ---
 
+## Reasoned exceptions (decided, documented, NOT open findings)
+
+Two things a review will flag every time. Both are deliberate positions with the
+threat named, documented in BASE-MANUAL §5 (the fork chapter) and OPERATIONS.md
+so a fork decides consciously rather than inheriting them by accident:
+
+- **`/media/*` capability URLs** — no session check on uploaded files. An
+  ex-member who saved a link keeps it, forever. Acceptable for product photos;
+  **not** for invoices, IDs or personal data. Any fork storing those must fix it
+  before launch.
+- **Identity fields behind a neighbouring right** — stakeholder emails, the team
+  creator's email, learning-progress user ids. Tenant-scoped throughout, so it is
+  a wrong-right mismatch within one team, not a cross-customer leak.
+
+---
+
 ## Fixed (2026-08-04, follow-up) — the independent security review
 
 Three no-prior-context auditors read a clean clone (no session notes, no prior
@@ -28,6 +44,172 @@ findings survived; all nine are fixed below. 371 tests.
 | LOW | **The email-change door was an enumeration oracle** — the "already in use?" check ran before the throttle, and a rejected probe counted toward nothing. | Throttle first; probes count. |
 | LOW | **A double-clicked CSV import could write every row twice** — read-then-write, while CONCURRENCY.md claimed it was guarded. | The session is claimed atomically, like its batch sibling. |
 | LOW | **Learning `body` + `contentLink` skipped the boundary seam** — a NUL byte was a 500, and the body had no length cap. | Both go through `optionalText` first, then the XSS scrub. |
+
+---
+
+# SECURITY ADVISORY — for apps forked from this base BEFORE 2026-08-04
+
+A base that fixes a vulnerability silently leaves its own children exposed. Every
+app forked before commit `5da1c76` carries the defects below in its own source —
+the fork copied the code, and no deploy of this repo reaches it. **Six of these
+have been independently confirmed live in a downstream product's production.**
+
+Each entry gives the grep that finds it in a fork and the minimal patch. Run the
+greps from the fork's root. **Every grep here was validated both ways** — it reads
+clear against the fixed base and FLAGS the pre-fix base (`3bebf0b`) — so a grep
+that comes back clear is evidence, not an absence of evidence. The one caveat: if
+you renamed the symbol it names, check that spot by hand.
+
+## A1 · CRITICAL-if-agent-enabled — the assistant grants privileges with no confirmation
+**Who is exposed:** any fork whose AI assistant is switched on and whose members
+can write free text anyone else's assistant will read (a ticket, an article, an
+imported row). **The attack:** a member writes instructions into a ticket
+description; an admin later asks the assistant anything that lists tickets; the
+model calls `set_role_permissions` / `set_member_role` / `create_role` /
+`invite_member` as the admin, with no panel. Nothing in the audit log looks unusual.
+
+```bash
+grep -A 12 -E 'name: "(create_role|update_role|set_role_active|set_role_permissions|set_member_role|invite_member)"' shared/workers/tool-catalog.ts | grep -c "confirm: false"
+```
+Any count above `0` is vulnerable. (A plain `grep confirm: false` is NOT a test —
+most tools legitimately don't confirm; only the privilege ones must.)
+**Patch:** any tool whose `TOOL_GATES` entry starts `member_roles:` or
+`team_members:` must declare `confirm: true`. Derive it rather than listing names
+— copy `isPrivilegeWrite()` from `shared/workers/tool-catalog.ts` and the
+`requiresConfirm` guard in `workers/data-ops/src/lib/tools.ts`.
+
+## A2 · HIGH — the activity feed leaks every module's history
+**The attack:** any member with `team_members:read` requests
+`GET /api/tenancy/activity?scope=user` **with no `id`**. It matches no branch,
+the WHERE comes out empty, and the whole team's cross-module history returns —
+including before→after values from modules that member cannot read.
+
+```bash
+grep -cE '^\s*\} else if \(scope === "team"\)' workers/tenancy/src/lib/activity-read.ts
+```
+**Patch:** any count above `0` is vulnerable (the branch is conditional, so an
+unresolved scope falls past it into an empty WHERE). Make it a plain `else`
+so an unresolved scope still gets the visibility filter, return empty when a
+non-team scope arrives without an `id`, and validate `scope` against the literal
+set in the route instead of casting it.
+
+## A3 · HIGH — a role can grant itself every right
+**The attack:** a member holding `member_roles:edit` posts their OWN role id to
+`/api/tenancy/roles/permissions` with every module true, and is an admin.
+
+```bash
+grep -n "export async function setRolePermissions" -A 12 workers/tenancy/src/lib/roles.ts | grep -c "guard.roleId"
+```
+**Patch:** returns `0` → vulnerable. Refuse when `roleId === guard.roleId`.
+
+## A4 · MEDIUM — anyone can write to your global database
+**The attack:** `curl -X POST <app>/api/log/client -H 'Cookie: session=x' -d
+'{"message":"…"}'` in a loop. The gate is a substring test on an
+attacker-controlled header, so unauthenticated rows accumulate in the core
+database that also holds users, sessions and teams — toward D1's 10 GB cap.
+
+```bash
+grep -n 'includes("session")' workers/gateway/src/index.ts
+```
+**Patch:** any hit is vulnerable. Resolve the session first —
+`env.AUTH.fetch("https://internal/api/auth/me", { headers: { Cookie: cookie } })`
+— and drop the beacon when it isn't ok.
+
+## A5 · MEDIUM — one mistyped directory arms sign-in-as-anyone
+**Why it matters:** if the test-login door is gated by `ADMIN_KEY`, it shares its
+name with the maintenance key your runbook tells operators to set on tenancy and
+data-ops **in both environments**. One `wrangler secret put ADMIN_KEY` run in the
+wrong directory turns a maintenance key into universal impersonation on production.
+
+```bash
+grep -n "env.ADMIN_KEY" workers/auth/src/index.ts
+```
+**Patch:** any hit is vulnerable. Give the door its own `TEST_LOGIN_KEY` secret,
+add `if (env.ENVIRONMENT === "production") return fail(403, …)`, and set
+`"ENVIRONMENT"` in `workers/auth/wrangler.jsonc` vars for every environment.
+
+## A6 · MEDIUM — the daily AI allowance is advisory
+**The attack:** fire N chat requests at once; every one reads `used < cap` before
+any writes, so all N proceed. The free allowance overruns by the burst width and
+paid credits are never reached.
+
+```bash
+grep -c "agent_usage.used <" workers/data-ops/src/lib/credits.ts
+```
+**Patch:** a count of `0` is vulnerable — the cap isn't in the write.
+(Don't grep for `SELECT used FROM agent_usage`: a legitimate read of the same
+row backs the quota display.) Put the cap in the write —
+`INSERT … ON CONFLICT … DO UPDATE SET used = used + 1 WHERE agent_usage.used < ?`
+— and proceed only when a row changed.
+
+## A7 · MEDIUM — an uncapped database-creation door
+**The attack:** sign up, then POST `/api/tenancy/teams` in a loop. Every call
+provisions a real D1 database until the Cloudflare account's quota is gone. No
+permission is exceeded; the platform simply stops working.
+
+```bash
+grep -n "creator_id = ?" workers/tenancy/src/routes/team.ts
+```
+**Patch:** returns nothing → vulnerable. Count teams the caller CREATED and
+refuse at a cap (`MAX_TEAMS_PER_USER`, default 5, overridable per environment).
+
+## A8 · LOW — an unthrottled user-enumeration oracle
+**The attack:** any signed-in account POSTs `/api/auth/email/change/start` in a
+loop; `409 email_taken` vs `{}` reveals whether any address has an account, at
+full request rate. The login door is deliberately non-enumerable; this undoes it.
+
+```bash
+grep -n "export async function startEmailChange" -A 25 workers/auth/src/lib/email-change.ts | grep -c "findUserByEmail"
+```
+**Patch:** any count above `0` is vulnerable — the START door answers "does this
+address exist?" before the throttle. Move the check to the VERIFY step (where the
+caller has already proved they control the new inbox) and keep the UNIQUE
+constraint as the backstop.
+
+## A9 · LOW — anyone can lock a real person out of sign-in
+**The attack:** request five codes for someone else's address. For the rest of
+the hour their own sign-in returns `429`. (This one bit a real operator on their
+own staging, self-inflicted, by retrying.)
+
+```bash
+grep -n "Try again in an hour" workers/auth/src/lib/login-codes.ts
+```
+**Patch:** any hit is vulnerable. Throttle the SEND with a short cooldown
+(~60s); past the hourly cap, ROTATE the live code row in place instead of
+refusing — codes are hashed at rest, so rotation (a fresh secret, fresh TTL,
+`attempts = 0`) is the only way to let the inbox owner back in.
+
+## A10 · LOW — a double-clicked import writes every row twice
+```bash
+grep -n "import_complete === 1" -A 6 workers/data-ops/src/lib/import.ts | grep -c "import_initiated = 1 WHERE"
+```
+**Patch:** returns `0` → the check is read-then-write. Claim the session in one
+statement (`UPDATE … WHERE id = ? AND import_complete = 0 AND import_initiated = 0
+RETURNING id`), placed BELOW every validation, and release it on failure.
+
+## A11 · LOW — a NUL byte is a 500
+```bash
+grep -n "safeBody(input.body)" workers/content/src/lib/learning.ts
+```
+**Patch:** any hit is vulnerable. Wrap with the boundary seam first —
+`safeBody(optionalText(input.body, "Body", TEXT_LIMITS.long))` — and the same for
+`contentLink`.
+
+## And the two blind CHECKS, which matter as much
+A fork also inherits the checks. Two flaw classes made several of them unable to
+fail — a green check that cannot go red is worse than no check, because it is
+reported as a pass:
+
+```bash
+grep -rn "gatedBody\\s\*\\(\|whoAmI\\s\*\\(" workers/*/test/gating-seam.test.ts
+grep -n "export (?:async )?function ((?:list|search)" web/test/rules.test.ts
+```
+**Patch:** put a leading boundary — `(?<![A-Za-z0-9_$.])` — in front of every
+identifier a check matches (without it, `ungatedBody(` satisfies a search for
+`gatedBody(`), and teach every source-scan BOTH export shapes (`export function`
+and `export const … =>`) plus a tripwire asserting it found something. See
+`web/test/hooks-order.test.ts` for the fixture pattern that locks a scanner's own
+blind spots.
 
 ---
 

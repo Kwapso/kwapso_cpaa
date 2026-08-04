@@ -409,6 +409,36 @@ outright when the worker's `ENVIRONMENT` var is `production`, so the isolation s
 mistake rather than depending on this paragraph being read. (2) The import catalog **self-heals on read** (R13) — a fresh
 fork's target picker works with no seed step; `seed-targets` only refreshes labels.
 
+**Two REASONED exceptions a fork inherits — decide on both before launch.** These
+are not oversights; they are deliberate positions the base takes, which are right
+for some products and wrong for others.
+
+1. **Uploaded files are capability URLs, not gated reads.** `/media/*` and
+   `/media/learning/*` serve any object whose key you know: the key is an
+   unguessable ULID under a per-team prefix, and the gateway serves it with
+   `default-src 'none'; sandbox` + `nosniff`, but it checks **no session and no
+   membership**. *The threat, plainly:* anyone who was ever given a link keeps it
+   — a removed ex-member who saved the URL of a learning attachment can still open
+   it after losing access, and so can anyone they forwarded it to. There is no
+   expiry and no revocation. That is an acceptable trade for product photos and
+   team logos. It is **not** acceptable for invoices, contracts, ID documents,
+   payroll, health or anything a regulator would call personal data. **If your
+   product stores any of that, fix this before launch:** require a session on
+   `/media/*` and check membership against the key's leading team segment (or
+   move to short-lived signed URLs).
+2. **Three reads return identity data behind a neighbouring module's right.**
+   `GET /api/content/help/stakeholders` (gated `help:read`) returns teammates'
+   email addresses; `GET /api/tenancy/team-meta` returns the creator's email to
+   any member; `GET /api/content/learning/progress` (gated `learning:read`)
+   returns every member's user id and completion state. All three are correctly
+   **tenant-scoped** — no other team's data is reachable — so this is a
+   wrong-right mismatch inside one team, not a leak between customers. It is left
+   as-is because the alternative (splitting those responses per-right) costs more
+   than it protects for a team-wide tool where colleagues know each other's names.
+   Revisit it if your product gives some members deliberately restricted
+   visibility of *other members* — a marketplace, a franchise network, a client
+   portal where tenants share a team.
+
 **What a new product must NOT do.** Don't fork the UI library into the app (fix it in
 `@swift-struck/ui`), don't add a public worker (only the gateway is public), don't add
 a per-module database (one D1 per *team*, not per module — modules are tables inside

@@ -211,16 +211,24 @@ describe("RULES — the laws of the base", () => {
   // stalls a worker at 100k rows — the 24k-catalogue failure).
   it("bounded-lists: every exported list*/search* function carries a LIMIT", () => {
     const offenders: string[] = []
+    let seen = 0
     for (const [path, src] of workerSources()) {
       if (!path.includes("/src/lib/")) continue
-      const re = /export (?:async )?function ((?:list|search)\w*)/g
+      // BOTH export shapes. A scan that only knows `export function listX` goes
+      // silently blind the day someone writes `export const listX = async () =>`
+      // — the read is then unbounded AND invisible, which is worse than either.
+      const re = /export (?:async )?function ((?:list|search)\w*)|export const ((?:list|search)\w*)\s*(?::[^=;\n]*)?=/g
       let m: RegExpExecArray | null
       while ((m = re.exec(src))) {
+        seen++
         const next = src.indexOf("\nexport ", m.index + 1)
         const body = src.slice(m.index, next === -1 ? undefined : next)
-        if (/SELECT/.test(body) && !/LIMIT\s/.test(body)) offenders.push(`${path} → ${m[1]}`)
+        if (/SELECT/.test(body) && !/LIMIT\s/.test(body)) offenders.push(`${path} → ${m[1] ?? m[2]}`)
       }
     }
+    // The tripwire: a scan that suddenly finds nothing has gone blind, and a
+    // blind check reports "all clear" exactly like a passing one.
+    expect(seen, "the bounded-lists scan found no list functions at all — it has gone blind").toBeGreaterThan(15)
     expect(
       offenders,
       `unbounded list read (R14) — add a hard-cap LIMIT (with its comment) or real paging: ${offenders.join(", ")}`

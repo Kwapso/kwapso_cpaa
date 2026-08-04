@@ -100,6 +100,10 @@ export type SharedTool = {
  * tool output plus one system-prompt sentence is a soft defence; a confirm panel
  * the admin must click is a hard one. So these four confirm — not because they are
  * destructive, but because a silent one is a silent privilege escalation.
+ * The set is DERIVED, not listed: isPrivilegeWrite() reads each tool's own gate,
+ * so a write added tomorrow to either table confirms the moment it exists. A
+ * name list would have locked the four above and waved through the fifth —
+ * which is exactly where update_role was found.
  * The MCP surface ignores `agent.confirm` — it has no panel to show, and the
  * confirming UI belongs to the connecting client. Same door, same gate, same
  * audit row; the asymmetry is documented in MCP.md, not a capability gap. */
@@ -178,7 +182,9 @@ export const SHARED_TOOLS: SharedTool[] = [
     binding: "TENANCY", method: "POST", path: "/api/tenancy/roles/update",
     schema: obj({ roleId: S, title: S, description: S }, ["roleId", "title"]),
     buildBody: (i) => ({ roleId: str(i, "roleId"), title: str(i, "title"), description: str(i, "description") || "" }),
-    agent: { write: true, confirm: false, summarize: (i, names) => `Rename ${roleLabel(i, names)} to "${str(i, "title")}"` },
+    // PRIVILEGE WRITE (member_roles) → confirm. Renaming isn't a grant, but a
+    // rename is how a grant gets socially engineered ("call Viewer Admin").
+    agent: { write: true, confirm: true, summarize: (i, names) => `Rename ${roleLabel(i, names)} to "${str(i, "title")}"` },
   },
   {
     name: "set_role_active",
@@ -188,7 +194,9 @@ export const SHARED_TOOLS: SharedTool[] = [
     buildBody: (i) => ({ roleId: str(i, "roleId"), active: i.active === true }),
     agent: {
       write: true,
-      confirm: (i) => i.active !== true, // destructive only when DEACTIVATING
+      // PRIVILEGE WRITE (member_roles) → confirm BOTH ways. Deactivating removes
+      // access; REACTIVATING hands it back to everyone still holding the role.
+      confirm: true,
       summarize: (i, names) => `${i.active === true ? "Activate" : "Deactivate"} ${roleLabel(i, names)}`,
     },
   },
@@ -383,4 +391,19 @@ export const TOOL_GATES: Record<string, string> = {
 }
 
 /** Lookup by canonical name (the agent's name). */
+/** The tables whose rows decide WHO CAN DO WHAT. */
+export const PRIVILEGE_MODULES = ["member_roles", "team_members"]
+
+/** Is this a PRIVILEGE write — one that changes who can do what? DERIVED from the
+ * tool's own declared gate (falling back to the door it posts to, so an agent-only
+ * tool can't slip through by being absent from TOOL_GATES). Never a list of names:
+ * a name list locks the tools you thought of and waves through the next one — which
+ * is exactly how `update_role` sat at confirm:false beside four that confirmed. */
+export function isPrivilegeWrite(tool: { name: string; path: string; write?: boolean }): boolean {
+  if (tool.write === false) return false
+  const gate = TOOL_GATES[tool.name]
+  if (gate) return PRIVILEGE_MODULES.includes(gate.split(":")[0])
+  return /\/api\/tenancy\/(roles|members|invites)\b/.test(tool.path)
+}
+
 export const sharedByName = (name: string): SharedTool | undefined => SHARED_TOOLS.find((t) => t.name === name)
