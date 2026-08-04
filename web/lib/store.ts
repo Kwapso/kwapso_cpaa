@@ -31,6 +31,34 @@ export function primeCache(key: string, value: unknown): void {
   notify(key)
 }
 
+/** Peek at a cached value without subscribing (e.g. the live handler bumping a
+ * primed `total:` sidecar by ±1 on an add/remove ping). */
+export function readCache<T>(key: string): T | undefined {
+  return cache.get(key) as T | undefined
+}
+
+/** Subscribe to a cached value WITHOUT a fetcher — for sidecar keys someone else
+ * primes (R16: the `total:<resource>:<teamId>` totals a list fetcher primes from
+ * the door's COUNT(*)). Returns undefined until primed; re-renders on every
+ * prime/invalidate of the key. Never fetches — the data has one owner. */
+export function useCachedValue<T>(key: string | null): T | undefined {
+  const subscribe = React.useCallback(
+    (fn: () => void) => {
+      if (!key) return () => {}
+      let subs = subscribers.get(key)
+      if (!subs) subscribers.set(key, (subs = new Set()))
+      subs.add(fn)
+      return () => subs.delete(fn)
+    },
+    [key]
+  )
+  return React.useSyncExternalStore(
+    subscribe,
+    () => (key ? (cache.get(key) as T | undefined) : undefined),
+    () => undefined
+  )
+}
+
 /** Background-PRIME a key ONLY if it's cold (nothing cached yet) — used to warm
  * always-needed team caches on team entry so the first tap paints from cache
  * instead of a skeleton. It NEVER overwrites a warm or live-patched entry (the

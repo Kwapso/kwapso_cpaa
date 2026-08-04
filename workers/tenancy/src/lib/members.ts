@@ -89,6 +89,13 @@ export async function listMembers(
 }
 
 /** Every role in the team, with how many members hold each. */
+/** R16: the exact server COUNT(*) a count badge shows — NEVER a loaded list's
+ * length (a capped list's length is a ceiling, not a total). */
+export async function countRoles(cfg: D1Rest, guard: MemberGuard): Promise<number> {
+  const rows = await d1Query<{ n: number }>(cfg, guard.databaseId, "SELECT COUNT(*) AS n FROM member_roles")
+  return rows[0]?.n ?? 0
+}
+
 export async function listRoles(
   env: Env,
   cfg: D1Rest,

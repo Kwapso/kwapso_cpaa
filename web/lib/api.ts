@@ -267,7 +267,7 @@ export const tenancy = {
     api<{ permissions: PermissionValue }>("/api/tenancy/my-permissions"),
 
   /** Every role in the active team (for the role picker + roles screen). */
-  roles: () => api<{ roles: TeamRole[] }>("/api/tenancy/roles"),
+  roles: () => api<{ roles: TeamRole[]; total: number }>("/api/tenancy/roles"),
 
   /** One role's permission matrix (modules + saved value + locked flag). */
   rolePermissions: (roleId: string) =>
@@ -305,7 +305,12 @@ export const tenancy = {
     }),
 
   /** The team's dropdown values ("selectable data"), ordered for grouping by type. */
-  selectable: () => api<{ values: SelectableValue[] }>("/api/tenancy/selectable"),
+  selectable: () => api<{ values: SelectableValue[]; total: number }>("/api/tenancy/selectable"),
+  /** One dropdown value by id (the row-level live re-pull) — same door, ?id= filter. */
+  selectableOne: (id: string) =>
+    api<{ values: SelectableValue[] }>(`/api/tenancy/selectable?id=${encodeURIComponent(id)}`).then(
+      (r) => r.values[0] ?? null
+    ),
 
   /** Add a dropdown value to a type group (pick-or-create the type). Needs
    * selectable_data:create. Returns the refreshed value list. */
@@ -345,7 +350,7 @@ export const tenancy = {
     }),
 
   /** Every invite for the active team (pending / accepted / revoked / expired). */
-  invites: () => api<{ invites: Invite[] }>("/api/tenancy/invites"),
+  invites: () => api<{ invites: Invite[]; total: number }>("/api/tenancy/invites"),
 
   /** Invite someone by email to a role; returns the refreshed invite list. */
   createInvite: (email: string, roleId: string) =>
@@ -409,7 +414,7 @@ const post = (body: unknown): RequestInit => ({ method: "POST", body: JSON.strin
 
 /** Content worker — Learning + Help (team-DB content modules). */
 export const content = {
-  learning: () => api<{ learning: Learning[] }>("/api/content/learning"),
+  learning: () => api<{ learning: Learning[]; total: number }>("/api/content/learning"),
   learningOne: (id: string) =>
     api<{ learning: Learning[] }>(`/api/content/learning?id=${enc(id)}`).then((r) => r.learning[0] ?? null),
   createLearning: (input: Partial<Learning>) =>
@@ -431,11 +436,11 @@ export const content = {
     api<{ progress: LearningProgressEntry[] }>("/api/content/learning/progress"),
 
   help: (scope: "mine" | "all" = "all") =>
-    api<{ tickets: HelpTicket[] }>(`/api/content/help?scope=${scope}`),
+    api<{ tickets: HelpTicket[]; total: number; mineTotal: number }>(`/api/content/help?scope=${scope}`),
   helpOne: (id: string) =>
     api<{ tickets: HelpTicket[] }>(`/api/content/help?id=${enc(id)}`).then((r) => r.tickets[0] ?? null),
   helpThread: (id: string) =>
-    api<{ replies: HelpMessage[] }>(`/api/content/help/thread?id=${enc(id)}`),
+    api<{ replies: HelpMessage[]; total: number }>(`/api/content/help/thread?id=${enc(id)}`),
   createHelp: (input: { description: string; helpType?: string; sourceScreen?: string }) =>
     api<{ tickets: HelpTicket[] }>("/api/content/help", post(input)),
   updateHelp: (input: { id: string; description: string; helpType?: string }) =>
@@ -443,7 +448,7 @@ export const content = {
   setHelpStatus: (id: string, status: HelpTicket["status"]) =>
     api<{ tickets: HelpTicket[] }>("/api/content/help/status", post({ id, status })),
   replyHelp: (helpId: string, body: string, taggedUserIds?: string[]) =>
-    api<{ replies: HelpMessage[] }>("/api/content/help/reply", post({ helpId, body, taggedUserIds })),
+    api<{ replies: HelpMessage[]; total: number }>("/api/content/help/reply", post({ helpId, body, taggedUserIds })),
   helpStakeholders: (id: string) =>
     api<{ stakeholders: HelpStakeholder[] }>(`/api/content/help/stakeholders?id=${enc(id)}`),
   addStakeholder: (id: string, userId: string) =>

@@ -1,0 +1,135 @@
+"use client"
+
+// The LIVE-LISTENER registry (R15): every resource string any worker publishes
+// must REACH a listener here — a row-level entry (TEAM_RESOURCES), a coarse
+// invalidation (SIMPLE_INVALIDATIONS), or a reasoned DEAF_EXEMPT entry in the
+// rules registry. Publishing to nobody is the silent half of the stale-screen
+// bug, so the check derives the publisher set by scanning publishChange calls
+// and fails the build on any resource no listener claims. Lives in lib (not the
+// shell component) so the check can import it as data.
+//
+// The list fetchers here ALSO prime the `total:` sidecar each door now returns
+// (R16): a badge shows the server COUNT(*), never rows.length, so whoever pulls
+// a list primes its total in the same round-trip.
+
+import { content as contentApi, tenancy } from "@/lib/api"
+import { primeCache } from "@/lib/store"
+
+/** The sidecar cache key holding a collection's exact server total (R16). */
+export function totalKey(prefix: string, teamId: string): string {
+  return `total:${prefix}:${teamId}`
+}
+
+/** List fetchers that prime their collection's `total:` sidecar as they load —
+ * shared by the screen reads (use-screen-data) and reconnect catch-up below, so
+ * a total can never go stale while its list is fresh. */
+export const listFetch = {
+  roles: (teamId: string) =>
+    tenancy.roles().then((r) => {
+      primeCache(totalKey("member_roles", teamId), r.total)
+      return r.roles
+    }),
+  invites: (teamId: string) =>
+    tenancy.invites().then((r) => {
+      primeCache(totalKey("invites", teamId), r.total)
+      return r.invites
+    }),
+  selectable: (teamId: string) =>
+    tenancy.selectable().then((r) => {
+      primeCache(totalKey("selectable", teamId), r.total)
+      return r.values
+    }),
+  learning: (teamId: string) =>
+    contentApi.learning().then((r) => {
+      primeCache(totalKey("learning", teamId), r.total)
+      return r.learning
+    }),
+  help: (teamId: string) =>
+    contentApi.help("all").then((r) => {
+      primeCache(totalKey("help", teamId), r.total)
+      primeCache(totalKey("help-mine", teamId), r.mineTotal)
+      return r.tickets
+    }),
+}
+
+/** Row-level live registry: a "<resource> row <id> changed" ping → re-pull JUST
+ * that row and patch it into the cached list (never refetch the whole list);
+ * then refresh the small dependent aggregations/feeds coarsely. Adding a module
+ * = ONE entry here; the shell's handler stays generic. */
+export const TEAM_RESOURCES: Record<
+  string,
+  {
+    key: (teamId: string) => string
+    idField: string
+    fetchOne: (id: string) => Promise<Record<string, unknown> | null>
+    /** re-pull the WHOLE list — used by reconnect catch-up to diff-patch it. */
+    fetchList: (teamId: string) => Promise<Record<string, unknown>[]>
+    /** small dependent caches to coarse-invalidate (aggregations / feeds). */
+    deps?: (teamId: string, id: string) => string[]
+    /** refresh the active-team context (e.g. the section member count). */
+    refreshCtx?: boolean
+  }
+> = {
+  members: {
+    key: (t) => `members:${t}`,
+    idField: "userId",
+    fetchOne: (id) => tenancy.member(id),
+    fetchList: () => tenancy.members().then((r) => r.members),
+    deps: (t, id) => [`member_roles:${t}`, `activity:user:${id}`],
+    refreshCtx: true,
+  },
+  member_roles: {
+    key: (t) => `member_roles:${t}`,
+    idField: "id",
+    fetchOne: (id) => tenancy.role(id),
+    fetchList: (t) => listFetch.roles(t),
+    deps: (t, id) => [`my-perms:${t}`, `role-perms:${id}`],
+  },
+  invites: {
+    key: (t) => `invites:${t}`,
+    idField: "id",
+    fetchOne: (id) => tenancy.invite(id),
+    fetchList: (t) => listFetch.invites(t),
+    // The invite detail also shows the invite_logs audit + that invite's activity;
+    // refresh both when the invite row changes (revoke/accept) so the detail stays live.
+    deps: (_t, id) => [`invite-audit:${id}`, `activity:invite:${id}`],
+  },
+  // Dropdown values — row-level live (was a DEAF publisher before R15: the worker
+  // pinged `selectable_data` and nothing listened, so a teammate's edit left the
+  // manager stale until a reload).
+  selectable_data: {
+    key: (t) => `selectable:${t}`,
+    idField: "id",
+    fetchOne: (id) => tenancy.selectableOne(id),
+    fetchList: (t) => listFetch.selectable(t),
+  },
+  // Learning content — row-level live. An edit / (de)activate elsewhere patches
+  // just that article in the cached list; the row read passes the team filter so a
+  // genuinely-gone item drops out. (Done toggles are personal, not broadcast.)
+  learning: {
+    key: (t) => `learning:${t}`,
+    idField: "id",
+    fetchOne: (id) => contentApi.learningOne(id),
+    fetchList: (t) => listFetch.learning(t),
+  },
+  // Help tickets — row-level live. A status change / new reply (postHelpReply
+  // pings `help` too) patches just that ticket in the cached "all" set.
+  help: {
+    key: (t) => `help:${t}`,
+    idField: "id",
+    fetchOne: (id) => contentApi.helpOne(id),
+    fetchList: (t) => listFetch.help(t),
+    // A status change / edit / reply / stakeholder-add on a ticket also refreshes
+    // its Activity tab + Stakeholders tab.
+    deps: (_t, id) => [`activity:record:help:${id}`, `help-stakeholders:${id}`],
+  },
+}
+
+/** Coarse listeners for resources with no row-shaped cache: the ping just drops
+ * these keys (cache-first refetch on next read). Part of the R15 listener set. */
+export const SIMPLE_INVALIDATIONS: Record<string, (teamId: string) => string[]> = {
+  // Team name/logo — the shell also refreshes the active context (see app-shell).
+  team: (t) => [`team-meta:${t}`],
+  // Per-team screen-recipe overrides (was a deaf publisher before R15).
+  screens: (t) => [`screens:${t}`],
+}

@@ -69,7 +69,7 @@ export const RULES_REGISTRY: Rule[] = [
   {
     id: "R8",
     dimension: "ui",
-    law: "Every team collection tab derives its count from its loaded rows — a placement:'tab' section that shows a collection must declare a countCacheKey.",
+    law: "Every placement:'tab' section that shows a collection declares a countCacheKey — R8 owns WHICH collection a tab's badge describes (derived from the registry, never hand-listed). The NUMBER the badge shows is owned by R16 (an exact server total through formatCount); where the two disagree, R16 prevails.",
     checkId: "tab-counts-derived",
     status: "enforced",
   },
@@ -109,6 +109,20 @@ export const RULES_REGISTRY: Rule[] = [
     status: "enforced",
   },
   {
+    id: "R15",
+    dimension: "arch",
+    law: "Every paged screen consumes the live channel (useLiveRefetch re-pulls its CURRENT page on its module's ping; the shell fans every ping to it and replays on reconnect) — AND no deaf publishers: every resource string any worker publishes must reach a listener (TEAM_RESOURCES / SIMPLE_INVALIDATIONS) or a reasoned DEAF_EXEMPT entry. Earned by: a server-paged screen whose rows live in page state outside the row caches going stale on a teammate's change — and the dropdown manager staling because its worker pinged a resource nothing listened to.",
+    checkId: "live-collections",
+    status: "enforced",
+  },
+  {
+    id: "R16",
+    dimension: "ui",
+    law: "Every screen showing a collection shows its count, exactly once: the NUMBER is an exact server COUNT(*) rendered through the ONE formatCount seam (floored abbreviation at every magnitude, zero/loading render nothing, the only '+' is a capped SEARCH total); the PLACE is a tab badge where the screen has a counted tab, else a CollectionHeading; the ARBITRATION is a React context (CountedTabs / CountedAbove) — a counted tab WINS and the heading stands down, decided per-permission at render, never by a prop. Where R8 and R16 disagree about a number, R16 prevails (R8 owns WHICH collection a tab describes). Earned by: a 24,011-product catalogue advertising '1000' (a capped list's length), and the same '24k' shown twice on one screen.",
+    checkId: "counted-collections",
+    status: "enforced",
+  },
+  {
     id: "R17",
     dimension: "arch",
     law: "State transitions are idempotent: every deactivate/reactivate UPDATE carries the current-status predicate (deactivate: AND deactivated_at IS NULL; reactivate: IS NOT NULL — status moves: AND status <> ?), reads the changed-row count back, and when zero rows moved writes NO activity row and publishes NO change. Earned by: a double-clicked Deactivate writing two 'deactivated' rows 2.0s apart into one record's history — history says what happened, not how many times a button was pressed.",
@@ -136,6 +150,16 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
   member_roles: "member_roles",
   users: "team_members",
   invite_logs: "team_members",
+}
+
+/** R15 — reviewed DEAF exemptions: resources a worker publishes that reach NO
+ * listener, each with its reason. Publishing to nobody is the silent half of the
+ * stale-screen bug, so every exemption is a visible, conscious line. */
+export const DEAF_EXEMPT: Record<string, string> = {
+  help_threads:
+    "a reply pings the parent help row too (op edit), whose row-level patch refreshes the open ticket's deps; the thread list itself re-pulls when the detail (re)opens",
+  agent_usage:
+    "the quota badge rides every chat response and the usage dialog fetches on open — there is no standing cache a ping could refresh",
 }
 
 /** R18 — reviewed exemptions, pinned EXACTLY: tables whose activity every member

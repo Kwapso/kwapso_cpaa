@@ -184,6 +184,12 @@ export async function listLearning(cfg: D1Rest, guard: MemberGuard): Promise<Lea
   return rows.map(toLearning)
 }
 
+/** R16: exact server COUNT(*) for the badge — never rows.length. */
+export async function countLearning(cfg: D1Rest, guard: MemberGuard): Promise<number> {
+  const rows = await d1Query<{ n: number }>(cfg, guard.databaseId, "SELECT COUNT(*) AS n FROM learning")
+  return rows[0]?.n ?? 0
+}
+
 /** Fields a create / update accepts (the editable surface). */
 export type LearningInput = {
   title?: string

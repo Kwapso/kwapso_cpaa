@@ -6,7 +6,7 @@ import { fail, json } from "../../../../shared/workers/http"
 import { csvResponse, toCsv } from "../../../../shared/workers/csv"
 import { optionalText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
 import { publishChange } from "../../../../shared/workers/realtime"
-import { listRoles } from "../lib/members"
+import { listRoles, countRoles } from "../lib/members"
 import { TEAM_MODULE_CATALOG } from "../team-schema"
 import { requireRight } from "../lib/permissions"
 import {
@@ -35,7 +35,8 @@ export async function getRoles(request: Request, env: Env): Promise<Response> {
   await requireRight(cfg, guard, "member_roles", "read")
   const roles = await listRoles(env, cfg, guard)
   const id = new URL(request.url).searchParams.get("id") // ?id= → one role
-  return json({ roles: id ? roles.filter((r) => r.id === id) : roles })
+  // R16: every list response carries the exact server total — badges never use rows.length.
+  return json({ roles: id ? roles.filter((r) => r.id === id) : roles, total: await countRoles(cfg, guard) })
 }
 
 /** GET /api/tenancy/roles/export — the team's roles as a CSV download carrying
@@ -128,7 +129,7 @@ export async function postCreateRole(request: Request, env: Env): Promise<Respon
   if (withMatrix) await setRolePermissions(cfg, guard, actor, roleId, body.permissions as PermissionValue)
   // Row-level: carry the new role's id so open role lists patch just that row.
   await publishChange(env.REALTIME, guard.teamId, "member_roles", roleId, "add")
-  return json({ roles: await listRoles(env, cfg, guard) })
+  return json({ roles: await listRoles(env, cfg, guard), total: await countRoles(cfg, guard) })
 }
 
 export async function postUpdateRole(request: Request, env: Env): Promise<Response> {
@@ -143,7 +144,7 @@ export async function postUpdateRole(request: Request, env: Env): Promise<Respon
   const title = requireText(body.title, "Name", TEXT_LIMITS.short)
   await updateRole(cfg, guard, actor, body.roleId, title, (optionalText(body.description, "Description", TEXT_LIMITS.long) ?? ""))
   await publishChange(env.REALTIME, guard.teamId, "member_roles", body.roleId)
-  return json({ roles: await listRoles(env, cfg, guard) })
+  return json({ roles: await listRoles(env, cfg, guard), total: await countRoles(cfg, guard) })
 }
 
 /** Deactivate / reactivate a role — never deleted (holders keep access). Gated
@@ -161,5 +162,5 @@ export async function postSetRoleActive(request: Request, env: Env): Promise<Res
   // published and no duplicate history exists; the response is still the list.
   const changed = await setRoleActive(cfg, guard, actor, body.roleId, body.active)
   if (changed) await publishChange(env.REALTIME, guard.teamId, "member_roles", body.roleId)
-  return json({ roles: await listRoles(env, cfg, guard) })
+  return json({ roles: await listRoles(env, cfg, guard), total: await countRoles(cfg, guard) })
 }

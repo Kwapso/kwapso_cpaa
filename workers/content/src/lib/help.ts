@@ -127,6 +127,21 @@ export async function listTickets(
   return rows.map(toTicket)
 }
 
+/** R16: exact server COUNT(*) for the badges — the All total and the caller's
+ * own (My) total in one read; never a loaded list's length. */
+export async function countTickets(
+  cfg: D1Rest,
+  guard: MemberGuard
+): Promise<{ total: number; mineTotal: number }> {
+  const rows = await d1Query<{ total: number; mine: number }>(
+    cfg,
+    guard.databaseId,
+    "SELECT COUNT(*) AS total, SUM(CASE WHEN creator_id = ? THEN 1 ELSE 0 END) AS mine FROM help",
+    [guard.userId]
+  )
+  return { total: rows[0]?.total ?? 0, mineTotal: rows[0]?.mine ?? 0 }
+}
+
 /** One ticket by id (or null). */
 export async function getTicket(
   cfg: D1Rest,
@@ -155,6 +170,18 @@ export async function listReplies(
     [ticketId]
   )
   return rows.map(toMessage)
+}
+
+/** R16: the thread's exact reply COUNT(*) — the Conversation badge shows this,
+ * never the loaded (THREAD_HARD_CAP-bounded) list's length. */
+export async function countReplies(cfg: D1Rest, guard: MemberGuard, ticketId: string): Promise<number> {
+  const rows = await d1Query<{ n: number }>(
+    cfg,
+    guard.databaseId,
+    "SELECT COUNT(*) AS n FROM help_threads WHERE help_id = ?",
+    [ticketId]
+  )
+  return rows[0]?.n ?? 0
 }
 
 /** Fields a create / update accepts. */

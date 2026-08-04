@@ -24,6 +24,7 @@ import {
   updateLearning,
   listLearningForExport,
   type LearningInput,
+  countLearning,
 } from "../lib/learning"
 import type { Env } from "../env"
 
@@ -31,7 +32,8 @@ export async function getLearning(request: Request, env: Env): Promise<Response>
   const { cfg, guard } = await gated(request, env, "learning", "read")
   const items = await listLearning(cfg, guard)
   const id = new URL(request.url).searchParams.get("id") // ?id= → one item
-  return json({ learning: id ? items.filter((l) => l.id === id) : items })
+  // R16: the exact server total rides every list response (badges never use rows.length).
+  return json({ learning: id ? items.filter((l) => l.id === id) : items, total: await countLearning(cfg, guard) })
 }
 
 /** GET /api/content/learning/export — the team's articles as a CSV download.
@@ -64,7 +66,7 @@ export async function postCreateLearning(request: Request, env: Env): Promise<Re
   const id = await createLearning(cfg, guard, actor, body)
   // Row-level: carry the new item's id so open learning lists patch just that row.
   await publishChange(env.REALTIME, guard.teamId, "learning", id, "add")
-  return json({ learning: await listLearning(cfg, guard) })
+  return json({ learning: await listLearning(cfg, guard), total: await countLearning(cfg, guard) })
 }
 
 export async function postUpdateLearning(request: Request, env: Env): Promise<Response> {
@@ -73,7 +75,7 @@ export async function postUpdateLearning(request: Request, env: Env): Promise<Re
   requireText(body.title, "Title", TEXT_LIMITS.short)
   await updateLearning(cfg, guard, actor, body.id, body)
   await publishChange(env.REALTIME, guard.teamId, "learning", body.id)
-  return json({ learning: await listLearning(cfg, guard) })
+  return json({ learning: await listLearning(cfg, guard), total: await countLearning(cfg, guard) })
 }
 
 /** Deactivate / reactivate a learning item — never deleted (progress survives).
@@ -85,7 +87,7 @@ export async function postSetLearningActive(request: Request, env: Env): Promise
   // R17: no-op repeat → no ping, no duplicate history (see setLearningActive).
   const changed = await setLearningActive(cfg, guard, actor, body.id, body.active)
   if (changed) await publishChange(env.REALTIME, guard.teamId, "learning", body.id)
-  return json({ learning: await listLearning(cfg, guard) })
+  return json({ learning: await listLearning(cfg, guard), total: await countLearning(cfg, guard) })
 }
 
 /** Deactivate / reactivate MANY learning items in one call (the bulk sibling of

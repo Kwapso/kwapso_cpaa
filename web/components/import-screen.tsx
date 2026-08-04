@@ -385,7 +385,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
             </div>
           )}
 
-          <div className="flex justify-end">
+          <div className="flex flex-wrap justify-end gap-2">
             <Button onClick={reset} className="gap-1.5">
               <Upload className="size-4" aria-hidden /> Import more
             </Button>

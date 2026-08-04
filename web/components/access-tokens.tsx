@@ -236,7 +236,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
               >
                 <ClipboardCopy className="size-3.5" aria-hidden /> Copy setup prompt for any AI
               </Button>
-              <div className="flex justify-end">
+              <div className="flex flex-wrap justify-end gap-2">
                 <Button
                   onClick={() => {
                     setSecret(null)

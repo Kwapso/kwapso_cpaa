@@ -12,7 +12,7 @@ import { TabsView, defaultTabsConfig } from "@swift-struck/ui/registry/primitive
 
 import type { PermissionValue } from "@shared/types"
 import { CONCEPT_ICON, TEAM_SECTIONS, type TeamSection } from "@/lib/pages"
-import { abbreviateCount } from "@/lib/format"
+import { formatCount } from "@/lib/format-count"
 
 export function TeamSectionNav({
   teamId,
@@ -49,7 +49,8 @@ export function TeamSectionNav({
             icon: CONCEPT_ICON[s.key],
             // Hide the chip when empty (0) or still loading (undefined) — a "0"
             // badge is noise; show it only once there's a real count.
-            badge: count ? abbreviateCount(count) : "",
+            // R16: the ONE seam — zero/loading render nothing, floored abbreviation, never a "+".
+            badge: formatCount(count),
             badgeVariant: "",
           }
         }),

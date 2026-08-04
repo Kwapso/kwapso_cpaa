@@ -53,6 +53,12 @@ export async function listSelectableForExport(cfg: D1Rest, guard: MemberGuard): 
   )
 }
 
+/** R16: exact server COUNT(*) for the badge — never rows.length. */
+export async function countSelectable(cfg: D1Rest, guard: MemberGuard): Promise<number> {
+  const rows = await d1Query<{ n: number }>(cfg, guard.databaseId, "SELECT COUNT(*) AS n FROM selectable_data")
+  return rows[0]?.n ?? 0
+}
+
 export async function createSelectable(
   cfg: D1Rest,
   guard: MemberGuard,

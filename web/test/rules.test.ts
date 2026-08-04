@@ -12,11 +12,13 @@ import { GLOSSARY } from "@shared/glossary"
 import {
   ACTIVITY_GATE_MAP,
   ACTIVITY_TABLE_EXEMPT,
+  DEAF_EXEMPT,
   FORM_DIALOGS,
   RECORD_DETAIL_COMPONENTS,
   RULES_REGISTRY,
   TAB_COUNT_EXCEPTIONS,
 } from "@shared/rules/registry"
+import { SIMPLE_INVALIDATIONS, TEAM_RESOURCES } from "../lib/live-resources"
 import { TEAM_SECTIONS } from "../lib/pages"
 
 /** Every worker's src .ts file (recursively), as [repo-relative path, source]. */
@@ -295,6 +297,96 @@ describe("RULES — the laws of the base", () => {
     expect(route).toContain("getMyPermissions")
   })
 
+  // R15 — every paged screen consumes the live channel, AND no deaf publishers:
+  // every resource any worker publishes must reach a listener (the row-level
+  // registry, a coarse invalidation, or a reasoned exemption). Publishing to
+  // nobody is the silent half of the stale-screen bug. The publisher set is
+  // DERIVED by scanning publishChange calls — never hand-listed.
+  it("live-collections: every published resource reaches a listener (no deaf publishers)", () => {
+    const published = new Set<string>()
+    for (const [, src] of workerSources()) {
+      // Literal resources: publishChange(env.REALTIME, <team>, "resource"…
+      for (const m of src.matchAll(/publishChange\([^,]+,[^,]+,\s*"([a-z_]+)"/g)) published.add(m[1])
+    }
+    // Dynamic resources: the import engine publishes each TargetDef's module.
+    const targetsSrc = read(join(ROOT, "workers", "data-ops", "src", "lib", "targets.ts"))
+    for (const m of targetsSrc.matchAll(/module: "([a-z_]+)"/g)) published.add(m[1])
+    const listeners = new Set([
+      ...Object.keys(TEAM_RESOURCES),
+      ...Object.keys(SIMPLE_INVALIDATIONS),
+      ...Object.keys(DEAF_EXEMPT),
+    ])
+    const deaf = [...published].filter((r) => !listeners.has(r))
+    expect(
+      deaf,
+      `published to nobody (R15) — add a TEAM_RESOURCES/SIMPLE_INVALIDATIONS listener or a reasoned DEAF_EXEMPT entry: ${deaf.join(", ")}`
+    ).toEqual([])
+    // The paged half: the refetch seam exists and the shell fans pings + reconnects
+    // into it; any component fetching a /search door must subscribe.
+    const bus = read(join(WEB, "lib", "use-live-refetch.ts"))
+    expect(bus).toContain("subscribeLive")
+    const shell = read(join(WEB, "components", "app-shell.tsx"))
+    expect(shell, "the shell must fan every ping into the bus").toContain('emitLive({ kind: "ping"')
+    expect(shell, "the shell must replay on reconnect").toContain('emitLive({ kind: "reconnect" })')
+    const offenders = componentFiles().filter((f) => {
+      const src = read(f)
+      return /\/search\?|usePagedList/.test(src) && !src.includes("useLiveRefetch")
+    })
+    expect(
+      offenders,
+      `paged screen without a live subscription (R15 — useLiveRefetch): ${offenders.join(", ")}`
+    ).toEqual([])
+  })
+
+  // R16 — every screen showing a collection shows its count exactly once: the
+  // NUMBER through the one formatCount seam (never rows.length), the PLACE a
+  // counted tab or a CollectionHeading, the ARBITRATION a context (a counted tab
+  // wins; the heading stands down).
+  it("counted-collections: server totals through ONE seam, one place, arbitrated", () => {
+    // (i) THE NUMBER — no component builds a count badge from a loaded list's length.
+    const lengthBadges = componentFiles().filter((f) => /badge:[^,\n]*\.length/.test(read(f)))
+    expect(
+      lengthBadges,
+      `a capped list's length is a ceiling, not a total (R16) — badge from the server total via formatCount: ${lengthBadges.join(", ")}`
+    ).toEqual([])
+    // …and the badge builders route through the seam.
+    expect(read(join(WEB, "components", "team-section-nav.tsx"))).toContain("formatCount")
+    const moduleContent = read(join(WEB, "components", "deep-link", "module-content.tsx"))
+    expect(moduleContent).toContain("formatCount")
+
+    // (ii) THE PLACE — every registry section with a count key whose placement
+    // isn't "tab" renders a CollectionHeading (derived, never hand-listed).
+    for (const s of TEAM_SECTIONS) {
+      if (!s.countCacheKey || s.placement === "tab") continue
+      const rendered = componentFiles().some((f) =>
+        read(f).includes(`<CollectionHeading sectionKey="${s.key}"`)
+      )
+      expect(rendered, `sidebar collection "${s.key}" must render a CollectionHeading (R16 ii)`).toBe(true)
+    }
+
+    // (iii) THE ARBITRATION — the context exists; the heading consults it ABOVE
+    // its early return and returns null when marked; the tab host marks badged
+    // panels only; a file with both a counted tab and a heading imports the seam.
+    const counted = read(join(WEB, "components", "counted-tabs.tsx"))
+    expect(counted).toContain("createContext")
+    expect(counted).toContain("CountedAbove")
+    const heading = read(join(WEB, "components", "collection-heading.tsx"))
+    const hookAt = heading.indexOf("useCountStandsDown()")
+    const returnAt = heading.indexOf("return null")
+    expect(hookAt, "the heading must consult the arbitration hook").toBeGreaterThan(-1)
+    expect(returnAt, "the heading must stand down (return null) when marked").toBeGreaterThan(hookAt)
+    const host = read(join(WEB, "components", "deep-link-screen.tsx"))
+    expect(host, "the tab host marks badged panels via CountedTabs").toContain("<CountedTabs badged=")
+    for (const f of componentFiles()) {
+      const src = read(f)
+      if (/badge: (formatCount|[a-z]+Badge)/.test(src) && /<CollectionHeading/.test(src))
+        expect(
+          /CountedAbove|CountedTabs/.test(src),
+          `${f} shows a counted tab AND a heading — it must import the arbitration seam (R16 iii)`
+        ).toBe(true)
+    }
+  })
+
   // Every enforced law in the registry maps to one of the checks above (or a
   // per-worker seam test) — a law can't exist without a check.
   it("every enforced law has a known check", () => {
@@ -314,6 +406,8 @@ describe("RULES — the laws of the base", () => {
       "bounded-lists", // R14: the source-scan above
       "idempotent-transitions", // R17: the source-scan above
       "activity-gate-coverage", // R18: the source-scan above
+      "live-collections", // R15: the deaf-publisher + paged-subscription scan above
+      "counted-collections", // R16: the seam/place/arbitration scan above + format-count.test.ts
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

@@ -48,14 +48,3 @@ export function formatRelative(iso?: string | null): string {
   if (days < 7) return `${days}d ago`
   return formatDate(iso)
 }
-
-/** Compact a count for a badge: 6 → "6", 189 → "189", 1180000 → "1.18M". Keeps
- * tab/section count chips short even when a collection grows into the millions
- * (the server lazy-loads rows; the badge is just the total). */
-export function abbreviateCount(n: number | undefined | null): string {
-  if (n == null || !Number.isFinite(n)) return ""
-  return new Intl.NumberFormat(undefined, {
-    notation: "compact",
-    maximumFractionDigits: 2,
-  }).format(n)
-}

@@ -32,6 +32,7 @@ import {
 
 import { AppShell, ShellLoading } from "@/components/app-shell"
 import { TeamSectionNav } from "@/components/team-section-nav"
+import { CountedTabs } from "@/components/counted-tabs"
 import { LearningFormDialog, type LearningFormValues } from "@/components/learning-form-dialog"
 import { HelpFormDialog } from "@/components/help-form-dialog"
 import { RolePickerDialog } from "@/components/role-picker-dialog"
@@ -156,6 +157,7 @@ export function DeepLinkScreen() {
     learningQ,
     helpQ,
     formSelectableQ,
+    totals,
     selectableValues,
     helpTypeOptions,
     learningCategoryOptions,
@@ -352,24 +354,25 @@ export function DeepLinkScreen() {
   // strip shows only on the "tab" sections (Overview / Members / Roles / Invites).
   const showTabs = (TEAM_SECTIONS.find((s) => s.key === section)?.placement ?? "tab") === "tab"
 
-  // Section-tab count badges — DERIVED, never hand-listed (LAW R8): each section
-  // that declares a countCacheKey (pages.ts) gets the length of that key's loaded
-  // rows, so a new collection tab can't ship without a count. The rows come from
-  // the queries above, keyed by the same cache prefix; members has no team-wide
-  // cache loaded here, so its count reads the active-member count from context.
-  const loadedByCacheKey: Record<string, unknown[] | undefined> = {
-    members: active.ctx.memberCount != null ? new Array(active.ctx.memberCount) : undefined,
-    member_roles: rolesQ.data,
-    invites: invitesQ.data,
-    selectable: formSelectableQ.data,
-    learning: learningQ.data,
-    help: helpQ.data,
+  // Section-tab count badges — DERIVED, never hand-listed (LAW R8: which
+  // collection a tab describes), and the NUMBER is an exact server total (LAW
+  // R16): members from the active context's COUNT(*), everything else from the
+  // `total:` sidecar each list door returns — NEVER a loaded list's length (a
+  // capped list's length is a ceiling, not a total). Undefined = still loading =
+  // the badge renders nothing.
+  const totalByCacheKey: Record<string, number | undefined> = {
+    members: active.ctx.memberCount ?? undefined,
+    member_roles: totals.member_roles,
+    invites: totals.invites,
+    selectable: totals.selectable,
+    learning: totals.learning,
+    help: totals.help,
   }
   const sectionCounts: Partial<Record<SectionKey, number>> = {}
   for (const s of TEAM_SECTIONS) {
     if (!s.countCacheKey) continue
-    const rows = loadedByCacheKey[s.countCacheKey]
-    if (rows !== undefined) sectionCounts[s.key] = rows.length
+    const total = totalByCacheKey[s.countCacheKey]
+    if (total !== undefined) sectionCounts[s.key] = total
   }
 
   // Breadcrumbs derived from the URL spine; the library Breadcrumbs collapses the
@@ -434,12 +437,18 @@ export function DeepLinkScreen() {
             onNavigate={(href) => go(href)}
           />
         )}
-        {renderModuleContent({
-          noAccess, enabled, perms, can, module, recordId, teamId, canImport, go,
-          overridesQ, metaQ, membersQ, rolesQ, roles, invitesQ, learningQ, helpQ,
-          activityQ, inviteAuditQ, teamName, active, rights, onAction, onIntent,
-          sectionPath, helpScope, setHelpScope, myUserId, query,
-        })}
+        {/* ARBITRATION (R16 iii): when the team tab strip above carries this
+            section's count badge, mark the panel — any CollectionHeading inside
+            stands down, so a screen can never show the same number twice. The
+            badged flag is per-permission (the strip may hide for this viewer). */}
+        <CountedTabs badged={showTabs && sectionCounts[section] !== undefined}>
+          {renderModuleContent({
+            noAccess, enabled, perms, can, module, recordId, teamId, canImport, go,
+            overridesQ, metaQ, membersQ, rolesQ, roles, invitesQ, learningQ, helpQ, totals,
+            activityQ, inviteAuditQ, teamName, active, rights, onAction, onIntent,
+            sectionPath, helpScope, setHelpScope, myUserId, query,
+          })}
+        </CountedTabs>
       </div>
 
       {/* Change a member's role (?panel=edit&module=members&id). Gated by the
