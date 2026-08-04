@@ -119,7 +119,10 @@ Confirm the live list with `tools/list` (it's generated, so it's always current)
 Today it covers:
 
 - **Read:** `whoami`, `list_members`, `list_roles`, `list_dropdown_values`,
-  `list_learning`, `list_help_tickets`, `list_imports`.
+  `list_learning`, `list_help_tickets`, `list_imports`. Each list tool that sits on a
+  door with an `?id=` filter now EXPOSES + FORWARDS it (R19 parity) — pass `id` to fetch
+  one record instead of pulling the whole collection (`list_help_tickets` also takes
+  `scope`).
 - **Export (full-field CSV):** `export_roles_csv`, `export_learning_csv`,
   `export_dropdown_values_csv`.
 - **Write — deterministic create / edit / deactivate** (free, no AI; each needs the

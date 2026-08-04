@@ -551,3 +551,36 @@ alive underneath — that's the "immovable, contentless page" feel.
       they **hide when empty**.
 - [ ] `npm run check` is green (TypeScript + the full test suite, including
       `web/test/rules.test.ts`).
+
+## Collection counts — one number, one place, one seam (LAW R16)
+Every screen that shows a collection shows its count **exactly once**:
+
+- **The number** is an exact server `COUNT(*)` (the list door returns `total`),
+  rendered through the ONE seam `web/lib/format-count.ts` — `formatCount` floors
+  and abbreviates at every magnitude (`1.3k` · `24k` · `1.2m`), renders NOTHING
+  for zero/loading, and never grows a `+` (only a capped filtered-search total
+  does, via `formatSearchTotal`). Never `rows.length` — a capped list's length is
+  a ceiling (that is how a 24,011-row catalogue once advertised "1000").
+- **The place** is a tab badge where the screen has a counted tab, else a
+  `CollectionHeading` (`<h1>` + count chip, title from the module registry). A
+  count may NEVER hinge on an unrelated permission — Learning's count once vanished
+  for non-curators because it rode the curator-only tab strip; sidebar collections
+  now carry a heading.
+- **The arbitration** is the React context in `web/components/counted-tabs.tsx`
+  (`CountedTabs` marks a badged tab's panel; `CountedAbove` marks a counted sibling
+  strip). The `CollectionHeading` calls the hook ABOVE its early return and renders
+  null when a tab already carries the count — so the same number never shows twice.
+  It is a context, not a prop, because "does a counted strip exist?" is a
+  per-permission answer every caller would otherwise re-derive and get wrong.
+
+## Action-button rows never clip (C4) · the brand mark is never clipped (C5)
+
+- **Action rows:** `flex flex-wrap` on the row (a narrow phone REFLOWS) and
+  `ml-auto` on the action GROUP — never `justify-end` on the parent alone, which
+  pushes overflow off the LEFT edge where the container hides it. This is the
+  house rule for every detail header, form footer and toolbar.
+- **The brand mark** always sits in a rounded box, so it renders `object-contain`
+  (never `object-cover`, which crops the corners). Generated icons draw the mark
+  at `LOGO_SAFE_RATIO` (0.76) of the square — inside the largest circle the square
+  contains — and `scripts/gen-icons.mjs` derives its log line from that constant,
+  so the log can't claim a size it didn't draw.

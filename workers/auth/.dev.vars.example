@@ -1,6 +1,8 @@
 # Local-dev settings for the auth worker. Copy to `.dev.vars` (gitignored).
 APP_ORIGIN=http://localhost:3000
-DEV_ECHO_CODES=1
+# (login codes are inbox-only — no echo var exists; STAGING dev/test sign-in uses
+#  the admin test-login door gated by ADMIN_KEY, staging-only, on the auth worker)
+ADMIN_KEY=set-on-staging-only-never-production
 INSECURE_COOKIE=1
 EMAIL_FROM=Brimba <onboarding@resend.dev>
 # RESEND_API_KEY=

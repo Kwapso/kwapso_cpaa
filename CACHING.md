@@ -49,7 +49,8 @@ mechanism covers add / edit / remove / soft-delete. A full-collection refetch
 happens only on **first load** and **team switch**.
 
 The client handler is **registry-driven**, not a per-resource `switch`: adding a
-module = one entry in `TEAM_RESOURCES` (app-shell.tsx). Two channels:
+module = one entry in `TEAM_RESOURCES` (`web/lib/live-resources.ts` — moved out of
+app-shell so the R15 `live-collections` check imports it as data). Two channels:
 
 ```ts
 // worker, after a successful write — carry the affected row id:
@@ -65,9 +66,23 @@ member_roles: {
 }
 ```
 
-Computed values (count badges, "N members", relative times) **recompute
-client-side** from the patched rows — never refetch a collection for a derived
-number.
+Relative times, "N members" and other derived text **recompute client-side**
+from the patched rows. But a **count BADGE is NOT one of these** (LAW R16): a
+capped list's length is a ceiling, not a total, so every list door returns its
+exact server `COUNT(*)` (`total`; help also `mineTotal`) and the client keeps it
+in a `total:<prefix>:<teamId>` cache sidecar — primed by the list fetchers,
+bumped ±1 by an `add`/`remove` ping, re-primed on reconnect — rendered through the
+one `web/lib/format-count.ts` seam. Never `rows.length`.
+
+**No deaf publishers, no deaf paged screens (LAW R15).** Every resource string a
+worker publishes must reach a listener: a `TEAM_RESOURCES` row-level entry, a
+coarse `SIMPLE_INVALIDATIONS` entry (team meta, screen recipes), or a reasoned
+`DEAF_EXEMPT` line in the rules registry (today: `help_threads`, `agent_usage`).
+The `selectable_data` manager was a deaf listener before R15 — its worker pinged
+and nothing heard — so it now has a row-level entry. A server-PAGED screen's rows
+live in page state outside these caches, so the shell fans every team ping (and a
+reconnect) into a bus (`web/lib/live-bus.ts`) and each paged screen re-pulls its
+current page via `useLiveRefetch`.
 
 ### 4 · Every mutation publishes (structurally can't-forget)
 Every state-changing route broadcasts a change ping — it is **not** per-call

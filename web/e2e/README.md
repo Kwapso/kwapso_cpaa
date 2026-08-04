@@ -8,9 +8,10 @@ in this repo (no browser binaries in CI). Run them locally, on demand.
 
 `team-flows.spec.ts` — one happy path:
 
-1. **Sign in** with the dev-code login (the auth worker echoes the 6-digit code
-   in the `/api/auth/email/start` response when `DEV_ECHO_CODES=1`, which staging
-   runs with — see `workers/auth/src/index.ts`).
+1. **Sign in** through the ADMIN test-login door: `POST /api/auth/admin/test-login`
+   with the `x-admin-key` header mints a normal login code and returns it once
+   (`export ADMIN_KEY=…` before running — login codes are never echoed anywhere
+   else, in any environment; see `workers/auth/src/index.ts` adminTestLogin).
 2. Land on **/home**, then open the team at **/t/&lt;id&gt;**.
 3. Open the **members** list → open a **member**.
 4. **Change their role** and assert the detail updates with **no full-page
@@ -38,11 +39,10 @@ BASE_URL=http://localhost:3000 npm run test:e2e --workspace=brimba-web
 
 ## Notes / TODOs
 
-- **Dev code retrieval** is done by reading `devCode` from the `email/start`
-  response body. If `DEV_ECHO_CODES` is turned **off** on the target environment
-  (production behaviour), the body won't contain it — supply the code out of band
-  (mailbox API or a fixed test code) and feed it to `fillCode()`. This is flagged
-  with a `TODO` in `signIn()`.
+- **Code retrieval** uses the admin test-login door (staging-only `ADMIN_KEY` on
+  the auth worker; fails closed where unset — production has no test door, by
+  design). Against production, supply the code out of band (a mailbox API) and
+  feed it to `fillCode()`.
 - The flow needs a **teamful** test account. A brand-new account lands on
   `/onboarding` with no team, so the test `skip`s itself there. Seed a test
   account that already belongs to a team (or extend the spec to complete

@@ -100,3 +100,18 @@ sibling of the pre-ship trio (`lean_mean_check` · `story_checks_out` ·
 
 See [CACHING.md](CACHING.md) for the loading/feedback side (what the user sees
 *while* things are working) and [CONCURRENCY.md](CONCURRENCY.md) for write safety.
+
+## The white screen — containment + prevention (C1)
+A thrown RENDER error is not caught by the `window.onerror` reporter (that fires
+for events, not React's render phase) — it blanks the tree. Both halves are now in
+place:
+
+- **Containment:** the `ErrorBoundary` is MOUNTED in the root layout
+  (`web/app/layout.tsx`) around the routed screens AND the co-pilot host, so a
+  render throw becomes a readable "something went wrong here + Try again" card and
+  reports through `reportError` to the central `error_logs` — never a blank page.
+- **Prevention:** the crash class was a hook called BELOW a top-level early return
+  (React #310/#300 — the hook count changes between renders). `web/test/hooks-order.test.ts`
+  walks every component/hook in `web/` and fails any `use*()` (or `React.use*()`)
+  call that appears after a depth-1 `return`. The check is worth more than any one
+  fix — it makes the class unshippable at 100 modules or 1,000 screens.

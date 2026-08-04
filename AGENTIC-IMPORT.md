@@ -95,7 +95,9 @@ failures from the gated endpoint itself.
 ## 3 · The catalog + declaring a target (how an app plugs in)
 
 An importable target is one entry in `TARGETS` (`workers/data-ops/src/lib/targets.ts`)
-plus an active catalog row (`importable_databases`, seeded). A target declares:
+— that is the ONLY step. The catalog row in `importable_databases` self-heals against
+the code on read (R13: `reconcileCatalog`, INSERT-only), so shipping the `TargetDef`
+ships the capability; seeding is now just a label refresh. A target declares:
 
 ```ts
 type TargetDef = {

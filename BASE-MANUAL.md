@@ -33,7 +33,7 @@ service-binding calls (never a public hop).
 | **realtime** | `brimba-realtime` | The live switchboard — one `TeamChannel` Durable Object per channel, fanning out row-level `{resource,id,op}` change pings over WebSockets | Live-sync is a cross-cutting concern with a stateful runtime (open sockets). It holds **no app data** — the databases stay the source of truth — so it can be a thin, hibernatable coordinator instead of a second copy of everything. |
 | **content** | `brimba-content` | **Learning** (how-to articles + per-user "done" progress) and **Help** (tickets + threaded replies) | These are the base's two real content modules. They're grouped because they share the same shape (team-DB CRUD gated on a permission module, deactivate-not-delete, R2 media) and neither is big enough to deserve its own worker. |
 | **data-ops** | `brimba-data-ops` | **CSV import** (the 3-stage single-target session + the agentic multi-file batch import, AGENTIC-IMPORT.md) and **the AI agent** | Both are "operations over the other modules' data" rather than modules of their own. Import writes act-as-user through a target's create endpoint; the agent acts-as-user through every gated endpoint. Neither owns a table of user content — they orchestrate. |
-| **gateway** | `brimba` / `brimba-staging` | The single public door: serves the web screens (static assets), serves uploaded media from R2, and routes `/api/*` to the right worker | **The only worker with a public URL.** Everything else sets `workers_dev: false` and is reachable *only* via service bindings. This is what makes `/internal/send-email` and the agent's act-as-user surface safe — no public route can reach them. |
+| **gateway** | `brimba` / `brimba-staging` | The single public door: serves the web screens (static assets), serves uploaded media from R2, and routes `/api/*` to the right worker | **The only worker with a public URL.** Everything else sets `workers_dev: false` AND `preview_urls: false` (both — a per-version preview URL would be a second public door) and is reachable *only* via service bindings. This is what makes `/internal/send-email` and the agent's act-as-user surface safe — no public route can reach them. |
 
 The seventh worker, **mcp** (personal access tokens → a team-pinned session
 bridge → an opt-in tool catalogue for external machines), is **BUILT (2026-07-07)**
@@ -399,6 +399,12 @@ follow the golden path.
    endpoint) so the AI can drive it — same act-as-user, same confirm rule.
 5. Keep `npm run check` green and obey the Laws; they're what stop a fast-growing
    product from drifting.
+
+**Two fork gotchas worth naming.** (1) `ADMIN_KEY` on the **auth** worker is a
+STAGING-ONLY secret — it enables the test-login door (sign in as any account), so never
+set it on production auth; the other workers' `ADMIN_KEY` (maintenance endpoints) is set
+on both envs as before. (2) The import catalog **self-heals on read** (R13) — a fresh
+fork's target picker works with no seed step; `seed-targets` only refreshes labels.
 
 **What a new product must NOT do.** Don't fork the UI library into the app (fix it in
 `@swift-struck/ui`), don't add a public worker (only the gateway is public), don't add
