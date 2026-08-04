@@ -15,6 +15,7 @@ import {
 import { ulid } from "../../../../shared/workers/id"
 import { TEAM_MODULE_CATALOG } from "../team-schema"
 import { GuardError, hasRight, type MemberGuard } from "./permissions"
+import { EXPORT_HARD_CAP } from "../../../../shared/workers/limits"
 
 /** The four switches for one module (matches the library PermissionMatrix). */
 export type RightSet = {
@@ -69,7 +70,7 @@ export async function listRoleAudit(cfg: D1Rest, guard: MemberGuard): Promise<Ro
   return d1Query<RoleAuditRow>(
     cfg,
     guard.databaseId,
-    "SELECT id, created_at, creator_name, updated_at, editor_name, deactivated_at, deactivator_name FROM member_roles"
+    `SELECT id, created_at, creator_name, updated_at, editor_name, deactivated_at, deactivator_name FROM member_roles LIMIT ${EXPORT_HARD_CAP}` // R14 hard cap (export tier)
   )
 }
 
@@ -82,7 +83,7 @@ export async function listAllRolePermissions(
   const rows = await d1Query<PermRow & { role_id: string }>(
     cfg,
     guard.databaseId,
-    "SELECT role_id, module, can_read, can_create, can_edit, can_delete FROM role_permissions"
+    `SELECT role_id, module, can_read, can_create, can_edit, can_delete FROM role_permissions LIMIT ${EXPORT_HARD_CAP}` // R14 hard cap (roles × modules)
   )
   const byRole = new Map<string, PermRow[]>()
   for (const row of rows) {
@@ -261,7 +262,7 @@ export async function setRoleActive(
   actor: Actor,
   roleId: string,
   active: boolean
-): Promise<void> {
+): Promise<boolean> {
   // Find the role regardless of status — we may be reactivating a deactivated one.
   const rows = await d1Query<RoleRow>(
     cfg,
@@ -274,11 +275,20 @@ export async function setRoleActive(
   if (role.is_default === 1)
     throw new GuardError(409, "locked_role", "The Admin role is locked — it can't be deactivated.")
 
+  // R17: the UPDATE carries the current-status predicate, so a repeat (a double
+  // click, a retried request) moves ZERO rows — and a record's history then says
+  // what happened, not how many times a button was pressed: no rows moved means
+  // no activity row and (in the route) no live ping.
   const now = new Date().toISOString()
-  const sql = active
-    ? `UPDATE member_roles SET deactivated_at = NULL, deactivator_id = NULL, deactivator_email = NULL, deactivator_name = NULL, updated_at = ${sqlString(now)} WHERE id = ${sqlString(roleId)};`
-    : `UPDATE member_roles SET deactivated_at = ${sqlString(now)}, deactivator_id = ${sqlString(actor.id)}, deactivator_email = ${sqlString(actor.email)}, deactivator_name = ${sqlString(actor.name)} WHERE id = ${sqlString(roleId)};`
-  await d1ExecScript(cfg, guard.databaseId, sql)
+  const changed = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    active
+      ? `UPDATE member_roles SET deactivated_at = NULL, deactivator_id = NULL, deactivator_email = NULL, deactivator_name = NULL, updated_at = ? WHERE id = ? AND deactivated_at IS NOT NULL RETURNING id`
+      : `UPDATE member_roles SET deactivated_at = ?, deactivator_id = ${sqlString(actor.id)}, deactivator_email = ${sqlString(actor.email)}, deactivator_name = ${sqlString(actor.name)}, updated_at = ? WHERE id = ? AND deactivated_at IS NULL RETURNING id`,
+    active ? [now, roleId] : [now, now, roleId]
+  )
+  if (!changed[0]) return false
 
   await logActivity(cfg, guard.databaseId, actor, {
     type: active ? "Role activated" : "Role deactivated",
@@ -286,6 +296,7 @@ export async function setRoleActive(
     relatedTable: "member_roles",
     relatedRowId: roleId,
   })
+  return true
 }
 
 /** Create a new (non-default) role. It starts with NO rights — the admin grants

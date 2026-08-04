@@ -82,8 +82,9 @@ export async function postSetLearningActive(request: Request, env: Env): Promise
   const { actor, cfg, guard, body } = await gatedBody<{ id?: string; active?: boolean }>(request, env, "learning", "delete")
   if (!body.id || typeof body.active !== "boolean")
     return fail(400, "invalid_input", "id and active are required.")
-  await setLearningActive(cfg, guard, actor, body.id, body.active)
-  await publishChange(env.REALTIME, guard.teamId, "learning", body.id)
+  // R17: no-op repeat → no ping, no duplicate history (see setLearningActive).
+  const changed = await setLearningActive(cfg, guard, actor, body.id, body.active)
+  if (changed) await publishChange(env.REALTIME, guard.teamId, "learning", body.id)
   return json({ learning: await listLearning(cfg, guard) })
 }
 

@@ -8,6 +8,7 @@ import { d1ExecScript, d1Query, sqlString, type D1Rest } from "../../../../share
 import { ulid } from "../../../../shared/workers/id"
 import { GuardError, type MemberGuard } from "../../../../shared/workers/gating"
 import type { AgentMessage, AgentThread } from "../../../../shared/types"
+import { LIST_HARD_CAP, THREAD_HARD_CAP } from "../../../../shared/workers/limits"
 
 type ThreadRow = { id: string; title: string | null; last_message_at: string | null; created_at: string }
 type MsgRow = {
@@ -49,7 +50,7 @@ export async function listThreads(cfg: D1Rest, guard: MemberGuard): Promise<Agen
   const rows = await d1Query<ThreadRow>(
     cfg,
     guard.databaseId,
-    "SELECT id, title, last_message_at, created_at FROM agent_threads WHERE creator_id = ? ORDER BY COALESCE(last_message_at, created_at) DESC",
+    `SELECT id, title, last_message_at, created_at FROM agent_threads WHERE creator_id = ? ORDER BY COALESCE(last_message_at, created_at) DESC LIMIT ${LIST_HARD_CAP}`, // R14 hard cap
     [guard.userId]
   )
   return rows.map(toThread)
@@ -66,7 +67,7 @@ export async function listMessages(
   const rows = await d1Query<MsgRow>(
     cfg,
     guard.databaseId,
-    "SELECT id, thread_id, role, content, tool_calls_json, source, created_at FROM agent_messages WHERE thread_id = ? ORDER BY created_at ASC",
+    `SELECT id, thread_id, role, content, tool_calls_json, source, created_at FROM agent_messages WHERE thread_id = ? ORDER BY created_at ASC LIMIT ${THREAD_HARD_CAP}`, // R14 hard cap
     [threadId]
   )
   return rows.map(toMessage)

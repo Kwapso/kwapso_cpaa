@@ -18,6 +18,7 @@ import { ulid } from "../../../../shared/workers/id"
 import type { Learning, LearningProgressEntry } from "../../../../shared/types"
 import { GuardError, type MemberGuard } from "../../../../shared/workers/gating"
 import { optionalText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
+import { EXPORT_HARD_CAP, LIST_HARD_CAP } from "../../../../shared/workers/limits"
 
 /** The dropdown `type` a learning item's category is stored under. */
 const CATEGORY_TYPE = "Learning category"
@@ -177,7 +178,7 @@ export async function listLearning(cfg: D1Rest, guard: MemberGuard): Promise<Lea
             l.created_at, l.creator_name, l.editor_name, l.updated_at, p.done AS done
      FROM learning l
      LEFT JOIN learning_progress p ON p.learning_id = l.id AND p.user_id = ?
-     ORDER BY l.sequence ASC, l.created_at ASC`,
+     ORDER BY l.sequence ASC, l.created_at ASC LIMIT ${LIST_HARD_CAP}`, // R14 hard cap
     [guard.userId]
   )
   return rows.map(toLearning)
@@ -227,7 +228,7 @@ export async function listLearningForExport(
     `SELECT content_title, category, content_description, content_type, content_link, content_body,
             sequence, is_required, deactivated_at, deactivator_name,
             created_at, creator_name, updated_at, editor_name
-     FROM learning ORDER BY sequence, created_at`
+     FROM learning ORDER BY sequence, created_at LIMIT ${EXPORT_HARD_CAP}` // R14 hard cap (export tier)
   )
 }
 
@@ -319,14 +320,22 @@ export async function setLearningActive(
   actor: Actor,
   id: string,
   active: boolean
-): Promise<void> {
+): Promise<boolean> {
   const item = await learningOrThrow(cfg, guard, id)
 
+  // R17: current-status predicate → a repeat (double click, retried request,
+  // re-run bulk) moves zero rows → no activity row, no publish. A record's
+  // history says what happened, not how many times a button was pressed.
   const now = new Date().toISOString()
-  const sql = active
-    ? `UPDATE learning SET deactivated_at = NULL, deactivator_id = NULL, deactivator_email = NULL, deactivator_name = NULL, updated_at = ${sqlString(now)} WHERE id = ${sqlString(id)};`
-    : `UPDATE learning SET deactivated_at = ${sqlString(now)}, deactivator_id = ${sqlString(actor.id)}, deactivator_email = ${sqlString(actor.email)}, deactivator_name = ${sqlString(actor.name)}, updated_at = ${sqlString(now)} WHERE id = ${sqlString(id)};`
-  await d1ExecScript(cfg, guard.databaseId, sql)
+  const changed = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    active
+      ? `UPDATE learning SET deactivated_at = NULL, deactivator_id = NULL, deactivator_email = NULL, deactivator_name = NULL, updated_at = ? WHERE id = ? AND deactivated_at IS NOT NULL RETURNING id`
+      : `UPDATE learning SET deactivated_at = ?, deactivator_id = ${sqlString(actor.id)}, deactivator_email = ${sqlString(actor.email)}, deactivator_name = ${sqlString(actor.name)}, updated_at = ? WHERE id = ? AND deactivated_at IS NULL RETURNING id`,
+    active ? [now, id] : [now, now, id]
+  )
+  if (!changed[0]) return false
 
   await logActivity(cfg, guard.databaseId, actor, {
     type: active ? "Learning activated" : "Learning deactivated",
@@ -334,14 +343,15 @@ export async function setLearningActive(
     relatedTable: "learning",
     relatedRowId: id,
   })
+  return true
 }
 
 /** Deactivate / reactivate MANY learning items in one call (the bulk sibling of
  * setLearningActive). Applies the SAME per-row change — same UPDATE, same audit
- * block, same activity row — to each id that names a real item, and reports how
- * many changed vs. were skipped (an id with no matching row). Returns the list of
- * ids that actually changed so the route can publish one row-level ping EACH (the
- * live-sync law: patch the changed row, never refetch the list). */
+ * block, same activity row — and reports how many actually changed vs. were
+ * skipped (an id with no matching row, or one ALREADY in the target state —
+ * R17: a re-run bulk writes no duplicate history and pings nothing). Returns the
+ * ids that really changed so the route publishes one row-level ping EACH. */
 export async function bulkSetLearningActive(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -353,8 +363,8 @@ export async function bulkSetLearningActive(
   let skipped = 0
   for (const id of ids) {
     try {
-      await setLearningActive(cfg, guard, actor, id, active)
-      changed.push(id)
+      if (await setLearningActive(cfg, guard, actor, id, active)) changed.push(id)
+      else skipped++ // already in the target state — a no-op, not an event
     } catch (e) {
       // A missing item is skipped, not fatal — the rest of the batch still applies.
       if (e instanceof GuardError && e.status === 404) {
@@ -405,7 +415,8 @@ export async function listProgress(
   }>(
     cfg,
     guard.databaseId,
-    "SELECT learning_id, user_id, done, done_at FROM learning_progress ORDER BY updated_at DESC"
+    // R14 hard cap — progress is articles × members; move to paging before this bites.
+    `SELECT learning_id, user_id, done, done_at FROM learning_progress ORDER BY updated_at DESC LIMIT ${EXPORT_HARD_CAP}`
   )
   return rows.map((r) => ({
     learningId: r.learning_id,

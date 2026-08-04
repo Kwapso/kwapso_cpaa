@@ -17,8 +17,26 @@ type ActivityRow = {
 
 const LIMIT = 50
 
+/** R18 — the ONE visibility clause for the cross-module team feed. The feed's
+ * rows name records and their before/after, so the team scope must subtract the
+ * caller's denied modules — and ANY count over the feed must go through THIS
+ * same builder, because a badge counting more than its list shows is itself the
+ * leak. `null` = unrestricted (the single-table scopes the route already gated
+ * per-module). Rows with no related_table name nothing, so they stay visible. */
+export function activityVisibilityClause(
+  allowedTables: string[] | null
+): { sql: string; params: string[] } {
+  if (allowedTables === null) return { sql: "", params: [] }
+  if (allowedTables.length === 0) return { sql: " WHERE related_table IS NULL", params: [] }
+  const marks = allowedTables.map(() => "?").join(", ")
+  return { sql: ` WHERE (related_table IS NULL OR related_table IN (${marks}))`, params: allowedTables }
+}
+
 /** The team's activity, newest first — optionally scoped to one record:
- *  • team   → everything that happened in the team
+ *  • team   → everything that happened in the team THAT THE CALLER MAY SEE —
+ *             the route passes `allowedTables` built from their module rights
+ *             plus the pinned exemptions (R18: a cross-module read carries the
+ *             caller's module rights)
  *  • user   → events about that member (role changes, removal, join)
  *  • role   → events about that role (created, renamed, permissions changed)
  *  • invite → events about that invite (sent, revoked) — `id` is the team-local
@@ -31,7 +49,8 @@ export async function getActivity(
   guard: MemberGuard,
   scope: "team" | "user" | "role" | "invite" | "record",
   id?: string,
-  table?: string
+  table?: string,
+  allowedTables: string[] | null = null
 ): Promise<ActivityItem[]> {
   let sql = "SELECT id, type, description, created_at, creator_name FROM activity"
   const params: (string | number)[] = []
@@ -47,6 +66,10 @@ export async function getActivity(
   } else if (scope === "record" && id && table) {
     sql += " WHERE related_table = ? AND related_row_id = ?"
     params.push(table, id)
+  } else if (scope === "team") {
+    const clause = activityVisibilityClause(allowedTables)
+    sql += clause.sql
+    params.push(...clause.params)
   }
   sql += " ORDER BY created_at DESC LIMIT ?"
   params.push(LIMIT)

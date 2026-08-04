@@ -80,8 +80,9 @@ export async function postHelpStatus(request: Request, env: Env): Promise<Respon
   const ticket = await getTicket(cfg, guard, body.id)
   if (!ticket) return fail(404, "help_not_found", "That ticket doesn't exist.")
 
-  await setStatus(cfg, guard, actor, body.id, status)
-  await publishChange(env.REALTIME, guard.teamId, "help", body.id)
+  // R17: already at that status → zero rows moved → no ping, no duplicate history.
+  const changed = await setStatus(cfg, guard, actor, body.id, status)
+  if (changed) await publishChange(env.REALTIME, guard.teamId, "help", body.id)
   return json({ tickets: await listTickets(cfg, guard, "all") })
 }
 

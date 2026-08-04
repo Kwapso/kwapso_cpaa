@@ -101,7 +101,51 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "cron-records",
     status: "enforced",
   },
+  {
+    id: "R14",
+    dimension: "arch",
+    law: "No unbounded list endpoint: every exported list*/search* function backing a collection route either PAGES (LIMIT ? OFFSET ? + a total) or applies a HARD CAP (LIMIT n) with a comment saying so. Earned by: one unbounded read stalling a worker under a 24,000-row catalogue — scale is a law, not a per-screen choice.",
+    checkId: "bounded-lists",
+    status: "enforced",
+  },
+  {
+    id: "R17",
+    dimension: "arch",
+    law: "State transitions are idempotent: every deactivate/reactivate UPDATE carries the current-status predicate (deactivate: AND deactivated_at IS NULL; reactivate: IS NOT NULL — status moves: AND status <> ?), reads the changed-row count back, and when zero rows moved writes NO activity row and publishes NO change. Earned by: a double-clicked Deactivate writing two 'deactivated' rows 2.0s apart into one record's history — history says what happened, not how many times a button was pressed.",
+    checkId: "idempotent-transitions",
+    status: "enforced",
+  },
+  {
+    id: "R18",
+    dimension: "arch",
+    law: "A cross-module read carries the caller's module rights: the team activity feed subtracts the caller's denied modules (ONE shared clause that any count over the feed must reuse), and every relatedTable a worker writes resolves to a module in ACTIVITY_GATE_MAP or a reasoned ACTIVITY_TABLE_EXEMPT entry. Earned by: a member with one read right seeing every module's before/after ('changed BIG-0000001 price from 4,500 to 3,900') through the one ungated feed.",
+    checkId: "activity-gate-coverage",
+    status: "enforced",
+  },
 ]
+
+/** R18 — which permission module gates each activity `relatedTable` a worker
+ * writes. The team feed (the ONE cross-module read) subtracts the caller's denied
+ * modules through this map; the generic record scope resolves through it too. A
+ * table a worker writes that is neither here nor exempt turns the build red —
+ * a table the feed cannot NAME is a table it cannot withhold. */
+export const ACTIVITY_GATE_MAP: Record<string, string> = {
+  help: "help",
+  learning: "learning",
+  selectable_data: "selectable_data",
+  member_roles: "member_roles",
+  users: "team_members",
+  invite_logs: "team_members",
+}
+
+/** R18 — reviewed exemptions, pinned EXACTLY: tables whose activity every member
+ * may see, each with its reason. A new relatedTable must join the gate map above
+ * or earn a visible line here — never a silent bypass. */
+export const ACTIVITY_TABLE_EXEMPT: Record<string, string> = {
+  teams: "team metadata (name/logo) is member-wide — the team screen itself has no module gate",
+  screens: "screen-recipe changes are app furniture every member renders; the rows carry no record content",
+  import: "an import summary names only counts + the target module; the imported rows' own activity is gated by their module",
+}
 
 /** Worker test suites that enforce R1. A new mutating worker without a
  * publish-seam test is a gap — track it here. */
