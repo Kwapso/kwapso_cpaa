@@ -604,3 +604,23 @@ AFTER SHIP
 - **A new worker for a new module, or editing `@swift-struck/ui`.** Add routes to an
   existing worker; the library is lego you assemble, not fork. (CLAUDE.md.)
 ```
+
+## The hardening checklist (R13–R19 — a new module must satisfy these)
+Beyond the golden path, a module that ships without these turns the build red:
+
+- **Import story (R13):** declare a `TargetDef` in `workers/data-ops/src/lib/targets.ts`
+  OR add a reasoned `CATALOG_EXEMPT` line in `shared/rules/registry.ts`.
+- **Bounded reads (R14):** every `list*` in the module's lib carries a hard cap
+  from `shared/workers/limits.ts` with its comment.
+- **Live listener (R15):** add a `TEAM_RESOURCES` row-level entry in
+  `web/lib/live-resources.ts` (or a `SIMPLE_INVALIDATIONS` / reasoned `DEAF_EXEMPT`
+  entry) for every resource the module publishes; a paged screen calls
+  `useLiveRefetch`.
+- **Count (R16):** the list door returns an exact `total`; the screen renders the
+  badge through `formatCount` and, if it's a sidebar page, a `CollectionHeading`.
+- **Idempotent transitions (R17):** any deactivate/reactivate/status write carries
+  the current-status predicate + `RETURNING id` and publishes only when a row moved.
+- **Activity gate (R18):** every `relatedTable` the module writes is in
+  `ACTIVITY_GATE_MAP` (or a pinned `ACTIVITY_TABLE_EXEMPT` reason).
+- **Filter parity (R19):** any GET agent/MCP tool exposes + forwards every param
+  its door parses.

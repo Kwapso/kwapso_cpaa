@@ -690,3 +690,35 @@ Open with `teamContext` → gate with `requireRight` → read the body defensive
 of deleting → `logActivity` → `publishChange` → `json`. Throw `GuardError` for every
 rule failure and let the one central catch format it. Comment the *why*. Add the least
 code that does the job, and keep `npm run check` green.
+
+## Scale + idempotency + filter patterns (R14 · R17 · R19)
+These three are machine-checked; write them the house way so the build stays green.
+
+- **Bounded reads (R14).** Every exported `list*`/`search*` in a worker `lib/`
+  either pages (`LIMIT ? OFFSET ?` + a total) or carries a HARD CAP from
+  `shared/workers/limits.ts` — `LIST_HARD_CAP` (1000), `EXPORT_HARD_CAP` (10000),
+  `THREAD_HARD_CAP` (500) — with a `// R14 hard cap` comment. Never an unbounded
+  `SELECT`; one unbounded read stalls a worker at 100k rows.
+
+- **Idempotent transitions (R17).** A deactivate/reactivate/status UPDATE carries
+  the current-status predicate INLINE and reads the changed rows back:
+
+  ```sql
+  UPDATE learning SET deactivated_at = ?, … WHERE id = ? AND deactivated_at IS NULL RETURNING id
+  ```
+
+  Return the boolean; when zero rows moved write NO activity row and (in the
+  route) publish NO ping — a double-click writes one history row, not two. Keep
+  the predicate *literally in the SQL string* (not hidden behind a variable) so
+  the source-scan can see it. Bulk siblings count a no-op as `skipped`.
+
+- **Filter parity (R19).** A GET agent/MCP tool on a list door must EXPOSE (schema
+  property) and FORWARD (`buildQuery`) every param the door parses — the check
+  derives the required set from the door's own `searchParams.get(...)`. If you add
+  a `?filter=` to a door, add it to the tool the same commit.
+
+- **The bulk cap is one constant.** `BULK_IDS_LIMIT` (`shared/workers/limits.ts`)
+  is enforced by the door AND declared in the tool schema (`maxItems`) + its
+  description — the number the model is told can never drift from what fits. For a
+  set-shaped job prefer a FILTER tool (facets, `dryRun` counts first) over passing
+  rows; never accept free text as a write filter.

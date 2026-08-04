@@ -64,3 +64,22 @@ feedback** section of [CACHING.md](CACHING.md).
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the Durable-Object code-vs-runtime
 model that powers tool (3).
+
+## The attempt limit is atomic (login codes)
+A "5 tries" limit written as *read the count, then check, then increment* is
+**burstable**: under concurrency N wrong guesses all read `attempts = 4` and each
+gets a free try. The fix (LAW-adjacent, B3) is to make the check and the increment
+**one statement** — consume a slot in the same UPDATE that enforces the cap, and
+read the changed-row count back:
+
+```sql
+UPDATE login_codes SET attempts = attempts + 1
+ WHERE id = ? AND attempts < ? AND consumed_at IS NULL
+```
+
+Zero rows changed = the cap is spent (a correct code consumes a slot too, then
+succeeds — the cap counts *tries*, not failures). The login flow and the
+email-change flow both use this shape (`workers/auth/src/index.ts`,
+`lib/email-change.ts`). Same principle as the never-negative credit decrement
+(`WHERE balance > 0`) and the last-admin guard: the invariant rides the WHERE, so
+the database enforces it atomically instead of the application racing itself.

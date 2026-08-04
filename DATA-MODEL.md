@@ -96,12 +96,22 @@ tables can be imported into. Real data: `id`, `table_key` (the target the import
 writes into, unique), `display_name`, `description`, `required_columns_json` (the
 schema the agent maps an uploaded file onto), `auto_populate_columns_json`
 (columns the import may fill itself, e.g. creator + team key),
-`reference_dataset_url`, `is_active`, + the audit block (creator/editor). Shared
-across all teams, so it lives in the global core DB. Maintained via an owner-only
-endpoint (`POST /api/data-ops/admin/seed-targets`, x-admin-key) — a standard
-catalog the owner curates, kept SEPARATE from the screen/recipe system (the
-earlier "likely merges with recipes" open question was resolved: they stay
-separate). Three targets are wired today: `selectable_data` (Dropdown values), `member_roles`, and `learning` — and the agentic multi-file importer (AGENTIC-IMPORT.md) orders them by their declared references.
+`reference_dataset_url` (both **unused today** — the code's `TARGETS` is the
+truth), `is_active`, + the audit block (creator/editor). Shared across all teams,
+so it lives in the global core DB. **The catalogue SELF-HEALS against the code on
+read (LAW R13):** `reconcileCatalog` (`lib/import.ts`) INSERT-only upserts a row
+for every code `TargetDef` (`ON CONFLICT DO NOTHING`), so a fresh environment's
+picker is never empty and a target the owner deliberately switched OFF (its row
+exists, `is_active=0`) stays off — the picker filters `is_active` **in memory**,
+never in SQL, or "switched off" and "never existed" would look identical. The
+by-key door heals on a miss only (the per-import path pays nothing). The owner
+seed door (`POST /api/data-ops/admin/seed-targets`, x-admin-key) now only refreshes
+LABELS (display name / description / schema) and never re-activates a switched-off
+target — it is no longer a step anyone must remember. Three targets are wired
+today: `selectable_data` (Dropdown values), `member_roles`, and `learning`
+(`team_members`/`help`/`teams`/`screens`/`agent` are pinned non-importable in
+`CATALOG_EXEMPT`); the agentic multi-file importer (AGENTIC-IMPORT.md) orders them
+by their declared references.
 
 ### agent_usage — KEEP (BUILT 2026-06-23, GLOBAL — `db/core/0009`)
 Purpose: the per-team **free** half of the AI agent quota. Real data: `team_id`,
@@ -131,8 +141,16 @@ global core DB so the gate can spend a unit without opening a team database.
 ### agent_usage_log — KEEP (BUILT 2026-07-01, GLOBAL — `db/core/0011`)
 Purpose: the usage TRAIL behind the panel's "where did my credits go" view.
 Real data: `id`, `team_id`, `actor_id`, `actor_name`, `created_at`, `credits`
-(units this command consumed), `source` (`free` / `credit` / `mixed`), `summary`
-— titled by the **WRITE action(s) the assistant took** (e.g. `Create the role
+(units this command consumed), `source` (`free` / `credit` / `mixed`), `summary`,
+and **`kind`** (`db/core/0014`: `'action'` | `'prompt'` | NULL). **Visibility rides
+`kind` (C3 — the log tells the TEAM where its credits went):** an `action` row's
+summary is TEAM-VISIBLE (the team is entitled to see what was done in its name); a
+`prompt` row's summary is the author's OWN (a teammate sees who spent how much and
+when, never the question typed); a back-filled NULL row stays private (it can't be
+classified after the fact, and a wrong guess publishes somebody's question). The
+old "only my own rows" rule showed an admin four blank rows with a teammate's name
+on them — withholding the one thing the team is owed. The summary is titled by the
+**WRITE action(s) the assistant took** (e.g. `Create the role
 "Test" · Invite alaap@… as Test`, with `(failed)` on a refused call), falling
 back to the user's prompt for a plain question OR a read-only turn. A READ isn't
 an action the user "did", so it never titles the row — a clarifying reply reads as
@@ -146,7 +164,9 @@ as two turns (propose + confirm); the confirm turn FOLDS its units into the
 propose row (`credits.ts` `foldUsageIntoLatest`) rather than adding a second
 row — so the history stays one entry per command and reconciles exactly with the
 balance drop (fixed 2026-07-10: a confirmed command used to split into a row +
-a cryptic "(continued)" row). Read newest-first, team-scoped, via
+a cryptic "(continued)" row). The fold **APPENDS** its actions to the row's title,
+never replaces — one command can pause for confirmation more than once, and
+replacing left a 10-credit turn titled by its last step alone. Read newest-first, team-scoped, via
 `GET /api/data-ops/agent/usage-log`. Lives in the global core DB beside the
 quota tables it explains.
 

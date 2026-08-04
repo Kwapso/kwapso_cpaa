@@ -144,7 +144,7 @@ ARCHITECTURE.md `/media/*` note before storing anything sensitive.
 |---|---|---|
 | `RESEND_API_KEY` | auth | send login codes + notifications. Until it's set, staging echoes login codes in the API response and production refuses email login. |
 | `CF_D1_TOKEN` | tenancy, content, data-ops | the scoped D1 REST token (Cloudflare → D1 → Edit) that reaches per-team databases. |
-| `ADMIN_KEY` | tenancy, data-ops | guards the maintenance endpoints (migrate-teams, db-sizes, seed the import catalog, grant credits). |
+| `ADMIN_KEY` | tenancy, data-ops, **+ auth (STAGING ONLY)** | guards the maintenance endpoints (migrate-teams, db-sizes, grant credits) — and, on the auth worker, the staging test-login door. NEVER set it on production auth (its holder can sign in as any account). |
 | `INTERNAL_KEY` | auth, tenancy, content, gateway, mcp | shared secret gating auth's `/internal/*` doors. tenancy + content call `/internal/send-email`; the **gateway** forwards client error beacons to `/internal/log-error` (a DIFFERENT reason — the gateway sends no email but still needs the key, or web errors never reach `error_logs`). The **mcp** worker uses it to mint team-pinned sessions (`/internal/mcp-session`). MUST match across all five. |
 | `ANTHROPIC_API_KEY` | data-ops | *optional* — when set, the agent's brain is Claude; unset falls back to Workers AI. Both do full tool use. |
 
@@ -182,12 +182,15 @@ data. Durable Objects require the Workers Paid plan.
 
 ---
 
-## 6 · Seed the import catalog (once per env)
+## 6 · The import catalog — self-healing (no manual step needed)
 
-The CSV-import feature reads a global catalog of allowed target tables. Seed it after
-the core `0008` migration and after data-ops is deployed:
+The CSV-import feature reads a global catalog of allowed target tables. As of R13 the
+catalogue **reconciles itself against the code on read** — a fresh environment's target
+picker heals on first open, so you do NOT need to seed it. The owner seed door still
+exists to refresh LABELS (display names / descriptions) if you edit them:
 
 ```bash
+# OPTIONAL — refreshes labels only; the picker already works without it.
 curl -X POST https://<gateway-url>/api/data-ops/admin/seed-targets -H "x-admin-key: <ADMIN_KEY>"
 ```
 
@@ -195,8 +198,11 @@ curl -X POST https://<gateway-url>/api/data-ops/admin/seed-targets -H "x-admin-k
 
 ## 7 · Create the first team + migrate-teams
 
-1. Open the gateway URL, sign in with an email code (staging echoes the code if
-   `RESEND_API_KEY` isn't set yet), and complete onboarding — this creates your first
+1. Open the gateway URL and sign in with an email code (a code appears ONLY in the
+   inbox now, in every environment — set `RESEND_API_KEY`; for automated/dev sign-in on
+   STAGING use the admin test-login door `POST /api/auth/admin/test-login` + `x-admin-key`,
+   gated by `ADMIN_KEY` on the **auth** worker, staging-only). Complete onboarding — this
+   creates your first
    **team**, which creates that team's own D1 database and runs every `TEAM_MIGRATIONS`
    entry on it.
 2. Whenever you later ship a NEW team-schema migration, roll it to all existing teams:
@@ -305,9 +311,9 @@ transient auth error; just retry.)
 prereqs → npm install → wrangler login → npm run check
   → d1 create (core, both envs) → migrations apply (core 0001–00NN)
   → r2 bucket create (media × 3 × 2 envs)
-  → secret put (RESEND, CF_D1_TOKEN, ADMIN_KEY, INTERNAL_KEY, [ANTHROPIC]) + set vars (PUBLIC_APP_URL, AGENT_*)
+  → secret put (RESEND, CF_D1_TOKEN, ADMIN_KEY [+ auth-staging-only for test-login], INTERNAL_KEY, [ANTHROPIC]) + set vars (PUBLIC_APP_URL, AGENT_*)
   → npm run deploy:staging  (realtime→auth→tenancy→content→data-ops→mcp→gateway) → smoke
-  → seed-targets → sign in → first team (creates its DB) → migrate-teams as needed
+  → sign in (test-login on staging) → first team (creates its DB) → migrate-teams as needed  (catalog self-heals; seed-targets optional)
   → verify → (repeat for production, owner-gated)
 ```
 

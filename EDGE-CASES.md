@@ -501,3 +501,46 @@ last) fails, and deploying a worker before its migration 500s at runtime.
 | Guard an invariant with a pre-write `COUNT` only | TOCTOU race | Re-check in the `UPDATE … WHERE`; count is just the friendly error |
 | Assume hot reads route through sharding | They query `guard.databaseId` directly | Fine today; revisit any batched script if a module is split |
 | Deploy auth-first / worker-before-migration | Binder-before-target 500s; missing table | realtime-FIRST; migrations to both DBs first |
+
+## The catalogue is data; the code is truth (R13)
+**The trap.** An import TargetDef lives in code, but a target only becomes one the
+picker OFFERS once a ROW exists in the core `importable_databases` table — and rows
+are DATA, which no deploy carries. So staging (seeded once by hand) could import
+modules that production, running byte-identical code, silently could not, and
+nothing anywhere said so. Any capability gated on a seeded row has this bug.
+
+**The rule.** The catalogue reconciles itself against the code on READ:
+`reconcileCatalog` INSERT-only upserts a row per `TargetDef` (`ON CONFLICT DO
+NOTHING`). INSERT-only is the whole point — a target the owner deliberately
+switched OFF keeps its row and stays off; only a NEVER-EXISTED target gets one. So
+the picker must NOT pre-filter `is_active` in SQL (filter in memory) — otherwise
+"switched off" and "never existed" are indistinguishable and the reconcile would
+resurrect a deliberate off. Reachable from both doors (the picker always; the
+by-key door on a miss). Shipping the code now ships the capability.
+
+## Two surfaces, one count (R16 arbitration)
+**The trap.** A collection count can live in two places — a tab badge and a
+`CollectionHeading` — so a screen can show the same number twice ("24k" on the tab
+and "24k" in the heading right beneath). The obvious fix, a `showHeadingCount`
+prop, is WRONG: whether a counted tab strip exists is a PER-PERMISSION answer (the
+strip renders null for a viewer who lacks the right that reveals it), so every
+caller re-derives it and is silently wrong for the roles nobody tests with.
+
+**The rule.** Arbitrate with a React CONTEXT (`counted-tabs.tsx`): `CountedTabs`
+marks a badged tab's panel, `CountedAbove` marks a counted sibling strip, and the
+heading calls the hook ABOVE its early return and renders null when marked. The
+tab wins; the heading stands down. (R16 owns the NUMBER; the tab-tie law R8 owns
+WHICH collection a tab describes — if they conflict, R16 prevails.)
+
+## A hook below an early return (the white screen)
+**The trap.** A `use*` hook placed AFTER a top-level `if (…) return` renders fine
+until the day that return fires first — then React sees a different hook count
+between renders (#310/#300) and blanks the whole tree. It is invisible in review
+and ships easily.
+
+**The rule.** Hoist every hook above the returns. `web/test/hooks-order.test.ts`
+makes the class unshippable — it fails any depth-1 hook call after a depth-1
+return — and the mounted root `ErrorBoundary` (`web/app/layout.tsx`) contains any
+that still slips through as a readable card, never a blank page. (The scanner
+walks past the parameter list to find the real function body, and catches
+`React.`-namespaced hooks too — both learned from its own sabotage test.)
