@@ -34,34 +34,33 @@ async function expectSentinelSurvived(page: Page): Promise<void> {
 }
 
 /**
- * Sign in via the dev-code login. On staging the auth worker runs with
- * DEV_ECHO_CODES=1, so POST /api/auth/email/start returns `{ devCode }` in its
- * JSON body (see workers/auth/src/index.ts emailStart). We capture that response
- * to read the code deterministically — far more robust than scraping the toast.
- *
- * TODO: if DEV_ECHO_CODES is turned OFF on the target environment, the body will
- * NOT contain devCode (production behaviour). In that case supply the code out
- * of band (e.g. a mailbox API or a fixed test code) and feed it to fillCode().
+ * Sign in via the ADMIN TEST-LOGIN door. Login codes are never echoed anywhere
+ * (no response field, no toast, in any environment) — automated runs instead
+ * mint a code through POST /api/auth/admin/test-login with the x-admin-key
+ * header (staging-only secret; the door fails closed where it's unset). Export
+ * ADMIN_KEY before running the e2e suite.
  */
 async function signIn(page: Page, email: string): Promise<void> {
-  await page.goto("/login")
+  const adminKey = process.env.ADMIN_KEY ?? ""
+  expect(adminKey, "export ADMIN_KEY — the e2e suite signs in through the admin test-login door").not.toBe("")
 
+  await page.goto("/login")
   await page.locator("#email").fill(email)
 
-  // Capture the start response (carries devCode on staging) as we submit.
-  const startResp = page.waitForResponse(
+  // Mint the code out of band (the UI's own send fires too; that's fine — the
+  // admin-minted code below is the newest unconsumed row, which verify picks).
+  await page.getByRole("button", { name: "Email me a code" }).click()
+  await page.waitForResponse(
     (r) => r.url().includes("/api/auth/email/start") && r.request().method() === "POST"
   )
-  await page.getByRole("button", { name: "Email me a code" }).click()
-  const body = (await (await startResp).json()) as { devCode?: string }
+  const minted = await page.request.post("/api/auth/admin/test-login", {
+    headers: { "x-admin-key": adminKey },
+    data: { email },
+  })
+  const body = (await minted.json()) as { code?: string }
+  expect(body.code, "admin test-login should mint a code (is ADMIN_KEY set on this env's auth worker?)").toMatch(/^\d{6}$/)
 
-  const code = body.devCode
-  expect(
-    code,
-    "expected a devCode in the email/start response (is DEV_ECHO_CODES=1 on this env?)"
-  ).toMatch(/^\d{6}$/)
-
-  await fillCode(page, code!)
+  await fillCode(page, body.code!)
 
   // Verified → the app routes to /home (teamful) or /onboarding (brand-new user).
   await page.waitForURL(/\/(home|onboarding)/)

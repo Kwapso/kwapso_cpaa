@@ -13,8 +13,9 @@
 import { fail, json } from "../../../shared/workers/http"
 import { logError, recordWorkerError } from "../../../shared/workers/error-log"
 import type { Env } from "./env"
-import { randomCode, sha256Hex } from "./lib/crypto"
+import { sha256Hex } from "./lib/crypto"
 import { isValidEmail, normalizeEmail, sendEmail, sendLoginCode } from "./lib/email"
+import { mintLoginCode } from "./lib/login-codes"
 import { startEmailChange, verifyEmailChange } from "./lib/email-change"
 import { createPinnedSession,
   createSession,
@@ -23,14 +24,13 @@ import { createPinnedSession,
   readCookie,
   SESSION_COOKIE,
 } from "./lib/sessions"
-import { ulid } from "../../../shared/workers/id"
 import { listAccountActivity } from "./lib/account-activity"
 import { updateProfile, type ProfileInput } from "./lib/profile"
 import {
   findOrCreateUserByEmail,
   toSessionUser,
 } from "./lib/users"
-import { CODE_TTL_MINUTES, MAX_CODE_ATTEMPTS, MAX_CODES_PER_HOUR } from "./lib/constants"
+import { MAX_CODE_ATTEMPTS } from "./lib/constants"
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -43,6 +43,11 @@ export default {
           return await emailStart(request, env)
         case "POST /api/auth/email/verify":
           return await emailVerify(request, env)
+        // STAGING-ONLY test door (ADMIN_KEY-gated, fails closed): mints a normal
+        // login code and returns it ONCE, so automated tests can sign in without
+        // any code ever being echoed by the real send door. See adminTestLogin.
+        case "POST /api/auth/admin/test-login":
+          return await adminTestLogin(request, env)
         case "POST /api/auth/email/change/start":
           return await emailChangeStart(request, env)
         case "POST /api/auth/email/change/verify":
@@ -112,9 +117,10 @@ async function internalMcpSession(request: Request, env: Env): Promise<Response>
 /** Internal (service-binding only): send a branded email composed by another
  * worker (e.g. tenancy's invite email). */
 async function internalSendEmail(request: Request, env: Env): Promise<Response> {
-  // Defense-in-depth: even though this worker has no public URL (workers_dev:
-  // false), require the shared secret when one is configured.
-  if (env.INTERNAL_KEY && request.headers.get("x-internal-key") !== env.INTERNAL_KEY)
+  // FAIL CLOSED: every internal door refuses every caller while its secret is
+  // unset — a half-finished bootstrap must not run with the doors open. (This
+  // used to wave callers through when INTERNAL_KEY was missing.)
+  if (!env.INTERNAL_KEY || request.headers.get("x-internal-key") !== env.INTERNAL_KEY)
     return fail(403, "forbidden", "Bad internal key.")
   const m = (await request.json().catch(() => ({}))) as {
     to?: string
@@ -138,7 +144,8 @@ async function internalSendEmail(request: Request, env: Env): Promise<Response> 
  * capped inside logError, and a bad body is simply dropped (a log endpoint must
  * never become an error source itself). */
 async function internalLogError(request: Request, env: Env): Promise<Response> {
-  if (env.INTERNAL_KEY && request.headers.get("x-internal-key") !== env.INTERNAL_KEY)
+  // FAIL CLOSED (same rule as send-email): no secret configured = no callers.
+  if (!env.INTERNAL_KEY || request.headers.get("x-internal-key") !== env.INTERNAL_KEY)
     return fail(403, "forbidden", "Bad internal key.")
   const b = (await request.json().catch(() => ({}))) as {
     source?: string
@@ -158,46 +165,43 @@ async function internalLogError(request: Request, env: Env): Promise<Response> {
   return new Response(null, { status: 204 })
 }
 
-/** Step 1 of email login: create + send a 6-digit code. */
+/** Step 1 of email login: create + send a 6-digit code. The response NEVER
+ * carries the code — a login code appears nowhere but the user's inbox, in any
+ * environment (the old staging echo was deleted; tests use adminTestLogin). */
 async function emailStart(request: Request, env: Env): Promise<Response> {
   const body = (await request.json().catch(() => ({}))) as { email?: string }
   const email = normalizeEmail(body.email ?? "")
   if (!isValidEmail(email))
     return fail(400, "invalid_email", "Enter a valid email address.")
 
-  // Throttle: at most 5 codes per email per hour.
-  const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
-  const recent = await env.DB.prepare(
-    "SELECT COUNT(*) AS n FROM login_codes WHERE email = ? AND created_at > ?"
-  )
-    .bind(email, hourAgo)
-    .first<{ n: number }>()
-  if ((recent?.n ?? 0) >= MAX_CODES_PER_HOUR)
-    return fail(429, "too_many_codes", "Too many codes requested. Try again in an hour.")
+  const minted = await mintLoginCode(env, email)
+  if ("error" in minted) return fail(minted.status, minted.error, minted.message)
 
-  const code = randomCode()
-  const now = new Date()
-  await env.DB.prepare(
-    `INSERT INTO login_codes (id, email, code_hash, expires_at, created_at)
-     VALUES (?, ?, ?, ?, ?)`
-  )
-    .bind(
-      ulid(),
-      email,
-      await sha256Hex(`${code}:${email}`),
-      new Date(now.getTime() + CODE_TTL_MINUTES * 60 * 1000).toISOString(),
-      now.toISOString()
-    )
-    .run()
-
-  const sent = await sendLoginCode(env, email, code)
-  const echo = env.DEV_ECHO_CODES === "1"
-
-  // Staging (echo on) ALSO returns the code so the smoke test + dev flow work
-  // even though a real email goes out too. Production (echo off) only sends —
-  // and if no key is configured yet, refuses rather than stranding the user.
-  if (sent || echo) return json({ ok: true, ...(echo ? { devCode: code } : {}) })
+  const sent = await sendLoginCode(env, email, minted.code)
+  if (sent) return json({ ok: true })
+  // No email key configured → refuse rather than stranding the user.
   return fail(503, "email_not_configured", "Email sending isn't set up yet.")
+}
+
+/** STAGING-ONLY: mint a login code through the SAME path as the real send door
+ * (hashed at rest, same TTL, same per-hour throttle) and return it ONCE instead
+ * of emailing — the sign-in door for automated tests now that no code is ever
+ * echoed anywhere. Gated by the ADMIN_KEY secret and FAILS CLOSED when it's
+ * unset: production never sets ADMIN_KEY on the auth worker, so this door does
+ * not exist there. The holder can sign in as ANY account on the environment —
+ * that is why it is staging-only (OPERATIONS.md § secrets). */
+async function adminTestLogin(request: Request, env: Env): Promise<Response> {
+  if (!env.ADMIN_KEY || request.headers.get("x-admin-key") !== env.ADMIN_KEY)
+    return fail(403, "forbidden", "Not available.")
+  const body = (await request.json().catch(() => ({}))) as { email?: string }
+  const email = normalizeEmail(body.email ?? "")
+  if (!isValidEmail(email))
+    return fail(400, "invalid_email", "Enter a valid email address.")
+  const minted = await mintLoginCode(env, email)
+  if ("error" in minted) return fail(minted.status, minted.error, minted.message)
+  // Returned exactly once, to the ADMIN_KEY holder; the normal verify door
+  // consumes it like any other code (attempt cap + TTL apply unchanged).
+  return json({ ok: true, code: minted.code })
 }
 
 /** Step 2 of email login: check the code, create the session. */
@@ -227,15 +231,22 @@ async function emailVerify(request: Request, env: Env): Promise<Response> {
   const now = new Date().toISOString()
   if (!row || row.expires_at <= now)
     return fail(400, "code_expired", "That code expired. Request a new one.")
-  if (row.attempts >= MAX_CODE_ATTEMPTS)
+
+  // ATOMIC attempt cap: consume one attempt slot in the same statement that
+  // checks the limit. The old read-then-write ("attempts >= cap?" … "+1") was
+  // burstable — N concurrent wrong tries could all read attempts=4 and each get
+  // a guess. Zero rows changed = the cap is spent (a correct code consumes a
+  // slot too, then succeeds — the cap counts tries, not failures).
+  const slot = await env.DB.prepare(
+    "UPDATE login_codes SET attempts = attempts + 1 WHERE id = ? AND attempts < ? AND consumed_at IS NULL"
+  )
+    .bind(row.id, MAX_CODE_ATTEMPTS)
+    .run()
+  if ((slot.meta.changes ?? 0) === 0)
     return fail(429, "too_many_attempts", "Too many wrong tries. Request a new code.")
 
-  if (row.code_hash !== (await sha256Hex(`${code}:${email}`))) {
-    await env.DB.prepare("UPDATE login_codes SET attempts = attempts + 1 WHERE id = ?")
-      .bind(row.id)
-      .run()
+  if (row.code_hash !== (await sha256Hex(`${code}:${email}`)))
     return fail(400, "wrong_code", "That code isn't right. Check and try again.")
-  }
 
   await env.DB.prepare("UPDATE login_codes SET consumed_at = ? WHERE id = ?")
     .bind(now, row.id)
@@ -257,7 +268,8 @@ async function emailChangeStart(request: Request, env: Env): Promise<Response> {
   const body = (await request.json().catch(() => ({}))) as { email?: string }
   const r = await startEmailChange(env, user, body.email ?? "")
   if ("error" in r) return fail(r.status, r.error, r.message)
-  return json({ ok: true, ...(r.devCode ? { devCode: r.devCode } : {}) })
+  // Never a code in the response — same law as login (inbox only).
+  return json({ ok: true })
 }
 
 /** Email change, step 2: verify the code, switch the email, log + secure it. */

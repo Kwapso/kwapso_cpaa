@@ -8,8 +8,11 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-06-01",
   // Only the gateway is public (locked: one public address). No *.workers.dev
-  // URL for this worker — it's reachable ONLY via service bindings.
+  // URL for this worker — it's reachable ONLY via service bindings. BOTH flags:
+  // workers_dev kills the stable subdomain, preview_urls kills the per-version
+  // preview URLs (each would be a second public door).
   "workers_dev": false,
+  "preview_urls": false,
   "observability": { "enabled": true },
   "d1_databases": [
     {
@@ -25,13 +28,13 @@
   "services": [{ "binding": "REALTIME", "service": "brimba-realtime" }],
   "vars": {
     "APP_ORIGIN": "https://brimba.swift-struck.workers.dev",
-    "EMAIL_FROM": "noreply@updates.swiftstruck.com",
-    "DEV_ECHO_CODES": "0"
+    "EMAIL_FROM": "noreply@updates.swiftstruck.com"
   },
   "env": {
     "staging": {
       "name": "brimba-auth-staging",
       "workers_dev": false,
+      "preview_urls": false,
       "observability": { "enabled": true },
       "d1_databases": [
         {
@@ -47,8 +50,7 @@
       "services": [{ "binding": "REALTIME", "service": "brimba-realtime-staging" }],
       "vars": {
         "APP_ORIGIN": "https://brimba-staging.swift-struck.workers.dev",
-        "EMAIL_FROM": "noreply@updates.swiftstruck.com",
-        "DEV_ECHO_CODES": "1"
+        "EMAIL_FROM": "noreply@updates.swiftstruck.com"
       }
     }
   }

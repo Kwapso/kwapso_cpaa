@@ -37,17 +37,11 @@ export function AuthCard({ onSignedIn }: { onSignedIn: () => void }) {
     setBusy(true)
     setError(undefined)
     try {
-      const res = await auth.startEmail(email)
+      await auth.startEmail(email)
       setStep("code")
       setCode("")
-      if (res.devCode) {
-        // TEMP until the Resend key is wired: staging shows the code here.
-        toast.info(`TEMP (staging only): your code is ${res.devCode}`, {
-          duration: 30000,
-        })
-      } else {
-        toast.success("Code sent — check your email.")
-      }
+      // The code goes ONLY to the inbox — it never rides the response or a toast.
+      toast.success("Code sent — check your email.")
     } catch (e) {
       setError(e instanceof ApiFailure ? e.message : "Couldn't send the code.")
     } finally {

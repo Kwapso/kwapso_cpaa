@@ -1,0 +1,98 @@
+// The login-code doors, source-locked (seam-test style — reads the real code off
+// disk). Three security invariants that must never regress:
+//   1. A login code appears NOWHERE but the user's inbox — no echo field, no
+//      config var that could re-enable one, in any environment. Automated tests
+//      sign in through the ADMIN test-login door instead (staging-only secret).
+//   2. Every secret-guarded door FAILS CLOSED when its secret is unset.
+//   3. The attempt cap is ATOMIC — the limit check and the increment are one
+//      statement, so concurrent guesses can't each read a stale count.
+
+import { readFileSync, readdirSync } from "node:fs"
+import { join } from "node:path"
+import { describe, expect, it } from "vitest"
+
+const SRC = join(__dirname, "..", "src")
+const ROOT = join(__dirname, "..", "..", "..")
+const index = readFileSync(join(SRC, "index.ts"), "utf8")
+const emailChange = readFileSync(join(SRC, "lib", "email-change.ts"), "utf8")
+
+function authSources(): string[] {
+  const out: string[] = []
+  const walk = (d: string) => {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      const p = join(d, e.name)
+      if (e.isDirectory()) walk(p)
+      else if (e.name.endsWith(".ts")) out.push(readFileSync(p, "utf8"))
+    }
+  }
+  walk(SRC)
+  return out
+}
+
+describe("no login code ever leaves through anything but the inbox", () => {
+  it("the echo path AND its config var are gone from the auth worker", () => {
+    for (const src of authSources()) expect(src).not.toContain("DEV_ECHO_CODES")
+    // The var can't be re-enabled by configuration either.
+    const wrangler = readFileSync(join(SRC, "..", "wrangler.jsonc"), "utf8")
+    expect(wrangler).not.toContain("DEV_ECHO_CODES")
+  })
+
+  it("the send doors' success responses carry no code field", () => {
+    // emailStart returns a bare ok — the code variable never reaches json().
+    const start = index.slice(index.indexOf("async function emailStart"), index.indexOf("async function adminTestLogin"))
+    expect(start).toContain("return json({ ok: true })")
+    expect(start, "emailStart must never place a code in its response").not.toMatch(/json\(\{[^}]*code/i)
+    // The email-change start door likewise.
+    const changeStart = index.slice(index.indexOf("async function emailChangeStart"), index.indexOf("async function emailChangeVerify"))
+    expect(changeStart).toContain("return json({ ok: true })")
+    expect(changeStart).not.toMatch(/json\(\{[^}]*code/i)
+    expect(emailChange).not.toContain("devCode")
+  })
+
+  it("the web client has no code-toast path left", () => {
+    for (const f of [
+      join(ROOT, "web", "components", "temp", "auth-card.tsx"),
+      join(ROOT, "web", "components", "email-change-dialog.tsx"),
+      join(ROOT, "web", "lib", "api.ts"),
+    ])
+      expect(readFileSync(f, "utf8"), `${f} must not reference devCode`).not.toContain("devCode")
+  })
+
+  it("the admin test-login door exists, shares the mint, and FAILS CLOSED", () => {
+    const door = index.slice(index.indexOf("async function adminTestLogin"), index.indexOf("async function emailVerify"))
+    // Fails closed: no ADMIN_KEY configured = the door does not exist.
+    expect(door).toContain("!env.ADMIN_KEY ||")
+    // Same mint as the real send door — TTL/throttle/hashing can never drift.
+    expect(door).toContain("mintLoginCode(")
+    const start = index.slice(index.indexOf("async function emailStart"), index.indexOf("async function adminTestLogin"))
+    expect(start).toContain("mintLoginCode(")
+  })
+})
+
+describe("every internal door fails closed", () => {
+  it("send-email, log-error and mcp-session all refuse when INTERNAL_KEY is unset", () => {
+    for (const fn of ["internalSendEmail", "internalLogError", "internalMcpSession"]) {
+      const start = index.indexOf(`async function ${fn}`)
+      expect(start, `${fn} must exist`).toBeGreaterThan(-1)
+      const body = index.slice(start, start + 600)
+      expect(body, `${fn} must fail closed (!env.INTERNAL_KEY || …)`).toContain("!env.INTERNAL_KEY ||")
+    }
+  })
+})
+
+describe("the attempt cap is atomic", () => {
+  it("login verify consumes an attempt slot in the same statement that checks the cap", () => {
+    expect(index).toContain(
+      "UPDATE login_codes SET attempts = attempts + 1 WHERE id = ? AND attempts < ? AND consumed_at IS NULL"
+    )
+    // The burstable read-then-check gate is gone.
+    expect(index).not.toMatch(/row\.attempts >= MAX_CODE_ATTEMPTS/)
+  })
+
+  it("email-change verify uses the same atomic pattern", () => {
+    expect(emailChange).toContain(
+      "UPDATE email_change_codes SET attempts = attempts + 1 WHERE id = ? AND attempts < ? AND consumed_at IS NULL"
+    )
+    expect(emailChange).not.toMatch(/row\.attempts >= MAX_CODE_ATTEMPTS/)
+  })
+})

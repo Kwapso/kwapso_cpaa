@@ -24,12 +24,14 @@ import { CODE_TTL_MINUTES, MAX_CODE_ATTEMPTS, MAX_CODES_PER_HOUR } from "./const
 /** A handled failure — the route turns this into the HTTP error response. */
 export type ChangeFail = { error: string; message: string; status: number }
 
-/** Step 1: validate the new address + send it a 6-digit confirmation code. */
+/** Step 1: validate the new address + send it a 6-digit confirmation code.
+ * The code goes ONLY to the new inbox — never into the response (same law as
+ * login: a code appears nowhere but the user's inbox, in any environment). */
 export async function startEmailChange(
   env: Env,
   user: UserRow,
   newEmailRaw: string
-): Promise<{ devCode?: string } | ChangeFail> {
+): Promise<Record<string, never> | ChangeFail> {
   const shape = validateNewEmail(user.email, newEmailRaw)
   if (shape) return { ...shape, status: 400 }
   const newEmail = normalizeEmail(newEmailRaw)
@@ -71,10 +73,7 @@ export async function startEmailChange(
     .run()
 
   const sent = await sendEmailChangeCode(env, newEmail, code)
-  const echo = env.DEV_ECHO_CODES === "1"
-  // Staging echoes the code (same as login) so the dev flow works; production
-  // refuses rather than stranding the user when no email key is configured.
-  if (sent || echo) return echo ? { devCode: code } : {}
+  if (sent) return {}
   return {
     error: "email_not_configured",
     message: "Email sending isn't set up yet.",
@@ -111,14 +110,18 @@ export async function verifyEmailChange(
   const nowIso = new Date().toISOString()
   if (!row || row.expires_at <= nowIso)
     return { error: "code_expired", message: "That code expired. Request a new one.", status: 400 }
-  if (row.attempts >= MAX_CODE_ATTEMPTS)
+
+  // ATOMIC attempt cap (same pattern as login): consume a slot in the statement
+  // that checks the limit, so concurrent guesses can't each read a stale count.
+  const slot = await env.DB.prepare(
+    "UPDATE email_change_codes SET attempts = attempts + 1 WHERE id = ? AND attempts < ? AND consumed_at IS NULL"
+  )
+    .bind(row.id, MAX_CODE_ATTEMPTS)
+    .run()
+  if ((slot.meta.changes ?? 0) === 0)
     return { error: "too_many_attempts", message: "Too many wrong tries. Request a new code.", status: 429 }
-  if (row.code_hash !== (await sha256Hex(`${code}:${newEmail}`))) {
-    await env.DB.prepare("UPDATE email_change_codes SET attempts = attempts + 1 WHERE id = ?")
-      .bind(row.id)
-      .run()
+  if (row.code_hash !== (await sha256Hex(`${code}:${newEmail}`)))
     return { error: "wrong_code", message: "That code isn't right. Check and try again.", status: 400 }
-  }
 
   const oldEmail = user.email
   // One transaction: consume the code, switch the email, write the audit row.
