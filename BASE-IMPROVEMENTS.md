@@ -10,6 +10,20 @@ Keep this current: when an item ships, move it to **Fixed** with the commit.
 
 ---
 
+## Fixed (2026-08-04, follow-up) — the five close-out items
+
+The hardening round's own review found five loose ends. 354 tests (up from 342).
+
+| Sev | Issue | Fix |
+|---|---|---|
+| SCALE | **A hard cap is an honest refusal, not an answer.** R14 capped growing collections at 1,000 rows and called cursor paging a "next step"; a downstream product had already shipped keyset paging on its growing collections and proved it at 24,000 rows. | R14 WIDENED: a collection that grows with ordinary use must PAGE by key — `shared/workers/paging.ts` (opaque cursor, id tiebreak, `LIMIT+1` for `hasMore`) answered through the one `pagedJson` seam. Support tickets + the team activity feed page end to end; the My/All tabs became SERVER scopes (a client filter over a page disagrees with its exact badge). `GROWING_COLLECTIONS` is registry DATA; the check asserts the lib seam, the response, and that the client can reach page two. |
+| BUG | **The agent was told a bulk cap it could not physically write.** The reply ceiling was 4,096 tokens while the declared cap was 500 ids (~8,000 tokens) — the tool call truncates mid-JSON, the turn dies, nothing changed, no error. | `AGENT_MAX_TOKENS` raised to 8,192 and `BULK_IDS_LIMIT` DERIVED from it (512). `reply-ceiling.test.ts` asserts the arithmetic and that every bulk schema declares the derived number. |
+| BUG | **The hooks-order scanner had a third blind spot**: a guard written the ordinary way (`if (!ready) {` newline `return null` newline `}`) put its return at brace depth 2, so it never registered as an early return — switching the white-screen check OFF for that whole file. | Rewritten around the real semantic: a return counts unless it is inside a NESTED FUNCTION. Arrow components are scanned too, and fixtures now lock the scanner's own blind spots (a check that cannot fail is not a check). |
+| BUG | **The dropdown-ordering rule was stated but not locked** — nothing stopped either surface losing it. | The rule is pinned as `DROPDOWN_ORDER_RULE` and asserted on BOTH surfaces the model reads (the tool description and the system rule wall), including that CREATE is the step named first (R9's vocabulary half). |
+| OPS | **Staging's smoke was red (16/18)** on a stale team-database pointer — indistinguishable, to the next reader, from a real regression. | Staging reset (3 of 4 team-DB pointers were dangling), re-deployed, smoke back to **18/18**. |
+
+---
+
 ## Fixed (2026-08-04) — the base hardening round (7 new laws + security/UI)
 
 Ported the twenty defects a downstream product (Acrymold) found under real load —
@@ -19,7 +33,7 @@ sabotage-proven; the rest are security/agent/UI fixes. 342 tests (up from 302).
 | Sev | Issue | Fix |
 |---|---|---|
 | DESIGN | **A capability shipped in code was invisible until a catalogue ROW existed** — staging could import modules production (byte-identical code) could not. | R13 widened: the import catalogue reconciles itself against the code on READ (INSERT-only; an owner's OFF stays off; the picker filters is_active in memory). Shipping the code now ships the capability. (`catalog-coverage`) |
-| SCALE | **Unbounded list reads** would stall a worker at 100k rows. | R14: every `list*`/`search*` pages or carries a hard cap from `shared/workers/limits.ts` with its comment. (`bounded-lists`) |
+| SCALE | **Unbounded list reads** would stall a worker at 100k rows. | R14: every `list*`/`search*` carries a hard cap from `shared/workers/limits.ts` with its comment (`bounded-lists`). *Widened in the follow-up round above: a GROWING collection must page, not cap.* |
 | BUG | **Deaf publishers / stale paged screens** — a worker pinged `selectable_data` and nothing listened; paged rows live outside the row caches. | R15: the live registry (`web/lib/live-resources.ts`) + a ping bus + `useLiveRefetch`; every published resource reaches a listener or a reasoned `DEAF_EXEMPT`. (`live-collections`) |
 | BUG | **A 24,011-row catalogue advertised "1000"** (a capped list's length) and the same count showed twice on one screen. | R16: exact server COUNT(*) through the one `formatCount` seam; tab-vs-heading arbitration by React context. (`counted-collections`) |
 | BUG | **A double-clicked Deactivate wrote two history rows** 2s apart. | R17: the current-status predicate rides the UPDATE; zero rows moved = no activity, no ping. (`idempotent-transitions`) |

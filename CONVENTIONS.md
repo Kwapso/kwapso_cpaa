@@ -694,11 +694,36 @@ code that does the job, and keep `npm run check` green.
 ## Scale + idempotency + filter patterns (R14 · R17 · R19)
 These three are machine-checked; write them the house way so the build stays green.
 
-- **Bounded reads (R14).** Every exported `list*`/`search*` in a worker `lib/`
-  either pages (`LIMIT ? OFFSET ?` + a total) or carries a HARD CAP from
-  `shared/workers/limits.ts` — `LIST_HARD_CAP` (1000), `EXPORT_HARD_CAP` (10000),
-  `THREAD_HARD_CAP` (500) — with a `// R14 hard cap` comment. Never an unbounded
-  `SELECT`; one unbounded read stalls a worker at 100k rows.
+- **Bounded reads, and PAGED growing ones (R14).** Every exported `list*`/`search*`
+  in a worker `lib/` carries a HARD CAP from `shared/workers/limits.ts` —
+  `LIST_HARD_CAP` (1000), `EXPORT_HARD_CAP` (10000), `THREAD_HARD_CAP` (500) —
+  with a `// R14 hard cap` comment. Never an unbounded `SELECT`; one unbounded
+  read stalls a worker at 100k rows.
+
+  But a cap is an honest *refusal* to answer, so a collection that GROWS with
+  ordinary use must **page** instead. Growing collections are DATA
+  (`GROWING_COLLECTIONS` in `shared/rules/registry.ts`); today: support tickets
+  and the team activity feed. Page by KEY, never by offset — `LIMIT ? OFFSET ?`
+  re-scans everything it skips and duplicates or drops rows when someone writes
+  mid-scroll:
+
+  ```ts
+  const after = keysetAfter(decodeCursor(cursor), "created_at")   // shared/workers/paging
+  //  … WHERE <filters> AND (created_at < ? OR (created_at = ? AND id < ?))
+  //    ORDER BY created_at DESC, id DESC LIMIT PAGE_SIZE + 1     // +1 reveals hasMore
+  const page = toPage(rows, PAGE_SIZE, (r) => [r.created_at, r.id])
+  return pagedJson("activity", { ...page, total })                // shared/workers/http
+  ```
+
+  Four things travel together and the check enforces all four: the rows, the
+  EXACT total, `hasMore`, and an OPAQUE `nextCursor` the client hands straight
+  back. Every response for that collection goes through `pagedJson` — a
+  hand-built `json({ rows, total })` is how a door ships half the contract. A
+  malformed cursor is a clean 400, never a silent restart at page one. On the
+  client, `<LoadMore>` (`web/components/load-more.tsx`) appends the next page and
+  is the only place the cursor is touched; a paged list's tabs must be SERVER
+  scopes, because filtering a loaded page client-side disagrees with the exact
+  count above it (R16).
 
 - **Idempotent transitions (R17).** A deactivate/reactivate/status UPDATE carries
   the current-status predicate INLINE and reads the changed rows back:
@@ -717,8 +742,14 @@ These three are machine-checked; write them the house way so the build stays gre
   derives the required set from the door's own `searchParams.get(...)`. If you add
   a `?filter=` to a door, add it to the tool the same commit.
 
-- **The bulk cap is one constant.** `BULK_IDS_LIMIT` (`shared/workers/limits.ts`)
-  is enforced by the door AND declared in the tool schema (`maxItems`) + its
-  description — the number the model is told can never drift from what fits. For a
+- **The bulk cap is one constant, DERIVED from the reply ceiling.**
+  `BULK_IDS_LIMIT` (`shared/workers/limits.ts`) is not hand-picked: it is
+  `floor((AGENT_MAX_TOKENS - AGENT_REPLY_ENVELOPE_TOKENS) / TOKENS_PER_EMITTED_ID)`
+  — what the model can physically emit in one turn. A cap the model is told but
+  cannot write is a promise the runtime breaks silently, mid-JSON: the tool call
+  truncates, the turn dies, nothing changed. It is enforced by the door AND
+  declared in the tool schema (`maxItems`) + its description, and
+  `workers/data-ops/test/reply-ceiling.test.ts` asserts the arithmetic still
+  holds. Raise the ceiling and the cap follows; never edit them apart. For a
   set-shaped job prefer a FILTER tool (facets, `dryRun` counts first) over passing
   rows; never accept free text as a write filter.

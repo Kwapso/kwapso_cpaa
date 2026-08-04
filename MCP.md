@@ -123,6 +123,13 @@ Today it covers:
   door with an `?id=` filter now EXPOSES + FORWARDS it (R19 parity) — pass `id` to fetch
   one record instead of pulling the whole collection (`list_help_tickets` also takes
   `scope`).
+
+  **`list_help_tickets` is PAGED** (R14 — tickets are a growing collection). One call
+  returns one page plus `total` (the exact server count, not the page length),
+  `hasMore`, and an opaque `nextCursor`. To read further, call again passing that
+  value as `cursor`; never construct or mutate one — a cursor the server didn't issue
+  is refused with a 400. When `hasMore` is false you have reached the end. A client
+  that ignores the cursor still works: it simply sees the newest page.
 - **Export (full-field CSV):** `export_roles_csv`, `export_learning_csv`,
   `export_dropdown_values_csv`.
 - **Write — deterministic create / edit / deactivate** (free, no AI; each needs the

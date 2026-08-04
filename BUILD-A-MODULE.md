@@ -610,8 +610,15 @@ Beyond the golden path, a module that ships without these turns the build red:
 
 - **Import story (R13):** declare a `TargetDef` in `workers/data-ops/src/lib/targets.ts`
   OR add a reasoned `CATALOG_EXEMPT` line in `shared/rules/registry.ts`.
-- **Bounded reads (R14):** every `list*` in the module's lib carries a hard cap
-  from `shared/workers/limits.ts` with its comment.
+- **Bounded reads — or real paging (R14):** every `list*` in the module's lib
+  carries a hard cap from `shared/workers/limits.ts` with its comment. Ask first
+  whether the collection GROWS with ordinary use (rows accumulate and are never
+  curated away — tickets, orders, events, a feed). If it does, it must PAGE
+  instead: add it to `GROWING_COLLECTIONS` in the registry, page by key through
+  `shared/workers/paging.ts`, answer through `pagedJson` (rows + exact total +
+  `hasMore` + an opaque cursor), and render `<LoadMore>` on its screen — the
+  check verifies all three ends, including that the client can reach page two.
+  A bounded collection (roles, members, dropdown values) may still just cap.
 - **Live listener (R15):** add a `TEAM_RESOURCES` row-level entry in
   `web/lib/live-resources.ts` (or a `SIMPLE_INVALIDATIONS` / reasoned `DEAF_EXEMPT`
   entry) for every resource the module publishes; a paged screen calls
