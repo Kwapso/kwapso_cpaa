@@ -11,13 +11,21 @@ import { describe, expect, it } from "vitest"
 
 const src = readFileSync(join(__dirname, "..", "src", "index.ts"), "utf8")
 
+/** Comments are NOT code — a comment naming a seam must never stand in for
+ * calling it (the same flaw that let a deleted gate stay green in the other
+ * workers' suites). Block comments first; line comments only when the `//` isn't
+ * part of a `https://` URL. */
+function stripComments(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/gm, "$1")
+}
+
 /** The body of a top-level `async function <name>(` in index.ts. */
 function fnBody(name: string): string {
   const start = src.indexOf(`async function ${name}(`)
   expect(start, `handler ${name} must exist in mcp/src/index.ts`).toBeGreaterThan(-1)
   const next = src.indexOf("\nasync function ", start + 1)
   const end = next === -1 ? src.indexOf("\n/* ", start + 1) : next
-  return src.slice(start, end === -1 ? undefined : end)
+  return stripComments(src.slice(start, end === -1 ? undefined : end))
 }
 
 describe("gating-seam (mcp): every non-GET route opens with identity verification", () => {
@@ -36,7 +44,7 @@ describe("gating-seam (mcp): every non-GET route opens with identity verificatio
       if (c.method === "GET") continue
       const body = fnBody(c.handler)
       expect(
-        /await verifyToken\(|await requireUser\(/.test(body),
+        /(?<![A-Za-z0-9_$.])(?:verifyToken|requireUser)\s*(?:<[^(<>]*>)?\s*\(/.test(body),
         `${c.method} ${c.path} (${c.handler}) must open with verifyToken (bearer) or requireUser (session) — no unverified write ships on the machine surface`
       ).toBe(true)
     }
@@ -64,7 +72,7 @@ describe("gating-seam (mcp): every non-GET route opens with identity verificatio
       if (c.path === "/api/mcp/health") continue
       const body = fnBody(c.handler)
       expect(
-        /await verifyToken\(|await requireUser\(/.test(body),
+        /(?<![A-Za-z0-9_$.])(?:verifyToken|requireUser)\s*(?:<[^(<>]*>)?\s*\(/.test(body),
         `${c.method} ${c.path} must verify its caller (only /api/mcp/health is open)`
       ).toBe(true)
     }

@@ -1,5 +1,9 @@
 # Agent + Modules — the build plan (LOCKED 2026-06-22; Phases 1–4 DONE 2026-06-23)
 
+> **Status: SHIPPED (Phases 1–4).** Kept because OPERATIONS.md and DATA-MODEL.md
+> cite it for the two deferred hooks (help attachments, agent auto-draft). For how
+> the agent works TODAY, read MCP.md + EDGE-CASES §4–5; this file is the *why*.
+
 The next big build on top of the shipped base: **learning + help + data import + the
 AI agent + MCP**, as ONE continuous build on branch `agent-modules`, green at every
 step, with a single staging ship at the end (owner gates production). The **54 product

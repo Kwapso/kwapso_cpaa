@@ -76,8 +76,27 @@ describe("team creation is capped per user", () => {
     expect(asked, "…never by membership").not.toContain("team_members")
   })
 
+  // "Create five, switch them off, repeat" would otherwise be an unbounded
+  // database generator wearing a cap: a deactivated team still HAS its database.
+  it("a deactivated team still counts against the cap", async () => {
+    let asked = ""
+    const env = {
+      DB: { prepare: (sql: string) => ((asked = sql), { bind: () => ({ first: async () => ({ n: 0 }) }) }) },
+    } as never
+    await createNamedTeam(post(), env)
+    expect(asked, "the count must NOT filter deactivated teams — their databases still exist").not.toMatch(
+      /deactivated|is_active|archived/i
+    )
+  })
+
   it("the owner can raise it per environment", async () => {
     const res = await createNamedTeam(post(), envWith(MAX_TEAMS_PER_USER, String(MAX_TEAMS_PER_USER + 5)))
     expect(res.status, "an override above the count must allow the create").toBe(200)
+  })
+
+  it("an override of ZERO means zero — it does not fall back to the default", async () => {
+    const res = await createNamedTeam(post(), envWith(0, "0"))
+    expect(res.status, "MAX_TEAMS_PER_USER=0 must refuse, not silently allow 5").toBe(403)
+    expect(created).toHaveLength(0)
   })
 })

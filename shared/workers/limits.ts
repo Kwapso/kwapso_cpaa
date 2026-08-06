@@ -45,3 +45,18 @@ export const BULK_IDS_LIMIT = Math.floor((AGENT_MAX_TOKENS - AGENT_REPLY_ENVELOP
  * database quota. Low on purpose — a person runs a handful of teams, not fifty;
  * the owner raises it per environment with MAX_TEAMS_PER_USER. */
 export const MAX_TEAMS_PER_USER = 5
+
+/** THE ONE numeric env-var parse. Two bugs of the same family live in the obvious
+ * spellings, in opposite directions:
+ *   • `Number(env.X) || DEFAULT` turns a deliberate **0** into the default — set
+ *     the AI allowance to zero and you silently grant the full daily quota.
+ *   • `Number(env.X)` with no empty test turns **unset** into 0 — a team cap that
+ *     refuses every account its very first team.
+ * Both are invisible until someone deliberately chooses the boundary value, which
+ * is exactly when it matters. So: unset, empty or unparseable → the fallback;
+ * every real number, INCLUDING zero and negatives, is honoured as written. */
+export function numberVar(raw: string | undefined, fallback: number): number {
+  if (raw === undefined || raw.trim() === "") return fallback
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : fallback
+}

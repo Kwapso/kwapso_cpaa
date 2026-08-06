@@ -43,6 +43,15 @@ const WEB = join(HERE, "..") // web/
 const ROOT = join(WEB, "..") // repo root
 const read = (p: string) => readFileSync(p, "utf8")
 
+/** Comments are NOT code. Without this, `// no LIMIT needed here` satisfies the
+ * very bound it describes the ABSENCE of, and a comment naming a seam stands in
+ * for calling it. Block comments go first; line comments only when the `//`
+ * isn't part of a `https://` URL (SQL and template literals are left intact —
+ * R14 reads LIMIT out of them). */
+function stripComments(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/gm, "$1")
+}
+
 /** Every *.tsx under web/components (recursively). */
 function componentFiles(): string[] {
   const out: string[] = []
@@ -222,7 +231,7 @@ describe("RULES — the laws of the base", () => {
       while ((m = re.exec(src))) {
         seen++
         const next = src.indexOf("\nexport ", m.index + 1)
-        const body = src.slice(m.index, next === -1 ? undefined : next)
+        const body = stripComments(src.slice(m.index, next === -1 ? undefined : next))
         if (/SELECT/.test(body) && !/LIMIT\s/.test(body)) offenders.push(`${path} → ${m[1] ?? m[2]}`)
       }
     }

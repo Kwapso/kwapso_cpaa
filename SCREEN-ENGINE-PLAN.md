@@ -1,5 +1,9 @@
 # Screen Engine + Team Management — the plan
 
+> **Status: SHIPPED.** This is the design record for the screen engine, kept because
+> live docs still cite its sections (SEARCH.md, ROADMAP §Navigation). For how the
+> engine works TODAY, read UI-CONVENTIONS.md + CACHING.md; this file is the *why*.
+
 The blueprint for Brimba's runtime, config-driven screen system (our own lean
 "mini-Glide") and the first feature built on it: home + team management
 (members, roles, invites). Decided with the user 2026-06-12/13.

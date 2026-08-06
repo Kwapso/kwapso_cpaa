@@ -8,6 +8,7 @@
 import type { AgentQuota, UsageLogRow } from "../../../../shared/types"
 import type { Actor } from "../../../../shared/workers/gating"
 import { ulid } from "../../../../shared/workers/id"
+import { numberVar } from "../../../../shared/workers/limits"
 import type { Env } from "../env"
 
 /** Free AI requests per team per day before credits are spent. */
@@ -28,7 +29,7 @@ export async function getQuota(env: Env, teamId: string): Promise<AgentQuota> {
   const credit = await env.DB.prepare("SELECT balance FROM agent_credits WHERE team_id = ?")
     .bind(teamId)
     .first<{ balance: number }>()
-  const cap = Number(env.AGENT_FREE_DAILY) || FREE_DAILY
+  const cap = numberVar(env.AGENT_FREE_DAILY, FREE_DAILY)
   const freeUsedToday = usage?.used ?? 0
   const creditBalance = credit?.balance ?? 0
   const freeRemaining = Math.max(0, cap - freeUsedToday)
@@ -59,7 +60,7 @@ export type ConsumeResult = {
 export async function consumeAiUnit(env: Env, teamId: string): Promise<ConsumeResult> {
   const now = new Date().toISOString()
   const period = today()
-  const cap = Number(env.AGENT_FREE_DAILY) || FREE_DAILY
+  const cap = numberVar(env.AGENT_FREE_DAILY, FREE_DAILY)
   // ONE statement checks the cap AND consumes the slot: the row is created at
   // used = 1, or incremented only while it is still under the cap. Zero rows
   // changed = the free allowance is spent, and we fall through to paid credits.

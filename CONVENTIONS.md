@@ -691,6 +691,37 @@ of deleting → `logActivity` → `publishChange` → `json`. Throw `GuardError`
 rule failure and let the one central catch format it. Comment the *why*. Add the least
 code that does the job, and keep `npm run check` green.
 
+## Reading config, and writing a check that can fail
+
+Two conventions that look like trivia and are not — each one shipped as a real
+defect first.
+
+- **Numeric env vars go through `numberVar(env.X, DEFAULT)`** (`shared/workers/limits.ts`),
+  never `Number(env.X) || DEFAULT` and never bare `Number(env.X)`. The two obvious
+  spellings fail in opposite directions: `|| DEFAULT` turns a deliberate **0** into
+  the default (set the AI allowance to zero, silently grant the full quota), and a
+  bare `Number()` turns **unset** into 0 (a team cap that refuses every account its
+  first team). Both are invisible until someone chooses the boundary value — which
+  is exactly when it matters. `web/test/config-vars.test.ts` tests both boundaries
+  and scans the workers so the raw spellings can't return.
+
+- **A source-scanning check STRIPS COMMENTS before it matches, and matches a CALL,
+  not a word.** This repo comments densely, and its comments discuss the very seams
+  the checks scan ("no requireRight (it's about you)"). A handler's slice runs to
+  the next top-level export, so it also swallows the doc comment introducing the
+  NEXT function. Three consequences, all proven by sabotage:
+  1. strip comments first — otherwise `// no LIMIT needed here` satisfies the very
+     bound it describes the absence of, and prose thirty lines below stands in for
+     a deleted gate;
+  2. every alternative ends in `\s*\(` — a name is not a call;
+  3. put a leading boundary `(?<![A-Za-z0-9_$.])` on each name — without it
+     `ungatedBody(` matches a search for `gatedBody(` — and allow the generic
+     between name and paren (`(?:<[^(<>]*>)?`), or `gatedBody<{…}>(` reads as a miss.
+
+  And give every scan a **tripwire**: assert it matched something. A scan that
+  silently finds nothing reports an empty offender list, which looks exactly like
+  a pass.
+
 ## Scale + idempotency + filter patterns (R14 · R17 · R19)
 These three are machine-checked; write them the house way so the build stays green.
 

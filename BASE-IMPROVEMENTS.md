@@ -10,6 +10,26 @@ Keep this current: when an item ships, move it to **Fixed** with the commit.
 
 ---
 
+## Fixed (2026-08-04, final) — four findings ported back FROM the downstream product
+
+The fork shipped its side and sent four findings back. Three were live here too;
+the fourth was a UX bug their seam tests caught that mine would have shipped.
+387 tests.
+
+| Sev | Issue | Fix |
+|---|---|---|
+| BLIND CHECK | **The gate scan read COMMENTS AS CODE.** Reproduced exactly: a mutation's real `requireRight(…)` was replaced with a comment mentioning it, and R10 stayed GREEN. This repo comments densely about the very seams being scanned, and a handler's slice runs to the next top-level export — so it swallows the next function's doc comment too. | All four gate scans (tenancy, content, data-ops, mcp) strip comments before matching, require `\s*\(` on every alternative, and allow the generic (`(?:<[^(<>]*>)?`) so `gatedBody<{…}>(` isn't a miss. |
+| BLIND CHECK | **R14's LIMIT test read comments** — `// no LIMIT needed here` satisfied the very bound it describes the absence of. (The arrow-shape blindness and the saw-something tripwire were already fixed in the previous round.) | Comment-stripped before matching; proven with an unbounded read whose comment says LIMIT. |
+| BUG | **A deliberate `0` in config silently became the default.** `Number(env.X) \|\| DEFAULT` at all three numeric env-var reads: `AGENT_FREE_DAILY=0` would have granted the full quota, and `MAX_TEAMS_PER_USER=0` the default 5. | One `numberVar()` parse — unset/empty/unparseable → fallback, every real number incl. zero honoured. Tested at both boundaries, plus a scan so the raw spellings can't return. |
+| BUG | **The OTP cooldown counted CONSUMED codes**, so signing in on a laptop and then a phone made the second device wait a minute — the cooldown punished the one user who had already proved they own the inbox. | The probe carries `consumed_at IS NULL`. Their seam tests caught this; mine would have shipped it. |
+
+Confirmed already correct here: the team cap counts `teams.creator_id` (not
+memberships) and does **not** filter deactivated teams — "create five, switch them
+off, repeat" would otherwise be an unbounded database generator wearing a cap.
+Now locked by a test.
+
+---
+
 ## Reasoned exceptions (decided, documented, NOT open findings)
 
 Two things a review will flag every time. Both are deliberate positions with the
@@ -195,21 +215,47 @@ grep -n "safeBody(input.body)" workers/content/src/lib/learning.ts
 `safeBody(optionalText(input.body, "Body", TEXT_LIMITS.long))` — and the same for
 `contentLink`.
 
+## A12 · LOW — a deliberate `0` in config silently becomes the default
+**The shape:** `Number(env.X) || DEFAULT`. Set the AI allowance to `0` to switch
+free usage off and you silently grant the full daily quota; the mirror shape,
+bare `Number(env.X)`, turns *unset* into `0` — a cap that refuses everyone.
+
+```bash
+grep -rnE "(?:Number|parseInt|parseFloat)\s*\(\s*env\." --include="*.ts" workers/ shared/ \
+  | grep -v node_modules | grep -vE ":[0-9]+: *(\*|//)"
+```
+**Patch:** any hit is vulnerable (the second `grep -v` drops doc comments that
+DESCRIBE the bad shape — including the one in the patched file itself). Route them
+all through one parse that treats
+unset/empty/unparseable as the fallback and honours every real number including
+zero — copy `numberVar` from `shared/workers/limits.ts`, and test at `0` and `""`.
+
 ## And the two blind CHECKS, which matter as much
 A fork also inherits the checks. Two flaw classes made several of them unable to
 fail — a green check that cannot go red is worse than no check, because it is
 reported as a pass:
 
 ```bash
-grep -rn "gatedBody\\s\*\\(\|whoAmI\\s\*\\(" workers/*/test/gating-seam.test.ts
-grep -n "export (?:async )?function ((?:list|search)" web/test/rules.test.ts
+grep -L "stripComments" workers/*/test/gating-seam.test.ts web/test/rules.test.ts
 ```
-**Patch:** put a leading boundary — `(?<![A-Za-z0-9_$.])` — in front of every
-identifier a check matches (without it, `ungatedBody(` satisfies a search for
-`gatedBody(`), and teach every source-scan BOTH export shapes (`export function`
-and `export const … =>`) plus a tripwire asserting it found something. See
-`web/test/hooks-order.test.ts` for the fixture pattern that locks a scanner's own
-blind spots.
+**Patch:** every file listed reads COMMENTS AS CODE. This is the worst of the
+three, because this repo comments densely about the very seams being scanned and
+a handler's slice runs to the next top-level export — so it swallows the doc
+comment introducing the next function. A gate deleted from a handler stayed green,
+satisfied by prose thirty lines below. Three fixes together:
+1. **strip comments** before matching (block comments, then line comments whose
+   `//` isn't part of a `https://`);
+2. **match a CALL, not a word** — every alternative ends `\s*\(`, and allow the
+   generic between name and paren (`(?:<[^(<>]*>)?`) or `gatedBody<{…}>(` reads
+   as a miss;
+3. **boundary every identifier** — `(?<![A-Za-z0-9_$.])`, without which
+   `ungatedBody(` satisfies a search for `gatedBody(`.
+
+Then teach every source-scan BOTH export shapes (`export function listX` and
+`export const listX = async (…) =>`) and give it a **tripwire** asserting it
+matched something — a scan that silently finds nothing returns an empty offender
+list, which reads exactly like a pass. See `web/test/hooks-order.test.ts` for the
+fixture pattern that locks a scanner's own blind spots.
 
 ---
 

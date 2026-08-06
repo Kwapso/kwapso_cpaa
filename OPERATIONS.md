@@ -79,6 +79,19 @@ Create with `npx wrangler r2 bucket create <name>` (run once per bucket per acco
 ### Public surface (LOCKED): only the gateway is public
 
 auth, tenancy, realtime, content, data-ops and mcp all set `"workers_dev": false` **and `"preview_urls": false`** (BOTH, top-level AND env.staging — a per-version preview URL would be a second public door) (top-level AND env.staging — envs don't inherit), so they have NO public `*.workers.dev` URL and are reachable ONLY via service bindings. The **gateway** (`brimba` / `brimba-staging`) is the single public address. This is what makes `/internal/send-email` (and the agent/import act-as-user surface) safe (no public route can reach it). Never add a public route/`workers_dev` to a non-gateway worker.
+- **Sign-in codes: a 60-second cooldown, never an hour-long lockout.** Asking for
+  a code twice inside a minute returns `429 too_soon`. Past the hourly cap the
+  live code is ROTATED in place (fresh secret, fresh TTL, fresh attempt budget)
+  rather than refused — so nobody, including an operator retrying a flaky email,
+  can be locked out of their own account. A CONSUMED code doesn't hold the
+  cooldown: signing in on a laptop and then a phone works straight away.
+- **Team creation is capped per user** — `MAX_TEAMS_PER_USER` (default 5) counts
+  teams the account CREATED, not teams it belongs to, and **deactivated teams
+  still count** (their database still exists, so "create five, switch them off,
+  repeat" would otherwise be an unbounded database generator). Raise it per
+  environment as a var. Setting it to `0` means zero, not the default.
+- **`AGENT_FREE_DAILY=0` means zero free AI**, not "fall back to 50". Every
+  numeric var behaves that way now (`numberVar`).
 - **Uploaded files are capability URLs (a reasoned exception).** `/media/*` serves
   any object whose unguessable key you hold — no session, no membership check, no
   expiry. An ex-member who saved a link keeps it. Fine for photos and logos;

@@ -31,8 +31,12 @@ export async function mintLoginCode(
   // including this function — can re-send digits that already went out.
   const now = new Date()
   const cooldownFrom = new Date(now.getTime() - RESEND_COOLDOWN_SECONDS * 1000).toISOString()
+  // CONSUMED codes don't count. Signing in on a laptop and then on a phone a
+  // moment later is one person doing something ordinary: the first code is spent,
+  // so there is nothing to wait for. Without this clause the cooldown punishes
+  // the successful case — the one user who has already proved they own the inbox.
   const justSent = await env.DB.prepare(
-    "SELECT id FROM login_codes WHERE email = ? AND created_at > ? LIMIT 1"
+    "SELECT id FROM login_codes WHERE email = ? AND created_at > ? AND consumed_at IS NULL LIMIT 1"
   )
     .bind(email, cooldownFrom)
     .first<{ id: string }>()

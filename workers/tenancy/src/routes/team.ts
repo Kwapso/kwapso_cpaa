@@ -19,7 +19,7 @@ import {
   switchTeam,
   updateTeamDetails,
 } from "../lib/teams"
-import { MAX_TEAMS_PER_USER } from "../../../../shared/workers/limits"
+import { MAX_TEAMS_PER_USER, numberVar } from "../../../../shared/workers/limits"
 import { gatedBody } from "../../../../shared/workers/route"
 import { teamContext, toActor, whoAmI } from "../context"
 import type { Env } from "../env"
@@ -97,7 +97,7 @@ export async function createNamedTeam(request: Request, env: Env): Promise<Respo
   // who CREATED the team (that's what provisions), never by membership, so
   // being invited to many teams costs nobody anything. The owner raises it per
   // deploy with MAX_TEAMS_PER_USER; onboarding's first team is far below it.
-  const cap = Number(env.MAX_TEAMS_PER_USER) || MAX_TEAMS_PER_USER
+  const cap = numberVar(env.MAX_TEAMS_PER_USER, MAX_TEAMS_PER_USER)
   const mine = await env.DB.prepare("SELECT COUNT(*) AS n FROM teams WHERE creator_id = ?")
     .bind(user.id)
     .first<{ n: number }>()

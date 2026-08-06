@@ -38,8 +38,10 @@ function fakeDb() {
         },
         async first<T>(): Promise<T | null> {
           const [email, since] = [String(a[0]), String(a[1])]
-          const matching = rows.filter((r) => r.email === email && r.created_at > since)
+          let matching = rows.filter((r) => r.email === email && r.created_at > since)
           if (flat.includes("COUNT(*)")) return { n: matching.length } as T
+          // the cooldown probe only sees UNCONSUMED codes
+          if (flat.includes("consumed_at IS NULL")) matching = matching.filter((r) => r.consumed_at === null)
           return (matching[0] ? ({ id: matching[0].id } as T) : null)
         },
         async run() {
@@ -114,6 +116,18 @@ describe("login-code throttle", () => {
     const update = db.statements.find((s) => s.startsWith("UPDATE login_codes")) as string
     expect(update, "a rotated code starts its attempt budget again").toContain("attempts = 0")
     expect(update, "…and only an unconsumed code may be rotated").toContain("consumed_at IS NULL")
+  })
+
+  // EARNED, not designed: the first cooldown counted consumed codes too, so
+  // signing in on a laptop and then a phone made the second device wait a minute.
+  it("a CONSUMED code doesn't hold the cooldown — laptop, then phone", async () => {
+    const db = fakeDb()
+    expect(await ask(db)).toHaveProperty("code")
+    db.rows.forEach((r) => (r.consumed_at = "used")) // signed in on the laptop
+    expect(
+      await ask(db),
+      "the phone must get a code straight away — the first one is already spent"
+    ).toHaveProperty("code")
   })
 
   it("with nothing live to rotate it mints, so a returning user is never stuck", async () => {

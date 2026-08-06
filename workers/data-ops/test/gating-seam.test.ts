@@ -29,6 +29,17 @@ function indexFunctions(dir: string): Map<string, string> {
   return out
 }
 
+
+/** Comments are NOT code. This repo comments heavily and its comments DISCUSS the
+ * very seams being scanned ("no requireRight (it's about you)"), and a handler's
+ * slice runs to the next top-level export — so it swallows the doc comment
+ * introducing the next function. Without this, a handler whose real gate was
+ * deleted stayed GREEN, satisfied by prose thirty lines below. Block comments go
+ * first; line comments only when the `//` isn't part of a `https://` URL. */
+function stripComments(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/gm, "$1")
+}
+
 const routeFns = indexFunctions(join(SRC, "routes"))
 
 /** The permission gates. Any ONE of these opening a handler satisfies R10. The
@@ -36,7 +47,7 @@ const routeFns = indexFunctions(join(SRC, "routes"))
  * `gatedBody(` and a removed gate reads as a present one — the scan would pass
  * its own sabotage. */
 const GATE_RE =
-  /(?<![A-Za-z0-9_$.])(?:requireRight|gatedBody|gated|requireAnyImportRight|adminGuard)\s*(?:<[^>]*>)?\s*\(/
+  /(?<![A-Za-z0-9_$.])(?:requireRight|gatedBody|gated|requireAnyImportRight|adminGuard)\s*(?:<[^(<>]*>)?\s*\(/
 
 /** The reviewed IDENTITY-gated writes: they can't ask "does your ROLE allow
  * this?" because the answer is about WHO you are, not what you may do. Each
@@ -57,16 +68,17 @@ describe("gating-seam (data-ops): no ungated door can ship", () => {
       if (route.startsWith("GET ")) continue
       const name = def.handler.name
       const body = routeFns.get(name)
+      const code = body === undefined ? undefined : stripComments(body)
       expect(body, `handler ${name} (${route}) must be an exported async function in routes/`).toBeDefined()
       if (IDENTITY_GATED[route]) {
         expect(
-          /(?<![A-Za-z0-9_$.])whoAmI\s*\(/.test(body as string),
+          /(?<![A-Za-z0-9_$.])whoAmI\s*\(/.test(code as string),
           `${route} is a reviewed identity-gated write (${IDENTITY_GATED[route]}) — it must still verify WHO the caller is via whoAmI`
         ).toBe(true)
         continue
       }
       expect(
-        GATE_RE.test(body as string),
+        GATE_RE.test(code as string),
         `${route} (${name}) changes state with no permission gate — open it with requireRight / gated / gatedBody / requireAnyImportRight / adminGuard, or add it to IDENTITY_GATED with a reason`
       ).toBe(true)
     }
