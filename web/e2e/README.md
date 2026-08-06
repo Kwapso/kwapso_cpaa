@@ -39,9 +39,9 @@ BASE_URL=http://localhost:3000 npm run test:e2e --workspace=brimba-web
 
 ## Notes / TODOs
 
-- **Code retrieval** uses the admin test-login door (staging-only `ADMIN_KEY` on
-  the auth worker; fails closed where unset — production has no test door, by
-  design). Against production, supply the code out of band (a mailbox API) and
+- **Code retrieval** uses the test-login door, gated by the auth worker's own
+  `TEST_LOGIN_KEY` secret (non-production only; fails closed where unset, and
+  refused outright when the worker's `ENVIRONMENT` var is `production`). Against production, supply the code out of band (a mailbox API) and
   feed it to `fillCode()`.
 - The flow needs a **teamful** test account. A brand-new account lands on
   `/onboarding` with no team, so the test `skip`s itself there. Seed a test
