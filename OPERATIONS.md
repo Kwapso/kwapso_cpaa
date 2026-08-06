@@ -79,6 +79,14 @@ Create with `npx wrangler r2 bucket create <name>` (run once per bucket per acco
 ### Public surface (LOCKED): only the gateway is public
 
 auth, tenancy, realtime, content, data-ops and mcp all set `"workers_dev": false` **and `"preview_urls": false`** (BOTH, top-level AND env.staging — a per-version preview URL would be a second public door) (top-level AND env.staging — envs don't inherit), so they have NO public `*.workers.dev` URL and are reachable ONLY via service bindings. The **gateway** (`brimba` / `brimba-staging`) is the single public address. This is what makes `/internal/send-email` (and the agent/import act-as-user surface) safe (no public route can reach it). Never add a public route/`workers_dev` to a non-gateway worker.
+- **Both environments are on the same commit as of 2026-08-06** — production was
+  brought up from the pre-hardening build in one rollout: core migration `0014`
+  applied to `brimba-core` first, then all seven workers realtime-first. Verified
+  on production: four worker healths, the test-login door refused (403) even when
+  handed the staging key (`ENVIRONMENT: "production"` ships in the config), the
+  activity door gating before scope resolution, and a forged-cookie beacon writing
+  zero rows. Production auth holds only `INTERNAL_KEY` + `RESEND_API_KEY` — no
+  `TEST_LOGIN_KEY`, and the door would refuse it anyway.
 - **Sign-in codes: a 60-second cooldown, never an hour-long lockout.** Asking for
   a code twice inside a minute returns `429 too_soon`. Past the hourly cap the
   live code is ROTATED in place (fresh secret, fresh TTL, fresh attempt budget)
