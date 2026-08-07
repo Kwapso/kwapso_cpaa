@@ -1,4 +1,4 @@
-// The REALTIME worker — Brimba's live "switchboard". Defines the TeamChannel
+// The REALTIME worker — kwapso's live "switchboard". Defines the TeamChannel
 // Durable Object (one instance per team, addressed by name "team:<id>"), which
 // holds that team's open WebSockets (hibernatable — idle teams cost ~nothing)
 // and broadcasts change pings. It reads team_members (global core DB) only to
@@ -7,7 +7,7 @@
 // DO binding + migration + DB + service are repeated there).
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "brimba-realtime",
+  "name": "kwapso-realtime",
   "main": "src/index.ts",
   "compatibility_date": "2026-06-01",
   // Only the gateway is public — reachable only via service bindings (the
@@ -22,14 +22,14 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "brimba-core",
+      "database_name": "kwapso-core",
       "database_id": "7196438c-5572-4317-b1e4-48084ab6e3ad"
     }
   ],
-  "services": [{ "binding": "AUTH", "service": "brimba-auth" }],
+  "services": [{ "binding": "AUTH", "service": "kwapso-auth" }],
   "env": {
     "staging": {
-      "name": "brimba-realtime-staging",
+      "name": "kwapso-realtime-staging",
       "workers_dev": false,
       "preview_urls": false,
       "observability": { "enabled": true },
@@ -40,11 +40,11 @@
       "d1_databases": [
         {
           "binding": "DB",
-          "database_name": "brimba-core-staging",
+          "database_name": "kwapso-core-staging",
           "database_id": "68a9a2f6-13af-4d73-932e-ab38b40cc5b6"
         }
       ],
-      "services": [{ "binding": "AUTH", "service": "brimba-auth-staging" }]
+      "services": [{ "binding": "AUTH", "service": "kwapso-auth-staging" }]
     }
   }
 }

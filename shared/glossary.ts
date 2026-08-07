@@ -1,4 +1,4 @@
-// THE BRIMBA DICTIONARY — one canonical term per product concept, each with a
+// THE KWAPSO DICTIONARY — one canonical term per product concept, each with a
 // plain, brief definition (correct word, explained simply, never over-explained).
 // Audience: 45–55yo managers who want things simple. The whole app speaks THESE
 // words; copy should never invent a synonym for a concept that's already here.

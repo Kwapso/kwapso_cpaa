@@ -18,8 +18,8 @@ import * as React from "react"
 
 import type { TraceTarget } from "@/lib/agent-trace"
 
-const TRACE_EVENT = "brimba:agent-trace" // panel → engine
-const HOST_EVENT = "brimba:agent-trace-host" // engine → the mounted deep-link host
+const TRACE_EVENT = "kwapso:agent-trace" // panel → engine
+const HOST_EVENT = "kwapso:agent-trace-host" // engine → the mounted deep-link host
 
 /** Fired from the panel per traced step. `teamId` is the team the tool ran in. */
 export type TraceNav = { teamId: string; target: TraceTarget }

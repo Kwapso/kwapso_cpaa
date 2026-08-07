@@ -8,7 +8,7 @@ link carries everything — code, docs, tests, and the skills that operate on th
 ## What's here
 
 - **`new-app/`** — the one-shot foundation builder. Given an app name, it clones the base,
-  runs the fork sweep (renames the `brimba-` prefix everywhere), stands the whole base up
+  runs the fork sweep (renames the `kwapso-` prefix everywhere), stands the whole base up
   on Cloudflare command-by-command (core DB + migrations → R2 → secrets → realtime-first
   deploy of all seven workers → seed → smoke), creates the GitHub repo, runs the three
   quality gates, and hands over a ready-to-brand checklist. This is `BOOTSTRAP.md`

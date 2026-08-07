@@ -2,7 +2,7 @@
 // tell the people who'd want to know: the ticket's raiser (someone answered them)
 // and anyone mentioned. Required communication: it happened to them but they
 // didn't trigger it. Sent through the SAME branded template + auth-worker sender
-// as every other Brimba email, so they all look identical.
+// as every other kwapso email, so they all look identical.
 //
 // Best-effort by design: a failed notification must NEVER fail the reply that
 // triggered it — the reply already saved and published. Every path swallows its
@@ -23,7 +23,7 @@ async function teamName(env: Env, teamId: string): Promise<string> {
 /** Look up email + display name for tagged ids — restricted to ACTIVE members of
  * THIS team (join team_members). A @mention can only notify a teammate, never an
  * arbitrary platform user, so it can't leak the team name + reply text to outsiders
- * or be used to spam from Brimba's trusted sender. Returns a map id → {email, name}. */
+ * or be used to spam from kwapso's trusted sender. Returns a map id → {email, name}. */
 async function lookupUsers(
   env: Env,
   teamId: string,

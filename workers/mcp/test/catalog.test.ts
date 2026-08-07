@@ -91,7 +91,7 @@ describe("personal access tokens", () => {
   it("secrets are prefixed + 64 hex chars of entropy, and hash deterministically", async () => {
     const s1 = newTokenSecret()
     const s2 = newTokenSecret()
-    expect(s1).toMatch(/^brimba_mcp_[0-9a-f]{64}$/)
+    expect(s1).toMatch(/^kwapso_mcp_[0-9a-f]{64}$/)
     expect(s1).not.toBe(s2)
     expect(await sha256Hex(s1)).toBe(await sha256Hex(s1))
     expect(await sha256Hex(s1)).not.toBe(await sha256Hex(s2))

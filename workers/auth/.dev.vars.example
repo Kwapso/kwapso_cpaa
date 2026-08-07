@@ -4,5 +4,5 @@ APP_ORIGIN=http://localhost:3000
 #  the admin test-login door gated by ADMIN_KEY, staging-only, on the auth worker)
 ADMIN_KEY=set-on-staging-only-never-production
 INSECURE_COOKIE=1
-EMAIL_FROM=Brimba <onboarding@resend.dev>
+EMAIL_FROM=kwapso <onboarding@resend.dev>
 # RESEND_API_KEY=

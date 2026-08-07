@@ -16,7 +16,7 @@
 
 import * as React from "react"
 
-const PREFIX = "brimba:draft:"
+const PREFIX = "kwapso:draft:"
 const storageKey = (id: string) => PREFIX + id
 
 function read<T>(id: string): T | null {

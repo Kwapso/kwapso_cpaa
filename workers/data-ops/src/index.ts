@@ -1,4 +1,4 @@
-// Brimba DATA-OPS worker — bulk data import today (the AI agent brain lands here
+// kwapso DATA-OPS worker — bulk data import today (the AI agent brain lands here
 // next). This file is the SWITCHBOARD: it maps each route to a handler and centrally
 // turns thrown GuardErrors into clean HTTP responses. The shared opening (whoAmI /
 // teamContext / requireRight) lives in the shared gating seam.

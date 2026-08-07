@@ -45,7 +45,7 @@ in Glide = our `deactivated_at` (non-null = archived/deactivated).
 
 ---
 
-## GLOBAL core (the card catalog — `brimba-core`)
+## GLOBAL core (the card catalog — `kwapso-core`)
 
 ### users  — KEEP (built)
 Real data: `id`, `email`, `image_url`, `first_name`, `last_name`,
@@ -224,7 +224,7 @@ ordering); deactivate-not-delete. **`Details/Seen` is RESOLVED** by a separate
 `learning_progress` table (the user×learning join the open question called for):
 audit + `learning_id`, `user_id`, and the reversible "mark as done" state, so a
 curator dashboard can show every member's done state. Per-module file storage is
-R2 (`brimba-learning-media`), not a DB column.
+R2 (`kwapso-learning-media`), not a DB column.
 
 ### help + help_threads — KEEP (BUILT 2026-06-23, team migration `0004_modules`, two-tier)
 `help` (parent ticket): audit + `help_type` (selectable), `description`,
@@ -233,7 +233,7 @@ lifecycle (`open` → `in_progress` → `resolved`, with `reopened`; the raiser 
 reopen without edit rights), `resolved`, `resolved_on`, `resolver_id/email/name`.
 `help_threads` (messages): audit + `help_id` (the parent ticket),
 `tagged_team_member_user_ids` (@mention → email notify), `message_body`. A ticket
-with a threaded conversation. (Help attachments to R2 `brimba-help-media` are a
+with a threaded conversation. (Help attachments to R2 `kwapso-help-media` are a
 deferred hook — see AGENT-MODULES-PLAN.)
 
 ### invite_logs — BUILT (per-team, team migration `0003_invite_logs`) + invite_index (GLOBAL, built)

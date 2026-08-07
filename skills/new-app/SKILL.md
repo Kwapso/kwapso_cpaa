@@ -1,6 +1,6 @@
 ---
 name: new-app
-description: The one-shot foundation builder — given an app name, it clones the Brimba base from GitHub, runs the fork sweep (renames the brimba- prefix everywhere), stands the whole base up on Cloudflare command-by-command (core database + migrations, R2 buckets, secrets, realtime-first deploy of all seven workers, catalog seed, smoke), creates the GitHub repo, verifies everything (npm run check, the staging smoke including the MCP stage, the three quality gates, a browser sanity pass), and hands over a ready-to-brand checklist. Use when the user says "new app", "start a new project", "fork the base", "set up a new app", "bootstrap this project", or wants a fresh product wired up with the full local → GitHub → staging → production pipeline.
+description: The one-shot foundation builder — given an app name, it clones the Brimba base from GitHub, runs the fork sweep (renames the kwapso- prefix everywhere), stands the whole base up on Cloudflare command-by-command (core database + migrations, R2 buckets, secrets, realtime-first deploy of all seven workers, catalog seed, smoke), creates the GitHub repo, verifies everything (npm run check, the staging smoke including the MCP stage, the three quality gates, a browser sanity pass), and hands over a ready-to-brand checklist. Use when the user says "new app", "start a new project", "fork the base", "set up a new app", "bootstrap this project", or wants a fresh product wired up with the full local → GitHub → staging → production pipeline.
 ---
 
 # new-app — the one-shot foundation builder
@@ -74,48 +74,48 @@ npm run check
 or touch any cloud resource. Re-point git: remove the brimba `origin` (the new repo
 is added in step 4).
 
-## 2 · The fork sweep (rename brimba- → <name>- everywhere)
+## 2 · The fork sweep (rename kwapso- → <name>- everywhere)
 Per BASE-MANUAL §5: rename the identity, never the plumbing. The real spots in the
 repo today — sweep them all, then verify:
 
 - **`workers/*/wrangler.jsonc` (all seven: auth, tenancy, realtime, gateway, content,
   data-ops, mcp):** the worker `name` (top-level = production AND `env.staging`),
-  every service-binding `service:` name, the `database_name`s (`brimba-core`,
-  `brimba-core-staging`), every R2 `bucket_name`, plus the identity vars —
+  every service-binding `service:` name, the `database_name`s (`kwapso-core`,
+  `kwapso-core-staging`), every R2 `bucket_name`, plus the identity vars —
   `APP_ORIGIN` + `EMAIL_FROM` (auth), `PUBLIC_APP_URL` (tenancy). Leave the
   checked-in `database_id` and `CF_ACCOUNT_ID` values alone for now — step 3
   overwrites them with the new account's real values.
 - **Package names:** root `package.json` (name, description, and every
-  `--workspace=brimba-*` reference in its scripts) + the workspace names in
+  `--workspace=kwapso-*` reference in its scripts) + the workspace names in
   `web/package.json` and all seven `workers/*/package.json`.
 - **`shared/brand.ts`:** the app `name`, `description`, `motto` (colours and logo
   come later — step 6).
 - **Scripts:** `scripts/reset-all.mjs` (the `GLOBAL_DB` names) and
-  `scripts/smoke-staging.mjs` (the default `BASE` URL, the `brimba_session` cookie
-  check, the `brimba_mcp_` token-prefix check, the `brimba-mcp` server-name check).
+  `scripts/smoke-staging.mjs` (the default `BASE` URL, the `kwapso_session` cookie
+  check, the `kwapso_mcp_` token-prefix check, the `kwapso-mcp` server-name check).
 - **Source constants:** `workers/auth/src/lib/sessions.ts` (`SESSION_COOKIE`),
   `workers/mcp/src/lib/tokens.ts` (the token prefix), `workers/mcp/src/index.ts`
-  (the MCP `serverInfo.name`). Optional/cosmetic: the `brimba:` localStorage
+  (the MCP `serverInfo.name`). Optional/cosmetic: the `kwapso:` localStorage
   prefixes in `web/lib/use-form-draft.ts`, `web/lib/agent-trace.ts`,
   `web/lib/use-agent-chat.tsx`.
 - **`OPERATIONS.md`:** rewrite the staging/production URLs, the worker-names table,
   the reset database names, and the `github_remote` — the ship and reset skills read
   this file.
-- **Host URLs in the docs (easy to miss — the `brimba-` rename skips them).** The base's
-  live hosts appear hardcoded as **`brimba.swift-struck.workers.dev`** (production, no
-  hyphen) and **`brimba-staging.swift-struck.workers.dev`** (staging) in `MCP.md`,
+- **Host URLs in the docs (easy to miss — the `kwapso-` rename skips them).** The base's
+  live hosts appear hardcoded as **`kwapso.<workers-subdomain>.workers.dev`** (production, no
+  hyphen) and **`kwapso-staging.<workers-subdomain>.workers.dev`** (staging) in `MCP.md`,
   `mcp-quickstart.md`, `BOOTSTRAP.md`, `PLATFORMS.md`, and `README.md`. These are **live
-  references, not history** — replace the `brimba`/`brimba-staging` host part with the new
-  app's hosts everywhere (a `brimba-` prefix rename alone MISSES `brimba.` with a dot).
+  references, not history** — replace the `kwapso`/`kwapso-staging` host part with the new
+  app's hosts everywhere (a `kwapso-` prefix rename alone MISSES `brimba.` with a dot).
   The verify grep below must come back clean of `swift-struck.workers.dev` hosts that
-  still say `brimba`.
+  still say `kwapso`.
 
 Verify: `grep -ri brimba . --exclude-dir=node_modules --exclude-dir=.git` — code,
 configs, and scripts must be clean. Prose mentions of "Brimba" *describing the base's
 history* may stay, but **functional references must not** — in particular any
 `brimba*.swift-struck.workers.dev` **host URL** is a live pointer, not history, so it
 must be swept (grep specifically for `swift-struck.workers.dev` and confirm none still
-say `brimba`). Then `npm run check` again — green before any deploy.
+say `kwapso`). Then `npm run check` again — green before any deploy.
 
 ## 3 · Stand it up on Cloudflare (BOOTSTRAP.md, command-by-command)
 Follow the cloned repo's `BOOTSTRAP.md` — it is the runbook; this is the order:

@@ -44,11 +44,11 @@ import { useCached, primeCache } from "@/lib/store"
 // the Bearer header, and a Claude-Desktop-style stdio config. Built from the LIVE
 // app host so it's correct for staging or production without a hardcoded URL. When
 // we hold the real secret (right after create) we embed it; otherwise we leave the
-// `brimba_mcp_YOUR_TOKEN` placeholder for the developer to swap in.
+// `kwapso_mcp_YOUR_TOKEN` placeholder for the developer to swap in.
 function connectPrompt(token: string): string {
-  const origin = typeof window === "undefined" ? "https://brimba.swift-struck.workers.dev" : window.location.origin
+  const origin = typeof window === "undefined" ? "https://kwapso.<workers-subdomain>.workers.dev" : window.location.origin
   const endpoint = `${origin}/mcp`
-  return `Connect to my Brimba workspace over MCP (Model Context Protocol).
+  return `Connect to my kwapso workspace over MCP (Model Context Protocol).
 
 Endpoint: ${endpoint}
 Auth header: Authorization: Bearer ${token}
@@ -57,7 +57,7 @@ Protocol: MCP over HTTP — JSON-RPC 2.0 (initialize, tools/list, tools/call)
 If your tool runs MCP servers locally over stdio (e.g. Claude Desktop), add this to its config:
 {
   "mcpServers": {
-    "brimba": {
+    "kwapso": {
       "command": "npx",
       "args": ["mcp-remote", "${endpoint}", "--header", "Authorization: Bearer ${token}"]
     }
@@ -164,12 +164,12 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
               {!t.revokedAt && (
                 <div className="flex items-center gap-2">
                   {/* Copy the connect prompt for any AI. The secret can't be re-read,
-                   * so this carries the `brimba_mcp_YOUR_TOKEN` placeholder to swap.
+                   * so this carries the `kwapso_mcp_YOUR_TOKEN` placeholder to swap.
                    * Label collapses to icon-only below sm (narrow-screen rule). */}
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => copyInstructions("brimba_mcp_YOUR_TOKEN")}
+                    onClick={() => copyInstructions("kwapso_mcp_YOUR_TOKEN")}
                     className="gap-1.5"
                     title="Copy setup instructions for any AI"
                   >

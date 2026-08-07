@@ -1,4 +1,4 @@
-// Brimba MCP worker — the external machine surface (ARCHITECTURE: the MCP front
+// kwapso MCP worker — the external machine surface (ARCHITECTURE: the MCP front
 // desk). This file is the SWITCHBOARD:
 //
 //   POST /mcp                    -> the MCP endpoint (JSON-RPC 2.0 over HTTP):
@@ -57,9 +57,9 @@ async function handleMcp(request: Request, env: Env): Promise<Response> {
       return rpcResult(id, {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: {} },
-        serverInfo: { name: "brimba-mcp", version: "1.0.0" },
+        serverInfo: { name: "kwapso-mcp", version: "1.0.0" },
         instructions:
-          "Brimba's machine surface. Every tool acts AS the token's owner, capped by their live role, inside the token's pinned team only. AI-costed tools (plan_import, agent_chat) draw from the team's assistant quota.",
+          "kwapso's machine surface. Every tool acts AS the token's owner, capped by their live role, inside the token's pinned team only. AI-costed tools (plan_import, agent_chat) draw from the team's assistant quota.",
       })
     case "notifications/initialized":
       return new Response(null, { status: 202 })

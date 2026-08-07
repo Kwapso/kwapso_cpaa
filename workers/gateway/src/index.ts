@@ -1,4 +1,4 @@
-// Brimba GATEWAY — the one front door. Serves the app's screens (static
+// kwapso GATEWAY — the one front door. Serves the app's screens (static
 // assets), uploaded media from R2, and passes every /api request to the right
 // worker behind it. Same address for screens and brains = login cookies just
 // work everywhere. This is also where the MCP front desk will live.
@@ -62,7 +62,7 @@ export default {
       console.error("client_error", raw.slice(0, 4000))
       const cookie = request.headers.get("Cookie") ?? ""
       const signedIn =
-        cookie.includes("brimba_session=") &&
+        cookie.includes("kwapso_session=") &&
         (await env.AUTH.fetch("https://internal/api/auth/me", { headers: { Cookie: cookie } })
           .then((r) => r.ok)
           .catch(() => false))

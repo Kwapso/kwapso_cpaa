@@ -10,7 +10,7 @@ import { GuardError } from "../../../../shared/workers/gating"
 import type { Env } from "../env"
 import type { McpTokenRow } from "./tokens"
 
-const SESSION_COOKIE = "brimba_session" // auth's cookie name (sessions.ts)
+const SESSION_COOKIE = "kwapso_session" // auth's cookie name (sessions.ts)
 const CACHE_MS = 10 * 60 * 1000 // well inside the 60-min pinned-session TTL
 
 const cache = new Map<string, { cookie: string; expires: number }>()

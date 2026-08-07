@@ -1,4 +1,4 @@
-// The MCP worker — Brimba's external machine surface (ARCHITECTURE: the MCP front
+// The MCP worker — kwapso's external machine surface (ARCHITECTURE: the MCP front
 // desk). Personal access tokens (hashed, shown-once, team-pinned, revocable) are
 // bridged to short-lived TEAM-PINNED sessions minted by auth, so every MCP tool
 // call flows through the SAME gated doors a browser uses — a token can never
@@ -7,7 +7,7 @@
 // Secrets (wrangler secret put): INTERNAL_KEY (the auth session-mint bridge).
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "brimba-mcp",
+  "name": "kwapso-mcp",
   "main": "src/index.ts",
   "compatibility_date": "2026-06-01",
   "workers_dev": false,
@@ -16,37 +16,37 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "brimba-core",
+      "database_name": "kwapso-core",
       "database_id": "7196438c-5572-4317-b1e4-48084ab6e3ad",
       "migrations_dir": "../../db/core"
     }
   ],
   "services": [
-    { "binding": "AUTH", "service": "brimba-auth" },
-    { "binding": "TENANCY", "service": "brimba-tenancy" },
-    { "binding": "CONTENT", "service": "brimba-content" },
-    { "binding": "DATAOPS", "service": "brimba-data-ops" }
+    { "binding": "AUTH", "service": "kwapso-auth" },
+    { "binding": "TENANCY", "service": "kwapso-tenancy" },
+    { "binding": "CONTENT", "service": "kwapso-content" },
+    { "binding": "DATAOPS", "service": "kwapso-data-ops" }
   ],
   "vars": { "CF_ACCOUNT_ID": "af3f1bf82aa34512f4f6630091358439" },
   "env": {
     "staging": {
-      "name": "brimba-mcp-staging",
+      "name": "kwapso-mcp-staging",
       "workers_dev": false,
       "preview_urls": false,
       "observability": { "enabled": true },
       "d1_databases": [
         {
           "binding": "DB",
-          "database_name": "brimba-core-staging",
+          "database_name": "kwapso-core-staging",
           "database_id": "68a9a2f6-13af-4d73-932e-ab38b40cc5b6",
           "migrations_dir": "../../db/core"
         }
       ],
       "services": [
-        { "binding": "AUTH", "service": "brimba-auth-staging" },
-        { "binding": "TENANCY", "service": "brimba-tenancy-staging" },
-        { "binding": "CONTENT", "service": "brimba-content-staging" },
-        { "binding": "DATAOPS", "service": "brimba-data-ops-staging" }
+        { "binding": "AUTH", "service": "kwapso-auth-staging" },
+        { "binding": "TENANCY", "service": "kwapso-tenancy-staging" },
+        { "binding": "CONTENT", "service": "kwapso-content-staging" },
+        { "binding": "DATAOPS", "service": "kwapso-data-ops-staging" }
       ],
       "vars": { "CF_ACCOUNT_ID": "af3f1bf82aa34512f4f6630091358439" }
     }

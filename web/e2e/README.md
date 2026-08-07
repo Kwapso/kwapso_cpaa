@@ -24,18 +24,18 @@ in this repo (no browser binaries in CI). Run them locally, on demand.
 
 ```bash
 # from the repo root
-npm install -D --workspace=brimba-web @playwright/test
-npx --workspace=brimba-web playwright install chromium
+npm install -D --workspace=kwapso-web @playwright/test
+npx --workspace=kwapso-web playwright install chromium
 
 # against staging (default)
-npm run test:e2e --workspace=brimba-web
+npm run test:e2e --workspace=kwapso-web
 
 # against another environment
-BASE_URL=http://localhost:3000 npm run test:e2e --workspace=brimba-web
+BASE_URL=http://localhost:3000 npm run test:e2e --workspace=kwapso-web
 ```
 
 `BASE_URL` defaults to the staging URL
-(`https://brimba-staging.swift-struck.workers.dev`, see `OPERATIONS.md`).
+(`https://kwapso-staging.<workers-subdomain>.workers.dev`, see `OPERATIONS.md`).
 
 ## Notes / TODOs
 

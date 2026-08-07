@@ -27,7 +27,7 @@ export async function sha256Hex(value: string): Promise<string> {
 /** 32 random bytes, hex — prefixed so a leaked string is recognizable in scans. */
 export function newTokenSecret(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32))
-  return `brimba_mcp_${[...bytes].map((b) => b.toString(16).padStart(2, "0")).join("")}`
+  return `kwapso_mcp_${[...bytes].map((b) => b.toString(16).padStart(2, "0")).join("")}`
 }
 
 /** Create a token for the signed-in caller, pinned to their CURRENT team. The

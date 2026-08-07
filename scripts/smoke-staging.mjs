@@ -5,7 +5,7 @@
 // Uses one fixed smoke account: the first run exercises the full team
 // factory; later runs prove idempotency (and don't litter team databases).
 
-const BASE = process.env.SMOKE_BASE ?? "https://brimba-staging.swift-struck.workers.dev"
+const BASE = process.env.SMOKE_BASE ?? "https://kwapso-staging.<workers-subdomain>.workers.dev"
 // Resend's test inbox: real send path, always "delivered", never bounces —
 // so running the smoke repeatedly doesn't hurt the sending domain's reputation.
 const EMAIL = "delivered@resend.dev"
@@ -81,7 +81,7 @@ const verify = await fetch(`${BASE}/api/auth/email/verify`, {
   body: JSON.stringify({ email: EMAIL, code }),
 })
 const cookie = (verify.headers.get("set-cookie") ?? "").split(";")[0]
-ok("login verified + cookie set", verify.ok && cookie.startsWith("brimba_session="))
+ok("login verified + cookie set", verify.ok && cookie.startsWith("kwapso_session="))
 
 // 4 · Onboarding profile (idempotent).
 const profile = await api(
@@ -112,7 +112,7 @@ ok("active context has your role (Admin)", ctx.body?.role?.title === "Admin", JS
     cookie
   )
   const secret = created.body?.secret
-  ok("mcp token created (secret shown once)", typeof secret === "string" && secret.startsWith("brimba_mcp_"))
+  ok("mcp token created (secret shown once)", typeof secret === "string" && secret.startsWith("kwapso_mcp_"))
   if (secret) {
     const rpc = async (method, params = {}) => {
       const res = await fetch(`${BASE}/mcp`, {
@@ -123,7 +123,7 @@ ok("active context has your role (Admin)", ctx.body?.role?.title === "Admin", JS
       return { res, body: await res.json().catch(() => null) }
     }
     const init = await rpc("initialize")
-    ok("mcp initialize answers", init.body?.result?.serverInfo?.name === "brimba-mcp")
+    ok("mcp initialize answers", init.body?.result?.serverInfo?.name === "kwapso-mcp")
     const tools = await rpc("tools/list")
     ok("mcp lists tools", Array.isArray(tools.body?.result?.tools) && tools.body.result.tools.length > 10)
     const who = await rpc("tools/call", { name: "whoami", arguments: {} })

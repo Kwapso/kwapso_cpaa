@@ -1,0 +1,353 @@
+{
+  "meta": {
+    "tool": "plan_with_questions",
+    "slug": "kwapso-portal-agency-round2",
+    "answered": 56,
+    "exported_at": "2026-08-06T10:18:55.422Z"
+  },
+  "answers": {
+    "k1": {
+      "section": "1 · The dictionary - lock the words",
+      "question": "APP - a folder for one big customer goal, written in plain words ('Fix dispatch operations'). It holds the processes we map for that goal, and exactly one person on the customer side is its main stakeholder - the approver. You used the word naturally in round 1.",
+      "selected": "Keep calling it an App",
+      "notes": ""
+    },
+    "k2": {
+      "section": "1 · The dictionary - lock the words",
+      "question": "PROCESS and STEP - a Process is one workflow inside an App ('Schedule workshop jobs'): it has a trigger (what kicks it off), a definition of done (how we know it finished), and a department. A Step is one action inside a process, done by a person, an automation, or an AI agent. A step can depend on other steps: this one cannot start until that one is done.",
+      "selected": "Keep both as defined",
+      "notes": ""
+    },
+    "k3": {
+      "section": "1 · The dictionary - lock the words",
+      "question": "TICKET - a request a client files in the portal ('this broke', 'please add X'). Staff look at each ticket and may split it into one or more internal work items. Tickets are what clients ask; work items are what we do.",
+      "selected": "Keep calling it a Ticket",
+      "notes": ""
+    },
+    "k4": {
+      "section": "1 · The dictionary - lock the words",
+      "question": "STORY - the spec doc's word for one unit of internal delivery work (a build, a fix, an enhancement, or support work) that staff execute and log time against. This is the word that confused you in round 1 - so name it yourself. Same concept, your word:",
+      "selected": "Keep Story (standard software word)",
+      "notes": ""
+    },
+    "k5": {
+      "section": "1 · The dictionary - lock the words",
+      "question": "TASK - the spec keeps a second, smaller list next to the delivery work: little admin items ('send onboarding email', 'chase the logo file') that are not client deliverables. Keep Tasks as a separate thing, or merge everything into one list with a type label?",
+      "selected": null,
+      "notes": "I don't know what delivery work means, but a task is essentially just like a story, but related to all internal admin-related things: essentially any build, fix, to-do, enhancement, or support work that is for the company itself, like the agency itself, and nothing to do with clients or their projects, like filing taxes or getting audited or paying for a subscription or whatever. Similarly, when we talk about this for the clients, they would be called to-dos. "
+    },
+    "k6": {
+      "section": "1 · The dictionary - lock the words",
+      "question": "SPRINT and PHASE - a Sprint is a committed block of delivery weeks for one customer, one of three kinds: planning (figuring out), implementation (building), iteration (adjusting after feedback). It carries a checklist of what was promised. A Phase is a smaller stage inside delivery (diagnostic, implementation, validation, refinement, training, enhancement); closing a phase requires all its work resolved, and moving a phase deadline asks the client to approve. Two layers - or is Phase bureaucracy?",
+      "selected": "Sprints only - kill Phases",
+      "notes": ""
+    },
+    "k7": {
+      "section": "1 · The dictionary - lock the words",
+      "question": "ENGAGEMENT - the commercial wrapper we sell a customer: blueprint (paid diagnostic and mapping), sprint (an implementation block), support (retainer), hourly (ad-hoc). Every logged minute of work points at one engagement, so money reports stay clean. Short references like BERG-SPR03 name them.",
+      "selected": "Keep Engagement as defined",
+      "notes": "Keep the engagement as defined, but also engagement types can change. I don't know. We should just have this be expensive, like I can add or edit engagement types. "
+    },
+    "k8": {
+      "section": "1 · The dictionary - lock the words",
+      "question": "SAGA - you asked twice, so here it is in plain words. When something important happens (say, the last work item of a ticket closes), two kinds of things follow. Database changes happen instantly and all-together - if any part fails, none of it happens (no half-updated data, ever). Outside-world side effects (update the Drive doc, send the email, sync the calendar) run as BACKGROUND JOBS: queued, retried automatically until they succeed, never able to block or corrupt the database part. You get a jobs screen showing every job, its status, retries and errors. I will stop saying saga and say background jobs.",
+      "selected": null,
+      "notes": "Why can't all of the drive, doc, email, and calendar sync also run instantly? If they can't, then it's fine. I'm okay with background jobs. Kill this SAGA word. I hate it.\n\nAlso, there is no such thing as work items. There are tickets, and tickets to be resolved can either be resolved directly, or we create stories that are assigned to the developers in the team. There are no work items, right? There are stories, and stories can be part of sprints, but that said, there is nothing less than stories. Each story, of course, will have a work log and an activity log, but those are not relevant. They are accessory data points. "
+    },
+    "m1": {
+      "section": "2 · One team, many customers - who sees what",
+      "question": "Confirm the model: ONE Kwapso tenant. A Customers area holds every client - a customer can be a company or a private individual - plus their contact people. Staff log into the agency app and see everything their permissions allow. A client person can log into the portal only after staff enable them as a user. What a client sees is decided by links between their person record and customers/apps - not by separate databases.",
+      "selected": "Close but adjust (notes)",
+      "notes": "Any person who is also authorised as a user in the client portal, by their main stakeholder, can essentially log into the client portal and see everything about that project, whether it is how many tickets were raised, etc. "
+    },
+    "m2": {
+      "section": "2 · One team, many customers - who sees what",
+      "question": "The fence, stated honestly: with one shared database, NOTHING physical separates customer A's data from customer B's. The only protection is code that filters every portal request by 'which customer does this logged-in person belong to'. I want that filter built as ONE reusable guard that every portal endpoint must pass through, plus an automated test for every module proving customer B can never read customer A's rows. That test suite becomes as sacred as the base's existing permission tests.",
+      "selected": "Yes - non-negotiable, build the guard + per-module leak tests",
+      "notes": "Why isn't the row-level security enough? "
+    },
+    "m3": {
+      "section": "2 · One team, many customers - who sees what",
+      "question": "What does a logged-in client person see by DEFAULT? Their whole company's world (all of that customer's apps, tickets, files, metrics), or only the specific Apps they are personally a stakeholder of?",
+      "selected": "Whole company view for everyone; stakeholder status only gates approvals (recommended)",
+      "notes": ""
+    },
+    "m4": {
+      "section": "2 · One team, many customers - who sees what",
+      "question": "Maria again, now without tenancy: she is a contact person at TWO of our customers. In the portal she:",
+      "selected": "Picks one company at a time from a switcher in the header (spec's intent, recommended)",
+      "notes": ""
+    },
+    "m5": {
+      "section": "2 · One team, many customers - who sees what",
+      "question": "Customer family trees: a holding company with two operating businesses underneath. Do we support parent-child customer structures from day one (the spec says yes), or keep customers flat and add trees when a real case shows up?",
+      "selected": "Parent-child from day one, as the spec says",
+      "notes": ""
+    },
+    "m6": {
+      "section": "2 · One team, many customers - who sees what",
+      "question": "Databases, plainly. You said sprints, stories and work logs should each be their OWN database. The catch: our database engine cannot join across separate databases - every screen mixing two of them (a work item plus its logged time) becomes multiple queries stitched in code, slower and more fragile. The base's actual design: everything starts in ONE database, a nightly job watches sizes, and a module MOVES OUT to its own database automatically when it grows - the plumbing exists and keeps APIs/MCP working after the move. My strong recommendation: start unified, let the sharding machinery split when size demands.",
+      "selected": null,
+      "notes": "Yes, I meant tables in one database, and then, of course, the database can shard as it grows. I meant tables, not databases, if that makes sense. "
+    },
+    "m7": {
+      "section": "2 · One team, many customers - who sees what",
+      "question": "The activity trail you asked for: every create, edit and archive anywhere writes an activity row (who, what, when, what changed). Clients see a filtered version - only their customer's activity, only client-relevant fields. Staff see everything.",
+      "selected": "Yes - both sides, filtered for clients",
+      "notes": ""
+    },
+    "p1": {
+      "section": "3 · People, login and doors",
+      "question": "Giving a client access: staff open a contact person's record and click 'Give portal access' - that person gets an email invite and signs in with a one-time code. Nobody can sign themselves up; an email we never invited can never get in. Correct?",
+      "selected": "Yes - exactly this",
+      "notes": ""
+    },
+    "p2": {
+      "section": "3 · People, login and doors",
+      "question": "Staff accounts: also invite-only (an admin invites them), one-time-code login, and ONLY kwapso.com or swiftstruck.com emails can ever be staff. In the notes: who are the admins on day one?",
+      "selected": null,
+      "notes": "So why can't we just, for the agency app, leverage the brimba basis entire process and systems of onboarding a new member and changing roles and removing them, etc.? "
+    },
+    "p3": {
+      "section": "3 · People, login and doors",
+      "question": "The door you did not pick in round 1 - flagging it because I think it was an oversight. Uploaded files (ticket screenshots, attachments) are currently served at long unguessable links that work WITHOUT being logged in: anyone holding the link sees the file. The base's own manual says fix this before storing client material. Lock file links behind login?",
+      "selected": "Leave the unguessable links - convenience wins",
+      "notes": ""
+    },
+    "p4": {
+      "section": "3 · People, login and doors",
+      "question": "Impersonation, resolved your way: NO 'view as client' back door at all. Instead we keep one permanent SANDBOX customer - a fake company with fake people - that staff can genuinely log into to experience exactly what clients experience. Real client accounts are verified with the client on a call, never by us wearing their identity.",
+      "selected": "Yes - sandbox customer, no impersonation",
+      "notes": ""
+    },
+    "p5": {
+      "section": "3 · People, login and doors",
+      "question": "Offboarding: we stop working with a customer. What happens in the portal?",
+      "selected": "Keep them read-only portal access to their history",
+      "notes": "We keep them as read-only. Archiving a customer is different from their access to the client portal. If we say revoke client portal access and unplug the button, then we start taking or deleting their names or rows from the users table, and that kills their access. Generally, we just want to archive them once we stop any engagements with them, but still grant them access to view all their data. "
+    },
+    "t1": {
+      "section": "4 · Time and work logs",
+      "question": "Seconds, official: the spec says store whole MINUTES; you said keep it accurate to the SECOND. Decision: store whole seconds internally, display friendly hours:minutes everywhere, round only when displaying. The spec's minutes rule dies. Confirm?",
+      "selected": "Yes - seconds internally, pretty display",
+      "notes": ""
+    },
+    "t2": {
+      "section": "4 · Time and work logs",
+      "question": "The stopwatch question, asked crisply this time: can ONE person have TWO timers RUNNING at the same moment (timing work item A and work item B simultaneously)?",
+      "selected": "Yes - parallel timers allowed, the header bar shows a list",
+      "notes": ""
+    },
+    "t3": {
+      "section": "4 · Time and work logs",
+      "question": "Multi-day work, my recommendation as you requested: timers never auto-stop. If one runs past 8 hours the app nudges - 'still on this?' - with one-tap fixes (stop now / stop at 6pm yesterday / keep going). Every log stays editable afterwards, edits visible in the activity trail. And you can always add time manually without a timer.",
+      "selected": "Adopt this",
+      "notes": ""
+    },
+    "t4": {
+      "section": "4 · Time and work logs",
+      "question": "Who can fix a wrong log? Your round-1 instinct: anyone whose permissions say 'can edit work logs' - covering typos, forgotten stops, wrong links - and every fix leaves a visible trail. Confirm?",
+      "selected": "Yes - permission-based editing with a trail",
+      "notes": ""
+    },
+    "t5": {
+      "section": "4 · Time and work logs",
+      "question": "What one work log points at: the person, the engagement type (inherited from context, editable with permission), exactly ONE work thing (a work item, a task, or a ticket), start time, duration in seconds, and an optional note. Sprint, app and customer are derived from that link - never entered twice.",
+      "selected": null,
+      "notes": "Well, the work log is simply a row that tracks what the source of this was, whether it started. In fact, it's always at the story level or a task level, and it can even capture the sprint, the app, the contact ID, etc., etc. Most importantly, it's just there to track time started and time stopped, and that's it.\n\nIt is never possible that they can open two work log rows for the exact same story or for the exact same task for the exact same user simultaneously. Sure, they can start one, keep that one open, and then close it and start a new one for the exact same story, and it's all good. Simultaneous never makes any sense. "
+    },
+    "w1": {
+      "section": "5 · Tickets and internal work",
+      "question": "Ticket life, plain: NEW (client filed it) → TRIAGED (we split it into internal work) → IN PROGRESS (work running) → READY (all its work done, draft reply built) → RESOLVED (client-visible closure). Archive possible any time. Anything to add or cut?",
+      "selected": "Good - lock these states",
+      "notes": ""
+    },
+    "w2": {
+      "section": "5 · Tickets and internal work",
+      "question": "Your round-1 rule, formalized: a client can edit and re-rank a ticket ONLY while staff have not touched it (not assigned, not in progress, not linked to internal work). After that, the ticket locks for the client - they can still comment. Confirm?",
+      "selected": "Yes - lock on first staff touch",
+      "notes": ""
+    },
+    "w3": {
+      "section": "5 · Tickets and internal work",
+      "question": "The automatic flip: when the LAST piece of internal work on a ticket closes, the ticket flips to READY by itself, and the closing notes from each work item have been stacked into ONE draft reply that staff polish and send to the client as the resolution. Confirm?",
+      "selected": "Yes - auto-flip plus stacked draft reply",
+      "notes": ""
+    },
+    "w4": {
+      "section": "5 · Tickets and internal work",
+      "question": "The round-1 confuser, explained with an example. The step 'workshop manager schedules jobs by hand' is in a customer's process map. We automate it. The moment staff flip that step from person to automation, the system auto-creates one piece of internal work - 'build the scheduling automation' - already linked to that exact step, so the engineering is tracked and the impact math knows why time got saved. If the automation later breaks and the step flips back to person, the system logs it, adjusts the savings math honestly, and pings the lead. Keep this?",
+      "selected": "No automation - staff create the work item manually",
+      "notes": "WHAT IS WORK ITEM?"
+    },
+    "w5": {
+      "section": "5 · Tickets and internal work",
+      "question": "Two priority signals live together: a 5-star priority on each ticket - the SAME number seen by client and staff, no secret urgency - and the client's drag-to-rank order of their open tickets, which tells us what to schedule next. Keep both?",
+      "selected": "Ranking only",
+      "notes": ""
+    },
+    "x1": {
+      "section": "6 · Automations and AI steps - map or engine",
+      "question": "The honest fork. (A) The process map is a living DOCUMENT: steps are labeled person/automation/AI with costs and savings; the actual automations run where they run (Make, scripts, the client's systems) and our app records that they exist. (B) The process map is an ENGINE: our system actually FIRES each automation and AI step, tracks every run, shows errors - a workflow engine, a much bigger machine. (C) The middle: the map documents the customer's operation, and the engine part exists ONLY for the automations and AI steps WE build and host - those run through our system and are monitored there. Which is the product?",
+      "selected": "I still do not get it - explain in chat",
+      "notes": "Look, mate, the process map is literally just a database and database versions of processes and their steps. Processes have nothing to do with our tech or workflows or anything. Processes are more of multiple steps grouped together in a business, like:\n- onboarding a new customer\n- government document check\n- handing over the car\n- assessing the car post-return\n- creating a work order for the car after return\n- assigning mechanics, etc.\nAll of these are processes, and they involve many sub-steps. This is what I mean. I don't know what this living document engine bullshit and all is.\nAlso, just remember that the step level is very tracked:\n- What kind of rules are involved?\n- How much time each step takes?\n- What type of step is it?\n- Is it an action or a decision?\n- etc.\nThere was one more thing we were tracking at the step level, ahh yes! TOOLS. digital or physcal.\n\nREMEBER PROCESS MAP IS NOTHING TO DO WITH TECH OR WORKFLOWS OR MAKECOM OR WEBHOOKS."
+    },
+    "x2": {
+      "section": "6 · Automations and AI steps - map or engine",
+      "question": "When an automation step fires (in whichever model you picked), what does it actually call? Pick all that exist in your world.",
+      "selected": [
+        "Not sure yet"
+      ],
+      "notes": ""
+    },
+    "x3": {
+      "section": "6 · Automations and AI steps - map or engine",
+      "question": "An AI step at launch means: our built-in agent does a defined job with the customer's knowledge ('draft the weekly dispatch summary', 'classify incoming requests'). Where do its outputs go?",
+      "selected": "Not sure",
+      "notes": ""
+    },
+    "x4": {
+      "section": "6 · Automations and AI steps - map or engine",
+      "question": "An automation or AI step fails at 2am. Who hears about it, where?",
+      "selected": "Not sure",
+      "notes": ""
+    },
+    "y1": {
+      "section": "7 · Money",
+      "question": "Currency mechanics: you chose per-customer currency. Cleanest version: every money amount is stored in the customer's currency, and our internal dashboards ALSO show a single reference currency (EUR?) using a stored conversion rate - so cross-customer totals mean something. Confirm, and name the reference currency in notes if not EUR.",
+      "selected": "Yes - customer currency + EUR reference view",
+      "notes": ""
+    },
+    "y2": {
+      "section": "7 · Money",
+      "question": "Two different rate cards exist, and mixing them is a classic mistake. Card 1: the CUSTOMER's labor rates (what an hour of their workshop manager costs THEM) - used to compute the savings we show them. Card 2: OUR internal rates (what an hour of our developer costs US) - used to compute our margin on engagements. Keep them as two clearly separate things?",
+      "selected": "Yes - two separate rate cards (recommended)",
+      "notes": ""
+    },
+    "y3": {
+      "section": "7 · Money",
+      "question": "Tool costs: subscriptions in the customer's process (their software) and ours (what we run for them) carry monthly costs that feed the savings math and our margins. Entered manually per tool?",
+      "selected": "Yes - manual entry per tool, per customer",
+      "notes": "but remeber tools costs physical or digital is tracked per step in process in app per customer / contact. "
+    },
+    "y4": {
+      "section": "7 · Money",
+      "question": "What a client sees about money: definitely the VALUE metrics (time saved, money saved). Never our rates or margins. Do they ALSO see their engagement commercials - what they bought, and how much of it is used?",
+      "selected": "Value metrics + engagement summary (what they bought, budget used vs remaining)",
+      "notes": ""
+    },
+    "y5": {
+      "section": "7 · Money",
+      "question": "Invoicing and payments stay OUTSIDE this system (the spec has no billing module; invoices happen wherever they happen today). Confirm?",
+      "selected": "Confirm - no billing module",
+      "notes": ""
+    },
+    "q1": {
+      "section": "8 · Google, files and the knowledge layer",
+      "question": "Is kwapso.com email on Google Workspace (the paid Google business account)? This decides the clean setup: a robot service account our system uses on its own, with no one's personal login involved.",
+      "selected": "Yes - kwapso.com is on Google Workspace",
+      "notes": ""
+    },
+    "q2": {
+      "section": "8 · Google, files and the knowledge layer",
+      "question": "Where do customer Drive folders live? (A) In OUR Kwapso Drive, one folder per customer, shared to the client - we control structure, nothing depends on their IT. (B) In each client's own Drive, shared to us - they own it, we depend on their sharing staying intact.",
+      "selected": "A - our Drive, shared out (recommended)",
+      "notes": ""
+    },
+    "q3": {
+      "section": "8 · Google, files and the knowledge layer",
+      "question": "EU honesty check: two knowledge-layer parts cannot be pinned to EU servers on Cloudflare today - the vector search index (Vectorize) and AI model calls. Raw files stay in Drive; what leaves the EU boundary is number-fingerprints of text plus the snippets being processed. In round 1 you accepted the AI-calls exception. Accept the search-index exception too?",
+      "selected": "Accept - knowledge layer as designed",
+      "notes": ""
+    },
+    "q4": {
+      "section": "8 · Google, files and the knowledge layer",
+      "question": "Since clients can ask the knowledge layer questions (your round-1 choice), one rule I want as non-negotiable: every piece of knowledge is stamped with its customer, and a client's questions can only ever search their OWN customer's material plus generic Kwapso material. Staff searches see everything.",
+      "selected": "Yes - non-negotiable stamp + filter",
+      "notes": ""
+    },
+    "q5": {
+      "section": "8 · Google, files and the knowledge layer",
+      "question": "Calendar, concretely (you chose full two-way): sprints, phases and customer to-dos appear as events in a shared Kwapso delivery calendar; staff personal kwapso.com calendars are read to show who is busy or free; moving an event in Google moves the matching thing in the app - and if that thing is a client-facing deadline, the client-approval flow triggers. That is the build. Confirm or trim?",
+      "selected": "Confirm - full two-way as described",
+      "notes": ""
+    },
+    "q6": {
+      "section": "8 · Google, files and the knowledge layer",
+      "question": "The context document (an auto-written summary of a customer's current state - systems, open and resolved tickets, changelog, SOPs - exported into their Drive folder so AI tools always have fresh context): refresh when?",
+      "selected": "Automatically on every meaningful change + a manual refresh button",
+      "notes": ""
+    },
+    "l1": {
+      "section": "9 · Look and feel - the operating rules",
+      "question": "The reconciliation, as one operating rule: the UI library is UNTOUCHED at component level - we only set its theme values (colors, fonts, radius). Its alive look (soft glows, glass, ambient background) stays, tinted kwapso mango instead of teal. The kwapso brand book governs everything WE author around the components: words and voice, layout, warmth, progressive disclosure, no clutter, low cognitive load. Where the book's strictest visual rules (flat-only, two radii, no gradients) collide with the library's internals, the library wins. Is that the rule?",
+      "selected": "Yes - that is exactly the resolution",
+      "notes": ""
+    },
+    "l2": {
+      "section": "9 · Look and feel - the operating rules",
+      "question": "Light in the day, dark at night - your round-1 wish. Cleanest way: the apps follow each device's own appearance setting (phones and laptops already switch light/dark on schedule), plus a manual toggle for people who want to choose. Alternative: the app itself switches by clock time, ignoring the device.",
+      "selected": "Follow the device + manual toggle (recommended)",
+      "notes": ""
+    },
+    "l3": {
+      "section": "9 · Look and feel - the operating rules",
+      "question": "Fonts: Saans becomes the app-wide typeface via configuration (an app-side setting - no library surgery). The condensed serif appears ONLY in moments we author - portal greeting, big empty states, tagline flourishes. One practical check: are the supplied font files licensed for use in these web apps?",
+      "selected": "Yes to both - and fonts are licensed",
+      "notes": ""
+    },
+    "l4": {
+      "section": "9 · Look and feel - the operating rules",
+      "question": "The 40 kwapso icons and the folder-tab shapes: the library's own icons drive the everyday UI (your round-1 pick). The kwapso glyphs and folder shapes still appear in brand moments we author - the logo area, portal home, empty states, section headers. Good?",
+      "selected": "Yes - library icons for UI, kwapso glyphs for brand moments",
+      "notes": ""
+    },
+    "l5": {
+      "section": "9 · Look and feel - the operating rules",
+      "question": "Calibration: which products FEEL like what these two apps should feel like? Pick any + add your own in notes (also name anything you hate).",
+      "selected": [
+        "Stripe Dashboard - dense but polished and trustworthy",
+        "Notion - calm, roomy, flexible"
+      ],
+      "notes": ""
+    },
+    "z1": {
+      "section": "10 · Launch logistics",
+      "question": "Legacy data: round 1 you said it lives in another app's database or API - but not which one. Name the tool(s) holding the history we import (and roughly what is in there: time logs? tickets? client list?).",
+      "selected": [],
+      "notes": "it lives in glideapps across normal tables and glide big tables"
+    },
+    "z2": {
+      "section": "10 · Launch logistics",
+      "question": "Construction order (everything gets built - this is only the sequence): 1 skeleton (fork the base, rename, weld the doors shut, kwapso theme) → 2 customers and people → 3 the work engine (tickets, work items, sprints, logs, timers) → 4 the business map (apps, processes, steps, versions, savings math) → 5 money → 6 files and knowledge → 7 background jobs and calendar → 8 automations/AI execution and final polish. And: the internal team starts USING the work engine as soon as it is solid, while I keep building the rest. OK?",
+      "selected": "OK - that order, and yes we dogfood early",
+      "notes": ""
+    },
+    "z3": {
+      "section": "10 · Launch logistics",
+      "question": "GitHub: the repo should live at github.com/Kwapso/kwapso_cpaa. Does the Kwapso organization already exist, and does YOUR GitHub login have rights to create repos there? (I push using your machine's existing git access - I never touch your passwords.)",
+      "selected": "Org exists and I have rights",
+      "notes": ""
+    },
+    "z4": {
+      "section": "10 · Launch logistics",
+      "question": "Cloudflare kickoff: when building starts, I will ask you for the new account's Account ID and one API token you create there (I provide the exact scopes list; values go into local secret files and the deploy pipeline, never into git). alaap@kwapso.com is on the account with Workers Paid - good. Ready to do the token dance at kickoff?",
+      "selected": "Ready - ask me at kickoff",
+      "notes": ""
+    },
+    "z5": {
+      "section": "10 · Launch logistics",
+      "question": "Until domains are wired, both apps live on workers.dev URLs with staging and production versions. Rule I propose: clients are only ever invited to PRODUCTION; staging holds ONLY the sandbox customer and fake data - never real client records.",
+      "selected": "Confirm - staging stays fake-only",
+      "notes": ""
+    },
+    "z6": {
+      "section": "10 · Launch logistics",
+      "question": "Last one: what genuinely worries you most about this build? Pick any and write freely - this decides where I add extra safety margin.",
+      "selected": [
+        "Running costs creeping up"
+      ],
+      "notes": "and also the entire RAG knowledge base system.. we are out of my depth here.. i am only good with relation databases or json kv stores.. i know nothing of scale, quality or speed of vector dbs"
+    }
+  }
+}

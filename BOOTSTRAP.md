@@ -12,7 +12,7 @@ end with a live base you can sign into and build on.
 
 > **The mental model in one paragraph.** Brimba is **seven Cloudflare Workers** behind
 > **one public door** (the gateway). Global identity/billing lives in **one core D1
-> database** (`brimba-core`), reached by the native `env.DB` binding. Every *team*
+> database** (`kwapso-core`), reached by the native `env.DB` binding. Every *team*
 > gets its **own D1 database**, created at runtime and reached over the **D1 REST
 > API** (a scoped token, `CF_D1_TOKEN`). Uploaded files live in **R2**. Live updates
 > fan out through **one Durable Object** (`TeamChannel`) in the realtime worker. The
@@ -90,14 +90,14 @@ quota tables. Create it for each environment and apply the core migrations in
 ```bash
 # Create the core DB for each env, then paste each returned database_id into ALL
 # SIX core-bound workers' wrangler.jsonc (auth, tenancy, content, data-ops, realtime, mcp).
-npx wrangler d1 create brimba-core-staging
-npx wrangler d1 create brimba-core
+npx wrangler d1 create kwapso-core-staging
+npx wrangler d1 create kwapso-core
 
 # Apply every core migration (0001…0013) to each env. Any core-bound worker can run it;
 # auth is the canonical one. Run WITHOUT --env for production.
 cd workers/auth
-npx wrangler d1 migrations apply brimba-core-staging --env staging --remote
-npx wrangler d1 migrations apply brimba-core --remote
+npx wrangler d1 migrations apply kwapso-core-staging --env staging --remote
+npx wrangler d1 migrations apply kwapso-core --remote
 cd ../..
 ```
 
@@ -119,12 +119,12 @@ lists every table. **Migrations are additive — never edit an applied one.**
 One bucket per media concern, per env. Create all six before deploying content/gateway:
 
 ```bash
-npx wrangler r2 bucket create brimba-media                    # profile photos + team logos (gateway MEDIA)
-npx wrangler r2 bucket create brimba-media-staging
-npx wrangler r2 bucket create brimba-learning-media           # learning attachments (content LEARNING_MEDIA)
-npx wrangler r2 bucket create brimba-learning-media-staging
-npx wrangler r2 bucket create brimba-help-media               # help attachments (content HELP_MEDIA)
-npx wrangler r2 bucket create brimba-help-media-staging
+npx wrangler r2 bucket create kwapso-media                    # profile photos + team logos (gateway MEDIA)
+npx wrangler r2 bucket create kwapso-media-staging
+npx wrangler r2 bucket create kwapso-learning-media           # learning attachments (content LEARNING_MEDIA)
+npx wrangler r2 bucket create kwapso-learning-media-staging
+npx wrangler r2 bucket create kwapso-help-media               # help attachments (content HELP_MEDIA)
+npx wrangler r2 bucket create kwapso-help-media-staging
 ```
 
 Inside each bucket, keys are prefixed per team (`teams/<id>`, `learning/<teamId>/<fileId>`, …).
@@ -157,7 +157,7 @@ ARCHITECTURE.md `/media/*` note before storing anything sensitive.
   writes). The checked-in value is the original author's account — **overwrite it** in
   both the top-level and `env.staging` vars blocks of those three workers.
 - `tenancy` → `PUBLIC_APP_URL` = the environment's absolute origin (e.g.
-  `https://brimba-staging.swift-struck.workers.dev`). Outbound email links use it;
+  `https://kwapso-staging.<workers-subdomain>.workers.dev`). Outbound email links use it;
   leave it unset and agent-sent invite links point at the internal binding host.
 - `auth` → `APP_ORIGIN` / `EMAIL_FROM` — pinned to the author's URLs/domain; update
   them if yours differ.

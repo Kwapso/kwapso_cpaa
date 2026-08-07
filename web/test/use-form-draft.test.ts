@@ -34,7 +34,7 @@ describe("useFormDraft", () => {
   it("does not write while inactive (a closed form)", () => {
     const { result } = renderHook(() => useFormDraft("learning:new:t1", { title: "" }, false))
     act(() => result.current[1]({ title: "y" }))
-    expect(sessionStorage.getItem("brimba:draft:learning:new:t1")).toBeNull()
+    expect(sessionStorage.getItem("kwapso:draft:learning:new:t1")).toBeNull()
   })
 
   it("is a no-op store when draftKey is omitted", () => {
@@ -51,12 +51,12 @@ describe("useFormDraft", () => {
   })
 
   it("clearAllFormDrafts wipes drafts but leaves other storage alone (sign-out)", () => {
-    sessionStorage.setItem("brimba:draft:one", "1")
-    sessionStorage.setItem("brimba:draft:two", "2")
+    sessionStorage.setItem("kwapso:draft:one", "1")
+    sessionStorage.setItem("kwapso:draft:two", "2")
     sessionStorage.setItem("unrelated", "keep")
     clearAllFormDrafts()
-    expect(sessionStorage.getItem("brimba:draft:one")).toBeNull()
-    expect(sessionStorage.getItem("brimba:draft:two")).toBeNull()
+    expect(sessionStorage.getItem("kwapso:draft:one")).toBeNull()
+    expect(sessionStorage.getItem("kwapso:draft:two")).toBeNull()
     expect(sessionStorage.getItem("unrelated")).toBe("keep")
   })
 })

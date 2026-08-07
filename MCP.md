@@ -21,8 +21,8 @@ So to give a teammate/contractor machine access:
 
 1. **Invite them to the team** (Settings → Members → Invite, or the app's invite flow).
    They sign in with **email + a 6-digit code** (no passwords). Hand them the app URL:
-   - Staging: `https://brimba-staging.swift-struck.workers.dev`
-   - Production: `https://brimba.swift-struck.workers.dev`
+   - Staging: `https://kwapso-staging.<workers-subdomain>.workers.dev`
+   - Production: `https://kwapso.<workers-subdomain>.workers.dev`
 2. **Give them the right role.** The token can only do what their role allows (see the
    cost note in §4 — a role *without* the AI-agent right can't spend any AI budget).
    For a pure "read + import + export" integration, a role with those rights and **no
@@ -40,7 +40,7 @@ token — so a person leaving doesn't break the automation, and you can revoke i
 1. Sign in → **Settings → Access tokens → New token**.
 2. Give it a name (what will use it — "CI importer", "Zapier", "Claude Desktop").
 3. Copy the secret **immediately** — it's shown **once** and never again (only its hash
-   is stored). It looks like `brimba_mcp_<64 hex chars>`.
+   is stored). It looks like `kwapso_mcp_<64 hex chars>`.
 4. The token is **pinned to the team you were in** when you made it, and **capped by
    your role at call time** (change the role later and the token's power changes with
    it). Revoke it any time from the same screen — revocation takes effect on the very
@@ -60,14 +60,14 @@ The endpoint is **`POST https://<app-host>/mcp`** (JSON-RPC 2.0), authenticated 
 
 ```bash
 # List the tools this token can call
-curl -s https://brimba.swift-struck.workers.dev/mcp \
-  -H "Authorization: Bearer brimba_mcp_XXXX" \
+curl -s https://kwapso.<workers-subdomain>.workers.dev/mcp \
+  -H "Authorization: Bearer kwapso_mcp_XXXX" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 
 # Call one — who am I, and which team is this token pinned to?
-curl -s https://brimba.swift-struck.workers.dev/mcp \
-  -H "Authorization: Bearer brimba_mcp_XXXX" \
+curl -s https://kwapso.<workers-subdomain>.workers.dev/mcp \
+  -H "Authorization: Bearer kwapso_mcp_XXXX" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"whoami","arguments":{}}}'
 ```
@@ -80,12 +80,12 @@ front with the standard `mcp-remote` shim — drop this into the client's MCP co
 ```json
 {
   "mcpServers": {
-    "brimba": {
+    "kwapso": {
       "command": "npx",
       "args": [
         "mcp-remote",
-        "https://brimba.swift-struck.workers.dev/mcp",
-        "--header", "Authorization: Bearer brimba_mcp_YOUR_TOKEN"
+        "https://kwapso.<workers-subdomain>.workers.dev/mcp",
+        "--header", "Authorization: Bearer kwapso_mcp_YOUR_TOKEN"
       ]
     }
   }
@@ -102,8 +102,8 @@ any assistant that can speak MCP:
 ```
 Connect to my Brimba workspace over MCP (Model Context Protocol).
 
-Endpoint: https://brimba.swift-struck.workers.dev/mcp
-Auth header: Authorization: Bearer brimba_mcp_YOUR_TOKEN
+Endpoint: https://kwapso.<workers-subdomain>.workers.dev/mcp
+Auth header: Authorization: Bearer kwapso_mcp_YOUR_TOKEN
 Protocol: MCP over HTTP — JSON-RPC 2.0 (initialize, tools/list, tools/call)
 
 Then call tools/list to see what I can do. You act as me, in one team, capped by my
@@ -111,7 +111,7 @@ role — reads, exports and imports are free; only the assistant tools (agent_ch
 agent_confirm, plan_import) use the team's AI quota.
 ```
 
-(Staging is the same, on `https://brimba-staging.swift-struck.workers.dev/mcp`.)
+(Staging is the same, on `https://kwapso-staging.<workers-subdomain>.workers.dev/mcp`.)
 
 ### The tools
 

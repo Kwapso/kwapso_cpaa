@@ -50,7 +50,7 @@ export const viewport: Viewport = {
 }
 
 // Root layout: theme, ambient background, and toasts all come straight from
-// the Swift Struck UI library. Every Brimba screen renders inside this shell.
+// the Swift Struck UI library. Every kwapso screen renders inside this shell.
 export default function RootLayout({
   children,
 }: {

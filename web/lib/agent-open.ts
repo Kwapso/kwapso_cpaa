@@ -13,7 +13,7 @@
 
 import { useSyncExternalStore } from "react"
 
-const KEY = "brimba:agent:open"
+const KEY = "kwapso:agent:open"
 
 function readPersisted(): boolean {
   try {

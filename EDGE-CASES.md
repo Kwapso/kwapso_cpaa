@@ -499,13 +499,13 @@ last) fails, and deploying a worker before its migration 500s at runtime.
   Realtime is **first** because every other worker service-binds it (they
   publish change pings; the gateway routes its WebSocket). Deploying a binder
   before its target fails with **"Worker not found"** — this bit the very first
-  production deploy when `brimba-realtime` didn't exist yet. `data-ops` binds
+  production deploy when `kwapso-realtime` didn't exist yet. `data-ops` binds
   `CONTENT` + `TENANCY`, so both precede it; the gateway is last because it
   routes to all of them. The root scripts already encode this order — use them.
 - **Apply new migrations to BOTH databases before deploying the workers that
   need them.** Core migrations (e.g. `0008 importable_databases`, `0009
-  agent_usage`, `0010 agent_credits`) go to `brimba-core` **and**
-  `brimba-core-staging`; the team-schema migration (`0004_modules`) rolls to
+  agent_usage`, `0010 agent_credits`) go to `kwapso-core` **and**
+  `kwapso-core-staging`; the team-schema migration (`0004_modules`) rolls to
   **every** team DB via `POST /api/tenancy/admin/migrate-teams` (x-admin-key).
   Deploy the worker before the migration and its first query hits a missing
   table. Production is owner-gated: migrations first, then the realtime-first

@@ -1,4 +1,4 @@
-// Brimba AUTH worker — every login-related action lives here, each as its own
+// kwapso AUTH worker — every login-related action lives here, each as its own
 // small handler (these become MCP-catalogued actions via the gateway later).
 //
 //   POST /api/auth/email/start          { email }        -> sends a 6-digit code

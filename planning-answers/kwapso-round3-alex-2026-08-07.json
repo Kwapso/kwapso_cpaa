@@ -1,0 +1,393 @@
+{
+  "meta": {
+    "tool": "plan_with_questions",
+    "slug": "kwapso-round3",
+    "respondent": "Alex",
+    "answered": 58,
+    "total": 58,
+    "exported_at": "2026-08-06T14:50:30.626Z"
+  },
+  "answers": {
+    "in1": {
+      "section": "Two apps, one system",
+      "question": "Does that match what you thought we were building?",
+      "selected": "Yes, that is what I pictured",
+      "notes": ""
+    },
+    "n1": {
+      "section": "The words we will all use",
+      "question": "Marta is listed at Bergman as their operations lead. She has never logged in and we have not switched her access on. What is she?",
+      "selected": "A contact",
+      "notes": ""
+    },
+    "n2": {
+      "section": "The words we will all use",
+      "question": "Is Customer the right word for the companies we work for?",
+      "selected": "Account is more natural for us",
+      "notes": ""
+    },
+    "n3": {
+      "section": "The words we will all use",
+      "question": "\"Assessing the car when it comes back from a rental\" — what is that?",
+      "selected": "A Process",
+      "notes": ""
+    },
+    "n4": {
+      "section": "The words we will all use",
+      "question": "And \"check the fuel level\", which happens inside that assessment — what is that?",
+      "selected": "A Step",
+      "notes": ""
+    },
+    "n5": {
+      "section": "The words we will all use",
+      "question": "Does \"App\" work as the word for a big customer goal, or should we change it now?",
+      "selected": "Call it an Area of work",
+      "notes": "Because we see both cases where an app becomes bigger and holds many area of work inside. Not everytime a new app is the right thing. Often we have an app with 10 areas of work (modules)"
+    },
+    "n6": {
+      "section": "The words we will all use",
+      "question": "A client emails asking whether they could get a weekly summary report. What do we create in the system?",
+      "selected": "A ticket",
+      "notes": ""
+    },
+    "n7": {
+      "section": "The words we will all use",
+      "question": "Our Figma subscription needs renewing. What is that?",
+      "selected": "A task",
+      "notes": ""
+    },
+    "n8": {
+      "section": "The words we will all use",
+      "question": "We need the client to send us their brand logo before we can continue. What is that?",
+      "selected": "A to-do",
+      "notes": ""
+    },
+    "n9": {
+      "section": "The words we will all use",
+      "question": "You just spent forty minutes fixing that returns filter. What records those forty minutes?",
+      "selected": "A work log",
+      "notes": ""
+    },
+    "n10": {
+      "section": "The words we will all use",
+      "question": "Which of these words feel wrong, confusing, or like they would be misread in a client meeting?",
+      "selected": [
+        "Engagement"
+      ],
+      "notes": "I dont understand what engagement would hold or track "
+    },
+    "n11": {
+      "section": "The words we will all use",
+      "question": "Is there something we do most weeks that has no word on this list?",
+      "selected": "No, the list covers it",
+      "notes": ""
+    },
+    "n12": {
+      "section": "The words we will all use",
+      "question": "We dropped the idea of Phases inside sprints. A sprint now holds stories directly, with nothing in between. Right call?",
+      "selected": "We will miss phases — we do work in stages",
+      "notes": ""
+    },
+    "ap1": {
+      "section": "What is on the screens",
+      "question": "You open the agency app at nine in the morning. What do you most want on that first screen?",
+      "selected": [
+        "What I am supposed to work on today",
+        "Where each customer's sprint stands"
+      ],
+      "notes": ""
+    },
+    "ap2": {
+      "section": "What is on the screens",
+      "question": "A client opens the portal. What should hit them first?",
+      "selected": [
+        "What we are working on right now",
+        "The status of what they asked for"
+      ],
+      "notes": "I believe that during a blueprint or sprint phase, it's more important for the customer to see the status of the work rather than the hours and money saved so far. These metrics become only relevant over time, once the initial project is done. "
+    },
+    "ap3": {
+      "section": "What is on the screens",
+      "question": "What are you using today for this kind of work?",
+      "selected": [
+        "Glide apps we built ourselves"
+      ],
+      "notes": ""
+    },
+    "ap4": {
+      "section": "What is on the screens",
+      "question": "What is the single most annoying part of how we track work today?",
+      "selected": "Time tracking never gets done properly",
+      "notes": "It's the constantly starting and ending, and changing deadlines "
+    },
+    "ap5": {
+      "section": "What is on the screens",
+      "question": "Does the agency app need to work properly on a phone, or is it a desktop tool?",
+      "selected": "Desktop mainly, phone for quick things only",
+      "notes": "The main thing that has to work is tasks on the phone and adding tasks. "
+    },
+    "jr1": {
+      "section": "How a request travels",
+      "question": "Are those five states right, or is one missing?",
+      "selected": "Five is right",
+      "notes": ""
+    },
+    "jr2": {
+      "section": "How a request travels",
+      "question": "The lock rule: once we touch a ticket, the client can no longer edit or re-rank it. Fair?",
+      "selected": "Fair — lock it",
+      "notes": ""
+    },
+    "jr3": {
+      "section": "How a request travels",
+      "question": "When the last story closes, the ticket flips to ready by itself and a draft reply is written for you from the story notes. Good, or unnerving?",
+      "selected": "Good — saves the boring part",
+      "notes": ""
+    },
+    "jr4": {
+      "section": "How a request travels",
+      "question": "Who should write the reply the client finally reads?",
+      "selected": null,
+      "notes": "Aurora in the beginning, later whoever did the work. "
+    },
+    "jr5": {
+      "section": "How a request travels",
+      "question": "Should clients be able to see which of us is working on their request?",
+      "selected": "Show that it is in progress, not who",
+      "notes": ""
+    },
+    "jr6": {
+      "section": "How a request travels",
+      "question": "We dropped the 5-star priority rating and kept only the client's drag-to-rank order. Enough?",
+      "selected": "Ranking is enough",
+      "notes": ""
+    },
+    "vm1": {
+      "section": "The map, and the number that matters",
+      "question": "Where does the saved number come from?",
+      "selected": "An estimate we agree with the client",
+      "notes": ""
+    },
+    "vm2": {
+      "section": "The map, and the number that matters",
+      "question": "For that number to be trustworthy, what must every step record?",
+      "selected": [
+        "How long it takes and how often it happens",
+        "Who does it — a person, an automation, or an AI"
+      ],
+      "notes": ""
+    },
+    "vm3": {
+      "section": "The map, and the number that matters",
+      "question": "How bold should the savings numbers be?",
+      "selected": "Realistic — our honest best estimate",
+      "notes": ""
+    },
+    "vm4": {
+      "section": "The map, and the number that matters",
+      "question": "Who keeps the process map up to date?",
+      "selected": "We maintain it, clients look and comment",
+      "notes": ""
+    },
+    "vm5": {
+      "section": "The map, and the number that matters",
+      "question": "When should a new version of a process be recorded?",
+      "selected": "Only when someone deliberately decides to",
+      "notes": ""
+    },
+    "vm6": {
+      "section": "The map, and the number that matters",
+      "question": "Awkward one: what if a process gets worse? An automation breaks, or we get it wrong, and the latest version is slower than before.",
+      "selected": "Not sure",
+      "notes": ""
+    },
+    "vm7": {
+      "section": "The map, and the number that matters",
+      "question": "When a step changes from being done by a person to being done by a machine, should the system automatically create a story for that engineering work?",
+      "selected": "Not sure",
+      "notes": ""
+    },
+    "tm1": {
+      "section": "Time",
+      "question": "Should one person be able to run two timers at once, on two different pieces of work?",
+      "selected": "Yes, allow it — real work overlaps",
+      "notes": "Especially working with AI because you can do two things at the same time "
+    },
+    "tm2": {
+      "section": "Time",
+      "question": "A timer has been running for nine hours. What should happen?",
+      "selected": "Stop it automatically and flag it for review",
+      "notes": ""
+    },
+    "tm3": {
+      "section": "Time",
+      "question": "Be honest: would you actually use a timer?",
+      "selected": "Yes, if it is one click",
+      "notes": ""
+    },
+    "tm4": {
+      "section": "Time",
+      "question": "Who should be able to fix somebody else's work log?",
+      "selected": "Anyone with permission to edit work logs, with a visible trail",
+      "notes": ""
+    },
+    "tm5": {
+      "section": "Time",
+      "question": "Should the system ever nag about missing time?",
+      "selected": "Yes, a gentle weekly summary",
+      "notes": ""
+    },
+    "sw1": {
+      "section": "Who sees what",
+      "question": "When a client logs in, should they see everything belonging to their company, or only the apps they are personally attached to?",
+      "selected": "Not sure",
+      "notes": "We can start with the whole company view but for bigger companies this will become a request that we can have them linked to apps. "
+    },
+    "sw2": {
+      "section": "Who sees what",
+      "question": "Files: today, an uploaded file gets a long unguessable web link that works without logging in. Anyone holding that link can open the file. Should we require login to open client files?",
+      "selected": "Keep the open links, convenience matters more",
+      "notes": ""
+    },
+    "sw3": {
+      "section": "Who sees what",
+      "question": "We stop working with a customer. What should happen to their portal access?",
+      "selected": "Keep read-only access to their history",
+      "notes": ""
+    },
+    "sw4": {
+      "section": "Who sees what",
+      "question": "There is no \"view as this client\" button. Instead we keep one permanent fake customer, with fake people, that we can genuinely log into to see exactly what clients see. Right approach?",
+      "selected": "Right — fake customer, no back door",
+      "notes": ""
+    },
+    "sw5": {
+      "section": "Who sees what",
+      "question": "Should every staff member see every customer?",
+      "selected": "Mostly, but money and margins stay restricted",
+      "notes": "We may want to restrict editing and add functionalities when someone is not involved in a customer. "
+    },
+    "sw6": {
+      "section": "Who sees what",
+      "question": "If something did leak to the wrong customer, what would hurt most?",
+      "selected": [
+        "What we charge, and our margins",
+        "Another customer's documents or files",
+        "Another customer's process map and how they work",
+        "Contact details of people at other companies"
+      ],
+      "notes": ""
+    },
+    "mn1": {
+      "section": "What a customer sees about money",
+      "question": "Which value numbers should a client see on their home screen?",
+      "selected": [
+        "Hours saved per year",
+        "Money saved per year",
+        "Number of steps we removed or automated"
+      ],
+      "notes": ""
+    },
+    "mn2": {
+      "section": "What a customer sees about money",
+      "question": "Should clients see their engagement commercials — what they bought and how much of it is used up?",
+      "selected": "No, keep commercials in conversations",
+      "notes": ""
+    },
+    "mn3": {
+      "section": "What a customer sees about money",
+      "question": "Awkward one: showing \"budget used\" invites \"why is it 80% used when I only see two things done?\" Is that a conversation we want the app to start?",
+      "selected": "No, do not show consumption",
+      "notes": ""
+    },
+    "kn1": {
+      "section": "Files, knowledge and the calendar",
+      "question": "What should someone realistically be able to ask this thing?",
+      "selected": [
+        "What did we agree with this client, and when",
+        "How does this process work today"
+      ],
+      "notes": ""
+    },
+    "kn2": {
+      "section": "Files, knowledge and the calendar",
+      "question": "An AI answer is confidently wrong in front of a client. What protects us?",
+      "selected": "Clients can ask, but answers are clearly labelled as generated",
+      "notes": ""
+    },
+    "kn3": {
+      "section": "Files, knowledge and the calendar",
+      "question": "Who decides the folder structure inside a customer's Drive?",
+      "selected": "One standard structure for every customer, created automatically",
+      "notes": ""
+    },
+    "kn4": {
+      "section": "Files, knowledge and the calendar",
+      "question": "Calendar: sprints and client to-dos become events in a shared kwapso calendar, staff calendars are read to show who is free, and moving an event in Google moves it in the app too. Right amount?",
+      "selected": "Not sure",
+      "notes": ""
+    },
+    "kn5": {
+      "section": "Files, knowledge and the calendar",
+      "question": "There is a document per customer that the system keeps rewriting — their current systems, open and resolved requests, what changed, how their processes work. It lives in their Drive folder. How often should it refresh?",
+      "selected": "Not sure",
+      "notes": ""
+    },
+    "dz1": {
+      "section": "How it should feel",
+      "question": "Which of these feel like the right neighbours for what we are making?",
+      "selected": [
+        "Stripe — dense but polished and trustworthy"
+      ],
+      "notes": ""
+    },
+    "dz2": {
+      "section": "How it should feel",
+      "question": "What makes software feel heavy to you?",
+      "selected": [
+        "Too many clicks to do a simple thing",
+        "Slow loading"
+      ],
+      "notes": ""
+    },
+    "dz3": {
+      "section": "How it should feel",
+      "question": "How much do keyboard shortcuts matter for the agency app?",
+      "selected": "Not sure",
+      "notes": ""
+    },
+    "dz4": {
+      "section": "How it should feel",
+      "question": "How much explaining should the apps do — tooltips, empty-state guidance, little help notes?",
+      "selected": "Light touch — a hint only where genuinely confusing",
+      "notes": ""
+    },
+    "yr1": {
+      "section": "Your turn",
+      "question": "What worries you most about this?",
+      "selected": [
+        "Data leaking between customers",
+        "It becomes so big it is never finished"
+      ],
+      "notes": ""
+    },
+    "yr2": {
+      "section": "Your turn",
+      "question": "What would make you quietly stop using it and go back to your old way?",
+      "selected": "Too many steps to log simple things",
+      "notes": "if its more complicated to use then a glide app"
+    },
+    "yr3": {
+      "section": "Your turn",
+      "question": "Is anything missing from this document entirely?",
+      "selected": "No, it covers our work",
+      "notes": ""
+    },
+    "yr4": {
+      "section": "Your turn",
+      "question": "Anything else you want to say before we start building?",
+      "selected": "Nothing to add",
+      "notes": ""
+    }
+  }
+}

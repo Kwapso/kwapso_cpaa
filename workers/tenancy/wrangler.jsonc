@@ -3,7 +3,7 @@
 // ADMIN_KEY (protects the migrate-all-teams maintenance endpoint).
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "brimba-tenancy",
+  "name": "kwapso-tenancy",
   "main": "src/index.ts",
   "compatibility_date": "2026-06-01",
   // Only the gateway is public — this worker is reachable only via bindings.
@@ -13,47 +13,47 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "brimba-core",
+      "database_name": "kwapso-core",
       "database_id": "7196438c-5572-4317-b1e4-48084ab6e3ad",
       "migrations_dir": "../../db/core"
     }
   ],
   "services": [
-    { "binding": "AUTH", "service": "brimba-auth" },
-    { "binding": "REALTIME", "service": "brimba-realtime" }
+    { "binding": "AUTH", "service": "kwapso-auth" },
+    { "binding": "REALTIME", "service": "kwapso-realtime" }
   ],
-  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "brimba-media" }],
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "kwapso-media" }],
   "vars": {
     "CF_ACCOUNT_ID": "af3f1bf82aa34512f4f6630091358439",
     // The public web origin the SPA is served on — used for links in outbound
     // emails (invite CTA). NOT request-derived, so agent-sent invites are correct.
-    "PUBLIC_APP_URL": "https://brimba.swift-struck.workers.dev"
+    "PUBLIC_APP_URL": "https://kwapso.<workers-subdomain>.workers.dev"
   },
   // Nightly 80%-size alarms (03:10 UTC) — the locked sharding machinery.
   "triggers": { "crons": ["10 3 * * *"] },
   "env": {
     "staging": {
-      "name": "brimba-tenancy-staging",
+      "name": "kwapso-tenancy-staging",
       "workers_dev": false,
       "preview_urls": false,
       "observability": { "enabled": true },
       "d1_databases": [
         {
           "binding": "DB",
-          "database_name": "brimba-core-staging",
+          "database_name": "kwapso-core-staging",
           "database_id": "68a9a2f6-13af-4d73-932e-ab38b40cc5b6",
           "migrations_dir": "../../db/core"
         }
       ],
       "services": [
-        { "binding": "AUTH", "service": "brimba-auth-staging" },
-        { "binding": "REALTIME", "service": "brimba-realtime-staging" }
+        { "binding": "AUTH", "service": "kwapso-auth-staging" },
+        { "binding": "REALTIME", "service": "kwapso-realtime-staging" }
       ],
-      "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "brimba-media-staging" }],
+      "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "kwapso-media-staging" }],
       "vars": {
         "CF_ACCOUNT_ID": "af3f1bf82aa34512f4f6630091358439",
         // The public staging web origin — used for invite-email links.
-        "PUBLIC_APP_URL": "https://brimba-staging.swift-struck.workers.dev"
+        "PUBLIC_APP_URL": "https://kwapso-staging.<workers-subdomain>.workers.dev"
       },
       "triggers": { "crons": ["10 3 * * *"] }
     }

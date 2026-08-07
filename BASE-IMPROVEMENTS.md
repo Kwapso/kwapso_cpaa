@@ -347,7 +347,7 @@ A sweep of real bugs surfaced by the team exercising the AI co-pilot on staging.
 | MEDIUM | No anti-clickjacking / MIME / referrer headers served | `X-Frame-Options: DENY` + `nosniff` + `Referrer-Policy` in `web/public/_headers` |
 | LOW | Boundary validation gaps: role `description`, team `name`, member/invite ids not type-checked → a non-string body was a **500, not a 400** | `optionalText` / `requireText` / `typeof` guards (tenancy routes) |
 | CRIT (forks) | `mcp` binds the core DB but docs said "**five** core-bound workers" → a fork on a shared account silently binds mcp to the ORIGINAL core DB (cross-tenant) | "SIX core-bound workers" everywhere (BOOTSTRAP, OPERATIONS, new-app); OPERATIONS now lists migration 0013 + mcp in the `INTERNAL_KEY` set |
-| — | Fork sweep left `brimba.swift-struck.workers.dev` host URLs in the MCP docs | new-app sweep now treats host URLs as live references, not history |
+| — | Fork sweep left `kwapso.<workers-subdomain>.workers.dev` host URLs in the MCP docs | new-app sweep now treats host URLs as live references, not history |
 
 ---
 

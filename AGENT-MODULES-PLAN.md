@@ -59,7 +59,7 @@ docs are being reconciled now. **Still remaining:** ~~the external `mcp` worker~
 - **Help** (`workers/content`): ticket CRUD + threaded replies (@mention = notify) +
   fixed status lifecycle (open/in-progress/resolved/reopened; raiser reopens) + My/All
   tab queries + source screen/record capture. Email on reply/@mention. (The
-  `brimba-help-media` R2 bucket is bound, but the **attachment hook is DEFERRED** —
+  `kwapso-help-media` R2 bucket is bound, but the **attachment hook is DEFERRED** —
   see the remaining-work list.)
 - **Import** (`workers/data-ops`): the 3-stage session against the global catalog;
   preview-then-write; one list-ping per table.
@@ -103,7 +103,7 @@ Gate: green + tests (token gating, confirm rule, fence, quota, tool catalog).
 
 ## Remaining work (after Phases 1–4)
 - **The external `mcp` worker** (Phase 3C above) — ~~not yet on disk~~ **SHIPPED 2026-07-07** (`workers/mcp`).
-- **Help attachments** — the `brimba-help-media` bucket is bound, but the upload hook
+- **Help attachments** — the `kwapso-help-media` bucket is bound, but the upload hook
   isn't wired.
 - **The agent's auto first-draft help reply** — the `cheapText` seam exists; the
   auto-draft-on-new-ticket hook is deferred.
@@ -112,8 +112,8 @@ Gate: green + tests (token gating, confirm rule, fence, quota, tool catalog).
 - **The agent generating temporary-view recipes** — deferred.
 
 ## New infra (BUILT 2026-06-23, except as noted)
-- **R2 buckets**: `brimba-help-media`, `brimba-learning-media` (+ `-staging`), per-team
-  key prefixes, bound to the content worker. (No `brimba-import-media` — CSV text is
+- **R2 buckets**: `kwapso-help-media`, `kwapso-learning-media` (+ `-staging`), per-team
+  key prefixes, bound to the content worker. (No `kwapso-import-media` — CSV text is
   uploaded into the import session, not R2.)
 - **Workers**: `content` + `data-ops` BUILT ; `mcp` **BUILT 2026-07-07** (gateway stays the
   single public door; it routes the in-app agent +, later, the external MCP surface).

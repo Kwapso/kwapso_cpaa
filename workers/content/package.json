@@ -1,8 +1,8 @@
 {
-  "name": "brimba-content",
+  "name": "kwapso-content",
   "version": "0.1.0",
   "private": true,
-  "description": "Brimba's content worker: team-DB content modules (Learning, Help).",
+  "description": "kwapso's content worker: team-DB content modules (Learning, Help).",
   "scripts": {
     "dev": "wrangler dev --env staging --port 8789 --inspector-port 9232 --local --persist-to ../../.dev-state",
     "test": "vitest run",

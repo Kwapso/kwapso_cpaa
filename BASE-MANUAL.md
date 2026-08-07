@@ -28,12 +28,12 @@ service-binding calls (never a public hop).
 
 | Worker | Cloudflare name | Owns | Why it's its own worker |
 |---|---|---|---|
-| **auth** | `brimba-auth` | Email-OTP login (6-digit codes via Resend, no Clerk/Google), sessions, the email-change flow, profile, `/api/auth/me`, and `/internal/send-email` | Identity is the one thing every other worker trusts. It's the single session authority: everyone else asks it "who is this?" (`whoAmI`) rather than parsing cookies themselves. |
-| **tenancy** | `brimba-tenancy` | Teams, members, Member roles (`member_roles`) + the permission sheet, invites, per-team dropdown values, the screen-recipe config store, and the team-DB migration/sharding admin endpoints | This is the multi-tenancy engine — it owns the global "who's in which team, in which role" catalog and the per-team database lifecycle. The permission seam that every module gates against lives here. |
-| **realtime** | `brimba-realtime` | The live switchboard — one `TeamChannel` Durable Object per channel, fanning out row-level `{resource,id,op}` change pings over WebSockets | Live-sync is a cross-cutting concern with a stateful runtime (open sockets). It holds **no app data** — the databases stay the source of truth — so it can be a thin, hibernatable coordinator instead of a second copy of everything. |
-| **content** | `brimba-content` | **Learning** (how-to articles + per-user "done" progress) and **Help** (tickets + threaded replies) | These are the base's two real content modules. They're grouped because they share the same shape (team-DB CRUD gated on a permission module, deactivate-not-delete, R2 media) and neither is big enough to deserve its own worker. |
-| **data-ops** | `brimba-data-ops` | **CSV import** (the 3-stage single-target session + the agentic multi-file batch import, AGENTIC-IMPORT.md) and **the AI agent** | Both are "operations over the other modules' data" rather than modules of their own. Import writes act-as-user through a target's create endpoint; the agent acts-as-user through every gated endpoint. Neither owns a table of user content — they orchestrate. |
-| **gateway** | `brimba` / `brimba-staging` | The single public door: serves the web screens (static assets), serves uploaded media from R2, and routes `/api/*` to the right worker | **The only worker with a public URL.** Everything else sets `workers_dev: false` AND `preview_urls: false` (both — a per-version preview URL would be a second public door) and is reachable *only* via service bindings. This is what makes `/internal/send-email` and the agent's act-as-user surface safe — no public route can reach them. |
+| **auth** | `kwapso-auth` | Email-OTP login (6-digit codes via Resend, no Clerk/Google), sessions, the email-change flow, profile, `/api/auth/me`, and `/internal/send-email` | Identity is the one thing every other worker trusts. It's the single session authority: everyone else asks it "who is this?" (`whoAmI`) rather than parsing cookies themselves. |
+| **tenancy** | `kwapso-tenancy` | Teams, members, Member roles (`member_roles`) + the permission sheet, invites, per-team dropdown values, the screen-recipe config store, and the team-DB migration/sharding admin endpoints | This is the multi-tenancy engine — it owns the global "who's in which team, in which role" catalog and the per-team database lifecycle. The permission seam that every module gates against lives here. |
+| **realtime** | `kwapso-realtime` | The live switchboard — one `TeamChannel` Durable Object per channel, fanning out row-level `{resource,id,op}` change pings over WebSockets | Live-sync is a cross-cutting concern with a stateful runtime (open sockets). It holds **no app data** — the databases stay the source of truth — so it can be a thin, hibernatable coordinator instead of a second copy of everything. |
+| **content** | `kwapso-content` | **Learning** (how-to articles + per-user "done" progress) and **Help** (tickets + threaded replies) | These are the base's two real content modules. They're grouped because they share the same shape (team-DB CRUD gated on a permission module, deactivate-not-delete, R2 media) and neither is big enough to deserve its own worker. |
+| **data-ops** | `kwapso-data-ops` | **CSV import** (the 3-stage single-target session + the agentic multi-file batch import, AGENTIC-IMPORT.md) and **the AI agent** | Both are "operations over the other modules' data" rather than modules of their own. Import writes act-as-user through a target's create endpoint; the agent acts-as-user through every gated endpoint. Neither owns a table of user content — they orchestrate. |
+| **gateway** | `kwapso` / `kwapso-staging` | The single public door: serves the web screens (static assets), serves uploaded media from R2, and routes `/api/*` to the right worker | **The only worker with a public URL.** Everything else sets `workers_dev: false` AND `preview_urls: false` (both — a per-version preview URL would be a second public door) and is reachable *only* via service bindings. This is what makes `/internal/send-email` and the agent's act-as-user surface safe — no public route can reach them. |
 
 The seventh worker, **mcp** (personal access tokens → a team-pinned session
 bridge → an opt-in tool catalogue for external machines), is **BUILT (2026-07-07)**
@@ -54,7 +54,7 @@ internal by physics — see `workers/gateway/src/index.ts`, which simply forward
 
 There are two kinds of database, and the split is deliberate.
 
-**One global core DB (`brimba-core`), reached natively via `env.DB`.** It holds
+**One global core DB (`kwapso-core`), reached natively via `env.DB`.** It holds
 everything that is about *identity and billing across teams*:
 
 | Table | Holds | Migration |
@@ -376,7 +376,7 @@ live updates — they're done.
 
 **What you rename (once).** The product's identity, not its plumbing: the app name +
 brand (in the web app's config + the `PUBLIC_APP_URL`/URLs), the worker name prefix
-if you want your own (`brimba-*` → `<yourapp>-*` in the `wrangler.jsonc` files and the
+if you want your own (`kwapso-*` → `<yourapp>-*` in the `wrangler.jsonc` files and the
 deploy scripts), and the GitHub/Cloudflare project names (the `/new-app` skill
 automates the scaffold + backup + staging + production wiring). Everything the base
 does keeps working because none of the *seams* changed.
@@ -558,7 +558,7 @@ documented path until a single module outgrows a whole database (Prime Directive
 
 **Organizing many apps in Cloudflare:** Cloudflare has no folders. The base's
 convention is (a) a name prefix per product — every worker, database and bucket
-starts `brimba-` (a fork renames the prefix, BASE-MANUAL §5), and (b) for real
+starts `kwapso-` (a fork renames the prefix, BASE-MANUAL §5), and (b) for real
 isolation, **one Cloudflare account per product** (BOOTSTRAP assumes this): separate
 billing, separate limits, separate blast radius. Within one account, the prefix IS
 the project grouping — search boxes in the dash filter on it.

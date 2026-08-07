@@ -27,7 +27,7 @@ const newId = () => `m${++nextId}`
 // We remember the last thread per team so reopening the panel resumes it (instead of
 // minting a fresh thread each time). localStorage is per-device and best-effort —
 // every access is guarded so a locked-down browser never breaks the panel.
-const lastThreadKey = (teamId: string) => `brimba:agent:lastThread:${teamId}`
+const lastThreadKey = (teamId: string) => `kwapso:agent:lastThread:${teamId}`
 const readLastThread = (teamId: string): string | null => {
   try {
     return localStorage.getItem(lastThreadKey(teamId))

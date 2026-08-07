@@ -441,7 +441,7 @@ UPDATE help SET updated_at = ${sqlString(now)} WHERE id = ${sqlString(ticketId)}
 }
 
 /** HOOK (Phase 3) — the AI agent drafts the FIRST reply here, labelled "Drafted by
- * the Brimba assistant" (is_agent = 1), built from Learning content + the team's
+ * the kwapso assistant" (is_agent = 1), built from Learning content + the team's
  * data. Until the data-ops/agent worker exists this stays a no-op, so a ticket
  * always opens awaiting a human reply (per the locked "ticket always opens" rule).
  * When implemented it will addReply(..., isAgent=true) and publish help_threads. */

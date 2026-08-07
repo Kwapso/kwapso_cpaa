@@ -1,8 +1,8 @@
 {
-  "name": "brimba-tenancy",
+  "name": "kwapso-tenancy",
   "version": "0.1.0",
   "private": true,
-  "description": "Brimba's tenancy worker: teams, memberships, and the per-team database factory.",
+  "description": "kwapso's tenancy worker: teams, memberships, and the per-team database factory.",
   "scripts": {
     "dev": "wrangler dev --env staging --port 8788 --inspector-port 9231 --local --persist-to ../../.dev-state",
     "test": "vitest run",

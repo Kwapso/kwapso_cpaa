@@ -1,10 +1,10 @@
-// The AUTH worker — Brimba's front-door brain: email-code login (strict OTP — no Google, no Clerk),
+// The AUTH worker — kwapso's front-door brain: email-code login (strict OTP — no Google, no Clerk),
 // sessions. Top-level config = PRODUCTION; the staging variant is under env.
 // Secrets (set via `wrangler secret put`, never in this file):
 //   RESEND_API_KEY        — lets us actually send code emails
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "brimba-auth",
+  "name": "kwapso-auth",
   "main": "src/index.ts",
   "compatibility_date": "2026-06-01",
   // Only the gateway is public (locked: one public address). No *.workers.dev
@@ -17,41 +17,41 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "brimba-core",
+      "database_name": "kwapso-core",
       "database_id": "7196438c-5572-4317-b1e4-48084ab6e3ad",
       "migrations_dir": "../../db/core"
     }
   ],
-  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "brimba-media" }],
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "kwapso-media" }],
   // Auth pushes identity-level live events (account activity, profile, sign-out)
   // to a user's OWN channel through the realtime worker.
-  "services": [{ "binding": "REALTIME", "service": "brimba-realtime" }],
+  "services": [{ "binding": "REALTIME", "service": "kwapso-realtime" }],
   "vars": {
-    "APP_ORIGIN": "https://brimba.swift-struck.workers.dev",
+    "APP_ORIGIN": "https://kwapso.<workers-subdomain>.workers.dev",
     "EMAIL_FROM": "noreply@updates.swiftstruck.com",
     // Ships with the deploy: the test-login door refuses outright here.
     "ENVIRONMENT": "production"
   },
   "env": {
     "staging": {
-      "name": "brimba-auth-staging",
+      "name": "kwapso-auth-staging",
       "workers_dev": false,
       "preview_urls": false,
       "observability": { "enabled": true },
       "d1_databases": [
         {
           "binding": "DB",
-          "database_name": "brimba-core-staging",
+          "database_name": "kwapso-core-staging",
           "database_id": "68a9a2f6-13af-4d73-932e-ab38b40cc5b6",
           "migrations_dir": "../../db/core"
         }
       ],
       "r2_buckets": [
-        { "binding": "MEDIA", "bucket_name": "brimba-media-staging" }
+        { "binding": "MEDIA", "bucket_name": "kwapso-media-staging" }
       ],
-      "services": [{ "binding": "REALTIME", "service": "brimba-realtime-staging" }],
+      "services": [{ "binding": "REALTIME", "service": "kwapso-realtime-staging" }],
       "vars": {
-        "APP_ORIGIN": "https://brimba-staging.swift-struck.workers.dev",
+        "APP_ORIGIN": "https://kwapso-staging.<workers-subdomain>.workers.dev",
         "EMAIL_FROM": "noreply@updates.swiftstruck.com",
         "ENVIRONMENT": "staging"
       }

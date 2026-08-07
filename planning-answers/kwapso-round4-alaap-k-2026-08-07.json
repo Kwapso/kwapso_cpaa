@@ -1,0 +1,186 @@
+{
+  "meta": {
+    "tool": "plan_with_questions",
+    "slug": "kwapso-round4",
+    "respondent": "Alaap K",
+    "answered": 29,
+    "total": 29,
+    "exported_at": "2026-08-07T09:57:40.337Z"
+  },
+  "answers": {
+    "pa1": {
+      "section": "People — one table, your way",
+      "question": "In this model, Marta before anyone presses the give-portal-access button: what is she?",
+      "selected": null,
+      "notes": "In this case, I would say Marta could be a user of the agency app or the main stakeholder user of the client portal app for whatever project or app a company is giving us to work on."
+    },
+    "pa2": {
+      "section": "People — one table, your way",
+      "question": "Unlimited nesting allows a loop: Bergman linked under Delaval AND Delaval linked under Bergman. Loops make roll-ups (savings per family tree) count things twice or run forever. What do we do?",
+      "selected": "Block the exact link that closes a loop, with a plain message (recommended)",
+      "notes": ""
+    },
+    "pa3": {
+      "section": "People — one table, your way",
+      "question": "Which account rows get a short code (BERG) and reference sequences?",
+      "selected": "Only accounts we actually do work for — staff assign a code when the relationship starts (recommended)",
+      "notes": ""
+    },
+    "pa4": {
+      "section": "People — one table, your way",
+      "question": "Can staff link one individual under a parent WITHOUT giving them portal access, and separately give portal access WITHOUT them being under any entity (a freelancer who is their own account)?",
+      "selected": "Yes — both independent, exactly as described",
+      "notes": ""
+    },
+    "dr1": {
+      "section": "Doors — sign-in reversed, delete redefined",
+      "question": "Confirm the sign-in change: email OTP or Google, matched by email, invite-only unchanged?",
+      "selected": "Yes — both doors, one identity",
+      "notes": ""
+    },
+    "dr2": {
+      "section": "Doors — sign-in reversed, delete redefined",
+      "question": "Someone with delete permission deletes an account row that has 3 contacts, 40 tickets and 200 work logs hanging off it. What happens?",
+      "selected": "Block: a record with children cannot be deleted until the children are deleted or moved (recommended)",
+      "notes": ""
+    },
+    "dr3": {
+      "section": "Doors — sign-in reversed, delete redefined",
+      "question": "A staffer wants a messy old ticket out of the everyday view but nothing lost. Which button?",
+      "selected": "Archive",
+      "notes": ""
+    },
+    "gd1": {
+      "section": "The guard, finally in plain words",
+      "question": "Why is one shared corridor safer than each screen doing its own account filtering?",
+      "selected": "One place to get right and to attack with tests, instead of hundreds of places to forget",
+      "notes": ""
+    },
+    "tk1": {
+      "section": "Tickets — your five states, and who does what",
+      "question": "Five states or six?",
+      "selected": "Five — Triaged covers it; the portal can still show 'planned for sprint 4' as a note without a whole status",
+      "notes": ""
+    },
+    "tk2": {
+      "section": "Tickets — your five states, and who does what",
+      "question": "Do tickets themselves carry an assignee and a due date, or do only stories?",
+      "selected": "Only stories carry assignee and dates; the ticket inherits its picture from them",
+      "notes": ""
+    },
+    "tk3": {
+      "section": "Tickets — your five states, and who does what",
+      "question": "Who can press Resolve — the client-visible closure?",
+      "selected": "Any staff member with the tickets permission (small team, shared queue)",
+      "notes": ""
+    },
+    "mo1": {
+      "section": "Money — where the price actually lives",
+      "question": "Where does a fixed price live?",
+      "selected": "On the sprint row — sold_price, filled when a sprint is sold (recommended: no new table, one obvious place)",
+      "notes": ""
+    },
+    "mo2": {
+      "section": "Money — where the price actually lives",
+      "question": "Blueprints specifically — fixed fee or billed by time?",
+      "selected": "Fixed fee (a priced diagnostic)",
+      "notes": ""
+    },
+    "mo3": {
+      "section": "Money — where the price actually lives",
+      "question": "Do those two cards look right?",
+      "selected": "Yes — build them like that",
+      "notes": ""
+    },
+    "rg1": {
+      "section": "RAG school — how the knowledge layer actually works",
+      "question": "The AI writes an answer for Marta. Where do its facts come from?",
+      "selected": "Only the retrieved passages from her account's documents",
+      "notes": ""
+    },
+    "rg2": {
+      "section": "RAG school — how the knowledge layer actually works",
+      "question": "Vectorize has a terrible month and we want off it. What happens to our knowledge?",
+      "selected": "Nothing is lost — chunks live in D1, we re-fingerprint onto a new index in minutes",
+      "notes": ""
+    },
+    "gg1": {
+      "section": "Google — everyone connects, everything flows",
+      "question": "Which emails from a connected staff Gmail get indexed into the knowledge layer?",
+      "selected": "Only threads with people at our accounts — matched by the email addresses on account rows (recommended)",
+      "notes": ""
+    },
+    "gg2": {
+      "section": "Google — everyone connects, everything flows",
+      "question": "Google Chat — which conversations get indexed?",
+      "selected": "Selected spaces we mark as work spaces (recommended)",
+      "notes": ""
+    },
+    "gg3": {
+      "section": "Google — everyone connects, everything flows",
+      "question": "Google Meet — what gets ingested?",
+      "selected": "Transcripts + we keep links to recordings for humans",
+      "notes": ""
+    },
+    "gg4": {
+      "section": "Google — everyone connects, everything flows",
+      "question": "Who can SEE knowledge that came from a staffer's personal Gmail or Chat?",
+      "selected": "All staff — it passed the work filter, it is work (recommended if gg1 is filtered)",
+      "notes": ""
+    },
+    "gg5": {
+      "section": "Google — everyone connects, everything flows",
+      "question": "Can the agent act in Gmail on your behalf?",
+      "selected": "Send directly when asked explicitly",
+      "notes": ""
+    },
+    "ag1": {
+      "section": "The agent with agency",
+      "question": "How much freedom does the agent get when acting on your behalf?",
+      "selected": null,
+      "notes": "I think the agent should have full autonomy, but it should have the same power and permissions as the user with their current member role has. The member role of the user trying to connect and talk with their agent has certain rights and does not have certain rights. The agent is gated by those same permissions. Also, for reading and adding rows, there should be no confirmation, but for any destructive actions like archiving, deleting, or any writing, adding, editing, updating, deleting, or archiving, there should be a confirmation. "
+    },
+    "ag2": {
+      "section": "The agent with agency",
+      "question": "Model strategy, given Claude cannot live on Workers AI:",
+      "selected": "Anthropic via Cloudflare AI Gateway: Claude quality, Cloudflare dashboard + spend caps, Anthropic credits behind it (recommended)",
+      "notes": ""
+    },
+    "ag3": {
+      "section": "The agent with agency",
+      "question": "The agent closes a to-do for you. Which door did it use?",
+      "selected": "The same gated endpoint the UI button uses, permission-checked, logged in the activity trail",
+      "notes": ""
+    },
+    "sp1": {
+      "section": "Small print, explained",
+      "question": "Step dependencies — keep as designed?",
+      "selected": "Keep both kinds (blocks + informs)",
+      "notes": ""
+    },
+    "sp2": {
+      "section": "Small print, explained",
+      "question": "A step stops using the dispatch SaaS after our work. Where does the €89/month saving get picked up?",
+      "selected": "The step_tools link is removed in the new version, so the version subtraction includes it",
+      "notes": ""
+    },
+    "sp3": {
+      "section": "Small print, explained",
+      "question": "Two staffers close the last two stories of one ticket in the same second. What does the account see?",
+      "selected": "One ticket flipping to ready, once",
+      "notes": ""
+    },
+    "cl1": {
+      "section": "Anything I misread?",
+      "question": "Reading everything above — did I misread or overstate anything from your review?",
+      "selected": "No — this captures it",
+      "notes": ""
+    },
+    "cl2": {
+      "section": "Anything I misread?",
+      "question": "Anything else before the final scope is drafted?",
+      "selected": "Nothing — draft it",
+      "notes": ""
+    }
+  }
+}

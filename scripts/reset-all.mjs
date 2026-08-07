@@ -19,7 +19,7 @@
 import { execSync } from "node:child_process"
 import { writeFileSync, unlinkSync } from "node:fs"
 
-const GLOBAL_DB = { staging: "brimba-core-staging", production: "brimba-core" }
+const GLOBAL_DB = { staging: "kwapso-core-staging", production: "kwapso-core" }
 const KEEP = new Set(["d1_migrations"]) // migration history survives a reset
 
 const arg = process.argv[2]
@@ -42,7 +42,7 @@ function query(db, sql) {
 
 /** Run a multi-statement script against a database (no return). */
 function exec(db, script) {
-  const file = `/tmp/brimba-reset-${db}-${process.pid}.sql`
+  const file = `/tmp/kwapso-reset-${db}-${process.pid}.sql`
   writeFileSync(file, script)
   try {
     sh(`npx wrangler d1 execute ${db} --remote --file ${file} -y`)

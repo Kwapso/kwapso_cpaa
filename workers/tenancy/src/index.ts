@@ -1,4 +1,4 @@
-// Brimba TENANCY worker — teams, memberships, and the team-database factory.
+// kwapso TENANCY worker — teams, memberships, and the team-database factory.
 // This file is just the SWITCHBOARD: it maps each route to a handler (grouped
 // by domain under ./routes/*) and centrally maps thrown GuardErrors to clean
 // HTTP responses. The shared opening (whoAmI / teamContext / adminGuard) lives

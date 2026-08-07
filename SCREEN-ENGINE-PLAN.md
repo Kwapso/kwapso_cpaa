@@ -98,7 +98,7 @@ blank-canvas builder.
 
 ## 5 · Config storage (proposed — confirm)
 
-- **Global config DB** (new, or a table set in `brimba-core`): the **base**
+- **Global config DB** (new, or a table set in `kwapso-core`): the **base**
   recipes for the standard app screens — one definition, every team uses it.
 - **Per-team custom**: a team's bespoke screens + overrides live in **that
   team's own database** (fits the per-team-DB architecture). The config worker

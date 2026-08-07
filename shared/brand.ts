@@ -14,9 +14,9 @@
 export type AccentPair = { light: string; dark: string } // oklch values
 
 export const brand = {
-  name: "Brimba",
-  description: "The multi-tenant SaaS base by Swift Struck.",
-  motto: "Your teams, your space.",
+  name: "kwapso",
+  description: "Tailored digital operating systems for mature businesses.",
+  motto: "Work, structured.",
 
   /** App logo URL. null = show a monogram built from the name. */
   logoUrl: null as string | null,
@@ -24,15 +24,16 @@ export const brand = {
   /** Accent colours — override the UI library's theme tokens (oklch, per mode).
    * Defaults reproduce the library's teal; change them to re-skin the app. */
   accent: {
-    /** main brand colour: buttons, links, focus rings, the living light. */
+    /** main brand colour: buttons, links, focus rings, the living light.
+     * kwapso mango (#FED069) — text on it is always charcoal, never white. */
     primary: {
-      light: "oklch(0.58 0.1 185)",
-      dark: "oklch(0.62 0.11 185)",
+      light: "oklch(0.87 0.12 86)",
+      dark: "oklch(0.8 0.12 86)",
     } as AccentPair,
-    /** soft tinted surfaces (subtle hovers, badges, highlights). */
+    /** soft tinted surfaces (subtle hovers, badges, highlights) — soft mango. */
     secondary: {
-      light: "oklch(0.96 0.02 185)",
-      dark: "oklch(0.3 0.04 185)",
+      light: "oklch(0.93 0.055 88)",
+      dark: "oklch(0.35 0.05 86)",
     } as AccentPair,
   },
 
@@ -40,9 +41,9 @@ export const brand = {
    * branded emails use these. Keep roughly in step with `accent` above.
    * primary = buttons/links · surface = soft tint panel · ink = text on surface. */
   accentHex: {
-    primary: "#0e9e86",
-    surface: "#e8f6f1",
-    ink: "#0a5446",
+    primary: "#FED069",
+    surface: "#FFE9B0",
+    ink: "#1A1918",
   },
 
   /** The screen background tone — the SINGLE source for the page surface behind
@@ -51,7 +52,7 @@ export const brand = {
    * + ambient light layer on top. Change these two values to re-tone every
    * screen in both modes at once (BrandTheme injects them as --background). */
   screen: {
-    light: "oklch(0.975 0 0)",
-    dark: "oklch(0.18 0 0)",
+    light: "oklch(0.99 0.004 95)",
+    dark: "oklch(0.2 0.004 80)",
   } as AccentPair,
 }

@@ -1,6 +1,6 @@
 "use client"
 
-// Keeps a long-lived tab honest across a deploy. Brimba is a static-export SPA
+// Keeps a long-lived tab honest across a deploy. kwapso is a static-export SPA
 // with NO service worker, so an open tab holds the OLD shell + its hashed chunks
 // indefinitely. Two failure modes follow a deploy, and this heals both:
 //

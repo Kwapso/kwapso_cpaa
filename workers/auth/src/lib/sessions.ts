@@ -3,7 +3,7 @@ import { randomToken, sha256Hex } from "./crypto"
 import { ulid } from "../../../../shared/workers/id"
 import type { UserRow } from "./users"
 
-export const SESSION_COOKIE = "brimba_session"
+export const SESSION_COOKIE = "kwapso_session"
 const SESSION_DAYS = 30
 /** When less than this many days remain, the session quietly extends itself. */
 const SLIDE_THRESHOLD_DAYS = 15

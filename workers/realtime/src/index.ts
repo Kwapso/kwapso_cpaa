@@ -1,4 +1,4 @@
-// Brimba REALTIME worker — the live "switchboard".
+// kwapso REALTIME worker — the live "switchboard".
 //
 // ONE Durable Object per team (TeamChannel, addressed by name "team:<id>") holds
 // that team's open WebSocket connections and fans out tiny "X changed" pings.
@@ -10,7 +10,7 @@
 //   POST /publish  { channel, event }                  -> broadcast (service-binding only)
 //   GET  /api/realtime/health
 //
-// Reusable as-is by any app built on the Brimba base — it knows nothing about
+// Reusable as-is by any app built on the kwapso base — it knows nothing about
 // what "members" or "member_roles" mean; it just relays opaque resource tags.
 
 import { DurableObject } from "cloudflare:workers"

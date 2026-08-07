@@ -1,0 +1,352 @@
+{
+  "meta": {
+    "tool": "plan_with_questions",
+    "slug": "kwapso-portal-agency",
+    "answered": 54,
+    "exported_at": "2026-08-06T07:03:05.619Z"
+  },
+  "answers": {
+    "a1": {
+      "section": "1 · The broken spec — what actually wins",
+      "question": "The spec doc's stack (Next.js / Vercel / Supabase / RLS / pgvector) conflicts with the Brimba-on-Cloudflare base. Which wins?",
+      "selected": "Cloudflare + Brimba wins everywhere - treat the doc's stack sections as void, keep its product and data rules",
+      "notes": ""
+    },
+    "a2": {
+      "section": "1 · The broken spec — what actually wins",
+      "question": "Concretely: the doc leans on Postgres RLS policies (auth_person_id, auth_customer_ids helpers). Brimba's model is physical isolation - each tenant gets its OWN D1 database, so a portal session can only ever touch its own data, plus a permission matrix (role_permissions) for what members can do inside it. Accept that as the security model, replacing RLS?",
+      "selected": "Yes - per-tenant D1 isolation + the base's role permission matrix replaces RLS",
+      "notes": ""
+    },
+    "a3": {
+      "section": "1 · The broken spec — what actually wins",
+      "question": "The doc requires the database in the EU region for GDPR. On Cloudflare: D1 supports location hints, R2 supports EU jurisdiction, but Workers execute globally. How strict is the residency requirement really?",
+      "selected": null,
+      "notes": "Let's ensure that literally everything that we can do via Cloudflare is on European servers, if possible. I know there will be some limitations if we externally use APIs or call APIs to AI models. That's fine, but other than that, everything is on EU servers. "
+    },
+    "a4": {
+      "section": "1 · The broken spec — what actually wins",
+      "question": "The doc demands background task queues (sagas) for every third-party call: Drive exports, Resend notifications, Calendar syncs - so an offline external API never breaks a DB transaction. Brimba has NO queue infrastructure today (one nightly cron + Durable Objects for realtime). What carries the sagas?",
+      "selected": null,
+      "notes": "I don't know what sagas are, but I would just assume that these are scheduled workflows, right? I don't know, man. You decide what is best, whatever you can find in Cloudflare infrastructure that can support this at scale with robust quality and allow us a lot of analysis and visibility into logs and something that we can document very well. Let's just use that. "
+    },
+    "a5": {
+      "section": "1 · The broken spec — what actually wins",
+      "question": "The doc's build order is Blocks 0-7 (Foundations, Contacts, Business Map, Delivery, Tickets+Sagas, Drive+RAG, Surfaces, Commercial+Calendar). Brimba already provides most of Blocks 0-1 (monorepo, auth, tenancy, roles, permission matrix). Does the ordering still hold?",
+      "selected": null,
+      "notes": "I want to revisit the meaning of:\n- foundations\n- business map\n- deliveries\n- sagas\n- surfaces\n- commercial calendar\nWhat the hell are all these terms? I think we need to get our terminology straight here."
+    },
+    "a6": {
+      "section": "1 · The broken spec — what actually wins",
+      "question": "Honestly, which parts of the spec doc do you consider 'broken' or stale besides the stack? (pick all that apply)",
+      "selected": [
+        "Nothing else - the product rules are all current"
+      ],
+      "notes": ""
+    },
+    "b1": {
+      "section": "2 · Repo and app topology",
+      "question": "How do the two surfaces physically exist?",
+      "selected": "One repo, two web frontends + two gateways, shared backend workers (recommended)",
+      "notes": ""
+    },
+    "b2": {
+      "section": "2 · Repo and app topology",
+      "question": "Same question, concretely: a client files a ticket in the portal; a staffer triages it in the agency app. In a shared-backend world that is one database row seen by two UIs. In a two-fork world it needs an API bridge between separately deployed apps. Which reality do you want to operate?",
+      "selected": "One row, two UIs - single backend",
+      "notes": ""
+    },
+    "b3": {
+      "section": "2 · Repo and app topology",
+      "question": "Where does the new repo live?",
+      "selected": "A new kwapso GitHub org",
+      "notes": "https://github.com/Kwapso/kwapso_cpaa.. here' si where wanna host"
+    },
+    "b4": {
+      "section": "2 · Repo and app topology",
+      "question": "Should the Kwapso fork keep a thread back to the Brimba base (surgical edits, port future base fixes by hand), or is it a one-time copy that diverges freely?",
+      "selected": null,
+      "notes": "whatever you think is best and robust and scalable."
+    },
+    "b5": {
+      "section": "2 · Repo and app topology",
+      "question": "'Not a completely open SaaS': which base doors get welded shut? (pick all that apply)",
+      "selected": [
+        "Open self-serve signup - become invite-only (staff domains + invited client emails)",
+        "Self-serve team creation + auto personal team - only staff provision customer tenants",
+        "Member self-issued MCP tokens - make machine-access tokens admin-granted"
+      ],
+      "notes": ""
+    },
+    "c1": {
+      "section": "3 · Tenancy, contacts and the customer switcher",
+      "question": "Does customer = tenant? I.e., each Kwapso customer company gets its own isolated tenant database holding their apps, processes, steps, tickets and file index?",
+      "selected": null,
+      "notes": "There is no need for this because we will just be operating under one team, which is the Kwapso team. The whole concept of multi-tenancy and every time there is a new tenant, we spin up a new database, still exists, but this time there will always and only be one tenant. The only thing that we need to keep in mind is that if this particular one tenant's databases start to grow beyond expectation, we just have to dip into our sharding mechanism that we already built. "
+    },
+    "c2": {
+      "section": "3 · Tenancy, contacts and the customer switcher",
+      "question": "The spec's unified contacts table wants every person - staff, client logins, and non-login participants (field workers who appear in process steps but never sign in) - in ONE place. Brimba already keeps login users global with per-team memberships. Where do the non-login people live?",
+      "selected": null,
+      "notes": "I don't understand what this means. The contacts table is a place where we literally store all of our clients as either entities and their points of contact. There is a users table that is designed to authenticate which users from our internal team can log in and which clients can log in. Of course, we can leverage that data to then set permission matrices and other things and member rules, etc. "
+    },
+    "c3": {
+      "section": "3 · Tenancy, contacts and the customer switcher",
+      "question": "Concretely: Maria is CFO of two companies you serve. She logs in once and flips between them with the header switcher (Brimba's team switcher already does this). When she creates a ticket for customer A, which database wrote what?",
+      "selected": null,
+      "notes": "Look, man, I know that this is a static form, but I've told you that we are the only tenant. Therefore, there is no multi-tenancy, technically, and the ability to create new teams or hop teams and all of that is technically disabled.\n\nIf there is Maria, who's a CFO of two companies we are building for, Maria just logs into the client portal with her email. Because she is a stakeholder of one or more apps, she'll be able to enter both those apps and see the relevant details in their details screens, etc.\n\nShe can log in because her name is in the users table, yes, somebody's name and company details, or a company entity or a private individual as a contact person of an entity. All of that can remain in the contacts table. Unless and until somebody goes into the contact and adds as a user who is not added to the users table (they are not part of our team member in the client portal or a client portal member or a user), they cannot log in, even if they exist in the contacts table. "
+    },
+    "c4": {
+      "section": "3 · Tenancy, contacts and the customer switcher",
+      "question": "Agency-side data - sprints, stories, work logs, rate cards, margins - is commercially sensitive and spans all customers. Where does it live?",
+      "selected": null,
+      "notes": "Sprints are their own database, one per tenant, and since we only have one tenant, one database. Keep in mind I've said it before: sharding laws apply, right? This should scale even if our database was to get full. That means we open up a new database and whatever we've designed in Brimba to work at large-scale sharding and joining on serving data across multiple databases per tenant, and making sure that MCPs, APIs, and all of that work perfectly.\n\nI'm saying sprints are separate database stories, separate database work logs, of course, separate database. Let's even throw in an activity table every time somebody creates, edits, or archives any sort of record. An activity is recorded, and I know this is commercially sensitive and spans all customers. I don't know where it should live, but we should have some kind of secure functionality to only serve this data to one if the customer has the correct access rights to view it and the data belongs to any of their apps. It will all be determined as to how we set up roles and stakeholders. "
+    },
+    "c5": {
+      "section": "3 · Tenancy, contacts and the customer switcher",
+      "question": "Cross-customer reporting (agency dashboard: profitability across every engagement) has to read across many tenant databases. What freshness do you need?",
+      "selected": "Live is required - design for fan-out queries",
+      "notes": ""
+    },
+    "c6": {
+      "section": "3 · Tenancy, contacts and the customer switcher",
+      "question": "Customer departments are custom per customer (e.g. Workshop, Operations). What else must be per-customer configurable from day one? (pick all that apply)",
+      "selected": [
+        "Departments only for v1",
+        "Custom roles/titles for their people",
+        "Custom ticket categories or labels",
+        "Currency / locale / timezone per customer"
+      ],
+      "notes": ""
+    },
+    "d1": {
+      "section": "4 · Auth, roles and impersonation",
+      "question": "Google OAuth vs the base: re-adding Google sign-in is real new auth code against a decision the base already reverted once. What ships?",
+      "selected": null,
+      "notes": "Alright, let's just do strictly email OTP for now, but make sure that it is very secure and very strict. Of course, you will get to know this from the Brimba base itself. "
+    },
+    "d2": {
+      "section": "4 · Auth, roles and impersonation",
+      "question": "Staff roles for the granular CRUD permission matrix (the base already has per-role can_read/create/edit/delete per module) - what is the real role list on day one?",
+      "selected": null,
+      "notes": "We will create the permission matrix per module and, in some cases, even per database. This I will tell you once we start building each and every module. For now, every database that we have will become its own permission matrix:\n- sprints has its own permission matrix\n- apps has its own permission matrix\n- stories have their own permission matrix\n- tasks have their own permission matrix\n- processes have their own permission matrix\n- steps, etc.\nIf we have to merge something to put it into a module-level umbrella, I will let you know."
+    },
+    "d3": {
+      "section": "4 · Auth, roles and impersonation",
+      "question": "On the portal side, what can a non-main-stakeholder client contact do?",
+      "selected": "Everything except approvals and the onboarding gate (create tickets, rank, see files and metrics)",
+      "notes": ""
+    },
+    "d4": {
+      "section": "4 · Auth, roles and impersonation",
+      "question": "Impersonation mode (staff viewing the portal as a client) must be read-only and logged with both identities. Where is read-only enforced?",
+      "selected": null,
+      "notes": "Well, this is a good point. I don't know how exactly this can be done. Are you suggesting we create some sort of back door? I don't like the idea of that. I want something to be truly private and truly secure, but what we could do to test it out whenever we do get to a point where we can preview and test these things out and provide feedback is that we could just create a fake contact with fake contact people, right? "
+    },
+    "d5": {
+      "section": "4 · Auth, roles and impersonation",
+      "question": "The onboarding gate: first portal login is blocked until the main stakeholder confirms the team map + company metadata (headcount, founding year). Is this v1, and what happens if they stall for weeks?",
+      "selected": "V1, soft gate - persistent banner but the portal works",
+      "notes": ""
+    },
+    "e1": {
+      "section": "5 · Delivery engine mechanics",
+      "question": "One active timer per person globally. A person starts timer B while timer A is running. What happens?",
+      "selected": null,
+      "notes": "I don't understand what this means. If there are multiple people working on multiple things, or even the same thing, it shouldn't matter because the work log creates a brand-new start and stop row per user per story per task or whatever. Given that we have a work log that is an append-only table, it doesn't matter if there is one active timer per person globally or anything like that. They're all just rows getting added and appended.  \n  \nWhen we want to know the breakdown, we can simply analyse all those work log rows per story, per session, per sprint, or whatever, because the work log is the most indivisible unit of how time at work is spent by each and every person. Therefore, it will contain all nested-level data, like whether it's part of a task or a story or a sprint, etc."
+    },
+    "e2": {
+      "section": "5 · Delivery engine mechanics",
+      "question": "Timer stop lands on integer minutes how?",
+      "selected": null,
+      "notes": "Keep the timer accurate. If it's 33 seconds, then it's 33 seconds. If it's 192 seconds, round up to the nearest second. "
+    },
+    "e3": {
+      "section": "5 · Delivery engine mechanics",
+      "question": "A timer left running overnight - 14 hours by mistake. What does the system do?",
+      "selected": null,
+      "notes": "Any work log that has taken... I am not sure, because sometimes things just take two days. That doesn't mean I've stayed up all night to finish it, but it just seems like an unnecessary task to do: to start and stop each and everything that I'm working on that spans 1 or 2 days, or 3 or 4 days, to turn it on and off every night and morning. Do you recommend something? "
+    },
+    "e4": {
+      "section": "5 · Delivery engine mechanics",
+      "question": "Work logs carry the commercial engagement type (blueprint, sprint, support, hourly). Who sets it?",
+      "selected": "Inherited and locked - only admins reclassify",
+      "notes": "All this data can be inherited. It can also be edited. It can also be picked from a required drop-down. Most likely, it is not locked, but if somebody has the ability to edit work logs equal to true from the permission matrix, then they can edit it. "
+    },
+    "e5": {
+      "section": "5 · Delivery engine mechanics",
+      "question": "Peer review before story close: reviewer must be the App's lead and cannot be the assignee. In a 2-3 person team the lead often IS the assignee. What then?",
+      "selected": null,
+      "notes": "I think this is fine, right, if it's a small team and the reviewer is also the assignee, even though it's unlikely to happen for us because now we're a dev team of four people. Even if it does, if the reviewer is the assignee, then it's very simple: the rule applies because I am also a reviewer. I can review my own task because this is not a systemic rule failure. It is a failure on whoever tried to create or assign this task. "
+    },
+    "f1": {
+      "section": "6 · Tickets, the close saga and failure modes",
+      "question": "Google is down the minute a story closes. What must be true?",
+      "selected": "DB parts commit atomically; the Drive refresh is queued with retries and may lag - exactly as the spec's saga section says",
+      "notes": "this: 'DB parts commit atomically; the Drive refresh is queued with retries and may lag - exactly as the spec's saga section says' But I still don't know what a saga is. "
+    },
+    "f2": {
+      "section": "6 · Tickets, the close saga and failure modes",
+      "question": "Two staffers close the last two sibling stories of one ticket in the same second. The ticket must flip to ready exactly once. Guard this race in v1, or harden later?",
+      "selected": "V1 - correctness on day one (transactions/locking)",
+      "notes": ""
+    },
+    "f3": {
+      "section": "6 · Tickets, the close saga and failure modes",
+      "question": "Customers drag-and-drop rank open tickets to define sprint order. A client re-ranks while staff is mid-triage splitting those tickets into stories. Who wins?",
+      "selected": null,
+      "notes": "Ranking and editing of a ticket is only possible until it has been marked as in progress and/or been assigned to somebody and/or been linked to a story. The whole concept is that, until somebody from the internal team does not enter and interact with the ticket, they are free to edit and sort it. "
+    },
+    "f4": {
+      "section": "6 · Tickets, the close saga and failure modes",
+      "question": "Flipping a step person-to-automation auto-creates a delivery Story. When an automation breaks and flips BACK to person, should the system also reopen or annotate the original story?",
+      "selected": null,
+      "notes": "I don't know what a delivery story even means, mate. I don't know what this means. There's so much terminology or bloat here that we need to straighten out. I can not even tell you. I don't know what this means, sorry. "
+    },
+    "f5": {
+      "section": "6 · Tickets, the close saga and failure modes",
+      "question": "Customer to-dos email on creation + remind one day before due. The customer ignores it past due - then what?",
+      "selected": "Escalate internally: overdue badge in portal + digest to staff; stop emailing the customer",
+      "notes": ""
+    },
+    "g1": {
+      "section": "7 · Google Drive, Calendar and the RAG layer",
+      "question": "Which Google identity owns the Drive integration?",
+      "selected": null,
+      "notes": "What do you recommend that is secure, scalable, and also requires the least effort for us to set up? "
+    },
+    "g2": {
+      "section": "7 · Google Drive, Calendar and the RAG layer",
+      "question": "RAG shape for v1?",
+      "selected": "Cloudflare Vectorize + Workers AI embeddings - stay in-platform",
+      "notes": ""
+    },
+    "g3": {
+      "section": "7 · Google Drive, Calendar and the RAG layer",
+      "question": "Who can ask the knowledge layer questions in v1?",
+      "selected": "Staff + customers in the portal",
+      "notes": ""
+    },
+    "g4": {
+      "section": "7 · Google Drive, Calendar and the RAG layer",
+      "question": "Google Calendar bidirectional sync (availability, busy/free bandwidth) - when?",
+      "selected": "V1 full bidirectional as the doc says",
+      "notes": ""
+    },
+    "g5": {
+      "section": "7 · Google Drive, Calendar and the RAG layer",
+      "question": "Drive is truth for files; D1 is truth for metadata/linkages. A staffer renames or deletes a Drive file that tickets link to. The app should:",
+      "selected": "Auto-heal by Drive file ID (names do not matter, IDs do) and log it; badge only true deletions",
+      "notes": ""
+    },
+    "h1": {
+      "section": "8 · Design language and the two surfaces",
+      "question": "Gradients: the brand book's non-negotiables forbid them ('No gradients. No emoji. No left-border accent cards' - they read as AI-mockup). Your message asked for 'brand colours and gradients'. Which wins?",
+      "selected": "Allow subtle gradients in app UI only (the book governs marketing, not product)",
+      "notes": ""
+    },
+    "h2": {
+      "section": "8 · Design language and the two surfaces",
+      "question": "Dark mode: the brand defines a paper-light world (charcoal is a surface, not a theme). The UI library supports light + dark. Do the Kwapso apps ship dark mode?",
+      "selected": null,
+      "notes": "How about we do light in the day, dark in the night for both apps? "
+    },
+    "h3": {
+      "section": "8 · Design language and the two surfaces",
+      "question": "Density tension: the spec demands dense, spreadsheet-style, keyboard-driven grids for the agency app; the brand is airy 24px-radius paper. Resolution?",
+      "selected": "Brand rules apply 100% to both surfaces, even datagrids",
+      "notes": "And ensure that, even in both places, the design language still is retained. I never want the client in the client portal or the internal staff member in the agency to ever feel cognitive load. It should be a delight to use these apps, so we have to be very good with the UI, the animations. It should be warm, exciting, inviting, and lazy cognitive displays. Essentially, don't show extra information. Only show the tip or summary of something through tabs, buttons, or components, and then, only when clicked or interacted with, we can show them more details. But please remember that we still need to leverage our existing UI library to do so. It is just how we arrange the sequence and use the UI library to build different screens that matters. We don't recreate components. "
+    },
+    "h4": {
+      "section": "8 · Design language and the two surfaces",
+      "question": "Same tension, concrete: a 40-row worklog grid. 24px-rounded 16px-text rows would be enormous. Acceptable adaptations inside grids? (pick all that apply)",
+      "selected": null,
+      "notes": "I really don't know what this means. Refer to the answer in H3. "
+    },
+    "h5": {
+      "section": "8 · Design language and the two surfaces",
+      "question": "Icons inside the apps?",
+      "selected": "Whatever icon set swift-struck-ui already ships, recolored",
+      "notes": ""
+    },
+    "h6": {
+      "section": "8 · Design language and the two surfaces",
+      "question": "Portal progressive disclosure: home is value metrics (time saved, money saved), detail behind clicks. How deep can a customer drill in v1?",
+      "selected": "Full drill: apps to processes to steps, impact metrics at each layer",
+      "notes": ""
+    },
+    "h7": {
+      "section": "8 · Design language and the two surfaces",
+      "question": "I inspected swift-struck-ui: its signature look is 'alive' - ambient aurora backgrounds, primary-tinted glows, frosted-glass surfaces, all derived from the brand color. The kwapso book demands the opposite: flat paper, no glass, no glows, shadows that feel stacked-on-paper. For the Kwapso apps:",
+      "selected": "Keep the library's alive look, just in mango - brand book bends for product UI",
+      "notes": ""
+    },
+    "h8": {
+      "section": "8 · Design language and the two surfaces",
+      "question": "Some Kwapso needs are LIBRARY changes, not app config: a serif/display font token (the condensed serif has no home today), radius derivations for the fixed rounded-2xl surfaces, tokenizing two hardcoded neutrals, and eventually datagrid virtualization for dense ops screens. Brimba's law says 'the library is lego, never fork it into the app' - gaps go upstream via the UI-GAPS workflow. Apply that here?",
+      "selected": null,
+      "notes": "Look, man, I really don't want to do anything to fuck with the UI library we made a lot of effort into building. We made it pretty customizable, and I almost don't want to do anything to change the UI library. We can change accent colours and stuff like that, but I don't want to literally change anything at the component level. "
+    },
+    "i1": {
+      "section": "9 · Endpoints, MCP and agents",
+      "question": "Which Kwapso flows must be MCP tools from v1? (pick all that apply)",
+      "selected": [
+        "Create/read tickets and stories",
+        "Start/stop timers and write work logs",
+        "Query the knowledge/RAG layer",
+        "Read impact metrics and profitability rollups"
+      ],
+      "notes": ""
+    },
+    "i2": {
+      "section": "9 · Endpoints, MCP and agents",
+      "question": "Who is the first consumer of that machine surface?",
+      "selected": "You + staff via Claude - operate the agency by chat",
+      "notes": ""
+    },
+    "i3": {
+      "section": "9 · Endpoints, MCP and agents",
+      "question": "The automation and ai_agent step types inside customer processes - in v1, are they labels for mapping/costing, or does the system actually execute them?",
+      "selected": "Full execution including agent steps in v1",
+      "notes": ""
+    },
+    "j1": {
+      "section": "10 · Hosting, accounts, migration and the finish line",
+      "question": "The new Cloudflare account for Kwapso - what exists today? (pick all that apply)",
+      "selected": [
+        "Workers Paid plan activated"
+      ],
+      "notes": "There's a new Kwapso Cloudflare account with a paid workers plan already activated, and alaap@kwapso.com is already a member of this plan. "
+    },
+    "j2": {
+      "section": "10 · Hosting, accounts, migration and the finish line",
+      "question": "To deploy without breaking your other projects: the kwapso repo gets its own CLOUDFLARE_API_TOKEN + account ID (env vars beat the global wrangler OAuth login, which stays as-is for your other work). The base additionally needs an account-scoped D1 REST token as a worker secret, same as Brimba's CF_D1_TOKEN. OK?",
+      "selected": "Yes - scoped tokens per project (recommended)",
+      "notes": ""
+    },
+    "j3": {
+      "section": "10 · Hosting, accounts, migration and the finish line",
+      "question": "Domain truth: the doc lists both .app and .com for each surface. Which is canonical?",
+      "selected": "portal.kwapso.app + system.kwapso.app canonical; .com redirects",
+      "notes": "at this moment.. let's forget about the domains.."
+    },
+    "j4": {
+      "section": "10 · Hosting, accounts, migration and the finish line",
+      "question": "Legacy data: the doc mentions fragmented legacy tracking and converting decimal-hour logs to integer minutes. Is there real data to import for v1?",
+      "selected": "Yes - another app's database or API (notes)",
+      "notes": ""
+    },
+    "j5": {
+      "section": "10 · Hosting, accounts, migration and the finish line",
+      "question": "Who uses v1 first, and with how many real customers?",
+      "selected": null,
+      "notes": "At least 10 to 15 customers, plus 5 to 6 internal team members, will begin using V1. Also, I don't like that we are calling it V1. We are building the full thing. There is no version 1 or version 2. We are attempting to and are going to build the full thing, and of course there will always be refinements further, but we only build so much in version 1 and that much in version 2. We build everything in this go. "
+    },
+    "j6": {
+      "section": "10 · Hosting, accounts, migration and the finish line",
+      "question": "If v1 could only ship three modules end-to-end, which three?",
+      "selected": null,
+      "notes": "Everything. Look at my answer in J5."
+    }
+  }
+}

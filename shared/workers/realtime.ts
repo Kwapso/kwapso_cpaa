@@ -1,7 +1,7 @@
 // Publish a "something changed" ping to a live channel — the call any worker
 // makes after a successful write so every open screen refreshes ONLY the row
 // that changed. Best-effort: a live-layer hiccup must never break the write it
-// describes (callers don't await-throw). Reusable by every Brimba-based app.
+// describes (callers don't await-throw). Reusable by every kwapso-based app.
 //
 // TWO channel scopes (the realtime worker fans each `event` to everyone on the
 // named channel):

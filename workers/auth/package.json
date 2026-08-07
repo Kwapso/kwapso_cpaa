@@ -1,8 +1,8 @@
 {
-  "name": "brimba-auth",
+  "name": "kwapso-auth",
   "version": "0.1.0",
   "private": true,
-  "description": "Brimba's auth worker: email-code login, Google login, sessions. All user data in our own D1.",
+  "description": "kwapso's auth worker: email-code login, Google login, sessions. All user data in our own D1.",
   "scripts": {
     "dev": "wrangler dev --env staging --port 8787 --inspector-port 9230 --local --persist-to ../../.dev-state",
     "test": "vitest run",

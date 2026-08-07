@@ -4,10 +4,10 @@ import { defineConfig, devices } from "@playwright/test"
 // default). This file is NOT type-checked by `tsc -p web` (e2e/** is excluded in
 // web/tsconfig.json) and Playwright is NOT installed in CI — run it locally with
 // `npm install -D @playwright/test && npx playwright install` then
-// `npm run test:e2e --workspace=brimba-web`. See e2e/README.md.
+// `npm run test:e2e --workspace=kwapso-web`. See e2e/README.md.
 
 const BASE_URL =
-  process.env.BASE_URL ?? "https://brimba-staging.swift-struck.workers.dev"
+  process.env.BASE_URL ?? "https://kwapso-staging.<workers-subdomain>.workers.dev"
 
 export default defineConfig({
   testDir: "./e2e",
