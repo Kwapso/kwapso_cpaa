@@ -223,7 +223,7 @@ on top follows [CACHING.md](CACHING.md).
   2026-06-17): Overview = the audit block (created/edited/deactivated + who);
   Activity = that record's slice of the log. Both tabs render from LIBRARY
   collections (`RecordDetail` / `DescriptionList` / `ActivityFeed` in
-  `@swift-struck/ui`) through the screen engine — never a hand-built app
+  `@kwapso/ui`) through the screen engine — never a hand-built app
   component (UI comes only from the library, §6). See the activity read path in
   `workers/tenancy/src/lib/activity-read.ts`.
 - Race-safety for invariant writes follows [CONCURRENCY.md](CONCURRENCY.md);
@@ -274,7 +274,7 @@ on top follows [CACHING.md](CACHING.md).
   `sm:` (`sm:flex-row`); every control gets enough width to show its
   placeholder / its content (`w-full` when stacked). Canon lives in the library
   `UI-RULES.md` (the twin of the no-horizontal-scroll / no-pinch-zoom rule).
-- **UI comes ONLY from `@swift-struck/ui`.** Gaps go INTO the library first
+- **UI comes ONLY from `@kwapso/ui`.** Gaps go INTO the library first
   (known gaps: 6-digit code input, step wizard). Never one-off components here.
 - Anti-bloat is law: one master copy of every rule/doc/component; reuse over
   recode; keep every piece small enough for an agent to reason about.

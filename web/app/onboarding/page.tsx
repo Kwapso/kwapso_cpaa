@@ -11,15 +11,15 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@swift-struck/ui/registry/primitives/avatar/avatar"
-import { Button } from "@swift-struck/ui/registry/primitives/button/button"
-import { Field } from "@swift-struck/ui/registry/primitives/field/field"
-import { FileUpload } from "@swift-struck/ui/registry/primitives/file-upload/file-upload"
-import { Input } from "@swift-struck/ui/registry/primitives/input/input"
-import { ModeToggle } from "@swift-struck/ui/registry/primitives/mode-toggle/mode-toggle"
-import { Spinner } from "@swift-struck/ui/registry/primitives/spinner/spinner"
-import { toast } from "@swift-struck/ui/registry/primitives/sonner/sonner"
-import { defaultFieldConfig } from "@swift-struck/ui/lib/config"
+} from "@kwapso/ui/registry/primitives/avatar/avatar"
+import { Button } from "@kwapso/ui/registry/primitives/button/button"
+import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { FileUpload } from "@kwapso/ui/registry/primitives/file-upload/file-upload"
+import { Input } from "@kwapso/ui/registry/primitives/input/input"
+import { ModeToggle } from "@kwapso/ui/registry/primitives/mode-toggle/mode-toggle"
+import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
+import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure, auth, tenancy } from "@/lib/api"
 import { BrandMark } from "@/components/brand-mark"

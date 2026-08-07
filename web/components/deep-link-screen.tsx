@@ -18,17 +18,17 @@
 import * as React from "react"
 import { useRouter, usePathname } from "next/navigation"
 
-import { Button } from "@swift-struck/ui/registry/primitives/button/button"
-import { toast } from "@swift-struck/ui/registry/primitives/sonner/sonner"
+import { Button } from "@kwapso/ui/registry/primitives/button/button"
+import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import {
   type ScreenActionContext,
   type ScreenIntent,
-} from "@swift-struck/ui/registry/collections/screen-renderer/screen-renderer"
+} from "@kwapso/ui/registry/collections/screen-renderer/screen-renderer"
 import {
   buildScreenQuery,
   type ScreenQuery,
   type ScreenRights,
-} from "@swift-struck/ui/lib/recipe"
+} from "@kwapso/ui/lib/recipe"
 
 import { AppShell, ShellLoading } from "@/components/app-shell"
 import { TeamSectionNav } from "@/components/team-section-nav"

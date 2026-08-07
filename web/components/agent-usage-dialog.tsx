@@ -17,13 +17,13 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from "@swift-struck/ui/registry/primitives/dialog/dialog"
-import { ScrollArea } from "@swift-struck/ui/registry/primitives/scroll-area/scroll-area"
+} from "@kwapso/ui/registry/primitives/dialog/dialog"
+import { ScrollArea } from "@kwapso/ui/registry/primitives/scroll-area/scroll-area"
 import {
   ActivityFeed,
   defaultActivityFeedConfig,
   type ActivityItem as ActivityFeedItem,
-} from "@swift-struck/ui/registry/collections/activity-feed/activity-feed"
+} from "@kwapso/ui/registry/collections/activity-feed/activity-feed"
 
 import { dataOps, type UsageLogRow } from "@/lib/api"
 import { formatActivityWhen } from "@/lib/format"

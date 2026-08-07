@@ -10,15 +10,15 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@swift-struck/ui/registry/primitives/avatar/avatar"
-import { Badge } from "@swift-struck/ui/registry/primitives/badge/badge"
-import { Button } from "@swift-struck/ui/registry/primitives/button/button"
-import { List } from "@swift-struck/ui/registry/collections/list/list"
-import { Skeleton } from "@swift-struck/ui/registry/primitives/skeleton/skeleton"
+} from "@kwapso/ui/registry/primitives/avatar/avatar"
+import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
+import { Button } from "@kwapso/ui/registry/primitives/button/button"
+import { List } from "@kwapso/ui/registry/collections/list/list"
+import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import {
   ActivityFeed,
   defaultActivityFeedConfig,
-} from "@swift-struck/ui/registry/collections/activity-feed/activity-feed"
+} from "@kwapso/ui/registry/collections/activity-feed/activity-feed"
 import { ChevronRight, Mail } from "lucide-react"
 
 import { AccessTokensSection } from "@/components/access-tokens"

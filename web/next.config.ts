@@ -21,7 +21,7 @@ const staticExport = process.env.BUILD_STATIC
 const nextConfig: NextConfig = {
   // The Swift Struck UI library ships as TypeScript SOURCE from GitHub, so
   // Next must compile it the same way it compiles our own files.
-  transpilePackages: ["@swift-struck/ui"],
+  transpilePackages: ["@kwapso/ui"],
   // Lets us import the repo-level shared/ types (one master copy of shapes).
   experimental: { externalDir: true },
   ...staticExport,

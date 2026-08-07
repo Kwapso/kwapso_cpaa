@@ -13,9 +13,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@swift-struck/ui/registry/primitives/alert-dialog/alert-dialog"
-import { Spinner } from "@swift-struck/ui/registry/primitives/spinner/spinner"
-import { type ScreenQuery } from "@swift-struck/ui/lib/recipe"
+} from "@kwapso/ui/registry/primitives/alert-dialog/alert-dialog"
+import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
+import { type ScreenQuery } from "@kwapso/ui/lib/recipe"
 
 import { personName } from "@/lib/identity"
 import type { TeamMember } from "@shared/types"

@@ -12,11 +12,11 @@
 
 import * as React from "react"
 
-import { Badge } from "@swift-struck/ui/registry/primitives/badge/badge"
-import { Button } from "@swift-struck/ui/registry/primitives/button/button"
-import { Skeleton } from "@swift-struck/ui/registry/primitives/skeleton/skeleton"
-import { Spinner } from "@swift-struck/ui/registry/primitives/spinner/spinner"
-import { toast } from "@swift-struck/ui/registry/primitives/sonner/sonner"
+import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
+import { Button } from "@kwapso/ui/registry/primitives/button/button"
+import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
+import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
+import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,22 +26,22 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@swift-struck/ui/registry/primitives/alert-dialog/alert-dialog"
+} from "@kwapso/ui/registry/primitives/alert-dialog/alert-dialog"
 import {
   PermissionMatrix,
   defaultPermissionMatrixConfig,
   type PermissionMatrixConfig,
-} from "@swift-struck/ui/registry/collections/permission-matrix/permission-matrix"
-import { TabsView, defaultTabsConfig } from "@swift-struck/ui/registry/primitives/tabs/tabs"
+} from "@kwapso/ui/registry/collections/permission-matrix/permission-matrix"
+import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import {
   DescriptionList,
   defaultDescriptionListConfig,
-} from "@swift-struck/ui/registry/collections/description-list/description-list"
+} from "@kwapso/ui/registry/collections/description-list/description-list"
 import {
   ActivityFeed,
   defaultActivityFeedConfig,
   type ActivityItem as ActivityFeedItem,
-} from "@swift-struck/ui/registry/collections/activity-feed/activity-feed"
+} from "@kwapso/ui/registry/collections/activity-feed/activity-feed"
 import { Lock, Pencil, Power } from "lucide-react"
 
 import type { ActivityItem, PermissionValue, RolePermissions, TeamRole } from "@shared/types"

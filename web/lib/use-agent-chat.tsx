@@ -10,9 +10,9 @@
 
 import * as React from "react"
 
-import type { AgentChatItem } from "@swift-struck/ui/registry/collections/agent-chat/agent-chat"
-import type { RunStep } from "@swift-struck/ui/registry/collections/run-steps/run-steps"
-import { toast } from "@swift-struck/ui/registry/primitives/sonner/sonner"
+import type { AgentChatItem } from "@kwapso/ui/registry/collections/agent-chat/agent-chat"
+import type { RunStep } from "@kwapso/ui/registry/collections/run-steps/run-steps"
+import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 
 import type { AgentMessage, AgentQuota, PendingCall } from "@shared/types"
 import { ApiFailure, dataOps, type AgentStreamEvent } from "@/lib/api"

@@ -10,10 +10,10 @@
 import * as React from "react"
 import { usePathname } from "next/navigation"
 
-import { Breadcrumbs } from "@swift-struck/ui/registry/primitives/breadcrumbs/breadcrumbs"
-import { ModeToggle } from "@swift-struck/ui/registry/primitives/mode-toggle/mode-toggle"
-import { Skeleton } from "@swift-struck/ui/registry/primitives/skeleton/skeleton"
-import { toast } from "@swift-struck/ui/registry/primitives/sonner/sonner"
+import { Breadcrumbs } from "@kwapso/ui/registry/primitives/breadcrumbs/breadcrumbs"
+import { ModeToggle } from "@kwapso/ui/registry/primitives/mode-toggle/mode-toggle"
+import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
+import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Home, Settings, GraduationCap, LifeBuoy, PanelLeftClose, PanelLeftOpen } from "lucide-react"
 
 import type { ActiveTeam } from "@/lib/use-active-team"

@@ -35,7 +35,7 @@ end with a live base you can sign into and build on.
 
 ```bash
 git clone <this-repo> brimba && cd brimba
-npm install            # also pulls @swift-struck/ui from GitHub
+npm install            # also pulls @kwapso/ui from GitHub
 npx wrangler login     # authenticate wrangler to your Cloudflare account
 npm run check          # sanity: TypeScript across every workspace + the full test suite must be green
 ```

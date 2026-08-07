@@ -8,17 +8,17 @@
 
 import * as React from "react"
 
-import { Button } from "@swift-struck/ui/registry/primitives/button/button"
-import { Input } from "@swift-struck/ui/registry/primitives/input/input"
+import { Button } from "@kwapso/ui/registry/primitives/button/button"
+import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@swift-struck/ui/registry/primitives/select/select"
-import { Skeleton } from "@swift-struck/ui/registry/primitives/skeleton/skeleton"
-import { toast } from "@swift-struck/ui/registry/primitives/sonner/sonner"
+} from "@kwapso/ui/registry/primitives/select/select"
+import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
+import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Plus, Pencil, X, Check, Upload, Download, Power, Search } from "lucide-react"
 
 import type { SelectableValue } from "@shared/types"

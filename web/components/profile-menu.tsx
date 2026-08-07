@@ -10,7 +10,7 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@swift-struck/ui/registry/primitives/avatar/avatar"
+} from "@kwapso/ui/registry/primitives/avatar/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,7 +18,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@swift-struck/ui/registry/primitives/dropdown-menu/dropdown-menu"
+} from "@kwapso/ui/registry/primitives/dropdown-menu/dropdown-menu"
 import { LogOut, UserRound } from "lucide-react"
 
 import { auth } from "@/lib/api"

@@ -2,7 +2,7 @@
 // deep-link screen. /t/<teamId>/<module>/<id>?panel|confirm. Kept separate so the
 // resolver component stays focused on data + rendering.
 
-import { parseScreenPath, parseScreenQuery, type ScreenQuery } from "@swift-struck/ui/lib/recipe"
+import { parseScreenPath, parseScreenQuery, type ScreenQuery } from "@kwapso/ui/lib/recipe"
 
 import { TEAM_SECTIONS } from "@/lib/pages"
 

@@ -27,7 +27,7 @@ paste-safe blocks (no `#` comment lines — their shell breaks on them) and say 
 directory to run them in.
 
 ## The library is lego
-UI primitives and collections come from `@swift-struck/ui` (its own repo). Apps
+UI primitives and collections come from `@kwapso/ui` (its own repo). Apps
 assemble screens from them and never fork or hand-roll library components locally.
 If a primitive needs changing, flag the gap (the app's UI-GAPS list) and fix it in
 the library — then every app inherits the fix.

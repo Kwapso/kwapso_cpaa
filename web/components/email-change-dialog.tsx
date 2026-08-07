@@ -7,19 +7,19 @@
 
 import * as React from "react"
 
-import { Button } from "@swift-struck/ui/registry/primitives/button/button"
+import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@swift-struck/ui/registry/primitives/dialog/dialog"
-import { Field } from "@swift-struck/ui/registry/primitives/field/field"
-import { Input } from "@swift-struck/ui/registry/primitives/input/input"
-import { Spinner } from "@swift-struck/ui/registry/primitives/spinner/spinner"
-import { toast } from "@swift-struck/ui/registry/primitives/sonner/sonner"
-import { defaultFieldConfig } from "@swift-struck/ui/lib/config"
+} from "@kwapso/ui/registry/primitives/dialog/dialog"
+import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Input } from "@kwapso/ui/registry/primitives/input/input"
+import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
+import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure, auth } from "@/lib/api"
 import { CodeInput } from "@/components/temp/code-input"

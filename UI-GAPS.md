@@ -1,7 +1,7 @@
 # UI gaps — what the library is missing (the flag list)
 
 Rule: Brimba never invents UI. When a needed component doesn't exist in
-[@swift-struck/ui](https://swift-struck-ui.pages.dev/documentation), we build a
+[@kwapso/ui](https://swift-struck-ui.pages.dev/documentation), we build a
 clearly-marked placeholder in `web/components/temp/`, list it HERE, and the
 library absorbs it later (built + tested there, then re-imported here and the
 placeholder deleted).
@@ -10,7 +10,7 @@ placeholder deleted).
 |---|---|---|---|---|
 | 1 | `code-input` (primitive) — one-time-code boxes | `web/components/temp/code-input.tsx` | Configurable length, auto-advance, backspace, paste-spread, numeric keypad on mobile, `one-time-code` autofill, disabled state | waiting on library |
 | 2 | `auth-card` (collection) — full sign-in card | `web/components/temp/auth-card.tsx` | Config-driven: app name, logo, legal links; two-step email→code flow; error/busy states; uses `code-input` | waiting on library |
-| 3 | ~~`permission-matrix` (collection)~~ | — | The roles access-rights grid. | **SHIPPED in the library (2026-06-13)** — live at `@swift-struck/ui/registry/collections/permission-matrix`; integrated in the Member roles detail under `/t/<teamId>/roles/<id>` (host-composed). Temp removed before it was ever needed. |
+| 3 | ~~`permission-matrix` (collection)~~ | — | The roles access-rights grid. | **SHIPPED in the library (2026-06-13)** — live at `@kwapso/ui/registry/collections/permission-matrix`; integrated in the Member roles detail under `/t/<teamId>/roles/<id>` (host-composed). Temp removed before it was ever needed. |
 | 4 | Collection card-surface config (`data-table`, `permission-matrix`) | (overridden app-side via `className`) | The user wants NO card backgrounds. `permission-matrix` flattens cleanly with `className="bg-transparent"`, but its sticky module column keeps a `bg-card` fill (needed so scrolled cells stay opaque), and `data-table`'s frame lives on an inner div `className` can't reach. Proper fix: a `surface: "card" \| "none"` option on the collection config that also swaps the sticky fill to `bg-background`. | **nice-to-have — flag for the library** |
 | 5 | ~~`dropdown-menu` (+ `glass` popovers) translucent~~ | — | Menus over page content were see-through (the `glass` 72%-opaque surface, no `bg-popover`). | **SHIPPED in the library (2026-06-18, `c31a35c`)** — `dropdown-menu`/`popover`/`hover-card` now render on an opaque `bg-popover` surface (light + dark). App-side inline stopgaps removed. |
 | 6 | ~~Selectable list-row (collection)~~ | — | The role list needed a selected/active highlight; the `list` collection was hover-only. | **SHIPPED in the library (2026-06-18, `c31a35c`)** — `list` now has an opt-in `selectedId`/`onSelect` with an accessible teal accent (`aria-current`/`data-[selected]`) that reads in both themes and keeps the leading icon legible. The engine's role screens use it; the hand-built rows are gone (the old `roles-panel.tsx` host file was itself retired in the M3 engine migration). |
@@ -22,7 +22,7 @@ placeholder deleted).
 | 12 | ~~`list` **surface="none" row-group rounding**~~ | — | A flat list's full-bleed hover/selected row showed square corners inside a rounded host card. | **SHIPPED in the library (0.4.0, 2026-07-07)** — the flat list rounds + clips its own row-group (`rounded-xl` + the existing overflow-hidden); host override removed from `CollectionCard`. |
 | 13 | ~~AgentChat **composer-native attach**~~ | — | The paperclip belonged INSIDE the composer (Intercom-style), not a host strip. | **SHIPPED in the library (0.4.0, 2026-07-07)** — `onAttachFiles` / `attachAccept` / `attachments` / `onRemoveAttachment` on `AgentChat`; Brimba's host strip replaced with the composer-native slot (panel-wide drop kept). |
 
-When the library ships one: re-run `npm install github:alaap-swift-struck/swift-struck-ui`,
+When the library ships one: re-run `npm install github:Kwapso/kwapso_ui`,
 swap the import, delete the temp file, update this table.
 
 ## Composition candidates (built from primitives here; could graduate to the library)

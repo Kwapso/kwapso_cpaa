@@ -9,24 +9,24 @@
 
 import * as React from "react"
 
-import { Button } from "@swift-struck/ui/registry/primitives/button/button"
-import { Skeleton } from "@swift-struck/ui/registry/primitives/skeleton/skeleton"
-import { toast } from "@swift-struck/ui/registry/primitives/sonner/sonner"
-import { TabsView, defaultTabsConfig } from "@swift-struck/ui/registry/primitives/tabs/tabs"
+import { Button } from "@kwapso/ui/registry/primitives/button/button"
+import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
+import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import {
   DescriptionList,
   defaultDescriptionListConfig,
-} from "@swift-struck/ui/registry/collections/description-list/description-list"
+} from "@kwapso/ui/registry/collections/description-list/description-list"
 import {
   ActivityFeed,
   defaultActivityFeedConfig,
   type ActivityItem as ActivityFeedItem,
-} from "@swift-struck/ui/registry/collections/activity-feed/activity-feed"
+} from "@kwapso/ui/registry/collections/activity-feed/activity-feed"
 import {
   TicketThread,
   type TicketMember,
   type TicketStatus,
-} from "@swift-struck/ui/registry/collections/ticket-thread/ticket-thread"
+} from "@kwapso/ui/registry/collections/ticket-thread/ticket-thread"
 import { Pencil } from "lucide-react"
 
 import type {

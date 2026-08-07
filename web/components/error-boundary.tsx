@@ -7,7 +7,7 @@
 
 import * as React from "react"
 
-import { Button } from "@swift-struck/ui/registry/primitives/button/button"
+import { Button } from "@kwapso/ui/registry/primitives/button/button"
 
 import { reportError } from "@/lib/log"
 

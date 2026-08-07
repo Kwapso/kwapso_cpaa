@@ -7,17 +7,17 @@
 
 import * as React from "react"
 
-import { Avatar, AvatarFallback, AvatarImage } from "@swift-struck/ui/registry/primitives/avatar/avatar"
-import { Badge } from "@swift-struck/ui/registry/primitives/badge/badge"
-import { Button } from "@swift-struck/ui/registry/primitives/button/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@kwapso/ui/registry/primitives/avatar/avatar"
+import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
+import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@swift-struck/ui/registry/primitives/select/select"
-import { toast } from "@swift-struck/ui/registry/primitives/sonner/sonner"
+} from "@kwapso/ui/registry/primitives/select/select"
+import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { UserPlus } from "lucide-react"
 
 import type { HelpStakeholder, TeamMember } from "@shared/types"

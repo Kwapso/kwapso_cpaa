@@ -19,8 +19,8 @@ import {
   type ScreenData,
   type ScreenActionContext,
   type ScreenIntent,
-} from "@swift-struck/ui/registry/collections/screen-renderer/screen-renderer"
-import type { ScreenRecipe, ScreenRights } from "@swift-struck/ui/lib/recipe"
+} from "@kwapso/ui/registry/collections/screen-renderer/screen-renderer"
+import type { ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
 
 import { isScreenRecipe } from "@/lib/screens"
 

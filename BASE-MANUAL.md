@@ -101,7 +101,7 @@ worker reads and writes team data through that one layer — never ad-hoc.
 
 `web/` is a Next.js app exported to **static** assets, served by the gateway
 alongside `/api/*` on the same origin. It is "lego assembled from a library": all
-UI primitives and collections come from `@swift-struck/ui` (a separate repo);
+UI primitives and collections come from `@kwapso/ui` (a separate repo);
 `web/` only composes *recipes* from them. **You do not edit the library from
 here** — if a primitive needs changing, surface it as a gap (UI-GAPS.md), don't
 fork it into the host. Screens are one client-resolved shell
@@ -440,7 +440,7 @@ for some products and wrong for others.
    portal where tenants share a team.
 
 **What a new product must NOT do.** Don't fork the UI library into the app (fix it in
-`@swift-struck/ui`), don't add a public worker (only the gateway is public), don't add
+`@kwapso/ui`), don't add a public worker (only the gateway is public), don't add
 a per-module database (one D1 per *team*, not per module — modules are tables inside
 it), and don't relitigate the locked decisions in ARCHITECTURE.md without a deliberate
 reason. Staying inside the seams is what keeps a big product lean and secure.

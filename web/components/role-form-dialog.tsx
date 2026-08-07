@@ -6,20 +6,20 @@
 
 import * as React from "react"
 
-import { Button } from "@swift-struck/ui/registry/primitives/button/button"
+import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
-} from "@swift-struck/ui/registry/primitives/dialog/dialog"
-import { Field } from "@swift-struck/ui/registry/primitives/field/field"
+} from "@kwapso/ui/registry/primitives/dialog/dialog"
+import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { FormShell, fieldSpacing } from "@/components/form-shell"
-import { Input } from "@swift-struck/ui/registry/primitives/input/input"
-import { Textarea } from "@swift-struck/ui/registry/primitives/textarea/textarea"
-import { Spinner } from "@swift-struck/ui/registry/primitives/spinner/spinner"
-import { toast } from "@swift-struck/ui/registry/primitives/sonner/sonner"
-import { defaultFieldConfig } from "@swift-struck/ui/lib/config"
+import { Input } from "@kwapso/ui/registry/primitives/input/input"
+import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
+import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
+import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
 import { useFormDraft } from "@/lib/use-form-draft"

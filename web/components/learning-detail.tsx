@@ -8,23 +8,23 @@
 
 import * as React from "react"
 
-import { Badge } from "@swift-struck/ui/registry/primitives/badge/badge"
-import { Button } from "@swift-struck/ui/registry/primitives/button/button"
-import { Skeleton } from "@swift-struck/ui/registry/primitives/skeleton/skeleton"
-import { Spinner } from "@swift-struck/ui/registry/primitives/spinner/spinner"
-import { toast } from "@swift-struck/ui/registry/primitives/sonner/sonner"
-import { ProgressToggle } from "@swift-struck/ui/registry/primitives/progress-toggle/progress-toggle"
-import { TabsView, defaultTabsConfig } from "@swift-struck/ui/registry/primitives/tabs/tabs"
-import { WebEmbed } from "@swift-struck/ui/registry/primitives/web-embed/web-embed"
+import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
+import { Button } from "@kwapso/ui/registry/primitives/button/button"
+import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
+import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
+import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+import { ProgressToggle } from "@kwapso/ui/registry/primitives/progress-toggle/progress-toggle"
+import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
+import { WebEmbed } from "@kwapso/ui/registry/primitives/web-embed/web-embed"
 import {
   DescriptionList,
   defaultDescriptionListConfig,
-} from "@swift-struck/ui/registry/collections/description-list/description-list"
+} from "@kwapso/ui/registry/collections/description-list/description-list"
 import {
   ActivityFeed,
   defaultActivityFeedConfig,
   type ActivityItem as ActivityFeedItem,
-} from "@swift-struck/ui/registry/collections/activity-feed/activity-feed"
+} from "@kwapso/ui/registry/collections/activity-feed/activity-feed"
 import { Pencil, Power } from "lucide-react"
 
 import type { ActivityItem, Learning, SelectableValue } from "@shared/types"

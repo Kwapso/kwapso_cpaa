@@ -8,14 +8,14 @@
 
 import * as React from "react"
 
-import { Skeleton } from "@swift-struck/ui/registry/primitives/skeleton/skeleton"
-import { TabsView, defaultTabsConfig } from "@swift-struck/ui/registry/primitives/tabs/tabs"
+import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
+import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import {
   ScreenRenderer,
   type ScreenActionContext,
   type ScreenIntent,
-} from "@swift-struck/ui/registry/collections/screen-renderer/screen-renderer"
-import { type ScreenQuery, type ScreenRights } from "@swift-struck/ui/lib/recipe"
+} from "@kwapso/ui/registry/collections/screen-renderer/screen-renderer"
+import { type ScreenQuery, type ScreenRights } from "@kwapso/ui/lib/recipe"
 
 import { RoleDetailScreen } from "@/components/role-detail"
 import { LearningDetailScreen } from "@/components/learning-detail"

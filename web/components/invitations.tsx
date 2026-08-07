@@ -13,12 +13,12 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@swift-struck/ui/registry/primitives/avatar/avatar"
-import { Button } from "@swift-struck/ui/registry/primitives/button/button"
-import { List } from "@swift-struck/ui/registry/collections/list/list"
-import { Skeleton } from "@swift-struck/ui/registry/primitives/skeleton/skeleton"
-import { Spinner } from "@swift-struck/ui/registry/primitives/spinner/spinner"
-import { toast } from "@swift-struck/ui/registry/primitives/sonner/sonner"
+} from "@kwapso/ui/registry/primitives/avatar/avatar"
+import { Button } from "@kwapso/ui/registry/primitives/button/button"
+import { List } from "@kwapso/ui/registry/collections/list/list"
+import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
+import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
+import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 
 import type { ReceivedInvite } from "@shared/types"
 import { ApiFailure, tenancy } from "@/lib/api"

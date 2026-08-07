@@ -15,10 +15,10 @@
 import * as React from "react"
 import { Download, FileSpreadsheet, Sparkles, Upload, X } from "lucide-react"
 
-import { Button } from "@swift-struck/ui/registry/primitives/button/button"
-import { Badge } from "@swift-struck/ui/registry/primitives/badge/badge"
-import { Skeleton } from "@swift-struck/ui/registry/primitives/skeleton/skeleton"
-import { toast } from "@swift-struck/ui/registry/primitives/sonner/sonner"
+import { Button } from "@kwapso/ui/registry/primitives/button/button"
+import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
+import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
+import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 
 import type { ImportableTarget, ImportBatchReport, ImportBatchSummary, ImportBatchView } from "@shared/types"
 import { ApiFailure, dataOps } from "@/lib/api"

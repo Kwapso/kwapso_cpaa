@@ -13,8 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from "@swift-struck/ui/registry/primitives/dialog/dialog"
-import { ScrollArea } from "@swift-struck/ui/registry/primitives/scroll-area/scroll-area"
+} from "@kwapso/ui/registry/primitives/dialog/dialog"
+import { ScrollArea } from "@kwapso/ui/registry/primitives/scroll-area/scroll-area"
 
 import type { AgentThread } from "@shared/types"
 import { dataOps } from "@/lib/api"

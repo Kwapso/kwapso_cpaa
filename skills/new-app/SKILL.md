@@ -193,8 +193,8 @@ seams — all identity, no plumbing:
 - **Icons** — drop the real logo into `web/public/icons/` (edit the SVGs or set
   `brand.logoUrl`), then `node scripts/gen-icons.mjs` regenerates the PNG set. The
   web manifest (`web/app/manifest.ts`) reads brand.ts automatically.
-- **The library theme** — `web/app/globals.css` is a COPY of the `@swift-struck/ui`
-  theme (master: swift-struck-ui repo); deeper theme changes belong in the library.
+- **The library theme** — `web/app/globals.css` is a COPY of the `@kwapso/ui`
+  theme (master: kwapso_ui repo); deeper theme changes belong in the library.
 - **Email sender** — verify a domain in Resend and set `EMAIL_FROM` in
   `workers/auth/wrangler.jsonc` when real users need emails.
 - **Next steps** — first product module via the repo's `BUILD-A-MODULE.md`; agent

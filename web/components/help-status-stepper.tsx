@@ -10,7 +10,7 @@
 // status mapping (the reopen nuance + the "Reopened" pill) and the same external
 // props so help-detail needs no change.
 
-import { StatusStepper, type StepperTone } from "@swift-struck/ui/registry/primitives/status-stepper/status-stepper"
+import { StatusStepper, type StepperTone } from "@kwapso/ui/registry/primitives/status-stepper/status-stepper"
 
 export type HelpStatusValue = "open" | "in_progress" | "resolved" | "reopened"
 

@@ -8,9 +8,9 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@swift-struck/ui/registry/primitives/avatar/avatar"
-import { Badge } from "@swift-struck/ui/registry/primitives/badge/badge"
-import { Button } from "@swift-struck/ui/registry/primitives/button/button"
+} from "@kwapso/ui/registry/primitives/avatar/avatar"
+import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
+import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,8 +18,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@swift-struck/ui/registry/primitives/dropdown-menu/dropdown-menu"
-import { toast } from "@swift-struck/ui/registry/primitives/sonner/sonner"
+} from "@kwapso/ui/registry/primitives/dropdown-menu/dropdown-menu"
+import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Check, ChevronsUpDown, Inbox, Plus } from "lucide-react"
 
 import { useReceivedInvites } from "@/components/invitations"

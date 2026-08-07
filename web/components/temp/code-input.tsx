@@ -2,12 +2,12 @@
 
 // TEMPORARY PLACEHOLDER — flagged in UI-GAPS.md.
 // The library has no one-time-code input yet. This stand-in composes six
-// library Inputs (auto-advance, backspace, paste). Once @swift-struck/ui
+// library Inputs (auto-advance, backspace, paste). Once @kwapso/ui
 // ships `code-input`, this file gets DELETED and imports swap to the library.
 
 import * as React from "react"
 
-import { Input } from "@swift-struck/ui/registry/primitives/input/input"
+import { Input } from "@kwapso/ui/registry/primitives/input/input"
 
 export function CodeInput({
   length = 6,

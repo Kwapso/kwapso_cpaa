@@ -101,7 +101,7 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
    the `/t/<teamId>/<module>/<id>` deep-link grammar the team area runs on.
 10. **[UI-GAPS.md](UI-GAPS.md)** — the running list of library gaps to close (UI is
     fixed in the library, not per-app).
-11. The UI comes ONLY from **[@swift-struck/ui](https://swift-struck-ui.pages.dev/documentation)**
+11. The UI comes ONLY from **[@kwapso/ui](https://swift-struck-ui.pages.dev/documentation)**
     (installed from GitHub). Missing a component? Add it to the LIBRARY first —
     never build one-off UI here.
 

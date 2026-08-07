@@ -11,7 +11,7 @@
 
 import * as React from "react"
 
-import { Separator } from "@swift-struck/ui/registry/primitives/separator/separator"
+import { Separator } from "@kwapso/ui/registry/primitives/separator/separator"
 
 export function FormShell({
   title,

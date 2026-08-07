@@ -8,9 +8,9 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@swift-struck/ui/registry/primitives/avatar/avatar"
-import { Badge } from "@swift-struck/ui/registry/primitives/badge/badge"
-import { List } from "@swift-struck/ui/registry/collections/list/list"
+} from "@kwapso/ui/registry/primitives/avatar/avatar"
+import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
+import { List } from "@kwapso/ui/registry/collections/list/list"
 import { Users, Settings, ChevronRight } from "lucide-react"
 
 import { letterMark } from "@/lib/identity"

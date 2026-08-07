@@ -9,8 +9,8 @@
 
 import * as React from "react"
 
-import { Skeleton } from "@swift-struck/ui/registry/primitives/skeleton/skeleton"
-import { ProgressDashboard } from "@swift-struck/ui/registry/collections/progress-dashboard/progress-dashboard"
+import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
+import { ProgressDashboard } from "@kwapso/ui/registry/collections/progress-dashboard/progress-dashboard"
 
 import type { Learning, LearningProgressEntry, TeamMember } from "@shared/types"
 import { content, tenancy } from "@/lib/api"

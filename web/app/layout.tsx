@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from "next"
 import { Inter } from "next/font/google"
 
-import { AmbientBackground } from "@swift-struck/ui/registry/primitives/ambient-background/ambient-background"
-import { Toaster } from "@swift-struck/ui/registry/primitives/sonner/sonner"
-import { ThemeProvider } from "@swift-struck/ui/registry/tokens/theme-provider"
+import { AmbientBackground } from "@kwapso/ui/registry/primitives/ambient-background/ambient-background"
+import { Toaster } from "@kwapso/ui/registry/primitives/sonner/sonner"
+import { ThemeProvider } from "@kwapso/ui/registry/tokens/theme-provider"
 import { brand } from "@shared/brand"
 import { AgentHost } from "@/components/agent-host"
 import { ErrorBoundary } from "@/components/error-boundary"

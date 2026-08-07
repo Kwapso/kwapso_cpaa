@@ -11,7 +11,7 @@ the voice section.
 
 The one-line mental model:
 
-> **The library (`@swift-struck/ui`) is the lego. `web/` is the instructions for
+> **The library (`@kwapso/ui`) is the lego. `web/` is the instructions for
 > this particular model. Whole screens are described as _data_ (recipes) and rendered
 > by the library engine; the few screens the engine can't express are host-composed
 > from the same primitives. Everything speaks one dictionary and obeys one set of
@@ -21,23 +21,23 @@ The one-line mental model:
 
 ## 1. The library is lego — never fork it into the host
 
-Brimba's primitives and collections come from **`@swift-struck/ui`**, a **separate
-repo** (`github:alaap-swift-struck/swift-struck-ui`), pinned in both
+Brimba's primitives and collections come from **`@kwapso/ui`**, a **separate
+repo** (`github:Kwapso/kwapso_ui`), pinned in both
 `package.json` and `web/package.json`. The host imports them by their registry path:
 
 ```ts
 // web/components/app-shell.tsx
-import { Breadcrumbs } from "@swift-struck/ui/registry/primitives/breadcrumbs/breadcrumbs"
-import { ModeToggle }  from "@swift-struck/ui/registry/primitives/mode-toggle/mode-toggle"
-import { toast }       from "@swift-struck/ui/registry/primitives/sonner/sonner"
+import { Breadcrumbs } from "@kwapso/ui/registry/primitives/breadcrumbs/breadcrumbs"
+import { ModeToggle }  from "@kwapso/ui/registry/primitives/mode-toggle/mode-toggle"
+import { toast }       from "@kwapso/ui/registry/primitives/sonner/sonner"
 ```
 
 The theme itself is imported, not copied — `web/app/globals.css`:
 
 ```css
 /* THE theme — imported straight from the library package. ONE master copy
- * (swift-struck-ui repo, styles.css); this app never carries its own. */
-@import "@swift-struck/ui/styles.css";
+ * (kwapso_ui repo, styles.css); this app never carries its own. */
+@import "@kwapso/ui/styles.css";
 ```
 
 **The rule:** `web/` **assembles** recipes from library lego. It does **not** edit
@@ -46,7 +46,7 @@ awkward.
 
 ### When a primitive needs to change
 
-You (the agent) cannot edit `@swift-struck/ui` from this repo — it's owned and
+You (the agent) cannot edit `@kwapso/ui` from this repo — it's owned and
 deployed separately (the owner runs it). So:
 
 1. **Surface it.** Say plainly which primitive is wrong and what it needs.
@@ -500,7 +500,7 @@ Every screen renders over the library's **`AmbientBackground`**, mounted once in
 
 ```tsx
 // web/app/layout.tsx
-import { AmbientBackground } from "@swift-struck/ui/registry/primitives/ambient-background/ambient-background"
+import { AmbientBackground } from "@kwapso/ui/registry/primitives/ambient-background/ambient-background"
 // …
 <AmbientBackground />
 ```

@@ -601,7 +601,7 @@ AFTER SHIP
 - **A per-module activity query.** Read history only via the generic `record` path (R5).
 - **A collection tab with a hand-listed count.** Declare a `countCacheKey` (R8).
 - **Refetching the whole list on a change.** Row-level live-sync only. (CACHING.md.)
-- **A new worker for a new module, or editing `@swift-struck/ui`.** Add routes to an
+- **A new worker for a new module, or editing `@kwapso/ui`.** Add routes to an
   existing worker; the library is lego you assemble, not fork. (CLAUDE.md.)
 ```
 

@@ -1,4 +1,4 @@
-import type { ScreenRecipe } from "@swift-struck/ui/lib/recipe"
+import type { ScreenRecipe } from "@kwapso/ui/lib/recipe"
 import { describe, expect, it } from "vitest"
 
 import { BASE_RECIPES, isScreenRecipe, resolveRecipe, withoutActions } from "@/lib/screens"

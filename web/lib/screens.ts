@@ -1,5 +1,5 @@
 // Base screen recipes — whole screens described as DATA, rendered by the library
-// engine (@swift-struck/ui ScreenRenderer). The host (deep-link-screen.tsx)
+// engine (@kwapso/ui ScreenRenderer). The host (deep-link-screen.tsx)
 // shapes app types into the flat rows/records these recipes reference, supplies
 // the per-module rights, dispatches the named actions, and owns the router. A
 // team can OVERRIDE any recipe at runtime via the config store (M2); the
@@ -7,13 +7,13 @@
 // module is the friendly URL segment used in the deep-link grammar
 // (/t/<teamId>/<module>/<id>).
 
-import type { RecipeAction, RecipeField, ScreenRecipe } from "@swift-struck/ui/lib/recipe"
+import type { RecipeAction, RecipeField, ScreenRecipe } from "@kwapso/ui/lib/recipe"
 import {
   defaultCollectionConfig,
   defaultFieldConfig,
   type CollectionConfig,
   type FilterFacet,
-} from "@swift-struck/ui/lib/config"
+} from "@kwapso/ui/lib/config"
 
 import { CONCEPT_ICON } from "@/lib/pages"
 

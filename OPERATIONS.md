@@ -140,6 +140,6 @@ both owner-only:
 
 ## Notes
 
-- The UI library (`@swift-struck/ui`) installs from GitHub. Update: `npm install github:alaap-swift-struck/swift-struck-ui`.
-- `web/app/globals.css` is a COPY of the library theme (master: swift-struck-ui repo, www/app/globals.css). Its `@source` points at the ROOT node_modules (workspaces hoist).
+- The UI library (`@kwapso/ui`) installs from GitHub. Update: `npm install github:Kwapso/kwapso_ui`.
+- `web/app/globals.css` is a COPY of the library theme (master: kwapso_ui repo, www/app/globals.css). Its `@source` points at the ROOT node_modules (workspaces hoist).
 - Missing UI components are placeholdered in `web/components/temp/` and tracked in UI-GAPS.md — the library absorbs them, then placeholders get deleted.

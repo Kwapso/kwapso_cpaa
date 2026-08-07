@@ -18,7 +18,7 @@
 
 import * as React from "react"
 
-import { toast } from "@swift-struck/ui/registry/primitives/sonner/sonner"
+import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 
 // Reload-loop guard: set just before the chunk-error reload, cleared once a
 // fresh load runs this module again. If it's still set, the reload didn't fix

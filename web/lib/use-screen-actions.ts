@@ -15,7 +15,7 @@
 
 import * as React from "react"
 
-import { toast } from "@swift-struck/ui/registry/primitives/sonner/sonner"
+import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 
 import { content as contentApi, tenancy } from "@/lib/api"
 import { invalidate, primeCache } from "@/lib/store"

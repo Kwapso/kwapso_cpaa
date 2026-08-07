@@ -4,8 +4,8 @@
 
 import * as React from "react"
 
-import { Button } from "@swift-struck/ui/registry/primitives/button/button"
-import { Card, CardContent } from "@swift-struck/ui/registry/primitives/card/card"
+import { Button } from "@kwapso/ui/registry/primitives/button/button"
+import { Card, CardContent } from "@kwapso/ui/registry/primitives/card/card"
 import { Plus, Mail, Upload, Download } from "lucide-react"
 
 export function NoAccess() {

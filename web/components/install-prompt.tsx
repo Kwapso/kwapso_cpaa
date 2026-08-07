@@ -14,13 +14,13 @@
 // Mechanics: Chrome/Edge/Android fire `beforeinstallprompt` → we show a real
 // "Install" button that calls the captured event. iOS Safari fires no such
 // event, so we show the manual "Share → Add to Home Screen" walkthrough.
-// Composed entirely from @swift-struck/ui (Sheet + Button) — no one-off UI.
+// Composed entirely from @kwapso/ui (Sheet + Button) — no one-off UI.
 
 import * as React from "react"
 import { usePathname } from "next/navigation"
 import { Download, Plus, Share } from "lucide-react"
 
-import { Button } from "@swift-struck/ui/registry/primitives/button/button"
+import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import {
   Sheet,
   SheetContent,
@@ -28,7 +28,7 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
-} from "@swift-struck/ui/registry/primitives/sheet/sheet"
+} from "@kwapso/ui/registry/primitives/sheet/sheet"
 
 import { brand } from "@shared/brand"
 import { detectPlatform, isIOSSafari, isStandalone, type PwaPlatform } from "@/lib/pwa"
