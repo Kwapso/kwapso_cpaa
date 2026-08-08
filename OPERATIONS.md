@@ -163,3 +163,13 @@ Routes → Add custom domain. Cloudflare writes the DNS record and issues the ce
 
 NOTE: `portal.kwapso.app` is NOT ours — it is the legacy Glide client portal, live and
 serving clients. It stays untouched until cutover, which is a single DNS record change.
+
+## Email sending — the domain split (decided 2026-08-08)
+
+**kwapso.com is NOT ours to touch.** It carries the website and Google Workspace mail
+for the business. Nothing in this project writes DNS there.
+
+**kwapso.app is the app domain.** It has no mail of its own, so it is where the
+application sends from: `kwapso <alerts@kwapso.app>`, verified in Resend (EU region).
+The three Resend records live on their own subdomains (`resend._domainkey`, `send`) and
+cannot affect kwapso.com in any way.

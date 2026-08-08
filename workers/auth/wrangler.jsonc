@@ -28,7 +28,7 @@
   "services": [{ "binding": "REALTIME", "service": "kwapso-realtime" }],
   "vars": {
     "APP_ORIGIN": "https://kwapso.kwapso.workers.dev",
-    "EMAIL_FROM": "kwapso <alerts@kwapso.com>",
+    "EMAIL_FROM": "kwapso <alerts@kwapso.app>",
     // Ships with the deploy: the test-login door refuses outright here.
     "ENVIRONMENT": "production"
   },
@@ -52,7 +52,7 @@
       "services": [{ "binding": "REALTIME", "service": "kwapso-realtime-staging" }],
       "vars": {
         "APP_ORIGIN": "https://kwapso-staging.kwapso.workers.dev",
-        "EMAIL_FROM": "kwapso <alerts@kwapso.com>",
+        "EMAIL_FROM": "kwapso <alerts@kwapso.app>",
         "ENVIRONMENT": "staging"
       }
     }
