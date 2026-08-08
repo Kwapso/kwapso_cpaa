@@ -14,7 +14,7 @@
     {
       "binding": "DB",
       "database_name": "kwapso-core",
-      "database_id": "7196438c-5572-4317-b1e4-48084ab6e3ad",
+      "database_id": "e55a2c0f-346a-4056-b01c-7869a8b253dc",
       "migrations_dir": "../../db/core"
     }
   ],
@@ -26,7 +26,7 @@
     { "binding": "LEARNING_MEDIA", "bucket_name": "kwapso-learning-media" },
     { "binding": "HELP_MEDIA", "bucket_name": "kwapso-help-media" }
   ],
-  "vars": { "CF_ACCOUNT_ID": "af3f1bf82aa34512f4f6630091358439" },
+  "vars": { "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7" },
   // No cron — content modules have no nightly housekeeping.
   "env": {
     "staging": {
@@ -38,7 +38,7 @@
         {
           "binding": "DB",
           "database_name": "kwapso-core-staging",
-          "database_id": "68a9a2f6-13af-4d73-932e-ab38b40cc5b6",
+          "database_id": "1df02340-fc91-4cac-8ccb-d19528dcd9f7",
           "migrations_dir": "../../db/core"
         }
       ],
@@ -50,7 +50,7 @@
         { "binding": "LEARNING_MEDIA", "bucket_name": "kwapso-learning-media-staging" },
         { "binding": "HELP_MEDIA", "bucket_name": "kwapso-help-media-staging" }
       ],
-      "vars": { "CF_ACCOUNT_ID": "af3f1bf82aa34512f4f6630091358439" }
+      "vars": { "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7" }
     }
   }
 }

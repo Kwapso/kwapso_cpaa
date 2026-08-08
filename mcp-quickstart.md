@@ -11,15 +11,15 @@ capped by your role** — never more. There's no separate "API key with god powe
 ## 1 · Get in
 
 1. **Sign in** to the app (email + a 6-digit code — no passwords):
-   - Production: `https://kwapso.<workers-subdomain>.workers.dev`
-   - Staging: `https://kwapso-staging.<workers-subdomain>.workers.dev`
+   - Production: `https://kwapso.kwapso.workers.dev`
+   - Staging: `https://kwapso-staging.kwapso.workers.dev`
    (If you're not on the team yet, ask the owner to invite you.)
 2. **Settings → Access tokens → New token.** Name it, then **copy the secret now** —
    it's shown once and looks like `kwapso_mcp_…`. Treat it like a password.
 
 ## 2 · The endpoint
 
-`POST https://kwapso.<workers-subdomain>.workers.dev/mcp` — JSON-RPC 2.0, authenticated with
+`POST https://kwapso.kwapso.workers.dev/mcp` — JSON-RPC 2.0, authenticated with
 `Authorization: Bearer <your token>`. (Staging: same path on the staging host.)
 
 ## 3 · Connect
@@ -36,7 +36,7 @@ capped by your role** — never more. There's no separate "API key with god powe
       "command": "npx",
       "args": [
         "mcp-remote",
-        "https://kwapso.<workers-subdomain>.workers.dev/mcp",
+        "https://kwapso.kwapso.workers.dev/mcp",
         "--header", "Authorization: Bearer kwapso_mcp_YOUR_TOKEN"
       ]
     }
@@ -50,7 +50,7 @@ any AI" button gives you this with your host + token already filled in):
 ```
 Connect to my Brimba workspace over MCP (Model Context Protocol).
 
-Endpoint: https://kwapso.<workers-subdomain>.workers.dev/mcp
+Endpoint: https://kwapso.kwapso.workers.dev/mcp
 Auth header: Authorization: Bearer kwapso_mcp_YOUR_TOKEN
 Protocol: MCP over HTTP — JSON-RPC 2.0 (initialize, tools/list, tools/call)
 
@@ -62,7 +62,7 @@ agent_confirm, plan_import) use the team's AI quota.
 **Test with curl:**
 
 ```bash
-curl -s https://kwapso.<workers-subdomain>.workers.dev/mcp \
+curl -s https://kwapso.kwapso.workers.dev/mcp \
   -H "Authorization: Bearer kwapso_mcp_YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'

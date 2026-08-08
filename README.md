@@ -24,8 +24,8 @@ UPDATED 2026-06-21: the team area (Overview, Members, Member roles, Invites)
 now lives at `/t/<teamId>/…` deep-link URLs (rendered by the screen engine),
 not under Settings; top-level `/members` and `/roles` are thin redirects there.
 
-- **Production:** https://kwapso.<workers-subdomain>.workers.dev
-- **Staging:** https://kwapso-staging.<workers-subdomain>.workers.dev
+- **Production:** https://kwapso.kwapso.workers.dev
+- **Staging:** https://kwapso-staging.kwapso.workers.dev
 
 ## The documents
 

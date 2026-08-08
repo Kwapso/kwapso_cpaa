@@ -102,8 +102,8 @@ repo today — sweep them all, then verify:
   the reset database names, and the `github_remote` — the ship and reset skills read
   this file.
 - **Host URLs in the docs (easy to miss — the `kwapso-` rename skips them).** The base's
-  live hosts appear hardcoded as **`kwapso.<workers-subdomain>.workers.dev`** (production, no
-  hyphen) and **`kwapso-staging.<workers-subdomain>.workers.dev`** (staging) in `MCP.md`,
+  live hosts appear hardcoded as **`kwapso.kwapso.workers.dev`** (production, no
+  hyphen) and **`kwapso-staging.kwapso.workers.dev`** (staging) in `MCP.md`,
   `mcp-quickstart.md`, `BOOTSTRAP.md`, `PLATFORMS.md`, and `README.md`. These are **live
   references, not history** — replace the `kwapso`/`kwapso-staging` host part with the new
   app's hosts everywhere (a `kwapso-` prefix rename alone MISSES `brimba.` with a dot).

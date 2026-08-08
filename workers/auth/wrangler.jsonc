@@ -18,7 +18,7 @@
     {
       "binding": "DB",
       "database_name": "kwapso-core",
-      "database_id": "7196438c-5572-4317-b1e4-48084ab6e3ad",
+      "database_id": "e55a2c0f-346a-4056-b01c-7869a8b253dc",
       "migrations_dir": "../../db/core"
     }
   ],
@@ -27,7 +27,7 @@
   // to a user's OWN channel through the realtime worker.
   "services": [{ "binding": "REALTIME", "service": "kwapso-realtime" }],
   "vars": {
-    "APP_ORIGIN": "https://kwapso.<workers-subdomain>.workers.dev",
+    "APP_ORIGIN": "https://kwapso.kwapso.workers.dev",
     "EMAIL_FROM": "noreply@updates.swiftstruck.com",
     // Ships with the deploy: the test-login door refuses outright here.
     "ENVIRONMENT": "production"
@@ -42,7 +42,7 @@
         {
           "binding": "DB",
           "database_name": "kwapso-core-staging",
-          "database_id": "68a9a2f6-13af-4d73-932e-ab38b40cc5b6",
+          "database_id": "1df02340-fc91-4cac-8ccb-d19528dcd9f7",
           "migrations_dir": "../../db/core"
         }
       ],
@@ -51,7 +51,7 @@
       ],
       "services": [{ "binding": "REALTIME", "service": "kwapso-realtime-staging" }],
       "vars": {
-        "APP_ORIGIN": "https://kwapso-staging.<workers-subdomain>.workers.dev",
+        "APP_ORIGIN": "https://kwapso-staging.kwapso.workers.dev",
         "EMAIL_FROM": "noreply@updates.swiftstruck.com",
         "ENVIRONMENT": "staging"
       }

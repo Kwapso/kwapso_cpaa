@@ -5,7 +5,7 @@
 // Uses one fixed smoke account: the first run exercises the full team
 // factory; later runs prove idempotency (and don't litter team databases).
 
-const BASE = process.env.SMOKE_BASE ?? "https://kwapso-staging.<workers-subdomain>.workers.dev"
+const BASE = process.env.SMOKE_BASE ?? "https://kwapso-staging.kwapso.workers.dev"
 // Resend's test inbox: real send path, always "delivered", never bounces —
 // so running the smoke repeatedly doesn't hurt the sending domain's reputation.
 const EMAIL = "delivered@resend.dev"

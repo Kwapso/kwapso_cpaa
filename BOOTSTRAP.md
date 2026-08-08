@@ -157,7 +157,7 @@ ARCHITECTURE.md `/media/*` note before storing anything sensitive.
   writes). The checked-in value is the original author's account — **overwrite it** in
   both the top-level and `env.staging` vars blocks of those three workers.
 - `tenancy` → `PUBLIC_APP_URL` = the environment's absolute origin (e.g.
-  `https://kwapso-staging.<workers-subdomain>.workers.dev`). Outbound email links use it;
+  `https://kwapso-staging.kwapso.workers.dev`). Outbound email links use it;
   leave it unset and agent-sent invite links point at the internal binding host.
 - `auth` → `APP_ORIGIN` / `EMAIL_FROM` — pinned to the author's URLs/domain; update
   them if yours differ.

@@ -35,7 +35,7 @@ BASE_URL=http://localhost:3000 npm run test:e2e --workspace=kwapso-web
 ```
 
 `BASE_URL` defaults to the staging URL
-(`https://kwapso-staging.<workers-subdomain>.workers.dev`, see `OPERATIONS.md`).
+(`https://kwapso-staging.kwapso.workers.dev`, see `OPERATIONS.md`).
 
 ## Notes / TODOs
 

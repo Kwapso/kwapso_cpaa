@@ -5,8 +5,8 @@ How this project ships. /ship-staging and /ship-production read the config below
 ## Deploy config
 
 - platform: cloudflare-workers (gateway worker serves the app + routes /api)
-- staging_url: https://kwapso-staging.<workers-subdomain>.workers.dev
-- production_url: https://kwapso.<workers-subdomain>.workers.dev
+- staging_url: https://kwapso-staging.kwapso.workers.dev
+- production_url: https://kwapso.kwapso.workers.dev
 - build_command: npm run build (root; builds web/ static export to web/out)
 - deploy_staging_command: npm run deploy:staging (root; builds web/ then deploys ALL seven workers realtime-first: realtime → auth → tenancy → content → data-ops → mcp → gateway, staging names)
 - deploy_production_command: npm run deploy:production (root; same seven-worker realtime-first order, production names)
@@ -143,3 +143,23 @@ both owner-only:
 - The UI library (`@kwapso/ui`) installs from GitHub. Update: `npm install github:Kwapso/kwapso_ui`.
 - `web/app/globals.css` is a COPY of the library theme (master: kwapso_ui repo, www/app/globals.css). Its `@source` points at the ROOT node_modules (workspaces hoist).
 - Missing UI components are placeholdered in `web/components/temp/` and tracked in UI-GAPS.md — the library absorbs them, then placeholders get deleted.
+
+## Custom domains — the agreed naming (decided 2026-08-08)
+
+Cloudflare's free Universal SSL covers `kwapso.app` plus ONE level (`*.kwapso.app`).
+Two-level names like `clients.staging.kwapso.app` would need Advanced Certificate
+Manager (paid per zone), so staging uses a hyphen instead of a dot.
+
+| Surface | Environment | Custom domain |
+|---|---|---|
+| Client portal | production | `clients.kwapso.app` |
+| Client portal | staging | `clients-staging.kwapso.app` |
+| Agency app | production | `agency.kwapso.app` |
+| Agency app | staging | `agency-staging.kwapso.app` |
+
+Until these are attached, both surfaces run on workers.dev (see the URLs above).
+Attach from each gateway worker: Workers & Pages → the worker → Settings → Domains &
+Routes → Add custom domain. Cloudflare writes the DNS record and issues the cert.
+
+NOTE: `portal.kwapso.app` is NOT ours — it is the legacy Glide client portal, live and
+serving clients. It stays untouched until cutover, which is a single DNS record change.
