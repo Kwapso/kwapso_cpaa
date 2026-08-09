@@ -352,8 +352,12 @@ Learning/Help), `"tab"` (an admin section in the team tab strip), or `"contextua
 
 **Law R8 — the count badge is derived.** Any `placement:"tab"` section that leads
 with a collection **must** declare a `countCacheKey` — the cache-key prefix whose
-loaded rows *are* the badge count, so a new tab can't ship a forgotten or
+exact server total *is* the badge count, so a new tab can't ship a forgotten or
 hand-listed count. Sidebar sections don't need one.
+
+R8 covers the **other** tab strip too — the tabs on one record's own screen (step
+6). Don't stop at this one; a module whose team tab is counted and whose record
+Activity tab isn't is only half in-rule.
 
 ```ts
 { key: "notes", title: "Notes", module: "notes", segment: "notes",
@@ -526,7 +530,7 @@ where a test looks for it.
 | **R3** no-handrolled-toggles | No component fakes a tab strip with `variant={x === y ? …}`. | Use `TabsView` for any tab strip (Learning's Articles/Team-progress does). |
 | **R4/R7** forms | Every dialog in `FORM_DIALOGS` imports `FormShell` and `useFormDraft`. | If you add a `note-form-dialog`, add it to `FORM_DIALOGS` (registry.ts) and build it on `FormShell` + `useFormDraft`. |
 | **R5** generic-activity-path | The activity read has a generic `record` scope; the web reads via `recordActivity`. | Read history only via `tenancy.recordActivity(...)` (Layer 5). No new SQL. |
-| **R8** tab-counts-derived | Every `placement:"tab"` collection section declares a `countCacheKey`, derived generically. | Declare `countCacheKey` (4b) — or, if your tab isn't a collection, add a reviewed `TAB_COUNT_EXCEPTIONS` line (registry.ts). |
+| **R8** tab-counts-derived | Both tab surfaces. Team strip: every `placement:"tab"` collection section declares a `countCacheKey`. Record detail: every tab is badged from the collection it reveals (recipe → the `withTabCounts` seam; bespoke → its own tabs config, read out of your source). | Declare `countCacheKey` (4b). On your detail (Layer 5), badge Activity with `formatCount(activity.total)` from `useRecordActivity` — and for each tab that shows no collection, add a reasoned `RECORD_TAB_COUNT_EXCEPTIONS` line (registry.ts). |
 | **boundary** validate | `workers/content/test/validate.test.ts` locks `requireText`/`optionalText`. | Validate every write at the top (3b). Bad input → 400, never 500. |
 
 Also add a plain unit test for your lib's business rules (see how Learning's
@@ -575,7 +579,9 @@ LAYER 4 — web client + screen
 
 LAYER 5 — record detail  (web/components/<module>-detail.tsx)
 [ ] Bespoke detail renders TabsView + Overview (DescriptionList via auditItems) + Activity (ActivityFeed) — R2
-[ ] Activity via tenancy.recordActivity("<module>", id) — the ONE generic path (R5); no new history SQL
+[ ] Activity via useRecordActivity("<module>", id) — the ONE generic path (R5); no new history SQL
+[ ] Every record tab badged from the collection it reveals — Activity = formatCount(activity.total) (R8/R16);
+    a tab that shows no collection gets a reasoned RECORD_TAB_COUNT_EXCEPTIONS line
 [ ] Actions carry lucide icons (Pencil edit, Power deactivate); destructive = red + confirm
 
 LAYER 6 — tests + ship
@@ -600,6 +606,9 @@ AFTER SHIP
 - **A detail without Overview + Activity tabs.** Fails `record-detail-tabs` (R2).
 - **A per-module activity query.** Read history only via the generic `record` path (R5).
 - **A collection tab with a hand-listed count.** Declare a `countCacheKey` (R8).
+- **A record tab with no count.** Every tab that reveals a collection carries it —
+  a record's Activity tab included (R8); an uncounted tab needs a reasoned
+  `RECORD_TAB_COUNT_EXCEPTIONS` line.
 - **Refetching the whole list on a change.** Row-level live-sync only. (CACHING.md.)
 - **A new worker for a new module, or editing `@kwapso/ui`.** Add routes to an
   existing worker; the library is lego you assemble, not fork. (CLAUDE.md.)

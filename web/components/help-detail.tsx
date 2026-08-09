@@ -30,7 +30,6 @@ import {
 import { Pencil } from "lucide-react"
 
 import type {
-  ActivityItem,
   HelpMessage,
   HelpStakeholder,
   HelpTicket,
@@ -44,6 +43,7 @@ import { personName } from "@/lib/identity"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, primeCache, useCached, useCachedValue } from "@/lib/store"
 import { formatCount } from "@/lib/format-count"
+import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
 import { HelpFormDialog } from "@/components/help-form-dialog"
 import { HelpStakeholders } from "@/components/help-stakeholders"
 import { HelpStatusStepper, type HelpStatusValue } from "@/components/help-status-stepper"
@@ -93,9 +93,9 @@ export function HelpDetailScreen({
   const membersQ = useCached<TeamMember[]>(`members:${teamId}`, () =>
     tenancy.members().then((r) => r.members)
   )
-  const activityQ = useCached<ActivityItem[]>(`activity:record:help:${helpId}`, () =>
-    tenancy.recordActivity("help", helpId)
-  )
+  // The generic record feed (Law R5) + the exact server total its tab badges
+  // (R8 for the place, R16 for the number — never the loaded page's length).
+  const activity = useRecordActivity("help", helpId)
   const selectableQ = useCached<SelectableValue[]>(`selectable:${teamId}`, () =>
     tenancy.selectable().then((r) => r.values)
   )
@@ -120,7 +120,7 @@ export function HelpDetailScreen({
     try {
       const { tickets } = await content.setHelpStatus(helpId, next)
       primeCache(`help:${teamId}`, tickets)
-      invalidate(`activity:record:help:${helpId}`)
+      invalidate(recordActivityKey("help", helpId))
       toast.success("Status updated.")
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't update the status.")
@@ -136,14 +136,14 @@ export function HelpDetailScreen({
       helpType: input.helpType,
     })
     primeCache(`help:${teamId}`, tickets)
-    invalidate(`activity:record:help:${helpId}`)
+    invalidate(recordActivityKey("help", helpId))
     toast.success("Ticket updated.")
   }
 
   async function addStakeholder(userId: string) {
     const { stakeholders } = await content.addStakeholder(helpId, userId)
     primeCache(`help-stakeholders:${helpId}`, stakeholders)
-    invalidate(`activity:record:help:${helpId}`)
+    invalidate(recordActivityKey("help", helpId))
   }
 
   async function onReply(body: string, _files: File[], mentions: TicketMember[]) {
@@ -203,7 +203,7 @@ export function HelpDetailScreen({
     { label: "Resolved", value: ticket.resolvedAt ? formatRelative(ticket.resolvedAt) : "" },
   ]
 
-  const activityItems: ActivityFeedItem[] = (activityQ.data ?? []).map((a) => ({
+  const activityItems: ActivityFeedItem[] = activity.rows.map((a) => ({
     id: a.id,
     description: a.description,
     actor: a.actorName ?? undefined,
@@ -222,7 +222,13 @@ export function HelpDetailScreen({
         badgeVariant: "" as const,
       },
       { value: "overview", label: "Overview", icon: "info", badge: "", badgeVariant: "" as const },
-      { value: "activity", label: "Activity", icon: "history", badge: "", badgeVariant: "" as const },
+      {
+        value: "activity",
+        label: "Activity",
+        icon: "history",
+        badge: formatCount(activity.total),
+        badgeVariant: "" as const,
+      },
       {
         value: "stakeholders",
         label: "Stakeholders",

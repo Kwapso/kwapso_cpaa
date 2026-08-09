@@ -69,7 +69,7 @@ export const RULES_REGISTRY: Rule[] = [
   {
     id: "R8",
     dimension: "ui",
-    law: "Every placement:'tab' section that shows a collection declares a countCacheKey — R8 owns WHICH collection a tab's badge describes (derived from the registry, never hand-listed). The NUMBER the badge shows is owned by R16 (an exact server total through formatCount); where the two disagree, R16 prevails.",
+    law: "Every tab that reveals a collection carries that collection's count, on BOTH tab surfaces: a team section tab (placement:'tab') declares a countCacheKey, and a RECORD-DETAIL tab is badged from the block it reveals — recipe details through the withTabCounts seam (the collection is derived from the tab's own block: activity → its source, list → its module), bespoke details in their own tabs config. A tab that shows no collection says so once, as a reviewed RECORD_TAB_COUNT_EXCEPTIONS entry. R8 owns WHICH collection a tab's badge describes (derived from the recipe/registry, never hand-listed). The NUMBER the badge shows is owned by R16 (an exact server total through formatCount); where the two disagree, R16 prevails. Earned by: every record in the app shipping an Activity tab with no count at all — the team strip was walked, the record tabs were built elsewhere and never were.",
     checkId: "tab-counts-derived",
     status: "enforced",
   },
@@ -243,6 +243,32 @@ export const RECORD_DETAIL_EXCEPTIONS: Record<string, string> = {}
 export const TAB_COUNT_EXCEPTIONS: Record<string, string> = {
   overview: "leads with team metadata (name, logo, audit) — not a collection, so no count.",
   import: "contextual per-target action reached from a button — not a collection tab.",
+}
+
+/** R8, the RECORD-DETAIL half: the tabs on one record's screen. A tab that
+ * reveals a collection (a record's Activity feed, a ticket's conversation, its
+ * stakeholders) MUST carry that collection's exact count; a tab that shows the
+ * record ITSELF (an overview block, the article prose, the permission grid)
+ * carries none — and says so HERE, once, with its reason. Keyed
+ * `<recipe>.<tabKey>` for the engine details (BASE_RECIPES) and
+ * `<component>.<tab value>` for the bespoke ones (RECORD_DETAIL_COMPONENTS), so
+ * a team tab and a record tab that share the word "overview" can never bypass
+ * each other. Separate from TAB_COUNT_EXCEPTIONS on purpose: these are two
+ * different tab surfaces, and one flat namespace would let an exception written
+ * for one silently excuse the other. */
+export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
+  // Engine-recipe details (web/lib/screens.ts) — a `description` block is the
+  // record's own fields, so there is no collection to count.
+  "team.detail.overview": "the team's own metadata (created, created by, last updated) — one record, not a collection.",
+  "members.detail.overview": "one member's role, joined date and email — one record, not a collection.",
+  "invites.detail.overview": "one invite's role, status and dates — one record, not a collection.",
+  // Bespoke details (host-composed) — the panel is the record itself.
+  "role-detail.permissions":
+    "the permission matrix is a fixed grid of the app's modules × four rights — app furniture that ships with the code, not a team collection that grows.",
+  "role-detail.overview": "one role's description, member count and audit block — one record, not a collection.",
+  "learning-detail.article": "the article's own prose + linked media — one record's body, not a collection.",
+  "learning-detail.overview": "one article's category, type and audit block — one record, not a collection.",
+  "help-detail.overview": "one ticket's type, source and audit block — one record, not a collection.",
 }
 
 /** R4 — the form dialogs that MUST use FormShell. */

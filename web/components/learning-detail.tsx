@@ -27,14 +27,16 @@ import {
 } from "@kwapso/ui/registry/collections/activity-feed/activity-feed"
 import { Pencil, Power } from "lucide-react"
 
-import type { ActivityItem, Learning, SelectableValue } from "@shared/types"
+import type { Learning, SelectableValue } from "@shared/types"
 import { LearningFormDialog, type LearningFormValues } from "@/components/learning-form-dialog"
 import { ApiFailure, content, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
 import { formatActivityWhen } from "@/lib/format"
+import { formatCount } from "@/lib/format-count"
 import { RichText } from "@/components/rich-text"
 import { usePermissions } from "@/lib/perms"
-import { primeCache, useCached } from "@/lib/store"
+import { invalidate, primeCache, useCached } from "@/lib/store"
+import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
 
 // Show the linked resource IN-APP. We pick the player by the content-type keyword
 // first (the team's own label, e.g. "Video file"), then fall back to the URL's
@@ -65,9 +67,9 @@ export function LearningDetailScreen({ teamId, learningId }: { teamId: string; l
   )
   const item = learningQ.data?.find((l) => l.id === learningId) ?? null
 
-  const activityQ = useCached<ActivityItem[]>(`activity:record:learning:${learningId}`, () =>
-    tenancy.recordActivity("learning", learningId)
-  )
+  // The generic record feed (Law R5) + the exact server total its tab badges
+  // (R8 for the place, R16 for the number — never the loaded page's length).
+  const activity = useRecordActivity("learning", learningId)
   const selectableQ = useCached<SelectableValue[]>(`selectable:${teamId}`, () =>
     tenancy.selectable().then((r) => r.values)
   )
@@ -125,10 +127,12 @@ export function LearningDetailScreen({ teamId, learningId }: { teamId: string; l
   }
 
   function invalidateActivity() {
-    // refresh the Activity tab after an edit/(de)activate
-    void tenancy.recordActivity("learning", learningId).then((a) =>
-      primeCache(`activity:record:learning:${learningId}`, a)
-    )
+    // Refresh the Activity tab after an edit/(de)activate. Drop the key rather
+    // than re-fetching by hand: the ONE fetcher behind useRecordActivity re-primes
+    // the tab's total in the same round-trip, so the rows and the badge can't
+    // disagree (a hand-rolled refetch used to refresh the rows and leave the
+    // count behind).
+    invalidate(recordActivityKey("learning", learningId))
   }
 
   async function setActive(activeNext: boolean) {
@@ -162,7 +166,7 @@ export function LearningDetailScreen({ teamId, learningId }: { teamId: string; l
     }),
   ]
 
-  const activityItems: ActivityFeedItem[] = (activityQ.data ?? []).map((a) => ({
+  const activityItems: ActivityFeedItem[] = activity.rows.map((a) => ({
     id: a.id,
     description: a.description,
     actor: a.actorName ?? undefined,
@@ -175,7 +179,13 @@ export function LearningDetailScreen({ teamId, learningId }: { teamId: string; l
     tabs: [
       { value: "article", label: "Article", icon: "book-open", badge: "", badgeVariant: "" as const },
       { value: "overview", label: "Overview", icon: "info", badge: "", badgeVariant: "" as const },
-      { value: "activity", label: "Activity", icon: "history", badge: "", badgeVariant: "" as const },
+      {
+        value: "activity",
+        label: "Activity",
+        icon: "history",
+        badge: formatCount(activity.total),
+        badgeVariant: "" as const,
+      },
     ],
   }
 

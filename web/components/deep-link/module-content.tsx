@@ -43,7 +43,13 @@ import {
 import type { useScreenData } from "@/lib/use-screen-data"
 import type { usePermissions } from "@/lib/perms"
 import type { useActiveTeam } from "@/lib/use-active-team"
-import { MODULE_PERMISSION, resolveRecipe, withDataDrivenCollection, withoutActions } from "@/lib/screens"
+import {
+  MODULE_PERMISSION,
+  resolveRecipe,
+  withDataDrivenCollection,
+  withoutActions,
+  withTabCounts,
+} from "@/lib/screens"
 import type { TeamRole } from "@shared/types"
 
 type ScreenData = ReturnType<typeof useScreenData>
@@ -53,7 +59,7 @@ type ScreenData = ReturnType<typeof useScreenData>
  * The host owns all of it; this bundle is how it hands the render half a snapshot. */
 export type ModuleContentCtx = Pick<
   ScreenData,
-  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "learningQ" | "helpQ" | "helpMineQ" | "totals" | "activityQ" | "inviteAuditQ"
+  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "learningQ" | "helpQ" | "helpMineQ" | "totals" | "activityQ" | "activityTotal" | "inviteAuditQ"
 > & {
   noAccess: boolean
   enabled: boolean
@@ -98,6 +104,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     helpQ,
     totals,
     activityQ,
+    activityTotal,
     inviteAuditQ,
     teamName,
     active,
@@ -139,9 +146,12 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
 
     // Team overview ----------------------------------------------------------
     if (module === "team") {
-      const recipe = resolveRecipe("team.detail", overridesQ.data)
-      if (!recipe) return <NotFound />
+      const base = resolveRecipe("team.detail", overridesQ.data)
+      if (!base) return <NotFound />
       if (metaQ.data === undefined) return <Skeleton variant="list" lines={3} />
+      // R8: the Activity tab badges the feed's EXACT server total (R16's seam),
+      // not the loaded page — this feed is the one that pages below.
+      const recipe = withTabCounts(base, { activity: activityTotal })
       const data = shapeTeamDetail({
         teamId: teamId as string,
         name: teamName,
@@ -365,8 +375,10 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       if (membersQ.data === undefined) return <Skeleton variant="list" lines={4} />
       const member = membersQ.data.find((m) => m.userId === recordId) ?? null
       if (!member) return <p className="text-muted-foreground text-sm">That member isn&apos;t on this team.</p>
-      let recipe = resolveRecipe("members.detail", overridesQ.data)
-      if (!recipe) return <NotFound />
+      const base = resolveRecipe("members.detail", overridesQ.data)
+      if (!base) return <NotFound />
+      // R8/R16: the Activity tab badges this member's exact history total.
+      let recipe = withTabCounts(base, { activity: activityTotal })
       // You can't change your own role or remove yourself here.
       if (member.isYou) recipe = withoutActions(recipe, ["members.changeRole", "members.remove"])
       const data = shapeMemberDetail(member, activityQ.data ?? [])
@@ -377,8 +389,10 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       if (invitesQ.data === undefined) return <Skeleton variant="list" lines={4} />
       const invite = invitesQ.data.find((i) => i.id === recordId) ?? null
       if (!invite) return <p className="text-muted-foreground text-sm">That invite no longer exists.</p>
-      let recipe = resolveRecipe("invites.detail", overridesQ.data)
-      if (!recipe) return <NotFound />
+      const base = resolveRecipe("invites.detail", overridesQ.data)
+      if (!base) return <NotFound />
+      // R8/R16: the Activity tab badges this invite's exact history total.
+      let recipe = withTabCounts(base, { activity: activityTotal })
       // Revoke only makes sense while the invite is still pending.
       if (invite.status !== "pending") recipe = withoutActions(recipe, ["invites.revoke"])
       const data = shapeInviteDetail(invite, inviteAuditQ.data ?? null, activityQ.data ?? [])

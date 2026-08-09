@@ -339,7 +339,7 @@ The laws today:
 | R5 | Record activity is read through ONE generic `(table, id)` path | `generic-activity-path` |
 | R6 | Product terms live in ONE glossary, clear and brief | `glossary-wellformed` |
 | R7 | Every form dialog persists its draft per session (`useFormDraft`) | `forms-persist-drafts` |
-| R8 | Every team collection tab derives its count from its loaded rows | `tab-counts-derived` |
+| R8 | Every tab that reveals a collection carries its count — the team strip AND a record's own tabs | `tab-counts-derived` |
 
 **Why "read off disk" matters.** The publish-seam test
 (`workers/content/test/publish-seam.test.ts`) doesn't trust the ROUTES table's

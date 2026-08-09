@@ -123,6 +123,11 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
         return r.activity
       })
   )
+  // R8: the number the DETAIL's Activity tab badges — the same exact, already-
+  // permission-filtered total the fetch above primed, read as a sidecar so the
+  // tab and the feed can never disagree. Undefined until page one lands, which
+  // formatCount renders as nothing.
+  const activityTotal = useCachedValue<number>(activityKey ? `total:${activityKey}` : null)
   // The invite-detail audit (inviter snapshot + acceptance) — only when viewing
   // one invite. Cache-first + live (a revoke/accept ping refreshes its invite row).
   const inviteAuditQ = useCached(
@@ -148,6 +153,7 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
     activityScope,
     activityKey,
     activityQ,
+    activityTotal,
     inviteAuditQ,
   }
 }
