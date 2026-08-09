@@ -173,3 +173,17 @@ for the business. Nothing in this project writes DNS there.
 application sends from: `kwapso <alerts@kwapso.app>`, verified in Resend (EU region).
 The three Resend records live on their own subdomains (`resend._domainkey`, `send`) and
 cannot affect kwapso.com in any way.
+
+## Secret hygiene — a lesson learned the hard way (2026-08-09)
+
+Worker secrets are COPIES, not references. When a credential is replaced, every
+worker holding it keeps the old value until the secret is pushed again.
+
+This bit us once: `CF_D1_TOKEN` was set on tenancy/content/data-ops from an early
+Cloudflare token that was later replaced. Deploys kept succeeding, health checks
+kept passing, and the smoke suite kept going green — because it reused an existing
+team. The only symptom was real team creation failing with an opaque 500.
+
+Rule: after replacing ANY credential, re-push it to every worker that holds it,
+then verify with a path that actually exercises it (a FRESH signup, not a reused
+one). The smoke suite passing is not proof that provisioning works.
