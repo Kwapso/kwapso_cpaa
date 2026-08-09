@@ -59,6 +59,8 @@ describe("team schema", () => {
       "teams",
       "team_members",
       "member_roles",
+      "accounts",
+      "portal_users",
       "learning",
       "help",
       "selectable_data",
