@@ -13,3 +13,85 @@
   background-color: color-mix(in oklch, var(--card) 94%, transparent);
 }
 
+/* ── The living mango field ────────────────────────────────────────────────
+ * kwapso_ui ships with the ambient layer switched OFF, because the brand book
+ * forbids gradients. The owner overruled that for product UI (planning round 3,
+ * h1) and asked for a soft animated field in #FECC6D. That is an APP decision,
+ * so it lives here — the library is never edited, only overridden downstream.
+ *
+ * Three blurred radial pools drift on long, prime-ish periods so they never
+ * visibly loop, and the first one follows the pointer through --mx / --my,
+ * the vars the library's <AmbientBackground /> already writes each frame.
+ * Absolutely positioned inside that fixed, clipped, -z-10 host: behind
+ * everything, never interactive, and silent for anyone who has asked their
+ * system for less motion. */
+.ambient::before,
+.ambient::after {
+  content: "";
+  position: absolute;
+  inset: -25%;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.ambient::before {
+  background:
+    radial-gradient(
+      42rem 42rem at calc(var(--mx, 50%) * 0.55 + 22%) calc(var(--my, 38%) * 0.55 + 12%),
+      color-mix(in oklch, #fecc6d 62%, transparent) 0%,
+      transparent 62%
+    ),
+    radial-gradient(
+      36rem 36rem at 82% 78%,
+      color-mix(in oklch, #fecc6d 46%, transparent) 0%,
+      transparent 66%
+    );
+  filter: blur(72px) saturate(112%);
+  animation: kw-drift-a 47s ease-in-out infinite alternate;
+}
+
+.ambient::after {
+  background: radial-gradient(
+    30rem 30rem at 16% 88%,
+    color-mix(in oklch, #fecc6d 40%, transparent) 0%,
+    transparent 64%
+  );
+  filter: blur(84px);
+  animation: kw-drift-b 61s ease-in-out infinite alternate;
+}
+
+/* Dark mode: the same field, dialled down so it reads as warmth on charcoal
+ * rather than a light leak. */
+.dark .ambient::before {
+  filter: blur(80px) saturate(105%);
+  opacity: 0.34;
+}
+.dark .ambient::after {
+  opacity: 0.26;
+}
+
+@keyframes kw-drift-a {
+  from {
+    transform: translate3d(-2.5%, -1.5%, 0) scale(1);
+  }
+  to {
+    transform: translate3d(2.5%, 2%, 0) scale(1.08);
+  }
+}
+
+@keyframes kw-drift-b {
+  from {
+    transform: translate3d(2%, 1.5%, 0) scale(1.06);
+  }
+  to {
+    transform: translate3d(-2%, -2%, 0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient::before,
+  .ambient::after {
+    animation: none;
+  }
+}
+

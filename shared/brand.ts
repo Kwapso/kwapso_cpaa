@@ -18,8 +18,10 @@ export const brand = {
   description: "Tailored digital operating systems for mature businesses.",
   motto: "Work, structured.",
 
-  /** App logo URL. null = show a monogram built from the name. */
-  logoUrl: null as string | null,
+  /** App logo URL. null = show a monogram built from the name.
+   * The kwapso isotype on its mango field — the same mark the PWA icons and the
+   * browser tab use, so the app looks like itself everywhere it appears. */
+  logoUrl: "/icons/kwapso-mark.png" as string | null,
 
   /** Accent colours — override the UI library's theme tokens (oklch, per mode).
    * Defaults reproduce the library's teal; change them to re-skin the app. */
