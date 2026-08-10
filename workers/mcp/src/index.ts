@@ -109,6 +109,9 @@ async function getTokens(request: Request, env: Env): Promise<Response> {
       label: t.label,
       teamId: t.team_id,
       createdAt: t.created_at,
+      // A token expires (0016). The screen shows the deadline, so "active" on
+      // this list means usable — not merely un-revoked.
+      expiresAt: t.expires_at,
       lastUsedAt: t.last_used_at,
       revokedAt: t.revoked_at,
     })),
@@ -124,7 +127,13 @@ async function postToken(request: Request, env: Env): Promise<Response> {
   const { row, secret } = await createToken(env, user.id, user.currentTeamId, label)
   // The ONE time the secret leaves the server.
   return json({
-    token: { id: row.id, label: row.label, teamId: row.team_id, createdAt: row.created_at },
+    token: {
+      id: row.id,
+      label: row.label,
+      teamId: row.team_id,
+      createdAt: row.created_at,
+      expiresAt: row.expires_at,
+    },
     secret,
   })
 }

@@ -15,7 +15,7 @@ import { logError, recordWorkerError } from "../../../shared/workers/error-log"
 import type { Env } from "./env"
 import { sha256Hex } from "./lib/crypto"
 import { isValidEmail, normalizeEmail, sendEmail, sendLoginCode } from "./lib/email"
-import { mintLoginCode } from "./lib/login-codes"
+import { clientIp, mintLoginCode } from "./lib/login-codes"
 import { startEmailChange, verifyEmailChange } from "./lib/email-change"
 import { createPinnedSession,
   createSession,
@@ -168,14 +168,16 @@ async function internalLogError(request: Request, env: Env): Promise<Response> {
 
 /** Step 1 of email login: create + send a 6-digit code. The response NEVER
  * carries the code — a login code appears nowhere but the user's inbox, in any
- * environment (the old staging echo was deleted; tests use adminTestLogin). */
+ * environment (the old staging echo was deleted; tests use adminTestLogin).
+ * The ONE unauthenticated door that sends mail and writes rows, so the send is
+ * charged to the caller (clientIp) as well as to the address. */
 async function emailStart(request: Request, env: Env): Promise<Response> {
   const body = (await request.json().catch(() => ({}))) as { email?: string }
   const email = normalizeEmail(body.email ?? "")
   if (!isValidEmail(email))
     return fail(400, "invalid_email", "Enter a valid email address.")
 
-  const minted = await mintLoginCode(env, email)
+  const minted = await mintLoginCode(env, email, clientIp(request))
   if ("error" in minted) return fail(minted.status, minted.error, minted.message)
 
   const sent = await sendLoginCode(env, email, minted.code)
@@ -206,7 +208,7 @@ async function adminTestLogin(request: Request, env: Env): Promise<Response> {
   const email = normalizeEmail(body.email ?? "")
   if (!isValidEmail(email))
     return fail(400, "invalid_email", "Enter a valid email address.")
-  const minted = await mintLoginCode(env, email)
+  const minted = await mintLoginCode(env, email, clientIp(request))
   if ("error" in minted) return fail(minted.status, minted.error, minted.message)
   // Returned exactly once, to the TEST_LOGIN_KEY holder; the normal verify door
   // consumes it like any other code (attempt cap + TTL apply unchanged).

@@ -46,6 +46,22 @@ export const BULK_IDS_LIMIT = Math.floor((AGENT_MAX_TOKENS - AGENT_REPLY_ENVELOP
  * the owner raises it per environment with MAX_TEAMS_PER_USER. */
 export const MAX_TEAMS_PER_USER = 5
 
+// ── the machine surface's keys (MCP.md) ──────────────────────────────────────
+// A personal access token acts AS its owner, in one team, forever — so "forever"
+// was the problem: a secret pasted into a CI config outlives the contract, the
+// laptop and often the job. Two numbers bound it: how long one lives, and how
+// many one account can hold at once.
+
+/** How long a new access token lives before it must be re-issued. Long enough
+ * that a working integration isn't churned, short enough that an abandoned
+ * secret stops being a key. */
+export const MCP_TOKEN_TTL_DAYS = 90
+
+/** Live tokens one account may hold. The cap is what makes a token REACHABLE:
+ * the settings list is hard-capped like every list (R14), so an uncapped minter
+ * could bury a live token past the cap and never be able to revoke it again. */
+export const MAX_ACTIVE_MCP_TOKENS_PER_USER = 10
+
 /** THE ONE numeric env-var parse. Two bugs of the same family live in the obvious
  * spellings, in opposite directions:
  *   • `Number(env.X) || DEFAULT` turns a deliberate **0** into the default — set

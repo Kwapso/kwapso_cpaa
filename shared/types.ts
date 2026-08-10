@@ -405,6 +405,8 @@ export type McpTokenSummary = {
   label: string
   teamId: string
   createdAt: string
+  /** When it stops working (every token has a deadline — core migration 0016). */
+  expiresAt: string | null
   lastUsedAt: string | null
   revokedAt: string | null
 }

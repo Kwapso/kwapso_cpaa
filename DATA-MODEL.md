@@ -174,8 +174,13 @@ quota tables it explains.
 
 Personal access tokens for the MCP front desk: `id, user_id, team_id, label,
 token_hash (sha256; the secret is shown ONCE and never stored), created_at,
-last_used_at, revoked_at` (deactivate-not-delete). Verified on EVERY /mcp
-request. The same migration adds **`sessions.team_pin`** — a session minted for
+**`expires_at`** (`db/core/0016` — every token has a deadline,
+`MCP_TOKEN_TTL_DAYS` = 90; a MISSING one counts as expired, so nothing is
+immortal), `last_used_at`, `revoked_at` (deactivate-not-delete). An account may
+hold **10 live tokens** (`MAX_ACTIVE_MCP_TOKENS_PER_USER`, enforced inside the
+INSERT), and the settings list sorts unrevoked rows first — together that is what
+keeps every usable token inside the 1,000-row list cap and therefore revocable
+from the app. Verified on EVERY /mcp request. The same migration adds **`sessions.team_pin`** — a session minted for
 a token is PINNED to the token's team (auth answers /me with the pinned team;
 short-lived, never slid), so a token can never act outside the team it was
 created for.
@@ -352,7 +357,9 @@ these rows are a record of intent, never a separate set of powers.
 
 - **Built**: users, teams, team_members, invite_index, member_roles,
   role_permissions, selectable_data, activity (table only), team_module_databases,
-  db_alerts, login_codes, sessions (+ `team_pin`, 0013), account_activity, email_change_logs +
+  db_alerts, login_codes (+ `sent_ip` / `sends`, 0015 — the send throttle's own
+  ledger: WHO asked for each code and how many emails that row has caused, so a
+  rotation is counted like a mint), sessions (+ `team_pin`, 0013), account_activity, email_change_logs +
   email_change_codes (the hashed-OTP split; BUILT 2026-06-17), invite_logs
   (per-team audit; BUILT 2026-06-22, M4). **Agent-modules build (BUILT
   2026-06-23)**: importable_databases, agent_usage, agent_credits, mcp_tokens (GLOBAL core
