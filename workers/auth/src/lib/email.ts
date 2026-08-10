@@ -78,6 +78,7 @@ export async function sendLoginCode(
   code: string
 ): Promise<boolean> {
   const { html, text } = brandedEmail({
+    origin: env.APP_ORIGIN,
     heading: "Your login code",
     intro: `Use this code to sign in to ${brand.name}. It expires in 10 minutes.`,
     code,
@@ -101,6 +102,7 @@ export async function sendEmailChangeCode(
   code: string
 ): Promise<boolean> {
   const { html, text } = brandedEmail({
+    origin: env.APP_ORIGIN,
     heading: "Confirm your new email",
     intro: `Use this code to confirm this address as your new ${brand.name} email. It expires in 10 minutes.`,
     code,
@@ -125,6 +127,7 @@ export async function sendEmailChangedNotice(
   newEmail: string
 ): Promise<boolean> {
   const { html, text } = brandedEmail({
+    origin: env.APP_ORIGIN,
     heading: "Your email was changed",
     intro: `The email address for your ${brand.name} account was just changed to ${maskEmail(newEmail)}. Sign in with the new address from now on.`,
     footnote:

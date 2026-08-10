@@ -5,7 +5,8 @@
 import { fail, json } from "../../../../shared/workers/http"
 import { d1Query } from "../../../../shared/workers/d1-rest"
 import { checkDatabaseSizes, moveModuleToOwnDatabase } from "../lib/sharding"
-import { applyMigration, d1Config } from "../lib/teams"
+import { applyMigration, createTeam, d1Config } from "../lib/teams"
+import { requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
 import { adminGuard } from "../context"
 import { TEAM_MIGRATIONS } from "../team-schema"
 import type { Env } from "../env"
@@ -86,4 +87,42 @@ export async function moveModule(request: Request, env: Env): Promise<Response> 
     body.tables
   )
   return json({ ok: true, ...result })
+}
+
+/**
+ * Seed a team on an environment where nobody can create one (shared/product.ts).
+ *
+ * This is NOT the user-facing door reopened under another name: it takes the
+ * deployment's ADMIN_KEY, which no user, agent or access token ever holds, and
+ * it names the owner explicitly rather than inferring them from a session — you
+ * cannot reach it by being signed in. It exists for two jobs: standing up a
+ * fresh environment, and giving the smoke suite the SECOND team it needs before
+ * "a token is pinned to one team" can be proved at all.
+ */
+export async function adminCreateTeam(request: Request, env: Env): Promise<Response> {
+  const denied = adminGuard(request, env)
+  if (denied) return denied
+
+  const body = (await request.json().catch(() => ({}))) as { name?: unknown; email?: unknown }
+  const name = requireText(body.name, "Team name", TEXT_LIMITS.short)
+  const email = requireText(body.email, "Owner email", TEXT_LIMITS.short)
+
+  const owner = await env.DB.prepare(
+    "SELECT id, email, first_name, last_name FROM users WHERE email = ? AND deactivated_at IS NULL"
+  )
+    .bind(email.toLowerCase())
+    .first<{ id: string; email: string; first_name: string | null; last_name: string | null }>()
+  if (!owner) return fail(404, "no_user", "No account with that email has signed in here yet.")
+
+  const team = await createTeam(
+    env,
+    {
+      id: owner.id,
+      email: owner.email,
+      name: [owner.first_name, owner.last_name].filter(Boolean).join(" ") || owner.email,
+    },
+    name,
+    null
+  )
+  return json({ ok: true, team })
 }

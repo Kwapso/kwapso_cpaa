@@ -24,6 +24,7 @@ import { Check, ChevronsUpDown, Inbox, Plus } from "lucide-react"
 
 import { useReceivedInvites } from "@/components/invitations"
 import { letterMark } from "@/lib/identity"
+import { TEAM_CREATION_CLOSED } from "@shared/product"
 import { softNavigate } from "@/lib/nav"
 import type { ActiveTeam } from "@/lib/use-active-team"
 
@@ -98,11 +99,18 @@ export function TeamSwitcher({
             {team.id === ctx.team?.id && <Check className="size-4" />}
           </DropdownMenuItem>
         ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={onCreateTeam} className="gap-2">
-          <Plus className="size-4" />
-          Create team
-        </DropdownMenuItem>
+        {/* One team, so there is nothing to create (shared/product.ts). The
+            menu keeps its switch list — a person can still be in more than one
+            team by invitation, and the base is still multi-team underneath. */}
+        {!TEAM_CREATION_CLOSED && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={onCreateTeam} className="gap-2">
+              <Plus className="size-4" />
+              Create team
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   )

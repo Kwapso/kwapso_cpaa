@@ -44,6 +44,7 @@
 //   GET  /api/tenancy/config/screens       -> a team's screen-recipe overrides (any member)
 //   POST /api/tenancy/config/screens       -> set a screen override (teams:edit; agent-callable)
 //   POST /api/tenancy/admin/migrate-teams  -> roll team-schema migrations (x-admin-key)
+//   POST /api/tenancy/admin/create-team    -> seed a team (x-admin-key; the user door is closed)
 //   GET  /api/tenancy/admin/db-sizes       -> size every team DB + open alarms
 //   POST /api/tenancy/admin/move-module    -> relocate a heavy module (the mover)
 //   GET  /api/tenancy/health
@@ -108,7 +109,7 @@ import {
   postSetSelectableActive,
   postUpdateSelectable,
 } from "./routes/selectable"
-import { dbSizes, migrateTeams, moveModule } from "./routes/admin"
+import { adminCreateTeam, dbSizes, migrateTeams, moveModule } from "./routes/admin"
 
 /**
  * THE LIVE-SYNC SEAM (locked, CACHING.md "Every mutation publishes"). Every
@@ -183,6 +184,9 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // admin/* are ops-only (roll migrations, relocate a module's DB) — they touch
   // no client-visible app row, so they broadcast nothing.
   "POST /api/tenancy/admin/migrate-teams": { handler: migrateTeams, kind: "housekeeping" },
+  // Ops only (x-admin-key, never a session): seeds a team where the user-facing
+  // door is closed — a fresh environment, and the smoke's second team.
+  "POST /api/tenancy/admin/create-team": { handler: adminCreateTeam, kind: "housekeeping" },
   "GET /api/tenancy/admin/db-sizes": { handler: dbSizes, kind: "read" },
   "POST /api/tenancy/admin/move-module": { handler: moveModule, kind: "housekeeping" },
 }

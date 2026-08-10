@@ -222,6 +222,7 @@ export async function createInvite(
 
   // Branded invite email, sent through the auth worker (best-effort).
   const { html, text } = brandedEmail({
+    origin: base,
     heading: `You're invited to ${teamName}`,
     intro: `${actor.name || "Someone"} invited you to join ${teamName} on ${brand.name} as ${roles[0].title}. Sign in with this email address to accept.`,
     ctaLabel: `Join ${teamName}`,

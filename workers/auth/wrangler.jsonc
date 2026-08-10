@@ -27,7 +27,7 @@
   // to a user's OWN channel through the realtime worker.
   "services": [{ "binding": "REALTIME", "service": "kwapso-realtime" }],
   "vars": {
-    "APP_ORIGIN": "https://kwapso.kwapso.workers.dev",
+    "APP_ORIGIN": "https://agency.kwapso.app",
     "EMAIL_FROM": "kwapso <alerts@kwapso.app>",
     // Ships with the deploy: the test-login door refuses outright here.
     "ENVIRONMENT": "production"
@@ -51,7 +51,7 @@
       ],
       "services": [{ "binding": "REALTIME", "service": "kwapso-realtime-staging" }],
       "vars": {
-        "APP_ORIGIN": "https://kwapso-staging.kwapso.workers.dev",
+        "APP_ORIGIN": "https://agency-staging.kwapso.app",
         "EMAIL_FROM": "kwapso <alerts@kwapso.app>",
         "ENVIRONMENT": "staging"
       }

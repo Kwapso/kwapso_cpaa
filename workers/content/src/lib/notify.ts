@@ -57,7 +57,7 @@ async function send(
   subject: string,
   content: Pick<BrandedEmail, "heading" | "intro" | "footnote">
 ): Promise<void> {
-  const { html, text } = brandedEmail(content)
+  const { html, text } = brandedEmail({ ...content, origin: env.PUBLIC_APP_URL })
   await env.AUTH.fetch("https://auth/internal/send-email", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-internal-key": env.INTERNAL_KEY ?? "" },
