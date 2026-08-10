@@ -264,6 +264,107 @@ CREATE TABLE data_import_batches (
 CREATE INDEX idx_import_batches_creator ON data_import_batches (creator_id, created_at DESC);
 `,
   },
+  {
+    // THE CUSTOMER SPINE (SCOPE ch.03 "People — one table" + ch.05 "Data model").
+    // Every company and every person is ONE row in `accounts`; `account_type`
+    // says which. Nothing else in the app gets a second people-table.
+    version: "0007_customer_spine",
+    sql: `
+-- The hierarchy is a SELF-POINTER with unlimited depth (a holding company's
+-- businesses, a business's divisions). A move that would close a loop is refused
+-- by the write itself — the cycle test rides the UPDATE's WHERE (lib/accounts.ts
+-- setAccountParent), so two people re-parenting at the same instant cannot
+-- co-operate their way into a ring that makes roll-ups count twice or run forever.
+--
+-- \`code\` is the human REFERENCE staff assign when work starts (BERG). Unique so
+-- two people can't mint the same one at the same instant (CONCURRENCY rule 2),
+-- nullable because most rows never earn one — and NEVER an identifier: every
+-- route addresses a row by its ULID \`id\`, so re-coding an account can never
+-- re-point its tickets, its files or its history.
+--
+-- \`status\` is the commercial lifecycle (prospect → client → past client), an
+-- editable vocabulary. \`deactivated_at\` is ARCHIVE — the everyday remove, which
+-- keeps the row, its children and its history intact.
+CREATE TABLE accounts (
+  id TEXT PRIMARY KEY,
+  account_type TEXT NOT NULL CHECK (account_type IN ('entity', 'individual')),
+  parent_account_id TEXT REFERENCES accounts (id),
+  name TEXT NOT NULL,
+  email TEXT,
+  phone TEXT,
+  address TEXT,
+  code TEXT,
+  currency TEXT,
+  locale TEXT,
+  timezone TEXT,
+  commercials_visible INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'active',
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT,
+  CHECK (parent_account_id IS NULL OR parent_account_id <> id)
+);
+-- The race guard: two staff assigning "BERG" at the same instant. Partial, so the
+-- (many) rows with no code don't collide with each other.
+CREATE UNIQUE INDEX idx_accounts_code ON accounts (code) WHERE code IS NOT NULL;
+CREATE INDEX idx_accounts_parent ON accounts (parent_account_id);
+CREATE INDEX idx_accounts_name ON accounts (name);
+
+-- A PERSON's relationship to an account. This is what the parent pointer cannot
+-- say: Marta is a contact of Bergman AND of Delaval, and a single parent has room
+-- for only one of them. "Contact" is a role word, not a table — it is THIS row.
+CREATE TABLE account_links (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL REFERENCES accounts (id),        -- the company side
+  person_account_id TEXT NOT NULL REFERENCES accounts (id), -- the person's own row
+  relationship TEXT,                                        -- "Operations manager"…
+  is_main_stakeholder INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT,
+  CHECK (account_id <> person_account_id)
+);
+-- Race guard: two staff adding the same person to the same company at once. Partial
+-- on ACTIVE rows, so unlinking and re-linking later is allowed (the old row stays).
+CREATE UNIQUE INDEX idx_account_links_pair ON account_links (account_id, person_account_id) WHERE deactivated_at IS NULL;
+CREATE INDEX idx_account_links_person ON account_links (person_account_id);
+
+-- THE LOGIN SWITCH. Linking and logging in are fully independent: an individual can
+-- be linked with no login, and a freelancer can hold a login on their own account
+-- with no parent. Granting writes a row here and sends the invite; REVOKING
+-- deactivates it — login dies, every record stays (SCOPE ch.06 offboarding). The
+-- audit block IS the grant record: creator_* is who granted it, deactivator_* is
+-- who revoked it, so there is no second granted_by column to keep in step.
+-- app_restriction: null = the whole account's world.
+CREATE TABLE portal_users (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL REFERENCES accounts (id),
+  user_id TEXT NOT NULL,
+  app_restriction TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+-- Race guard AND the pin itself: at most ONE live grant per person, so the guard
+-- corridor always resolves a caller to exactly one account set. Two concurrent
+-- grants can't leave a person straddling two fences.
+CREATE UNIQUE INDEX idx_portal_users_user ON portal_users (user_id) WHERE deactivated_at IS NULL;
+CREATE INDEX idx_portal_users_account ON portal_users (account_id);
+
+-- Existing teams: the locked Admin role gains the two new modules in full (it is
+-- DEFINED as full access, and it can't be edited afterwards to grant them). Every
+-- other role gains nothing — a migration must never hand out sight of customer
+-- data that nobody granted. \`is_default\` is 1 on Admin alone, so it doubles as
+-- the bit. New teams don't reach this: their seed writes the rows already.
+INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+SELECT lower(hex(randomblob(16))), r.id, m.module, r.is_default, r.is_default, r.is_default, r.is_default
+  FROM member_roles r
+  CROSS JOIN (SELECT 'accounts' AS module UNION ALL SELECT 'portal_users') m
+ WHERE NOT EXISTS (
+   SELECT 1 FROM role_permissions p WHERE p.role_id = r.id AND p.module = m.module
+ );
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

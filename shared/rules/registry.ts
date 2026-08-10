@@ -160,7 +160,20 @@ export const CATALOG_EXEMPT: Record<string, string> = {
   help: "tickets are conversations raised in-app; importing them would forge authorship and timelines",
   screens: "screen recipes are app furniture (config), not team data",
   agent: "the assistant's threads/usage are system records, not importable content",
+  accounts:
+    "the spine's rows arrive as ONE referenced set (accounts → their parents → their links), which the Glide migration imports in dependency order (SCOPE ch.12); a lone accounts target would offer a picker entry that cannot resolve a parent id — the TargetDef lands with that import build",
+  portal_users:
+    "a login is a granted identity, not importable content — a CSV cannot consent for a person (the same reason team_members is exempt)",
 }
+
+/** THE ACCOUNT-SCOPED MODULES — the ones whose rows belong to a CUSTOMER, not to
+ * the team at large. A caller pinned to one account (a portal user) must never
+ * reach another account's rows through ANY door on these modules, whatever their
+ * role says. DATA, not a hand-list in a test: every route gating on a module
+ * named here is derived off disk and must have a burglar attacking it
+ * (workers/tenancy/test/account-leak.test.ts), and a module added here with no
+ * attack turns the build red. */
+export const ACCOUNT_SCOPED_MODULES = ["accounts", "portal_users"] as const
 
 /** R18 — which permission module gates each activity `relatedTable` a worker
  * writes. The team feed (the ONE cross-module read) subtracts the caller's denied
@@ -174,6 +187,9 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
   member_roles: "member_roles",
   users: "team_members",
   invite_logs: "team_members",
+  accounts: "accounts",
+  account_links: "accounts",
+  portal_users: "portal_users",
 }
 
 /** R15 — reviewed DEAF exemptions: resources a worker publishes that reach NO
@@ -213,6 +229,14 @@ export const DEAF_EXEMPT: Record<string, string> = {
     "a reply pings the parent help row too (op edit), whose row-level patch refreshes the open ticket's deps; the thread list itself re-pulls when the detail (re)opens",
   agent_usage:
     "the quota badge rides every chat response and the usage dialog fetches on open — there is no standing cache a ping could refresh",
+  // TEMPORARY, and deliberately visible. The customer spine's data door ships
+  // ahead of its screens (the accounts UI is a separate build), so these three
+  // resources currently ping a channel nobody listens on. DELETE these three
+  // lines the day the accounts screens land — a listener is the whole point, and
+  // an exemption that outlives its reason is how a stale screen hides.
+  accounts: "the accounts screens land in the UI build — replace with a TEAM_RESOURCES listener then",
+  account_links: "the account detail's contacts list lands in the UI build — replace with a listener then",
+  portal_users: "the portal-access panel lands in the UI build — replace with a listener then",
 }
 
 /** R18 — reviewed exemptions, pinned EXACTLY: tables whose activity every member

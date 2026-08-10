@@ -9,6 +9,8 @@ export const TEAM_MODULES = [
   "teams",
   "team_members",
   "member_roles",
+  "accounts",
+  "portal_users",
   "learning",
   "help",
   "selectable_data",
@@ -23,6 +25,12 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   teams: "Team",
   team_members: "Members",
   member_roles: "Roles & permissions",
+  // The customer spine. `accounts` covers the account records AND the links
+  // between them (a link is the SHAPE of an account, not a record of its own);
+  // granting someone a login is separately gated because it hands out sight of
+  // customer data, which is a bigger decision than editing a phone number.
+  accounts: "Accounts",
+  portal_users: "Portal access",
   learning: "Learning",
   help: "Help",
   selectable_data: "Dropdown data",

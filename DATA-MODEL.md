@@ -274,6 +274,49 @@ skipped, failed}` counts + up to five error messages — recorded on the session
 (rows missing required values are skipped at preview; a failed row never blocks
 the rest).
 
+### accounts + account_links + portal_users — KEEP (BUILT 2026-08-09, team migration `0007_customer_spine`) — THE CUSTOMER SPINE
+Purpose: every company and every person kwapso works with, in **one** table
+(SCOPE ch.03 "People — one table"). There is no second people-table anywhere.
+
+`accounts`: audit block + `account_type` (`entity` | `individual`, CHECKed),
+`parent_account_id` (a **self-pointer**: unlimited nesting, a holding company's
+businesses, a business's divisions), `name`, `email`, `phone`, `address`, `code`,
+`currency`, `locale`, `timezone`, `commercials_visible`, `status` (the commercial
+lifecycle: prospect → client → past client). **`code` is a REFERENCE, never an
+identifier** — staff assign it when work starts (BERG), it is unique-when-present
+(a partial unique index, so two people can't mint the same one at the same
+instant) and nullable, and every route addresses a row by its ULID `id`. Re-coding
+an account therefore re-points nothing. **The loop guard is the write itself**: a
+move rides a recursive `WITH … UPDATE … WHERE NOT EXISTS (ancestors)`, so two
+admins re-parenting at the same instant cannot co-operate their way into a ring
+(CONCURRENCY rule 1); zero rows changed is the refusal, reported as a plain 409.
+
+`account_links`: audit block + `account_id` (the company side),
+`person_account_id` (the person's own account row), `relationship`,
+`is_main_stakeholder`. This is what the parent pointer **cannot** say — Marta is a
+contact of Bergman *and* of Delaval, and a single parent has room for one. A
+partial unique index on the active pair is the duplicate race guard. "Contact" is
+a role word, not a table: it is this row.
+
+`portal_users`: audit block + `account_id`, `user_id` (the GLOBAL users row),
+`app_restriction` (null = the whole account's world). **The login switch, and
+independent of linking**: an individual can be linked with no login, a freelancer
+can hold a login on their own parentless account. The audit block IS the grant
+record (creator_* = who granted, deactivator_* = who revoked), so there is no
+second `granted_by` column to keep in step. **Revoke deactivates, never deletes**
+— login dies, every record stays — and a partial unique index on `user_id` where
+active means at most ONE live grant per person, which is what pins a caller to
+exactly one account set.
+
+**The guard corridor** (`shared/workers/account-scope.ts`) is the one place a
+caller's account set is decided: session → person → account set, and every
+account-scoped statement ANDs its clause into the WHERE (reads *and* writes — the
+fence rides the statement, it is never a pre-check). Portal-ness is decided by the
+PRESENCE of a portal_users row, never by its absence: a revoked row still makes
+you a portal caller, pinned to the EMPTY set, rather than silently promoting a
+former client to staff. Enforced by `workers/tenancy/test/account-leak.test.ts`,
+which derives the account-scoped routes off disk and sends a burglar at each.
+
 ### data_import_batches — KEEP (BUILT 2026-07-04, team migration `0006_import_batches`) — agentic multi-file import
 Purpose: the shell for an AGENTIC, multi-file import (AGENTIC-IMPORT.md). Groups the
 uploaded files, the agent-built PLAN (targets, column mappings, normalizations,

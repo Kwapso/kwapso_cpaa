@@ -20,6 +20,17 @@
 //   POST /api/tenancy/roles/active         -> deactivate / reactivate a role (never deleted)
 //   GET  /api/tenancy/roles/permissions    -> a role's permission matrix (?roleId)
 //   POST /api/tenancy/roles/permissions    -> save a role's permission matrix
+//   GET  /api/tenancy/accounts             -> the caller's accounts (paged, ?q= &type= &cursor=)
+//   GET  /api/tenancy/accounts/detail      -> one account + its people + its logins (?id)
+//   POST /api/tenancy/accounts             -> create an account (company or person)
+//   POST /api/tenancy/accounts/update      -> edit an account's own fields
+//   POST /api/tenancy/accounts/parent      -> move it under another (loop-refused)
+//   POST /api/tenancy/accounts/active      -> archive / restore (never deleted)
+//   POST /api/tenancy/accounts/links       -> link a person to an account
+//   POST /api/tenancy/accounts/links/active-> unlink / relink a person
+//   GET  /api/tenancy/portal-users         -> who can log in (?accountId)
+//   POST /api/tenancy/portal-users         -> grant portal access
+//   POST /api/tenancy/portal-users/active  -> revoke / restore portal access
 //   GET  /api/tenancy/activity             -> activity feed (?scope=team|user|role&id=)
 //   GET  /api/tenancy/team-meta            -> the active team's Overview metadata
 //   GET  /api/tenancy/invites              -> the team's invites (all statuses)
@@ -74,6 +85,19 @@ import {
 } from "./routes/invites"
 import { getScreens, postScreen } from "./routes/config"
 import {
+  getAccountDetail,
+  getAccounts,
+  getPortalUsers,
+  postAccountActive,
+  postAccountParent,
+  postCreateAccount,
+  postGrantPortalAccess,
+  postLinkActive,
+  postLinkPerson,
+  postPortalAccessActive,
+  postUpdateAccount,
+} from "./routes/accounts"
+import {
   getSelectable,
   getSelectableExport,
   postCreateSelectable,
@@ -116,6 +140,19 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/tenancy/roles/active": { handler: postSetRoleActive, kind: "mutation" },
   "GET /api/tenancy/roles/permissions": { handler: getRolePerms, kind: "read" },
   "POST /api/tenancy/roles/permissions": { handler: postRolePerms, kind: "mutation" },
+  // The customer spine. Reads are fenced by the caller's account set as well as
+  // their role; writes are fenced inside the statement itself (lib/accounts.ts).
+  "GET /api/tenancy/accounts": { handler: getAccounts, kind: "read" },
+  "GET /api/tenancy/accounts/detail": { handler: getAccountDetail, kind: "read" },
+  "POST /api/tenancy/accounts": { handler: postCreateAccount, kind: "mutation" },
+  "POST /api/tenancy/accounts/update": { handler: postUpdateAccount, kind: "mutation" },
+  "POST /api/tenancy/accounts/parent": { handler: postAccountParent, kind: "mutation" },
+  "POST /api/tenancy/accounts/active": { handler: postAccountActive, kind: "mutation" },
+  "POST /api/tenancy/accounts/links": { handler: postLinkPerson, kind: "mutation" },
+  "POST /api/tenancy/accounts/links/active": { handler: postLinkActive, kind: "mutation" },
+  "GET /api/tenancy/portal-users": { handler: getPortalUsers, kind: "read" },
+  "POST /api/tenancy/portal-users": { handler: postGrantPortalAccess, kind: "mutation" },
+  "POST /api/tenancy/portal-users/active": { handler: postPortalAccessActive, kind: "mutation" },
   "GET /api/tenancy/activity": { handler: getActivityFeed, kind: "read" },
   "GET /api/tenancy/team-meta": { handler: getTeamMetaFeed, kind: "read" },
   "GET /api/tenancy/invites": { handler: getInvites, kind: "read" },

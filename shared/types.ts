@@ -448,3 +448,56 @@ export type StreamEvent =
   | { t: "final"; outcome: ChatOutcome }
   /** TERMINAL: something went wrong; a safe message to show. */
   | { t: "error"; message: string }
+
+// ── The customer spine (SCOPE ch.03) ─────────────────────────────────────────
+// One table for every company and every person. What the workers hand the client
+// carries `id` as THE identifier and `code` as a label — never the other way
+// round, on either side of the wire.
+
+/** One account — a company (`entity`) or a person (`individual`). */
+export type Account = {
+  id: string
+  accountType: "entity" | "individual"
+  /** the account this one sits under; null at the top of its tree */
+  parentAccountId: string | null
+  name: string
+  email: string | null
+  phone: string | null
+  address: string | null
+  /** the human reference staff assign when work starts (BERG). Display only. */
+  code: string | null
+  currency: string | null
+  locale: string | null
+  timezone: string | null
+  /** may this account see money figures on its own work? */
+  commercialsVisible: boolean
+  /** the commercial lifecycle (prospect / client / past client) */
+  status: string
+  /** false once archived (deactivate-never-delete) */
+  active: boolean
+}
+
+/** A person's relationship to an account — the "contact of" row. */
+export type AccountLink = {
+  id: string
+  accountId: string
+  personAccountId: string
+  personName: string
+  relationship: string | null
+  isMainStakeholder: boolean
+  active: boolean
+}
+
+/** A client-side person's login. Absent = no portal access; present and inactive
+ * = revoked (their records are untouched). */
+export type PortalUser = {
+  id: string
+  accountId: string
+  userId: string
+  email: string | null
+  /** null = the whole account's world; otherwise the Apps they're narrowed to */
+  appRestriction: string | null
+  grantedAt: string
+  grantedByName: string | null
+  active: boolean
+}
