@@ -17,6 +17,18 @@
 // two ceilings of its own, and — the second half — every limit RIDES THE WRITE
 // (CONCURRENCY.md): a read-then-write throttle is a suggestion under load.
 //
+// AND THEN THE CURE BECAME THE DISEASE, TWICE. Both halves are in here now:
+//   • the environment-wide ceiling was a hard refusal, so ten source IPs could
+//     spend it and lock EVERY legitimate person out of the only entrance to the
+//     product for the rest of the hour. It rations now instead of refusing, and
+//     the tests below prove an ordinary person still gets a code mid-flood.
+//   • the verify door's attempt cap was one shared pool, so five junk requests
+//     killed a freshly minted code and the person who asked for it could not sign
+//     in. The five tries are two lanes now, and the tests prove a junk burst
+//     leaves the owner's lane untouched.
+// A test that only checks a cap still holds is testing the old fear. Both are
+// here: the cap AND the lockout it must not become.
+//
 // These tests run against a REAL SQLite database with the REAL migrations applied
 // (0001 + 0015), because a stub that "understands" the statements would happily
 // agree with a broken WHERE clause, and the whole point here is what SQL does
@@ -28,11 +40,14 @@ import { DatabaseSync, type SqlValue } from "node:sqlite"
 import { describe, expect, it } from "vitest"
 
 import {
+  MAX_CODE_ATTEMPTS,
+  MAX_CODE_ATTEMPTS_ELSEWHERE,
   MAX_CODES_PER_HOUR,
-  MAX_SENDS_GLOBAL_PER_HOUR,
   MAX_SENDS_PER_IP_PER_HOUR,
+  MAX_SENDS_PER_IP_WHEN_RATIONED,
+  SENDS_EVERYWHERE_BEFORE_RATIONING,
 } from "../src/lib/constants"
-import { clientIp, mintLoginCode } from "../src/lib/login-codes"
+import { clientIp, mintLoginCode, verifyLoginCode } from "../src/lib/login-codes"
 
 const CORE = join(__dirname, "..", "..", "..", "db", "core")
 const migration = (name: string) => readFileSync(join(CORE, name), "utf8")
@@ -90,11 +105,24 @@ function d1(db: DatabaseSync) {
 
 const EMAIL = "person@example.com"
 const IP = "203.0.113.7"
+/** Whoever is posting junk at someone else's code. Never the address that asked. */
+const STRANGER_IP = "198.51.100.66"
+
+/** A 6-digit code that is definitely NOT the real one (which is random). */
+const wrong = (real: string) => (real === "000000" ? "111111" : "000000")
 
 function fresh() {
   const db = coreDb()
   const door = d1(db)
   const ask = (email = EMAIL, ip = IP) => mintLoginCode({ DB: door } as never, email, ip)
+  const verify = (code: string, ip = IP, email = EMAIL) =>
+    verifyLoginCode({ DB: door } as never, email, code, ip)
+  /** Ask, and hand back the plain code the inbox would have received. */
+  const askForCode = async (email = EMAIL, ip = IP) => {
+    const r = await mintLoginCode({ DB: door } as never, email, ip)
+    if (!("code" in r)) throw new Error(`expected a code, got ${JSON.stringify(r)}`)
+    return r.code
+  }
   const rows = () => db.prepare("SELECT * FROM login_codes ORDER BY created_at DESC").all() as unknown as Row[]
   /** Move every stored row `seconds` further into the past (no clock mocking). */
   const age = (seconds: number) => {
@@ -105,7 +133,20 @@ function fresh() {
       )
   }
   const consumeAll = () => db.prepare("UPDATE login_codes SET consumed_at = 'used'").run()
-  return { db, door, ask, rows, age, consumeAll }
+  /** Sends this hour, everywhere — the number the rationing line is drawn on. */
+  const sentEverywhere = () =>
+    (db.prepare("SELECT COALESCE(SUM(sends), 0) AS n FROM login_codes").get() as { n: number }).n
+  return { db, door, ask, askForCode, verify, rows, age, consumeAll, sentEverywhere }
+}
+
+/** Put the environment past its hourly line the only way an attacker can: many
+ * separate callers, none of them near their OWN ceiling. `per` stays well under
+ * MAX_SENDS_PER_IP_PER_HOUR so nothing here is refused by the per-caller cap —
+ * what the tests below observe must be the environment's line, not that one. */
+async function flood(t: ReturnType<typeof fresh>, callers: number, per: number) {
+  for (let c = 0; c < callers; c++)
+    for (let i = 0; i < per; i++)
+      expect(await t.ask(`flood-${c}-${i}@example.com`, `192.0.2.${c}`), "the flood itself is not refused").toHaveProperty("code")
 }
 
 /** Fill ONE address's hourly quota, spacing each request past the cooldown. */
@@ -196,18 +237,6 @@ describe("the throttle rides the write (a burst can't outrun it)", () => {
     expect(results.filter((r) => "error" in r && r.error === "too_many_sends").length).toBe(20)
   })
 
-  it("a fresh IP per request still can't outrun the GLOBAL ceiling", async () => {
-    const t = fresh()
-    const n = MAX_SENDS_GLOBAL_PER_HOUR + 20
-    const results = await Promise.all(
-      Array.from({ length: n }, (_, i) => t.ask(`stranger${i}@example.com`, `198.51.100.${i}`))
-    )
-    expect(
-      results.filter((r) => "code" in r).length,
-      "a botnet spreads across IPs — only the global ceiling sees that"
-    ).toBe(MAX_SENDS_GLOBAL_PER_HOUR)
-  })
-
   // A ROTATION emails a fresh code without inserting a row. Counting rows would
   // have let a caller pay for a handful of rows once, then rotate them forever —
   // one mail a minute per address, past every budget. So sends are counted.
@@ -228,6 +257,172 @@ describe("the throttle rides the write (a burst can't outrun it)", () => {
       MAX_SENDS_PER_IP_PER_HOUR - MAX_CODES_PER_HOUR
     )
     expect(t.rows().length, "…while still not growing the table").toBe(MAX_CODES_PER_HOUR)
+  })
+})
+
+// The environment-wide number used to be a hard refusal on both write paths. That
+// made it a lockout switch for the whole product: ten source IPs, a tenth of a
+// request per second each, and nobody gets a sign-in code for the rest of the
+// hour — on either public door, with no password and no other way in. The bound
+// meant to shrink an attack had turned it into a better one.
+//
+// It rations now instead of refusing. Over the line, every caller narrows to a
+// small share, so the flood — far over that share — is what stops. The two tests
+// below are the two halves of that sentence, and BOTH have to hold: the old
+// "prove the ceiling still refuses at 300" test was retired here on purpose,
+// because passing it is now the bug.
+describe("a crowded hour rations the crowd — it does not close the door", () => {
+  /** Enough separate callers, five sends each, to put the hour past its line. */
+  const CALLERS = Math.ceil(SENDS_EVERYWHERE_BEFORE_RATIONING / MAX_SENDS_PER_IP_WHEN_RATIONED) + 2
+
+  it("a flood from many addresses can't stop an ordinary person getting a code", async () => {
+    const t = fresh()
+    await flood(t, CALLERS, MAX_SENDS_PER_IP_WHEN_RATIONED)
+    expect(t.sentEverywhere(), "the flood really did cross the line").toBeGreaterThanOrEqual(
+      SENDS_EVERYWHERE_BEFORE_RATIONING
+    )
+
+    // Someone who has asked for nothing this hour, signing in for the first time,
+    // mid-flood. Under the old hard ceiling this was `too_many_sends` — a stranger
+    // spending a shared number they had no part in.
+    expect(
+      await t.ask("newcomer@example.com", "203.0.113.200"),
+      "an ordinary person must never be collateral for someone else's flood"
+    ).toHaveProperty("code")
+  })
+
+  it("…and the flood's own callers are the ones the ration refuses", async () => {
+    const t = fresh()
+    await flood(t, CALLERS, MAX_SENDS_PER_IP_WHEN_RATIONED)
+
+    // Each flood caller sits at exactly the rationed share and nowhere near its
+    // own hourly ceiling — so a refusal here can only be the ration biting.
+    const again = await t.ask("flood-0-again@example.com", "192.0.2.0")
+    expect(again, "over the line, a caller past their share stops").toMatchObject({
+      status: 429,
+      error: "too_many_sends",
+    })
+    expect(
+      MAX_SENDS_PER_IP_WHEN_RATIONED,
+      "the ration must bite long before the per-caller ceiling, or this proves nothing"
+    ).toBeLessThan(MAX_SENDS_PER_IP_PER_HOUR)
+  })
+
+  it("under the line the environment's number is silent", async () => {
+    const t = fresh()
+    // A busy but ordinary hour: nowhere near the line, so one caller may still
+    // spend their full per-caller ceiling — the ration must not leak downward
+    // into normal traffic.
+    for (let i = 0; i < MAX_SENDS_PER_IP_WHEN_RATIONED + 3; i++)
+      expect(await t.ask(`quiet${i}@example.com`, "203.0.113.44")).toHaveProperty("code")
+    expect(t.sentEverywhere()).toBeLessThan(SENDS_EVERYWHERE_BEFORE_RATIONING)
+  })
+})
+
+// ANYONE WHO KNOWS AN EMAIL ADDRESS COULD LOCK THAT PERSON OUT. The verify door is
+// unauthenticated and keyed on the address alone, and it used to burn an attempt
+// slot for EVERY caller before comparing the hash — so five junk requests against
+// a freshly minted code destroyed it, and the person who actually asked could not
+// sign in. Sign-in is the only way into the product; there is no password.
+//
+// The five tries are two lanes now: whoever the code was last sent to (sent_ip —
+// earned by paying the send throttle's price) keeps all five, and everybody else
+// shares a small one. The cap itself is untouched — a 6-digit code is a million
+// guesses, and five is what stops it being walked.
+describe("a stranger's wrong guesses cost the stranger, not the person signing in", () => {
+  it("a burst of junk verify attempts does NOT stop the real person signing in", async () => {
+    const t = fresh()
+    const code = await t.askForCode(EMAIL, IP) // the victim asked; the code is in their inbox
+
+    for (let i = 0; i < MAX_CODE_ATTEMPTS * 4; i++) {
+      const junk = await t.verify(wrong(code), STRANGER_IP)
+      expect(junk, "junk from elsewhere is always refused").toHaveProperty("error")
+    }
+
+    expect(
+      await t.verify(code, IP),
+      "the person who asked for the code must still be able to use it"
+    ).toHaveProperty("id")
+  })
+
+  it("rotating addresses buys a guesser nothing — the small lane is the code's, not the caller's", async () => {
+    const t = fresh()
+    const code = await t.askForCode(EMAIL, IP)
+    for (let i = 0; i < 40; i++) await t.verify(wrong(code), `198.51.100.${i}`)
+    expect(
+      t.rows()[0].attempts,
+      "every stranger, however many addresses they own, shares ONE small lane"
+    ).toBe(MAX_CODE_ATTEMPTS_ELSEWHERE)
+    expect(await t.verify(code, IP), "…and the owner's tries were never touched").toHaveProperty("id")
+  })
+
+  it("the lane rides the write — simultaneous guesses can't each read a stale count", async () => {
+    const t = fresh()
+    const code = await t.askForCode(EMAIL, IP)
+    const at_once = await Promise.all(
+      Array.from({ length: 20 }, () => t.verify(wrong(code), STRANGER_IP))
+    )
+    expect(
+      at_once.filter((r) => "error" in r && r.error === "wrong_code").length,
+      "read-then-write would have let all twenty through at once"
+    ).toBe(MAX_CODE_ATTEMPTS_ELSEWHERE)
+    expect(t.rows()[0].attempts).toBe(MAX_CODE_ATTEMPTS_ELSEWHERE)
+  })
+
+  // THE CAP IS STILL THE CAP. It is the only thing standing between a 6-digit
+  // code and a million tries, so widening a lane must never widen the total.
+  it("five wrong guesses is still the whole budget, right code or not", async () => {
+    const t = fresh()
+    const code = await t.askForCode(EMAIL, IP)
+    for (let i = 0; i < MAX_CODE_ATTEMPTS; i++)
+      expect(await t.verify(wrong(code), IP), `guess ${i + 1}`).toMatchObject({ error: "wrong_code" })
+
+    expect(await t.verify(wrong(code), IP), "the sixth guess").toMatchObject({
+      status: 429,
+      error: "too_many_attempts",
+    })
+    expect(
+      await t.verify(code, IP),
+      "not even the RIGHT code past the cap — otherwise a brute-forcer who finally lands on it walks in"
+    ).toMatchObject({ error: "too_many_attempts" })
+    expect(t.rows()[0].consumed_at, "…and nothing was consumed").toBeNull()
+  })
+
+  it("a correct code costs no try at all — the cap counts failures now, not attempts", async () => {
+    const t = fresh()
+    const code = await t.askForCode(EMAIL, IP)
+    expect(await t.verify(wrong(code), IP)).toMatchObject({ error: "wrong_code" })
+
+    expect(await t.verify(code, IP)).toHaveProperty("id")
+    expect(t.rows()[0].attempts, "one mistype charged, the right code free").toBe(1)
+    expect(t.rows()[0].consumed_at, "and spent, so it can't be replayed").not.toBeNull()
+  })
+
+  it("asking again takes the lane back, with a clean budget", async () => {
+    const t = fresh()
+    await t.askForCode(EMAIL, IP)
+    // A stranger asks for a code too: it goes to the inbox's OWNER, and it costs
+    // the stranger a send — but it does move the reserved lane to them.
+    t.age(61)
+    await t.askForCode(EMAIL, STRANGER_IP)
+    for (let i = 0; i < MAX_CODE_ATTEMPTS; i++) await t.verify("000000", STRANGER_IP)
+    expect(t.rows()[0].attempts, "the stranger spent the whole budget while holding the lane").toBe(
+      MAX_CODE_ATTEMPTS
+    )
+
+    // The owner's answer is the one they always had, and it is under a minute
+    // away: ask again. (Rotation's own budget reset is locked further up.)
+    t.age(61)
+    const mine = await t.askForCode(EMAIL, IP)
+    expect(t.rows()[0].attempts, "a fresh code comes with a clean budget").toBe(0)
+    expect(await t.verify(mine, IP), "…and the reserved lane comes back with it").toHaveProperty("id")
+  })
+
+  it("an expired code is expired, whoever asks", async () => {
+    const t = fresh()
+    const code = await t.askForCode(EMAIL, IP)
+    t.db.prepare("UPDATE login_codes SET expires_at = '2000-01-01T00:00:00.000Z'").run()
+    expect(await t.verify(code, IP)).toMatchObject({ status: 400, error: "code_expired" })
   })
 })
 

@@ -15,6 +15,7 @@ const SRC = join(__dirname, "..", "src")
 const ROOT = join(__dirname, "..", "..", "..")
 const index = readFileSync(join(SRC, "index.ts"), "utf8")
 const emailChange = readFileSync(join(SRC, "lib", "email-change.ts"), "utf8")
+const loginCodes = readFileSync(join(SRC, "lib", "login-codes.ts"), "utf8")
 
 function authSources(): string[] {
   const out: string[] = []
@@ -87,12 +88,38 @@ describe("every internal door fails closed", () => {
 })
 
 describe("the attempt cap is atomic", () => {
-  it("login verify consumes an attempt slot in the same statement that checks the cap", () => {
-    expect(index).toContain(
-      "UPDATE login_codes SET attempts = attempts + 1 WHERE id = ? AND attempts < ? AND consumed_at IS NULL"
+  it("login verify spends a try in the same statement that checks the budget", () => {
+    // The cap and the spend are ONE statement (CONCURRENCY.md) — the check moved
+    // from index.ts into the mint's own file, but it may never move back apart.
+    expect(loginCodes).toMatch(
+      /UPDATE login_codes SET attempts = attempts \+ 1\s+WHERE id = \? AND consumed_at IS NULL AND \$\{ATTEMPTS_LEFT\}/
     )
-    // The burstable read-then-check gate is gone.
+    // The burstable read-then-check gate is gone from both files.
     expect(index).not.toMatch(/row\.attempts >= MAX_CODE_ATTEMPTS/)
+    expect(loginCodes).not.toMatch(/row\.attempts >= MAX_CODE_ATTEMPTS/)
+  })
+
+  // EARNED: the cap used to be one shared pool, so anyone who knew an email
+  // address could burn five junk tries and lock its owner out of the product.
+  it("the budget asks WHO is spending it — on both write paths", () => {
+    // Two lanes, chosen inside the statement: all five for the address the code
+    // was sent to, a small share for anyone else. A flat `attempts < ?` here is
+    // the lockout, restored.
+    expect(loginCodes).toContain(
+      "attempts < (CASE WHEN sent_ip = ? THEN ? ELSE ? END)"
+    )
+    // Both halves carry it: charging a wrong guess AND consuming a right one —
+    // or a brute-forcer who finally lands on the digits walks in past the cap.
+    const spends = loginCodes.match(/\$\{ATTEMPTS_LEFT\}/g) ?? []
+    expect(spends.length, "the charge and the consume must both carry the budget").toBe(2)
+    expect(loginCodes).toMatch(/UPDATE login_codes SET consumed_at = \? WHERE id = \? AND \$\{ATTEMPTS_LEFT\}/)
+  })
+
+  it("the verify door owns no copy of the rules — it calls the one seam", () => {
+    const door = index.slice(index.indexOf("async function emailVerify"), index.indexOf("async function emailChangeStart"))
+    expect(door).toContain("verifyLoginCode(")
+    expect(door, "the caller is named, so the try is charged to them").toContain("clientIp(request)")
+    expect(door, "no second copy of the attempt cap may grow here").not.toContain("attempts")
   })
 
   it("email-change verify uses the same atomic pattern", () => {

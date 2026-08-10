@@ -1,6 +1,9 @@
-// ONE mint for login codes. The real send door (email/start) and the staging-only
-// admin test-login door both go through THIS function, so the hashed-at-rest
-// storage, the TTL and every throttle can never differ between them.
+// A login code's WHOLE life, in one file: minted here (mintLoginCode), spent here
+// (verifyLoginCode). The real send door (email/start) and the staging-only admin
+// test-login door both go through the same mint, so the hashed-at-rest storage,
+// the TTL and every throttle can never differ between them — and the verify door
+// sits beside it because the two halves share the same ledger row and the same
+// question, "who is this caller, and what have they already spent?".
 // WHY it exists: login codes must never appear anywhere but the user's inbox —
 // the old staging echo (code in the API response + a toast) was deleted outright, and automated tests now sign in through the admin door instead.
 
@@ -8,10 +11,13 @@ import { ulid } from "../../../../shared/workers/id"
 import type { Env } from "../env"
 import {
   CODE_TTL_MINUTES,
+  MAX_CODE_ATTEMPTS,
+  MAX_CODE_ATTEMPTS_ELSEWHERE,
   MAX_CODES_PER_HOUR,
-  MAX_SENDS_GLOBAL_PER_HOUR,
   MAX_SENDS_PER_IP_PER_HOUR,
+  MAX_SENDS_PER_IP_WHEN_RATIONED,
   RESEND_COOLDOWN_SECONDS,
+  SENDS_EVERYWHERE_BEFORE_RATIONING,
 } from "./constants"
 import { randomCode, sha256Hex } from "./crypto"
 
@@ -24,8 +30,9 @@ export type MintFail = { error: string; message: string; status: number }
  * door in production) doesn't get a free pass — it joins a single shared
  * "unknown" bucket, so all header-less callers spend one caller's quota between
  * them. And the one thing an IP bucket can never bound — a caller who rotates
- * addresses, or somehow rotates the header — is bounded by the GLOBAL ceiling,
- * which no header value can move. */
+ * addresses, or somehow rotates the header — is what the environment's ration
+ * answers: over the line, a rotated header buys another SMALL share, never an
+ * escape, and never anybody else's turn. */
 export function clientIp(request: Request): string {
   const raw = request.headers.get("CF-Connecting-IP") ?? ""
   // Attacker-shaped input on a pre-auth door: strip NULs (D1 rejects them → a
@@ -41,6 +48,29 @@ export function clientIp(request: Request): string {
  * minute per address forever, having paid for them once. */
 const SENDS_FROM_IP = "(SELECT COALESCE(SUM(sends), 0) FROM login_codes WHERE sent_ip = ? AND created_at > ?)"
 const SENDS_EVERYWHERE = "(SELECT COALESCE(SUM(sends), 0) FROM login_codes WHERE created_at > ?)"
+
+/** The caller's whole send budget, as ONE clause both write paths carry — so the
+ * mint and the rotation can never enforce different rules.
+ *
+ *   line 1  this caller's hourly ceiling. Always.
+ *   line 2  the environment's. Note it is an OR, not an AND: the global number
+ *           does not refuse anyone by itself. Under the line, it is silent. Over
+ *           it, every caller narrows to the small rationed share — so the flood,
+ *           which is far over that share, stops, and the person asking for their
+ *           first code this hour does not. See constants.ts for the trade-off
+ *           this buys and what it costs.
+ *
+ * The binds are built by sendBudgetArgs BELOW, never by hand: eight values in one
+ * order, where a swap would be a silent security hole rather than a broken test. */
+const WITHIN_SEND_BUDGET = `${SENDS_FROM_IP} < ?
+        AND (${SENDS_EVERYWHERE} < ? OR ${SENDS_FROM_IP} < ?)`
+
+/** The eight values WITHIN_SEND_BUDGET reads, in its order. */
+const sendBudgetArgs = (sentIp: string, hourAgo: string) => [
+  sentIp, hourAgo, MAX_SENDS_PER_IP_PER_HOUR,
+  hourAgo, SENDS_EVERYWHERE_BEFORE_RATIONING,
+  sentIp, hourAgo, MAX_SENDS_PER_IP_WHEN_RATIONED,
+]
 
 /** Create + store a login code for `email` (hashed at rest, TTL'd, throttled).
  * Returns the PLAIN code exactly once — the caller decides where it goes: the
@@ -81,8 +111,8 @@ export async function mintLoginCode(
   //   1. the per-address cooldown — nothing unconsumed newer than cooldownFrom;
   //   2. the per-address hourly cap — unless nothing live is left to rotate, in
   //      which case a mint is the only way the inbox's owner gets back in;
-  //   3. this caller's hourly send budget;
-  //   4. the environment's hourly send budget.
+  //   3. the caller's send budget (their own ceiling, plus the ration the
+  //      environment's hour imposes on everyone when it's crowded).
   const minted = await env.DB.prepare(
     `INSERT INTO login_codes (id, email, code_hash, expires_at, created_at, sent_ip, sends)
      SELECT ?, ?, ?, ?, ?, ?, 1
@@ -90,24 +120,24 @@ export async function mintLoginCode(
                          WHERE email = ? AND consumed_at IS NULL AND created_at > ?)
         AND ((SELECT COUNT(*) FROM login_codes WHERE email = ? AND created_at > ?) < ?
              OR NOT EXISTS (SELECT 1 FROM login_codes WHERE email = ? AND consumed_at IS NULL))
-        AND ${SENDS_FROM_IP} < ?
-        AND ${SENDS_EVERYWHERE} < ?`
+        AND ${WITHIN_SEND_BUDGET}`
   )
     .bind(
       ulid(), email, hash, expires, nowIso, sentIp,
       email, cooldownFrom,
       email, hourAgo, MAX_CODES_PER_HOUR,
       email,
-      sentIp, hourAgo, MAX_SENDS_PER_IP_PER_HOUR,
-      hourAgo, MAX_SENDS_GLOBAL_PER_HOUR
+      ...sendBudgetArgs(sentIp, hourAgo)
     )
     .run()
   if ((minted.meta.changes ?? 0) > 0) return { code }
 
   // At the address's cap: replace the newest unconsumed code rather than adding a
   // row — a fresh secret, a fresh TTL, a fresh attempt budget, no growth. The
-  // cooldown and both send budgets ride this UPDATE too (a rotation is an email
-  // like any other), and `sends` counts it so the budgets see it.
+  // cooldown and the send budget ride this UPDATE too (a rotation is an email like
+  // any other), and `sends` counts it so the budget sees it. `sent_ip` moves to
+  // this caller: whoever just paid for a send is the person about to type the
+  // code, and that is what earns the reserved attempt lane (see verifyLoginCode).
   const rotated = await env.DB.prepare(
     `UPDATE login_codes
         SET code_hash = ?, expires_at = ?, created_at = ?, attempts = 0,
@@ -116,15 +146,13 @@ export async function mintLoginCode(
                   ORDER BY created_at DESC LIMIT 1)
         AND NOT EXISTS (SELECT 1 FROM login_codes
                          WHERE email = ? AND consumed_at IS NULL AND created_at > ?)
-        AND ${SENDS_FROM_IP} < ?
-        AND ${SENDS_EVERYWHERE} < ?`
+        AND ${WITHIN_SEND_BUDGET}`
   )
     .bind(
       hash, expires, nowIso, sentIp,
       email,
       email, cooldownFrom,
-      sentIp, hourAgo, MAX_SENDS_PER_IP_PER_HOUR,
-      hourAgo, MAX_SENDS_GLOBAL_PER_HOUR
+      ...sendBudgetArgs(sentIp, hourAgo)
     )
     .run()
   if ((rotated.meta.changes ?? 0) > 0) return { code }
@@ -139,15 +167,113 @@ export async function mintLoginCode(
   )
     .bind(sentIp, hourAgo)
     .first<{ mine: number; everyone: number }>()
-  if ((spent?.mine ?? 0) >= MAX_SENDS_PER_IP_PER_HOUR || (spent?.everyone ?? 0) >= MAX_SENDS_GLOBAL_PER_HOUR)
+  const mine = spent?.mine ?? 0
+  const crowded = (spent?.everyone ?? 0) >= SENDS_EVERYWHERE_BEFORE_RATIONING
+  const rationed = crowded && mine >= MAX_SENDS_PER_IP_WHEN_RATIONED
+  if (mine >= MAX_SENDS_PER_IP_PER_HOUR || rationed) {
+    // The one moment worth an operator's attention: the environment is over its
+    // hourly line AND the ration is actually turning callers away. A console line,
+    // not a row — this door is anonymous, and an alert an attacker can write on
+    // demand is just a slower way to fill the database. The durable version of
+    // this signal belongs at the edge, with the rule that should be stopping them.
+    if (rationed) console.warn(`login send rationed: ${spent?.everyone} sends this hour, ${mine} from this caller`)
     return {
+      // True as written now, which it wasn't before: only a caller who is
+      // themselves over a budget reaches this line. Someone caught by an
+      // environment-wide wall they had no part in used to be told the same thing.
       error: "too_many_sends",
       message: `That's a lot of sign-in codes from one place. Try again a bit later.`,
       status: 429,
     }
+  }
   return {
     error: "too_soon",
     message: `A code was just sent. Give it a moment, then ask again.`,
     status: 429,
   }
+}
+
+/** The code's five tries, split into two lanes by WHO is asking. A caller whose
+ * address matches the one the code was last SENT to (`sent_ip`) may spend all
+ * five; anyone else may spend at most MAX_CODE_ATTEMPTS_ELSEWHERE of them, and the
+ * rest stay reserved for the person who asked.
+ *
+ * WHY: this door is unauthenticated and keyed on an email address alone, so
+ * anyone who knows an address can post junk at their code. When the cap was one
+ * shared pool, five junk requests killed a freshly minted code and the person who
+ * asked for it could not sign in — and sign-in is the only way into the product.
+ * A guess is free; an ask costs a send from a throttled budget. So the free thing
+ * gets the small lane and the costed thing earns the reserved one.
+ *
+ * A stranger can still take the reserved lane by ASKING for a code themselves —
+ * but that emails a fresh code to the inbox's owner, spends one of the stranger's
+ * thirty hourly sends, and is undone the moment the owner asks again. Bounded,
+ * costed, and recoverable in under a minute, which the old shared pool was not.
+ *
+ * The brute-force bound is UNCHANGED: five wrong guesses, whoever makes them,
+ * against a 1,000,000-wide code that lives ten minutes. Rotating addresses buys a
+ * guesser nothing — the small lane belongs to the CODE, not to each caller.
+ * The limits of an address as a name, said out loud: someone behind the same
+ * gateway as the person signing in shares their lane, and header-less callers
+ * share the "unknown" bucket the same way they share a send budget (see
+ * clientIp). Both are the price of the only identifier a pre-sign-in door has. */
+const ATTEMPTS_LEFT = "attempts < (CASE WHEN sent_ip = ? THEN ? ELSE ? END)"
+
+/** The three values ATTEMPTS_LEFT reads, in its order. */
+const attemptsLeftArgs = (callerIp: string) => [callerIp, MAX_CODE_ATTEMPTS, MAX_CODE_ATTEMPTS_ELSEWHERE]
+
+/** Step 2 of email login, minus the session: check `code` against the live code
+ * for `email` and consume it. Returns the row's id on success — the caller signs
+ * the person in. `callerIp` is the bucket the try is charged to (see clientIp). */
+export async function verifyLoginCode(
+  env: Env,
+  email: string,
+  code: string,
+  callerIp: string
+): Promise<{ id: string } | MintFail> {
+  const row = await env.DB.prepare(
+    `SELECT id, code_hash, expires_at FROM login_codes
+     WHERE email = ? AND consumed_at IS NULL
+     ORDER BY created_at DESC LIMIT 1`
+  )
+    .bind(email)
+    .first<{ id: string; code_hash: string; expires_at: string }>()
+
+  const now = new Date().toISOString()
+  if (!row || row.expires_at <= now)
+    return { error: "code_expired", message: "That code expired. Request a new one.", status: 400 }
+
+  // COUNT FAILURES, NOT TRIES. The cap exists to bound GUESSING, and someone
+  // holding the right digits has not guessed — so a correct code costs nothing,
+  // and a person who asked on their laptop and typed it on their phone (a
+  // different address, so the small lane) is not competing with strangers for
+  // tries they never needed. The old shape had to charge every try because the
+  // comparison happened after the write; both statements below carry the budget
+  // in their own WHERE, so the check and the spend are still ONE statement
+  // (CONCURRENCY.md — N concurrent guesses can't each read a stale count).
+  if (row.code_hash !== (await sha256Hex(`${code}:${email}`))) {
+    const charged = await env.DB.prepare(
+      `UPDATE login_codes SET attempts = attempts + 1
+        WHERE id = ? AND consumed_at IS NULL AND ${ATTEMPTS_LEFT}`
+    )
+      .bind(row.id, ...attemptsLeftArgs(callerIp))
+      .run()
+    // Nothing moved = this caller's lane is spent. Same words either way: a
+    // refusal must never tell a stranger how much of someone else's budget is
+    // left, and a real person only needs to know to ask for a fresh code.
+    if ((charged.meta.changes ?? 0) === 0)
+      return { error: "too_many_attempts", message: "Too many wrong tries. Request a new code.", status: 429 }
+    return { error: "wrong_code", message: "That code isn't right. Check and try again.", status: 400 }
+  }
+
+  // Right code — but it still needs a live lane, or a brute-forcer who finally
+  // lands on the digits past the cap would be waved through.
+  const consumed = await env.DB.prepare(
+    `UPDATE login_codes SET consumed_at = ? WHERE id = ? AND ${ATTEMPTS_LEFT}`
+  )
+    .bind(now, row.id, ...attemptsLeftArgs(callerIp))
+    .run()
+  if ((consumed.meta.changes ?? 0) === 0)
+    return { error: "too_many_attempts", message: "Too many wrong tries. Request a new code.", status: 429 }
+  return { id: row.id }
 }

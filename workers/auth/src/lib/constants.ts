@@ -3,6 +3,21 @@
 // cap and per-hour throttle can never drift between the two.
 export const CODE_TTL_MINUTES = 10
 export const MAX_CODE_ATTEMPTS = 5
+
+/** How many of those five tries a caller who did NOT ask for this code may spend.
+ * The rest are RESERVED for whoever asked (login_codes.sent_ip — rewritten by
+ * every mint and rotation, so it always names the caller who most recently paid
+ * the send throttle's price for this code, which is the best available signal for
+ * "the person about to type it").
+ * WHY IT EXISTS: the cap used to be one shared pool, so ~5 junk requests against a
+ * freshly minted code destroyed it and the person who actually asked for it could
+ * not sign in — and sign-in is the only way into the product. A guess is free; an
+ * ask is throttled. So guessing gets the small shared lane and asking earns the
+ * reserved one, and a stranger's wrong guesses can never reach the owner's tries.
+ * The brute-force bound is UNCHANGED: five wrong guesses total against a
+ * 1,000,000-wide code that lives ten minutes, however many callers try. */
+export const MAX_CODE_ATTEMPTS_ELSEWHERE = 2
+
 export const MAX_CODES_PER_HOUR = 5
 /** How long before the SAME address may ask for another code. This — not the
  * hourly cap — is what limits sending: the hourly cap bounds how many code ROWS
@@ -23,8 +38,30 @@ export const RESEND_COOLDOWN_SECONDS = 60
  * NAT signing in on a Monday morning; far below "walk a mailing list". */
 export const MAX_SENDS_PER_IP_PER_HOUR = 30
 
-/** Codes the whole environment may email in an hour, whatever the source. The
- * backstop for the one thing a per-IP cap cannot see: a caller who rotates
- * addresses (a botnet, or a forged edge header). Spoofing the IP header buys a
- * bigger share of THIS number, never an escape from it. */
-export const MAX_SENDS_GLOBAL_PER_HOUR = 300
+/** Codes the whole environment may email in an hour before the door starts
+ * RATIONING. This number is the backstop for the one thing a per-IP cap cannot
+ * see: a caller who rotates addresses (a botnet, or a forged edge header).
+ *
+ * IT IS NOT A WALL, DELIBERATELY. It used to be a hard refusal on both write
+ * paths, and that turned it into a lockout switch for the whole product: ten
+ * source IPs at a tenth of a request per second spent it, and then every
+ * legitimate person was refused a sign-in code for the rest of the hour, on both
+ * public doors. A bound that refuses honest traffic has turned one attack into a
+ * better one. Past this line the door instead narrows every caller to the small
+ * share below — so the flood's own addresses, which are far over it, are the ones
+ * refused, and someone signing in for the first time this hour is not. */
+export const SENDS_EVERYWHERE_BEFORE_RATIONING = 300
+
+/** A caller's send budget once the environment is over the line above. Exactly one
+ * address's own hourly cap (MAX_CODES_PER_HOUR) — the most one honest person can
+ * possibly need — so rationing can never be tighter than a single sign-in. A busy
+ * office behind one address is squeezed to five codes while a flood is running;
+ * that is the price, and it is paid in a slower Monday morning rather than a
+ * closed door.
+ * THE TRADE-OFF, SAID PLAINLY: there is no longer an absolute ceiling on mail from
+ * this door, so a large enough address pool can still run up a sending bill —
+ * five per address per hour instead of the thirty they could spend before. We
+ * bought that with the guarantee that nobody can shut the product's only entrance.
+ * The control for a genuinely distributed flood is at the edge (a WAF rule, a
+ * challenge on the send door) — not a self-inflicted lockout in here. */
+export const MAX_SENDS_PER_IP_WHEN_RATIONED = 5
