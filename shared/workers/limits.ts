@@ -77,7 +77,7 @@ export const AGENT_REPLY_ENVELOPE_TOKENS = 512
 export const BULK_IDS_LIMIT = Math.floor((AGENT_MAX_TOKENS - AGENT_REPLY_ENVELOPE_TOKENS) / TOKENS_PER_EMITTED_ID)
 
 /** Per-user ceiling on CREATED teams. Every team provisions a REAL database, so
- * an uncapped create door lets one signed-up account exhaust the platform's
+ * an uncapped create door lets one signed-up person exhaust the platform's
  * database quota. Low on purpose — a person runs a handful of teams, not fifty;
  * the owner raises it per environment with MAX_TEAMS_PER_USER. */
 export const MAX_TEAMS_PER_USER = 5
@@ -86,14 +86,14 @@ export const MAX_TEAMS_PER_USER = 5
 // A personal access token acts AS its owner, in one team, forever — so "forever"
 // was the problem: a secret pasted into a CI config outlives the contract, the
 // laptop and often the job. Two numbers bound it: how long one lives, and how
-// many one account can hold at once.
+// many one person can hold at once.
 
 /** How long a new access token lives before it must be re-issued. Long enough
  * that a working integration isn't churned, short enough that an abandoned
  * secret stops being a key. */
 export const MCP_TOKEN_TTL_DAYS = 90
 
-/** Live tokens one account may hold. The cap is what makes a token REACHABLE:
+/** Live tokens one person may hold. The cap is what makes a token REACHABLE:
  * the settings list is hard-capped like every list (R14), so an uncapped minter
  * could bury a live token past the cap and never be able to revoke it again. */
 export const MAX_ACTIVE_MCP_TOKENS_PER_USER = 10
@@ -103,7 +103,7 @@ export const MAX_ACTIVE_MCP_TOKENS_PER_USER = 10
  *   • `Number(env.X) || DEFAULT` turns a deliberate **0** into the default — set
  *     the AI allowance to zero and you silently grant the full daily quota.
  *   • `Number(env.X)` with no empty test turns **unset** into 0 — a team cap that
- *     refuses every account its very first team.
+ *     refuses every person their very first team.
  * Both are invisible until someone deliberately chooses the boundary value, which
  * is exactly when it matters. So: unset, empty or unparseable → the fallback;
  * every real number, INCLUDING zero and negatives, is honoured as written. */

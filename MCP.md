@@ -1,6 +1,6 @@
-# MCP.md — the machine door (how outside tools use Brimba)
+# MCP.md — the machine door (how outside tools use Kwapso)
 
-Brimba has an **external machine surface**: an AI agent, a script, or an automation
+Kwapso has an **external machine surface**: an AI agent, a script, or an automation
 can do the same things a person can — invite/manage members, read and write learning
 and help, run imports, pull CSV exports, even talk to the in-app assistant — over the
 **Model Context Protocol (MCP)**. This is the `mcp` worker (ARCHITECTURE → the MCP
@@ -14,8 +14,13 @@ powers." A token is just that person, reached by a machine.
 
 ## 1 · Who can use it
 
-Anyone who can sign into the app and holds a role that allows the actions they want.
-There is no separate developer account system — the machine borrows a human's rights.
+Anyone on **your team** who holds a role that allows the actions they want. There is no
+separate developer sign-up — the machine borrows a human's rights.
+
+**Your clients cannot.** A client-portal contact is an ordinary team member by
+construction (grant → invite → accept is the only way to make a working portal login),
+so "can they sign in?" was never the right question — see §5. They are refused at both
+doors: they cannot make a token, and a token cannot act for one.
 
 So to give a teammate/contractor machine access:
 
@@ -29,8 +34,8 @@ So to give a teammate/contractor machine access:
    agent access** is the safe, zero-AI-cost choice.
 3. They **make their own token** (next section). You never see or handle their secret.
 
-Prefer a **service account** for an unattended integration: create one app account
-(e.g. `ci@yourco.com`), invite it with a tightly-scoped role, and let it hold the
+Prefer a **dedicated service login** for an unattended integration: make one app
+login (e.g. `ci@yourco.com`), invite it with a tightly-scoped role, and let it hold the
 token — so a person leaving doesn't break the automation, and you can revoke it alone.
 
 ---
@@ -106,7 +111,7 @@ active token) that copies the block below with the live host filled in. Paste it
 any assistant that can speak MCP:
 
 ```
-Connect to my Brimba workspace over MCP (Model Context Protocol).
+Connect to my Kwapso workspace over MCP (Model Context Protocol).
 
 Endpoint: https://agency.kwapso.app/mcp
 Auth header: Authorization: Bearer kwapso_mcp_YOUR_TOKEN
@@ -124,20 +129,30 @@ agent_confirm, plan_import) use the team's AI quota.
 Confirm the live list with `tools/list` (it's generated, so it's always current).
 Today it covers:
 
-- **Read:** `whoami`, `list_members`, `list_roles`, `list_dropdown_values`,
-  `list_learning`, `list_help_tickets`, `list_imports`. Each list tool that sits on a
-  door with an `?id=` filter now EXPOSES + FORWARDS it (R19 parity) — pass `id` to fetch
-  one record instead of pulling the whole collection (`list_help_tickets` also takes
-  `scope`).
+- **Read:** `whoami`, `list_members`, `list_roles`, `list_invites`,
+  `list_dropdown_values`, `list_learning`, `list_help_tickets`, `get_help_thread`,
+  `list_help_stakeholders`, `list_accounts`, `get_account`, `list_portal_access`,
+  `list_imports`. Each list tool that sits on a door with an `?id=` filter EXPOSES +
+  FORWARDS it (R19 parity) — pass `id` to fetch one record instead of pulling the whole
+  collection (`list_help_tickets` also takes `scope`; `list_accounts` takes `q`, `type`
+  and `parentId`).
+
+  **R19 now starts at the DOORS, not the tools.** The parity check used to walk the
+  tool catalogue, so a door with no tool wasn't a failure — it was invisible, which is
+  how the whole customer spine sat off this surface with a green build. It now derives
+  every filtered or paged door on tenancy + content from their own route tables: a door
+  with no tool is a red build unless it is a named, reasoned line in the check's
+  `TOOLLESS_DOORS` (three today — the role permission matrix, one invite's audit trail,
+  and the cross-module activity feed; each says why, in writing).
 
   **One asymmetry worth stating plainly.** The in-app assistant now stops for a yes/no
   panel before every write that decides who-can-do-what — derived from the gate map,
   so anything gated on `member_roles:` or `team_members:` is included (EDGE-CASES §5). The MCP
   surface has **no such panel and cannot have one**: the confirming UI belongs to your
-  client, not to Brimba. That is not a capability gap — the same door, the same gate, the
+  client, not to Kwapso. That is not a capability gap — the same door, the same gate, the
   same audit row — but it means the operator of an MCP client is the one deciding when to
   confirm. If your client drives an LLM that reads team data (tickets, articles), treat
-  those tools the way Brimba does and put a human in front of them.
+  those tools the way Kwapso does and put a human in front of them.
 
   **`list_help_tickets` is PAGED** (R14 — tickets are a growing collection). One call
   returns one page plus `total` (the exact server count, not the page length),
@@ -145,28 +160,58 @@ Today it covers:
   value as `cursor`; never construct or mutate one — a cursor the server didn't issue
   is refused with a 400. When `hasMore` is false you have reached the end. A client
   that ignores the cursor still works: it simply sees the newest page.
+  **A result is whole, or it is an error.** One `tools/call` answer is capped at
+  400,000 characters. Over that the call comes back `isError: true` with a
+  `result_too_large` body telling you to filter, page, or use the export tool — it is
+  never sliced and handed back as a success. (It used to be: half a JSON document,
+  reported `ok`, which a client has no way to notice and no reason to re-ask.)
 - **Export (full-field CSV):** `export_roles_csv`, `export_learning_csv`,
-  `export_dropdown_values_csv`.
+  `export_dropdown_values_csv`, `export_accounts_csv`.
 - **Write — deterministic create / edit / deactivate** (free, no AI; each needs the
   matching role right, e.g. `member_roles:create`):
   - roles — `create_role`, `update_role`, `set_role_active`, `set_role_permissions`
   - members — `set_member_role`, `remove_member` (people join via **invite**)
   - invites — `create_invite`, `revoke_invite`
+  - accounts — `create_account`, `update_account`, `set_account_parent`,
+    `set_account_active`, `link_contact`, `set_contact_link_active`
+  - portal access — `grant_portal_access`, `set_portal_access_active`
   - dropdown values — `create_dropdown_value`, `update_dropdown_value`, `set_dropdown_value_active`
   - learning — `create_learning`, `update_learning`, `set_learning_active`
-  - help — `create_help_ticket`, `update_help_ticket`, `set_help_status`, `reply_help_ticket`
+  - help — `create_help_ticket`, `update_help_ticket`, `set_help_status`,
+    `reply_help_ticket`, `add_help_stakeholder`
 - **Bulk create:** the import pipeline — `start_import` → `add_import_file` →
-  `plan_import` → `run_import`.
+  `plan_import` → `run_import`. Accounts are importable AND exportable (they were
+  importable only, which made the customer spine a one-way street).
 - **The in-app assistant:** `agent_chat`, `agent_confirm`.
 
-**Intentionally NOT on the machine surface (a reasoned exclusion, not a gap):** the
-multi-row *mutation* tools the in-app assistant uses — `bulk_set_help_status`,
-`bulk_set_learning_active`, and the set-shaped `set_help_status_by_filter` — are
-agent-only. They're built around the app's yes/no CONFIRM panel (a person approves the
-true count before a high-blast write runs); a headless MCP client has no such panel, so
-exposing them would be a blind mass-write. A machine client that needs the same effect
-composes the single-record writes above (each gated + audited identically). The bulk
-READ path — filtering a list to one record via `id` — IS on MCP (R19 parity).
+**Intentionally NOT on the machine surface — reasoned exclusions, not gaps.**
+
+1. **The multi-row *mutation* tools** the in-app assistant uses —
+   `bulk_set_help_status`, `bulk_set_learning_active`, and the set-shaped
+   `set_help_status_by_filter` — are agent-only. They're built around the app's yes/no
+   CONFIRM panel (a person approves the true count before a high-blast write runs); a
+   headless MCP client has no such panel, so exposing them would be a blind mass-write.
+   A machine client that needs the same effect composes the single-record writes above
+   (each gated + audited identically). The bulk READ path — filtering a list to one
+   record via `id` — IS on MCP (R19 parity).
+2. **Teams:** `list_teams`, `create_team` and `switch_team` are off both machine
+   surfaces. A token is PINNED to one team by design (§5); a tool that moved or made
+   one would be the only way to widen that pin, which is the thing the pin exists to
+   prevent.
+3. **The client-portal standing doors** — `GET /api/tenancy/portal/context` and
+   `POST /api/tenancy/portal/switch-account` — are off it too, and the reason is
+   structural rather than a judgement call: they answer "which of *your own* companies
+   are you standing in?", which is a question only a CLIENT login has, and a client
+   login cannot hold a token at all (§5). For staff, both doors are already an honest
+   empty answer. Adding them would be adding tools that no caller who can reach them
+   has any use for.
+4. **The role permission MATRIX read, one invite's AUDIT trail, and the cross-module
+   ACTIVITY feed** are named, reasoned lines in the R19 check's `TOOLLESS_DOORS` —
+   respectively: the same matrix comes back flattened in `export_roles_csv`; an
+   invite's own state is already in `list_invites` and the audit is the forensic strip
+   a person reads on its detail; and the activity feed is the one door whose answer is
+   assembled by subtracting the caller's denied modules (R18), so putting the merged
+   stream on this surface is a separate decision for the owner, not a parity default.
 
 Every tool is a thin forward to the **same gated door the app's own screens use** — so
 input is validated, **your live role is re-checked** (a Viewer's `create_role` is
@@ -220,6 +265,31 @@ or zero, by choice.
 
 ## 5 · Security posture (what a token can't do)
 
+- **It is the agency's surface, not its clients'.** A client-portal login is refused
+  both a new token and a session for an existing one.
+
+  This is worth spelling out, because nothing was ever *bypassed* here. A client
+  contact **is** a team member — that is how the portal works — so they hold a role,
+  and their role holds `learning:read` for the ordinary reason that their own doors
+  need nothing from it. Signing in at the AGENCY address and minting a token therefore
+  let them call `list_learning` and `export_learning_csv` and receive every internal
+  how-to article, in full, as a CSV. The gate ran and PASSED. What kept those articles
+  private was that the client portal's own gateway refuses that door outright — "the
+  team's how-to articles are INTERNAL and carry no account fence" — i.e. the protection
+  was a **door-level** decision, and the machine surface had no door-level opinion at
+  all.
+
+  So it has one, in one sentence, asked in one place. Before minting, and before
+  bridging a token to a session, the `mcp` worker asks **tenancy** — the worker that
+  owns the fence — which kind of caller this is. It cannot answer that itself: the
+  `portal_users` row lives in the per-team database and this worker holds no D1
+  credential, and inventing a second way to decide who is a client is the exact thing
+  interface-parity exists to prevent. The check **fails closed** in both directions: a
+  caller who reads as a client is refused, *and so is one tenancy could not answer for*
+  — a door that assumed "staff" whenever the check itself broke would hand the surface
+  back to precisely the caller it excludes, on precisely the day something is wrong.
+  Revoked grants count as client too: portal-ness is decided by the PRESENCE of the
+  row, never by its absence.
 - **Acts AS the owner, capped by their LIVE role** — re-checked on every call. Demote
   the person and the token weakens the same instant.
 - **One team only.** The token is pinned to the team it was made in; it can never read
@@ -237,7 +307,7 @@ or zero, by choice.
   the revoke check on every call, so a secret forgotten in an old CI config stops being
   a key whether or not anyone remembers it. A token row with no deadline is refused
   rather than trusted.
-- **And it stays reachable.** An account holds at most 10 live tokens, and the settings
+- **And it stays reachable.** One person holds at most 10 live tokens, and the settings
   list shows unrevoked ones first — so a token that still works is always on the
   screen, and always revocable. (It was previously possible to bury a live token behind
   more than 1,000 revoked ones and lose the ability to revoke it from the app.)
@@ -261,10 +331,12 @@ or zero, by choice.
 ## 6 · For maintainers (where it lives)
 
 `workers/mcp/` — `POST /mcp` (JSON-RPC) + session-gated token management under
-`/api/mcp/tokens*`; the human-facing card is `web/components/access-tokens.tsx`
+`/api/mcp/tokens*`; the staff-only rule is `workers/mcp/src/lib/staff.ts` (called from
+`postToken` and from the session bridge, held by `test/staff-only.test.ts`); the
+human-facing card is `web/components/access-tokens.tsx`
 (Settings → Access tokens). Tokens live in the core DB (`mcp_tokens`, migrations
 `0013` + `0016` — `expires_at`, backfilled so applying it gives every existing token a
-full term rather than killing it); the TTL and the per-account cap are
+full term rather than killing it); the TTL and the per-person cap are
 `MCP_TOKEN_TTL_DAYS` / `MAX_ACTIVE_MCP_TOKENS_PER_USER` in
 `shared/workers/limits.ts`, and `workers/mcp/test/tokens.test.ts` runs the real
 migrations against a real SQLite database to hold all three fixes in place.

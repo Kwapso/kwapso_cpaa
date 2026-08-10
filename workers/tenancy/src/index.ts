@@ -21,6 +21,7 @@
 //   GET  /api/tenancy/roles/permissions    -> a role's permission matrix (?roleId)
 //   POST /api/tenancy/roles/permissions    -> save a role's permission matrix
 //   GET  /api/tenancy/accounts             -> the caller's accounts (paged, ?q= &type= &cursor=)
+//   GET  /api/tenancy/accounts/export      -> the caller's accounts as a full-field CSV
 //   GET  /api/tenancy/accounts/detail      -> one account + its people + its logins (?id)
 //   POST /api/tenancy/accounts             -> create an account (company or person)
 //   POST /api/tenancy/accounts/update      -> edit an account's own fields
@@ -90,6 +91,7 @@ import { getScreens, postScreen } from "./routes/config"
 import {
   getAccountDetail,
   getAccounts,
+  getAccountsExport,
   getPortalContext,
   getPortalUsers,
   postSwitchPortalAccount,
@@ -148,6 +150,7 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // The customer spine. Reads are fenced by the caller's account set as well as
   // their role; writes are fenced inside the statement itself (lib/accounts.ts).
   "GET /api/tenancy/accounts": { handler: getAccounts, kind: "read" },
+  "GET /api/tenancy/accounts/export": { handler: getAccountsExport, kind: "read" },
   "GET /api/tenancy/accounts/detail": { handler: getAccountDetail, kind: "read" },
   "POST /api/tenancy/accounts": { handler: postCreateAccount, kind: "mutation" },
   "POST /api/tenancy/accounts/update": { handler: postUpdateAccount, kind: "mutation" },

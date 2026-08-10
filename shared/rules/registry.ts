@@ -205,7 +205,11 @@ export const PORTAL_VISIBLE_READS: Record<string, { fence: string | null; why: s
   },
   "workers/content/src/lib/help.ts": {
     fence: "authorScope",
-    why: "a client raises tickets; the team-wide default handed them every other client's — and the thread doors, one table along, had to be taught the same sentence.",
+    why: "a client raises tickets; the team-wide default handed them every other client's — the thread doors, one table along, had to be taught the same sentence, and the door that RAISES a ticket answered with the whole list until the check learned that a POST can be a read.",
+  },
+  "workers/content/src/lib/notify.ts": {
+    fence: null,
+    why: "it sends email and returns no rows to the caller: the only ids it resolves are the ticket's own raiser (read through the fence) and the mentions the route already refused from a client login, and the lookup joins team_members so an address outside the team can never be reached.",
   },
   "workers/content/src/lib/stakeholders.ts": {
     fence: "getTicket",

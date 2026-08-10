@@ -80,6 +80,15 @@ const MCP_ONLY: McpTool[] = [
     method: "GET",
     path: "/api/tenancy/selectable/export",
   },
+  {
+    name: "export_accounts_csv",
+    description:
+      "Every account you can see as CSV — companies and people, full fields + audit. The columns lead with the import format, so the file goes straight back in through the importer.",
+    inputSchema: obj({}),
+    binding: "TENANCY",
+    method: "GET",
+    path: "/api/tenancy/accounts/export",
+  },
   // ---- the agentic import (plan is METERED on the team's AI quota) ----
   {
     name: "start_import",
@@ -160,7 +169,14 @@ export function getMcpTool(name: string): McpTool | undefined {
 /** Cap what one tools/call returns (a 5 MB export would blow an MCP client). */
 const MAX_RESULT_CHARS = 400_000
 
-/** Forward one tool call to its gated door with the bridged session cookie. */
+/** Forward one tool call to its gated door with the bridged session cookie.
+ *
+ * A TRUNCATED ANSWER IS NOT AN ANSWER. The cap used to slice the body, append
+ * "…(truncated)" and hand it back as `ok` — so a machine client received invalid
+ * JSON (or half a CSV row) reported as a SUCCESSFUL call, and the only place the
+ * damage showed up was wherever it tried to parse it. A client cannot re-ask a
+ * question it was never told failed. So over the cap the call FAILS, and the
+ * message says what to do instead: page, filter, or use the export door. */
 export async function forwardTool(
   env: Env,
   tool: McpTool,
@@ -175,6 +191,15 @@ export async function forwardTool(
     body: tool.buildBody ? tool.buildBody(input) : {},
   })
   const raw = await res.text()
-  const text = raw.length > MAX_RESULT_CHARS ? `${raw.slice(0, MAX_RESULT_CHARS)}\n…(truncated)` : raw
-  return { ok: res.ok, text }
+  if (raw.length > MAX_RESULT_CHARS)
+    return {
+      ok: false,
+      text: JSON.stringify({
+        error: "result_too_large",
+        message: `${tool.name} answered with ${raw.length} characters; one call may return ${MAX_RESULT_CHARS}. Narrow it with a filter, take one page at a time, or pull the whole table through its export tool.`,
+        limit: MAX_RESULT_CHARS,
+        size: raw.length,
+      }),
+    }
+  return { ok: res.ok, text: raw }
 }

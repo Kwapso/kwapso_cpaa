@@ -47,6 +47,20 @@ export const memberLabel = (input: Record<string, unknown>, names?: Record<strin
   return names?.[id] ?? `member ${id}`
 }
 
+/** The optional fields an account carries — the SAME set on create and edit, so
+ * the two tools can't drift into different shapes (the door validates them
+ * identically for exactly that reason). */
+const accountFields = (i: Record<string, unknown>): Record<string, unknown> => ({
+  code: opt(i, "code"),
+  email: opt(i, "email"),
+  phone: opt(i, "phone"),
+  address: opt(i, "address"),
+  currency: opt(i, "currency"),
+  locale: opt(i, "locale"),
+  timezone: opt(i, "timezone"),
+  status: opt(i, "status"),
+})
+
 /** The learning create/edit body — the same optional field set both surfaces send
  * (undefined keys drop out of JSON.stringify, so the door treats them as omitted). */
 const learningBody = (i: Record<string, unknown>): Record<string, unknown> => ({
@@ -101,9 +115,11 @@ export type SharedTool = {
  * the admin must click is a hard one. So these four confirm — not because they are
  * destructive, but because a silent one is a silent privilege escalation.
  * The set is DERIVED, not listed: isPrivilegeWrite() reads each tool's own gate,
- * so a write added tomorrow to either table confirms the moment it exists. A
- * name list would have locked the four above and waved through the fifth —
- * which is exactly where update_role was found.
+ * so a write added tomorrow to any of those tables confirms the moment it
+ * exists. A name list would have locked the four above and waved through the
+ * fifth — which is exactly where update_role was found, and the derivation is
+ * what carried the rule, unprompted, onto the two portal-access writes the
+ * customer spine brought with it.
  * The MCP surface ignores `agent.confirm` — it has no panel to show, and the
  * confirming UI belongs to the connecting client. Same door, same gate, same
  * audit row; the asymmetry is documented in MCP.md, not a capability gap. */
@@ -164,6 +180,183 @@ export const SHARED_TOOLS: SharedTool[] = [
       return `?${q.join("&")}`
     },
     agent: { write: false, summarize: (i) => (str(i, "id") ? "Look up one ticket" : "List support tickets") },
+  },
+  {
+    name: "get_help_thread",
+    summary:
+      "Read one support ticket's conversation — every reply, oldest first — by ticket id. The list tools return the ticket; this returns what was said on it.",
+    binding: "CONTENT", method: "GET", path: "/api/content/help/thread",
+    schema: obj({ id: S }, ["id"]),
+    buildQuery: (i) => `?id=${encodeURIComponent(str(i, "id"))}`,
+    agent: { write: false, summarize: (i) => `Read the conversation on ticket ${str(i, "id")}` },
+  },
+  {
+    name: "list_help_stakeholders",
+    summary:
+      "The people following one support ticket (by ticket id): the person who raised it, the team's admins, anyone mentioned on it, and anyone added by hand.",
+    binding: "CONTENT", method: "GET", path: "/api/content/help/stakeholders",
+    schema: obj({ id: S }, ["id"]),
+    buildQuery: (i) => `?id=${encodeURIComponent(str(i, "id"))}`,
+    agent: { write: false, summarize: (i) => `List who's following ticket ${str(i, "id")}` },
+  },
+
+  /* -------------------------------- accounts ------------------------------- */
+  // The customer spine. Reads are fenced by the caller's account set as well as
+  // their role, so these tools inherit that fence for free — a token held by a
+  // person pinned to one account answers about that account and no other.
+  {
+    name: "list_accounts",
+    summary:
+      "List the team's accounts — companies and people in one list. Filters: `q` (searches name, reference and email), `type` ('entity' for a company or 'individual' for a person), `parentId` (only the accounts sitting under that one). Returns ONE page plus the exact `total`, `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
+    binding: "TENANCY", method: "GET", path: "/api/tenancy/accounts",
+    schema: obj({ q: S, type: S, parentId: S, cursor: S }),
+    buildQuery: (i) => {
+      const q: string[] = []
+      for (const key of ["q", "type", "parentId", "cursor"])
+        if (str(i, key)) q.push(`${key}=${encodeURIComponent(str(i, key))}`)
+      return q.length ? `?${q.join("&")}` : ""
+    },
+    agent: { write: false, summarize: (i) => (str(i, "q") ? `Search accounts for "${str(i, "q")}"` : "List accounts") },
+  },
+  {
+    name: "get_account",
+    summary:
+      "One account in full (by id), with its contacts (the people linked to it) and its portal logins. Use list_accounts to find the id.",
+    binding: "TENANCY", method: "GET", path: "/api/tenancy/accounts/detail",
+    schema: obj({ id: S }, ["id"]),
+    buildQuery: (i) => `?id=${encodeURIComponent(str(i, "id"))}`,
+    agent: { write: false, summarize: (i) => `Look up account ${str(i, "id")}` },
+  },
+  {
+    name: "create_account",
+    summary:
+      "Create an account. `accountType` is 'entity' (a company) or 'individual' (a person) — nothing else is accepted. `parentAccountId` puts it under another account; leave it out for a top-level one.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/accounts",
+    schema: obj(
+      { accountType: S, name: S, parentAccountId: S, code: S, email: S, phone: S, address: S, currency: S, locale: S, timezone: S, status: S },
+      ["accountType", "name"]
+    ),
+    buildBody: (i) => ({
+      accountType: str(i, "accountType"),
+      name: str(i, "name"),
+      parentAccountId: opt(i, "parentAccountId"),
+      ...accountFields(i),
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Create the account "${str(i, "name")}"` },
+  },
+  {
+    name: "update_account",
+    summary:
+      "Edit an account's own details (by id) — never its place in the hierarchy; that's set_account_parent. Any field you leave out is CLEARED (status and commercialsVisible keep their current value), so send the whole record — read it with get_account first.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/accounts/update",
+    schema: obj(
+      { id: S, name: S, code: S, email: S, phone: S, address: S, currency: S, locale: S, timezone: S, status: S, commercialsVisible: B },
+      ["id", "name"]
+    ),
+    buildBody: (i) => ({
+      id: str(i, "id"),
+      name: str(i, "name"),
+      ...accountFields(i),
+      commercialsVisible: typeof i.commercialsVisible === "boolean" ? i.commercialsVisible : undefined,
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Edit account ${str(i, "id")}` },
+  },
+  {
+    name: "set_account_parent",
+    summary:
+      "Move an account under another one (by id), or send it back to the top by leaving `parentAccountId` out. A move that would close a loop is refused.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/accounts/parent",
+    schema: obj({ id: S, parentAccountId: S }, ["id"]),
+    buildBody: (i) => ({ id: str(i, "id"), parentAccountId: opt(i, "parentAccountId") ?? null }),
+    agent: {
+      write: true, confirm: false,
+      summarize: (i) =>
+        str(i, "parentAccountId")
+          ? `Move account ${str(i, "id")} under ${str(i, "parentAccountId")}`
+          : `Move account ${str(i, "id")} to the top level`,
+    },
+  },
+  {
+    name: "set_account_active",
+    summary: "Archive an account (active:false) or restore it (active:true) — never deleted; every record it carries survives.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/accounts/active",
+    schema: obj({ id: S, active: B }, ["id", "active"]),
+    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
+    agent: {
+      write: true,
+      confirm: (i) => i.active !== true, // destructive only when ARCHIVING
+      summarize: (i) => `${i.active === true ? "Restore" : "Archive"} account ${str(i, "id")}`,
+    },
+  },
+  {
+    name: "link_contact",
+    summary:
+      "Say that a person is a contact of an account: `accountId` is the company, `personAccountId` is the person's own account row (create it first with create_account if it isn't there). The same person can be a contact of more than one account.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/accounts/links",
+    schema: obj({ accountId: S, personAccountId: S, relationship: S, isMainStakeholder: B }, ["accountId", "personAccountId"]),
+    buildBody: (i) => ({
+      accountId: str(i, "accountId"),
+      personAccountId: str(i, "personAccountId"),
+      relationship: opt(i, "relationship"),
+      isMainStakeholder: i.isMainStakeholder === true,
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Link ${str(i, "personAccountId")} to account ${str(i, "accountId")}` },
+  },
+  {
+    name: "set_contact_link_active",
+    summary:
+      "Unlink a contact from an account (active:false) or link them back (active:true), by the CONTACT LINK's id — get_account returns it. The person's own account is untouched either way.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/accounts/links/active",
+    schema: obj({ id: S, active: B }, ["id", "active"]),
+    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
+    agent: {
+      write: true,
+      confirm: (i) => i.active !== true, // destructive only when UNLINKING
+      summarize: (i) => `${i.active === true ? "Relink" : "Unlink"} contact link ${str(i, "id")}`,
+    },
+  },
+
+  /* ------------------------------ portal access ---------------------------- */
+  {
+    name: "list_portal_access",
+    summary:
+      "Who can log in to the client portal — every portal access the caller may see, or just one account's with `accountId`. Each row carries the person's email and whether their access is live.",
+    binding: "TENANCY", method: "GET", path: "/api/tenancy/portal-users",
+    schema: obj({ accountId: S }),
+    buildQuery: (i) => (str(i, "accountId") ? `?accountId=${encodeURIComponent(str(i, "accountId"))}` : ""),
+    agent: {
+      write: false,
+      summarize: (i) => (str(i, "accountId") ? `List portal access on account ${str(i, "accountId")}` : "List portal access"),
+    },
+  },
+  {
+    name: "grant_portal_access",
+    summary:
+      "Give someone at an account a login to the client portal. `accountId` is the account they'll see; `personAccountId` is the person, picked off that account's own records — the door reads their email from there, so it never takes a typed-in address. They must have signed in here at least once, and a member of your own team is refused.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/portal-users",
+    schema: obj({ accountId: S, personAccountId: S, appRestriction: S }, ["accountId", "personAccountId"]),
+    buildBody: (i) => ({
+      accountId: str(i, "accountId"),
+      personAccountId: str(i, "personAccountId"),
+      appRestriction: opt(i, "appRestriction"),
+    }),
+    // PRIVILEGE WRITE (portal_users) → confirm. Handing out a login decides who
+    // can SEE a customer's world; see the note above SHARED_TOOLS.
+    agent: { write: true, confirm: true, summarize: (i) => `Give ${str(i, "personAccountId")} a login on account ${str(i, "accountId")}` },
+  },
+  {
+    name: "set_portal_access_active",
+    summary:
+      "Revoke a portal login (active:false) or restore it (active:true), by the PORTAL ACCESS row's id — get_account and list_portal_access both return it. The login dies; every record stays.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/portal-users/active",
+    schema: obj({ id: S, active: B }, ["id", "active"]),
+    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
+    // PRIVILEGE WRITE (portal_users) → confirm BOTH ways: revoking takes sight
+    // of a customer's world away, restoring hands it back.
+    agent: {
+      write: true, confirm: true,
+      summarize: (i) => `${i.active === true ? "Restore" : "Revoke"} portal access ${str(i, "id")}`,
+    },
   },
 
   /* --------------------------------- roles --------------------------------- */
@@ -363,6 +556,15 @@ export const SHARED_TOOLS: SharedTool[] = [
     buildBody: (i) => ({ helpId: str(i, "helpId"), body: str(i, "body") }),
     agent: { write: true, confirm: false, summarize: (i) => `Reply to ticket ${str(i, "helpId")}` },
   },
+  {
+    name: "add_help_stakeholder",
+    summary:
+      "Pull a teammate into a support ticket so they follow it (`id` = the ticket, `userId` = the person). Add-only — it never removes anyone.",
+    binding: "CONTENT", method: "POST", path: "/api/content/help/stakeholders",
+    schema: obj({ id: S, userId: S }, ["id", "userId"]),
+    buildBody: (i) => ({ id: str(i, "id"), userId: str(i, "userId") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Add someone to ticket ${str(i, "id")}` },
+  },
 ]
 
 /** The permission each SHARED WRITE needs (module:right). The door ENFORCES it; this is
@@ -370,6 +572,15 @@ export const SHARED_TOOLS: SharedTool[] = [
  * Needs member_roles:create."). Keyed by canonical name (works for the mcpName ones too).
  * Reads carry no hint (they just need the module's read right). */
 export const TOOL_GATES: Record<string, string> = {
+  create_account: "accounts:create",
+  update_account: "accounts:edit",
+  set_account_parent: "accounts:edit",
+  set_account_active: "accounts:delete",
+  link_contact: "accounts:create",
+  set_contact_link_active: "accounts:delete",
+  grant_portal_access: "portal_users:create",
+  set_portal_access_active: "portal_users:delete",
+  add_help_stakeholder: "help:read",
   create_role: "member_roles:create",
   update_role: "member_roles:edit",
   set_role_active: "member_roles:delete",
@@ -391,8 +602,12 @@ export const TOOL_GATES: Record<string, string> = {
 }
 
 /** Lookup by canonical name (the agent's name). */
-/** The tables whose rows decide WHO CAN DO WHAT. */
-export const PRIVILEGE_MODULES = ["member_roles", "team_members"]
+/** The tables whose rows decide WHO CAN DO WHAT — or, in `portal_users`' case,
+ * who can SEE WHOSE. A portal grant is not a permission on the matrix, but it is
+ * the same kind of decision: it hands a person outside the team sight of a
+ * customer's whole world, and it is reachable while the model is reading text an
+ * attacker can author. Same reasoning, same panel. */
+export const PRIVILEGE_MODULES = ["member_roles", "team_members", "portal_users"]
 
 /** Is this a PRIVILEGE write — one that changes who can do what? DERIVED from the
  * tool's own declared gate (falling back to the door it posts to, so an agent-only

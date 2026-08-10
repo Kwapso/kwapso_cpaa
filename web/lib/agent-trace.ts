@@ -100,7 +100,28 @@ export function traceFor(
       return { path: `${seg(teamId, "help")}/${str(input, "helpId")}`, highlight: "main" }
     case "update_help_ticket":
     case "set_help_status":
+    case "add_help_stakeholder":
       return { path: `${seg(teamId, "help")}/${str(input, "id")}`, highlight: "main" }
+
+    /* ------------------------------- accounts ------------------------------- */
+    // Create → the accounts list, where the new account appears live. Every other
+    // account write → that account's detail: its own fields, its contacts and its
+    // portal logins all live on one screen, so the change is visible wherever it
+    // landed. A contact link and a portal login carry their OWN row ids (not an
+    // account id), so those two land on the list — the ping names the account and
+    // the row patches in place.
+    case "create_account":
+      return { path: seg(teamId, "accounts"), highlight: "main" }
+    case "update_account":
+    case "set_account_parent":
+    case "set_account_active":
+      return { path: `${seg(teamId, "accounts")}/${str(input, "id")}`, highlight: "main" }
+    case "link_contact":
+    case "grant_portal_access":
+      return { path: `${seg(teamId, "accounts")}/${str(input, "accountId")}`, highlight: "main" }
+    case "set_contact_link_active":
+    case "set_portal_access_active":
+      return { path: seg(teamId, "accounts"), highlight: "main" }
 
     /* ------------------------------- imports -------------------------------- */
     // Running an attached-files import (the chat import) → the Import screen,

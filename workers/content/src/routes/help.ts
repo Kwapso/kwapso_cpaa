@@ -34,15 +34,33 @@ import { notifyReplyAndMentions } from "../lib/notify"
 import { addStakeholder, listStakeholders } from "../lib/stakeholders"
 import type { Env } from "../env"
 
+/** Is this caller a client login rather than staff? Resolved ONCE per request,
+ * the same sentence every help door speaks — and now the same sentence the
+ * WRITES speak, because three of them answered with a page and none of them
+ * asked. */
+async function isPortal(
+  cfg: Parameters<typeof listTickets>[0],
+  guard: Parameters<typeof listTickets>[1]
+): Promise<boolean> {
+  return (await accountScope(cfg, guard)).kind === "portal"
+}
+
 /** EVERY ticket response is a PAGE (R14) — including the one a mutation returns,
  * so a client re-priming its list from a write still learns where page two
- * starts. One seam: rows + exact totals + hasMore + the opaque cursor. */
+ * starts. One seam: rows + exact totals + hasMore + the opaque cursor.
+ *
+ * `portal` is REQUIRED, and that is the whole fix for the worst bug this file
+ * has had: it used to default to false, so `postCreateHelp` — a door the client
+ * portal forwards untouched — answered a client's brand-new question with EVERY
+ * ticket in the team, other clients' included, description text and all. Nothing
+ * was crafted; that was the happy path. A defaulted fence is a fence that fails
+ * open the moment someone writes a new door, so there is no default here now. */
 async function ticketPage(
   cfg: Parameters<typeof listTickets>[0],
   guard: Parameters<typeof listTickets>[1],
   scope: "mine" | "all",
-  cursor: string | null = null,
-  portal = false
+  cursor: string | null,
+  portal: boolean
 ): Promise<Response> {
   const [page, counts] = await Promise.all([
     listTickets(cfg, guard, scope, cursor, portal),
@@ -55,7 +73,7 @@ async function ticketPage(
 export async function getHelp(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "help", "read")
   // Portal-ness decides WHOSE tickets, exactly as it decides whose accounts.
-  const portal = (await accountScope(cfg, guard)).kind === "portal"
+  const portal = await isPortal(cfg, guard)
   const url = new URL(request.url)
   const scope = queryText(url.searchParams.get("scope"), "Scope") === "mine" ? "mine" : "all"
   const id = queryText(url.searchParams.get("id"), "Id")
@@ -81,7 +99,7 @@ export async function getHelp(request: Request, env: Env): Promise<Response> {
  * the fence rides the thread's own WHERE (lib/help threadFence). */
 export async function getHelpThread(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "help", "read")
-  const portal = (await accountScope(cfg, guard)).kind === "portal"
+  const portal = await isPortal(cfg, guard)
   const id = queryText(new URL(request.url).searchParams.get("id"), "Id")
   if (!id) return fail(400, "invalid_input", "A ticket id is required.")
   return json({
@@ -90,16 +108,22 @@ export async function getHelpThread(request: Request, env: Env): Promise<Respons
   })
 }
 
-/** POST /api/content/help — raise a ticket (help:create). */
+/** POST /api/content/help — raise a ticket (help:create).
+ *
+ * The response is a PAGE, which makes this a READ door wearing a POST — and it
+ * is on the client portal's surface. So it resolves the caller like every
+ * sibling: a client asking their first question gets their own list back, not
+ * the agency's book of everybody's problems. */
 export async function postCreateHelp(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<TicketInput>(request, env, "help", "create")
   const description = requireText(body.description, "Description", TEXT_LIMITS.long)
+  const portal = await isPortal(cfg, guard)
   const id = await createTicket(cfg, guard, actor, body)
   await publishChange(env, guard.teamId, "help", id, "add")
   // HOOK (Phase 3): the agent drafts the first reply here; a no-op today, so the
   // ticket simply opens awaiting a human (per "ticket always opens").
   await maybeDraftFirstReply(cfg, guard, id, description)
-  return ticketPage(cfg, guard, "all")
+  return ticketPage(cfg, guard, "all", null, portal)
 }
 
 /** POST /api/content/help/update — edit a ticket (help:edit). */
@@ -107,9 +131,10 @@ export async function postUpdateHelp(request: Request, env: Env): Promise<Respon
   const { actor, cfg, guard, body } = await gatedBody<TicketInput & { id?: string }>(request, env, "help", "edit")
   if (!body.id) return fail(400, "invalid_input", "id and description are required.")
   requireText(body.description, "Description", TEXT_LIMITS.long)
-  await updateTicket(cfg, guard, actor, body.id, body)
+  const portal = await isPortal(cfg, guard)
+  await updateTicket(cfg, guard, actor, body.id, body, portal)
   await publishChange(env, guard.teamId, "help", body.id)
-  return ticketPage(cfg, guard, "all")
+  return ticketPage(cfg, guard, "all", null, portal)
 }
 
 /** POST /api/content/help/status — move a ticket along its fixed lifecycle.
@@ -120,13 +145,14 @@ export async function postHelpStatus(request: Request, env: Env): Promise<Respon
     return fail(400, "invalid_input", "id and a valid status are required.")
   const status = body.status as HelpStatus
 
-  const ticket = await getTicket(cfg, guard, body.id)
+  const portal = await isPortal(cfg, guard)
+  const ticket = await getTicket(cfg, guard, body.id, portal)
   if (!ticket) return fail(404, "help_not_found", "That ticket doesn't exist.")
 
   // R17: already at that status → zero rows moved → no ping, no duplicate history.
-  const changed = await setStatus(cfg, guard, actor, body.id, status)
+  const changed = await setStatus(cfg, guard, actor, body.id, status, portal)
   if (changed) await publishChange(env, guard.teamId, "help", body.id)
-  return ticketPage(cfg, guard, "all")
+  return ticketPage(cfg, guard, "all", null, portal)
 }
 
 /** POST /api/content/help/bulk-status-by-filter — the SET-shaped bulk: move every
@@ -153,7 +179,8 @@ export async function postBulkHelpStatusByFilter(request: Request, env: Env): Pr
   const helpType = optionalText(body.helpType, "Type", TEXT_LIMITS.short)
   if (helpType) filter.helpType = helpType
   const result = await bulkSetStatusByFilter(
-    cfg, guard, actor, filter, body.toStatus as HelpStatus, body.dryRun === true
+    cfg, guard, actor, filter, body.toStatus as HelpStatus, body.dryRun === true,
+    await isPortal(cfg, guard)
   )
   // ONE coarse list-ping for the whole set — and only when something moved.
   if (result.changed > 0) await publishChange(env, guard.teamId, "help")
@@ -172,7 +199,9 @@ export async function postBulkHelpStatus(request: Request, env: Env): Promise<Re
   const ids = requireIdList(body.ids)
   if (typeof body.status !== "string" || !(HELP_STATUSES as readonly string[]).includes(body.status))
     return fail(400, "invalid_input", "A valid status is required.")
-  const { changed, skipped } = await bulkSetStatus(cfg, guard, actor, ids, body.status as HelpStatus)
+  const { changed, skipped } = await bulkSetStatus(
+    cfg, guard, actor, ids, body.status as HelpStatus, await isPortal(cfg, guard)
+  )
   // Row-level live-sync: one ping per changed ticket (same row shape the single
   // endpoint patches) — no list refetch.
   for (const id of changed) await publishChange(env, guard.teamId, "help", id)
@@ -194,9 +223,22 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
   // The fence decides WHOSE ticket this is before a word is appended — a reply
   // cannot be un-appended, and 404 rather than 403 so "not yours" never confirms
   // the ticket exists.
-  const portal = (await accountScope(cfg, guard)).kind === "portal"
+  const portal = await isPortal(cfg, guard)
   const ticket = await getTicket(cfg, guard, body.helpId, portal)
   if (!ticket) return fail(404, "help_not_found", "That ticket doesn't exist.")
+
+  // A CLIENT DOES NOT @MENTION. This is the one door on the client portal that
+  // makes the app SEND EMAIL, from the team's own verified sender, carrying the
+  // caller's text — and a mention is what aims it. Everything a client needs is
+  // already here without one: the reply lands on their ticket and the agency
+  // reads it in Help. What a mention adds is a list of staff ids to fire at, and
+  // a client has no way to legitimately know one (the portal serves no member
+  // list, and the stakeholder door — which NAMES staff — is deliberately off its
+  // surface). So an array here can only have been hand-written, and it is
+  // refused rather than quietly dropped: silence would teach a script to keep
+  // trying. Staff keep mentions; the cap above still bounds them.
+  if (portal && Array.isArray(body.taggedUserIds) && body.taggedUserIds.length)
+    return fail(403, "no_mentions", "Just write your reply — we'll make sure the right people see it.")
 
   // Untrusted: only keep string ids, and never the author's own id (you can't
   // @mention yourself). A mention is notify-only — never an instruction.
@@ -214,7 +256,7 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
     return fail(400, "too_many_mentions", `A reply can mention up to ${MENTIONS_LIMIT} people.`)
   for (const id of tagged) requireText(id, "Mentioned person", TEXT_LIMITS.short)
 
-  const replyId = await addReply(cfg, guard, actor, body.helpId, replyBody, tagged, false)
+  const replyId = await addReply(cfg, guard, actor, body.helpId, replyBody, tagged, false, portal)
   await publishChange(env, guard.teamId, "help_threads", replyId, "add")
   await publishChange(env, guard.teamId, "help", body.helpId, "edit")
   await notifyReplyAndMentions(
@@ -238,7 +280,7 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
  * leak as the thread, in its most personal form. */
 export async function getHelpStakeholders(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "help", "read")
-  const portal = (await accountScope(cfg, guard)).kind === "portal"
+  const portal = await isPortal(cfg, guard)
   const id = queryText(new URL(request.url).searchParams.get("id"), "Id")
   if (!id) return fail(400, "invalid_input", "A ticket id is required.")
   return json({ stakeholders: await listStakeholders(cfg, env, guard, id, portal) })
@@ -251,7 +293,7 @@ export async function postAddStakeholder(request: Request, env: Env): Promise<Re
   const { actor, cfg, guard, body } = await gatedBody<{ id?: string; userId?: string }>(request, env, "help", "read")
   if (!body.id || !body.userId)
     return fail(400, "invalid_input", "id and userId are required.")
-  const portal = (await accountScope(cfg, guard)).kind === "portal"
+  const portal = await isPortal(cfg, guard)
   const ticket = await getTicket(cfg, guard, body.id, portal)
   if (!ticket) return fail(404, "help_not_found", "That ticket doesn't exist.")
   const stakeholders = await addStakeholder(cfg, env, guard, actor, body.id, body.userId, portal)

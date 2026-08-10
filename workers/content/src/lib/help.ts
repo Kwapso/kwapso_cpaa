@@ -97,13 +97,27 @@ function toMessage(r: ReplyRow): HelpMessage {
 const TICKET_COLS =
   "id, help_type, description, screen_recording_link, source_screen, status, resolved, resolved_at, creator_id, creator_name, editor_name, created_at, updated_at"
 
-/** Fetch one ticket (the raw row the gating + notify need), or throw a clean 404. */
-async function ticketOrThrow(cfg: D1Rest, guard: MemberGuard, id: string): Promise<TicketRow> {
+/** Fetch one ticket (the raw row the gating + notify need), or throw a clean 404.
+ *
+ * THE FENCE RIDES THE WRITE PATH TOO. This is the row every help WRITE resolves
+ * before it changes anything (edit, status move, reply), so an unfenced version
+ * of it is an unfenced version of all three: outside the caller's world the row
+ * must be indistinguishable from a made-up id. `creator_id` never changes, so
+ * resolving here and updating next is not a race — but the UPDATEs carry the
+ * clause as well, because a fence you can only see by reading the caller is a
+ * fence the next reader will delete. */
+async function ticketOrThrow(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  id: string,
+  portal: boolean
+): Promise<TicketRow> {
+  const fence = authorScope(guard, portal, "all")
   const rows = await d1Query<TicketRow>(
     cfg,
     guard.databaseId,
-    `SELECT ${TICKET_COLS} FROM help WHERE id = ?`,
-    [id]
+    `SELECT ${TICKET_COLS} FROM help WHERE id = ?${fence.sql ? ` AND ${fence.sql}` : ""}`,
+    [id, ...fence.params]
   )
   if (!rows[0]) throw new GuardError(404, "help_not_found", "That ticket doesn't exist.")
   return rows[0]
@@ -125,7 +139,14 @@ const TICKET_ORDER = "COALESCE(updated_at, created_at)"
  * A portal caller is pinned to their own, whatever scope they ask for. Staff are
  * unchanged. Returned as a clause rather than a pre-check so it rides the same
  * WHERE as the page AND the count — a total that didn't pass the same filter
- * would say how many tickets it is refusing to show. */
+ * would say how many tickets it is refusing to show.
+ *
+ * NO DEFAULT ANYWHERE BELOW, deliberately. Every reader in this file used to
+ * take `portal = false`, which is a fence that fails OPEN when a call site
+ * forgets it — and one did: the door that RAISES a ticket answered with the
+ * whole team's list, so a client asking a question was handed every other
+ * client's. A required parameter turns that miss into a compile error, which is
+ * the only kind of reminder that never gets tired. */
 export function authorScope(guard: MemberGuard, portal: boolean, scope: "mine" | "all") {
   const own = portal || scope === "mine"
   return { sql: own ? "creator_id = ?" : "", params: own ? [guard.userId] : [] }
@@ -135,8 +156,8 @@ export async function listTickets(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: "mine" | "all",
-  cursor?: string | null,
-  portal = false
+  cursor: string | null,
+  portal: boolean
 ): Promise<Page<HelpTicket>> {
   const pos = decodeCursor(cursor)
   const after = keysetAfter(pos, TICKET_ORDER)
@@ -160,7 +181,7 @@ export async function listTickets(
 export async function countTickets(
   cfg: D1Rest,
   guard: MemberGuard,
-  portal = false
+  portal: boolean
 ): Promise<{ total: number; mineTotal: number }> {
   // R16 says the count is exact; the fence says exact ABOUT WHAT THEY MAY SEE.
   // An unfenced total would tell a client how many tickets exist that it is
@@ -182,7 +203,7 @@ export async function getTicket(
   cfg: D1Rest,
   guard: MemberGuard,
   id: string,
-  portal = false
+  portal: boolean
 ): Promise<HelpTicket | null> {
   // The fence rides the WHERE here too: a by-id lookup that skipped it would be
   // the leak in its most convenient form (one id, one ticket, no list to page).
@@ -224,7 +245,7 @@ export async function listReplies(
   cfg: D1Rest,
   guard: MemberGuard,
   ticketId: string,
-  portal = false
+  portal: boolean
 ): Promise<HelpMessage[]> {
   const fence = threadFence(guard, portal)
   const rows = await d1Query<ReplyRow>(
@@ -242,7 +263,7 @@ export async function countReplies(
   cfg: D1Rest,
   guard: MemberGuard,
   ticketId: string,
-  portal = false
+  portal: boolean
 ): Promise<number> {
   const fence = threadFence(guard, portal)
   const rows = await d1Query<{ n: number }>(
@@ -300,16 +321,21 @@ export async function updateTicket(
   guard: MemberGuard,
   actor: Actor,
   id: string,
-  input: TicketInput
+  input: TicketInput,
+  portal: boolean
 ): Promise<void> {
-  const before = await ticketOrThrow(cfg, guard, id)
+  const before = await ticketOrThrow(cfg, guard, id, portal)
   const description = requireText(input.description, "Description", TEXT_LIMITS.long)
 
   const now = new Date().toISOString()
+  // The fence rides the UPDATE as well as the read above — same sentence, same
+  // statement, so neither can be removed while the other keeps the door honest.
+  const fence = authorScope(guard, portal, "all")
+  const fenceSql = fence.sql ? ` AND creator_id = ${sqlString(guard.userId)}` : ""
   await d1ExecScript(
     cfg,
     guard.databaseId,
-    `UPDATE help SET help_type = ${sqlString((optionalText(input.helpType, "Type", TEXT_LIMITS.short) ?? null))}, description = ${sqlString(description)}, screen_recording_link = ${sqlString((optionalText(input.screenRecordingLink, "Screen recording link", TEXT_LIMITS.link) ?? null))}, source_screen = ${sqlString((optionalText(input.sourceScreen, "Source", TEXT_LIMITS.short) ?? null))}, updated_at = ${sqlString(now)}, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE id = ${sqlString(id)};`
+    `UPDATE help SET help_type = ${sqlString((optionalText(input.helpType, "Type", TEXT_LIMITS.short) ?? null))}, description = ${sqlString(description)}, screen_recording_link = ${sqlString((optionalText(input.screenRecordingLink, "Screen recording link", TEXT_LIMITS.link) ?? null))}, source_screen = ${sqlString((optionalText(input.sourceScreen, "Source", TEXT_LIMITS.short) ?? null))}, updated_at = ${sqlString(now)}, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE id = ${sqlString(id)}${fenceSql};`
   )
 
   const changes = describeChanges([
@@ -339,9 +365,10 @@ export async function setStatus(
   guard: MemberGuard,
   actor: Actor,
   id: string,
-  status: HelpStatus
+  status: HelpStatus,
+  portal: boolean
 ): Promise<boolean> {
-  await ticketOrThrow(cfg, guard, id)
+  await ticketOrThrow(cfg, guard, id, portal)
   // R17: the `status <> ?` predicate makes the move idempotent — re-resolving an
   // already-resolved ticket moves zero rows, so it writes no duplicate history,
   // re-stamps no editor/updated_at (no phantom re-sort), and pings nothing.
@@ -350,11 +377,13 @@ export async function setStatus(
   const resolveBlock = resolved
     ? `resolved = 1, resolved_at = ${sqlString(now)}, resolver_id = ${sqlString(actor.id)}, resolver_email = ${sqlString(actor.email)}, resolver_name = ${sqlString(actor.name)}`
     : "resolved = 0, resolved_at = NULL, resolver_id = NULL, resolver_email = NULL, resolver_name = NULL"
+  // The fence rides the move itself, beside the R17 predicate.
+  const fence = authorScope(guard, portal, "all")
   const changed = await d1Query<{ id: string }>(
     cfg,
     guard.databaseId,
-    `UPDATE help SET status = ?, ${resolveBlock}, updated_at = ?, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE id = ? AND status <> ? RETURNING id`,
-    [status, now, id, status]
+    `UPDATE help SET status = ?, ${resolveBlock}, updated_at = ?, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE id = ? AND status <> ?${fence.sql ? ` AND ${fence.sql}` : ""} RETURNING id`,
+    [status, now, id, status, ...fence.params]
   )
   if (!changed[0]) return false
 
@@ -378,13 +407,14 @@ export async function bulkSetStatus(
   guard: MemberGuard,
   actor: Actor,
   ids: string[],
-  status: HelpStatus
+  status: HelpStatus,
+  portal: boolean
 ): Promise<{ changed: string[]; skipped: number }> {
   const changed: string[] = []
   let skipped = 0
   for (const id of ids) {
     try {
-      if (await setStatus(cfg, guard, actor, id, status)) changed.push(id)
+      if (await setStatus(cfg, guard, actor, id, status, portal)) changed.push(id)
       else skipped++ // already at the target status — a no-op, not an event
     } catch (e) {
       // A missing ticket is skipped, not fatal — the rest of the batch still applies.
@@ -413,13 +443,19 @@ export async function bulkSetStatusByFilter(
   actor: Actor,
   filter: { status?: HelpStatus; helpType?: string },
   toStatus: HelpStatus,
-  dryRun: boolean
+  dryRun: boolean,
+  portal: boolean
 ): Promise<{ matched: number; changed: number }> {
   // The same facet set the Help screen sends (status / type). The R17 predicate
   // (`status <> ?`) is INLINE in both statements below — source-visible for the
   // idempotent-transitions scan — so "matched" is already "would change".
-  const extra: string[] = []
-  const extraParams: (string | number)[] = []
+  //
+  // The fence leads the extras: a set-shaped write must not reach a ticket the
+  // caller cannot even see, and the COUNT it confirms with must be a count of
+  // the same rows the UPDATE will touch.
+  const authored = authorScope(guard, portal, "all")
+  const extra: string[] = [...(authored.sql ? [authored.sql] : [])]
+  const extraParams: (string | number)[] = [...authored.params]
   if (filter.status) {
     extra.push("status = ?")
     extraParams.push(filter.status)
@@ -478,11 +514,12 @@ export async function addReply(
   ticketId: string,
   body: string,
   taggedUserIds: string[],
-  isAgent: boolean
+  isAgent: boolean,
+  portal: boolean
 ): Promise<string> {
   const clean = body.trim()
   if (!clean) throw new GuardError(400, "invalid_input", "A reply can't be empty.")
-  await ticketOrThrow(cfg, guard, ticketId)
+  await ticketOrThrow(cfg, guard, ticketId, portal)
 
   const id = ulid()
   const now = new Date().toISOString()

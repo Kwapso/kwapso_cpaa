@@ -22,7 +22,7 @@ import {
 } from "../../../../shared/workers/account-scope"
 import { d1Query, type D1Rest } from "../../../../shared/workers/d1-rest"
 import { ulid } from "../../../../shared/workers/id"
-import { LIST_HARD_CAP, MAX_ACCOUNT_DEPTH } from "../../../../shared/workers/limits"
+import { EXPORT_HARD_CAP, LIST_HARD_CAP, MAX_ACCOUNT_DEPTH } from "../../../../shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "../../../../shared/workers/paging"
 import type { Account, AccountDetail, AccountLink, PortalUser } from "../../../../shared/types"
 import { GuardError, type MemberGuard } from "./permissions"
@@ -151,6 +151,34 @@ export async function listAccounts(
 
   const page = toPage(rows, PAGE_SIZE, (r) => [r.created_at, r.id])
   return { ...page, rows: page.rows.map(toAccount), total: counted[0]?.n ?? 0 }
+}
+
+/** Every account this caller may see, as full rows for the CSV export.
+ *
+ * The SAME fence as the list — an export that skipped it would be the leak in
+ * its most convenient form (one request, every row, in a file). Ordered by name
+ * so the download is readable, and capped at the deliberate-download ceiling
+ * rather than paged: a person clicking Export wants one file, and past the cap
+ * the honest answer is a bigger tool, not a slower refusal.
+ *
+ * Columns lead with the import format (Name, Type, Reference, Email, Phone,
+ * Address, Status) so an exported file imports straight back — the round-trip
+ * the roles and dropdown exports already promise. */
+export async function listAccountsForExport(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope
+): Promise<Account[]> {
+  const fence = accountScopeClause(scope, "id")
+  const rows = await d1Query<AccountRow>(
+    cfg,
+    guard.databaseId,
+    // R14 hard cap — never unbounded (exports get the larger deliberate-download cap).
+    `SELECT ${ACCOUNT_COLUMNS} FROM accounts${where([fence.sql])}
+      ORDER BY name ASC, id ASC LIMIT ${EXPORT_HARD_CAP}`,
+    fence.params
+  )
+  return rows.map(toAccount)
 }
 
 /** One account with its people and its logins — the detail read. Outside the
