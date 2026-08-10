@@ -12,7 +12,7 @@
 
 import { fail, json } from "../../../shared/workers/http"
 import { GuardError } from "../../../shared/workers/gating"
-import { requireText, TEXT_LIMITS } from "../../../shared/workers/validate"
+import { optionalText, requireText, TEXT_LIMITS } from "../../../shared/workers/validate"
 import { logError, recordWorkerError } from "../../../shared/workers/error-log"
 import type { Env } from "./env"
 import { sha256Hex } from "./lib/crypto"
@@ -134,19 +134,20 @@ async function internalSendEmail(request: Request, env: Env): Promise<Response> 
   // used to wave callers through when INTERNAL_KEY was missing.)
   if (!env.INTERNAL_KEY || request.headers.get("x-internal-key") !== env.INTERNAL_KEY)
     return fail(403, "forbidden", "Bad internal key.")
+  // Validated for the same reason internalMcpSession is (R20): the INTERNAL_KEY
+  // proves the caller is a worker, not that its payload is well-formed — and
+  // this door AIMS AN EMAIL from the product's verified sender.
   const m = (await request.json().catch(() => ({}))) as {
-    to?: string
-    subject?: string
-    html?: string
-    text?: string
+    to?: unknown
+    subject?: unknown
+    html?: unknown
+    text?: unknown
   }
-  if (!m.to || !m.subject)
-    return fail(400, "invalid_input", "to and subject are required.")
   const sent = await sendEmail(env, {
-    to: m.to,
-    subject: m.subject,
-    html: m.html ?? "",
-    text: m.text ?? "",
+    to: requireText(m.to, "Recipient", TEXT_LIMITS.short),
+    subject: requireText(m.subject, "Subject", TEXT_LIMITS.short),
+    html: optionalText(m.html, "Body", TEXT_LIMITS.long) ?? "",
+    text: optionalText(m.text, "Body", TEXT_LIMITS.long) ?? "",
   })
   return json({ sent })
 }
@@ -160,19 +161,26 @@ async function internalLogError(request: Request, env: Env): Promise<Response> {
   if (!env.INTERNAL_KEY || request.headers.get("x-internal-key") !== env.INTERNAL_KEY)
     return fail(403, "forbidden", "Bad internal key.")
   const b = (await request.json().catch(() => ({}))) as {
-    source?: string
-    place?: string
-    message?: string
-    stack?: string
-    url?: string
+    source?: unknown
+    place?: unknown
+    message?: unknown
+    stack?: unknown
+    url?: unknown
   }
-  if (b.message)
+  // Type-checked field by field rather than put through requireText, because
+  // this door DROPS rubbish instead of refusing it (R20 is satisfied by an
+  // explicit runtime check, not only by the text seam). A log endpoint that
+  // answers 400 teaches a broken client to report its breakage as a second
+  // error — it must never become an error source itself. logError caps every
+  // length; this decides every type.
+  const message = typeof b.message === "string" ? b.message : ""
+  if (message)
     await logError(env.DB, {
-      source: b.source || "web",
-      place: b.place || "unknown",
-      message: b.message,
-      stack: b.stack,
-      url: b.url,
+      source: typeof b.source === "string" ? b.source : "web",
+      place: typeof b.place === "string" ? b.place : "unknown",
+      message,
+      stack: typeof b.stack === "string" ? b.stack : undefined,
+      url: typeof b.url === "string" ? b.url : undefined,
     })
   return new Response(null, { status: 204 })
 }

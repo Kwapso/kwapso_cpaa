@@ -104,10 +104,13 @@ export async function postRolePerms(request: Request, env: Env): Promise<Respons
     roleId?: string
     value?: PermissionValue
   }
-  if (!body.roleId || !body.value)
+  const roleId = requireText(body.roleId, "Role", TEXT_LIMITS.short)
+  // The matrix must be an OBJECT, not merely truthy: a string or a number here
+  // would sail past `!body.value` and reach the permission writer as rubbish.
+  if (typeof body.value !== "object" || body.value === null)
     return fail(400, "invalid_input", "roleId and value are required.")
-  await setRolePermissions(cfg, guard, actor, body.roleId, body.value)
-  await publishChange(env, guard.teamId, "member_roles", body.roleId)
+  await setRolePermissions(cfg, guard, actor, roleId, body.value)
+  await publishChange(env, guard.teamId, "member_roles", roleId)
   return json({ ok: true })
 }
 
@@ -140,10 +143,10 @@ export async function postUpdateRole(request: Request, env: Env): Promise<Respon
     title?: string
     description?: string
   }
-  if (!body.roleId) return fail(400, "invalid_input", "roleId and title are required.")
+  const roleId = requireText(body.roleId, "Role", TEXT_LIMITS.short)
   const title = requireText(body.title, "Name", TEXT_LIMITS.short)
-  await updateRole(cfg, guard, actor, body.roleId, title, (optionalText(body.description, "Description", TEXT_LIMITS.long) ?? ""))
-  await publishChange(env, guard.teamId, "member_roles", body.roleId)
+  await updateRole(cfg, guard, actor, roleId, title, (optionalText(body.description, "Description", TEXT_LIMITS.long) ?? ""))
+  await publishChange(env, guard.teamId, "member_roles", roleId)
   return json({ roles: await listRoles(env, cfg, guard), total: await countRoles(cfg, guard) })
 }
 
@@ -156,11 +159,12 @@ export async function postSetRoleActive(request: Request, env: Env): Promise<Res
     roleId?: string
     active?: boolean
   }
-  if (!body.roleId || typeof body.active !== "boolean")
+  const roleId = requireText(body.roleId, "Role", TEXT_LIMITS.short)
+  if (typeof body.active !== "boolean")
     return fail(400, "invalid_input", "roleId and active are required.")
   // R17: a repeat (double click / retry) moves zero rows — then nothing is
   // published and no duplicate history exists; the response is still the list.
-  const changed = await setRoleActive(cfg, guard, actor, body.roleId, body.active)
-  if (changed) await publishChange(env, guard.teamId, "member_roles", body.roleId)
+  const changed = await setRoleActive(cfg, guard, actor, roleId, body.active)
+  if (changed) await publishChange(env, guard.teamId, "member_roles", roleId)
   return json({ roles: await listRoles(env, cfg, guard), total: await countRoles(cfg, guard) })
 }

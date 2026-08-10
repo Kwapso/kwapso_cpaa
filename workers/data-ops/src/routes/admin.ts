@@ -5,7 +5,7 @@
 // Re-running the seed is idempotent (upsert by table_key), so it's safe at deploy.
 
 import { fail, json } from "../../../../shared/workers/http"
-import { queryText } from "../../../../shared/workers/validate"
+import { optionalText, queryText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
 import { adminGuard } from "../../../../shared/workers/gating"
 import { DEFAULT_CATALOG } from "../lib/targets"
 import { seedDefaultCatalog } from "../lib/import"
@@ -44,12 +44,15 @@ export async function getErrors(request: Request, env: Env): Promise<Response> {
 export async function postResolveError(request: Request, env: Env): Promise<Response> {
   const blocked = adminGuard(request, env)
   if (blocked) return blocked
-  const b = (await request.json().catch(() => ({}))) as { id?: string; note?: string }
-  if (!b.id || typeof b.id !== "string") return fail(400, "invalid_input", "id is required.")
+  const b = (await request.json().catch(() => ({}))) as { id?: unknown; note?: unknown }
+  const id = requireText(b.id, "Error", TEXT_LIMITS.short)
+  // `(b.note ?? "").slice(...)` was a live 500: a NUMBER has no .slice, and an
+  // admin key is not a promise the body is well-formed.
+  const note = optionalText(b.note, "Note", 2000)
   const res = await env.DB.prepare(
     `UPDATE error_logs SET status = 'resolved', resolved_at = ?, resolution_note = ? WHERE id = ?`
   )
-    .bind(new Date().toISOString(), (b.note ?? "").slice(0, 2000) || null, b.id.slice(0, 40))
+    .bind(new Date().toISOString(), note ?? null, id.slice(0, 40))
     .run()
   return json({ updated: res.meta.changes ?? 0 })
 }

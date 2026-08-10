@@ -26,7 +26,9 @@
     "wrangler": "^4.0.0"
   },
   "dependencies": {
-    "@kwapso/ui": "github:Kwapso/kwapso_ui"
+    "@kwapso/ui": "github:Kwapso/kwapso_ui",
+    "next": "^15.1.6",
+    "react": "^19.0.0"
   },
   "optionalDependencies": {
     "@rolldown/binding-linux-x64-gnu": "1.0.3"

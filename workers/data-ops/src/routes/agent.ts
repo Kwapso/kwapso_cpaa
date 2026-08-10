@@ -120,13 +120,14 @@ export async function getAgentUsageLog(request: Request, env: Env): Promise<Resp
 export async function postGrantCredits(request: Request, env: Env): Promise<Response> {
   const blocked = adminGuard(request, env)
   if (blocked) return blocked
-  const body = (await request.json().catch(() => ({}))) as { teamId?: string; amount?: number }
+  const body = (await request.json().catch(() => ({}))) as { teamId?: unknown; amount?: unknown }
+  const teamId = requireText(body.teamId, "Team", TEXT_LIMITS.short)
   const amount = Number(body.amount)
-  if (!body.teamId || !Number.isFinite(amount) || amount <= 0 || Math.trunc(amount) !== amount)
+  if (!Number.isFinite(amount) || amount <= 0 || Math.trunc(amount) !== amount)
     return fail(400, "invalid_input", "teamId and a positive whole amount are required.")
-  const balance = await grantCredits(env, body.teamId, amount)
-  await publishChange(env, body.teamId, "agent_usage")
-  return json({ teamId: body.teamId, balance })
+  const balance = await grantCredits(env, teamId, amount)
+  await publishChange(env, teamId, "agent_usage")
+  return json({ teamId, balance })
 }
 
 /** POST /api/data-ops/agent/chat — run one agent turn (answer, or propose/take action).
@@ -168,12 +169,13 @@ export async function postAgentChat(request: Request, env: Env): Promise<Respons
 export async function postAgentConfirm(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, user } = await teamContext(request, env)
   await requireRight(cfg, guard, "agent", "create")
-  const body = (await request.json().catch(() => ({}))) as { threadId?: string; approve?: boolean }
-  if (!body.threadId || typeof body.approve !== "boolean")
+  const body = (await request.json().catch(() => ({}))) as { threadId?: unknown; approve?: unknown }
+  const threadId = requireText(body.threadId, "Thread", 64)
+  if (typeof body.approve !== "boolean")
     return fail(400, "invalid_input", "threadId and approve are required.")
   // What runs comes from the server's stored proposal (in confirmAndRun), not the
   // client — any client-supplied `calls` are ignored, so nothing un-proposed executes.
-  const opts = { threadId: body.threadId, approve: body.approve, source: callerSurface(user) }
+  const opts = { threadId, approve: body.approve, source: callerSurface(user) }
   if (wantsStream(request))
     return streamRun(env, (emit) => confirmAndRun(env, request, cfg, guard, actor, opts, emit))
   return json(await confirmAndRun(env, request, cfg, guard, actor, opts))

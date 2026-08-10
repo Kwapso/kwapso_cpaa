@@ -12,6 +12,7 @@ import { fail, json } from "../../../../shared/workers/http"
 import { publishChange } from "../../../../shared/workers/realtime"
 import { getScreenOverrides, setScreenOverride } from "../lib/screens-config"
 import { gatedBody } from "../../../../shared/workers/route"
+import { requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
 import { teamContext } from "../context"
 import type { Env } from "../env"
 
@@ -24,11 +25,12 @@ export async function postScreen(request: Request, env: Env): Promise<Response> 
   const { actor, cfg, guard, body } = await gatedBody<{ module?: string; recipe?: unknown }>(
     request, env, "teams", "edit"
   )
-  if (!body.module || typeof body.recipe === "undefined")
+  const module = requireText(body.module, "Module", TEXT_LIMITS.short)
+  if (typeof body.recipe === "undefined")
     return fail(400, "invalid_input", "module and recipe are required.")
   const recipeJson =
     typeof body.recipe === "string" ? body.recipe : JSON.stringify(body.recipe)
-  await setScreenOverride(cfg, guard, actor, body.module, recipeJson)
-  await publishChange(env, guard.teamId, "screens", body.module)
+  await setScreenOverride(cfg, guard, actor, module, recipeJson)
+  await publishChange(env, guard.teamId, "screens", module)
   return json({ screens: await getScreenOverrides(cfg, guard) })
 }
