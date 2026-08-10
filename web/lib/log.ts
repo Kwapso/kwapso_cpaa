@@ -40,13 +40,28 @@ function isBenignNetworkError(e: Error): boolean {
   )
 }
 
+/** Chatter the BROWSER makes that is not about our code.
+ *
+ * "ResizeObserver loop completed with undelivered notifications" is the one that
+ * matters: the browser fires it whenever an observer callback causes layout, it
+ * is harmless by specification, and it repeats. It was the single most recent
+ * row in the error store, competing for attention with a real D1 auth failure
+ * and a real mail-sending failure. A store where noise outnumbers signal is a
+ * store nobody reads — which is the same as having none.
+ *
+ * Console-only, like the network blips above: still visible to whoever is
+ * looking, never written down. */
+function isBrowserNoise(e: Error): boolean {
+  return /^resizeobserver loop/i.test((e.message || "").trim())
+}
+
 /** Report a handled error with context. Logs to the console (for the dev) and
  * beacons it to the central store — EXCEPT transient network blips (see above),
  * which stay console-only so the store keeps only real, actionable failures. */
 export function reportError(where: string, error: unknown, extra?: Record<string, unknown>) {
   const e = error instanceof Error ? error : new Error(String(error))
   console.error(`[${where}]`, e, extra ?? "")
-  if (isBenignNetworkError(e)) return
+  if (isBenignNetworkError(e) || isBrowserNoise(e)) return
   send({ where, message: e.message, stack: e.stack, extra })
 }
 
