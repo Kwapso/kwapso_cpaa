@@ -16,6 +16,8 @@ type CfResponse<T> = {
   result: T
 }
 
+import { D1_LIST_PAGE_CAP } from "./limits"
+
 const API = "https://api.cloudflare.com/client/v4"
 const RETRIES = 2 // total attempts = 1 + RETRIES, only on 5xx/network blips
 
@@ -83,13 +85,20 @@ export async function d1ListDatabases(
   cfg: D1Rest
 ): Promise<{ uuid: string; name: string; file_size: number | null }[]> {
   const all: { uuid: string; name: string; file_size: number | null }[] = []
-  for (let page = 1; ; page++) {
+  // BOUNDED: the loop used to be `for (;;)` with only "a short page" to stop it —
+  // an upstream that keeps answering with a full page (a paging bug, a `page`
+  // parameter it ignores) spun this forever, building an array until the worker
+  // died. D1_LIST_PAGE_CAP × 100 rows is the ceiling, and hitting it is loud.
+  for (let page = 1; page <= D1_LIST_PAGE_CAP; page++) {
     const batch = await cf<
       { uuid: string; name: string; file_size: number | null }[]
     >(cfg, `/d1/database?page=${page}&per_page=100`)
     all.push(...batch)
-    if (batch.length < 100) break
+    if (batch.length < 100) return all
   }
+  console.error(
+    `d1ListDatabases: stopped at the ${D1_LIST_PAGE_CAP}-page ceiling (${all.length} databases) — the list is INCOMPLETE.`
+  )
   return all
 }
 

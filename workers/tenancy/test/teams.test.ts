@@ -25,6 +25,7 @@ import {
   createTeam,
   listMyTeams,
 } from "../src/lib/teams"
+import { INVITE_SWEEP_CAP } from "../../../shared/workers/limits"
 import type { Env } from "../src/env"
 
 const ACTOR = { id: "01USER", email: "chris@x.com", name: "Chris Martin" }
@@ -148,6 +149,21 @@ describe("acceptPendingInvites (locked onboarding flow)", () => {
     const { db, calls } = fakeDb()
     expect(await acceptPendingInvites(envWith(db), ACTOR)).toBe(0)
     expect(calls.some((c) => c.sql.includes("INTO team_members"))).toBe(false)
+  })
+
+  // The sweep is keyed on an EMAIL ADDRESS and anyone may invite any address, so
+  // its row count is attacker-influenced — and every row costs three core-DB
+  // writes plus two live pings. The bound has to ride the read itself: filtering
+  // in TypeScript would already have paid for fetching them all.
+  it("reads a BOUNDED page of pending invites, oldest first", async () => {
+    const { db, calls } = fakeDb([{ match: "FROM invite_index", all: [] }])
+    await acceptPendingInvites(envWith(db), ACTOR)
+    const sweep = calls.find((c) => c.sql.includes("FROM invite_index"))
+    expect(sweep, "the pending-invite sweep must run").toBeDefined()
+    expect(sweep?.sql, "the sweep must carry a hard cap").toContain(`LIMIT ${INVITE_SWEEP_CAP}`)
+    // Oldest first: without a stable order, a capped sweep can starve the
+    // earliest invitation forever while newer ones keep jumping the queue.
+    expect(sweep?.sql).toContain("ORDER BY i.created_at ASC")
   })
 })
 

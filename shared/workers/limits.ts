@@ -15,6 +15,42 @@ export const EXPORT_HARD_CAP = 10_000
  * messages, a per-member progress matrix). */
 export const THREAD_HARD_CAP = 500
 
+// ── bounds on the work a single request or tick may do ───────────────────────
+// R14 caps the ROWS a read returns. These cap the WORK a path does: how many
+// pages it will pull, how many round-trips it will fan out, how deep it will
+// recurse. Same reasoning, other axis — an unbounded loop stalls a worker just as
+// surely as an unbounded SELECT, and it does it without a single big query to
+// blame.
+
+/** Pages the D1 REST database listing will walk (100 per page → 10,000 databases).
+ * The paging loop is `for (;;)` — a door that kept answering "full page" would
+ * otherwise spin forever and never return. A ceiling turns "impossible" into
+ * "incomplete", which the caller can at least survive. */
+export const D1_LIST_PAGE_CAP = 100
+
+/** Alarm rows one nightly size-check tick will write. The scan itself is cheap
+ * (a size field per database), but every ALARMING database costs a core-DB read
+ * plus an insert — so the tick's write work is bounded and the rest waits for
+ * tomorrow's run, which re-finds them (the check is idempotent per database). */
+export const CRON_ALERT_CAP = 50
+
+/** Pending invitations one sign-in sweep will accept in a single pass. Each one is
+ * three core-DB writes plus two live pings, and the list is keyed on an EMAIL
+ * ADDRESS — anyone may invite any address, so the row count is attacker-influenced.
+ * The rest stay pending and are accepted from the Invitations inbox. */
+export const INVITE_SWEEP_CAP = 25
+
+/** @mentions one help reply may carry. Each mention becomes a row in an `IN (...)`
+ * lookup AND an email, so an uncapped list is both an unbounded statement and an
+ * unbounded send from a trusted sender. */
+export const MENTIONS_LIMIT = 50
+
+/** How far up the account tree the loop guard will walk. The tree is self-nesting,
+ * so the ancestor walk is the only unbounded recursion in the base. Past this depth
+ * the guard cannot PROVE a move is ring-free, so it refuses — fails closed, never
+ * open. Far deeper than any real org chart. */
+export const MAX_ACCOUNT_DEPTH = 64
+
 // ── the agent's reply ceiling, and the bulk cap DERIVED from it ───────────────
 // A cap the model is TOLD but cannot physically EMIT is a promise the runtime
 // breaks silently, mid-JSON: the tool call truncates, the turn dies, nothing

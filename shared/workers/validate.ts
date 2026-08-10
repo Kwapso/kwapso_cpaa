@@ -46,3 +46,21 @@ export function optionalText(
     throw new GuardError(400, "invalid_input", `${field} is too long (max ${max} characters).`)
   return clean
 }
+
+/** A QUERY-STRING parameter — the OTHER half of the request boundary. Bodies have
+ * gone through requireText/optionalText since day one, but `url.searchParams.get()`
+ * handed its raw string straight on: a multi-megabyte `?id=` became a multi-megabyte
+ * SQL statement (or a multi-megabyte atob + JSON.parse in the cursor decoder) — a 500
+ * and a stalled worker where a clean 400 belonged. Same treatment, ONE seam, so the
+ * query half of the boundary can never drift from the body half.
+ *
+ * The cap DEFAULTS to `short`, because that is what a query parameter is here: an id,
+ * an opaque cursor, a facet value, a search phrase. One that genuinely carries prose
+ * passes its own max. */
+export function queryText(
+  value: string | null,
+  field: string,
+  max: number = TEXT_LIMITS.short
+): string | undefined {
+  return optionalText(value, field, max)
+}

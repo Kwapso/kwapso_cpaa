@@ -9,10 +9,15 @@ import { toHtml } from "@/lib/agent-markdown-html"
 describe("AgentMarkdown toHtml — XSS-safe", () => {
   it("neutralizes an attribute-breakout link (a stray quote in the href)", () => {
     const html = toHtml('click [here](https://a.com/"onmouseover="alert(document.cookie))')
-    // the injected quote is encoded (&quot;) so it stays INSIDE the href value —
-    // no literal `"onmouseover` breaks out into a live event handler
-    expect(html).not.toContain('"onmouseover')
-    expect(html).toContain("&quot;onmouseover")
+    // A quote can no longer reach the href at all: safeHref refuses a candidate
+    // carrying markup characters outright, so this renders as PLAIN TEXT with no
+    // anchor — stronger than the old behaviour, which built the anchor and relied
+    // on escapeAttr to encode the quote inside it. Two assertions, because "no
+    // anchor" and "no live handler anywhere" fail for different regressions.
+    expect(html, "a URL carrying a quote must not become a link at all").not.toContain("<a ")
+    expect(html, "no rendered tag may carry an event handler").not.toMatch(/<[^>]*\son\w+\s*=/i)
+    // …and the text itself is still shown, escaped, so the reply isn't silently eaten.
+    expect(html).toContain("alert(document.cookie)")
   })
 
   it("drops a javascript: link to plain (escaped) text", () => {

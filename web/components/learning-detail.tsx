@@ -35,6 +35,7 @@ import { auditItems } from "@/lib/audit-overview"
 import { formatActivityWhen } from "@/lib/format"
 import { formatCount } from "@/lib/format-count"
 import { RichText } from "@/components/rich-text"
+import { safeHref, safeSrc } from "@/lib/rich-text"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, primeCache, useCached } from "@/lib/store"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
@@ -43,9 +44,17 @@ import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
 // first (the team's own label, e.g. "Video file"), then fall back to the URL's
 // extension. Uploaded files live under /media; anything we can't classify (a PDF,
 // an embeddable page, an unknown upload) goes in a sandboxed WebEmbed frame.
-function LearningMedia({ url, contentType }: { url: string; contentType: string }) {
+//
+// RENDER SAFETY: the link is typed by a person, so it is untrusted here no matter
+// what the write door did — an older row, or one that arrived by import, can still
+// carry `javascript:`/`data:`. Every URL therefore reaches its `src` through the
+// safeSrc seam (http/https or app-relative only); a framed `javascript:` URL would
+// otherwise run with THIS origin's cookies. An unsafe link renders no player at all.
+export function LearningMedia({ url, contentType }: { url: string; contentType: string }) {
+  const src = safeSrc(url)
+  if (!src) return null
   const type = contentType.toLowerCase()
-  const lower = url.toLowerCase()
+  const lower = src.toLowerCase()
   const ext = (lower.split("?")[0].split(".").pop() ?? "").trim()
 
   const isImage = type.includes("image") || /^(png|jpe?g|gif|webp|avif|svg)$/.test(ext)
@@ -54,12 +63,12 @@ function LearningMedia({ url, contentType }: { url: string; contentType: string 
 
   if (isImage)
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={url} alt="" className="max-h-96 w-full rounded-xl border object-contain" />
-  if (isVideo) return <video src={url} controls className="max-h-96 w-full rounded-xl border" />
-  if (isAudio) return <audio src={url} controls className="w-full" />
+    return <img src={src} alt="" className="max-h-96 w-full rounded-xl border object-contain" />
+  if (isVideo) return <video src={src} controls className="max-h-96 w-full rounded-xl border" />
+  if (isAudio) return <audio src={src} controls className="w-full" />
   // No obvious media type (a PDF, an /media upload we can't classify, or an
   // external embeddable page) → frame it.
-  return <WebEmbed src={url} title="Linked resource" />
+  return <WebEmbed src={src} title="Linked resource" />
 }
 
 export function LearningDetailScreen({ teamId, learningId }: { teamId: string; learningId: string }) {
@@ -167,6 +176,9 @@ export function LearningDetailScreen({ teamId, learningId }: { teamId: string; l
     }),
   ]
 
+  // The article's linked resource, checked at the render boundary (see LearningMedia).
+  const resourceHref = safeHref(item.contentLink)
+
   const activityItems: ActivityFeedItem[] = activity.rows.map((a) => ({
     id: a.id,
     description: a.description,
@@ -258,19 +270,26 @@ export function LearningDetailScreen({ teamId, learningId }: { teamId: string; l
                 ) : (
                   <p className="text-muted-foreground text-sm">No content yet.</p>
                 )}
-                {item.contentLink && (
-                  <div className="flex flex-col gap-2">
-                    <LearningMedia url={item.contentLink} contentType={item.contentType ?? ""} />
-                    <a
-                      href={item.contentLink}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className="text-primary inline-flex w-fit items-center gap-1 text-sm underline-offset-2 hover:underline"
-                    >
-                      Open the linked resource
-                    </a>
-                  </div>
-                )}
+                {item.contentLink &&
+                  (resourceHref ? (
+                    <div className="flex flex-col gap-2">
+                      <LearningMedia url={item.contentLink} contentType={item.contentType ?? ""} />
+                      <a
+                        href={resourceHref}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="text-primary inline-flex w-fit items-center gap-1 text-sm underline-offset-2 hover:underline"
+                      >
+                        Open the linked resource
+                      </a>
+                    </div>
+                  ) : (
+                    // Say so rather than showing a dead link — an address we won't
+                    // open is a fact about the article, not a thing to hide.
+                    <p className="text-muted-foreground text-sm">
+                      The linked resource isn&apos;t a web address we can open safely.
+                    </p>
+                  ))}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {item.active && <ProgressToggle done={!!item.done} onToggle={() => void toggleDone()} />}

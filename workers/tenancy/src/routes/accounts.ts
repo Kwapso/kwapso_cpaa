@@ -12,7 +12,7 @@
 // right on the matrix and still reach exactly one account's data.
 
 import { fail, json, pagedJson } from "../../../../shared/workers/http"
-import { optionalText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
+import { optionalText, queryText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
 import { publishChange } from "../../../../shared/workers/realtime"
 import { gated, gatedBody, openTeam } from "../../../../shared/workers/route"
 import { accountScope, type AccountScope } from "../../../../shared/workers/account-scope"
@@ -65,13 +65,15 @@ export async function getAccounts(request: Request, env: Env): Promise<Response>
   const { cfg, guard } = await gated(request, env, "accounts", "read")
   const scope = await accountScope(cfg, guard)
   const url = new URL(request.url)
-  const rawType = url.searchParams.get("type")
+  const rawType = queryText(url.searchParams.get("type"), "Type")
   const type = rawType === "entity" || rawType === "individual" ? rawType : undefined
   const page = await listAccounts(cfg, guard, scope, {
-    q: optionalText(url.searchParams.get("q"), "Search", TEXT_LIMITS.short),
+    q: queryText(url.searchParams.get("q"), "Search"),
     type,
-    parentId: optionalText(url.searchParams.get("parentId"), "Parent", TEXT_LIMITS.short),
-    cursor: url.searchParams.get("cursor"),
+    parentId: queryText(url.searchParams.get("parentId"), "Parent"),
+    // Capped like every other query parameter — an opaque cursor is ~70 chars, so a
+    // megabyte of it is a bad request, not an atob + JSON.parse of a megabyte.
+    cursor: queryText(url.searchParams.get("cursor"), "Cursor") ?? null,
   })
   return pagedJson("accounts", page)
 }
@@ -80,7 +82,7 @@ export async function getAccounts(request: Request, env: Env): Promise<Response>
 export async function getAccountDetail(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "accounts", "read")
   const scope = await accountScope(cfg, guard)
-  const id = new URL(request.url).searchParams.get("id")
+  const id = queryText(new URL(request.url).searchParams.get("id"), "Id")
   if (!id) return fail(400, "invalid_input", "Which account?")
   const detail = await getAccount(cfg, guard, scope, id)
   return json({ ...detail, portalUsers: await withEmails(env, detail.portalUsers) })
@@ -207,11 +209,7 @@ export async function postLinkActive(request: Request, env: Env): Promise<Respon
 export async function getPortalUsers(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "portal_users", "read")
   const scope = await accountScope(cfg, guard)
-  const accountId = optionalText(
-    new URL(request.url).searchParams.get("accountId"),
-    "Account",
-    TEXT_LIMITS.short
-  )
+  const accountId = queryText(new URL(request.url).searchParams.get("accountId"), "Account")
   const [rows, total] = await Promise.all([
     listPortalUsers(cfg, guard, scope, accountId),
     countPortalUsers(cfg, guard, scope, accountId),

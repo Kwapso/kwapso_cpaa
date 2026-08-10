@@ -5,7 +5,7 @@
 // real endpoint it calls (act-as-user), so it can never exceed the caller's rights.
 
 import { fail, json } from "../../../../shared/workers/http"
-import { optionalText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
+import { optionalText, queryText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
 import { publishChange } from "../../../../shared/workers/realtime"
 import { GuardError, adminGuard, requireRight, teamContext } from "../../../../shared/workers/gating"
 import { recordWorkerError } from "../../../../shared/workers/error-log"
@@ -173,7 +173,7 @@ export async function getAgentThreads(request: Request, env: Env): Promise<Respo
 export async function getAgentThread(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await teamContext(request, env)
   await requireRight(cfg, guard, "agent", "read")
-  const id = new URL(request.url).searchParams.get("id")
+  const id = queryText(new URL(request.url).searchParams.get("id"), "Id")
   if (!id) return fail(400, "invalid_input", "A conversation id is required.")
   return json({ messages: await listMessages(cfg, guard, id) })
 }

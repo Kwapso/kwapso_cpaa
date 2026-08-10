@@ -8,7 +8,7 @@
 
 import { fail, json } from "../../../../shared/workers/http"
 import { csvResponse, toCsv } from "../../../../shared/workers/csv"
-import { requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
+import { queryText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
 import { publishChange } from "../../../../shared/workers/realtime"
 import { mediaKey, parseUploadDataUrl } from "../../../../shared/workers/image"
 import { gated, gatedBody } from "../../../../shared/workers/route"
@@ -30,7 +30,7 @@ import type { Env } from "../env"
 export async function getLearning(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "learning", "read")
   const items = await listLearning(cfg, guard)
-  const id = new URL(request.url).searchParams.get("id") // ?id= → one item
+  const id = queryText(new URL(request.url).searchParams.get("id"), "Id") // ?id= → one item
   // R16: the exact server total rides every list response (badges never use rows.length).
   return json({ learning: id ? items.filter((l) => l.id === id) : items, total: await countLearning(cfg, guard) })
 }

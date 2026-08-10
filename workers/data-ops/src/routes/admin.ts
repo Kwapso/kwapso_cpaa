@@ -5,6 +5,7 @@
 // Re-running the seed is idempotent (upsert by table_key), so it's safe at deploy.
 
 import { fail, json } from "../../../../shared/workers/http"
+import { queryText } from "../../../../shared/workers/validate"
 import { adminGuard } from "../../../../shared/workers/gating"
 import { DEFAULT_CATALOG } from "../lib/targets"
 import { seedDefaultCatalog } from "../lib/import"
@@ -26,7 +27,7 @@ export async function getErrors(request: Request, env: Env): Promise<Response> {
   const blocked = adminGuard(request, env)
   if (blocked) return blocked
   const url = new URL(request.url)
-  const status = url.searchParams.get("status") ?? "open"
+  const status = queryText(url.searchParams.get("status"), "Status") ?? "open"
   const limit = Math.min(Number(url.searchParams.get("limit")) || 100, 200)
   const where = status === "all" ? "" : "WHERE status = ?"
   const stmt = env.DB.prepare(

@@ -2,7 +2,7 @@
 // switcher, creating a team, editing it, the Overview metadata + Activity feed.
 
 import { fail, json, pagedJson } from "../../../../shared/workers/http"
-import { requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
+import { queryText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
 import { publishChange } from "../../../../shared/workers/realtime"
 import { logActivity } from "../../../../shared/workers/activity"
 import { getActivity } from "../lib/activity-read"
@@ -163,21 +163,23 @@ export async function getActivityFeed(request: Request, env: Env): Promise<Respo
   // VALIDATED, not cast: an unrecognised scope used to fall past every branch
   // here AND in getActivity, leaving an unfiltered whole-feed read behind.
   const SCOPES = ["team", "user", "role", "invite", "record"] as const
-  const raw = url.searchParams.get("scope") ?? "team"
+  const raw = queryText(url.searchParams.get("scope"), "Scope") ?? "team"
   const scope = (SCOPES as readonly string[]).includes(raw)
     ? (raw as (typeof SCOPES)[number])
     : null
   if (!scope) return fail(400, "invalid_input", "Unknown activity scope.")
-  let id = url.searchParams.get("id") ?? undefined
+  // Every query parameter through the ONE boundary seam (queryText): capped, so a
+  // multi-megabyte ?id= or ?cursor= is a clean 400, not a giant statement / atob.
+  let id = queryText(url.searchParams.get("id"), "Id")
   // The OPAQUE cursor from the previous page (R14) — decoded (and 400-checked)
   // inside getActivity, never parsed here.
-  const cursor = url.searchParams.get("cursor")
+  const cursor = queryText(url.searchParams.get("cursor"), "Cursor") ?? null
 
   // Generic record scope: any module's activity by (table, id), gated by THAT
   // module's read right (resolved from the SAME registry map the team scope
   // subtracts through — an unknown table returns empty, never the whole feed).
   if (scope === "record") {
-    const table = url.searchParams.get("table") ?? undefined
+    const table = queryText(url.searchParams.get("table"), "Table")
     if (!id || !table) return emptyFeed()
     const module = ACTIVITY_GATE_MAP[table]
     if (!module) return emptyFeed()

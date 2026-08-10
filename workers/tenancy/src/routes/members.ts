@@ -5,6 +5,7 @@ import { fail, json } from "../../../../shared/workers/http"
 import { publishChange, publishUserChange } from "../../../../shared/workers/realtime"
 import { changeMemberRole, listMembers, removeMember } from "../lib/members"
 import { gated, gatedBody } from "../../../../shared/workers/route"
+import { queryText } from "../../../../shared/workers/validate"
 import type { Env } from "../env"
 
 export async function getMembers(request: Request, env: Env): Promise<Response> {
@@ -12,7 +13,7 @@ export async function getMembers(request: Request, env: Env): Promise<Response> 
   const members = await listMembers(env, cfg, guard)
   // ?id=<userId> → just that member (for row-level live patching); same filter
   // as the list, so a no-longer-active member yields [] and the client drops it.
-  const id = new URL(request.url).searchParams.get("id")
+  const id = queryText(new URL(request.url).searchParams.get("id"), "Id")
   return json({ members: id ? members.filter((m) => m.userId === id) : members })
 }
 

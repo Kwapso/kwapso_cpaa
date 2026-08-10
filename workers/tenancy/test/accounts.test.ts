@@ -15,6 +15,7 @@ vi.mock("../../../shared/workers/d1-rest", async (importOriginal) => {
 })
 
 import { accountScope } from "../../../shared/workers/account-scope"
+import { MAX_ACCOUNT_DEPTH } from "../../../shared/workers/limits"
 import {
   countAccountLinks,
   createAccount,
@@ -94,6 +95,37 @@ describe("the hierarchy: unlimited depth, but never a loop", () => {
     expect(parentOf(IDS.victimChild)).toBe(IDS.burglarAccount)
     await setAccountParent(cfg, guard, staff, actor, IDS.victimChild, null)
     expect(parentOf(IDS.victimChild)).toBeNull()
+  })
+
+  // The ring test is a RECURSIVE walk up the tree, and the tree is the one
+  // self-nesting structure in the base — so it is the one place recursion depth is
+  // set by data rather than by code. The walk is capped at MAX_ACCOUNT_DEPTH, and
+  // the cap must fail CLOSED: past it the walk can no longer see the top, so it
+  // cannot prove the move is ring-free, so it refuses.
+  it("bounds the ancestor walk, and refuses rather than guesses past the ceiling", async () => {
+    // A chain deeper than the ceiling, built directly (createAccount would run the
+    // same guard we're testing). Row 0 is the top; each row's parent is the one above.
+    const chain: string[] = [IDS.burglarAccount]
+    const insert = db().prepare(
+      "INSERT INTO accounts (id, account_type, parent_account_id, name, created_at, creator_id, creator_email, creator_name) VALUES (?, 'entity', ?, ?, '2026-01-01', 'u', 'e', 'n')"
+    )
+    for (let i = 0; i < MAX_ACCOUNT_DEPTH + 5; i++) {
+      const id = `deep-${i}`
+      insert.run(id, chain[chain.length - 1], `Deep ${i}`)
+      chain.push(id)
+    }
+
+    // A move UNDER the bottom of that chain can't be proven safe — the walk up
+    // from it runs out of depth before it reaches the top — so it is refused.
+    await expect(
+      setAccountParent(cfg, guard, staff, actor, IDS.victimAccount, chain[chain.length - 1])
+    ).rejects.toMatchObject({ code: "would_loop" })
+    expect(parentOf(IDS.victimAccount)).toBeNull()
+
+    // …while a move that sits comfortably inside the ceiling still works, so the
+    // bound refuses the unprovable case only, not every deep tree.
+    await setAccountParent(cfg, guard, staff, actor, IDS.victimAccount, chain[3])
+    expect(parentOf(IDS.victimAccount)).toBe(chain[3])
   })
 })
 

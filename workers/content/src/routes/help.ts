@@ -7,7 +7,8 @@
 // best-effort in lib/notify.
 
 import { fail, json, pagedJson } from "../../../../shared/workers/http"
-import { optionalText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
+import { optionalText, queryText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
+import { MENTIONS_LIMIT } from "../../../../shared/workers/limits"
 import { publishChange } from "../../../../shared/workers/realtime"
 import { accountScope } from "../../../../shared/workers/account-scope"
 import { gated, gatedBody } from "../../../../shared/workers/route"
@@ -56,8 +57,8 @@ export async function getHelp(request: Request, env: Env): Promise<Response> {
   // Portal-ness decides WHOSE tickets, exactly as it decides whose accounts.
   const portal = (await accountScope(cfg, guard)).kind === "portal"
   const url = new URL(request.url)
-  const scope = url.searchParams.get("scope") === "mine" ? "mine" : "all"
-  const id = url.searchParams.get("id")
+  const scope = queryText(url.searchParams.get("scope"), "Scope") === "mine" ? "mine" : "all"
+  const id = queryText(url.searchParams.get("id"), "Id")
   // One ticket by id is a LOOKUP, not a page — answer it directly rather than
   // filtering a page (which could legitimately not contain it once paged).
   if (id) {
@@ -72,13 +73,13 @@ export async function getHelp(request: Request, env: Env): Promise<Response> {
   // R14: tickets are a GROWING collection, so the door pages by key — the opaque
   // cursor comes straight back from the previous response. R16: the exact server
   // totals (All + the caller's My) ride every list response.
-  return ticketPage(cfg, guard, scope, url.searchParams.get("cursor"), portal)
+  return ticketPage(cfg, guard, scope, queryText(url.searchParams.get("cursor"), "Cursor") ?? null, portal)
 }
 
 /** GET /api/content/help/thread?id=<ticketId> → the ticket's replies (oldest first). */
 export async function getHelpThread(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "help", "read")
-  const id = new URL(request.url).searchParams.get("id")
+  const id = queryText(new URL(request.url).searchParams.get("id"), "Id")
   if (!id) return fail(400, "invalid_input", "A ticket id is required.")
   return json({ replies: await listReplies(cfg, guard, id) , total: await countReplies(cfg, guard, id) })
 }
@@ -189,9 +190,19 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
 
   // Untrusted: only keep string ids, and never the author's own id (you can't
   // @mention yourself). A mention is notify-only — never an instruction.
+  //
+  // BOUNDED (MENTIONS_LIMIT): each surviving id becomes a placeholder in an
+  // `IN (...)` lookup AND, if it resolves, an email — so an uncapped array was
+  // both an unbounded statement (a 500) and an unbounded send from a trusted
+  // sender. De-duped first, so 10,000 copies of one id is one mention, and the
+  // cap counts PEOPLE. Over the cap is a clean 400, never a silent truncation:
+  // a reply that quietly drops half its mentions is worse than one that refuses.
   const tagged = Array.isArray(body.taggedUserIds)
-    ? body.taggedUserIds.filter((x): x is string => typeof x === "string" && x !== actor.id)
+    ? [...new Set(body.taggedUserIds.filter((x): x is string => typeof x === "string" && x !== actor.id))]
     : []
+  if (tagged.length > MENTIONS_LIMIT)
+    return fail(400, "too_many_mentions", `A reply can mention up to ${MENTIONS_LIMIT} people.`)
+  for (const id of tagged) requireText(id, "Mentioned person", TEXT_LIMITS.short)
 
   const replyId = await addReply(cfg, guard, actor, body.helpId, replyBody, tagged, false)
   await publishChange(env, guard.teamId, "help_threads", replyId, "add")
@@ -211,7 +222,7 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
  * set (raiser + admins + @mentions + manual adds). help:read gates it. */
 export async function getHelpStakeholders(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "help", "read")
-  const id = new URL(request.url).searchParams.get("id")
+  const id = queryText(new URL(request.url).searchParams.get("id"), "Id")
   if (!id) return fail(400, "invalid_input", "A ticket id is required.")
   return json({ stakeholders: await listStakeholders(cfg, env, guard, id) })
 }

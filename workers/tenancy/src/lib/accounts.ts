@@ -22,7 +22,7 @@ import {
 } from "../../../../shared/workers/account-scope"
 import { d1Query, type D1Rest } from "../../../../shared/workers/d1-rest"
 import { ulid } from "../../../../shared/workers/id"
-import { LIST_HARD_CAP } from "../../../../shared/workers/limits"
+import { LIST_HARD_CAP, MAX_ACCOUNT_DEPTH } from "../../../../shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "../../../../shared/workers/paging"
 import type { Account, AccountDetail, AccountLink, PortalUser } from "../../../../shared/types"
 import { GuardError, type MemberGuard } from "./permissions"
@@ -350,6 +350,13 @@ export async function updateAccount(
  * the statements, the second one re-walks the tree the first one left behind, and
  * a ring is refused rather than created (CONCURRENCY rule 1). Zero rows changed =
  * refused, and the caller is told plainly which of the three reasons it was.
+ *
+ * AND THE WALK IS BOUNDED. The accounts table is the one self-nesting structure in
+ * the base, so this is the one unbounded recursion — a chain N deep costs N steps
+ * every time anyone moves anything. `depth` rides the CTE and stops it at
+ * MAX_ACCOUNT_DEPTH. Hitting the ceiling REFUSES the move (`OR depth >= ?` in the
+ * ring test): past it the walk can no longer prove the tree is ring-free, and a
+ * guard that can't prove safety must fail closed, not fall through to "fine".
  */
 export async function setAccountParent(
   cfg: D1Rest,
@@ -369,11 +376,11 @@ export async function setAccountParent(
   const changed = await d1Query<{ id: string }>(
     cfg,
     guard.databaseId,
-    `WITH RECURSIVE ancestors(id) AS (
-       SELECT ?
+    `WITH RECURSIVE ancestors(id, depth) AS (
+       SELECT ?, 0
        UNION
-       SELECT a.parent_account_id FROM accounts a JOIN ancestors an ON a.id = an.id
-        WHERE a.parent_account_id IS NOT NULL
+       SELECT a.parent_account_id, an.depth + 1 FROM accounts a JOIN ancestors an ON a.id = an.id
+        WHERE a.parent_account_id IS NOT NULL AND an.depth < ?
      )
      UPDATE accounts SET parent_account_id = ?, ${audit.sql}
      ${where([
@@ -381,12 +388,14 @@ export async function setAccountParent(
        "id = ?",
        // the new parent must exist and be inside the same fence…
        `(? IS NULL OR EXISTS (SELECT 1 FROM accounts p ${where([parentFence.sql, "p.id = ?"])}))`,
-       // …and must not already sit beneath us (that is the ring).
-       "NOT EXISTS (SELECT 1 FROM ancestors WHERE id = ?)",
+       // …and must not already sit beneath us (that is the ring) — or sit so deep
+       // that the bounded walk couldn't reach the top and prove it isn't.
+       "NOT EXISTS (SELECT 1 FROM ancestors WHERE id = ? OR depth >= ?)",
      ])}
      RETURNING id`,
     [
       parentAccountId,
+      MAX_ACCOUNT_DEPTH,
       parentAccountId,
       ...audit.params,
       ...fence.params,
@@ -395,6 +404,7 @@ export async function setAccountParent(
       ...parentFence.params,
       parentAccountId,
       id,
+      MAX_ACCOUNT_DEPTH,
     ]
   )
   if (!changed[0])
