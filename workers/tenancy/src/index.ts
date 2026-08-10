@@ -224,6 +224,20 @@ export default {
       console.log(
         `size check: ${result.checked} team DBs, ${result.alerted.length} alarm(s)`
       )
+      // R12 IN SPIRIT: the run has a ceiling, and hitting it means databases over
+      // 80% went un-alarmed tonight. That is not a crash, so the catch below
+      // never sees it — and a cheerful success line above it is the only thing
+      // anyone would read. Record it, so "we stopped early" cannot look like
+      // "there was nothing more to find".
+      if (result.capped)
+        await recordWorkerError(
+          env.DB,
+          "tenancy",
+          "cron/size-check",
+          new Error(
+            `size check stopped at its ${result.alerted.length}-alarm ceiling — more team databases are over the threshold and were NOT alarmed tonight. Tomorrow's run continues from where this one stopped.`
+          )
+        )
     } catch (e) {
       // LAW R12: unattended work has no user watching, so a swallowed failure would be
       // invisible — record it to the error store, not just the console.

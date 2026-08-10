@@ -27,12 +27,17 @@ import * as React from "react"
 
 import type { SessionUser } from "@shared/types"
 import { useCached } from "@shared/web/store"
+import { reportError } from "@shared/web/log"
 import { ApiFailure, auth, portal, type PortalContext } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 
 export type PortalSession =
   | { state: "loading" }
   | { state: "signed-out" }
+  /** Something on OUR side is wrong — a 500, a dropped connection. Deliberately
+   * distinct from "signed-out": sending a client to the sign-in screen because a
+   * worker had a bad minute tells them they did something, when we did. */
+  | { state: "unavailable" }
   | { state: "needs-name"; user: SessionUser }
   | { state: "no-access"; user: SessionUser }
   | {
@@ -99,7 +104,18 @@ export function usePortalSession(): {
   const { data, loading, error, refresh } = useCached<Resolved>(cacheKeys.session, resolveSession)
 
   const session = React.useMemo<PortalSession>(() => {
-    if (!data) return loading || !error ? { state: "loading" } : { state: "signed-out" }
+    // A REAL ERROR IS NOT A SIGN-OUT. `resolveSession` already turns a 401/403/409
+    // into an ANSWER (signed-out / no-access) — so anything still throwing here is
+    // a 500 or a dropped connection. Reading that as "signed out" sent a client to
+    // the login screen mid-session and told them nothing, on a day when the only
+    // thing wrong was ours. It also reported nothing: the file's own comment said
+    // the error would reach the boundary, and it cannot — useCached catches it
+    // into state and never rethrows during render.
+    if (!data && error) {
+      reportError("portal-session.resolve", error)
+      return { state: "unavailable" }
+    }
+    if (!data) return { state: "loading" }
     if (data.kind === "signed-out") return { state: "signed-out" }
     if (data.kind === "needs-name") return { state: "needs-name", user: data.user }
     if (data.kind === "no-access") return { state: "no-access", user: data.user }

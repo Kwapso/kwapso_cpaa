@@ -11,6 +11,8 @@
 //   GET  /api/auth/health                                -> is this worker alive?
 
 import { fail, json } from "../../../shared/workers/http"
+import { GuardError } from "../../../shared/workers/gating"
+import { requireText, TEXT_LIMITS } from "../../../shared/workers/validate"
 import { logError, recordWorkerError } from "../../../shared/workers/error-log"
 import type { Env } from "./env"
 import { sha256Hex } from "./lib/crypto"
@@ -83,6 +85,12 @@ export default {
           return fail(404, "not_found", "No such auth action.")
       }
     } catch (e) {
+      // A refusal is an ANSWER, not a crash. Every sibling worker maps this
+      // first; auth did not, so the moment its handlers started validating,
+      // every intended 400 would have become a 500 — and a 500 on the
+      // unauthenticated sign-in door writes a row to the GLOBAL core database
+      // per request. The two changes only make sense together.
+      if (e instanceof GuardError) return fail(e.status, e.code, e.message)
       console.error("auth worker error:", e)
       // Record the crash in the central error log (core DB) — best-effort,
       // never blocks the response. Clean GuardError refusals never reach here.
@@ -101,17 +109,20 @@ async function internalMcpSession(request: Request, env: Env): Promise<Response>
   // bootstrap must set the secret BEFORE the MCP bridge can work).
   if (!env.INTERNAL_KEY || request.headers.get("x-internal-key") !== env.INTERNAL_KEY)
     return fail(403, "forbidden", "Bad internal key.")
-  const body = (await request.json().catch(() => ({}))) as { userId?: string; teamId?: string }
-  if (!body.userId || !body.teamId)
-    return fail(400, "invalid_input", "userId and teamId are required.")
+  // Validated even though the caller proved itself with INTERNAL_KEY. This is
+  // the highest-blast internal door in the product — it mints a session — and
+  // "a trusted caller cannot send rubbish" is an assumption, not a guarantee.
+  const body = (await request.json().catch(() => ({}))) as { userId?: unknown; teamId?: unknown }
+  const userId = requireText(body.userId, "User", TEXT_LIMITS.short)
+  const teamId = requireText(body.teamId, "Team", TEXT_LIMITS.short)
   const member = await env.DB.prepare(
     "SELECT id FROM team_members WHERE team_id = ? AND user_id = ? AND deactivated_at IS NULL"
   )
-    .bind(body.teamId, body.userId)
+    .bind(teamId, userId)
     .first()
   if (!member)
     return fail(403, "not_a_member", "That account is no longer an active member of the token's team.")
-  const { token } = await createPinnedSession(env, body.userId, body.teamId)
+  const { token } = await createPinnedSession(env, userId, teamId)
   return json({ token })
 }
 
@@ -172,8 +183,8 @@ async function internalLogError(request: Request, env: Env): Promise<Response> {
  * The ONE unauthenticated door that sends mail and writes rows, so the send is
  * charged to the caller (clientIp) as well as to the address. */
 async function emailStart(request: Request, env: Env): Promise<Response> {
-  const body = (await request.json().catch(() => ({}))) as { email?: string }
-  const email = normalizeEmail(body.email ?? "")
+  const body = (await request.json().catch(() => ({}))) as { email?: unknown }
+  const email = normalizeEmail(requireText(body.email, "Email", TEXT_LIMITS.short))
   if (!isValidEmail(email))
     return fail(400, "invalid_email", "Enter a valid email address.")
 
@@ -204,8 +215,8 @@ async function adminTestLogin(request: Request, env: Env): Promise<Response> {
   if (env.ENVIRONMENT === "production") return fail(403, "forbidden", "Not available.")
   if (!env.TEST_LOGIN_KEY || request.headers.get("x-admin-key") !== env.TEST_LOGIN_KEY)
     return fail(403, "forbidden", "Not available.")
-  const body = (await request.json().catch(() => ({}))) as { email?: string }
-  const email = normalizeEmail(body.email ?? "")
+  const body = (await request.json().catch(() => ({}))) as { email?: unknown }
+  const email = normalizeEmail(requireText(body.email, "Email", TEXT_LIMITS.short))
   if (!isValidEmail(email))
     return fail(400, "invalid_email", "Enter a valid email address.")
   // Charged to the test door's OWN bucket, not to the machine's address. This
@@ -229,8 +240,8 @@ async function emailVerify(request: Request, env: Env): Promise<Response> {
     email?: string
     code?: string
   }
-  const email = normalizeEmail(body.email ?? "")
-  const code = (body.code ?? "").trim()
+  const email = normalizeEmail(requireText(body.email, "Email", TEXT_LIMITS.short))
+  const code = requireText(body.code, "Code", TEXT_LIMITS.short)
   if (!isValidEmail(email) || !/^\d{6}$/.test(code))
     return fail(400, "invalid_input", "Enter your email and the 6-digit code.")
 
@@ -251,7 +262,7 @@ async function emailChangeStart(request: Request, env: Env): Promise<Response> {
   if (!user) return fail(401, "signed_out", "Not signed in.")
 
   const body = (await request.json().catch(() => ({}))) as { email?: string }
-  const r = await startEmailChange(env, user, body.email ?? "")
+  const r = await startEmailChange(env, user, requireText(body.email, "Email", TEXT_LIMITS.short))
   if ("error" in r) return fail(r.status, r.error, r.message)
   // Never a code in the response — same law as login (inbox only).
   return json({ ok: true })
@@ -272,8 +283,8 @@ async function emailChangeVerify(request: Request, env: Env): Promise<Response> 
   const r = await verifyEmailChange(
     env,
     user,
-    body.email ?? "",
-    (body.code ?? "").trim(),
+    requireText(body.email, "Email", TEXT_LIMITS.short),
+    requireText(body.code, "Code", TEXT_LIMITS.short),
     currentTokenHash
   )
   if ("error" in r) return fail(r.status, r.error, r.message)

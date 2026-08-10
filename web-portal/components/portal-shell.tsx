@@ -74,6 +74,19 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
       </main>
     )
 
+  // Ours, not theirs. Say so, and offer the only useful thing — try again —
+  // rather than the sign-in screen, which would read as "you were logged out".
+  if (session.state === "unavailable")
+    return (
+      <main className="mx-auto flex min-h-[100svh] max-w-md flex-col items-center justify-center gap-5 px-6 text-center">
+        <h1 className="text-2xl font-semibold tracking-tight">We can&apos;t reach your account</h1>
+        <p className="text-muted-foreground">
+          Something on our side isn&apos;t responding. Nothing is lost — try again in a moment.
+        </p>
+        <Button onClick={refresh}>Try again</Button>
+      </main>
+    )
+
   if (session.state === "needs-name") return <NeedsName onDone={refresh} />
   if (session.state === "no-access") return <NoAccess email={session.user.email} />
 

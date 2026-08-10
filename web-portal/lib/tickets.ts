@@ -14,6 +14,8 @@ import * as React from "react"
 
 import type { HelpTicket } from "@shared/types"
 import { primeCache, readCache, useCached, useCachedValue } from "@shared/web/store"
+import { reportError } from "@shared/web/log"
+import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { support } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 
@@ -41,6 +43,12 @@ export function useTickets() {
       primeCache(cacheKeys.tickets, [...(readCache<HelpTicket[]>(cacheKeys.tickets) ?? []), ...page.tickets])
       primeCache(cacheKeys.ticketsTotal, page.total)
       primeCache(cacheKeys.ticketsCursor, page.nextCursor)
+    } catch (e) {
+      // `loadMore` is called as `void loadMore()`, so without this a failed page
+      // two is an unhandled rejection that lands nowhere — the button simply
+      // stops working and nobody is told, here or in the error store.
+      reportError("portal-tickets.loadMore", e)
+      toast.error("We couldn't load any more. Try again in a moment.")
     } finally {
       setLoadingMore(false)
     }
