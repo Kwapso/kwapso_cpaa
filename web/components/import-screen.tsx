@@ -23,9 +23,9 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import type { ImportableTarget, ImportBatchReport, ImportBatchSummary, ImportBatchView } from "@shared/types"
 import { ApiFailure, dataOps } from "@/lib/api"
 import { fileToCsv, UserFileError } from "@/lib/file-to-csv"
-import { formatActivityWhen } from "@/lib/format"
+import { formatActivityWhen } from "@shared/web/format"
 import { usePermissions } from "@/lib/perms"
-import { useCached } from "@/lib/store"
+import { useCached } from "@shared/web/store"
 
 type Phase = "upload" | "review" | "done"
 

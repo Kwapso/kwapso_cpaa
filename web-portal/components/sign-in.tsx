@@ -2,23 +2,20 @@
 
 // SIGN IN — an email address and a six-digit code, and nothing else on screen.
 //
-// Two decisions worth stating, because both are easy to get wrong later:
+// This file is the portal door's CHROME. The behaviour behind it — email → code
+// → signed in, and the rule that a cooldown moves you ON rather than stranding
+// you — lives once, in shared/web/use-email-sign-in.ts, which the agency app's
+// own sign-in screen renders too. It used to live here as well, in a second
+// copy, and a bug had to be fixed in both on the same day.
 //
-// 1. THE CODE ONLY EVER GOES TO THE INBOX. It never rides the response and never
-//    appears in a toast. That is a rule of the auth worker, and this screen is
-//    where it would be broken first if someone "helpfully" surfaced it in dev.
-//
-// 2. SIGNING IN IS NOT GETTING IN. Invite-only is absolute (SCOPE ch.06): a
-//    correct code proves who you are, it does not create access. So a stranger
-//    who signs in successfully lands on the "nothing here yet" screen rather
-//    than a new empty world of their own — and this component says nothing that
-//    promises otherwise.
+// SIGNING IN IS NOT GETTING IN. Invite-only is absolute (SCOPE ch.06): a correct
+// code proves who you are, it does not create access. So a stranger who signs in
+// successfully lands on the "nothing here yet" screen rather than a new empty
+// world of their own — and this component says nothing that promises otherwise.
 //
 // Google sign-in exists as a product decision (same person as long as the email
 // matches) but is not wired in code yet, on either front door. It is deliberately
 // NOT stubbed here: a button that doesn't work is worse than one that isn't there.
-
-import * as React from "react"
 
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
@@ -28,63 +25,27 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { brand } from "@shared/brand"
-import { CodeInput } from "@web/components/temp/code-input"
-import { invalidate } from "@web/lib/store"
-import { ApiFailure, auth } from "@/lib/api"
+import { CodeInput } from "@shared/web/code-input"
+import { invalidate } from "@shared/web/store"
+import { useEmailSignIn } from "@shared/web/use-email-sign-in"
+import { auth } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 
 const emailConfig = { ...defaultFieldConfig, label: "Your email", required: true }
 
 export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
-  const [step, setStep] = React.useState<"email" | "code">("email")
-  const [email, setEmail] = React.useState("")
-  const [code, setCode] = React.useState("")
-  const [busy, setBusy] = React.useState(false)
-  const [error, setError] = React.useState<string | undefined>()
-
-  async function sendCode(e: React.FormEvent) {
-    e.preventDefault()
-    setBusy(true)
-    setError(undefined)
-    try {
-      await auth.startEmail(email)
-      setStep("code")
-      setCode("")
-      toast.success("Code sent — check your email.")
-    } catch (err) {
-      // The cooldown is not a failure — it means a code IS already in their
-      // inbox, and it still works. Leaving them on this screen with nowhere to
-      // type it is the dead end this app exists to avoid. Move them on and say
-      // the true thing. (It is not an account oracle either: the cooldown fires
-      // on the caller's own previous send, whoever the address belongs to.)
-      if (err instanceof ApiFailure && err.code === "too_soon") {
-        setStep("code")
-        setCode("")
-        toast.success("A code is already on its way — check your email.")
-        return
-      }
-      setError(err instanceof ApiFailure ? err.message : "Couldn't send the code.")
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function verify(full: string) {
-    setBusy(true)
-    setError(undefined)
-    try {
-      await auth.verifyEmail(email, full)
-      // The session changed under us; nothing cached about the last person is
-      // true any more.
-      invalidate(cacheKeys.session)
-      onSignedIn()
-    } catch (err) {
-      setCode("")
-      setError(err instanceof ApiFailure ? err.message : "That didn't work. Try again.")
-    } finally {
-      setBusy(false)
-    }
-  }
+  const { step, email, setEmail, code, busy, error, sendCode, enterCode, useDifferentEmail } =
+    useEmailSignIn({
+      startEmail: auth.startEmail,
+      verifyEmail: auth.verifyEmail,
+      onSignedIn: () => {
+        // The session changed under us; nothing cached about the last person is
+        // true any more.
+        invalidate(cacheKeys.session)
+        onSignedIn()
+      },
+      announce: toast.success,
+    })
 
   return (
     <div className="w-full max-w-sm">
@@ -101,7 +62,13 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
 
       <div className="mt-8 flex flex-col gap-4">
         {step === "email" ? (
-          <form className="flex flex-col gap-4" onSubmit={sendCode}>
+          <form
+            className="flex flex-col gap-4"
+            onSubmit={(e) => {
+              e.preventDefault()
+              void sendCode()
+            }}
+          >
             <Field config={emailConfig} htmlFor="email" error={error}>
               <Input
                 id="email"
@@ -122,29 +89,14 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
           </form>
         ) : (
           <>
-            <CodeInput
-              value={code}
-              disabled={busy}
-              onChange={(next) => {
-                setCode(next)
-                if (next.length === 6) void verify(next)
-              }}
-            />
+            <CodeInput value={code} disabled={busy} onChange={enterCode} />
             {error ? <p className="text-destructive text-center text-sm">{error}</p> : null}
             {busy ? (
               <div className="flex justify-center">
                 <Spinner />
               </div>
             ) : null}
-            <Button
-              variant="ghost"
-              className="w-full"
-              disabled={busy}
-              onClick={() => {
-                setStep("email")
-                setError(undefined)
-              }}
-            >
+            <Button variant="ghost" className="w-full" disabled={busy} onClick={useDifferentEmail}>
               Use a different email
             </Button>
           </>

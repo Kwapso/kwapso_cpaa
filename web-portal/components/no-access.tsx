@@ -20,8 +20,8 @@ import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { LogOut } from "lucide-react"
 
 import { brand } from "@shared/brand"
-import { clearAllFormDrafts } from "@web/lib/use-form-draft"
-import { invalidate } from "@web/lib/store"
+import { clearAllFormDrafts } from "@shared/web/use-form-draft"
+import { invalidate } from "@shared/web/store"
 import { auth } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 

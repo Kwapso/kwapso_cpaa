@@ -22,7 +22,7 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure, auth } from "@/lib/api"
-import { CodeInput } from "@/components/temp/code-input"
+import { CodeInput } from "@shared/web/code-input"
 
 const emailField = { ...defaultFieldConfig, label: "New email", required: true }
 

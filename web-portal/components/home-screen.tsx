@@ -20,7 +20,7 @@ import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { ArrowRight, Plus } from "lucide-react"
 
-import { invalidate } from "@web/lib/store"
+import { invalidate } from "@shared/web/store"
 import { support } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 import { useTickets } from "@/lib/tickets"

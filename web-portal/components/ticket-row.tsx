@@ -14,7 +14,7 @@ import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { ChevronRight } from "lucide-react"
 
 import type { HelpTicket } from "@shared/types"
-import { formatRelative } from "@web/lib/format"
+import { formatRelative } from "@shared/web/format"
 
 /** Plain words for each state, and a colour that means the same thing every
  * time. "In progress" is the only one that needed translating from the wire. */

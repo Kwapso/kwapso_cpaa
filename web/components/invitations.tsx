@@ -24,7 +24,7 @@ import type { ReceivedInvite } from "@shared/types"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { letterMark } from "@/lib/identity"
 import { softNavigate } from "@/lib/nav"
-import { primeCache, useCached } from "@/lib/store"
+import { primeCache, useCached } from "@shared/web/store"
 import type { ActiveTeam } from "@/lib/use-active-team"
 
 /** The signed-in person's pending received invitations. Shared cache key so the

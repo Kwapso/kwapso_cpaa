@@ -20,9 +20,9 @@ import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
-import { FormShell, fieldSpacing } from "@web/components/form-shell"
-import { useFormDraft } from "@web/lib/use-form-draft"
-import { invalidate } from "@web/lib/store"
+import { FormShell, fieldSpacing } from "@shared/web/form-shell"
+import { useFormDraft } from "@shared/web/use-form-draft"
+import { invalidate } from "@shared/web/store"
 import { ApiFailure, auth } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 

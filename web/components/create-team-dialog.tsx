@@ -21,7 +21,7 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
-import { useFormDraft } from "@/lib/use-form-draft"
+import { useFormDraft } from "@shared/web/use-form-draft"
 
 const nameField = { ...defaultFieldConfig, label: "Team name", required: true }
 

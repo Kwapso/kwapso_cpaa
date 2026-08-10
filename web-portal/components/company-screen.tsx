@@ -23,7 +23,7 @@ import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 
 import type { AccountDetail } from "@shared/types"
-import { useCached } from "@web/lib/store"
+import { useCached } from "@shared/web/store"
 import { portal } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 import { CollectionHeading } from "@/components/collection-heading"

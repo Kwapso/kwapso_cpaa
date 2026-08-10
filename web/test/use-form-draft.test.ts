@@ -5,7 +5,7 @@
 import { act, renderHook } from "@testing-library/react"
 import { afterEach, describe, expect, it } from "vitest"
 
-import { clearAllFormDrafts, useFormDraft } from "@/lib/use-form-draft"
+import { clearAllFormDrafts, useFormDraft } from "@shared/web/use-form-draft"
 
 afterEach(() => sessionStorage.clear())
 

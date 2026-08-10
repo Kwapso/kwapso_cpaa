@@ -1,0 +1,14 @@
+/* THE ONE PLACE EITHER FRONT DOOR OVERRIDES THE LIBRARY.
+ *
+ * @kwapso/ui is lego and is never edited from this repo — but an app may
+ * override a token downstream. When BOTH doors need the same override, it lives
+ * here, so the day the library adopts it as its default there is one line to
+ * delete, not two to remember.
+ *
+ * Overlay readability (feedback 2026-06-30): the library's frosted `.glass` sits
+ * at 72% surface opacity — too see-through to read dialog/sheet text against the
+ * living background. Keep the frosted blur, make the surface mostly opaque. (A
+ * library prompt tracks adopting this as the default; see UI-GAPS.md.) */
+.glass {
+  background-color: color-mix(in oklch, var(--card) 94%, transparent);
+}

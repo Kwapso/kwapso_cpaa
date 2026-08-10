@@ -6,7 +6,7 @@
 
 import * as React from "react"
 
-import { installGlobalErrorReporting } from "@/lib/log"
+import { installGlobalErrorReporting } from "@shared/web/log"
 
 export function ErrorReporter() {
   React.useEffect(() => {

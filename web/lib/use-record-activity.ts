@@ -20,7 +20,7 @@
 
 import { tenancy } from "@/lib/api"
 import { cursorKey } from "@/lib/live-resources"
-import { primeCache, useCached, useCachedValue } from "@/lib/store"
+import { primeCache, useCached, useCachedValue } from "@shared/web/store"
 import type { ActivityItem } from "@shared/types"
 
 /** The cache key holding one record's activity rows. The same key the live

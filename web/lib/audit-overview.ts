@@ -1,6 +1,6 @@
 // The ONE consistent audit block every record's Overview tab shows, so "metadata"
 // reads the same everywhere (RULES/feedback 2026-06-30).
-import { formatRelative } from "@/lib/format"
+import { formatRelative } from "@shared/web/format"
 
 export type AuditMeta = {
   createdByName?: string | null

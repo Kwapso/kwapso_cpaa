@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
 
-import { invalidate, patchRow, primeCache, reconcile, useCached } from "@/lib/store"
+import { invalidate, patchRow, primeCache, reconcile, useCached } from "@shared/web/store"
 
 type Row = Record<string, unknown>
 

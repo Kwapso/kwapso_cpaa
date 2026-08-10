@@ -32,8 +32,8 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { Paperclip, X } from "lucide-react"
 
 import { ApiFailure, content } from "@/lib/api"
-import { useFormDraft } from "@/lib/use-form-draft"
-import { FormShell, fieldSpacing } from "@/components/form-shell"
+import { useFormDraft } from "@shared/web/use-form-draft"
+import { FormShell, fieldSpacing } from "@shared/web/form-shell"
 import { ManageDropdownsLink } from "@/components/manage-dropdowns-link"
 
 const titleField = { ...defaultFieldConfig, label: "Title", required: true }

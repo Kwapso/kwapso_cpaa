@@ -5,8 +5,10 @@
 // from library primitives (Button, Input, Field, Spinner, toast) so when
 // @kwapso/ui ships `auth-card`, swapping is a one-file change. Flat (no
 // card surface), matching the app-wide flat look. No styles invented beyond layout.
-
-import * as React from "react"
+//
+// This file is the agency door's CHROME. The email → code → signed-in BEHAVIOUR
+// (including the cooldown rule) lives once, in shared/web/use-email-sign-in.ts,
+// which the portal's own sign-in screen renders too.
 
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
@@ -15,10 +17,11 @@ import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { brand } from "@shared/brand"
+import { CodeInput } from "@shared/web/code-input"
+import { useEmailSignIn } from "@shared/web/use-email-sign-in"
 
-import { ApiFailure, auth } from "@/lib/api"
+import { auth } from "@/lib/api"
 import { BrandMark } from "@/components/brand-mark"
-import { CodeInput } from "./code-input"
 
 const emailFieldConfig = {
   ...defaultFieldConfig,
@@ -27,51 +30,13 @@ const emailFieldConfig = {
 }
 
 export function AuthCard({ onSignedIn }: { onSignedIn: () => void }) {
-  const [step, setStep] = React.useState<"email" | "code">("email")
-  const [email, setEmail] = React.useState("")
-  const [code, setCode] = React.useState("")
-  const [busy, setBusy] = React.useState(false)
-  const [error, setError] = React.useState<string | undefined>()
-
-  async function sendCode() {
-    setBusy(true)
-    setError(undefined)
-    try {
-      await auth.startEmail(email)
-      setStep("code")
-      setCode("")
-      // The code goes ONLY to the inbox — it never rides the response or a toast.
-      toast.success("Code sent — check your email.")
-    } catch (e) {
-      // The cooldown is not a failure — a code IS already in their inbox and it
-      // still works. Stranding them here with nowhere to type it is a dead end.
-      // (Not an account oracle: the cooldown fires on the caller's own previous
-      // send, whoever the address belongs to.)
-      if (e instanceof ApiFailure && e.code === "too_soon") {
-        setStep("code")
-        setCode("")
-        toast.success("A code is already on its way — check your email.")
-        return
-      }
-      setError(e instanceof ApiFailure ? e.message : "Couldn't send the code.")
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function verify(fullCode: string) {
-    setBusy(true)
-    setError(undefined)
-    try {
-      await auth.verifyEmail(email, fullCode)
-      onSignedIn()
-    } catch (e) {
-      setCode("")
-      setError(e instanceof ApiFailure ? e.message : "That didn't work. Try again.")
-    } finally {
-      setBusy(false)
-    }
-  }
+  const { step, email, setEmail, code, busy, error, sendCode, enterCode, useDifferentEmail } =
+    useEmailSignIn({
+      startEmail: auth.startEmail,
+      verifyEmail: auth.verifyEmail,
+      onSignedIn,
+      announce: toast.success,
+    })
 
   return (
     <div className="animate-rise w-full max-w-sm">
@@ -81,69 +46,48 @@ export function AuthCard({ onSignedIn }: { onSignedIn: () => void }) {
           Welcome to {brand.name}
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          {step === "email"
-            ? brand.motto
-            : `Enter the 6-digit code sent to ${email}`}
+          {step === "email" ? brand.motto : `Enter the 6-digit code sent to ${email}`}
         </p>
       </div>
       <div className="mt-6 flex flex-col gap-4">
         {step === "email" ? (
           <form
-              className="flex flex-col gap-4"
-              onSubmit={(e) => {
-                e.preventDefault()
-                void sendCode()
-              }}
-            >
-              <Field config={emailFieldConfig} htmlFor="email" error={error}>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={busy}
-                  autoFocus
-                />
-              </Field>
-              <Button type="submit" className="w-full" disabled={busy || !email}>
-                {busy ? <Spinner /> : null}
-                Email me a code
-              </Button>
-            </form>
+            className="flex flex-col gap-4"
+            onSubmit={(e) => {
+              e.preventDefault()
+              void sendCode()
+            }}
+          >
+            <Field config={emailFieldConfig} htmlFor="email" error={error}>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={busy}
+                autoFocus
+              />
+            </Field>
+            <Button type="submit" className="w-full" disabled={busy || !email}>
+              {busy ? <Spinner /> : null}
+              Email me a code
+            </Button>
+          </form>
         ) : (
           <>
-            <CodeInput
-              value={code}
-              disabled={busy}
-              onChange={(next) => {
-                setCode(next)
-                if (next.length === 6) void verify(next)
-              }}
-            />
-            {error && (
-              <p className="text-destructive text-center text-xs">{error}</p>
-            )}
+            <CodeInput value={code} disabled={busy} onChange={enterCode} />
+            {error && <p className="text-destructive text-center text-xs">{error}</p>}
             {busy && (
               <div className="flex justify-center">
                 <Spinner />
               </div>
             )}
             <div className="flex justify-between">
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={busy}
-                onClick={() => setStep("email")}
-              >
+              <Button variant="ghost" size="sm" disabled={busy} onClick={useDifferentEmail}>
                 Change email
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={busy}
-                onClick={() => void sendCode()}
-              >
+              <Button variant="ghost" size="sm" disabled={busy} onClick={() => void sendCode()}>
                 Resend code
               </Button>
             </div>
@@ -153,4 +97,3 @@ export function AuthCard({ onSignedIn }: { onSignedIn: () => void }) {
     </div>
   )
 }
-

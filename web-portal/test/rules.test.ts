@@ -10,6 +10,13 @@
 // toggles), R4 (forms through the ONE FormShell), R7 (drafts survive), R16 (an
 // exact server count, in one place, through the one seam), plus the two rules
 // this surface adds — the reasoned R2 exemption, and staff anonymity.
+//
+// The "ONE" in those laws now means shared/web/ — the browser half of the same
+// shared/ the workers already use. It used to mean web/, reached through an
+// alias into the sibling app's tree, which made the portal compile out of source
+// it never declared a dependency on (and one of those files says, in its own
+// header, that it gets deleted the day the library ships a replacement). The
+// last describe below is what keeps that door shut.
 
 import { readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
@@ -48,14 +55,14 @@ describe("portal UI laws", () => {
   })
 
   // R4 — every form renders through the shared FormShell, and it is THE shared
-  // one: imported from the host, not a portal-local copy. A second copy would be
-  // a second form layout the first day either changed.
+  // one: imported from shared/web, not a portal-local copy. A second copy would
+  // be a second form layout the first day either changed.
   it("forms-use-formshell: every portal form uses the ONE FormShell", () => {
     for (const c of FORM_COMPONENTS) {
       const src = read(join(PORTAL, "components", `${c}.tsx`))
       expect(src, `${c} must RENDER a FormShell, not merely import one`).toContain("<FormShell")
       expect(src, `${c} must import the SHARED FormShell, not a portal copy`).toContain(
-        "@web/components/form-shell"
+        "@shared/web/form-shell"
       )
     }
     const localCopy = componentFiles().some((f) => f.endsWith("form-shell.tsx"))
@@ -80,8 +87,8 @@ describe("portal UI laws", () => {
   // portal has no counted tabs, so the arbitration is this assertion.
   it("counted-collections: one count seam, one place, no list lengths", () => {
     const heading = read(join(PORTAL, "components", "collection-heading.tsx"))
-    expect(heading, "the count seam must be the host's formatCount, not a copy").toContain(
-      "@web/lib/format-count"
+    expect(heading, "the count seam must be the ONE shared formatCount, not a copy").toContain(
+      "@shared/web/format-count"
     )
     // Nobody else formats a count.
     const others = componentFiles().filter(
@@ -184,5 +191,82 @@ describe("portal rules the agency app doesn't have", () => {
       if (banned.test(visible)) offenders.push(f.split("/").pop() as string)
     }
     expect(offenders, "'account' is a company or a person we work for — never a login").toEqual([])
+  })
+})
+
+// THE PORTAL COMPILES OUT OF ITS OWN TREE, AND shared/. NOTHING ELSE.
+//
+// It used to reach 25 modules out of web/ through an `@web/*` alias that no
+// package.json declared — including web/components/temp/code-input.tsx, whose
+// own header says the file gets DELETED once the library ships a replacement. A
+// planned deletion in one app would have broken the other, silently, with
+// nothing in this app changed.
+//
+// The shared seams live in shared/web/ now (the browser half of the same shared/
+// the workers use), so the dependency runs app → shared, the direction every
+// other part of this repo already runs. This is the guard that keeps it there:
+// it reads the config AND the source, because removing the alias is only half of
+// it — a relative `../../web/lib/store` would compile just as happily.
+describe("the portal does not compile out of the agency app's tree", () => {
+  function portalFiles(): string[] {
+    const out: string[] = []
+    const walk = (p: string) => {
+      for (const entry of readdirSync(p, { withFileTypes: true } as never) as unknown as {
+        name: string
+        isDirectory: () => boolean
+      }[]) {
+        if (["node_modules", ".next", "out"].includes(entry.name)) continue
+        const full = join(p, entry.name)
+        if (entry.isDirectory()) walk(full)
+        else if (/\.(tsx?|mjs)$/.test(entry.name)) out.push(full)
+      }
+    }
+    walk(PORTAL)
+    return out
+  }
+
+  it("sees the portal's own source (guards the walk)", () => {
+    expect(portalFiles().length).toBeGreaterThan(20)
+  })
+
+  it("declares no alias into the sibling app", () => {
+    for (const cfg of ["tsconfig.json", "vitest.config.ts"])
+      expect(
+        /["']@web["']?\s*[:/]/.test(read(join(PORTAL, cfg))),
+        `${cfg} must not alias into web/ — put shared seams in shared/web/`
+      ).toBe(false)
+  })
+
+  it("imports nothing from web/, by alias or by path", () => {
+    const offenders: string[] = []
+    for (const file of portalFiles()) {
+      // Comments are not imports: this file explains the rule, and so do several
+      // portal headers, so the prose must not read as a violation of itself.
+      const code = read(file)
+        .replace(/\/\*[\s\S]*?\*\//g, " ")
+        .replace(/^\s*\/\/.*$/gm, "")
+      for (const m of code.matchAll(/from\s+["']([^"']+)["']|import\s*\(\s*["']([^"']+)["']/g)) {
+        const spec = m[1] ?? m[2]
+        if (/^@web\//.test(spec) || /(^|\/)\.\.\/web\//.test(spec))
+          offenders.push(`${file.slice(PORTAL.length + 1)} → ${spec}`)
+      }
+    }
+    expect(
+      offenders,
+      `the portal must not import from the agency app — promote the seam into shared/web/ instead: ${offenders.join(", ")}`
+    ).toEqual([])
+  })
+
+  // The other half of "one implementation": the portal must not answer the move
+  // by growing its own copy of a seam the laws say there is exactly one of.
+  it("carries no second copy of a single-instance seam", () => {
+    const single = ["form-shell", "format-count", "use-form-draft", "store", "use-email-sign-in"]
+    const local = portalFiles()
+      .map((f) => f.slice(PORTAL.length + 1))
+      .filter((f) => single.some((s) => f.endsWith(`/${s}.ts`) || f.endsWith(`/${s}.tsx`)))
+    expect(
+      local,
+      "these seams exist exactly once, in shared/web/ (R4, R7, R16) — the portal must import them, not re-declare them"
+    ).toEqual([])
   })
 })

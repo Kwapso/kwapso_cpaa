@@ -24,7 +24,7 @@ import { LogOut, UserRound } from "lucide-react"
 import { auth } from "@/lib/api"
 import { personName, personInitials } from "@/lib/identity"
 import { softNavigate } from "@/lib/nav"
-import { clearAllFormDrafts } from "@/lib/use-form-draft"
+import { clearAllFormDrafts } from "@shared/web/use-form-draft"
 import type { ActiveTeam } from "@/lib/use-active-team"
 
 export function ProfileMenu({ active }: { active: ActiveTeam }) {

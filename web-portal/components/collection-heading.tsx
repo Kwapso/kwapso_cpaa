@@ -16,7 +16,7 @@
 // renders nothing at all — never a "0" that reads as an empty collection while
 // the rows are still on their way.
 
-import { formatCount } from "@web/lib/format-count"
+import { formatCount } from "@shared/web/format-count"
 
 export function CollectionHeading({
   label,

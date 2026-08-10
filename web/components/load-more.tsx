@@ -13,7 +13,7 @@ import * as React from "react"
 
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { cursorKey, loadMore } from "@/lib/live-resources"
-import { useCachedValue } from "@/lib/store"
+import { useCachedValue } from "@shared/web/store"
 
 export function LoadMore<T>({
   listKey,

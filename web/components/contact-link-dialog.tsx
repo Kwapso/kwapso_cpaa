@@ -36,9 +36,9 @@ import { Plus, Search } from "lucide-react"
 
 import type { Account } from "@shared/types"
 import { ApiFailure, tenancy } from "@/lib/api"
-import { FormShell, fieldSpacing } from "@/components/form-shell"
-import { useCached } from "@/lib/store"
-import { useFormDraft } from "@/lib/use-form-draft"
+import { FormShell, fieldSpacing } from "@shared/web/form-shell"
+import { useCached } from "@shared/web/store"
+import { useFormDraft } from "@shared/web/use-form-draft"
 
 const personField = { ...defaultFieldConfig, label: "Person", required: true }
 const relationshipField = { ...defaultFieldConfig, label: "Relationship", required: false }

@@ -33,8 +33,8 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { KeyRound } from "lucide-react"
 
 import { ApiFailure } from "@/lib/api"
-import { FormShell, fieldSpacing } from "@/components/form-shell"
-import { useFormDraft } from "@/lib/use-form-draft"
+import { FormShell, fieldSpacing } from "@shared/web/form-shell"
+import { useFormDraft } from "@shared/web/use-form-draft"
 
 const personField = { ...defaultFieldConfig, label: "Person", required: true }
 

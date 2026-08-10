@@ -37,12 +37,16 @@ import type {
   TeamSummary,
 } from "@shared/types"
 
-/** The import session as the data-ops worker returns it (a view, not the raw row). */
-/** R14: what every PAGED door returns — the rows, the exact server `total`, and
- * the pair that says whether there's another page. `nextCursor` is OPAQUE: hand
- * it straight back, never build or parse one. */
-export type PagedResponse<T> = T & { total: number; hasMore: boolean; nextCursor: string | null }
+// The plumbing — one fetch wrapper, one error class, one paged shape, the two
+// URL/POST one-liners — is shared with the client portal (shared/web/api.ts).
+// Only the DOOR LIST below is this app's own; it is also the attack surface the
+// portal gateway's closed-door suite fires at, so it stays here, whole.
+import { api, ApiFailure, enc, post, type PagedResponse } from "@shared/web/api"
 
+export { ApiFailure }
+export type { PagedResponse }
+
+/** The import session as the data-ops worker returns it (a view, not the raw row). */
 export type ImportSessionView = {
   id: string
   tableKey: string
@@ -68,16 +72,6 @@ export type UsageLogRow = {
   source: string
   summary: string | null
   kind?: "action" | "prompt" | null
-}
-
-export class ApiFailure extends Error {
-  constructor(
-    public status: number,
-    public code: string,
-    message: string
-  ) {
-    super(message)
-  }
 }
 
 /** One Server-Sent Event from an agent turn. `text` deltas + `step_*` may repeat any
@@ -138,22 +132,6 @@ async function streamSse(
   }
   // A final record with no trailing blank line (some servers omit it on close).
   if (buffer.trim()) flush(buffer)
-}
-
-async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
-    headers: { "Content-Type": "application/json" },
-    ...init,
-  })
-  if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as ApiError | null
-    throw new ApiFailure(
-      res.status,
-      body?.error ?? "unknown",
-      body?.message ?? "Something went wrong. Try again."
-    )
-  }
-  return (await res.json()) as T
 }
 
 export const auth = {
@@ -491,9 +469,6 @@ export const tenancy = {
   setPortalAccessActive: (id: string, active: boolean) =>
     api<{ ok: true }>("/api/tenancy/portal-users/active", post({ id, active })),
 }
-
-const enc = encodeURIComponent
-const post = (body: unknown): RequestInit => ({ method: "POST", body: JSON.stringify(body) })
 
 /** Content worker — Learning + Help (team-DB content modules). */
 export const content = {

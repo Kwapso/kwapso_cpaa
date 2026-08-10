@@ -14,7 +14,7 @@ import * as React from "react"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { RotateCcw } from "lucide-react"
 
-import { reportError } from "@web/lib/log"
+import { reportError } from "@shared/web/log"
 
 type Props = { label?: string; children: React.ReactNode }
 type State = { error: Error | null }

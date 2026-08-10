@@ -20,7 +20,7 @@ import {
   RULES_REGISTRY,
   TAB_COUNT_EXCEPTIONS,
 } from "@shared/rules/registry"
-import { formatCount } from "../lib/format-count"
+import { formatCount } from "@shared/web/format-count"
 import { SIMPLE_INVALIDATIONS, TEAM_RESOURCES } from "../lib/live-resources"
 import { TEAM_SECTIONS } from "../lib/pages"
 import { BASE_RECIPES, tabCountKey, withTabCounts } from "../lib/screens"

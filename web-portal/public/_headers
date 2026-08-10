@@ -1,5 +1,9 @@
-# Cloudflare Workers Static Assets reads this file (copied into web/out by the
-# Next export).
+# Cloudflare Workers Static Assets reads this file (copied into <app>/out by the
+# Next export). It exists TWICE — once per front door — because each app's export
+# needs its own copy, and it must be IDENTICAL in both: this is the security-header
+# file, and a hardening change made to one door and not the other is a hole nobody
+# would notice. web/test/front-door-parity.test.ts compares the two byte for byte,
+# so editing one alone turns the build red. Edit both, or neither.
 
 # Security headers on EVERY response (different header names from the Cache-Control
 # rules below, so they layer, not conflict): the app is never meant to be iframed

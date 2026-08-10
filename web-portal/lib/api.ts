@@ -10,12 +10,13 @@
 // It is NOT web/lib/api.ts with a filter. The agency client carries ~90 calls
 // across roles, invites, imports and the assistant; the portal has fourteen.
 
-import type { AccountDetail, ApiError, HelpMessage, HelpTicket, SessionUser } from "@shared/types"
+import type { AccountDetail, HelpMessage, HelpTicket, SessionUser } from "@shared/types"
+// The plumbing — one fetch wrapper, one error class, one paged shape — is shared
+// with the agency app (shared/web/api.ts). Only the DOOR LIST below is the
+// portal's own, and it is meant to be: it is this surface's honest inventory.
+import { api, enc, post, type PagedResponse } from "@shared/web/api"
 
-/** R14: what every PAGED door returns — the rows, the exact server `total`, and
- * the pair that says whether there's another page. `nextCursor` is OPAQUE: hand
- * it straight back, never build or parse one. */
-export type PagedResponse<T> = T & { total: number; hasMore: boolean; nextCursor: string | null }
+export { ApiFailure, type PagedResponse } from "@shared/web/api"
 
 /** Where this person may stand, and where they stand now (the switcher's data).
  * `accounts` is a list of companies, never a list of logins — an account is a
@@ -24,32 +25,6 @@ export type PortalContext = {
   accounts: { id: string; name: string }[]
   currentAccountId: string | null
 }
-
-export class ApiFailure extends Error {
-  constructor(
-    public status: number,
-    public code: string,
-    message: string
-  ) {
-    super(message)
-  }
-}
-
-async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...init })
-  if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as ApiError | null
-    throw new ApiFailure(
-      res.status,
-      body?.error ?? "unknown",
-      body?.message ?? "Something went wrong. Try again."
-    )
-  }
-  return (await res.json()) as T
-}
-
-const enc = encodeURIComponent
-const post = (body: unknown): RequestInit => ({ method: "POST", body: JSON.stringify(body) })
 
 export const auth = {
   /** Request a 6-digit code. The code goes ONLY to the inbox — never the response. */

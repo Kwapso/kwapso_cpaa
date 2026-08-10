@@ -9,7 +9,7 @@ import * as React from "react"
 
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 
-import { reportError } from "@/lib/log"
+import { reportError } from "@shared/web/log"
 
 type Props = { label?: string; children: React.ReactNode }
 type State = { error: Error | null }

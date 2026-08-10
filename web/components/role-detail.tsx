@@ -49,10 +49,10 @@ import { LoadMore } from "@/components/load-more"
 import { RoleFormDialog } from "@/components/role-form-dialog"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
-import { formatActivityWhen } from "@/lib/format"
-import { formatCount } from "@/lib/format-count"
+import { formatActivityWhen } from "@shared/web/format"
+import { formatCount } from "@shared/web/format-count"
 import { usePermissions } from "@/lib/perms"
-import { primeCache, useCached } from "@/lib/store"
+import { primeCache, useCached } from "@shared/web/store"
 import { useRecordActivity } from "@/lib/use-record-activity"
 
 export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: string }) {

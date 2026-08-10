@@ -19,7 +19,7 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 
 import { content as contentApi, tenancy } from "@/lib/api"
 import { accountsKey, listFetch } from "@/lib/live-resources"
-import { invalidate, primeCache } from "@/lib/store"
+import { invalidate, primeCache } from "@shared/web/store"
 import type { AccountFormValues } from "@/components/account-form-dialog"
 import type { LearningFormValues } from "@/components/learning-form-dialog"
 
