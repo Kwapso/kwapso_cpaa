@@ -26,12 +26,21 @@
 // It cannot prove a fence is CORRECT — that is what the burglar suite in
 // workers/tenancy/test/account-leak.test.ts is for. It proves no portal-reachable
 // read is built without one, which is the failure that actually happened twice.
+//
+// AND THE WRITES. The walk above began `if (!door.startsWith("GET ")) continue`,
+// and the closed-door suite next door only ever proves that an UNNAMED door is
+// refused. Between them, adding one line — `"POST /api/tenancy/accounts"` — to
+// the portal gateway's allow-list turned the whole build green, and a client
+// could edit the agency's books. The last describe in this file is that hole,
+// closed: every non-GET door a client can reach must be a declared, reasoned
+// line in PORTAL_VISIBLE_WRITES, and one that claims a fence must resolve it in
+// the handler before it changes anything.
 
 import { readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
-import { PORTAL_VISIBLE_READS } from "@shared/rules/registry"
+import { PORTAL_VISIBLE_READS, PORTAL_VISIBLE_WRITES } from "@shared/rules/registry"
 
 const ROOT = join(__dirname, "..", "..")
 const read = (p: string) => readFileSync(p, "utf8")
@@ -128,23 +137,35 @@ function handlerFor(worker: string, door: string): string | null {
   return m ? m[1] : null
 }
 
-/** The READ doors the portal gateway names, walked to their handler bodies. */
-function portalReadHandlers(): { door: string; worker: string; body: string }[] {
+/** The doors the portal gateway names, walked to their handler bodies. `want`
+ * picks which half of the surface to walk: the READS (fenced down in their SQL)
+ * or the WRITES (fenced in the handler, before anything changes). */
+function portalHandlers(
+  want: (door: string) => boolean
+): { door: string; worker: string; body: string }[] {
   const out: { door: string; worker: string; body: string }[] = []
   for (const door of Object.keys(PORTAL_DOORS)) {
-    if (!door.startsWith("GET ")) continue
-    const path = door.slice(4)
-    const worker = workerOf(path)
-    // The realtime handshake returns no rows, and auth returns only the caller's
-    // own identity — neither reads an account-owned table.
-    if (!worker || worker === "realtime" || worker === "auth") continue
-    const name = handlerFor(worker, door)
+    if (!want(door)) continue
+    const worker = workerOf(door.split(" ")[1])
+    expect(worker, `${door} sits under no known worker prefix`).toBeTruthy()
+    const name = handlerFor(worker as string, door)
     expect(name, `${door} is named by the portal door but has no handler in workers/${worker}`).toBeTruthy()
-    const body = indexFunctions(join(ROOT, "workers", worker, "src", "routes")).get(name as string)
+    const body = indexFunctions(join(ROOT, "workers", worker as string, "src", "routes")).get(
+      name as string
+    )
     expect(body, `handler ${name} for ${door} not found in workers/${worker}/src/routes`).toBeTruthy()
-    out.push({ door, worker, body: body as string })
+    out.push({ door, worker: worker as string, body: body as string })
   }
   return out
+}
+
+/** The READ doors. The realtime handshake returns no rows, and auth returns only
+ * the caller's own identity — neither reads an account-owned table. */
+function portalReadHandlers(): { door: string; worker: string; body: string }[] {
+  return portalHandlers(
+    (door) =>
+      door.startsWith("GET ") && !["realtime", "auth"].includes(workerOf(door.slice(4)) ?? "")
+  )
 }
 
 describe("portal fence — every read a client can reach carries the fence", () => {
@@ -203,6 +224,82 @@ describe("portal fence — every read a client can reach carries the fence", () 
   it("an exemption states its reason", () => {
     for (const [file, e] of Object.entries(PORTAL_VISIBLE_READS))
       if (e.fence === null) expect(e.why.length, `${file} needs a real reason`).toBeGreaterThan(20)
+  })
+})
+
+// THE OTHER HALF — a write a client can reach.
+//
+// The walk above stops at GET, and the closed-door suite only proves that an
+// UNNAMED door is refused. So NAMING a write door had no consequence anywhere:
+// one line in the gateway's allow-list and `POST /api/tenancy/accounts` was
+// open to clients, with a green build.
+//
+// A write is fenced in a different PLACE from a read, which is why this is its
+// own walk. A read carries the fence into the SQL; a write resolves the caller's
+// AccountScope in the HANDLER and refuses the record — 404, never 403 — before a
+// row is touched. So this reads the handler body, and it demands a declared line
+// per door either way: opening a write to clients has to be written down, and
+// somebody has to say why it is safe.
+describe("portal fence — every write a client can reach is declared and reasoned", () => {
+  /** Every non-GET door, straight off the gateway's table. Declaration is
+   * demanded of ALL of them, including auth's — "this one owns nothing yet" is
+   * a claim that deserves to be written down and read, not assumed. */
+  const writeDoors = Object.keys(PORTAL_DOORS).filter((d) => !d.startsWith("GET "))
+
+  /** The subset whose handler can be walked. The auth worker answers from a
+   * `switch`, not a declarative ROUTES table, and every one of its doors is a
+   * stated no-fence line anyway — there is no record for a fence to protect. */
+  const writes = portalHandlers(
+    (door) => !door.startsWith("GET ") && workerOf(door.split(" ")[1]) !== "auth"
+  )
+
+  it("derives real write doors from the portal gateway's own table", () => {
+    expect(writeDoors.length, "the write walk found nothing — it has gone blind").toBeGreaterThanOrEqual(5)
+    expect(writes.length, "no walkable write handler — the walk has gone blind").toBeGreaterThanOrEqual(3)
+    expect(writes.map((w) => w.door)).toContain("POST /api/content/help/reply")
+    expect(writes.map((w) => w.door)).toContain("POST /api/tenancy/portal/switch-account")
+  })
+
+  it("every non-GET door the portal opens is declared in PORTAL_VISIBLE_WRITES", () => {
+    const undeclared = writeDoors.filter((d) => !(d in PORTAL_VISIBLE_WRITES))
+    expect(
+      undeclared,
+      `these doors let a CLIENT change something and are not declared — name the fence the handler resolves, or write the reason it needs none: ${undeclared.join(", ")}`
+    ).toEqual([])
+  })
+
+  it("a declared fence is actually resolved in the handler", () => {
+    const naked: string[] = []
+    for (const { door, body } of writes) {
+      const declared = PORTAL_VISIBLE_WRITES[door]
+      if (!declared || declared.fence === null) continue
+      // Comments are not code: this repo's handlers DISCUSS their fences at
+      // length ("the fence decides WHOSE ticket this is"), and prose that names
+      // a fence must never stand in for calling one.
+      const code = body.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/gm, "$1")
+      if (!new RegExp(`(?<![\\w.])${declared.fence}\\s*\\(`).test(code)) naked.push(door)
+    }
+    expect(
+      naked,
+      `these writes claim a fence their handler never resolves: ${naked.join(", ")}`
+    ).toEqual([])
+  })
+
+  it("an unfenced write states why it needs no fence", () => {
+    for (const [door, e] of Object.entries(PORTAL_VISIBLE_WRITES))
+      if (e.fence === null)
+        expect(
+          e.why.length,
+          `${door} changes something with no account fence — that needs a real reason`
+        ).toBeGreaterThan(40)
+  })
+
+  it("every declared entry still names a door the portal actually opens (no rotting lines)", () => {
+    const open = new Set(Object.keys(PORTAL_DOORS))
+    for (const door of Object.keys(PORTAL_VISIBLE_WRITES))
+      expect(open.has(door), `PORTAL_VISIBLE_WRITES declares ${door}, which the portal no longer opens`).toBe(
+        true
+      )
   })
 })
 

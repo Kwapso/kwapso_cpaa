@@ -213,6 +213,63 @@ export const PORTAL_VISIBLE_READS: Record<string, { fence: string | null; why: s
   },
 }
 
+/** EVERY WRITE a CLIENT LOGIN can reach — door → the fence its HANDLER resolves
+ * before it changes anything, or a reasoned exemption.
+ *
+ * The reads above were guarded first, and thoroughly. The writes were not: the
+ * fence walk started `if (!door.startsWith("GET ")) continue`, and the closed-
+ * door suite only ever proves that an UNNAMED door is refused. Between them,
+ * adding `"POST /api/tenancy/accounts"` to the portal gateway's allow-list
+ * turned the build green — one line, and a client could edit the agency's books.
+ *
+ * A write is fenced in a different PLACE from a read, which is why this is its
+ * own table. A read carries the fence down into the SQL (`accountScopeClause`);
+ * a write resolves the caller's AccountScope in the handler and refuses the
+ * record — 404, never 403 — before a row is touched. So the check walks the
+ * handler body, not the lib functions.
+ *
+ * Every non-GET door in PORTAL_DOORS must appear here, with a fence or a stated
+ * reason. That is the point: opening a write to clients cannot be one line in a
+ * routing table any more. It is a line here too, and someone has to write down
+ * why it is safe.
+ *
+ * Enforced by web-portal/test/portal-fence.test.ts. */
+export const PORTAL_VISIBLE_WRITES: Record<string, { fence: string | null; why: string }> = {
+  // ── identity: nothing to fence, because nothing is owned yet ────────────────
+  "POST /api/auth/email/start": {
+    fence: null,
+    why: "asks for a code to be emailed. It touches no account-owned row, and it answers the same way whoever the address belongs to — an account fence here would be an account oracle.",
+  },
+  "POST /api/auth/email/verify": {
+    fence: null,
+    why: "proves WHO the caller is; the account set they may stand in is resolved afterwards, from the invite, never from this body. Signing in never creates access (SCOPE ch.06).",
+  },
+  "POST /api/auth/profile": {
+    fence: null,
+    why: "writes the caller's own name and photo on the GLOBAL user row — their own record, reached through no id but their session's.",
+  },
+  "POST /api/auth/logout": {
+    fence: null,
+    why: "ends the caller's own session; there is no record to be fenced from.",
+  },
+
+  // ── the client's own world ─────────────────────────────────────────────────
+  "POST /api/tenancy/portal/switch-account": {
+    fence: "accountScope",
+    why: "flips the caller's OWN current-account pointer. The set they may stand in comes from the guard corridor, so the only thing the body can do is name one of their own companies or be refused.",
+  },
+
+  // ── support ────────────────────────────────────────────────────────────────
+  "POST /api/content/help": {
+    fence: null,
+    why: "raises a NEW ticket, stamped with the caller as creator. There is no existing record to be fenced away from, and the fence that matters (who may read it back) is on the list door.",
+  },
+  "POST /api/content/help/reply": {
+    fence: "accountScope",
+    why: "appends to a ticket named by a caller-supplied id — so the fence decides whose ticket it is BEFORE a word is appended, and answers 404 rather than 403 so 'not yours' never confirms the ticket exists. A reply cannot be un-appended.",
+  },
+}
+
 /** R2 on the CLIENT surface — the reasoned exemption, not a quiet skip.
  *
  * Every record detail in the base exposes Overview + Activity (R2), because a

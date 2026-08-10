@@ -26,6 +26,12 @@
 // see what; it only decides which questions may be asked. Every answer comes
 // from a door that already resolves the caller's account set.
 
+// The two things BOTH front doors do identically — serve an uploaded file (with
+// its key validated at the boundary and its security headers) and record a
+// client crash. ONE implementation, deliberately: this door's media serving was
+// once written a second time from memory and shipped without the key check the
+// agency door had carried for weeks.
+import { recordClientError, serveMedia } from "../../../shared/workers/front-door"
 import { fail } from "../../../shared/workers/http"
 
 /** The workers a portal door may be forwarded to. */
@@ -92,20 +98,6 @@ export const PORTAL_DOORS: Record<string, Upstream> = {
   "GET /api/realtime": "REALTIME",
 }
 
-// Headers for an R2 media object served on the portal origin. Worker-built
-// responses, so web-portal/public/_headers does NOT apply to them — the security
-// headers must live here. Identical posture to the agency gateway: `sandbox` +
-// `default-src 'none'` neuters any script even if a script-capable file slipped
-// past the upload allow-list; nosniff stops MIME sniffing.
-function mediaHeaders(object: R2ObjectBody): HeadersInit {
-  return {
-    "Content-Type": object.httpMetadata?.contentType ?? "application/octet-stream",
-    "Content-Security-Policy": "default-src 'none'; sandbox",
-    "X-Content-Type-Options": "nosniff",
-    "Cache-Control": "public, max-age=31536000, immutable",
-  }
-}
-
 type Env = {
   ASSETS: Fetcher
   AUTH: Fetcher
@@ -122,42 +114,10 @@ export default {
     const { pathname } = new URL(request.url)
 
     // The client error beacon → console AND the central error_logs table, the
-    // same never-swallow seam the agency door uses (ERROR-HANDLING.md). Only
-    // forwarded once the session is VERIFIED: a Cookie header is attacker-
-    // controlled, so an unverified beacon would let anonymous traffic write rows
-    // into the GLOBAL core database. Recording is best-effort — a failed lookup
-    // drops the row and keeps the console line.
-    if (pathname === "/api/log/client" && request.method === "POST") {
-      const raw = await request.text().catch(() => "")
-      console.error("portal_client_error", raw.slice(0, 4000))
-      const cookie = request.headers.get("Cookie") ?? ""
-      const signedIn =
-        cookie.includes("kwapso_session=") &&
-        (await env.AUTH.fetch("https://internal/api/auth/me", { headers: { Cookie: cookie } })
-          .then((r) => r.ok)
-          .catch(() => false))
-      if (signedIn) {
-        let b: { where?: string; message?: string; stack?: string; url?: string } = {}
-        try {
-          b = JSON.parse(raw)
-        } catch {
-          /* an unparsable beacon stays console-only */
-        }
-        if (b.message)
-          await env.AUTH.fetch("https://internal/internal/log-error", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "x-internal-key": env.INTERNAL_KEY ?? "" },
-            body: JSON.stringify({
-              source: "portal",
-              place: b.where ?? "unknown",
-              message: b.message,
-              stack: b.stack,
-              url: b.url,
-            }),
-          }).catch(() => null) // recording must never break the beacon
-      }
-      return new Response(null, { status: 204 })
-    }
+    // same never-swallow seam the agency door uses (ERROR-HANDLING.md). The only
+    // thing that differs is the label on the row.
+    if (pathname === "/api/log/client" && request.method === "POST")
+      return recordClientError(request, env.AUTH, "portal", env.INTERNAL_KEY)
 
     if (pathname.startsWith("/api/") || pathname === "/mcp") {
       const upstream = PORTAL_DOORS[`${request.method} ${pathname}`]
@@ -169,13 +129,11 @@ export default {
     }
 
     // Uploaded files (a company's logo, a person's photo). URLs carry ?v= for
-    // cache busting, so the file itself can be cached hard.
-    if (pathname.startsWith("/media/") && request.method === "GET") {
-      const key = decodeURIComponent(pathname.slice("/media/".length))
-      const object = await env.MEDIA.get(key)
-      if (!object) return new Response("Not found", { status: 404 })
-      return new Response(object.body, { headers: mediaHeaders(object) })
-    }
+    // cache busting, so the file itself can be cached hard. Same capability-URL
+    // decision, same boundary validation, same headers as the agency door — one
+    // function, so it cannot be otherwise.
+    if (pathname.startsWith("/media/") && request.method === "GET")
+      return serveMedia(env.MEDIA, pathname, "/media/")
 
     // The support tree: /support/<ticketId> is ONE client-resolved screen. The
     // static export emits a single shell, so serve it for any /support/* depth

@@ -3,22 +3,12 @@
 // worker behind it. Same address for screens and brains = login cookies just
 // work everywhere. This is also where the MCP front desk will live.
 
+// The two things BOTH front doors do identically — serve an uploaded file (with
+// its key validated at the boundary and its security headers) and record a
+// client crash. One implementation, so a hardening change cannot reach one door
+// and miss the other.
+import { recordClientError, serveMedia } from "../../../shared/workers/front-door"
 import { fail } from "../../../shared/workers/http"
-import { safeMediaKey } from "../../../shared/workers/image"
-
-// Headers for an R2 media object served on the app origin. These responses are
-// worker-built, so web/public/_headers does NOT apply to them — the security
-// headers must live here. `sandbox` + `default-src 'none'` neuters any script even
-// if a script-capable file slipped past the upload allowlist (defense-in-depth
-// behind parseUploadDataUrl's INLINE_SAFE_UPLOAD check); nosniff stops MIME sniffing.
-function mediaHeaders(object: R2ObjectBody): HeadersInit {
-  return {
-    "Content-Type": object.httpMetadata?.contentType ?? "application/octet-stream",
-    "Content-Security-Policy": "default-src 'none'; sandbox",
-    "X-Content-Type-Options": "nosniff",
-    "Cache-Control": "public, max-age=31536000, immutable",
-  }
-}
 
 type Env = {
   ASSETS: Fetcher
@@ -50,91 +40,30 @@ export default {
     // Live channels (WebSocket upgrade + health) → the realtime switchboard.
     if (pathname.startsWith("/api/realtime")) return env.REALTIME.fetch(request)
 
-    // Client error beacon → console (Cloudflare observability, live tails) AND
-    // the central error_logs table via auth's internal door, so a crash on a
-    // user's phone is queryable + resolvable later, not just visible for a week.
-    // Only forwarded once the session is VERIFIED with auth — a cookie header is
-    // attacker-controlled, so `Cookie: session=x` used to be enough to write a
-    // row into the GLOBAL core database from an anonymous request. Recording is
-    // best-effort, so a failed lookup simply drops it (the console line stays).
-    // The swappable client seam is web/lib/log.ts; the ruleset is ERROR-HANDLING.md.
-    if (pathname === "/api/log/client" && request.method === "POST") {
-      const raw = await request.text().catch(() => "")
-      console.error("client_error", raw.slice(0, 4000))
-      const cookie = request.headers.get("Cookie") ?? ""
-      const signedIn =
-        cookie.includes("kwapso_session=") &&
-        (await env.AUTH.fetch("https://internal/api/auth/me", { headers: { Cookie: cookie } })
-          .then((r) => r.ok)
-          .catch(() => false))
-      if (signedIn) {
-        let b: { where?: string; message?: string; stack?: string; url?: string } = {}
-        try {
-          b = JSON.parse(raw)
-        } catch {
-          /* an unparsable beacon stays console-only */
-        }
-        if (b.message)
-          await env.AUTH.fetch("https://internal/internal/log-error", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-internal-key": env.INTERNAL_KEY ?? "",
-            },
-            body: JSON.stringify({
-              source: "web",
-              place: b.where ?? "unknown",
-              message: b.message,
-              stack: b.stack,
-              url: b.url,
-            }),
-          }).catch(() => null) // recording must never break the beacon
-      }
-      return new Response(null, { status: 204 })
-    }
+    // Client error beacon → console + the central error_logs table (the shared
+    // seam does the session verification; see shared/workers/front-door.ts).
+    if (pathname === "/api/log/client" && request.method === "POST")
+      return recordClientError(request, env.AUTH, "web", env.INTERNAL_KEY)
 
     if (pathname.startsWith("/api/")) {
       return fail(404, "not_found", "No such API.")
     }
 
     // ── Uploaded media: a CAPABILITY URL, on purpose ───────────────────────
-    // These two doors serve any object whose key you know, with NO session and
-    // NO membership check. That is a recorded, deliberate decision (SCOPE ch.06
-    // "Files": uploaded media stays on unguessable no-login links, with the
-    // exposure accepted in writing — anyone holding a link can open that file,
-    // for as long as the object exists). It is re-stated as a fork decision in
-    // BASE-MANUAL §5 ("Two REASONED exceptions"): a product that stores
-    // invoices, contracts, ID documents or anything a regulator calls personal
-    // data must replace this with a session + membership check or short-lived
-    // signed URLs BEFORE launch. Nothing here is an accident to be tidied away.
-    //
-    // What the decision RESTS on is that the key is unguessable — so that is the
-    // part this code has to keep true, and it is enforced upstream by mediaKey()
-    // (shared/workers/image.ts): every object is written under a random ULID
-    // segment. Photos and logos used to be `users/<userId>` / `teams/<teamId>`,
-    // derivable from an id anyone had already seen; they aren't any more.
-    //
-    // The key still arrives from the URL, so it is validated at the boundary
-    // like any other request value, and a probe gets the same 404 as a miss.
+    // No session, no membership check — a recorded, deliberate decision whose
+    // reasoning (and the fork warning that goes with it) lives on serveMedia in
+    // shared/workers/front-door.ts, which also validates the key at the boundary.
 
     // Learning attachments (images + short clips uploaded to a how-to article)
     // live in their own per-team bucket. Same serving shape as /media/* below;
     // just a different bucket, matched first since it's a more specific prefix.
-    if (pathname.startsWith("/media/learning/") && request.method === "GET") {
-      const key = safeMediaKey(pathname.slice("/media/learning/".length))
-      const object = key && (await env.LEARNING_MEDIA.get(key))
-      if (!object) return new Response("Not found", { status: 404 })
-      return new Response(object.body, { headers: mediaHeaders(object) })
-    }
+    if (pathname.startsWith("/media/learning/") && request.method === "GET")
+      return serveMedia(env.LEARNING_MEDIA, pathname, "/media/learning/")
 
     // Uploaded files (profile photos, team logos). URLs carry ?v= for cache
     // busting, so the file itself can be cached hard.
-    if (pathname.startsWith("/media/") && request.method === "GET") {
-      const key = safeMediaKey(pathname.slice("/media/".length))
-      const object = key && (await env.MEDIA.get(key))
-      if (!object) return new Response("Not found", { status: 404 })
-      return new Response(object.body, { headers: mediaHeaders(object) })
-    }
+    if (pathname.startsWith("/media/") && request.method === "GET")
+      return serveMedia(env.MEDIA, pathname, "/media/")
 
     // Deep-link tree: /t/<teamId>/<module>/<id>/… is ONE client-resolved screen.
     // Static export emits a single shell (t.html), so serve it for ANY /t/* depth
