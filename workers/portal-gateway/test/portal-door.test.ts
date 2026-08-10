@@ -58,6 +58,27 @@ describe("portal gateway — the named doors open", () => {
       expect(log).toEqual([`${upstream} ${path}`])
     })
   }
+
+  // The loop above proves the DISPATCHER honours the table. It cannot prove the
+  // TABLE is right — it derives both the expectation and the behaviour from the
+  // same line, so a door pointed at the wrong worker would pass it happily. This
+  // is the independent statement of what each path means: the prefix decides the
+  // worker, so a mistyped upstream is a red build rather than a request quietly
+  // answered by a worker that never owned that route.
+  it("every door goes to the worker its own path names", () => {
+    const byPrefix: [string, string][] = [
+      ["/api/auth/", "AUTH"],
+      ["/api/tenancy/", "TENANCY"],
+      ["/api/content/", "CONTENT"],
+      ["/api/realtime", "REALTIME"],
+    ]
+    for (const [door, upstream] of Object.entries(PORTAL_DOORS)) {
+      const path = door.split(" ")[1]
+      const match = byPrefix.find(([p]) => path.startsWith(p))
+      expect(match, `${door} sits under no known /api prefix`).toBeTruthy()
+      expect(upstream, `${door} must be forwarded to ${match?.[1]}`).toBe(match?.[1])
+    }
+  })
 })
 
 describe("portal gateway — everything else is closed", () => {

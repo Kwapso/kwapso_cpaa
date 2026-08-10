@@ -53,7 +53,7 @@ describe("portal UI laws", () => {
   it("forms-use-formshell: every portal form uses the ONE FormShell", () => {
     for (const c of FORM_COMPONENTS) {
       const src = read(join(PORTAL, "components", `${c}.tsx`))
-      expect(src, `${c} must render through FormShell`).toContain("FormShell")
+      expect(src, `${c} must RENDER a FormShell, not merely import one`).toContain("<FormShell")
       expect(src, `${c} must import the SHARED FormShell, not a portal copy`).toContain(
         "@web/components/form-shell"
       )
@@ -68,7 +68,9 @@ describe("portal UI laws", () => {
   it("forms-persist-drafts: every portal form persists its draft", () => {
     for (const c of FORM_COMPONENTS) {
       const src = read(join(PORTAL, "components", `${c}.tsx`))
-      expect(src, `${c} must persist its draft (useFormDraft)`).toContain("useFormDraft")
+      expect(src, `${c} must CALL useFormDraft — an unused import is not a draft`).toMatch(
+        /useFormDraft\(/
+      )
     }
   })
 
@@ -105,7 +107,9 @@ describe("portal UI laws", () => {
     expect(tickets, "the ticket list must page by the opaque cursor").toContain("nextCursor")
     expect(tickets, "…and expose a way to load the next page").toContain("loadMore")
     const support = read(join(PORTAL, "components", "support-screen.tsx"))
-    expect(support, "the support screen must actually offer page two").toContain("loadMore")
+    expect(support, "the support screen must CALL loadMore, not merely import it").toMatch(
+      /loadMore\(\)/
+    )
   })
 
   // R15 — the portal publishes nothing, so the "no deaf publishers" half is free.
@@ -113,9 +117,9 @@ describe("portal UI laws", () => {
   // sits unseen until the client reloads.
   it("live-collections: the shell consumes the live channel", () => {
     const shell = read(join(PORTAL, "components", "portal-shell.tsx"))
-    expect(shell, "the shell must open the team channel").toContain("useRealtime")
-    expect(shell, "…fan every ping into the portal's listeners").toContain("applyLivePing")
-    expect(shell, "…and replay what it missed after a drop").toContain("replayAfterReconnect")
+    expect(shell, "the shell must open the team channel").toMatch(/useRealtime\(/)
+    expect(shell, "…fan every ping into the portal's listeners").toMatch(/applyLivePing\(/)
+    expect(shell, "…and replay what it missed after a drop").toMatch(/replayAfterReconnect\(/)
   })
 })
 
