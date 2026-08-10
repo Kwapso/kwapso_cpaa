@@ -65,3 +65,19 @@ export const SENDS_EVERYWHERE_BEFORE_RATIONING = 300
  * The control for a genuinely distributed flood is at the edge (a WAF rule, a
  * challenge on the send door) — not a self-inflicted lockout in here. */
 export const MAX_SENDS_PER_IP_WHEN_RATIONED = 5
+
+/** The bucket the NON-PRODUCTION test-login door charges its sends to.
+ *
+ * It is a bucket of its own, and that is the point. Every budget in this file
+ * exists to bound OUTBOUND MAIL from an anonymous caller. The test door is
+ * neither: it proves itself with its own secret, it is refused outright in
+ * production, and it sends no email at all — it hands the code straight back to
+ * the holder. Charging it to the caller's address meant a machine running the
+ * smoke suite spent the same thirty codes an office signs in on, so running the
+ * verification twice in an hour locked the verification out. A budget that stops
+ * us checking whether the door works is not protecting the door. */
+export const TEST_LOGIN_BUCKET = "test-login"
+
+/** …and its own ceiling, so the door is still bounded rather than free. Sized for
+ * a day of automated runs, not for a person. */
+export const MAX_TEST_LOGIN_SENDS_PER_HOUR = 400

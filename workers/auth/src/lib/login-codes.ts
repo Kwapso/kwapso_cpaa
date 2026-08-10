@@ -16,6 +16,8 @@ import {
   MAX_CODES_PER_HOUR,
   MAX_SENDS_PER_IP_PER_HOUR,
   MAX_SENDS_PER_IP_WHEN_RATIONED,
+  MAX_TEST_LOGIN_SENDS_PER_HOUR,
+  TEST_LOGIN_BUCKET,
   RESEND_COOLDOWN_SECONDS,
   SENDS_EVERYWHERE_BEFORE_RATIONING,
 } from "./constants"
@@ -67,10 +69,20 @@ const WITHIN_SEND_BUDGET = `${SENDS_FROM_IP} < ?
 
 /** The eight values WITHIN_SEND_BUDGET reads, in its order. */
 const sendBudgetArgs = (sentIp: string, hourAgo: string) => [
-  sentIp, hourAgo, MAX_SENDS_PER_IP_PER_HOUR,
+  sentIp, hourAgo, ceilingFor(sentIp),
   hourAgo, SENDS_EVERYWHERE_BEFORE_RATIONING,
-  sentIp, hourAgo, MAX_SENDS_PER_IP_WHEN_RATIONED,
+  sentIp, hourAgo, rationedCeilingFor(sentIp),
 ]
+
+/** The test door carries its own ceiling because it is not the thing these
+ * budgets guard against — see TEST_LOGIN_BUCKET. Everyone else is a caller. */
+const ceilingFor = (sentIp: string) =>
+  sentIp === TEST_LOGIN_BUCKET ? MAX_TEST_LOGIN_SENDS_PER_HOUR : MAX_SENDS_PER_IP_PER_HOUR
+
+/** …and it is not rationed when the environment is busy, for the same reason: it
+ * sends no mail, so it is not what a busy hour is measuring. */
+const rationedCeilingFor = (sentIp: string) =>
+  sentIp === TEST_LOGIN_BUCKET ? MAX_TEST_LOGIN_SENDS_PER_HOUR : MAX_SENDS_PER_IP_WHEN_RATIONED
 
 /** Create + store a login code for `email` (hashed at rest, TTL'd, throttled).
  * Returns the PLAIN code exactly once — the caller decides where it goes: the

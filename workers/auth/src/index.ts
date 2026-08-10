@@ -16,6 +16,7 @@ import type { Env } from "./env"
 import { sha256Hex } from "./lib/crypto"
 import { isValidEmail, normalizeEmail, sendEmail, sendLoginCode } from "./lib/email"
 import { clientIp, mintLoginCode, verifyLoginCode } from "./lib/login-codes"
+import { TEST_LOGIN_BUCKET } from "./lib/constants"
 import { startEmailChange, verifyEmailChange } from "./lib/email-change"
 import { createPinnedSession,
   createSession,
@@ -207,7 +208,11 @@ async function adminTestLogin(request: Request, env: Env): Promise<Response> {
   const email = normalizeEmail(body.email ?? "")
   if (!isValidEmail(email))
     return fail(400, "invalid_email", "Enter a valid email address.")
-  const minted = await mintLoginCode(env, email, clientIp(request))
+  // Charged to the test door's OWN bucket, not to the machine's address. This
+  // door sends no mail, so it is not what the caller budgets are guarding — and
+  // sharing them meant running the smoke suite twice in an hour locked the smoke
+  // suite out of the product it was checking.
+  const minted = await mintLoginCode(env, email, TEST_LOGIN_BUCKET)
   if ("error" in minted) return fail(minted.status, minted.error, minted.message)
   // Returned exactly once, to the TEST_LOGIN_KEY holder; the normal verify door
   // consumes it like any other code (attempt cap + TTL apply unchanged).

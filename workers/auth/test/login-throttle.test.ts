@@ -46,6 +46,8 @@ import {
   MAX_SENDS_PER_IP_PER_HOUR,
   MAX_SENDS_PER_IP_WHEN_RATIONED,
   SENDS_EVERYWHERE_BEFORE_RATIONING,
+  MAX_TEST_LOGIN_SENDS_PER_HOUR,
+  TEST_LOGIN_BUCKET,
 } from "../src/lib/constants"
 import { clientIp, mintLoginCode, verifyLoginCode } from "../src/lib/login-codes"
 
@@ -464,5 +466,44 @@ describe("the caller's identity fails toward refusing", () => {
     expect(bucket.length).toBeLessThanOrEqual(45)
     const t = fresh()
     expect(await t.ask(EMAIL, bucket), "a strange header must not break sign-in").toHaveProperty("code")
+  })
+})
+
+// THE VERIFICATION MUST NOT BE ABLE TO LOCK ITSELF OUT.
+//
+// The non-production test-login door mints a code and hands it back to the
+// TEST_LOGIN_KEY holder. It sends no email. But it used to charge the send to
+// the calling machine's address, so it shared the thirty-an-hour budget meant to
+// bound anonymous mail — and running the smoke suite twice in an hour refused
+// the smoke suite. A budget that stops us checking whether the door works is not
+// protecting the door.
+//
+// Found by running the real smoke against staging and being refused.
+describe("the test door has a budget of its own", () => {
+  it("mints far past the hourly ceiling a person would hit", async () => {
+    const { ask } = fresh()
+    // Comfortably past MAX_SENDS_PER_IP_PER_HOUR (30): a person is capped here,
+    // the automation must not be.
+    for (let i = 0; i < 60; i++) {
+      const out = await ask(`run${i}@example.com`, TEST_LOGIN_BUCKET)
+      expect(out, `mint ${i + 1} must succeed`).not.toHaveProperty("error")
+    }
+  })
+
+  it("does not spend the budget an ordinary caller needs", async () => {
+    const { ask } = fresh()
+    for (let i = 0; i < 60; i++) await ask(`run${i}@example.com`, TEST_LOGIN_BUCKET)
+    // A real person, on a real address, arriving after all that: still served.
+    expect(await ask("someone@example.com", "203.0.113.9")).not.toHaveProperty("error")
+  })
+
+  it("is still bounded — it is a bigger budget, not an absent one", async () => {
+    const { ask } = fresh()
+    let refused = false
+    for (let i = 0; i < MAX_TEST_LOGIN_SENDS_PER_HOUR + 5; i++) {
+      const out = await ask(`bulk${i}@example.com`, TEST_LOGIN_BUCKET)
+      if ("error" in out) { refused = true; break }
+    }
+    expect(refused, "the test door must have a ceiling of its own").toBe(true)
   })
 })
