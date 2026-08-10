@@ -8,26 +8,31 @@ import { renderHook, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { formatCount } from "@/lib/format-count"
+import { cursorKey, loadMore } from "@/lib/live-resources"
 import { invalidate, readCache } from "@/lib/store"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
 
 const recordActivity = vi.fn()
 vi.mock("@/lib/api", () => ({
-  tenancy: { recordActivity: (table: string, id: string) => recordActivity(table, id) },
+  tenancy: {
+    recordActivity: (table: string, id: string, cursor?: string | null) =>
+      recordActivity(table, id, cursor),
+  },
 }))
 
-/** One page of a much longer history — 2 rows on the wire, 143 in the table. */
-const page = (rows: number, total: number) => ({
+/** One page of a much longer history — 2 rows on the wire, 143 in the table.
+ * `nextCursor` null is the last page (which is how <LoadMore> stops offering). */
+const page = (rows: number, total: number, nextCursor: string | null = "opaque", from = 0) => ({
   activity: Array.from({ length: rows }, (_, i) => ({
-    id: `a${i}`,
+    id: `a${from + i}`,
     type: "edited",
     description: "changed the title",
     actorName: "Sam",
     createdAt: "2026-08-09T10:00:00Z",
   })),
   total,
-  hasMore: true,
-  nextCursor: "opaque",
+  hasMore: nextCursor !== null,
+  nextCursor,
 })
 
 // The cache is a module singleton — a fresh record id per test so nothing bleeds.
@@ -50,7 +55,30 @@ describe("useRecordActivity", () => {
     await waitFor(() => expect(result.current.total).toBe(143))
     expect(result.current.rows).toHaveLength(2) // the page…
     expect(formatCount(result.current.total)).toBe("143") // …the badge counts them all
-    expect(recordActivity).toHaveBeenCalledWith("learning", id)
+    expect(recordActivity).toHaveBeenCalledWith("learning", id, undefined) // page one asks for no cursor
+  })
+
+  // R14 — the other half of that same truth: a badge counting 143 over a feed
+  // frozen at its newest 50 is an exact count of rows the screen refuses to show.
+  it("parks the next cursor and appends page two — the badge stays the SERVER total", async () => {
+    const id = freshId()
+    recordActivity.mockResolvedValue(page(2, 143, "cursor-1"))
+    const { result } = renderHook(() => useRecordActivity("help", id))
+    await waitFor(() => expect(result.current.total).toBe(143))
+    // The cursor sidecar <LoadMore> reads, keyed off the feed's own cache key.
+    expect(readCache(cursorKey(recordActivityKey("help", id)))).toBe("cursor-1")
+
+    // <LoadMore> hands the opaque cursor straight back and APPENDS what returns.
+    recordActivity.mockResolvedValue(page(2, 143, null, 2))
+    await loadMore(result.current.listKey, result.current.fetchPage)
+
+    expect(recordActivity).toHaveBeenLastCalledWith("help", id, "cursor-1")
+    await waitFor(() => expect(result.current.rows).toHaveLength(4)) // page one + page two
+    expect(result.current.rows.map((r) => r.id)).toEqual(["a0", "a1", "a2", "a3"])
+    // R16: loading more must NOT move the count — it was never the loaded length.
+    expect(result.current.total).toBe(143)
+    // Last page: the sidecar empties, so the button takes itself away.
+    expect(readCache(cursorKey(recordActivityKey("help", id)))).toBeNull()
   })
 
   it("badges nothing until the first page lands (never a '0' that reads as empty)", () => {

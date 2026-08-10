@@ -45,6 +45,7 @@ import { invalidate, primeCache, useCached, useCachedValue } from "@/lib/store"
 import { formatCount } from "@/lib/format-count"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
 import { HelpFormDialog } from "@/components/help-form-dialog"
+import { LoadMore } from "@/components/load-more"
 import { HelpStakeholders } from "@/components/help-stakeholders"
 import { HelpStatusStepper, type HelpStatusValue } from "@/components/help-status-stepper"
 
@@ -280,13 +281,22 @@ export function HelpDetailScreen({
             )
           if (t.value === "activity")
             return (
-              <ActivityFeed
-                config={{
-                  ...defaultActivityFeedConfig,
-                  emptyText: "No activity yet.",
-                }}
-                items={activityItems}
-              />
+              // R14: the badge above counts the WHOLE history, so the feed under
+              // it must be able to reach all of it — page one, then Load more.
+              <div className="flex flex-col gap-4">
+                <ActivityFeed
+                  config={{
+                    ...defaultActivityFeedConfig,
+                    emptyText: "No activity yet.",
+                  }}
+                  items={activityItems}
+                />
+                <LoadMore
+                  listKey={activity.listKey}
+                  fetchPage={activity.fetchPage}
+                  label="Load more activity"
+                />
+              </div>
             )
           if (t.value === "stakeholders")
             return (

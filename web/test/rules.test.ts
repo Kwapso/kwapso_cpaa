@@ -86,6 +86,13 @@ describe("RULES — the laws of the base", () => {
       const src = read(join(WEB, "components", `${c}.tsx`))
       expect(src, `${c} must use library TabsView`).toContain("TabsView")
       expect(src, `${c} must render an ActivityFeed (the Activity tab)`).toContain("ActivityFeed")
+      // R2 meets R14: that feed is a PAGE of a growing collection under a badge
+      // counting ALL of it. The generic check below proves SOMETHING in web can
+      // reach page two; this proves THIS detail can — the gap that let a record
+      // with 143 events truthfully badge 143 over its newest 50, forever.
+      expect(src, `${c}'s Activity feed must carry a <LoadMore> — its badge counts rows it can't reach (R14)`).toContain(
+        "<LoadMore"
+      )
     }
   })
 

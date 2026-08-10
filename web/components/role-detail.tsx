@@ -45,6 +45,7 @@ import {
 import { Lock, Pencil, Power } from "lucide-react"
 
 import type { PermissionValue, RolePermissions, TeamRole } from "@shared/types"
+import { LoadMore } from "@/components/load-more"
 import { RoleFormDialog } from "@/components/role-form-dialog"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
@@ -244,10 +245,19 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
             )
           if (t.value === "activity")
             return (
-              <ActivityFeed
-                config={{ ...defaultActivityFeedConfig, emptyText: "No activity yet." }}
-                items={activityItems}
-              />
+              // R14: the badge above counts the WHOLE history, so the feed under
+              // it must be able to reach all of it — page one, then Load more.
+              <div className="flex flex-col gap-4">
+                <ActivityFeed
+                  config={{ ...defaultActivityFeedConfig, emptyText: "No activity yet." }}
+                  items={activityItems}
+                />
+                <LoadMore
+                  listKey={activity.listKey}
+                  fetchPage={activity.fetchPage}
+                  label="Load more activity"
+                />
+              </div>
             )
           // Permissions — the main tab.
           return !role.active ? (

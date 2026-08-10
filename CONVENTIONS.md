@@ -734,7 +734,9 @@ These three are machine-checked; write them the house way so the build stays gre
   But a cap is an honest *refusal* to answer, so a collection that GROWS with
   ordinary use must **page** instead. Growing collections are DATA
   (`GROWING_COLLECTIONS` in `shared/rules/registry.ts`); today: support tickets
-  and the team activity feed. Page by KEY, never by offset — `LIMIT ? OFFSET ?`
+  and the activity feed — both the team-wide one and one record's slice of it,
+  registered separately because "the server pages" and "the client can reach page
+  two" are different facts. Page by KEY, never by offset — `LIMIT ? OFFSET ?`
   re-scans everything it skips and duplicates or drops rows when someone writes
   mid-scroll:
 

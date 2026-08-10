@@ -449,7 +449,8 @@ export function DeepLinkScreen() {
           {renderModuleContent({
             noAccess, enabled, perms, can, module, recordId, teamId, canImport, go,
             overridesQ, metaQ, membersQ, rolesQ, roles, invitesQ, learningQ, helpQ, totals,
-            activityQ, activityTotal, inviteAuditQ, teamName, active, rights, onAction, onIntent,
+            activityQ, activityTotal, activityKey, activityScope, inviteAuditQ, teamName, active,
+            rights, onAction, onIntent,
             sectionPath, helpScope, setHelpScope, myUserId, query, helpMineQ,
           })}
         </CountedTabs>
