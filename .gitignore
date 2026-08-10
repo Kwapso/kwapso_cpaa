@@ -21,3 +21,7 @@ out/
 # Per-workstream working notes — local to whoever is building, never forked
 # into a new app (the new-app skill clones this repo).
 .session-notes/
+
+# The pulled Glide rows are real customer data — the catalogue is tracked, the
+# data never is. Re-pull with `node scripts/glide-pull.mjs`.
+glide/data/
