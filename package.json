@@ -2,7 +2,7 @@
   "name": "kwapso",
   "version": "0.1.0",
   "private": true,
-  "description": "kwapso — the agency app + the client portal by Swift Struck. web/ = the agency screens, web-portal/ = the client screens, workers/ = the brains (two gateways over one shared set), shared/ = types all sides agree on.",
+  "description": "kwapso \u2014 the agency app + the client portal by Swift Struck. web/ = the agency screens, web-portal/ = the client screens, workers/ = the brains (two gateways over one shared set), shared/ = types all sides agree on.",
   "workspaces": [
     "web",
     "web-portal",
@@ -22,6 +22,7 @@
     "smoke:mcp": "node scripts/smoke-mcp.mjs"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260101.0",
     "wrangler": "^4.0.0"
   },
   "dependencies": {
