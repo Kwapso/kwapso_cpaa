@@ -102,9 +102,12 @@ repo today — sweep them all, then verify:
   check, the `kwapso_mcp_` token-prefix check, the `kwapso-mcp` server-name check).
 - **Source constants:** `workers/auth/src/lib/sessions.ts` (`SESSION_COOKIE`),
   `workers/mcp/src/lib/tokens.ts` (the token prefix), `workers/mcp/src/index.ts`
-  (the MCP `serverInfo.name`). Optional/cosmetic: the `kwapso:` localStorage
-  prefixes in `web/lib/use-form-draft.ts`, `web/lib/agent-trace.ts`,
-  `web/lib/use-agent-chat.tsx`.
+  (the MCP `serverInfo.name`). Optional/cosmetic: the `kwapso:` browser-storage
+  and custom-event prefixes in `shared/web/use-form-draft.ts`,
+  `web/lib/use-agent-chat.tsx`, `web/lib/agent-open.ts` and
+  `web/lib/screen-trace.tsx`. Don't hand-list them — `grep -rn "kwapso:" web shared
+  web-portal --include="*.ts" --include="*.tsx"` finds every one, test files
+  included (some are template literals, so don't anchor the grep on a quote).
 - **`OPERATIONS.md`:** rewrite the staging/production URLs, the worker-names table,
   the reset database names, and the `github_remote` — the ship and reset skills read
   this file.

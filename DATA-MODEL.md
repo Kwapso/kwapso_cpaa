@@ -462,8 +462,10 @@ owner-maintained catalog).
   that would drop a team below one active Admin, and no one can remove or demote
   themselves, so a SOLE admin can't currently leave or be offboarded until they
   promote another member to Admin first. An explicit transfer-ownership /
-  leave-team flow (and what becomes of a fully-empty team) is future work
-  (ROADMAP) — until then the team simply never reaches zero admins. Role changes are direct, instant server
+  leave-team flow (and what becomes of a fully-empty team) is future work — not
+  designed, not scheduled, and deliberately not written down as a plan anywhere
+  else (this paragraph is the record of it; ROADMAP.md is a closed build history
+  and never covered it). Until then the team simply never reaches zero admins. Role changes are direct, instant server
   actions — Glide's async "updated role id + webhook complete" two-step is
   dropped (it was a Glide limitation we don't have).
 

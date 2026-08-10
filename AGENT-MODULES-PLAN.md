@@ -115,8 +115,17 @@ Gate: green + tests (token gating, confirm rule, fence, quota, tool catalog).
 - **R2 buckets**: `kwapso-help-media`, `kwapso-learning-media` (+ `-staging`), per-team
   key prefixes, bound to the content worker. (No `kwapso-import-media` — CSV text is
   uploaded into the import session, not R2.)
-- **Workers**: `content` + `data-ops` BUILT ; `mcp` **BUILT 2026-07-07** (gateway stays the
-  single public door; it routes the in-app agent +, later, the external MCP surface).
+- **Workers**: `content` + `data-ops` BUILT ; `mcp` **BUILT 2026-07-07** — it routes the
+  in-app agent and the external MCP surface, and it is not public: it is reached only
+  through the agency gateway.
+  **CORRECTED 2026-08-10:** this line used to call the gateway "the single public
+  door". That stopped being true when the client portal shipped: there are two
+  public doors now — the agency `gateway` and `portal-gateway` — and no more. It
+  survived a month under the check written to catch exactly this sentence, because
+  a line break landed in the middle of it (`web/test/doc-claims.test.ts` now
+  collapses whitespace first). See OPERATIONS.md for the rule and BASE-MANUAL.md
+  for why the portal's door is deliberately a different shape.
 - Deploy order extends the realtime-first rule: realtime → auth → tenancy → content →
-  data-ops → gateway (anything a binder needs must exist first; data-ops binds
-  content + tenancy). The `mcp` worker slots in before the gateway when it lands.
+  data-ops → mcp → gateway → portal-gateway (anything a binder needs must exist first;
+  data-ops binds content + tenancy, and both gateways bind the workers they forward
+  to, so they go last). OPERATIONS.md is the live version of this order.

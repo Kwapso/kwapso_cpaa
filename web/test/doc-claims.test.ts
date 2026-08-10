@@ -75,6 +75,13 @@ const toNumber = (s: string) => WORDS[s.toLowerCase()] ?? Number(s)
 /** What counts as a CLAIM. Stripped before matching, in this order:
  *  - fenced code blocks — a shell transcript printing "12 workers" is output, not a
  *    claim about the roster;
+ *  - WHITESPACE, collapsed to single spaces. A markdown paragraph wraps wherever it
+ *    hits the margin, and the reader hears one sentence either way — so the check has
+ *    to read it that way too. Without this, "gateway stays the\n  single public door"
+ *    was invisible to every pattern below: the one stale security claim in the repo
+ *    sat in AGENT-MODULES-PLAN.md for a month, under the very check written to catch
+ *    it, because a line break landed in the middle of it. Collapsing here (before the
+ *    quote strips, not after) also means a QUOTE that wraps is still read as a quote;
  *  - short QUOTED phrases, `like this` or "like this" — the same reason the source
  *    scans strip comments before matching (CONVENTIONS.md, "writing a check that can
  *    fail"): the docs that explain this very check have to be able to quote the stale
@@ -84,6 +91,7 @@ const toNumber = (s: string) => WORDS[s.toLowerCase()] ?? Number(s)
 const prose = (src: string) =>
   src
     .replace(/```[\s\S]*?```/g, "")
+    .replace(/\s+/g, " ")
     .replace(/`[^`\n]{1,60}`/g, " ")
     .replace(/"[^"\n]{1,60}"/g, " ")
     .replace(/\*\*?/g, "")

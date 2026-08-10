@@ -23,7 +23,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     // Report with the component stack so a render crash is diagnosable from the
-    // logs (the swappable seam — web/lib/log.ts → Cloudflare observability now).
+    // logs (the swappable seam — shared/web/log.ts → Cloudflare observability now).
     reportError(`ErrorBoundary${this.props.label ? `:${this.props.label}` : ""}`, error, {
       componentStack: info.componentStack,
     })

@@ -440,7 +440,7 @@ export function shapeNotesList(items: Note[]): ScreenData {
 **cache-first read**, then a list branch and a detail branch, mirroring Learning
 (deep-link-screen.tsx, :606, :739).
 
-- **Cache-first read** with `useCached(key, fetcher)` (`web/lib/store.ts`): it
+- **Cache-first read** with `useCached(key, fetcher)` (`shared/web/store.ts`): it
   returns cached data instantly and revalidates in the background, and a live ping
   patches the one row in place. Key by team so a team switch re-fetches:
 
