@@ -3,6 +3,7 @@
 // (read to view, create/edit/delete to manage). Each mutation broadcasts a live
 // change ping (the publish-seam test enforces this).
 
+import { refusePortalCaller } from "../../../../shared/workers/account-scope"
 import { fail, json } from "../../../../shared/workers/http"
 import { csvResponse, toCsv } from "../../../../shared/workers/csv"
 import { queryText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
@@ -20,6 +21,7 @@ import type { Env } from "../env"
 
 export async function getSelectable(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "selectable_data", "read")
+  await refusePortalCaller(cfg, guard)
   const values = await listSelectable(cfg, guard)
   const id = queryText(new URL(request.url).searchParams.get("id"), "Id") // ?id= → one value (row-level live re-pull)
   return json({ values: id ? values.filter((v) => v.id === id) : values, total: await countSelectable(cfg, guard) })
@@ -30,6 +32,7 @@ export async function getSelectable(request: Request, env: Env): Promise<Respons
  * (type, value) so the file round-trips through the CSV importer. */
 export async function getSelectableExport(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "selectable_data", "read")
+  await refusePortalCaller(cfg, guard)
   const rows = await listSelectableForExport(cfg, guard)
   const csv = toCsv(
     ["type", "value", "active", "created_at", "created_by"],

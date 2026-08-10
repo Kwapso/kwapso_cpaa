@@ -14,6 +14,8 @@
 // The burglar's role holds EVERY help right. Their role is not what stops them;
 // if they get through, the fence itself is broken.
 
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import type { DatabaseSync } from "node:sqlite"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -227,5 +229,50 @@ describe("a client login cannot aim the app's email at staff", () => {
     })
     expect(res.status).toBe(200)
     expect(sent.map((s) => s.to)).toContain("burglar@delaval.example")
+  })
+})
+
+// THE AGENCY'S OWN MATERIAL IS NOT SERVED TO A CLIENT LOGIN.
+//
+// The account fence answers "which of these rows are theirs". Some doors have no
+// such answer, because nothing behind them belongs to any client: the agency's
+// internal how-to articles, and its dropdown vocabulary. The client portal's
+// gateway already refuses them by not naming them — and its own comment says why
+// ("publishing them here would be a disclosure, not a feature"). But the AGENCY
+// origin serves the same doors to the same person, and a client login is an
+// ordinary team member by construction, so the module right alone let them
+// through: the whole library, and a full-field CSV export of it.
+describe("the agency's internal material refuses a client login", () => {
+  const READS = [
+    { file: "workers/content/src/routes/learning.ts", fns: ["getLearning", "getLearningExport", "getLearningProgress"] },
+    { file: "workers/tenancy/src/routes/selectable.ts", fns: ["getSelectable", "getSelectableExport"] },
+  ]
+
+  for (const { file, fns } of READS) {
+    for (const fn of fns) {
+      it(`${fn} refuses a portal caller`, () => {
+        const src = readFileSync(join(__dirname, "../../..", file), "utf8")
+        const at = src.indexOf(`export async function ${fn}(`)
+        if (at === -1) return // the door was renamed or retired; the roster check below catches that
+        const open = src.indexOf("{", at)
+        let depth = 0
+        let body = ""
+        for (let i = open; i < src.length; i++) {
+          if (src[i] === "{") depth++
+          else if (src[i] === "}" && --depth === 0) { body = src.slice(open + 1, i); break }
+        }
+        expect(body, `${fn} must refuse a client login before it answers`).toMatch(/refusePortalCaller\(/)
+      })
+    }
+  }
+
+  it("the doors named here still exist", () => {
+    for (const { file, fns } of READS) {
+      const src = readFileSync(join(__dirname, "../../..", file), "utf8")
+      for (const fn of fns)
+        expect(src, `${file} no longer exports ${fn} — re-read this list`).toContain(
+          `export async function ${fn}(`
+        )
+    }
   })
 })

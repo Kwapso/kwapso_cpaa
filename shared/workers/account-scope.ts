@@ -293,3 +293,23 @@ export function portalActivityClause(
     ? accountActivityClause(scope)
     : { sql: "0 = 1", params: [] }
 }
+
+/** Refuse a CLIENT LOGIN outright, for the agency's own material.
+ *
+ * The account fence answers "which of these rows are theirs". Some doors have no
+ * such answer, because nothing behind them is any client's: the agency's how-to
+ * articles, its dropdown vocabulary, its own team record. The client portal's
+ * gateway already refuses those doors by not naming them — but the AGENCY origin
+ * serves them to the same person, and a client login is an ordinary team member
+ * by construction, so the module right alone lets them through.
+ *
+ * A 403 that says which door they want, rather than a 404 — they are a person we
+ * know, signed in correctly, on the wrong front door. */
+export async function refusePortalCaller(cfg: D1Rest, guard: MemberGuard): Promise<void> {
+  if ((await accountScope(cfg, guard)).kind === "portal")
+    throw new GuardError(
+      403,
+      "client_login",
+      "This sign-in is a client login — your company's work is on the client portal."
+    )
+}

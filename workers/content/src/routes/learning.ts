@@ -6,6 +6,7 @@
 // op) so open lists patch just that row. Locked module rules (pick-or-create
 // category, deactivate-not-delete) live in lib/learning.
 
+import { refusePortalCaller } from "../../../../shared/workers/account-scope"
 import { fail, json } from "../../../../shared/workers/http"
 import { csvResponse, toCsv } from "../../../../shared/workers/csv"
 import { queryText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
@@ -29,6 +30,7 @@ import type { Env } from "../env"
 
 export async function getLearning(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "learning", "read")
+  await refusePortalCaller(cfg, guard)
   const items = await listLearning(cfg, guard)
   const id = queryText(new URL(request.url).searchParams.get("id"), "Id") // ?id= → one item
   // R16: the exact server total rides every list response (badges never use rows.length).
@@ -43,6 +45,7 @@ export async function getLearning(request: Request, env: Env): Promise<Response>
  * straight back through the CSV importer; `active` rides along as information. */
 export async function getLearningExport(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "learning", "read")
+  await refusePortalCaller(cfg, guard)
   const items = await listLearningForExport(cfg, guard)
   const csv = toCsv(
     [
@@ -125,6 +128,7 @@ export async function postLearningDone(request: Request, env: Env): Promise<Resp
  * learning:read for now (the curator view shares the read right). */
 export async function getLearningProgress(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "learning", "read")
+  await refusePortalCaller(cfg, guard)
   return json({ progress: await listProgress(cfg, guard) })
 }
 
