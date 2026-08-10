@@ -191,3 +191,39 @@ export function requireStandableRoot(scope: AccountScope, accountId: string): vo
   if (!scope.roots.includes(accountId))
     throw new GuardError(404, "not_found", "That account doesn't exist.")
 }
+
+/** The account-owned tables: rows whose visibility is decided by the fence, not
+ * by a module right. Named once so a reader of the ACTIVITY feed and a reader of
+ * the accounts list can never disagree about which rows are fenced. */
+export const ACCOUNT_OWNED_TABLES = ["accounts", "account_links", "portal_users"] as const
+
+/** The fence, for a feed that stores a TABLE NAME and a ROW ID rather than an
+ * account id — the activity feed being the one that matters.
+ *
+ * This is the hole the first security sweep found, and it is worth naming
+ * precisely: the fence had been applied door by door to the ACCOUNT doors, and
+ * the activity feed is a different door. It gates on "may you read the accounts
+ * module?" — which a client login must hold to use their portal at all — and
+ * then reads history by (table, id) with no fence, so one out-of-fence id read
+ * back another client's history. Row ids are not secret: the live channel
+ * broadcasts them.
+ *
+ * `related_row_id` points at a different table each time, so the clause resolves
+ * each one to the account it hangs off:
+ *   • accounts       → the row IS the account
+ *   • account_links  → the account the link is on
+ *   • portal_users   → the account the login is on
+ * Staff get no clause. A portal caller sees their own world's history and
+ * NOTHING else — not even the existence of a row outside it. */
+export function accountActivityClause(scope: AccountScope): { sql: string; params: string[] } {
+  if (scope.kind === "staff") return { sql: "", params: [] }
+  if (scope.accountIds.length === 0) return { sql: "0 = 1", params: [] }
+  const marks = scope.accountIds.map(() => "?").join(", ")
+  return {
+    sql:
+      `((related_table = 'accounts' AND related_row_id IN (${marks}))` +
+      ` OR (related_table = 'account_links' AND related_row_id IN (SELECT id FROM account_links WHERE account_id IN (${marks})))` +
+      ` OR (related_table = 'portal_users' AND related_row_id IN (SELECT id FROM portal_users WHERE account_id IN (${marks}))))`,
+    params: [...scope.accountIds, ...scope.accountIds, ...scope.accountIds],
+  }
+}

@@ -356,9 +356,16 @@ async function runPlanLoop(
   // refund the logged row shows 0 credits (an honest "attempted, refused, no charge").
   const refundIfNothingDone = async () => {
     if (opts.tally.okWrites === 0 && opts.tally.credits > 0) {
-      await refundAiUnits(env, guard.teamId, opts.tally.free, opts.tally.credit)
-      opts.tally.credits = 0
-      opts.tally.free = 0
+      // THE FREE ALLOWANCE IS NEVER REFUNDED. It is not a price, it is the daily
+      // BOUND on how much model spend this team can cause, and refunding it
+      // dissolved the bound: a turn that reliably ends in a refusal (asking to
+      // invite someone who is already a member will do it) burns real tokens
+      // against the Anthropic balance and hands its unit straight back, so the
+      // same turn runs forever for nothing. Paid credits still come back — that
+      // was the fairness this was written for, and credits are finite because
+      // someone bought them.
+      await refundAiUnits(env, guard.teamId, 0, opts.tally.credit)
+      opts.tally.credits = opts.tally.free
       opts.tally.credit = 0
       quota = await getQuota(env, guard.teamId)
     }

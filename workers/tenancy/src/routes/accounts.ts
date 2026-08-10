@@ -237,11 +237,32 @@ export async function postGrantPortalAccess(request: Request, env: Env): Promise
   )
   const scope = await accountScope(cfg, guard)
   const accountId = requireText(body.accountId, "Account", TEXT_LIMITS.short)
-  const personAccountId = optionalText(body.personAccountId, "Person", TEXT_LIMITS.short)
-  const userId = personAccountId
-    ? await userIdForPerson(env, cfg, guard, scope, personAccountId)
-    : requireText(body.userId, "Person", TEXT_LIMITS.short)
+  // A login is granted to a PERSON ON THE BOOKS, resolved through the fence —
+  // never to a bare platform id typed into a body. The raw-id path let a holder
+  // of portal_users:create turn any account on the platform into a fenced portal
+  // caller, including a colleague and including the owner: portal-ness is decided
+  // by the PRESENCE of this row, so the grant is a demotion nobody consented to.
+  const userId = await userIdForPerson(
+    env,
+    cfg,
+    guard,
+    scope,
+    requireText(body.personAccountId, "Person", TEXT_LIMITS.short)
+  )
   if (!userId) return fail(400, "invalid_input", "Pick the person this login is for.")
+  // Staff are not clients. Granting a portal login to a team member would fence
+  // them out of the agency side at the next request.
+  const staff = await env.DB.prepare(
+    "SELECT 1 FROM team_members WHERE team_id = ? AND user_id = ? AND deactivated_at IS NULL"
+  )
+    .bind(guard.teamId, userId)
+    .first()
+  if (staff)
+    return fail(
+      409,
+      "is_staff",
+      "That person is a member of your team — a client login would lock them out of the agency app."
+    )
   const id = await grantPortalAccess(cfg, guard, scope, actor, {
     accountId,
     userId,

@@ -5,6 +5,11 @@
 
 import type { ActivityItem } from "../../../../shared/types"
 import { d1Query, type D1Rest } from "../../../../shared/workers/d1-rest"
+import {
+  accountActivityClause,
+  ACCOUNT_OWNED_TABLES,
+  type AccountScope,
+} from "../../../../shared/workers/account-scope"
 import type { MemberGuard } from "./permissions"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "../../../../shared/workers/paging"
 
@@ -50,7 +55,12 @@ export async function getActivity(
   id?: string,
   table?: string,
   allowedTables: string[] | null = null,
-  cursor?: string | null
+  cursor?: string | null,
+  /** The caller's account fence. Staff → no clause. A PORTAL caller sees only
+   * their own world's history, on every scope — the record scope because an id
+   * from outside the fence must read as "doesn't exist", and the team scope
+   * because a whole-team feed is exactly the leak in convenient form. */
+  accountScope?: AccountScope
 ): Promise<Page<ActivityItem> & { total: number }> {
   // FAIL CLOSED. An id-scope with no id used to match NO branch below, leaving the
   // WHERE empty — so `?scope=user` with no `id` returned the entire team's
@@ -76,6 +86,16 @@ export async function getActivity(
   } else if (scope === "record" && id && table) {
     clauses.push("related_table = ? AND related_row_id = ?")
     params.push(table, id)
+    // An account-owned record is fenced by WHO OWNS IT, not by the module right
+    // that got the caller this far. Out of fence, the feed is empty — the same
+    // answer a made-up id gets, so it can't be used to test what exists.
+    if ((ACCOUNT_OWNED_TABLES as readonly string[]).includes(table) && accountScope) {
+      const fence = accountActivityClause(accountScope)
+      if (fence.sql) {
+        clauses.push(fence.sql)
+        params.push(...fence.params)
+      }
+    }
   } else {
     // `else`, not `else if (scope === "team")` — anything that reaches here is
     // the whole-team read and MUST carry the R18 filter. A scope string the route
@@ -83,6 +103,14 @@ export async function getActivity(
     const clause = activityVisibilityClause(allowedTables)
     if (clause.sql) clauses.push(clause.sql.replace(/^\s*WHERE\s*/, ""))
     params.push(...clause.params)
+    // R18 subtracts the modules a caller may not read. It does NOT know about
+    // the account fence, and a portal caller holds real module rights — so the
+    // whole-team feed handed them every client's history until this line.
+    if (accountScope && accountScope.kind === "portal") {
+      const fence = accountActivityClause(accountScope)
+      clauses.push(fence.sql)
+      params.push(...fence.params)
+    }
   }
   const where = clauses.length ? ` WHERE ${clauses.join(" AND ")}` : ""
 

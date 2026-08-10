@@ -21,6 +21,7 @@ import {
 } from "../lib/teams"
 import { MAX_TEAMS_PER_USER, numberVar } from "../../../../shared/workers/limits"
 import { TEAM_CREATION_CLOSED } from "../../../../shared/product"
+import { accountScope } from "../../../../shared/workers/account-scope"
 import { gatedBody } from "../../../../shared/workers/route"
 import { teamContext, toActor, whoAmI } from "../context"
 import type { Env } from "../env"
@@ -181,7 +182,7 @@ export async function getActivityFeed(request: Request, env: Env): Promise<Respo
     const module = ACTIVITY_GATE_MAP[table]
     if (!module) return emptyFeed()
     await requireRight(cfg, guard, module, "read")
-    return feed((await getActivity(cfg, guard, "record", id, table, null, cursor)))
+    return feed((await getActivity(cfg, guard, "record", id, table, null, cursor, await accountScope(cfg, guard))))
   }
 
   await requireRight(cfg, guard, scope === "role" ? "member_roles" : "team_members", "read")
@@ -200,7 +201,7 @@ export async function getActivityFeed(request: Request, env: Env): Promise<Respo
         .map(([table]) => table),
       ...Object.keys(ACTIVITY_TABLE_EXEMPT),
     ]
-    return feed((await getActivity(cfg, guard, "team", undefined, undefined, allowed, cursor)))
+    return feed((await getActivity(cfg, guard, "team", undefined, undefined, allowed, cursor, await accountScope(cfg, guard))))
   }
   // Invite scope: the client passes the GLOBAL invite id; map it to the team-local
   // invite_logs row id the activity rows reference. Bail to an empty feed if it
@@ -215,7 +216,7 @@ export async function getActivityFeed(request: Request, env: Env): Promise<Respo
     if (!idx?.invite_row_id) return emptyFeed()
     id = idx.invite_row_id
   }
-  return feed((await getActivity(cfg, guard, scope, id, undefined, null, cursor)))
+  return feed((await getActivity(cfg, guard, scope, id, undefined, null, cursor, await accountScope(cfg, guard))))
 }
 
 /** The active team's Overview metadata (any member may read it). */

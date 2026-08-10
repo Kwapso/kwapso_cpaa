@@ -254,7 +254,7 @@ describe("granting a login: the person is picked off the account, never typed in
     const ana = await createAccount(cfg, guard, staff, actor, {
       accountType: "individual",
       name: "Ana",
-      email: "staff@kwapso.app", // the one signed-in identity in the harness
+      email: "nadia@bergman.example", // a CLIENT: a platform account, not a team member
     })
     await linkPerson(cfg, guard, staff, actor, { accountId: IDS.victimAccount, personAccountId: ana })
 
@@ -263,7 +263,7 @@ describe("granting a login: the person is picked off the account, never typed in
     const row = db()
       .prepare("SELECT user_id FROM portal_users WHERE account_id = ? AND deactivated_at IS NULL")
       .get(IDS.victimAccount) as { user_id: string }
-    expect(row.user_id).toBe(IDS.staffUser)
+    expect(row.user_id).toBe(IDS.clientUser)
   })
 
   it("refuses plainly when the person has no email, or has never signed in", async () => {
@@ -307,7 +307,7 @@ describe("the paged list (R14/R16)", () => {
 
     const first = await listAccounts(cfg, guard, staff)
     expect(first.rows).toHaveLength(50)
-    expect(first.total).toBe(67) // 7 seeded + 60 — the exact COUNT, not the page length
+    expect(first.total).toBe(68) // 8 seeded + 60 — the exact COUNT, not the page length
     expect(first.hasMore).toBe(true)
     expect(first.nextCursor).toBeTruthy()
 
