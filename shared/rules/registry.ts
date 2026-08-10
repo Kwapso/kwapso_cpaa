@@ -160,8 +160,6 @@ export const CATALOG_EXEMPT: Record<string, string> = {
   help: "tickets are conversations raised in-app; importing them would forge authorship and timelines",
   screens: "screen recipes are app furniture (config), not team data",
   agent: "the assistant's threads/usage are system records, not importable content",
-  accounts:
-    "the spine's rows arrive as ONE referenced set (accounts → their parents → their links), which the Glide migration imports in dependency order (SCOPE ch.12); a lone accounts target would offer a picker entry that cannot resolve a parent id — the TargetDef lands with that import build",
   portal_users:
     "a login is a granted identity, not importable content — a CSV cannot consent for a person (the same reason team_members is exempt)",
 }
@@ -214,6 +212,15 @@ export const GROWING_COLLECTIONS: Record<
     webKey: "helpKey(",
     why: "support tickets accumulate forever — a team that has raised 3,000 must still reach the oldest",
   },
+  accounts: {
+    lib: "workers/tenancy/src/lib/accounts.ts",
+    fn: "listAccounts",
+    routes: "workers/tenancy/src/routes/accounts.ts",
+    rowsKey: "accounts",
+    listRecipe: "accounts.list",
+    webKey: "accountsKey(",
+    why: "every company AND every person an agency works with is a row here — a contact list that only grows, so a ceiling would eventually become a refusal to answer",
+  },
   activity: {
     lib: "workers/tenancy/src/lib/activity-read.ts",
     fn: "getActivity",
@@ -241,14 +248,6 @@ export const DEAF_EXEMPT: Record<string, string> = {
     "a reply pings the parent help row too (op edit), whose row-level patch refreshes the open ticket's deps; the thread list itself re-pulls when the detail (re)opens",
   agent_usage:
     "the quota badge rides every chat response and the usage dialog fetches on open — there is no standing cache a ping could refresh",
-  // TEMPORARY, and deliberately visible. The customer spine's data door ships
-  // ahead of its screens (the accounts UI is a separate build), so these three
-  // resources currently ping a channel nobody listens on. DELETE these three
-  // lines the day the accounts screens land — a listener is the whole point, and
-  // an exemption that outlives its reason is how a stale screen hides.
-  accounts: "the accounts screens land in the UI build — replace with a TEAM_RESOURCES listener then",
-  account_links: "the account detail's contacts list lands in the UI build — replace with a listener then",
-  portal_users: "the portal-access panel lands in the UI build — replace with a listener then",
 }
 
 /** R18 — reviewed exemptions, pinned EXACTLY: tables whose activity every member
@@ -266,7 +265,12 @@ export const MUTATING_WORKERS = ["tenancy", "content", "data-ops"] as const
 
 /** R2 — the bespoke (host-composed) record-detail components that MUST render the
  * Overview + Activity tabs themselves (the engine-recipe details get them for free). */
-export const RECORD_DETAIL_COMPONENTS = ["help-detail", "learning-detail", "role-detail"] as const
+export const RECORD_DETAIL_COMPONENTS = [
+  "help-detail",
+  "learning-detail",
+  "role-detail",
+  "account-detail",
+] as const
 
 /** R2 — reviewed bypasses. Each MUST get tabs over time; the reason is mandatory.
  * (Empty today: role-detail — the last exception — grew its Permissions/Overview/
@@ -315,4 +319,7 @@ export const FORM_DIALOGS = [
   "invite-dialog",
   "team-edit-dialog",
   "selectable-form-dialog",
+  "account-form-dialog",
+  "contact-link-dialog",
+  "portal-access-dialog",
 ] as const

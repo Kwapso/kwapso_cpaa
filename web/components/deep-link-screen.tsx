@@ -33,6 +33,7 @@ import {
 import { AppShell, ShellLoading } from "@/components/app-shell"
 import { TeamSectionNav } from "@/components/team-section-nav"
 import { CountedTabs } from "@/components/counted-tabs"
+import { AccountFormDialog } from "@/components/account-form-dialog"
 import { LearningFormDialog, type LearningFormValues } from "@/components/learning-form-dialog"
 import { HelpFormDialog } from "@/components/help-form-dialog"
 import { RolePickerDialog } from "@/components/role-picker-dialog"
@@ -155,6 +156,7 @@ export function DeepLinkScreen() {
   // it shows). Lifted into one hook so the host reads as "fetch, then render".
   const {
     overridesQ,
+    accountsQ,
     membersQ,
     rolesQ,
     invitesQ,
@@ -274,7 +276,7 @@ export function DeepLinkScreen() {
   // lifted into one hook. Each action calls the permission-checked endpoint, primes
   // the actor's cache and invalidates any changed sibling count; runAction throws on
   // failure so the calling dialog / confirm surfaces it.
-  const { runAction, createLearning, createHelp } = useScreenActions(teamId)
+  const { runAction, createLearning, createHelp, createAccount } = useScreenActions(teamId)
 
   /* ------------------------- engine intent + action ------------------------ */
 
@@ -342,13 +344,15 @@ export function DeepLinkScreen() {
   const teamName = active.ctx.team?.name ?? "Team"
   const myUserId = active.user?.id ?? null
   // Import has no read-right of its own — it's gated per-target. You can reach it
-  // if you can CREATE into any supported target (member_roles or learning).
-  const canImport = can("member_roles", "create") || can("learning", "create")
+  // if you can CREATE into any supported target (member roles, learning, accounts).
+  const canImport =
+    can("member_roles", "create") || can("learning", "create") || can("accounts", "create")
   const section: SectionKey =
     module === "members" ||
     module === "roles" ||
     module === "invites" ||
     module === "dropdowns" ||
+    module === "accounts" ||
     module === "learning" ||
     module === "help" ||
     module === "import"
@@ -371,6 +375,7 @@ export function DeepLinkScreen() {
     selectable: totals.selectable,
     learning: totals.learning,
     help: totals.help,
+    accounts: totals.accounts,
   }
   const sectionCounts: Partial<Record<SectionKey, number>> = {}
   for (const s of TEAM_SECTIONS) {
@@ -401,6 +406,8 @@ export function DeepLinkScreen() {
   }
 
   function recordLabel(): string {
+    if (module === "accounts")
+      return accountsQ.data?.find((a) => a.id === recordId)?.name ?? "Account"
     if (module === "members")
       return membersQ.data?.find((m) => m.userId === recordId)
         ? personName(membersQ.data.find((m) => m.userId === recordId) as TeamMember)
@@ -448,7 +455,7 @@ export function DeepLinkScreen() {
         <CountedTabs badged={showTabs && sectionCounts[section] !== undefined}>
           {renderModuleContent({
             noAccess, enabled, perms, can, module, recordId, teamId, canImport, go,
-            overridesQ, metaQ, membersQ, rolesQ, roles, invitesQ, learningQ, helpQ, totals,
+            overridesQ, metaQ, membersQ, rolesQ, roles, invitesQ, learningQ, helpQ, accountsQ, totals,
             activityQ, activityTotal, activityKey, activityScope, inviteAuditQ, teamName, active,
             rights, onAction, onIntent,
             sectionPath, helpScope, setHelpScope, myUserId, query, helpMineQ,
@@ -488,6 +495,20 @@ export function DeepLinkScreen() {
         onOpenChange={(o) => !o && closePanel()}
         draftKey={teamId ? `role:new:${teamId}` : undefined}
         onSubmit={(title, description) => runAction("roles.create", { title, description })}
+      />
+
+      {/* Add an account (?panel=add&module=accounts) — gated by create. The parent
+       * picker offers the accounts already loaded on the list behind it; the
+       * statuses are the ones this team already uses, so they stay consistent. */}
+      <AccountFormDialog
+        open={query.panel === "add" && query.module === "accounts" && can("accounts", "create")}
+        onOpenChange={(o) => !o && closePanel()}
+        draftKey={teamId ? `account:new:${teamId}` : undefined}
+        parentOptions={(accountsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
+        statusOptions={[
+          ...new Set((accountsQ.data ?? []).map((a) => a.status).filter((s): s is string => !!s)),
+        ]}
+        onSubmit={createAccount}
       />
 
       {/* Create a learning article (?panel=add&module=learning) — gated by create. */}

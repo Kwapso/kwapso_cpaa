@@ -128,11 +128,11 @@ export default {
       return env.ASSETS.fetch(new Request(shell, request))
     }
 
-    // Top-level module pages (/learning, /help) are ALSO client-resolved deep-link
-    // shells (their own clean URLs, active team from context). Serve the module's
-    // shell for any sub-path (e.g. /learning/<id>); the bare /learning is a real
-    // static file served below.
-    for (const mod of ["learning", "help"]) {
+    // Top-level module pages (/accounts, /learning, /help) are ALSO client-resolved
+    // deep-link shells (their own clean URLs, active team from context). Serve the
+    // module's shell for any sub-path (e.g. /accounts/<id>); the bare /accounts is a
+    // real static file served below.
+    for (const mod of ["accounts", "learning", "help"]) {
       if (pathname.startsWith(`/${mod}/`)) {
         const shell = new URL(request.url)
         shell.pathname = `/${mod}`

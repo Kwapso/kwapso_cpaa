@@ -13,6 +13,7 @@ export type SectionKey =
   | "roles"
   | "invites"
   | "dropdowns"
+  | "accounts"
   | "learning"
   | "help"
   | "import"
@@ -35,7 +36,7 @@ export type Route = {
  * (/home, /settings, /invitations). Everything here is in-app, so `go()` moves to it
  * with the History API (no reload); only pre-auth routes (/login, /onboarding) are left
  * out, so leaving the app is a real navigation. */
-export const TOP_LEVEL_MODULES = ["learning", "help", "home", "settings", "invitations"]
+export const TOP_LEVEL_MODULES = ["accounts", "learning", "help", "home", "settings", "invitations"]
 
 /** The account-level screens the shell renders directly (not team-scoped module content). */
 export const ACCOUNT_MODULES = ["home", "settings", "invitations"]

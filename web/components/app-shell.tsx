@@ -14,7 +14,15 @@ import { Breadcrumbs } from "@kwapso/ui/registry/primitives/breadcrumbs/breadcru
 import { ModeToggle } from "@kwapso/ui/registry/primitives/mode-toggle/mode-toggle"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { Home, Settings, GraduationCap, LifeBuoy, PanelLeftClose, PanelLeftOpen } from "lucide-react"
+import {
+  Building2,
+  Home,
+  Settings,
+  GraduationCap,
+  LifeBuoy,
+  PanelLeftClose,
+  PanelLeftOpen,
+} from "lucide-react"
 
 import type { ActiveTeam } from "@/lib/use-active-team"
 import { auth } from "@/lib/api"
@@ -34,8 +42,13 @@ import { ProfileMenu } from "@/components/profile-menu"
 import { TeamSwitcher } from "@/components/team-switcher"
 
 const NAV_ICONS = { home: Home, settings: Settings } as const
-// The lucide component for each team SIDEBAR page (Learning / Help) in the rail.
-const SECTION_ICONS: Record<string, typeof Home> = { learning: GraduationCap, help: LifeBuoy }
+// The lucide component for each team SIDEBAR page (Accounts / Learning / Help) in
+// the rail — the same concept icons the tabs use (CONCEPT_ICON, pages.ts).
+const SECTION_ICONS: Record<string, typeof Home> = {
+  accounts: Building2,
+  learning: GraduationCap,
+  help: LifeBuoy,
+}
 
 export function AppShell({
   active,

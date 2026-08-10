@@ -17,6 +17,7 @@ import {
 } from "@kwapso/ui/registry/collections/screen-renderer/screen-renderer"
 import { type ScreenQuery, type ScreenRights } from "@kwapso/ui/lib/recipe"
 
+import { AccountDetailScreen } from "@/components/account-detail"
 import { RoleDetailScreen } from "@/components/role-detail"
 import { LearningDetailScreen } from "@/components/learning-detail"
 import { LearningProgressScreen } from "@/components/learning-progress"
@@ -27,10 +28,11 @@ import { NoAccess, NotFound, LoadError, SectionWithCreate, CollectionCard } from
 import { CollectionHeading } from "@/components/collection-heading"
 import { LoadMore } from "@/components/load-more"
 import { content as contentApi, tenancy } from "@/lib/api"
-import { helpKey } from "@/lib/live-resources"
+import { accountsKey, helpKey } from "@/lib/live-resources"
 import { CountedAbove } from "@/components/counted-tabs"
 import { formatCount } from "@/lib/format-count"
 import {
+  shapeAccountsList,
   shapeHelpList,
   shapeInviteDetail,
   shapeInvitesList,
@@ -59,7 +61,7 @@ type ScreenData = ReturnType<typeof useScreenData>
  * The host owns all of it; this bundle is how it hands the render half a snapshot. */
 export type ModuleContentCtx = Pick<
   ScreenData,
-  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "learningQ" | "helpQ" | "helpMineQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "inviteAuditQ"
+  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "learningQ" | "helpQ" | "helpMineQ" | "accountsQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "inviteAuditQ"
 > & {
   noAccess: boolean
   enabled: boolean
@@ -102,6 +104,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     invitesQ,
     learningQ,
     helpQ,
+    accountsQ,
     totals,
     activityQ,
     activityTotal,
@@ -308,6 +311,41 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
           </CountedAbove>
         )
       }
+      if (module === "accounts") {
+        if (accountsQ.error) return <LoadError what="accounts" />
+        if (accountsQ.data === undefined) return <Skeleton variant="list" lines={4} />
+        const data = shapeAccountsList(accountsQ.data)
+        const accountsRecipe = withDataDrivenCollection(recipe, data.rows ?? [])
+        // R16: the count lives in the heading (a sidebar page has no tab strip to
+        // badge), and it is the door's exact COUNT(*) — never the loaded page's
+        // length, which on a paged list is just "50" forever.
+        return (
+          <div className="flex flex-col gap-4">
+            <CollectionHeading sectionKey="accounts" total={totals.accounts} />
+            <SectionWithCreate
+              show={can("accounts", "create")}
+              label="New account"
+              icon="plus"
+              secondary={{
+                show: can("accounts", "create"),
+                label: "Import CSV",
+                onClick: () => go(`/t/${teamId}/import/accounts`),
+              }}
+              onCreate={() => go(sectionPath, { panel: "add", module: "accounts" })}
+            >
+              <ScreenRenderer recipe={accountsRecipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
+            </SectionWithCreate>
+            {/* R14: every company AND every person is a row here — the list pages. */}
+            <LoadMore
+              listKey={accountsKey(teamId as string)}
+              label="Load more accounts"
+              fetchPage={(c: string) =>
+                tenancy.accounts({ cursor: c }).then((r) => ({ rows: r.accounts, nextCursor: r.nextCursor }))
+              }
+            />
+          </div>
+        )
+      }
       if (module === "help") {
         // R14: My/All is a SERVER scope, each its own paged cache — filtering a
         // loaded PAGE by raiser would disagree with the exact badge above it.
@@ -424,6 +462,15 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
           <ScreenRenderer recipe={recipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
           {activityMore}
         </div>
+      )
+    }
+    if (module === "accounts") {
+      return (
+        <AccountDetailScreen
+          teamId={teamId as string}
+          accountId={recordId}
+          basePath={sectionPath}
+        />
       )
     }
     if (module === "roles") {

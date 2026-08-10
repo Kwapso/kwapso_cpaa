@@ -16,7 +16,9 @@ vi.mock("../../../shared/workers/d1-rest", async (importOriginal) => {
 
 import { accountScope } from "../../../shared/workers/account-scope"
 import {
+  countAccountLinks,
   createAccount,
+  getAccount,
   grantPortalAccess,
   linkPerson,
   listAccounts,
@@ -26,7 +28,8 @@ import {
   setPortalAccessActive,
   switchPortalAccount,
 } from "../src/lib/accounts"
-import { buildSpineDb, IDS } from "./spine-harness"
+import worker from "../src/index"
+import { buildSpineDb, IDS, makeEnv, req } from "./spine-harness"
 
 const cfg = { accountId: "a", apiToken: "t" } as never
 const actor = { id: IDS.staffUser, email: "staff@kwapso.app", name: "Staff" }
@@ -193,6 +196,107 @@ describe("contacts", () => {
         personAccountId: IDS.victimAccount,
       })
     ).rejects.toMatchObject({ code: "invalid_input" })
+  })
+})
+
+describe("what the detail's tabs badge (R16)", () => {
+  it("counts contacts and logins on the SERVER, not from the capped lists", async () => {
+    const detail = await getAccount(cfg, guard, staff, IDS.victimAccount)
+    expect(detail.linksTotal).toBe(1)
+    expect(detail.portalUsersTotal).toBe(0) // Marta's login sits on HER row, not the company's
+    expect(await countAccountLinks(cfg, guard, staff, IDS.victimPerson)).toBe(0)
+
+    // A second contact moves the count — and it is a COUNT, never links.length
+    // (which a hard-capped list would silently cap).
+    const ana = await createAccount(cfg, guard, staff, actor, { accountType: "individual", name: "Ana" })
+    await linkPerson(cfg, guard, staff, actor, {
+      accountId: IDS.victimAccount,
+      personAccountId: ana,
+    })
+    expect((await getAccount(cfg, guard, staff, IDS.victimAccount)).linksTotal).toBe(2)
+  })
+
+  it("a pinned caller's counts see only their own world", async () => {
+    const scope = await accountScope(cfg, { ...guard, userId: IDS.burglarUser })
+    expect(await countAccountLinks(cfg, guard, scope, IDS.victimAccount)).toBe(0)
+  })
+})
+
+describe("a contact / login change names the ACCOUNT it hangs off", () => {
+  it("hands back the account when a row moved, and null when none did (R17)", async () => {
+    expect(await setLinkActive(cfg, guard, staff, actor, IDS.victimLink, false)).toBe(IDS.victimAccount)
+    // Second click: already unlinked → zero rows moved → nothing to publish.
+    expect(await setLinkActive(cfg, guard, staff, actor, IDS.victimLink, false)).toBeNull()
+
+    expect(await setPortalAccessActive(cfg, guard, staff, actor, IDS.victimPortal, false)).toBe(
+      IDS.victimPerson
+    )
+    expect(await setPortalAccessActive(cfg, guard, staff, actor, IDS.victimPortal, false)).toBeNull()
+
+    // …and the history says what happened, not how many times it was clicked.
+    const history = db()
+      .prepare("SELECT COUNT(*) n FROM activity WHERE type = 'Portal access revoked'")
+      .get() as { n: number }
+    expect(history.n).toBe(1)
+  })
+})
+
+describe("granting a login: the person is picked off the account, never typed in", () => {
+  const grant = async (body: unknown) => {
+    const res = await worker.fetch(
+      req("POST /api/tenancy/portal-users", body),
+      makeEnv(() => db(), IDS.staffUser)
+    )
+    return { status: res.status, text: await res.text() }
+  }
+
+  it("resolves the person's OWN email to their platform account", async () => {
+    const ana = await createAccount(cfg, guard, staff, actor, {
+      accountType: "individual",
+      name: "Ana",
+      email: "staff@kwapso.app", // the one signed-in identity in the harness
+    })
+    await linkPerson(cfg, guard, staff, actor, { accountId: IDS.victimAccount, personAccountId: ana })
+
+    const { status } = await grant({ accountId: IDS.victimAccount, personAccountId: ana })
+    expect(status).toBe(200)
+    const row = db()
+      .prepare("SELECT user_id FROM portal_users WHERE account_id = ? AND deactivated_at IS NULL")
+      .get(IDS.victimAccount) as { user_id: string }
+    expect(row.user_id).toBe(IDS.staffUser)
+  })
+
+  it("refuses plainly when the person has no email, or has never signed in", async () => {
+    const noEmail = await createAccount(cfg, guard, staff, actor, {
+      accountType: "individual",
+      name: "Nadia",
+    })
+    const blank = await grant({ accountId: IDS.victimAccount, personAccountId: noEmail })
+    expect(blank.status).toBe(400)
+    expect(blank.text).toContain("Add an email address to Nadia")
+
+    const stranger = await createAccount(cfg, guard, staff, actor, {
+      accountType: "individual",
+      name: "Iker",
+      email: "iker@nowhere.example",
+    })
+    const missing = await grant({ accountId: IDS.victimAccount, personAccountId: stranger })
+    expect(missing.status).toBe(404)
+    expect(missing.text).toContain("hasn't signed in here yet")
+  })
+
+  it("still cannot name a person outside the fence", async () => {
+    // The resolution reads the person's email through the SAME fence, so a pinned
+    // caller can't turn it into a lookup of somebody else's contact.
+    const res = await worker.fetch(
+      req("POST /api/tenancy/portal-users", {
+        accountId: IDS.burglarAccount,
+        personAccountId: IDS.victimPerson,
+      }),
+      makeEnv(() => db(), IDS.burglarUser)
+    )
+    expect(res.status).toBeGreaterThanOrEqual(400)
+    expect(await res.text()).not.toContain(IDS.victimPerson)
   })
 })
 

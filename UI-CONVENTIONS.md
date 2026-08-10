@@ -106,6 +106,7 @@ export const BASE_RECIPES: Record<string, ScreenRecipe> = {
   "invites.detail": inviteDetailRecipe,
   "learning.list":  learningListRecipe,
   "help.list":      helpListRecipe,
+  "accounts.list":  accountsListRecipe,
 }
 ```
 
@@ -146,10 +147,12 @@ permission grid is a bespoke `PermissionMatrix` with no screen-engine block, so
 // host composes it from the library PermissionMatrix (see role-detail.tsx).
 ```
 
-The current bespoke details are **`role-detail`**, **`learning-detail`**, and
-**`help-detail`** — each a full record screen (its own header, tabs, actions) wired by
-hand because it carries a control (permission matrix / rich-text article body + media /
-ticket thread + status stepper) the engine doesn't render.
+The current bespoke details are **`role-detail`**, **`learning-detail`**,
+**`help-detail`** and **`account-detail`** — each a full record screen (its own header,
+tabs, actions) wired by hand because it carries a control (permission matrix /
+rich-text article body + media / ticket thread + status stepper / the account's
+contacts, the accounts nested under it and its portal logins, each a collection with
+its own actions) the engine doesn't render.
 
 The one bespoke **list** is **`selectable-screen.tsx`** (Dropdown values): it groups
 values by *type* — a shape the flat `list` recipe doesn't express. Because it's
@@ -188,9 +191,14 @@ permission module the server enforces:
 export const MODULE_PERMISSION: Record<string, string> = {
   team: "teams", members: "team_members", roles: "member_roles",
   invites: "team_members", dropdowns: "selectable_data",
-  learning: "learning", help: "help",
+  learning: "learning", help: "help", accounts: "accounts",
 }
 ```
+
+Learning, Help and **Accounts** each have a clean top-level URL too (`/learning`,
+`/help`, `/accounts`) — a sidebar page resolves the team from context, like `/home`.
+A new one needs three lines: `TOP_LEVEL_MODULES` (`deep-link/route.ts`), the
+gateway's top-level shell loop, and its own `web/app/<segment>/[[...rest]]/page.tsx`.
 
 Navigation *inside* `/t/*` uses the History API, never the framework router — a static
 export would otherwise full-reload and wipe the warm in-memory cache. Write UI is

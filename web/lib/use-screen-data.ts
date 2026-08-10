@@ -14,7 +14,7 @@
 import * as React from "react"
 
 import { tenancy } from "@/lib/api"
-import { cursorKey, helpKey, listFetch, totalKey } from "@/lib/live-resources"
+import { accountsKey, cursorKey, helpKey, listFetch, totalKey } from "@/lib/live-resources"
 import { primeCache, useCached, useCachedValue } from "@/lib/store"
 
 /** What the host needs to drive the reads: the resolved team, whether reads are
@@ -67,6 +67,13 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
     enabled && module === "help" && helpScope === "mine" ? helpKey(teamId as string, "mine") : null,
     () => listFetch.helpMine(teamId as string)
   )
+  // Accounts back their list, the breadcrumb label and the record screen. R14:
+  // the list is a PAGE — page one lands here, its next cursor in the sidecar
+  // <LoadMore> reads. Row-level live: a change patches the one account in place.
+  const accountsQ = useCached(
+    enabled && module === "accounts" ? accountsKey(teamId as string) : null,
+    () => listFetch.accounts(teamId as string)
+  )
   // The team's dropdown values — feed the help/learning forms' Type/Category pickers
   // AND the Dropdown-values tab's count badge, so load them across the team area
   // (cache-first + live, like roles/invites, so the count stays honest).
@@ -83,6 +90,7 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
     learning: useCachedValue<number>(enabled ? totalKey("learning", teamId as string) : null),
     help: useCachedValue<number>(enabled ? totalKey("help", teamId as string) : null),
     helpMine: useCachedValue<number>(enabled ? totalKey("help-mine", teamId as string) : null),
+    accounts: useCachedValue<number>(enabled ? totalKey("accounts", teamId as string) : null),
   }
   const selectableValues = formSelectableQ.data ?? []
   // The list now includes DEACTIVATED values (so the manager can reactivate them),
@@ -98,6 +106,8 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
   // Activity is one read path over three scopes (team / a member / an invite) — the
   // scope is derived from what's in view, and its cache key mirrors the scope so a
   // live ping refreshes the right feed.
+  // (An account's own history is read by its record screen through the generic
+  // record path — it isn't one of the three scopes this feed covers.)
   const activityScope: "team" | "user" | "invite" | null =
     module === "team"
       ? "team"
@@ -137,6 +147,7 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
 
   return {
     overridesQ,
+    accountsQ,
     membersQ,
     rolesQ,
     invitesQ,

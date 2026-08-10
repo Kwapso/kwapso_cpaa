@@ -15,12 +15,14 @@ import { fail, json, pagedJson } from "../../../../shared/workers/http"
 import { optionalText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
 import { publishChange } from "../../../../shared/workers/realtime"
 import { gated, gatedBody, openTeam } from "../../../../shared/workers/route"
-import { teamContext, whoAmI } from "../../../../shared/workers/gating"
-import { accountScope } from "../../../../shared/workers/account-scope"
+import { accountScope, type AccountScope } from "../../../../shared/workers/account-scope"
+import { GuardError, teamContext, whoAmI, type MemberGuard } from "../../../../shared/workers/gating"
+import type { D1Rest } from "../../../../shared/workers/d1-rest"
 import type { PortalUser } from "../../../../shared/types"
 import {
   createAccount,
   getAccount,
+  getAccountRow,
   grantPortalAccess,
   linkPerson,
   listAccounts,
@@ -160,6 +162,12 @@ export async function postAccountActive(request: Request, env: Env): Promise<Res
   return json({ ok: true })
 }
 
+/** POST /api/tenancy/accounts/links — say that a person is a contact of an account.
+ *
+ * THE PING NAMES THE ACCOUNT, not the link row. A contact is the SHAPE of an
+ * account, never a record with a list of its own — it is only ever read on its
+ * account's detail — so the account id is the one id a listener can act on
+ * (re-pull that row, refresh that open detail). Same for the login pings below. */
 export async function postLinkPerson(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<Body>(
     request,
@@ -168,13 +176,14 @@ export async function postLinkPerson(request: Request, env: Env): Promise<Respon
     "create"
   )
   const scope = await accountScope(cfg, guard)
+  const accountId = requireText(body.accountId, "Account", TEXT_LIMITS.short)
   const id = await linkPerson(cfg, guard, scope, actor, {
-    accountId: requireText(body.accountId, "Account", TEXT_LIMITS.short),
+    accountId,
     personAccountId: requireText(body.personAccountId, "Person", TEXT_LIMITS.short),
     relationship: optionalText(body.relationship, "Relationship", TEXT_LIMITS.short),
     isMainStakeholder: body.isMainStakeholder === true,
   })
-  await publishChange(env.REALTIME, guard.teamId, "account_links", id, "add")
+  await publishChange(env.REALTIME, guard.teamId, "account_links", accountId, "add")
   return json({ id })
 }
 
@@ -188,8 +197,9 @@ export async function postLinkActive(request: Request, env: Env): Promise<Respon
   const scope = await accountScope(cfg, guard)
   const id = requireText(body.id, "Contact link", TEXT_LIMITS.short)
   if (typeof body.active !== "boolean") return fail(400, "invalid_input", "Unlink or relink?")
-  const changed = await setLinkActive(cfg, guard, scope, actor, id, body.active)
-  if (changed) await publishChange(env.REALTIME, guard.teamId, "account_links", id)
+  // R17: null = zero rows moved = already like that → no ping, no duplicate history.
+  const accountId = await setLinkActive(cfg, guard, scope, actor, id, body.active)
+  if (accountId) await publishChange(env.REALTIME, guard.teamId, "account_links", accountId)
   return json({ ok: true })
 }
 
@@ -209,6 +219,15 @@ export async function getPortalUsers(request: Request, env: Env): Promise<Respon
   return json({ portalUsers: await withEmails(env, rows), total })
 }
 
+/** POST /api/tenancy/portal-users — hand someone a login.
+ *
+ * The person can be named two ways. A machine caller that already holds an
+ * identity passes `userId`. A HUMAN never has one: staff pick a person off the
+ * account (a contact, or the individual account itself), so the door takes
+ * `personAccountId`, reads that row's email THROUGH THE FENCE, and resolves it
+ * against the global users table. Identity is looked up outside the fence, so
+ * the email it is looked up by has to come from inside it — staff can only ever
+ * resolve people already on their own records, never a typed-in address. */
 export async function postGrantPortalAccess(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<Body>(
     request,
@@ -217,13 +236,49 @@ export async function postGrantPortalAccess(request: Request, env: Env): Promise
     "create"
   )
   const scope = await accountScope(cfg, guard)
+  const accountId = requireText(body.accountId, "Account", TEXT_LIMITS.short)
+  const personAccountId = optionalText(body.personAccountId, "Person", TEXT_LIMITS.short)
+  const userId = personAccountId
+    ? await userIdForPerson(env, cfg, guard, scope, personAccountId)
+    : requireText(body.userId, "Person", TEXT_LIMITS.short)
+  if (!userId) return fail(400, "invalid_input", "Pick the person this login is for.")
   const id = await grantPortalAccess(cfg, guard, scope, actor, {
-    accountId: requireText(body.accountId, "Account", TEXT_LIMITS.short),
-    userId: requireText(body.userId, "Person", TEXT_LIMITS.short),
+    accountId,
+    userId,
     appRestriction: optionalText(body.appRestriction, "App restriction", TEXT_LIMITS.short),
   })
-  await publishChange(env.REALTIME, guard.teamId, "portal_users", id, "add")
+  await publishChange(env.REALTIME, guard.teamId, "portal_users", accountId, "add")
   return json({ id })
+}
+
+/** A person's account row (inside the fence) → their platform account. A client
+ * has to have signed in at least once before a login can be switched on for
+ * them; both refusals say plainly what to do next. */
+async function userIdForPerson(
+  env: Env,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  personAccountId: string
+): Promise<string> {
+  const person = await getAccountRow(cfg, guard, scope, personAccountId)
+  const email = person.email?.trim().toLowerCase()
+  if (!email)
+    throw new GuardError(
+      400,
+      "no_email",
+      `Add an email address to ${person.name} first — that's how they sign in.`
+    )
+  const row = await env.DB.prepare("SELECT id FROM users WHERE email = ? AND deactivated_at IS NULL")
+    .bind(email)
+    .first<{ id: string }>()
+  if (!row)
+    throw new GuardError(
+      404,
+      "no_account",
+      `${person.name} hasn't signed in here yet. Ask them to sign in once with ${email}, then switch their access on.`
+    )
+  return row.id
 }
 
 /** POST /api/tenancy/portal-users/active — the hard revoke, and its undo. The row
@@ -238,8 +293,9 @@ export async function postPortalAccessActive(request: Request, env: Env): Promis
   const scope = await accountScope(cfg, guard)
   const id = requireText(body.id, "Portal access", TEXT_LIMITS.short)
   if (typeof body.active !== "boolean") return fail(400, "invalid_input", "Revoke or restore?")
-  const changed = await setPortalAccessActive(cfg, guard, scope, actor, id, body.active)
-  if (changed) await publishChange(env.REALTIME, guard.teamId, "portal_users", id)
+  // R17: null = the login was already in that state → no ping, no history row.
+  const accountId = await setPortalAccessActive(cfg, guard, scope, actor, id, body.active)
+  if (accountId) await publishChange(env.REALTIME, guard.teamId, "portal_users", accountId)
   return json({ ok: true })
 }
 
