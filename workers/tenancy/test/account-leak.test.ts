@@ -415,14 +415,20 @@ describe("account leak tests: a caller pinned to one account cannot reach anothe
     for (const r of [
       req("GET /api/tenancy/active"),
       req("POST /api/tenancy/switch-team", { teamId: IDS.team }),
+      // One door along, the same shape: the Overview metadata names who created
+      // the team, by name and EMAIL ADDRESS.
+      req("GET /api/tenancy/team-meta"),
     ]) {
       const attack = await call(r, IDS.burglarUser)
-      expect(attack.status, "a client login must not get the agency's context").toBe(403)
+      expect(attack.status, "a client login must not get the agency's own answers").toBe(403)
       expect(attack.text, "and must learn nothing from the refusal").not.toContain("memberCount")
+      expect(attack.text).not.toContain("staff@kwapso.app")
     }
     const staff = await call(req("GET /api/tenancy/active"), IDS.staffUser)
     expect(staff.status, `staff lost their own context door: ${staff.text.slice(0, 200)}`).toBe(200)
     expect(JSON.parse(staff.text).memberCount, "staff still see the headcount").toBeGreaterThan(0)
+    const meta = await call(req("GET /api/tenancy/team-meta"), IDS.staffUser)
+    expect(meta.status, `staff lost the team metadata: ${meta.text.slice(0, 200)}`).toBe(200)
   })
 
   it("a REVOKED login pins to nothing — it never falls back to staff", async () => {
