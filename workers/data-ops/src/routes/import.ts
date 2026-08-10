@@ -123,7 +123,7 @@ export async function postImportConfirm(request: Request, env: Env): Promise<Res
   const { target } = await targetForSession(env, cfg, guard, body.sessionId)
   await requireRight(cfg, guard, target.module, "create")
   const out = await confirmImport(env, request, cfg, guard, actor, body.sessionId)
-  await publishChange(env.REALTIME, guard.teamId, target.module)
+  await publishChange(env, guard.teamId, target.module)
   return json({ session: out.summary, result: out.result })
 }
 
@@ -178,7 +178,7 @@ export async function postBatchConfirm(request: Request, env: Env): Promise<Resp
   if (!view.plan) return fail(409, "no_plan", "Plan the import before running it.")
   for (const m of planModules(view.plan)) await requireRight(cfg, guard, m, "create")
   const { report, modules } = await confirmBatch(env, request, cfg, guard, actor, body.batchId)
-  for (const m of modules) await publishChange(env.REALTIME, guard.teamId, m)
+  for (const m of modules) await publishChange(env, guard.teamId, m)
   return json({ report })
 }
 

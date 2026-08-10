@@ -34,7 +34,7 @@ export async function logAccountActivity(
     return
   }
   // Live: the actor's own account feed gains this row (best-effort).
-  await publishUserChange(env.REALTIME, userId, "account_activity", id, "add")
+  await publishUserChange(env, userId, "account_activity", id, "add")
 }
 
 /** The signed-in person's own account history, newest first (capped at 50). */

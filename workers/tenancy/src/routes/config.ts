@@ -24,6 +24,6 @@ export async function postScreen(request: Request, env: Env): Promise<Response> 
   const recipeJson =
     typeof body.recipe === "string" ? body.recipe : JSON.stringify(body.recipe)
   await setScreenOverride(cfg, guard, actor, body.module, recipeJson)
-  await publishChange(env.REALTIME, guard.teamId, "screens", body.module)
+  await publishChange(env, guard.teamId, "screens", body.module)
   return json({ screens: await getScreenOverrides(cfg, guard) })
 }

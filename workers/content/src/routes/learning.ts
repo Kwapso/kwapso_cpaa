@@ -65,7 +65,7 @@ export async function postCreateLearning(request: Request, env: Env): Promise<Re
   requireText(body.title, "Title", TEXT_LIMITS.short)
   const id = await createLearning(cfg, guard, actor, body)
   // Row-level: carry the new item's id so open learning lists patch just that row.
-  await publishChange(env.REALTIME, guard.teamId, "learning", id, "add")
+  await publishChange(env, guard.teamId, "learning", id, "add")
   return json({ learning: await listLearning(cfg, guard), total: await countLearning(cfg, guard) })
 }
 
@@ -74,7 +74,7 @@ export async function postUpdateLearning(request: Request, env: Env): Promise<Re
   if (!body.id) return fail(400, "invalid_input", "id and title are required.")
   requireText(body.title, "Title", TEXT_LIMITS.short)
   await updateLearning(cfg, guard, actor, body.id, body)
-  await publishChange(env.REALTIME, guard.teamId, "learning", body.id)
+  await publishChange(env, guard.teamId, "learning", body.id)
   return json({ learning: await listLearning(cfg, guard), total: await countLearning(cfg, guard) })
 }
 
@@ -86,7 +86,7 @@ export async function postSetLearningActive(request: Request, env: Env): Promise
     return fail(400, "invalid_input", "id and active are required.")
   // R17: no-op repeat → no ping, no duplicate history (see setLearningActive).
   const changed = await setLearningActive(cfg, guard, actor, body.id, body.active)
-  if (changed) await publishChange(env.REALTIME, guard.teamId, "learning", body.id)
+  if (changed) await publishChange(env, guard.teamId, "learning", body.id)
   return json({ learning: await listLearning(cfg, guard), total: await countLearning(cfg, guard) })
 }
 
@@ -104,7 +104,7 @@ export async function postBulkSetLearningActive(request: Request, env: Env): Pro
   const { changed, skipped } = await bulkSetLearningActive(cfg, guard, actor, ids, body.active)
   // Row-level live-sync: one ping per changed item (same row shape the single
   // endpoint patches) — no list refetch.
-  for (const id of changed) await publishChange(env.REALTIME, guard.teamId, "learning", id)
+  for (const id of changed) await publishChange(env, guard.teamId, "learning", id)
   return json({ updated: changed.length, skipped })
 }
 
@@ -116,7 +116,7 @@ export async function postLearningDone(request: Request, env: Env): Promise<Resp
   if (!body.id || typeof body.done !== "boolean")
     return fail(400, "invalid_input", "id and done are required.")
   await setLearningDone(cfg, guard, body.id, body.done)
-  await publishChange(env.REALTIME, guard.teamId, "learning", body.id, "edit")
+  await publishChange(env, guard.teamId, "learning", body.id, "edit")
   return json({ ok: true })
 }
 

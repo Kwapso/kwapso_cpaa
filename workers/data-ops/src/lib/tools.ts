@@ -227,7 +227,7 @@ async function runImportBatchTool(
     if (!view.plan) return { ok: false, status: 409, data: null, error: "That import hasn't been planned." }
     for (const m of planModules(view.plan)) await requireRight(cfg, guard, m, "create")
     const { report, modules } = await confirmBatch(env, request, cfg, guard, actor, batchId)
-    for (const m of modules) await publishChange(env.REALTIME, guard.teamId, m)
+    for (const m of modules) await publishChange(env, guard.teamId, m)
     return {
       ok: true,
       status: 200,

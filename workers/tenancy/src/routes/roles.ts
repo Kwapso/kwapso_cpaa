@@ -107,7 +107,7 @@ export async function postRolePerms(request: Request, env: Env): Promise<Respons
   if (!body.roleId || !body.value)
     return fail(400, "invalid_input", "roleId and value are required.")
   await setRolePermissions(cfg, guard, actor, body.roleId, body.value)
-  await publishChange(env.REALTIME, guard.teamId, "member_roles", body.roleId)
+  await publishChange(env, guard.teamId, "member_roles", body.roleId)
   return json({ ok: true })
 }
 
@@ -128,7 +128,7 @@ export async function postCreateRole(request: Request, env: Env): Promise<Respon
   const roleId = await createRole(cfg, guard, actor, title, (optionalText(body.description, "Description", TEXT_LIMITS.long) ?? ""))
   if (withMatrix) await setRolePermissions(cfg, guard, actor, roleId, body.permissions as PermissionValue)
   // Row-level: carry the new role's id so open role lists patch just that row.
-  await publishChange(env.REALTIME, guard.teamId, "member_roles", roleId, "add")
+  await publishChange(env, guard.teamId, "member_roles", roleId, "add")
   return json({ roles: await listRoles(env, cfg, guard), total: await countRoles(cfg, guard) })
 }
 
@@ -143,7 +143,7 @@ export async function postUpdateRole(request: Request, env: Env): Promise<Respon
   if (!body.roleId) return fail(400, "invalid_input", "roleId and title are required.")
   const title = requireText(body.title, "Name", TEXT_LIMITS.short)
   await updateRole(cfg, guard, actor, body.roleId, title, (optionalText(body.description, "Description", TEXT_LIMITS.long) ?? ""))
-  await publishChange(env.REALTIME, guard.teamId, "member_roles", body.roleId)
+  await publishChange(env, guard.teamId, "member_roles", body.roleId)
   return json({ roles: await listRoles(env, cfg, guard), total: await countRoles(cfg, guard) })
 }
 
@@ -161,6 +161,6 @@ export async function postSetRoleActive(request: Request, env: Env): Promise<Res
   // R17: a repeat (double click / retry) moves zero rows — then nothing is
   // published and no duplicate history exists; the response is still the list.
   const changed = await setRoleActive(cfg, guard, actor, body.roleId, body.active)
-  if (changed) await publishChange(env.REALTIME, guard.teamId, "member_roles", body.roleId)
+  if (changed) await publishChange(env, guard.teamId, "member_roles", body.roleId)
   return json({ roles: await listRoles(env, cfg, guard), total: await countRoles(cfg, guard) })
 }

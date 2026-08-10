@@ -137,7 +137,7 @@ export async function verifyEmailChange(
   await signOutOtherSessions(env, user.id, currentTokenHash)
   // Live: push the OTHER devices to login instantly (the acting device keeps its
   // still-valid session). Best-effort.
-  await publishSignOut(env.REALTIME, user.id)
+  await publishSignOut(env, user.id)
   await sendEmailChangedNotice(env, oldEmail, newEmail).catch((e) =>
     console.error("email-change notice failed:", e)
   )

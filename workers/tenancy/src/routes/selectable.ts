@@ -44,7 +44,7 @@ export async function postCreateSelectable(request: Request, env: Env): Promise<
   const value = requireText(body.value, "Option", TEXT_LIMITS.short)
   const id = await createSelectable(cfg, guard, actor, type, value)
   // Row-level: carry the new value's id so open lists can patch just that row.
-  await publishChange(env.REALTIME, guard.teamId, "selectable_data", id, "add")
+  await publishChange(env, guard.teamId, "selectable_data", id, "add")
   return json({ values: await listSelectable(cfg, guard), total: await countSelectable(cfg, guard) })
 }
 
@@ -53,7 +53,7 @@ export async function postUpdateSelectable(request: Request, env: Env): Promise<
   if (!body.id) return fail(400, "invalid_input", "id and value are required.")
   const value = requireText(body.value, "Option", TEXT_LIMITS.short)
   await updateSelectable(cfg, guard, actor, body.id, value)
-  await publishChange(env.REALTIME, guard.teamId, "selectable_data", body.id)
+  await publishChange(env, guard.teamId, "selectable_data", body.id)
   return json({ values: await listSelectable(cfg, guard), total: await countSelectable(cfg, guard) })
 }
 
@@ -63,6 +63,6 @@ export async function postSetSelectableActive(request: Request, env: Env): Promi
     return fail(400, "invalid_input", "id and active are required.")
   // R17: no-op repeat → no ping, no duplicate history (see setSelectableActive).
   const changed = await setSelectableActive(cfg, guard, actor, body.id, body.active)
-  if (changed) await publishChange(env.REALTIME, guard.teamId, "selectable_data", body.id)
+  if (changed) await publishChange(env, guard.teamId, "selectable_data", body.id)
   return json({ values: await listSelectable(cfg, guard), total: await countSelectable(cfg, guard) })
 }

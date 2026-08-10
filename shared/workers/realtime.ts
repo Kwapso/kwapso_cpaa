@@ -17,6 +17,12 @@
 
 import type { Fetcher } from "@cloudflare/workers-types"
 
+/** What a publisher needs: the binding, and the shared internal key the realtime
+ * worker checks. Taking the whole env (rather than just the binding) is what
+ * lets the key travel with the call — a publisher that forgets it is a type
+ * error here instead of a silent 403 at runtime. */
+export type RealtimeEnv = { REALTIME: Fetcher; INTERNAL_KEY?: string }
+
 /** One change ping. `op` is advisory; the client re-pulls the row and decides
  * whether it still belongs in the collection (keep-or-drop), so "edit" vs
  * "remove" need not be exact. A `session` event (no id) is the sign-out signal. */
@@ -30,11 +36,18 @@ export type ChangeEvent = {
   op?: "add" | "edit" | "remove" | "session"
 }
 
-async function publish(realtime: Fetcher, channel: string, event: ChangeEvent): Promise<void> {
+async function publish(env: RealtimeEnv, channel: string, event: ChangeEvent): Promise<void> {
   try {
-    await realtime.fetch("https://realtime/publish", {
+    await env.REALTIME.fetch("https://realtime/publish", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        // /publish can broadcast to ANY channel, so it is an internal door and
+        // is keyed like every other one. Network isolation (workers_dev:false,
+        // and the gateway never routing it) was its only protection before —
+        // one config regression away from an open broadcast door.
+        "x-internal-key": env.INTERNAL_KEY ?? "",
+      },
       body: JSON.stringify({ channel, event }),
     })
   } catch (e) {
@@ -44,29 +57,29 @@ async function publish(realtime: Fetcher, channel: string, event: ChangeEvent): 
 
 /** Tell a TEAM's channel that one row in `resource` changed. */
 export async function publishChange(
-  realtime: Fetcher,
+  env: RealtimeEnv,
   teamId: string,
   resource: string,
   id?: string,
   op?: ChangeEvent["op"]
 ): Promise<void> {
-  await publish(realtime, `team:${teamId}`, { resource, id, op })
+  await publish(env, `team:${teamId}`, { resource, id, op })
 }
 
 /** Tell ONE user's channel (all their devices) that one identity row changed. */
 export async function publishUserChange(
-  realtime: Fetcher,
+  env: RealtimeEnv,
   userId: string,
   resource: string,
   id?: string,
   op?: ChangeEvent["op"]
 ): Promise<void> {
-  await publish(realtime, `user:${userId}`, { resource, id, op })
+  await publish(env, `user:${userId}`, { resource, id, op })
 }
 
 /** Force-sign-out one user's OTHER devices (e.g. after an email change). Carries
  * no id — the client re-checks auth and, if its session is dead, redirects to
  * login. The acting device keeps its (still-valid) session. */
-export async function publishSignOut(realtime: Fetcher, userId: string): Promise<void> {
-  await publish(realtime, `user:${userId}`, { resource: "session", op: "session" })
+export async function publishSignOut(env: RealtimeEnv, userId: string): Promise<void> {
+  await publish(env, `user:${userId}`, { resource: "session", op: "session" })
 }

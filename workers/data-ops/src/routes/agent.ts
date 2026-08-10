@@ -108,7 +108,7 @@ export async function postGrantCredits(request: Request, env: Env): Promise<Resp
   if (!body.teamId || !Number.isFinite(amount) || amount <= 0 || Math.trunc(amount) !== amount)
     return fail(400, "invalid_input", "teamId and a positive whole amount are required.")
   const balance = await grantCredits(env, body.teamId, amount)
-  await publishChange(env.REALTIME, body.teamId, "agent_usage")
+  await publishChange(env, body.teamId, "agent_usage")
   return json({ teamId: body.teamId, balance })
 }
 
