@@ -1,16 +1,38 @@
-# Roadmap — members, roles & settings build-out (Phase C)
+# Phase C — members, roles & settings: the build record (CLOSED 2026-07-02)
 
-> **Where things stand (2026-07-02).** Everything below SHIPPED, and a whole
-> further era shipped after it: learning + help + CSV import + the streaming AI
-> agent co-pilot (branch `agent-modules`, staging). This file is the Phase-C
-> HISTORY + its still-open tail (see "Remaining"); for the current system read
-> README.md → BASE-MANUAL.md, and for what's next: the owner's staging verdict,
-> ~~the external `mcp` worker~~ (BUILT 2026-07-07 — ARCHITECTURE.md), the two deferred perf
-> wins (EDGE-CASES.md), and the `lean-mean-report.md` fix list.
+> **This is history, not a plan. Do not read it for what is true today.**
+>
+> It is the record of ONE build round — Phase C, decided with the owner on
+> 2026-06-13 and finished on 2026-07-02 — kept because the decisions in it were
+> argued once and should not be argued again, and because later docs cite its
+> phases by name. Its last edit was the day it closed. Everything below shipped;
+> anything it calls "next" or "remaining" is a snapshot of what was open on
+> 2026-07-02 and has been overtaken.
+>
+> **Two whole eras shipped after this file stopped moving**, and neither is
+> described here: the agent-modules build (learning, help, CSV import, the
+> streaming AI co-pilot, and the external machine surface) and the client-portal
+> build (the second front end, the account fence, and the closed-allow-list door
+> in front of it).
+>
+> **For what is true today, read these instead:**
+>
+> | You want | Read |
+> |---|---|
+> | What the base is and where every doc lives | [README.md](README.md) |
+> | How the whole system works, and why | [BASE-MANUAL.md](BASE-MANUAL.md) |
+> | The decisions that are locked | [ARCHITECTURE.md](ARCHITECTURE.md) |
+> | The rules a change must obey | [CLAUDE.md](CLAUDE.md) + [RULES.md](RULES.md) |
+> | What is still open, and where | [UI-GAPS.md](UI-GAPS.md) (library gaps), [EDGE-CASES.md](EDGE-CASES.md) (the two deferred perf wins), [AGENT-MODULES-PLAN.md](AGENT-MODULES-PLAN.md) (the deferred agent hooks), [BASE-IMPROVEMENTS.md](BASE-IMPROVEMENTS.md) (what each audit round changed) |
+>
+> There is deliberately **no single "what's next" document**. A roadmap file goes
+> stale the week after it is written and then quietly misleads — which is exactly
+> what this one did between 2026-07-02 and 2026-08-10. Open work lives beside the
+> thing it is open on, where whoever changes that thing will actually see it.
 
 Decided 2026-06-13 with the user. Built **sequentially, phase by phase**, each
-shipped to staging. This file is the contract — keep the seams stable so phases
-don't drift.
+shipped to staging. This file was the contract for that round — the seams named
+below were kept stable so the phases didn't drift.
 
 ## Phase 0 · Performance + Live data — SHIPPED (2026-06-13)
 
@@ -20,10 +42,10 @@ every navigation, and hashed assets were `must-revalidate`. Fixes, all
 cross-cutting so every screen + future phase inherits them:
 - **Immutable asset caching** — gateway marks `/_next/static/**`
   `max-age=1yr, immutable`.
-- **Cache-first data layer** (`web/lib/store.ts` + module-cached session in
+- **Cache-first data layer** (`shared/web/store.ts` + module-cached session in
   `use-active-team.ts`) — screens paint instantly, revalidate in the background.
 - **Live layer** — new `realtime` worker (`TeamChannel` Durable Object,
-  hibernatable), `web/lib/realtime.ts` client hook wired in `AppShell`. See
+  hibernatable), `shared/web/realtime.ts` client hook wired in `AppShell`. See
   ARCHITECTURE.md (workers table, LOCKED 2026-06-13).
   **UPDATED 2026-06-22 — now ROW-LEVEL + two channels:** pings carry
   `{resource, id, op}`; the client re-pulls just the changed row and patches it
@@ -112,6 +134,12 @@ Then the Foundation phase (below) resumes.
 **Web seams:** `web/lib/pages.ts` (registry) · `web/components/app-shell.tsx`
 (sidebar + bottom tabs) · a `<PageGuard>` wrapper used by guarded screens.
 
+> **`<PageGuard>` was never built** (noted 2026-08-10). It was a planned seam in
+> this contract and there is no such component in the repo — the page-visibility
+> guard is enforced inside the shell instead, as the 2026-06-21 update two
+> sections above describes. It survives here as a nice-to-have (see "Remaining"
+> item 3), never as a thing you can import.
+
 **Product rules locked 2026-06-21 (apply to Members / Member roles / Invites):**
 - **Count badges:** when a section/tab leads with a collection (Members, Invites,
   …) it shows a count = what the collection displays, compacted via
@@ -176,7 +204,7 @@ Then the Foundation phase (below) resumes.
 
 - **Hardening:** client permission gating (`web/lib/perms.ts` `can()`), opaque
   dropdown menus (stopgap; library flagged), restyled role selection + visible
-  icons, an `ErrorBoundary` + global error reporting (`web/lib/log.ts` → the
+  icons, an `ErrorBoundary` + global error reporting (`shared/web/log.ts` → the
   gateway's `/api/log/client` → Cloudflare observability). Rule: ERROR-HANDLING.md.
 - **Concurrency (race-safety):** atomic last-admin writes (`members.ts`, no DO
   needed) + a partial unique index for pending invites (`db/core/0006`). Rule:
@@ -187,7 +215,12 @@ Then the Foundation phase (below) resumes.
   reusable `MetadataOverview` + `ActivityFeed`; team-detail **Overview** + **Activity**
   tabs and a **member-detail dialog** (Overview + Activity). Email-change flow live.
 
-## Remaining (for the next session)
+## Remaining — as it stood on 2026-07-02 (a snapshot, not a to-do list)
+
+These were Phase C's open ends on the day it closed. They are left here unedited
+so the record reads honestly; do not treat them as the current backlog. Where an
+item is still open, the doc that owns it says so — UI-GAPS.md for the library
+gaps, the per-module docs for the rest.
 
 1. ~~**Role detail Overview/Activity**~~ — **DONE (2026-07-06).** `role-detail.tsx`
    composes `TabsView`: Permissions (the matrix, main) + Overview (the audit block) +

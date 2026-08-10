@@ -179,7 +179,7 @@ Two consequences worth knowing:
 
 ### Two channel scopes
 
-Defined in `shared/workers/realtime.ts` and consumed by `web/lib/realtime.ts`:
+Defined in `shared/workers/realtime.ts` and consumed by `shared/web/realtime.ts`:
 
 | Scope | Name | Members | Carries |
 |---|---|---|---|
@@ -319,7 +319,7 @@ runtime drops it on close).
 
 ### Step 4 — the client patches ONE row (browser)
 
-`web/lib/realtime.ts` receives the frame and calls the host's `onEvent`; the
+`shared/web/realtime.ts` receives the frame and calls the host's `onEvent`; the
 registry-driven handler in `web/components/app-shell.tsx` decides what to do. It
 is **not** a per-resource `switch` — every module is one entry in
 `TEAM_RESOURCES`:
@@ -464,7 +464,7 @@ recovered by revalidation or reconnect catch-up. Never make a write's success
 depend on the live layer.
 
 **Reconnect re-syncs — pings can be missed.** A backoff-reconnecting socket
-(`web/lib/realtime.ts`: 1s, 2s, 4s … capped at 15s) can't prove it saw every
+(`shared/web/realtime.ts`: 1s, 2s, 4s … capped at 15s) can't prove it saw every
 ping while it was down. `onReconnect` fires only on a **re**-connect (not the
 first open) and the host `reconcile`s each on-screen list — diff-patching changed
 rows in, new rows in order, gone rows out — plus refreshes the small derived
@@ -524,7 +524,7 @@ To add the live layer to a new app on this base:
 5. **Classify every route** `read` / `mutation` / `housekeeping` in the worker's
    `ROUTES` table; the `publish-seam.test.ts` guard turns the build red if a
    `mutation` doesn't publish. (CACHING.md rule 4.)
-6. **The client** — `web/lib/realtime.ts` (two sockets, backoff, reconnect) plus
+6. **The client** — `shared/web/realtime.ts` (two sockets, backoff, reconnect) plus
    one `TEAM_RESOURCES` entry per module (`key` / `idField` / `fetchOne` /
    `fetchList` / `deps`); the generic handler does row-level `patchRow` +
    reconnect `reconcile`. No bespoke per-module code. (CACHING.md rule 3.)

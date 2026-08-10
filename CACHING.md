@@ -6,10 +6,10 @@ sit on stale data, and a cache can never hold something you're not allowed to
 see. Follow them for every new screen and module.
 
 The whole layer is tiny and dependency-free:
-- [`web/lib/store.ts`](web/lib/store.ts) — the cache + `useCached` / `invalidate` /
+- [`shared/web/store.ts`](shared/web/store.ts) — the cache + `useCached` / `invalidate` /
   `primeCache`, plus `patchRow` (row-level: patch ONE row in a cached list) and
   `reconcile` (reconnect catch-up: diff-patch a whole list back in place).
-- [`web/lib/realtime.ts`](web/lib/realtime.ts) — the live channel client. A browser
+- [`shared/web/realtime.ts`](shared/web/realtime.ts) — the live channel client. A browser
   opens **two** sockets: the active **team** channel and its **own user** channel.
 - [`shared/workers/realtime.ts`](shared/workers/realtime.ts) — the publish side:
   `publishChange` (team channel), `publishUserChange` (one user's devices),
@@ -72,7 +72,7 @@ capped list's length is a ceiling, not a total, so every list door returns its
 exact server `COUNT(*)` (`total`; help also `mineTotal`) and the client keeps it
 in a `total:<prefix>:<teamId>` cache sidecar — primed by the list fetchers,
 bumped ±1 by an `add`/`remove` ping, re-primed on reconnect — rendered through the
-one `web/lib/format-count.ts` seam. Never `rows.length`.
+one `shared/web/format-count.ts` seam. Never `rows.length`.
 
 **No deaf publishers, no deaf paged screens (LAW R15).** Every resource string a
 worker publishes must reach a listener: a `TEAM_RESOURCES` row-level entry, a
@@ -147,7 +147,7 @@ navigated elsewhere in the same tab would otherwise reset to empty on return —
 input lived only in component state. **Rule: every form dialog persists its draft.**
 
 - Back the form's values with `useFormDraft(draftKey, initialValues, open)`
-  ([`web/lib/use-form-draft.ts`](web/lib/use-form-draft.ts)) instead of plain
+  ([`shared/web/use-form-draft.ts`](shared/web/use-form-draft.ts)) instead of plain
   `useState`. It restores a saved draft when the form opens and saves every change to
   `sessionStorage` (survives navigation AND reload within the tab; gone when the tab
   closes — "on-device per session").

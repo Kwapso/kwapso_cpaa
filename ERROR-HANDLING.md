@@ -11,7 +11,8 @@ observability** (already enabled on every worker); to send errors to
 Sentry/Datadog later, change ONLY the seam's body — call sites never move (same
 trick as the swappable AI-import interface).
 
-- **Client — `web/lib/log.ts`** → `reportError(where, error, extra?)`:
+- **Client — `shared/web/log.ts`** → `reportError(where, error, extra?)`: one seam,
+  both front ends — the agency app and the client portal import the same file.
   - logs to the console (for the developer), and
   - beacons a compact `{where, message, stack, url, at}` to `POST /api/log/client`.
 - **Client global handlers** — `installGlobalErrorReporting()` (mounted once by

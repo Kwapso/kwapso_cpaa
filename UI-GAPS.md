@@ -8,7 +8,7 @@ placeholder deleted).
 
 | # | Missing component | Placeholder here | What the library version needs | Status |
 |---|---|---|---|---|
-| 1 | `code-input` (primitive) — one-time-code boxes | `web/components/temp/code-input.tsx` | Configurable length, auto-advance, backspace, paste-spread, numeric keypad on mobile, `one-time-code` autofill, disabled state | waiting on library |
+| 1 | `code-input` (primitive) — one-time-code boxes | `shared/web/code-input.tsx` (MOVED 2026-08-10 — see note under the table) | Configurable length, auto-advance, backspace, paste-spread, numeric keypad on mobile, `one-time-code` autofill, disabled state | waiting on library |
 | 2 | `auth-card` (collection) — full sign-in card | `web/components/temp/auth-card.tsx` | Config-driven: app name, logo, legal links; two-step email→code flow; error/busy states; uses `code-input` | waiting on library |
 | 3 | ~~`permission-matrix` (collection)~~ | — | The roles access-rights grid. | **SHIPPED in the library (2026-06-13)** — live at `@kwapso/ui/registry/collections/permission-matrix`; integrated in the Member roles detail under `/t/<teamId>/roles/<id>` (host-composed). Temp removed before it was ever needed. |
 | 4 | Collection card-surface config (`data-table`, `permission-matrix`) | (overridden app-side via `className`) | The user wants NO card backgrounds. `permission-matrix` flattens cleanly with `className="bg-transparent"`, but its sticky module column keeps a `bg-card` fill (needed so scrolled cells stay opaque), and `data-table`'s frame lives on an inner div `className` can't reach. Proper fix: a `surface: "card" \| "none"` option on the collection config that also swaps the sticky fill to `bg-background`. | **nice-to-have — flag for the library** |
@@ -25,6 +25,16 @@ placeholder deleted).
 
 When the library ships one: re-run `npm install github:Kwapso/kwapso_ui`,
 swap the import, delete the temp file, update this table.
+
+**One placeholder is not in `web/components/temp/`, and it needs saying.**
+`code-input` moved to `shared/web/code-input.tsx` when the client portal shipped:
+both front ends sign in with it, and a file two workspaces import cannot live
+inside one of them. So it now sits in the most permanent folder in the repo with
+none of the folder's "this is a stand-in" signal — the only thing marking it as
+temporary is the comment at the top of the file and this row. It is still #1 on
+this list, and it still gets deleted the day the library ships the primitive.
+`auth-card` (#2) is unaffected: only the agency app uses it, so it stayed in
+`web/components/temp/`.
 
 ## Composition candidates (built from primitives here; could graduate to the library)
 

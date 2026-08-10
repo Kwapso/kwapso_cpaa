@@ -64,7 +64,7 @@ Start with **[README.md](README.md)** (the doc map), then:
 - **[ERROR-HANDLING.md](ERROR-HANDLING.md)** — the one logging seam, the error boundary, never-swallow.
 - **[DATA-MODEL.md](DATA-MODEL.md)** — every table (global core + per-team).
 - **[SEARCH.md](SEARCH.md)** — the layered search / filter model.
-- **[ROADMAP.md](ROADMAP.md)** — what's built and what's next, with the contracts each phase plugs into.
+- **[ROADMAP.md](ROADMAP.md)** — HISTORY, not a plan: the build record of the Phase-C round (closed 2026-07-02) and the contracts its phases plugged into. Don't read it for current state — that's README.md → BASE-MANUAL.md. Open work lives beside the thing it's open on (UI-GAPS.md, EDGE-CASES.md, AGENT-MODULES-PLAN.md, BASE-IMPROVEMENTS.md).
 
 **The manual — to build on the base, or rebuild it from zero:**
 

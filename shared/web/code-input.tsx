@@ -1,9 +1,15 @@
 "use client"
 
-// TEMPORARY PLACEHOLDER — flagged in UI-GAPS.md.
+// TEMPORARY PLACEHOLDER — flagged in UI-GAPS.md (#1).
 // The library has no one-time-code input yet. This stand-in composes six
 // library Inputs (auto-advance, backspace, paste). Once @kwapso/ui
 // ships `code-input`, this file gets DELETED and imports swap to the library.
+//
+// It sits in shared/web/ — the most permanent folder in the repo — and NOT in
+// web/components/temp/ beside auth-card, for one reason: both front ends sign in
+// with it (the agency app and the client portal), and a file two workspaces
+// import cannot live inside one of them. The folder no longer carries the
+// "this is a stand-in" signal, so this comment has to. It is still temporary.
 
 import * as React from "react"
 

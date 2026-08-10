@@ -100,9 +100,9 @@ function editedBy(actor: Actor, now: string): { sql: string; params: string[] } 
  * R14: accounts grow with ordinary use — every contact of every client is a row
  * here, so a hard cap would eventually become a refusal to answer. This door
  * therefore pages (opaque cursor + exact total + hasMore) rather than capping.
- * It is not in GROWING_COLLECTIONS yet only because that registry entry also
- * asserts a client that can reach page two, and the accounts screens land with
- * the UI build — add the entry the day the screen ships.
+ * The screens shipped, so the registry entry is in place: `accounts` is a
+ * GROWING_COLLECTIONS row in shared/rules/registry.ts, which also holds the
+ * check to a client that can actually reach page two.
  *
  * `q` searches name, code and email. `type` narrows to entities or individuals.
  * Archived rows are included and carry `active` (the manager greys them with a

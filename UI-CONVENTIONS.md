@@ -77,7 +77,7 @@ a *tracked note*, never a silent fork.
 
 ### Host-composed ≠ new library component
 
-`FormShell` (`web/components/form-shell.tsx`) is the tell. It is a **host-side recipe
+`FormShell` (`shared/web/form-shell.tsx`) is the tell. It is a **host-side recipe
 assembled from library primitives** (`Separator`, `<form>`), not a new library widget:
 
 ```tsx
@@ -284,7 +284,7 @@ config with `tabs`, `badge`, `badgeVariant`, and an `onValueChange` that drives 
 ### R4 — every form goes through `FormShell`
 
 One layout, everywhere: **title + subtitle · separator · fields · separator ·
-action**. `FormShell` (`web/components/form-shell.tsx`) is that layout, assembled from
+action**. `FormShell` (`shared/web/form-shell.tsx`) is that layout, assembled from
 library primitives. The check asserts each form dialog imports it:
 
 ```ts
@@ -638,7 +638,7 @@ alive underneath — that's the "immovable, contentless page" feel.
 Every screen that shows a collection shows its count **exactly once**:
 
 - **The number** is an exact server `COUNT(*)` (the list door returns `total`),
-  rendered through the ONE seam `web/lib/format-count.ts` — `formatCount` floors
+  rendered through the ONE seam `shared/web/format-count.ts` — `formatCount` floors
   and abbreviates at every magnitude (`1.3k` · `24k` · `1.2m`), renders NOTHING
   for zero/loading, and never grows a `+` (only a capped filtered-search total
   does, via `formatSearchTotal`). Never `rows.length` — a capped list's length is

@@ -1,7 +1,7 @@
 "use client"
 
 // A render-error catcher for the portal. Same seam as the agency app's (report
-// through web/lib/log → the gateway → the 90-day error log), DIFFERENT words.
+// through shared/web/log → the gateway → the 90-day error log), DIFFERENT words.
 //
 // The agency version prints the raw error message, because the person reading it
 // is us and a stack trace is the most useful thing we could give them. A client

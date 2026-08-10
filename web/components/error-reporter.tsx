@@ -2,7 +2,7 @@
 
 // Mounts the global error/unhandled-rejection listeners once, at the app root,
 // so async crashes (which React error boundaries can't catch) are reported with
-// their real message + stack. Renders nothing. See web/lib/log.ts.
+// their real message + stack. Renders nothing. See shared/web/log.ts.
 
 import * as React from "react"
 

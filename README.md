@@ -103,8 +103,15 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
    that protects an invariant (counts, balances, uniqueness).
 5. **[ERROR-HANDLING.md](ERROR-HANDLING.md)** — the error-capture ruleset (the
    one swappable logging seam, the error boundary, never-swallow).
-6. **[ROADMAP.md](ROADMAP.md)** — what's built and what's next, with the
-   type/endpoint contracts each phase plugs into.
+6. **[ROADMAP.md](ROADMAP.md)** — **history, not a plan.** The build record of ONE
+   round (Phase C: members, roles & settings), closed 2026-07-02, with the
+   type/endpoint contracts each of its phases plugged into. Kept so its decisions
+   aren't re-argued; it does not describe the eras that shipped after it. There is
+   deliberately no single "what's next" file — open work lives beside the thing
+   it's open on: **UI-GAPS.md** (library gaps), **EDGE-CASES.md** (the deferred
+   perf wins), **AGENT-MODULES-PLAN.md** (the deferred agent hooks), and
+   **BASE-IMPROVEMENTS.md** (what each audit round changed). For what is true
+   today: this file → BASE-MANUAL.md.
 7. **[SEARCH.md](SEARCH.md)** — the search + in-app-filter ruleset (the layered
    client-side → server `?q=` → per-team FTS5 model; recipe-declared).
 8. **[DATA-MODEL.md](DATA-MODEL.md)** — every table (global core + per-team), what's
@@ -168,6 +175,15 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
 25. **[glide/README.md](glide/README.md)** — the legacy Glide catalogue: the two apps
     kwapso ran on before this one, how to pull their rows, and the field
     reconciliation. `glide/data/` is git-ignored — it is customer data.
+26. **`planning-answers/`** — the answered briefing forms behind SCOPE.html, one JSON
+    file per round per respondent (`plan_with_questions` exports). Rounds 1–2 settled
+    the shape of the system; round 3 was answered independently by three people
+    (Alaap K, Alex, Aurora) so agreement could be told apart from misunderstanding;
+    round 4 closed the open questions. **Tracked on purpose, and not to be deleted or
+    edited:** SCOPE ch.13 states that every decision in it traces back here, so these
+    files are the evidence for "we decided this, and here is who said so". They are a
+    RECORD, never a spec — where a form answer and SCOPE.html disagree, SCOPE wins,
+    and where SCOPE is silent, base law applies. They hold no customer data.
 
 ### Where the code lives
 
@@ -176,10 +192,11 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
 | `web/` | the AGENCY screens (Next.js static export → `web/out`, served by `workers/gateway`) |
 | `web-portal/` | the CLIENT PORTAL screens (static export → `web-portal/out`, served by `workers/portal-gateway`). Its own workspace, its own tests — including the account-fence suite |
 | `workers/` | the eight workers. Six private brains + the two public gateways |
-| `shared/` | what every side agrees on: the worker seams, the types, the glossary, the rules registry |
+| `shared/` | what every side agrees on. `shared/workers/` — the worker seams (gating, the data door, validation, publish); `shared/web/` — the front-end seams BOTH apps import (the cache `store.ts`, the live client `realtime.ts`, `log.ts`, `form-shell.tsx`, `format-count.ts`, `use-form-draft.ts`); plus the types, the glossary and the rules registry. A file lands in `shared/web/` the moment the second front end needs it — that is why several seams the docs used to place under `web/lib/` now live here |
 | `db/core/` | the global core database's migrations (per-team schema lives in `workers/tenancy/src/team-schema.ts`) |
 | `scripts/` | the operational scripts — reset, seed, the smokes, the Glide pull |
 | `skills/` | the build skills that travel with the base (`new-app`) |
+| `planning-answers/` | the answered briefing forms SCOPE.html traces its decisions to (see #26). A record, not a spec |
 
 ## Develop
 
