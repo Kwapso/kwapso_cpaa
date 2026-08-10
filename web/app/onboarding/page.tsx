@@ -36,6 +36,12 @@ export default function OnboardingPage() {
   const [lastName, setLastName] = React.useState("")
   const [photo, setPhoto] = React.useState<string | undefined>()
   const [busy, setBusy] = React.useState(false)
+  // Someone who already finished onboarding and has NO team didn't arrive here
+  // to sign up — they were removed from their last one (or their team's creation
+  // failed). Telling them "your team gets created right after" reads as an
+  // instruction to start again, which is neither what happened nor what they
+  // usually want. Same form, honest words.
+  const [teamless, setTeamless] = React.useState(false)
 
   React.useEffect(() => {
     let alive = true
@@ -50,6 +56,7 @@ export default function OnboardingPage() {
             router.replace("/home")
             return
           }
+          if (alive) setTeamless(true)
         }
         if (!alive) return
         setFirstName(user.firstName ?? "")
@@ -109,10 +116,12 @@ export default function OnboardingPage() {
         <div className="flex flex-col items-center text-center">
           <BrandMark className="mb-1" />
           <h1 className="text-2xl font-semibold tracking-tight">
-            Set up your profile
+            {teamless ? "You're not in a team" : "Set up your profile"}
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Tell us who you are — your team gets created right after.
+            {teamless
+              ? "An admin can invite you back, or you can start a team of your own below."
+              : "Tell us who you are — your team gets created right after."}
           </p>
         </div>
         <form className="mt-6 flex flex-col gap-4" onSubmit={finish}>
@@ -150,7 +159,10 @@ export default function OnboardingPage() {
               disabled={busy || !firstName.trim() || !lastName.trim()}
             >
               {busy ? <Spinner /> : null}
-              {busy ? "Creating your team…" : "Continue"}
+              {/* The button says what pressing it DOES. For a removed member
+                  "Continue" hides the consequence — they'd end up owning a new
+                  team they never asked for. */}
+              {busy ? "Creating your team…" : teamless ? "Start my own team" : "Continue"}
             </Button>
           </form>
       </div>
