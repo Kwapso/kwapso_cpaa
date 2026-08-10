@@ -9,3 +9,18 @@ declare module "node:fs" {
 declare module "node:path" {
   export function join(...parts: string[]): string
 }
+// The token test runs the REAL migrations against a REAL SQLite database — the
+// fixes it guards ARE the SQL, so a stub would agree with a broken one. Just the
+// slice tokens.test.ts uses.
+declare module "node:sqlite" {
+  export type SqlValue = string | number | bigint | null | Uint8Array
+  export class DatabaseSync {
+    constructor(path: string)
+    exec(sql: string): void
+    prepare(sql: string): {
+      get(...params: SqlValue[]): unknown
+      all(...params: SqlValue[]): unknown[]
+      run(...params: SqlValue[]): { changes: number | bigint }
+    }
+  }
+}

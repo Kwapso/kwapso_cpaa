@@ -93,7 +93,7 @@ quota tables. Create it for each environment and apply the core migrations in
 npx wrangler d1 create kwapso-core-staging
 npx wrangler d1 create kwapso-core
 
-# Apply every core migration (0001…0013) to each env. Any core-bound worker can run it;
+# Apply every core migration (0001…0016) to each env. Any core-bound worker can run it;
 # auth is the canonical one. Run WITHOUT --env for production.
 cd workers/auth
 npx wrangler d1 migrations apply kwapso-core-staging --env staging --remote
@@ -101,7 +101,7 @@ npx wrangler d1 migrations apply kwapso-core --remote
 cd ../..
 ```
 
-The current core migrations are `0001`–`0013` (0013 = `mcp_tokens` + `sessions.team_pin` — the MCP front desk) (users, teams, team_members, the
+The current core migrations are `0001`–`0016` (0013 = `mcp_tokens` + `sessions.team_pin` — the MCP front desk; 0015 = the login-code send throttle's ledger; 0016 = access-token expiry) (users, teams, team_members, the
 email-change security records, account activity, the import catalog, and the three
 agent quota tables `agent_usage` / `agent_credits` / `agent_usage_log`, plus the
 central error log `error_logs`). DATA-MODEL.md

@@ -45,6 +45,12 @@ token — so a person leaving doesn't break the automation, and you can revoke i
    your role at call time** (change the role later and the token's power changes with
    it). Revoke it any time from the same screen — revocation takes effect on the very
    next call.
+5. **It expires after 90 days**, and you can hold **10 live tokens at once**. The
+   screen shows each token's "works until" date; past it, calls come back
+   `401 token_expired` and you make a new one (there is no renewal — a new secret is
+   the point). Trying to mint an eleventh live token is a clean refusal: revoke one
+   you no longer use first. Both limits exist for the same reason — a key with no end
+   date is a key forever, and an unbounded pile of them is a pile you stop watching.
 
 Treat the secret like a password. Anyone holding it can act as you, in that team.
 
@@ -227,6 +233,14 @@ or zero, by choice.
   you can't remove yourself or the last admin.
 - **Revoke bites immediately.** The token is re-verified on every request, so revoking
   it stops the next call — even if a session was mid-flight.
+- **It runs out on its own.** Every token carries a deadline (90 days), checked beside
+  the revoke check on every call, so a secret forgotten in an old CI config stops being
+  a key whether or not anyone remembers it. A token row with no deadline is refused
+  rather than trusted.
+- **And it stays reachable.** An account holds at most 10 live tokens, and the settings
+  list shows unrevoked ones first — so a token that still works is always on the
+  screen, and always revocable. (It was previously possible to bury a live token behind
+  more than 1,000 revoked ones and lose the ability to revoke it from the app.)
 - **Hashed at rest.** Only the token's hash is stored; the secret is shown once.
 
 **Two honest limits:**
@@ -248,8 +262,13 @@ or zero, by choice.
 
 `workers/mcp/` — `POST /mcp` (JSON-RPC) + session-gated token management under
 `/api/mcp/tokens*`; the human-facing card is `web/components/access-tokens.tsx`
-(Settings → Access tokens). Tokens live in the core DB (`mcp_tokens`, migration
-`0013`); a token is bridged to a **short-lived team-pinned session** via auth's
+(Settings → Access tokens). Tokens live in the core DB (`mcp_tokens`, migrations
+`0013` + `0016` — `expires_at`, backfilled so applying it gives every existing token a
+full term rather than killing it); the TTL and the per-account cap are
+`MCP_TOKEN_TTL_DAYS` / `MAX_ACTIVE_MCP_TOKENS_PER_USER` in
+`shared/workers/limits.ts`, and `workers/mcp/test/tokens.test.ts` runs the real
+migrations against a real SQLite database to hold all three fixes in place.
+A token is bridged to a **short-lived team-pinned session** via auth's
 `/internal/mcp-session` (INTERNAL_KEY, fail-closed). The gateway routes `/mcp` +
 `/api/mcp/*` to the worker (it's the only public door; the mcp worker is
 `workers_dev:false`). See ARCHITECTURE.md (the `mcp` row) and DATA-MODEL.md

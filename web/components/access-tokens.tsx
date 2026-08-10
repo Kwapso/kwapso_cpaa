@@ -35,10 +35,18 @@ import {
 import { Ban, ClipboardCopy, Copy, Plus } from "lucide-react"
 
 import type { McpTokenSummary } from "@shared/types"
+import { MCP_TOKEN_TTL_DAYS } from "@shared/workers/limits"
 import { FormShell, fieldSpacing } from "@/components/form-shell"
 import { ApiFailure, mcp } from "@/lib/api"
-import { formatActivityWhen } from "@/lib/format"
+import { formatActivityWhen, formatDate } from "@/lib/format"
 import { useCached, primeCache } from "@/lib/store"
+
+/** Past its deadline (or missing one — the server treats that as expired too).
+ * A token that has run out is not "active": it stops working the same way a
+ * revoked one does, so the screen must not keep calling it live. */
+function hasExpired(t: McpTokenSummary): boolean {
+  return !t.expiresAt || t.expiresAt <= new Date().toISOString()
+}
 
 // A ready-to-paste connect prompt for ANY AI (Claude, Gemini, GPT, …) — endpoint,
 // the Bearer header, and a Claude-Desktop-style stdio config. Built from the LIVE
@@ -152,6 +160,10 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
                 <Badge variant="outline" className="text-muted-foreground text-[10px]">
                   Revoked
                 </Badge>
+              ) : hasExpired(t) ? (
+                <Badge variant="outline" className="text-muted-foreground text-[10px]">
+                  Expired
+                </Badge>
               ) : (
                 <Badge variant="secondary" className="text-[10px]">
                   Active
@@ -160,22 +172,30 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
               <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs">
                 Created {formatActivityWhen(t.createdAt)}
                 {t.lastUsedAt ? ` · last used ${formatActivityWhen(t.lastUsedAt)}` : " · never used"}
+                {t.revokedAt
+                  ? ""
+                  : hasExpired(t)
+                    ? ` · expired ${formatDate(t.expiresAt)}`
+                    : ` · works until ${formatDate(t.expiresAt)}`}
               </span>
               {!t.revokedAt && (
                 <div className="flex items-center gap-2">
                   {/* Copy the connect prompt for any AI. The secret can't be re-read,
                    * so this carries the `kwapso_mcp_YOUR_TOKEN` placeholder to swap.
-                   * Label collapses to icon-only below sm (narrow-screen rule). */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => copyInstructions("kwapso_mcp_YOUR_TOKEN")}
-                    className="gap-1.5"
-                    title="Copy setup instructions for any AI"
-                  >
-                    <ClipboardCopy className="size-3.5" aria-hidden />
-                    <span className="hidden sm:inline">Instructions</span>
-                  </Button>
+                   * Label collapses to icon-only below sm (narrow-screen rule).
+                   * Nothing to set up with an expired token — make a new one. */}
+                  {!hasExpired(t) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copyInstructions("kwapso_mcp_YOUR_TOKEN")}
+                      className="gap-1.5"
+                      title="Copy setup instructions for any AI"
+                    >
+                      <ClipboardCopy className="size-3.5" aria-hidden />
+                      <span className="hidden sm:inline">Instructions</span>
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
@@ -208,7 +228,8 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
               <DialogTitle>Copy your token now</DialogTitle>
               <DialogDescription>
                 This is the only time it&apos;s shown. Anyone holding it can act as you in{" "}
-                {teamName ?? "this team"} — treat it like a password.
+                {teamName ?? "this team"} — treat it like a password. It works for{" "}
+                {MCP_TOKEN_TTL_DAYS} days, then you make a new one.
               </DialogDescription>
               <div className="bg-muted/60 flex items-center gap-2 rounded-lg border p-3">
                 <code className="min-w-0 flex-1 break-all text-xs">{secret}</code>
@@ -257,7 +278,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
               subtitle={
                 <DialogDescription>
                   Pinned to {teamName ?? "your current team"}. It can do exactly what you can do
-                  there — nothing more.
+                  there — nothing more — and it stops working after {MCP_TOKEN_TTL_DAYS} days.
                 </DialogDescription>
               }
               footer={

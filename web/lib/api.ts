@@ -619,9 +619,9 @@ export const dataOps = {
 export const mcp = {
   tokens: () => api<{ tokens: McpTokenSummary[] }>("/api/mcp/tokens"),
   createToken: (label: string) =>
-    api<{ token: { id: string; label: string; teamId: string; createdAt: string }; secret: string }>(
-      "/api/mcp/tokens",
-      post({ label })
-    ),
+    api<{
+      token: { id: string; label: string; teamId: string; createdAt: string; expiresAt: string }
+      secret: string
+    }>("/api/mcp/tokens", post({ label })),
   revokeToken: (id: string) => api<{ ok: true }>("/api/mcp/tokens/revoke", post({ id })),
 }
