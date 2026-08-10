@@ -59,7 +59,7 @@ type ScreenData = ReturnType<typeof useScreenData>
  * The host owns all of it; this bundle is how it hands the render half a snapshot. */
 export type ModuleContentCtx = Pick<
   ScreenData,
-  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "learningQ" | "helpQ" | "helpMineQ" | "totals" | "activityQ" | "activityTotal" | "inviteAuditQ"
+  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "learningQ" | "helpQ" | "helpMineQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "inviteAuditQ"
 > & {
   noAccess: boolean
   enabled: boolean
@@ -105,6 +105,8 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     totals,
     activityQ,
     activityTotal,
+    activityKey,
+    activityScope,
     inviteAuditQ,
     teamName,
     active,
@@ -370,6 +372,22 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     }
 
     // Details ----------------------------------------------------------------
+    // R14: a member's / an invite's history is the same ever-growing feed, sliced
+    // — and the Activity tab badges its EXACT total (R16), so the feed under the
+    // badge must be able to reach the rest of it. The recipe renders the tabs, so
+    // this sits below the screen (like the team feed above); it disappears on its
+    // own when there is no next page. Same key the detail's page one primed.
+    const activityMore = (
+      <LoadMore
+        listKey={activityKey as string}
+        label="Load more activity"
+        fetchPage={(c: string) =>
+          tenancy
+            .activity(activityScope ?? "team", recordId ?? undefined, c)
+            .then((r) => ({ rows: r.activity, nextCursor: r.nextCursor }))
+        }
+      />
+    )
     if (module === "members") {
       if (membersQ.error) return <LoadError what="members" />
       if (membersQ.data === undefined) return <Skeleton variant="list" lines={4} />
@@ -382,7 +400,12 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       // You can't change your own role or remove yourself here.
       if (member.isYou) recipe = withoutActions(recipe, ["members.changeRole", "members.remove"])
       const data = shapeMemberDetail(member, activityQ.data ?? [])
-      return <ScreenRenderer recipe={recipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
+      return (
+        <div className="flex flex-col gap-4">
+          <ScreenRenderer recipe={recipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
+          {activityMore}
+        </div>
+      )
     }
     if (module === "invites") {
       if (invitesQ.error) return <LoadError what="invites" />
@@ -396,7 +419,12 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       // Revoke only makes sense while the invite is still pending.
       if (invite.status !== "pending") recipe = withoutActions(recipe, ["invites.revoke"])
       const data = shapeInviteDetail(invite, inviteAuditQ.data ?? null, activityQ.data ?? [])
-      return <ScreenRenderer recipe={recipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
+      return (
+        <div className="flex flex-col gap-4">
+          <ScreenRenderer recipe={recipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
+          {activityMore}
+        </div>
+      )
     }
     if (module === "roles") {
       return <RoleDetailScreen teamId={teamId as string} roleId={recordId} />

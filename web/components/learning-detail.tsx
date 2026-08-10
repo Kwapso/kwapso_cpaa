@@ -29,6 +29,7 @@ import { Pencil, Power } from "lucide-react"
 
 import type { Learning, SelectableValue } from "@shared/types"
 import { LearningFormDialog, type LearningFormValues } from "@/components/learning-form-dialog"
+import { LoadMore } from "@/components/load-more"
 import { ApiFailure, content, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
 import { formatActivityWhen } from "@/lib/format"
@@ -235,10 +236,19 @@ export function LearningDetailScreen({ teamId, learningId }: { teamId: string; l
             )
           if (t.value === "activity")
             return (
-              <ActivityFeed
-                config={{ ...defaultActivityFeedConfig, emptyText: "No activity yet." }}
-                items={activityItems}
-              />
+              // R14: the badge above counts the WHOLE history, so the feed under
+              // it must be able to reach all of it — page one, then Load more.
+              <div className="flex flex-col gap-4">
+                <ActivityFeed
+                  config={{ ...defaultActivityFeedConfig, emptyText: "No activity yet." }}
+                  items={activityItems}
+                />
+                <LoadMore
+                  listKey={activity.listKey}
+                  fetchPage={activity.fetchPage}
+                  label="Load more activity"
+                />
+              </div>
             )
           return (
             <div className="flex flex-col gap-6">

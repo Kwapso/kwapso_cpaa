@@ -222,6 +222,18 @@ export const GROWING_COLLECTIONS: Record<
     webKey: "activity:team:",
     why: "the fastest-growing table in the base — EVERY mutation writes a row",
   },
+  // The SAME door and the SAME rows, read through the generic (table, id) scope —
+  // listed separately because "the server pages" and "the client can reach page
+  // two" are different facts, and this half was the one missing: every record
+  // detail badged the exact total (R16) over a feed frozen at its newest 50.
+  recordActivity: {
+    lib: "workers/tenancy/src/lib/activity-read.ts",
+    fn: "getActivity",
+    routes: "workers/tenancy/src/routes/team.ts",
+    rowsKey: "activity",
+    webKey: "useRecordActivity(",
+    why: "one record's slice of the same ever-growing feed — a long-running ticket outgrows a page on its own",
+  },
 }
 
 export const DEAF_EXEMPT: Record<string, string> = {
