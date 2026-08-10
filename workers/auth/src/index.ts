@@ -15,7 +15,7 @@ import { logError, recordWorkerError } from "../../../shared/workers/error-log"
 import type { Env } from "./env"
 import { sha256Hex } from "./lib/crypto"
 import { isValidEmail, normalizeEmail, sendEmail, sendLoginCode } from "./lib/email"
-import { clientIp, mintLoginCode } from "./lib/login-codes"
+import { clientIp, mintLoginCode, verifyLoginCode } from "./lib/login-codes"
 import { startEmailChange, verifyEmailChange } from "./lib/email-change"
 import { createPinnedSession,
   createSession,
@@ -30,7 +30,6 @@ import {
   findOrCreateUserByEmail,
   toSessionUser,
 } from "./lib/users"
-import { MAX_CODE_ATTEMPTS } from "./lib/constants"
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -215,7 +214,11 @@ async function adminTestLogin(request: Request, env: Env): Promise<Response> {
   return json({ ok: true, code: minted.code })
 }
 
-/** Step 2 of email login: check the code, create the session. */
+/** Step 2 of email login: check the code, create the session. Unauthenticated and
+ * keyed on the address alone — anyone who knows an email can post junk here — so
+ * the try is charged to the CALLER (clientIp) as well as to the code, and a
+ * stranger's wrong guesses can't spend the tries of the person who asked for it.
+ * See verifyLoginCode for the two lanes and why. */
 async function emailVerify(request: Request, env: Env): Promise<Response> {
   const body = (await request.json().catch(() => ({}))) as {
     email?: string
@@ -226,42 +229,8 @@ async function emailVerify(request: Request, env: Env): Promise<Response> {
   if (!isValidEmail(email) || !/^\d{6}$/.test(code))
     return fail(400, "invalid_input", "Enter your email and the 6-digit code.")
 
-  const row = await env.DB.prepare(
-    `SELECT * FROM login_codes
-     WHERE email = ? AND consumed_at IS NULL
-     ORDER BY created_at DESC LIMIT 1`
-  )
-    .bind(email)
-    .first<{
-      id: string
-      code_hash: string
-      attempts: number
-      expires_at: string
-    }>()
-
-  const now = new Date().toISOString()
-  if (!row || row.expires_at <= now)
-    return fail(400, "code_expired", "That code expired. Request a new one.")
-
-  // ATOMIC attempt cap: consume one attempt slot in the same statement that
-  // checks the limit. The old read-then-write ("attempts >= cap?" … "+1") was
-  // burstable — N concurrent wrong tries could all read attempts=4 and each get
-  // a guess. Zero rows changed = the cap is spent (a correct code consumes a
-  // slot too, then succeeds — the cap counts tries, not failures).
-  const slot = await env.DB.prepare(
-    "UPDATE login_codes SET attempts = attempts + 1 WHERE id = ? AND attempts < ? AND consumed_at IS NULL"
-  )
-    .bind(row.id, MAX_CODE_ATTEMPTS)
-    .run()
-  if ((slot.meta.changes ?? 0) === 0)
-    return fail(429, "too_many_attempts", "Too many wrong tries. Request a new code.")
-
-  if (row.code_hash !== (await sha256Hex(`${code}:${email}`)))
-    return fail(400, "wrong_code", "That code isn't right. Check and try again.")
-
-  await env.DB.prepare("UPDATE login_codes SET consumed_at = ? WHERE id = ?")
-    .bind(now, row.id)
-    .run()
+  const checked = await verifyLoginCode(env, email, code, clientIp(request))
+  if ("error" in checked) return fail(checked.status, checked.error, checked.message)
 
   const { user, isNew } = await findOrCreateUserByEmail(env, email)
   if (user.deactivated_at !== null)
