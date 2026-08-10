@@ -32,7 +32,16 @@ export function bottomNavItems<T extends { slug: string }>(items: T[]): T[] {
  * (empty = the team overview at /t/<teamId> itself). Activity lives as a tab on
  * the Overview screen, so it isn't a separate section. */
 export type TeamSection = {
-  key: "overview" | "members" | "roles" | "invites" | "dropdowns" | "learning" | "help" | "import"
+  key:
+    | "overview"
+    | "members"
+    | "roles"
+    | "invites"
+    | "dropdowns"
+    | "accounts"
+    | "learning"
+    | "help"
+    | "import"
   title: string
   module: string
   segment: string
@@ -58,6 +67,11 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // Dropdown values ("selectable data") — managed on the team page, a tab beside
   // the other admin sections. Gated by the selectable_data module.
   { key: "dropdowns", title: "Dropdown values", module: "selectable_data", segment: "dropdowns", placement: "tab", countCacheKey: "selectable" },
+  // Accounts — the companies and people the team works with (the customer spine,
+  // SCOPE ch.03). A first-class SIDEBAR page: it's the day's work, not an admin
+  // setting. Its count is an exact server total (R16) keyed off the same
+  // `accounts:<teamId>` cache the list reads, so the badge and the rows agree.
+  { key: "accounts", title: "Accounts", module: "accounts", segment: "accounts", placement: "sidebar", countCacheKey: "accounts" },
   // Learning + Help are first-class SIDEBAR pages (not buried tabs) — team-scoped,
   // each gated by its own read right. The URL segment IS the permission module.
   { key: "learning", title: "Learning", module: "learning", segment: "learning", placement: "sidebar", countCacheKey: "learning" },
@@ -81,6 +95,10 @@ export const CONCEPT_ICON = {
   roles: "shield-half",
   invites: "mail",
   dropdowns: "list",
+  // The customer spine's own vocabulary: an account, the people on it, and a login.
+  accounts: "building-2",
+  contacts: "contact",
+  portal: "key-round",
   learning: "graduation-cap",
   help: "life-buoy",
   import: "upload",

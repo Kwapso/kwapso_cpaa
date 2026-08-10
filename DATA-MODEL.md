@@ -308,6 +308,15 @@ second `granted_by` column to keep in step. **Revoke deactivates, never deletes*
 active means at most ONE live grant per person, which is what pins a caller to
 exactly one account set.
 
+**How a login is handed out.** Staff never type an address: the grant door takes
+a `personAccountId` (a contact of the account, or the account itself when it is a
+person), reads THAT row's email through the fence, and matches it to the global
+`users` row. Identity is resolved outside the fence, so the email it is resolved
+by has to come from inside it — staff can only ever switch access on for people
+already on their own books. The person must have signed in here at least once
+(there is no client invite yet); both refusals name them and say what to do next.
+`userId` is still accepted directly for a machine caller that already holds one.
+
 **The guard corridor** (`shared/workers/account-scope.ts`) is the one place a
 caller's account set is decided: session → person → account set, and every
 account-scoped statement ANDs its clause into the WHERE (reads *and* writes — the

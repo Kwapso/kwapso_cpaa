@@ -76,7 +76,7 @@ export function buildSpineDb(): DatabaseSync {
 
   // The GLOBAL core tables the gating seam reads natively.
   db.exec(`
-    CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT, first_name TEXT, last_name TEXT, current_team_id TEXT);
+    CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT, first_name TEXT, last_name TEXT, current_team_id TEXT, deactivated_at TEXT);
     CREATE TABLE teams (id TEXT PRIMARY KEY, name TEXT, database_id TEXT, db_status TEXT NOT NULL DEFAULT 'ready', deactivated_at TEXT);
     CREATE TABLE team_members (id TEXT PRIMARY KEY, team_id TEXT, user_id TEXT, role_id TEXT, created_at TEXT, deactivated_at TEXT);
     INSERT INTO teams (id, name, database_id) VALUES ('${IDS.team}', 'Kwapso', 'db_team');

@@ -38,7 +38,7 @@ export const GLOSSARY = {
   assistant: { term: "Assistant", def: "Your in-app helper — it can find things, explain them, and make changes for you." },
   activity: { term: "Activity", def: "A history of what changed on a record, and who changed it." },
   overview: { term: "Overview", def: "The key facts about a record at a glance." },
-  status: { term: "Status", def: "Where a ticket is in its lifecycle: open, in progress, or resolved." },
+  status: { term: "Status", def: "Where a record sits in its lifecycle — a ticket is open or resolved; an account is a prospect, a client, or a past client." },
 } as const satisfies Record<string, GlossaryEntry>
 
 export type GlossaryKey = keyof typeof GLOSSARY

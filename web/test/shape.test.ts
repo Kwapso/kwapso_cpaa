@@ -1,4 +1,5 @@
 import type {
+  Account,
   ActivityItem,
   HelpTicket,
   Invite,
@@ -11,8 +12,11 @@ import type {
 import { describe, expect, it } from "vitest"
 
 import {
+  ACCOUNT_TYPE,
   HELP_STATUS,
   INVITE_STATUS,
+  accountStatus,
+  shapeAccountsList,
   shapeActivity,
   shapeHelpList,
   shapeInviteDetail,
@@ -288,5 +292,64 @@ describe("shapeTeamDetail", () => {
     expect(data.record?.createdBy).toBe("Alaap Kanchwala")
     expect(data.record?.updated).toBe("—") // meta.updatedAt is null
     expect(data.sets?.activity?.[0].id).toBe("a1")
+  })
+})
+
+/* ------------------------------- accounts ------------------------------- */
+
+const account = (over: Partial<Account> & { id: string; name: string }): Account => ({
+  accountType: "entity",
+  parentAccountId: null,
+  email: null,
+  phone: null,
+  address: null,
+  code: null,
+  currency: null,
+  locale: null,
+  timezone: null,
+  commercialsVisible: false,
+  status: "client",
+  active: true,
+  ...over,
+})
+
+describe("shapeAccountsList", () => {
+  it("says what a row IS on one line — kind, reference, status", () => {
+    const rows = shapeAccountsList([
+      account({ id: "a1", name: "Bergman S.A.", code: "BERG", status: "past_client" }),
+    ]).rows
+    expect(rows?.[0].name).toBe("Bergman S.A.")
+    expect(rows?.[0].detail).toBe("Company · BERG · Past client")
+    // Facet columns the filter bar reads.
+    expect(rows?.[0].type).toBe(ACCOUNT_TYPE.entity)
+    expect(rows?.[0].status).toBe("Past client")
+    expect(rows?.[0].archived).toBe("No")
+  })
+
+  it("names the parent when it is on the page, and still says nested when it isn't", () => {
+    const rows = shapeAccountsList([
+      account({ id: "a1", name: "Bergman S.A." }),
+      account({ id: "a2", name: "Bergman Workshop", parentAccountId: "a1" }),
+      // Its parent sits on a later page — the line must not imply top level.
+      account({ id: "a3", name: "Delaval Nord", parentAccountId: "off-page" }),
+    ]).rows
+    expect(rows?.[0].detail).not.toContain("under")
+    expect(rows?.[1].detail).toContain("under Bergman S.A.")
+    expect(rows?.[2].detail).toContain("under another account")
+  })
+
+  it("keeps an archived account visible, and flags it (archive-never-delete)", () => {
+    const rows = shapeAccountsList([account({ id: "a1", name: "Old Co", active: false })]).rows
+    expect(rows?.[0].name).toBe("Old Co (archived)")
+    expect(rows?.[0].archived).toBe("Yes")
+  })
+})
+
+describe("accountStatus", () => {
+  it("tidies the team's own word without translating it", () => {
+    expect(accountStatus("past_client")).toBe("Past client")
+    expect(accountStatus("prospect")).toBe("Prospect")
+    expect(accountStatus("")).toBe("")
+    expect(accountStatus(null)).toBe("")
   })
 })

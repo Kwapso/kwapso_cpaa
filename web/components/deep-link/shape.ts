@@ -8,6 +8,7 @@ import { type ScreenData } from "@kwapso/ui/registry/collections/screen-renderer
 import { formatActivityWhen, formatDate, formatDateTime } from "@/lib/format"
 import { personName } from "@/lib/identity"
 import type {
+  Account,
   ActivityItem,
   HelpTicket,
   Invite,
@@ -132,6 +133,53 @@ export function shapeLearningList(items: Learning[]): ScreenData {
       category: l.category || "—",
       state: l.active ? "Active" : "Inactive",
     })),
+  }
+}
+
+/* -------------------------------- accounts -------------------------------- */
+
+/** The two kinds an account can be, in the words the screens use. ONE source for
+ * the list line, the detail header and the create form (SCOPE ch.03: companies
+ * and people are one table, told apart by this). */
+export const ACCOUNT_TYPE: Record<Account["accountType"], string> = {
+  entity: "Company",
+  individual: "Person",
+}
+
+/** A stored status ("past_client") as a person reads it ("Past client"). The
+ * value is the team's own word, so we only tidy it — never translate it. */
+export function accountStatus(raw: string | null): string {
+  const s = (raw ?? "").replace(/[_-]+/g, " ").trim()
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : ""
+}
+
+export function shapeAccountsList(accounts: Account[]): ScreenData {
+  // The hierarchy, readable in the list itself: name the parent when it is on
+  // the page we loaded (for a normal agency, the whole tree is), and otherwise
+  // still say the account is nested. Both lines are true — one is just more
+  // specific — so a paged list never claims an account is top-level when it
+  // isn't. The record's own screen always shows its parent by name.
+  const nameById = new Map(accounts.map((a) => [a.id, a.name]))
+  return {
+    rows: accounts.map((a) => {
+      const parent = a.parentAccountId
+        ? `under ${nameById.get(a.parentAccountId) ?? "another account"}`
+        : ""
+      return {
+        id: a.id,
+        // Archived rows stay visible (archive-never-delete), flagged like retired
+        // roles and articles are.
+        name: a.active ? a.name : `${a.name} (archived)`,
+        detail:
+          [ACCOUNT_TYPE[a.accountType], a.code, accountStatus(a.status), parent]
+            .filter(Boolean)
+            .join(" · ") || "—",
+        // Facet columns (read by the filter engine, not the renderer).
+        type: ACCOUNT_TYPE[a.accountType],
+        status: accountStatus(a.status) || "—",
+        archived: a.active ? "No" : "Yes",
+      }
+    }),
   }
 }
 

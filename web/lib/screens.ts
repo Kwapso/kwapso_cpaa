@@ -68,6 +68,10 @@ export const MODULE_PERMISSION: Record<string, string> = {
   // The content modules' URL segment IS their permission module (no alias).
   learning: "learning",
   help: "help",
+  // The customer spine: the segment IS the module (portal_users is a second gate
+  // ON the same screens, never a screen of its own — handing out a login is a
+  // bigger decision than editing a phone number).
+  accounts: "accounts",
 }
 
 /* --------------------------------- team --------------------------------- */
@@ -298,6 +302,33 @@ export const helpListRecipe: ScreenRecipe = {
   ),
 }
 
+/* -------------------------------- accounts -------------------------------- */
+
+/** Accounts list — every company and every person the team works with, in one
+ * list (they are one table). A row's summary line carries what you'd read out
+ * loud: what it is, its reference, where it stands, and the account it sits
+ * under. PAGED (R14) — the list grows with ordinary use, so the frame's own
+ * "Showing X of Y" stays off and the exact total is badged once, above. */
+export const accountsListRecipe: ScreenRecipe = {
+  type: "list",
+  display: "list",
+  surface: "none",
+  binding: { module: "accounts" },
+  gate: { module: "accounts", right: "read" },
+  fields: [field("name", "Account"), field("detail", "Details")],
+  actions: [],
+  collection: listCollection(
+    "No accounts yet.",
+    "Search accounts…",
+    [
+      { field: "type", label: "Type", control: "select" },
+      { field: "status", label: "Status", control: "select" },
+      { field: "archived", label: "Archived", control: "select" },
+    ],
+    { paged: true }
+  ),
+}
+
 /* ------------------------------ the registry ------------------------------ */
 
 /** The in-code BASE recipe for each screen key — the shipped default every team
@@ -314,6 +345,10 @@ export const BASE_RECIPES: Record<string, ScreenRecipe> = {
   "invites.detail": inviteDetailRecipe,
   "learning.list": learningListRecipe,
   "help.list": helpListRecipe,
+  // Accounts DETAIL has no recipe — its people, its logins and the accounts
+  // nested under it are collections with their own actions, which no engine
+  // block draws (see account-detail.tsx).
+  "accounts.list": accountsListRecipe,
 }
 
 /** A structural guard for a parsed override. The config store treats a recipe as

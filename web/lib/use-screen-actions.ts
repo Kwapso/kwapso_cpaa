@@ -18,7 +18,9 @@ import * as React from "react"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 
 import { content as contentApi, tenancy } from "@/lib/api"
+import { accountsKey, listFetch } from "@/lib/live-resources"
 import { invalidate, primeCache } from "@/lib/store"
+import type { AccountFormValues } from "@/components/account-form-dialog"
 import type { LearningFormValues } from "@/components/learning-form-dialog"
 
 export function useScreenActions(teamId: string | null) {
@@ -97,5 +99,28 @@ export function useScreenActions(teamId: string | null) {
     [teamId]
   )
 
-  return { runAction, createLearning, createHelp }
+  // Add an account (a company or a person). The list is PAGED, so the create call
+  // can't hand back "the new list" — we re-pull page ONE instead, which is where
+  // the newest row now sits, and that same fetcher re-primes the exact total and
+  // the cursor. Everyone else gets the realtime "add" ping.
+  const createAccount = React.useCallback(
+    async (values: AccountFormValues) => {
+      if (!teamId) return
+      await tenancy.createAccount({
+        accountType: values.accountType,
+        name: values.name.trim(),
+        parentAccountId: values.parentAccountId || undefined,
+        code: values.code.trim() || undefined,
+        email: values.email.trim() || undefined,
+        phone: values.phone.trim() || undefined,
+        address: values.address.trim() || undefined,
+        status: values.status.trim() || undefined,
+      })
+      primeCache(accountsKey(teamId), await listFetch.accounts(teamId))
+      toast.success(`Added ${values.name.trim()}.`)
+    },
+    [teamId]
+  )
+
+  return { runAction, createLearning, createHelp, createAccount }
 }

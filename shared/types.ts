@@ -475,6 +475,12 @@ export type Account = {
   status: string
   /** false once archived (deactivate-never-delete) */
   active: boolean
+  /** the audit block, for the detail Overview tab (the same shape every record
+   * shows — see TeamRole). */
+  createdAt?: string | null
+  createdByName?: string | null
+  updatedAt?: string | null
+  editedByName?: string | null
 }
 
 /** A person's relationship to an account — the "contact of" row. */
@@ -486,6 +492,18 @@ export type AccountLink = {
   relationship: string | null
   isMainStakeholder: boolean
   active: boolean
+}
+
+/** One account opened: the record, the account it sits under, the people linked
+ * to it and who can log in — plus the two EXACT server totals its tabs badge
+ * (R16: a badge is a COUNT(*), never the length of a capped list). */
+export type AccountDetail = {
+  account: Account
+  parent: Account | null
+  links: AccountLink[]
+  portalUsers: PortalUser[]
+  linksTotal: number
+  portalUsersTotal: number
 }
 
 /** A client-side person's login. Absent = no portal access; present and inactive

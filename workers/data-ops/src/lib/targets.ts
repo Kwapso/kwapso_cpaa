@@ -82,6 +82,16 @@ export type TargetDef = {
   sample?: Record<string, string>
 }
 
+/** A spreadsheet says "Company" / "Person"; the door speaks entity / individual.
+ * Anything we don't recognise is passed through UNCHANGED so the door refuses it
+ * by name — guessing a type would file a person as a company in silence. */
+function accountType(v: string): string {
+  const s = v.trim().toLowerCase()
+  if (/^(entity|company|business|organisation|organization|firm|client)$/.test(s)) return "entity"
+  if (/^(individual|person|people|contact|human)$/.test(s)) return "individual"
+  return v.trim()
+}
+
 export const TARGETS: Record<string, TargetDef> = {
   // Dropdown values ("Selectable data") — the base's PARENT in the worked
   // multi-table demo: import these first, then learning articles reference them.
@@ -129,6 +139,52 @@ export const TARGETS: Record<string, TargetDef> = {
       const permissions = matrixFromRow(r)
       return { title: r.title, description: r.description ?? "", ...(permissions ? { permissions } : {}) }
     },
+  },
+  // The customer spine. Companies and people are ONE table (SCOPE ch.03), so one
+  // target imports both — `accountType` says which a row is.
+  //
+  // WHAT THIS TARGET DELIBERATELY DOES NOT CARRY: the parent account. A file's
+  // own rows can only be resolved to ids AFTER the file has been written (the
+  // engine reads a parent target back once its step finishes), so a
+  // self-referencing parent column would resolve to nothing on the very rows it
+  // exists for — and silently file every account at the top level. Structure is
+  // set on the account itself (its detail screen refuses a move that would close
+  // a loop); this target's job is getting the records in.
+  accounts: {
+    tableKey: "accounts",
+    module: "accounts",
+    displayName: "Accounts",
+    description:
+      "Create accounts in bulk — companies and people in one file. Say which each row is in the Type column (company or person). The account each one sits under is set afterwards on the account itself.",
+    columns: [
+      { key: "name", label: "Name", required: true },
+      { key: "accountType", label: "Type", required: true },
+      { key: "code", label: "Reference", required: false },
+      { key: "email", label: "Email", required: false },
+      { key: "phone", label: "Phone", required: false },
+      { key: "address", label: "Address", required: false },
+      { key: "status", label: "Status", required: false },
+    ],
+    endpoint: { binding: "TENANCY", path: "/api/tenancy/accounts" },
+    naturalKey: "name",
+    sample: {
+      name: "Bergman S.A.",
+      accountType: "company",
+      code: "BERG",
+      email: "hola@bergman.example",
+      phone: "+34 600 000 000",
+      address: "Calle Mayor 1, Madrid",
+      status: "client",
+    },
+    buildBody: (r) => ({
+      accountType: accountType(r.accountType),
+      name: r.name,
+      code: r.code || undefined,
+      email: r.email || undefined,
+      phone: r.phone || undefined,
+      address: r.address || undefined,
+      status: r.status || undefined,
+    }),
   },
   learning: {
     tableKey: "learning",

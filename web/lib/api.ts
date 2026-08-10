@@ -2,6 +2,8 @@
 // the gateway routes them — so cookies flow automatically, no config needed.
 
 import type {
+  Account,
+  AccountDetail,
   ActiveContext,
   ActivityItem,
   AgentMessage,
@@ -428,6 +430,66 @@ export const tenancy = {
       method: "POST",
       body: JSON.stringify({ module, recipe }),
     }),
+
+  /* ---- the customer spine: accounts, their people, their logins ---- */
+
+  /** R14: a PAGE of accounts (a GROWING collection) — hand `cursor` back from the
+   * previous response for the next one; `total` is the exact server count of what
+   * this caller may see. `parentId` narrows to one account's children. */
+  accounts: (opts: { q?: string; type?: string; parentId?: string; cursor?: string | null } = {}) => {
+    const p = new URLSearchParams()
+    if (opts.q) p.set("q", opts.q)
+    if (opts.type) p.set("type", opts.type)
+    if (opts.parentId) p.set("parentId", opts.parentId)
+    if (opts.cursor) p.set("cursor", opts.cursor)
+    const qs = p.toString()
+    return api<PagedResponse<{ accounts: Account[] }>>(`/api/tenancy/accounts${qs ? `?${qs}` : ""}`)
+  },
+
+  /** One account opened: the record, its parent, its people, its logins, and the
+   * two exact totals its tabs badge. */
+  accountDetail: (id: string) => api<AccountDetail>(`/api/tenancy/accounts/detail?id=${enc(id)}`),
+
+  /** ONE account row (the row-level live re-pull). A 404 means it's genuinely gone
+   * — anything else propagates, so a network blip never drops a row off a list. */
+  accountRow: (id: string): Promise<Account | null> =>
+    tenancy
+      .accountDetail(id)
+      .then((d) => d.account)
+      .catch((err) => {
+        if (err instanceof ApiFailure && err.status === 404) return null
+        throw err
+      }),
+
+  createAccount: (input: Record<string, unknown>) =>
+    api<{ id: string }>("/api/tenancy/accounts", post(input)),
+  updateAccount: (input: Record<string, unknown> & { id: string }) =>
+    api<{ ok: true }>("/api/tenancy/accounts/update", post(input)),
+  /** Move an account under another, or to the top with null. A move that would
+   * close a loop comes back as a plain sentence (409). */
+  setAccountParent: (id: string, parentAccountId: string | null) =>
+    api<{ ok: true }>("/api/tenancy/accounts/parent", post({ id, parentAccountId })),
+  /** Archive / restore — never deleted. */
+  setAccountActive: (id: string, active: boolean) =>
+    api<{ ok: true }>("/api/tenancy/accounts/active", post({ id, active })),
+
+  linkPerson: (input: {
+    accountId: string
+    personAccountId: string
+    relationship?: string
+    isMainStakeholder?: boolean
+  }) => api<{ id: string }>("/api/tenancy/accounts/links", post(input)),
+  /** Unlink / relink a person (the row survives, so who was a contact when stays true). */
+  setLinkActive: (id: string, active: boolean) =>
+    api<{ ok: true }>("/api/tenancy/accounts/links/active", post({ id, active })),
+
+  /** Give someone at this account a login. The person is picked off the account
+   * (`personAccountId`); the door resolves their email to their platform account. */
+  grantPortalAccess: (accountId: string, personAccountId: string) =>
+    api<{ id: string }>("/api/tenancy/portal-users", post({ accountId, personAccountId })),
+  /** Revoke / restore a login. Revoking switches the login off; every record stays. */
+  setPortalAccessActive: (id: string, active: boolean) =>
+    api<{ ok: true }>("/api/tenancy/portal-users/active", post({ id, active })),
 }
 
 const enc = encodeURIComponent

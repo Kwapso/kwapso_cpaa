@@ -67,6 +67,23 @@ export const listFetch = {
       primeCache(totalKey("learning", teamId), r.total)
       return r.learning
     }),
+  // R14: accounts are PAGED — every company AND every person an agency works with
+  // is a row here, so the door answers with a cursor rather than a ceiling. Page
+  // one lands in the cache, its next cursor in the sidecar <LoadMore> reads.
+  accounts: (teamId: string) =>
+    tenancy.accounts().then((r) => {
+      primeCache(totalKey("accounts", teamId), r.total)
+      primeCache(cursorKey(accountsKey(teamId)), r.nextCursor)
+      return r.accounts
+    }),
+  // The accounts nested UNDER one account — the same paged door, narrowed by
+  // parent. Keyed by the ACCOUNT (not the team): it is that record's own list.
+  accountChildren: (accountId: string) =>
+    tenancy.accounts({ parentId: accountId }).then((r) => {
+      primeCache(totalKey("account-children", accountId), r.total)
+      primeCache(cursorKey(childrenKey(accountId)), r.nextCursor)
+      return r.accounts
+    }),
   // R14: help is PAGED — the fetchers below load page ONE and park the next
   // cursor in its sidecar; <LoadMore> appends from there. A fresh load (or a
   // reconnect catch-up) resets to page one, which is what a reconnect should do.
@@ -84,6 +101,21 @@ export const listFetch = {
       primeCache(cursorKey(helpKey(teamId, "mine")), r.nextCursor)
       return r.tickets
     }),
+}
+
+/** The accounts list's cache key (the paged customers list). */
+export function accountsKey(teamId: string): string {
+  return `accounts:${teamId}`
+}
+
+/** One account's own caches: the opened record (with its people, its logins and
+ * their exact totals) and the accounts nested under it. Keyed by the ACCOUNT, so
+ * moving between records never clobbers the one you came from. */
+export function accountKey(accountId: string): string {
+  return `account:${accountId}`
+}
+export function childrenKey(accountId: string): string {
+  return `account-children:${accountId}`
 }
 
 /** The ticket list's cache key. My/All is a SERVER scope, not a client filter:
@@ -152,6 +184,34 @@ export const TEAM_RESOURCES: Record<
     idField: "id",
     fetchOne: (id) => contentApi.learningOne(id),
     fetchList: (t) => listFetch.learning(t),
+  },
+  // THE CUSTOMER SPINE — three resources, one row-level target. `accounts` pings
+  // carry the account id, and so do `account_links` / `portal_users`: a contact
+  // and a login are read ONLY on their account's detail (neither has a list of
+  // its own), so the account is the one row a listener can act on. All three
+  // therefore patch the same accounts list and refresh the same open record —
+  // which is why none of them needs a DEAF_EXEMPT line any more.
+  accounts: {
+    key: (t) => accountsKey(t),
+    idField: "id",
+    fetchOne: (id) => tenancy.accountRow(id),
+    fetchList: (t) => listFetch.accounts(t),
+    deps: (_t, id) => [accountKey(id), childrenKey(id), `activity:record:accounts:${id}`],
+  },
+  account_links: {
+    key: (t) => accountsKey(t),
+    idField: "id",
+    fetchOne: (id) => tenancy.accountRow(id),
+    fetchList: (t) => listFetch.accounts(t),
+    // The contacts list + its badge live inside the opened record's cache.
+    deps: (_t, id) => [accountKey(id), `activity:record:accounts:${id}`],
+  },
+  portal_users: {
+    key: (t) => accountsKey(t),
+    idField: "id",
+    fetchOne: (id) => tenancy.accountRow(id),
+    fetchList: (t) => listFetch.accounts(t),
+    deps: (_t, id) => [accountKey(id), `activity:record:accounts:${id}`],
   },
   // Help tickets — row-level live. A status change / new reply (postHelpReply
   // pings `help` too) patches just that ticket in the cached "all" set.

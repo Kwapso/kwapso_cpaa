@@ -24,7 +24,7 @@ import { d1Query, type D1Rest } from "../../../../shared/workers/d1-rest"
 import { ulid } from "../../../../shared/workers/id"
 import { LIST_HARD_CAP } from "../../../../shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "../../../../shared/workers/paging"
-import type { Account, AccountLink, PortalUser } from "../../../../shared/types"
+import type { Account, AccountDetail, AccountLink, PortalUser } from "../../../../shared/types"
 import { GuardError, type MemberGuard } from "./permissions"
 
 type AccountRow = {
@@ -42,10 +42,18 @@ type AccountRow = {
   commercials_visible: number
   status: string
   deactivated_at: string | null
+  created_at: string
+  creator_name: string | null
+  updated_at: string | null
+  editor_name: string | null
 }
 
+/** The audit names ride along on every read: every record's Overview tab shows
+ * the same block (who made it, who touched it last), and the list's keyset pages
+ * on created_at, so it is selected once here rather than twice at the call site. */
 const ACCOUNT_COLUMNS = `id, account_type, parent_account_id, name, email, phone, address, code,
-  currency, locale, timezone, commercials_visible, status, deactivated_at`
+  currency, locale, timezone, commercials_visible, status, deactivated_at,
+  created_at, creator_name, updated_at, editor_name`
 
 function toAccount(r: AccountRow): Account {
   return {
@@ -63,6 +71,10 @@ function toAccount(r: AccountRow): Account {
     commercialsVisible: r.commercials_visible === 1,
     status: r.status,
     active: r.deactivated_at == null,
+    createdAt: r.created_at,
+    createdByName: r.creator_name,
+    updatedAt: r.updated_at,
+    editedByName: r.editor_name,
   }
 }
 
@@ -125,10 +137,10 @@ export async function listAccounts(
 
   const [rows, counted] = await Promise.all([
     // PAGE_SIZE + 1 is how hasMore is known without a second query.
-    d1Query<AccountRow & { created_at: string }>(
+    d1Query<AccountRow>(
       cfg,
       guard.databaseId,
-      `SELECT ${ACCOUNT_COLUMNS}, created_at FROM accounts${pageWhere}
+      `SELECT ${ACCOUNT_COLUMNS} FROM accounts${pageWhere}
         ORDER BY created_at DESC, id DESC LIMIT ${PAGE_SIZE + 1}`,
       [...params, ...after.params]
     ),
@@ -142,13 +154,17 @@ export async function listAccounts(
 }
 
 /** One account with its people and its logins — the detail read. Outside the
- * fence it is a 404, identical to a made-up id. */
+ * fence it is a 404, identical to a made-up id.
+ *
+ * R16: the two counts ride along as exact server COUNT(*)s through the SAME
+ * fence, because the detail's tabs badge them. Never `links.length` — that is a
+ * capped read's ceiling wearing a total's clothes. */
 export async function getAccount(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
   id: string
-): Promise<{ account: Account; parent: Account | null; links: AccountLink[]; portalUsers: PortalUser[] }> {
+): Promise<AccountDetail> {
   const fence = accountScopeClause(scope, "id")
   const rows = await d1Query<AccountRow>(
     cfg,
@@ -161,7 +177,7 @@ export async function getAccount(
 
   // The parent is read through the SAME fence: a pinned caller who can see a
   // subsidiary must not learn its holding company's name by opening the child.
-  const [parentRows, links, portalUsers] = await Promise.all([
+  const [parentRows, links, portalUsers, linksTotal, portalUsersTotal] = await Promise.all([
     account.parentAccountId
       ? d1Query<AccountRow>(
           cfg,
@@ -172,9 +188,32 @@ export async function getAccount(
       : Promise.resolve([] as AccountRow[]),
     listAccountLinks(cfg, guard, scope, id),
     listPortalUsers(cfg, guard, scope, id),
+    countAccountLinks(cfg, guard, scope, id),
+    countPortalUsers(cfg, guard, scope, id),
   ])
 
-  return { account, parent: parentRows[0] ? toAccount(parentRows[0]) : null, links, portalUsers }
+  return {
+    account,
+    parent: parentRows[0] ? toAccount(parentRows[0]) : null,
+    links,
+    portalUsers,
+    linksTotal,
+    portalUsersTotal,
+  }
+}
+
+/** ONE account inside the fence — the row alone, no people, no logins.
+ *
+ * The portal grant reads a person's email through this before it may look them
+ * up in the GLOBAL users table: identity lives outside the fence, so the row
+ * that names the email has to come from inside it. */
+export async function getAccountRow(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  id: string
+): Promise<Account> {
+  return accountOrThrow(cfg, guard, scope, id)
 }
 
 /** Create an account. A portal caller may only add people INSIDE their own
@@ -455,6 +494,25 @@ export async function listAccountLinks(
   }))
 }
 
+/** R16 — the exact server total behind the contacts list above, through the SAME
+ * fence, so the Contacts tab's badge can never advertise more people than the
+ * list is willing to show. */
+export async function countAccountLinks(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  accountId: string
+): Promise<number> {
+  const fence = accountScopeClause(scope, "account_id")
+  const rows = await d1Query<{ n: number }>(
+    cfg,
+    guard.databaseId,
+    `SELECT COUNT(*) AS n FROM account_links${where([fence.sql, "account_id = ?"])}`,
+    [...fence.params, accountId]
+  )
+  return rows[0]?.n ?? 0
+}
+
 /** Link a person to an account. BOTH sides are checked against the fence: the
  * company AND the person, or a pinned caller could staple a stranger's contact
  * row onto their own company and read the name back out of the list. */
@@ -510,7 +568,12 @@ export async function linkPerson(
 }
 
 /** Unlink / relink a person (deactivate-never-delete: the row survives, so the
- * history of who was a contact when stays true). R17 predicate included. */
+ * history of who was a contact when stays true). R17 predicate included.
+ *
+ * Returns the ACCOUNT the link hangs off when a row actually moved, else null —
+ * the route publishes that account (a contact is the SHAPE of an account, never
+ * a record with a list of its own, so the account id is what a listener can act
+ * on). Null is the R17 silence: no row moved, no ping. */
 export async function setLinkActive(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -518,7 +581,7 @@ export async function setLinkActive(
   actor: Actor,
   id: string,
   active: boolean
-): Promise<boolean> {
+): Promise<string | null> {
   // The fence check has to come BEFORE the idempotent write, because "zero rows
   // moved" answers two completely different questions: "it was already like
   // that" (a 200 no-op, R17) and "that row isn't yours" (a 404). Collapsing them
@@ -528,19 +591,19 @@ export async function setLinkActive(
   const fence = accountScopeClause(scope, "account_id")
   const now = new Date().toISOString()
 
-  const changed = await d1Query<{ id: string }>(
+  const changed = await d1Query<{ account_id: string }>(
     cfg,
     guard.databaseId,
     active
       ? `UPDATE account_links SET deactivated_at = NULL, deactivator_id = NULL, deactivator_email = NULL,
            deactivator_name = NULL, updated_at = ?
-         ${where([fence.sql, "id = ?", "deactivated_at IS NOT NULL"])} RETURNING id`
+         ${where([fence.sql, "id = ?", "deactivated_at IS NOT NULL"])} RETURNING account_id`
       : `UPDATE account_links SET deactivated_at = ?, deactivator_id = ?, deactivator_email = ?,
            deactivator_name = ?, updated_at = ?
-         ${where([fence.sql, "id = ?", "deactivated_at IS NULL"])} RETURNING id`,
+         ${where([fence.sql, "id = ?", "deactivated_at IS NULL"])} RETURNING account_id`,
     active ? [now, ...fence.params, id] : [now, actor.id, actor.email, actor.name, now, ...fence.params, id]
   )
-  if (!changed[0]) return false
+  if (!changed[0]) return null
 
   await logActivity(cfg, guard.databaseId, actor, {
     type: active ? "Contact relinked" : "Contact unlinked",
@@ -548,7 +611,7 @@ export async function setLinkActive(
     relatedTable: "account_links",
     relatedRowId: id,
   })
-  return true
+  return changed[0].account_id
 }
 
 // ── portal logins (portal_users) ─────────────────────────────────────────────
@@ -656,7 +719,9 @@ export async function grantPortalAccess(
 }
 
 /** Revoke / restore a login. Revoking deactivates the row — the login dies, every
- * record the person is attached to stays exactly where it was. R17 predicate. */
+ * record the person is attached to stays exactly where it was. R17 predicate.
+ * Returns the account the login sits on when a row moved, else null (see
+ * setLinkActive for why the ACCOUNT is what comes back). */
 export async function setPortalAccessActive(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -664,26 +729,26 @@ export async function setPortalAccessActive(
   actor: Actor,
   id: string,
   active: boolean
-): Promise<boolean> {
+): Promise<string | null> {
   // Fence first, then the idempotent write — see setLinkActive for why the two
   // can't share an answer.
   await rowInFenceOrThrow(cfg, guard, scope, "portal_users", id)
   const fence = accountScopeClause(scope, "account_id")
   const now = new Date().toISOString()
 
-  const changed = await d1Query<{ id: string }>(
+  const changed = await d1Query<{ account_id: string }>(
     cfg,
     guard.databaseId,
     active
       ? `UPDATE portal_users SET deactivated_at = NULL, deactivator_id = NULL, deactivator_email = NULL,
            deactivator_name = NULL, updated_at = ?
-         ${where([fence.sql, "id = ?", "deactivated_at IS NOT NULL"])} RETURNING id`
+         ${where([fence.sql, "id = ?", "deactivated_at IS NOT NULL"])} RETURNING account_id`
       : `UPDATE portal_users SET deactivated_at = ?, deactivator_id = ?, deactivator_email = ?,
            deactivator_name = ?, updated_at = ?
-         ${where([fence.sql, "id = ?", "deactivated_at IS NULL"])} RETURNING id`,
+         ${where([fence.sql, "id = ?", "deactivated_at IS NULL"])} RETURNING account_id`,
     active ? [now, ...fence.params, id] : [now, actor.id, actor.email, actor.name, now, ...fence.params, id]
   )
-  if (!changed[0]) return false
+  if (!changed[0]) return null
 
   await logActivity(cfg, guard.databaseId, actor, {
     type: active ? "Portal access restored" : "Portal access revoked",
@@ -691,7 +756,7 @@ export async function setPortalAccessActive(
     relatedTable: "portal_users",
     relatedRowId: id,
   })
-  return true
+  return changed[0].account_id
 }
 
 // ── shared internals ─────────────────────────────────────────────────────────
