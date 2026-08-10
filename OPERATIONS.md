@@ -187,3 +187,21 @@ team. The only symptom was real team creation failing with an opaque 500.
 Rule: after replacing ANY credential, re-push it to every worker that holds it,
 then verify with a path that actually exercises it (a FRESH signup, not a reused
 one). The smoke suite passing is not proof that provisioning works.
+
+### Client portal hostnames (decided 10 Aug 2026)
+
+`portal.kwapso.app` is **taken** — it points at the live Glide client portal and
+must not be reused. Pointing this app at it broke that link once already and the
+DNS had to be put back.
+
+The client portal uses:
+
+| environment | hostname |
+|---|---|
+| staging | `staging-client.kwapso.app` |
+| production | `client.kwapso.app` |
+
+Both are single-label subdomains, so Universal SSL covers them (the same reason
+the agency app is `agency-staging.kwapso.app` and not `agency.staging.…`). Moving
+the portal to `portal.kwapso.app` later is the owner's call, once the Glide app
+is retired — it is a DNS change plus a custom-domain swap, nothing in code.
