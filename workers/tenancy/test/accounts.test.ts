@@ -22,6 +22,9 @@ import {
   listAccounts,
   setAccountActive,
   setAccountParent,
+  setLinkActive,
+  setPortalAccessActive,
+  switchPortalAccount,
 } from "../src/lib/accounts"
 import { buildSpineDb, IDS } from "./spine-harness"
 
@@ -174,7 +177,7 @@ describe("contacts", () => {
     const n = db().prepare("SELECT COUNT(*) n FROM account_links WHERE person_account_id = ?").get(
       IDS.victimPerson
     ) as { n: number }
-    expect(n.n).toBe(2)
+    expect(n.n).toBe(3) // the two she starts with, plus the one just added
   })
 
   it("refuses the same person twice on the same company, and self-links", async () => {
@@ -200,7 +203,7 @@ describe("the paged list (R14/R16)", () => {
 
     const first = await listAccounts(cfg, guard, staff)
     expect(first.rows).toHaveLength(50)
-    expect(first.total).toBe(65) // 5 seeded + 60 — the exact COUNT, not the page length
+    expect(first.total).toBe(67) // 7 seeded + 60 — the exact COUNT, not the page length
     expect(first.hasMore).toBe(true)
     expect(first.nextCursor).toBeTruthy()
 
@@ -214,5 +217,131 @@ describe("the paged list (R14/R16)", () => {
     const scope = await accountScope(cfg, { ...guard, userId: IDS.burglarUser })
     const page = await listAccounts(cfg, guard, scope)
     expect(page.total).toBe(2) // Delaval + Diego, and nothing of Bergman's
+  })
+})
+
+// The owner's two rules for the client side (10 Aug 2026), each written as the
+// example he gave rather than as an abstraction — a test that reads like the
+// decision is a test someone can still check against the decision next year.
+describe("standing in ONE company at a time", () => {
+  const portalScope = (userId: string) => accountScope(cfg, { ...guard, userId })
+  // The switch writes the CALLER's own pointer (`user_id` off the guard), so the
+  // guard and the scope must belong to the same person — as they always do on
+  // the route, where both come from the one session.
+  const asVictim = { ...guard, userId: IDS.victimUser }
+
+  it("a contact who hangs under a company sees that company's world", async () => {
+    // Company A with A1/A2/A3 beneath it: whoever logs in as one of the children
+    // is a person INSIDE that company, and they see what the company sees.
+    const scope = await portalScope(IDS.contactUser)
+    expect(scope.kind).toBe("portal")
+    if (scope.kind !== "portal") return
+    expect(scope.currentAccountId).toBe(IDS.victimAccount)
+    expect(scope.accountIds).toContain(IDS.victimAccount) // the company itself
+    expect(scope.accountIds).toContain(IDS.victimChild) // and everything under it
+    expect(scope.accountIds).toContain(IDS.victimContact) // and their own row
+  })
+
+  it("…but never climbs past the company they belong to", async () => {
+    // Put Bergman under a holding group. The contact belongs to Bergman, not to
+    // the group — inheriting upward would hand them the whole family.
+    const holding = await createAccount(cfg, guard, staff, actor, {
+      accountType: "entity",
+      name: "Bergman Holding",
+    })
+    await setAccountParent(cfg, guard, staff, actor, IDS.victimAccount, holding)
+
+    const scope = await portalScope(IDS.contactUser)
+    if (scope.kind !== "portal") throw new Error("expected a portal caller")
+    expect(scope.accountIds).not.toContain(holding)
+  })
+
+  it("a person on two companies sees ONE of them, not both at once", async () => {
+    const scope = await portalScope(IDS.victimUser)
+    if (scope.kind !== "portal") throw new Error("expected a portal caller")
+    // Both are offered by the switcher…
+    expect(scope.roots).toEqual([IDS.victimAccount, IDS.victimSecond])
+    // …but only the one they stand in is inside the fence.
+    expect(scope.accountIds).toContain(IDS.victimAccount)
+    expect(scope.accountIds).not.toContain(IDS.victimSecond)
+  })
+
+  it("switching moves the fence, and the old company goes dark", async () => {
+    const before = await portalScope(IDS.victimUser)
+    if (before.kind !== "portal") throw new Error("expected a portal caller")
+    const moved = await switchPortalAccount(cfg, asVictim, before, IDS.victimSecond)
+    expect(moved).toBe(true)
+
+    const after = await portalScope(IDS.victimUser)
+    if (after.kind !== "portal") throw new Error("expected a portal caller")
+    expect(after.currentAccountId).toBe(IDS.victimSecond)
+    expect(after.accountIds).toContain(IDS.victimSecond)
+    expect(after.accountIds).not.toContain(IDS.victimAccount)
+    expect(after.accountIds).not.toContain(IDS.victimChild)
+  })
+
+  it("standing where you already stand changes nothing (R17)", async () => {
+    const scope = await portalScope(IDS.victimUser)
+    if (scope.kind !== "portal") throw new Error("expected a portal caller")
+    await switchPortalAccount(cfg, asVictim, scope, IDS.victimSecond)
+    const again = await portalScope(IDS.victimUser)
+    expect(await switchPortalAccount(cfg, asVictim, again, IDS.victimSecond)).toBe(false)
+  })
+
+  it("a switch into someone else's company is a 404, not a 403", async () => {
+    const scope = await portalScope(IDS.victimUser)
+    if (scope.kind !== "portal") throw new Error("expected a portal caller")
+    // 403 would confirm the id exists. Outside the fence, a real company and a
+    // made-up one must be the same sentence.
+    await expect(switchPortalAccount(cfg, asVictim, scope, IDS.burglarAccount)).rejects.toMatchObject({
+      status: 404,
+    })
+    await expect(switchPortalAccount(cfg, asVictim, scope, "A_NOT_A_REAL_ID")).rejects.toMatchObject({
+      status: 404,
+    })
+  })
+
+  it("a pointer at a company they've been unlinked from falls back, never sticks", async () => {
+    const first = await portalScope(IDS.victimUser)
+    if (first.kind !== "portal") throw new Error("expected a portal caller")
+    await switchPortalAccount(cfg, asVictim, first, IDS.victimSecond)
+    // Staff unlink them from Bergman Marine; the stale pointer must not keep working.
+    await setLinkActive(cfg, guard, staff, actor, IDS.victimSecondLink, false)
+
+    const after = await portalScope(IDS.victimUser)
+    if (after.kind !== "portal") throw new Error("expected a portal caller")
+    expect(after.roots).toEqual([IDS.victimAccount])
+    expect(after.currentAccountId).toBe(IDS.victimAccount)
+    expect(after.accountIds).not.toContain(IDS.victimSecond)
+  })
+
+  it("a revoked login stands nowhere and switches nowhere", async () => {
+    const live = await portalScope(IDS.victimUser)
+    if (live.kind !== "portal") throw new Error("expected a portal caller")
+    await setPortalAccessActive(cfg, guard, staff, actor, IDS.victimPortal, false)
+
+    const dead = await portalScope(IDS.victimUser)
+    expect(dead.kind).toBe("portal") // still a client, never promoted to staff
+    if (dead.kind !== "portal") return
+    expect(dead.roots).toEqual([])
+    expect(dead.currentAccountId).toBeNull()
+    expect(dead.accountIds).toEqual([])
+    await expect(switchPortalAccount(cfg, asVictim, dead, IDS.victimAccount)).rejects.toMatchObject({
+      status: 404,
+    })
+  })
+
+  it("a freelancer with no company still sees themselves", async () => {
+    // Their own row IS the world (SCOPE ch.03). Without the fallback the fence
+    // would resolve to nothing and lock out the person it exists to protect.
+    const solo = await createAccount(cfg, guard, staff, actor, {
+      accountType: "individual",
+      name: "Solo Trader",
+    })
+    await grantPortalAccess(cfg, guard, staff, actor, { accountId: solo, userId: "U_SOLO" })
+    const scope = await accountScope(cfg, { ...guard, userId: "U_SOLO" })
+    if (scope.kind !== "portal") throw new Error("expected a portal caller")
+    expect(scope.roots).toEqual([solo])
+    expect(scope.accountIds).toEqual([solo])
   })
 })

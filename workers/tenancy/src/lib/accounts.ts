@@ -17,6 +17,7 @@ import { logActivity, describeChanges, type Actor } from "../../../../shared/wor
 import {
   accountScopeClause,
   requireAccountInScope,
+  requireStandableRoot,
   type AccountScope,
 } from "../../../../shared/workers/account-scope"
 import { d1Query, type D1Rest } from "../../../../shared/workers/d1-rest"
@@ -731,6 +732,56 @@ async function rowInFenceOrThrow(
     [...fence.params, id]
   )
   if (!rows[0]) throw new GuardError(404, "not_found", "That record doesn't exist.")
+}
+
+/** WHERE this client login may stand, with names — the switcher's whole payload,
+ * and the ONLY place the roots become readable text. Not a growing collection: a
+ * person belongs to a handful of companies, and the guard corridor has already
+ * bounded the set. LIMIT LIST_HARD_CAP anyway (R14), because "it can't get big"
+ * is exactly the sentence every unbounded read was born from. */
+export async function portalStandings(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope
+): Promise<{ accounts: { id: string; name: string }[]; currentAccountId: string | null }> {
+  if (scope.kind === "staff" || scope.roots.length === 0)
+    return { accounts: [], currentAccountId: null }
+  const rows = await d1Query<{ id: string; name: string }>(
+    cfg,
+    guard.databaseId,
+    `SELECT id, name FROM accounts
+      WHERE id IN (${scope.roots.map(() => "?").join(", ")})
+      ORDER BY name LIMIT ${LIST_HARD_CAP}`,
+    [...scope.roots]
+  )
+  return { accounts: rows, currentAccountId: scope.currentAccountId }
+}
+
+/** Move a client login to another of THEIR OWN companies — a narrowing, never a
+ * widening: `requireStandableRoot` refuses anything outside the set the guard
+ * corridor resolved, with the same 404 as any other stranger's id.
+ *
+ * Idempotent (R17): the current value rides the WHERE, so standing where you
+ * already stand moves zero rows and the caller learns nothing changed. The
+ * pointer is the caller's OWN — `user_id = ?` from the session, never a body
+ * field — so one client can never re-seat another. */
+export async function switchPortalAccount(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  accountId: string
+): Promise<boolean> {
+  requireStandableRoot(scope, accountId)
+  const changed = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    `UPDATE portal_users SET current_account_id = ?, updated_at = ?
+      WHERE user_id = ? AND deactivated_at IS NULL
+        AND (current_account_id IS NULL OR current_account_id <> ?)
+      RETURNING id`,
+    [accountId, new Date().toISOString(), guard.userId, accountId]
+  )
+  return !!changed[0]
 }
 
 /** A parameterised INSERT — the table name is a code literal, every value is

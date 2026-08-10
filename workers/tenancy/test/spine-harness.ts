@@ -40,6 +40,15 @@ export const IDS = {
   victimPerson: "A_VICTIM_PERSON",
   victimLink: "L_VICTIM",
   victimPortal: "P_VICTIM",
+  // A SECOND company of the victim's, with the same person on both — the
+  // switcher's reason to exist, and the one-at-a-time proof.
+  victimSecond: "A_VICTIM_SECOND",
+  victimSecondLink: "L_VICTIM_SECOND",
+  // A contact who hangs UNDER the company rather than being linked to it: the
+  // owner's own example (a person inside Company A, who sees Company A's world).
+  contactUser: "U_CONTACT",
+  victimContact: "A_VICTIM_CONTACT",
+  contactPortal: "P_CONTACT",
   burglarAccount: "A_BURGLAR",
   burglarPerson: "A_BURGLAR_PERSON",
   burglarLink: "L_BURGLAR",
@@ -54,6 +63,10 @@ export const VICTIM_IDS = [
   IDS.victimPerson,
   IDS.victimLink,
   IDS.victimPortal,
+  IDS.victimSecond,
+  IDS.victimSecondLink,
+  IDS.victimContact,
+  IDS.contactPortal,
 ] as const
 
 /** A fresh team database: the real migrations, the real seed, then the two
@@ -70,11 +83,13 @@ export function buildSpineDb(): DatabaseSync {
     INSERT INTO users (id, email, first_name, current_team_id) VALUES
       ('${IDS.staffUser}', 'staff@kwapso.app', 'Staff', '${IDS.team}'),
       ('${IDS.burglarUser}', 'burglar@delaval.example', 'Burglar', '${IDS.team}'),
-      ('${IDS.victimUser}', 'marta@bergman.example', 'Marta', '${IDS.team}');
+      ('${IDS.victimUser}', 'marta@bergman.example', 'Marta', '${IDS.team}'),
+      ('${IDS.contactUser}', 'luis@bergman.example', 'Luis', '${IDS.team}');
     INSERT INTO team_members (id, team_id, user_id, role_id, created_at) VALUES
       ('m1', '${IDS.team}', '${IDS.staffUser}', '${IDS.adminRole}', '2026-01-01'),
       ('m2', '${IDS.team}', '${IDS.burglarUser}', '${IDS.clientRole}', '2026-01-01'),
-      ('m3', '${IDS.team}', '${IDS.victimUser}', '${IDS.clientRole}', '2026-01-01');
+      ('m3', '${IDS.team}', '${IDS.victimUser}', '${IDS.clientRole}', '2026-01-01'),
+      ('m4', '${IDS.team}', '${IDS.contactUser}', '${IDS.clientRole}', '2026-01-01');
   `)
 
   // The team database: every migration, in order, exactly as the runner rolls them.
@@ -103,15 +118,21 @@ export function buildSpineDb(): DatabaseSync {
   account(IDS.victimAccount, "entity", "Bergman S.A.", null)
   account(IDS.victimChild, "entity", "Bergman Workshop", IDS.victimAccount)
   account(IDS.victimPerson, "individual", "Marta Ruiz", null)
+  account(IDS.victimSecond, "entity", "Bergman Marine", null)
+  // Hangs UNDER the company instead of being linked to it — the contact rows a
+  // company's record carries.
+  account(IDS.victimContact, "individual", "Luis Vera", IDS.victimAccount)
   account(IDS.burglarAccount, "entity", "Delaval Group", null)
   account(IDS.burglarPerson, "individual", "Diego Sanz", null)
 
   db.exec(`
     INSERT INTO account_links (id, account_id, person_account_id, relationship, created_at, creator_id) VALUES
       ('${IDS.victimLink}', '${IDS.victimAccount}', '${IDS.victimPerson}', 'Operations', '2026-01-01', '${IDS.staffUser}'),
+      ('${IDS.victimSecondLink}', '${IDS.victimSecond}', '${IDS.victimPerson}', 'Operations', '2026-01-01', '${IDS.staffUser}'),
       ('${IDS.burglarLink}', '${IDS.burglarAccount}', '${IDS.burglarPerson}', 'Owner', '2026-01-01', '${IDS.staffUser}');
     INSERT INTO portal_users (id, account_id, user_id, created_at, creator_id) VALUES
       ('${IDS.victimPortal}', '${IDS.victimPerson}', '${IDS.victimUser}', '2026-01-01', '${IDS.staffUser}'),
+      ('${IDS.contactPortal}', '${IDS.victimContact}', '${IDS.contactUser}', '2026-01-01', '${IDS.staffUser}'),
       ('${IDS.burglarPortal}', '${IDS.burglarPerson}', '${IDS.burglarUser}', '2026-01-01', '${IDS.staffUser}');
   `)
 

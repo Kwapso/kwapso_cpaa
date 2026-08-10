@@ -43,6 +43,7 @@ const HOUSEKEEPING = new Set([
   "POST /api/tenancy/switch-team", // flips the caller's own current-team pointer
   "POST /api/tenancy/admin/migrate-teams", // ops: roll team-schema migrations
   "POST /api/tenancy/admin/move-module", // ops: relocate a module's DB
+  "POST /api/tenancy/portal/switch-account", // flips the caller's own current-account pointer
 ])
 
 describe("live-sync seam: every mutation publishes", () => {
@@ -99,6 +100,7 @@ const IDENTITY_GATED = new Set<string>([
   "POST /api/tenancy/switch-team", // flips the caller's OWN current-team pointer
   "POST /api/tenancy/teams", // create a team — any signed-in user, no prior membership
   "POST /api/tenancy/invitations/accept", // accept a received invite — gates on email ownership
+  "POST /api/tenancy/portal/switch-account", // own-pointer: the standable set comes from the guard corridor
 ])
 
 describe("permission-gating seam (R10): every write gates", () => {

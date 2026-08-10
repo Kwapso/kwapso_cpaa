@@ -365,6 +365,18 @@ SELECT lower(hex(randomblob(16))), r.id, m.module, r.is_default, r.is_default, r
  );
 `,
   },
+  {
+    version: "0008_portal_current_account",
+    sql: `
+-- A client login stands in ONE company at a time and switches between them
+-- (owner decision, 10 Aug 2026) — the same bargain the team switcher makes.
+-- This is that pointer, and nothing more: it NARROWS the fence to one of the
+-- companies the person already belongs to, it can never widen it. NULL means
+-- "not chosen yet", which the guard corridor reads as their first company, so
+-- every existing grant keeps working without a backfill.
+ALTER TABLE portal_users ADD COLUMN current_account_id TEXT REFERENCES accounts (id);
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }
