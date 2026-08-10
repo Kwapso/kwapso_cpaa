@@ -17,7 +17,7 @@ import type { D1Rest } from "../../../../shared/workers/d1-rest"
 import type { Env } from "../env"
 import { selectModel, type ChatMessage, type Model, type ModelReply, type ToolCall, type ToolSpec } from "./model"
 import { executeTool, getTool, requiresConfirm, toolSpecs, type ToolResult } from "./tools"
-import { appendMessage, consumePendingProposal, createThread, getPendingProposal, listMessages } from "./threads"
+import { appendMessage, consumePendingProposal, createThread, getPendingProposal, listMessages, requireOwnThread } from "./threads"
 import { addBatchFile, createBatch, planBatch } from "./import-batch"
 import { GuardError } from "../../../../shared/workers/gating"
 import { recordWorkerError } from "../../../../shared/workers/error-log"
@@ -259,6 +259,10 @@ export async function runChat(
   opts: { threadId?: string; message: string; source: string; files?: { name: string; csv: string }[] },
   emit?: Emit
 ): Promise<ChatOutcome> {
+  // Prove the thread is the caller's BEFORE the first append — a message written
+  // into someone else's conversation cannot be taken back, and the next turn
+  // would read their history as context.
+  if (opts.threadId) await requireOwnThread(cfg, guard, actor.id, opts.threadId)
   const threadId = opts.threadId ?? (await createThread(cfg, guard, actor, deriveTitle(opts.message)))
   // The saved message names the attachments (honest history); the machine plan block
   // below is model-facing only.

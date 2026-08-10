@@ -27,7 +27,7 @@ import {
   planModules,
 } from "../lib/import-batch"
 import { consumeAiUnit } from "../lib/credits"
-import { sampleRows, TARGETS } from "../lib/targets"
+import { sampleRows, TARGETS, targetFor } from "../lib/targets"
 import { csvResponse, toCsv } from "../../../../shared/workers/csv"
 import type { D1Rest } from "../../../../shared/workers/d1-rest"
 import type { MemberGuard } from "../../../../shared/workers/gating"
@@ -50,7 +50,10 @@ export async function getImportTargets(request: Request, env: Env): Promise<Resp
 export async function getImportSample(request: Request, env: Env): Promise<Response> {
   await teamContext(request, env)
   const key = new URL(request.url).searchParams.get("tableKey") ?? ""
-  const target = TARGETS[key]
+  // `TARGETS[key]` alone resolves INHERITED members: ?tableKey=constructor hands
+  // back a function, sails past a truthiness check and crashes downstream as a
+  // 500 with an error-log row per request. Own-property only.
+  const target = targetFor(key)
   if (!target) return fail(400, "invalid_target", "That isn't an importable target.")
   const { header, row } = sampleRows(target)
   return csvResponse(`${target.tableKey}-sample.csv`, toCsv(header, [row]))
@@ -60,7 +63,7 @@ export async function getImportSample(request: Request, env: Env): Promise<Respo
 export async function postImportStart(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard } = await teamContext(request, env)
   const body = (await request.json().catch(() => ({}))) as { tableKey?: string }
-  const def = body.tableKey ? TARGETS[body.tableKey] : undefined
+  const def = targetFor(body.tableKey)
   if (!def || !body.tableKey) return fail(400, "invalid_target", "Pick a valid import target.")
   await requireRight(cfg, guard, def.module, "create")
   const { summary, catalog } = await startSession(env, cfg, guard, actor, body.tableKey)

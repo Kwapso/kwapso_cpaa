@@ -101,6 +101,27 @@ export async function createThread(
   return id
 }
 
+/** A thread the CALLER owns, or a refusal. The chat entry point used to append
+ * straight into whatever `threadId` arrived in the body: same team, so no tenant
+ * was crossed, but a colleague's private conversation with the agent is not
+ * yours to write into — or to read back on the next turn. Checked BEFORE the
+ * first write, because an appended message can't be un-appended. */
+export async function requireOwnThread(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actorId: string,
+  threadId: string
+): Promise<void> {
+  const rows = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    "SELECT id FROM agent_threads WHERE id = ? AND creator_id = ? LIMIT 1",
+    [threadId, actorId]
+  )
+  // 404, not 403: "that thread isn't yours" confirms the thread exists.
+  if (!rows[0]) throw new GuardError(404, "not_found", "That conversation doesn't exist.")
+}
+
 export async function appendMessage(
   cfg: D1Rest,
   guard: MemberGuard,

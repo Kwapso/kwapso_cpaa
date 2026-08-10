@@ -92,6 +92,16 @@ function accountType(v: string): string {
   return v.trim()
 }
 
+/** THE ONE WAY to look a target up from anything a caller supplied.
+ *
+ * A plain `TARGETS[key]` resolves INHERITED members too, so `?tableKey=constructor`
+ * hands back a function that passes a truthiness check and then crashes deeper in
+ * as a 500 — one error-log row per request, from a string anyone can send. Own
+ * properties only, and `undefined` for everything else. */
+export function targetFor(key: string | null | undefined): TargetDef | undefined {
+  return key && Object.prototype.hasOwnProperty.call(TARGETS, key) ? TARGETS[key] : undefined
+}
+
 export const TARGETS: Record<string, TargetDef> = {
   // Dropdown values ("Selectable data") — the base's PARENT in the worked
   // multi-table demo: import these first, then learning articles reference them.

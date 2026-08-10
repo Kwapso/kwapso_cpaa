@@ -10,7 +10,7 @@
 import type { Env } from "../env"
 import type { ImportPlan, ImportPlanStep, TransformKey } from "../../../../shared/types"
 import { selectModel, type ChatMessage } from "./model"
-import { TARGETS } from "./targets"
+import { TARGETS, targetFor } from "./targets"
 import {
   buildFallbackPlan,
   isTransformKey,
@@ -85,7 +85,7 @@ function adaptPlan(files: AnalyzeFile[], raw: RawStep[]): ImportPlan {
   const steps: ImportPlanStep[] = []
   for (const s of raw) {
     const file = s.fileId ? byId.get(s.fileId) : undefined
-    const def = s.target ? TARGETS[s.target] : undefined
+    const def = targetFor(s.target)
     if (!file || !def) {
       if (s.fileId && s.target) warnings.push(`Ignored an unrecognized target "${s.target}".`)
       continue
