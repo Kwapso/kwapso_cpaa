@@ -19,23 +19,39 @@ import {
   type D1Rest,
 } from "../../../../shared/workers/d1-rest"
 import { ulid } from "../../../../shared/workers/id"
+import { CRON_ALERT_CAP } from "../../../../shared/workers/limits"
 import type { Env } from "../env"
 
 /** 80% of D1's 10GB per-database cap. */
 export const ALERT_THRESHOLD_BYTES = 8 * 1024 * 1024 * 1024
 const COPY_BATCH = 250
 
-/** Nightly: size every team database, alarm on anything ≥ the threshold. */
+/** Nightly: size every team database, alarm on anything ≥ the threshold.
+ *
+ * BOUNDED WORK PER TICK. The scan itself is cheap, but every ALARMING database
+ * costs a core-DB read plus an insert, and nobody is watching a cron: a tick that
+ * tries to alarm on 5,000 databases at once simply dies partway and reports
+ * nothing. So the tick stops at CRON_ALERT_CAP alarms and says so — the rest are
+ * found by tomorrow's run, because the check is idempotent per database (an open
+ * alert suppresses a second one). */
 export async function checkDatabaseSizes(
   env: Env,
   cfg: D1Rest
-): Promise<{ checked: number; alerted: string[] }> {
+): Promise<{ checked: number; alerted: string[]; capped: boolean }> {
   const all = await d1ListDatabases(cfg)
   const teamDbs = all.filter((db) => db.name.startsWith("team-"))
   const alerted: string[] = []
+  let capped = false
 
   for (const db of teamDbs) {
     if ((db.file_size ?? 0) < ALERT_THRESHOLD_BYTES) continue
+    if (alerted.length >= CRON_ALERT_CAP) {
+      capped = true
+      console.error(
+        `D1 SIZE ALARM: stopped at the ${CRON_ALERT_CAP}-alarm ceiling for this run — more databases are over the threshold; tomorrow's run continues.`
+      )
+      break
+    }
 
     const open = await env.DB.prepare(
       "SELECT id FROM db_alerts WHERE database_id = ? AND resolved_at IS NULL"
@@ -62,7 +78,7 @@ export async function checkDatabaseSizes(
     )
     alerted.push(db.name)
   }
-  return { checked: teamDbs.length, alerted }
+  return { checked: teamDbs.length, alerted, capped }
 }
 
 /**

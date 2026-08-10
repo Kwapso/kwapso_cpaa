@@ -4,7 +4,7 @@
 
 import { fail, json } from "../../../../shared/workers/http"
 import { csvResponse, toCsv } from "../../../../shared/workers/csv"
-import { optionalText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
+import { optionalText, queryText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
 import { publishChange } from "../../../../shared/workers/realtime"
 import { listRoles, countRoles } from "../lib/members"
 import { TEAM_MODULE_CATALOG } from "../team-schema"
@@ -34,7 +34,7 @@ export async function getRoles(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await teamContext(request, env)
   await requireRight(cfg, guard, "member_roles", "read")
   const roles = await listRoles(env, cfg, guard)
-  const id = new URL(request.url).searchParams.get("id") // ?id= → one role
+  const id = queryText(new URL(request.url).searchParams.get("id"), "Id") // ?id= → one role
   // R16: every list response carries the exact server total — badges never use rows.length.
   return json({ roles: id ? roles.filter((r) => r.id === id) : roles, total: await countRoles(cfg, guard) })
 }
@@ -92,7 +92,7 @@ export async function getRolesExport(request: Request, env: Env): Promise<Respon
 export async function getRolePerms(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await teamContext(request, env)
   await requireRight(cfg, guard, "member_roles", "read")
-  const roleId = new URL(request.url).searchParams.get("roleId")
+  const roleId = queryText(new URL(request.url).searchParams.get("roleId"), "Role")
   if (!roleId) return fail(400, "invalid_input", "roleId is required.")
   return json(await getRolePermissions(cfg, guard, roleId))
 }

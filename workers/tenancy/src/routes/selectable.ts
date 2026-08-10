@@ -5,7 +5,7 @@
 
 import { fail, json } from "../../../../shared/workers/http"
 import { csvResponse, toCsv } from "../../../../shared/workers/csv"
-import { requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
+import { queryText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
 import { publishChange } from "../../../../shared/workers/realtime"
 import { gated, gatedBody } from "../../../../shared/workers/route"
 import {
@@ -21,7 +21,7 @@ import type { Env } from "../env"
 export async function getSelectable(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "selectable_data", "read")
   const values = await listSelectable(cfg, guard)
-  const id = new URL(request.url).searchParams.get("id") // ?id= → one value (row-level live re-pull)
+  const id = queryText(new URL(request.url).searchParams.get("id"), "Id") // ?id= → one value (row-level live re-pull)
   return json({ values: id ? values.filter((v) => v.id === id) : values, total: await countSelectable(cfg, guard) })
 }
 

@@ -1,10 +1,21 @@
-// sanitizeRichHtml is the SECURITY BOUNDARY for user-authored article HTML (the
-// Notes editor). What it returns is injected into the page, so it must keep
-// formatting but drop scripts, inline handlers, and unsafe links. These lock that.
+// web/lib/rich-text.ts is the RENDER SECURITY BOUNDARY, in two halves:
+//
+//  • sanitizeRichHtml — user-authored article HTML (the Notes editor). What it
+//    returns is injected into the page, so it must keep formatting but drop
+//    scripts, inline handlers, and unsafe links.
+//  • safeHref / safeSrc — the URL half. A person types an article's linked
+//    resource; the assistant writes links into its replies (and the assistant is
+//    steerable by anything it read). Neither may reach an href or a src unchecked.
+//
+// These lock both halves, plus the source-level rule that no screen may bind a
+// user-supplied URL to an attribute without going through the seam.
 
+import { readdirSync, readFileSync } from "node:fs"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
-import { richTextPlain, sanitizeRichHtml } from "@/lib/rich-text"
+import { richTextPlain, safeHref, safeSrc, sanitizeRichHtml } from "@/lib/rich-text"
 
 describe("sanitizeRichHtml", () => {
   it("keeps allowlisted formatting + lists", () => {
@@ -54,5 +65,134 @@ describe("richTextPlain", () => {
   it("strips tags to plain text (previews / assistant)", () => {
     expect(richTextPlain("<p>Hello <strong>world</strong></p>")).toBe("Hello world")
     expect(richTextPlain(null)).toBe("")
+  })
+})
+
+/** Live URLs, in every spelling that has ever worked in a browser: the plain
+ * scheme, the case-shifted one, the one padded with the whitespace and control
+ * characters the URL parser strips before it decides the protocol, and the
+ * markup shapes that only *look* like URLs. Every one must come back undefined. */
+const HOSTILE_URLS = [
+  "javascript:alert(document.cookie)",
+  "JaVaScRiPt:alert(1)",
+  "  javascript:alert(1)",
+  "	java\nscript:alert(1)", // tab + newline inside the scheme — stripped by the parser
+  "data:text/html,<script>alert(1)</script>",
+  "data:image/svg+xml,<svg onload=alert(1)></svg>",
+  "vbscript:msgbox(1)",
+  "blob:https://evil.example/1234",
+  "<img src=x onerror=alert(1)>",
+  "<script>alert(1)</script>",
+]
+
+describe("safeHref / safeSrc — the URL render boundary", () => {
+  it("returns undefined for every live-URL scheme (nothing to click, nothing to load)", () => {
+    for (const raw of HOSTILE_URLS) {
+      expect(safeHref(raw), `safeHref must refuse ${JSON.stringify(raw)}`).toBeUndefined()
+      expect(safeSrc(raw), `safeSrc must refuse ${JSON.stringify(raw)}`).toBeUndefined()
+    }
+  })
+
+  it("keeps the addresses people actually paste", () => {
+    for (const ok of ["https://example.com/a?b=1", "http://example.com", "/media/learning/x.pdf"]) {
+      expect(safeHref(ok)).toBe(ok)
+      expect(safeSrc(ok)).toBe(ok)
+    }
+    expect(safeHref(null)).toBeUndefined()
+    expect(safeHref("")).toBeUndefined()
+  })
+
+  it("safeSrc is STRICTER than safeHref: mailto is a link, never a frame", () => {
+    // An iframe/img src has no use for mailto — and the stricter list is what keeps
+    // the src allowlist from ever growing towards the schemes that execute.
+    expect(safeHref("mailto:someone@example.com")).toBe("mailto:someone@example.com")
+    expect(safeSrc("mailto:someone@example.com")).toBeUndefined()
+  })
+})
+
+/* ------------------------------------------------------------------------- */
+
+const HERE = dirname(fileURLToPath(import.meta.url))
+const WEB = join(HERE, "..")
+
+/** Every .tsx under web/ that renders (components + app routes). */
+function screenFiles(): string[] {
+  const out: string[] = []
+  const walk = (dir: string) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, e.name)
+      if (e.isDirectory()) walk(p)
+      else if (e.name.endsWith(".tsx")) out.push(p)
+    }
+  }
+  walk(join(WEB, "components"))
+  walk(join(WEB, "app"))
+  return out
+}
+
+/** The `{...}` immediately after `at`, brace-balanced (JSX expressions nest). */
+function braced(src: string, at: number): string {
+  let depth = 0
+  for (let i = at; i < src.length; i++) {
+    if (src[i] === "{") depth++
+    else if (src[i] === "}" && --depth === 0) return src.slice(at + 1, i).trim()
+  }
+  return src.slice(at)
+}
+
+/**
+ * URL-ish expressions that are NOT user-typed text, so they don't need the seam.
+ * Data, not judgement in code — every exemption is a visible line with a reason,
+ * the same shape the rules registry uses. Anything not on this list must pass
+ * through safeHref/safeSrc or be a literal we wrote ourselves.
+ */
+const NOT_USER_TYPED: Record<string, string> = {
+  // Written without `?.` — the scan normalises optional chaining before lookup, so
+  // one entry covers `team.logoUrl` and `ctx?.team?.logoUrl` alike.
+  "brand.logoUrl": "shared/brand.ts — a build-time constant, not a field anyone fills in",
+  "download.href": "a screen-recipe constant (the export route we wrote)",
+  "dataOps.importSampleHref(t.tableKey)": "an app-built URL from a catalogue key",
+  // Uploads: the server writes these as `/media/<key>` (auth/profile.ts,
+  // tenancy/teams.ts) — no caller ever supplies the string. `photo`/`logo` are the
+  // object/data URL of the file the user just picked in THIS session.
+  photo: "the local preview of the image just picked",
+  "user.imageUrl": "server-minted /media path",
+  "team.logoUrl": "server-minted /media path",
+  "ctx.team.logoUrl": "server-minted /media path",
+  "inv.teamLogoUrl": "server-minted /media path",
+  "s.imageUrl": "server-minted /media path",
+  "photo || (user.imageUrl as string)": "local preview, else server-minted /media path",
+  "logo || (team.logoUrl as string)": "local preview, else server-minted /media path",
+}
+
+describe("no screen binds an unchecked URL to an attribute", () => {
+  it("every href/src expression is a literal, a seam call, or a reviewed exemption", () => {
+    const offenders: string[] = []
+    let seen = 0
+    for (const file of screenFiles()) {
+      const src = readFileSync(file, "utf8")
+      for (const m of src.matchAll(/\b(href|src)=\{/g)) {
+        seen++
+        const expr = braced(src, m.index + m[0].length - 1)
+        // A literal we wrote (template or quoted string) is our own route.
+        if (/^[`"']/.test(expr)) continue
+        // The seam, called inline…
+        if (/\bsafe(Href|Src)\s*\(/.test(expr)) continue
+        // …or a plain local this file assigned FROM the seam (the readable shape:
+        // check once at the top, bind the result, use it). Nothing else counts —
+        // a local assigned from anything else stays an offender.
+        if (/^[A-Za-z_$][\w$]*$/.test(expr) && new RegExp(`\\b${expr}\\s*=\\s*safe(Href|Src)\\s*\\(`).test(src))
+          continue
+        if (expr.replace(/\?\./g, ".") in NOT_USER_TYPED) continue
+        offenders.push(`${file.slice(WEB.length + 1)} → ${m[1]}={${expr}}`)
+      }
+    }
+    // Tripwire: a scan that finds nothing reports "all clear" exactly like a
+    // passing one, so prove it is still looking at real markup.
+    expect(seen, "the href/src scan found no attribute bindings at all — it has gone blind").toBeGreaterThan(10)
+    expect(
+      offenders,
+      `a URL reaches an attribute unchecked — wrap it in safeHref()/safeSrc() (or add a reasoned NOT_USER_TYPED entry): ${offenders.join(", ")}`
+    ).toEqual([])
   })
 })

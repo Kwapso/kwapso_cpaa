@@ -12,13 +12,14 @@ import {
 } from "../lib/invites"
 import { acceptInvite, listReceivedInvites } from "../lib/teams"
 import { gated, gatedBody } from "../../../../shared/workers/route"
+import { queryText } from "../../../../shared/workers/validate"
 import { toActor, whoAmI } from "../context"
 import type { Env } from "../env"
 
 export async function getInvites(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "team_members", "read")
   const invites = await listInvites(env, cfg, guard)
-  const id = new URL(request.url).searchParams.get("id") // ?id= → one invite
+  const id = queryText(new URL(request.url).searchParams.get("id"), "Id") // ?id= → one invite
   // R16: the exact server total rides every list response (badges never use rows.length).
   return json({ invites: id ? invites.filter((i) => i.id === id) : invites, total: await countInvites(env, guard) })
 }
@@ -55,7 +56,7 @@ export async function postRevokeInvite(request: Request, env: Env): Promise<Resp
  * acceptance + shelf life, for the invite detail. Gated by team_members:read. */
 export async function getInviteAudit(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "team_members", "read")
-  const id = new URL(request.url).searchParams.get("id")
+  const id = queryText(new URL(request.url).searchParams.get("id"), "Id")
   if (!id) return fail(400, "invalid_input", "id is required.")
   return json({ audit: await readInviteAudit(env, cfg, guard, id) })
 }

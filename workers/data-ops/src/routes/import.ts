@@ -6,6 +6,7 @@
 // The session-shaping rules live in lib/import; the catalog code side in lib/targets.
 
 import { fail, json } from "../../../../shared/workers/http"
+import { queryText } from "../../../../shared/workers/validate"
 import { publishChange } from "../../../../shared/workers/realtime"
 import { GuardError, hasRight, requireRight, teamContext } from "../../../../shared/workers/gating"
 import {
@@ -49,7 +50,7 @@ export async function getImportTargets(request: Request, env: Env): Promise<Resp
  * offers this — AGENTIC-IMPORT §10 (show a good file before people prepare theirs). */
 export async function getImportSample(request: Request, env: Env): Promise<Response> {
   await teamContext(request, env)
-  const key = new URL(request.url).searchParams.get("tableKey") ?? ""
+  const key = queryText(new URL(request.url).searchParams.get("tableKey"), "Table") ?? ""
   // `TARGETS[key]` alone resolves INHERITED members: ?tableKey=constructor hands
   // back a function, sails past a truthiness check and crashes downstream as a
   // 500 with an error-log row per request. Own-property only.
@@ -109,7 +110,7 @@ export async function postImportMapping(request: Request, env: Env): Promise<Res
 /** GET /api/data-ops/import/preview?id= — the session's current preview. */
 export async function getImportPreview(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await teamContext(request, env)
-  const id = new URL(request.url).searchParams.get("id")
+  const id = queryText(new URL(request.url).searchParams.get("id"), "Id")
   if (!id) return fail(400, "invalid_input", "An import session id is required.")
   const { target } = await targetForSession(env, cfg, guard, id)
   await requireRight(cfg, guard, target.module, "create")
@@ -197,7 +198,7 @@ export async function getBatches(request: Request, env: Env): Promise<Response> 
 /** GET /api/data-ops/import/batch?id= — the batch (files + plan + report). */
 export async function getBatch(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await teamContext(request, env)
-  const id = new URL(request.url).searchParams.get("id")
+  const id = queryText(new URL(request.url).searchParams.get("id"), "Id")
   if (!id) return fail(400, "invalid_input", "A batch id is required.")
   return json({ batch: await getBatchView(cfg, guard, id) })
 }

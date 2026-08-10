@@ -18,7 +18,7 @@ import { d1ConfigFrom } from "../../../../shared/workers/gating"
 import type { Env } from "../env"
 import { GuardError } from "./permissions"
 import { buildTeamSeed, TEAM_MIGRATIONS, type Actor } from "../team-schema"
-import { LIST_HARD_CAP } from "../../../../shared/workers/limits"
+import { INVITE_SWEEP_CAP, LIST_HARD_CAP } from "../../../../shared/workers/limits"
 
 export function d1Config(env: Env): D1Rest {
   return d1ConfigFrom(env)
@@ -198,10 +198,17 @@ export async function acceptPendingInvites(
   actor: Actor
 ): Promise<number> {
   const now = new Date().toISOString()
+  // BOUNDED SWEEP: this list is keyed on an EMAIL ADDRESS, and anyone may invite
+  // any address — so its length is attacker-influenced, and each row costs three
+  // core-DB writes plus two live pings. Uncapped, one sign-in could be made to do
+  // tens of thousands of writes. INVITE_SWEEP_CAP bounds the pass; anything past
+  // it stays pending and is accepted from the Invitations inbox (oldest first, so
+  // the sweep never starves the earliest invitations).
   const pending = await env.DB.prepare(
     `SELECT i.id, i.team_id, i.role_id, i.invite_row_id FROM invite_index i
      JOIN teams t ON t.id = i.team_id AND t.deactivated_at IS NULL
-     WHERE i.email = ? AND i.status = 'pending' AND i.expires_at > ?`
+     WHERE i.email = ? AND i.status = 'pending' AND i.expires_at > ?
+     ORDER BY i.created_at ASC LIMIT ${INVITE_SWEEP_CAP}`
   )
     .bind(actor.email, now)
     .all<{ id: string; team_id: string; role_id: string; invite_row_id: string }>()

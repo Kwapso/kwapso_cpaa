@@ -44,14 +44,43 @@ export const escapeText = (s: string) =>
 export const escapeAttr = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
 
-export function safeHref(raw: string | null): string | undefined {
-  if (!raw) return undefined
+// THE URL RENDER BOUNDARY. Any user-authored URL — an article's linked resource,
+// a link the assistant wrote — is untrusted, and the browser will happily run
+// `javascript:` from an href (on click) or from an iframe src (in THIS origin).
+// So a URL only reaches an attribute through one of the two functions below,
+// which resolve it against a base and check the RESOLVED protocol (so entity- and
+// whitespace-obfuscated schemes decode before the check). Anything else → undefined,
+// and the caller renders nothing rather than something live.
+const LINK_SCHEMES = ["http:", "https:", "mailto:"]
+// A src has no reason to be mailto:, and MUST never be javascript:/data:/blob:/vbscript:.
+const SRC_SCHEMES = ["http:", "https:"]
+// Characters that never appear unencoded in a real address (a genuine URL
+// percent-encodes them) but are exactly the ones that break OUT of an HTML
+// attribute. What this seam returns is put straight into `attr="..."` by callers
+// that build HTML as strings, so refuse them here rather than trust every caller
+// to escape: a value that needs escaping to be safe isn't a safe value.
+const MARKUP_CHARS = /[<>"'`\\]/
+
+function safeUrl(raw: string | null | undefined, allow: readonly string[]): string | undefined {
+  if (!raw || MARKUP_CHARS.test(raw)) return undefined
   try {
     const u = new URL(raw, "https://x.invalid")
-    return ["http:", "https:", "mailto:"].includes(u.protocol) ? raw : undefined
+    return allow.includes(u.protocol) ? raw : undefined
   } catch {
     return undefined
   }
+}
+
+/** A URL safe to put in an `href` — http/https/mailto, or app-relative. */
+export function safeHref(raw: string | null | undefined): string | undefined {
+  return safeUrl(raw, LINK_SCHEMES)
+}
+
+/** A URL safe to put in a `src` (img / video / audio / iframe) — http/https or
+ * app-relative only. Stricter than safeHref on purpose: a framed `javascript:`
+ * URL executes with the page's own origin, which is a full XSS, not a broken image. */
+export function safeSrc(raw: string | null | undefined): string | undefined {
+  return safeUrl(raw, SRC_SCHEMES)
 }
 
 function serializeNode(node: ChildNode): string {
