@@ -70,22 +70,23 @@ export async function postCreateLearning(request: Request, env: Env): Promise<Re
 
 export async function postUpdateLearning(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<LearningInput & { id?: string }>(request, env, "learning", "edit")
-  if (!body.id) return fail(400, "invalid_input", "id and title are required.")
+  const id = requireText(body.id, "Article", TEXT_LIMITS.short)
   requireText(body.title, "Title", TEXT_LIMITS.short)
-  await updateLearning(cfg, guard, actor, body.id, body)
-  await publishChange(env, guard.teamId, "learning", body.id)
+  await updateLearning(cfg, guard, actor, id, body)
+  await publishChange(env, guard.teamId, "learning", id)
   return json({ learning: await listLearning(cfg, guard), total: await countLearning(cfg, guard) })
 }
 
 /** Deactivate / reactivate a learning item — never deleted (progress survives).
  * Gated by learning:delete (deactivate is our "delete" in the deactivate model). */
 export async function postSetLearningActive(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{ id?: string; active?: boolean }>(request, env, "learning", "delete")
-  if (!body.id || typeof body.active !== "boolean")
+  const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown; active?: unknown }>(request, env, "learning", "delete")
+  const id = requireText(body.id, "Article", TEXT_LIMITS.short)
+  if (typeof body.active !== "boolean")
     return fail(400, "invalid_input", "id and active are required.")
   // R17: no-op repeat → no ping, no duplicate history (see setLearningActive).
-  const changed = await setLearningActive(cfg, guard, actor, body.id, body.active)
-  if (changed) await publishChange(env, guard.teamId, "learning", body.id)
+  const changed = await setLearningActive(cfg, guard, actor, id, body.active)
+  if (changed) await publishChange(env, guard.teamId, "learning", id)
   return json({ learning: await listLearning(cfg, guard), total: await countLearning(cfg, guard) })
 }
 
@@ -111,11 +112,12 @@ export async function postBulkSetLearningActive(request: Request, env: Env): Pro
  * may record their own). Publishes an "edit" on the row so open lists refresh the
  * viewer's done badge. */
 export async function postLearningDone(request: Request, env: Env): Promise<Response> {
-  const { cfg, guard, body } = await gatedBody<{ id?: string; done?: boolean }>(request, env, "learning", "read")
-  if (!body.id || typeof body.done !== "boolean")
+  const { cfg, guard, body } = await gatedBody<{ id?: unknown; done?: unknown }>(request, env, "learning", "read")
+  const id = requireText(body.id, "Article", TEXT_LIMITS.short)
+  if (typeof body.done !== "boolean")
     return fail(400, "invalid_input", "id and done are required.")
-  await setLearningDone(cfg, guard, body.id, body.done)
-  await publishChange(env, guard.teamId, "learning", body.id, "edit")
+  await setLearningDone(cfg, guard, id, body.done)
+  await publishChange(env, guard.teamId, "learning", id, "edit")
   return json({ ok: true })
 }
 

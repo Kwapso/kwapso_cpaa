@@ -112,10 +112,10 @@ export async function switchActiveTeam(request: Request, env: Env): Promise<Resp
   const user = await whoAmI(request, env)
   if (!user) return fail(401, "signed_out", "Not signed in.")
 
-  const body = (await request.json().catch(() => ({}))) as { teamId?: string }
-  if (!body.teamId) return fail(400, "invalid_input", "teamId is required.")
+  const body = (await request.json().catch(() => ({}))) as { teamId?: unknown }
+  const teamId = requireText(body.teamId, "Team", TEXT_LIMITS.short)
 
-  const ok = await switchTeam(env, user.id, body.teamId)
+  const ok = await switchTeam(env, user.id, teamId)
   if (!ok) return fail(403, "not_member", "You're not a member of that team.")
   // The SAME answer as /active, so it carries the same refusal — a door that
   // returns a payload another door guards is that payload's second front door.
@@ -165,10 +165,15 @@ export async function createNamedTeam(request: Request, env: Env): Promise<Respo
 }
 
 export async function postUpdateTeam(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{ name?: string; logoDataUrl?: string }>(
+  const { actor, cfg, guard, body } = await gatedBody<{ name?: unknown; logoDataUrl?: unknown }>(
     request, env, "teams", "edit"
   )
   const name = requireText(body.name, "Name", TEXT_LIMITS.short)
+  // A data URL is bytes, not prose — parseDataUrl caps and refuses it downstream,
+  // so the boundary's job here is only to prove it IS a string (a number would
+  // reach .exec() as a coerced value and a bad logo would look like a good one).
+  if (body.logoDataUrl !== undefined && typeof body.logoDataUrl !== "string")
+    return fail(400, "invalid_input", "The logo must be an image.")
   await updateTeamDetails(env, guard.teamId, name, body.logoDataUrl)
   // Record the edit on the team's Activity feed (was missing — team-edit feedback).
   await logActivity(cfg, guard.databaseId, actor, {

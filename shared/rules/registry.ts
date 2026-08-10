@@ -118,7 +118,7 @@ export const RULES_REGISTRY: Rule[] = [
   {
     id: "R15",
     dimension: "arch",
-    law: "Every paged screen consumes the live channel (useLiveRefetch re-pulls its CURRENT page on its module's ping; the shell fans every ping to it and replays on reconnect) — AND no deaf publishers: every resource string any worker publishes must reach a listener (TEAM_RESOURCES / SIMPLE_INVALIDATIONS) or a reasoned DEAF_EXEMPT entry. Earned by: a server-paged screen whose rows live in page state outside the row caches going stale on a teammate's change — and the dropdown manager staling because its worker pinged a resource nothing listened to.",
+    law: "No deaf publishers: every resource string any worker publishes must reach a listener (TEAM_RESOURCES / SIMPLE_INVALIDATIONS in web/lib/live-resources.ts, or the portal's own PORTAL_LISTENERS) or a reasoned DEAF_EXEMPT entry — the publisher set DERIVED by scanning publishChange calls, never hand-listed. Earned by: the dropdown manager staling because its worker pinged a resource nothing listened to. RETIRED HALF: this law also used to require every paged screen to hold a useLiveRefetch subscription. That clause detected paged screens by matching '/search?' or 'usePagedList' in web/components — zero files matched, so it could never fail, and the hook it protected had no call sites. The need was real and then went away: paging moved to opaque cursors over the SHARED STORE, so a paged list's rows now live in a cache key with its cursor in a sidecar — the very caches the row-level registry patches and the portal's listener map invalidates. No screen holds page state outside them any more, which was the hook's whole premise, so the clause and web/lib/use-live-refetch.ts were retired rather than re-detected.",
     checkId: "live-collections",
     status: "enforced",
   },
@@ -148,6 +148,13 @@ export const RULES_REGISTRY: Rule[] = [
     dimension: "ai",
     law: "Agent/MCP filter parity: any tool sitting on a screen's list/search door EXPOSES and FORWARDS every filter that door parses — the required set is DERIVED from the door's own parameter parsing, never hand-listed. Earned by: the assistant falling back to free text and answering a DIFFERENT question — 3,465 descriptions that mentioned the words instead of the 134 records actually carrying the value.",
     checkId: "agent-filter-parity",
+    status: "enforced",
+  },
+  {
+    id: "R20",
+    dimension: "arch",
+    law: "Input is validated at the boundary — and it is SCANNED. Every field a worker reads off a request body must sit in a CHECKING position: the first argument of a validator from shared/workers/validate.ts (requireText / optionalText / queryText / requireIdList), the operand of typeof, inside Array.isArray() or Number(), a strict comparison against a literal, or the needle of an allow-list .includes(). Nothing else — a truthiness guard is not a type check, and a cast is not a check at all. A body may not be DESTRUCTURED at the read (that scatters untrusted values into bare locals nothing can follow). A door that genuinely cannot validate is a reasoned RAW_BODY_EXEMPT line, and the list may only SHRINK: a listed line that is no longer an offender turns the build red. Earned by: POST /api/auth/email/start with {\"email\": 123} — an unauthenticated 500 that crashed BEFORE the send throttle and wrote a row into the global core database on every request. This law existed as a sentence for months, claiming to be locked by a test that covers the query half and excludes auth outright.",
+    checkId: "validated-bodies",
     status: "enforced",
   },
 ]
@@ -408,6 +415,27 @@ export const DEAF_EXEMPT: Record<string, string> = {
     "a reply pings the parent help row too (op edit), whose row-level patch refreshes the open ticket's deps; the thread list itself re-pulls when the detail (re)opens",
   agent_usage:
     "the quota badge rides every chat response and the usage dialog fetches on open — there is no standing cache a ping could refresh",
+}
+
+/** R20 — reviewed exemptions: the request-body fields a door reads WITHOUT a
+ * runtime check, keyed `<worker src path>::<var>.<field>` exactly as the scan
+ * names them, each with the reason it is safe there.
+ *
+ * The list is a RATCHET, not a parking bay. A line that is no longer an offender
+ * turns the build RED, so validating a listed field FORCES its line out and the
+ * list can only ever shrink. That is the difference between a reviewed exception
+ * and a quiet permanent bypass — and it is why this file is the right place for
+ * it: an exception nobody can find is a bypass with better manners.
+ *
+ * Every line here today belongs to `workers/mcp/`, which is the EXTERNAL machine
+ * surface and owns its own boundary suites. */
+export const RAW_BODY_EXEMPT: Record<string, string> = {
+  "workers/mcp/src/index.ts::rpc.id":
+    "JSON-RPC 2.0 requires the request id be ECHOED BACK verbatim in the response envelope (`id` may be a string, a number or null by spec). It is never read as a value, never reaches a statement, and normalising it would break the protocol.",
+  "workers/mcp/src/index.ts::rpc.params":
+    "the params OBJECT itself is only ever indexed (`rpc.params?.name`, coerced with String()) and handed to the tool catalogue, which validates each argument against the tool's own schema before it reaches a door. The field read here is the envelope, not a value.",
+  "workers/mcp/src/index.ts::body.id":
+    "the token-revoke door names a caller-PRIVATE token row and is scoped to the caller's own tokens, so an unrecognised value refuses rather than reaching anything. Left listed rather than fixed because workers/mcp/ is a separate lane's file — the ratchet above forces this line out the moment it is validated.",
 }
 
 /** R18 — reviewed exemptions, pinned EXACTLY: tables whose activity every member

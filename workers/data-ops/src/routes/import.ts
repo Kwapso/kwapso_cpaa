@@ -6,7 +6,7 @@
 // The session-shaping rules live in lib/import; the catalog code side in lib/targets.
 
 import { fail, json } from "../../../../shared/workers/http"
-import { queryText } from "../../../../shared/workers/validate"
+import { optionalText, queryText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
 import { publishChange } from "../../../../shared/workers/realtime"
 import { GuardError, hasRight, requireRight, teamContext } from "../../../../shared/workers/gating"
 import {
@@ -63,11 +63,12 @@ export async function getImportSample(request: Request, env: Env): Promise<Respo
 /** POST /api/data-ops/import — start a session for a target (gated on target create). */
 export async function postImportStart(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard } = await teamContext(request, env)
-  const body = (await request.json().catch(() => ({}))) as { tableKey?: string }
-  const def = targetFor(body.tableKey)
-  if (!def || !body.tableKey) return fail(400, "invalid_target", "Pick a valid import target.")
+  const body = (await request.json().catch(() => ({}))) as { tableKey?: unknown }
+  const tableKey = requireText(body.tableKey, "Target", TEXT_LIMITS.short)
+  const def = targetFor(tableKey)
+  if (!def) return fail(400, "invalid_target", "Pick a valid import target.")
   await requireRight(cfg, guard, def.module, "create")
-  const { summary, catalog } = await startSession(env, cfg, guard, actor, body.tableKey)
+  const { summary, catalog } = await startSession(env, cfg, guard, actor, tableKey)
   return json({
     session: summary,
     target: { tableKey: catalog.tableKey, displayName: catalog.displayName, columns: def.columns },
@@ -78,17 +79,19 @@ export async function postImportStart(request: Request, env: Env): Promise<Respo
 export async function postImportFile(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await teamContext(request, env)
   const body = (await request.json().catch(() => ({}))) as {
-    sessionId?: string
-    fileName?: string
-    csv?: string
+    sessionId?: unknown
+    fileName?: unknown
+    csv?: unknown
   }
-  if (!body.sessionId || typeof body.csv !== "string")
+  const sessionId = requireText(body.sessionId, "Session", TEXT_LIMITS.short)
+  const fileName = optionalText(body.fileName, "File name", TEXT_LIMITS.short) ?? ""
+  if (typeof body.csv !== "string")
     return fail(400, "invalid_input", "sessionId and csv are required.")
   if (body.csv.length > MAX_CSV_BYTES)
     return fail(413, "file_too_large", "That file is too large to import. Export a smaller CSV (up to about 5 MB).")
-  const { target } = await targetForSession(env, cfg, guard, body.sessionId)
+  const { target } = await targetForSession(env, cfg, guard, sessionId)
   await requireRight(cfg, guard, target.module, "create")
-  const out = await applyFile(env, cfg, guard, body.sessionId, body.fileName ?? "", body.csv)
+  const out = await applyFile(env, cfg, guard, sessionId, fileName, body.csv)
   return json({ session: out.summary, preview: out.preview })
 }
 
@@ -96,14 +99,15 @@ export async function postImportFile(request: Request, env: Env): Promise<Respon
 export async function postImportMapping(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await teamContext(request, env)
   const body = (await request.json().catch(() => ({}))) as {
-    sessionId?: string
-    mapping?: Record<string, string>
+    sessionId?: unknown
+    mapping?: unknown
   }
-  if (!body.sessionId || typeof body.mapping !== "object" || body.mapping === null)
+  const sessionId = requireText(body.sessionId, "Session", TEXT_LIMITS.short)
+  if (typeof body.mapping !== "object" || body.mapping === null)
     return fail(400, "invalid_input", "sessionId and mapping are required.")
-  const { target } = await targetForSession(env, cfg, guard, body.sessionId)
+  const { target } = await targetForSession(env, cfg, guard, sessionId)
   await requireRight(cfg, guard, target.module, "create")
-  const out = await applyMapping(env, cfg, guard, body.sessionId, body.mapping)
+  const out = await applyMapping(env, cfg, guard, sessionId, body.mapping as Record<string, string>)
   return json({ session: out.summary, preview: out.preview })
 }
 
@@ -122,11 +126,11 @@ export async function getImportPreview(request: Request, env: Env): Promise<Resp
  * act-as-user through the gated create endpoint, then ONE list-ping for the table. */
 export async function postImportConfirm(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard } = await teamContext(request, env)
-  const body = (await request.json().catch(() => ({}))) as { sessionId?: string }
-  if (!body.sessionId) return fail(400, "invalid_input", "A sessionId is required.")
-  const { target } = await targetForSession(env, cfg, guard, body.sessionId)
+  const body = (await request.json().catch(() => ({}))) as { sessionId?: unknown }
+  const sessionId = requireText(body.sessionId, "Session", TEXT_LIMITS.short)
+  const { target } = await targetForSession(env, cfg, guard, sessionId)
   await requireRight(cfg, guard, target.module, "create")
-  const out = await confirmImport(env, request, cfg, guard, actor, body.sessionId)
+  const out = await confirmImport(env, request, cfg, guard, actor, sessionId)
   await publishChange(env, guard.teamId, target.module)
   return json({ session: out.summary, result: out.result })
 }
@@ -152,10 +156,12 @@ export async function postBatchStart(request: Request, env: Env): Promise<Respon
 export async function postBatchFile(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await teamContext(request, env)
   await requireAnyImportRight(cfg, guard)
-  const body = (await request.json().catch(() => ({}))) as { batchId?: string; name?: string; csv?: string }
-  if (!body.batchId || typeof body.csv !== "string")
+  const body = (await request.json().catch(() => ({}))) as { batchId?: unknown; name?: unknown; csv?: unknown }
+  const batchId = requireText(body.batchId, "Batch", TEXT_LIMITS.short)
+  const name = optionalText(body.name, "File name", TEXT_LIMITS.short) ?? "file"
+  if (typeof body.csv !== "string")
     return fail(400, "invalid_input", "batchId and csv are required.")
-  return json({ batch: await addBatchFile(cfg, guard, body.batchId, body.name ?? "file", body.csv) })
+  return json({ batch: await addBatchFile(cfg, guard, batchId, name, body.csv) })
 }
 
 /** POST /api/data-ops/import/batch/plan — the AGENT builds the plan. Metered on the
@@ -163,12 +169,12 @@ export async function postBatchFile(request: Request, env: Env): Promise<Respons
 export async function postBatchPlan(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await teamContext(request, env)
   await requireAnyImportRight(cfg, guard)
-  const body = (await request.json().catch(() => ({}))) as { batchId?: string }
-  if (!body.batchId) return fail(400, "invalid_input", "A batchId is required.")
+  const body = (await request.json().catch(() => ({}))) as { batchId?: unknown }
+  const batchId = requireText(body.batchId, "Batch", TEXT_LIMITS.short)
   const c = await consumeAiUnit(env, guard.teamId)
   if (!c.ok)
     return fail(429, "over_quota", "You're out of AI requests for now — the plan step uses the assistant. They reset tomorrow, or an admin can add credits.")
-  return json({ batch: await planBatch(env, cfg, guard, body.batchId), quota: c.quota })
+  return json({ batch: await planBatch(env, cfg, guard, batchId), quota: c.quota })
 }
 
 /** POST /api/data-ops/import/batch/confirm — run the plan in dependency order. Gates
@@ -176,12 +182,12 @@ export async function postBatchPlan(request: Request, env: Env): Promise<Respons
  * coarse ping per changed module. */
 export async function postBatchConfirm(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard } = await teamContext(request, env)
-  const body = (await request.json().catch(() => ({}))) as { batchId?: string }
-  if (!body.batchId) return fail(400, "invalid_input", "A batchId is required.")
-  const view = await getBatchView(cfg, guard, body.batchId)
+  const body = (await request.json().catch(() => ({}))) as { batchId?: unknown }
+  const batchId = requireText(body.batchId, "Batch", TEXT_LIMITS.short)
+  const view = await getBatchView(cfg, guard, batchId)
   if (!view.plan) return fail(409, "no_plan", "Plan the import before running it.")
   for (const m of planModules(view.plan)) await requireRight(cfg, guard, m, "create")
-  const { report, modules } = await confirmBatch(env, request, cfg, guard, actor, body.batchId)
+  const { report, modules } = await confirmBatch(env, request, cfg, guard, actor, batchId)
   for (const m of modules) await publishChange(env, guard.teamId, m)
   return json({ report })
 }

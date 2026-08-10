@@ -129,29 +129,30 @@ export async function postCreateHelp(request: Request, env: Env): Promise<Respon
 /** POST /api/content/help/update — edit a ticket (help:edit). */
 export async function postUpdateHelp(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<TicketInput & { id?: string }>(request, env, "help", "edit")
-  if (!body.id) return fail(400, "invalid_input", "id and description are required.")
+  const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
   requireText(body.description, "Description", TEXT_LIMITS.long)
   const portal = await isPortal(cfg, guard)
-  await updateTicket(cfg, guard, actor, body.id, body, portal)
-  await publishChange(env, guard.teamId, "help", body.id)
+  await updateTicket(cfg, guard, actor, id, body, portal)
+  await publishChange(env, guard.teamId, "help", id)
   return ticketPage(cfg, guard, "all", null, portal)
 }
 
 /** POST /api/content/help/status — move a ticket along its fixed lifecycle.
  * Gated PURELY by help:edit (every status move, including reopen — no raiser exception). */
 export async function postHelpStatus(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{ id?: string; status?: string }>(request, env, "help", "edit")
-  if (!body.id || !body.status || !(HELP_STATUSES as readonly string[]).includes(body.status))
+  const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown; status?: unknown }>(request, env, "help", "edit")
+  const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
+  if (typeof body.status !== "string" || !(HELP_STATUSES as readonly string[]).includes(body.status))
     return fail(400, "invalid_input", "id and a valid status are required.")
   const status = body.status as HelpStatus
 
   const portal = await isPortal(cfg, guard)
-  const ticket = await getTicket(cfg, guard, body.id, portal)
+  const ticket = await getTicket(cfg, guard, id, portal)
   if (!ticket) return fail(404, "help_not_found", "That ticket doesn't exist.")
 
   // R17: already at that status → zero rows moved → no ping, no duplicate history.
-  const changed = await setStatus(cfg, guard, actor, body.id, status, portal)
-  if (changed) await publishChange(env, guard.teamId, "help", body.id)
+  const changed = await setStatus(cfg, guard, actor, id, status, portal)
+  if (changed) await publishChange(env, guard.teamId, "help", id)
   return ticketPage(cfg, guard, "all", null, portal)
 }
 
@@ -217,14 +218,14 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
     body?: string
     taggedUserIds?: unknown
   }>(request, env, "help", "read")
-  if (!body.helpId) return fail(400, "invalid_input", "helpId and a reply body are required.")
+  const helpId = requireText(body.helpId, "Ticket", TEXT_LIMITS.short)
   const replyBody = requireText(body.body, "Reply", TEXT_LIMITS.long)
 
   // The fence decides WHOSE ticket this is before a word is appended — a reply
   // cannot be un-appended, and 404 rather than 403 so "not yours" never confirms
   // the ticket exists.
   const portal = await isPortal(cfg, guard)
-  const ticket = await getTicket(cfg, guard, body.helpId, portal)
+  const ticket = await getTicket(cfg, guard, helpId, portal)
   if (!ticket) return fail(404, "help_not_found", "That ticket doesn't exist.")
 
   // A CLIENT DOES NOT @MENTION. This is the one door on the client portal that
@@ -256,9 +257,9 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
     return fail(400, "too_many_mentions", `A reply can mention up to ${MENTIONS_LIMIT} people.`)
   for (const id of tagged) requireText(id, "Mentioned person", TEXT_LIMITS.short)
 
-  const replyId = await addReply(cfg, guard, actor, body.helpId, replyBody, tagged, false, portal)
+  const replyId = await addReply(cfg, guard, actor, helpId, replyBody, tagged, false, portal)
   await publishChange(env, guard.teamId, "help_threads", replyId, "add")
-  await publishChange(env, guard.teamId, "help", body.helpId, "edit")
+  await publishChange(env, guard.teamId, "help", helpId, "edit")
   await notifyReplyAndMentions(
     env,
     guard.teamId,
@@ -268,8 +269,8 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
     tagged
   )
   return json({
-    replies: await listReplies(cfg, guard, body.helpId, portal),
-    total: await countReplies(cfg, guard, body.helpId, portal),
+    replies: await listReplies(cfg, guard, helpId, portal),
+    total: await countReplies(cfg, guard, helpId, portal),
   })
 }
 
@@ -290,13 +291,13 @@ export async function getHelpStakeholders(request: Request, env: Env): Promise<R
  * any member who can see a ticket may pull a teammate in). Add-only — never
  * removes anyone. SEAM LAW: this mutation publishes the help row change. */
 export async function postAddStakeholder(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{ id?: string; userId?: string }>(request, env, "help", "read")
-  if (!body.id || !body.userId)
-    return fail(400, "invalid_input", "id and userId are required.")
+  const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown; userId?: unknown }>(request, env, "help", "read")
+  const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
+  const userId = requireText(body.userId, "Person", TEXT_LIMITS.short)
   const portal = await isPortal(cfg, guard)
-  const ticket = await getTicket(cfg, guard, body.id, portal)
+  const ticket = await getTicket(cfg, guard, id, portal)
   if (!ticket) return fail(404, "help_not_found", "That ticket doesn't exist.")
-  const stakeholders = await addStakeholder(cfg, env, guard, actor, body.id, body.userId, portal)
-  await publishChange(env, guard.teamId, "help", body.id, "edit")
+  const stakeholders = await addStakeholder(cfg, env, guard, actor, id, userId, portal)
+  await publishChange(env, guard.teamId, "help", id, "edit")
   return json({ stakeholders })
 }

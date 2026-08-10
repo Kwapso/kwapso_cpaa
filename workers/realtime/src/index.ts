@@ -20,6 +20,7 @@ import { accountScope, mayHearChange, scopeStamp, type ScopeStamp } from "../../
 import { d1ConfigFrom, GuardError, requireMember } from "../../../shared/workers/gating"
 import { fail, json } from "../../../shared/workers/http"
 import { recordWorkerError } from "../../../shared/workers/error-log"
+import { requireText, TEXT_LIMITS } from "../../../shared/workers/validate"
 
 export type Env = {
   /** The per-team live channels (one Durable Object instance per team). */
@@ -131,6 +132,11 @@ export default {
     try {
       return await handle(request, env)
     } catch (e) {
+      // A REFUSAL IS NOT A CRASH, and it is mapped FIRST — the lesson auth paid
+      // for: adding boundary validation to a worker whose catch had no
+      // GuardError branch turns every intended 400 into exactly the 500 the
+      // validation existed to prevent, and records a row for each one.
+      if (e instanceof GuardError) return fail(e.status, e.code, e.message)
       // Never a bare 1101. Realtime binds the core database, so a crash here is
       // recorded like every other worker's (ERROR-HANDLING.md) instead of
       // vanishing into Cloudflare's exception counter.
@@ -154,13 +160,20 @@ async function handle(request: Request, env: Env): Promise<Response> {
       // the body is read.
       if (!env.INTERNAL_KEY || request.headers.get("x-internal-key") !== env.INTERNAL_KEY)
         return fail(403, "forbidden", "Bad internal key.")
-      const { channel, event } = (await request.json().catch(() => ({}))) as {
-        channel?: string
+      // Read as ONE object, never destructured (R20): a destructured body
+      // scatters untrusted values into bare locals no scan — and no reader —
+      // can follow back to the boundary they crossed.
+      const body = (await request.json().catch(() => ({}))) as {
+        channel?: unknown
         event?: unknown
       }
-      if (!channel || event === undefined)
+      // The channel NAMES a Durable Object, so an unbounded string here is an
+      // unbounded object name; the key-holder is trusted to be a worker, not to
+      // be well-formed.
+      const channel = requireText(body.channel, "Channel", TEXT_LIMITS.short)
+      if (body.event === undefined)
         return fail(400, "invalid_input", "channel and event are required.")
-      await env.CHANNELS.getByName(channel).broadcast(JSON.stringify(event))
+      await env.CHANNELS.getByName(channel).broadcast(JSON.stringify(body.event))
       return json({ ok: true })
     }
 

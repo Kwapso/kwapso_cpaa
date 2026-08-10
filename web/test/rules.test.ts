@@ -15,6 +15,7 @@ import {
   DEAF_EXEMPT,
   FORM_DIALOGS,
   GROWING_COLLECTIONS,
+  RAW_BODY_EXEMPT,
   RECORD_DETAIL_COMPONENTS,
   RECORD_TAB_COUNT_EXCEPTIONS,
   RULES_REGISTRY,
@@ -456,11 +457,25 @@ describe("RULES — the laws of the base", () => {
     expect(route).toContain("getMyPermissions")
   })
 
-  // R15 — every paged screen consumes the live channel, AND no deaf publishers:
-  // every resource any worker publishes must reach a listener (the row-level
-  // registry, a coarse invalidation, or a reasoned exemption). Publishing to
-  // nobody is the silent half of the stale-screen bug. The publisher set is
-  // DERIVED by scanning publishChange calls — never hand-listed.
+  // R15 — no deaf publishers: every resource any worker publishes must reach a
+  // listener (the row-level registry, a coarse invalidation, or a reasoned
+  // exemption). Publishing to nobody is the silent half of the stale-screen bug.
+  // The publisher set is DERIVED by scanning publishChange calls — never hand-listed.
+  //
+  // R15 USED TO HAVE A SECOND HALF — "every paged screen subscribes via
+  // useLiveRefetch" — and it was a guard that could not fail. It filtered
+  // components on `/\/search\?|usePagedList/`; ZERO files matched, so its
+  // offender list was permanently `[]` and it protected a hook with no call
+  // sites. The need was real when it was written and then went away: paging
+  // moved to opaque CURSORS over the shared store, so a paged list's rows now
+  // live IN a cache key (`accounts:<team>`, `help:<team>`, `activity:record:…`)
+  // with its cursor in a sidecar — exactly the caches the row-level registry
+  // below already patches and the portal's own listener map invalidates. There
+  // is no longer any screen holding page state OUTSIDE those caches, which was
+  // the hook's entire premise. So the clause and the hook are retired rather
+  // than re-detected: a law kept alive by a filter matching nothing is worse
+  // than no law. What still bites is below — and it is derived off the workers'
+  // own publishChange calls, so it cannot go blind the same way.
   it("live-collections: every published resource reaches a listener (no deaf publishers)", () => {
     const published = new Set<string>()
     for (const [, src] of workerSources()) {
@@ -480,21 +495,9 @@ describe("RULES — the laws of the base", () => {
       deaf,
       `published to nobody (R15) — add a TEAM_RESOURCES/SIMPLE_INVALIDATIONS listener or a reasoned DEAF_EXEMPT entry: ${deaf.join(", ")}`
     ).toEqual([])
-    // The paged half: the refetch seam exists and the shell fans pings + reconnects
-    // into it; any component fetching a /search door must subscribe.
-    const bus = read(join(WEB, "lib", "use-live-refetch.ts"))
-    expect(bus).toContain("subscribeLive")
-    const shell = read(join(WEB, "components", "app-shell.tsx"))
-    expect(shell, "the shell must fan every ping into the bus").toContain('emitLive({ kind: "ping"')
-    expect(shell, "the shell must replay on reconnect").toContain('emitLive({ kind: "reconnect" })')
-    const offenders = componentFiles().filter((f) => {
-      const src = read(f)
-      return /\/search\?|usePagedList/.test(src) && !src.includes("useLiveRefetch")
-    })
-    expect(
-      offenders,
-      `paged screen without a live subscription (R15 — useLiveRefetch): ${offenders.join(", ")}`
-    ).toEqual([])
+    // Tripwire: the publisher set is scanned, so a scan that finds nothing would
+    // report "all clear" exactly like a passing one.
+    expect(published.size, "the publisher scan found no publishChange calls — it has gone blind").toBeGreaterThan(5)
   })
 
   // R16 — every screen showing a collection shows its count exactly once: the
@@ -546,6 +549,103 @@ describe("RULES — the laws of the base", () => {
     }
   })
 
+  // R20 — INPUT IS VALIDATED AT THE BOUNDARY, and now it is SCANNED. This law
+  // lived for months as a sentence in CLAUDE.md claiming to be "locked by
+  // workers/content/test/validate.test.ts" — which locks the helpers' behaviour
+  // and the QUERY-string half, and excludes workers/auth outright. Auth is
+  // exactly where an unauthenticated 500 was found: POST /api/auth/email/start
+  // with {"email": 123} crashed before the send throttle and wrote an error row
+  // into the GLOBAL core database on every request. Every other law had a real
+  // scanner; the one about never trusting a request body had prose.
+  //
+  // THE RULE IS POSITIONAL, and that is deliberate. An earlier auth-only version
+  // matched the shape of the bug (`body.x ?? ""`), and a cast — `(body.email as
+  // string) ?? ""` — walked straight past it. So a body field may appear ONLY
+  // where something is CHECKING it: as the first argument of a validator from
+  // shared/workers/validate.ts, as the operand of `typeof`, inside
+  // Array.isArray()/Number(), in a strict comparison against a literal, or as
+  // the needle of an allow-list `.includes()`. A cast occupies none of those
+  // positions, so it cannot launder a field.
+  //
+  // Comments are stripped first (stripComments above): this repo comments
+  // heavily and its comments discuss the very fields being scanned — a rule
+  // satisfied by prose is not satisfied.
+  it("validated-bodies: no request-body field reaches code unchecked", () => {
+    const offenders: string[] = []
+    let doors = 0
+    for (const [path, raw] of workerSources()) {
+      const src = stripComments(raw)
+      const file = path.replace(/^\//, "")
+      // A body may NOT be destructured at the read: `const { channel } = await
+      // request.json()` scatters untrusted values into bare locals the scan (and
+      // the reader) can no longer follow. Read it as one object, then validate.
+      for (const m of src.matchAll(/const\s*\{[^}]*\}\s*=\s*\(?\s*await\s+request\.json\s*\(/g)) {
+        void m
+        offenders.push(`${file}:: destructures the request body at the read`)
+      }
+      // Where a body ENTERS: a direct read, or the shared gated openings that do
+      // the read for the handler (shared/workers/route.ts).
+      const binds: { name: string; at: number }[] = []
+      for (const m of src.matchAll(/(?:const|let)\s+(\w+)\s*=\s*\(?\s*await\s+request\.json\s*\(/g))
+        binds.push({ name: m[1], at: m.index as number })
+      for (const m of src.matchAll(/const\s*\{([^}]*)\}\s*=\s*await\s+(?:gatedBody|openTeam)\s*[<(]/g))
+        if (/\bbody\b/.test(m[1])) binds.push({ name: "body", at: m.index as number })
+      if (!binds.length) continue
+      binds.sort((a, b) => a.at - b.at)
+      doors += binds.length
+      // One region per binding — each handler rebinds, so a region IS a door, and
+      // one handler's check can never license another handler's raw read.
+      for (let i = 0; i < binds.length; i++) {
+        const { name, at } = binds[i]
+        const region = src.slice(at, binds[i + 1]?.at ?? src.length)
+        const seen = new Map<string, boolean>() // field → checked anywhere in this door
+        for (const u of region.matchAll(new RegExp(`(?<![\\w$.])${name}\\.(\\w+)`, "g"))) {
+          const field = u[1]
+          const at2 = u.index as number
+          const before = region.slice(Math.max(0, at2 - 60), at2).trimEnd()
+          const after = region.slice(at2 + u[0].length, at2 + u[0].length + 30)
+          // The checkers. `parseUploadDataUrl` earns its place beside the text
+          // seam because it IS the seam's binary half: it takes `unknown`,
+          // type-checks, and caps BYTES before decoding (a data URL is megabytes,
+          // so a character cap would be the wrong refusal) — locked by
+          // workers/content/test/upload-parse.test.ts. `parseDataUrl` beside it
+          // does NOT qualify: it declares `dataUrl: string`, which is a claim.
+          const checked =
+            /(?<![\w$.])(?:requireText|optionalText|queryText|requireIdList|parseUploadDataUrl|Array\.isArray|Number|includes)\($/.test(
+              before
+            ) ||
+            /(?<![\w$.])typeof\s*$/.test(before) ||
+            /^\s*(?:===|!==)\s*(?:"[^"]*"|'[^']*'|true|false|null|undefined|-?\d+)/.test(after)
+          seen.set(field, (seen.get(field) ?? false) || checked)
+        }
+        for (const [field, checked] of seen)
+          if (!checked) offenders.push(`${file}::${name}.${field}`)
+      }
+    }
+    // Tripwire: a scan that finds no doors reports "all clear" exactly like a
+    // passing one. This is the failure mode the retired R15 clause died of.
+    expect(doors, "the body-boundary scan found no request bodies — it has gone blind").toBeGreaterThan(30)
+
+    const exempt = new Set(Object.keys(RAW_BODY_EXEMPT))
+    const unlisted = offenders.filter((o) => !exempt.has(o))
+    expect(
+      unlisted,
+      `a request-body field is trusted without a runtime check (R20) — put it through requireText/optionalText from shared/workers/validate.ts (or typeof / Array.isArray / a literal comparison), or add a reasoned RAW_BODY_EXEMPT line: ${unlisted.join(", ")}`
+    ).toEqual([])
+
+    // THE RATCHET, and the reason an exemption here cannot rot: every listed line
+    // must still BE an offender. Validate a listed field and its line must go —
+    // so the list can only ever shrink, and it can never quietly describe code
+    // that no longer exists.
+    const stale = [...exempt].filter((k) => !offenders.includes(k))
+    expect(
+      stale,
+      `RAW_BODY_EXEMPT names a door that no longer reads that field raw — delete the line (R20's exemptions may only shrink): ${stale.join(", ")}`
+    ).toEqual([])
+    for (const [k, why] of Object.entries(RAW_BODY_EXEMPT))
+      expect(why.length, `${k} is an exception to R20 — that needs a real reason`).toBeGreaterThan(20)
+  })
+
   // Every enforced law in the registry maps to one of the checks above (or a
   // per-worker seam test) — a law can't exist without a check.
   it("every enforced law has a known check", () => {
@@ -565,7 +665,8 @@ describe("RULES — the laws of the base", () => {
       "bounded-lists", // R14: the source-scan above
       "idempotent-transitions", // R17: the source-scan above
       "activity-gate-coverage", // R18: the source-scan above
-      "live-collections", // R15: the deaf-publisher + paged-subscription scan above
+      "live-collections", // R15: the deaf-publisher scan above
+      "validated-bodies", // R20: the request-body boundary scan above
       "counted-collections", // R16: the seam/place/arbitration scan above + format-count.test.ts
       "catalog-coverage", // R13: workers/data-ops/test/catalog-coverage.test.ts
       "agent-filter-parity", // R19: workers/mcp/test/filter-parity.test.ts

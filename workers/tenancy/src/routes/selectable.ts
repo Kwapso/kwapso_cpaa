@@ -50,19 +50,19 @@ export async function postCreateSelectable(request: Request, env: Env): Promise<
 
 export async function postUpdateSelectable(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<{ id?: string; value?: string }>(request, env, "selectable_data", "edit")
-  if (!body.id) return fail(400, "invalid_input", "id and value are required.")
+  const id = requireText(body.id, "Option", TEXT_LIMITS.short)
   const value = requireText(body.value, "Option", TEXT_LIMITS.short)
-  await updateSelectable(cfg, guard, actor, body.id, value)
-  await publishChange(env, guard.teamId, "selectable_data", body.id)
+  await updateSelectable(cfg, guard, actor, id, value)
+  await publishChange(env, guard.teamId, "selectable_data", id)
   return json({ values: await listSelectable(cfg, guard), total: await countSelectable(cfg, guard) })
 }
 
 export async function postSetSelectableActive(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<{ id?: string; active?: boolean }>(request, env, "selectable_data", "delete")
-  if (!body.id || typeof body.active !== "boolean")
-    return fail(400, "invalid_input", "id and active are required.")
+  const id = requireText(body.id, "Option", TEXT_LIMITS.short)
+  if (typeof body.active !== "boolean") return fail(400, "invalid_input", "id and active are required.")
   // R17: no-op repeat → no ping, no duplicate history (see setSelectableActive).
-  const changed = await setSelectableActive(cfg, guard, actor, body.id, body.active)
-  if (changed) await publishChange(env, guard.teamId, "selectable_data", body.id)
+  const changed = await setSelectableActive(cfg, guard, actor, id, body.active)
+  if (changed) await publishChange(env, guard.teamId, "selectable_data", id)
   return json({ values: await listSelectable(cfg, guard), total: await countSelectable(cfg, guard) })
 }
