@@ -414,10 +414,15 @@ are not oversights; they are deliberate positions the base takes, which are righ
 for some products and wrong for others.
 
 1. **Uploaded files are capability URLs, not gated reads.** `/media/*` and
-   `/media/learning/*` serve any object whose key you know: the key is an
-   unguessable ULID under a per-team prefix, and the gateway serves it with
-   `default-src 'none'; sandbox` + `nosniff`, but it checks **no session and no
-   membership**. *The threat, plainly:* anyone who was ever given a link keeps it
+   `/media/learning/*` serve any object whose key you know: every key is minted
+   by one seam (`mediaKey`, `shared/workers/image.ts`) as owner ids plus a random
+   ULID, the gateway validates the requested key at the boundary (`safeMediaKey`)
+   and serves it with `default-src 'none'; sandbox` + `nosniff`, but it checks
+   **no session and no membership**. (Until 2026-08-10 two of the three key
+   shapes — team logos and profile photos — were *derivable* from a visible id,
+   so "you must know the key" wasn't a barrier for them at all; that half is
+   closed, the decision itself stands.) *The threat, plainly:* anyone who was
+   ever given a link keeps it
    — a removed ex-member who saved the URL of a learning attachment can still open
    it after losing access, and so can anyone they forwarded it to. There is no
    expiry and no revocation. That is an acceptable trade for product photos and

@@ -10,8 +10,7 @@ import { fail, json } from "../../../../shared/workers/http"
 import { csvResponse, toCsv } from "../../../../shared/workers/csv"
 import { requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
 import { publishChange } from "../../../../shared/workers/realtime"
-import { parseUploadDataUrl } from "../../../../shared/workers/image"
-import { ulid } from "../../../../shared/workers/id"
+import { mediaKey, parseUploadDataUrl } from "../../../../shared/workers/image"
 import { gated, gatedBody } from "../../../../shared/workers/route"
 import { requireIdList } from "../lib/bulk"
 import {
@@ -130,7 +129,7 @@ export async function getLearningProgress(request: Request, env: Env): Promise<R
 /** Local file upload for a learning item (images + short clips, cap 25 MB) sent
  * as a base64 data URL — same JSON pattern as the profile-photo / team-logo
  * upload, not multipart. Stores the bytes in the team's learning-media bucket
- * under <teamId>/<ulid> and hands back the gateway URL the editor pastes into
+ * under <teamId>/<random ULID> and hands back the gateway URL the editor pastes into
  * the article. HOUSEKEEPING: it writes a file, NOT a record — there's no row to
  * patch, so nothing to broadcast (the create/edit that references the URL pings
  * its own row). Gated by learning:create. */
@@ -139,14 +138,16 @@ export async function postUploadLearningFile(request: Request, env: Env): Promis
   const { guard, body } = await gatedBody<{ dataUrl?: unknown }>(request, env, "learning", "create")
   const parsed = parseUploadDataUrl(body.dataUrl, MAX_UPLOAD_BYTES)
   if (!parsed) return fail(400, "invalid_input", "That file isn't a supported upload (max 25 MB).")
-  const id = ulid()
-  const key = `${guard.teamId}/${id}`
+  // The key IS the credential — the gateway serves /media/* with no session, so
+  // every upload carries a random ULID segment (mediaKey, the one place that's
+  // decided). Same shape this door has always used, now through the seam.
+  const key = mediaKey(guard.teamId)
   await env.LEARNING_MEDIA.put(key, parsed.bytes, {
     httpMetadata: { contentType: parsed.contentType },
   })
   // ?v= busts caches; the file itself is served immutable by the gateway.
   return json({
-    url: `/media/learning/${guard.teamId}/${id}?v=${Date.now()}`,
+    url: `/media/learning/${key}?v=${Date.now()}`,
     contentType: parsed.contentType,
   })
 }

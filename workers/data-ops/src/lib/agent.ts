@@ -9,6 +9,7 @@
 // with each step's outcome (the audit trail the panel rehydrates from).
 
 import type { AgentQuota, ChatOutcome, PendingCall, StreamEvent } from "../../../../shared/types"
+import { pendingCall } from "../../../../shared/workers/confirm-payload"
 import { capabilityBrief } from "./app-brief"
 import { GLOSSARY } from "../../../../shared/glossary"
 import { consumeAiUnit, foldUsageIntoLatest, getQuota, logUsage, refundAiUnits, type UsageSource } from "./credits"
@@ -449,17 +450,15 @@ async function runPlanLoop(
       // reaching the proposal; confirmAndRun logs its own row when it resumes.
       await log()
       // Surface ALL of the turn's calls (not just the dangerous subset) so a mixed
-      // turn doesn't silently drop its non-confirm calls.
+      // turn doesn't silently drop its non-confirm calls. Each one goes through the
+      // ONE pendingCall seam, so the panel gets the summary AND the payload behind
+      // it — the human is approving what the door will actually receive.
       return {
         done: false,
         threadId,
         assistantText: reply.text,
         quota,
-        needsConfirm: valid.map((tc) => ({
-          name: tc.name,
-          input: tc.input,
-          summary: getTool(tc.name)!.summarize(tc.input, names),
-        })),
+        needsConfirm: valid.map((tc) => pendingCall(getTool(tc.name)!, tc.input, names)),
       }
     }
 

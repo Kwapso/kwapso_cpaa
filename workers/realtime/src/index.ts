@@ -16,36 +16,70 @@
 import { DurableObject } from "cloudflare:workers"
 
 import type { SessionUser } from "../../../shared/types"
+import { accountScope, mayHearChange, scopeStamp, type ScopeStamp } from "../../../shared/workers/account-scope"
+import { d1ConfigFrom, GuardError, requireMember } from "../../../shared/workers/gating"
 import { fail, json } from "../../../shared/workers/http"
-import { isActiveMember } from "../../../shared/workers/membership"
 
 export type Env = {
   /** The per-team live channels (one Durable Object instance per team). */
   CHANNELS: DurableObjectNamespace<TeamChannel>
   /** The auth worker — answers "who is opening this socket?". */
   AUTH: Fetcher
-  /** Global core DB — read only to confirm the connector is a team member. */
+  /** Global core DB — read to confirm the connector is a team member (and to
+   * find the team's own database, below). */
   DB: D1Database
+  /** The Cloudflare D1 REST door, for the ONE extra read a socket needs: is this
+   * listener a client login, and which accounts are theirs (the fence). */
+  CF_ACCOUNT_ID: string
+  CF_D1_TOKEN?: string
   /** Shared secret every internal caller presents on /publish. Fail-closed:
    * unset means the door refuses everyone. */
   INTERNAL_KEY?: string
 }
 
+/** The listener's fence, handed from the gate to the channel on the upgrade
+ * request. Set by this worker only — the DO is reachable only from here. */
+const SCOPE_HEADER = "x-listener-scope"
+
 /** One team's live channel: holds its members' sockets, relays change pings. */
 export class TeamChannel extends DurableObject<Env> {
   /** A browser joins. Accept the socket via the Hibernation API so the runtime
-   *  keeps it (even after this object sleeps) and we don't pay while idle. */
-  async fetch(_request: Request): Promise<Response> {
+   *  keeps it (even after this object sleeps) and we don't pay while idle.
+   *  The listener's FENCE (if any) is serialized onto the socket, so it survives
+   *  hibernation and every later broadcast can honour it without a DB read. */
+  async fetch(request: Request): Promise<Response> {
     const pair = new WebSocketPair()
     const [client, server] = Object.values(pair)
     this.ctx.acceptWebSocket(server)
+    const stamp = request.headers.get(SCOPE_HEADER)
+    if (stamp) {
+      try {
+        server.serializeAttachment(JSON.parse(stamp) as ScopeStamp)
+      } catch {
+        // Unreadable stamp = we can't prove what they may hear. Attach the empty
+        // fence rather than none: none means STAFF, and a wrong guess that way
+        // would broadcast the agency's world to a client login.
+        server.serializeAttachment({ accountIds: [] })
+      }
+    }
     return new Response(null, { status: 101, webSocket: client })
   }
 
-  /** Fan a tiny message out to everyone currently connected to this team. */
+  /** Fan a tiny message out to everyone on this channel who may hear it. A ping
+   * carries a ROW ID, so "may hear" is the account fence, not just membership —
+   * see mayHearChange (shared/workers/account-scope.ts). */
   broadcast(message: string): void {
+    let event: { resource?: string; id?: string } | null = null
+    try {
+      event = JSON.parse(message) as { resource?: string; id?: string }
+    } catch {
+      // Unparsable event: staff still get it (this worker wrote it), fenced
+      // listeners don't — a ping nobody can check is a ping nobody fenced.
+    }
     for (const ws of this.ctx.getWebSockets()) {
       try {
+        const stamp = ws.deserializeAttachment() as ScopeStamp
+        if (stamp && !(event && mayHearChange(stamp, event))) continue
         ws.send(message)
       } catch {
         // Dead socket — the runtime drops it on close; nothing to do here.
@@ -64,6 +98,22 @@ export class TeamChannel extends DurableObject<Env> {
     }
   }
   async webSocketError(): Promise<void> {}
+}
+
+/** The upgrade request, carrying the listener's fence to the channel. Staff
+ * (`null`) carry no header at all, so the DO attaches nothing and they hear the
+ * whole team — the shape it has always had, byte for byte.
+ *
+ * A header the CALLER sent is never allowed to survive: the fence is resolved
+ * here from their session, so an inbound `x-listener-scope` is either overwritten
+ * or deleted. (It could only ever narrow what its sender hears, but a security
+ * header that a request can carry is a habit worth not forming.) */
+function stamped(request: Request, stamp: ScopeStamp): Request {
+  if (!stamp && !request.headers.has(SCOPE_HEADER)) return request
+  const headers = new Headers(request.headers)
+  if (stamp) headers.set(SCOPE_HEADER, JSON.stringify(stamp))
+  else headers.delete(SCOPE_HEADER)
+  return new Request(request, { headers })
 }
 
 /** Ask the auth worker (one session system, one master) who this is. */
@@ -124,10 +174,30 @@ export default {
 
       const teamId = url.searchParams.get("team")
       if (teamId) {
-        // Team channel: must be an active member of THIS team.
-        if (!(await isActiveMember(env.DB, user.id, teamId)))
-          return fail(403, "not_member", "You're not a member of this team.")
-        return env.CHANNELS.getByName(`team:${teamId}`).fetch(request)
+        // Team channel: must be an active member of THIS team — the same
+        // team_members + teams join the API gates on (requireMember), which also
+        // hands back the team's database so the next line can resolve the fence.
+        //
+        // MEMBERSHIP IS NOT THE WHOLE GATE. A client-portal login IS a member of
+        // the agency's team (that is how they reach any door at all), so
+        // membership alone put them on a channel that names, by row id, every
+        // account in the agency as it changes. Ids are the currency of the leak
+        // this base already fixed once. So the caller's fence rides the socket.
+        let stamp: ScopeStamp
+        try {
+          const guard = await requireMember(env, user.id, teamId)
+          stamp = scopeStamp(await accountScope(d1ConfigFrom(env), guard))
+        } catch (e) {
+          if (e instanceof GuardError) return fail(e.status, e.code, e.message)
+          // FAIL CLOSED, and note which way: with no answer we cannot tell a
+          // client login from staff, so nobody joins the TEAM channel until we
+          // can. The user channel above is unaffected, so identity events and a
+          // forced sign-out still reach every device; team screens fall back to
+          // cache-first reads and the client retries with backoff.
+          console.error("realtime fence lookup failed:", e)
+          return fail(503, "live_unavailable", "The live connection isn't available right now.")
+        }
+        return env.CHANNELS.getByName(`team:${teamId}`).fetch(stamped(request, stamp))
       }
 
       return fail(400, "invalid_input", "team or user is required.")

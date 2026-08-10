@@ -4,6 +4,7 @@
 // work everywhere. This is also where the MCP front desk will live.
 
 import { fail } from "../../../shared/workers/http"
+import { safeMediaKey } from "../../../shared/workers/image"
 
 // Headers for an R2 media object served on the app origin. These responses are
 // worker-built, so web/public/_headers does NOT apply to them — the security
@@ -96,12 +97,32 @@ export default {
       return fail(404, "not_found", "No such API.")
     }
 
+    // ── Uploaded media: a CAPABILITY URL, on purpose ───────────────────────
+    // These two doors serve any object whose key you know, with NO session and
+    // NO membership check. That is a recorded, deliberate decision (SCOPE ch.06
+    // "Files": uploaded media stays on unguessable no-login links, with the
+    // exposure accepted in writing — anyone holding a link can open that file,
+    // for as long as the object exists). It is re-stated as a fork decision in
+    // BASE-MANUAL §5 ("Two REASONED exceptions"): a product that stores
+    // invoices, contracts, ID documents or anything a regulator calls personal
+    // data must replace this with a session + membership check or short-lived
+    // signed URLs BEFORE launch. Nothing here is an accident to be tidied away.
+    //
+    // What the decision RESTS on is that the key is unguessable — so that is the
+    // part this code has to keep true, and it is enforced upstream by mediaKey()
+    // (shared/workers/image.ts): every object is written under a random ULID
+    // segment. Photos and logos used to be `users/<userId>` / `teams/<teamId>`,
+    // derivable from an id anyone had already seen; they aren't any more.
+    //
+    // The key still arrives from the URL, so it is validated at the boundary
+    // like any other request value, and a probe gets the same 404 as a miss.
+
     // Learning attachments (images + short clips uploaded to a how-to article)
     // live in their own per-team bucket. Same serving shape as /media/* below;
     // just a different bucket, matched first since it's a more specific prefix.
     if (pathname.startsWith("/media/learning/") && request.method === "GET") {
-      const key = decodeURIComponent(pathname.slice("/media/learning/".length))
-      const object = await env.LEARNING_MEDIA.get(key)
+      const key = safeMediaKey(pathname.slice("/media/learning/".length))
+      const object = key && (await env.LEARNING_MEDIA.get(key))
       if (!object) return new Response("Not found", { status: 404 })
       return new Response(object.body, { headers: mediaHeaders(object) })
     }
@@ -109,8 +130,8 @@ export default {
     // Uploaded files (profile photos, team logos). URLs carry ?v= for cache
     // busting, so the file itself can be cached hard.
     if (pathname.startsWith("/media/") && request.method === "GET") {
-      const key = decodeURIComponent(pathname.slice("/media/".length))
-      const object = await env.MEDIA.get(key)
+      const key = safeMediaKey(pathname.slice("/media/".length))
+      const object = key && (await env.MEDIA.get(key))
       if (!object) return new Response("Not found", { status: 404 })
       return new Response(object.body, { headers: mediaHeaders(object) })
     }

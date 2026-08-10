@@ -52,23 +52,33 @@ and nothing else**:
 - **It relays opaque tags.** It knows nothing about what "members" or
   "member_roles" mean — it just broadcasts whatever `{resource, id, op}` ping it
   is handed. That is why it is reusable as-is by any app built on this base.
+- **It honours one fence.** The single exception to "opaque": a socket may carry
+  a **scope stamp**, and an account-owned ping is only sent to a stamped socket
+  whose fence contains that row (see "The listener's fence" below).
 
-The whole class is ~30 lines:
+The whole class is ~50 lines:
 
 ```ts
 export class TeamChannel extends DurableObject<Env> {
   // A browser joins. Accept via the Hibernation API so the runtime keeps the
-  // socket even after this object sleeps — we don't pay while idle.
-  async fetch(_request: Request): Promise<Response> {
+  // socket even after this object sleeps — we don't pay while idle. The
+  // listener's fence (if any) is serialized onto the socket, so it survives
+  // hibernation and every later broadcast honours it with no extra DB read.
+  async fetch(request: Request): Promise<Response> {
     const pair = new WebSocketPair()
     const [client, server] = Object.values(pair)
     this.ctx.acceptWebSocket(server)
+    const stamp = request.headers.get("x-listener-scope")
+    if (stamp) server.serializeAttachment(JSON.parse(stamp))
     return new Response(null, { status: 101, webSocket: client })
   }
 
-  // Fan a tiny message out to everyone currently connected to this channel.
+  // Fan a tiny message out to everyone on this channel WHO MAY HEAR IT.
   broadcast(message: string): void {
+    const event = JSON.parse(message)
     for (const ws of this.ctx.getWebSockets()) {
+      const stamp = ws.deserializeAttachment()          // null = staff
+      if (stamp && !mayHearChange(stamp, event)) continue
       try { ws.send(message) } catch { /* dead socket — runtime drops it */ }
     }
   }
@@ -107,9 +117,10 @@ makes "one instance per team **and** per user" affordable.
 | `/api/realtime/health` | GET | Ops | `{ ok: true }` |
 
 `/publish` is internal: it is reached only over the service binding
-(`env.REALTIME`), never the public gateway, so it needs no per-caller auth — a
-worker only publishes after it has already gated and committed the write it is
-describing.
+(`env.REALTIME`), never the public gateway. It is **still keyed** — every caller
+presents `x-internal-key`, and an unset `INTERNAL_KEY` makes the door refuse
+everyone (fail-closed). One door that can reach ANY team's channel is not
+protected by network isolation alone.
 
 ### The connection gate — the same rule as the API
 
@@ -122,12 +133,49 @@ check, not a lock. `fetch` in `index.ts`:
    (`userId !== user.id` → `403`). Open for every signed-in user, even before
    they join a team.
 3. `?team=<id>`: you must be an **active member of that team** —
-   `isActiveMember(env.DB, user.id, teamId)` (`shared/workers/membership.ts`),
-   the same `team_members` + `teams` join the API uses. Not a member → `403`.
+   `requireMember(env, user.id, teamId)` (`shared/workers/gating.ts`), the very
+   function every API door gates on. Not a member → `403`.
 
 Because the socket is gated at connect, a listener never receives a ping it
 could not already have earned through the API. (CACHING.md rule 8, and
 CONCURRENCY.md's "What is NOT a lock".)
+
+### The listener's fence — membership is not the whole gate
+
+Team membership answers "may you be on this channel?". It does **not** answer
+"may you hear about THAT row?" — and a client-portal login is a member of the
+agency's team (that is how their requests reach any door at all). So the channel
+was naming, by row id, every account in the agency as it changed, to a listener
+fenced out of all of them. A ping carries no row data, but **row ids are exactly
+what made the activity-feed leak reachable**; the fence file says so in as many
+words.
+
+So the gate resolves the caller's account scope through the one guard corridor
+(`accountScope`, `shared/workers/account-scope.ts`) and stamps the socket:
+
+| Listener | Stamp | Hears |
+|---|---|---|
+| **Staff** (no `portal_users` row) | none | every ping on the team channel — unchanged |
+| **Client login** | `{ accountIds }` | account-owned pings (`accounts`, `account_links`, `portal_users`) **inside their fence**, and nothing else |
+
+`mayHearChange(stamp, event)` is the whole rule, and it lives beside the SQL
+fence so the two can never disagree. A client hears silence for the agency's
+members, roles, invites, tickets and articles — they have no screen in this app
+that reads any of them, and that is the fail-closed direction: when the client
+portal needs its own tickets live, the fence extends to that resource
+deliberately, rather than having been open to everything all along.
+
+Two consequences worth knowing:
+
+- **It costs one read per connect.** The team channel needs `CF_D1_TOKEN` on the
+  realtime worker (OPERATIONS.md § Secrets). With no token — or a failed lookup —
+  the team channel **refuses the socket** (`503`): we cannot tell staff from a
+  client login, so nobody joins. The `user:<id>` channel is unaffected, so
+  identity events and a forced sign-out still reach every device.
+- **The stamp is taken at connect.** A fence that changes (a client switches
+  company, or their access is revoked) takes effect on the next connect. The
+  standing socket keeps the fence it was given — narrower or equal to what its
+  doors allow, never wider, and every door re-checks anyway.
 
 ### Two channel scopes
 
@@ -232,7 +280,8 @@ async function publish(realtime, channel, event) {
   try {
     await realtime.fetch("https://realtime/publish", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      // Keyed like every internal door — /publish can reach ANY team's channel.
+      headers: { "Content-Type": "application/json", "x-internal-key": INTERNAL_KEY },
       body: JSON.stringify({ channel, event }),
     })
   } catch (e) {
@@ -261,8 +310,9 @@ await env.CHANNELS.getByName(channel).broadcast(JSON.stringify(event))
 ```
 
 `broadcast` loops `this.ctx.getWebSockets()` and `ws.send`s the JSON to every
-currently-connected socket on that one channel. The DO is single-threaded, so
-this is a clean fan-out; a dead socket throws on `send` and is ignored (the
+socket on that one channel that MAY HEAR IT (staff: all of them; a client login:
+its own accounts only — "The listener's fence", §2). The DO is single-threaded,
+so this is a clean fan-out; a dead socket throws on `send` and is ignored (the
 runtime drops it on close).
 
 ### Step 4 — the client patches ONE row (browser)

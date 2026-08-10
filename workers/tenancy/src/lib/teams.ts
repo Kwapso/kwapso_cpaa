@@ -12,7 +12,7 @@ import {
   type D1Rest,
 } from "../../../../shared/workers/d1-rest"
 import { ulid } from "../../../../shared/workers/id"
-import { MAX_IMAGE_BYTES, parseDataUrl } from "../../../../shared/workers/image"
+import { MAX_IMAGE_BYTES, mediaKey, parseDataUrl } from "../../../../shared/workers/image"
 import { publishChange, publishUserChange } from "../../../../shared/workers/realtime"
 import { d1ConfigFrom } from "../../../../shared/workers/gating"
 import type { Env } from "../env"
@@ -153,8 +153,9 @@ export async function createTeam(
 }
 
 /** Edit a team's name + optional logo (the global teams row). A new logo (data
- * URL) lands in R2 and is served by the gateway at /media/teams/<id>. Caller
- * checks teams:edit. */
+ * URL) lands in R2 and is served by the gateway at /media/teams/<id>/<random> —
+ * a capability URL (no session on that door), so the key carries a random tail.
+ * Caller checks teams:edit. */
 export async function updateTeamDetails(
   env: Env,
   teamId: string,
@@ -170,7 +171,9 @@ export async function updateTeamDetails(
     if (!parsed) throw new GuardError(400, "bad_image", "That image format isn't supported.")
     if (parsed.bytes.byteLength > MAX_IMAGE_BYTES)
       throw new GuardError(400, "image_too_large", "That image is too large.")
-    const key = `teams/${teamId}`
+    // Unguessable by construction — the logo is served with no session, so the
+    // key is the credential (mediaKey; see the gateway's /media/* door).
+    const key = mediaKey("teams", teamId)
     await env.MEDIA.put(key, parsed.bytes, { httpMetadata: { contentType: parsed.contentType } })
     logoUrl = `/media/${key}?v=${Date.now()}`
   }

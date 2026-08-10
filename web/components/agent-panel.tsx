@@ -175,7 +175,14 @@ export function AgentPanel({
             {chat.pending && (
               <div className="flex flex-col gap-3 border-t p-4">
                 <p className="text-sm font-medium">I&apos;d like to make these changes:</p>
-                <RunSteps steps={chat.confirmSteps} />
+                {/* Each step now carries the PAYLOAD under its label (a role's
+                 * whole access sheet is a dozen lines), so the list scrolls on
+                 * its own and the two buttons stay where a thumb expects them —
+                 * a confirm you have to hunt for is nearly as bad as one you
+                 * can't read. */}
+                <div className="max-h-[40vh] min-h-0 overflow-y-auto">
+                  <RunSteps steps={chat.confirmSteps} />
+                </div>
                 <div className="flex flex-wrap justify-end gap-2">
                   <Button
                     variant="outline"
