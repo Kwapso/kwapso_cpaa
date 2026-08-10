@@ -10,14 +10,15 @@ end with a live base you can sign into and build on.
 > point of this file. When something here disagrees with reality, **ARCHITECTURE.md
 > is the master** and OPERATIONS.md holds the live deploy config.
 
-> **The mental model in one paragraph.** Brimba is **seven Cloudflare Workers** behind
-> **one public door** (the gateway). Global identity/billing lives in **one core D1
-> database** (`kwapso-core`), reached by the native `env.DB` binding. Every *team*
-> gets its **own D1 database**, created at runtime and reached over the **D1 REST
-> API** (a scoped token, `CF_D1_TOKEN`). Uploaded files live in **R2**. Live updates
-> fan out through **one Durable Object** (`TeamChannel`) in the realtime worker. The
-> web app is a **Next.js static export** served by the gateway. Read BASE-MANUAL.md
-> for the *why*; this file is the *how to stand it up*.
+> **The mental model in one paragraph.** Brimba is **eight Cloudflare Workers** behind
+> **two public doors** — the agency gateway (`web/`) and the client portal's gateway
+> (`web-portal/`). The other six are private. Global identity/billing lives in **one
+> core D1 database** (`kwapso-core`), reached by the native `env.DB` binding. Every
+> *team* gets its **own D1 database**, created at runtime and reached over the **D1
+> REST API** (a scoped token, `CF_D1_TOKEN`). Uploaded files live in **R2**. Live
+> updates fan out through **one Durable Object** (`TeamChannel`) in the realtime
+> worker. Each front end is a **Next.js static export** served by its own gateway.
+> Read BASE-MANUAL.md for the *why*; this file is the *how to stand it up*.
 
 ---
 
@@ -45,27 +46,30 @@ any cloud resource.
 
 ---
 
-## 1 · The seven workers (what you are about to create)
+## 1 · The eight workers (what you are about to create)
 
-Each worker is its own `wrangler.jsonc` under `workers/<name>/`. Only the **gateway**
-is public; every other worker sets `"workers_dev": false` and is reachable **only**
-over service bindings (this is the locked "one public door" rule — never add a public
-route to a non-gateway worker).
+Each worker is its own `wrangler.jsonc` under `workers/<name>/`. Only the **two
+gateways** are public; every other worker sets `"workers_dev": false` and is reachable
+**only** over service bindings (this is the locked "only the two gateways are public"
+rule — never add a public route to a worker that isn't one of them, because no public
+route may reach `/internal/*`, the agent, or the act-as-user surface).
 
 | Worker | Public? | Does |
 |---|---|---|
 | `realtime` | no | the `TeamChannel` Durable Object — fans out live change pings |
 | `auth` | no | email-code login, sessions, the email sender |
-| `tenancy` | no | teams, members, Member roles + permissions, invites, dropdown values |
+| `tenancy` | no | teams, members, Member roles + permissions, invites, dropdown values, the customer spine |
 | `content` | no | Learning + Help |
 | `data-ops` | no | CSV import + the AI agent |
-| `mcp` | no | the external machine surface: personal access tokens → team-pinned sessions → the MCP tool catalog at `/mcp` (routed only via the gateway) |
-| `gateway` | **YES** | the single front desk: serves the web app + routes `/api/*` (incl. `/mcp` + `/api/mcp/*`) + serves `/media/*` |
+| `mcp` | no | the external machine surface: personal access tokens → team-pinned sessions → the MCP tool catalog at `/mcp` (routed only via the agency gateway) |
+| `gateway` | **YES** | the AGENCY front desk: serves `web/out` + routes `/api/*` (incl. `/mcp` + `/api/mcp/*`) by PREFIX + serves `/media/*` |
+| `portal-gateway` | **YES** | the CLIENT portal's front desk: serves `web-portal/out` + forwards a NAMED, CLOSED allow-list of `/api` doors (never a prefix fan-out) + serves `/media/*`. Binds only auth/tenancy/content/realtime, so data-ops and mcp are unreachable from the client internet by construction |
 
-**Deploy order is `realtime → auth → tenancy → content → data-ops → mcp → gateway`** and it
-matters: realtime is FIRST because every other worker service-binds it (deploying a
-binder before its target fails with "Worker not found"). The root `npm run deploy:*`
-scripts already encode this order.
+**Deploy order is `realtime → auth → tenancy → content → data-ops → mcp → gateway →
+portal-gateway`** and it matters: realtime is FIRST because every other worker
+service-binds it (deploying a binder before its target fails with "Worker not found"),
+and both gateways go LAST because each service-binds the domain workers it forwards to.
+The root `npm run deploy:*` scripts already encode this order.
 
 ---
 
@@ -90,6 +94,7 @@ quota tables. Create it for each environment and apply the core migrations in
 ```bash
 # Create the core DB for each env, then paste each returned database_id into ALL
 # SIX core-bound workers' wrangler.jsonc (auth, tenancy, content, data-ops, realtime, mcp).
+# Six, not eight: neither gateway binds a database — they forward and serve files.
 npx wrangler d1 create kwapso-core-staging
 npx wrangler d1 create kwapso-core
 
@@ -109,8 +114,12 @@ lists every table. **Migrations are additive — never edit an applied one.**
 
 > **Per-team databases are NOT created here.** Each team's database is created at
 > runtime when the team is created (`applyTeamSchema` runs the `TEAM_MIGRATIONS` from
-> `workers/tenancy/src/team-schema.ts` — `0001`…`0006` today). You only apply *team-schema* migrations to
-> *existing* teams later, via the migrate-teams robot (§7).
+> `workers/tenancy/src/team-schema.ts` — `0001_team_base` … `0008_portal_current_account`
+> today, eight of them; that file is the live list, this number is a copy of it). You
+> only apply *team-schema* migrations to *existing* teams later, via the migrate-teams
+> robot (§7). The last two are the customer spine (`0007`) and the client-portal
+> switcher's pointer (`0008`) — see DATA-MODEL.md for what each one adds and what
+> breaks without it.
 
 ---
 
@@ -157,7 +166,7 @@ ARCHITECTURE.md `/media/*` note before storing anything sensitive.
   writes). The checked-in value is the original author's account — **overwrite it** in
   both the top-level and `env.staging` vars blocks of those three workers.
 - `tenancy` → `PUBLIC_APP_URL` = the environment's absolute origin (e.g.
-  `https://kwapso-staging.kwapso.workers.dev`). Outbound email links use it;
+  `https://agency-staging.kwapso.app`). Outbound email links use it;
   leave it unset and agent-sent invite links point at the internal binding host.
 - `auth` → `APP_ORIGIN` / `EMAIL_FROM` — pinned to the author's URLs/domain; update
   them if yours differ.
@@ -167,15 +176,18 @@ ARCHITECTURE.md `/media/*` note before storing anything sensitive.
 
 ---
 
-## 5 · Deploy (realtime-first) + the web build
+## 5 · Deploy (realtime-first) + the web builds
 
-The root scripts build the web static export and deploy all seven workers in the
-correct order:
+The root scripts build **both** static exports (`web/out` and `web-portal/out`) and
+deploy all eight workers in the correct order:
 
 ```bash
-npm run deploy:staging      # build web/ → deploy realtime,auth,tenancy,content,data-ops,mcp,gateway (staging) → smoke
+npm run deploy:staging      # build web/ + web-portal/ → deploy realtime,auth,tenancy,content,data-ops,mcp,gateway,portal-gateway (staging) → smoke
 npm run deploy:production   # same order, production names (run only after staging is verified)
 ```
+
+(`npm run build` alone builds both front ends; `npm run build:portal` builds the
+client portal on its own.)
 
 The realtime worker defines the `TeamChannel` Durable Object via a one-time
 `migrations` tag in its `wrangler.jsonc` — no data migration, the DO holds no app
@@ -199,7 +211,7 @@ curl -X POST https://<gateway-url>/api/data-ops/admin/seed-targets -H "x-admin-k
 
 ## 7 · Create the first team + migrate-teams
 
-1. Open the gateway URL and sign in with an email code (a code appears ONLY in the
+1. Open the AGENCY gateway's URL and sign in with an email code (a code appears ONLY in the
    inbox now, in every environment — set `RESEND_API_KEY`; for automated/dev sign-in on a
    NON-PRODUCTION environment use the test-login door `POST /api/auth/admin/test-login` +
    `x-admin-key`, gated by the auth worker's own `TEST_LOGIN_KEY` secret and refused
@@ -223,10 +235,13 @@ That robot diffs each team's `_migrations` against `TEAM_MIGRATIONS` and applies
 npm run smoke:staging     # scripted end-to-end: health, login, team, context, logout
 ```
 
-Or by hand: the gateway URL returns the app (HTTP 200); you can sign in, land in a
-team, see Home / Learning / Help / Settings, and open the AI assistant. If the smoke's
-login step reports `too_many_codes`, that's a per-email rate limit from repeated test
-logins — wait it out; the deploy itself is fine.
+Or by hand: the agency gateway's URL returns the app (HTTP 200); you can sign in, land
+in a team, see Home / Learning / Help / Settings, and open the AI assistant. Then the
+portal gateway's URL: a client login lands in its own company's world. If the smoke's
+login step reports `too_soon`, that's the 60-second cooldown between code requests, and
+`too_many_sends` is the hourly cap on the address or the caller — both are the send
+throttle doing its job after repeated test logins. Wait it out; the deploy itself is
+fine.
 
 ---
 
@@ -263,13 +278,22 @@ core `teams` table to find them).
    node scripts/reset-all.mjs both
    ```
 
-2. **The seven workers, both envs** (14 deployments). Delete each by name:
+2. **The eight workers, both envs** (16 deployments). The two GATEWAYS are the two
+   public ones, so a teardown that misses either leaves a live public address serving
+   a half-deleted product — that is the one mistake worth checking twice. Their
+   deployed names do not follow the `<name>-<folder>` pattern the others do (the
+   agency gateway is just `<name>`, the portal gateway is `<name>-portal`), so they
+   are listed separately rather than swept by the loop:
 
    ```bash
-   for w in auth tenancy realtime content data-ops mcp gateway; do
+   for w in auth tenancy realtime content data-ops mcp; do
      npx wrangler delete --name <name>-$w
      npx wrangler delete --name <name>-$w-staging
    done
+   npx wrangler delete --name <name>                  # the AGENCY gateway (public)
+   npx wrangler delete --name <name>-staging
+   npx wrangler delete --name <name>-portal           # the CLIENT portal gateway (public)
+   npx wrangler delete --name <name>-portal-staging
    ```
 
 3. **The two core databases:**
@@ -301,7 +325,8 @@ core `teams` table to find them).
    ```
 
 **Verify it's gone:** `npx wrangler d1 list` and `npx wrangler r2 bucket list` show no
-`<name>-…` entries, and the staging/production URLs return an error (no worker). Secrets
+`<name>-…` entries, and **all four** public URLs — the agency's two and the client
+portal's two — return an error (no worker). Secrets
 die with their workers — nothing to scrub. (Note: `wrangler d1 list` can throw a
 transient auth error; just retry.)
 
@@ -314,9 +339,10 @@ prereqs → npm install → wrangler login → npm run check
   → d1 create (core, both envs) → migrations apply (core 0001–00NN)
   → r2 bucket create (media × 3 × 2 envs)
   → secret put (RESEND, CF_D1_TOKEN, ADMIN_KEY, INTERNAL_KEY, [ANTHROPIC], [TEST_LOGIN_KEY on non-prod auth]) + set vars (PUBLIC_APP_URL, AGENT_*)
-  → npm run deploy:staging  (realtime→auth→tenancy→content→data-ops→mcp→gateway) → smoke
+  → npm run deploy:staging  (builds web/ + web-portal/, then
+                             realtime→auth→tenancy→content→data-ops→mcp→gateway→portal-gateway) → smoke
   → sign in (test-login on staging) → first team (creates its DB) → migrate-teams as needed  (catalog self-heals; seed-targets optional)
-  → verify → (repeat for production, owner-gated)
+  → verify BOTH doors → (repeat for production, owner-gated)
 ```
 
 If you can run this list, you can rebuild Brimba from nothing. To then *build a new

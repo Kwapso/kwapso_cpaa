@@ -17,17 +17,31 @@
 //   • Look like an error. Nothing is broken. Their login is fine.
 
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
+import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { LogOut } from "lucide-react"
 
 import { brand } from "@shared/brand"
 import { clearAllFormDrafts } from "@web/lib/use-form-draft"
 import { invalidate } from "@web/lib/store"
+import { reportError } from "@web/lib/log"
 import { auth } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 
 export function NoAccess({ email }: { email: string }) {
   async function signOut() {
-    await auth.logout().catch(() => null)
+    // The session cookie is HttpOnly, so ONLY the server's Set-Cookie clears it.
+    // Swallowing a failed sign-out wipes the local state, redirects, and looks
+    // exactly like success — while the cookie survives. On a shared device the
+    // next person lands on the home screen still signed in as the last one. So
+    // it is reported, and the person is told plainly rather than shown a door
+    // they did not actually walk through.
+    try {
+      await auth.logout()
+    } catch (e) {
+      reportError("no-access.signOut", e)
+      toast.error("We couldn't sign you out. Check your connection and try again.")
+      return
+    }
     clearAllFormDrafts()
     invalidate(cacheKeys.session)
     location.assign("/login")

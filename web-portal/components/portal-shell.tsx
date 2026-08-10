@@ -20,6 +20,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
+import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { ModeToggle } from "@kwapso/ui/registry/primitives/mode-toggle/mode-toggle"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { Building2, House, LifeBuoy, LogOut } from "lucide-react"
@@ -28,6 +29,7 @@ import { brand } from "@shared/brand"
 import { useRealtime } from "@web/lib/realtime"
 import { clearAllFormDrafts } from "@web/lib/use-form-draft"
 import { invalidate } from "@web/lib/store"
+import { reportError } from "@web/lib/log"
 import { auth } from "@/lib/api"
 import { applyLivePing, cacheKeys, replayAfterReconnect } from "@/lib/live-resources"
 import { usePortalSession, type PortalSession } from "@/lib/session"
@@ -76,7 +78,19 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
   if (session.state === "no-access") return <NoAccess email={session.user.email} />
 
   async function signOut() {
-    await auth.logout().catch(() => null)
+    // The session cookie is HttpOnly, so ONLY the server's Set-Cookie clears it.
+    // Swallowing a failed sign-out wipes the local state, redirects, and looks
+    // exactly like success — while the cookie survives. On a shared device the
+    // next person lands on the home screen still signed in as the last one. So
+    // it is reported, and the person is told plainly rather than shown a door
+    // they did not actually walk through.
+    try {
+      await auth.logout()
+    } catch (e) {
+      reportError("portal-shell.signOut", e)
+      toast.error("We couldn't sign you out. Check your connection and try again.")
+      return
+    }
     clearAllFormDrafts() // one person's half-typed ticket is never the next one's
     invalidate(cacheKeys.session)
     router.replace("/login")
@@ -86,7 +100,11 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
     <div className="flex min-h-[100svh] flex-col">
       <header className="bg-background/80 sticky top-0 z-30 border-b backdrop-blur">
         <div className="mx-auto flex w-full max-w-3xl items-center gap-2 px-5 py-3">
-          <AccountSwitcher accounts={session.accounts} currentAccountId={session.currentAccountId} />
+          <AccountSwitcher
+            accounts={session.accounts}
+            currentAccountId={session.currentAccountId}
+            onSwitched={refresh}
+          />
           <div className="flex-1" />
           <ModeToggle />
           <Button variant="ghost" size="icon" aria-label="Sign out" onClick={() => void signOut()}>

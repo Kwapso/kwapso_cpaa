@@ -19,6 +19,7 @@ import type { SessionUser } from "../../../shared/types"
 import { accountScope, mayHearChange, scopeStamp, type ScopeStamp } from "../../../shared/workers/account-scope"
 import { d1ConfigFrom, GuardError, requireMember } from "../../../shared/workers/gating"
 import { fail, json } from "../../../shared/workers/http"
+import { recordWorkerError } from "../../../shared/workers/error-log"
 
 export type Env = {
   /** The per-team live channels (one Durable Object instance per team). */
@@ -127,6 +128,19 @@ async function whoAmI(request: Request, env: Env): Promise<SessionUser | null> {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    try {
+      return await handle(request, env)
+    } catch (e) {
+      // Never a bare 1101. Realtime binds the core database, so a crash here is
+      // recorded like every other worker's (ERROR-HANDLING.md) instead of
+      // vanishing into Cloudflare's exception counter.
+      await recordWorkerError(env.DB, "realtime", new URL(request.url).pathname, e).catch(() => null)
+      return fail(500, "server_error", "Something went wrong.")
+    }
+  },
+} satisfies ExportedHandler<Env>
+
+async function handle(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
 
     // Internal only (reached via service binding, never the public gateway):
@@ -194,7 +208,12 @@ export default {
           // can. The user channel above is unaffected, so identity events and a
           // forced sign-out still reach every device; team screens fall back to
           // cache-first reads and the client retries with backoff.
+          // Recorded, not just logged. A console line expires in a week, and
+          // this is the refusal of a fail-closed gate on a token that HAS
+          // failed in production before (the bootstrap D1 auth error). Learning
+          // about it from a log tail is learning about it too late.
           console.error("realtime fence lookup failed:", e)
+          await recordWorkerError(env.DB, "realtime", "GET /?team= (fence lookup)", e)
           return fail(503, "live_unavailable", "The live connection isn't available right now.")
         }
         return env.CHANNELS.getByName(`team:${teamId}`).fetch(stamped(request, stamp))
@@ -204,5 +223,4 @@ export default {
     }
 
     return fail(404, "not_found", "No such realtime action.")
-  },
-} satisfies ExportedHandler<Env>
+}

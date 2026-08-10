@@ -1,18 +1,23 @@
-# Operations — brimba
+# Operations — kwapso
 
 How this project ships. /ship-staging and /ship-production read the config below.
 
 ## Deploy config
 
 - platform: cloudflare-workers (TWO gateway workers — one per front door — each serving its own static export + routing /api)
-- staging_url: https://kwapso-staging.kwapso.workers.dev
-- production_url: https://kwapso.kwapso.workers.dev
-- portal_staging_url: https://kwapso-portal-staging.kwapso.workers.dev
-- portal_production_url: https://kwapso-portal.kwapso.workers.dev
+- staging_url: https://agency-staging.kwapso.app
+- production_url: https://agency.kwapso.app
+- portal_staging_url: https://staging-client.kwapso.app
+- portal_production_url: https://client.kwapso.app
+  (the custom domains are attached and serving — see "Custom domains" below. The
+  `*.workers.dev` names still resolve as the workers' own subdomains; nothing
+  advertises them any more, and two scripts still DEFAULT to the staging one:
+  `scripts/smoke-staging.mjs` and `scripts/smoke-mcp.mjs` read `SMOKE_BASE`, so
+  export it to run either against a custom domain.)
 - build_command: npm run build (root; builds BOTH static exports — web/ → web/out and web-portal/ → web-portal/out). `npm run build:portal` builds the portal alone.
 - deploy_staging_command: npm run deploy:staging (root; builds both frontends then deploys ALL eight workers realtime-first: realtime → auth → tenancy → content → data-ops → mcp → gateway → portal-gateway, staging names)
 - deploy_production_command: npm run deploy:production (root; same eight-worker realtime-first order, production names)
-- github_remote: origin (https://github.com/alaap-swift-struck/brimba)
+- github_remote: origin (https://github.com/Kwapso/kwapso_cpaa.git)
 
 ## Reset config
 
@@ -56,7 +61,7 @@ obviously fictional client world so there is something to click around.
 
 | Worker | Staging name | Production name | What it is |
 |---|---|---|---|
-| gateway (`workers/gateway`) | kwapso-staging | brimba | The AGENCY front door: serves web/out (marks `/_next/static/**` immutable) + routes /api/* (incl. the /api/realtime WebSocket) via service bindings, by PREFIX |
+| gateway (`workers/gateway`) | kwapso-staging | kwapso | The AGENCY front door: serves web/out (marks `/_next/static/**` immutable) + routes /api/* (incl. the /api/realtime WebSocket) via service bindings, by PREFIX |
 | portal-gateway (`workers/portal-gateway`) | kwapso-portal-staging | kwapso-portal | BUILT 2026-08-10. The CLIENT front door: serves web-portal/out + forwards a NAMED, CLOSED set of /api doors (an allow-list keyed `METHOD /path`, not a prefix fan-out) to auth / tenancy / content / realtime. Binds only those four — no DATAOPS, no MCP — so import, the assistant and the machine surface are unreachable from the client internet by construction. Its closed-door suite (`workers/portal-gateway/test`) derives the agency's whole /api surface off `web/lib/api.ts` and asserts every door the portal does not name 404s |
 | auth (`workers/auth`) | kwapso-auth-staging | kwapso-auth | Login (strict email codes only), sessions, users |
 | realtime (`workers/realtime`) | kwapso-realtime-staging | kwapso-realtime | The live switchboard: one `TeamChannel` Durable Object per **channel** fans out row-level `{resource,id,op}` pings over WebSockets. TWO channel scopes — `team:<id>` (per active team) and `user:<id>` (per signed-in user) — so each open browser holds two sockets; idle channels hibernate (≈ free). Binds AUTH + the core DB (to gate connections); holds no app data |
@@ -72,13 +77,13 @@ obviously fictional client world so there is something to click around.
 
 Deploy order when several change: **realtime → auth → tenancy → content → data-ops → mcp → gateway → portal-gateway** (root scripts do this — both gateways go LAST, for the same reason: each service-binds the domain workers it forwards to — realtime FIRST because every other worker service-binds it: auth/tenancy/content/data-ops publish change pings, the gateway routes the WebSocket. Deploying a binder before its target fails with "Worker not found" — this bit us on the first production deploy, when `kwapso-realtime` didn't exist yet; FIXED 2026-06-22). content and data-ops slot in before the gateway because the gateway routes `/api/content/*` and `/api/data-ops/*` to them, and **data-ops binds CONTENT + TENANCY** (so both must exist before data-ops). **COLD-START (a genuinely fresh account — every `new-app` fork):** realtime also binds AUTH, so `realtime → auth` and `auth → realtime` form a cycle; the very first deploy dies with **`code 10143`** ("Worker not found" for the not-yet-deployed side). This is NOT a "usually auth already exists" footnote — on a fresh account NEITHER exists. Break it once: in `workers/realtime/wrangler.jsonc` **temporarily remove the AUTH service binding**, run `npm run deploy:*` (realtime deploys, then auth, …), then **restore the binding and redeploy realtime**. Do it on staging AND production. (A future improvement automates this in the deploy script — BASE-IMPROVEMENTS.) The realtime worker defines the `TeamChannel` Durable Object (a one-time `migrations` tag in its wrangler.jsonc; no team-DB migration involved — the DO holds no app data). Durable Objects need the Workers Paid plan.
 A nightly cron (03:10 UTC, tenancy worker) sizes every team DB and alarms at 80% of the 10GB cap.
-New migrations must be applied to BOTH databases before deploying workers that need them. The agent-modules build (2026-06-23) adds **core migrations 0008 (`importable_databases`) / 0009 (`agent_usage`) / 0010 (`agent_credits`)**, the credit-usage view (2026-07-01) adds **0011 (`agent_usage_log` — the per-command "why" trail)**, the error store (2026-07-03) adds **0012 (`error_logs` — the central error log, ERROR-HANDLING.md)**, and the MCP front desk (2026-07-07) adds **0013 (`mcp_tokens` + `sessions.team_pin`)** — WITHOUT 0013 the whole MCP surface hits a missing table — and the honest usage log (2026-08-04) adds **0014 (`agent_usage_log.kind` — action rows team-visible, prompt rows the author's; WITHOUT it every usage write fails its best-effort insert, so the log silently stops filling)**, and the send/token hardening (2026-08-10) adds **0015 (`login_codes.sent_ip` + `sends` — the send throttle's ledger; WITHOUT it every sign-in code request 500s on a missing column)** and **0016 (`mcp_tokens.expires_at`, backfilled so live tokens keep a full term; WITHOUT it every MCP call 500s)** — apply them to `kwapso-core` + `kwapso-core-staging` (same command as below, any of the core-bound workers can run it; 0011 is applied on staging, production is owner-gated) — and the **team-schema migrations `0004_modules`** (learning, learning_progress, help, help_threads, data_import_sessions, agent_threads, agent_messages) **… `0006_import_batches`** (the agentic multi-file import shell, AGENTIC-IMPORT.md) — rolled to every team DB via `POST /api/tenancy/admin/migrate-teams` (x-admin-key). Apply BOTH before deploying content/data-ops.
+New migrations must be applied to BOTH databases before deploying workers that need them. The agent-modules build (2026-06-23) adds **core migrations 0008 (`importable_databases`) / 0009 (`agent_usage`) / 0010 (`agent_credits`)**, the credit-usage view (2026-07-01) adds **0011 (`agent_usage_log` — the per-command "why" trail)**, the error store (2026-07-03) adds **0012 (`error_logs` — the central error log, ERROR-HANDLING.md)**, and the MCP front desk (2026-07-07) adds **0013 (`mcp_tokens` + `sessions.team_pin`)** — WITHOUT 0013 the whole MCP surface hits a missing table — and the honest usage log (2026-08-04) adds **0014 (`agent_usage_log.kind` — action rows team-visible, prompt rows the author's; WITHOUT it every usage write fails its best-effort insert, so the log silently stops filling)**, and the send/token hardening (2026-08-10) adds **0015 (`login_codes.sent_ip` + `sends` — the send throttle's ledger; WITHOUT it every sign-in code request 500s on a missing column)** and **0016 (`mcp_tokens.expires_at`, backfilled so live tokens keep a full term; WITHOUT it every MCP call 500s)** — apply them to `kwapso-core` + `kwapso-core-staging` (same command as below, any of the core-bound workers can run it; 0011 is applied on staging, production is owner-gated) — and the **team-schema migrations, `0001_team_base` … `0008_portal_current_account`** (the live list is `TEAM_MIGRATIONS` in `workers/tenancy/src/team-schema.ts`; the recent ones are **`0004_modules`** — learning, learning_progress, help, help_threads, data_import_sessions, agent_threads, agent_messages — **`0005_help_stakeholders`**, **`0006_import_batches`** (the agentic multi-file import shell, AGENTIC-IMPORT.md), **`0007_customer_spine`** (accounts + account_links + portal_users — the customer spine the whole client portal reads; WITHOUT it every account and portal route hits a missing table) and **`0008_portal_current_account`** (`portal_users.current_account_id` — the pointer the account switcher stands on; WITHOUT it switching companies fails and a client who belongs to two is stuck in the first one)) — rolled to every team DB via `POST /api/tenancy/admin/migrate-teams` (x-admin-key). Apply BOTH before deploying content/data-ops.
 
 ## Secrets (set once per env, never in git)
 
 - `cd workers/auth && npx wrangler secret put RESEND_API_KEY --env staging` (and again without `--env` for production)
 - `CF_D1_TOKEN` (Account→D1→Edit) on kwapso-tenancy + kwapso-tenancy-staging — SET 2026-06-12 (team creation live). `ADMIN_KEY` (maintenance endpoints: migrate-teams, db-sizes, move-module) — SET on both envs 2026-06-12; rotate anytime with `wrangler secret put ADMIN_KEY`.
-- `INTERNAL_KEY` — shared secret guarding auth's `/internal/send-email` (tenancy sends it; auth enforces it). UPDATED 2026-08-04: every internal door now **FAILS CLOSED** — send-email, log-error and mcp-session all REFUSE every caller while `INTERNAL_KEY` is unset (a half-finished bootstrap must not run with the doors open), and a mismatch is a hard reject. The key MUST match across `kwapso-auth*` + `kwapso-tenancy*` + `kwapso-content*` (help/notify emails via auth) + `brimba*`/`kwapso-staging` (the AGENCY GATEWAY — it forwards client error beacons to auth's /internal/log-error; ADDED 2026-07-03) + `kwapso-portal*` (the PORTAL GATEWAY — same beacon door, same seam; ADDED 2026-08-10 — without it a crash on a client's phone is console-only) + `kwapso-mcp*` (it mints team-pinned sessions via auth's `/internal/mcp-session`; ADDED 2026-07-07 — omit it and the whole MCP surface can't authenticate), and it MUST be set in EVERY env before the member-notification email feature ships (so "when set" is not an optional/skippable path in production). Defense-in-depth alongside `workers_dev:false`.
+- `INTERNAL_KEY` — shared secret guarding auth's `/internal/send-email` (tenancy sends it; auth enforces it). UPDATED 2026-08-04: every internal door now **FAILS CLOSED** — send-email, log-error and mcp-session all REFUSE every caller while `INTERNAL_KEY` is unset (a half-finished bootstrap must not run with the doors open), and a mismatch is a hard reject. The key MUST match across `kwapso-auth*` + `kwapso-tenancy*` + `kwapso-content*` (help/notify emails via auth) + `kwapso`/`kwapso-staging` (the AGENCY GATEWAY — it forwards client error beacons to auth's /internal/log-error; ADDED 2026-07-03) + `kwapso-portal*` (the PORTAL GATEWAY — same beacon door, same seam; ADDED 2026-08-10 — without it a crash on a client's phone is console-only) + `kwapso-mcp*` (it mints team-pinned sessions via auth's `/internal/mcp-session`; ADDED 2026-07-07 — omit it and the whole MCP surface can't authenticate), and it MUST be set in EVERY env before the member-notification email feature ships (so "when set" is not an optional/skippable path in production). Defense-in-depth alongside `workers_dev:false`.
 - `PUBLIC_APP_URL` — a **var** (not a secret) in `workers/tenancy/wrangler.jsonc`, set per env (staging + production, SET 2026-07-01): the absolute origin used in outbound email links (invites). Without it an agent-sent invite email would link to the internal binding host — see EDGE-CASES §4.
 - `CF_D1_TOKEN` on **kwapso-realtime + kwapso-realtime-staging** (ADDED 2026-08-10 — the live-channel fence). A joining socket now resolves the caller's account scope through the same guard corridor the API uses, so a client-portal login hears only its own world instead of every account id in the agency (DURABLE-OBJECTS §2). Same scoped Account→D1→Edit token as tenancy/content/data-ops; `CF_ACCOUNT_ID` rides along as a var in `workers/realtime/wrangler.jsonc`. **Set it before deploying realtime**: with no token the team channel refuses every socket (fail-closed — we cannot tell staff from a client login), which costs live sync until it's set. `cd workers/realtime && npx wrangler secret put CF_D1_TOKEN --env staging` (and again without `--env`).
 
@@ -88,7 +93,7 @@ New migrations must be applied to BOTH databases before deploying workers that n
 - `INTERNAL_KEY` on **kwapso-content*** (it calls auth's `/internal/send-email` for help reply/@mention notifications) — same value as auth/tenancy.
 - `ADMIN_KEY` on **kwapso-data-ops*** (guards the two owner-only endpoints below) — same as the tenancy maintenance key. data-ops also forwards the caller's session cookie to content/tenancy (act-as-user), so no extra cross-worker secret is needed for the import/agent executor.
 - `ANTHROPIC_API_KEY` on **kwapso-data-ops*** — OPTIONAL. When set, the AI agent's brain is Claude (this is what the owner runs — SET on staging 2026-06-30; production is owner-gated); when unset, it falls back to Cloudflare Workers AI. **BOTH brains do full tool use** — the key changes which model thinks, never whether the agent can act. (Claude also streams word-by-word; Workers AI replies arrive at once but still emits live step events.) Set per env with `wrangler secret put ANTHROPIC_API_KEY`.
-- **Vars (in `workers/data-ops/wrangler.jsonc`, not secrets):** `AGENT_MODEL` (the Claude model id, default **`claude-sonnet-5`**, used only when `ANTHROPIC_API_KEY` is set) + `AGENT_EFFORT` (Claude reasoning effort, default **`low`** — the cheap setting; raise when more capability is worth the tokens) + `AGENT_FREE_DAILY` (the team's free daily agent allowance; code default 25, **staging runs 50**) + `WORKERS_AI_MODEL` (the fallback model, default **`@cf/meta/llama-4-scout-17b-16e-instruct`**, verified live: chats, answers from real team data, takes actions). Swap the brain by editing one var or `selectModel()` — "model is a battery". Other good Workers AI swaps: `@cf/openai/gpt-oss-20b` / `gpt-oss-120b` (agentic), `@cf/moonshotai/kimi-k2.6` (frontier, premium, best chat). `cheapText` (inline jobs) always uses the Workers AI var. **HISTORY / GOTCHAS:** (1) the old default `@cf/meta/llama-3.1-8b-instruct` was DEPRECATED+removed 5/30/2026 — calling it threw and crashed the agent on EVERY message (even "hi"); always check a model id is still served. (2) Workers AI models need the **OpenAI-wrapped tools format** `{type:"function",function:{…}}` (a flat shape 400s); the seam handles this. (3) Never send `temperature`/`top_p`/`budget_tokens` to Claude Sonnet 5 — each is a 400; effort is the one knob. Docs: developers.cloudflare.com/workers-ai/function-calling/ + /models/llama-4-scout-17b-16e-instruct/.
+- **Vars (in `workers/data-ops/wrangler.jsonc`, not secrets):** `AGENT_MODEL` (the Claude model id, default **`claude-sonnet-5`**, used only when `ANTHROPIC_API_KEY` is set) + `AGENT_EFFORT` (Claude reasoning effort, default **`low`** — the cheap setting; raise when more capability is worth the tokens) + `AGENT_FREE_DAILY` (**the app's own daily allowance** — how many free assistant actions a team gets each day inside kwapso. The code default is 25, but **both environments ship 50** in the checked-in wrangler vars, so 50 is what a team actually gets. This is not your Anthropic bill or any provider limit; it is a number this app enforces on itself) + `WORKERS_AI_MODEL` (the fallback model, default **`@cf/meta/llama-4-scout-17b-16e-instruct`**, verified live: chats, answers from real team data, takes actions). Swap the brain by editing one var or `selectModel()` — "model is a battery". Other good Workers AI swaps: `@cf/openai/gpt-oss-20b` / `gpt-oss-120b` (agentic), `@cf/moonshotai/kimi-k2.6` (frontier, premium, best chat). `cheapText` (inline jobs) always uses the Workers AI var. **HISTORY / GOTCHAS:** (1) the old default `@cf/meta/llama-3.1-8b-instruct` was DEPRECATED+removed 5/30/2026 — calling it threw and crashed the agent on EVERY message (even "hi"); always check a model id is still served. (2) Workers AI models need the **OpenAI-wrapped tools format** `{type:"function",function:{…}}` (a flat shape 400s); the seam handles this. (3) Never send `temperature`/`top_p`/`budget_tokens` to Claude Sonnet 5 — each is a 400; effort is the one knob. Docs: developers.cloudflare.com/workers-ai/function-calling/ + /models/llama-4-scout-17b-16e-instruct/.
 - **Workers AI binding:** `kwapso-data-ops*` declares `"ai": { "binding": "AI" }` in its wrangler.jsonc — no secret, just the binding (Workers AI is metered on the account). This is what powers the swappable model's fallback path + every `cheapText` call.
 
 ### R2 buckets (BUILT 2026-06-23 — bound to `kwapso-content*`)
@@ -105,14 +110,16 @@ Create with `npx wrangler r2 bucket create <name>` (run once per bucket per acco
 
 - `POST /api/data-ops/admin/seed-targets` — refresh the GLOBAL `importable_databases` catalog's LABELS (display names / descriptions / schemas). **No longer a step anyone must remember**: the catalogue reconciles itself against the code on read (R13 — a fresh env's picker heals on first open; a target the owner switched off stays off, and this door no longer re-activates it either).
 - `GET /api/data-ops/admin/errors?status=open|resolved|all&limit=N` — read the central error log (newest first). `POST /api/data-ops/admin/errors/resolve` `{ id, note }` — mark one resolved with the what-went-wrong note. See ERROR-HANDLING.md.
-- `POST /api/data-ops/admin/grant-credits` — top up a team's AI credit balance (the purchasable half of the agent quota; the free half defaults to 25/day via the `AGENT_FREE_DAILY` var — staging runs 50). This is the seam real payments wire into later.
+- `POST /api/data-ops/admin/grant-credits` — top up a team's AI credit balance (the purchasable half of the agent quota; the free half is **the app's own daily allowance**, `AGENT_FREE_DAILY` — code default 25, but both environments ship **50**). This is the seam real payments wire into later.
 
-### Public surface (LOCKED): only the gateway is public
+### Public surface (LOCKED): only the two gateways are public
 
-auth, tenancy, realtime, content, data-ops and mcp all set `"workers_dev": false` **and `"preview_urls": false`** (BOTH, top-level AND env.staging — a per-version preview URL would be a second public door) (top-level AND env.staging — envs don't inherit), so they have NO public `*.workers.dev` URL and are reachable ONLY via service bindings. The **gateway** (`kwapso` / `kwapso-staging`) is the single public address. This is what makes `/internal/send-email` (and the agent/import act-as-user surface) safe (no public route can reach it). Never add a public route/`workers_dev` to a non-gateway worker.
+auth, tenancy, realtime, content, data-ops and mcp — the six domain workers — all set `"workers_dev": false` **and `"preview_urls": false`** (BOTH, top-level AND env.staging — envs don't inherit, and a per-version preview URL would be another public door), so they have NO public `*.workers.dev` URL and are reachable ONLY via service bindings. The two public addresses are the **agency gateway** (`kwapso` / `kwapso-staging`) and the **portal gateway** (`kwapso-portal` / `kwapso-portal-staging`) — one per front door, and no more. That is what makes `/internal/send-email` (and the agent/import act-as-user surface) safe: no public route can reach `/internal/*`, the agent, or the act-as-user surface. Never add a public route/`workers_dev` to a worker that isn't one of the two gateways.
 - **Both environments are on the same commit as of 2026-08-06** — production was
   brought up from the pre-hardening build in one rollout: core migration `0014`
-  applied to `kwapso-core` first, then all seven workers realtime-first. Verified
+  applied to `kwapso-core` first, then every worker then on disk, realtime-first
+  (seven at the time; the portal gateway landed on 2026-08-10 and made it eight).
+  Verified
   on production: four worker healths, the test-login door refused (403) even when
   handed the staging key (`ENVIRONMENT: "production"` ships in the config), the
   activity door gating before scope resolution, and a forged-cookie beacon writing
@@ -166,13 +173,13 @@ both owner-only:
    `cd workers/auth && npx wrangler secret put RESEND_API_KEY` (prod) and again
    with `--env staging`. The moment it's set, real emails send and the staging
    echo stops.
-2. **Verified sender domain** — `onboarding@resend.dev` (the current default
-   `EMAIL_FROM`) only delivers to the Resend account owner's own inbox, so it's
-   fine for our own testing but NOT for real users. To email anyone: in Resend
-   add a domain (e.g. `mail.swiftstruck.com`), add the DKIM/SPF records it shows
-   to that domain's DNS in Cloudflare, then set `EMAIL_FROM` in
-   `workers/auth/wrangler.jsonc` to e.g. `Brimba <login@mail.swiftstruck.com>`
-   and redeploy.
+2. **Verified sender domain** — `EMAIL_FROM` in `workers/auth/wrangler.jsonc` is
+   `kwapso <alerts@kwapso.app>` in both environments. Resend's own
+   `onboarding@resend.dev` only delivers to the Resend account owner's inbox, so
+   it is fine for our own testing and NOT for real users. To send from a new
+   domain: add it in Resend, add the DKIM/SPF records it shows to that domain's
+   DNS in Cloudflare, then set `EMAIL_FROM` to an address on it and redeploy.
+   See "Email sending — the domain split" below for which domains are ours.
 
 ## Verify before shipping
 
@@ -208,9 +215,12 @@ Manager (paid per zone), so staging uses a hyphen instead of a dot.
 below, which is the decision this table follows. The earlier `clients.kwapso.app` /
 `clients-staging.kwapso.app` pair was never attached.)
 
-Until these are attached, both surfaces run on workers.dev (see the URLs above).
-Attach from each gateway worker: Workers & Pages → the worker → Settings → Domains &
-Routes → Add custom domain. Cloudflare writes the DNS record and issues the cert.
+**All four are attached and serving** (agency: production + staging; client portal:
+staging on `staging-client.kwapso.app`, production on `client.kwapso.app`). These are
+the addresses to hand anyone — the `*.workers.dev` names are no longer advertised
+anywhere in the docs. Attach a new one from the gateway worker: Workers & Pages → the
+worker → Settings → Domains & Routes → Add custom domain. Cloudflare writes the DNS
+record and issues the cert.
 
 NOTE: `portal.kwapso.app` is NOT ours — it is the legacy Glide client portal, live and
 serving clients. It stays untouched until cutover, which is a single DNS record change.
