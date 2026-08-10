@@ -4,7 +4,9 @@
 // (Law R2): Overview / Contacts / Under this account / Portal access / Activity.
 // Host-composed, because three of those tabs are collections with their own
 // actions — link a person, give someone a login, take one away — and no engine
-// block draws those.
+// block draws those. Those three list bodies live next door in
+// account-detail-panels.tsx; this file owns the record itself — its data, its
+// rights, its tabs and counts, its dialogs, and the one confirm they all share.
 //
 // The hierarchy is meant to be readable at a glance, so it is stated twice over:
 // the header says which account this one sits under (a link, one tap up the tree),
@@ -43,17 +45,24 @@ import {
   defaultActivityFeedConfig,
   type ActivityItem as ActivityFeedItem,
 } from "@kwapso/ui/registry/collections/activity-feed/activity-feed"
-import { Ban, ChevronRight, KeyRound, Pencil, Plus, Power, UserMinus } from "lucide-react"
+import { Pencil, Power } from "lucide-react"
 
-import type { Account, AccountDetail, ActivityItem } from "@shared/types"
+import type { Account, AccountDetail } from "@shared/types"
 import { AccountFormDialog, type AccountFormValues } from "@/components/account-form-dialog"
+import {
+  ChildrenPanel,
+  ContactsPanel,
+  PortalAccessPanel,
+  type Confirm,
+  type PanelActions,
+} from "@/components/account-detail-panels"
 import { ContactLinkDialog, type ContactLinkValues } from "@/components/contact-link-dialog"
 import { PortalAccessDialog } from "@/components/portal-access-dialog"
 import { LoadMore } from "@/components/load-more"
 import { ACCOUNT_TYPE, accountStatus } from "@/components/deep-link/shape"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
-import { formatActivityWhen, formatDate } from "@shared/web/format"
+import { formatActivityWhen } from "@shared/web/format"
 import { formatCount } from "@shared/web/format-count"
 import { accountKey, accountsKey, childrenKey, listFetch, totalKey } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
@@ -61,12 +70,6 @@ import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, useCached, useCachedValue } from "@shared/web/store"
 import { useRecordActivity } from "@/lib/use-record-activity"
-
-/** A destructive action waiting for a yes. One dialog serves all three (archive,
- * unlink, revoke) — they differ only in their words and what they run. `run`
- * answers whether it worked, so a refusal leaves the dialog open beside the
- * message rather than closing as if it had happened. */
-type Confirm = { title: string; body: string; action: string; run: () => Promise<boolean> }
 
 export function AccountDetailScreen({
   teamId,
@@ -139,6 +142,11 @@ export function AccountDetailScreen({
     },
     [refresh]
   )
+
+  /** What the three collection tabs borrow from this screen: ask first, then do
+   * it. Bundled so a panel takes one prop rather than three, and so there is
+   * exactly one confirm dialog on the record (at the bottom of this file). */
+  const actions: PanelActions = { busy, ask: setConfirm, act: run }
 
   // Saving the record: the MOVE goes first, because it is the one the server can
   // refuse (an account cannot be put inside itself). Refused first = nothing
@@ -401,215 +409,32 @@ export function AccountDetailScreen({
 
           if (t.value === "contacts")
             return (
-              <div className="flex flex-col gap-3">
-                {canCreate && (
-                  <div className="flex flex-wrap justify-end gap-2">
-                    <Button size="sm" onClick={() => setLinkOpen(true)} className="gap-1.5">
-                      <Plus className="size-4" />
-                      Add contact
-                    </Button>
-                  </div>
-                )}
-                {links.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">No contacts yet.</p>
-                ) : (
-                  <ul className="flex flex-col gap-1.5">
-                    {links.map((l) => (
-                      <li
-                        key={l.id}
-                        className={`border-border/60 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 ${
-                          l.active ? "" : "opacity-60"
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => openAccount(l.personAccountId)}
-                          className="hover:text-primary min-w-0 flex-1 truncate text-left text-sm underline-offset-2 hover:underline"
-                        >
-                          {l.personName}
-                        </button>
-                        {l.relationship && (
-                          <span className="text-muted-foreground text-xs">{l.relationship}</span>
-                        )}
-                        {l.isMainStakeholder && (
-                          <Badge variant="secondary" className="text-[10px]">
-                            Main contact
-                          </Badge>
-                        )}
-                        {!l.active && (
-                          <span className="text-muted-foreground text-xs">Not a contact now</span>
-                        )}
-                        {canArchive &&
-                          (l.active ? (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              disabled={busy}
-                              onClick={() =>
-                                setConfirm({
-                                  title: `Remove ${l.personName} from ${account.name}?`,
-                                  body: "They stay in your accounts, with everything they're attached to. You're only saying they're no longer a contact here.",
-                                  action: "Remove contact",
-                                  run: () =>
-                                    run(
-                                      () => tenancy.setLinkActive(l.id, false),
-                                      "Contact removed.",
-                                      "Couldn't remove that contact."
-                                    ),
-                                })
-                              }
-                              className="text-destructive hover:text-destructive gap-1.5"
-                              aria-label={`Remove ${l.personName}`}
-                            >
-                              <UserMinus className="size-3.5" />
-                            </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              disabled={busy}
-                              onClick={() =>
-                                void run(
-                                  () => tenancy.setLinkActive(l.id, true),
-                                  "Contact added back.",
-                                  "Couldn't add that contact back."
-                                )
-                              }
-                              className="gap-1.5"
-                              aria-label={`Add ${l.personName} back`}
-                            >
-                              <Power className="size-3.5" /> Add back
-                            </Button>
-                          ))}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+              <ContactsPanel
+                accountName={account.name}
+                links={links}
+                canCreate={canCreate}
+                canArchive={canArchive}
+                actions={actions}
+                onAdd={() => setLinkOpen(true)}
+                onOpen={openAccount}
+              />
             )
 
           if (t.value === "children")
             return (
-              <div className="flex flex-col gap-3">
-                {children.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">
-                    Nothing sits under this account yet.
-                  </p>
-                ) : (
-                  <ul className="flex flex-col gap-1.5">
-                    {children.map((c) => (
-                      <li key={c.id}>
-                        <button
-                          type="button"
-                          onClick={() => openAccount(c.id)}
-                          className={`border-border/60 hover:bg-muted/50 flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors ${
-                            c.active ? "" : "opacity-60"
-                          }`}
-                        >
-                          <span className="min-w-0 flex-1 truncate text-sm">{c.name}</span>
-                          <span className="text-muted-foreground text-xs">
-                            {ACCOUNT_TYPE[c.accountType]}
-                          </span>
-                          <ChevronRight className="text-muted-foreground size-4 shrink-0" />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {/* R14: a holding company can hold more than one page of businesses. */}
-                <LoadMore
-                  listKey={childrenKey(accountId)}
-                  label="Load more accounts"
-                  fetchPage={(c: string) =>
-                    tenancy
-                      .accounts({ parentId: accountId, cursor: c })
-                      .then((r) => ({ rows: r.accounts, nextCursor: r.nextCursor }))
-                  }
-                />
-              </div>
+              <ChildrenPanel accountId={accountId} accounts={children} onOpen={openAccount} />
             )
 
           // Portal access — the login switch. Only rendered for someone who may
           // see logins at all (the tab itself is hidden otherwise).
           return (
-            <div className="flex flex-col gap-3">
-              {canGrant && (
-                <div className="flex flex-wrap justify-end gap-2">
-                  <Button size="sm" onClick={() => setGrantOpen(true)} className="gap-1.5">
-                    <KeyRound className="size-4" />
-                    Give access
-                  </Button>
-                </div>
-              )}
-              {portalUsers.length === 0 ? (
-                <p className="text-muted-foreground text-sm">
-                  Nobody here can sign in yet. Give access to someone and they&apos;ll see this
-                  account&apos;s own work.
-                </p>
-              ) : (
-                <ul className="flex flex-col gap-1.5">
-                  {portalUsers.map((p) => (
-                    <li
-                      key={p.id}
-                      className={`border-border/60 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 ${
-                        p.active ? "" : "opacity-60"
-                      }`}
-                    >
-                      <span className="min-w-0 flex-1 truncate text-sm">
-                        {p.email ?? "Someone with a login"}
-                      </span>
-                      <span className="text-muted-foreground text-xs">
-                        {p.active ? "Can sign in" : "Access taken away"}
-                        {p.grantedByName ? ` · by ${p.grantedByName}` : ""}
-                        {p.grantedAt ? ` · ${formatDate(p.grantedAt)}` : ""}
-                      </span>
-                      {canRevoke &&
-                        (p.active ? (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            disabled={busy}
-                            onClick={() =>
-                              setConfirm({
-                                title: "Take this login away?",
-                                body: "They won't be able to sign in any more. Everything they're attached to — their records, their history — stays exactly where it is, and you can switch it back on later.",
-                                action: "Take access away",
-                                run: () =>
-                                  run(
-                                    () => tenancy.setPortalAccessActive(p.id, false),
-                                    "Access taken away.",
-                                    "Couldn't change that login."
-                                  ),
-                              })
-                            }
-                            className="text-destructive hover:text-destructive gap-1.5"
-                            aria-label="Take access away"
-                          >
-                            <Ban className="size-3.5" />
-                          </Button>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            disabled={busy}
-                            onClick={() =>
-                              void run(
-                                () => tenancy.setPortalAccessActive(p.id, true),
-                                "Access switched back on.",
-                                "Couldn't change that login."
-                              )
-                            }
-                            className="gap-1.5"
-                            aria-label="Switch access back on"
-                          >
-                            <Power className="size-3.5" /> Switch back on
-                          </Button>
-                        ))}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+            <PortalAccessPanel
+              portalUsers={portalUsers}
+              canGrant={canGrant}
+              canRevoke={canRevoke}
+              actions={actions}
+              onGrant={() => setGrantOpen(true)}
+            />
           )
         }}
       />
