@@ -11,8 +11,11 @@
 // so the wiring here (path · method · binding · schema · buildBody) must match the door.
 // Surface-ONLY tools stay in each surface's own file: the agent's run_import_batch (SELF)
 // + bulk_* + set_help_status_by_filter (all confirm-gated, no MCP confirm panel) +
-// get_role_permissions + update_team + mark_learning_done; the MCP's whoami +
-// exports + the agentic-import batch tools + agent_chat/agent_confirm.
+// get_role_permissions; the MCP's whoami + the caller's own rights + exports + the
+// import-catalogue reads + the agentic-import batch tools + the AI-allowance reads +
+// the saved conversations + agent_chat/agent_confirm.
+
+import { GuardError } from "./gating"
 
 /* ------------------------------- schema helpers ------------------------------- */
 
@@ -25,10 +28,49 @@ export const obj = (props: Record<string, unknown>, required: string[] = []): Re
   required,
 })
 
-/** Coerce a model/tool input field to a trimmed string (NUL-free enough for a body). */
+/** Read a tool input field as a string. A value of the WRONG TYPE reads as absent
+ * rather than being coerced: `String({})` is `"[object Object]"`, which is a
+ * perfectly valid 17-character name as far as the door's text validation is
+ * concerned, so a machine could invent a record called "[object Object]" through
+ * a door that was doing exactly what it was told. A browser form cannot produce a
+ * non-string; a JSON-RPC client can send anything.
+ *
+ * Reading as absent is the FLOOR, not the refusal — the refusal is
+ * `checkArgTypes` below, which both executors run before the builders, so a
+ * wrong-typed argument is answered with a 400 that says which field. This stays
+ * lenient so it can also be used in the step SUMMARIES (which run before the
+ * executor and must never throw a label). */
 export const str = (input: Record<string, unknown>, key: string): string => {
   const v = input[key]
-  return typeof v === "string" ? v : v == null ? "" : String(v)
+  return typeof v === "string" ? v : ""
+}
+
+/** REFUSE A WRONG-TYPED ARGUMENT, once, at the boundary of both machine surfaces.
+ * The tool's own JSON-Schema already declares each field's type for the model;
+ * this is the same declaration enforced. Only the field types the catalog uses are
+ * checked (string / boolean / number / object / array) and only for keys the caller
+ * actually sent — an omitted optional stays omitted. Throws the GuardError both
+ * executors already know how to turn into a clean 400. */
+export function checkArgTypes(schema: Record<string, unknown>, input: Record<string, unknown>): void {
+  const props = (schema.properties ?? {}) as Record<string, { type?: string }>
+  for (const [key, spec] of Object.entries(props)) {
+    const v = input[key]
+    if (v === undefined || v === null) continue
+    const want = spec?.type
+    const ok =
+      want === "string" ? typeof v === "string"
+      : want === "boolean" ? typeof v === "boolean"
+      : want === "number" ? typeof v === "number" && Number.isFinite(v)
+      : want === "array" ? Array.isArray(v)
+      : want === "object" ? typeof v === "object" && !Array.isArray(v)
+      : true // an undeclared type is nothing to check against
+    if (!ok)
+      throw new GuardError(
+        400,
+        "invalid_input",
+        `"${key}" must be ${want === "array" ? "a list" : want === "object" ? "an object" : `a ${want}`}.`
+      )
+  }
 }
 /** An OPTIONAL string body field: the value, or undefined so JSON.stringify drops it
  * (the door then treats it as an omitted form field). */
@@ -198,6 +240,21 @@ export const SHARED_TOOLS: SharedTool[] = [
     schema: obj({ id: S }, ["id"]),
     buildQuery: (i) => `?id=${encodeURIComponent(str(i, "id"))}`,
     agent: { write: false, summarize: (i) => `List who's following ticket ${str(i, "id")}` },
+  },
+
+  /* --------------------------------- the team ------------------------------ */
+  // Renaming the team the caller is standing in. It was agent-only, on the
+  // reading that teams are off the machine surface — but that exclusion is about
+  // the PIN (list / create / switch would move a token to a team it wasn't made
+  // in), and renaming the pinned team moves nothing. Same door, same teams:edit
+  // gate, same audit row.
+  {
+    name: "update_team",
+    summary: "Rename the team this caller is standing in. Its people, records and history are untouched.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/teams/update",
+    schema: obj({ name: S }, ["name"]),
+    buildBody: (i) => ({ name: str(i, "name") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Rename the team to "${str(i, "name")}"` },
   },
 
   /* -------------------------------- accounts ------------------------------- */
@@ -522,6 +579,18 @@ export const SHARED_TOOLS: SharedTool[] = [
     },
   },
 
+  {
+    name: "mark_learning_done",
+    summary: "Mark a learning article done (or not done) for YOURSELF — never for anyone else. Everyone's done state is a separate read (the curator's progress view).",
+    binding: "CONTENT", method: "POST", path: "/api/content/learning/done",
+    schema: obj({ id: S, done: B }, ["id", "done"]),
+    buildBody: (i) => ({ id: str(i, "id"), done: i.done === true }),
+    agent: {
+      write: true, confirm: false,
+      summarize: (i) => `Mark learning article ${str(i, "id")} ${i.done === true ? "done" : "not done"}`,
+    },
+  },
+
   /* ---------------------------------- help --------------------------------- */
   {
     name: "raise_help_ticket",
@@ -572,6 +641,7 @@ export const SHARED_TOOLS: SharedTool[] = [
  * Needs member_roles:create."). Keyed by canonical name (works for the mcpName ones too).
  * Reads carry no hint (they just need the module's read right). */
 export const TOOL_GATES: Record<string, string> = {
+  update_team: "teams:edit",
   create_account: "accounts:create",
   update_account: "accounts:edit",
   set_account_parent: "accounts:edit",
@@ -595,6 +665,7 @@ export const TOOL_GATES: Record<string, string> = {
   create_learning: "learning:create",
   update_learning: "learning:edit",
   set_learning_active: "learning:delete",
+  mark_learning_done: "learning:read",
   raise_help_ticket: "help:create",
   update_help_ticket: "help:edit",
   set_help_status: "help:edit",

@@ -2,9 +2,9 @@
 //
 //   1. it never expired — a secret pasted into a CI config in 2026 still opened
 //      that person's team years later, long after the laptop and often the job;
-//   2. nothing capped how many one account could mint;
+//   2. nothing capped how many one PERSON could mint;
 //   3. and (1)+(2) met the list cap: the settings screen reads a hard-capped
-//      1,000 rows (R14), so an account that churned through tokens could bury a
+//      1,000 rows (R14), so someone who churned through tokens could bury a
 //      LIVE one past the ceiling — invisible in the app, and therefore
 //      unrevokable from it, while still working perfectly for whoever held it.
 //
@@ -133,7 +133,7 @@ describe("an access token has a life", () => {
   })
 })
 
-describe("an account can't mint keys without end", () => {
+describe("one person can't mint keys without end", () => {
   it("the cap holds even when every request arrives at once", async () => {
     const t = fresh()
     const tries = MAX_ACTIVE_MCP_TOKENS_PER_USER + 12
@@ -160,7 +160,7 @@ describe("an account can't mint keys without end", () => {
     await expect(createToken(t.env, USER, TEAM, "replacement")).resolves.toBeTruthy()
   })
 
-  it("the cap is per account — a teammate's tokens don't crowd yours out", async () => {
+  it("the cap is per person — a teammate's tokens don't crowd yours out", async () => {
     const t = fresh()
     for (let i = 0; i < MAX_ACTIVE_MCP_TOKENS_PER_USER; i++)
       await createToken(t.env, USER, TEAM, `mine ${i}`)

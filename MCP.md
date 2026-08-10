@@ -129,21 +129,36 @@ agent_confirm, plan_import) use the team's AI quota.
 Confirm the live list with `tools/list` (it's generated, so it's always current).
 Today it covers:
 
-- **Read:** `whoami`, `list_members`, `list_roles`, `list_invites`,
-  `list_dropdown_values`, `list_learning`, `list_help_tickets`, `get_help_thread`,
-  `list_help_stakeholders`, `list_accounts`, `get_account`, `list_portal_access`,
-  `list_imports`. Each list tool that sits on a door with an `?id=` filter EXPOSES +
-  FORWARDS it (R19 parity) — pass `id` to fetch one record instead of pulling the whole
-  collection (`list_help_tickets` also takes `scope`; `list_accounts` takes `q`, `type`
-  and `parentId`).
+- **Read:** `whoami`, `my_permissions`, `get_team`, `list_members`, `list_roles`,
+  `list_invites`, `list_dropdown_values`, `list_learning`, `list_learning_progress`,
+  `list_help_tickets`, `get_help_thread`, `list_help_stakeholders`, `list_accounts`,
+  `get_account`, `list_portal_access`, `list_import_targets`, `get_import_sample`,
+  `list_imports`, `get_import`, `get_ai_allowance`, `list_ai_usage`,
+  `list_agent_threads`, `get_agent_thread`. Each list tool that sits on a door with an
+  `?id=` filter EXPOSES + FORWARDS it (R19 parity) — pass `id` to fetch one record
+  instead of pulling the whole collection (`list_help_tickets` also takes `scope`;
+  `list_accounts` takes `q`, `type` and `parentId`).
 
-  **R19 now starts at the DOORS, not the tools.** The parity check used to walk the
-  tool catalogue, so a door with no tool wasn't a failure — it was invisible, which is
-  how the whole customer spine sat off this surface with a green build. It now derives
-  every filtered or paged door on tenancy + content from their own route tables: a door
-  with no tool is a red build unless it is a named, reasoned line in the check's
-  `TOOLLESS_DOORS` (three today — the role permission matrix, one invite's audit trail,
-  and the cross-module activity feed; each says why, in writing).
+  **`my_permissions` is the one to call first.** `whoami` says who the token is and
+  which team it is pinned to; `my_permissions` says what that person may DO there,
+  module by module. Every door re-checks the same rights on every call regardless —
+  this is simply how a client can know before it asks, instead of learning from a 403.
+
+  **R19 now starts at the DOORS, and at ALL of them.** The parity check used to walk
+  the tool catalogue, so a door with no tool wasn't a failure — it was invisible, which
+  is how the whole customer spine sat off this surface with a green build. Moving the
+  scan to the doors fixed that for doors that take a QUERY PARAMETER — and left every
+  parameterless door just as invisible, which is where twenty capabilities were sitting
+  (what may I do here, how much of the app's own daily AI allowance is left, what may I
+  import into, what did that import plan say).
+
+  So the census is now every non-admin door on tenancy, content, data-ops and auth —
+  filtered or not, GET or POST. Each one has a tool on some machine surface or is a
+  named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
+  red build. Today: **87 doors, 66 with a tool, 21 with a written reason** — the reasons
+  being the team-pin doors (§3.2 below), the client-portal standing doors (§3.3), the
+  sign-in and personal-identity doors on auth, the screen-recipe store, the media
+  upload, one invite's audit trail and the cross-module activity feed.
 
   **One asymmetry worth stating plainly.** The in-app assistant now stops for a yes/no
   panel before every write that decides who-can-do-what — derived from the gate map,
@@ -165,10 +180,24 @@ Today it covers:
   `result_too_large` body telling you to filter, page, or use the export tool — it is
   never sliced and handed back as a success. (It used to be: half a JSON document,
   reported `ok`, which a client has no way to notice and no reason to re-ask.)
+
+  **An argument of the wrong type is refused, not coerced.** The type each tool
+  declares in its `inputSchema` is the type enforced, checked before the call is built:
+  `{"name": {}}` comes back a clean `invalid_input` naming the field. It used to be
+  coerced with `String(v)` and arrive at the door as the perfectly valid 17-character
+  string `"[object Object]"` — a browser form cannot produce that, and a JSON-RPC
+  client can send anything.
+
+  **A call has a deadline.** A tool that doesn't answer within 30 seconds (2 minutes
+  for `run_import`, `plan_import`, `agent_chat` and `agent_confirm`, which are supposed
+  to take a while) comes back `door_timeout` rather than holding your call open with
+  nothing to read. A timeout is not a rollback: read before retrying a write.
 - **Export (full-field CSV):** `export_roles_csv`, `export_learning_csv`,
   `export_dropdown_values_csv`, `export_accounts_csv`.
 - **Write — deterministic create / edit / deactivate** (free, no AI; each needs the
   matching role right, e.g. `member_roles:create`):
+  - the team — `update_team` (rename the team this token is pinned to; needs `teams:edit`)
+  - learning progress — `mark_learning_done` (for yourself only)
   - roles — `create_role`, `update_role`, `set_role_active`, `set_role_permissions`
   - members — `set_member_role`, `remove_member` (people join via **invite**)
   - invites — `create_invite`, `revoke_invite`
@@ -194,10 +223,17 @@ Today it covers:
    A machine client that needs the same effect composes the single-record writes above
    (each gated + audited identically). The bulk READ path — filtering a list to one
    record via `id` — IS on MCP (R19 parity).
-2. **Teams:** `list_teams`, `create_team` and `switch_team` are off both machine
-   surfaces. A token is PINNED to one team by design (§5); a tool that moved or made
-   one would be the only way to widen that pin, which is the thing the pin exists to
-   prevent.
+2. **Teams — the PIN, not the word "team".** `list_teams`, `create_team` and
+   `switch_team` are off both machine surfaces: a token is PINNED to one team by design
+   (§5), and a tool that moved or made one would be the only way to widen that pin,
+   which is the thing the pin exists to prevent. The two received-invitation doors are
+   off for the same reason and more directly — accepting an invite JOINS another team
+   and SWITCHES the session to it.
+
+   RENAMING the pinned team is not that, and `update_team` is on this surface. It was
+   agent-only on a reading of this exclusion that its own reason never supported: a
+   rename moves nothing and reaches nowhere new. The same door, the same `teams:edit`
+   gate, the same audit row.
 3. **The client-portal standing doors** — `GET /api/tenancy/portal/context` and
    `POST /api/tenancy/portal/switch-account` — are off it too, and the reason is
    structural rather than a judgement call: they answer "which of *your own* companies
@@ -205,13 +241,30 @@ Today it covers:
    login cannot hold a token at all (§5). For staff, both doors are already an honest
    empty answer. Adding them would be adding tools that no caller who can reach them
    has any use for.
-4. **The role permission MATRIX read, one invite's AUDIT trail, and the cross-module
-   ACTIVITY feed** are named, reasoned lines in the R19 check's `TOOLLESS_DOORS` —
-   respectively: the same matrix comes back flattened in `export_roles_csv`; an
-   invite's own state is already in `list_invites` and the audit is the forensic strip
-   a person reads on its detail; and the activity feed is the one door whose answer is
-   assembled by subtracting the caller's denied modules (R18), so putting the merged
-   stream on this surface is a separate decision for the owner, not a parity default.
+4. **One invite's AUDIT trail and the cross-module ACTIVITY feed** are named, reasoned
+   lines in the R19 census's `TOOLLESS_DOORS` — respectively: an invite's own state is
+   already in `list_invites` and the audit is the forensic strip a person reads on its
+   detail; and the activity feed is the one door whose answer is assembled by
+   subtracting the caller's denied modules (R18), so putting the merged stream on this
+   surface is a separate decision for the owner, not a parity default.
+
+   The **role permission MATRIX** read is a surface asymmetry rather than a gap: the
+   in-app assistant has `get_role_permissions`, and this surface reads the same matrix,
+   flattened across every role and module, in `export_roles_csv`. One question, one way
+   to ask it per surface.
+
+5. **Auth's personal doors** — signing in, changing your login address, editing your
+   name and photo, reading that identity history, and logging out — are off this
+   surface. They write who the PERSON is, across every team they belong to; no team
+   role gates any of them, so they sit outside the one-team, role-capped envelope a
+   token promises. `whoami` and `my_permissions` are the machine's read of the same
+   ground, inside it.
+
+6. **The screen-recipe store and the learning media upload.** A recipe describes what
+   the agency app RENDERS, and the only way to judge one is to look at the screen it
+   draws; the upload is a base64 data URL up to 25 MB, two orders of magnitude past
+   what one call here is built to carry. A machine writes the article and references
+   media it already has a URL for.
 
 Every tool is a thin forward to the **same gated door the app's own screens use** — so
 input is validated, **your live role is re-checked** (a Viewer's `create_role` is
@@ -258,8 +311,21 @@ developer. So two levers keep it under control:
    import step that uses AI — bounded by the quota like everything else.)
 
 So your instinct is right for the cheap tools ("they're just hitting our endpoints") —
-and for the AI tools, the quota + the role are how you keep the cost yours-but-bounded,
+and for the AI tools, the allowance + the role are how you keep the cost yours-but-bounded,
 or zero, by choice.
+
+**And you can now read the allowance before you spend it.** `get_ai_allowance` returns
+what the team has left of the app's own daily allowance (the free daily amount plus any
+credits an admin has added); `list_ai_usage` shows where it went, one row per turn. Both
+are free reads needing `agent:read`. Until they existed, 429 was the documented failure
+mode of this surface and nothing on it could see 429 coming — a client learned the
+allowance was gone by being refused. (Note what this is *not*: it is the app's own daily
+allowance, set here, shared by everyone on the team. It is not your Anthropic account and
+not a bill anyone outside this app sees.)
+
+**A lost plan is recoverable without re-spending it.** `plan_import` costs one request
+of that allowance; `get_import` re-reads the same plan for free. A client that dropped a
+`plan_import` response should come here rather than plan again.
 
 ---
 
@@ -301,6 +367,13 @@ or zero, by choice.
 - **Writes are reversible + audited.** The write tools deactivate, never hard-delete;
   every change stamps an audit block (who + when) and the locked guards fire even here —
   you can't remove yourself or the last admin.
+- **An assistant turn records that a MACHINE ran it.** `agent_chat` and `agent_confirm`
+  reach the same handler the in-app assistant does, and that handler used to stamp every
+  turn "in-app" — so a token-driven conversation was written into the team's history as
+  if somebody had typed it. It now records the calling surface, derived from the session
+  itself (a token's session is team-pinned; a browser's never is), so it is not something
+  a caller can state about itself in a header. Nothing about rights changed; what changed
+  is that after a leaked token, "did a token do this, or did a person?" has an answer.
 - **Revoke bites immediately.** The token is re-verified on every request, so revoking
   it stops the next call — even if a session was mid-flight.
 - **It runs out on its own.** Every token carries a deadline (90 days), checked beside

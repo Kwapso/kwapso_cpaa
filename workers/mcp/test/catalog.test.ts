@@ -45,6 +45,21 @@ describe("MCP catalog ↔ the real doors (no drift)", () => {
     }
   })
 
+  // The OWNER doors (x-admin-key: migrate a team's schema, seed the catalogue, grant
+  // credits, read the central error log) are protected structurally today — adminGuard
+  // demands a header forwardToDoor never sends, so a tool pointed at one would simply be
+  // refused. Structurally-safe is not the same as locked: nothing said a tool may not
+  // forward there, so the day someone adds the header for a good reason, the protection
+  // becomes a coincidence. The rule is that the machine surface has no owner doors on it
+  // at all, and this is where that is written down.
+  it("no tool on either surface forwards to an /admin/ door", () => {
+    for (const t of [...MCP_TOOLS, ...TOOL_CATALOG])
+      expect(
+        t.path.includes("/admin/"),
+        `${t.name} forwards to ${t.path} — owner-only maintenance is not a machine capability`
+      ).toBe(false)
+  })
+
   it("tools/list shape: every tool has a name, description, and an object schema", () => {
     for (const t of MCP_TOOLS) {
       expect(t.name).toMatch(/^[a-z_]+$/)

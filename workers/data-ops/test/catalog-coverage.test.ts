@@ -52,12 +52,28 @@ describe("catalog-coverage (R13): the catalogue reconciles itself against the co
     expect(body).not.toContain("DO UPDATE")
   })
 
-  it("the reconcile is reachable from BOTH doors (the picker + the by-key lookup)", () => {
-    expect(fnBody("getActiveCatalog"), "the picker heals on read").toMatch(/(?<![A-Za-z0-9_$.])reconcileCatalog\(/)
-    const byKey = fnBody("catalogByKey")
-    expect(byKey, "the by-key door heals on a miss").toMatch(/(?<![A-Za-z0-9_$.])reconcileCatalog\(/)
-    // …but only on a MISS — the per-import happy path pays nothing.
-    expect(byKey.search(/(?<![A-Za-z0-9_$.])reconcileCatalog\(/)).toBeGreaterThan(byKey.indexOf("await read()"))
+  // This case used to demand the heal from BOTH catalogue doors — the picker AND a
+  // by-key lookup. There is no by-key door any more: it existed only to start a
+  // single-target import session, and that whole flow was deleted once nothing on
+  // any surface still called it (no screen, no agent tool, no MCP tool). Every
+  // catalogue READ that survives goes through the picker, so the law's own sentence
+  // — "reconciles itself against the code on READ" — is fully covered by one door.
+  // If a second read door is ever added, it must heal too; this case is where that
+  // is said. NOT a coverage cut: the number of doors fell, not the fraction checked.
+  it("every catalogue read door heals on read (today: the picker)", () => {
+    const readDoors = ["getActiveCatalog"]
+    for (const d of readDoors)
+      expect(fnBody(d), `${d} must heal the catalogue on read`).toMatch(
+        /(?<![A-Za-z0-9_$.])reconcileCatalog\(/
+      )
+    // …and no catalogue read escaped the list: every function in lib/import.ts that
+    // SELECTs from the catalogue table is one of them.
+    const selectors = [...importSrc.matchAll(/function (\w+)[\s\S]{0,600}?FROM importable_databases/g)]
+      .map((m) => m[1])
+      .filter((n) => n !== "reconcileCatalog" && n !== "seedDefaultCatalog")
+    expect(selectors.sort(), "a catalogue reader that doesn't heal is a fresh environment with an empty picker").toEqual(
+      readDoors.sort()
+    )
   })
 
   it("the picker does NOT pre-filter is_active in SQL (off ≠ never-existed)", () => {

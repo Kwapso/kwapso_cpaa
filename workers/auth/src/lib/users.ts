@@ -16,7 +16,13 @@ export type UserRow = {
   deactivated_at: string | null
 }
 
-export function toSessionUser(row: UserRow): SessionUser {
+/** The session row's `team_pin` rides along (as `pinnedTeamId`) because it is the
+ * only honest way a downstream worker can tell a MACHINE caller from a person: a
+ * pinned session exists solely because the mcp worker bridged a verified token
+ * through `/internal/mcp-session`. A browser session never has one, and a browser
+ * cannot mint one — which is why this is read off the session rather than taken
+ * from a header the caller sets. A row with no pin (a fresh login) reads null. */
+export function toSessionUser(row: UserRow & { team_pin?: string | null }): SessionUser {
   return {
     id: row.id,
     email: row.email,
@@ -25,6 +31,7 @@ export function toSessionUser(row: UserRow): SessionUser {
     imageUrl: row.image_url,
     onboardingComplete: row.onboarding_completed_at !== null,
     currentTeamId: row.current_team_id ?? null,
+    pinnedTeamId: row.team_pin ?? null,
   }
 }
 
