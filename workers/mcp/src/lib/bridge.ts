@@ -8,6 +8,7 @@
 
 import { GuardError } from "../../../../shared/workers/gating"
 import type { Env } from "../env"
+import { requireStaff } from "./staff"
 import type { McpTokenRow } from "./tokens"
 
 const SESSION_COOKIE = "kwapso_session" // auth's cookie name (sessions.ts)
@@ -39,6 +40,13 @@ export async function sessionCookieFor(env: Env, token: McpTokenRow): Promise<st
   }
   const { token: session } = (await res.json()) as { token: string }
   const cookie = `${SESSION_COOKIE}=${session}`
+  // THE ONE PLACE A TOOL CALL GETS ITS HANDS ON A SESSION — so it is the one
+  // place worth asking whether this caller belongs on the machine surface at
+  // all. A client login is refused here rather than at each tool, because a
+  // per-tool check is a list, and a list is a thing you can be missing from.
+  // Nothing is cached until it passes, so a refused token pays the question
+  // again on its next call instead of holding a cookie it may not use.
+  await requireStaff(env, cookie)
   cache.set(token.id, { cookie, expires: Date.now() + CACHE_MS })
   return cookie
 }

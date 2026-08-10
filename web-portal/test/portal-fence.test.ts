@@ -6,13 +6,13 @@
 // red, ever. This suite is that promise, kept — and it is deliberately built to
 // catch the class of miss that produced it.
 //
-// TWO DESIGN CHOICES DO THE WORK:
+// THREE DESIGN CHOICES DO THE WORK:
 //
 // 1. THE TARGET SET IS DERIVED FROM THE PORTAL'S OWN DOOR TABLE. The registry's
 //    comment says the lesson was "enumerate by WHAT A CLIENT CAN REACH, never by
 //    what the account module happens to own" — but until this door existed there
 //    was no machine-readable answer to "what can a client reach". Now there is:
-//    workers/portal-gateway/src/index.ts. Every READ door named there is walked
+//    workers/portal-gateway/src/index.ts. Every door named there is walked
 //    through to the worker's ROUTES table, to the handler, to the lib functions
 //    the handler calls. Open a door tomorrow and its fence is demanded today.
 //
@@ -23,9 +23,22 @@
 //    that claimed to cover it. So each reachable function must itself touch the
 //    caller's stamp: its own declared fence, or the AccountScope it was handed.
 //
+// 3. A READ IS A READ WHATEVER VERB IT WEARS. This suite used to walk GET doors
+//    only — `if (!door.startsWith("GET "))` — and that is precisely why it sat
+//    green over the third leak: `POST /api/content/help` RAISES a ticket and
+//    ANSWERS WITH THE LIST, so a client's first question came back carrying
+//    every other client's tickets. It was never a GET, so it was never a target.
+//    Now every portal door is walked, GET and POST, and the discriminator is
+//    what the code DOES, not what the verb says: a reachable function that
+//    SELECTs rows must be declared and must carry the fence; one that only
+//    writes is a write (it stamps the caller's own row and has no list to leak).
+//    Reachability follows route-LOCAL helpers too — the leak lived inside
+//    `ticketPage`, a page builder the handler called, invisible to a walk that
+//    stopped at exported names.
+//
 // It cannot prove a fence is CORRECT — that is what the burglar suite in
 // workers/tenancy/test/account-leak.test.ts is for. It proves no portal-reachable
-// read is built without one, which is the failure that actually happened twice.
+// read is built without one, which is the failure that has now happened three times.
 
 import { readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
@@ -66,17 +79,52 @@ function workerOf(path: string): string | null {
   return WORKER_DIR[seg] ?? null
 }
 
-/** Every `export async function NAME` body in a directory, keyed by name — the
- * same source-indexing the burglar suite uses, so the two can't disagree about
- * what a handler's body is. */
+/** Every function body in a directory, keyed by name — exported or not. The
+ * private ones matter: a handler's rows are routinely assembled by a route-LOCAL
+ * page builder, and a walk that stopped at exported names could not see into the
+ * one that leaked (`ticketPage`). */
 function indexFunctions(dir: string): Map<string, string> {
   const out = new Map<string, string>()
   for (const file of readdirSync(dir).filter((f) => f.endsWith(".ts"))) {
     const code = read(join(dir, file))
-    const starts = [...code.matchAll(/export\s+async\s+function\s+(\w+)/g)]
+    const starts = [...code.matchAll(/(?:export\s+)?(?:async\s+)?function\s+(\w+)/g)]
     starts.forEach((m, i) => out.set(m[1], code.slice(m.index, starts[i + 1]?.index ?? code.length)))
   }
   return out
+}
+
+/** A handler's REACH: its own source plus every route-local helper it calls,
+ * followed transitively. Flattened to one string so every check below reads the
+ * whole of what the door actually runs, not just its top frame. */
+function reachOf(name: string, fns: Map<string, string>, seen = new Set<string>()): string {
+  if (seen.has(name) || seen.size > 6) return ""
+  seen.add(name)
+  const body = fns.get(name)
+  if (!body) return ""
+  let out = body
+  for (const other of fns.keys())
+    if (other !== name && new RegExp(`(?<![\\w.])${other}\\s*\\(`).test(body))
+      out += reachOf(other, fns, seen)
+  return out
+}
+
+/** Strip comments — a sentence ABOUT a SELECT is not a SELECT, and a note naming
+ * the fence must never stand in for calling it. */
+const code = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/gm, "$1")
+
+/** Does this function hand rows back — itself, or through a helper in the same
+ * file? That is what makes a fence load-bearing. A function that only INSERTs or
+ * UPDATEs stamps the caller's own row and has no collection to disclose. */
+function readsRows(fn: string, fns: Map<string, string>, seen = new Set<string>()): boolean {
+  if (seen.has(fn) || seen.size > 4) return false
+  seen.add(fn)
+  const body = fns.get(fn)
+  if (!body) return false
+  if (/\bSELECT\b/.test(code(body))) return true
+  for (const other of fns.keys())
+    if (other !== fn && new RegExp(`(?<![\\w.])${other}\\s*\\(`).test(body))
+      if (readsRows(other, fns, seen)) return true
+  return false
 }
 
 /** file → (function name → body) for one worker's lib/. EXPORTED functions are
@@ -128,21 +176,21 @@ function handlerFor(worker: string, door: string): string | null {
   return m ? m[1] : null
 }
 
-/** The READ doors the portal gateway names, walked to their handler bodies. */
+/** EVERY door the portal gateway names — GET and POST alike — walked to the full
+ * source its handler runs. A POST that answers with a page is a read. */
 function portalReadHandlers(): { door: string; worker: string; body: string }[] {
   const out: { door: string; worker: string; body: string }[] = []
   for (const door of Object.keys(PORTAL_DOORS)) {
-    if (!door.startsWith("GET ")) continue
-    const path = door.slice(4)
+    const path = door.slice(door.indexOf(" ") + 1)
     const worker = workerOf(path)
     // The realtime handshake returns no rows, and auth returns only the caller's
     // own identity — neither reads an account-owned table.
     if (!worker || worker === "realtime" || worker === "auth") continue
     const name = handlerFor(worker, door)
     expect(name, `${door} is named by the portal door but has no handler in workers/${worker}`).toBeTruthy()
-    const body = indexFunctions(join(ROOT, "workers", worker, "src", "routes")).get(name as string)
-    expect(body, `handler ${name} for ${door} not found in workers/${worker}/src/routes`).toBeTruthy()
-    out.push({ door, worker, body: body as string })
+    const routeFns = indexFunctions(join(ROOT, "workers", worker, "src", "routes"))
+    expect(routeFns.has(name as string), `handler ${name} for ${door} not found in workers/${worker}/src/routes`).toBe(true)
+    out.push({ door, worker, body: reachOf(name as string, routeFns) })
   }
   return out
 }
@@ -152,18 +200,36 @@ describe("portal fence — every read a client can reach carries the fence", () 
 
   // Guard the derivation itself: a walk that silently found nothing would pass
   // every assertion below and prove exactly nothing.
-  it("derives real read doors from the portal gateway's own table", () => {
+  it("derives real doors from the portal gateway's own table — POSTs included", () => {
     expect(handlers.length).toBeGreaterThanOrEqual(3)
     expect(handlers.map((h) => h.door)).toContain("GET /api/content/help/thread")
     expect(handlers.map((h) => h.door)).toContain("GET /api/tenancy/accounts/detail")
+    // The door the GET-only walk could not see. A write that answers with a
+    // collection is a read; keep it in the target set by name so the derivation
+    // can never quietly narrow back.
+    expect(handlers.map((h) => h.door)).toContain("POST /api/content/help")
+    expect(handlers.map((h) => h.door)).toContain("POST /api/content/help/reply")
   })
 
-  it("every lib file a portal read touches is declared in PORTAL_VISIBLE_READS", () => {
+  // Reachability follows route-local helpers, so the check sees what the door
+  // actually runs. Guarded here because a broken walk would silently pass
+  // everything below — which is exactly how the leak survived.
+  it("sees through a route-local page builder into the lib it reads with", () => {
+    const raise = handlers.find((h) => h.door === "POST /api/content/help")
+    expect(raise, "POST /api/content/help must be a target").toBeTruthy()
+    expect(
+      /(?<![\w.])listTickets\s*\(/.test((raise as { body: string }).body),
+      "the reach of POST /api/content/help must include the ticket list it answers with"
+    ).toBe(true)
+  })
+
+  it("every lib file a portal READ touches is declared in PORTAL_VISIBLE_READS", () => {
     const undeclared: string[] = []
     for (const { door, worker, body } of handlers) {
-      for (const [file, { exported }] of indexLib(worker)) {
+      for (const [file, { exported, all }] of indexLib(worker)) {
         for (const fn of exported.keys()) {
           if (!new RegExp(`(?<![\\w.])${fn}\\s*\\(`).test(body)) continue
+          if (!readsRows(fn, all)) continue // a pure write has no collection to leak
           if (!(file in PORTAL_VISIBLE_READS)) undeclared.push(`${door} → ${file} (${fn})`)
         }
       }
@@ -182,9 +248,10 @@ describe("portal fence — every read a client can reach carries the fence", () 
         if (!declared || declared.fence === null) continue // a reasoned exemption is a reviewed line
         for (const fn of exported.keys()) {
           if (!new RegExp(`(?<![\\w.])${fn}\\s*\\(`).test(body)) continue
+          if (!readsRows(fn, all)) continue
           // A function that reaches NEITHER the declared fence nor an AccountScope
           // is reading a caller-supplied id with nothing on the WHERE but that id
-          // — the exact shape of both leaks found so far.
+          // — the exact shape of all three leaks found so far.
           if (!carriesFence(fn, all, declared.fence)) naked.push(`${file} → ${fn}()  [reached by ${door}]`)
         }
       }

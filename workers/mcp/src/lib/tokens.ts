@@ -54,8 +54,8 @@ export async function createToken(
   const expiresAt = new Date(now.getTime() + MCP_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString()
   // The cap RIDES THE WRITE (CONCURRENCY.md): counting first and inserting after
   // lets a burst of clicks — or a script — put any number of live keys on one
-  // account, which is exactly what buries a token past the list cap. Zero rows
-  // inserted = the account is full.
+  // person, which is exactly what buries a token past the list cap. Zero rows
+  // inserted = that person is full.
   const res = await env.DB.prepare(
     `INSERT INTO mcp_tokens (id, user_id, team_id, label, token_hash, created_at, expires_at)
      SELECT ?, ?, ?, ?, ?, ?, ?
@@ -92,7 +92,7 @@ export async function createToken(
  * a hard ceiling (R14), and revoked history is the one thing that grows without
  * limit here — sorted by date alone, a long-lived token could be pushed past the
  * ceiling by its owner's own churn and become impossible to revoke from the app.
- * Unrevoked rows sort first, newest first inside each group, and an account may
+ * Unrevoked rows sort first, newest first inside each group, and one person may
  * hold only MAX_ACTIVE_MCP_TOKENS_PER_USER live ones — so a usable token is
  * always on the first page, always revocable by id. */
 export async function listTokens(env: Env, userId: string): Promise<McpTokenRow[]> {

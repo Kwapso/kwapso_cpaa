@@ -6,6 +6,11 @@
 //                                   Auth: `Authorization: Bearer <token>` — a
 //                                   personal access token, verified on EVERY
 //                                   request, bridged to a team-pinned session.
+//
+// THIS SURFACE IS THE AGENCY'S, not its clients'. A client-portal login is an
+// ordinary team member by construction, so "signed in" never distinguished them
+// — both doors that hand out power (minting a token, and acting with one) ask
+// tenancy which kind of caller this is first. See lib/staff.ts.
 //   GET  /api/mcp/tokens         -> the signed-in caller's tokens (never hashes)
 //   POST /api/mcp/tokens         -> create one (label; pinned to the CURRENT team;
 //                                   the secret is returned ONCE)
@@ -25,6 +30,7 @@ import { recordWorkerError } from "../../../shared/workers/error-log"
 import type { Env } from "./env"
 import { createToken, listTokens, revokeToken, verifyToken } from "./lib/tokens"
 import { dropCachedSession, sessionCookieFor } from "./lib/bridge"
+import { requireStaff } from "./lib/staff"
 import { forwardTool, getMcpTool, MCP_TOOLS } from "./lib/tools"
 
 const PROTOCOL_VERSION = "2025-06-18"
@@ -122,6 +128,10 @@ async function postToken(request: Request, env: Env): Promise<Response> {
   const user = await requireUser(request, env)
   if (!user.currentTeamId)
     return fail(409, "no_team", "Pick a team first — a token is pinned to one team.")
+  // A CLIENT LOGIN MINTS NOTHING. They are a team member by construction, so
+  // "signed in" was never the question — see lib/staff.ts. Asked with the
+  // caller's OWN cookie, before the label is even read.
+  await requireStaff(env, request.headers.get("Cookie") ?? "")
   const body = (await request.json().catch(() => ({}))) as { label?: unknown }
   const label = requireText(body.label, "Name", TEXT_LIMITS.short)
   const { row, secret } = await createToken(env, user.id, user.currentTeamId, label)

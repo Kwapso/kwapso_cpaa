@@ -12,6 +12,7 @@
 // right on the matrix and still reach exactly one account's data.
 
 import { fail, json, pagedJson } from "../../../../shared/workers/http"
+import { csvResponse, toCsv } from "../../../../shared/workers/csv"
 import { optionalText, queryText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
 import { publishChange } from "../../../../shared/workers/realtime"
 import { gated, gatedBody, openTeam } from "../../../../shared/workers/route"
@@ -26,6 +27,7 @@ import {
   grantPortalAccess,
   linkPerson,
   listAccounts,
+  listAccountsForExport,
   listPortalUsers,
   countPortalUsers,
   portalStandings,
@@ -76,6 +78,29 @@ export async function getAccounts(request: Request, env: Env): Promise<Response>
     cursor: queryText(url.searchParams.get("cursor"), "Cursor") ?? null,
   })
   return pagedJson("accounts", page)
+}
+
+/** GET /api/tenancy/accounts/export — the caller's accounts as a full-field CSV
+ * (EXPORT NEEDS READ, like every other export door). Same gate, same fence, same
+ * rows as the list — a machine caller pulls the whole book in one call exactly
+ * as the Export CSV button does, and a client login pulls only their own. */
+export async function getAccountsExport(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "accounts", "read")
+  const scope = await accountScope(cfg, guard)
+  const rows = await listAccountsForExport(cfg, guard, scope)
+  const csv = toCsv(
+    [
+      "name", "accountType", "code", "email", "phone", "address", "status",
+      "parent_account_id", "currency", "locale", "timezone", "commercials_visible",
+      "active", "created_at", "created_by", "updated_at", "updated_by",
+    ],
+    rows.map((r) => [
+      r.name, r.accountType, r.code, r.email, r.phone, r.address, r.status,
+      r.parentAccountId, r.currency, r.locale, r.timezone, r.commercialsVisible,
+      r.active, r.createdAt, r.createdByName, r.updatedAt, r.editedByName,
+    ])
+  )
+  return csvResponse("accounts.csv", csv)
 }
 
 /** GET /api/tenancy/accounts/detail?id= — one account, its people, its logins. */
@@ -318,13 +343,24 @@ export async function postPortalAccessActive(request: Request, env: Env): Promis
   return json({ ok: true })
 }
 
-/** GET /api/tenancy/portal/context — where this client login may stand and where
- * they stand now. Staff get an empty list, which is the honest answer: the
- * switcher is a client-side idea and there is nothing for staff to switch. */
+/** GET /api/tenancy/portal/context — WHAT KIND of caller this is, where they may
+ * stand, and where they stand now. Staff get an empty list, which is the honest
+ * answer: the switcher is a client-side idea and there is nothing for staff to
+ * switch.
+ *
+ * `kind` is the part another worker needs, and the reason it is here: an empty
+ * list is AMBIGUOUS. Staff answer with nothing; so does a client whose access
+ * was revoked, and so does one with no company yet. Any caller reading emptiness
+ * as "staff" would fail OPEN on exactly the people the fence exists for — the
+ * inversion `accountScope` warns about in its own header ("portal-ness is decided
+ * by the PRESENCE of a portal_users row, never by its absence"). So the door says
+ * which it is, out loud, and the machine surface asks THIS rather than inventing
+ * a second opinion: `portal_users` lives in the team database, and tenancy is the
+ * worker that owns the fence. */
 export async function getPortalContext(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await teamContext(request, env)
   const scope = await accountScope(cfg, guard)
-  return json(await portalStandings(cfg, guard, scope))
+  return json({ kind: scope.kind, ...(await portalStandings(cfg, guard, scope)) })
 }
 
 /** POST /api/tenancy/portal/switch-account — a client login moves to another of
@@ -343,8 +379,10 @@ export async function postSwitchPortalAccount(request: Request, env: Env): Promi
   const scope = await accountScope(cfg, guard)
   await switchPortalAccount(cfg, guard, scope, accountId)
   // Re-resolve rather than patch the old stamp: the fence the next request will
-  // use is the one worth answering with.
-  return json(await portalStandings(cfg, guard, await accountScope(cfg, guard)))
+  // use is the one worth answering with. Same shape as the context door — one
+  // response type, so a client never has to know which call it came from.
+  const after = await accountScope(cfg, guard)
+  return json({ kind: after.kind, ...(await portalStandings(cfg, guard, after)) })
 }
 
 /** Identity lives in the GLOBAL users table and is never mirrored into a team

@@ -114,7 +114,7 @@ export async function listStakeholders(
   env: Env,
   guard: MemberGuard,
   ticketId: string,
-  portal = false
+  portal: boolean
 ): Promise<HelpStakeholder[]> {
   // Best origin wins per user id (lowest rank).
   const origin = new Map<string, StakeholderOrigin>()
@@ -188,7 +188,7 @@ export async function addStakeholder(
   actor: Actor,
   ticketId: string,
   userId: string,
-  portal = false
+  portal: boolean
 ): Promise<HelpStakeholder[]> {
   // The ticket must be VISIBLE to this caller (reuse the fenced getTicket) and
   // the target must be on this team.

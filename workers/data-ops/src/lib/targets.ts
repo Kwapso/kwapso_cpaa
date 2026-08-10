@@ -176,6 +176,12 @@ export const TARGETS: Record<string, TargetDef> = {
       { key: "status", label: "Status", required: false },
     ],
     endpoint: { binding: "TENANCY", path: "/api/tenancy/accounts" },
+    // Accounts could be imported and never exported — a one-way street through
+    // the module the whole product is about. The catalogue's own parity guard
+    // could not catch it: it asserts every DECLARED exportPath is a tool, so an
+    // absent one passed vacuously. Declaring it here is what puts the export in
+    // the agent's capability brief AND on the machine surface, in one line.
+    exportPath: "/api/tenancy/accounts/export",
     naturalKey: "name",
     sample: {
       name: "Bergman S.A.",

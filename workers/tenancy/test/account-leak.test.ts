@@ -120,6 +120,13 @@ const BURGLARIES: Burglary[] = [
     expect: "nothing",
   },
   {
+    route: "GET /api/tenancy/accounts/export",
+    why: "skip the paged list entirely and download the whole book as one CSV",
+    attack: () => req("GET /api/tenancy/accounts/export"),
+    honest: () => req("GET /api/tenancy/accounts/export"),
+    expect: "nothing",
+  },
+  {
     route: "GET /api/tenancy/accounts/detail",
     why: "open the victim's record by id",
     attack: () => req("GET /api/tenancy/accounts/detail", undefined, `?id=${IDS.victimAccount}`),
