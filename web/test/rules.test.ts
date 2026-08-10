@@ -16,12 +16,14 @@ import {
   FORM_DIALOGS,
   GROWING_COLLECTIONS,
   RECORD_DETAIL_COMPONENTS,
+  RECORD_TAB_COUNT_EXCEPTIONS,
   RULES_REGISTRY,
   TAB_COUNT_EXCEPTIONS,
 } from "@shared/rules/registry"
+import { formatCount } from "../lib/format-count"
 import { SIMPLE_INVALIDATIONS, TEAM_RESOURCES } from "../lib/live-resources"
 import { TEAM_SECTIONS } from "../lib/pages"
-import { BASE_RECIPES } from "../lib/screens"
+import { BASE_RECIPES, tabCountKey, withTabCounts } from "../lib/screens"
 
 /** Every worker's src .ts file (recursively), as [repo-relative path, source]. */
 function workerSources(): [string, string][] {
@@ -111,11 +113,11 @@ describe("RULES — the laws of the base", () => {
     }
   })
 
-  // R8 — every team collection tab derives its count from its loaded rows. A
-  // placement:"tab" section that shows a collection MUST declare a countCacheKey
-  // (so the badge is derived, never a forgotten hand-listed key), AND the host
-  // must build the counts by iterating that field — not a per-key literal.
-  it("tab-counts-derived: every collection tab declares a countCacheKey, derived generically", () => {
+  // R8, surface ONE — the TEAM section strip. A placement:"tab" section that
+  // shows a collection MUST declare a countCacheKey (so the badge is derived,
+  // never a forgotten hand-listed key), AND the host must build the counts by
+  // iterating that field — not a per-key literal.
+  it("tab-counts-derived: every team collection tab declares a countCacheKey, derived generically", () => {
     for (const s of TEAM_SECTIONS) {
       if (s.placement !== "tab") continue
       if (s.countCacheKey === undefined) {
@@ -131,6 +133,85 @@ describe("RULES — the laws of the base", () => {
     // hand-listed per-section literal can creep back in.
     const src = read(join(WEB, "components", "deep-link-screen.tsx"))
     expect(src, "deep-link-screen must derive tab counts from countCacheKey").toContain("s.countCacheKey")
+  })
+
+  // R8, surface TWO — a RECORD's OWN tabs. The team strip is not the only tab
+  // strip in the app: every record detail carries one too, built somewhere else
+  // entirely (recipe data for the engine details, a tabs config for the bespoke
+  // ones) — which is exactly how every record in the app shipped an Activity tab
+  // with no count at all while surface one stayed green. Same law, both surfaces:
+  // a tab that reveals a collection carries its count; a tab that shows the
+  // record itself says so once, in RECORD_TAB_COUNT_EXCEPTIONS, with a reason.
+  it("tab-counts-derived: every record-detail collection tab carries its count", () => {
+    // (a) ENGINE-RECIPE details — which tabs are collections is DERIVED from each
+    // tab's own block (tabCountKey), and the withTabCounts seam badges exactly
+    // those. Run the seam rather than reading it: a badge the seam fails to apply
+    // is the whole bug, and source text can't tell us it applied.
+    let countedRecipeTabs = 0
+    for (const [key, recipe] of Object.entries(BASE_RECIPES)) {
+      if (recipe.type !== "detail" || !recipe.tabs) continue
+      const collections = recipe.tabs.map(tabCountKey).filter((k): k is string => k !== null)
+      const badged = withTabCounts(recipe, Object.fromEntries(collections.map((k) => [k, 42])))
+      for (const tab of badged.tabs ?? []) {
+        if (tabCountKey(tab) === null) {
+          expect(
+            RECORD_TAB_COUNT_EXCEPTIONS[`${key}.${tab.key}`],
+            `${key} tab "${tab.key}" shows no collection → say so once, as a reviewed RECORD_TAB_COUNT_EXCEPTIONS entry`
+          ).toBeTruthy()
+          continue
+        }
+        countedRecipeTabs++
+        expect(
+          tab.badge,
+          `${key} tab "${tab.key}" reveals a collection → it must carry that collection's count`
+        ).toBe(formatCount(42))
+      }
+    }
+    // Tripwire: a scan that finds no counted tabs has gone blind, and a blind
+    // check reports "all clear" exactly like a passing one.
+    expect(countedRecipeTabs, "the recipe-tab scan found no collection tabs — it has gone blind").toBeGreaterThan(2)
+
+    // …and the HOST must actually badge every detail it renders — a seam nothing
+    // calls is dead code wearing a law's clothes. One withTabCounts per rendered
+    // detail recipe, counted both ways so neither can drift.
+    const host = read(join(WEB, "components", "deep-link", "module-content.tsx"))
+    const rendered = [...host.matchAll(/resolveRecipe\("[a-z]+\.detail"/g)].length
+    expect(rendered, "the host renders no detail recipes — the scan has gone blind").toBeGreaterThan(2)
+    expect(
+      [...host.matchAll(/withTabCounts\(/g)].length,
+      `the host renders ${rendered} detail recipes but badges fewer — every detail's tabs go through withTabCounts`
+    ).toBe(rendered)
+    // R16 owns the NUMBER: the seam abbreviates through the one formatCount path.
+    expect(read(join(WEB, "lib", "screens.ts")), "withTabCounts must render the number through formatCount").toContain(
+      "formatCount"
+    )
+
+    // (b) BESPOKE details — host-composed tabs configs. Their panels are JSX, so
+    // "does this tab reveal a collection?" can't be derived off disk: every tab
+    // must therefore carry a badge OR be a reviewed exception. Reading the tabs
+    // out of the source (not a hand-list) is what makes a NEW tab arrive already
+    // held to the law.
+    for (const c of RECORD_DETAIL_COMPONENTS) {
+      const src = read(join(WEB, "components", `${c}.tsx`))
+      const tabs = [...src.matchAll(/\{\s*value: "([a-z-]+)",[\s\S]{0,300}?badge: ([^,\n]+),/g)]
+      expect(tabs.length, `${c}: the tab scan found no tabs — it has gone blind`).toBeGreaterThan(2)
+      let counted = 0
+      for (const [, value, badge] of tabs) {
+        if (badge.trim() !== '""') {
+          counted++
+          continue
+        }
+        expect(
+          RECORD_TAB_COUNT_EXCEPTIONS[`${c}.${value}`],
+          `${c} tab "${value}" carries no count → badge it from the door's exact total, or pin it (with a reason) in RECORD_TAB_COUNT_EXCEPTIONS`
+        ).toBeTruthy()
+      }
+      // R16 owns the NUMBER here too — a counted bespoke tab goes through the seam.
+      if (counted > 0)
+        expect(src, `${c} badges a tab → the number must come through the formatCount seam (R16)`).toContain(
+          "format-count"
+        )
+    }
   })
 
   // R5 — record activity is read through the ONE generic (table, id) path.

@@ -7,7 +7,7 @@
 // module is the friendly URL segment used in the deep-link grammar
 // (/t/<teamId>/<module>/<id>).
 
-import type { RecipeAction, RecipeField, ScreenRecipe } from "@kwapso/ui/lib/recipe"
+import type { RecipeAction, RecipeField, RecipeTab, ScreenRecipe } from "@kwapso/ui/lib/recipe"
 import {
   defaultCollectionConfig,
   defaultFieldConfig,
@@ -16,6 +16,7 @@ import {
 } from "@kwapso/ui/lib/config"
 
 import { CONCEPT_ICON } from "@/lib/pages"
+import { formatCount } from "@/lib/format-count"
 
 /** A plain text column/field for a recipe (label only — the host supplies the
  * already-formatted value in the row/record). */
@@ -374,6 +375,43 @@ export function withDataDrivenCollection(
   return {
     ...recipe,
     collection: { ...collection, searchable: true, userFilter: facets.length > 0, filterFacets: facets },
+  }
+}
+
+/** LAW R8, the record-detail half — WHICH collection a detail tab reveals, read
+ * off the tab's OWN block rather than a hand-kept list of tab keys:
+ *
+ *   • `activity` → the feed it names (`block.source`)
+ *   • `list`     → the module it binds to (`block.binding.module`)
+ *   • anything else (a `description` / `fields` block) → the record ITSELF, so
+ *     there is no collection and no count (each one pinned, with its reason, in
+ *     RECORD_TAB_COUNT_EXCEPTIONS).
+ *
+ * Derived, so a new tab is classified by what it renders — never by someone
+ * remembering to add its key somewhere. */
+export function tabCountKey(tab: RecipeTab): string | null {
+  if (tab.block.kind === "activity") return tab.block.source
+  if (tab.block.kind === "list") return tab.block.binding.module
+  return null
+}
+
+/** Badge a detail recipe's collection tabs with their EXACT server totals (LAW
+ * R8 for the place, LAW R16 for the number — `formatCount` is the one seam, and
+ * an absent/zero total renders nothing rather than a "0" that reads as empty
+ * while the rows are still on their way). `totals` is keyed by the collection
+ * `tabCountKey` names, so the host supplies numbers without knowing tab keys.
+ * A fresh copy — the base recipe is never mutated. */
+export function withTabCounts(
+  recipe: ScreenRecipe,
+  totals: Record<string, number | undefined>
+): ScreenRecipe {
+  if (!recipe.tabs?.length) return recipe
+  return {
+    ...recipe,
+    tabs: recipe.tabs.map((tab) => {
+      const key = tabCountKey(tab)
+      return key === null ? tab : { ...tab, badge: formatCount(totals[key]) }
+    }),
   }
 }
 

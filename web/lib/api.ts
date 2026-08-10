@@ -398,11 +398,16 @@ export const tenancy = {
     ),
 
   /** One record's activity slice (generic — any module's rows by table+id; e.g.
-   * a help ticket's history). Gated server-side by that module's read right. */
-  recordActivity: (table: string, id: string): Promise<ActivityItem[]> =>
-    api<{ activity: ActivityItem[] }>(
+   * a help ticket's history). Gated server-side by that module's read right.
+   * The door answers through the same paged seam as every other activity scope,
+   * so the exact COUNT(*) rides along — R8/R16: the record's Activity TAB badges
+   * that total, never the loaded page's length. Kept as the whole response
+   * rather than unwrapped to the rows: dropping `total` here is what left every
+   * record's Activity tab with no count for want of a number already on the wire. */
+  recordActivity: (table: string, id: string) =>
+    api<PagedResponse<{ activity: ActivityItem[] }>>(
       `/api/tenancy/activity?scope=record&table=${encodeURIComponent(table)}&id=${encodeURIComponent(id)}`
-    ).then((r) => r.activity),
+    ),
 
   /** The active team's Overview metadata (created by/when, last updated). */
   teamMeta: () => api<TeamMeta>("/api/tenancy/team-meta"),

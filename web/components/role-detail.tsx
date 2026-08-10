@@ -44,13 +44,15 @@ import {
 } from "@kwapso/ui/registry/collections/activity-feed/activity-feed"
 import { Lock, Pencil, Power } from "lucide-react"
 
-import type { ActivityItem, PermissionValue, RolePermissions, TeamRole } from "@shared/types"
+import type { PermissionValue, RolePermissions, TeamRole } from "@shared/types"
 import { RoleFormDialog } from "@/components/role-form-dialog"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
 import { formatActivityWhen } from "@/lib/format"
+import { formatCount } from "@/lib/format-count"
 import { usePermissions } from "@/lib/perms"
 import { primeCache, useCached } from "@/lib/store"
+import { useRecordActivity } from "@/lib/use-record-activity"
 
 export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: string }) {
   const rolesQ = useCached<TeamRole[]>(`member_roles:${teamId}`, () =>
@@ -71,9 +73,9 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
 
   // The generic record feed (Law R5): every role action lands here — created,
   // details edited, permissions changed, deactivated — including imported roles.
-  const activityQ = useCached<ActivityItem[]>(`activity:record:member_roles:${roleId}`, () =>
-    tenancy.recordActivity("member_roles", roleId)
-  )
+  // `total` is the door's exact COUNT(*), badged on the tab (R8) through the one
+  // formatCount seam (R16) — never the loaded page's length.
+  const activity = useRecordActivity("member_roles", roleId)
 
   // A deactivated role's permissions are frozen + not fetchable (the server 404s
   // it) — only load the matrix for an active role.
@@ -169,7 +171,7 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
     }),
   ]
 
-  const activityItems: ActivityFeedItem[] = (activityQ.data ?? []).map((a) => ({
+  const activityItems: ActivityFeedItem[] = activity.rows.map((a) => ({
     id: a.id,
     description: a.description,
     actor: a.actorName ?? undefined,
@@ -182,7 +184,13 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
     tabs: [
       { value: "permissions", label: "Permissions", icon: "shield-check", badge: "", badgeVariant: "" as const },
       { value: "overview", label: "Overview", icon: "info", badge: "", badgeVariant: "" as const },
-      { value: "activity", label: "Activity", icon: "history", badge: "", badgeVariant: "" as const },
+      {
+        value: "activity",
+        label: "Activity",
+        icon: "history",
+        badge: formatCount(activity.total),
+        badgeVariant: "" as const,
+      },
     ],
   }
 

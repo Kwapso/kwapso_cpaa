@@ -212,7 +212,7 @@ code. The UI laws:
 | **R4** | Every form/dialog renders through the shared **`FormShell`**. | `forms-use-formshell` |
 | **R6** | Product terms live in **ONE glossary** — the app speaks one dictionary. | `glossary-wellformed` |
 | **R7** | Every form dialog persists its draft per session (**`useFormDraft`**). | `forms-persist-drafts` |
-| **R8** | Every team collection tab derives its **count from its loaded rows** (declares a `countCacheKey`). | `tab-counts-derived` |
+| **R8** | Every tab that reveals a collection carries its count — the **team** strip (a `countCacheKey`) *and* a **record's own** tabs. | `tab-counts-derived` |
 
 (`R1` and `R5` are the arch/data laws — mutations publish a live change; activity is
 read through one generic path — covered in CACHING.md / DATA-MODEL.md. `R5`'s web half
@@ -311,12 +311,24 @@ back filled. Every form dialog persists via **`useFormDraft`** (backed by
 dismiss (Esc / backdrop / close); *preserved* on navigation. The check mirrors R4 —
 each `FORM_DIALOGS` entry must contain `useFormDraft`. See CACHING.md §11.
 
-### R8 — tab counts derive from rows
+### R8 — every tab that reveals a collection carries its count
 
-A team collection tab's badge is the length of the rows it shows — never a hand-typed
-number that can drift. Any `placement: "tab"` section that leads with a collection
-must declare a **`countCacheKey`** (`web/lib/pages.ts`), and the host builds every
-badge by *iterating* that field:
+There are **two** tab strips in this app, and the law covers both: the **team section
+strip** (Overview · Members · Roles · Invites) and the tabs on **one record's own
+screen** (Overview · Activity, plus whatever that record adds). A tab that shows a
+collection carries that collection's count; a tab that shows the record itself
+(Overview, an article's prose, the permission grid) carries none — and says so once,
+with its reason, in **`RECORD_TAB_COUNT_EXCEPTIONS`**.
+
+*(This half was learned the hard way: the check walked `TEAM_SECTIONS` only, so the
+team strip stayed honest while every record in the app shipped an Activity tab with
+no count at all — the record tabs were built somewhere else entirely.)*
+
+#### The team strip
+
+Any `placement: "tab"` section that leads with a collection must declare a
+**`countCacheKey`** (`web/lib/pages.ts`), and the host builds every badge by
+*iterating* that field:
 
 ```ts
 // web/components/deep-link-screen.tsx
@@ -332,6 +344,36 @@ a reasoned `TAB_COUNT_EXCEPTIONS` entry), *and* `deep-link-screen.tsx` still der
 badges generically (it must contain `s.countCacheKey`, so no per-section literal can
 creep back). Reviewed exceptions: `overview` (leads with team metadata, not a
 collection) and `import` (a contextual per-target action, not a tab).
+
+#### A record's own tabs
+
+**Engine-recipe details** (`team.detail`, `members.detail`, `invites.detail`) are data,
+so *which* tab is a collection is read off the tab's **own block** — never a list of tab
+keys someone has to remember:
+
+```ts
+// web/lib/screens.ts
+export function tabCountKey(tab: RecipeTab): string | null {
+  if (tab.block.kind === "activity") return tab.block.source        // the feed it names
+  if (tab.block.kind === "list") return tab.block.binding.module    // the module it binds
+  return null                                                       // the record itself
+}
+```
+
+The host badges them through the **`withTabCounts(recipe, totals)`** seam at every
+detail render (`module-content.tsx`), keyed by what `tabCountKey` names — so a host
+supplies numbers without knowing tab keys, and the check asserts one `withTabCounts`
+per rendered detail recipe (a seam nothing calls is dead code wearing a law's clothes).
+
+**Bespoke details** (`role-detail`, `learning-detail`, `help-detail`) build their own
+tabs config, so the check reads the tabs **out of the source** and requires each one to
+carry a badge or be a reviewed exception. Their counts come from the one generic record
+read, **`useRecordActivity(table, id)`** (`web/lib/use-record-activity.ts`), which
+returns page one's rows *and* the door's exact `total` — the feed is paged, so the
+loaded rows' length is a ceiling, not a total.
+
+The **number** is always R16's: `formatCount(total)`, so zero and still-loading render
+nothing rather than a "0" that reads as "nothing ever happened here".
 
 ### How the whole scheme is keystoned — `registry-integrity`
 
@@ -541,7 +583,10 @@ alive underneath — that's the "immovable, contentless page" feel.
 - [ ] Any tab strip / toggle uses the library **`TabsView`** (R3) — no `variant={x===y?…}`.
 - [ ] New form? Through **`FormShell`** (R4) *and* **`useFormDraft`** (R7), added to
       `FORM_DIALOGS`.
-- [ ] New collection tab? Declares a **`countCacheKey`** (R8).
+- [ ] New collection tab? A team tab declares a **`countCacheKey`**; a **record-detail**
+      tab carries its collection's count (recipe → `withTabCounts`; bespoke → its own
+      badge). A tab that shows no collection earns a reasoned
+      **`RECORD_TAB_COUNT_EXCEPTIONS`** line (R8).
 - [ ] Every new product word is in **`shared/glossary.ts`** (R6) — one term, one brief
       definition — and the copy uses it.
 - [ ] Action buttons carry the **right icon** (Pencil / Power / UserMinus / Ban / Plus /
