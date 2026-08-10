@@ -139,7 +139,7 @@ export async function postUpdateTeam(request: Request, env: Env): Promise<Respon
     relatedTable: "teams",
     relatedRowId: guard.teamId,
   })
-  await publishChange(env.REALTIME, guard.teamId, "team")
+  await publishChange(env, guard.teamId, "team")
   return json({ ok: true })
 }
 

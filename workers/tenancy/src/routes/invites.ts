@@ -33,7 +33,7 @@ export async function postCreateInvite(request: Request, env: Env): Promise<Resp
     env, cfg, guard, actor, body.email, body.roleId, request
   )
   // Row-level: carry the new invite's id so open invite lists patch just that row.
-  await publishChange(env.REALTIME, guard.teamId, "invites", inviteId, "add")
+  await publishChange(env, guard.teamId, "invites", inviteId, "add")
   // `emailSent` first + honest: the invite always succeeds (the row routes acceptance),
   // but the branded email is best-effort — the client + the agent report the real outcome.
   return json({ emailSent, invites: await listInvites(env, cfg, guard), total: await countInvites(env, guard) })
@@ -47,7 +47,7 @@ export async function postRevokeInvite(request: Request, env: Env): Promise<Resp
   await revokeInvite(env, cfg, guard, actor, body.inviteId)
   // Revoke is an in-place edit (the row stays, status → 'revoked'), so re-pulling
   // this one id keeps the list live without a full refetch.
-  await publishChange(env.REALTIME, guard.teamId, "invites", body.inviteId, "edit")
+  await publishChange(env, guard.teamId, "invites", body.inviteId, "edit")
   return json({ invites: await listInvites(env, cfg, guard), total: await countInvites(env, guard) })
 }
 

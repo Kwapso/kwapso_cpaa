@@ -81,7 +81,7 @@ export async function postCreateHelp(request: Request, env: Env): Promise<Respon
   const { actor, cfg, guard, body } = await gatedBody<TicketInput>(request, env, "help", "create")
   const description = requireText(body.description, "Description", TEXT_LIMITS.long)
   const id = await createTicket(cfg, guard, actor, body)
-  await publishChange(env.REALTIME, guard.teamId, "help", id, "add")
+  await publishChange(env, guard.teamId, "help", id, "add")
   // HOOK (Phase 3): the agent drafts the first reply here; a no-op today, so the
   // ticket simply opens awaiting a human (per "ticket always opens").
   await maybeDraftFirstReply(cfg, guard, id, description)
@@ -94,7 +94,7 @@ export async function postUpdateHelp(request: Request, env: Env): Promise<Respon
   if (!body.id) return fail(400, "invalid_input", "id and description are required.")
   requireText(body.description, "Description", TEXT_LIMITS.long)
   await updateTicket(cfg, guard, actor, body.id, body)
-  await publishChange(env.REALTIME, guard.teamId, "help", body.id)
+  await publishChange(env, guard.teamId, "help", body.id)
   return ticketPage(cfg, guard, "all")
 }
 
@@ -111,7 +111,7 @@ export async function postHelpStatus(request: Request, env: Env): Promise<Respon
 
   // R17: already at that status → zero rows moved → no ping, no duplicate history.
   const changed = await setStatus(cfg, guard, actor, body.id, status)
-  if (changed) await publishChange(env.REALTIME, guard.teamId, "help", body.id)
+  if (changed) await publishChange(env, guard.teamId, "help", body.id)
   return ticketPage(cfg, guard, "all")
 }
 
@@ -142,7 +142,7 @@ export async function postBulkHelpStatusByFilter(request: Request, env: Env): Pr
     cfg, guard, actor, filter, body.toStatus as HelpStatus, body.dryRun === true
   )
   // ONE coarse list-ping for the whole set — and only when something moved.
-  if (result.changed > 0) await publishChange(env.REALTIME, guard.teamId, "help")
+  if (result.changed > 0) await publishChange(env, guard.teamId, "help")
   return json(result)
 }
 
@@ -161,7 +161,7 @@ export async function postBulkHelpStatus(request: Request, env: Env): Promise<Re
   const { changed, skipped } = await bulkSetStatus(cfg, guard, actor, ids, body.status as HelpStatus)
   // Row-level live-sync: one ping per changed ticket (same row shape the single
   // endpoint patches) — no list refetch.
-  for (const id of changed) await publishChange(env.REALTIME, guard.teamId, "help", id)
+  for (const id of changed) await publishChange(env, guard.teamId, "help", id)
   return json({ updated: changed.length, skipped })
 }
 
@@ -187,8 +187,8 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
     : []
 
   const replyId = await addReply(cfg, guard, actor, body.helpId, replyBody, tagged, false)
-  await publishChange(env.REALTIME, guard.teamId, "help_threads", replyId, "add")
-  await publishChange(env.REALTIME, guard.teamId, "help", body.helpId, "edit")
+  await publishChange(env, guard.teamId, "help_threads", replyId, "add")
+  await publishChange(env, guard.teamId, "help", body.helpId, "edit")
   await notifyReplyAndMentions(
     env,
     guard.teamId,
@@ -219,6 +219,6 @@ export async function postAddStakeholder(request: Request, env: Env): Promise<Re
   const ticket = await getTicket(cfg, guard, body.id)
   if (!ticket) return fail(404, "help_not_found", "That ticket doesn't exist.")
   const stakeholders = await addStakeholder(cfg, env, guard, actor, body.id, body.userId)
-  await publishChange(env.REALTIME, guard.teamId, "help", body.id, "edit")
+  await publishChange(env, guard.teamId, "help", body.id, "edit")
   return json({ stakeholders })
 }

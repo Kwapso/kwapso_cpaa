@@ -26,6 +26,9 @@ export type Env = {
   AUTH: Fetcher
   /** Global core DB — read only to confirm the connector is a team member. */
   DB: D1Database
+  /** Shared secret every internal caller presents on /publish. Fail-closed:
+   * unset means the door refuses everyone. */
+  INTERNAL_KEY?: string
 }
 
 /** One team's live channel: holds its members' sockets, relays change pings. */
@@ -79,6 +82,14 @@ export default {
     // Internal only (reached via service binding, never the public gateway):
     // a worker tells a team's channel something changed.
     if (url.pathname === "/publish" && request.method === "POST") {
+      // Keyed like every other internal door, and FAIL-CLOSED: no secret set
+      // means no broadcasting, never "wave them through". This door can reach
+      // ANY team's channel, so network isolation alone (workers_dev:false plus
+      // the gateway never routing /publish) was one config regression away from
+      // an unauthenticated cross-tenant broadcast. The header is checked before
+      // the body is read.
+      if (!env.INTERNAL_KEY || request.headers.get("x-internal-key") !== env.INTERNAL_KEY)
+        return fail(403, "forbidden", "Bad internal key.")
       const { channel, event } = (await request.json().catch(() => ({}))) as {
         channel?: string
         event?: unknown

@@ -31,15 +31,18 @@ describe("isActiveMember (WebSocket connection gate)", () => {
 
 describe("publishChange (the change ping)", () => {
   it("posts a team-scoped, data-free event to /publish", async () => {
-    const calls: { url: string; body: unknown }[] = []
-    const realtime = {
-      fetch: async (url: string, init: { body: string }) => {
-        calls.push({ url, body: JSON.parse(init.body) })
-        return new Response(null)
+    const calls: { url: string; body: unknown; key?: string }[] = []
+    const env = {
+      REALTIME: {
+        fetch: async (url: string, init: { body: string; headers: Record<string, string> }) => {
+          calls.push({ url, body: JSON.parse(init.body), key: init.headers["x-internal-key"] })
+          return new Response(null)
+        },
       },
+      INTERNAL_KEY: "shhh",
     } as unknown as Parameters<typeof publishChange>[0]
 
-    await publishChange(realtime, "TEAM1", "members")
+    await publishChange(env, "TEAM1", "members")
 
     expect(calls).toHaveLength(1)
     expect(calls[0].url).toContain("/publish")
@@ -47,17 +50,24 @@ describe("publishChange (the change ping)", () => {
       channel: "team:TEAM1",
       event: { resource: "members" },
     })
+    // /publish can reach ANY channel, so the caller must present the internal
+    // key. Without this assertion the header could silently stop being sent and
+    // every publish would 403 in production while the tests stayed green.
+    expect(calls[0].key, "the publish must carry the internal key").toBe("shhh")
   })
 
   it("includes a row id when given (so a specific open record can refresh)", async () => {
     const calls: { body: unknown }[] = []
-    const realtime = {
-      fetch: async (_url: string, init: { body: string }) => {
-        calls.push({ body: JSON.parse(init.body) })
-        return new Response(null)
+    const env = {
+      REALTIME: {
+        fetch: async (_url: string, init: { body: string }) => {
+          calls.push({ body: JSON.parse(init.body) })
+          return new Response(null)
+        },
       },
+      INTERNAL_KEY: "shhh",
     } as unknown as Parameters<typeof publishChange>[0]
-    await publishChange(realtime, "T", "member_roles", "ROLE9")
+    await publishChange(env, "T", "member_roles", "ROLE9")
     expect(calls[0].body).toEqual({
       channel: "team:T",
       event: { resource: "member_roles", id: "ROLE9" },
@@ -65,11 +75,14 @@ describe("publishChange (the change ping)", () => {
   })
 
   it("never throws — a live-layer hiccup can't break the write it describes", async () => {
-    const realtime = {
-      fetch: async () => {
-        throw new Error("realtime down")
+    const env = {
+      REALTIME: {
+        fetch: async () => {
+          throw new Error("realtime down")
+        },
       },
+      INTERNAL_KEY: "shhh",
     } as unknown as Parameters<typeof publishChange>[0]
-    await expect(publishChange(realtime, "T", "members")).resolves.toBeUndefined()
+    await expect(publishChange(env, "T", "members")).resolves.toBeUndefined()
   })
 })

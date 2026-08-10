@@ -25,7 +25,7 @@ export async function postMemberRole(request: Request, env: Env): Promise<Respon
   await changeMemberRole(env, cfg, guard, actor, body.userId, body.roleId)
   // Carry the affected userId so other clients can refresh that member's
   // activity feed (activity:user:<id>) in addition to the member + role lists.
-  await publishChange(env.REALTIME, guard.teamId, "members", body.userId, "edit")
+  await publishChange(env, guard.teamId, "members", body.userId, "edit")
   return json({ members: await listMembers(env, cfg, guard) })
 }
 
@@ -36,9 +36,9 @@ export async function postMemberRemove(request: Request, env: Env): Promise<Resp
   if (typeof body.userId !== "string") return fail(400, "invalid_input", "userId is required.")
   await removeMember(env, cfg, guard, actor, body.userId)
   // Team channel: drop them from everyone else's member list (row-level).
-  await publishChange(env.REALTIME, guard.teamId, "members", body.userId, "remove")
+  await publishChange(env, guard.teamId, "members", body.userId, "remove")
   // Cross-team: the REMOVED person rides their own user channel — their other
   // devices update the team switcher and leave this team's screens (decision #8).
-  await publishUserChange(env.REALTIME, body.userId, "teams", guard.teamId, "remove")
+  await publishUserChange(env, body.userId, "teams", guard.teamId, "remove")
   return json({ members: await listMembers(env, cfg, guard) })
 }

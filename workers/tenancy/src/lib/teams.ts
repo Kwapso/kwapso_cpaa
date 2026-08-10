@@ -132,7 +132,7 @@ export async function createTeam(
     // Cross-team live event: the creator's OTHER devices should see the new team
     // appear in their switcher without a refetch. Rides the per-user channel
     // (the team channel doesn't exist for them yet). The client reacts in B.
-    await publishUserChange(env.REALTIME, actor.id, "teams", teamId, "add")
+    await publishUserChange(env, actor.id, "teams", teamId, "add")
 
     return { teamId }
   } catch (e) {
@@ -237,14 +237,14 @@ export async function acceptPendingInvites(
     // level: the new member is this user (actor.id); each invite flips to
     // 'accepted' in place (carry its own id).
     for (const invite of invites) {
-      await publishChange(env.REALTIME, invite.team_id, "invites", invite.id, "edit")
+      await publishChange(env, invite.team_id, "invites", invite.id, "edit")
     }
     const affected = [...new Set(invites.map((i) => i.team_id))]
     for (const teamId of affected) {
-      await publishChange(env.REALTIME, teamId, "members", actor.id, "add")
+      await publishChange(env, teamId, "members", actor.id, "add")
     }
     // Cross-team: the joiner's other devices pick up the newly-joined team(s).
-    await publishUserChange(env.REALTIME, actor.id, "teams", affected[0], "add")
+    await publishUserChange(env, actor.id, "teams", affected[0], "add")
   }
   return invites.length
 }
@@ -351,10 +351,10 @@ export async function acceptInvite(
 
   // Row-level: the joiner becomes a member (added) and the invite flips to
   // 'accepted' in place — carry both ids so open lists patch just those rows.
-  await publishChange(env.REALTIME, invite.team_id, "members", actor.id, "add")
-  await publishChange(env.REALTIME, invite.team_id, "invites", inviteId, "edit")
+  await publishChange(env, invite.team_id, "members", actor.id, "add")
+  await publishChange(env, invite.team_id, "invites", inviteId, "edit")
   // Cross-team: the joiner's OTHER devices add the new team to their switcher.
-  await publishUserChange(env.REALTIME, actor.id, "teams", invite.team_id, "add")
+  await publishUserChange(env, actor.id, "teams", invite.team_id, "add")
   return invite.team_id
 }
 

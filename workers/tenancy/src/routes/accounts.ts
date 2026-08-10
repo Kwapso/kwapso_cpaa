@@ -105,7 +105,7 @@ export async function postCreateAccount(request: Request, env: Env): Promise<Res
     ...accountFields(body),
   })
   // Row-level: carry the new id so an open list patches just that row.
-  await publishChange(env.REALTIME, guard.teamId, "accounts", id, "add")
+  await publishChange(env, guard.teamId, "accounts", id, "add")
   return json({ id })
 }
 
@@ -124,7 +124,7 @@ export async function postUpdateAccount(request: Request, env: Env): Promise<Res
     ...accountFields(body),
     commercialsVisible: typeof body.commercialsVisible === "boolean" ? body.commercialsVisible : undefined,
   })
-  await publishChange(env.REALTIME, guard.teamId, "accounts", id)
+  await publishChange(env, guard.teamId, "accounts", id)
   return json({ ok: true })
 }
 
@@ -141,7 +141,7 @@ export async function postAccountParent(request: Request, env: Env): Promise<Res
   const id = requireText(body.id, "Account", TEXT_LIMITS.short)
   const parentAccountId = optionalText(body.parentAccountId, "Parent", TEXT_LIMITS.short) ?? null
   await setAccountParent(cfg, guard, scope, actor, id, parentAccountId)
-  await publishChange(env.REALTIME, guard.teamId, "accounts", id)
+  await publishChange(env, guard.teamId, "accounts", id)
   return json({ ok: true })
 }
 
@@ -158,7 +158,7 @@ export async function postAccountActive(request: Request, env: Env): Promise<Res
   if (typeof body.active !== "boolean") return fail(400, "invalid_input", "Archive or restore?")
   // R17: a repeat moves zero rows → no ping, no duplicate history.
   const changed = await setAccountActive(cfg, guard, scope, actor, id, body.active)
-  if (changed) await publishChange(env.REALTIME, guard.teamId, "accounts", id)
+  if (changed) await publishChange(env, guard.teamId, "accounts", id)
   return json({ ok: true })
 }
 
@@ -183,7 +183,7 @@ export async function postLinkPerson(request: Request, env: Env): Promise<Respon
     relationship: optionalText(body.relationship, "Relationship", TEXT_LIMITS.short),
     isMainStakeholder: body.isMainStakeholder === true,
   })
-  await publishChange(env.REALTIME, guard.teamId, "account_links", accountId, "add")
+  await publishChange(env, guard.teamId, "account_links", accountId, "add")
   return json({ id })
 }
 
@@ -199,7 +199,7 @@ export async function postLinkActive(request: Request, env: Env): Promise<Respon
   if (typeof body.active !== "boolean") return fail(400, "invalid_input", "Unlink or relink?")
   // R17: null = zero rows moved = already like that → no ping, no duplicate history.
   const accountId = await setLinkActive(cfg, guard, scope, actor, id, body.active)
-  if (accountId) await publishChange(env.REALTIME, guard.teamId, "account_links", accountId)
+  if (accountId) await publishChange(env, guard.teamId, "account_links", accountId)
   return json({ ok: true })
 }
 
@@ -247,7 +247,7 @@ export async function postGrantPortalAccess(request: Request, env: Env): Promise
     userId,
     appRestriction: optionalText(body.appRestriction, "App restriction", TEXT_LIMITS.short),
   })
-  await publishChange(env.REALTIME, guard.teamId, "portal_users", accountId, "add")
+  await publishChange(env, guard.teamId, "portal_users", accountId, "add")
   return json({ id })
 }
 
@@ -295,7 +295,7 @@ export async function postPortalAccessActive(request: Request, env: Env): Promis
   if (typeof body.active !== "boolean") return fail(400, "invalid_input", "Revoke or restore?")
   // R17: null = the login was already in that state → no ping, no history row.
   const accountId = await setPortalAccessActive(cfg, guard, scope, actor, id, body.active)
-  if (accountId) await publishChange(env.REALTIME, guard.teamId, "portal_users", accountId)
+  if (accountId) await publishChange(env, guard.teamId, "portal_users", accountId)
   return json({ ok: true })
 }
 
