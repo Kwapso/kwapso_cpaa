@@ -1,0 +1,59 @@
+// The PORTAL GATEWAY worker — the CLIENT portal's public address. Top-level =
+// PRODUCTION; staging lives under env, exactly like the agency gateway.
+//
+// Custom domains (OPERATIONS.md "Client portal hostnames"):
+//   production → client.kwapso.app
+//   staging    → staging-client.kwapso.app
+// portal.kwapso.app is TAKEN — it points at the owner's live Glide portal and
+// must never be attached here. Domains are attached from the dashboard (Workers
+// & Pages → the worker → Settings → Domains & Routes); nothing in this repo
+// writes DNS.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kwapso-portal",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-01",
+  "observability": { "enabled": true },
+  "assets": {
+    "directory": "../../web-portal/out",
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    // Worker-first for every DYNAMIC path this worker owns. An ARRAY here means
+    // non-listed paths skip the worker entirely (asset-only), so ALL must be
+    // listed: /api/* (the allow-list fan-out), /mcp (so it is refused HERE
+    // rather than falling through to the asset 404 page — the refusal must be
+    // the worker's, not the asset layer's), /media/* (R2) and /support/* (the
+    // client-resolved ticket shell). Static screens (/, /home, /_next/static/**)
+    // are NOT listed, so they keep the fast asset path + immutable caching.
+    "run_worker_first": ["/api/*", "/mcp", "/media/*", "/support/*"]
+  },
+  // Only the doors the portal actually uses are bound. There is no DATAOPS and
+  // no MCP binding here ON PURPOSE: a worker cannot forward to a service it
+  // cannot reach, so the allow-list is backed by the bindings, not just by code.
+  "services": [
+    { "binding": "AUTH", "service": "kwapso-auth" },
+    { "binding": "TENANCY", "service": "kwapso-tenancy" },
+    { "binding": "CONTENT", "service": "kwapso-content" },
+    { "binding": "REALTIME", "service": "kwapso-realtime" }
+  ],
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "kwapso-media" }],
+  "env": {
+    "staging": {
+      "name": "kwapso-portal-staging",
+      "observability": { "enabled": true },
+      "assets": {
+        "directory": "../../web-portal/out",
+        "binding": "ASSETS",
+        "not_found_handling": "404-page",
+        "run_worker_first": ["/api/*", "/mcp", "/media/*", "/support/*"]
+      },
+      "services": [
+        { "binding": "AUTH", "service": "kwapso-auth-staging" },
+        { "binding": "TENANCY", "service": "kwapso-tenancy-staging" },
+        { "binding": "CONTENT", "service": "kwapso-content-staging" },
+        { "binding": "REALTIME", "service": "kwapso-realtime-staging" }
+      ],
+      "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "kwapso-media-staging" }]
+    }
+  }
+}

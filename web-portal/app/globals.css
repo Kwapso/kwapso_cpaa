@@ -1,0 +1,49 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* THE theme — imported straight from the library package, exactly as the agency
+ * app does. ONE master copy (kwapso_ui repo, styles.css); neither front door
+ * carries its own. The portal's difference from the agency app is SCALE, not a
+ * second design language: same tokens, same components, more air. */
+@import "@kwapso/ui/styles.css";
+
+/* Overlay readability: the library's frosted `.glass` sits at 72% surface
+ * opacity — too see-through to read dialog text against a living background.
+ * Same override the agency app carries; removed from both when the library
+ * adopts it as the default. */
+.glass {
+  background-color: color-mix(in oklch, var(--card) 94%, transparent);
+}
+
+/* ── Reading size ──────────────────────────────────────────────────────────
+ * The one visual decision this file makes, and the reason it exists.
+ *
+ * The portal is read by people who do not use software like this all day, on
+ * whatever device is nearest, often at arm's length. The agency app is a work
+ * tool used for hours by people who want density; the portal is a place someone
+ * visits for ninety seconds to find out where their work stands. So the base
+ * step goes up one notch and the line height opens, which cascades through
+ * every library component at once rather than being re-decided per screen.
+ *
+ * This is a token change, not new styling — no colours, no shadows, no
+ * bespoke surfaces. The library stays lego. */
+:root {
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+@media (min-width: 768px) {
+  :root {
+    font-size: 18px;
+  }
+}
+
+/* Tap targets, for the same reason. A 44px minimum is the accessibility floor
+ * for touch, and the portal is opened on a phone more often than not. */
+@media (pointer: coarse) {
+  button,
+  a[role="button"],
+  [role="tab"] {
+    min-height: 44px;
+  }
+}

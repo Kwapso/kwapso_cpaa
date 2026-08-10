@@ -75,12 +75,18 @@ export async function getHelp(request: Request, env: Env): Promise<Response> {
   return ticketPage(cfg, guard, scope, url.searchParams.get("cursor"), portal)
 }
 
-/** GET /api/content/help/thread?id=<ticketId> → the ticket's replies (oldest first). */
+/** GET /api/content/help/thread?id=<ticketId> → the ticket's replies (oldest first).
+ * Portal-ness decides WHOSE conversation, exactly as it decides whose tickets —
+ * the fence rides the thread's own WHERE (lib/help threadFence). */
 export async function getHelpThread(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "help", "read")
+  const portal = (await accountScope(cfg, guard)).kind === "portal"
   const id = new URL(request.url).searchParams.get("id")
   if (!id) return fail(400, "invalid_input", "A ticket id is required.")
-  return json({ replies: await listReplies(cfg, guard, id) , total: await countReplies(cfg, guard, id) })
+  return json({
+    replies: await listReplies(cfg, guard, id, portal),
+    total: await countReplies(cfg, guard, id, portal),
+  })
 }
 
 /** POST /api/content/help — raise a ticket (help:create). */
@@ -184,7 +190,11 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
   if (!body.helpId) return fail(400, "invalid_input", "helpId and a reply body are required.")
   const replyBody = requireText(body.body, "Reply", TEXT_LIMITS.long)
 
-  const ticket = await getTicket(cfg, guard, body.helpId)
+  // The fence decides WHOSE ticket this is before a word is appended — a reply
+  // cannot be un-appended, and 404 rather than 403 so "not yours" never confirms
+  // the ticket exists.
+  const portal = (await accountScope(cfg, guard)).kind === "portal"
+  const ticket = await getTicket(cfg, guard, body.helpId, portal)
   if (!ticket) return fail(404, "help_not_found", "That ticket doesn't exist.")
 
   // Untrusted: only keep string ids, and never the author's own id (you can't
@@ -204,16 +214,23 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
     replyBody,
     tagged
   )
-  return json({ replies: await listReplies(cfg, guard, body.helpId), total: await countReplies(cfg, guard, body.helpId) })
+  return json({
+    replies: await listReplies(cfg, guard, body.helpId, portal),
+    total: await countReplies(cfg, guard, body.helpId, portal),
+  })
 }
 
 /** GET /api/content/help/stakeholders?id=<ticketId> — the full derived ∪ added
- * set (raiser + admins + @mentions + manual adds). help:read gates it. */
+ * set (raiser + admins + @mentions + manual adds). help:read gates it, and the
+ * fence decides whether the ticket is theirs to ask about at all: a stakeholder
+ * list NAMES people (staff admins included), so an unfenced one was the same
+ * leak as the thread, in its most personal form. */
 export async function getHelpStakeholders(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "help", "read")
+  const portal = (await accountScope(cfg, guard)).kind === "portal"
   const id = new URL(request.url).searchParams.get("id")
   if (!id) return fail(400, "invalid_input", "A ticket id is required.")
-  return json({ stakeholders: await listStakeholders(cfg, env, guard, id) })
+  return json({ stakeholders: await listStakeholders(cfg, env, guard, id, portal) })
 }
 
 /** POST /api/content/help/stakeholders — manually add a stakeholder (help:read;
@@ -223,9 +240,10 @@ export async function postAddStakeholder(request: Request, env: Env): Promise<Re
   const { actor, cfg, guard, body } = await gatedBody<{ id?: string; userId?: string }>(request, env, "help", "read")
   if (!body.id || !body.userId)
     return fail(400, "invalid_input", "id and userId are required.")
-  const ticket = await getTicket(cfg, guard, body.id)
+  const portal = (await accountScope(cfg, guard)).kind === "portal"
+  const ticket = await getTicket(cfg, guard, body.id, portal)
   if (!ticket) return fail(404, "help_not_found", "That ticket doesn't exist.")
-  const stakeholders = await addStakeholder(cfg, env, guard, actor, body.id, body.userId)
+  const stakeholders = await addStakeholder(cfg, env, guard, actor, body.id, body.userId, portal)
   await publishChange(env, guard.teamId, "help", body.id, "edit")
   return json({ stakeholders })
 }

@@ -113,7 +113,8 @@ export async function listStakeholders(
   cfg: D1Rest,
   env: Env,
   guard: MemberGuard,
-  ticketId: string
+  ticketId: string,
+  portal = false
 ): Promise<HelpStakeholder[]> {
   // Best origin wins per user id (lowest rank).
   const origin = new Map<string, StakeholderOrigin>()
@@ -128,8 +129,9 @@ export async function listStakeholders(
   // round-trip instead of four serial ones. (adminUserIds/lookupUsers are core-DB
   // and depend on adminRoleId / the claimed set, so they stay in order below.)
   const [ticket, replyRows, addedRows, adminId] = await Promise.all([
-    // 1. raiser (from the help row).
-    getTicket(cfg, guard, ticketId),
+    // 1. raiser (from the help row) — read through the FENCE, which is also what
+    //    decides whether this caller may know anything about the ticket at all.
+    getTicket(cfg, guard, ticketId, portal),
     // 2. mentioned: every tagged id across the ticket's replies.
     d1Query<{ tagged_user_ids: string | null }>(
       cfg,
@@ -147,7 +149,12 @@ export async function listStakeholders(
     // 4. the team's Admin role id (TEAM DB).
     adminRoleId(cfg, guard),
   ])
-  if (ticket?.raiserId) claim(ticket.raiserId, "raiser")
+  // No visible ticket, no set. The other three reads are keyed by ticket id
+  // alone, so returning what they found would name the raiser's colleagues and
+  // every staff admin on a ticket this caller may not even know exists — the
+  // stakeholder-shaped half of the thread leak.
+  if (!ticket) return []
+  if (ticket.raiserId) claim(ticket.raiserId, "raiser")
   for (const r of replyRows) for (const id of parseTagged(r.tagged_user_ids)) claim(id, "mentioned")
   for (const r of addedRows) claim(r.user_id, "added")
 
@@ -180,10 +187,12 @@ export async function addStakeholder(
   guard: MemberGuard,
   actor: Actor,
   ticketId: string,
-  userId: string
+  userId: string,
+  portal = false
 ): Promise<HelpStakeholder[]> {
-  // The ticket must exist (reuse getTicket) and the target must be on this team.
-  const ticket = await getTicket(cfg, guard, ticketId)
+  // The ticket must be VISIBLE to this caller (reuse the fenced getTicket) and
+  // the target must be on this team.
+  const ticket = await getTicket(cfg, guard, ticketId, portal)
   if (!ticket) throw new GuardError(404, "help_not_found", "That ticket doesn't exist.")
   if (!(await isActiveMember(env, guard.teamId, userId)))
     throw new GuardError(400, "not_member", "That person isn't on this team.")
@@ -204,5 +213,5 @@ VALUES (${sqlString(id)}, ${sqlString(ticketId)}, ${sqlString(userId)}, ${sqlStr
     relatedRowId: ticketId,
   })
 
-  return listStakeholders(cfg, env, guard, ticketId)
+  return listStakeholders(cfg, env, guard, ticketId, portal)
 }

@@ -196,29 +196,60 @@ export async function getTicket(
   return rows[0] ? toTicket(rows[0]) : null
 }
 
+/** THE THREAD FENCE — the same fence, one table along.
+ *
+ * A reply belongs to a ticket, so "may I read this conversation?" is exactly
+ * "may I read this ticket?". `getTicket` has carried that answer since the help
+ * fence landed; the THREAD doors did not, and read `help_threads WHERE help_id
+ * = ?` on a caller-supplied id with nothing else on the WHERE. Row ids are not
+ * secret — the live channel broadcasts them — so a client login holding
+ * `help:read` (which they must hold to use their own support screen at all)
+ * could hand back another client's ticket id and read the whole conversation.
+ *
+ * Expressed as a subquery rather than a pre-check so it rides the SAME WHERE as
+ * the rows AND the count: a total that didn't pass the same filter would say how
+ * many replies it is refusing to show. `authorScope` yields `creator_id = ?`,
+ * a column on `help` — hence the alias. */
+function threadFence(guard: MemberGuard, portal: boolean): { sql: string; params: string[] } {
+  const fence = authorScope(guard, portal, "all")
+  if (!fence.sql) return { sql: "", params: [] }
+  return {
+    sql: ` AND EXISTS (SELECT 1 FROM help h WHERE h.id = help_id AND h.${fence.sql})`,
+    params: fence.params,
+  }
+}
+
 /** Every reply on a ticket, oldest first (the conversation order). */
 export async function listReplies(
   cfg: D1Rest,
   guard: MemberGuard,
-  ticketId: string
+  ticketId: string,
+  portal = false
 ): Promise<HelpMessage[]> {
+  const fence = threadFence(guard, portal)
   const rows = await d1Query<ReplyRow>(
     cfg,
     guard.databaseId,
-    `SELECT id, help_id, message_body, tagged_user_ids, is_agent, creator_id, creator_name, created_at FROM help_threads WHERE help_id = ? ORDER BY created_at ASC LIMIT ${THREAD_HARD_CAP}`, // R14 hard cap
-    [ticketId]
+    `SELECT id, help_id, message_body, tagged_user_ids, is_agent, creator_id, creator_name, created_at FROM help_threads WHERE help_id = ?${fence.sql} ORDER BY created_at ASC LIMIT ${THREAD_HARD_CAP}`, // R14 hard cap
+    [ticketId, ...fence.params]
   )
   return rows.map(toMessage)
 }
 
 /** R16: the thread's exact reply COUNT(*) — the Conversation badge shows this,
  * never the loaded (THREAD_HARD_CAP-bounded) list's length. */
-export async function countReplies(cfg: D1Rest, guard: MemberGuard, ticketId: string): Promise<number> {
+export async function countReplies(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  ticketId: string,
+  portal = false
+): Promise<number> {
+  const fence = threadFence(guard, portal)
   const rows = await d1Query<{ n: number }>(
     cfg,
     guard.databaseId,
-    "SELECT COUNT(*) AS n FROM help_threads WHERE help_id = ?",
-    [ticketId]
+    `SELECT COUNT(*) AS n FROM help_threads WHERE help_id = ?${fence.sql}`,
+    [ticketId, ...fence.params]
   )
   return rows[0]?.n ?? 0
 }
