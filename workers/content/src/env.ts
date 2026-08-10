@@ -15,6 +15,8 @@ export type Env = {
 
   /** Cloudflare account id (plain var) — for reaching per-team databases. */
   CF_ACCOUNT_ID: string
+  /** The app's public origin — the only way an email's logo can be absolute. */
+  PUBLIC_APP_URL?: string
 
   // Secrets (wrangler secret put):
   /** API token scoped to Account → D1 → Edit. Without it, team databases

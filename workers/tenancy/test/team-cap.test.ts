@@ -1,24 +1,36 @@
-// AN UNCAPPED CREATE DOOR IS A RESOURCE-CREATION DOOR. Every team provisions a
-// REAL database, so anyone who can sign up could otherwise mint them in a loop
-// until the platform's database quota is gone — no permission is exceeded, no
-// tenant is breached, and the whole product stops working anyway.
+// ONE TEAM. Kwapso is a single agency on a base built for many tenants, so the
+// create-a-team machinery exists in the code and would otherwise be reachable
+// from three places at once: the sidebar, the API, and onboarding — which used
+// to mint a private team for anyone who simply signed in. A second team is an
+// empty world with its own database, its own roles and none of the customer
+// data, and nobody would mean to make one.
 //
-// The cap counts teams the caller CREATED, never teams they belong to: being
-// invited to twenty teams costs nobody a database, and counting memberships
-// would punish the wrong person.
+// Closed means closed on every surface a person or a program can ask through.
+// These tests hold each of the three shut, and hold the ops door — the one that
+// needs the deployment's ADMIN_KEY and no session at all — open, because a fresh
+// environment still has to be seeded and the smoke still has to prove that a
+// token pinned to one team cannot read another.
+//
+// (The per-user cap that used to live here is now unreachable, so its tests went
+// with it. The cap itself stays in the route: it is the guard that applies the
+// moment TEAM_CREATION_CLOSED is ever flipped back.)
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { MAX_TEAMS_PER_USER } from "../../../shared/workers/limits"
+import { TEAM_CREATION_CLOSED } from "../../../shared/product"
 
 const created: string[] = []
 vi.mock("../src/context", () => ({
   whoAmI: vi.fn(async () => ({ id: "u1", email: "a@b.c", firstName: "A", onboardingComplete: true })),
   toActor: (u: { id: string }) => ({ id: u.id, email: "a@b.c", name: "A" }),
   teamContext: vi.fn(),
+  adminGuard: () => null,
 }))
 vi.mock("../src/lib/teams", () => ({
-  createTeam: vi.fn(async (_e: unknown, _a: unknown, name: string) => created.push(name)),
+  createTeam: vi.fn(async (_e: unknown, _a: unknown, name: string) => {
+    created.push(name)
+    return { id: "t1", name }
+  }),
   d1Config: () => ({}),
   getActiveContext: async () => ({ ok: true }),
   listMyTeams: async () => [],
@@ -26,77 +38,73 @@ vi.mock("../src/lib/teams", () => ({
   switchTeam: async () => true,
   getTeamMeta: async () => ({}),
   updateTeamDetails: async () => undefined,
+  applyMigration: async () => undefined,
 }))
 
-const { createNamedTeam } = await import("../src/routes/team")
+const { createNamedTeam, bootstrap } = await import("../src/routes/team")
+const { adminCreateTeam } = await import("../src/routes/admin")
 
-/** env whose `teams` table reports `existing` rows created by this user. */
-const envWith = (existing: number, override?: string) =>
+/** An env whose users table answers with one signed-in person. */
+const env = () =>
   ({
-    MAX_TEAMS_PER_USER: override,
     DB: {
       prepare: (sql: string) => ({
         bind: () => ({
-          first: async () => (sql.includes("COUNT(*)") ? { n: existing } : null),
+          first: async () =>
+            sql.includes("FROM users")
+              ? { id: "u1", email: "a@b.c", first_name: "A", last_name: null, current_team_id: null }
+              : { n: 0 },
+          all: async () => ({ results: [] }),
+          run: async () => ({ meta: { changes: 0 } }),
         }),
+        first: async () => null,
       }),
     },
   }) as never
 
-const post = () =>
-  new Request("https://x/api/tenancy/teams", {
+const post = (path: string, body: unknown) =>
+  new Request(`https://x${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: "Another team" }),
+    body: JSON.stringify(body),
   })
 
 beforeEach(() => (created.length = 0))
 
-describe("team creation is capped per user", () => {
-  it("lets an ordinary user create teams below the cap", async () => {
-    const res = await createNamedTeam(post(), envWith(MAX_TEAMS_PER_USER - 1))
-    expect(res.status).toBe(200)
-    expect(created, "the team was actually provisioned").toHaveLength(1)
+describe("one team: creation is closed on every surface", () => {
+  it("is actually closed (the tests below mean nothing otherwise)", () => {
+    expect(TEAM_CREATION_CLOSED).toBe(true)
   })
 
-  it("refuses AT the cap — cleanly, and without provisioning a database", async () => {
-    const res = await createNamedTeam(post(), envWith(MAX_TEAMS_PER_USER))
+  it("refuses the API door — the same answer a person, the agent or a token gets", async () => {
+    // Everything reaches this handler through the same gateway, so one refusal
+    // covers all three surfaces the owner named.
+    const res = await createNamedTeam(post("/api/tenancy/teams", { name: "Another team" }), env())
     expect(res.status).toBe(403)
-    expect((await res.json()) as { error: string }).toMatchObject({ error: "team_limit" })
+    expect((await res.json()) as { error: string }).toMatchObject({ error: "team_creation_closed" })
     expect(created, "no database may be provisioned by a refused request").toHaveLength(0)
   })
 
-  it("counts teams the caller CREATED, not teams they belong to", async () => {
-    let asked = ""
-    const env = {
-      DB: { prepare: (sql: string) => ((asked = sql), { bind: () => ({ first: async () => ({ n: 0 }) }) }) },
-    } as never
-    await createNamedTeam(post(), env)
-    expect(asked, "the count must be by creator_id").toContain("creator_id")
-    expect(asked, "…never by membership").not.toContain("team_members")
-  })
-
-  // "Create five, switch them off, repeat" would otherwise be an unbounded
-  // database generator wearing a cap: a deactivated team still HAS its database.
-  it("a deactivated team still counts against the cap", async () => {
-    let asked = ""
-    const env = {
-      DB: { prepare: (sql: string) => ((asked = sql), { bind: () => ({ first: async () => ({ n: 0 }) }) }) },
-    } as never
-    await createNamedTeam(post(), env)
-    expect(asked, "the count must NOT filter deactivated teams — their databases still exist").not.toMatch(
-      /deactivated|is_active|archived/i
-    )
-  })
-
-  it("the owner can raise it per environment", async () => {
-    const res = await createNamedTeam(post(), envWith(MAX_TEAMS_PER_USER, String(MAX_TEAMS_PER_USER + 5)))
-    expect(res.status, "an override above the count must allow the create").toBe(200)
-  })
-
-  it("an override of ZERO means zero — it does not fall back to the default", async () => {
-    const res = await createNamedTeam(post(), envWith(0, "0"))
-    expect(res.status, "MAX_TEAMS_PER_USER=0 must refuse, not silently allow 5").toBe(403)
+  it("refuses BEFORE reading the body, so a malformed name can't change the answer", async () => {
+    const res = await createNamedTeam(post("/api/tenancy/teams", { name: { not: "a string" } }), env())
+    expect(res.status, "not a 400 about the name — the door is shut regardless").toBe(403)
     expect(created).toHaveLength(0)
+  })
+
+  it("onboarding no longer mints a team for someone with no invite", async () => {
+    // The quiet one: this path had no button and no permission check, it just
+    // ran. A stranger who signed in used to land in a private world of their own.
+    const res = await bootstrap(post("/api/tenancy/bootstrap", {}), env())
+    expect(res.status).toBe(200)
+    expect(created, "no invite, no team").toHaveLength(0)
+  })
+
+  it("the ops door still seeds one — it needs the admin key, never a session", async () => {
+    const res = await adminCreateTeam(
+      post("/api/tenancy/admin/create-team", { name: "Seeded", email: "a@b.c" }),
+      env()
+    )
+    expect(res.status).toBe(200)
+    expect(created, "a fresh environment must still be standable").toEqual(["Seeded"])
   })
 })

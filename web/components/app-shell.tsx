@@ -38,6 +38,7 @@ import { NAV, TEAM_SECTIONS, bottomNavItems, isNavActive, type Crumb } from "@/l
 import { usePermissions } from "@/lib/perms"
 import { useTeamPrewarm } from "@/lib/use-team-prewarm"
 import { CreateTeamDialog } from "@/components/create-team-dialog"
+import { TEAM_CREATION_CLOSED } from "@shared/product"
 import { ProfileMenu } from "@/components/profile-menu"
 import { TeamSwitcher } from "@/components/team-switcher"
 
@@ -325,6 +326,9 @@ export function AppShell({
         </nav>
       </div>
 
+      {/* Not rendered while creation is closed — a dialog that can only ever be
+          refused by the door is worse than no dialog (shared/product.ts). */}
+      {!TEAM_CREATION_CLOSED && (
       <CreateTeamDialog
         open={creating}
         onOpenChange={setCreating}
@@ -334,6 +338,7 @@ export function AppShell({
           toast.success(`Created ${name}`)
         }}
       />
+      )}
 
       {/* The AI co-pilot (launcher + panel) now lives at the root layout
        * (agent-host.tsx) so it survives navigation — it is intentionally not

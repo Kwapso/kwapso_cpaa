@@ -44,6 +44,7 @@ const HOUSEKEEPING = new Set([
   "POST /api/tenancy/admin/migrate-teams", // ops: roll team-schema migrations
   "POST /api/tenancy/admin/move-module", // ops: relocate a module's DB
   "POST /api/tenancy/portal/switch-account", // flips the caller's own current-account pointer
+  "POST /api/tenancy/admin/create-team", // ops: seed a team where the user door is closed
 ])
 
 describe("live-sync seam: every mutation publishes", () => {

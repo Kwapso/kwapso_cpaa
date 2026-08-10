@@ -18,6 +18,9 @@ export type BrandedEmail = {
   ctaUrl?: string
   /** small print at the bottom of the card */
   footnote?: string
+  /** the app's public origin, e.g. https://agency.kwapso.app — the ONLY way the
+   * logo can be absolute, and email is the one place a relative src is useless. */
+  origin?: string
 }
 
 /** Build { html, text } for a branded email. `text` is the plaintext fallback. */
@@ -37,8 +40,19 @@ export function brandedEmail(o: BrandedEmail): { html: string; text: string } {
   const font =
     "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
 
-  const logo = brand.logoUrl
-    ? `<img src="${brand.logoUrl}" alt="${brand.name}" height="28" style="display:block;border:0">`
+  // A mail client has no origin to resolve a path against, so a relative logo
+  // src can only ever render as a broken-image icon — which is what shipped.
+  // Absolute or nothing: with no origin to build one, fall back to the wordmark,
+  // which is a worse logo but a better email.
+  const logoSrc = !brand.logoUrl
+    ? null
+    : /^https?:\/\//.test(brand.logoUrl)
+      ? brand.logoUrl
+      : o.origin
+        ? `${o.origin.replace(/\/$/, "")}${brand.logoUrl}`
+        : null
+  const logo = logoSrc
+    ? `<img src="${logoSrc}" alt="${brand.name}" height="28" style="display:block;border:0">`
     : `<span style="font:600 20px ${font};color:${primary}">${brand.name}</span>`
 
   const codeBlock = o.code

@@ -20,6 +20,7 @@ import {
   updateTeamDetails,
 } from "../lib/teams"
 import { MAX_TEAMS_PER_USER, numberVar } from "../../../../shared/workers/limits"
+import { TEAM_CREATION_CLOSED } from "../../../../shared/product"
 import { gatedBody } from "../../../../shared/workers/route"
 import { teamContext, toActor, whoAmI } from "../context"
 import type { Env } from "../env"
@@ -40,7 +41,11 @@ export async function bootstrap(request: Request, env: Env): Promise<Response> {
   let teams = await listMyTeams(env, user.id)
   if (teams.length === 0) {
     const accepted = await acceptPendingInvites(env, actor)
-    if (accepted === 0) {
+    // With creation closed, an invitation is the ONLY way in. Someone who signs
+    // in without one gets no team rather than a private world of their own —
+    // the onboarding screen then tells them to ask for an invite, which is the
+    // true answer instead of a team nobody meant them to have.
+    if (accepted === 0 && !TEAM_CREATION_CLOSED) {
       await createTeam(env, actor, `${user.firstName ?? "My"}'s team`, user.imageUrl)
     }
     teams = await listMyTeams(env, user.id)
@@ -83,6 +88,15 @@ export async function switchActiveTeam(request: Request, env: Env): Promise<Resp
 export async function createNamedTeam(request: Request, env: Env): Promise<Response> {
   const user = await whoAmI(request, env)
   if (!user) return fail(401, "signed_out", "Not signed in.")
+  // Closed for everyone who can ask — a person at the keyboard, the agent acting
+  // as them, a personal access token. The refusal comes BEFORE the identity
+  // checks below so it reads the same to all three (shared/product.ts).
+  if (TEAM_CREATION_CLOSED)
+    return fail(
+      403,
+      "team_creation_closed",
+      "This app runs as one team. Ask an admin to invite you to it."
+    )
   if (!user.onboardingComplete)
     return fail(409, "onboarding_incomplete", "Finish onboarding first.")
 
