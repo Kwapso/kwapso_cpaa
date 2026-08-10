@@ -703,6 +703,17 @@ check(
 const priyaTickets = await ticketsFor(priya.cookie)
 const tomTickets = await ticketsFor(tom.cookie)
 const tomIds = new Set(tomTickets.map((t) => t.id))
+
+// A NEGATIVE CHECK IS ONLY WORTH ANYTHING IF THERE IS SOMETHING TO FIND.
+// "Priya cannot see our internal ticket" passes trivially when that ticket does
+// not exist — which is exactly how a fence test can stay green over an open
+// hole. So prove it exists first, from the one account that should see it.
+const oursSeenByUs = (await ticketsFor(staff.cookie)).some((t) => t.description === OURS.description)
+check(
+  "our own internal question exists, so the next check has something to catch",
+  oursSeenByUs,
+  oursSeenByUs ? "" : "the agency's own ticket is missing — the negative below would pass for nothing"
+)
 check(
   "Priya sees the questions she raised",
   priyaTickets.length > 0 && priyaTickets.every((t) => TICKETS.some((s) => s.description === t.description)),
