@@ -64,6 +64,8 @@ const IDENTITY_GATED: Record<string, string> = {
     "creates the caller's own team — they become its Admin, so no prior right exists",
   "POST /api/tenancy/invitations/accept":
     "acceptance is proved by the invite's email matching the signed-in account",
+  "POST /api/tenancy/portal/switch-account":
+    "flips the caller's OWN current-account pointer; the companies they may stand in come from the guard corridor, not the body",
 }
 
 describe("gating-seam (tenancy): no ungated door can ship", () => {

@@ -48,7 +48,15 @@ export function useActiveTeam(): ActiveTeam {
     const onChange = () => {
       setUser(sessionCache?.user ?? null)
       setCtx(sessionCache?.ctx ?? null)
-      if (sessionCache) setLoading(false)
+      // Mirror the INITIAL rule (`useState(!sessionCache)`): no session = still
+      // loading. When the cache is CLEARED — removed from your last team, signed
+      // out elsewhere — the shell has no person and no team, and the bounce that
+      // follows is a client navigation that takes a moment. Leaving `loading`
+      // false paints a hollow shell through that window: a nav with nothing in
+      // it and a profile button with no identity behind it, which is exactly
+      // what "the profile button seems broken" looked like. A skeleton is the
+      // honest frame to show while we work out where this person belongs.
+      setLoading(!sessionCache)
     }
     sessionSubs.add(onChange)
     return () => {

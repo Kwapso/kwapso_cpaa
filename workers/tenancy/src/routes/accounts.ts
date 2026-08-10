@@ -14,7 +14,8 @@
 import { fail, json, pagedJson } from "../../../../shared/workers/http"
 import { optionalText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
 import { publishChange } from "../../../../shared/workers/realtime"
-import { gated, gatedBody } from "../../../../shared/workers/route"
+import { gated, gatedBody, openTeam } from "../../../../shared/workers/route"
+import { teamContext, whoAmI } from "../../../../shared/workers/gating"
 import { accountScope } from "../../../../shared/workers/account-scope"
 import type { PortalUser } from "../../../../shared/types"
 import {
@@ -25,6 +26,8 @@ import {
   listAccounts,
   listPortalUsers,
   countPortalUsers,
+  portalStandings,
+  switchPortalAccount,
   setAccountActive,
   setAccountParent,
   setLinkActive,
@@ -238,6 +241,35 @@ export async function postPortalAccessActive(request: Request, env: Env): Promis
   const changed = await setPortalAccessActive(cfg, guard, scope, actor, id, body.active)
   if (changed) await publishChange(env.REALTIME, guard.teamId, "portal_users", id)
   return json({ ok: true })
+}
+
+/** GET /api/tenancy/portal/context — where this client login may stand and where
+ * they stand now. Staff get an empty list, which is the honest answer: the
+ * switcher is a client-side idea and there is nothing for staff to switch. */
+export async function getPortalContext(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await teamContext(request, env)
+  const scope = await accountScope(cfg, guard)
+  return json(await portalStandings(cfg, guard, scope))
+}
+
+/** POST /api/tenancy/portal/switch-account — a client login moves to another of
+ * their own companies, and the fence follows them.
+ *
+ * IDENTITY-gated, like switch-team: no role can grant or deny this, because the
+ * question is WHO the caller is, not what they may do. The set they may stand in
+ * comes from the guard corridor — never from the body — so the only thing the
+ * body can do is name one of their own companies or be refused. */
+export async function postSwitchPortalAccount(request: Request, env: Env): Promise<Response> {
+  const user = await whoAmI(request, env)
+  if (!user) return fail(401, "signed_out", "Not signed in.")
+
+  const { cfg, guard, body } = await openTeam<Body>(request, env)
+  const accountId = requireText(body.accountId, "Account", TEXT_LIMITS.short)
+  const scope = await accountScope(cfg, guard)
+  await switchPortalAccount(cfg, guard, scope, accountId)
+  // Re-resolve rather than patch the old stamp: the fence the next request will
+  // use is the one worth answering with.
+  return json(await portalStandings(cfg, guard, await accountScope(cfg, guard)))
 }
 
 /** Identity lives in the GLOBAL users table and is never mirrored into a team

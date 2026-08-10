@@ -31,6 +31,8 @@
 //   GET  /api/tenancy/portal-users         -> who can log in (?accountId)
 //   POST /api/tenancy/portal-users         -> grant portal access
 //   POST /api/tenancy/portal-users/active  -> revoke / restore portal access
+//   GET  /api/tenancy/portal/context       -> where a client login may stand, and where it stands
+//   POST /api/tenancy/portal/switch-account-> stand in another of their own companies
 //   GET  /api/tenancy/activity             -> activity feed (?scope=team|user|role&id=)
 //   GET  /api/tenancy/team-meta            -> the active team's Overview metadata
 //   GET  /api/tenancy/invites              -> the team's invites (all statuses)
@@ -87,7 +89,9 @@ import { getScreens, postScreen } from "./routes/config"
 import {
   getAccountDetail,
   getAccounts,
+  getPortalContext,
   getPortalUsers,
+  postSwitchPortalAccount,
   postAccountActive,
   postAccountParent,
   postCreateAccount,
@@ -153,6 +157,14 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "GET /api/tenancy/portal-users": { handler: getPortalUsers, kind: "read" },
   "POST /api/tenancy/portal-users": { handler: postGrantPortalAccess, kind: "mutation" },
   "POST /api/tenancy/portal-users/active": { handler: postPortalAccessActive, kind: "mutation" },
+  // The client-side switcher. switch-account flips only the caller's OWN
+  // current-account pointer — no shared row moves, so it publishes nothing,
+  // exactly like switch-team.
+  "GET /api/tenancy/portal/context": { handler: getPortalContext, kind: "read" },
+  "POST /api/tenancy/portal/switch-account": {
+    handler: postSwitchPortalAccount,
+    kind: "housekeeping",
+  },
   "GET /api/tenancy/activity": { handler: getActivityFeed, kind: "read" },
   "GET /api/tenancy/team-meta": { handler: getTeamMetaFeed, kind: "read" },
   "GET /api/tenancy/invites": { handler: getInvites, kind: "read" },
