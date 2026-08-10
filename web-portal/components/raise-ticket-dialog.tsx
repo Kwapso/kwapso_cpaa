@@ -17,8 +17,6 @@ import * as React from "react"
 
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import {
-  Dialog,
-  DialogContent,
   DialogDescription,
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
@@ -29,7 +27,7 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { Plus } from "lucide-react"
 
-import { FormShell, fieldSpacing } from "@shared/web/form-shell"
+import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { ApiFailure } from "@/lib/api"
 
@@ -66,43 +64,36 @@ export function RaiseTicketDialog({
   }
 
   return (
-    <Dialog
+    <FormShellDialog
       open={open}
-      onOpenChange={(o) => {
-        if (busy) return
-        if (!o) clearDraft() // dismissing the form discards the draft
-        onOpenChange(o)
-      }}
+      onOpenChange={onOpenChange}
+      busy={busy}
+      clearDraft={clearDraft}
+      onSubmit={submit}
+      title={<DialogTitle>Ask us something</DialogTitle>}
+      subtitle={
+        <DialogDescription>
+          Tell us what&apos;s going on in your own words. You&apos;ll get the reply right here.
+        </DialogDescription>
+      }
+      footer={
+        <Button type="submit" size="lg" disabled={busy || !values.description.trim()}>
+          {busy ? <Spinner /> : <Plus className="size-3.5" />}
+          {busy ? "Sending…" : "Send it"}
+        </Button>
+      }
     >
-      <DialogContent>
-        <FormShell
-          onSubmit={submit}
-          title={<DialogTitle>Ask us something</DialogTitle>}
-          subtitle={
-            <DialogDescription>
-              Tell us what&apos;s going on in your own words. You&apos;ll get the reply right here.
-            </DialogDescription>
-          }
-          footer={
-            <Button type="submit" size="lg" disabled={busy || !values.description.trim()}>
-              {busy ? <Spinner /> : <Plus className="size-3.5" />}
-              {busy ? "Sending…" : "Send it"}
-            </Button>
-          }
-        >
-          <Field config={descField} htmlFor="ticket-desc" className={fieldSpacing}>
-            <Textarea
-              id="ticket-desc"
-              value={values.description}
-              onChange={(e) => setValues((v) => ({ ...v, description: e.target.value }))}
-              placeholder="For example: the new booking page is showing last month's prices."
-              disabled={busy}
-              rows={5}
-              autoFocus
-            />
-          </Field>
-        </FormShell>
-      </DialogContent>
-    </Dialog>
+      <Field config={descField} htmlFor="ticket-desc" className={fieldSpacing}>
+        <Textarea
+          id="ticket-desc"
+          value={values.description}
+          onChange={(e) => setValues((v) => ({ ...v, description: e.target.value }))}
+          placeholder="For example: the new booking page is showing last month's prices."
+          disabled={busy}
+          rows={5}
+          autoFocus
+        />
+      </Field>
+    </FormShellDialog>
   )
 }

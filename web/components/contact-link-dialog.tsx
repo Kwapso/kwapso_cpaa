@@ -15,8 +15,6 @@ import * as React from "react"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Checkbox } from "@kwapso/ui/registry/primitives/checkbox/checkbox"
 import {
-  Dialog,
-  DialogContent,
   DialogDescription,
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
@@ -36,7 +34,7 @@ import { Plus, Search } from "lucide-react"
 
 import type { Account } from "@shared/types"
 import { ApiFailure, tenancy } from "@/lib/api"
-import { FormShell, fieldSpacing } from "@shared/web/form-shell"
+import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useCached } from "@shared/web/store"
 import { useFormDraft } from "@shared/web/use-form-draft"
 
@@ -102,88 +100,81 @@ export function ContactLinkDialog({
   }
 
   return (
-    <Dialog
+    <FormShellDialog
       open={open}
-      onOpenChange={(o) => {
-        if (busy) return
-        if (!o) clearDraft()
-        onOpenChange(o)
-      }}
+      onOpenChange={onOpenChange}
+      busy={busy}
+      clearDraft={clearDraft}
+      onSubmit={submit}
+      title={<DialogTitle>Add a contact</DialogTitle>}
+      subtitle={
+        <DialogDescription>
+          Pick the person who&apos;s a contact of {accountName}. If they&apos;re new, add them
+          as a person first.
+        </DialogDescription>
+      }
+      footer={
+        <Button type="submit" disabled={busy || !values.personAccountId} className="gap-1.5">
+          {busy ? <Spinner /> : <Plus className="size-4" />}
+          {busy ? "Adding…" : "Add contact"}
+        </Button>
+      }
     >
-      <DialogContent>
-        <FormShell
-          onSubmit={submit}
-          title={<DialogTitle>Add a contact</DialogTitle>}
-          subtitle={
-            <DialogDescription>
-              Pick the person who&apos;s a contact of {accountName}. If they&apos;re new, add them
-              as a person first.
-            </DialogDescription>
-          }
-          footer={
-            <Button type="submit" disabled={busy || !values.personAccountId} className="gap-1.5">
-              {busy ? <Spinner /> : <Plus className="size-4" />}
-              {busy ? "Adding…" : "Add contact"}
-            </Button>
-          }
+      <Field config={personField} htmlFor="contact-person" className={fieldSpacing}>
+        <div className="relative">
+          <Search
+            className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
+            aria-hidden
+          />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search people…"
+            className="pl-8"
+            disabled={busy}
+            aria-label="Search people"
+          />
+        </div>
+        <Select
+          value={values.personAccountId}
+          onValueChange={(personAccountId) => setValues((v) => ({ ...v, personAccountId }))}
+          disabled={busy || people.length === 0}
         >
-          <Field config={personField} htmlFor="contact-person" className={fieldSpacing}>
-            <div className="relative">
-              <Search
-                className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
-                aria-hidden
-              />
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search people…"
-                className="pl-8"
-                disabled={busy}
-                aria-label="Search people"
-              />
-            </div>
-            <Select
-              value={values.personAccountId}
-              onValueChange={(personAccountId) => setValues((v) => ({ ...v, personAccountId }))}
-              disabled={busy || people.length === 0}
-            >
-              <SelectTrigger id="contact-person">
-                <SelectValue placeholder={people.length ? "Choose a person" : "No people found"} />
-              </SelectTrigger>
-              <SelectContent>
-                {people.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                    {p.email ? ` · ${p.email}` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
+          <SelectTrigger id="contact-person">
+            <SelectValue placeholder={people.length ? "Choose a person" : "No people found"} />
+          </SelectTrigger>
+          <SelectContent>
+            {people.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.name}
+                {p.email ? ` · ${p.email}` : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
 
-          <Field config={relationshipField} htmlFor="contact-relationship" className={fieldSpacing}>
-            <Input
-              id="contact-relationship"
-              value={values.relationship}
-              onChange={(e) => setValues((v) => ({ ...v, relationship: e.target.value }))}
-              placeholder="Operations"
-              disabled={busy}
-            />
-          </Field>
+      <Field config={relationshipField} htmlFor="contact-relationship" className={fieldSpacing}>
+        <Input
+          id="contact-relationship"
+          value={values.relationship}
+          onChange={(e) => setValues((v) => ({ ...v, relationship: e.target.value }))}
+          placeholder="Operations"
+          disabled={busy}
+        />
+      </Field>
 
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="contact-main"
-              checked={values.isMainStakeholder}
-              onCheckedChange={(c) => setValues((v) => ({ ...v, isMainStakeholder: c === true }))}
-              disabled={busy}
-            />
-            <label htmlFor="contact-main" className="text-sm">
-              Main contact — the person you deal with first
-            </label>
-          </div>
-        </FormShell>
-      </DialogContent>
-    </Dialog>
+      <div className="flex items-center gap-2">
+        <Checkbox
+          id="contact-main"
+          checked={values.isMainStakeholder}
+          onCheckedChange={(c) => setValues((v) => ({ ...v, isMainStakeholder: c === true }))}
+          disabled={busy}
+        />
+        <label htmlFor="contact-main" className="text-sm">
+          Main contact — the person you deal with first
+        </label>
+      </div>
+    </FormShellDialog>
   )
 }

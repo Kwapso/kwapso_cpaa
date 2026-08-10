@@ -6,8 +6,8 @@
 import { brand } from "../../../../shared/brand"
 import { logActivity, type Actor } from "../../../../shared/workers/activity"
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "../../../../shared/workers/d1-rest"
-import { brandedEmail } from "../../../../shared/workers/email-template"
 import { ulid } from "../../../../shared/workers/id"
+import { sendBrandedEmail } from "../../../../shared/workers/notify"
 import type { Invite, InviteAudit } from "../../../../shared/types"
 import type { Env } from "../env"
 import { GuardError, type MemberGuard } from "./permissions"
@@ -220,42 +220,26 @@ export async function createInvite(
   // back to the request origin only when PUBLIC_APP_URL is unset (human path).
   const base = env.PUBLIC_APP_URL || new URL(request.url).origin
 
-  // Branded invite email, sent through the auth worker (best-effort).
-  const { html, text } = brandedEmail({
-    origin: base,
-    heading: `You're invited to ${teamName}`,
-    intro: `${actor.name || "Someone"} invited you to join ${teamName} on ${brand.name} as ${roles[0].title}. Sign in with this email address to accept.`,
-    ctaLabel: `Join ${teamName}`,
-    // Deep-link to the in-app Invitations inbox: an already-signed-in user lands
-    // right on Accept; a new user is sent to sign in, then onboarding auto-joins.
-    ctaUrl: `${base}/invitations`,
-    footnote: "This invite expires in 7 days. If you weren't expecting it, you can ignore this email.",
-  })
-  // Send the branded email and CAPTURE whether it actually went out. Best-effort: a
-  // mail failure must NOT fail the invite (the invite_index row already routes the
-  // acceptance, and the invitee can accept from their in-app Invitations inbox), but we
-  // report the real outcome so the caller (and the agent) never claim an email was sent
-  // when it wasn't.
-  let emailSent = false
-  try {
-    const res = await env.AUTH.fetch("https://auth/internal/send-email", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-internal-key": env.INTERNAL_KEY ?? "",
-      },
-      body: JSON.stringify({
-        to,
-        subject: `You're invited to ${teamName} on ${brand.name}`,
-        html,
-        text,
-      }),
-    })
-    emailSent = res.ok
-    if (!res.ok) console.error("invite email failed:", res.status)
-  } catch (e) {
-    console.error("invite email failed:", e)
-  }
+  // The branded invite email, through the same sender every other worker uses, and
+  // CAPTURING whether it actually went out. Best-effort: a mail failure must NOT fail
+  // the invite (the invite_index row already routes the acceptance, and the invitee can
+  // accept from their in-app Invitations inbox), but we report the real outcome so the
+  // caller — and the agent — never claim an email was sent when it wasn't.
+  const emailSent = await sendBrandedEmail(
+    env,
+    to,
+    `You're invited to ${teamName} on ${brand.name}`,
+    {
+      heading: `You're invited to ${teamName}`,
+      intro: `${actor.name || "Someone"} invited you to join ${teamName} on ${brand.name} as ${roles[0].title}. Sign in with this email address to accept.`,
+      ctaLabel: `Join ${teamName}`,
+      // Deep-link to the in-app Invitations inbox: an already-signed-in user lands
+      // right on Accept; a new user is sent to sign in, then onboarding auto-joins.
+      ctaUrl: `${base}/invitations`,
+      footnote: "This invite expires in 7 days. If you weren't expecting it, you can ignore this email.",
+    },
+    base
+  )
 
   return { inviteId, emailSent }
 }

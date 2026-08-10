@@ -11,8 +11,6 @@ import * as React from "react"
 
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import {
-  Dialog,
-  DialogContent,
   DialogDescription,
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
@@ -24,7 +22,7 @@ import { Plus } from "lucide-react"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
-import { FormShell, fieldSpacing } from "@shared/web/form-shell"
+import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
 
 const groupField = { ...defaultFieldConfig, label: "Group", required: true }
@@ -64,61 +62,54 @@ export function SelectableFormDialog({
   }
 
   return (
-    <Dialog
+    <FormShellDialog
       open={open}
-      onOpenChange={(o) => {
-        if (busy) return
-        if (!o) clearDraft() // dismissing the form discards the draft
-        onOpenChange(o)
-      }}
-    >
-      <DialogContent>
-        <FormShell
-          onSubmit={submit}
-          title={<DialogTitle>New dropdown value</DialogTitle>}
-          subtitle={
-            <DialogDescription>
-              Pick an existing group or start a new one, then add the option.
-            </DialogDescription>
-          }
-          footer={
-            <Button
-              type="submit"
-              disabled={busy || !values.type.trim() || !values.value.trim()}
-              className="gap-1.5"
-            >
-              {busy ? <Spinner /> : <Plus className="size-4" />}
-              {busy ? "Adding…" : "Add value"}
-            </Button>
-          }
+      onOpenChange={onOpenChange}
+      busy={busy}
+      clearDraft={clearDraft}
+      onSubmit={submit}
+      title={<DialogTitle>New dropdown value</DialogTitle>}
+      subtitle={
+        <DialogDescription>
+          Pick an existing group or start a new one, then add the option.
+        </DialogDescription>
+      }
+      footer={
+        <Button
+          type="submit"
+          disabled={busy || !values.type.trim() || !values.value.trim()}
+          className="gap-1.5"
         >
-          <Field config={groupField} htmlFor="selectable-group" className={fieldSpacing}>
-            <Input
-              id="selectable-group"
-              list="dropdown-types"
-              value={values.type}
-              onChange={(e) => setValues((v) => ({ ...v, type: e.target.value }))}
-              placeholder="e.g. Help type"
-              disabled={busy}
-              autoFocus
-            />
-            <datalist id="dropdown-types">
-              {types.map((t) => (
-                <option key={t} value={t} />
-              ))}
-            </datalist>
-          </Field>
-          <Field config={optionField} htmlFor="selectable-value" className={fieldSpacing}>
-            <Input
-              id="selectable-value"
-              value={values.value}
-              onChange={(e) => setValues((v) => ({ ...v, value: e.target.value }))}
-              placeholder="New option"
-              disabled={busy}
-            />
-          </Field>
-        </FormShell>
-      </DialogContent>
-    </Dialog>
+          {busy ? <Spinner /> : <Plus className="size-4" />}
+          {busy ? "Adding…" : "Add value"}
+        </Button>
+      }
+    >
+      <Field config={groupField} htmlFor="selectable-group" className={fieldSpacing}>
+        <Input
+          id="selectable-group"
+          list="dropdown-types"
+          value={values.type}
+          onChange={(e) => setValues((v) => ({ ...v, type: e.target.value }))}
+          placeholder="e.g. Help type"
+          disabled={busy}
+          autoFocus
+        />
+        <datalist id="dropdown-types">
+          {types.map((t) => (
+            <option key={t} value={t} />
+          ))}
+        </datalist>
+      </Field>
+      <Field config={optionField} htmlFor="selectable-value" className={fieldSpacing}>
+        <Input
+          id="selectable-value"
+          value={values.value}
+          onChange={(e) => setValues((v) => ({ ...v, value: e.target.value }))}
+          placeholder="New option"
+          disabled={busy}
+        />
+      </Field>
+    </FormShellDialog>
   )
 }

@@ -9,6 +9,7 @@
 // control that exists twice is a security control that holds until someone
 // writes the second copy from memory.
 
+import { fail } from "./http"
 import { safeMediaKey } from "./image"
 
 /** Anything with `.fetch()` — a service binding, in worker terms. */
@@ -118,4 +119,42 @@ export async function recordClientError(
         .catch(() => null) // recording must never break the beacon
   }
   return new Response(null, { status: 204 })
+}
+
+/** The other thing both doors do the same way: catch their OWN crash.
+ *
+ * A public door must never answer a stranger with Cloudflare's raw 1101. Neither
+ * gateway binds a database, so the crash goes out the same internal pipe the
+ * client beacon uses — best-effort, because a door that cannot report is still a
+ * door that must answer.
+ *
+ * NOT `recordClientError`, deliberately: that one reads the request BODY (there
+ * is no body here, only an exception), and it writes nothing for an anonymous
+ * caller — which is exactly the 1101 case this exists to catch. Same pipe, two
+ * honestly different jobs.
+ *
+ * `source` is the door's name ("gateway" / "portal-gateway") and also spells the
+ * console prefix, so the two logs read as they always did. */
+export async function recordGatewayCrash(
+  request: Request,
+  auth: Upstream,
+  source: string,
+  internalKey: string | undefined,
+  e: unknown
+): Promise<Response> {
+  const place = new URL(request.url).pathname
+  console.error(`${source.replaceAll("-", "_")}_error`, place, e)
+  await auth
+    .fetch("https://internal/internal/log-error", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-internal-key": internalKey ?? "" },
+      body: JSON.stringify({
+        source,
+        place,
+        message: e instanceof Error ? e.message : String(e),
+        stack: e instanceof Error ? e.stack : undefined,
+      }),
+    })
+    .catch(() => null)
+  return fail(500, "server_error", "Something went wrong.")
 }

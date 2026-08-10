@@ -79,6 +79,48 @@ describe("credit history reconciles with the balance (one row per command)", () 
   })
 })
 
+// ONE STEP SEAM. The plan loop and confirmAndRun each carried their own copy of the
+// tool-call loop, and the copies DRIFTED: the plan loop tallied only writes, the confirm
+// copy tallied EVERY call ("confirmed calls are always writes" — they aren't; a turn that
+// needs confirming stores ALL of its calls in the proposal, reads included). So the audit
+// trail — the record of what the assistant did on someone's behalf — read differently
+// depending on which loop happened to run it, and a plain list_members could flip a row
+// from the author's own 'prompt' entry to a team-visible 'action' one.
+//
+// The check above stayed green through all of it: ONE guarded push anywhere in the file
+// satisfied it, and the plan loop's copy provided one. These lock the seam itself.
+describe("one tool-execution seam — the audit trail can't depend on which loop ran", () => {
+  const seam = (() => {
+    const start = agent.indexOf("async function runToolCall")
+    return start === -1 ? "" : agent.slice(start, agent.indexOf("\n/**", start + 1))
+  })()
+
+  it("both loops run their steps through the ONE runToolCall", () => {
+    expect(seam, "the shared step seam must exist").toBeTruthy()
+    // A second executeTool call site IS a second copy of the step — how they drifted.
+    expect((agent.match(/await executeTool\(/g) ?? []).length, "one place runs a tool").toBe(1)
+    // …and both the plan loop and the confirm path reach it.
+    expect((agent.match(/await runToolCall\(/g) ?? []).length, "both loops call the seam").toBe(2)
+  })
+
+  it("the step's audit row is written INSIDE the seam, so both paths persist it", () => {
+    expect(/appendMessage\(/.test(seam), "the seam must persist the step").toBe(true)
+    expect(/role: "tool"/.test(seam), "…as the step's own tool row").toBe(true)
+    expect(
+      /status: result\.ok \? "done" : "failed"/.test(seam),
+      "…carrying the real outcome, so a reopened chat shows a failed step red, never a false green"
+    ).toBe(true)
+  })
+
+  it("the tally is written-guarded in the seam, and nowhere else", () => {
+    expect((agent.match(/tally\.actions\.push/g) ?? []).length, "one tally, in the one seam").toBe(1)
+    expect(
+      /if \(t\?\.write\) \{\n\s*tally\.actions\.push/.test(seam),
+      "the push must sit directly under the write guard, inside the seam"
+    ).toBe(true)
+  })
+})
+
 // A turn that changed NOTHING the user wanted — a refused action (inviting an existing
 // member) or a model hiccup — must not cost a credit. The turn meters up front (before the
 // outcome is known), then hands the units back on the failure exits when no write succeeded.

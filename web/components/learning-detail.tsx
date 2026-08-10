@@ -23,7 +23,6 @@ import {
 import {
   ActivityFeed,
   defaultActivityFeedConfig,
-  type ActivityItem as ActivityFeedItem,
 } from "@kwapso/ui/registry/collections/activity-feed/activity-feed"
 import { Pencil, Power } from "lucide-react"
 
@@ -32,7 +31,6 @@ import { LearningFormDialog, type LearningFormValues } from "@/components/learni
 import { LoadMore } from "@/components/load-more"
 import { ApiFailure, content, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
-import { formatActivityWhen } from "@shared/web/format"
 import { formatCount } from "@shared/web/format-count"
 import { RichText } from "@/components/rich-text"
 import { safeHref, safeSrc } from "@/lib/rich-text"
@@ -179,12 +177,6 @@ export function LearningDetailScreen({ teamId, learningId }: { teamId: string; l
   // The article's linked resource, checked at the render boundary (see LearningMedia).
   const resourceHref = safeHref(item.contentLink)
 
-  const activityItems: ActivityFeedItem[] = activity.rows.map((a) => ({
-    id: a.id,
-    description: a.description,
-    actor: a.actorName ?? undefined,
-    timestamp: formatActivityWhen(a.createdAt),
-  }))
 
   const tabsConfig = {
     ...defaultTabsConfig,
@@ -253,7 +245,7 @@ export function LearningDetailScreen({ teamId, learningId }: { teamId: string; l
               <div className="flex flex-col gap-4">
                 <ActivityFeed
                   config={{ ...defaultActivityFeedConfig, emptyText: "No activity yet." }}
-                  items={activityItems}
+                  items={activity.items}
                 />
                 <LoadMore
                   listKey={activity.listKey}

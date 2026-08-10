@@ -9,13 +9,11 @@ import * as React from "react"
 
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import {
-  Dialog,
-  DialogContent,
   DialogDescription,
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
-import { FormShell, fieldSpacing } from "@shared/web/form-shell"
+import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import {
   Select,
@@ -83,61 +81,54 @@ export function InviteDialog({
   }
 
   return (
-    <Dialog
+    <FormShellDialog
       open={open}
-      onOpenChange={(o) => {
-        if (busy) return
-        if (!o) clearDraft() // dismissing the form (Esc / backdrop / close) discards the draft
-        onOpenChange(o)
-      }}
+      onOpenChange={onOpenChange}
+      busy={busy}
+      clearDraft={clearDraft}
+      onSubmit={submit}
+      title={<DialogTitle>Invite someone to the team</DialogTitle>}
+      subtitle={
+        <DialogDescription>
+          We&apos;ll email them an invite to join in the role you pick.
+        </DialogDescription>
+      }
+      footer={
+        <Button type="submit" disabled={busy || !values.email.trim() || !values.roleId} className="gap-1.5">
+          {busy ? <Spinner /> : <Mail className="size-4" />}
+          {busy ? "Sending…" : "Send invite"}
+        </Button>
+      }
     >
-      <DialogContent>
-        <FormShell
-          onSubmit={submit}
-          title={<DialogTitle>Invite someone to the team</DialogTitle>}
-          subtitle={
-            <DialogDescription>
-              We&apos;ll email them an invite to join in the role you pick.
-            </DialogDescription>
-          }
-          footer={
-            <Button type="submit" disabled={busy || !values.email.trim() || !values.roleId} className="gap-1.5">
-              {busy ? <Spinner /> : <Mail className="size-4" />}
-              {busy ? "Sending…" : "Send invite"}
-            </Button>
-          }
+      <Field config={emailField} htmlFor="invite-email" className={fieldSpacing}>
+        <Input
+          id="invite-email"
+          type="email"
+          value={values.email}
+          onChange={(e) => setValues((v) => ({ ...v, email: e.target.value }))}
+          placeholder="name@company.com"
+          disabled={busy}
+          autoFocus
+        />
+      </Field>
+      <Field config={roleField} htmlFor="invite-role" className={fieldSpacing}>
+        <Select
+          value={values.roleId}
+          onValueChange={(roleId) => setValues((v) => ({ ...v, roleId }))}
+          disabled={busy}
         >
-          <Field config={emailField} htmlFor="invite-email" className={fieldSpacing}>
-            <Input
-              id="invite-email"
-              type="email"
-              value={values.email}
-              onChange={(e) => setValues((v) => ({ ...v, email: e.target.value }))}
-              placeholder="name@company.com"
-              disabled={busy}
-              autoFocus
-            />
-          </Field>
-          <Field config={roleField} htmlFor="invite-role" className={fieldSpacing}>
-            <Select
-              value={values.roleId}
-              onValueChange={(roleId) => setValues((v) => ({ ...v, roleId }))}
-              disabled={busy}
-            >
-              <SelectTrigger id="invite-role" className="w-full">
-                <SelectValue placeholder="Role" />
-              </SelectTrigger>
-              <SelectContent>
-                {roles.map((r) => (
-                  <SelectItem key={r.id} value={r.id}>
-                    {r.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-        </FormShell>
-      </DialogContent>
-    </Dialog>
+          <SelectTrigger id="invite-role" className="w-full">
+            <SelectValue placeholder="Role" />
+          </SelectTrigger>
+          <SelectContent>
+            {roles.map((r) => (
+              <SelectItem key={r.id} value={r.id}>
+                {r.title}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+    </FormShellDialog>
   )
 }

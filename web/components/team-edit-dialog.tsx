@@ -12,13 +12,11 @@ import {
 } from "@kwapso/ui/registry/primitives/avatar/avatar"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import {
-  Dialog,
-  DialogContent,
   DialogDescription,
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
-import { FormShell, fieldSpacing } from "@shared/web/form-shell"
+import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { FileUpload } from "@kwapso/ui/registry/primitives/file-upload/file-upload"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
@@ -85,51 +83,44 @@ export function TeamEditDialog({
   }
 
   return (
-    <Dialog
+    <FormShellDialog
       open={open}
-      onOpenChange={(o) => {
-        if (busy) return
-        if (!o) clearDraft() // dismissing the form (Esc / backdrop / close) discards the draft
-        onOpenChange(o)
-      }}
+      onOpenChange={onOpenChange}
+      busy={busy}
+      clearDraft={clearDraft}
+      onSubmit={submit}
+      title={<DialogTitle>Edit your team</DialogTitle>}
+      subtitle={
+        <DialogDescription>
+          Change your team&apos;s name or add a logo. This is what everyone sees.
+        </DialogDescription>
+      }
+      footer={
+        <Button type="submit" disabled={busy || !name.trim()}>
+          {busy ? <Spinner /> : null}
+          {busy ? "Saving…" : "Save changes"}
+        </Button>
+      }
     >
-      <DialogContent>
-        <FormShell
-          onSubmit={submit}
-          title={<DialogTitle>Edit your team</DialogTitle>}
-          subtitle={
-            <DialogDescription>
-              Change your team&apos;s name or add a logo. This is what everyone sees.
-            </DialogDescription>
-          }
-          footer={
-            <Button type="submit" disabled={busy || !name.trim()}>
-              {busy ? <Spinner /> : null}
-              {busy ? "Saving…" : "Save changes"}
-            </Button>
-          }
-        >
-          <div className="flex flex-col items-center gap-3">
-            <Avatar className="size-20">
-              {(logo || team?.logoUrl) && (
-                <AvatarImage src={logo || (team?.logoUrl as string)} alt="Team logo" />
-              )}
-              <AvatarFallback className="text-xl">
-                {letterMark(name)}
-              </AvatarFallback>
-            </Avatar>
-            <FileUpload accept="image/*" multiple={false} onChange={handlePhoto} />
-          </div>
-          <Field config={nameField} htmlFor="team-name" className={fieldSpacing}>
-            <Input
-              id="team-name"
-              value={name}
-              onChange={(e) => setValues((v) => ({ ...v, name: e.target.value }))}
-              disabled={busy}
-            />
-          </Field>
-        </FormShell>
-      </DialogContent>
-    </Dialog>
+      <div className="flex flex-col items-center gap-3">
+        <Avatar className="size-20">
+          {(logo || team?.logoUrl) && (
+            <AvatarImage src={logo || (team?.logoUrl as string)} alt="Team logo" />
+          )}
+          <AvatarFallback className="text-xl">
+            {letterMark(name)}
+          </AvatarFallback>
+        </Avatar>
+        <FileUpload accept="image/*" multiple={false} onChange={handlePhoto} />
+      </div>
+      <Field config={nameField} htmlFor="team-name" className={fieldSpacing}>
+        <Input
+          id="team-name"
+          value={name}
+          onChange={(e) => setValues((v) => ({ ...v, name: e.target.value }))}
+          disabled={busy}
+        />
+      </Field>
+    </FormShellDialog>
   )
 }

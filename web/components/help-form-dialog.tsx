@@ -10,13 +10,11 @@ import * as React from "react"
 
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import {
-  Dialog,
-  DialogContent,
   DialogDescription,
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
-import { FormShell, fieldSpacing } from "@shared/web/form-shell"
+import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import {
   Select,
@@ -94,78 +92,71 @@ export function HelpFormDialog({
   }
 
   return (
-    <Dialog
+    <FormShellDialog
       open={open}
-      onOpenChange={(o) => {
-        if (busy) return
-        if (!o) clearDraft() // dismissing the form (Esc / backdrop / close) discards the draft
-        onOpenChange(o)
-      }}
+      onOpenChange={onOpenChange}
+      busy={busy}
+      clearDraft={clearDraft}
+      onSubmit={submit}
+      title={<DialogTitle>{isEdit ? "Edit this ticket" : "Raise a ticket"}</DialogTitle>}
+      subtitle={
+        <DialogDescription>
+          {isEdit
+            ? "Update what you're asking for. Everyone on the ticket will see the change."
+            : "Describe the problem you're facing. Chat with others, or use this ticket as a forum to discuss solutions."}
+        </DialogDescription>
+      }
+      footer={
+        <Button type="submit" disabled={busy || !values.description.trim()}>
+          {busy ? <Spinner /> : null}
+          {busy ? (isEdit ? "Saving…" : "Raising…") : isEdit ? "Save changes" : "Raise ticket"}
+        </Button>
+      }
     >
-      <DialogContent>
-        <FormShell
-          onSubmit={submit}
-          title={<DialogTitle>{isEdit ? "Edit this ticket" : "Raise a ticket"}</DialogTitle>}
-          subtitle={
-            <DialogDescription>
-              {isEdit
-                ? "Update what you're asking for. Everyone on the ticket will see the change."
-                : "Describe the problem you're facing. Chat with others, or use this ticket as a forum to discuss solutions."}
-            </DialogDescription>
-          }
-          footer={
-            <Button type="submit" disabled={busy || !values.description.trim()}>
-              {busy ? <Spinner /> : null}
-              {busy ? (isEdit ? "Saving…" : "Raising…") : isEdit ? "Save changes" : "Raise ticket"}
-            </Button>
-          }
-        >
-          <Field config={descField} htmlFor="help-desc" className={fieldSpacing}>
-            <Textarea
-              id="help-desc"
-              value={values.description}
-              onChange={(e) => setValues((v) => ({ ...v, description: e.target.value }))}
-              placeholder="Tell us what's going on — e.g. I can't invite a new member, the button is greyed out."
-              disabled={busy}
-              rows={4}
-              autoFocus
-            />
-          </Field>
-          <Field config={typeField} htmlFor="help-type" className={fieldSpacing}>
-            <div className="relative">
-              <Select
-                value={values.helpType}
-                onValueChange={(helpType) => setValues((v) => ({ ...v, helpType }))}
-                disabled={busy}
-              >
-                <SelectTrigger id="help-type">
-                  <SelectValue placeholder="Choose a type (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>No type</SelectItem>
-                  {helpTypeOptions.map((v) => (
-                    <SelectItem key={v} value={v}>
-                      {v}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {/* Clear (X): reset to NONE without scrolling up to "No type". */}
-              {values.helpType !== NONE && !busy && (
-                <button
-                  type="button"
-                  aria-label="Clear type"
-                  onClick={() => setValues((v) => ({ ...v, helpType: NONE }))}
-                  className="text-muted-foreground hover:text-foreground absolute inset-y-0 right-8 my-auto flex size-5 items-center justify-center rounded-sm"
-                >
-                  <X className="size-3.5" />
-                </button>
-              )}
-            </div>
-            <ManageDropdownsLink teamId={teamId ?? null} />
-          </Field>
-        </FormShell>
-      </DialogContent>
-    </Dialog>
+      <Field config={descField} htmlFor="help-desc" className={fieldSpacing}>
+        <Textarea
+          id="help-desc"
+          value={values.description}
+          onChange={(e) => setValues((v) => ({ ...v, description: e.target.value }))}
+          placeholder="Tell us what's going on — e.g. I can't invite a new member, the button is greyed out."
+          disabled={busy}
+          rows={4}
+          autoFocus
+        />
+      </Field>
+      <Field config={typeField} htmlFor="help-type" className={fieldSpacing}>
+        <div className="relative">
+          <Select
+            value={values.helpType}
+            onValueChange={(helpType) => setValues((v) => ({ ...v, helpType }))}
+            disabled={busy}
+          >
+            <SelectTrigger id="help-type">
+              <SelectValue placeholder="Choose a type (optional)" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>No type</SelectItem>
+              {helpTypeOptions.map((v) => (
+                <SelectItem key={v} value={v}>
+                  {v}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {/* Clear (X): reset to NONE without scrolling up to "No type". */}
+          {values.helpType !== NONE && !busy && (
+            <button
+              type="button"
+              aria-label="Clear type"
+              onClick={() => setValues((v) => ({ ...v, helpType: NONE }))}
+              className="text-muted-foreground hover:text-foreground absolute inset-y-0 right-8 my-auto flex size-5 items-center justify-center rounded-sm"
+            >
+              <X className="size-3.5" />
+            </button>
+          )}
+        </div>
+        <ManageDropdownsLink teamId={teamId ?? null} />
+      </Field>
+    </FormShellDialog>
   )
 }

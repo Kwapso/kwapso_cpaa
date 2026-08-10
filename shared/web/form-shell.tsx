@@ -11,6 +11,7 @@
 
 import * as React from "react"
 
+import { Dialog, DialogContent } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Separator } from "@kwapso/ui/registry/primitives/separator/separator"
 
 export function FormShell({
@@ -41,6 +42,61 @@ export function FormShell({
       <Separator />
       <div className="flex flex-wrap justify-end gap-2 pt-4">{footer}</div>
     </form>
+  )
+}
+
+/** A FormShell inside a dialog — which is how nearly every form in the app appears.
+ *
+ * The wrapper around FormShell was written out eleven times, byte for byte: the same
+ * Dialog, the same DialogContent, and the same two dismissal rules, which are the only
+ * part with teeth. While a save is in flight the form CANNOT be dismissed (busy), and
+ * dismissing it any other way — Esc, backdrop, the close button — DISCARDS the draft,
+ * so a form the user walked away from doesn't reappear half-filled tomorrow.
+ *
+ * The draft itself stays at the call site: each form owns the shape of what it saves,
+ * so `useFormDraft` lives there and hands `clearDraft` down. */
+export function FormShellDialog({
+  open,
+  onOpenChange,
+  busy,
+  clearDraft,
+  title,
+  subtitle,
+  children,
+  footer,
+  onSubmit,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  /** A save in flight — the dialog refuses to close until it lands. */
+  busy?: boolean
+  /** Dismissing the form throws its draft away. */
+  clearDraft?: () => void
+  /** Pass a <DialogTitle>…</DialogTitle>. */
+  title: React.ReactNode
+  /** Pass a <DialogDescription>…</DialogDescription>. */
+  subtitle?: React.ReactNode
+  /** The fields (each a <Field>). */
+  children: React.ReactNode
+  /** The action button(s). */
+  footer: React.ReactNode
+  onSubmit?: (e: React.FormEvent) => void
+}) {
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (busy) return
+        if (!o) clearDraft?.()
+        onOpenChange(o)
+      }}
+    >
+      <DialogContent>
+        <FormShell onSubmit={onSubmit} title={title} subtitle={subtitle} footer={footer}>
+          {children}
+        </FormShell>
+      </DialogContent>
+    </Dialog>
   )
 }
 

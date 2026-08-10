@@ -16,8 +16,6 @@ import * as React from "react"
 
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import {
-  Dialog,
-  DialogContent,
   DialogDescription,
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
@@ -37,7 +35,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { Plus } from "lucide-react"
 
 import { ApiFailure } from "@/lib/api"
-import { FormShell, fieldSpacing } from "@shared/web/form-shell"
+import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
 
 const typeField = { ...defaultFieldConfig, label: "Type", required: true }
@@ -122,140 +120,133 @@ export function AccountFormDialog({
   const set = (patch: Partial<AccountFormValues>) => setValues((v) => ({ ...v, ...patch }))
 
   return (
-    <Dialog
+    <FormShellDialog
       open={open}
-      onOpenChange={(o) => {
-        if (busy) return
-        if (!o) clearDraft() // dismissing the form discards the draft
-        onOpenChange(o)
-      }}
+      onOpenChange={onOpenChange}
+      busy={busy}
+      clearDraft={clearDraft}
+      onSubmit={submit}
+      title={<DialogTitle>{isEdit ? "Edit this account" : "Add an account"}</DialogTitle>}
+      subtitle={
+        <DialogDescription>
+          {isEdit
+            ? "Update the details you hold for them."
+            : "A company or a person — both live in the same list."}
+        </DialogDescription>
+      }
+      footer={
+        <Button type="submit" disabled={busy || !values.name.trim()} className="gap-1.5">
+          {busy ? <Spinner /> : isEdit ? null : <Plus className="size-4" />}
+          {busy ? "Saving…" : isEdit ? "Save changes" : "Add account"}
+        </Button>
+      }
     >
-      <DialogContent>
-        <FormShell
-          onSubmit={submit}
-          title={<DialogTitle>{isEdit ? "Edit this account" : "Add an account"}</DialogTitle>}
-          subtitle={
-            <DialogDescription>
-              {isEdit
-                ? "Update the details you hold for them."
-                : "A company or a person — both live in the same list."}
-            </DialogDescription>
-          }
-          footer={
-            <Button type="submit" disabled={busy || !values.name.trim()} className="gap-1.5">
-              {busy ? <Spinner /> : isEdit ? null : <Plus className="size-4" />}
-              {busy ? "Saving…" : isEdit ? "Save changes" : "Add account"}
-            </Button>
-          }
+      {!isEdit && (
+        <Field config={typeField} htmlFor="account-type" className={fieldSpacing}>
+          <Select
+            value={values.accountType}
+            onValueChange={(v) => set({ accountType: v === "individual" ? "individual" : "entity" })}
+            disabled={busy}
+          >
+            <SelectTrigger id="account-type">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="entity">Company</SelectItem>
+              <SelectItem value="individual">Person</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+      )}
+
+      <Field config={nameField} htmlFor="account-name" className={fieldSpacing}>
+        <Input
+          id="account-name"
+          value={values.name}
+          onChange={(e) => set({ name: e.target.value })}
+          placeholder="Bergman S.A."
+          disabled={busy}
+          autoFocus
+        />
+      </Field>
+
+      <Field config={parentField} htmlFor="account-parent" className={fieldSpacing}>
+        <Select
+          value={values.parentAccountId || TOP}
+          onValueChange={(v) => set({ parentAccountId: v === TOP ? "" : v })}
+          disabled={busy}
         >
-          {!isEdit && (
-            <Field config={typeField} htmlFor="account-type" className={fieldSpacing}>
-              <Select
-                value={values.accountType}
-                onValueChange={(v) => set({ accountType: v === "individual" ? "individual" : "entity" })}
-                disabled={busy}
-              >
-                <SelectTrigger id="account-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="entity">Company</SelectItem>
-                  <SelectItem value="individual">Person</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-          )}
+          <SelectTrigger id="account-parent">
+            <SelectValue placeholder="Sits on its own" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TOP}>Sits on its own</SelectItem>
+            {parentOptions.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
 
-          <Field config={nameField} htmlFor="account-name" className={fieldSpacing}>
-            <Input
-              id="account-name"
-              value={values.name}
-              onChange={(e) => set({ name: e.target.value })}
-              placeholder="Bergman S.A."
-              disabled={busy}
-              autoFocus
-            />
-          </Field>
+      <Field config={codeField} htmlFor="account-code" className={fieldSpacing}>
+        <Input
+          id="account-code"
+          value={values.code}
+          onChange={(e) => set({ code: e.target.value })}
+          placeholder="BERG"
+          disabled={busy}
+        />
+      </Field>
 
-          <Field config={parentField} htmlFor="account-parent" className={fieldSpacing}>
-            <Select
-              value={values.parentAccountId || TOP}
-              onValueChange={(v) => set({ parentAccountId: v === TOP ? "" : v })}
-              disabled={busy}
-            >
-              <SelectTrigger id="account-parent">
-                <SelectValue placeholder="Sits on its own" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={TOP}>Sits on its own</SelectItem>
-                {parentOptions.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
+      <Field config={emailField} htmlFor="account-email" className={fieldSpacing}>
+        <Input
+          id="account-email"
+          type="email"
+          value={values.email}
+          onChange={(e) => set({ email: e.target.value })}
+          placeholder="hola@bergman.example"
+          disabled={busy}
+        />
+      </Field>
 
-          <Field config={codeField} htmlFor="account-code" className={fieldSpacing}>
-            <Input
-              id="account-code"
-              value={values.code}
-              onChange={(e) => set({ code: e.target.value })}
-              placeholder="BERG"
-              disabled={busy}
-            />
-          </Field>
+      <Field config={phoneField} htmlFor="account-phone" className={fieldSpacing}>
+        <Input
+          id="account-phone"
+          value={values.phone}
+          onChange={(e) => set({ phone: e.target.value })}
+          placeholder="+34 600 000 000"
+          disabled={busy}
+        />
+      </Field>
 
-          <Field config={emailField} htmlFor="account-email" className={fieldSpacing}>
-            <Input
-              id="account-email"
-              type="email"
-              value={values.email}
-              onChange={(e) => set({ email: e.target.value })}
-              placeholder="hola@bergman.example"
-              disabled={busy}
-            />
-          </Field>
+      <Field config={addressField} htmlFor="account-address" className={fieldSpacing}>
+        <Textarea
+          id="account-address"
+          value={values.address}
+          onChange={(e) => set({ address: e.target.value })}
+          placeholder="Where they are (optional)."
+          disabled={busy}
+          rows={2}
+        />
+      </Field>
 
-          <Field config={phoneField} htmlFor="account-phone" className={fieldSpacing}>
-            <Input
-              id="account-phone"
-              value={values.phone}
-              onChange={(e) => set({ phone: e.target.value })}
-              placeholder="+34 600 000 000"
-              disabled={busy}
-            />
-          </Field>
-
-          <Field config={addressField} htmlFor="account-address" className={fieldSpacing}>
-            <Textarea
-              id="account-address"
-              value={values.address}
-              onChange={(e) => set({ address: e.target.value })}
-              placeholder="Where they are (optional)."
-              disabled={busy}
-              rows={2}
-            />
-          </Field>
-
-          <Field config={statusField} htmlFor="account-status" className={fieldSpacing}>
-            <Input
-              id="account-status"
-              list="account-statuses"
-              value={values.status}
-              onChange={(e) => set({ status: e.target.value })}
-              placeholder="client"
-              disabled={busy}
-            />
-            <datalist id="account-statuses">
-              {statusOptions.map((s) => (
-                <option key={s} value={s} />
-              ))}
-            </datalist>
-          </Field>
-        </FormShell>
-      </DialogContent>
-    </Dialog>
+      <Field config={statusField} htmlFor="account-status" className={fieldSpacing}>
+        <Input
+          id="account-status"
+          list="account-statuses"
+          value={values.status}
+          onChange={(e) => set({ status: e.target.value })}
+          placeholder="client"
+          disabled={busy}
+        />
+        <datalist id="account-statuses">
+          {statusOptions.map((s) => (
+            <option key={s} value={s} />
+          ))}
+        </datalist>
+      </Field>
+    </FormShellDialog>
   )
 }

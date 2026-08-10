@@ -43,7 +43,6 @@ import {
 import {
   ActivityFeed,
   defaultActivityFeedConfig,
-  type ActivityItem as ActivityFeedItem,
 } from "@kwapso/ui/registry/collections/activity-feed/activity-feed"
 import { Pencil, Power } from "lucide-react"
 
@@ -62,7 +61,6 @@ import { LoadMore } from "@/components/load-more"
 import { ACCOUNT_TYPE, accountStatus } from "@/components/deep-link/shape"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
-import { formatActivityWhen } from "@shared/web/format"
 import { formatCount } from "@shared/web/format-count"
 import { accountKey, accountsKey, childrenKey, listFetch, totalKey } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
@@ -212,12 +210,6 @@ export function AccountDetailScreen({
     }),
   ]
 
-  const activityItems: ActivityFeedItem[] = activity.rows.map((a) => ({
-    id: a.id,
-    description: a.description,
-    actor: a.actorName ?? undefined,
-    timestamp: formatActivityWhen(a.createdAt),
-  }))
 
   // Who could be given a login: the people linked to this account, plus the
   // account itself when it IS a person (a freelancer with no company above them).
@@ -397,7 +389,7 @@ export function AccountDetailScreen({
               <div className="flex flex-col gap-4">
                 <ActivityFeed
                   config={{ ...defaultActivityFeedConfig, emptyText: "No activity yet." }}
-                  items={activityItems}
+                  items={activity.items}
                 />
                 <LoadMore
                   listKey={activity.listKey}

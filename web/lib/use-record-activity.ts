@@ -20,8 +20,19 @@
 
 import { tenancy } from "@/lib/api"
 import { cursorKey } from "@/lib/live-resources"
+import { formatActivityWhen } from "@shared/web/format"
 import { primeCache, useCached, useCachedValue } from "@shared/web/store"
 import type { ActivityItem } from "@shared/types"
+
+/** One activity row, dressed for the library ActivityFeed. Every record detail
+ * wrote this same four-line map out for itself — same fields, same date format —
+ * which is four places to change the day a feed row grows a field. */
+export type ActivityFeedRow = {
+  id: string
+  description: string
+  actor: string | undefined
+  timestamp: string
+}
 
 /** The cache key holding one record's activity rows. The same key the live
  * registry names in its `deps`, so a change to the record refreshes its feed. */
@@ -42,6 +53,8 @@ export function useRecordActivity(
   id: string
 ): {
   rows: ActivityItem[]
+  /** The same rows, ready to hand straight to the library ActivityFeed. */
+  items: ActivityFeedRow[]
   total: number | undefined
   error: unknown
   listKey: string
@@ -55,8 +68,15 @@ export function useRecordActivity(
       return r.activity
     })
   )
+  const rows = query.data ?? []
   return {
-    rows: query.data ?? [],
+    rows,
+    items: rows.map((a) => ({
+      id: a.id,
+      description: a.description,
+      actor: a.actorName ?? undefined,
+      timestamp: formatActivityWhen(a.createdAt),
+    })),
     total: useCachedValue<number>(`total:${key}`),
     error: query.error,
     listKey: key,
