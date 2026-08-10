@@ -1,0 +1,16 @@
+{
+  "name": "kwapso-portal-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "description": "kwapso's CLIENT portal front door: serves the portal screens, forwards a named, closed set of /api doors to the shared workers.",
+  "scripts": {
+    "test": "vitest run",
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:production": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260101.0",
+    "typescript": "^5.7.3",
+    "vitest": "^4.1.8"
+  }
+}

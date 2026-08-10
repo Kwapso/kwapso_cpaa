@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [{ "name": "next" }],
+    "paths": {
+      "@/*": ["./*"],
+      "@shared/*": ["../shared/*"],
+      // The two seams the Laws of the Base say there may be only ONE of: the
+      // FormShell layout (R4) and the formatCount badge seam (R16). The portal
+      // REUSES them rather than carrying a second copy — a second copy is a
+      // second seam, and the law is "one". (Both deserve to move into shared/
+      // once a change is allowed to touch web/; noted in the handover.)
+      "@web/*": ["../web/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "../shared/**/*.ts", ".next/types/**/*.ts"],
+  "exclude": ["node_modules", "out", ".next"]
+}

@@ -185,7 +185,15 @@ export const ACCOUNT_SCOPED_MODULES = ["accounts", "portal_users"] as const
  * by what the account module happens to own.
  *
  * A file added here with `fence: null` must state why in `why`. A file that reads
- * one of these tables and is in neither state turns the build red. */
+ * one of these tables and is in neither state turns the build red.
+ *
+ * ENFORCED, at last, by web-portal/test/portal-fence.test.ts — and enforced at
+ * FUNCTION level, not file level. This list sat here as data with no check for
+ * its whole first life, which is how `help.ts` could be listed as fenced while
+ * two of its exported readers (the ticket THREAD) carried no fence at all: the
+ * file said "authorScope" and the leak was one function along. The check now
+ * walks the portal gateway's own door table through to each lib function behind
+ * it and demands that function touch the caller's stamp. */
 export const PORTAL_VISIBLE_READS: Record<string, { fence: string | null; why: string }> = {
   "workers/tenancy/src/lib/accounts.ts": {
     fence: "accountScopeClause",
@@ -197,8 +205,33 @@ export const PORTAL_VISIBLE_READS: Record<string, { fence: string | null; why: s
   },
   "workers/content/src/lib/help.ts": {
     fence: "authorScope",
-    why: "a client raises tickets; the team-wide default handed them every other client's.",
+    why: "a client raises tickets; the team-wide default handed them every other client's — and the thread doors, one table along, had to be taught the same sentence.",
   },
+  "workers/content/src/lib/stakeholders.ts": {
+    fence: "getTicket",
+    why: "a stakeholder set is a PROPERTY of a ticket, so the fenced getTicket decides visibility first and an invisible ticket yields an empty set — otherwise the door names staff admins and another client's colleagues by ticket id alone.",
+  },
+}
+
+/** R2 on the CLIENT surface — the reasoned exemption, not a quiet skip.
+ *
+ * Every record detail in the base exposes Overview + Activity (R2), because a
+ * record's history is the thing that makes a shared workspace trustworthy. On
+ * the portal that same feed is a disclosure: its rows are sentences like
+ * "<name> moved this to in progress", and "the portal shows work status but
+ * never which staff member is doing it" (SCOPE ch.06). The activity door is not
+ * on the portal gateway's surface at all, so this is not a hidden tab — it is a
+ * door that was never opened.
+ *
+ * Component → why it ships no Activity feed. Held true by
+ * web-portal/test/rules.test.ts, which fails if a listed component grows one (an
+ * exemption nobody checks is a skip with better manners) AND if a component is
+ * listed here that no longer exists. */
+export const PORTAL_ACTIVITY_EXEMPT: Record<string, string> = {
+  "ticket-screen":
+    "a ticket's history names the staff who moved it; the client is shown the STATUS instead, which is the part that is theirs to know",
+  "company-screen":
+    "an account's history names the staff who edited the record and shows the agency's own before/after values (status moves, commercial flags) — none of which is the client's to read",
 }
 
 /** R18 — which permission module gates each activity `relatedTable` a worker
