@@ -44,8 +44,9 @@ the agency app are two views of the same rows rather than two systems.
 gateway, **content**, **data-ops**, and **mcp** (the external machine surface:
 personal access tokens → a team-pinned session bridge → the opt-in tool catalog;
 routed through the gateway at `/mcp` + `/api/mcp/*`). (The planned `workers/config` recipe store was folded into
-**tenancy**, not built separately.) `npm run check` type-checks web + the built
-workers and runs the full unit/integration suite (web + the workers).
+**tenancy**, not built separately.) `npm run check` type-checks both front ends
+(`web` + `web-portal`) and all eight workers, then runs the full
+unit/integration suite across every workspace.
 
 | Worker | Owns |
 |---|---|
@@ -54,18 +55,18 @@ workers and runs the full unit/integration suite (web + the workers).
 | **content** *(BUILT 2026-06-23; `kwapso-content`)* | **Learning** (how-to articles, in-app body, manual sequence, pick-or-create category → `selectable_data`, per-user `mark done` progress, deactivate-not-delete) + **Help** (team-wide tickets + threaded replies, fixed status lifecycle `open/in_progress/resolved/reopened`, raiser-can-reopen, @mention + reply email notify, source screen/record capture). Routes under `/api/content/*`. Binds AUTH (whoami) + REALTIME (live pings) + the core DB (gating) + per-module R2 (`LEARNING_MEDIA`, `HELP_MEDIA`). Gated by the `learning` / `help` permission modules; not public (`workers_dev:false`) |
 | **data-ops** *(BUILT 2026-06-23; `kwapso-data-ops`)* | **(a) CSV import** — the 3-stage session (file → mapping → confirm) against the GLOBAL owner-maintained `importable_databases` catalog, **INSERT-ONLY**, gated by the **target's `create` right** (no key of its own), writing **act-as-user** through the gated create endpoints (three targets today: `selectable_data` + `member_roles` + `learning`), PLUS the agentic multi-file **batch** import (AGENTIC-IMPORT.md — analyze → plan → ordered run with foreign-key resolution). **(b) the AI agent** — a swappable model seam, an opt-in tool catalog, an act-as-user executor, the confirm rule, identity-act blocks, fenced tool results, a step cap, saved per-team threads (audit), and a credit-based quota (the quota tables + rules live in DATA-MODEL.md `agent_usage`/`agent_credits` + EDGE-CASES.md §8). Routes under `/api/data-ops/*`. Binds AUTH/REALTIME/CONTENT/TENANCY + Workers AI (`AI`) + the core DB; not public (`workers_dev:false`) |
 | **realtime** | the live "switchboard" (LOCKED 2026-06-13; ROW-LEVEL 2026-06-22): one **TeamChannel Durable Object** per channel holds its open WebSockets (hibernatable → idle channels cost ~nothing) and fans out tiny **row-level** change pings `{resource, id, op}` so screens patch just the changed row — no refetch. Holds NO app data — the databases stay the source of truth. **Two channel scopes**, both gated like the API: `team:<id>` (every active member; gated by active membership of THAT team) and `user:<id>` (one person's devices — identity/membership events + a forced sign-out; gated to your OWN id, open even when teamless). Channels are created on-demand by name, unlimited, reusable as-is. Workers publish via `publishChange` / `publishUserChange` / `publishSignOut`; the client re-pulls the one changed row through the normal permission-checked endpoint. The ping carries no row CONTENT (just `{resource,id,op}`), and the socket is gated at connect, so a listener never receives data it couldn't already fetch. |
-| **gateway / MCP** | the single front desk: serves the web screens (and marks `/_next/static/**` immutable so repeat loads don't re-validate), routes `/api/*` to the workers (incl. `/api/content/*`, `/api/data-ops/*`, and the `/api/realtime` WebSocket), and serves uploaded media from R2. Routes `/mcp` + `/api/mcp/*` to the mcp worker (the ONE master MCP catalog — BUILT, below). UI and agents call the SAME doors |
-| **portal-gateway** *(BUILT 2026-08-10; `kwapso-portal`)* | the CLIENT portal's front door — the second of the two doors SCOPE ch.04 locks ("two front doors, one building": the portal and the agency app are different permission-gated views of the same rows, never copies, never synced). Serves `web-portal/out` and forwards `/api` — but by an **allow-list keyed `METHOD /path`**, not by prefix. That is the one structural difference from the agency gateway and the whole point of a second door: a prefix fan-out here would publish every tenancy route, data-ops and `/mcp` to the client internet, each defended only by a role check. Instead the surface is fourteen named doors; everything else is 404, and the worker binds only AUTH/TENANCY/CONTENT/REALTIME so it *cannot* reach data-ops or mcp at all. Hostnames `client.kwapso.app` / `staging-client.kwapso.app` (**never** `portal.kwapso.app` — that is the owner's live Glide portal). Guarded by `workers/portal-gateway/test/portal-door.test.ts` (every agency door not named must 404, derived off the agency's own API client) and `web-portal/test/portal-fence.test.ts` (every READ it names is walked to the lib function behind it, which must carry the account fence) |
-| **mcp** *(BUILT 2026-07-07; `kwapso-mcp`)* | the external machine surface: personal access tokens (hashed, shown-once, revocable, pinned to ONE team; core `mcp_tokens`, mig 0013) verified on EVERY request and bridged (auth `/internal/mcp-session`, INTERNAL_KEY) to a short-lived session PINNED to the token's team (`sessions.team_pin` — /me answers with the pinned team, so the whole gating chain re-checks live membership + role per call and the token can never act outside its team). Exposes the OPT-IN tool catalog over JSON-RPC at `/mcp` (Bearer auth): reads, full-field CSV exports, deterministic create/edit/deactivate writes (roles, members, invites, dropdowns, learning, help — each re-checking requireRight + the locked guards + audit + publishChange at the door), the agentic import (start/add/plan/run — plan METERED on the team's AI quota), and the assistant itself (agent_chat/agent_confirm). Every tool is a thin forward to an existing gated door; `catalog.test.ts` machine-checks each forwarded path against the target worker's own ROUTES + that every declared exportPath is a tool. Token management (create show-once / list / revoke) is session-gated under `/api/mcp/tokens` with a Settings card. Not public (`workers_dev:false`) — only the gateway routes to it. **Developer guide: MCP.md** (how an outside tool connects + the cost model) |
+| **gateway / MCP** | the AGENCY front desk — one of the two public doors: serves the web screens (and marks `/_next/static/**` immutable so repeat loads don't re-validate), routes `/api/*` to the workers (incl. `/api/content/*`, `/api/data-ops/*`, and the `/api/realtime` WebSocket), and serves uploaded media from R2. Routes `/mcp` + `/api/mcp/*` to the mcp worker (the ONE master MCP catalog — BUILT, below). UI and agents call the SAME doors |
+| **portal-gateway** *(BUILT 2026-08-10; `kwapso-portal`)* | the CLIENT portal's front door — the second of the two doors SCOPE ch.04 locks ("two front doors, one building": the portal and the agency app are different permission-gated views of the same rows, never copies, never synced). Serves `web-portal/out` and forwards `/api` — but by an **allow-list keyed `METHOD /path`**, not by prefix. That is the one structural difference from the agency gateway and the whole point of a second door: a prefix fan-out here would publish every tenancy route, data-ops and `/mcp` to the client internet, each defended only by a role check. Instead the surface is fourteen named doors — plus `POST /api/log/client`, the client error beacon, which is handled BEFORE the allow-list because it is the door's own crash pipe rather than a forward (it verifies the session before it writes anything, ERROR-HANDLING.md) — and everything else is 404. The worker binds only AUTH/TENANCY/CONTENT/REALTIME so it *cannot* reach data-ops or mcp at all. Hostnames `client.kwapso.app` / `staging-client.kwapso.app` (**never** `portal.kwapso.app` — that is the owner's live Glide portal). Guarded by `workers/portal-gateway/test/portal-door.test.ts` (every agency door not named must 404, derived off the agency's own API client) and `web-portal/test/portal-fence.test.ts` (every READ it names is walked to the lib function behind it, which must carry the account fence) |
+| **mcp** *(BUILT 2026-07-07; `kwapso-mcp`)* | the external machine surface: personal access tokens (hashed, shown-once, revocable, pinned to ONE team; core `mcp_tokens`, mig 0013) verified on EVERY request and bridged (auth `/internal/mcp-session`, INTERNAL_KEY) to a short-lived session PINNED to the token's team (`sessions.team_pin` — /me answers with the pinned team, so the whole gating chain re-checks live membership + role per call and the token can never act outside its team). Exposes the OPT-IN tool catalog over JSON-RPC at `/mcp` (Bearer auth): reads, full-field CSV exports, deterministic create/edit/deactivate writes (roles, members, invites, dropdowns, learning, help — each re-checking requireRight + the locked guards + audit + publishChange at the door), the agentic import (start/add/plan/run — plan METERED on the team's AI quota), and the assistant itself (agent_chat/agent_confirm). Every tool is a thin forward to an existing gated door; `catalog.test.ts` machine-checks each forwarded path against the target worker's own ROUTES + that every declared exportPath is a tool. Token management (create show-once / list / revoke) is session-gated under `/api/mcp/tokens` with a Settings card. Not public (`workers_dev:false`) — only the AGENCY gateway routes to it; the portal gateway does not bind it at all, so the machine surface is off the client internet. **Developer guide: MCP.md** (how an outside tool connects + the cost model) |
 
 
 ### Durable Objects — code vs runtime, and how they scale (LOCKED 2026-06-15)
 
 The confusion to retire: **a worker count and a Durable-Object count are different things.**
 
-- A **Worker** is deployed *code*. We have **7 built today** (auth, tenancy,
-  realtime, gateway, content, data-ops, mcp — UPDATED 2026-07-07). This number
-  does **not** grow with teams.
+- A **Worker** is deployed *code*. We have **8 built today** (auth, tenancy,
+  realtime, content, data-ops, mcp, gateway, portal-gateway — UPDATED
+  2026-08-10). This number does **not** grow with teams.
 - A **Durable Object class** is also code — a class *inside* a worker (e.g.
   `TeamChannel` in the realtime worker). We have very few (the 500-classes cap is
   irrelevant).
@@ -74,7 +75,7 @@ The confusion to retire: **a worker count and a Durable-Object count are differe
   — addressing one by name conjures it; idle ones hibernate (≈ free). **An
   instance is not a worker.**
 
-So 10,000 teams + their members = still 7 workers + one `TeamChannel` class, but
+So 10,000 teams + their members = still 8 workers + one `TeamChannel` class, but
 that many *instances* (one per team **and** one per signed-in user), almost all
 hibernating. Exactly like OOP: one `class` (code), millions of objects (runtime).
 
@@ -177,8 +178,9 @@ on top follows [CACHING.md](CACHING.md).
   A deep link to another team's record gets blocked/booted server-side —
   security is never just hiding UI.
   - *The reviewed exception (FLAGGED 2026-07-02; the predictable-key half CLOSED
-    2026-08-10):* `GET /media/*` is served by the gateway **without a session
-    check** — a deliberate, recorded decision (SCOPE ch.06 "Files": uploaded
+    2026-08-10):* `GET /media/*` is served by **both** public doors — the agency
+    gateway and the client portal's — **without a session check**, a deliberate,
+    recorded decision (SCOPE ch.06 "Files": uploaded
     media stays on unguessable no-login links, exposure accepted in writing).
     R2 has no directory listing, so only someone holding a file's exact key can
     fetch it. **Every key is now unguessable**: one seam mints them
@@ -189,8 +191,12 @@ on top follows [CACHING.md](CACHING.md).
     URL, which quietly made those two "no session" full stop. New uploads get
     the new shape; objects written under an old key stay reachable at it (a link
     already handed out keeps working, which is the decision's own bargain).
-    The door also validates the key at the boundary (`safeMediaKey`) so a probe
-    with a dot-segment, a space or a control character gets a plain 404.
+    **Both** doors validate the key at the boundary through the one shared
+    validator (`safeMediaKey`, `shared/workers/image.ts`), so a probe with a
+    dot-segment, a space or a control character gets a plain 404 — the same plain
+    404 a genuine miss gets, on the agency origin and the client origin alike.
+    One validator, two doors: a guarantee that held on only one of them would be
+    no guarantee at all.
     **This is a capability-URL model, not a gated read**: anyone holding a link
     keeps it, with no expiry and no revocation. Fine for photos, logos and
     how-to screenshots; NOT fine for invoices, contracts, ID documents or
@@ -284,11 +290,12 @@ on top follows [CACHING.md](CACHING.md).
   installability is manifest-based (Chrome ≥90 needs no SW). A reusable
   `pwa-install-prompt` library collection is flagged in UI-GAPS.md for later.
 - **Mobile is not desktop-shrunk (LOCKED 2026-06-18).** Controls placed
-  side-by-side on desktop must NOT blindly stay side-by-side on mobile: a
-  multi-control row stacks (`flex-col`) by default and becomes a row only at
-  `sm:` (`sm:flex-row`); every control gets enough width to show its
-  placeholder / its content (`w-full` when stacked). Canon lives in the library
-  `UI-RULES.md` (the twin of the no-horizontal-scroll / no-pinch-zoom rule).
+  side-by-side on desktop must NOT blindly stay side-by-side on mobile. The rule
+  in full — and the reason it is a rule — lives in
+  [UI-CONVENTIONS.md](UI-CONVENTIONS.md) §4, "Mobile is not desktop-shrunk",
+  beside its twin (action-button rows never clip). It is written down HERE as a
+  locked decision and THERE as the convention you apply; it is not in the
+  library's own rule-book, which governs the library, not this app.
 - **UI comes ONLY from `@kwapso/ui`.** Gaps go INTO the library first
   (known gaps: 6-digit code input, step wizard). Never one-off components here.
 - Anti-bloat is law: one master copy of every rule/doc/component; reuse over

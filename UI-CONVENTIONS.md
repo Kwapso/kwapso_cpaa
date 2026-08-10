@@ -23,7 +23,17 @@ The one-line mental model:
 
 Brimba's primitives and collections come from **`@kwapso/ui`**, a **separate
 repo** (`github:Kwapso/kwapso_ui`), pinned in both
-`package.json` and `web/package.json`. The host imports them by their registry path:
+`package.json` and `web/package.json`. Both front ends — `web/` and `web-portal/` —
+import from that one package.
+
+**One name, said once:** the package is **`@kwapso/ui`**. That is what
+`package.json` installs and what every import path starts with. Its documentation
+site is hosted at `swift-struck-ui.pages.dev` (Swift Struck builds and owns the
+library), which is the only reason the words "swift struck" appear near it — there is
+no `@swift-struck/ui` package, and an import from one would not resolve. If you see
+that name anywhere, it is a typo for this one.
+
+The host imports them by their registry path:
 
 ```ts
 // web/components/app-shell.tsx
@@ -437,6 +447,25 @@ import wizard, the agent confirm panel). On a very narrow screen, dropping to
 icon-only buttons is also acceptable (the mapping above). This is a **documented
 convention**, not a machine-checked Law (responsive CSS is out of the rules-test
 scope) — but it applies everywhere buttons sit in a row.
+
+### Mobile is not desktop-shrunk (LOCKED 2026-06-18)
+
+The twin of the rule above, and its canon lives **here** — ARCHITECTURE.md §6 records
+it as a locked decision and points at this section for how to apply it. (It is not in
+the UI library's own rule-book: that book governs the library, and this is a rule about
+how *this app* assembles library pieces.)
+
+Controls placed side-by-side on desktop must **not** blindly stay side-by-side on a
+phone. A multi-control row **stacks by default** (`flex-col`) and becomes a row only at
+`sm:` (`sm:flex-row`), and every control gets enough width to show its placeholder or
+its content (`w-full` when stacked). The failure this prevents is the quiet one: three
+controls that fit a laptop share a phone's width between them, and each ends up too
+narrow to read — a date field showing half a date, a select showing no placeholder at
+all. Nothing looks broken, so nobody reports it.
+
+Like its twin, this is a **documented convention, not a machine-checked Law** —
+responsive CSS is outside the rules-test scope — but it applies to every multi-control
+row in both front ends.
 
 Remove and Revoke currently run through the engine's `?confirm=` route (a `destructive`
 text button, not yet an icon button); when they *do* carry an icon, use `UserMinus` and

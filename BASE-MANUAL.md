@@ -15,11 +15,12 @@ is downstream of them: **stay lean**, and **obey the Laws of the Base**.
 
 ## 1 · The shape
 
-Brimba is seven Cloudflare Workers, a two-tier database, and a static web app the
-workers serve. Nothing more. The count does not grow with the number of teams or
-users — it grows only when you add a genuinely new capability.
+Brimba is eight Cloudflare Workers, a two-tier database, and two static web apps the
+workers serve — the agency screens and the client portal. Nothing more. The count does
+not grow with the number of teams or users — it grows only when you add a genuinely new
+capability, which is exactly what the eighth (the portal's own front door) was.
 
-### The seven workers, and why each exists
+### The eight workers, and why each exists
 
 A worker here is one small, single-purpose service, "small enough for an AI
 agent to hold fully in its head" (ARCHITECTURE.md §2). The split is by
@@ -33,22 +34,26 @@ service-binding calls (never a public hop).
 | **realtime** | `kwapso-realtime` | The live switchboard — one `TeamChannel` Durable Object per channel, fanning out row-level `{resource,id,op}` change pings over WebSockets | Live-sync is a cross-cutting concern with a stateful runtime (open sockets). It holds **no app data** — the databases stay the source of truth — so it can be a thin, hibernatable coordinator instead of a second copy of everything. |
 | **content** | `kwapso-content` | **Learning** (how-to articles + per-user "done" progress) and **Help** (tickets + threaded replies) | These are the base's two real content modules. They're grouped because they share the same shape (team-DB CRUD gated on a permission module, deactivate-not-delete, R2 media) and neither is big enough to deserve its own worker. |
 | **data-ops** | `kwapso-data-ops` | **CSV import** (the 3-stage single-target session + the agentic multi-file batch import, AGENTIC-IMPORT.md) and **the AI agent** | Both are "operations over the other modules' data" rather than modules of their own. Import writes act-as-user through a target's create endpoint; the agent acts-as-user through every gated endpoint. Neither owns a table of user content — they orchestrate. |
-| **gateway** | `kwapso` / `kwapso-staging` | The single public door: serves the web screens (static assets), serves uploaded media from R2, and routes `/api/*` to the right worker | **The only worker with a public URL.** Everything else sets `workers_dev: false` AND `preview_urls: false` (both — a per-version preview URL would be a second public door) and is reachable *only* via service bindings. This is what makes `/internal/send-email` and the agent's act-as-user surface safe — no public route can reach them. |
+| **mcp** | `kwapso-mcp` | The external machine surface: personal access tokens → a team-pinned session bridge → an opt-in tool catalogue for outside machines | It proves the point of the door design: it slots onto the same gated endpoints the agent already uses, so it added zero new trust surface beyond the token itself. How an outside tool connects + the cost model: **MCP.md**. |
+| **gateway** | `kwapso` / `kwapso-staging` | The AGENCY public door: serves `web/out`, serves uploaded media from R2, and routes `/api/*` to the right worker by PREFIX | One of the two workers with a public URL. |
+| **portal-gateway** | `kwapso-portal` / `kwapso-portal-staging` | The CLIENT PORTAL's public door: serves `web-portal/out`, serves media, and forwards a NAMED, CLOSED allow-list of `/api` doors | The other public one — and deliberately a different shape. A client-facing origin that fanned out by prefix would publish every tenancy route, data-ops and `/mcp` to the client internet, each defended only by a role check. It also binds only auth/tenancy/content/realtime, so data-ops and mcp are unreachable from it by construction. |
 
-The seventh worker, **mcp** (personal access tokens → a team-pinned session
-bridge → an opt-in tool catalogue for external machines), is **BUILT (2026-07-07)**
-— and it proves the point of the door design: it slots onto the same gated
-endpoints the agent already uses, so it added zero new trust surface beyond the
-token itself. How an outside tool connects + the cost model: **MCP.md**.
+**Why only these two are public.** Everything else sets `workers_dev: false` AND
+`preview_urls: false` (both — a per-version preview URL would be another public door)
+and is reachable *only* via service bindings. That is what makes `/internal/send-email`
+and the agent's act-as-user surface safe: **no public route can reach `/internal/*`, the
+agent, or the act-as-user surface.**
 
-**Why the gateway is the only door.** UI and agents call the *same* endpoints.
-If any domain worker had its own public URL, you'd have two doors to secure and
-two behaviours to keep in sync. Instead there is one origin: login cookies work
-everywhere (including an installed iOS PWA), and the internal-only surface is
-internal by physics — see `workers/gateway/src/index.ts`, which simply forwards
-`/api/auth/*` → `env.AUTH`, `/api/tenancy/*` → `env.TENANCY`, `/api/content/*` →
-`env.CONTENT`, `/api/data-ops/*` → `env.DATAOPS`, `/api/realtime` →
-`env.REALTIME`, `/media/*` from R2, and everything else from the static assets.
+**Why a door per front end, and not one shared one.** UI and agents call the *same*
+endpoints, so each front end wants one origin of its own: login cookies work everywhere
+on it (including an installed iOS PWA), and the internal-only surface stays internal by
+physics. See `workers/gateway/src/index.ts`, which simply forwards `/api/auth/*` →
+`env.AUTH`, `/api/tenancy/*` → `env.TENANCY`, `/api/content/*` → `env.CONTENT`,
+`/api/data-ops/*` → `env.DATAOPS`, `/api/realtime` → `env.REALTIME`, `/media/*` from R2,
+and everything else from the static assets — and `workers/portal-gateway/src/index.ts`,
+which does the same job against a named allow-list instead of a prefix. Two doors, one
+building: the portal and the agency app are permission-gated views of the same rows,
+never copies and never synced.
 
 ### The two-tier database, and why it's split
 
@@ -221,9 +226,9 @@ Four more structural guards layer on top (all in `agent.ts` / `tools.ts`):
   in `executeTool`.
 - **Fenced tool results** — a tool's output goes back to the model as DATA
   (`role:"tool"`), never as instructions.
-- **A step cap** (`MAX_STEPS`) and a **credit quota** (a free daily allowance via
-  `agent_usage` — default 25/day, per-env via the `AGENT_FREE_DAILY` var, staging
-  runs 50 — + a purchasable balance in `agent_credits`) bound runaways and
+- **A step cap** (`MAX_STEPS`) and a **credit quota** (the app's own daily allowance via
+  `agent_usage` — `AGENT_FREE_DAILY`, code default 25/day, but both environments
+  ship 50 — + a purchasable balance in `agent_credits`) bound runaways and
   abuse. Every turn is saved to `agent_threads`/`agent_messages` — the audit
   trail — and each user COMMAND writes one `agent_usage_log` row (when · who ·
   credits · why) that powers the usage view behind the panel's quota badge. A
@@ -294,17 +299,19 @@ the machine-checked Laws (§4) turn a careless change red before it ships.
 1. **Change the seam in one place.** There is one master copy of every rule, doc,
    and shared helper — reuse over recode. Don't fork a shared function into a
    module.
-2. **Run `npm run check`** — it type-checks `web` + the seven workers and runs the
-   full test suite, including the rule + seam tests. It is the gate; keep it green.
+2. **Run `npm run check`** — it type-checks both front ends (`web` + `web-portal`)
+   and all eight workers, then runs the full test suite across every workspace,
+   including the rule + seam tests. It is the gate; keep it green.
 3. **If you changed a table**, add a **migration**, never an edit-in-place. Core
    migrations live in `db/core/*`; team migrations are appended to
    `TEAM_MIGRATIONS` and rolled to every team DB by `POST
    /api/tenancy/admin/migrate-teams` (owner, `x-admin-key`).
 4. **If you changed a worker**, respect the **deploy order**: realtime → auth →
-   tenancy → content → data-ops → gateway. Realtime is FIRST because every other
-   worker service-binds it to publish change pings, and deploying a binder before
-   its target fails with "Worker not found." Data-ops binds content + tenancy, so
-   both must exist before it; the gateway is last because it routes to all of them.
+   tenancy → content → data-ops → mcp → gateway → portal-gateway. Realtime is FIRST
+   because every other worker service-binds it to publish change pings, and deploying
+   a binder before its target fails with "Worker not found." Data-ops binds content +
+   tenancy, so both must exist before it; the two gateways are last, for the same
+   reason as each other — each service-binds the domain workers it forwards to.
 5. **If you added a Law**, you must add it to RULES.md *and* the registry *and* a
    check together (see §4) — the build fails otherwise.
 
@@ -318,7 +325,7 @@ hoped. This is the mechanism.
 
 A Law lives in three linked places:
 
-- **`RULES.md`** — the human-readable law-book (R1–R8), one row per law.
+- **`RULES.md`** — the human-readable law-book, one row per law.
 - **`shared/rules/registry.ts`** — the same laws *as data* (`RULES_REGISTRY`),
   each carrying the `checkId` of the test that enforces it. Deny-lists (the
   reviewed exceptions) also live here as data, so every exception is a visible,
@@ -328,18 +335,13 @@ A Law lives in three linked places:
   `publish-seam.test.ts` or a case in `web/test/rules.test.ts`. Break a law and
   `npm run check` turns **red**.
 
-The laws today:
-
-| ID | Law | Enforced by |
-|---|---|---|
-| R1 | Every mutation route publishes a live change ping | `publish-seam` (per-worker) |
-| R2 | Every record-detail screen exposes Overview + Activity tabs | `record-detail-tabs` |
-| R3 | Collection tab strips use the library `TabsView` — no hand-rolled toggles | `no-handrolled-toggles` |
-| R4 | Every form/dialog renders through the shared `FormShell` | `forms-use-formshell` |
-| R5 | Record activity is read through ONE generic `(table, id)` path | `generic-activity-path` |
-| R6 | Product terms live in ONE glossary, clear and brief | `glossary-wellformed` |
-| R7 | Every form dialog persists its draft per session (`useFormDraft`) | `forms-persist-drafts` |
-| R8 | Every tab that reveals a collection carries its count — the team strip AND a record's own tabs | `tab-counts-derived` |
+**The laws today: read them in [RULES.md](RULES.md).** They are deliberately not
+re-tabulated here. This manual once carried its own copy of the table, and the copy
+went stale the moment the laws grew past it — a second list of the laws is a second
+thing to keep in step, which is the exact failure the registry exists to prevent. The
+law-book, the registry (`shared/rules/registry.ts`) and the checks are the three linked
+places; a fourth would only ever be wrong. The count has grown well past the first
+handful — trust RULES.md for the current set rather than any number written elsewhere.
 
 **Why "read off disk" matters.** The publish-seam test
 (`workers/content/test/publish-seam.test.ts`) doesn't trust the ROUTES table's
@@ -369,7 +371,7 @@ permissions, invites, emails, live-sync, the screen engine, the CSV import, and 
 AI agent **for free** — and you add your product's own modules on top. Here's the
 whole story.
 
-**What you keep, untouched.** The seven workers, the two-tier database, the gate
+**What you keep, untouched.** The eight workers, the two-tier database, the gate
 (`teamContext → requireRight`), the realtime layer, the auth/email flow, the agent,
 and the Laws. These are the base. You do not re-solve multi-tenancy, permissions, or
 live updates — they're done.
@@ -445,7 +447,9 @@ for some products and wrong for others.
    portal where tenants share a team.
 
 **What a new product must NOT do.** Don't fork the UI library into the app (fix it in
-`@kwapso/ui`), don't add a public worker (only the gateway is public), don't add
+`@kwapso/ui`), don't add a public worker (only the two gateways are public — a third
+public address is a third door onto `/internal/*`, the agent and the act-as-user
+surface), don't add
 a per-module database (one D1 per *team*, not per module — modules are tables inside
 it), and don't relitigate the locked decisions in ARCHITECTURE.md without a deliberate
 reason. Staying inside the seams is what keeps a big product lean and secure.
@@ -570,7 +574,7 @@ the project grouping — search boxes in the dash filter on it.
 
 ## The base in one breath
 
-Seven workers behind one public door. A global core DB for identity + billing, one
+Eight workers behind two public doors — one per front end, and no more. A global core DB for identity + billing, one
 isolated D1 per team for its content. One gate (`teamContext → requireRight`) that
 every request — UI *and* agent — passes through, so the AI can do anything the
 user can and nothing they can't. A module plugs into six seams (permissions,

@@ -24,10 +24,16 @@ trick as the swappable AI-import interface).
   `/t/<teamId>/<module>/<id>` subtree). On a render throw it shows the **real
   message inline** (no white screen) and calls `reportError` with the component
   stack.
-- **Gateway — `/api/log/client`** logs the beacon (`console.error`, capped) AND —
-  when the browser carries a session cookie (an anonymous drive-by can't fill the
-  table) — forwards it to auth's `/internal/log-error` (INTERNAL_KEY-guarded), so
-  the error also lands in the central store below.
+- **Both gateways — `/api/log/client`.** Each front end has its own door on its own
+  origin: the agency gateway carries one for `web/`, the portal gateway carries one
+  for `web-portal/`. Both do the same two things — log the beacon (`console.error`,
+  capped) AND, when the browser carries a session cookie the worker has **verified**
+  with auth (an anonymous drive-by must not be able to fill a table in the GLOBAL
+  core database), forward it to auth's `/internal/log-error` (INTERNAL_KEY-guarded)
+  so the error also lands in the central store below. They stamp different `source`
+  values (`web` and `portal`) so a crash on a client's phone is told apart from one
+  on a staff screen. Without `INTERNAL_KEY` set on **both** gateways, the beacon is
+  console-only — the crash is seen by nobody.
 - **Workers** `console.error` in their `catch` blocks → observability, AND every
   core-bound worker's central catch calls `recordWorkerError(env.DB, …)`
   (`shared/workers/error-log.ts`) so the crash lands in the store below —
@@ -43,8 +49,12 @@ failure is RECORDED in **`error_logs`** in the global core DB — one table per
 environment (staging and production errors never mix), cross-team by design
 (system health is global; `team_id`/`user_id` are optional context).
 
-- **Captured per row:** `id`, `at`, `source` (auth / tenancy / content /
-  data-ops / web), `place` (the route `POST /api/…`, or the client's `where`),
+- **Captured per row:** `id`, `at`, `source` — one of `auth`, `tenancy`, `content`,
+  `data-ops`, `mcp`, `realtime` (the six workers that bind the core DB and record
+  their own crashes), `web` (a beacon from the agency screens), `portal` (a beacon
+  from the client portal's screens) and `portal-gateway` (the portal door's own
+  crash, which it reports through auth because it binds no database of its own) —
+  `place` (the route `POST /api/…`, or the client's `where`),
   `message`, `stack` (capped), `team_id` / `user_id` / `url` when known, and the
   resolve-workflow fields: `status` (`open` → `resolved`), `resolved_at`,
   `resolution_note`.

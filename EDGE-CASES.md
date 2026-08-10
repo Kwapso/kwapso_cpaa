@@ -408,8 +408,8 @@ a team database. `agent_usage` is keyed by **`(team_id, period)`** where
 - One model call costs **one unit** — metered before EACH call inside a turn,
   so a multi-step turn costs one unit per step (capped by `MAX_STEPS`); a
   declined confirm costs nothing; running dry mid-plan stops the turn with a
-  saved, plain reply. Free allowance first (code default 25/day, per-env via
-  `AGENT_FREE_DAILY` — staging runs 50), then a purchased credit.
+  saved, plain reply. The app's own daily allowance first (`AGENT_FREE_DAILY`:
+  code default 25/day, but BOTH environments ship 50), then a purchased credit.
 - **The credit decrement is race-safe; the free counter is deliberately not.**
   The paid path is `UPDATE agent_credits SET balance = balance - 1 … WHERE
   team_id = ? AND balance > 0` — the `WHERE balance > 0` means it can never go
@@ -495,18 +495,20 @@ last) fails, and deploying a worker before its migration 500s at runtime.
 
 **Why + the rules** (OPERATIONS.md, "Deploy order"):
 
-- **Deploy order: `realtime → auth → tenancy → content → data-ops → gateway`.**
-  Realtime is **first** because every other worker service-binds it (they
-  publish change pings; the gateway routes its WebSocket). Deploying a binder
-  before its target fails with **"Worker not found"** — this bit the very first
-  production deploy when `kwapso-realtime` didn't exist yet. `data-ops` binds
-  `CONTENT` + `TENANCY`, so both precede it; the gateway is last because it
-  routes to all of them. The root scripts already encode this order — use them.
+- **Deploy order: `realtime → auth → tenancy → content → data-ops → mcp → gateway
+  → portal-gateway`.** Realtime is **first** because every other worker
+  service-binds it (they publish change pings; the gateway routes its WebSocket).
+  Deploying a binder before its target fails with **"Worker not found"** — this bit
+  the very first production deploy when `kwapso-realtime` didn't exist yet.
+  `data-ops` binds `CONTENT` + `TENANCY`, so both precede it; the **two gateways**
+  are last, for the same reason as each other — each routes to the workers behind
+  it. The root scripts already encode this order — use them.
 - **Apply new migrations to BOTH databases before deploying the workers that
   need them.** Core migrations (e.g. `0008 importable_databases`, `0009
   agent_usage`, `0010 agent_credits`) go to `kwapso-core` **and**
-  `kwapso-core-staging`; the team-schema migration (`0004_modules`) rolls to
-  **every** team DB via `POST /api/tenancy/admin/migrate-teams` (x-admin-key).
+  `kwapso-core-staging`; the team-schema migrations (`0004_modules` through
+  `0008_portal_current_account`) roll to **every** team DB via `POST
+  /api/tenancy/admin/migrate-teams` (x-admin-key).
   Deploy the worker before the migration and its first query hits a missing
   table. Production is owner-gated: migrations first, then the realtime-first
   deploy.

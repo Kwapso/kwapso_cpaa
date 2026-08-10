@@ -39,9 +39,14 @@ import { cacheKeys } from "@/lib/live-resources"
 export function AccountSwitcher({
   accounts,
   currentAccountId,
+  onSwitched,
 }: {
   accounts: { id: string; name: string }[]
   currentAccountId: string
+  /** The shell's own session reload. Dropping the caches marks them stale; this
+   * is what actually re-reads and repaints. Without it the server moves and the
+   * screen does not. */
+  onSwitched: () => void
 }) {
   const [busy, setBusy] = React.useState(false)
   const current = accounts.find((a) => a.id === currentAccountId)
@@ -68,6 +73,10 @@ export function AccountSwitcher({
       invalidate(cacheKeys.ticketsCursor)
       invalidate(cacheKeys.company(currentAccountId))
       invalidate(cacheKeys.company(accountId))
+      // Dropping a cache marks it stale; this re-reads it. The shell holds the
+      // context inside its session read, so the header, this menu's tick and
+      // every screen below repaint from one call.
+      onSwitched()
     } catch (e) {
       toast.error(e instanceof ApiFailure ? e.message : "Couldn't switch. Try again.")
     } finally {

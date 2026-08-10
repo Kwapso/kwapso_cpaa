@@ -36,6 +36,30 @@ type Env = {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    try {
+      return await handle(request, env)
+    } catch (e) {
+      // A public door must never answer a stranger with Cloudflare's raw 1101.
+      // This worker binds no database, so the crash goes out the same internal
+      // pipe the client beacon uses — best-effort, because a door that cannot
+      // report is still a door that must answer.
+      console.error("gateway_error", new URL(request.url).pathname, e)
+      await env.AUTH.fetch("https://internal/internal/log-error", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-internal-key": env.INTERNAL_KEY ?? "" },
+        body: JSON.stringify({
+          source: "gateway",
+          place: new URL(request.url).pathname,
+          message: e instanceof Error ? e.message : String(e),
+          stack: e instanceof Error ? e.stack : undefined,
+        }),
+      }).catch(() => null)
+      return fail(500, "server_error", "Something went wrong.")
+    }
+  },
+} satisfies ExportedHandler<Env>
+
+async function handle(request: Request, env: Env): Promise<Response> {
     const { pathname } = new URL(request.url)
 
     if (pathname.startsWith("/api/auth/")) return env.AUTH.fetch(request)
@@ -166,5 +190,4 @@ export default {
     // Assets serves matching files BEFORE this Worker runs, so per-asset headers
     // must live in _headers, not here.
     return env.ASSETS.fetch(request)
-  },
-} satisfies ExportedHandler<Env>
+}

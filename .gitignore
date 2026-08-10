@@ -25,3 +25,6 @@ out/
 # The pulled Glide rows are real customer data — the catalogue is tracked, the
 # data never is. Re-pull with `node scripts/glide-pull.mjs`.
 glide/data/
+
+# Parallel agent worktrees — working copies, never content
+.claude/worktrees/

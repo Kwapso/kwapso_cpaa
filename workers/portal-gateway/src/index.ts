@@ -27,6 +27,7 @@
 // from a door that already resolves the caller's account set.
 
 import { fail } from "../../../shared/workers/http"
+import { safeMediaKey } from "../../../shared/workers/image"
 
 /** The workers a portal door may be forwarded to. */
 type Upstream = "AUTH" | "TENANCY" | "CONTENT" | "REALTIME"
@@ -119,6 +120,30 @@ type Env = {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    try {
+      return await handle(request, env)
+    } catch (e) {
+      // A public door must never answer a stranger with Cloudflare's raw 1101.
+      // This worker binds no database, so the crash goes out the same internal
+      // pipe the client beacon uses — best-effort, because a door that cannot
+      // report is still a door that must answer.
+      console.error("portal_gateway_error", new URL(request.url).pathname, e)
+      await env.AUTH.fetch("https://internal/internal/log-error", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-internal-key": env.INTERNAL_KEY ?? "" },
+        body: JSON.stringify({
+          source: "portal-gateway",
+          place: new URL(request.url).pathname,
+          message: e instanceof Error ? e.message : String(e),
+          stack: e instanceof Error ? e.stack : undefined,
+        }),
+      }).catch(() => null)
+      return fail(500, "server_error", "Something went wrong.")
+    }
+  },
+} satisfies ExportedHandler<Env>
+
+async function handle(request: Request, env: Env): Promise<Response> {
     const { pathname } = new URL(request.url)
 
     // The client error beacon → console AND the central error_logs table, the
@@ -171,8 +196,13 @@ export default {
     // Uploaded files (a company's logo, a person's photo). URLs carry ?v= for
     // cache busting, so the file itself can be cached hard.
     if (pathname.startsWith("/media/") && request.method === "GET") {
-      const key = decodeURIComponent(pathname.slice("/media/".length))
-      const object = await env.MEDIA.get(key)
+      // Through the SAME validator the agency door uses. A raw
+      // decodeURIComponent throws on a malformed escape — `/media/%` alone was
+      // enough to 500 this worker — and it also lets `..`, `//` and control
+      // characters through to the bucket. A refused key gets the same plain 404
+      // a miss gets, so the door never says which of the two it was.
+      const key = safeMediaKey(pathname.slice("/media/".length))
+      const object = key && (await env.MEDIA.get(key))
       if (!object) return new Response("Not found", { status: 404 })
       return new Response(object.body, { headers: mediaHeaders(object) })
     }
@@ -193,5 +223,4 @@ export default {
     // Static Assets serves matching files BEFORE this Worker runs, so per-asset
     // headers must live there, not here.
     return env.ASSETS.fetch(request)
-  },
-} satisfies ExportedHandler<Env>
+}

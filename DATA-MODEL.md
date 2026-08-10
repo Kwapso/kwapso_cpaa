@@ -123,9 +123,9 @@ dry mid-plan stops the turn with a saved, plain reply). A turn that changes
 NOTHING the user wanted — a refused/failed action (e.g. inviting someone already
 on the team) or a model hiccup — is **refunded** (`refundAiUnits` reverses both
 pools), so a blocked action costs zero; a turn with any successful write keeps its
-charge. Once a team is over its
-free daily allowance (default **25/day**, per-env via the `AGENT_FREE_DAILY` var
-— staging runs 50), the gate spends from the credit balance instead. Lives in
+charge. Once a team is over the app's own daily allowance (`AGENT_FREE_DAILY`:
+code default **25/day**, but both environments ship **50**), the gate spends from
+the credit balance instead. Lives in
 the global core DB so the gate can check it without opening a team database.
 
 ### agent_credits — KEEP (BUILT 2026-06-23, GLOBAL — `db/core/0010`)
@@ -284,8 +284,9 @@ Purpose: every company and every person kwapso works with, in **one** table
 (SCOPE ch.03 "People — one table"). There is no second people-table anywhere.
 
 `accounts`: audit block + `account_type` (`entity` | `individual`, CHECKed),
-`parent_account_id` (a **self-pointer**: unlimited nesting, a holding company's
-businesses, a business's divisions), `name`, `email`, `phone`, `address`, `code`,
+`parent_account_id` (a **self-pointer**: a holding company's businesses, a
+business's divisions — nesting is deep, but not unlimited; the two ceilings are
+below), `name`, `email`, `phone`, `address`, `code`,
 `currency`, `locale`, `timezone`, `commercials_visible`, `status` (the commercial
 lifecycle: prospect → client → past client). **`code` is a REFERENCE, never an
 identifier** — staff assign it when work starts (BERG), it is unique-when-present
@@ -296,6 +297,19 @@ move rides a recursive `WITH … UPDATE … WHERE NOT EXISTS (ancestors)`, so tw
 admins re-parenting at the same instant cannot co-operate their way into a ring
 (CONCURRENCY rule 1); zero rows changed is the refusal, reported as a plain 409.
 
+**The two ceilings on the tree, said out loud** (R14's premise is that every read
+states its cap): the accounts table is the one self-nesting structure in the base,
+so it is the one place a walk could run away with itself, and both walks stop.
+**`MAX_ACCOUNT_DEPTH` (64, `shared/workers/limits.ts`)** bounds the loop guard's
+climb when a record is re-parented: past 64 ancestors the walk can no longer PROVE
+the move is ring-free, so it **refuses the move** — fails closed, never open. Far
+deeper than any real org chart, and a refusal you would only ever meet by building
+a chain nobody meant. **`SCOPE_HARD_CAP` (500, `shared/workers/account-scope.ts`)**
+bounds the other direction: the reach walk that decides which accounts a client may
+see stops at 500 rows. Past that the account set is wrong in the SAFE direction —
+it stops early and grants LESS, never more. Both numbers are one-line changes, and
+both are deliberately generous rather than tuned.
+
 `account_links`: audit block + `account_id` (the company side),
 `person_account_id` (the person's own account row), `relationship`,
 `is_main_stakeholder`. This is what the parent pointer **cannot** say — Marta is a
@@ -304,9 +318,22 @@ partial unique index on the active pair is the duplicate race guard. "Contact" i
 a role word, not a table: it is this row.
 
 `portal_users`: audit block + `account_id`, `user_id` (the GLOBAL users row),
-`app_restriction` (null = the whole account's world). **The login switch, and
-independent of linking**: an individual can be linked with no login, a freelancer
-can hold a login on their own parentless account. The audit block IS the grant
+`app_restriction`, and `current_account_id` (added by `0008`, below). **The login
+switch, and independent of linking**: an individual can be linked with no login, a
+freelancer can hold a login on their own parentless account.
+
+> **`app_restriction` is CARRIED, NOT ENFORCED — read this before you rely on it.**
+> The column is written and read back honestly, and the guard corridor
+> (`shared/workers/account-scope.ts`) puts it on the caller's stamp. Nothing acts
+> on it. It is the per-person "only these named Apps" narrowing from SCOPE ch.03,
+> and the Apps module that is the only thing able to honour it has not landed yet,
+> so today a value in this column changes **nothing** about what a client can see:
+> their fence is their account's world, whole. Treat a non-null value as a note of
+> intent, never as a restriction in force — a field that looks like a security
+> control and is not is worse than no field at all, which is why the guard
+> corridor says so at the field itself and why it is said plainly here. The grant
+> door accepts it (`POST` accounts → `appRestriction`) and the read hands it back;
+> neither narrows anything. When the Apps module lands, enforcing it is the work. The audit block IS the grant
 record (creator_* = who granted, deactivator_* = who revoked), so there is no
 second `granted_by` column to keep in step. **Revoke deactivates, never deletes**
 — login dies, every record stays — and a partial unique index on `user_id` where
@@ -330,6 +357,29 @@ PRESENCE of a portal_users row, never by its absence: a revoked row still makes
 you a portal caller, pinned to the EMPTY set, rather than silently promoting a
 former client to staff. Enforced by `workers/tenancy/test/account-leak.test.ts`,
 which derives the account-scoped routes off disk and sends a burglar at each.
+
+### portal_users.current_account_id — KEEP (BUILT 2026-08-10, team migration `0008_portal_current_account`) — where a client is standing
+
+One column, and the whole account switcher stands on it. A client login belongs to
+one company at a time and switches between them (owner decision, 10 Aug 2026 — the
+same bargain the team switcher makes: you own the data, it simply isn't fetched
+while you're standing somewhere else). `current_account_id` is that pointer and
+nothing more: it **NARROWS** the fence to one of the companies the person already
+belongs to, and it can never widen it — the guard corridor re-derives the roots
+first and only then honours the pointer, so a value naming a company they have no
+grant on is ignored, not obeyed.
+
+`NULL` means "not chosen yet", which the corridor reads as their first company
+(roots are id-ordered, so the fallback pick is the same on every request — a
+switcher that moved you on refresh would be a bug you could not reproduce). That is
+why the migration needs no backfill: every grant that existed before it keeps
+working untouched.
+
+**WITHOUT `0008` applied to a team's database, the account switcher breaks**: every
+read of `portal_users` hits a missing column, so switching companies fails and a
+person who acts for two of the agency's clients is stuck in whichever one comes
+first. Roll it with `POST /api/tenancy/admin/migrate-teams` (x-admin-key) before
+deploying the portal — same rule as every team-schema migration.
 
 ### data_import_batches — KEEP (BUILT 2026-07-04, team migration `0006_import_batches`) — agentic multi-file import
 Purpose: the shell for an AGENTIC, multi-file import (AGENTIC-IMPORT.md). Groups the
@@ -368,7 +418,16 @@ these rows are a record of intent, never a separate set of powers.
   **Since:** agent_usage_log (GLOBAL core `0011`, BUILT 2026-07-01), error_logs
   (GLOBAL core `0012`, the central error store, BUILT 2026-07-03),
   data_import_batches (per-team `0006_import_batches`, the agentic multi-file
-  import, BUILT 2026-07-04).
+  import, BUILT 2026-07-04), the customer spine — accounts + account_links +
+  portal_users (per-team `0007_customer_spine`, BUILT 2026-08-09) — and
+  `portal_users.current_account_id` (per-team `0008_portal_current_account`,
+  BUILT 2026-08-10; see below).
+- **The per-team migration list is `TEAM_MIGRATIONS` in
+  `workers/tenancy/src/team-schema.ts`** — eight today, `0001_team_base` through
+  `0008_portal_current_account`. A new team's database runs all of them at
+  creation; existing teams get the gap rolled to them by `POST
+  /api/tenancy/admin/migrate-teams`. That file is the source; any list written
+  down elsewhere (here, OPERATIONS, BOOTSTRAP) is a copy of it.
 - **To build (tables)**: selectable_data_types (the only remaining one) — the
   global authoritative dropdown-GROUP list.
 

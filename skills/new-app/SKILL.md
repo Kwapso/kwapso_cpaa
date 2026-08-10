@@ -1,6 +1,6 @@
 ---
 name: new-app
-description: The one-shot foundation builder — given an app name, it clones the Brimba base from GitHub, runs the fork sweep (renames the kwapso- prefix everywhere), stands the whole base up on Cloudflare command-by-command (core database + migrations, R2 buckets, secrets, realtime-first deploy of all seven workers, catalog seed, smoke), creates the GitHub repo, verifies everything (npm run check, the staging smoke including the MCP stage, the three quality gates, a browser sanity pass), and hands over a ready-to-brand checklist. Use when the user says "new app", "start a new project", "fork the base", "set up a new app", "bootstrap this project", or wants a fresh product wired up with the full local → GitHub → staging → production pipeline.
+description: The one-shot foundation builder — given an app name, it clones the Brimba base from GitHub, runs the fork sweep (renames the kwapso- prefix everywhere), stands the whole base up on Cloudflare command-by-command (core database + migrations, R2 buckets, secrets, realtime-first deploy of all eight workers, catalog seed, smoke), creates the GitHub repo, verifies everything (npm run check, the staging smoke including the MCP stage, the three quality gates, a browser sanity pass), and hands over a ready-to-brand checklist. Use when the user says "new app", "start a new project", "fork the base", "set up a new app", "bootstrap this project", or wants a fresh product wired up with the full local → GitHub → staging → production pipeline.
 ---
 
 # new-app — the one-shot foundation builder
@@ -22,7 +22,7 @@ The cloned repo carries its own canon — read its `CLAUDE.md`, `BASE-MANUAL.md`
 fork, §6 scaling), and `BOOTSTRAP.md` as you go. This skill is the checklist; those
 docs are the law.
 
-**Platform note — recommend Cloudflare; the top-10 are mapped.** The base's seven-worker
+**Platform note — recommend Cloudflare; the top-10 are mapped.** The base's eight-worker
 shape, per-team D1 databases, Durable Object live layer, and R2 media are
 Cloudflare-native, and this skill stands them up **turnkey** — so **recommend
 Cloudflare**. If the owner names a different platform (AWS, GCP, Azure, Vercel, Supabase,
@@ -78,16 +78,23 @@ is added in step 4).
 Per BASE-MANUAL §5: rename the identity, never the plumbing. The real spots in the
 repo today — sweep them all, then verify:
 
-- **`workers/*/wrangler.jsonc` (all seven: auth, tenancy, realtime, gateway, content,
-  data-ops, mcp):** the worker `name` (top-level = production AND `env.staging`),
-  every service-binding `service:` name, the `database_name`s (`kwapso-core`,
-  `kwapso-core-staging`), every R2 `bucket_name`, plus the identity vars —
-  `APP_ORIGIN` + `EMAIL_FROM` (auth), `PUBLIC_APP_URL` (tenancy). Leave the
-  checked-in `database_id` and `CF_ACCOUNT_ID` values alone for now — step 3
-  overwrites them with the new account's real values.
+- **`workers/*/wrangler.jsonc` (all EIGHT: auth, tenancy, realtime, content,
+  data-ops, mcp, gateway, **portal-gateway**):** the worker `name` (top-level =
+  production AND `env.staging`), every service-binding `service:` name, the
+  `database_name`s (`kwapso-core`, `kwapso-core-staging`), every R2 `bucket_name`,
+  plus the identity vars — `APP_ORIGIN` + `EMAIL_FROM` (auth), `PUBLIC_APP_URL`
+  (tenancy, content). **Do not stop at seven**: `workers/portal-gateway` is the
+  client portal's public door, and a fork that skips it deploys a worker still
+  named `kwapso-portal` — the new product's client-facing address carrying the old
+  product's name. Its wrangler file also names the portal's custom domains in a
+  comment; update those to the new product's. Leave the checked-in `database_id`
+  and `CF_ACCOUNT_ID` values alone for now — step 3 overwrites them with the new
+  account's real values.
 - **Package names:** root `package.json` (name, description, and every
-  `--workspace=kwapso-*` reference in its scripts) + the workspace names in
-  `web/package.json` and all seven `workers/*/package.json`.
+  `--workspace=kwapso-*` reference in its scripts — there are two front ends and
+  eight workers in those scripts) + the workspace names in `web/package.json`,
+  **`web-portal/package.json`** (`kwapso-portal-web` — the other easy miss) and all
+  EIGHT `workers/*/package.json`.
 - **`shared/brand.ts`:** the app `name`, `description`, `motto` (colours and logo
   come later — step 6).
 - **Scripts:** `scripts/reset-all.mjs` (the `GLOBAL_DB` names) and
@@ -101,21 +108,26 @@ repo today — sweep them all, then verify:
 - **`OPERATIONS.md`:** rewrite the staging/production URLs, the worker-names table,
   the reset database names, and the `github_remote` — the ship and reset skills read
   this file.
-- **Host URLs in the docs (easy to miss — the `kwapso-` rename skips them).** The base's
-  live hosts appear hardcoded as **`kwapso.kwapso.workers.dev`** (production, no
-  hyphen) and **`kwapso-staging.kwapso.workers.dev`** (staging) in `MCP.md`,
-  `mcp-quickstart.md`, `BOOTSTRAP.md`, `PLATFORMS.md`, and `README.md`. These are **live
-  references, not history** — replace the `kwapso`/`kwapso-staging` host part with the new
-  app's hosts everywhere (a `kwapso-` prefix rename alone MISSES `brimba.` with a dot).
-  The verify grep below must come back clean of `swift-struck.workers.dev` hosts that
-  still say `kwapso`.
+- **Host URLs in the docs (easy to miss — a `kwapso-` prefix rename skips them).** The
+  base's live addresses are written out in `README.md`, `OPERATIONS.md`, `MCP.md`,
+  `mcp-quickstart.md`, `BOOTSTRAP.md`, `PLATFORMS.md` and `web/e2e/README.md`. There
+  are **four** of them, because there are two front ends: the agency app on
+  `agency.kwapso.app` / `agency-staging.kwapso.app` and the client portal on
+  `client.kwapso.app` / `staging-client.kwapso.app`. These are **live references, not
+  history** — replace all four with the new product's own hosts (or, until it has
+  custom domains, its `*.workers.dev` names). A prefix rename alone misses them: the
+  product name sits in the middle of the hostname, not at the front of a resource
+  name. Verify with `grep -rn "kwapso.app" . --exclude-dir=node_modules
+  --exclude-dir=.git` — nothing should come back.
 
-Verify: `grep -ri brimba . --exclude-dir=node_modules --exclude-dir=.git` — code,
-configs, and scripts must be clean. Prose mentions of "Brimba" *describing the base's
-history* may stay, but **functional references must not** — in particular any
-`brimba*.swift-struck.workers.dev` **host URL** is a live pointer, not history, so it
-must be swept (grep specifically for `swift-struck.workers.dev` and confirm none still
-say `kwapso`). Then `npm run check` again — green before any deploy.
+Verify: `grep -ri kwapso . --exclude-dir=node_modules --exclude-dir=.git` — code,
+configs, and scripts must be clean. Prose mentions of the base's *history* may stay,
+but **functional references must not**: a resource name, a service binding, a cookie
+or token prefix, and above all a **host URL** are live pointers, not history. Then
+`npm run check` again — green before any deploy. `npm run check` also runs
+`web/test/doc-claims.test.ts`, which checks the docs against the worker roster on
+disk, so a fork that half-renamed the workers is caught here rather than in
+production.
 
 ## 3 · Stand it up on Cloudflare (BOOTSTRAP.md, command-by-command)
 Follow the cloned repo's `BOOTSTRAP.md` — it is the runbook; this is the order:
@@ -141,12 +153,15 @@ Follow the cloned repo's `BOOTSTRAP.md` — it is the runbook; this is the order
    - `RESEND_API_KEY` → auth
    - `CF_D1_TOKEN` → tenancy, content, data-ops
    - `ADMIN_KEY` (generate a strong one) → tenancy, data-ops
-   - `INTERNAL_KEY` (generate one; the SAME value on all five) → auth, tenancy,
-     content, gateway, mcp
+   - `INTERNAL_KEY` (generate one; the SAME value on all SIX) → auth, tenancy,
+     content, gateway, **portal-gateway**, mcp — the portal door forwards its own
+     client error beacon through auth, so without the key a crash on a client's
+     phone is console-only
    - `ANTHROPIC_API_KEY` (optional) → data-ops
-5. **Deploy, realtime-first:** `npm run deploy:staging` — builds the web export and
-   deploys all SEVEN workers in the locked order realtime → auth → tenancy →
-   content → data-ops → mcp → gateway, then runs the smoke automatically.
+5. **Deploy, realtime-first:** `npm run deploy:staging` — builds BOTH static
+   exports (`web/out` and `web-portal/out`) and deploys all EIGHT workers in the
+   locked order realtime → auth → tenancy → content → data-ops → mcp → gateway →
+   portal-gateway, then runs the smoke automatically.
    **COLD-START — expect this on a fresh account:** realtime binds auth and auth binds
    realtime, so the FIRST deploy dies with `code 10143` (neither exists yet). Break the
    cycle once: temporarily remove the AUTH service binding from
@@ -154,9 +169,12 @@ Follow the cloned repo's `BOOTSTRAP.md` — it is the runbook; this is the order
    realtime. Do it on staging AND production (OPERATIONS.md → Deploy order).
 6. **Seed the import catalog:** `curl -X POST
    https://<staging-url>/api/data-ops/admin/seed-targets -H "x-admin-key: <ADMIN_KEY>"`.
-7. **First team:** open the staging URL, sign in with an email code (echoed in the
-   response until Resend is set), complete onboarding — this creates the first team
-   and its own database.
+7. **First team:** open the AGENCY staging URL, sign in with an email code (a code
+   appears only in the inbox, in every environment — set `RESEND_API_KEY`, or use the
+   test-login door gated by auth's own `TEST_LOGIN_KEY` on non-production), complete
+   onboarding — this creates the first team and its own database. Then open the
+   CLIENT PORTAL's staging URL and confirm it serves its sign-in screen: a fork that
+   missed the portal gateway shows up here.
 
 Production is **owner-gated**: everything above is repeated for production names by
 `npm run deploy:production` + the production catalog seed, only after staging is
@@ -177,8 +195,11 @@ git-ignored; secrets never reach the repo.
   token revoked.
 - The **three quality gates**: `lean_mean_check` (92 or better), `story_checks_out`,
   `security_sentry` (no critical/high). Adversarially verify your own findings.
-- A **browser sanity pass** on staging: sign in, land in a team, see Home / Learning /
-  Help / Settings, open the AI assistant and get a reply.
+- A **browser sanity pass** on staging, on BOTH doors: on the agency app sign in,
+  land in a team, see Home / Learning / Help / Settings, open the AI assistant and get
+  a reply; on the client portal confirm its own sign-in screen loads and that
+  `/api/data-ops/agent` there returns 404 (the portal names no such door — proof the
+  allow-list survived the fork).
 
 Report pass/fail per item; fix what fails before handover.
 
@@ -202,8 +223,9 @@ seams — all identity, no plumbing:
 
 **Tearing down a test.** If this run was a throwaway test, everything created carries the
 `<name>-` prefix and is fully reversible — follow the cloned repo's **BOOTSTRAP.md §10
-(Teardown)**: reset-all → delete the 14 worker deployments → the 2 core DBs → the 6 R2
-buckets → the GitHub repo → the local clone. Safest of all: run the test on a throwaway
+(Teardown)**: reset-all → delete the 16 worker deployments (eight workers × two
+environments — the two GATEWAYS included, or a public address stays live) → the 2 core
+DBs → the 6 R2 buckets → the GitHub repo → the local clone. Safest of all: run the test on a throwaway
 Cloudflare account, so cleanup is just deleting that account's resources.
 
 ## Mandate

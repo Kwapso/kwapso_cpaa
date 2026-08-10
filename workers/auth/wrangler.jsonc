@@ -7,10 +7,11 @@
   "name": "kwapso-auth",
   "main": "src/index.ts",
   "compatibility_date": "2026-06-01",
-  // Only the gateway is public (locked: one public address). No *.workers.dev
-  // URL for this worker — it's reachable ONLY via service bindings. BOTH flags:
-  // workers_dev kills the stable subdomain, preview_urls kills the per-version
-  // preview URLs (each would be a second public door).
+  // Only the two gateways are public (locked: one public address per front door —
+  // the agency's and the client portal's). No *.workers.dev URL for this worker —
+  // it's reachable ONLY via service bindings, which is what keeps /internal/* off
+  // the public internet. BOTH flags: workers_dev kills the stable subdomain,
+  // preview_urls kills the per-version preview URLs (each would be another door).
   "workers_dev": false,
   "preview_urls": false,
   "observability": { "enabled": true },

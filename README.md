@@ -9,23 +9,33 @@ acts AS the signed-in user through the same gated endpoints (never exceeding
 their rights), all hosted on Cloudflare.
 
 UPDATED 2026-06-23: the **agent-modules build** landed (branch `agent-modules`) —
-learning, help, CSV import, and the AI agent are all BUILT. **Seven workers are on
-disk**: auth, tenancy, realtime, gateway, **content** (learning + help),
-**data-ops** (import + the AI agent), and **mcp** — the external machine surface
+learning, help, CSV import, and the AI agent are all BUILT. UPDATED 2026-08-10:
+**eight workers are on disk** — six shared brains (auth, tenancy, realtime,
+**content** (learning + help), **data-ops** (import + the AI agent), and **mcp**)
+under **two front doors**: `gateway` (the agency app, `web/`) and `portal-gateway`
+(the client portal, `web-portal/`). The mcp worker is the external machine surface
 (BUILT 2026-07-07): personal access tokens (hashed, shown-once, team-pinned,
 revocable; managed under Settings → Access tokens) bridged to short-lived
 team-pinned sessions, exposing the gated doors as MCP tools at `/mcp`. The agent's
 model is swappable: Claude when `ANTHROPIC_API_KEY` is set, else Cloudflare
 Workers AI (both do full tool use); it confirms on destructive + bulk actions
-and is metered by a credit quota (a free daily allowance — default 25, the
-`AGENT_FREE_DAILY` var — + a purchasable balance).
+and is metered by a credit quota — **the app's own daily allowance** (the
+`AGENT_FREE_DAILY` var: code default 25, but both environments ship **50**) plus a
+purchasable balance.
 
 UPDATED 2026-06-21: the team area (Overview, Members, Member roles, Invites)
 now lives at `/t/<teamId>/…` deep-link URLs (rendered by the screen engine),
 not under Settings; top-level `/members` and `/roles` are thin redirects there.
 
-- **Production:** https://kwapso.kwapso.workers.dev
-- **Staging:** https://kwapso-staging.kwapso.workers.dev
+The agency app and the client portal each have their own address:
+
+| Surface | Production | Staging |
+|---|---|---|
+| Agency app | https://agency.kwapso.app | https://agency-staging.kwapso.app |
+| Client portal | https://client.kwapso.app | https://staging-client.kwapso.app |
+
+(`portal.kwapso.app` is **not** ours — it is the owner's live Glide portal, untouched
+until cutover.)
 
 ## The documents
 
@@ -61,6 +71,8 @@ concrete + checkable:
 - **Import + export rules** — [AGENTIC-IMPORT.md](AGENTIC-IMPORT.md): audit parity, export-needs-read/import-needs-create, one-confirm, insert-only, and every import place offers a sample file (test-enforced).
 - **Error rules** — [ERROR-HANDLING.md](ERROR-HANDLING.md): never swallow; one client seam; every worker records to the central store.
 - **The single vocabulary** — `shared/glossary.ts` (Law R6, machine-checked): one word per concept, used in all UI copy.
+
+- **The docs themselves are checked too** — `web/test/doc-claims.test.ts` derives the worker roster from `workers/` on disk and reads each `wrangler.jsonc` to see which are public, then fails if any doc states a worker count or a public-door count that disagrees. Add a worker, and every stale sentence goes red the same day.
 
 If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says so and names where it's applied.
 
@@ -108,7 +120,7 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
 ### The manual — build on it, understand it, rebuild it from zero
 
 12. **[BASE-MANUAL.md](BASE-MANUAL.md)** — how the whole base works AND *why*: the
-    seven workers, the two-tier database, the permission spine, how a new module and
+    eight workers, the two-tier database, the permission spine, how a new module and
     the base influence each other, and how to change foundational code + how a
     change ripples. Start here to understand the system.
 13. **[BUILD-A-MODULE.md](BUILD-A-MODULE.md)** — the golden-path checklist to add a
@@ -142,14 +154,45 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
     (per-team data · live layer · compute · storage · static web) onto the top-10 cloud
     providers (AWS, GCP, Azure, Vercel, Supabase, Fly.io, Render, DigitalOcean, Netlify)
     with an honest effort rating and the porting method (swap ~4 seam files, not the app).
+22. **[mcp-quickstart.md](mcp-quickstart.md)** — the one-page version of MCP.md, meant
+    to be handed straight to an outside developer. Deliberately a short overlap with
+    MCP.md, not a second source: MCP.md is the full detail, this is the page you send.
+23. **[SCOPE.html](SCOPE.html)** — the product's scope of work: what kwapso is for,
+    chapter by chapter. The other docs defer to it by chapter ("SCOPE ch.06") for
+    product decisions — the account fence, the two front doors, what the client may
+    see — so when a rule here says "because SCOPE says so", this is the book it means.
+    Open it in a browser.
+24. **[kwapso-the-system-explained.html](kwapso-the-system-explained.html)** — the
+    owner-facing walkthrough of the whole system in plain language. A companion to
+    SCOPE, not a rule source.
+25. **[glide/README.md](glide/README.md)** — the legacy Glide catalogue: the two apps
+    kwapso ran on before this one, how to pull their rows, and the field
+    reconciliation. `glide/data/` is git-ignored — it is customer data.
+
+### Where the code lives
+
+| Folder | What it is |
+|---|---|
+| `web/` | the AGENCY screens (Next.js static export → `web/out`, served by `workers/gateway`) |
+| `web-portal/` | the CLIENT PORTAL screens (static export → `web-portal/out`, served by `workers/portal-gateway`). Its own workspace, its own tests — including the account-fence suite |
+| `workers/` | the eight workers. Six private brains + the two public gateways |
+| `shared/` | what every side agrees on: the worker seams, the types, the glossary, the rules registry |
+| `db/core/` | the global core database's migrations (per-team schema lives in `workers/tenancy/src/team-schema.ts`) |
+| `scripts/` | the operational scripts — reset, seed, the smokes, the Glide pull |
+| `skills/` | the build skills that travel with the base (`new-app`) |
 
 ## Develop
 
 ```bash
 npm install        # also pulls the UI library from GitHub
-npm run dev        # http://localhost:3000
-npx tsc --noEmit   # type-check (run before any commit)
+npm run dev        # the agency app on http://localhost:3000
+npm run dev:portal # the client portal on http://localhost:3001
+npm run check      # THE GATE — types across every workspace + the full test suite
 ```
+
+`npm run check` is what you run before any commit. It type-checks both front ends and
+all eight workers and then runs every test, including the law checks that read the
+source off disk — a plain `npx tsc --noEmit` proves far less.
 
 Ship by saying **"ship to staging"** / **"ship to production"** — the skills
 read OPERATIONS.md and handle GitHub + Cloudflare.

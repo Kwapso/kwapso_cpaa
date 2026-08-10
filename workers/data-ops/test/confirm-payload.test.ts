@@ -123,6 +123,39 @@ describe("the confirm panel shows the payload it asks an admin to approve", () =
     expect(text).not.toContain("Learning: read, create, edit")
   })
 
+  it("still spells the sheet out when the payload carries a stray extra key", () => {
+    // THE BYPASS. The panel used to decide "is this a permission sheet?" by
+    // LOOKING AT THE PAYLOAD — every key must hold an object. But the payload is
+    // written by the model, so one scalar key was enough to answer no: the sheet
+    // fell through to the generic renderer, `renderGrid` never ran, and the nine
+    // modules being set to NO ACCESS disappeared from the panel while the door
+    // wrote them anyway. A stealth demotion, approved by an admin who was shown
+    // a different change from the one they authorised.
+    //
+    // The fix is structural: the TOOL declares that this field is a permission
+    // sheet. Data does not get a vote on how it is read.
+    const lines = describePayload("set_role_permissions", {
+      roleId: "01ROLE",
+      value: { learning: { read: true }, note: "" },
+    })
+    const text = lines.join("\n")
+    for (const m of TEAM_MODULE_CATALOG)
+      expect(text, `${m.label} must still appear beside a stray key`).toContain(`${m.label}:`)
+    expect(text).toContain("Members: no access")
+    expect(text).toContain("Roles & permissions: no access")
+    // The stray key is shown for what it is, not mislabelled as a permission.
+    expect(text).not.toContain("Note: no access")
+  })
+
+  it("reads a permission sheet by the tool it belongs to, not by its shape", () => {
+    // The same object under a DIFFERENT tool is not a permission sheet, and must
+    // not be rendered as the whole module catalogue.
+    const text = describePayload("some_future_tool", {
+      value: { learning: { read: true }, help: { read: true } },
+    }).join("\n")
+    expect(text).not.toContain("Members: no access")
+  })
+
   it("reads in the app's words, with ids resolved to people (never a bare ULID)", () => {
     const names = { "01USER": "Jane Doe", "01ROLE": "Sub Admin" }
     expect(describePayload("set_member_role", { userId: "01USER", roleId: "01ROLE" }, names)).toEqual([

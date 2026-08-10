@@ -122,19 +122,35 @@ function renderGrid(grid: Record<string, unknown>): string[] {
   const keys = [...MODULE_LABELS.keys(), ...Object.keys(grid).filter((k) => !MODULE_LABELS.has(k))]
   return keys.map((key) => {
     const row = grid[key]
-    const on = isPlainObject(row)
-      ? Object.entries(row)
-          .filter(([, v]) => v === true)
-          .map(([right]) => right)
-      : []
-    return `${MODULE_LABELS.get(key) ?? humanize(key)}: ${on.length ? on.join(", ") : "no access"}`
+    const label = MODULE_LABELS.get(key) ?? humanize(key)
+    // A key that isn't one of our modules, or isn't the rights shape, is shown
+    // as whatever it actually is. Calling it "no access" would describe a
+    // permission that was never being set — and a panel that says something
+    // untrue is no better than one that stays quiet.
+    if (!isPlainObject(row)) {
+      if (!MODULE_LABELS.has(key)) return `${label}: ${renderValue(key, row) ?? "nothing"}`
+      return `${label}: no access`
+    }
+    const on = Object.entries(row)
+      .filter(([, v]) => v === true)
+      .map(([right]) => right)
+    return `${label}: ${on.length ? on.join(", ") : "no access"}`
   })
 }
 
-/** Is this object the module → { read, create, edit, delete } shape? */
-function isPermissionGrid(value: Record<string, unknown>): boolean {
-  const keys = Object.keys(value)
-  return keys.length > 0 && keys.some((k) => MODULE_LABELS.has(k)) && keys.every((k) => isPlainObject(value[k]))
+/** The `tool.field` positions that ARE a permission sheet.
+ *
+ * Keyed by the TOOL, never inferred from the payload. The payload is written by
+ * the model, so any shape test on it is a test the model can fail on purpose: an
+ * earlier version asked "do all the keys hold objects?", and `{ learning: {…},
+ * note: "" }` answered no — which sent the whole sheet down the generic path and
+ * silently dropped the nine modules being set to no access, while the door wrote
+ * them anyway. The tool declares what a field means; the data does not get a
+ * vote. */
+const PERMISSION_GRID_FIELDS = new Set(["set_role_permissions.value"])
+
+function isPermissionGrid(tool: string, key: string): boolean {
+  return PERMISSION_GRID_FIELDS.has(`${tool}.${key}`)
 }
 
 /** The body a confirmed call will POST, as the lines the panel shows under the
@@ -149,7 +165,7 @@ export function describePayload(
   for (const [key, value] of Object.entries(body)) {
     if (isPlainObject(value)) {
       if (SECRET_KEY.test(key)) lines.push(`${fieldLabel(tool, key)}: hidden`)
-      else if (isPermissionGrid(value)) lines.push(...renderGrid(value))
+      else if (isPermissionGrid(tool, key)) lines.push(...renderGrid(value))
       else lines.push(...describePayload(tool, value, names).map((l) => `${fieldLabel(tool, key)} — ${l}`))
       continue
     }
