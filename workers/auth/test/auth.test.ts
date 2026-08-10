@@ -1,5 +1,5 @@
 // Unit tests for the auth worker's pure logic (no network, no database).
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 import { randomCode, randomToken, sha256Hex } from "../src/lib/crypto"
 import {
@@ -9,6 +9,7 @@ import {
   validateNewEmail,
 } from "../src/lib/email"
 import { ulid } from "../../../shared/workers/id"
+import { dataUrlBytes, MAX_IMAGE_BYTES, parseDataUrl } from "../../../shared/workers/image"
 
 describe("randomCode", () => {
   it("is always exactly 6 digits (zero-padded)", () => {
@@ -76,5 +77,38 @@ describe("maskEmail (security notice)", () => {
   })
   it("returns junk unchanged (no @)", () => {
     expect(maskEmail("notanemail")).toBe("notanemail")
+  })
+})
+
+// The profile door (POST /api/auth/profile) is on the client portal's allow-list
+// and gates on the session alone, so it is the one image door a stranger with a
+// login can hammer. It used to `atob()` whatever arrived and check the size of
+// the RESULT — asking the worker to allocate the payload in order to decide it
+// was too big. The byte count was always knowable from the encoded text.
+describe("image bounds (measure before you decode)", () => {
+  const dataUrl = (b64: string) => `data:image/png;base64,${b64}`
+
+  it("counts the decoded bytes from the encoded text, padding and all", () => {
+    for (const s of ["abc", "hi", "hello", "a longer sample string, still short"])
+      expect(dataUrlBytes(dataUrl(btoa(s))), `wrong count for "${s}"`).toBe(s.length)
+  })
+
+  it("refuses an oversize image WITHOUT decoding it", () => {
+    const spy = vi.spyOn(globalThis, "atob")
+    // 4 base64 chars = 3 bytes, so this is ~3MB decoded — over the 2.5MB cap.
+    const big = "A".repeat(4 * 1_000_000)
+    expect(dataUrlBytes(dataUrl(big))).toBeGreaterThan(MAX_IMAGE_BYTES)
+    expect(parseDataUrl(dataUrl(big)), "an oversize image must not parse").toBeNull()
+    expect(
+      spy,
+      "the payload was DECODED before it was measured — the cap has to come first"
+    ).not.toHaveBeenCalled()
+    spy.mockRestore()
+  })
+
+  it("still parses a real image (the cap is a cap, not a wall)", () => {
+    const out = parseDataUrl(dataUrl(btoa("PNG-ish bytes")))
+    expect(out?.contentType).toBe("image/png")
+    expect(out?.bytes.byteLength).toBe(13)
   })
 })

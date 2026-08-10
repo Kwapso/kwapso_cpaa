@@ -7,7 +7,7 @@ import type { ActivityItem } from "../../../../shared/types"
 import { d1Query, type D1Rest } from "../../../../shared/workers/d1-rest"
 import {
   accountActivityClause,
-  ACCOUNT_OWNED_TABLES,
+  portalActivityClause,
   type AccountScope,
 } from "../../../../shared/workers/account-scope"
 import type { MemberGuard } from "./permissions"
@@ -19,6 +19,16 @@ type ActivityRow = {
   description: string
   created_at: string
   creator_name: string | null
+}
+
+/** The fixed-table scopes, as what they actually are: the generic (table, id)
+ * read with the table named by the scope. Exported so the fence's own coverage
+ * check can read the set off this file rather than retyping it — a scope added
+ * here without a line in PORTAL_ACTIVITY_FENCE turns the build red. */
+export const FIXED_SCOPE_TABLES: Record<string, string> = {
+  user: "users",
+  role: "member_roles",
+  invite: "invite_logs",
 }
 
 /** R18 — the ONE visibility clause for the cross-module team feed. The feed's
@@ -52,15 +62,21 @@ export async function getActivity(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: "team" | "user" | "role" | "invite" | "record",
-  id?: string,
-  table?: string,
-  allowedTables: string[] | null = null,
-  cursor?: string | null,
-  /** The caller's account fence. Staff → no clause. A PORTAL caller sees only
-   * their own world's history, on every scope — the record scope because an id
-   * from outside the fence must read as "doesn't exist", and the team scope
-   * because a whole-team feed is exactly the leak in convenient form. */
-  accountScope?: AccountScope
+  // Every argument is STATED at every call site — no optionals, no defaults. The
+  // last one is the fence, and TypeScript will not let a required parameter
+  // follow an optional one, which is exactly the right trade: a little noise at
+  // four call sites buys "you cannot call this read without deciding the fence".
+  id: string | undefined,
+  table: string | undefined,
+  allowedTables: string[] | null,
+  cursor: string | null,
+  /** The caller's account fence, and REQUIRED — a caller who may omit it is a
+   * caller who may forget it, and this read is the one that gets forgotten.
+   * Staff → `{ kind: "staff" }`, no clause. A PORTAL caller sees only what is
+   * theirs, on every scope: the record scope because an id from outside the
+   * fence must read as "doesn't exist", and the team scope because a whole-team
+   * feed is exactly the leak in convenient form. */
+  accountScope: AccountScope
 ): Promise<Page<ActivityItem> & { total: number }> {
   // FAIL CLOSED. An id-scope with no id used to match NO branch below, leaving the
   // WHERE empty — so `?scope=user` with no `id` returned the entire team's
@@ -74,27 +90,23 @@ export async function getActivity(
   // pass through the same visibility filter would over-count what it can't show.
   const clauses: string[] = []
   const params: string[] = []
-  if (scope === "user" && id) {
-    clauses.push("related_table = 'users' AND related_row_id = ?")
-    params.push(id)
-  } else if (scope === "role" && id) {
-    clauses.push("related_table = 'member_roles' AND related_row_id = ?")
-    params.push(id)
-  } else if (scope === "invite" && id) {
-    clauses.push("related_table = 'invite_logs' AND related_row_id = ?")
-    params.push(id)
-  } else if (scope === "record" && id && table) {
+  // user / role / invite ARE the generic (table, id) read with the table supplied
+  // by the scope name (R5: one path, any module's history) — so they resolve to a
+  // table here and share the ONE branch below. As four branches they shared no
+  // fence, and the one that got it was the one somebody remembered.
+  const target = scope === "record" ? table : FIXED_SCOPE_TABLES[scope]
+  if (target && id) {
     clauses.push("related_table = ? AND related_row_id = ?")
-    params.push(table, id)
-    // An account-owned record is fenced by WHO OWNS IT, not by the module right
-    // that got the caller this far. Out of fence, the feed is empty — the same
-    // answer a made-up id gets, so it can't be used to test what exists.
-    if ((ACCOUNT_OWNED_TABLES as readonly string[]).includes(table) && accountScope) {
-      const fence = accountActivityClause(accountScope)
-      if (fence.sql) {
-        clauses.push(fence.sql)
-        params.push(...fence.params)
-      }
+    params.push(target, id)
+    // A record is fenced by WHO MAY SEE IT, not by the module right that got the
+    // caller this far — and WHICH fence is decided by the table (see
+    // PORTAL_ACTIVITY_FENCE). Staff get no clause; a client login gets their own
+    // world or nothing. Out of fence, the feed is empty — the same answer a
+    // made-up id gets, so it can't be used to test what exists.
+    const fence = portalActivityClause(accountScope, target)
+    if (fence.sql) {
+      clauses.push(fence.sql)
+      params.push(...fence.params)
     }
   } else {
     // `else`, not `else if (scope === "team")` — anything that reaches here is
@@ -106,7 +118,7 @@ export async function getActivity(
     // R18 subtracts the modules a caller may not read. It does NOT know about
     // the account fence, and a portal caller holds real module rights — so the
     // whole-team feed handed them every client's history until this line.
-    if (accountScope && accountScope.kind === "portal") {
+    if (accountScope.kind === "portal") {
       const fence = accountActivityClause(accountScope)
       clauses.push(fence.sql)
       params.push(...fence.params)
