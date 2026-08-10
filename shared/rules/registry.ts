@@ -173,6 +173,34 @@ export const CATALOG_EXEMPT: Record<string, string> = {
  * attack turns the build red. */
 export const ACCOUNT_SCOPED_MODULES = ["accounts", "portal_users"] as const
 
+/** EVERY read a CLIENT LOGIN can reach that returns rows belonging to someone —
+ * file → the fence it must carry, or a reasoned exemption.
+ *
+ * Earned the hard way. The fence was applied door by door to the ACCOUNT doors,
+ * and the first security sweep found three other doors that return account-owned
+ * rows and never got it: the record activity feed, the team activity feed, and
+ * the help list. The burglar suite could not have caught them, because it derived
+ * its targets from the account routes — the very set that excluded them. The
+ * lesson is the shape of this list: enumerate by WHAT A CLIENT CAN REACH, never
+ * by what the account module happens to own.
+ *
+ * A file added here with `fence: null` must state why in `why`. A file that reads
+ * one of these tables and is in neither state turns the build red. */
+export const PORTAL_VISIBLE_READS: Record<string, { fence: string | null; why: string }> = {
+  "workers/tenancy/src/lib/accounts.ts": {
+    fence: "accountScopeClause",
+    why: "the spine itself — every exported reader takes the caller's AccountScope.",
+  },
+  "workers/tenancy/src/lib/activity-read.ts": {
+    fence: "accountActivityClause",
+    why: "history rows NAME account records; the row id is not a secret (the live channel broadcasts it).",
+  },
+  "workers/content/src/lib/help.ts": {
+    fence: "authorScope",
+    why: "a client raises tickets; the team-wide default handed them every other client's.",
+  },
+}
+
 /** R18 — which permission module gates each activity `relatedTable` a worker
  * writes. The team feed (the ONE cross-module read) subtracts the caller's denied
  * modules through this map; the generic record scope resolves through it too. A

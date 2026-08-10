@@ -228,10 +228,29 @@ const BURGLARIES: Burglary[] = [
     route: "POST /api/tenancy/portal-users",
     why: "grant themselves a second login, on the victim's account",
     attack: () =>
-      req("POST /api/tenancy/portal-users", { accountId: IDS.victimAccount, userId: IDS.burglarUser }),
+      req("POST /api/tenancy/portal-users", { accountId: IDS.victimAccount, personAccountId: IDS.clientPerson }),
     honest: () =>
-      req("POST /api/tenancy/portal-users", { accountId: IDS.victimAccount, userId: IDS.staffUser }),
+      req("POST /api/tenancy/portal-users", { accountId: IDS.victimAccount, personAccountId: IDS.clientPerson }),
     expect: "refused",
+  },
+  {
+    // THE DOOR THE FIRST SWEEP FOUND. It is not an account route, so the derived
+    // set never included it — the whole reason this suite now attacks by "what a
+    // client can reach" rather than by "what the accounts module owns".
+    route: "GET /api/tenancy/activity",
+    why: "read the victim account's whole history by naming its id",
+    attack: () =>
+      req("GET /api/tenancy/activity", undefined, `?scope=record&table=accounts&id=${IDS.victimAccount}`),
+    honest: () =>
+      req("GET /api/tenancy/activity", undefined, `?scope=record&table=accounts&id=${IDS.victimAccount}`),
+    expect: "nothing",
+  },
+  {
+    route: "GET /api/tenancy/activity",
+    why: "take the whole team's feed, which names every client's records",
+    attack: () => req("GET /api/tenancy/activity", undefined, "?scope=team"),
+    honest: () => req("GET /api/tenancy/activity", undefined, "?scope=team"),
+    expect: "nothing",
   },
   {
     route: "POST /api/tenancy/portal-users/active",

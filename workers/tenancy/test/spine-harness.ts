@@ -47,6 +47,11 @@ export const IDS = {
   // A contact who hangs UNDER the company rather than being linked to it: the
   // owner's own example (a person inside Company A, who sees Company A's world).
   contactUser: "U_CONTACT",
+  // A real client: a platform account with NO team_members row. Staff are not
+  // clients and clients are not staff — the grant door now refuses to blur them,
+  // so the fixtures have to be able to tell them apart.
+  clientUser: "U_CLIENT",
+  clientPerson: "A_CLIENT_PERSON",
   victimContact: "A_VICTIM_CONTACT",
   contactPortal: "P_CONTACT",
   burglarAccount: "A_BURGLAR",
@@ -67,6 +72,7 @@ export const VICTIM_IDS = [
   IDS.victimSecondLink,
   IDS.victimContact,
   IDS.contactPortal,
+  IDS.clientPerson,
 ] as const
 
 /** A fresh team database: the real migrations, the real seed, then the two
@@ -84,7 +90,8 @@ export function buildSpineDb(): DatabaseSync {
       ('${IDS.staffUser}', 'staff@kwapso.app', 'Staff', '${IDS.team}'),
       ('${IDS.burglarUser}', 'burglar@delaval.example', 'Burglar', '${IDS.team}'),
       ('${IDS.victimUser}', 'marta@bergman.example', 'Marta', '${IDS.team}'),
-      ('${IDS.contactUser}', 'luis@bergman.example', 'Luis', '${IDS.team}');
+      ('${IDS.contactUser}', 'luis@bergman.example', 'Luis', '${IDS.team}'),
+      ('${IDS.clientUser}', 'nadia@bergman.example', 'Nadia', NULL);
     INSERT INTO team_members (id, team_id, user_id, role_id, created_at) VALUES
       ('m1', '${IDS.team}', '${IDS.staffUser}', '${IDS.adminRole}', '2026-01-01'),
       ('m2', '${IDS.team}', '${IDS.burglarUser}', '${IDS.clientRole}', '2026-01-01'),
@@ -124,6 +131,10 @@ export function buildSpineDb(): DatabaseSync {
   account(IDS.victimContact, "individual", "Luis Vera", IDS.victimAccount)
   account(IDS.burglarAccount, "entity", "Delaval Group", null)
   account(IDS.burglarPerson, "individual", "Diego Sanz", null)
+  db.exec(
+    `INSERT INTO accounts (id, account_type, name, email, created_at, creator_id)
+     VALUES ('${IDS.clientPerson}', 'individual', 'Nadia Ruiz', 'nadia@bergman.example', '2026-01-01', '${IDS.staffUser}');`
+  )
 
   db.exec(`
     INSERT INTO account_links (id, account_id, person_account_id, relationship, created_at, creator_id) VALUES
@@ -134,6 +145,17 @@ export function buildSpineDb(): DatabaseSync {
       ('${IDS.victimPortal}', '${IDS.victimPerson}', '${IDS.victimUser}', '2026-01-01', '${IDS.staffUser}'),
       ('${IDS.contactPortal}', '${IDS.victimContact}', '${IDS.contactUser}', '2026-01-01', '${IDS.staffUser}'),
       ('${IDS.burglarPortal}', '${IDS.burglarPerson}', '${IDS.burglarUser}', '2026-01-01', '${IDS.staffUser}');
+  `)
+
+  // REAL HISTORY on the victim's world. Without it the activity burglaries pass
+  // trivially — there is nothing to steal, so an unfenced feed and a fenced one
+  // both answer "nothing". A green test that proves nothing is worse than none.
+  db.exec(`
+    INSERT INTO activity (id, type, description, related_table, related_row_id, created_at, creator_id, creator_email, creator_name) VALUES
+      ('ACT_V1', 'Account edited', 'Staff changed Bergman S.A. phone to +34 600 111 222', 'accounts', '${IDS.victimAccount}', '2026-02-01', '${IDS.staffUser}', 'staff@kwapso.app', 'Staff'),
+      ('ACT_V2', 'Contact added', 'Staff added Marta Ruiz (marta@bergman.example) to Bergman S.A.', 'account_links', '${IDS.victimLink}', '2026-02-02', '${IDS.staffUser}', 'staff@kwapso.app', 'Staff'),
+      ('ACT_V3', 'Portal access granted', 'Staff gave portal access on Bergman S.A.', 'portal_users', '${IDS.victimPortal}', '2026-02-03', '${IDS.staffUser}', 'staff@kwapso.app', 'Staff'),
+      ('ACT_B1', 'Account edited', 'Staff changed Delaval Group address', 'accounts', '${IDS.burglarAccount}', '2026-02-04', '${IDS.staffUser}', 'staff@kwapso.app', 'Staff');
   `)
 
   return db

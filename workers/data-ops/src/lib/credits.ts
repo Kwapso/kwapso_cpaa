@@ -65,11 +65,16 @@ export async function consumeAiUnit(env: Env, teamId: string): Promise<ConsumeRe
   // used = 1, or incremented only while it is still under the cap. Zero rows
   // changed = the free allowance is spent, and we fall through to paid credits.
   const claimed = await env.DB.prepare(
-    `INSERT INTO agent_usage (team_id, period, used, updated_at) VALUES (?, ?, 1, ?)
+    // The `SELECT ... WHERE ? > 0` is load-bearing: a bare VALUES row is inserted
+    // unconditionally, so the ON CONFLICT guard below only ever protected the
+    // SECOND request of the day. With AGENT_FREE_DAILY=0 the first one still went
+    // through free — a cap of zero that granted one.
+    `INSERT INTO agent_usage (team_id, period, used, updated_at)
+     SELECT ?, ?, 1, ? WHERE ? > 0
      ON CONFLICT(team_id, period) DO UPDATE SET used = used + 1, updated_at = ?
      WHERE agent_usage.used < ?`
   )
-    .bind(teamId, period, now, now, cap)
+    .bind(teamId, period, now, cap, now, cap)
     .run()
   if ((claimed.meta.changes ?? 0) > 0) {
     const quota = await getQuota(env, teamId)

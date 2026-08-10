@@ -9,6 +9,7 @@
 import { fail, json, pagedJson } from "../../../../shared/workers/http"
 import { optionalText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
 import { publishChange } from "../../../../shared/workers/realtime"
+import { accountScope } from "../../../../shared/workers/account-scope"
 import { gated, gatedBody } from "../../../../shared/workers/route"
 import { requireIdList } from "../lib/bulk"
 import {
@@ -39,23 +40,29 @@ async function ticketPage(
   cfg: Parameters<typeof listTickets>[0],
   guard: Parameters<typeof listTickets>[1],
   scope: "mine" | "all",
-  cursor: string | null = null
+  cursor: string | null = null,
+  portal = false
 ): Promise<Response> {
-  const [page, counts] = await Promise.all([listTickets(cfg, guard, scope, cursor), countTickets(cfg, guard)])
+  const [page, counts] = await Promise.all([
+    listTickets(cfg, guard, scope, cursor, portal),
+    countTickets(cfg, guard, portal),
+  ])
   return pagedJson("tickets", { ...page, total: counts.total }, { mineTotal: counts.mineTotal })
 }
 
 /** GET /api/content/help?scope=mine|all  (?id=<ticketId> → just that one). */
 export async function getHelp(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "help", "read")
+  // Portal-ness decides WHOSE tickets, exactly as it decides whose accounts.
+  const portal = (await accountScope(cfg, guard)).kind === "portal"
   const url = new URL(request.url)
   const scope = url.searchParams.get("scope") === "mine" ? "mine" : "all"
   const id = url.searchParams.get("id")
   // One ticket by id is a LOOKUP, not a page — answer it directly rather than
   // filtering a page (which could legitimately not contain it once paged).
   if (id) {
-    const one = await getTicket(cfg, guard, id)
-    const counts = await countTickets(cfg, guard)
+    const one = await getTicket(cfg, guard, id, portal)
+    const counts = await countTickets(cfg, guard, portal)
     return pagedJson(
       "tickets",
       { rows: one ? [one] : [], total: counts.total, hasMore: false, nextCursor: null },
@@ -65,7 +72,7 @@ export async function getHelp(request: Request, env: Env): Promise<Response> {
   // R14: tickets are a GROWING collection, so the door pages by key — the opaque
   // cursor comes straight back from the previous response. R16: the exact server
   // totals (All + the caller's My) ride every list response.
-  return ticketPage(cfg, guard, scope, url.searchParams.get("cursor"))
+  return ticketPage(cfg, guard, scope, url.searchParams.get("cursor"), portal)
 }
 
 /** GET /api/content/help/thread?id=<ticketId> → the ticket's replies (oldest first). */

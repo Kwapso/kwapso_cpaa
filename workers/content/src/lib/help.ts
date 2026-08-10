@@ -117,16 +117,32 @@ const TICKET_ORDER = "COALESCE(updated_at, created_at)"
  * R14 GROWING collection: keyset-PAGED, not capped — tickets accumulate forever,
  * so the door answers "here's a page and where the next one starts" instead of
  * refusing past a ceiling. `cursor` is the opaque one from the previous page. */
+/** THE HELP FENCE. "All tickets" means all of the AGENCY's tickets — it was
+ * never meant to mean "every client's". A client login raises tickets like
+ * anyone else, and the team-wide default handed them everyone else's: names,
+ * problems, and whatever they pasted into the description.
+ *
+ * A portal caller is pinned to their own, whatever scope they ask for. Staff are
+ * unchanged. Returned as a clause rather than a pre-check so it rides the same
+ * WHERE as the page AND the count — a total that didn't pass the same filter
+ * would say how many tickets it is refusing to show. */
+export function authorScope(guard: MemberGuard, portal: boolean, scope: "mine" | "all") {
+  const own = portal || scope === "mine"
+  return { sql: own ? "creator_id = ?" : "", params: own ? [guard.userId] : [] }
+}
+
 export async function listTickets(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: "mine" | "all",
-  cursor?: string | null
+  cursor?: string | null,
+  portal = false
 ): Promise<Page<HelpTicket>> {
   const pos = decodeCursor(cursor)
   const after = keysetAfter(pos, TICKET_ORDER)
-  const clauses = [...(scope === "mine" ? ["creator_id = ?"] : []), ...(after.sql ? [after.sql] : [])]
-  const params = [...(scope === "mine" ? [guard.userId] : []), ...after.params]
+  const fence = authorScope(guard, portal, scope)
+  const clauses = [...(fence.sql ? [fence.sql] : []), ...(after.sql ? [after.sql] : [])]
+  const params = [...fence.params, ...after.params]
   const rows = await d1Query<TicketRow>(
     cfg,
     guard.databaseId,
@@ -143,13 +159,20 @@ export async function listTickets(
  * own (My) total in one read; never a loaded list's length. */
 export async function countTickets(
   cfg: D1Rest,
-  guard: MemberGuard
+  guard: MemberGuard,
+  portal = false
 ): Promise<{ total: number; mineTotal: number }> {
+  // R16 says the count is exact; the fence says exact ABOUT WHAT THEY MAY SEE.
+  // An unfenced total would tell a client how many tickets exist that it is
+  // refusing to show them — a smaller leak, but the same leak.
+  const fence = authorScope(guard, portal, "all")
   const rows = await d1Query<{ total: number; mine: number }>(
     cfg,
     guard.databaseId,
-    "SELECT COUNT(*) AS total, SUM(CASE WHEN creator_id = ? THEN 1 ELSE 0 END) AS mine FROM help",
-    [guard.userId]
+    `SELECT COUNT(*) AS total, SUM(CASE WHEN creator_id = ? THEN 1 ELSE 0 END) AS mine FROM help${
+      fence.sql ? ` WHERE ${fence.sql}` : ""
+    }`,
+    [guard.userId, ...fence.params]
   )
   return { total: rows[0]?.total ?? 0, mineTotal: rows[0]?.mine ?? 0 }
 }
@@ -158,13 +181,17 @@ export async function countTickets(
 export async function getTicket(
   cfg: D1Rest,
   guard: MemberGuard,
-  id: string
+  id: string,
+  portal = false
 ): Promise<HelpTicket | null> {
+  // The fence rides the WHERE here too: a by-id lookup that skipped it would be
+  // the leak in its most convenient form (one id, one ticket, no list to page).
+  const fence = authorScope(guard, portal, "all")
   const rows = await d1Query<TicketRow>(
     cfg,
     guard.databaseId,
-    `SELECT ${TICKET_COLS} FROM help WHERE id = ?`,
-    [id]
+    `SELECT ${TICKET_COLS} FROM help WHERE id = ?${fence.sql ? ` AND ${fence.sql}` : ""}`,
+    [id, ...fence.params]
   )
   return rows[0] ? toTicket(rows[0]) : null
 }
