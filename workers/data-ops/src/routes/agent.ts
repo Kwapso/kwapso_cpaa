@@ -41,6 +41,23 @@ function wantsStream(request: Request): boolean {
   return (request.headers.get("Accept") ?? "").includes("text/event-stream")
 }
 
+/** WHICH SURFACE ASKED — the value stamped on every row this turn writes
+ * (agent_messages.source, and the usage log's). It used to be the literal
+ * "in-app" for BOTH callers, so a turn driven by a personal access token through
+ * `agent_chat` was recorded as if a person had typed it in the app. Nothing
+ * exceeded its rights either way, but after a token leak the one question the
+ * column exists to answer — did a token do this, or did a person? — had no
+ * answer anywhere.
+ *
+ * Derived from the SESSION, not from a header: only auth's internal bridge mints
+ * a team-pinned session, and only for a verified token, so `pinnedTeamId` is a
+ * claim the caller cannot make about itself. A header would let a browser label
+ * its own turn "mcp" (and a machine label itself "in-app"), which is the same
+ * hole facing the other way. */
+function callerSurface(user: { pinnedTeamId: string | null }): string {
+  return user.pinnedTeamId ? "mcp" : "in-app"
+}
+
 /** Run an agent turn as an SSE stream: `run(emit)` produces the ChatOutcome while emitting
  * text + step events; when it returns we write the ONE terminal event and close. A
  * thrown GuardError keeps its own clean message (an over-quota or file-too-large
@@ -116,7 +133,7 @@ export async function postGrantCredits(request: Request, env: Env): Promise<Resp
  * When the client Accepts text/event-stream we stream progress (text deltas + step
  * events) and end with the single terminal event; otherwise we return the JSON outcome. */
 export async function postAgentChat(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard } = await teamContext(request, env)
+  const { actor, cfg, guard, user } = await teamContext(request, env)
   await requireRight(cfg, guard, "agent", "create")
   const body = (await request.json().catch(() => ({}))) as {
     threadId?: unknown
@@ -140,7 +157,7 @@ export async function postAgentChat(request: Request, env: Env): Promise<Respons
       return { name, csv: raw.csv }
     })
   }
-  const opts = { threadId, message, source: "in-app", files }
+  const opts = { threadId, message, source: callerSurface(user), files }
   if (wantsStream(request))
     return streamRun(env, (emit) => runChat(env, request, cfg, guard, actor, opts, emit))
   return json(await runChat(env, request, cfg, guard, actor, opts))
@@ -149,14 +166,14 @@ export async function postAgentChat(request: Request, env: Env): Promise<Respons
 /** POST /api/data-ops/agent/confirm — approve (or decline) the proposed dangerous
  * action(s) the last turn returned, then resume. */
 export async function postAgentConfirm(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard } = await teamContext(request, env)
+  const { actor, cfg, guard, user } = await teamContext(request, env)
   await requireRight(cfg, guard, "agent", "create")
   const body = (await request.json().catch(() => ({}))) as { threadId?: string; approve?: boolean }
   if (!body.threadId || typeof body.approve !== "boolean")
     return fail(400, "invalid_input", "threadId and approve are required.")
   // What runs comes from the server's stored proposal (in confirmAndRun), not the
   // client — any client-supplied `calls` are ignored, so nothing un-proposed executes.
-  const opts = { threadId: body.threadId, approve: body.approve, source: "in-app" }
+  const opts = { threadId: body.threadId, approve: body.approve, source: callerSurface(user) }
   if (wantsStream(request))
     return streamRun(env, (emit) => confirmAndRun(env, request, cfg, guard, actor, opts, emit))
   return json(await confirmAndRun(env, request, cfg, guard, actor, opts))

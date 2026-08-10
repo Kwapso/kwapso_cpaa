@@ -18,9 +18,7 @@ import type {
   ImportBatchSummary,
   McpTokenSummary,
   ImportBatchView,
-  ImportColumn,
   ImportableTarget,
-  ImportPreview,
   Invite,
   InviteAudit,
   Learning,
@@ -45,20 +43,6 @@ import { api, ApiFailure, enc, post, type PagedResponse } from "@shared/web/api"
 
 export { ApiFailure }
 export type { PagedResponse }
-
-/** The import session as the data-ops worker returns it (a view, not the raw row). */
-export type ImportSessionView = {
-  id: string
-  tableKey: string
-  tableName: string | null
-  status: string
-  fileValidated: boolean
-  extractionComplete: boolean
-  importComplete: boolean
-  createdAt: string
-}
-export type ImportResultView = { created: number; skipped: number; failed: number; errors: string[] }
-export type ImportTargetView = { tableKey: string; displayName: string; columns: ImportColumn[] }
 
 /** One row of the agent usage log (written once per turn): who ran it, when, how
  * many AI units it used, whether that was free / credit / mixed, and a short line.
@@ -517,30 +501,9 @@ export const content = {
     api<{ stakeholders: HelpStakeholder[] }>("/api/content/help/stakeholders", post({ id, userId })),
 }
 
-/** Data-ops worker — the 3-stage import + the AI agent. */
+/** Data-ops worker — the agentic file import + the AI agent. */
 export const dataOps = {
   importTargets: () => api<{ targets: ImportableTarget[] }>("/api/data-ops/import/targets"),
-  startImport: (tableKey: string) =>
-    api<{ session: ImportSessionView; target: ImportTargetView }>("/api/data-ops/import", post({ tableKey })),
-  uploadCsv: (sessionId: string, fileName: string, csv: string) =>
-    api<{ session: ImportSessionView; preview: ImportPreview }>(
-      "/api/data-ops/import/file",
-      post({ sessionId, fileName, csv })
-    ),
-  setMapping: (sessionId: string, mapping: Record<string, string>) =>
-    api<{ session: ImportSessionView; preview: ImportPreview }>(
-      "/api/data-ops/import/mapping",
-      post({ sessionId, mapping })
-    ),
-  importPreview: (id: string) =>
-    api<{ session: ImportSessionView; preview: ImportPreview | null; columns: ImportColumn[] }>(
-      `/api/data-ops/import/preview?id=${enc(id)}`
-    ),
-  confirmImport: (sessionId: string) =>
-    api<{ session: ImportSessionView; result: ImportResultView }>(
-      "/api/data-ops/import/confirm",
-      post({ sessionId })
-    ),
 
   /** A downloadable sample CSV href for a target — a good-file template. */
   importSampleHref: (tableKey: string) => `/api/data-ops/import/sample?tableKey=${enc(tableKey)}`,

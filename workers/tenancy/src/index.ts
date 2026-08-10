@@ -43,7 +43,9 @@
 //   GET  /api/tenancy/invitations          -> invites I've RECEIVED (any signed-in user)
 //   POST /api/tenancy/invitations/accept   -> accept a received invite (join + switch)
 //   GET  /api/tenancy/config/screens       -> a team's screen-recipe overrides (any member)
-//   POST /api/tenancy/config/screens       -> set a screen override (teams:edit; agent-callable)
+//   POST /api/tenancy/config/screens       -> set a screen override (teams:edit; people only —
+//                                             it is on neither machine catalogue, and the R19
+//                                             census says why)
 //   POST /api/tenancy/admin/migrate-teams  -> roll team-schema migrations (x-admin-key)
 //   POST /api/tenancy/admin/create-team    -> seed a team (x-admin-key; the user door is closed)
 //   GET  /api/tenancy/admin/db-sizes       -> size every team DB + open alarms

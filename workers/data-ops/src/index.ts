@@ -4,11 +4,7 @@
 // teamContext / requireRight) lives in the shared gating seam.
 //
 //   GET  /api/data-ops/import/targets   -> the active, supported import targets
-//   POST /api/data-ops/import           -> start a session for a target
-//   POST /api/data-ops/import/file      -> upload CSV text; auto-map + preview
-//   POST /api/data-ops/import/mapping   -> adjust the column mapping; re-preview
-//   GET  /api/data-ops/import/preview   -> the session's current preview (?id=)
-//   POST /api/data-ops/import/confirm   -> write every mapped row (insert-only)
+//   GET  /api/data-ops/import/sample    -> a good-file template for one target (?tableKey=)
 //   POST /api/data-ops/admin/seed-targets -> owner-only: seed the import catalog
 //   GET  /api/data-ops/agent/usage      -> the team's AI quota (free + credits)
 //   GET  /api/data-ops/agent/usage-log  -> the team's AI usage trail (one row/turn)
@@ -27,17 +23,12 @@ import type { Env } from "./env"
 import {
   getBatch,
   getBatches,
-  getImportPreview,
   getImportSample,
   getImportTargets,
   postBatchConfirm,
   postBatchFile,
   postBatchPlan,
   postBatchStart,
-  postImportConfirm,
-  postImportFile,
-  postImportMapping,
-  postImportStart,
 } from "./routes/import"
 import { getErrors, postResolveError, postSeedTargets } from "./routes/admin"
 import {
@@ -57,22 +48,17 @@ import {
  *   • "read"        — a GET; changes nothing, broadcasts nothing.
  *   • "mutation"    — a write other clients can see, so it MUST broadcast a ping.
  *   • "housekeeping" — the reviewed deny-list: a write that intentionally broadcasts
- *                      NOTHING. The import session steps (start/file/mapping) only
- *                      shape the CALLER's own draft, returned synchronously in the
- *                      same response — no other screen needs a ping. The owner seed
- *                      writes the global catalog (no team channel). Only confirm,
- *                      which actually creates rows in a shared table, broadcasts.
+ *                      NOTHING. The import batch steps (draft/file/plan) only shape
+ *                      the CALLER's own batch, returned synchronously in the same
+ *                      response — no other screen needs a ping. The owner seed writes
+ *                      the global catalog (no team channel). Only confirm, which
+ *                      actually creates rows in a shared table, broadcasts.
  */
 type RouteKind = "read" | "mutation" | "housekeeping"
 type Handler = (request: Request, env: Env) => Promise<Response>
 export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "GET /api/data-ops/import/targets": { handler: getImportTargets, kind: "read" },
   "GET /api/data-ops/import/sample": { handler: getImportSample, kind: "read" },
-  "GET /api/data-ops/import/preview": { handler: getImportPreview, kind: "read" },
-  "POST /api/data-ops/import": { handler: postImportStart, kind: "housekeeping" },
-  "POST /api/data-ops/import/file": { handler: postImportFile, kind: "housekeeping" },
-  "POST /api/data-ops/import/mapping": { handler: postImportMapping, kind: "housekeeping" },
-  "POST /api/data-ops/import/confirm": { handler: postImportConfirm, kind: "mutation" },
   // Agentic multi-file batch. Draft/file/plan only shape the caller's OWN batch
   // (returned synchronously) — housekeeping, no broadcast. Only confirm creates
   // rows in shared tables, so only confirm publishes (per changed module).

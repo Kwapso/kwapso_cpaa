@@ -25,7 +25,8 @@ import { GuardError, requireRight, teamContext } from "../../../../shared/worker
 import { forwardToDoor } from "../../../../shared/workers/http"
 import { BULK_IDS_LIMIT } from "../../../../shared/workers/limits"
 import { publishChange } from "../../../../shared/workers/realtime"
-import { isPrivilegeWrite,
+import { checkArgTypes,
+  isPrivilegeWrite,
   obj,
   roleLabel,
   S,
@@ -79,7 +80,7 @@ function toAgentTool(s: SharedTool): AgentTool {
 }
 
 /** Tools the AGENT exposes but the MCP does not: a read the MCP serves via export, the
- * team-rename, the two bulk writes, the personal mark-done, and the SELF import runner. */
+ * two bulk writes, the set-shaped bulk, and the SELF import runner. */
 const AGENT_ONLY: AgentTool[] = [
   {
     name: "get_role_permissions",
@@ -93,18 +94,6 @@ const AGENT_ONLY: AgentTool[] = [
     confirm: false,
     buildQuery: (i) => `?roleId=${encodeURIComponent(str(i, "roleId"))}`,
     summarize: (i, names) => `Read access rights for ${roleLabel(i, names)}`,
-  },
-  {
-    name: "update_team",
-    description: "Edit the active team's details (its name).",
-    schema: obj({ name: S }, ["name"]),
-    binding: "TENANCY",
-    method: "POST",
-    path: "/api/tenancy/teams/update",
-    write: true,
-    confirm: false, // constructive: renaming the team is reversible
-    buildBody: (i) => ({ name: str(i, "name") }),
-    summarize: (i) => `Rename the team to "${str(i, "name")}"`,
   },
   {
     name: "set_help_status_by_filter",
@@ -173,19 +162,6 @@ const AGENT_ONLY: AgentTool[] = [
     buildBody: (i) => ({ ids: i.ids, active: i.active }),
     summarize: (i) =>
       `${i.active ? "Activate" : "Deactivate"} ${Array.isArray(i.ids) ? i.ids.length : 0} articles`,
-  },
-  {
-    name: "mark_learning_done",
-    description: "Mark a learning article done (or not done) for yourself.",
-    schema: obj({ id: S, done: { type: "boolean" } }, ["id", "done"]),
-    binding: "CONTENT",
-    method: "POST",
-    path: "/api/content/learning/done",
-    write: true,
-    confirm: false,
-    buildBody: (i) => ({ id: str(i, "id"), done: i.done === true }),
-    summarize: (i) =>
-      `Mark learning article ${str(i, "id")} ${i.done === true ? "done" : "not done"}`,
   },
   {
     // Runs INSIDE data-ops (binding SELF): the import batch engine, not a worker fetch.
@@ -282,6 +258,15 @@ export async function executeTool(
 ): Promise<ToolResult> {
   if (tool.identityBlocked)
     return { ok: false, status: 403, data: null, error: "That action can only be done by you, in person." }
+  // A wrong-typed argument is refused HERE, before any builder turns it into a
+  // string — and returned as a failed step rather than thrown, so the model reads
+  // "id must be a string" and can correct itself inside the same turn.
+  try {
+    checkArgTypes(tool.schema, input)
+  } catch (e) {
+    if (e instanceof GuardError) return { ok: false, status: e.status, data: null, error: e.message }
+    throw e
+  }
   if (tool.run) return tool.run(env, request, input)
 
   const fetcher = tool.binding === "CONTENT" ? env.CONTENT : env.TENANCY

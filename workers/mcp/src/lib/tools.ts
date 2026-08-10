@@ -6,13 +6,17 @@
 // The ~two dozen tenancy/content CRUD tools are DECLARED ONCE in the shared catalog
 // (`shared/workers/tool-catalog.ts`) and shared with the in-app agent — this file
 // PROJECTS each shared endpoint into an McpTool (`toMcpTool`: inputSchema = schema, the
-// MCP's own name where it differs), then adds the MCP-ONLY tools below: whoami, the CSV
-// exports, the agentic-import batch tools, and the agent_chat/agent_confirm bridge.
+// MCP's own name where it differs), then adds the MCP-ONLY tools below: whoami and the
+// caller's own rights, the CSV exports, the import catalogue + the agentic-import batch
+// tools, the app's own daily AI allowance, the saved conversations, and the
+// agent_chat/agent_confirm bridge.
 // catalog.test.ts machine-checks every forwarded path against the target workers' OWN
-// route tables, so this list can't quietly rot.
+// route tables, and filter-parity.test.ts checks the other direction — every door that
+// answers a person reaches a machine caller, or says in writing why it doesn't.
 
+import { GuardError } from "../../../../shared/workers/gating"
 import { forwardToDoor } from "../../../../shared/workers/http"
-import { obj, S, SHARED_TOOLS, TOOL_GATES, type SharedTool } from "../../../../shared/workers/tool-catalog"
+import { checkArgTypes, N, obj, S, SHARED_TOOLS, TOOL_GATES, type SharedTool } from "../../../../shared/workers/tool-catalog"
 import type { Env } from "../env"
 
 export type McpTool = {
@@ -44,8 +48,11 @@ function toMcpTool(s: SharedTool): McpTool {
   }
 }
 
-/** Tools the MCP exposes but the agent does not: identity, the CSV exports, the scripted
- * agentic-import batch flow, and the assistant bridge (metered like any chat turn). */
+/** Tools the MCP exposes but the agent does not: identity and rights, the CSV exports,
+ * the scripted agentic-import batch flow, the AI allowance, the saved conversations, and
+ * the assistant bridge (metered like any chat turn). The agent needs none of them — it
+ * runs inside the app, where the screen already knows who the caller is, what they may
+ * do, and what the allowance says. A machine client has no screen. */
 const MCP_ONLY: McpTool[] = [
   {
     name: "whoami",
@@ -54,6 +61,33 @@ const MCP_ONLY: McpTool[] = [
     binding: "AUTH",
     method: "GET",
     path: "/api/auth/me",
+  },
+  {
+    name: "my_permissions",
+    description:
+      "What this token may DO in its team: the caller's own access rights, module by module (read / create / edit / delete). whoami says who and where; this says what. Every door re-checks the same rights on every call, so this is how a client knows before it asks instead of learning from a 403.",
+    inputSchema: obj({}),
+    binding: "TENANCY",
+    method: "GET",
+    path: "/api/tenancy/my-permissions",
+  },
+  {
+    name: "get_team",
+    description:
+      "The pinned team's own record — its name, when it was created and by whom. The read half of update_team.",
+    inputSchema: obj({}),
+    binding: "TENANCY",
+    method: "GET",
+    path: "/api/tenancy/team-meta",
+  },
+  {
+    name: "list_learning_progress",
+    description:
+      "Every member's done state for the team's learning articles — the curator's view of who has finished what. (mark_learning_done sets it, for yourself only.) Needs learning:read.",
+    inputSchema: obj({}),
+    binding: "CONTENT",
+    method: "GET",
+    path: "/api/content/learning/progress",
   },
   // ---- exports (READ right; the same full-field CSVs the Export buttons serve) ----
   {
@@ -89,7 +123,26 @@ const MCP_ONLY: McpTool[] = [
     method: "GET",
     path: "/api/tenancy/accounts/export",
   },
-  // ---- the agentic import (plan is METERED on the team's AI quota) ----
+  // ---- the agentic import (plan is METERED on the app's own daily AI allowance) ----
+  {
+    name: "list_import_targets",
+    description:
+      "What this team may import into: every active import target, with the table key you pass to get_import_sample. Read this before building a file — the catalogue is per-team, and an owner can switch a target off.",
+    inputSchema: obj({}),
+    binding: "DATAOPS",
+    method: "GET",
+    path: "/api/data-ops/import/targets",
+  },
+  {
+    name: "get_import_sample",
+    description:
+      "A sample CSV for one import target (`tableKey` from list_import_targets): the column headers the importer expects, plus one example row. It is a template — no team data in it.",
+    inputSchema: obj({ tableKey: S }, ["tableKey"]),
+    binding: "DATAOPS",
+    method: "GET",
+    path: "/api/data-ops/import/sample",
+    buildQuery: (i) => `?tableKey=${encodeURIComponent(String(i.tableKey ?? ""))}`,
+  },
   {
     name: "start_import",
     description:
@@ -137,7 +190,54 @@ const MCP_ONLY: McpTool[] = [
     method: "GET",
     path: "/api/data-ops/import/batches",
   },
+  {
+    name: "get_import",
+    description:
+      "One import batch in full (by `id`): its files, the plan — which table each file feeds, the column mapping, the rows that will be skipped and why — and, once it has run, the per-row report. Re-READING a plan is free; re-PLANNING spends one request of the app's own daily AI allowance, so a client that lost a plan_import answer should come here first.",
+    inputSchema: obj({ id: S }, ["id"]),
+    binding: "DATAOPS",
+    method: "GET",
+    path: "/api/data-ops/import/batch",
+    buildQuery: (i) => `?id=${encodeURIComponent(String(i.id ?? ""))}`,
+  },
   // ---- the in-app assistant, over MCP (metered like any chat turn) ----
+  {
+    name: "get_ai_allowance",
+    description:
+      "How much of the app's own daily AI allowance this team has left (the free daily amount plus any credits an admin has added). agent_chat, agent_confirm and plan_import each draw on it; every other tool here is free. When it runs out those three answer 429 until it resets — this is how a client sees that coming instead of discovering it. Needs agent:read.",
+    inputSchema: obj({}),
+    binding: "DATAOPS",
+    method: "GET",
+    path: "/api/data-ops/agent/usage",
+  },
+  {
+    name: "list_ai_usage",
+    description:
+      "Where the allowance went: the team's AI usage trail, newest first, one row per assistant turn. `limit` caps how many rows come back (default 50, most 200). Other members' prompts are redacted. Needs agent:read.",
+    inputSchema: obj({ limit: N }),
+    binding: "DATAOPS",
+    method: "GET",
+    path: "/api/data-ops/agent/usage-log",
+    buildQuery: (i) => (Number.isFinite(Number(i.limit)) ? `?limit=${Number(i.limit)}` : ""),
+  },
+  {
+    name: "list_agent_threads",
+    description: "The caller's own saved assistant conversations (newest first). Needs agent:read.",
+    inputSchema: obj({}),
+    binding: "DATAOPS",
+    method: "GET",
+    path: "/api/data-ops/agent/threads",
+  },
+  {
+    name: "get_agent_thread",
+    description:
+      "One saved conversation's messages, oldest first (by `id` from list_agent_threads) — what was asked, what the assistant answered, and which actions it took. Needs agent:read.",
+    inputSchema: obj({ id: S }, ["id"]),
+    binding: "DATAOPS",
+    method: "GET",
+    path: "/api/data-ops/agent/thread",
+    buildQuery: (i) => `?id=${encodeURIComponent(String(i.id ?? ""))}`,
+  },
   {
     name: "agent_chat",
     description:
@@ -169,6 +269,20 @@ export function getMcpTool(name: string): McpTool | undefined {
 /** Cap what one tools/call returns (a 5 MB export would blow an MCP client). */
 const MAX_RESULT_CHARS = 400_000
 
+/** HOW LONG ONE DOOR MAY TAKE. A service binding is Cloudflare-bounded, so R11's
+ * external-fetch law doesn't strictly bite here — but "not external" is not "never
+ * hangs", and with no deadline at all a stuck door holds the MCP client's call open
+ * with nothing to read and no reason to retry. So every forward carries one.
+ *
+ * Two tiers, because these tools do genuinely different amounts of work. A plain
+ * door call is a read or a single gated write. The long tier is for the tools that
+ * are SUPPOSED to take a while: running an import writes a whole file's rows one
+ * gated write at a time, and the three assistant tools each wait on a model. Timing
+ * those out at 30 seconds would break the thing working correctly. */
+const DOOR_TIMEOUT_MS = 30_000
+const LONG_DOOR_TIMEOUT_MS = 120_000
+const LONG_RUNNING = new Set(["run_import", "plan_import", "agent_chat", "agent_confirm"])
+
 /** Forward one tool call to its gated door with the bridged session cookie.
  *
  * A TRUNCATED ANSWER IS NOT AN ANSWER. The cap used to slice the body, append
@@ -183,13 +297,39 @@ export async function forwardTool(
   input: Record<string, unknown>,
   cookie: string
 ): Promise<{ ok: boolean; text: string }> {
-  const res = await forwardToDoor(env[tool.binding], {
-    path: tool.path,
-    method: tool.method,
-    cookie,
-    query: tool.method === "GET" && tool.buildQuery ? tool.buildQuery(input) : "",
-    body: tool.buildBody ? tool.buildBody(input) : {},
-  })
+  // A wrong-typed argument is refused before any builder sees it: a JSON-RPC client
+  // can send `{"name":{}}`, and coercing that would create a record actually called
+  // "[object Object]" through a door doing exactly what it was told.
+  const timeoutMs = LONG_RUNNING.has(tool.name) ? LONG_DOOR_TIMEOUT_MS : DOOR_TIMEOUT_MS
+  let res: Response
+  try {
+    checkArgTypes(tool.inputSchema, input)
+    res = await forwardToDoor(env[tool.binding], {
+      path: tool.path,
+      method: tool.method,
+      cookie,
+      query: tool.method === "GET" && tool.buildQuery ? tool.buildQuery(input) : "",
+      body: tool.buildBody ? tool.buildBody(input) : {},
+      timeoutMs,
+    })
+  } catch (e) {
+    if (e instanceof GuardError)
+      return { ok: false, text: JSON.stringify({ error: e.code, message: e.message }) }
+    // An ABORT is the deadline above, and only that: it is reported as its own
+    // thing because "it hung" and "it failed" call for different reactions from a
+    // client. Anything else is a real crash and is re-thrown to the worker's
+    // central catch, which records it — a timeout message in front of a genuine
+    // fault would hide the fault (ERROR-HANDLING.md: never swallow).
+    const aborted = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")
+    if (!aborted) throw e
+    return {
+      ok: false,
+      text: JSON.stringify({
+        error: "door_timeout",
+        message: `${tool.name} didn't answer within ${Math.round(timeoutMs / 1000)} seconds. A write may or may not have landed — read before retrying it.`,
+      }),
+    }
+  }
   const raw = await res.text()
   if (raw.length > MAX_RESULT_CHARS)
     return {

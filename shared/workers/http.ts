@@ -38,12 +38,24 @@ export const pagedJson = (
  * This is the ONE cookie-forward seam both act-as-user executors share. */
 export async function forwardToDoor(
   fetcher: { fetch(url: string, init?: RequestInit): Promise<Response> },
-  opts: { path: string; method: string; cookie: string; query?: string; body?: unknown }
+  opts: {
+    path: string
+    method: string
+    cookie: string
+    query?: string
+    body?: unknown
+    /** Give up after this long. Optional because a service binding is
+     * Cloudflare-bounded (R11 exempts it), but "bounded" is not "never hangs" and
+     * a caller with an impatient client of its own — the MCP surface — needs to be
+     * able to say when it stops waiting. The caller decides what an abort means. */
+    timeoutMs?: number
+  }
 ): Promise<Response> {
   const init: RequestInit = { method: opts.method, headers: { Cookie: opts.cookie } }
   if (opts.method === "POST") {
     ;(init.headers as Record<string, string>)["Content-Type"] = "application/json"
     init.body = JSON.stringify(opts.body ?? {})
   }
+  if (opts.timeoutMs) init.signal = AbortSignal.timeout(opts.timeoutMs)
   return fetcher.fetch(`https://internal${opts.path}${opts.query ?? ""}`, init)
 }

@@ -1,7 +1,12 @@
 // Config routes — the screen-engine recipe store. Serve a team's per-screen
 // overrides (any member: they drive what the member sees; each screen's DATA is
-// still permission-checked at its own endpoint), and set one (team-admin, also
-// agent-callable so an agent can author/reshape a screen at runtime).
+// still permission-checked at its own endpoint), and set one (team-admin).
+//
+// NOT agent-callable, and not on the MCP either — this comment used to say the
+// write was, while it sat on neither catalogue. Authoring a recipe changes what
+// every person on the team sees, and the only way to judge one is to look at the
+// screen it draws; a machine client has no screen. The decision is recorded where
+// the machine surface's other decisions are (TOOLLESS_DOORS in the R19 census).
 
 import { fail, json } from "../../../../shared/workers/http"
 import { publishChange } from "../../../../shared/workers/realtime"

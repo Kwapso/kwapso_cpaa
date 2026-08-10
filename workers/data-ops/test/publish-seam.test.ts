@@ -11,13 +11,10 @@ import { publishSeam } from "../../../shared/rules/seam-scan"
 import { ROUTES } from "../src/index"
 
 /** The ONLY writes allowed to broadcast nothing — a conscious, reviewed
- * decision. Here the import session steps and the owner catalog seed are
- * housekeeping (the caller's own draft / global owner data, no team broadcast);
+ * decision. Here the import batch steps and the owner catalog seed are
+ * housekeeping (the caller's own batch / global owner data, no team broadcast);
  * only the confirm WRITE creates shared rows, so only it publishes. */
 const HOUSEKEEPING = [
-  "POST /api/data-ops/import",
-  "POST /api/data-ops/import/file",
-  "POST /api/data-ops/import/mapping",
   "POST /api/data-ops/admin/seed-targets",
   // The batch draft/file/plan steps only shape the caller's OWN batch (returned
   // in the same response) — no other screen needs a ping. Only /batch/confirm

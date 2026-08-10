@@ -244,13 +244,18 @@ export async function getPortalUsers(request: Request, env: Env): Promise<Respon
 
 /** POST /api/tenancy/portal-users — hand someone a login.
  *
- * The person can be named two ways. A machine caller that already holds an
- * identity passes `userId`. A HUMAN never has one: staff pick a person off the
- * account (a contact, or the individual account itself), so the door takes
- * `personAccountId`, reads that row's email THROUGH THE FENCE, and resolves it
+ * The person is named ONE way, on every surface: `personAccountId`, a person
+ * already on the account's own records (a contact, or the individual account
+ * itself). The door reads that row's email THROUGH THE FENCE and resolves it
  * against the global users table. Identity is looked up outside the fence, so
- * the email it is looked up by has to come from inside it — staff can only ever
- * resolve people already on their own records, never a typed-in address. */
+ * the email it is looked up by has to come from inside it — a caller can only
+ * ever resolve people already on their own records, never a typed-in address.
+ *
+ * There used to be a second way in: a caller "that already holds an identity"
+ * could pass a bare `userId`. It is gone, and no surface has it back — a holder
+ * of portal_users:create could turn ANY account on the platform into a fenced
+ * portal caller, colleagues and the owner included. The machine surface reaches
+ * this door through the same one parameter a person does. */
 export async function postGrantPortalAccess(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<Body>(
     request,

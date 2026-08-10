@@ -12,6 +12,13 @@ export type SessionUser = {
   onboardingComplete: boolean
   /** the team this person is currently working in (one at a time, locked) */
   currentTeamId: string | null
+  /** The team this SESSION is locked to, or null for an ordinary browser session.
+   * Only auth's internal `/internal/mcp-session` bridge mints a pinned session, and
+   * only for a verified personal access token — so a non-null value is the one
+   * unspoofable statement that the caller on the other end is a MACHINE. It travels
+   * with `/api/auth/me`, which is how a downstream worker can tell a token's call
+   * from a person's without inventing a header a browser could also send. */
+  pinnedTeamId: string | null
 }
 
 /** One team as the tenancy worker lists them for the signed-in person. */
