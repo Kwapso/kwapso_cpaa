@@ -14,13 +14,36 @@
 //      the schema must still be there, and the deleted team databases must be
 //      gone. Exits non-zero if anything is off.
 //
-// Uses the locally-authenticated wrangler CLI (no API token needed).
+// WHICH CLOUDFLARE ACCOUNT THIS LANDS IN IS THE WHOLE SAFETY STORY.
+//
+// This script deletes databases. `wrangler` picks an account from whatever the
+// machine happens to be logged into, and on the machine this was written for
+// that is a DIFFERENT account holding a different client's data. Nothing in the
+// repo corrects it: no worker pins `account_id`. It survived only because the
+// name lookup for `kwapso-core-staging` happened to fail there, which is luck,
+// not a guard.
+//
+// So it refuses to start unless the account is named out loud and is the right
+// one. Run it through `cf-exec`, or export CLOUDFLARE_ACCOUNT_ID +
+// CLOUDFLARE_API_TOKEN yourself.
 
 import { execSync } from "node:child_process"
 import { writeFileSync, unlinkSync } from "node:fs"
 
 const GLOBAL_DB = { staging: "kwapso-core-staging", production: "kwapso-core" }
 const KEEP = new Set(["d1_migrations"]) // migration history survives a reset
+
+// The one account these databases live in. A destructive script may not infer
+// this from ambient login state.
+const KWAPSO_ACCOUNT_ID = "b5bb3d84a59c029ea5e0fe164dab1cf7"
+if (process.env.CLOUDFLARE_ACCOUNT_ID !== KWAPSO_ACCOUNT_ID) {
+  console.error(
+    `Refusing to run: CLOUDFLARE_ACCOUNT_ID is ${process.env.CLOUDFLARE_ACCOUNT_ID ?? "unset"},\n` +
+      `and this script only ever touches ${KWAPSO_ACCOUNT_ID}.\n\n` +
+      `Run it through cf-exec, or set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN first.`
+  )
+  process.exit(2)
+}
 
 const arg = process.argv[2]
 const ENVS = arg === "both" ? ["staging", "production"] : [arg]
