@@ -208,6 +208,13 @@ export type LearningProgressEntry = {
   doneAt: string | null
 }
 
+/** THE ticket lifecycle — the one list, for every side of the app. The server
+ * validates against it, the stepper renders from it, and the agent's tool
+ * descriptions name it. It was written out four times over; a fifth status was
+ * four edits and TypeScript caught none of them. Now it's one edit. */
+export const HELP_STATUSES = ["open", "in_progress", "resolved", "reopened"] as const
+export type HelpStatus = (typeof HELP_STATUSES)[number]
+
 /** A support ticket (team-wide; the My/All tabs filter by raiser). The built-in
  * `status` is the source of truth; `helpType` is a cosmetic selectable value. */
 export type HelpTicket = {
@@ -216,7 +223,7 @@ export type HelpTicket = {
   description: string
   screenRecordingLink: string | null
   sourceScreen: string | null
-  status: "open" | "in_progress" | "resolved" | "reopened"
+  status: HelpStatus
   resolved: boolean
   resolvedAt: string | null
   raiserId: string

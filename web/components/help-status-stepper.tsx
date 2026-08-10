@@ -12,7 +12,11 @@
 
 import { StatusStepper, type StepperTone } from "@kwapso/ui/registry/primitives/status-stepper/status-stepper"
 
-export type HelpStatusValue = "open" | "in_progress" | "resolved" | "reopened"
+import type { HelpStatus } from "@shared/types"
+
+/** The ticket's status, named the way this screen talks about it. One list, in
+ * shared/types — the server validates against the very same one. */
+export type HelpStatusValue = HelpStatus
 
 // The three track stages, in order. `reopened` is folded onto "open" (below).
 const STAGES = [

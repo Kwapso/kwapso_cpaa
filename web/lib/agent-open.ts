@@ -44,11 +44,6 @@ export function setAgentOpen(next: boolean): void {
   for (const fn of subscribers) fn()
 }
 
-/** Open the assistant — the launcher button's click. */
-export function openAgent(): void {
-  setAgentOpen(true)
-}
-
 /** Subscribe to the open state (the root-mounted host). SSR snapshot is always false —
  * the panel is client-only, so the server never renders it open (client hydration then
  * reflects the persisted value). */

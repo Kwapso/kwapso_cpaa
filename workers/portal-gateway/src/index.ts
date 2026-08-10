@@ -26,12 +26,12 @@
 // see what; it only decides which questions may be asked. Every answer comes
 // from a door that already resolves the caller's account set.
 
-// The two things BOTH front doors do identically — serve an uploaded file (with
-// its key validated at the boundary and its security headers) and record a
-// client crash. ONE implementation, deliberately: this door's media serving was
-// once written a second time from memory and shipped without the key check the
-// agency door had carried for weeks.
-import { recordClientError, serveMedia } from "../../../shared/workers/front-door"
+// The three things BOTH front doors do identically — serve an uploaded file (with
+// its key validated at the boundary and its security headers), record a client
+// crash, and answer their own crash without leaking a raw 1101. ONE implementation,
+// deliberately: this door's media serving was once written a second time from memory
+// and shipped without the key check the agency door had carried for weeks.
+import { recordClientError, recordGatewayCrash, serveMedia } from "../../../shared/workers/front-door"
 import { fail } from "../../../shared/workers/http"
 import { safeMediaKey } from "../../../shared/workers/image"
 
@@ -115,22 +115,7 @@ export default {
     try {
       return await handle(request, env)
     } catch (e) {
-      // A public door must never answer a stranger with Cloudflare's raw 1101.
-      // This worker binds no database, so the crash goes out the same internal
-      // pipe the client beacon uses — best-effort, because a door that cannot
-      // report is still a door that must answer.
-      console.error("portal_gateway_error", new URL(request.url).pathname, e)
-      await env.AUTH.fetch("https://internal/internal/log-error", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-internal-key": env.INTERNAL_KEY ?? "" },
-        body: JSON.stringify({
-          source: "portal-gateway",
-          place: new URL(request.url).pathname,
-          message: e instanceof Error ? e.message : String(e),
-          stack: e instanceof Error ? e.stack : undefined,
-        }),
-      }).catch(() => null)
-      return fail(500, "server_error", "Something went wrong.")
+      return recordGatewayCrash(request, env.AUTH, "portal-gateway", env.INTERNAL_KEY, e)
     }
   },
 } satisfies ExportedHandler<Env>

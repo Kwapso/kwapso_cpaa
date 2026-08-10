@@ -119,6 +119,10 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
     dataOps
       .agentUsage()
       .then((r) => alive && setQuota(r.quota))
+      // Swallowed on purpose: the quota badge is decoration on the way in. If the
+      // count doesn't arrive, `quota` stays null and the badge simply doesn't
+      // render — the panel still opens and the conversation still works. Failing
+      // loudly here would block the panel over a number nobody asked for.
       .catch(() => {})
 
     if (teamId && items.length === 0) {
@@ -278,6 +282,11 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
       dataOps
         .agentUsage()
         .then((u) => setQuota(u.quota))
+        // Swallowed on purpose: the re-sync has ALREADY succeeded by here — the
+        // messages are restored and the thread is pinned. This last refresh only
+        // freshens the quota badge. Letting it reject would drop us into the outer
+        // catch and return false, showing the "something went wrong" message this
+        // whole function exists to avoid. The badge just keeps its old number.
         .catch(() => {})
       return true
     } catch {

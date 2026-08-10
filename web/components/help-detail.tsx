@@ -20,7 +20,6 @@ import {
 import {
   ActivityFeed,
   defaultActivityFeedConfig,
-  type ActivityItem as ActivityFeedItem,
 } from "@kwapso/ui/registry/collections/activity-feed/activity-feed"
 import {
   TicketThread,
@@ -204,12 +203,6 @@ export function HelpDetailScreen({
     { label: "Resolved", value: ticket.resolvedAt ? formatRelative(ticket.resolvedAt) : "" },
   ]
 
-  const activityItems: ActivityFeedItem[] = activity.rows.map((a) => ({
-    id: a.id,
-    description: a.description,
-    actor: a.actorName ?? undefined,
-    timestamp: formatActivityWhen(a.createdAt),
-  }))
 
   const tabsConfig = {
     ...defaultTabsConfig,
@@ -289,7 +282,7 @@ export function HelpDetailScreen({
                     ...defaultActivityFeedConfig,
                     emptyText: "No activity yet.",
                   }}
-                  items={activityItems}
+                  items={activity.items}
                 />
                 <LoadMore
                   listKey={activity.listKey}

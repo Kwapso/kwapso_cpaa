@@ -12,16 +12,17 @@
 import { describeChanges, logActivity, type Actor } from "../../../../shared/workers/activity"
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "../../../../shared/workers/d1-rest"
 import { ulid } from "../../../../shared/workers/id"
-import type { HelpMessage, HelpTicket } from "../../../../shared/types"
+import { HELP_STATUSES, type HelpMessage, type HelpStatus, type HelpTicket } from "../../../../shared/types"
 import { GuardError, type MemberGuard } from "../../../../shared/workers/gating"
 import { optionalText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
 import { BULK_IDS_LIMIT, THREAD_HARD_CAP } from "../../../../shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "../../../../shared/workers/paging"
 
-/** The fixed status lifecycle the code trusts (the team-editable dropdown is
- * display-only). Anything outside this set is rejected. */
-export const HELP_STATUSES = ["open", "in_progress", "resolved", "reopened"] as const
-export type HelpStatus = (typeof HELP_STATUSES)[number]
+// The fixed status lifecycle the code trusts (the team-editable dropdown is
+// display-only) — Anything outside this set is rejected. It lives in shared/types
+// beside HelpTicket, because the stepper and the ticket row need the same list;
+// re-exported here so this worker's routes still read it off its own module.
+export { HELP_STATUSES, type HelpStatus }
 
 type TicketRow = {
   id: string

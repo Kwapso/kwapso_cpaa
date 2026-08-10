@@ -64,9 +64,20 @@ describe("error seam: the roster is the fleet on disk", () => {
       // budget matched a `return` further down the file and stayed green while
       // the catch rethrew — a check that passes on the broken shape is worse
       // than none.
+      //
+      // Answering may be DELEGATED: the two public doors now share one crash seam
+      // (recordGatewayCrash) instead of carrying the same block twice, and the
+      // second copy is exactly the kind that drifts. So follow the delegation
+      // through rather than demanding an inline fail() — a check that only
+      // accepted the inline shape would force the duplicate back to stay green.
       expect(body, `${w.name}'s catch must ANSWER, not rethrow`).toMatch(
-        /return (fail\(500|new Response)/
+        /return (fail\(500|new Response|recordGatewayCrash\()/
       )
+      if (/return recordGatewayCrash\(/.test(body ?? "")) {
+        const seam = readFileSync(join(WORKERS_DIR, "..", "shared", "workers", "front-door.ts"), "utf8")
+        const fn = seam.slice(seam.indexOf("export async function recordGatewayCrash"))
+        expect(fn, "the shared crash seam must itself answer with a 500").toMatch(/return fail\(500/)
+      }
       expect(body, `${w.name}'s catch must not rethrow`).not.toMatch(/^\s*throw\b/m)
     })
   }

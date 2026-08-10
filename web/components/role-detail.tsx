@@ -40,7 +40,6 @@ import {
 import {
   ActivityFeed,
   defaultActivityFeedConfig,
-  type ActivityItem as ActivityFeedItem,
 } from "@kwapso/ui/registry/collections/activity-feed/activity-feed"
 import { Lock, Pencil, Power } from "lucide-react"
 
@@ -49,7 +48,6 @@ import { LoadMore } from "@/components/load-more"
 import { RoleFormDialog } from "@/components/role-form-dialog"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
-import { formatActivityWhen } from "@shared/web/format"
 import { formatCount } from "@shared/web/format-count"
 import { usePermissions } from "@/lib/perms"
 import { primeCache, useCached } from "@shared/web/store"
@@ -172,12 +170,6 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
     }),
   ]
 
-  const activityItems: ActivityFeedItem[] = activity.rows.map((a) => ({
-    id: a.id,
-    description: a.description,
-    actor: a.actorName ?? undefined,
-    timestamp: formatActivityWhen(a.createdAt),
-  }))
 
   const tabsConfig = {
     ...defaultTabsConfig,
@@ -250,7 +242,7 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
               <div className="flex flex-col gap-4">
                 <ActivityFeed
                   config={{ ...defaultActivityFeedConfig, emptyText: "No activity yet." }}
-                  items={activityItems}
+                  items={activity.items}
                 />
                 <LoadMore
                   listKey={activity.listKey}

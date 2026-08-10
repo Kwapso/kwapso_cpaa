@@ -34,6 +34,8 @@
 import { readFileSync, readdirSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 
+import { makeApi, makeRpc, timedFetch } from "./lib/api.mjs"
+
 const BASE = process.env.SMOKE_BASE ?? "https://kwapso-staging.kwapso.workers.dev"
 const REPO = fileURLToPath(new URL("..", import.meta.url))
 
@@ -66,21 +68,7 @@ const section = (title) => console.log(`\n— ${title}`)
 /* ------------------------------- the app doors ------------------------------- */
 
 /** A normal app request (session cookie), exactly as the browser makes it. */
-const api = async (path, opts = {}, cookie = "") => {
-  const res = await fetch(`${BASE}${path}`, {
-    ...opts,
-    headers: {
-      "Content-Type": "application/json",
-      ...(cookie ? { Cookie: cookie } : {}),
-      ...opts.headers,
-    },
-  })
-  let body = null
-  try {
-    body = await res.json()
-  } catch {}
-  return { res, body }
-}
+const api = makeApi(BASE)
 
 const TEST_LOGIN_KEY = process.env.TEST_LOGIN_KEY ?? ""
 if (!TEST_LOGIN_KEY)
@@ -98,7 +86,8 @@ async function signIn(email) {
   })
   const code = start.body?.code
   if (typeof code !== "string") stop(`could not mint a login code for ${email}`, JSON.stringify({ status: start.res.status, body: start.body }))
-  const verify = await fetch(`${BASE}/api/auth/email/verify`, {
+  // Raw (not api()) because this one needs the set-cookie header off the Response.
+  const verify = await timedFetch(`${BASE}/api/auth/email/verify`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, code }),
@@ -114,21 +103,7 @@ async function signIn(email) {
 
 /** One JSON-RPC call to POST /mcp with a bearer token — the outside tool's view.
  * `bearer` is passed explicitly so the no-token and bad-token cases share it. */
-async function rpc(bearer, method, params = {}, id = 1) {
-  const res = await fetch(`${BASE}/mcp`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(bearer === null ? {} : { Authorization: `Bearer ${bearer}` }),
-    },
-    body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
-  })
-  let body = null
-  try {
-    body = await res.json()
-  } catch {}
-  return { status: res.status, body }
-}
+const rpc = makeRpc(BASE)
 
 /** tools/call, unwrapped: the door's own JSON comes back as the content text. */
 async function callTool(bearer, name, args = {}) {
@@ -323,7 +298,7 @@ ok("the catalogue includes whoami", TOOLS.some((t) => t.name === "whoami"))
 // mint a token, a leaked token could mint itself a fresh one and outlive revocation.
 ok("no tool can mint or read access tokens", !TOOLS.some((t) => /token/i.test(t.name)), TOOLS.filter((t) => /token/i.test(t.name)).map((t) => t.name).join(", "))
 {
-  const asBearer = await fetch(`${BASE}/api/mcp/tokens`, { headers: { Authorization: `Bearer ${SECRET}` } })
+  const asBearer = await timedFetch(`${BASE}/api/mcp/tokens`, { headers: { Authorization: `Bearer ${SECRET}` } })
   ok("the token itself is refused at the token-management door", asBearer.status === 401, `status ${asBearer.status}`)
 }
 

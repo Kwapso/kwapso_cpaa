@@ -9,30 +9,8 @@
 // happened and is logged in activity).
 
 import { brand } from "../../../../shared/brand"
-import { brandedEmail, type BrandedEmail } from "../../../../shared/workers/email-template"
+import { sendBrandedEmail as send, teamName } from "../../../../shared/workers/notify"
 import type { Env } from "../env"
-
-async function teamName(env: Env, teamId: string): Promise<string> {
-  const row = await env.DB.prepare("SELECT name FROM teams WHERE id = ?")
-    .bind(teamId)
-    .first<{ name: string }>()
-  return row?.name ?? "your team"
-}
-
-/** Send one branded email through the auth worker (it owns the Resend key). */
-async function send(
-  env: Env,
-  to: string,
-  subject: string,
-  content: Pick<BrandedEmail, "heading" | "intro" | "footnote">
-): Promise<void> {
-  const { html, text } = brandedEmail({ ...content, origin: env.PUBLIC_APP_URL })
-  await env.AUTH.fetch("https://auth/internal/send-email", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-internal-key": env.INTERNAL_KEY ?? "" },
-    body: JSON.stringify({ to, subject, html, text }),
-  })
-}
 
 /** A member's role was changed by someone else. */
 export async function notifyRoleChanged(

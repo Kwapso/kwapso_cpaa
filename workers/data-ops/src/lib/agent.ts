@@ -214,6 +214,74 @@ export type { ChatOutcome, PendingCall }
  * exactly as before (the JSON path). The route owns the single TERMINAL event. */
 export type Emit = (ev: StreamEvent) => void
 
+/** Everything ONE tool step needs that doesn't change between the steps of a turn. */
+type StepCtx = {
+  env: Env
+  request: Request
+  cfg: D1Rest
+  guard: MemberGuard
+  actor: Actor
+  threadId: string
+  source: string
+  tally: UsageTally
+  /** id → friendly name, so a step summary reads "Remove Jane Doe" not a ULID. */
+  names: Record<string, string>
+  emit?: Emit
+}
+
+/** RUN ONE TOOL CALL — the single step seam, shared by the plan loop and confirmAndRun.
+ * Emits the step rows, runs the tool AS the caller, tallies the turn, and persists the
+ * step's OUTCOME on its own tool row (the panel rehydrates a reopened chat from these,
+ * so a failed step stays red, never a false green). Returns the tool message for the
+ * convo plus whether it succeeded.
+ *
+ * ONE function because the audit trail must not depend on WHICH loop ran the call — the
+ * two copies had already drifted. The plan loop tallied only writes; the confirm copy
+ * tallied EVERY call, believing "confirmed calls are always writes". They are not: when
+ * any call in a turn needs confirming, the proposal stores ALL of that turn's calls (so
+ * a mixed turn doesn't silently drop its non-confirm ones), so a plain list_members
+ * riding along with a removal titled the usage row — and flipped it from the author's
+ * own 'prompt' row to a team-visible 'action' one.
+ *
+ * WRITES-ONLY is the rule kept here: a READ isn't an action the user "did", so a
+ * read-only turn titles by the prompt, not "List roles" (what usageTitle documents).
+ * The confirm path loses nothing — requiresConfirm is false for every read, so a stored
+ * proposal always holds at least one write to title the folded row. */
+async function runToolCall(ctx: StepCtx, tc: ToolCall): Promise<{ message: ChatMessage; ok: boolean }> {
+  const { emit, tally } = ctx
+  const t = getTool(tc.name)
+  const summary = t ? t.summarize(tc.input, ctx.names) : `Run ${tc.name}`
+  emit?.({ t: "step_start", tool: tc.name, summary, ids: traceIds(tc.input) })
+  const result: ToolResult = t
+    ? await executeTool(ctx.env, ctx.request, t, tc.input)
+    : { ok: false, status: 404, data: null, error: `Unknown tool "${tc.name}".` }
+  // A failed step carries the door's short reason (e.g. which permission was missing) —
+  // shown on the red step row, live AND when the chat is reopened.
+  const failMsg = result.ok ? undefined : (result.error ?? "It failed.").slice(0, 140)
+  emit?.({ t: "step_end", tool: tc.name, ok: result.ok, summary, ...(failMsg ? { error: failMsg } : {}) })
+  // Title the usage-log row by the WRITES the turn ran (a failed write is still an action
+  // attempted, kept with "(failed)"). Count the successful ones so a wholly-refused turn
+  // can refund its credits.
+  if (t?.write) {
+    tally.actions.push(result.ok ? summary : `${summary} (failed)`)
+    if (result.ok) tally.okWrites += 1
+  }
+  const content = fence(result)
+  await appendMessage(ctx.cfg, ctx.guard, ctx.actor, ctx.threadId, {
+    role: "tool",
+    content,
+    toolCallsJson: JSON.stringify([
+      {
+        tool: tc.name,
+        summary: failMsg ? `${summary} — ${failMsg}` : summary,
+        status: result.ok ? "done" : "failed",
+      },
+    ]),
+    source: ctx.source,
+  })
+  return { message: { role: "tool", content, toolCallId: tc.id, toolName: tc.name }, ok: result.ok }
+}
+
 /** Files attached to a chat message → a PLANNED batch + the machine block the model
  * sees. The file CONTENT never enters the prompt (it goes straight into the batch
  * engine); the model gets the compact PLAN — tables, counts, what will be skipped —
@@ -482,43 +550,12 @@ async function runPlanLoop(
       emit && reply.toolCalls.some((tc) => hasNameableId(tc.input))
         ? await resolveNames(env, request, reply.toolCalls)
         : {}
+    const stepCtx: StepCtx = { env, request, cfg, guard, actor, threadId, source: opts.source, tally: opts.tally, names, emit }
     let failed = false
     for (const tc of reply.toolCalls) {
-      const t = getTool(tc.name)
-      const summary = t ? t.summarize(tc.input, names) : `Run ${tc.name}`
-      emit?.({ t: "step_start", tool: tc.name, summary, ids: traceIds(tc.input) })
-      const result: ToolResult = t
-        ? await executeTool(env, request, t, tc.input)
-        : { ok: false, status: 404, data: null, error: `Unknown tool "${tc.name}".` }
-      // A failed step carries the door's short reason (e.g. which permission was
-      // missing) — shown on the red step row, live AND when the chat is reopened.
-      const failMsg = result.ok ? undefined : (result.error ?? "It failed.").slice(0, 140)
-      emit?.({ t: "step_end", tool: tc.name, ok: result.ok, summary, ...(failMsg ? { error: failMsg } : {}) })
-      // Title the usage-log row by the WRITES the turn ran (a failed write is still an
-      // action attempted, kept with "(failed)"); a READ isn't an action the user "did", so
-      // it's left off — a read-only clarifying turn then titles by the prompt, not "List
-      // roles". Count successful writes so a wholly-refused turn can refund its credits.
-      if (t?.write) {
-        opts.tally.actions.push(result.ok ? summary : `${summary} (failed)`)
-        if (result.ok) opts.tally.okWrites += 1
-      }
-      const content = fence(result)
-      // Persist the step's OUTCOME on its tool row — the panel rehydrates a reopened
-      // chat from these, so a failed step stays red, never a false green.
-      await appendMessage(cfg, guard, actor, threadId, {
-        role: "tool",
-        content,
-        toolCallsJson: JSON.stringify([
-          {
-            tool: tc.name,
-            summary: failMsg ? `${summary} — ${failMsg}` : summary,
-            status: result.ok ? "done" : "failed",
-          },
-        ]),
-        source: opts.source,
-      })
-      convo.push({ role: "tool", content, toolCallId: tc.id, toolName: tc.name })
-      if (!result.ok) failed = true
+      const { message, ok } = await runToolCall(stepCtx, tc)
+      convo.push(message)
+      if (!ok) failed = true
     }
     if (failed) {
       // The model explains (unmetered): the FAILED reasons are in the convo, so the
@@ -593,38 +630,15 @@ export async function confirmAndRun(
   // Resolve the confirming calls' ids → friendly names so the step summary reads plainly
   // (same seam the confirm panel used to build these very summaries). Only when streaming.
   const names = emit ? await resolveNames(env, request, calls) : {}
+  // The SAME step seam the plan loop uses — one audit trail, one tally rule, whichever
+  // loop ran the call (see runToolCall: writes title the row, reads ride along quietly).
+  const stepCtx: StepCtx = { env, request, cfg, guard, actor, threadId: opts.threadId, source: opts.source, tally, names, emit }
   const toolMsgs: ChatMessage[] = []
   let failed = false
   for (const tc of calls) {
-    const t = getTool(tc.name)
-    const summary = t ? t.summarize(tc.input, names) : `Run ${tc.name}`
-    emit?.({ t: "step_start", tool: tc.name, summary, ids: traceIds(tc.input) })
-    const result: ToolResult = t
-      ? await executeTool(env, request, t, tc.input)
-      : { ok: false, status: 404, data: null, error: `Unknown tool "${tc.name}".` }
-    const failMsg = result.ok ? undefined : (result.error ?? "It failed.").slice(0, 140)
-    emit?.({ t: "step_end", tool: tc.name, ok: result.ok, summary, ...(failMsg ? { error: failMsg } : {}) })
-    // Title the folded usage row by the confirmed action(s), not the "(continued)" prompt.
-    // Confirmed calls are always writes, so they always title the row.
-    tally.actions.push(result.ok ? summary : `${summary} (failed)`)
-    if (t?.write && result.ok) tally.okWrites += 1
-    const content = fence(result)
-    // Same as the plan loop: persist the step's outcome so a reopened chat shows the
-    // truth (a failed confirm step stays red, with its reason).
-    await appendMessage(cfg, guard, actor, opts.threadId, {
-      role: "tool",
-      content,
-      toolCallsJson: JSON.stringify([
-        {
-          tool: tc.name,
-          summary: failMsg ? `${summary} — ${failMsg}` : summary,
-          status: result.ok ? "done" : "failed",
-        },
-      ]),
-      source: opts.source,
-    })
-    toolMsgs.push({ role: "tool", content, toolCallId: tc.id, toolName: tc.name })
-    if (!result.ok) failed = true
+    const { message, ok } = await runToolCall(stepCtx, tc)
+    toolMsgs.push(message)
+    if (!ok) failed = true
   }
   // Mark the proposal consumed ("proposed" → "done") now the calls have run, so a stray
   // re-POST to /confirm finds nothing waiting and can't replay a remove/revoke.

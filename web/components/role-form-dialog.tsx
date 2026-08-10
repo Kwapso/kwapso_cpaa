@@ -8,13 +8,11 @@ import * as React from "react"
 
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import {
-  Dialog,
-  DialogContent,
   DialogDescription,
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
-import { FormShell, fieldSpacing } from "@shared/web/form-shell"
+import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
@@ -68,54 +66,47 @@ export function RoleFormDialog({
   }
 
   return (
-    <Dialog
+    <FormShellDialog
       open={open}
-      onOpenChange={(o) => {
-        if (busy) return
-        if (!o) clearDraft() // dismissing the form (Esc / backdrop / close) discards the draft
-        onOpenChange(o)
-      }}
+      onOpenChange={onOpenChange}
+      busy={busy}
+      clearDraft={clearDraft}
+      onSubmit={submit}
+      title={<DialogTitle>{isEdit ? "Edit this role" : "Create a role"}</DialogTitle>}
+      subtitle={
+        <DialogDescription>
+          {isEdit
+            ? "Rename it or update what it's for. You set what it can do over in the grid."
+            : "It starts with no access — you'll choose what it can do in the next step."}
+        </DialogDescription>
+      }
+      footer={
+        <Button type="submit" disabled={busy || !values.title.trim()}>
+          {busy ? <Spinner /> : null}
+          {busy ? "Saving…" : isEdit ? "Save changes" : "Create role"}
+        </Button>
+      }
     >
-      <DialogContent>
-        <FormShell
-          onSubmit={submit}
-          title={<DialogTitle>{isEdit ? "Edit this role" : "Create a role"}</DialogTitle>}
-          subtitle={
-            <DialogDescription>
-              {isEdit
-                ? "Rename it or update what it's for. You set what it can do over in the grid."
-                : "It starts with no access — you'll choose what it can do in the next step."}
-            </DialogDescription>
-          }
-          footer={
-            <Button type="submit" disabled={busy || !values.title.trim()}>
-              {busy ? <Spinner /> : null}
-              {busy ? "Saving…" : isEdit ? "Save changes" : "Create role"}
-            </Button>
-          }
-        >
-          <Field config={titleField} htmlFor="role-title" className={fieldSpacing}>
-            <Input
-              id="role-title"
-              value={values.title}
-              onChange={(e) => setValues((v) => ({ ...v, title: e.target.value }))}
-              placeholder="Editor"
-              disabled={busy}
-              autoFocus
-            />
-          </Field>
-          <Field config={descField} htmlFor="role-desc" className={fieldSpacing}>
-            <Textarea
-              id="role-desc"
-              value={values.description}
-              onChange={(e) => setValues((v) => ({ ...v, description: e.target.value }))}
-              placeholder="What this role is for (optional)."
-              disabled={busy}
-              rows={3}
-            />
-          </Field>
-        </FormShell>
-      </DialogContent>
-    </Dialog>
+      <Field config={titleField} htmlFor="role-title" className={fieldSpacing}>
+        <Input
+          id="role-title"
+          value={values.title}
+          onChange={(e) => setValues((v) => ({ ...v, title: e.target.value }))}
+          placeholder="Editor"
+          disabled={busy}
+          autoFocus
+        />
+      </Field>
+      <Field config={descField} htmlFor="role-desc" className={fieldSpacing}>
+        <Textarea
+          id="role-desc"
+          value={values.description}
+          onChange={(e) => setValues((v) => ({ ...v, description: e.target.value }))}
+          placeholder="What this role is for (optional)."
+          disabled={busy}
+          rows={3}
+        />
+      </Field>
+    </FormShellDialog>
   )
 }

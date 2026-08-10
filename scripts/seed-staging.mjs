@@ -30,6 +30,8 @@
 // ~/.config/kwapso/keys.env — export them, never paste them):
 //   TEST_LOGIN_KEY=… ADMIN_KEY=… node scripts/seed-staging.mjs staging
 
+import { makeApi, timedFetch } from "./lib/api.mjs"
+
 // ── where, and may we ────────────────────────────────────────────────────────
 
 const TARGETS = {
@@ -272,26 +274,7 @@ const check = (label, ok, detail = "") => {
   if (!ok) failures++
 }
 
-async function api(path, opts = {}, cookie = "") {
-  const res = await fetch(`${BASE}${path}`, {
-    signal: AbortSignal.timeout(30_000), // R11: never hang on an external service
-    ...opts,
-    headers: {
-      "Content-Type": "application/json",
-      ...(cookie ? { Cookie: cookie } : {}),
-      ...opts.headers,
-    },
-  })
-  let body = null
-  try {
-    body = await res.json()
-  } catch {
-    // Not JSON — a gateway error page, an empty 502, a timeout. Keep the text so
-    // a failure reports a reason rather than a bare status.
-    body = { message: (await res.text().catch(() => "")).slice(0, 300) || "(no body)" }
-  }
-  return { ok: res.ok, status: res.status, body, res }
-}
+const api = makeApi(BASE)
 
 const post = (path, payload, cookie) =>
   api(path, { method: "POST", body: JSON.stringify(payload ?? {}) }, cookie)
@@ -322,8 +305,8 @@ async function signIn(email, profile) {
     )
     process.exit(1)
   }
-  const verify = await fetch(`${BASE}/api/auth/email/verify`, {
-    signal: AbortSignal.timeout(30_000), // R11
+  // Raw (not api()) because this one needs the set-cookie header off the Response.
+  const verify = await timedFetch(`${BASE}/api/auth/email/verify`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, code: start.body.code }),

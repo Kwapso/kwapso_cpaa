@@ -5,6 +5,8 @@
 // Uses one fixed smoke account: the first run exercises the full team
 // factory; later runs prove idempotency (and don't litter team databases).
 
+import { makeApi, makeRpc, timedFetch } from "./lib/api.mjs"
+
 const BASE = process.env.SMOKE_BASE ?? "https://kwapso-staging.kwapso.workers.dev"
 // Resend's test inbox: real send path, always "delivered", never bounces —
 // so running the smoke repeatedly doesn't hurt the sending domain's reputation.
@@ -16,21 +18,7 @@ const ok = (name, cond, detail = "") => {
   if (!cond) failures++
 }
 
-const api = async (path, opts = {}, cookie = "") => {
-  const res = await fetch(`${BASE}${path}`, {
-    ...opts,
-    headers: {
-      "Content-Type": "application/json",
-      ...(cookie ? { Cookie: cookie } : {}),
-      ...opts.headers,
-    },
-  })
-  let body = null
-  try {
-    body = await res.json()
-  } catch {}
-  return { res, body }
-}
+const api = makeApi(BASE)
 
 // 1 · Both workers answer through the front door.
 {
@@ -75,7 +63,8 @@ if (!code) process.exit(1)
 }
 
 // 3 · Verify the code → session cookie.
-const verify = await fetch(`${BASE}/api/auth/email/verify`, {
+// Raw (not api()) because this one needs the set-cookie header off the Response.
+const verify = await timedFetch(`${BASE}/api/auth/email/verify`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ email: EMAIL, code }),
@@ -114,14 +103,8 @@ ok("active context has your role (Admin)", ctx.body?.role?.title === "Admin", JS
   const secret = created.body?.secret
   ok("mcp token created (secret shown once)", typeof secret === "string" && secret.startsWith("kwapso_mcp_"))
   if (secret) {
-    const rpc = async (method, params = {}) => {
-      const res = await fetch(`${BASE}/mcp`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${secret}` },
-        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-      })
-      return { res, body: await res.json().catch(() => null) }
-    }
+    const call = makeRpc(BASE)
+    const rpc = (method, params = {}) => call(secret, method, params)
     const init = await rpc("initialize")
     ok("mcp initialize answers", init.body?.result?.serverInfo?.name === "kwapso-mcp")
     const tools = await rpc("tools/list")
@@ -131,7 +114,7 @@ ok("active context has your role (Admin)", ctx.body?.role?.title === "Admin", JS
     ok("mcp whoami acts AS the token owner", whoText.includes(EMAIL), whoText.slice(0, 120))
     await api("/api/mcp/tokens/revoke", { method: "POST", body: JSON.stringify({ id: created.body?.token?.id }) }, cookie)
     const dead = await rpc("tools/list")
-    ok("revoked token is refused immediately", dead.res.status === 401)
+    ok("revoked token is refused immediately", dead.status === 401)
   }
 }
 

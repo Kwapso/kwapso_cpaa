@@ -11,8 +11,6 @@ import * as React from "react"
 
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import {
-  Dialog,
-  DialogContent,
   DialogDescription,
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
@@ -33,7 +31,7 @@ import { Paperclip, X } from "lucide-react"
 
 import { ApiFailure, content } from "@/lib/api"
 import { useFormDraft } from "@shared/web/use-form-draft"
-import { FormShell, fieldSpacing } from "@shared/web/form-shell"
+import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { ManageDropdownsLink } from "@/components/manage-dropdowns-link"
 
 const titleField = { ...defaultFieldConfig, label: "Title", required: true }
@@ -172,183 +170,176 @@ export function LearningFormDialog({
   }
 
   return (
-    <Dialog
+    <FormShellDialog
       open={open}
-      onOpenChange={(o) => {
-        if (busy) return
-        if (!o) clearDraft() // dismissing the form (Esc / backdrop / close) discards the draft
-        onOpenChange(o)
-      }}
+      onOpenChange={onOpenChange}
+      busy={busy}
+      clearDraft={clearDraft}
+      onSubmit={submit}
+      title={<DialogTitle>{isEdit ? "Edit this article" : "Write a how-to"}</DialogTitle>}
+      subtitle={
+        <DialogDescription>
+          {isEdit
+            ? "Update what this article teaches. The content is also what the assistant reads to help your team."
+            : "Share a how-to your team can read right here. The content also helps the assistant answer questions."}
+        </DialogDescription>
+      }
+      footer={
+        <Button type="submit" disabled={busy || !values.title.trim()}>
+          {busy ? <Spinner /> : null}
+          {busy ? "Saving…" : isEdit ? "Save changes" : "Create article"}
+        </Button>
+      }
     >
-      <DialogContent>
-        <FormShell
-          onSubmit={submit}
-          title={<DialogTitle>{isEdit ? "Edit this article" : "Write a how-to"}</DialogTitle>}
-          subtitle={
-            <DialogDescription>
-              {isEdit
-                ? "Update what this article teaches. The content is also what the assistant reads to help your team."
-                : "Share a how-to your team can read right here. The content also helps the assistant answer questions."}
-            </DialogDescription>
-          }
-          footer={
-            <Button type="submit" disabled={busy || !values.title.trim()}>
-              {busy ? <Spinner /> : null}
-              {busy ? "Saving…" : isEdit ? "Save changes" : "Create article"}
-            </Button>
-          }
-        >
-          <Field config={titleField} htmlFor="learning-title" className={fieldSpacing}>
-            <Input
-              id="learning-title"
-              value={values.title}
-              onChange={(e) => setValues((v) => ({ ...v, title: e.target.value }))}
-              placeholder="How to onboard a new client"
+      <Field config={titleField} htmlFor="learning-title" className={fieldSpacing}>
+        <Input
+          id="learning-title"
+          value={values.title}
+          onChange={(e) => setValues((v) => ({ ...v, title: e.target.value }))}
+          placeholder="How to onboard a new client"
+          disabled={busy}
+          autoFocus
+        />
+      </Field>
+
+      <Field config={categoryField} htmlFor="learning-category" className={fieldSpacing}>
+        <div className="flex items-center gap-2">
+          <Select
+            value={values.category}
+            onValueChange={(category) => setValues((v) => ({ ...v, category }))}
+            disabled={busy}
+          >
+            <SelectTrigger id="learning-category" className="flex-1">
+              <SelectValue placeholder="Choose a category (optional)" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>No category</SelectItem>
+              {categoryOptions.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {values.category !== NONE && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setValues((v) => ({ ...v, category: NONE }))}
               disabled={busy}
-              autoFocus
-            />
-          </Field>
-
-          <Field config={categoryField} htmlFor="learning-category" className={fieldSpacing}>
-            <div className="flex items-center gap-2">
-              <Select
-                value={values.category}
-                onValueChange={(category) => setValues((v) => ({ ...v, category }))}
-                disabled={busy}
-              >
-                <SelectTrigger id="learning-category" className="flex-1">
-                  <SelectValue placeholder="Choose a category (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>No category</SelectItem>
-                  {categoryOptions.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {values.category !== NONE && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setValues((v) => ({ ...v, category: NONE }))}
-                  disabled={busy}
-                  className="text-muted-foreground shrink-0"
-                  aria-label="Clear category"
-                >
-                  <X className="size-4" />
-                </Button>
-              )}
-            </div>
-          </Field>
-
-          <Field config={typeField} htmlFor="learning-type" className={fieldSpacing}>
-            <div className="flex items-center gap-2">
-              <Select
-                value={values.contentType}
-                onValueChange={(contentType) => setValues((v) => ({ ...v, contentType }))}
-                disabled={busy}
-              >
-                <SelectTrigger id="learning-type" className="flex-1">
-                  <SelectValue placeholder="Choose a type (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>No type</SelectItem>
-                  {contentTypeOptions.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {values.contentType !== NONE && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setValues((v) => ({ ...v, contentType: NONE }))}
-                  disabled={busy}
-                  className="text-muted-foreground shrink-0"
-                  aria-label="Clear content type"
-                >
-                  <X className="size-4" />
-                </Button>
-              )}
-            </div>
-            <ManageDropdownsLink teamId={teamId ?? null} />
-          </Field>
-
-          {wantsFile ? (
-            // File-type content: upload the file itself (stored on R2, served from
-            // /media) instead of pasting an external link.
-            <Field config={fileField} htmlFor="learning-file" className={fieldSpacing}>
-              {values.contentLink ? (
-                <div className="flex items-center gap-2 rounded-lg border bg-card p-2 text-sm">
-                  <Paperclip className="text-muted-foreground size-4 shrink-0" />
-                  <span className="min-w-0 flex-1 truncate">{fileName || "Uploaded file"}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={removeFile}
-                    disabled={busy || uploading}
-                    className="text-muted-foreground h-auto shrink-0 px-2 py-1"
-                  >
-                    Remove
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <input
-                    ref={fileInputRef}
-                    id="learning-file"
-                    type="file"
-                    accept={acceptFor(values.contentType)}
-                    onChange={(e) => void handleFile(e)}
-                    disabled={busy || uploading}
-                    className="hidden"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={busy || uploading}
-                    className="gap-1.5"
-                  >
-                    {uploading ? <Spinner /> : <Paperclip className="size-3.5" />}
-                    {uploading ? "Uploading…" : "Choose a file"}
-                  </Button>
-                  <span className="text-muted-foreground text-xs">Up to 25 MB.</span>
-                </div>
-              )}
-            </Field>
-          ) : (
-            <Field config={linkField} htmlFor="learning-link" className={fieldSpacing}>
-              <Input
-                id="learning-link"
-                type="url"
-                value={values.contentLink}
-                onChange={(e) => setValues((v) => ({ ...v, contentLink: e.target.value }))}
-                placeholder="https://… (optional)"
-                disabled={busy}
-              />
-            </Field>
+              className="text-muted-foreground shrink-0"
+              aria-label="Clear category"
+            >
+              <X className="size-4" />
+            </Button>
           )}
+        </div>
+      </Field>
 
-          <Field config={bodyField} htmlFor="learning-body" className={fieldSpacing}>
-            <Notes
-              key={seed}
-              defaultValue={values.body}
-              onChange={(html) => setValues((v) => ({ ...v, body: html }))}
-              placeholder="Write the article — bold, italic, highlight, and lists are supported."
-              className="min-h-40"
-            />
-          </Field>
-        </FormShell>
-      </DialogContent>
-    </Dialog>
+      <Field config={typeField} htmlFor="learning-type" className={fieldSpacing}>
+        <div className="flex items-center gap-2">
+          <Select
+            value={values.contentType}
+            onValueChange={(contentType) => setValues((v) => ({ ...v, contentType }))}
+            disabled={busy}
+          >
+            <SelectTrigger id="learning-type" className="flex-1">
+              <SelectValue placeholder="Choose a type (optional)" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>No type</SelectItem>
+              {contentTypeOptions.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {values.contentType !== NONE && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setValues((v) => ({ ...v, contentType: NONE }))}
+              disabled={busy}
+              className="text-muted-foreground shrink-0"
+              aria-label="Clear content type"
+            >
+              <X className="size-4" />
+            </Button>
+          )}
+        </div>
+        <ManageDropdownsLink teamId={teamId ?? null} />
+      </Field>
+
+      {wantsFile ? (
+        // File-type content: upload the file itself (stored on R2, served from
+        // /media) instead of pasting an external link.
+        <Field config={fileField} htmlFor="learning-file" className={fieldSpacing}>
+          {values.contentLink ? (
+            <div className="flex items-center gap-2 rounded-lg border bg-card p-2 text-sm">
+              <Paperclip className="text-muted-foreground size-4 shrink-0" />
+              <span className="min-w-0 flex-1 truncate">{fileName || "Uploaded file"}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={removeFile}
+                disabled={busy || uploading}
+                className="text-muted-foreground h-auto shrink-0 px-2 py-1"
+              >
+                Remove
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <input
+                ref={fileInputRef}
+                id="learning-file"
+                type="file"
+                accept={acceptFor(values.contentType)}
+                onChange={(e) => void handleFile(e)}
+                disabled={busy || uploading}
+                className="hidden"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={busy || uploading}
+                className="gap-1.5"
+              >
+                {uploading ? <Spinner /> : <Paperclip className="size-3.5" />}
+                {uploading ? "Uploading…" : "Choose a file"}
+              </Button>
+              <span className="text-muted-foreground text-xs">Up to 25 MB.</span>
+            </div>
+          )}
+        </Field>
+      ) : (
+        <Field config={linkField} htmlFor="learning-link" className={fieldSpacing}>
+          <Input
+            id="learning-link"
+            type="url"
+            value={values.contentLink}
+            onChange={(e) => setValues((v) => ({ ...v, contentLink: e.target.value }))}
+            placeholder="https://… (optional)"
+            disabled={busy}
+          />
+        </Field>
+      )}
+
+      <Field config={bodyField} htmlFor="learning-body" className={fieldSpacing}>
+        <Notes
+          key={seed}
+          defaultValue={values.body}
+          onChange={(html) => setValues((v) => ({ ...v, body: html }))}
+          placeholder="Write the article — bold, italic, highlight, and lists are supported."
+          className="min-h-40"
+        />
+      </Field>
+    </FormShellDialog>
   )
 }
