@@ -23,6 +23,33 @@ The /reset-all skill reads this. DESTRUCTIVE — wipes data back to empty.
   references (never other projects' DBs), then removes all rows from the global
   core DB while keeping the schema + d1_migrations. Self-tests with a read-back.
 
+## Seed config — the staging sandbox
+
+The other half of reset-all: fill an empty staging back up with one believable,
+obviously fictional client world so there is something to click around.
+
+- seed_command: `TEST_LOGIN_KEY=… ADMIN_KEY=… node scripts/seed-staging.mjs staging`
+  (both keys live in `~/.config/kwapso/keys.env` — export them, never paste them)
+- what it seeds: the "Kwapso sandbox" team, a **Client** role, two sandbox
+  companies (one with two accounts nested under it), four contacts — one of whom
+  belongs to *both* companies, which is the only way to exercise the account
+  switcher — three portal logins on plus-addressed variants of the owner's own
+  inbox, six tickets raised by the people who would really raise them, three
+  learning articles and two extra Help types.
+- how it writes: every row goes through a real gated endpoint, signed in as a
+  real person — never straight into D1. Seeding through the front door is what
+  proves the doors work and leaves genuine activity rows and live pings behind.
+- idempotent: every record is matched on a natural key first (an account's
+  reference, a person's email, an article's title, a ticket's description), so a
+  second run writes nothing and says so.
+- it checks the fence afterwards: signs in as a seeded client login and proves it
+  sees its own company's world and nothing from the other one — eight PASS/FAIL
+  lines, non-zero exit if any fails.
+- STAGING ONLY (SCOPE ch.13: staging holds only the sandbox account; real client
+  accounts are only ever invited on production). `production` needs an explicit
+  `--confirm-production`, and auth's test-login door refuses production anyway,
+  so the sign-in would fail even then.
+
 ## The pieces
 
 | Worker | Staging name | Production name | What it is |
