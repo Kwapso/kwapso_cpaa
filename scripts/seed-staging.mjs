@@ -248,6 +248,10 @@ const TICKETS = [
   },
 ]
 
+/** The one ticket raised by US, not by a client. The fence check asserts a client
+ * never sees it, and reads it from here so the two can never drift apart. */
+const OURS = TICKETS[TICKETS.length - 1]
+
 // ── the plumbing ─────────────────────────────────────────────────────────────
 
 let changed = 0
@@ -270,6 +274,7 @@ const check = (label, ok, detail = "") => {
 
 async function api(path, opts = {}, cookie = "") {
   const res = await fetch(`${BASE}${path}`, {
+    signal: AbortSignal.timeout(30_000), // R11: never hang on an external service
     ...opts,
     headers: {
       "Content-Type": "application/json",
@@ -280,7 +285,11 @@ async function api(path, opts = {}, cookie = "") {
   let body = null
   try {
     body = await res.json()
-  } catch {}
+  } catch {
+    // Not JSON — a gateway error page, an empty 502, a timeout. Keep the text so
+    // a failure reports a reason rather than a bare status.
+    body = { message: (await res.text().catch(() => "")).slice(0, 300) || "(no body)" }
+  }
   return { ok: res.ok, status: res.status, body, res }
 }
 
@@ -314,6 +323,7 @@ async function signIn(email, profile) {
     process.exit(1)
   }
   const verify = await fetch(`${BASE}/api/auth/email/verify`, {
+    signal: AbortSignal.timeout(30_000), // R11
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, code: start.body.code }),
@@ -341,10 +351,15 @@ async function allPages(path, key, cookie) {
     const url = cursor ? `${path}${sep}cursor=${encodeURIComponent(cursor)}` : path
     const body = must(await api(url, {}, cookie), `reading ${path}`)
     rows.push(...(body[key] ?? []))
-    if (!body.hasMore || !body.nextCursor) break
+    if (!body.hasMore || !body.nextCursor) return rows
     cursor = body.nextCursor
   }
-  return rows
+  // A SHORT READ MUST NOT LOOK LIKE A COMPLETE ONE. This feeds the fence check
+  // at the end, and that check is a NEGATIVE: "Priya cannot see the other
+  // company". A truncated read makes a negative pass for the wrong reason and
+  // prints "the fence holds" — the one line in this script worth more than
+  // every "created" line above it. So stopping early is a failure, loudly.
+  throw new Error(`${path}: more than 25 pages — refusing to report a partial read as complete`)
 }
 
 // ── 1 · the agency side: a signed-in owner, standing in the sandbox team ──────
@@ -696,7 +711,9 @@ check(
 check(
   "Priya sees none of the other client's questions, and none of ours",
   priyaTickets.every((t) => !tomIds.has(t.id)) &&
-    !priyaTickets.some((t) => t.description.startsWith("Sandbox: check the new account screens")),
+    // Derived from TICKETS, never retyped: a hand-copied prefix means rewording
+    // the seed ticket silently turns this negative check into a no-op.
+    !priyaTickets.some((t) => t.description === OURS.description),
   priyaTickets.map((t) => t.description.slice(0, 40)).join(" | ")
 )
 

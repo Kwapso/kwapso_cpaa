@@ -84,11 +84,20 @@ for (const app of catalog.apps) {
       console.log(`${rows.length} rows, ${columns.length} columns`)
       summary.push({ app: app.key, table: table.key, rows: rows.length, columns })
     } catch (err) {
-      console.log(`FAILED — ${err.message}`)
+      // To stderr, and counted. "Wrote 32 files" with three of them empty reads
+      // as a complete export — and this export is the thing the owner never
+      // wants to do twice.
+      console.error(`FAILED — ${err.message}`)
       summary.push({ app: app.key, table: table.key, error: err.message })
     }
   }
 }
 
 writeFileSync(resolve(OUT_DIR, "_summary.json"), JSON.stringify(summary, null, 2))
-console.log(`\nWrote ${summary.length} files to glide/data/. Summary: glide/data/_summary.json`)
+const failed = summary.filter((s) => s.error)
+const wrote = summary.length - failed.length
+console.log(`\nWrote ${wrote} of ${summary.length} tables to glide/data/. Summary: glide/data/_summary.json`)
+if (failed.length) {
+  console.error(`\n${failed.length} table(s) failed: ${failed.map((f) => `${f.app}/${f.table}`).join(", ")}`)
+  process.exit(1) // a partial export must not exit 0
+}
