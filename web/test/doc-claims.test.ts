@@ -42,8 +42,18 @@ const WORKERS = readdirSync(join(ROOT, "workers"))
 
 /** A worker is PUBLIC unless its own config switches the public URL off. Absence
  * is the dangerous direction, so absence reads as public — the same way
- * Cloudflare treats it. */
-const isPublic = (w: string) => !/"workers_dev"\s*:\s*false/.test(read(join(ROOT, "workers", w, "wrangler.jsonc")))
+ * Cloudflare treats it.
+ *
+ * PER SETTING, not per file. Every worker here declares `workers_dev` once at the
+ * top level (production) and again under `env.staging`, so asking only "does the
+ * word false appear anywhere?" let a worker be opened in ONE environment and
+ * still read as closed — production wide open, the test green, and the docs
+ * cheerfully saying two public doors. A single `true` anywhere makes it public. */
+const isPublic = (w: string) => {
+  const cfg = read(join(ROOT, "workers", w, "wrangler.jsonc"))
+  if (/"workers_dev"\s*:\s*true/.test(cfg)) return true
+  return !/"workers_dev"\s*:\s*false/.test(cfg)
+}
 
 const PUBLIC_WORKERS = WORKERS.filter(isPublic)
 
