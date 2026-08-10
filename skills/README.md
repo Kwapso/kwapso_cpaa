@@ -10,7 +10,7 @@ link carries everything — code, docs, tests, and the skills that operate on th
 - **`new-app/`** — the one-shot foundation builder. Given an app name, it clones the base,
   runs the fork sweep (renames the `kwapso-` prefix everywhere), stands the whole base up
   on Cloudflare command-by-command (core DB + migrations → R2 → secrets → realtime-first
-  deploy of all seven workers → seed → smoke), creates the GitHub repo, runs the three
+  deploy of all eight workers → seed → smoke), creates the GitHub repo, runs the three
   quality gates, and hands over a ready-to-brand checklist. This is `BOOTSTRAP.md`
   automated. Read it: [new-app/SKILL.md](new-app/SKILL.md).
 

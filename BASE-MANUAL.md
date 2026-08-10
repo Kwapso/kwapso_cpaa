@@ -226,9 +226,9 @@ Four more structural guards layer on top (all in `agent.ts` / `tools.ts`):
   in `executeTool`.
 - **Fenced tool results** — a tool's output goes back to the model as DATA
   (`role:"tool"`), never as instructions.
-- **A step cap** (`MAX_STEPS`) and a **credit quota** (a free daily allowance via
-  `agent_usage` — default 25/day, per-env via the `AGENT_FREE_DAILY` var, staging
-  runs 50 — + a purchasable balance in `agent_credits`) bound runaways and
+- **A step cap** (`MAX_STEPS`) and a **credit quota** (the app's own daily allowance via
+  `agent_usage` — `AGENT_FREE_DAILY`, code default 25/day, but both environments
+  ship 50 — + a purchasable balance in `agent_credits`) bound runaways and
   abuse. Every turn is saved to `agent_threads`/`agent_messages` — the audit
   trail — and each user COMMAND writes one `agent_usage_log` row (when · who ·
   credits · why) that powers the usage view behind the panel's quota badge. A

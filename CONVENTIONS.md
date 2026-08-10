@@ -518,7 +518,7 @@ The line is simple: **if two workers would write it the same way, it lives in `s
   `gating.ts` (`GuardError`, `teamContext`, `requireRight`), `validate.ts`, `d1-rest.ts`
   (`d1Query`/`d1ExecScript`/`sqlString`), `id.ts` (`ulid`), `activity.ts`
   (`logActivity`), `realtime.ts` (`publishChange`). Touch these carefully — a change
-  ripples across all seven workers.
+  ripples across all eight workers.
 - **`shared/types.ts`** is the contract the web `web/` client and the workers both agree
   on (`SessionUser`, `Learning`, `ApiError`, …). Shape a DB row into a shared type at the
   lib boundary (`toLearning`) so the wire type is stable even as columns change.
@@ -649,14 +649,15 @@ between "I think it works" and "the laws still hold".
 
 ```jsonc
 // package.json
-"check": "npx tsc --noEmit -p web
-        && npx tsc --noEmit -p workers/auth   && … && npx tsc --noEmit -p workers/gateway
+"check": "npx tsc --noEmit -p web && npx tsc --noEmit -p web-portal
+        && npx tsc --noEmit -p workers/auth && … && npx tsc --noEmit -p workers/portal-gateway
         && npm test"
 ```
 
-`check` = **type-check every workspace** (web + all seven workers, each against its own
-tsconfig) **then run the full test suite** (`npm test` fans out to every worker's
-`vitest run` plus `web`).
+`check` = **type-check every workspace** (both front ends — `web` and `web-portal` — and
+all eight workers, each against its own tsconfig) **then run the full test suite**
+(`npm test` fans out across nine workspaces: every worker that carries a suite, plus
+both front ends).
 
 The test suite is not just unit tests of behaviour — it includes the **law checks and
 seam tests that read the source straight off disk**, so breaking a Law of the Base turns
@@ -669,6 +670,14 @@ the build red:
   (non-string / blank / over-long / NUL → clean 400) so the 500 bugs can't return.
 - **`web/test/rules.test.ts`** — the UI + registry laws (record-detail tabs, `FormShell`,
   `TabsView`, one generic activity path, glossary well-formed, `registry-integrity`).
+- **`web/test/doc-claims.test.ts`** — the docs against the roster on disk. It derives
+  the worker list from `workers/` and reads each `wrangler.jsonc`'s own `workers_dev`
+  flag to decide which are public, then fails if a doc states a worker count or a
+  public-door count that disagrees. Not a Law (it governs prose, not code), but it is
+  the answer to the same problem: "seven workers" and "one public door" stayed true in
+  fourteen documents for two months after they stopped being true, because nothing
+  read them. A genuine subset claim ("the six workers that bind the core DB") is a
+  reviewed line in that file's `SUBSET_CLAIMS`, with its reason.
 
 A law without a passing check is not a law — you cannot add one to `RULES.md` and the
 registry without also adding its test (`registry-integrity` enforces the doc/registry/

@@ -25,9 +25,9 @@ code. A port = back these five with the target platform's primitives.
 |---|--------|-------------------------------|----------------------------|
 | 1 | **Per-team data isolation** | one **D1** (SQLite) database *per team* + one core D1 for global identity/billing | `shared/workers/d1-rest.ts` (`d1Query` / `d1ExecScript` / `d1QueryAcross` / `sqlString`) — the ONLY place SQL runs |
 | 2 | **The live layer** | the `TeamChannel` **Durable Object** fans out change pings | `shared/workers/realtime.ts` (`publishChange`) — the ONLY broadcast seam |
-| 3 | **Compute** | **7 Workers** behind one public gateway | each `workers/*` + the gateway router (the shape ports; the runtime swaps) |
+| 3 | **Compute** | **8 Workers** behind two public gateways (one per front end) | each `workers/*` + the gateway router (the shape ports; the runtime swaps) |
 | 4 | **File storage** | **R2**, keyed per team | the R2 `.put/.get` calls in `content` + `gateway` (`/media/*`) |
-| 5 | **Static web** | Next.js **static export** served at the edge | none — a static bundle any host can serve |
+| 5 | **Static web** | TWO Next.js **static exports** (the agency app + the client portal), each served at the edge by its own gateway | none — a static bundle any host can serve |
 
 Two more are **already provider-agnostic seams** (swap by config, no port):
 
@@ -40,7 +40,7 @@ database-per-team (D1). On a Postgres platform you choose one of: **row-level se
 with a `team_id`** (recommended — one database, a policy per table), **schema-per-team**
 (stronger isolation, heavier ops), or **database-per-team** (closest to Brimba, most
 expensive). The base's data door (`d1-rest.ts`) is where that choice lands — rewrite
-that one seam and the 7 workers keep working unchanged.
+that one seam and the 8 workers keep working unchanged.
 
 ---
 
@@ -74,25 +74,27 @@ rewrite. In rough effort order:
 
 1. **Pick the tenancy model** (§1) and **rewrite the data door** (`d1-rest.ts`) to speak
    the target DB. Keep the function signatures (`d1Query`, `d1ExecScript`, `sqlString`,
-   `d1QueryAcross`) — the 7 workers call only these, so nothing above changes. For a
+   `d1QueryAcross`) — the 8 workers call only these, so nothing above changes. For a
    Postgres+RLS port, `d1QueryAcross` (the shard fan-out) collapses to a normal query.
 2. **Swap the live seam** (`realtime.ts` → `publishChange`) for the platform's realtime
    (SignalR, Supabase Realtime, Ably/Pusher, or a small WebSocket server). The payload
    contract is tiny and fixed: `{ resource, id, op }` — no row data crosses it.
 3. **Swap the storage calls** (R2 → S3/GCS/Blob/Supabase Storage). Same per-team key
    prefixes; most targets speak the S3 API, so this is often a client swap only.
-4. **Re-home the compute.** The 7 workers are small HTTP handlers; map each to the
+4. **Re-home the compute.** The 8 workers are small HTTP handlers; map each to the
    platform's function/container unit (or collapse several into one service on
-   container platforms like Fly/Render/Cloud Run). Keep the **one-public-door** rule —
-   only the gateway is public; the rest are private/internal.
+   container platforms like Fly/Render/Cloud Run). Keep the **public-doors** rule —
+   only the two gateways (one per front end) are public; the other six are
+   private/internal, which is what keeps `/internal/*`, the agent and the act-as-user
+   surface unreachable from outside.
 5. **Serve the static web bundle** (`web/out`) from the platform's static host (native
    on Vercel/Netlify; a bucket+CDN elsewhere).
 6. **Point the config seams**: the email sender and `AGENT_MODEL`. No code.
-7. **Re-run the gates**: `npm run check` (the app code is unchanged, so the Laws R1–R10
-   still hold), then the platform's own smoke.
+7. **Re-run the gates**: `npm run check` (the app code is unchanged, so the Laws in
+   RULES.md still hold), then the platform's own smoke.
 
-**What never changes in a port:** the app logic, the 7-worker split, the permission
-spine (`requireRight`), the Laws (R1–R10), the screen engine, the glossary, the agent.
+**What never changes in a port:** the app logic, the 8-worker split, the permission
+spine (`requireRight`), the Laws (RULES.md), the screen engine, the glossary, the agent.
 That's the payoff of the seams — you rewrite ~4 files, not the product.
 
 ---
@@ -112,7 +114,7 @@ Brimba data model but not Cloudflare, this is the shortest hop.
 **Vercel — Moderate, best web fit.** Next.js is native (the static export or full SSR).
 You add the missing pieces from partners: Vercel Postgres (Neon) with **RLS** for
 tenancy, Vercel Blob for storage, and a realtime partner (Ably/Pusher/Upstash) for the
-live seam. The 7 workers become Vercel Functions. Email via Resend (a Vercel partner).
+live seam. The 8 workers become Vercel Functions. Email via Resend (a Vercel partner).
 
 **Netlify — Moderate.** Like Vercel for the web + functions; bring Neon/Supabase for the
 DB (RLS), Netlify Blobs for storage, Ably/Pusher for realtime.
@@ -123,7 +125,7 @@ and S3-compatible storage (Spaces on DO). Straightforward, ops-simple, no edge.
 
 **Supabase — Moderate–Heavy, natural data fit.** Postgres + **RLS** is the textbook
 multi-tenant model, and **Supabase Realtime** maps cleanly onto the `publishChange`
-seam. Compute is **Edge Functions** (Deno) — the 7 workers port to Deno handlers.
+seam. Compute is **Edge Functions** (Deno) — the 8 workers port to Deno handlers.
 Caveats: Supabase doesn't host a static SPA well (host `web/out` on Vercel/Netlify), and
 you'd likely adopt **Supabase Auth** in place of the custom email-OTP (a bigger change
 than the other seams). Its own AI story is thin — point `AGENT_MODEL` at Anthropic.

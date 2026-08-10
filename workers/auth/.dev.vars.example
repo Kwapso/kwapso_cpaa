@@ -1,8 +1,12 @@
 # Local-dev settings for the auth worker. Copy to `.dev.vars` (gitignored).
 APP_ORIGIN=http://localhost:3000
 # (login codes are inbox-only — no echo var exists; STAGING dev/test sign-in uses
-#  the admin test-login door gated by ADMIN_KEY, staging-only, on the auth worker)
-ADMIN_KEY=set-on-staging-only-never-production
+#  the test-login door on this worker, gated by its OWN TEST_LOGIN_KEY secret —
+#  deliberately NOT ADMIN_KEY, so the maintenance key can never arm impersonation.
+#  It fails closed when unset and refuses outright when ENVIRONMENT is production.)
+TEST_LOGIN_KEY=set-on-staging-only-never-production
+# ADMIN_KEY guards the maintenance endpoints only (migrate-teams, db-sizes, …).
+ADMIN_KEY=
 INSECURE_COOKIE=1
 EMAIL_FROM=kwapso <onboarding@resend.dev>
 # RESEND_API_KEY=

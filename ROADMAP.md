@@ -189,9 +189,11 @@ Then the Foundation phase (below) resumes.
 
 ## Remaining (for the next session)
 
-1. **Role detail Overview/Activity** — reuse `MetadataOverview` + `ActivityFeed`
-   (scope=role) on the selected role in the Member-roles tab (the endpoint + both
-   components already support it — small wiring job).
+1. ~~**Role detail Overview/Activity**~~ — **DONE (2026-07-06).** `role-detail.tsx`
+   composes `TabsView`: Permissions (the matrix, main) + Overview (the audit block) +
+   Activity (the generic feed). It joined `RECORD_DETAIL_COMPONENTS` and
+   `RECORD_DETAIL_EXCEPTIONS` is now empty — every record in the app carries the R2
+   tabs. See UI-GAPS.md #8.
 2. **One-row-three-places (optional polish):** to show a member-role-change on the
    role's detail too (not just the user's + team feed), add `subject_role_id` to the
    per-team `activity` table (a team-schema migration + a `migrate-teams` roll).

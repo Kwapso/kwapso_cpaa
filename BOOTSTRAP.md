@@ -171,8 +171,9 @@ ARCHITECTURE.md `/media/*` note before storing anything sensitive.
 - `auth` → `APP_ORIGIN` / `EMAIL_FROM` — pinned to the author's URLs/domain; update
   them if yours differ.
 - `data-ops` → `AGENT_MODEL` (default `claude-sonnet-5`), `AGENT_EFFORT` (default
-  `low`), `AGENT_FREE_DAILY` (the free daily agent allowance — code default 25; the
-  checked-in wrangler var sets **50**), `WORKERS_AI_MODEL` (the keyless fallback).
+  `low`), `AGENT_FREE_DAILY` (**the app's own daily allowance** — how many free assistant
+  actions a team gets each day; code default 25, but the checked-in wrangler var sets
+  **50** in both environments, so 50 is what a team really gets), `WORKERS_AI_MODEL` (the keyless fallback).
 
 ---
 

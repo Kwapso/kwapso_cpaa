@@ -14,6 +14,38 @@ its check, and you cannot add a check without its law.**
 Deny-lists (the reviewed exceptions for each law) live as DATA in the registry, so
 every exception is a visible, conscious line — never a silent bypass.
 
+## The client portal, and the exceptions it earns
+
+`web-portal/` is the second front end (the client portal; `web/` is the agency app).
+It obeys the same laws with three recorded differences, and they are written here
+because an exception nobody can find is a bypass with better manners:
+
+- **R2 on the portal — `PORTAL_ACTIVITY_EXEMPT`** (in the registry). Every record
+  detail in the base carries Overview + Activity, because a record's history is what
+  makes a shared workspace trustworthy. On the client's side that same feed is a
+  disclosure: its rows name the staff who moved a ticket or edited an account, and the
+  portal shows work status but never who inside the agency is doing it (SCOPE ch.06).
+  Two components are listed — the ticket screen and the company screen — each with the
+  sentence for why. The activity door is not on the portal gateway's surface at all,
+  so this is not a hidden tab; it is a door that was never opened.
+  `web-portal/test/rules.test.ts` fails if a listed component grows an activity feed,
+  and if a listed component no longer exists.
+- **The account fence — `PORTAL_VISIBLE_READS`** (in the registry). Every read a
+  client can reach names the fence its lib function must carry.
+  `web-portal/test/portal-fence.test.ts` walks the portal gateway's own door table
+  through to the function behind each door and demands that function touch the
+  caller's stamp — FUNCTION level, not file level, because this list once said a file
+  was fenced while one of its readers was not.
+- **`workers/portal-gateway/` has no `gating-seam` and no `publish-seam` suite** — a
+  reasoned exemption, not an oversight. That worker owns no writes of its own and no
+  tables: every `/api` request it accepts is forwarded, unchanged, to a door that is
+  already gated (R10) and already publishes (R1) in the worker that owns it. There is
+  nothing there for either seam test to read. What it *does* own is which doors exist
+  at all, and that is checked instead by `workers/portal-gateway/test/portal-door.test.ts`,
+  which derives the agency's whole `/api` surface off `web/lib/api.ts` and asserts every
+  door the portal does not name returns a 404. A door-list worker is held to a
+  door-list check.
+
 | ID | Dimension | Law (plain English) | Check (test id) | Status |
 |----|-----------|---------------------|-----------------|--------|
 | R1 | arch | Every mutation route publishes a live change ping (so screens stay live). | `publish-seam` (per-worker tests: tenancy, content, data-ops; auth's two user-channel publishes and mcp's caller-private token rows are the reviewed, untested exceptions — CACHING rule 5) | enforced |
@@ -25,7 +57,7 @@ every exception is a visible, conscious line — never a silent bypass.
 | R7 | ui | Every form dialog persists its draft per session (useFormDraft) — unsaved input survives navigating away (CACHING.md §11). | `forms-persist-drafts` | enforced |
 | R8 | ui | **Every tab that reveals a collection carries that collection's count — on BOTH tab surfaces.** A team section tab (`placement:'tab'`) declares a `countCacheKey`; a **record-detail** tab is badged from the block it reveals — recipe details through the `withTabCounts` seam (which collection is DERIVED from the tab's own block: `activity` → its source, `list` → its module), bespoke details in their own tabs config. A tab that shows no collection (Overview, the article body, the permission grid) says so once, as a reviewed `RECORD_TAB_COUNT_EXCEPTIONS` entry. R8 owns WHICH collection a tab's badge describes (derived, never hand-listed). The NUMBER is owned by R16 (an exact server total through `formatCount`); where the two disagree, R16 prevails. *Earned by:* every record in the app shipping an Activity tab with no count at all — the check walked the team strip, and the record tabs were built somewhere else. | `tab-counts-derived` | enforced |
 | R9 | arch | The agent knows what the app can do — its system prompt carries a capability brief GENERATED from the import/export catalog (+ the glossary), so the UI and the agent can never disagree about a capability. And it knows what the app REFUSES: a vocabulary-gated write states its call ORDER (create the dropdown value first, write the rows second, one turn) on BOTH surfaces the model reads — the tool's own description and the system rule wall. | `agent-app-parity` (workers/data-ops/test/agent-parity.test.ts) | enforced |
-| R10 | arch | Every state-changing route opens with a permission gate (requireRight / gated / requireAnyImportRight / adminGuard) — unless it's a reviewed identity-gated write (teamless onboarding, own-pointer, ownership) that gates on whoAmI. No ungated door ships. | `gating-seam` (per-worker tests: tenancy, content, data-ops — the security counterpart to `publish-seam`) | enforced |
+| R10 | arch | Every state-changing route opens with a permission gate (requireRight / gated / requireAnyImportRight / adminGuard) — unless it's a reviewed identity-gated write (teamless onboarding, own-pointer, ownership) that gates on whoAmI. No ungated door ships. | `gating-seam` (per-worker tests: tenancy, content, data-ops **and mcp** — the security counterpart to `publish-seam`. The mcp suite is the EXTERNAL machine surface's own: it asserts every non-GET route there opens with token or user verification, because a door reached by a machine is reached by a stranger) | enforced |
 | R11 | arch | Every external `fetch()` (a bare global fetch to the internet — D1 REST door, email sender, AI model call) carries an `AbortSignal` timeout, so a hung socket can't stall a worker. Service-binding `X.fetch()` calls are Cloudflare-bounded and exempt. | `fetch-timeout` (source-scan in `web/test/rules.test.ts`) | enforced |
 | R12 | arch | Every cron / `scheduled` handler records its failures to the error store (`recordWorkerError`) — unattended work has no user watching, so a swallowed background failure would vanish from the 90-day error log. (A user-facing catch that shows a friendly message should record too — a convention; see the agent's model-call catch.) | `cron-records` (source-scan in `web/test/rules.test.ts`) | enforced |
 | R13 | arch | Shipping the code ships the capability: every module is an import TargetDef or a reviewed `CATALOG_EXEMPT` entry — AND the core catalogue reconciles itself against the code on READ (INSERT-only, `ON CONFLICT DO NOTHING`: a target the owner switched OFF stays off; only a never-existed row is created; the picker filters `is_active` in memory, never in SQL). *Earned by:* staging importing two modules that production, running byte-identical code, could not — rows are data, and no deploy carries data. | `catalog-coverage` (`workers/data-ops/test/catalog-coverage.test.ts`) | enforced |

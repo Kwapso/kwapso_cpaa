@@ -72,6 +72,8 @@ concrete + checkable:
 - **Error rules** — [ERROR-HANDLING.md](ERROR-HANDLING.md): never swallow; one client seam; every worker records to the central store.
 - **The single vocabulary** — `shared/glossary.ts` (Law R6, machine-checked): one word per concept, used in all UI copy.
 
+- **The docs themselves are checked too** — `web/test/doc-claims.test.ts` derives the worker roster from `workers/` on disk and reads each `wrangler.jsonc` to see which are public, then fails if any doc states a worker count or a public-door count that disagrees. Add a worker, and every stale sentence goes red the same day.
+
 If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says so and names where it's applied.
 
 > **The completeness bar this doc set is held to:** a non-technical owner, an AI agent,

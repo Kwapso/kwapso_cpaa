@@ -24,13 +24,13 @@ are different again.
 
 | Thing | What it is | How many | Grows with teams? |
 |---|---|---|---|
-| **Worker** | Deployed code (auth, tenancy, realtime, gateway, content, data-ops) | 6 built | No |
+| **Worker** | Deployed code (auth, tenancy, realtime, content, data-ops, mcp, gateway, portal-gateway) | 8 built | No |
 | **DO class** | A class *inside* a worker (`TeamChannel` in realtime) | 1 today | No |
 | **DO instance** | A *runtime* entity addressed by name (`team:<id>`, `user:<id>`) | Unlimited | Yes — one per team **and** one per signed-in user |
 
 An instance is **not** a worker. Addressing one by name conjures it; idle ones
 hibernate and cost ~nothing. Exactly like OOP: one `class` (code), millions of
-objects (runtime). 10,000 teams + their members is still 7 workers + one
+objects (runtime). 10,000 teams + their members is still 8 workers + one
 `TeamChannel` class, but that many instances — almost all asleep.
 
 This doc uses "the DO" for the runtime instance and "`TeamChannel`" for the class.
@@ -229,8 +229,9 @@ From `workers/realtime/wrangler.jsonc`:
 ### Why realtime deploys FIRST
 
 Deploy order is **realtime-first**, then auth → tenancy → content → data-ops →
-gateway (OPERATIONS.md; the "base-completion" and "agent-modules" builds both
-fixed regressions here). The reason is a dependency direction:
+mcp → gateway → portal-gateway (OPERATIONS.md; the "base-completion" and
+"agent-modules" builds both fixed regressions here). The reason is a dependency
+direction:
 
 - Every other worker holds a **service binding to realtime** and calls
   `publishChange` after a write. If realtime is deployed *last*, there is a
@@ -243,8 +244,9 @@ fixed regressions here). The reason is a dependency direction:
   not-yet-updated realtime can't corrupt a write — but deploying realtime first
   removes the window entirely rather than relying on the safety net.
 
-The gateway deploys **last** because it is the only public door: nothing is
-reachable by users until every worker behind it is already updated.
+The two gateways deploy **last** because they are the only public doors: nothing is
+reachable by users — agency staff through `gateway`, clients through
+`portal-gateway` — until every worker behind them is already updated.
 
 ---
 

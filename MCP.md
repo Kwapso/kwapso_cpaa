@@ -21,8 +21,8 @@ So to give a teammate/contractor machine access:
 
 1. **Invite them to the team** (Settings → Members → Invite, or the app's invite flow).
    They sign in with **email + a 6-digit code** (no passwords). Hand them the app URL:
-   - Staging: `https://kwapso-staging.kwapso.workers.dev`
-   - Production: `https://kwapso.kwapso.workers.dev`
+   - Staging: `https://agency-staging.kwapso.app`
+   - Production: `https://agency.kwapso.app`
 2. **Give them the right role.** The token can only do what their role allows (see the
    cost note in §4 — a role *without* the AI-agent right can't spend any AI budget).
    For a pure "read + import + export" integration, a role with those rights and **no
@@ -66,13 +66,13 @@ The endpoint is **`POST https://<app-host>/mcp`** (JSON-RPC 2.0), authenticated 
 
 ```bash
 # List the tools this token can call
-curl -s https://kwapso.kwapso.workers.dev/mcp \
+curl -s https://agency.kwapso.app/mcp \
   -H "Authorization: Bearer kwapso_mcp_XXXX" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 
 # Call one — who am I, and which team is this token pinned to?
-curl -s https://kwapso.kwapso.workers.dev/mcp \
+curl -s https://agency.kwapso.app/mcp \
   -H "Authorization: Bearer kwapso_mcp_XXXX" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"whoami","arguments":{}}}'
@@ -90,7 +90,7 @@ front with the standard `mcp-remote` shim — drop this into the client's MCP co
       "command": "npx",
       "args": [
         "mcp-remote",
-        "https://kwapso.kwapso.workers.dev/mcp",
+        "https://agency.kwapso.app/mcp",
         "--header", "Authorization: Bearer kwapso_mcp_YOUR_TOKEN"
       ]
     }
@@ -108,7 +108,7 @@ any assistant that can speak MCP:
 ```
 Connect to my Brimba workspace over MCP (Model Context Protocol).
 
-Endpoint: https://kwapso.kwapso.workers.dev/mcp
+Endpoint: https://agency.kwapso.app/mcp
 Auth header: Authorization: Bearer kwapso_mcp_YOUR_TOKEN
 Protocol: MCP over HTTP — JSON-RPC 2.0 (initialize, tools/list, tools/call)
 
@@ -117,7 +117,7 @@ role — reads, exports and imports are free; only the assistant tools (agent_ch
 agent_confirm, plan_import) use the team's AI quota.
 ```
 
-(Staging is the same, on `https://kwapso-staging.kwapso.workers.dev/mcp`.)
+(Staging is the same, on `https://agency-staging.kwapso.app/mcp`.)
 
 ### The tools
 
@@ -269,7 +269,9 @@ full term rather than killing it); the TTL and the per-account cap are
 `shared/workers/limits.ts`, and `workers/mcp/test/tokens.test.ts` runs the real
 migrations against a real SQLite database to hold all three fixes in place.
 A token is bridged to a **short-lived team-pinned session** via auth's
-`/internal/mcp-session` (INTERNAL_KEY, fail-closed). The gateway routes `/mcp` +
-`/api/mcp/*` to the worker (it's the only public door; the mcp worker is
-`workers_dev:false`). See ARCHITECTURE.md (the `mcp` row) and DATA-MODEL.md
+`/internal/mcp-session` (INTERNAL_KEY, fail-closed). The **agency** gateway routes
+`/mcp` + `/api/mcp/*` to the worker; the mcp worker itself is `workers_dev:false`,
+so that gateway is the only way in. The client portal's gateway does NOT bind the
+mcp worker at all and refuses `/mcp` outright — the machine surface is not on the
+client internet. See ARCHITECTURE.md (the `mcp` row) and DATA-MODEL.md
 (`mcp_tokens` + `sessions.team_pin`).

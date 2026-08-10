@@ -12,7 +12,7 @@ ordered BUILD MAP. Don't relitigate decisions — see the design notes; ask only
 genuine new fork.
 
 **STATUS (2026-06-23):** Phases **1–4 are DONE** and green on branch `agent-modules`
-(the seven workers are on disk; learning + help + import + the in-app AI agent + the
+(every worker of the day was on disk; learning + help + import + the in-app AI agent + the
 UI wiring all shipped). **Phase 5 (quality + docs + ship) is IN PROGRESS** — these
 docs are being reconciled now. **Still remaining:** ~~the external `mcp` worker~~ (SHIPPED 2026-07-07) — a few small deferred hooks may remain (listed at the end).
 
