@@ -172,6 +172,11 @@ describe("docs agree with the roster on disk", () => {
     // The phrasings the sweep had to correct. They carry no number, so the count
     // check above cannot see them — and each one reads as a security guarantee,
     // which is exactly the kind of sentence that must not be quietly wrong.
+    //
+    // This one also reads the WRANGLER COMMENTS, not just the .md files. Five of
+    // them said "only the gateway is public" — and a config comment is where that
+    // rule is read at the exact moment someone is deciding whether to add a public
+    // route, so it is the last place that should be out of date.
     const STALE = [
       /\bthe only public door\b(?!s)/i,
       /\bone public door\b/i,
@@ -182,7 +187,8 @@ describe("docs agree with the roster on disk", () => {
       /\bthe only worker with a public URL\b/i,
     ]
     const wrong: string[] = []
-    for (const doc of DOCS) {
+    const CONFIGS = WORKERS.map((w) => join("workers", w, "wrangler.jsonc"))
+    for (const doc of [...DOCS, ...CONFIGS]) {
       const src = prose(read(join(ROOT, doc)))
       for (const re of STALE) {
         const m = src.match(re)
