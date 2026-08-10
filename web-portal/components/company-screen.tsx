@@ -85,7 +85,10 @@ export function CompanyScreen({ ready }: { ready: PortalReady }) {
               <li key={c.id} className="flex items-center gap-3 rounded-xl border p-4">
                 <span className="min-w-0 flex-1 truncate">{c.personName}</span>
                 {c.isMainStakeholder ? <Badge variant="secondary">Main contact</Badge> : null}
-                {c.relationship ? (
+                {/* Staff often type the relationship as "Main contact" too, and then
+                    the row says it twice. Say it once — the badge is the stronger
+                    of the two. */}
+                {c.relationship && c.relationship.trim().toLowerCase() !== "main contact" ? (
                   <span className="text-muted-foreground text-sm">{c.relationship}</span>
                 ) : null}
               </li>

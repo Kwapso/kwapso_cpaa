@@ -55,11 +55,19 @@ export function AccountSwitcher({
     setBusy(true)
     try {
       await portal.switchAccount(accountId)
-      // Everything on screen belonged to the company they just left.
+      // Everything on screen belonged to the company they just left. CONTEXT
+      // FIRST — it holds which company they are standing in and its name, so
+      // leaving it cached switches the server and not the screen: the header,
+      // this menu's tick and the company page all keep naming the old company
+      // while the tickets underneath belong to the new one. That is worse than
+      // not switching at all.
+      invalidate(cacheKeys.context)
       invalidate(cacheKeys.session)
       invalidate(cacheKeys.tickets)
       invalidate(cacheKeys.ticketsTotal)
+      invalidate(cacheKeys.ticketsCursor)
       invalidate(cacheKeys.company(currentAccountId))
+      invalidate(cacheKeys.company(accountId))
     } catch (e) {
       toast.error(e instanceof ApiFailure ? e.message : "Couldn't switch. Try again.")
     } finally {
