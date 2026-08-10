@@ -355,6 +355,15 @@ describe("account leak tests: a caller pinned to one account cannot reach anothe
     expect(list.status).toBe(200)
     expect(list.text).toContain(IDS.burglarAccount)
     expect(list.text).toContain(IDS.burglarPerson)
+    // …including the HISTORY of their own company. A fence that answered "0 = 1"
+    // to everything would pass every burglary above and be a wall.
+    const mine = await call(
+      req("GET /api/tenancy/activity", undefined, `?scope=record&table=accounts&id=${IDS.burglarAccount}`),
+      IDS.burglarUser
+    )
+    expect(mine.status).toBe(200)
+    expect(JSON.parse(mine.text).total, "a client lost their own account's history").toBe(1)
+    expect(mine.text).toContain("Delaval Group")
   })
 
   it("the fence reaches DOWN the tree: the victim's own person sees their subsidiary", async () => {
