@@ -309,6 +309,8 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
   "learning-detail.article": "the article's own prose + linked media — one record's body, not a collection.",
   "learning-detail.overview": "one article's category, type and audit block — one record, not a collection.",
   "help-detail.overview": "one ticket's type, source and audit block — one record, not a collection.",
+  "account-detail.overview":
+    "one account's own fields (type, reference, contact details, where it sits) — one record, not a collection. Its four collection tabs — contacts, children, portal access, activity — each carry a server count.",
 }
 
 /** R4 — the form dialogs that MUST use FormShell. */

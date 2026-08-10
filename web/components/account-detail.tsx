@@ -60,6 +60,7 @@ import { softNavigate } from "@/lib/nav"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, useCached, useCachedValue } from "@/lib/store"
+import { useRecordActivity } from "@/lib/use-record-activity"
 
 /** A destructive action waiting for a yes. One dialog serves all three (archive,
  * unlink, revoke) — they differ only in their words and what they run. `run`
@@ -87,9 +88,10 @@ export function AccountDetailScreen({
     listFetch.accountChildren(accountId)
   )
   const childrenTotal = useCachedValue<number>(totalKey("account-children", accountId))
-  const activityQ = useCached<ActivityItem[]>(`activity:record:accounts:${accountId}`, () =>
-    tenancy.recordActivity("accounts", accountId)
-  )
+  // The ONE web-side read of a record's history (R5) — rows, the door's exact
+  // COUNT(*) for the tab badge, and the cursor the feed below spends. Hand-rolling
+  // this read is what let a badge and its feed disagree elsewhere.
+  const activity = useRecordActivity("accounts", accountId)
   // The same page-one cache the list screen holds — it feeds the parent picker and
   // the statuses already in use, so opening this record adds no round-trip.
   const accountsQ = useCached<Account[]>(accountsKey(teamId), () => listFetch.accounts(teamId))
@@ -202,7 +204,7 @@ export function AccountDetailScreen({
     }),
   ]
 
-  const activityItems: ActivityFeedItem[] = (activityQ.data ?? []).map((a) => ({
+  const activityItems: ActivityFeedItem[] = activity.rows.map((a) => ({
     id: a.id,
     description: a.description,
     actor: a.actorName ?? undefined,
@@ -268,7 +270,9 @@ export function AccountDetailScreen({
         value: "activity",
         label: "Activity",
         icon: CONCEPT_ICON.activity,
-        badge: "",
+        // R8: a tab that reveals a collection carries its count, and R16 says the
+        // number is the server total through the one seam — never the loaded page.
+        badge: formatCount(activity.total),
         badgeVariant: "" as const,
       },
     ],
@@ -380,10 +384,19 @@ export function AccountDetailScreen({
 
           if (t.value === "activity")
             return (
-              <ActivityFeed
-                config={{ ...defaultActivityFeedConfig, emptyText: "No activity yet." }}
-                items={activityItems}
-              />
+              // R14: the badge above counts the WHOLE history, so the feed under
+              // it must be able to reach all of it — page one, then Load more.
+              <div className="flex flex-col gap-4">
+                <ActivityFeed
+                  config={{ ...defaultActivityFeedConfig, emptyText: "No activity yet." }}
+                  items={activityItems}
+                />
+                <LoadMore
+                  listKey={activity.listKey}
+                  fetchPage={activity.fetchPage}
+                  label="Load more activity"
+                />
+              </div>
             )
 
           if (t.value === "contacts")
