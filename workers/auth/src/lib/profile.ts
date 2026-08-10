@@ -3,7 +3,7 @@
 // and are served by the gateway at /media/users/<id>/<random> — a capability
 // URL: the door checks no session, so the KEY has to be unguessable (mediaKey).
 
-import { MAX_IMAGE_BYTES, mediaKey, parseDataUrl } from "../../../../shared/workers/image"
+import { dataUrlBytes, MAX_IMAGE_BYTES, mediaKey, parseDataUrl } from "../../../../shared/workers/image"
 import { publishChange, publishUserChange } from "../../../../shared/workers/realtime"
 import type { Env } from "../env"
 import { logAccountActivity } from "./account-activity"
@@ -31,11 +31,16 @@ export async function updateProfile(
 
   let imageUrl = user.image_url
   if (input.imageDataUrl) {
+    // SIZE FIRST, and from the ENCODED text (dataUrlBytes) — this door is on the
+    // client portal's allow-list and gates on the session alone, so the one thing
+    // it must not do is decode a stranger's payload to find out how big it is.
+    // parseDataUrl caps too; measuring here is what lets the answer say WHICH
+    // refusal it is.
+    if (dataUrlBytes(input.imageDataUrl) > MAX_IMAGE_BYTES)
+      return { error: "image_too_large", message: "That image is too large." }
     const parsed = parseDataUrl(input.imageDataUrl)
     if (!parsed)
       return { error: "bad_image", message: "That image format isn't supported." }
-    if (parsed.bytes.byteLength > MAX_IMAGE_BYTES)
-      return { error: "image_too_large", message: "That image is too large." }
 
     // A NEW key each time: the photo's URL is the only way to reach it, and the
     // old one keeps working for anything still holding it (the stored image_url

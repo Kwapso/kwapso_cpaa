@@ -8,7 +8,7 @@ import { logActivity } from "../../../../shared/workers/activity"
 import { getActivity } from "../lib/activity-read"
 import { getMyPermissions } from "../lib/roles"
 import { ACTIVITY_GATE_MAP, ACTIVITY_TABLE_EXEMPT } from "../../../../shared/rules/registry"
-import { requireRight } from "../lib/permissions"
+import { GuardError, requireMember, requireRight } from "../lib/permissions"
 import {
   acceptPendingInvites,
   createTeam,
@@ -65,11 +65,43 @@ export async function myTeams(request: Request, env: Env): Promise<Response> {
   return json({ teams: await listMyTeams(env, user.id), currentTeamId: user.currentTeamId })
 }
 
+/** THE AGENCY'S OWN CONTEXT — and only the agency's.
+ *
+ * A client login is a member of the agency's team (that is how the fence knows
+ * them at all), so identity alone lets them ask; the answer carries the team's
+ * name and logo, the caller's role title and the team's ACTIVE MEMBER COUNT —
+ * the agency's staff headcount, which is no part of a client's world. The client
+ * portal's own gateway refuses to forward this door and says so in its door
+ * table; the agency origin serves the same person, so the refusal has to live on
+ * the door rather than on one gateway's list.
+ *
+ * Refused, not trimmed: there is no version of this answer a client needs. The
+ * one field the portal ever wanted (the team id its live channel is keyed by)
+ * `/api/auth/me` already carries. Costs one guard read + the portal_users miss,
+ * the same toll every fenced door pays. */
+async function agencyContext(env: Env, userId: string) {
+  const cfg = d1Config(env)
+  const ctx = await getActiveContext(env, cfg, userId)
+  // Resolved from the ANSWER, never from the stored pointer — getActiveContext
+  // self-heals a stale current team, and a guard built from the un-healed value
+  // would refuse a member who is simply looking at a different team today.
+  if (ctx.team) {
+    const guard = await requireMember(env, userId, ctx.team.id)
+    if ((await accountScope(cfg, guard)).kind === "portal")
+      throw new GuardError(
+        403,
+        "client_login",
+        "This sign-in is a client login — your company's work is on the client portal."
+      )
+  }
+  return ctx
+}
+
 /** The active context: current team + your role + member count + all teams. */
 export async function active(request: Request, env: Env): Promise<Response> {
   const user = await whoAmI(request, env)
   if (!user) return fail(401, "signed_out", "Not signed in.")
-  return json(await getActiveContext(env, d1Config(env), user.id))
+  return json(await agencyContext(env, user.id))
 }
 
 /** Switch the active team (one team session at a time, validated). */
@@ -82,7 +114,9 @@ export async function switchActiveTeam(request: Request, env: Env): Promise<Resp
 
   const ok = await switchTeam(env, user.id, body.teamId)
   if (!ok) return fail(403, "not_member", "You're not a member of that team.")
-  return json(await getActiveContext(env, d1Config(env), user.id))
+  // The SAME answer as /active, so it carries the same refusal — a door that
+  // returns a payload another door guards is that payload's second front door.
+  return json(await agencyContext(env, user.id))
 }
 
 /** Create a brand-new team (its own database, you as Admin) and switch to it. */
@@ -124,7 +158,7 @@ export async function createNamedTeam(request: Request, env: Env): Promise<Respo
     )
 
   await createTeam(env, toActor(user), name, null)
-  return json(await getActiveContext(env, d1Config(env), user.id))
+  return json(await agencyContext(env, user.id))
 }
 
 export async function postUpdateTeam(request: Request, env: Env): Promise<Response> {

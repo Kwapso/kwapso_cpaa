@@ -38,7 +38,13 @@ vi.mock("../../../shared/workers/d1-rest", async (importOriginal) => {
   return { ...actual, ...d1Impl(() => holder.db as DatabaseSync) }
 })
 
-import { ACCOUNT_SCOPED_MODULES } from "../../../shared/rules/registry"
+import {
+  ACTIVITY_GATE_MAP,
+  ACCOUNT_SCOPED_MODULES,
+  PORTAL_ACTIVITY_FENCE,
+} from "../../../shared/rules/registry"
+import { ACCOUNT_OWNED_TABLES } from "../../../shared/workers/account-scope"
+import { FIXED_SCOPE_TABLES } from "../src/lib/activity-read"
 import worker, { ROUTES } from "../src/index"
 import { buildSpineDb, IDS, makeEnv, req, VICTIM_IDS } from "./spine-harness"
 
@@ -253,6 +259,22 @@ const BURGLARIES: Burglary[] = [
     expect: "nothing",
   },
   {
+    // THE DOOR THE SECOND SWEEP FOUND — the same door, one TABLE along. The
+    // record scope was fenced only for the tables the ACCOUNTS module owns, and
+    // a support ticket belongs to none of them, so naming a ticket id read back
+    // another client's support history: the sentences, the staff who answered,
+    // and the before/after of the problem statement. The burglar holds help:read
+    // (every client login must, to see their own tickets) — so the module gate
+    // waves them through and only the fence stands there.
+    route: "GET /api/tenancy/activity",
+    why: "read another client's SUPPORT history by naming their ticket id",
+    attack: () =>
+      req("GET /api/tenancy/activity", undefined, `?scope=record&table=help&id=${IDS.victimTicket}`),
+    honest: () =>
+      req("GET /api/tenancy/activity", undefined, `?scope=record&table=help&id=${IDS.victimTicket}`),
+    expect: "nothing",
+  },
+  {
     route: "POST /api/tenancy/portal-users/active",
     why: "revoke the victim's login — sabotage needs no read to hurt",
     attack: () => req("POST /api/tenancy/portal-users/active", { id: IDS.victimPortal, active: false }),
@@ -344,6 +366,65 @@ describe("account leak tests: a caller pinned to one account cannot reach anothe
     expect(list.text).not.toContain(IDS.burglarAccount)
   })
 
+  // The fixture is the proof. A burglary over an EMPTY table passes with the
+  // fence torn out, and that is how the first help attack could have shipped
+  // green: assert first that there is really something to steal.
+  it("the victim's stealable history exists (the burglary is not over an empty table)", async () => {
+    const staff = await call(
+      req("GET /api/tenancy/activity", undefined, `?scope=record&table=help&id=${IDS.victimTicket}`),
+      IDS.staffUser
+    )
+    expect(staff.status).toBe(200)
+    expect(staff.text, "staff must SEE the ticket history the burglar is denied").toContain("Bergman")
+    expect(JSON.parse(staff.text).total, "two rows of real support history").toBe(2)
+  })
+
+  // The fixed-table scopes (user / role / invite) are the same (table, id) read
+  // with the table named by the scope — and they were the three that never had a
+  // fence at all. A client login asking about a STAFF member reads the agency's
+  // own history: role moves, joins, removals.
+  it("a client login reads NO agency history through the fixed scopes", async () => {
+    for (const [scope, id, tell] of [
+      ["user", IDS.staffUser, "Nadia Ruiz"],
+      ["role", IDS.adminRole, "delete on accounts"],
+    ] as const) {
+      const r = await call(
+        req("GET /api/tenancy/activity", undefined, `?scope=${scope}&id=${id}`),
+        IDS.burglarUser
+      )
+      expect(r.status).toBe(200)
+      expect(r.text, `the ${scope} scope handed a client login the agency's history`).not.toContain(tell)
+      expect(JSON.parse(r.text).total, `${scope} must total what it shows: nothing`).toBe(0)
+      // …and the same read still works for staff, or this proves only that the
+      // door is broken.
+      const ok = await call(
+        req("GET /api/tenancy/activity", undefined, `?scope=${scope}&id=${id}`),
+        IDS.staffUser
+      )
+      expect(JSON.parse(ok.text).total, `staff lost the ${scope} feed`).toBeGreaterThan(0)
+      expect(ok.text).toContain(tell)
+    }
+  })
+
+  // The agency's own context door. A client login is a member of the agency's
+  // team — that is how the fence knows them — so identity alone got them the
+  // team's name, their role title and the agency's ACTIVE MEMBER COUNT. The
+  // portal's gateway refuses to forward this door; the agency origin serves the
+  // same person, so the refusal has to be on the door.
+  it("the agency's context door refuses a client login (and still answers staff)", async () => {
+    for (const r of [
+      req("GET /api/tenancy/active"),
+      req("POST /api/tenancy/switch-team", { teamId: IDS.team }),
+    ]) {
+      const attack = await call(r, IDS.burglarUser)
+      expect(attack.status, "a client login must not get the agency's context").toBe(403)
+      expect(attack.text, "and must learn nothing from the refusal").not.toContain("memberCount")
+    }
+    const staff = await call(req("GET /api/tenancy/active"), IDS.staffUser)
+    expect(staff.status, `staff lost their own context door: ${staff.text.slice(0, 200)}`).toBe(200)
+    expect(JSON.parse(staff.text).memberCount, "staff still see the headcount").toBeGreaterThan(0)
+  })
+
   it("a REVOKED login pins to nothing — it never falls back to staff", async () => {
     // The failure this exists to catch: deciding portal-ness by the ABSENCE of a
     // row. Revoke the burglar's grant and the naive version promotes them to
@@ -353,6 +434,55 @@ describe("account leak tests: a caller pinned to one account cannot reach anothe
     expect(list.status).toBe(200)
     for (const id of [...VICTIM_IDS, IDS.burglarAccount])
       expect(list.text.includes(id), `a revoked login still reached ${id}`).toBe(false)
+  })
+})
+
+// THE FRAMING, checked. The leak was not that someone forgot the fence on one
+// door — it is that the fence was decided by a list of what the ACCOUNTS MODULE
+// OWNS, so every table a client can reach by another route (a support ticket
+// first) was outside it by construction, silently. The deciding list is now an
+// enumeration of what the FEED CAN BE ASKED ABOUT, and this is the check that
+// makes an undecided table a red build instead of an open door.
+describe("the activity fence is decided by DATA, and the data is complete", () => {
+  /** Every table the (table, id) read will answer about: the modules the route
+   * resolves through the gate map, plus the fixed-scope aliases the reader
+   * names. DERIVED from both sources — retyping either is how they drift. */
+  const REACHABLE = [...new Set([...Object.keys(ACTIVITY_GATE_MAP), ...Object.values(FIXED_SCOPE_TABLES)])]
+
+  it("the derivation is alive (a blind scan reports 'all clear' exactly like a passing one)", () => {
+    expect(REACHABLE.length, "no reachable table derived — the scan has gone blind").toBeGreaterThan(6)
+    expect(REACHABLE, "the table the leak went through must be in the derived set").toContain("help")
+    expect(REACHABLE).toContain("users")
+  })
+
+  it("every table the feed answers about has a decided fence", () => {
+    const undecided = REACHABLE.filter((t) => !(t in PORTAL_ACTIVITY_FENCE))
+    expect(
+      undecided,
+      `these tables answer a CLIENT LOGIN with no decision about what they may see — add a line to PORTAL_ACTIVITY_FENCE ("account", or null with the reason): ${undecided.join(", ")}`
+    ).toEqual([])
+  })
+
+  it("a table a client reads NOTHING of still says why", () => {
+    for (const [table, e] of Object.entries(PORTAL_ACTIVITY_FENCE))
+      if (e.fence === null)
+        expect(e.why.length, `${table} needs a real reason, not a shrug`).toBeGreaterThan(20)
+  })
+
+  it("no rotting lines: every entry names a table the feed can be asked about", () => {
+    const rotten = Object.keys(PORTAL_ACTIVITY_FENCE).filter((t) => !REACHABLE.includes(t))
+    expect(rotten, `PORTAL_ACTIVITY_FENCE decides tables the feed never answers: ${rotten.join(", ")}`).toEqual([])
+  })
+
+  // The two lists describe the same rows from two directions, so they must agree:
+  // an account-owned table the feed would answer with `0 = 1` is a fence that
+  // locks out the client it exists to serve, and the mirror mistake is the leak.
+  it("agrees with ACCOUNT_OWNED_TABLES about which rows the account fence covers", () => {
+    const byFence = Object.entries(PORTAL_ACTIVITY_FENCE)
+      .filter(([, e]) => e.fence === "account")
+      .map(([t]) => t)
+      .sort()
+    expect(byFence).toEqual([...ACCOUNT_OWNED_TABLES].sort())
   })
 })
 

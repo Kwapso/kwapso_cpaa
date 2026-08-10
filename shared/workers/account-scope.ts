@@ -33,6 +33,7 @@
 // the moment access is withdrawn. "Deactivate, never delete" is what makes that
 // safe: the row that proves you are a client outlives your login.
 
+import { PORTAL_ACTIVITY_FENCE } from "../rules/registry"
 import { d1Query, type D1Rest } from "./d1-rest"
 import { GuardError, type MemberGuard } from "./gating"
 
@@ -194,7 +195,14 @@ export function requireStandableRoot(scope: AccountScope, accountId: string): vo
 
 /** The account-owned tables: rows whose visibility is decided by the fence, not
  * by a module right. Named once so a reader of the ACTIVITY feed and a reader of
- * the accounts list can never disagree about which rows are fenced. */
+ * the accounts list can never disagree about which rows are fenced.
+ *
+ * NOT the list to fence a feed BY. It answers "which rows does an account own?",
+ * which is a fact about the accounts module — and a client login can reach rows
+ * this list has never heard of (a support ticket, for one). Deciding a fence
+ * from it is how the same leak happened twice; `PORTAL_ACTIVITY_FENCE` in the
+ * rules registry enumerates by what a CLIENT CAN REACH, and is the list a new
+ * table has to appear in. */
 export const ACCOUNT_OWNED_TABLES = ["accounts", "account_links", "portal_users"] as const
 
 /** What a LIVE LISTENER carries so a change ping can be fenced without another
@@ -265,4 +273,23 @@ export function accountActivityClause(scope: AccountScope): { sql: string; param
       ` OR (related_table = 'portal_users' AND related_row_id IN (SELECT id FROM portal_users WHERE account_id IN (${marks}))))`,
     params: [...scope.accountIds, ...scope.accountIds, ...scope.accountIds],
   }
+}
+
+/** The same fence for ONE NAMED TABLE — the (table, id) read of a single record's
+ * history, which is the shape both leaks took.
+ *
+ * The table decides, and the decision is DATA (`PORTAL_ACTIVITY_FENCE`): the
+ * account-owned tables get the clause above, everything else gets `0 = 1` —
+ * silence, in the same fail-closed direction as `mayHearChange`. An UNKNOWN
+ * table lands there too, so a module added to the feed before anyone has decided
+ * what a client may read of it is closed, not open, while the build goes red for
+ * the missing line. Staff, as everywhere, get no clause at all. */
+export function portalActivityClause(
+  scope: AccountScope,
+  table: string
+): { sql: string; params: string[] } {
+  if (scope.kind === "staff") return { sql: "", params: [] }
+  return PORTAL_ACTIVITY_FENCE[table]?.fence === "account"
+    ? accountActivityClause(scope)
+    : { sql: "0 = 1", params: [] }
 }

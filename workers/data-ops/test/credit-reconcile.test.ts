@@ -91,6 +91,39 @@ describe("credit fairness — a refused/failed turn is refunded", () => {
     expect(/used = MAX\(0, used - \?\)/.test(body), "un-counts today's free units, bounded at zero").toBe(true)
   })
 
+  // …but the FREE allowance is not a price, it is the daily BOUND on how much
+  // model spend this team can cause. Refunding it dissolved the bound: a turn
+  // that reliably ends in a refusal (ask to invite someone who is already a
+  // member) burns real tokens and hands its unit straight back, so the same turn
+  // runs all day for nothing. Paid credits still come back — someone bought
+  // those. The rule lived only in a comment; this is the check that holds it.
+  it("the app's own daily allowance is NEVER refunded — only the paid pool comes back", () => {
+    const start = agent.indexOf("const refundIfNothingDone")
+    expect(start, "refundIfNothingDone must exist").toBeGreaterThan(-1)
+    // Comments are not code — this very block explains the rule in prose, and a
+    // scan satisfied by prose would stay green through the rule being deleted.
+    const body = agent
+      .slice(start, agent.indexOf("\n  for (", start))
+      .replace(/\/\*[\s\S]*?\*\//g, " ")
+      .replace(/(^|[^:])\/\/[^\n]*/gm, "$1")
+    // The free argument is a literal 0: nothing goes back to today's counter.
+    expect(
+      /refundAiUnits\(\s*env,\s*guard\.teamId,\s*0\s*,/.test(body),
+      "the refund must hand back ZERO free units"
+    ).toBe(true)
+    expect(
+      /refundAiUnits\([^)]*tally\.free/.test(body),
+      "the free pool must never be an argument to the refund"
+    ).toBe(false)
+    // …and the turn still REMEMBERS the free units it spent, so the usage row and
+    // the day's counter tell the same story.
+    expect(
+      /tally\.free\s*=\s*0/.test(body),
+      "zeroing the tally's free units hides a spend that really happened"
+    ).toBe(false)
+    expect(/tally\.credits = opts\.tally\.free/.test(body), "the logged row keeps the free units").toBe(true)
+  })
+
   it("the agent refunds ONLY when nothing succeeded, on the failure exits", () => {
     expect(/refundAiUnits/.test(agent), "agent must use the refund").toBe(true)
     // Guarded on okWrites === 0 — a turn with a successful write keeps its charge.

@@ -47,12 +47,28 @@ export function safeMediaKey(rawPath: string): string | null {
   return /^[A-Za-z0-9][A-Za-z0-9/_-]*$/.test(key) ? key : null
 }
 
-/** data:image/png;base64,AAAA... -> bytes + content type, or null if invalid. */
+/** MEASURE BEFORE YOU DECODE. How many bytes a data URL's base64 payload will
+ * decode to, read straight off the ENCODED text: every 4 characters carry 3
+ * bytes, less the padding. Nothing is allocated, so a caller can refuse an
+ * oversize upload without `atob` first turning the request body into a decoded
+ * copy of itself in memory — the byte count was always knowable for free, and
+ * decoding to find it out is the door doing the attacker's work for them. */
+export function dataUrlBytes(dataUrl: string): number {
+  const b64 = dataUrl.slice(dataUrl.indexOf(",") + 1)
+  const pad = b64.endsWith("==") ? 2 : b64.endsWith("=") ? 1 : 0
+  return Math.max(0, Math.floor((b64.length * 3) / 4) - pad)
+}
+
+/** data:image/png;base64,AAAA... -> bytes + content type, or null if invalid or
+ * over MAX_IMAGE_BYTES. The cap is enforced HERE, before the decode, so every
+ * door that takes an image is bounded by construction; a door that wants to say
+ * "too large" in its own words measures with `dataUrlBytes` first (profile.ts). */
 export function parseDataUrl(
   dataUrl: string
 ): { contentType: string; bytes: Uint8Array } | null {
   const match = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl)
   if (!match) return null
+  if (dataUrlBytes(dataUrl) > MAX_IMAGE_BYTES) return null
   try {
     const binary = atob(match[2])
     const bytes = new Uint8Array(binary.length)
@@ -85,9 +101,12 @@ export function parseUploadDataUrl(
   const match = /^data:([\w.+-]+\/[\w.+-]+);base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl)
   if (!match) return null
   if (!INLINE_SAFE_UPLOAD.test(match[1])) return null // reject script-capable types (XSS)
+  // The cap BEFORE the decode, for the same reason as parseDataUrl: `atob` on an
+  // unmeasured payload allocates whatever the caller sent, and only then is it
+  // refused for being too big.
+  if (dataUrlBytes(dataUrl) > maxBytes) return null
   try {
     const binary = atob(match[2])
-    if (binary.length > maxBytes) return null
     const bytes = new Uint8Array(binary.length)
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
     return { contentType: match[1], bytes }

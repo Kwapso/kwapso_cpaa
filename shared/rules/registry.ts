@@ -201,7 +201,7 @@ export const PORTAL_VISIBLE_READS: Record<string, { fence: string | null; why: s
   },
   "workers/tenancy/src/lib/activity-read.ts": {
     fence: "accountActivityClause",
-    why: "history rows NAME account records; the row id is not a secret (the live channel broadcasts it).",
+    why: "history rows NAME records; the row id is not a secret (the live channel broadcasts it). WHICH fence each (table, id) read carries is decided by PORTAL_ACTIVITY_FENCE below — deciding it from the account module's own tables is what left `help` open.",
   },
   "workers/content/src/lib/help.ts": {
     fence: "authorScope",
@@ -211,6 +211,44 @@ export const PORTAL_VISIBLE_READS: Record<string, { fence: string | null; why: s
     fence: "getTicket",
     why: "a stakeholder set is a PROPERTY of a ticket, so the fenced getTicket decides visibility first and an invisible ticket yields an empty set — otherwise the door names staff admins and another client's colleagues by ticket id alone.",
   },
+}
+
+/** THE ACTIVITY FEED'S OWN FENCE — for every table it will answer about, what a
+ * CLIENT LOGIN may read of that table's history.
+ *
+ * Earned TWICE, the same way. The record scope reads history by (table, id) with
+ * nothing on the WHERE but two caller-supplied values, so the fence has to be
+ * decided by the TABLE. The first time, the deciding list was
+ * `ACCOUNT_OWNED_TABLES` — what the accounts module owns — and `help` is not in
+ * it, so a client login read another client's support history (the activity
+ * sentence plus its before/after snippets) by naming a ticket id. Row ids are
+ * not secret: the live channel broadcasts them.
+ *
+ * So the list is no longer "what the accounts module owns". It is EVERY table
+ * the feed can be asked about, each with an answer:
+ *   • "account" — fenced to the caller's own account world (accountActivityClause);
+ *   • null      — a client login reads NOTHING of this table's history, and the
+ *                 reason says why. That is the DEFAULT posture, not a gap: the
+ *                 portal ships no activity feed at all (PORTAL_ACTIVITY_EXEMPT),
+ *                 and silence is the same direction mayHearChange fails in.
+ *
+ * A table the feed can be asked about (ACTIVITY_GATE_MAP + the fixed-scope
+ * aliases the reader names) that is missing here turns the build RED —
+ * workers/tenancy/test/account-leak.test.ts. Adding a module to the gate map
+ * without deciding this is exactly how `help` slipped through. */
+export const PORTAL_ACTIVITY_FENCE: Record<string, { fence: "account" | null; why: string }> = {
+  accounts: { fence: "account", why: "the row IS an account — theirs to read inside the fence" },
+  account_links: { fence: "account", why: "a contact on an account they may stand in" },
+  portal_users: { fence: "account", why: "a login granted on an account they may stand in" },
+  help: {
+    fence: null,
+    why: "a ticket's history names the staff who moved it and quotes the problem statement — the client is shown the STATUS instead (PORTAL_ACTIVITY_EXEMPT says the same thing about the screen). THE LEAK: help sat outside the deciding list, so another client's support history came back by ticket id.",
+  },
+  learning: { fence: null, why: "the agency's own knowledge base — a client has no screen on it" },
+  selectable_data: { fence: null, why: "the agency's dropdown vocabulary — app furniture, and none of it is the client's" },
+  users: { fence: null, why: "a member's joins, role changes and removals — the agency's staff, never a client's business" },
+  member_roles: { fence: null, why: "the agency's permission structure — knowing its shape helps only an attacker" },
+  invite_logs: { fence: null, why: "who the agency invited and when — the agency's own hiring, by another name" },
 }
 
 /** R2 on the CLIENT surface — the reasoned exemption, not a quiet skip.

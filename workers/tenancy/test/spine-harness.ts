@@ -54,6 +54,10 @@ export const IDS = {
   clientPerson: "A_CLIENT_PERSON",
   victimContact: "A_VICTIM_CONTACT",
   contactPortal: "P_CONTACT",
+  // A support ticket the VICTIM raised, and the staff member who answered it.
+  // The activity feed reads history by (table, id) — so a ticket id is a handle
+  // on another client's support history, one table along from the account rows.
+  victimTicket: "H_VICTIM",
   burglarAccount: "A_BURGLAR",
   burglarPerson: "A_BURGLAR_PERSON",
   burglarLink: "L_BURGLAR",
@@ -73,6 +77,7 @@ export const VICTIM_IDS = [
   IDS.victimContact,
   IDS.contactPortal,
   IDS.clientPerson,
+  IDS.victimTicket,
 ] as const
 
 /** A fresh team database: the real migrations, the real seed, then the two
@@ -82,10 +87,10 @@ export function buildSpineDb(): DatabaseSync {
 
   // The GLOBAL core tables the gating seam reads natively.
   db.exec(`
-    CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT, first_name TEXT, last_name TEXT, current_team_id TEXT, deactivated_at TEXT);
-    CREATE TABLE teams (id TEXT PRIMARY KEY, name TEXT, database_id TEXT, db_status TEXT NOT NULL DEFAULT 'ready', deactivated_at TEXT);
+    CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT, first_name TEXT, last_name TEXT, current_team_id TEXT, updated_at TEXT, deactivated_at TEXT);
+    CREATE TABLE teams (id TEXT PRIMARY KEY, name TEXT, logo_url TEXT, database_id TEXT, db_status TEXT NOT NULL DEFAULT 'ready', created_at TEXT, deactivated_at TEXT);
     CREATE TABLE team_members (id TEXT PRIMARY KEY, team_id TEXT, user_id TEXT, role_id TEXT, created_at TEXT, deactivated_at TEXT);
-    INSERT INTO teams (id, name, database_id) VALUES ('${IDS.team}', 'Kwapso', 'db_team');
+    INSERT INTO teams (id, name, database_id, created_at) VALUES ('${IDS.team}', 'Kwapso', 'db_team', '2026-01-01');
     INSERT INTO users (id, email, first_name, current_team_id) VALUES
       ('${IDS.staffUser}', 'staff@kwapso.app', 'Staff', '${IDS.team}'),
       ('${IDS.burglarUser}', 'burglar@delaval.example', 'Burglar', '${IDS.team}'),
@@ -106,13 +111,19 @@ export function buildSpineDb(): DatabaseSync {
   // Two roles that both hold EVERY right on the spine. That is the point of the
   // burglar: their role is not what stops them, so if they get through, the
   // fence itself is broken.
+  // `help` is in the set on purpose: a client login MUST hold help:read to use
+  // their own support screen, and that right is what carries them past the
+  // activity door's module gate. Without it the help burglary below would be
+  // refused by the gate and pass while the fence was wide open — a green test
+  // asserting the wrong thing.
   const grantAll = (roleId: string) =>
     db.exec(`
       INSERT INTO member_roles (id, title, is_default, created_at) VALUES ('${roleId}', '${roleId}', 0, '2026-01-01');
       INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
       SELECT '${roleId}_' || m.module, '${roleId}', m.module, 1, 1, 1, 1
         FROM (SELECT 'accounts' AS module UNION ALL SELECT 'portal_users'
-              UNION ALL SELECT 'team_members' UNION ALL SELECT 'member_roles') m;`)
+              UNION ALL SELECT 'team_members' UNION ALL SELECT 'member_roles'
+              UNION ALL SELECT 'help') m;`)
   grantAll(IDS.adminRole)
   grantAll(IDS.clientRole)
 
@@ -147,6 +158,14 @@ export function buildSpineDb(): DatabaseSync {
       ('${IDS.burglarPortal}', '${IDS.burglarPerson}', '${IDS.burglarUser}', '2026-01-01', '${IDS.staffUser}');
   `)
 
+  // A SUPPORT TICKET of the victim's — the table the fence did not reach. It is
+  // seeded here rather than in the leak suite because the fixture IS the proof:
+  // a burglar can only be caught stealing something that exists.
+  db.exec(
+    `INSERT INTO help (id, description, status, resolved, created_at, creator_id, creator_email, creator_name)
+     VALUES ('${IDS.victimTicket}', 'Bergman S.A. cannot see the March invoice run', 'open', 0, '2026-02-05', '${IDS.victimUser}', 'marta@bergman.example', 'Marta Ruiz');`
+  )
+
   // REAL HISTORY on the victim's world. Without it the activity burglaries pass
   // trivially — there is nothing to steal, so an unfenced feed and a fenced one
   // both answer "nothing". A green test that proves nothing is worse than none.
@@ -155,7 +174,11 @@ export function buildSpineDb(): DatabaseSync {
       ('ACT_V1', 'Account edited', 'Staff changed Bergman S.A. phone to +34 600 111 222', 'accounts', '${IDS.victimAccount}', '2026-02-01', '${IDS.staffUser}', 'staff@kwapso.app', 'Staff'),
       ('ACT_V2', 'Contact added', 'Staff added Marta Ruiz (marta@bergman.example) to Bergman S.A.', 'account_links', '${IDS.victimLink}', '2026-02-02', '${IDS.staffUser}', 'staff@kwapso.app', 'Staff'),
       ('ACT_V3', 'Portal access granted', 'Staff gave portal access on Bergman S.A.', 'portal_users', '${IDS.victimPortal}', '2026-02-03', '${IDS.staffUser}', 'staff@kwapso.app', 'Staff'),
-      ('ACT_B1', 'Account edited', 'Staff changed Delaval Group address', 'accounts', '${IDS.burglarAccount}', '2026-02-04', '${IDS.staffUser}', 'staff@kwapso.app', 'Staff');
+      ('ACT_B1', 'Account edited', 'Staff changed Delaval Group address', 'accounts', '${IDS.burglarAccount}', '2026-02-04', '${IDS.staffUser}', 'staff@kwapso.app', 'Staff'),
+      ('ACT_H1', 'Help ticket raised', 'Marta Ruiz raised a support ticket — Bergman S.A. cannot see the March invoice run', 'help', '${IDS.victimTicket}', '2026-02-05', '${IDS.victimUser}', 'marta@bergman.example', 'Marta Ruiz'),
+      ('ACT_H2', 'Help ticket edited', 'Staff edited a support ticket — Description from "Bergman S.A. cannot see the March invoice" to "Bergman S.A. cannot see the March invoice run"', 'help', '${IDS.victimTicket}', '2026-02-06', '${IDS.staffUser}', 'staff@kwapso.app', 'Staff'),
+      ('ACT_U1', 'Member role changed', 'Staff moved Nadia Ruiz to Admin', 'users', '${IDS.staffUser}', '2026-02-07', '${IDS.staffUser}', 'staff@kwapso.app', 'Staff'),
+      ('ACT_R1', 'Role permissions changed', 'Staff gave ${IDS.adminRole} delete on accounts', 'member_roles', '${IDS.adminRole}', '2026-02-08', '${IDS.staffUser}', 'staff@kwapso.app', 'Staff');
   `)
 
   return db
