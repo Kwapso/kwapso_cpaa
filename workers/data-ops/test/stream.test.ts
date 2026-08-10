@@ -116,7 +116,16 @@ describe("sseFrame: each event serializes to one data: frame", () => {
         summary: 'Create the role "Sub admin"',
         error: 'You don\'t have permission to do that — your role is missing the "create" right on member roles.',
       },
-      { t: "confirm", threadId: "t1", calls: [{ name: "remove_member", input: { userId: "u1" }, summary: "Remove Jane Doe" }], text: "About to remove" },
+      {
+        t: "confirm",
+        threadId: "t1",
+        // The payload rides the wire with the summary — the panel can't show what
+        // never left the server.
+        calls: [
+          { name: "remove_member", input: { userId: "u1" }, summary: "Remove Jane Doe", details: ["Member: Jane Doe"] },
+        ],
+        text: "About to remove",
+      },
       { t: "error", message: "safe message" },
     ]
     for (const ev of cases) {
@@ -144,7 +153,9 @@ describe("terminalEvent: a ChatOutcome becomes the single terminal event", () =>
       done: false,
       threadId: "t1",
       assistantText: "I'll remove them once you confirm.",
-      needsConfirm: [{ name: "remove_member", input: { userId: "u1" }, summary: "Remove Jane Doe" }],
+      needsConfirm: [
+        { name: "remove_member", input: { userId: "u1" }, summary: "Remove Jane Doe", details: ["Member: Jane Doe"] },
+      ],
       quota: QUOTA,
     }
     const ev = terminalEvent(outcome)
@@ -154,6 +165,9 @@ describe("terminalEvent: a ChatOutcome becomes the single terminal event", () =>
       calls: outcome.needsConfirm,
       text: "I'll remove them once you confirm.",
     })
+    // The payload travels WITH the proposal. A terminal event that carried only the
+    // summary would leave the panel asking for a yes to something unreadable.
+    expect(ev.t === "confirm" && ev.calls[0].details).toEqual(["Member: Jane Doe"])
     // The regression lock: the confirm event MUST carry the thread id, or a first-turn
     // confirm (a brand-new conversation) can never be resolved — the approve/decline
     // buttons no-op because the client never learned the thread id (dead-button bug).
@@ -165,7 +179,14 @@ describe("terminalEvent: a ChatOutcome becomes the single terminal event", () =>
       done: false,
       threadId: "t1",
       assistantText: "",
-      needsConfirm: [{ name: "revoke_invite", input: { inviteId: "i1" }, summary: "Revoke the invite for a@b.com" }],
+      needsConfirm: [
+        {
+          name: "revoke_invite",
+          input: { inviteId: "i1" },
+          summary: "Revoke the invite for a@b.com",
+          details: ["Invite: a@b.com"],
+        },
+      ],
       quota: QUOTA,
     }
     expect(terminalEvent(outcome)).toEqual({ t: "confirm", threadId: "t1", calls: outcome.needsConfirm })

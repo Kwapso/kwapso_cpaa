@@ -1,8 +1,51 @@
 // Shared image helper: turn a base64 data URL (the web app downsizes images
 // before upload) into bytes + content type for R2. Pure + web-safe (atob is a
 // browser/worker global). Used for profile photos AND team logos — one copy.
+//
+// It also owns THE KEY: what an uploaded object is called in R2, and which
+// key a request is allowed to ask for. `/media/*` is served with no session
+// (SCOPE ch.06 — a deliberate, recorded decision), so the key IS the credential
+// and both halves of that sentence live here.
+
+import { ulid } from "./id"
 
 export const MAX_IMAGE_BYTES = 2_500_000 // ~2.5MB after the client-side downsize
+
+/** THE key an upload is stored under: the owning ids (so a bucket stays
+ * readable, and a team's objects sit under one prefix) plus a RANDOM last
+ * segment that makes the URL a CAPABILITY.
+ *
+ * That last segment is the whole point. Profile photos were `users/<userId>` and
+ * team logos `teams/<teamId>` — keys anyone could DERIVE from an id they had
+ * already seen (a member list, a `/t/<teamId>/…` URL, a live ping), which made
+ * "no session, but you must know the key" mean "no session" for those two. The
+ * ULID's 80 random bits are what the learning attachments always had, and what
+ * ARCHITECTURE.md told the next person to add if the exposure ever mattered.
+ *
+ * A new key per upload also means an object is never overwritten in place, so a
+ * changed photo can't be served stale from a cache that was told `immutable`. */
+export function mediaKey(...owners: string[]): string {
+  return [...owners, ulid()].join("/")
+}
+
+/** The key a `/media/*` request is asking for — or null when it is not a key we
+ * would ever have written. Boundary validation, in the house style: a request
+ * value is checked before it reaches a store, never trusted because "R2 has no
+ * directory traversal anyway". Keys we mint are ids joined by `/`, so anything
+ * with a dot-segment, a space, a control character, a backslash or a leading
+ * slash is a probe, and the honest answer to a probe is the same 404 a missing
+ * object gets. */
+export function safeMediaKey(rawPath: string): string | null {
+  let key: string
+  try {
+    key = decodeURIComponent(rawPath)
+  } catch {
+    return null // a malformed %-escape is not a key
+  }
+  if (!key || key.length > 512) return null
+  if (key.includes("..") || key.includes("//")) return null
+  return /^[A-Za-z0-9][A-Za-z0-9/_-]*$/.test(key) ? key : null
+}
 
 /** data:image/png;base64,AAAA... -> bytes + content type, or null if invalid. */
 export function parseDataUrl(

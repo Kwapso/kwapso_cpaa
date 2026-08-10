@@ -75,6 +75,26 @@ const toChatItems = (messages: AgentMessage[]): AgentChatItem[] =>
         : { id: m.id, role: m.role, content: <AgentMarkdown text={m.content ?? ""} /> }
     )
 
+/** The paused turn's proposed actions, as the panel's step rows: the one-line
+ * summary AND — under it — the payload the door will receive (server-built, see
+ * shared/workers/confirm-payload.ts). The detail lines are what makes the panel a
+ * CONFIRM rather than a permission slip: approving "Set access rights for the Sub
+ * Admin role" without seeing which rights is approving something you can't read.
+ * Exported (and pure) so the render test can prove the payload really paints. */
+export function confirmStepsFrom(calls: PendingCall[]): RunStep[] {
+  return calls.map((c) => ({
+    label: c.summary,
+    status: "pending" as const,
+    detail: c.details?.length ? (
+      <span className="flex flex-col gap-0.5">
+        {c.details.map((line, i) => (
+          <span key={i}>{line}</span>
+        ))}
+      </span>
+    ) : undefined,
+  }))
+}
+
 export function useAgentChat(teamId: string | null, open: boolean, canUse: boolean) {
   const [items, setItems] = React.useState<AgentChatItem[]>([])
   const [threadId, setThreadId] = React.useState<string | undefined>(undefined)
@@ -389,9 +409,7 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
   const showTyping = busy && !pending && !lastAssistant?.content
 
   // The proposed actions as RunSteps (pending until the user decides).
-  const confirmSteps: RunStep[] = pending
-    ? pending.calls.map((c) => ({ label: c.summary, status: "pending" as const }))
-    : []
+  const confirmSteps: RunStep[] = pending ? confirmStepsFrom(pending.calls) : []
 
   const quotaLabel = quota
     ? quota.blocked

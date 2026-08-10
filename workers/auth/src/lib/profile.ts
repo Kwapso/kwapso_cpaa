@@ -1,8 +1,9 @@
 // Onboarding / profile updates: first name, last name, optional photo.
 // Photos arrive as a data URL (the web app downsizes them first), land in R2,
-// and are served by the gateway at /media/users/<id>.
+// and are served by the gateway at /media/users/<id>/<random> — a capability
+// URL: the door checks no session, so the KEY has to be unguessable (mediaKey).
 
-import { MAX_IMAGE_BYTES, parseDataUrl } from "../../../../shared/workers/image"
+import { MAX_IMAGE_BYTES, mediaKey, parseDataUrl } from "../../../../shared/workers/image"
 import { publishChange, publishUserChange } from "../../../../shared/workers/realtime"
 import type { Env } from "../env"
 import { logAccountActivity } from "./account-activity"
@@ -36,7 +37,10 @@ export async function updateProfile(
     if (parsed.bytes.byteLength > MAX_IMAGE_BYTES)
       return { error: "image_too_large", message: "That image is too large." }
 
-    const key = `users/${user.id}`
+    // A NEW key each time: the photo's URL is the only way to reach it, and the
+    // old one keeps working for anything still holding it (the stored image_url
+    // moves on). `users/<id>` alone was derivable by anyone who had seen the id.
+    const key = mediaKey("users", user.id)
     await env.MEDIA.put(key, parsed.bytes, {
       httpMetadata: { contentType: parsed.contentType },
     })

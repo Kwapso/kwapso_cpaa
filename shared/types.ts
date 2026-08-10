@@ -409,8 +409,17 @@ export type McpTokenSummary = {
   revokedAt: string | null
 }
 
-/** One action the agent proposes that needs the user's confirmation before it runs. */
-export type PendingCall = { name: string; input: Record<string, unknown>; summary: string }
+/** One action the agent proposes that needs the user's confirmation before it runs.
+ * `summary` is the one-line label; `details` is the PAYLOAD behind it — the body
+ * the gated door will receive, in plain lines (shared/workers/confirm-payload.ts).
+ * Both are built by the one `pendingCall` seam: a confirm you cannot read is not
+ * a confirm, so the panel never shows the label without what it will do. */
+export type PendingCall = {
+  name: string
+  input: Record<string, unknown>
+  summary: string
+  details: string[]
+}
 
 /** The result of one agent chat turn: a finished reply, or a pause for confirmation. */
 export type ChatOutcome =

@@ -170,18 +170,27 @@ on top follows [CACHING.md](CACHING.md).
 - **Every server request validates active-team membership + role rights.**
   A deep link to another team's record gets blocked/booted server-side —
   security is never just hiding UI.
-  - *The reviewed exception (FLAGGED 2026-07-02, owner to confirm):* `GET
-    /media/*` is served by the gateway **without a session check** (R2 has no
-    directory listing, so only someone holding a file's exact key can fetch it).
-    Two key shapes, two risk levels: **learning media** is `learning/<teamId>/<random
-    ULID>` — the per-file ULID is unguessable, so cross-tenant access is
-    infeasible (this is the sensitive content, and it's protected). **Team logos
-    (`teams/<teamId>`) and profile photos (`users/<userId>`)** use PREDICTABLE
-    keys — the team/user id is visible in normal URLs — so anyone who knows an id
-    can fetch that logo/photo without being a member. Accepted today because
-    logos/avatars are low-sensitivity, display-only images; if any future upload
-    is sensitive, give it a random-ULID key (like learning) or a membership
-    check / signed URL BEFORE shipping it.
+  - *The reviewed exception (FLAGGED 2026-07-02; the predictable-key half CLOSED
+    2026-08-10):* `GET /media/*` is served by the gateway **without a session
+    check** — a deliberate, recorded decision (SCOPE ch.06 "Files": uploaded
+    media stays on unguessable no-login links, exposure accepted in writing).
+    R2 has no directory listing, so only someone holding a file's exact key can
+    fetch it. **Every key is now unguessable**: one seam mints them
+    (`mediaKey`, `shared/workers/image.ts`) as `<owner ids>/<random ULID>` —
+    learning media has always been `<teamId>/<ULID>`, and team logos + profile
+    photos now carry the same random tail. They used to be `teams/<teamId>` and
+    `users/<userId>` — DERIVABLE from an id anyone had already seen in a normal
+    URL, which quietly made those two "no session" full stop. New uploads get
+    the new shape; objects written under an old key stay reachable at it (a link
+    already handed out keeps working, which is the decision's own bargain).
+    The door also validates the key at the boundary (`safeMediaKey`) so a probe
+    with a dot-segment, a space or a control character gets a plain 404.
+    **This is a capability-URL model, not a gated read**: anyone holding a link
+    keeps it, with no expiry and no revocation. Fine for photos, logos and
+    how-to screenshots; NOT fine for invoices, contracts, ID documents or
+    anything a regulator calls personal data — a product storing those must add
+    a session + membership check or short-lived signed URLs BEFORE launch
+    (BASE-MANUAL §5, "Two REASONED exceptions").
 - **Deep-link access story (UPDATED 2026-06-21).** Deep links now use the
   `/t/<teamId>/<module>/<id>` grammar, rendered by the screen engine. A deep link
   to a team you are **NOT** a member of does **NOT** switch your active team — the

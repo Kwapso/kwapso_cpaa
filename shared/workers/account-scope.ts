@@ -197,6 +197,45 @@ export function requireStandableRoot(scope: AccountScope, accountId: string): vo
  * the accounts list can never disagree about which rows are fenced. */
 export const ACCOUNT_OWNED_TABLES = ["accounts", "account_links", "portal_users"] as const
 
+/** What a LIVE LISTENER carries so a change ping can be fenced without another
+ * database read: `null` = staff (the agency side hears its whole team), a set =
+ * a client login, pinned to the world they are standing in. Small and plain on
+ * purpose — it is serialized onto a hibernating WebSocket. */
+export type ScopeStamp = { accountIds: string[] } | null
+
+/** The caller's fence, reduced to what a socket needs to carry. */
+export function scopeStamp(scope: AccountScope): ScopeStamp {
+  return scope.kind === "staff" ? null : { accountIds: scope.accountIds }
+}
+
+/** The fence, for a LIVE CHANGE PING (`{resource, id}` on a team's channel).
+ *
+ * A ping carries no row data, but it does carry a ROW ID — and row ids are how
+ * the activity-feed leak was reachable in the first place ("row ids are not
+ * secret: the live channel broadcasts them", above). So the channel gate can't
+ * stop at "are you a member of this team": a client login is a member, and it
+ * was hearing every account in the agency change, by id, in real time.
+ *
+ * Staff hear everything. A client login hears its OWN WORLD and nothing else:
+ * an account-owned ping whose id is inside their fence. Everything else — the
+ * agency's members, roles, invites, tickets, articles — is silence, because a
+ * client has no screen in this app that reads any of it. That is the fail-closed
+ * direction: when the client portal lands and needs its own tickets live, the
+ * fence extends to that resource on purpose, one line at a time, rather than
+ * having been open to everything all along. */
+export function mayHearChange(
+  stamp: ScopeStamp,
+  event: { resource?: string; id?: string }
+): boolean {
+  if (!stamp) return true
+  if (!ACCOUNT_OWNED_TABLES.includes(event.resource as (typeof ACCOUNT_OWNED_TABLES)[number]))
+    return false
+  // Every account-owned publish carries the ACCOUNT the row hangs off (a contact
+  // and a login are only ever read on their account's detail). No id = nothing to
+  // check it against = not theirs to hear.
+  return !!event.id && stamp.accountIds.includes(event.id)
+}
+
 /** The fence, for a feed that stores a TABLE NAME and a ROW ID rather than an
  * account id — the activity feed being the one that matters.
  *
