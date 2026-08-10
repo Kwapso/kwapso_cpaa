@@ -14,7 +14,7 @@ import {
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
-import { FormShell, fieldSpacing } from "@/components/form-shell"
+import { FormShell, fieldSpacing } from "@shared/web/form-shell"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
@@ -22,7 +22,7 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
-import { useFormDraft } from "@/lib/use-form-draft"
+import { useFormDraft } from "@shared/web/use-form-draft"
 
 const titleField = { ...defaultFieldConfig, label: "Role name", required: true }
 const descField = { ...defaultFieldConfig, label: "Description", required: false }

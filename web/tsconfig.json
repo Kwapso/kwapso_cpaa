@@ -24,6 +24,11 @@
     "**/*.ts",
     "**/*.tsx",
     "../shared/**/*.ts",
+    // shared/web/ is the BROWSER half of shared/ — the seams both front doors
+    // render (FormShell, formatCount, the cache store, the draft hook). It is
+    // .tsx as well as .ts, and it is excluded from every worker's tsconfig,
+    // which has no DOM.
+    "../shared/**/*.tsx",
     ".next/types/**/*.ts"
   ],
   "exclude": ["node_modules", "e2e/**", "playwright.config.ts"]

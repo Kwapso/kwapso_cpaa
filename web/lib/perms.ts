@@ -9,7 +9,7 @@
 import type { PermissionValue } from "@shared/types"
 
 import { tenancy } from "@/lib/api"
-import { useCached } from "@/lib/store"
+import { useCached } from "@shared/web/store"
 
 export type Right = "read" | "create" | "edit" | "delete"
 export type Can = (module: string, right: Right) => boolean

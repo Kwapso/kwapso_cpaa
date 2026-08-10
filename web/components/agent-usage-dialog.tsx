@@ -26,7 +26,7 @@ import {
 } from "@kwapso/ui/registry/collections/activity-feed/activity-feed"
 
 import { dataOps, type UsageLogRow } from "@/lib/api"
-import { formatActivityWhen } from "@/lib/format"
+import { formatActivityWhen } from "@shared/web/format"
 
 /** A redacted row's stand-in line: the row is real (who + when + credits), only
  * the TEXT is theirs. Never a blank bubble with a teammate's name on it. */

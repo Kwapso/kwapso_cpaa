@@ -7,13 +7,8 @@
  * second design language: same tokens, same components, more air. */
 @import "@kwapso/ui/styles.css";
 
-/* Overlay readability: the library's frosted `.glass` sits at 72% surface
- * opacity — too see-through to read dialog text against a living background.
- * Same override the agency app carries; removed from both when the library
- * adopts it as the default. */
-.glass {
-  background-color: color-mix(in oklch, var(--card) 94%, transparent);
-}
+/* The library overrides BOTH front doors carry, in one file. */
+@import "../../shared/web/library-overrides.css";
 
 /* ── Reading size ──────────────────────────────────────────────────────────
  * The one visual decision this file makes, and the reason it exists.

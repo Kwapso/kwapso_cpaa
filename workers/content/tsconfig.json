@@ -10,5 +10,8 @@
     "isolatedModules": true,
     "types": ["@cloudflare/workers-types"]
   },
+  // shared/web/ is the BROWSER half of shared/ — React modules both front doors
+  // render. A worker compiles with no DOM and no React, so it never sees them.
+  "exclude": ["../../shared/web/**"],
   "include": ["src/**/*.ts", "test/**/*.ts", "../../shared/**/*.ts"]
 }

@@ -13,7 +13,7 @@
 // a list primes its total in the same round-trip.
 
 import { content as contentApi, tenancy } from "@/lib/api"
-import { primeCache, readCache } from "@/lib/store"
+import { primeCache, readCache } from "@shared/web/store"
 
 /** The sidecar cache key holding a collection's exact server total (R16). */
 export function totalKey(prefix: string, teamId: string): string {

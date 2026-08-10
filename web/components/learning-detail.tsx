@@ -32,12 +32,12 @@ import { LearningFormDialog, type LearningFormValues } from "@/components/learni
 import { LoadMore } from "@/components/load-more"
 import { ApiFailure, content, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
-import { formatActivityWhen } from "@/lib/format"
-import { formatCount } from "@/lib/format-count"
+import { formatActivityWhen } from "@shared/web/format"
+import { formatCount } from "@shared/web/format-count"
 import { RichText } from "@/components/rich-text"
 import { safeHref, safeSrc } from "@/lib/rich-text"
 import { usePermissions } from "@/lib/perms"
-import { invalidate, primeCache, useCached } from "@/lib/store"
+import { invalidate, primeCache, useCached } from "@shared/web/store"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
 
 // Show the linked resource IN-APP. We pick the player by the content-type keyword

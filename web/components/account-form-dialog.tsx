@@ -37,8 +37,8 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { Plus } from "lucide-react"
 
 import { ApiFailure } from "@/lib/api"
-import { FormShell, fieldSpacing } from "@/components/form-shell"
-import { useFormDraft } from "@/lib/use-form-draft"
+import { FormShell, fieldSpacing } from "@shared/web/form-shell"
+import { useFormDraft } from "@shared/web/use-form-draft"
 
 const typeField = { ...defaultFieldConfig, label: "Type", required: true }
 const nameField = { ...defaultFieldConfig, label: "Name", required: true }

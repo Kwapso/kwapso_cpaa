@@ -28,12 +28,12 @@ import type { ActiveTeam } from "@/lib/use-active-team"
 import { auth } from "@/lib/api"
 import { softNavigate } from "@/lib/nav"
 import { emitLive } from "@/lib/live-bus"
-import { useRealtime, useUserRealtime } from "@/lib/realtime"
+import { useRealtime, useUserRealtime } from "@shared/web/realtime"
 // The row-level registry + coarse invalidations moved to lib (R15): they're DATA
 // the live-collections check imports, and the thread/help_threads + agent_usage
 // deaf-exemptions live beside them in the rules registry.
 import { SIMPLE_INVALIDATIONS, TEAM_RESOURCES, totalKey } from "@/lib/live-resources"
-import { invalidate, patchRow, primeCache, readCache, reconcile } from "@/lib/store"
+import { invalidate, patchRow, primeCache, readCache, reconcile } from "@shared/web/store"
 import { NAV, TEAM_SECTIONS, bottomNavItems, isNavActive, type Crumb } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useTeamPrewarm } from "@/lib/use-team-prewarm"

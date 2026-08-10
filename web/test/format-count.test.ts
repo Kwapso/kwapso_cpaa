@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest"
 
-import { formatCount, formatSearchTotal, SEARCH_TOTAL_CAP } from "../lib/format-count"
+import { formatCount, formatSearchTotal, SEARCH_TOTAL_CAP } from "@shared/web/format-count"
 
 describe("formatCount — exact totals, floored abbreviation, no ceiling", () => {
   it("renders NOTHING for zero and still-loading (never a '0' that reads as empty)", () => {

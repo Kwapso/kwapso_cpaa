@@ -21,9 +21,9 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { LogOut } from "lucide-react"
 
 import { brand } from "@shared/brand"
-import { clearAllFormDrafts } from "@web/lib/use-form-draft"
-import { invalidate } from "@web/lib/store"
-import { reportError } from "@web/lib/log"
+import { clearAllFormDrafts } from "@shared/web/use-form-draft"
+import { invalidate } from "@shared/web/store"
+import { reportError } from "@shared/web/log"
 import { auth } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 

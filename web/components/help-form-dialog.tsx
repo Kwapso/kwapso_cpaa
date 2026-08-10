@@ -16,7 +16,7 @@ import {
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
-import { FormShell, fieldSpacing } from "@/components/form-shell"
+import { FormShell, fieldSpacing } from "@shared/web/form-shell"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import {
   Select,
@@ -31,7 +31,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { X } from "lucide-react"
 
 import { ApiFailure } from "@/lib/api"
-import { useFormDraft } from "@/lib/use-form-draft"
+import { useFormDraft } from "@shared/web/use-form-draft"
 import { ManageDropdownsLink } from "@/components/manage-dropdowns-link"
 
 const descField = { ...defaultFieldConfig, label: "What do you need help with?", required: true }

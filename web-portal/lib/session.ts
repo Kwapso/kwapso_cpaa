@@ -26,7 +26,7 @@
 import * as React from "react"
 
 import type { SessionUser } from "@shared/types"
-import { useCached } from "@web/lib/store"
+import { useCached } from "@shared/web/store"
 import { ApiFailure, auth, portal, type PortalContext } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 

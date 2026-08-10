@@ -15,7 +15,7 @@ import * as React from "react"
 
 import { tenancy } from "@/lib/api"
 import { accountsKey, cursorKey, helpKey, listFetch, totalKey } from "@/lib/live-resources"
-import { primeCache, useCached, useCachedValue } from "@/lib/store"
+import { primeCache, useCached, useCachedValue } from "@shared/web/store"
 
 /** What the host needs to drive the reads: the resolved team, whether reads are
  * enabled (on-team + signed-in), the active module and the record id in view. */

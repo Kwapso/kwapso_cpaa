@@ -15,7 +15,7 @@ import { ProgressDashboard } from "@kwapso/ui/registry/collections/progress-dash
 import type { Learning, LearningProgressEntry, TeamMember } from "@shared/types"
 import { content, tenancy } from "@/lib/api"
 import { personName } from "@/lib/identity"
-import { useCached } from "@/lib/store"
+import { useCached } from "@shared/web/store"
 
 export function LearningProgressScreen({ teamId }: { teamId: string }) {
   const membersQ = useCached<TeamMember[]>(`members:${teamId}`, () =>

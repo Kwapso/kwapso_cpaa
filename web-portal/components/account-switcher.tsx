@@ -32,7 +32,7 @@ import {
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Check, ChevronsUpDown } from "lucide-react"
 
-import { invalidate } from "@web/lib/store"
+import { invalidate } from "@shared/web/store"
 import { ApiFailure, portal } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 

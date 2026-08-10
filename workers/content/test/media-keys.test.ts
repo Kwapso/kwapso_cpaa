@@ -111,12 +111,32 @@ describe("safeMediaKey — the door validates the key at the boundary", () => {
     expect(safeMediaKey("%E0%A4%A")).toBeNull() // a malformed escape is not a key
   })
 
-  it("the gateway's media doors run every key through it", () => {
-    // Not "a validator exists" — the two doors must USE it, or the boundary is a
-    // decoration. Read the door's own source.
-    const gateway = readFileSync(join(ROOT, "workers", "gateway", "src", "index.ts"), "utf8")
-    const doors = [...gateway.matchAll(/const key = ([^\n]+)/g)].map((m) => m[1])
-    expect(doors.length, "the gateway must still have its two media doors").toBe(2)
-    for (const door of doors) expect(door).toContain("safeMediaKey(")
+  it("EVERY front door serves media through the one validating seam", () => {
+    // Not "a validator exists" — the doors must USE it, or the boundary is a
+    // decoration. This used to read the agency gateway alone and count two
+    // `const key =` lines, which is exactly how a SECOND front door shipped a
+    // third media door that decoded the path itself and validated nothing. So
+    // the assertion is now the shape that cannot be sidestepped by writing
+    // another one: the serving lives in ONE function, that function validates,
+    // and no gateway builds a key of its own.
+    const seam = readFileSync(
+      join(ROOT, "shared", "workers", "front-door.ts"),
+      "utf8"
+    )
+    expect(seam, "serveMedia must validate the key at the boundary").toContain("safeMediaKey(")
+
+    let doors = 0
+    for (const gw of ["gateway", "portal-gateway"]) {
+      const src = readFileSync(join(ROOT, "workers", gw, "src", "index.ts"), "utf8")
+      const uses = [...src.matchAll(/serveMedia\(/g)].length
+      expect(uses, `${gw} must serve its media through the shared seam`).toBeGreaterThan(0)
+      doors += uses
+      expect(
+        /const key = /.test(src),
+        `${gw} builds a media key of its own — serve through serveMedia so the key is validated`
+      ).toBe(false)
+    }
+    // The tripwire: a scan that finds no doors reports "all clear" like a pass.
+    expect(doors, "the two gateways ship three media doors between them").toBe(3)
   })
 })

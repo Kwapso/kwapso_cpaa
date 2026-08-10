@@ -11,7 +11,7 @@
 
 import * as React from "react"
 
-import { formatCount } from "@/lib/format-count"
+import { formatCount } from "@shared/web/format-count"
 import { TEAM_SECTIONS } from "@/lib/pages"
 import { useCountStandsDown } from "@/components/counted-tabs"
 

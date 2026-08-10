@@ -44,7 +44,7 @@ import { readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
-import { PORTAL_VISIBLE_READS } from "@shared/rules/registry"
+import { PORTAL_VISIBLE_READS, PORTAL_VISIBLE_WRITES } from "@shared/rules/registry"
 
 const ROOT = join(__dirname, "..", "..")
 const read = (p: string) => readFileSync(p, "utf8")
@@ -195,6 +195,25 @@ function portalReadHandlers(): { door: string; worker: string; body: string }[] 
   return out
 }
 
+
+/** The non-GET doors the portal opens, walked to the full source their handler
+ * runs — the same transitive reach the read walk uses, so a fence resolved in a
+ * route-local helper still counts. */
+function portalWriteHandlers(): { door: string; worker: string; body: string }[] {
+  const out: { door: string; worker: string; body: string }[] = []
+  for (const door of Object.keys(PORTAL_DOORS)) {
+    if (door.startsWith("GET ")) continue
+    const path = door.slice(door.indexOf(" ") + 1)
+    const worker = workerOf(path)
+    if (!worker || worker === "realtime" || worker === "auth") continue
+    const name = handlerFor(worker, door)
+    expect(name, `${door} is named by the portal door but has no handler in workers/${worker}`).toBeTruthy()
+    const routeFns = indexFunctions(join(ROOT, "workers", worker, "src", "routes"))
+    out.push({ door, worker, body: reachOf(name as string, routeFns) })
+  }
+  return out
+}
+
 describe("portal fence — every read a client can reach carries the fence", () => {
   const handlers = portalReadHandlers()
 
@@ -270,6 +289,67 @@ describe("portal fence — every read a client can reach carries the fence", () 
   it("an exemption states its reason", () => {
     for (const [file, e] of Object.entries(PORTAL_VISIBLE_READS))
       if (e.fence === null) expect(e.why.length, `${file} needs a real reason`).toBeGreaterThan(20)
+  })
+})
+
+describe("portal fence — every write a client can reach is declared and reasoned", () => {
+  /** Every non-GET door, straight off the gateway's table. Declaration is
+   * demanded of ALL of them, including auth's — "this one owns nothing yet" is
+   * a claim that deserves to be written down and read, not assumed. */
+  const writeDoors = Object.keys(PORTAL_DOORS).filter((d) => !d.startsWith("GET "))
+
+  /** The subset whose handler can be walked. The auth worker answers from a
+   * `switch`, not a declarative ROUTES table, and every one of its doors is a
+   * stated no-fence line anyway — there is no record for a fence to protect. */
+  const writes = portalWriteHandlers()
+
+  it("derives real write doors from the portal gateway's own table", () => {
+    expect(writeDoors.length, "the write walk found nothing — it has gone blind").toBeGreaterThanOrEqual(5)
+    expect(writes.length, "no walkable write handler — the walk has gone blind").toBeGreaterThanOrEqual(3)
+    expect(writes.map((w) => w.door)).toContain("POST /api/content/help/reply")
+    expect(writes.map((w) => w.door)).toContain("POST /api/tenancy/portal/switch-account")
+  })
+
+  it("every non-GET door the portal opens is declared in PORTAL_VISIBLE_WRITES", () => {
+    const undeclared = writeDoors.filter((d) => !(d in PORTAL_VISIBLE_WRITES))
+    expect(
+      undeclared,
+      `these doors let a CLIENT change something and are not declared — name the fence the handler resolves, or write the reason it needs none: ${undeclared.join(", ")}`
+    ).toEqual([])
+  })
+
+  it("a declared fence is actually resolved in the handler", () => {
+    const naked: string[] = []
+    for (const { door, body } of writes) {
+      const declared = PORTAL_VISIBLE_WRITES[door]
+      if (!declared || declared.fence === null) continue
+      // Comments are not code: this repo's handlers DISCUSS their fences at
+      // length ("the fence decides WHOSE ticket this is"), and prose that names
+      // a fence must never stand in for calling one.
+      const code = body.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/gm, "$1")
+      if (!new RegExp(`(?<![\\w.])${declared.fence}\\s*\\(`).test(code)) naked.push(door)
+    }
+    expect(
+      naked,
+      `these writes claim a fence their handler never resolves: ${naked.join(", ")}`
+    ).toEqual([])
+  })
+
+  it("an unfenced write states why it needs no fence", () => {
+    for (const [door, e] of Object.entries(PORTAL_VISIBLE_WRITES))
+      if (e.fence === null)
+        expect(
+          e.why.length,
+          `${door} changes something with no account fence — that needs a real reason`
+        ).toBeGreaterThan(40)
+  })
+
+  it("every declared entry still names a door the portal actually opens (no rotting lines)", () => {
+    const open = new Set(Object.keys(PORTAL_DOORS))
+    for (const door of Object.keys(PORTAL_VISIBLE_WRITES))
+      expect(open.has(door), `PORTAL_VISIBLE_WRITES declares ${door}, which the portal no longer opens`).toBe(
+        true
+      )
   })
 })
 

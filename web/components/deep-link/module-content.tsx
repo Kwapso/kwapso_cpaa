@@ -30,7 +30,7 @@ import { LoadMore } from "@/components/load-more"
 import { content as contentApi, tenancy } from "@/lib/api"
 import { accountsKey, helpKey } from "@/lib/live-resources"
 import { CountedAbove } from "@/components/counted-tabs"
-import { formatCount } from "@/lib/format-count"
+import { formatCount } from "@shared/web/format-count"
 import {
   shapeAccountsList,
   shapeHelpList,

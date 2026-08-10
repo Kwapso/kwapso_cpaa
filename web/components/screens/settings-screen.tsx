@@ -26,10 +26,10 @@ import { EmailChangeDialog } from "@/components/email-change-dialog"
 import { InvitationsPanel, useReceivedInvites } from "@/components/invitations"
 import { ProfileDialog } from "@/components/profile-dialog"
 import { auth } from "@/lib/api"
-import { formatDateTime } from "@/lib/format"
+import { formatDateTime } from "@shared/web/format"
 import { personName, personInitials, letterMark } from "@/lib/identity"
 import { softNavigate } from "@/lib/nav"
-import { useCached } from "@/lib/store"
+import { useCached } from "@shared/web/store"
 import type { ActiveTeam } from "@/lib/use-active-team"
 
 export function SettingsScreen({ active }: { active: ActiveTeam }) {

@@ -17,7 +17,7 @@
 import * as React from "react"
 
 import { tenancy } from "@/lib/api"
-import { primeCacheIfCold } from "@/lib/store"
+import { primeCacheIfCold } from "@shared/web/store"
 
 export function useTeamPrewarm(teamId: string | null): void {
   React.useEffect(() => {

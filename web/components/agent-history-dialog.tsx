@@ -18,7 +18,7 @@ import { ScrollArea } from "@kwapso/ui/registry/primitives/scroll-area/scroll-ar
 
 import type { AgentThread } from "@shared/types"
 import { dataOps } from "@/lib/api"
-import { formatActivityWhen } from "@/lib/format"
+import { formatActivityWhen } from "@shared/web/format"
 
 export function AgentHistoryDialog({
   open,

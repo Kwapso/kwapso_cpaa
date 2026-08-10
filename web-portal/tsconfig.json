@@ -16,15 +16,24 @@
     "plugins": [{ "name": "next" }],
     "paths": {
       "@/*": ["./*"],
-      "@shared/*": ["../shared/*"],
-      // The two seams the Laws of the Base say there may be only ONE of: the
-      // FormShell layout (R4) and the formatCount badge seam (R16). The portal
-      // REUSES them rather than carrying a second copy — a second copy is a
-      // second seam, and the law is "one". (Both deserve to move into shared/
-      // once a change is allowed to touch web/; noted in the handover.)
-      "@web/*": ["../web/*"]
+      // The portal reaches its own tree and shared/ — and NOTHING else. There is
+      // deliberately no alias into web/: a front door that compiled out of the
+      // other front door's source had an undeclared dependency on it, and a file
+      // marked for deletion over there could break this app without a single
+      // line changing here. Every seam both doors need lives in shared/web/,
+      // which is the browser half of the same shared/ the workers already use.
+      // Locked by web-portal/test/rules.test.ts ("the portal imports nothing
+      // from the agency app").
+      "@shared/*": ["../shared/*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "../shared/**/*.ts", ".next/types/**/*.ts"],
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    "../shared/**/*.ts",
+    "../shared/**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
   "exclude": ["node_modules", "out", ".next"]
 }

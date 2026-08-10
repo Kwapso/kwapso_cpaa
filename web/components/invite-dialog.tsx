@@ -15,7 +15,7 @@ import {
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
-import { FormShell, fieldSpacing } from "@/components/form-shell"
+import { FormShell, fieldSpacing } from "@shared/web/form-shell"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import {
   Select,
@@ -31,8 +31,8 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import type { TeamRole } from "@shared/types"
 import { ApiFailure } from "@/lib/api"
-import { useFormDraft } from "@/lib/use-form-draft"
-import { reportError } from "@/lib/log"
+import { useFormDraft } from "@shared/web/use-form-draft"
+import { reportError } from "@shared/web/log"
 
 const emailField = { ...defaultFieldConfig, label: "Email", required: true }
 const roleField = { ...defaultFieldConfig, label: "Role", required: true }

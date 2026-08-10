@@ -36,10 +36,10 @@ import { Ban, ClipboardCopy, Copy, Plus } from "lucide-react"
 
 import type { McpTokenSummary } from "@shared/types"
 import { MCP_TOKEN_TTL_DAYS } from "@shared/workers/limits"
-import { FormShell, fieldSpacing } from "@/components/form-shell"
+import { FormShell, fieldSpacing } from "@shared/web/form-shell"
 import { ApiFailure, mcp } from "@/lib/api"
-import { formatActivityWhen, formatDate } from "@/lib/format"
-import { useCached, primeCache } from "@/lib/store"
+import { formatActivityWhen, formatDate } from "@shared/web/format"
+import { useCached, primeCache } from "@shared/web/store"
 
 /** Past its deadline (or missing one — the server treats that as expired too).
  * A token that has run out is not "active": it stops working the same way a

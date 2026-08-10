@@ -5,7 +5,7 @@
 
 import { type ScreenData } from "@kwapso/ui/registry/collections/screen-renderer/screen-renderer"
 
-import { formatActivityWhen, formatDate, formatDateTime } from "@/lib/format"
+import { formatActivityWhen, formatDate, formatDateTime } from "@shared/web/format"
 import { personName } from "@/lib/identity"
 import type {
   Account,

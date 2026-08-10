@@ -12,7 +12,7 @@ import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs
 
 import type { PermissionValue } from "@shared/types"
 import { CONCEPT_ICON, TEAM_SECTIONS, type TeamSection } from "@/lib/pages"
-import { formatCount } from "@/lib/format-count"
+import { formatCount } from "@shared/web/format-count"
 
 export function TeamSectionNav({
   teamId,

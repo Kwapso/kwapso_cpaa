@@ -20,12 +20,12 @@ import { describe, expect, it } from "vitest"
 // exercises them through the source. If they are ever exported, rewrite this to
 // call them.
 
-const LOG = readFileSync(resolve(__dirname, "../lib/log.ts"), "utf8")
+const LOG = readFileSync(resolve(__dirname, "../../shared/web/log.ts"), "utf8")
 
 /** Rebuild a predicate from its source so the test runs the real regex. */
 function predicate(name: string): (e: { name?: string; message: string }) => boolean {
   const at = LOG.indexOf(`function ${name}(`)
-  expect(at, `${name} must exist in web/lib/log.ts`).toBeGreaterThan(-1)
+  expect(at, `${name} must exist in shared/web/log.ts`).toBeGreaterThan(-1)
   const open = LOG.indexOf("{", at)
   let depth = 0
   let close = open

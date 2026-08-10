@@ -7,9 +7,9 @@
 import { renderHook, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { formatCount } from "@/lib/format-count"
+import { formatCount } from "@shared/web/format-count"
 import { cursorKey, loadMore } from "@/lib/live-resources"
-import { invalidate, readCache } from "@/lib/store"
+import { invalidate, readCache } from "@shared/web/store"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
 
 const recordActivity = vi.fn()

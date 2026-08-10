@@ -29,8 +29,8 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { Plus } from "lucide-react"
 
-import { FormShell, fieldSpacing } from "@web/components/form-shell"
-import { useFormDraft } from "@web/lib/use-form-draft"
+import { FormShell, fieldSpacing } from "@shared/web/form-shell"
+import { useFormDraft } from "@shared/web/use-form-draft"
 import { ApiFailure } from "@/lib/api"
 
 const descField = { ...defaultFieldConfig, label: "What do you need?", required: true }

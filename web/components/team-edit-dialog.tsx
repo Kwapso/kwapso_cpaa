@@ -18,7 +18,7 @@ import {
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
-import { FormShell, fieldSpacing } from "@/components/form-shell"
+import { FormShell, fieldSpacing } from "@shared/web/form-shell"
 import { FileUpload } from "@kwapso/ui/registry/primitives/file-upload/file-upload"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
@@ -27,7 +27,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import type { TeamSummary } from "@shared/types"
 import { ApiFailure, tenancy } from "@/lib/api"
-import { useFormDraft } from "@/lib/use-form-draft"
+import { useFormDraft } from "@shared/web/use-form-draft"
 import { letterMark } from "@/lib/identity"
 import { fileToDataUrl } from "@/lib/image"
 

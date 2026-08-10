@@ -5,13 +5,8 @@
  * (kwapso_ui repo, styles.css); this app never carries its own. */
 @import "@kwapso/ui/styles.css";
 
-/* Overlay readability (feedback 2026-06-30): the library's frosted `.glass` sits at
- * 72% surface opacity — too see-through to read dialog/sheet text against the living
- * background. Keep the frosted blur, but make the surface mostly opaque. (A library
- * prompt tracks adopting this as the default; remove this override once it lands.) */
-.glass {
-  background-color: color-mix(in oklch, var(--card) 94%, transparent);
-}
+/* The library overrides BOTH front doors carry, in one file. */
+@import "../../shared/web/library-overrides.css";
 
 /* ── The living mango field ────────────────────────────────────────────────
  * kwapso_ui ships with the ambient layer switched OFF, because the brand book

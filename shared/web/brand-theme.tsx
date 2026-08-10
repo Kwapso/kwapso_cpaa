@@ -1,4 +1,4 @@
-import { brand } from "@shared/brand"
+import { brand } from "../brand"
 
 // Injects the app's accent colours AND the screen background tone (from
 // shared/brand.ts) as token overrides, so the whole UI library re-skins — and

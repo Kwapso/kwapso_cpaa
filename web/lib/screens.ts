@@ -16,7 +16,7 @@ import {
 } from "@kwapso/ui/lib/config"
 
 import { CONCEPT_ICON } from "@/lib/pages"
-import { formatCount } from "@/lib/format-count"
+import { formatCount } from "@shared/web/format-count"
 
 /** A plain text column/field for a recipe (label only — the host supplies the
  * already-formatted value in the row/record). */

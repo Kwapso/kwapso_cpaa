@@ -24,8 +24,8 @@ import { Plus } from "lucide-react"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
-import { FormShell, fieldSpacing } from "@/components/form-shell"
-import { useFormDraft } from "@/lib/use-form-draft"
+import { FormShell, fieldSpacing } from "@shared/web/form-shell"
+import { useFormDraft } from "@shared/web/use-form-draft"
 
 const groupField = { ...defaultFieldConfig, label: "Group", required: true }
 const optionField = { ...defaultFieldConfig, label: "Option", required: true }

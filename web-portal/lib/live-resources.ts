@@ -15,7 +15,7 @@
 // handful of tickets; dropping the key and re-reading is simpler code, one
 // round-trip, and indistinguishable to the person watching.
 
-import { invalidate } from "@web/lib/store"
+import { invalidate } from "@shared/web/store"
 
 /** The portal's cache keys, named in one place so a listener and a screen can
  * never disagree about which string they mean. */

@@ -18,7 +18,7 @@ import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { Plus } from "lucide-react"
 
-import { invalidate } from "@web/lib/store"
+import { invalidate } from "@shared/web/store"
 import { support } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 import { useTickets } from "@/lib/tickets"

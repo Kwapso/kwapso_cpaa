@@ -13,7 +13,7 @@
 import * as React from "react"
 
 import type { HelpTicket } from "@shared/types"
-import { primeCache, readCache, useCached, useCachedValue } from "@web/lib/store"
+import { primeCache, readCache, useCached, useCachedValue } from "@shared/web/store"
 import { support } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 

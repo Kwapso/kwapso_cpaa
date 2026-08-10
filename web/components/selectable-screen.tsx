@@ -25,7 +25,7 @@ import type { SelectableValue } from "@shared/types"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { SelectableFormDialog } from "@/components/selectable-form-dialog"
 import { usePermissions } from "@/lib/perms"
-import { primeCache, useCached } from "@/lib/store"
+import { primeCache, useCached } from "@shared/web/store"
 
 export function SelectableScreen({
   teamId,
