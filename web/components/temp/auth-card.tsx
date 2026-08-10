@@ -43,6 +43,16 @@ export function AuthCard({ onSignedIn }: { onSignedIn: () => void }) {
       // The code goes ONLY to the inbox — it never rides the response or a toast.
       toast.success("Code sent — check your email.")
     } catch (e) {
+      // The cooldown is not a failure — a code IS already in their inbox and it
+      // still works. Stranding them here with nowhere to type it is a dead end.
+      // (Not an account oracle: the cooldown fires on the caller's own previous
+      // send, whoever the address belongs to.)
+      if (e instanceof ApiFailure && e.code === "too_soon") {
+        setStep("code")
+        setCode("")
+        toast.success("A code is already on its way — check your email.")
+        return
+      }
       setError(e instanceof ApiFailure ? e.message : "Couldn't send the code.")
     } finally {
       setBusy(false)

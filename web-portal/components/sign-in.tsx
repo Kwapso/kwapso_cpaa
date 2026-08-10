@@ -52,6 +52,17 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
       setCode("")
       toast.success("Code sent — check your email.")
     } catch (err) {
+      // The cooldown is not a failure — it means a code IS already in their
+      // inbox, and it still works. Leaving them on this screen with nowhere to
+      // type it is the dead end this app exists to avoid. Move them on and say
+      // the true thing. (It is not an account oracle either: the cooldown fires
+      // on the caller's own previous send, whoever the address belongs to.)
+      if (err instanceof ApiFailure && err.code === "too_soon") {
+        setStep("code")
+        setCode("")
+        toast.success("A code is already on its way — check your email.")
+        return
+      }
       setError(err instanceof ApiFailure ? err.message : "Couldn't send the code.")
     } finally {
       setBusy(false)
