@@ -43,7 +43,8 @@ import {
   ACCOUNT_SCOPED_MODULES,
   PORTAL_ACTIVITY_FENCE,
 } from "../../../shared/rules/registry"
-import { ACCOUNT_OWNED_TABLES } from "../../../shared/workers/account-scope"
+import { ACCOUNT_OWNED_TABLES, accountScope } from "../../../shared/workers/account-scope"
+import { createAccount, grantPortalAccess, linkPerson } from "../src/lib/accounts"
 import { FIXED_SCOPE_TABLES } from "../src/lib/activity-read"
 import worker, { ROUTES } from "../src/index"
 import { buildSpineDb, IDS, makeEnv, req, VICTIM_IDS } from "./spine-harness"
@@ -569,5 +570,63 @@ describe("leak-test coverage: every account-scoped door has a burglar on it", ()
       offenders,
       `spine SQL outside the one fenced file (lib/accounts.ts): ${offenders.join(", ")}`
     ).toEqual([])
+  })
+})
+
+// A GRANT ON A NESTED COMPANY MUST NOT CLIMB.
+//
+// `portal_users.account_id` is the PERSON'S OWN ROW, and the fence walks UP from
+// it to the companies that person belongs to, then DOWN through everything under
+// the one they're standing in. Store a COMPANY there instead and the same walk
+// does something very different: a company is nobody's contact, so the link half
+// of ROOTS_SQL finds nothing and the parent half returns THAT COMPANY'S PARENT —
+// and the walk down then covers every sibling company beneath it.
+//
+// It hid for a whole day because every grant anyone happened to make was on a
+// TOP-LEVEL company, which has no parent to climb to. The agency screen passed
+// the company; the seeding script passed the person; both looked fine.
+//
+// Bergman S.A. owns Bergman Workshop. A login belonging to a person of the
+// Workshop must see the Workshop — never Bergman S.A., and never its siblings.
+describe("a portal grant on a nested company does not climb to its parent", () => {
+  it("stores the person, and the person's reach starts at their own company", async () => {
+    // The suite's own fixture — the REST door is mocked against `holder.db`, so a
+    // second database would be written to and then never read.
+    const db2 = () => holder.db as DatabaseSync
+    const cfg2 = { accountId: "a", apiToken: "t" } as never
+    const guard2 = { userId: IDS.staffUser, teamId: IDS.team, roleId: IDS.adminRole, databaseId: "db_team" }
+    const actor2 = { id: IDS.staffUser, email: "staff@kwapso.app", name: "Staff" }
+
+    // A person who belongs to the CHILD company, the way a site manager does.
+    const nils = await createAccount(cfg2, guard2, { kind: "staff" }, actor2, {
+      accountType: "individual",
+      name: "Nils Ekberg",
+    })
+    await linkPerson(cfg2, guard2, { kind: "staff" }, actor2, {
+      accountId: IDS.victimChild,
+      personAccountId: nils,
+    })
+    await grantPortalAccess(cfg2, guard2, { kind: "staff" }, actor2, {
+      onAccountId: IDS.victimChild, // granted ON the child
+      personAccountId: nils,
+      userId: "U_NILS",
+    })
+
+    const stored = db2()
+      .prepare("SELECT account_id FROM portal_users WHERE user_id = 'U_NILS'")
+      .get() as { account_id: string }
+    expect(stored.account_id, "the row holds the PERSON, not the company").toBe(nils)
+
+    const scope = await accountScope(cfg2, { ...guard2, userId: "U_NILS" })
+    if (scope.kind !== "portal") throw new Error("expected a portal caller")
+
+    // Their world is the company they belong to, and what hangs under it.
+    expect(scope.roots).toEqual([IDS.victimChild])
+    expect(scope.accountIds).toContain(IDS.victimChild)
+
+    // THE LEAK, named: the parent and every sibling under it.
+    expect(scope.accountIds, "the fence must not climb to the parent").not.toContain(IDS.victimAccount)
+    expect(scope.accountIds, "…nor reach a sibling through it").not.toContain(IDS.victimSecond)
+    expect(scope.accountIds, "…nor another company's person").not.toContain(IDS.victimPerson)
   })
 })

@@ -73,6 +73,7 @@ function coreDb() {
   db.exec(/CREATE TABLE login_codes[\s\S]*?\);/.exec(base)![0])
   db.exec(/CREATE INDEX idx_login_codes_email[^;]*;/.exec(base)![0])
   db.exec(migration("0015_login_send_throttle.sql")) // the throttle's own columns
+  db.exec(migration("0017_login_send_ledger.sql")) // the send ledger the budget reads
   return db
 }
 
@@ -128,6 +129,25 @@ function fresh() {
   const rows = () => db.prepare("SELECT * FROM login_codes ORDER BY created_at DESC").all() as unknown as Row[]
   /** Move every stored row `seconds` further into the past (no clock mocking). */
   const age = (seconds: number) => {
+    // The ledger ages with the codes — otherwise every budget test is really a
+    // cooldown test, and the number it thinks it is measuring never moves.
+    for (const s of db.prepare("SELECT id, created_at FROM login_sends").all() as unknown as { id: string; created_at: string }[])
+      db.prepare("UPDATE login_sends SET created_at = ? WHERE id = ?").run(
+        new Date(Date.parse(s.created_at) - seconds * 1000).toISOString(),
+        s.id
+      )
+    for (const r of rows())
+      db.prepare("UPDATE login_codes SET created_at = ? WHERE id = ?").run(
+        new Date(Date.parse(r.created_at) - seconds * 1000).toISOString(),
+        r.id
+      )
+  }
+  /** Age the CODES only, leaving the send ledger where it is.
+   *
+   * The cooldown lives on login_codes; the budget window lives on login_sends.
+   * Ageing both together slides the budget's own hour out from under the test,
+   * so a budget test using `age` measures nothing and passes over the bug. */
+  const passCooldown = (seconds = 61) => {
     for (const r of rows())
       db.prepare("UPDATE login_codes SET created_at = ? WHERE id = ?").run(
         new Date(Date.parse(r.created_at) - seconds * 1000).toISOString(),
@@ -137,8 +157,8 @@ function fresh() {
   const consumeAll = () => db.prepare("UPDATE login_codes SET consumed_at = 'used'").run()
   /** Sends this hour, everywhere — the number the rationing line is drawn on. */
   const sentEverywhere = () =>
-    (db.prepare("SELECT COALESCE(SUM(sends), 0) AS n FROM login_codes").get() as { n: number }).n
-  return { db, door, ask, askForCode, verify, rows, age, consumeAll, sentEverywhere }
+    (db.prepare("SELECT COUNT(*) AS n FROM login_sends").get() as { n: number }).n
+  return { db, door, ask, askForCode, verify, rows, age, passCooldown, consumeAll, sentEverywhere }
 }
 
 /** Put the environment past its hourly line the only way an attacker can: many
@@ -505,5 +525,78 @@ describe("the test door has a budget of its own", () => {
       if ("error" in out) { refused = true; break }
     }
     expect(refused, "the test door must have a ceiling of its own").toBe(true)
+  })
+})
+
+// A LEDGER THAT CAN CHANGE HANDS IS NOT A LEDGER.
+//
+// The budget used to be SUM(login_codes.sends) keyed on login_codes.sent_ip —
+// but `sent_ip` legitimately MOVES on a rotation, because whoever just asked is
+// the person about to type the code, and that is what earns them the reserved
+// attempt lane. The accumulated `sends` moved with it. So the charge was a token
+// held by whoever wrote last:
+//
+//   • two addresses taking turns on one email never paid — at each write the
+//     heavy row belonged to the OTHER one, so each writer's own bucket read
+//     near zero and the per-caller ceiling never bit;
+//   • and the whole accumulated charge landed on the next honest asker, who was
+//     then refused for sends they had never made, and told it was "a lot of
+//     sign-in codes from one place".
+//
+// One row per send now (migration 0017), attributed when it happens and never
+// reassigned.
+describe("the send ledger cannot be handed to someone else", () => {
+  it("two addresses taking turns both pay their own way", async () => {
+    const { ask, passCooldown } = fresh()
+    const A = "198.51.100.7"
+    const B = "203.0.113.7"
+    let refusedA = 0
+    let refusedB = 0
+    // ONE address, alternating callers — because the transfer only happens on a
+    // ROTATION, and a rotation needs a live code for the same email. Distinct
+    // emails would mint a fresh row each time, `sent_ip` would never move, and
+    // the test would pass just as happily over the bug.
+    //
+    // The COOLDOWN is cleared between asks; the ledger is left alone, so what
+    // is measured is the budget's own trailing hour.
+    for (let i = 0; i < MAX_SENDS_PER_IP_PER_HOUR + 8; i++) {
+      passCooldown()
+      if ("error" in (await ask(EMAIL, A))) refusedA++
+      passCooldown()
+      if ("error" in (await ask(EMAIL, B))) refusedB++
+    }
+    // Under the old ledger both were ZERO: at each write the accumulated charge
+    // sat on the row, which belonged to the OTHER caller, so each writer's own
+    // bucket read about one.
+    expect(refusedA, "A must hit its own ceiling").toBeGreaterThan(0)
+    expect(refusedB, "…and so must B — neither can hide behind the other").toBeGreaterThan(0)
+  })
+
+  it("does not dump one caller's charge on the next honest person", async () => {
+    const { ask, passCooldown } = fresh()
+    const attacker = "198.51.100.9"
+    // The attacker works the victim's address up to their own ceiling.
+    for (let i = 0; i < MAX_SENDS_PER_IP_PER_HOUR + 5; i++) { passCooldown(); await ask(EMAIL, attacker) }
+    passCooldown()
+    // Now the owner of that inbox asks, from their own address, for the first time.
+    const owner = await ask(EMAIL, "192.0.2.44")
+    expect(owner, "the person who has sent nothing must not be refused").not.toHaveProperty("error")
+  })
+
+  it("a rotation is charged to whoever asked for it, not to the row", async () => {
+    const { ask, db, passCooldown } = fresh()
+    const first = "198.51.100.1"
+    const second = "203.0.113.1"
+    await ask(EMAIL, first)
+    passCooldown()
+    await ask(EMAIL, second) // rotates the live row, moving sent_ip to `second`
+    const rows = db
+      .prepare("SELECT ip, COUNT(*) AS n FROM login_sends GROUP BY ip ORDER BY ip")
+      .all() as { ip: string; n: number }[]
+    // One send each, on the ledger, permanently.
+    expect(rows.map((r) => [r.ip, r.n])).toEqual([
+      [first, 1],
+      [second, 1],
+    ])
   })
 })

@@ -44,12 +44,19 @@ export function clientIp(request: Request): string {
   return clean || "unknown"
 }
 
-/** SUM of the emails sent from one bucket inside the window. Sends, not rows: a
- * rotation (below) emails a fresh code without inserting a row, so `COUNT(*)`
- * would let a caller sitting on a handful of rotatable rows send one email a
- * minute per address forever, having paid for them once. */
-const SENDS_FROM_IP = "(SELECT COALESCE(SUM(sends), 0) FROM login_codes WHERE sent_ip = ? AND created_at > ?)"
-const SENDS_EVERYWHERE = "(SELECT COALESCE(SUM(sends), 0) FROM login_codes WHERE created_at > ?)"
+/** Emails sent from one bucket inside the window, read from the LEDGER (0017) —
+ * one row per send, attributed when it happens and never reassigned.
+ *
+ * It used to be SUM(login_codes.sends) keyed on login_codes.sent_ip, and that
+ * column legitimately MOVES: a rotation hands `sent_ip` to whoever just asked,
+ * because they are the person about to type the code and that earns them the
+ * reserved attempt lane. The accumulated `sends` moved with it — so the budget
+ * was a token held by whoever wrote last. Two addresses taking turns on one
+ * email never paid at all, and the whole charge landed on the next honest asker,
+ * who was refused for sends they had never made. A ledger that can change hands
+ * is not a ledger. */
+const SENDS_FROM_IP = "(SELECT COUNT(*) FROM login_sends WHERE ip = ? AND created_at > ?)"
+const SENDS_EVERYWHERE = "(SELECT COUNT(*) FROM login_sends WHERE created_at > ?)"
 
 /** The caller's whole send budget, as ONE clause both write paths carry — so the
  * mint and the rotation can never enforce different rules.
@@ -125,6 +132,37 @@ export async function mintLoginCode(
   //      which case a mint is the only way the inbox's owner gets back in;
   //   3. the caller's send budget (their own ceiling, plus the ration the
   //      environment's hour imposes on everyone when it's crowded).
+  // CHARGE FIRST, ATOMICALLY, AND ONLY IF A SEND COULD ACTUALLY HAPPEN.
+  //
+  // The ledger row IS the budget check: the INSERT carries the caller's ceiling,
+  // the environment's ration and the per-address cooldown, so a burst cannot all
+  // read "under the line" and all send. One statement, and SQLite serializes it.
+  //
+  // The cooldown rides this too, so someone hammering the button inside their
+  // sixty seconds is refused without being charged for it — otherwise thirty
+  // impatient taps would spend an honest person's whole hour.
+  //
+  // If the code write below then declines (there was nothing to rotate and the
+  // address is at its cap), the charge is handed back — see the compensation at
+  // the end. Over-charging a send that never left is the one direction this must
+  // not fail in: it would refuse the person, not the attacker.
+  const sendId = ulid()
+  const charged = await env.DB.prepare(
+    `INSERT INTO login_sends (id, ip, created_at)
+     SELECT ?, ?, ?
+      WHERE NOT EXISTS (SELECT 1 FROM login_codes
+                         WHERE email = ? AND consumed_at IS NULL AND created_at > ?)
+        AND ${WITHIN_SEND_BUDGET}`
+  )
+    .bind(sendId, sentIp, nowIso, email, cooldownFrom, ...sendBudgetArgs(sentIp, hourAgo))
+    .run()
+  if ((charged.meta.changes ?? 0) === 0) return refusal(env, sentIp, hourAgo)
+
+  /** Hand the charge back — a send that never left must not be on the ledger. */
+  const uncharge = async () => {
+    await env.DB.prepare("DELETE FROM login_sends WHERE id = ?").bind(sendId).run()
+  }
+
   const minted = await env.DB.prepare(
     `INSERT INTO login_codes (id, email, code_hash, expires_at, created_at, sent_ip, sends)
      SELECT ?, ?, ?, ?, ?, ?, 1
@@ -132,22 +170,21 @@ export async function mintLoginCode(
                          WHERE email = ? AND consumed_at IS NULL AND created_at > ?)
         AND ((SELECT COUNT(*) FROM login_codes WHERE email = ? AND created_at > ?) < ?
              OR NOT EXISTS (SELECT 1 FROM login_codes WHERE email = ? AND consumed_at IS NULL))
-        AND ${WITHIN_SEND_BUDGET}`
+`
   )
     .bind(
       ulid(), email, hash, expires, nowIso, sentIp,
       email, cooldownFrom,
       email, hourAgo, MAX_CODES_PER_HOUR,
-      email,
-      ...sendBudgetArgs(sentIp, hourAgo)
+      email
     )
     .run()
   if ((minted.meta.changes ?? 0) > 0) return { code }
 
   // At the address's cap: replace the newest unconsumed code rather than adding a
   // row — a fresh secret, a fresh TTL, a fresh attempt budget, no growth. The
-  // cooldown and the send budget ride this UPDATE too (a rotation is an email like
-  // any other), and `sends` counts it so the budget sees it. `sent_ip` moves to
+  // The cooldown rides this UPDATE; the SEND was already charged to the ledger
+  // above, so `sends` here is only this row's own count. `sent_ip` moves to
   // this caller: whoever just paid for a send is the person about to type the
   // code, and that is what earns the reserved attempt lane (see verifyLoginCode).
   const rotated = await env.DB.prepare(
@@ -158,52 +195,22 @@ export async function mintLoginCode(
                   ORDER BY created_at DESC LIMIT 1)
         AND NOT EXISTS (SELECT 1 FROM login_codes
                          WHERE email = ? AND consumed_at IS NULL AND created_at > ?)
-        AND ${WITHIN_SEND_BUDGET}`
+`
   )
     .bind(
       hash, expires, nowIso, sentIp,
       email,
-      email, cooldownFrom,
-      ...sendBudgetArgs(sentIp, hourAgo)
+      email, cooldownFrom
     )
     .run()
   if ((rotated.meta.changes ?? 0) > 0) return { code }
 
-  // Refused — say WHICH wall was hit, in one read, on the refusal path only.
-  // Guessing would tell someone waiting on a 60-second cooldown to "try later",
-  // and someone who has spent their hour to "wait a moment".
-  const spent = await env.DB.prepare(
-    `SELECT COALESCE(SUM(CASE WHEN sent_ip = ? THEN sends END), 0) AS mine,
-            COALESCE(SUM(sends), 0) AS everyone
-       FROM login_codes WHERE created_at > ?`
-  )
-    .bind(sentIp, hourAgo)
-    .first<{ mine: number; everyone: number }>()
-  const mine = spent?.mine ?? 0
-  const crowded = (spent?.everyone ?? 0) >= SENDS_EVERYWHERE_BEFORE_RATIONING
-  const rationed = crowded && mine >= MAX_SENDS_PER_IP_WHEN_RATIONED
-  if (mine >= MAX_SENDS_PER_IP_PER_HOUR || rationed) {
-    // The one moment worth an operator's attention: the environment is over its
-    // hourly line AND the ration is actually turning callers away. A console line,
-    // not a row — this door is anonymous, and an alert an attacker can write on
-    // demand is just a slower way to fill the database. The durable version of
-    // this signal belongs at the edge, with the rule that should be stopping them.
-    if (rationed) console.warn(`login send rationed: ${spent?.everyone} sends this hour, ${mine} from this caller`)
-    return {
-      // True as written now, which it wasn't before: only a caller who is
-      // themselves over a budget reaches this line. Someone caught by an
-      // environment-wide wall they had no part in used to be told the same thing.
-      error: "too_many_sends",
-      message: `That's a lot of sign-in codes from one place. Try again a bit later.`,
-      status: 429,
-    }
-  }
-  return {
-    error: "too_soon",
-    message: `A code was just sent. Give it a moment, then ask again.`,
-    status: 429,
-  }
+  // Nothing was sent — hand the charge back before answering.
+  await uncharge()
+
+  return refusal(env, sentIp, hourAgo)
 }
+
 
 /** The code's five tries, split into two lanes by WHO is asking. A caller whose
  * address matches the one the code was last SENT to (`sent_ip`) may spend all
@@ -288,4 +295,41 @@ export async function verifyLoginCode(
   if ((consumed.meta.changes ?? 0) === 0)
     return { error: "too_many_attempts", message: "Too many wrong tries. Request a new code.", status: 429 }
   return { id: row.id }
+}
+
+/** Which wall the caller actually hit, read once and only on the refusal path.
+ * Guessing would tell someone waiting on a sixty-second cooldown to "try later",
+ * and someone who has spent their hour to "wait a moment". */
+async function refusal(env: Env, sentIp: string, hourAgo: string): Promise<MintFail> {
+  const spent = await env.DB.prepare(
+    `SELECT COUNT(CASE WHEN ip = ? THEN 1 END) AS mine,
+            COUNT(*) AS everyone
+       FROM login_sends WHERE created_at > ?`
+  )
+    .bind(sentIp, hourAgo)
+    .first<{ mine: number; everyone: number }>()
+  const mine = spent?.mine ?? 0
+  const crowded = (spent?.everyone ?? 0) >= SENDS_EVERYWHERE_BEFORE_RATIONING
+  const rationed = crowded && mine >= MAX_SENDS_PER_IP_WHEN_RATIONED
+  if (mine >= MAX_SENDS_PER_IP_PER_HOUR || rationed) {
+    // The one moment worth an operator's attention: the environment is over its
+    // hourly line AND the ration is actually turning callers away. A console line,
+    // not a row — this door is anonymous, and an alert an attacker can write on
+    // demand is just a slower way to fill the database. The durable version of
+    // this signal belongs at the edge, with the rule that should be stopping them.
+    if (rationed) console.warn(`login send rationed: ${spent?.everyone} sends this hour, ${mine} from this caller`)
+    return {
+      // True as written now, which it wasn't before: only a caller who is
+      // themselves over a budget reaches this line. Someone caught by an
+      // environment-wide wall they had no part in used to be told the same thing.
+      error: "too_many_sends",
+      message: `That's a lot of sign-in codes from one place. Try again a bit later.`,
+      status: 429,
+    }
+  }
+  return {
+    error: "too_soon",
+    message: `A code was just sent. Give it a moment, then ask again.`,
+    status: 429,
+  }
 }

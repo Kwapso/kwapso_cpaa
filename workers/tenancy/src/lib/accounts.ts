@@ -719,10 +719,37 @@ export async function grantPortalAccess(
   guard: MemberGuard,
   scope: AccountScope,
   actor: Actor,
-  input: { accountId: string; userId: string; appRestriction?: string }
+  input: {
+    /** The company the grant is made ON — used to check the granter's own reach
+     * and to say what happened in the activity feed. It is NOT what gets stored. */
+    onAccountId: string
+    /** The PERSON's own account row. THIS is what `portal_users.account_id`
+     * holds, because it is what the fence reads: `accountScope` walks from this
+     * row UP to the companies the person belongs to (their parent pointer and
+     * their links), then DOWN through everything nested.
+     *
+     * Handing it a COMPANY instead looks like it works and quietly widens the
+     * fence: a company is nobody's contact, so the link half finds nothing and
+     * the parent half returns the company's PARENT — and the walk down then
+     * covers every sibling company under that parent. Top-level grants hide it,
+     * because a top-level company has no parent to climb to. The agency screen
+     * passed the company; the seed passed the person; both looked fine. */
+    personAccountId: string
+    userId: string
+    appRestriction?: string
+  }
 ): Promise<string> {
-  requireAccountInScope(scope, input.accountId)
-  const account = await accountOrThrow(cfg, guard, scope, input.accountId)
+  requireAccountInScope(scope, input.onAccountId)
+  const account = await accountOrThrow(cfg, guard, scope, input.onAccountId)
+  // The person must be a person. A grant whose stored row is an entity is the
+  // widening above, so it is refused here rather than resolved into a bigger fence.
+  const person = await accountOrThrow(cfg, guard, scope, input.personAccountId)
+  if (person.accountType !== "individual")
+    throw new GuardError(
+      400,
+      "invalid_input",
+      "A login belongs to a person, not to a company."
+    )
 
   const live = await d1Query<{ id: string }>(
     cfg,
@@ -738,7 +765,7 @@ export async function grantPortalAccess(
   const now = new Date().toISOString()
   await insertRow(cfg, guard, "portal_users", {
     id,
-    account_id: input.accountId,
+    account_id: input.personAccountId, // the PERSON — see the note above
     user_id: input.userId,
     app_restriction: input.appRestriction ?? null,
     created_at: now,

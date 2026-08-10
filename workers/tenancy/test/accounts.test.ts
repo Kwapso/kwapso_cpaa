@@ -160,14 +160,16 @@ describe("one live login per person", () => {
   it("refuses a second grant, then allows one after a revoke", async () => {
     await expect(
       grantPortalAccess(cfg, guard, staff, actor, {
-        accountId: IDS.victimAccount,
+        onAccountId: IDS.victimAccount,
+        personAccountId: IDS.victimPerson,
         userId: IDS.victimUser,
       })
     ).rejects.toMatchObject({ code: "duplicate" })
 
     db().prepare("UPDATE portal_users SET deactivated_at = '2026-02-01' WHERE id = ?").run(IDS.victimPortal)
     const id = await grantPortalAccess(cfg, guard, staff, actor, {
-      accountId: IDS.victimAccount,
+      onAccountId: IDS.victimAccount,
+        personAccountId: IDS.victimPerson,
       userId: IDS.victimUser,
     })
     expect(id).toBeTruthy()
@@ -292,10 +294,32 @@ describe("granting a login: the person is picked off the account, never typed in
 
     const { status } = await grant({ accountId: IDS.victimAccount, personAccountId: ana })
     expect(status).toBe(200)
+    // CHANGED DELIBERATELY, and it is a security change. This used to look the row
+    // up by the COMPANY, which pinned `portal_users.account_id` as "the account
+    // they'll see". The fence reads that column as the PERSON'S OWN ROW and walks
+    // UP from it to their companies — so storing a company made the walk climb to
+    // that company's PARENT and then down through every sibling. It only ever
+    // looked right because a top-level company has no parent to climb to.
     const row = db()
-      .prepare("SELECT user_id FROM portal_users WHERE account_id = ? AND deactivated_at IS NULL")
-      .get(IDS.victimAccount) as { user_id: string }
+      .prepare("SELECT user_id, account_id FROM portal_users WHERE user_id = ? AND deactivated_at IS NULL")
+      .get(IDS.clientUser) as { user_id: string; account_id: string }
     expect(row.user_id).toBe(IDS.clientUser)
+    expect(row.account_id, "the row must hold the PERSON, never the company").toBe(ana)
+  })
+
+  it("refuses to hang a login on a company — the row is a person's", async () => {
+    // THE SHAPE THAT WIDENED THE FENCE. Stored against a company, the fence's
+    // walk climbs to that company's PARENT and then down through every sibling.
+    // The route happens to refuse a company earlier (a company has no email to
+    // resolve), but that is an accident of the lookup, not a rule — so the rule
+    // is asserted where it lives, on the writer itself.
+    await expect(
+      grantPortalAccess(cfg, guard, staff, actor, {
+        onAccountId: IDS.victimAccount,
+        personAccountId: IDS.victimChild, // a COMPANY, not a person
+        userId: "U_SOMEONE",
+      })
+    ).rejects.toMatchObject({ status: 400 })
   })
 
   it("refuses plainly when the person has no email, or has never signed in", async () => {
@@ -474,7 +498,7 @@ describe("standing in ONE company at a time", () => {
       accountType: "individual",
       name: "Solo Trader",
     })
-    await grantPortalAccess(cfg, guard, staff, actor, { accountId: solo, userId: "U_SOLO" })
+    await grantPortalAccess(cfg, guard, staff, actor, { onAccountId: solo, personAccountId: solo, userId: "U_SOLO" })
     const scope = await accountScope(cfg, { ...guard, userId: "U_SOLO" })
     if (scope.kind !== "portal") throw new Error("expected a portal caller")
     expect(scope.roots).toEqual([solo])
