@@ -1,0 +1,70 @@
+{
+  "$comment": "The Glide table catalogue for the two legacy Kwapso apps. Captured by hand from the Glide editor on 10 Aug 2026 — it took the owner a very long time and must never be re-collected. Table ids are stable; the API token is NOT stored here (it lives in ~/.config/kwapso/keys.env as GLIDE_API_KEY). Pull rows with `node scripts/glide-pull.mjs`.",
+  "capturedOn": "2026-08-10",
+  "endpoint": "https://api.glideapp.io/api/function/queryTables",
+  "note": "Both apps read the SAME underlying tables — every table the client portal app exposes has an identical table id in the agency app. The portal is a filtered view over one dataset, not a second dataset. That is the same shape as the account fence in this codebase.",
+  "apps": [
+    {
+      "key": "agency",
+      "name": "Kwapso agency app (legacy Glide)",
+      "appId": "jccAFi3qFPETPvk638rV",
+      "tables": [
+        { "key": "choices", "id": "native-table-JfLEOyRIZ2NrQUpbZT85", "note": "dropdown / option values — maps to the base's dropdown management" },
+        { "key": "users", "id": "native-table-qQtBfW3I3zbQYJd4b3oF", "note": "agency staff logins" },
+        { "key": "roles", "id": "native-table-7f5pKJzXzolFsKqHS4c1", "note": "OWNER: not migrating — the base has its own permission matrix" },
+        { "key": "apps", "id": "native-table-trYxzJO7fNUqmapeROI1", "sharedWithPortal": true },
+        { "key": "deliverables", "id": "native-table-oRrmIzPl1HurCC7oYsmG", "sharedWithPortal": true },
+        { "key": "assets", "id": "native-table-8cf1IX4m4GvGcy69MEXO" },
+        { "key": "tickets", "id": "native-table-5186ea27-1514-45a9-ba3c-53ae05466a97", "sharedWithPortal": true, "note": "maps to the base's help desk" },
+        { "key": "backlog", "id": "native-table-f62343cf-6973-4cae-b799-7518fe3741e4" },
+        { "key": "modules", "id": "native-table-048SaWG1a0QUiLVv4opI", "sharedWithPortal": true },
+        { "key": "worklog", "id": "native-table-3fe00469-05b3-4fe5-bffd-2455f55d0290", "note": "time / effort records — the 'work-and-money' phase" },
+        { "key": "sprints", "id": "native-table-IRxiMDOu3PJpqHwfZpJr", "sharedWithPortal": true },
+        { "key": "tasks", "id": "native-table-00d380bc-7e52-4c73-994e-976b7d5537ab" },
+        { "key": "customers", "id": "native-table-KtgLf68Rejdeh7590Lem", "sharedWithPortal": true, "note": "maps to `accounts` (entity) in the customer spine" },
+        { "key": "contacts", "id": "native-table-vsZ4hEgzNvnIl8G9gts0", "sharedWithPortal": true, "note": "maps to `accounts` (individual) + `account_links`" },
+        { "key": "meetings", "id": "native-table-2QIXgooqiEGEJ5PBR4HR" },
+        { "key": "purposes", "id": "native-table-m1ZMnM9yl0ooheCMZd7V" },
+        { "key": "comments", "id": "native-table-f69cfa16-0d2b-43bb-8561-14cb9a1c011e" },
+        { "key": "branding", "id": "native-table-aBgFERYNBXnhrFs1fL9v", "note": "likely the source of per-account logos — see open question 3 in .session-notes/kwapso-security.md" },
+        { "key": "program", "id": "native-table-6HJmNVdObM27v0uKlwm2" },
+        { "key": "departments", "id": "native-table-8RxCkJJp2q2arT982O78" },
+        {
+          "key": "milestones",
+          "id": "native-table-8nMct0jnKW3BWIahrRgj",
+          "note": "the only table whose column mapping the owner supplied — Glide column ids are opaque, so this is the shape to expect everywhere",
+          "columns": {
+            "date": "j4PZ2",
+            "milestone": "Name",
+            "description": "EAyh4",
+            "link": "4oj0W",
+            "imageImage1": "WgupA",
+            "imageImage2": "pypHU",
+            "imageImage3": "klmNS",
+            "logCreatedOn": "PH1Lz",
+            "logLastModified": "EbnpO"
+          }
+        },
+        { "key": "channels", "id": "native-table-Q6hO0ZKJD7HiVjT1KOqN" },
+        { "key": "content", "id": "native-table-Jl2cJVQtl8tVm5Yh7Grm", "note": "maps to the base's learning module" },
+        { "key": "certificates", "id": "native-table-9r2e7PnjCiLSrSF0PV7g", "note": "learning completion records" }
+      ]
+    },
+    {
+      "key": "portal",
+      "name": "Kwapso client portal (legacy Glide, live at portal.kwapso.app)",
+      "appId": "56S1drNyIIaBg6t9vvp3",
+      "note": "Every table below shares its id with the agency app — same data, filtered view.",
+      "tables": [
+        { "key": "tickets", "id": "native-table-5186ea27-1514-45a9-ba3c-53ae05466a97" },
+        { "key": "modules", "id": "native-table-048SaWG1a0QUiLVv4opI" },
+        { "key": "contacts", "id": "native-table-vsZ4hEgzNvnIl8G9gts0" },
+        { "key": "customers", "id": "native-table-KtgLf68Rejdeh7590Lem" },
+        { "key": "sprints", "id": "native-table-IRxiMDOu3PJpqHwfZpJr" },
+        { "key": "apps", "id": "native-table-trYxzJO7fNUqmapeROI1" },
+        { "key": "deliverables", "id": "native-table-oRrmIzPl1HurCC7oYsmG" },
+        { "key": "choices", "id": "native-table-JfLEOyRIZ2NrQUpbZT85" }
+      ]
+    }
+  ]
+}
