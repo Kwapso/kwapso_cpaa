@@ -119,11 +119,15 @@ Purpose: the per-team **free** half of the AI agent quota. Real data: `team_id`,
 daily), `used` (AI units consumed this window), `updated_at`. One unit = one
 model call, metered before EACH call inside a turn (a multi-step turn costs one
 unit per step, capped by `MAX_STEPS`; declining a confirm costs nothing; running
-dry mid-plan stops the turn with a saved, plain reply). A turn that changes
-NOTHING the user wanted — a refused/failed action (e.g. inviting someone already
-on the team) or a model hiccup — is **refunded** (`refundAiUnits` reverses both
-pools), so a blocked action costs zero; a turn with any successful write keeps its
-charge. Once a team is over the app's own daily allowance (`AGENT_FREE_DAILY`:
+dry mid-plan stops the turn with a saved, plain reply). **A unit is spent the
+moment the model answers**, so exactly one thing is refundable: the unit metered
+for a step whose model call THREW, which bought no completion at all
+(`refundUnspentUnit`, and only from the paid pool — the free allowance is the
+daily BOUND on how much model spend a team can cause, and a refund dissolves the
+bound). A REFUSED ACTION IS NOT REFUNDED: it used to be, and that made the credit
+lane the unbounded one — asking to invite someone already on the team fails on
+demand, every time, burning real tokens and handing the credit straight back, so
+the same turn could run forever for nothing. Once a team is over the app's own daily allowance (`AGENT_FREE_DAILY`:
 code default **25/day**, but both environments ship **50**), the gate spends from
 the credit balance instead. Lives in
 the global core DB so the gate can check it without opening a team database.

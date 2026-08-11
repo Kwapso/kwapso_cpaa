@@ -224,7 +224,7 @@ nowhere.
 confirm every privilege change. That's the wrong model here — it double-checks
 the user on ordinary, reversible building. The confirm behaviour is narrow and
 specific: **destructive acts pause — and so does every write that decides who can
-do what.** Nothing else does.
+do what, or who can see whose.** Nothing else does.
 
 **Why.** Since every write is **already gated** as the user (§4) and every write
 is **reversible + audited**, the confirm panel isn't a permission check — it's
@@ -248,18 +248,37 @@ click is a hard one.
 
 So privilege writes confirm — and the set is **DERIVED, never listed**:
 `isPrivilegeWrite()` reads each tool's own entry in `TOOL_GATES` and returns true
-for anything gated on `member_roles:` or `team_members:` (falling back to the
-door it posts to, so an agent-only tool can't slip through by being absent from
-the map). Today that resolves to eight: `create_role`, `update_role`,
-`set_role_active`, `set_role_permissions`, `set_member_role`, `remove_member`,
-`invite_member`, `revoke_invite`. Deriving it is not tidiness — a hand-written
-list of four had already waved through `update_role`, which sat at
-`confirm: false` beside the four that confirmed. A write added tomorrow to either
-table confirms the moment it exists: `requiresConfirm` derives it at runtime, so
-the safe behaviour doesn't wait for anyone to remember, and
-`workers/data-ops/test/agent.test.ts` still requires the catalog to DECLARE
-`confirm: true` so it reads honestly. Everything else constructive runs free, so
-the friction the 2026-07-10 decision removed stays removed.
+for anything gated on `member_roles:`, `team_members:` or `portal_users:`
+(falling back to the door it posts to, so an agent-only tool can't slip through
+by being absent from the map). Deriving it is not tidiness — a hand-written list
+of four had already waved through `update_role`, which sat at `confirm: false`
+beside the four that confirmed.
+
+**And the second half, added 2026-08-11: the ACCOUNT FENCE.** Deriving from
+module names is honest about permissions and blind to *who can see whose*.
+`link_contact` is gated `accounts:create` and `set_account_parent` is gated
+`accounts:edit`, so neither looked like a privilege write — while
+`accountScope()` resolves a client login's whole world from exactly the rows they
+write (the parent pointer, `account_links`, `portal_users`). Linking a contact to
+a company, or re-parenting an account, hands an outside company sight of data it
+could not see a second ago, with no permission changing hands and no panel. Both
+ran silently, and `set_contact_link_active` ran silently in the *relink*
+direction for the same reason. So the derivation now has two halves, and the
+second reads the fence's own inputs: `FENCE_INPUTS` is declared in
+`shared/workers/account-scope.ts` beside the SQL that reads them, and
+`isPrivilegeWrite()` matches a tool's door and body fields against it — the
+parent pointer is a single named column, so renaming or archiving an account is
+*not* a fence write and stays free.
+
+A write added tomorrow to any of those tables confirms the moment it exists:
+`requiresConfirm` derives it at runtime, so the safe behaviour doesn't wait for
+anyone to remember; `workers/data-ops/test/agent.test.ts` requires the catalog to
+DECLARE `confirm: true` so it reads honestly; and
+`workers/tenancy/test/fence-confirm.test.ts` derives the fence-writing doors from
+the **doors' own source** (which table each handler publishes) rather than from
+any list, so a new door that the name-matching misses still turns the build red.
+Everything else constructive runs free, so the friction the 2026-07-10 decision
+removed stays removed.
 
 **The rule** (`requiresConfirm` in `workers/data-ops/src/lib/tools.ts` — the one
 place it's decided; a tool's `confirm` is a boolean, or a predicate for the
@@ -268,9 +287,10 @@ input-aware toggles):
 | Behaviour | Tools | Why |
 |---|---|---|
 | **Pause for a yes/no panel** | the destructive acts — `remove_member`, `revoke_invite` — plus `set_role_active` / `set_learning_active` / `set_dropdown_active` **only when deactivating** (`active !== true`) | It removes/withdraws access, or switches an existing record OFF. Reversible, but destructive-feeling — the app double-checks, exactly as the red UI action does. |
-| **Pause for a yes/no panel (privilege writes)** | DERIVED — every write gated on `member_roles:` or `team_members:` (today: `create_role`, `update_role`, `set_role_active`, `set_role_permissions`, `set_member_role`, `remove_member`, `invite_member`, `revoke_invite`) | They decide WHO CAN DO WHAT, and the model reaches them while reading team data an attacker can author. A silent one is a silent privilege escalation. Derived, so the next such tool is covered the day it lands. |
+| **Pause for a yes/no panel (privilege writes)** | DERIVED — every write gated on `member_roles:`, `team_members:` or `portal_users:` (today: `create_role`, `update_role`, `set_role_active`, `set_role_permissions`, `set_member_role`, `remove_member`, `invite_member`, `revoke_invite`, `grant_portal_access`, `set_portal_access_active`) | They decide WHO CAN DO WHAT, and the model reaches them while reading team data an attacker can author. A silent one is a silent privilege escalation. Derived, so the next such tool is covered the day it lands. |
+| **Pause for a yes/no panel (account-fence writes)** | DERIVED from `FENCE_INPUTS` — every write whose door writes `portal_users`, `account_links`, or `accounts.parent_account_id` (today: `create_account`, `set_account_parent`, `link_contact`, `set_contact_link_active`, plus the two portal-access writes above) | They decide WHO CAN SEE WHOSE. `accountScope()` builds a client login's whole world from these rows, so a silent link or re-parent widens what an outside company reads — without touching a permission. Both directions confirm: a relink hands a company back as surely as an unlink takes it away. |
 | **Confirm-with-a-count** | `bulk_set_help_status`, `bulk_set_learning_active`, `run_import_batch` | High-blast: "Set 12 tickets to resolved" / a whole imported file is confirmed by the count before it runs. |
-| **Run straight away** | every OTHER constructive write — `update_role`, `update_team`, `create_dropdown_value`, `update_dropdown_value`, the (re)activations, and all single content edits | Ordinary re-gated + reversible + audited CRUD; the server gates each call, so no panel. |
+| **Run straight away** | every OTHER constructive write — `update_team`, `update_account`, `create_dropdown_value`, `update_dropdown_value`, the content (re)activations, and all single content edits | Ordinary re-gated + reversible + audited CRUD; the server gates each call, so no panel. |
 
 The system prompt (`agent.ts`) tells the model **not** to also ask in
 chat for a confirmed action — the app shows one yes/no panel, and a chat-level

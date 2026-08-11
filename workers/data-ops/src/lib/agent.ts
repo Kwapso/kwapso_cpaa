@@ -12,7 +12,7 @@ import type { AgentQuota, ChatOutcome, PendingCall, StreamEvent } from "../../..
 import { pendingCall } from "../../../../shared/workers/confirm-payload"
 import { capabilityBrief } from "./app-brief"
 import { GLOSSARY } from "../../../../shared/glossary"
-import { consumeAiUnit, foldUsageIntoLatest, getQuota, logUsage, refundAiUnits, type UsageSource } from "./credits"
+import { consumeAiUnit, foldUsageIntoLatest, getQuota, logUsage, refundAiUnits, type ConsumeResult, type UsageSource } from "./credits"
 import type { Actor, MemberGuard } from "../../../../shared/workers/gating"
 import type { D1Rest } from "../../../../shared/workers/d1-rest"
 import type { Env } from "../env"
@@ -74,16 +74,17 @@ function usageSummary(message: string): string {
 }
 
 /** A running tally of the AI units ONE turn consumed and where they came from (free vs
- * paid credit, tracked as counts so a wholly-unsuccessful turn can be refunded exactly),
+ * paid credit, kept as counts so the usage row can name the pool the turn drew on),
  * so the loop can write a single usage-log row per turn. Steps add to it as they meter;
  * confirmAndRun seeds it with the unit it prepaid up front. `actions` collects the human
  * summary of each WRITE the turn ran (with a "(failed)" tag when a call was refused) — so
  * the usage log TITLES the row by what the assistant actually DID; a turn of only READS (a
  * clarifying question, a lookup) titles by the user's prompt instead, so it doesn't read as
  * "List roles" when the user only made a choice (the credit-log-clarity feedback).
- * `okWrites` counts the SUCCESSFUL writes, so a turn that changed nothing (a refused action)
- * can hand its credits back. */
-type UsageTally = { credits: number; free: number; credit: number; actions: string[]; okWrites: number }
+ * It counts no "successful writes" any more: that number existed only to decide a refund,
+ * and the refund no longer asks whether the turn ACHIEVED anything — it asks whether the
+ * unit was ever spent (see refundUnspentUnit). */
+type UsageTally = { credits: number; free: number; credit: number; actions: string[] }
 
 function tallySource(t: UsageTally): UsageSource {
   if (t.free > 0 && t.credit > 0) return "mixed"
@@ -260,11 +261,10 @@ async function runToolCall(ctx: StepCtx, tc: ToolCall): Promise<{ message: ChatM
   const failMsg = result.ok ? undefined : (result.error ?? "It failed.").slice(0, 140)
   emit?.({ t: "step_end", tool: tc.name, ok: result.ok, summary, ...(failMsg ? { error: failMsg } : {}) })
   // Title the usage-log row by the WRITES the turn ran (a failed write is still an action
-  // attempted, kept with "(failed)"). Count the successful ones so a wholly-refused turn
-  // can refund its credits.
+  // attempted, kept with "(failed)"). A READ never titles the row — a read-only turn falls
+  // back to the user's prompt.
   if (t?.write) {
     tally.actions.push(result.ok ? summary : `${summary} (failed)`)
-    if (result.ok) tally.okWrites += 1
   }
   const content = fence(result)
   await appendMessage(ctx.cfg, ctx.guard, ctx.actor, ctx.threadId, {
@@ -347,7 +347,7 @@ export async function runChat(
   // coalesces it with the message) — never persisted, rebuilt fresh per attach.
   if (planBlock) convo.push({ role: "user", content: planBlock })
   const quota = await getQuota(env, guard.teamId)
-  const tally: UsageTally = { credits: 0, free: 0, credit: 0, actions: [], okWrites: 0 }
+  const tally: UsageTally = { credits: 0, free: 0, credit: 0, actions: [] }
   return runPlanLoop(
     env,
     request,
@@ -422,29 +422,45 @@ async function runPlanLoop(
         )
   }
 
-  // A turn that changed NOTHING the user wanted — a refused/failed action or a model
-  // hiccup — hands its metered units back, so a blocked action never costs a credit (the
-  // credit-fairness feedback). Called only on the FAILURE exits; a normal question-answer
-  // turn (which took no write but did the work asked of it) still meters as usual. After a
-  // refund the logged row shows 0 credits (an honest "attempted, refused, no charge").
-  const refundIfNothingDone = async () => {
-    if (opts.tally.okWrites === 0 && opts.tally.credits > 0) {
-      // THE FREE ALLOWANCE IS NEVER REFUNDED. It is not a price, it is the daily
-      // BOUND on how much model spend this team can cause, and refunding it
-      // dissolved the bound: a turn that reliably ends in a refusal (asking to
-      // invite someone who is already a member will do it) burns real tokens
-      // against the Anthropic balance and hands its unit straight back, so the
-      // same turn runs forever for nothing. Paid credits still come back — that
-      // was the fairness this was written for, and credits are finite because
-      // someone bought them.
-      await refundAiUnits(env, guard.teamId, 0, opts.tally.credit)
-      opts.tally.credits = opts.tally.free
-      opts.tally.credit = 0
-      quota = await getQuota(env, guard.teamId)
-    }
+  // REFUND WHAT WAS NEVER SPENT — and nothing else.
+  //
+  // The old rule was "if no WRITE succeeded this turn, hand back every paid unit",
+  // and it was two mistakes in one line. A turn meters a unit per step, and each
+  // step the model answered was already PAID FOR in real tokens; refunding those
+  // gives back money that has gone. Worse, it fired on the failed-STEP exit — a
+  // failure any caller can produce on demand (ask to invite someone who is
+  // already a member) — so the credit lane became the unbounded one the free
+  // allowance was so carefully kept from becoming. The comment below explains at
+  // length why the free allowance must never come back, then handed the credit
+  // back on exactly the turn it was describing.
+  //
+  // A unit is SPENT the moment the model answers. Whether the answer pleased
+  // anybody, whether the door then refused the write, whether the wrap-up had to
+  // explain a failure — none of that un-burns the tokens. So exactly one unit is
+  // ever refundable: the one metered for the step whose model call THREW, which
+  // bought no completion at all. Not an earlier step's; not a step whose tools
+  // were refused; not the prepaid confirm unit, which already bought its writes.
+  //
+  // THE FREE ALLOWANCE IS STILL NEVER REFUNDED. It is not a price, it is the
+  // daily BOUND on how much model spend this team can cause, and a refund
+  // dissolves the bound. Credits come back on this one path because a model
+  // outage is ours, not the customer's.
+  //
+  // `stepUnit` is what THIS step paid with, or null when it paid nothing (the
+  // prepaid first step of a confirm continuation). It is re-set every iteration,
+  // so it always names the step the catch below is handling.
+  let stepUnit: ConsumeResult["source"] | null = null
+  const refundUnspentUnit = async () => {
+    if (stepUnit !== "credit") return
+    stepUnit = null // never twice, whatever else an exit path does
+    await refundAiUnits(env, guard.teamId, 0, 1)
+    opts.tally.credits -= 1
+    opts.tally.credit -= 1
+    quota = await getQuota(env, guard.teamId)
   }
 
   for (let step = 0; step < MAX_STEPS; step++) {
+    stepUnit = null
     if (!(loopOpts.prepaid && step === 0)) {
       const c = await consumeAiUnit(env, guard.teamId)
       quota = c.quota
@@ -458,6 +474,7 @@ async function runPlanLoop(
       opts.tally.credits += 1
       if (c.source === "credit") opts.tally.credit += 1
       else if (c.source === "free") opts.tally.free += 1
+      stepUnit = c.source
     }
 
     let reply: ModelReply
@@ -482,7 +499,7 @@ async function runPlanLoop(
       const msg = "The assistant had trouble just now and couldn't reply. Please try again in a moment."
       say(msg)
       await appendMessage(cfg, guard, actor, threadId, { role: "assistant", content: msg, source: opts.source })
-      await refundIfNothingDone() // a model hiccup that changed nothing costs nothing
+      await refundUnspentUnit() // this step's unit bought no completion — hand it back
       await log()
       return { done: true, threadId, reply: msg, quota }
     }
@@ -563,7 +580,10 @@ async function runPlanLoop(
       const note = await failureWrapUp(model, convo, tools)
       say(note)
       await appendMessage(cfg, guard, actor, threadId, { role: "assistant", content: note, source: opts.source })
-      await refundIfNothingDone() // a refused action (e.g. inviting an existing member) costs nothing
+      // NO REFUND HERE, deliberately. The model answered — twice, counting the
+      // unmetered wrap-up that reads the failure and explains it — so the unit is
+      // spent. This exit is also the one a caller can reach on demand (ask to
+      // invite an existing member), which is precisely why it must not be free.
       await log()
       return { done: true, threadId, reply: note, quota }
     }
@@ -621,7 +641,6 @@ export async function confirmAndRun(
     free: c.source === "free" ? 1 : 0,
     credit: c.source === "credit" ? 1 : 0,
     actions: [],
-    okWrites: 0,
   }
   const usageOpts = { source: opts.source, summary: "assistant action", tally }
 

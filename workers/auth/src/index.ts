@@ -166,6 +166,7 @@ async function internalLogError(request: Request, env: Env): Promise<Response> {
     message?: unknown
     stack?: unknown
     url?: unknown
+    userId?: unknown
   }
   // Type-checked field by field rather than put through requireText, because
   // this door DROPS rubbish instead of refusing it (R20 is satisfied by an
@@ -181,6 +182,12 @@ async function internalLogError(request: Request, env: Env): Promise<Response> {
       message,
       stack: typeof b.stack === "string" ? b.stack : undefined,
       url: typeof b.url === "string" ? b.url : undefined,
+      // WHO the gateway's session check named — the bucket logError's hourly
+      // ceiling charges the row to, and the only reason a client beacon can be
+      // bounded per person at all. It arrives from the gateway, never from the
+      // browser's body; a caller who reached this door already holds INTERNAL_KEY
+      // and could write anything, so there is nothing further to prove here.
+      userId: typeof b.userId === "string" ? b.userId : undefined,
     })
   return new Response(null, { status: 204 })
 }
