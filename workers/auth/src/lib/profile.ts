@@ -3,7 +3,14 @@
 // and are served by the gateway at /media/users/<id>/<random> — a capability
 // URL: the door checks no session, so the KEY has to be unguessable (mediaKey).
 
-import { dataUrlBytes, MAX_IMAGE_BYTES, mediaKey, parseDataUrl } from "../../../../shared/workers/image"
+import {
+  dataUrlBytes,
+  MAX_IMAGE_BYTES,
+  mediaKey,
+  ownedMediaKey,
+  parseDataUrl,
+  reclaimMedia,
+} from "../../../../shared/workers/image"
 import { publishChange, publishUserChange } from "../../../../shared/workers/realtime"
 import type { Env } from "../env"
 import { logAccountActivity } from "./account-activity"
@@ -30,6 +37,12 @@ export async function updateProfile(
     return { error: "name_too_long", message: "That name is too long." }
 
   let imageUrl = user.image_url
+  // The key this row points at NOW, read BEFORE anything moves. Every upload
+  // mints a NEW key, so once the row moves the old object is unreachable by
+  // anything except this variable — read it late and it is already an orphan.
+  // Proved to be THIS person's own photo from THEIR id (ownedMediaKey), never
+  // from a string a caller handed us.
+  let supersededKey: string | null = null
   if (input.imageDataUrl) {
     // SIZE FIRST, and from the ENCODED text (dataUrlBytes) — this door is on the
     // client portal's allow-list and gates on the session alone, so the one thing
@@ -45,6 +58,7 @@ export async function updateProfile(
     // A NEW key each time: the photo's URL is the only way to reach it, and the
     // old one keeps working for anything still holding it (the stored image_url
     // moves on). `users/<id>` alone was derivable by anyone who had seen the id.
+    supersededKey = ownedMediaKey(user.image_url, "/media/", "users", user.id)
     const key = mediaKey("users", user.id)
     await env.MEDIA.put(key, parsed.bytes, {
       httpMetadata: { contentType: parsed.contentType },
@@ -70,6 +84,15 @@ export async function updateProfile(
   )
     .bind(firstName, lastName, imageUrl, now, now, user.id)
     .run()
+
+  // THE ROW HAS MOVED — now reclaim the photo it no longer points at. Every
+  // changed photo used to leak its predecessor into the bucket forever. After,
+  // and fail-soft, on purpose: see reclaimMedia.
+  await reclaimMedia(env.MEDIA, [supersededKey], {
+    db: env.DB,
+    source: "auth",
+    place: "POST /api/auth/profile",
+  })
 
   // Account-activity (best-effort): record name / photo edits to the person's
   // own history. Only once they're past onboarding — the first fill-in isn't a

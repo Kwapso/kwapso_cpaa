@@ -44,7 +44,16 @@ export async function findUserByEmail(
     .first<UserRow>()
 }
 
-/** Email-code sign-in: the verified email IS the identity. */
+/** Email-code sign-in: the verified email IS the identity.
+ *
+ * IDEMPOTENT, because this is the front door. Read-then-insert against the
+ * `users.email` UNIQUE index is a race: two sign-ins for a brand-new address —
+ * a double-submit, a retried request — both read "no such user" and both insert,
+ * and the loser got a constraint violation, a 500, and a row in the global
+ * `error_logs`, on that person's very first interaction with the product. The
+ * uniqueness rule now rides the write (CONCURRENCY.md rule 2): `DO NOTHING`
+ * means the loser writes no row, throws nothing, and simply reads back the row
+ * the winner made. Whoever arrives second is not new — which is exactly true. */
 export async function findOrCreateUserByEmail(
   env: Env,
   email: string
@@ -65,12 +74,20 @@ export async function findOrCreateUserByEmail(
     updated_at: now,
     deactivated_at: null,
   }
-  await env.DB.prepare(
-    "INSERT INTO users (id, email, created_at, updated_at) VALUES (?, ?, ?, ?)"
+  const inserted = await env.DB.prepare(
+    "INSERT INTO users (id, email, created_at, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(email) DO NOTHING"
   )
     .bind(user.id, user.email, now, now)
     .run()
-  return { user, isNew: true }
+  if ((inserted.meta.changes ?? 0) > 0) return { user, isNew: true }
+
+  // Zero rows = someone else created this identity in the window. Their row is
+  // the identity; ours never existed.
+  const raced = await findUserByEmail(env, email)
+  if (raced) return { user: raced, isNew: false }
+  // No insert AND no row is not a race — it is a broken write, and sign-in must
+  // not hand back a session for a user that isn't there.
+  throw new Error(`user row for ${email} neither inserted nor found`)
 }
 
 

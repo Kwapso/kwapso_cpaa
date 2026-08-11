@@ -112,7 +112,14 @@ describe("the attempt cap is atomic", () => {
     // or a brute-forcer who finally lands on the digits walks in past the cap.
     const spends = loginCodes.match(/\$\{ATTEMPTS_LEFT\}/g) ?? []
     expect(spends.length, "the charge and the consume must both carry the budget").toBe(2)
-    expect(loginCodes).toMatch(/UPDATE login_codes SET consumed_at = \? WHERE id = \? AND \$\{ATTEMPTS_LEFT\}/)
+    // …and the consume carries `consumed_at IS NULL` too, exactly as the charge
+    // above does. This line used to pin the statement WITHOUT it — a green test
+    // holding a real race in place: the SELECT filtered on consumed_at and the
+    // write didn't, so two verifies of one correct code both passed and ONE code
+    // minted TWO sessions (double-submit.test.ts runs that race).
+    expect(loginCodes).toMatch(
+      /UPDATE login_codes SET consumed_at = \? WHERE id = \? AND consumed_at IS NULL AND \$\{ATTEMPTS_LEFT\}/
+    )
   })
 
   it("the verify door owns no copy of the rules — it calls the one seam", () => {
