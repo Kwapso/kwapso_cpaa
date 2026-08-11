@@ -68,6 +68,13 @@ export async function getLearningExport(request: Request, env: Env): Promise<Res
 
 export async function postCreateLearning(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<LearningInput>(request, env, "learning", "create")
+  // R21 AT THE DOOR, ON THE WRITE HALF TOO. Every READ door on this module already
+  // refuses a client login; not one WRITE door did, so the refusal existed on the
+  // module and was missing on exactly the half that changes things. It held only
+  // because the shipped Client role happens not to carry the right — and R21's own
+  // sentence is that the decision belongs at the door, precisely so it does not
+  // depend on how carefully a role was built.
+  await refusePortalCaller(cfg, guard)
   requireText(body.title, "Title", TEXT_LIMITS.short)
   const id = await createLearning(cfg, guard, actor, body)
   // Row-level: carry the new item's id so open learning lists patch just that row.
@@ -77,6 +84,13 @@ export async function postCreateLearning(request: Request, env: Env): Promise<Re
 
 export async function postUpdateLearning(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<LearningInput & { id?: string }>(request, env, "learning", "edit")
+  // R21 AT THE DOOR, ON THE WRITE HALF TOO. Every READ door on this module already
+  // refuses a client login; not one WRITE door did, so the refusal existed on the
+  // module and was missing on exactly the half that changes things. It held only
+  // because the shipped Client role happens not to carry the right — and R21's own
+  // sentence is that the decision belongs at the door, precisely so it does not
+  // depend on how carefully a role was built.
+  await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Article", TEXT_LIMITS.short)
   requireText(body.title, "Title", TEXT_LIMITS.short)
   await updateLearning(env, cfg, guard, actor, id, body)
@@ -88,6 +102,13 @@ export async function postUpdateLearning(request: Request, env: Env): Promise<Re
  * Gated by learning:delete (deactivate is our "delete" in the deactivate model). */
 export async function postSetLearningActive(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown; active?: unknown }>(request, env, "learning", "delete")
+  // R21 AT THE DOOR, ON THE WRITE HALF TOO. Every READ door on this module already
+  // refuses a client login; not one WRITE door did, so the refusal existed on the
+  // module and was missing on exactly the half that changes things. It held only
+  // because the shipped Client role happens not to carry the right — and R21's own
+  // sentence is that the decision belongs at the door, precisely so it does not
+  // depend on how carefully a role was built.
+  await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Article", TEXT_LIMITS.short)
   if (typeof body.active !== "boolean")
     return fail(400, "invalid_input", "id and active are required.")
@@ -105,6 +126,13 @@ export async function postSetLearningActive(request: Request, env: Env): Promise
  * never refetch the list). Returns { updated, skipped }. */
 export async function postBulkSetLearningActive(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<{ ids?: unknown; active?: unknown }>(request, env, "learning", "delete")
+  // R21 AT THE DOOR, ON THE WRITE HALF TOO. Every READ door on this module already
+  // refuses a client login; not one WRITE door did, so the refusal existed on the
+  // module and was missing on exactly the half that changes things. It held only
+  // because the shipped Client role happens not to carry the right — and R21's own
+  // sentence is that the decision belongs at the door, precisely so it does not
+  // depend on how carefully a role was built.
+  await refusePortalCaller(cfg, guard)
   const ids = requireIdList(body.ids)
   if (typeof body.active !== "boolean")
     return fail(400, "invalid_input", "active must be true or false.")
@@ -151,7 +179,14 @@ export async function getLearningProgress(request: Request, env: Env): Promise<R
  * its own row). Gated by learning:create. */
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 export async function postUploadLearningFile(request: Request, env: Env): Promise<Response> {
-  const { guard, body } = await gatedBody<{ dataUrl?: unknown }>(request, env, "learning", "create")
+  const { cfg, guard, body } = await gatedBody<{ dataUrl?: unknown }>(request, env, "learning", "create")
+  // R21 AT THE DOOR, ON THE WRITE HALF TOO. Every READ door on this module already
+  // refuses a client login; not one WRITE door did, so the refusal existed on the
+  // module and was missing on exactly the half that changes things. It held only
+  // because the shipped Client role happens not to carry the right — and R21's own
+  // sentence is that the decision belongs at the door, precisely so it does not
+  // depend on how carefully a role was built.
+  await refusePortalCaller(cfg, guard)
   const parsed = parseUploadDataUrl(body.dataUrl, MAX_UPLOAD_BYTES)
   if (!parsed) return fail(400, "invalid_input", "That file isn't a supported upload (max 25 MB).")
   // The key IS the credential — the gateway serves /media/* with no session, so

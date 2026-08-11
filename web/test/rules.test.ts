@@ -706,13 +706,28 @@ describe("RULES — the laws of the base", () => {
     const seed = read(join(ROOT, "scripts", "seed-staging.mjs"))
     const rightsAt = seed.indexOf("rights: {", seed.indexOf("const CLIENT_ROLE"))
     expect(rightsAt, "the seed no longer declares CLIENT_ROLE.rights — re-read this check").toBeGreaterThan(-1)
-    const block = seed.slice(rightsAt, seed.indexOf("\n  },", rightsAt))
+    // INSIDE the brace, not from the `rights:` key itself. Scanning from the key
+    // made the container look like the FIRST module: `[^}]*` ran from `rights: {`
+    // to the closing brace of `teams: { read: true }`, so the first module in the
+    // block was recorded as a phantom `rights:read` and its real right was lost.
+    // It cost nothing only because no door happens to gate on `teams:read` — the
+    // check silently declared the Client role unable to reach a right it holds,
+    // which is the one direction this derivation must never fail in.
+    const block = seed.slice(seed.indexOf("{", rightsAt) + 1, seed.indexOf("\n  },", rightsAt))
     const clientRights = new Set<string>()
     for (const m of block.matchAll(/(\w+):\s*\{([^}]*)\}/g))
       for (const r of m[2].matchAll(/(\w+):\s*true/g)) clientRights.add(`${m[1]}:${r[1]}`)
     // Guard the derivation: an empty right set would make every door "unreachable"
     // and pass this whole law without reading a line of worker source.
     expect(clientRights.has("help:read"), "the Client role must still hold help:read").toBe(true)
+    // And guard it against the mis-parse above, which an empty-set check cannot
+    // see: the FIRST module in the block has to survive, and the container must
+    // never appear as one.
+    expect(clientRights.has("teams:read"), "the first module in the block was dropped").toBe(true)
+    expect(
+      [...clientRights].filter((r) => r.startsWith("rights:")),
+      "`rights` is the container, not a module — the scan started outside the brace"
+    ).toEqual([])
     expect(clientRights.size, "the Client role's rights did not parse").toBeGreaterThan(4)
 
     // ── 2. the portal's own surface ──────────────────────────────────────────

@@ -206,6 +206,13 @@ export async function postUpdateTeam(request: Request, env: Env): Promise<Respon
   const { actor, cfg, guard, body } = await gatedBody<{ name?: unknown; logoDataUrl?: unknown }>(
     request, env, "teams", "edit"
   )
+  // R21 AT THE DOOR, ON THE WRITE HALF TOO. Every READ door on this module already
+  // refuses a client login; not one WRITE door did, so the refusal existed on the
+  // module and was missing on exactly the half that changes things. It held only
+  // because the shipped Client role happens not to carry the right — and R21's own
+  // sentence is that the decision belongs at the door, precisely so it does not
+  // depend on how carefully a role was built.
+  await refusePortalCaller(cfg, guard)
   const name = requireText(body.name, "Name", TEXT_LIMITS.short)
   // A data URL is bytes, not prose — parseDataUrl caps and refuses it downstream,
   // so the boundary's job here is only to prove it IS a string (a number would
