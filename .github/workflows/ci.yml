@@ -5,6 +5,13 @@ on:
   push:
     branches: [main]
   pull_request:
+# Least privilege for GITHUB_TOKEN. Without this the job inherits the repository
+# default, which on many repos is write on `contents` — and `npm ci` below runs
+# the install lifecycle scripts of ~380 dependencies inside that job. One
+# compromised transitive package would be able to read the token out of the
+# runner and push. This workflow only ever reads the code.
+permissions:
+  contents: read
 jobs:
   check:
     runs-on: ubuntu-latest

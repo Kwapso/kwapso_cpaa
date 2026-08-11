@@ -102,6 +102,15 @@ export async function postBatchFile(request: Request, env: Env): Promise<Respons
 export async function postBatchPlan(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await teamContext(request, env)
   await requireAnyImportRight(cfg, guard)
+  // THE PLAN STEP IS AN ASSISTANT TURN, so it is gated like one. It spends the
+  // team's free daily allowance and then decrements `agent_credits.balance` —
+  // money the owner bought — and it used to do that behind the import rights
+  // alone. MCP.md §1 tells a developer that "a role with those rights and no
+  // agent access is the safe, zero-AI-cost choice"; without this line that
+  // sentence was false, and a token issued on exactly that advice could loop this
+  // door and drain the balance to zero. Worse, the same role cannot read
+  // `get_ai_allowance` (agent:read), so it could not see what it was spending.
+  await requireRight(cfg, guard, "agent", "create")
   const body = (await request.json().catch(() => ({}))) as { batchId?: unknown }
   const batchId = requireText(body.batchId, "Batch", TEXT_LIMITS.short)
   const c = await consumeAiUnit(env, guard.teamId)

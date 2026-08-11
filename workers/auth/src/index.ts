@@ -325,7 +325,34 @@ async function profile(request: Request, env: Env): Promise<Response> {
   const user = await getSessionUser(env, request)
   if (!user) return fail(401, "signed_out", "Not signed in.")
 
-  const input = (await request.json().catch(() => ({}))) as ProfileInput
+  // R20 AT THE DOOR, not one frame down. This handler used to read the body with
+  // a bare cast and hand the WHOLE object to updateProfile, which did
+  // `(input.firstName ?? "").trim()` — and `??` does not catch a number, so
+  // {"firstName": 1} was a TypeError, a 500, and an error_logs row in the GLOBAL
+  // core database, from any signed-in caller, at BOTH front doors (this route is
+  // on the portal's allow-list too).
+  //
+  // It is also the reason the law's own scanner never saw it: `validated-bodies`
+  // follows `<binding>.<field>` reads in the file that bound the body, and this
+  // file read no fields at all — the door contributed ZERO fields to the census
+  // and reported clean. Validating here fixes the crash AND puts the three fields
+  // back in the scanner's field of view, which is the half that stays fixed.
+  const body = (await request.json().catch(() => ({}))) as {
+    firstName?: unknown
+    lastName?: unknown
+    imageDataUrl?: unknown
+  }
+  const input: ProfileInput = {
+    firstName: optionalText(body.firstName, "First name", TEXT_LIMITS.short),
+    lastName: optionalText(body.lastName, "Last name", TEXT_LIMITS.short),
+    // Through the SAME seam, not a `typeof` — auth's own boundary rule
+    // (test/boundary.test.ts) is stricter than R20's and admits only the three
+    // validators, because a cast walked past its first version. The cap is in
+    // CHARACTERS and deliberately generous: a data URL is measured in bytes, and
+    // dataUrlBytes + parseDataUrl enforce MAX_IMAGE_BYTES (2.5 MB) a moment
+    // later. This one only has to stop a non-string and an absurd string.
+    imageDataUrl: optionalText(body.imageDataUrl, "Photo", 4_000_000),
+  }
   const result = await updateProfile(env, user, input)
   if ("error" in result) return fail(400, result.error, result.message)
   return json(result)

@@ -113,6 +113,34 @@ export const FENCE_INPUTS: Record<string, string[]> = {
   accounts: ["parent_account_id"],
 }
 
+/** TABLES THE FENCE IS APPLIED **TO** — the other half of the sentence above.
+ *
+ * `FENCE_INPUTS` names what `accountScope()` READS to work out where a caller
+ * stands. This names the rows the resulting clause is then ANDed into: the
+ * column on each table that says which account owns the row, and therefore which
+ * client login may read it. A ticket is the first and, today, the only one
+ * (`ticketFence` → `accountScopeClause(scope, "account_id")`).
+ *
+ * Both change who can see whose; they just change it from opposite ends. Writing
+ * `accounts.parent_account_id` MOVES THE FENCE. Writing `help.account_id` MOVES
+ * A ROW ACROSS IT — and a ticket carries its whole reply history with it, so
+ * naming a client on an agency ticket publishes that conversation into their
+ * portal in one call.
+ *
+ * WHO READS THIS. `shared/workers/tool-catalog.ts`, beside FENCE_INPUTS, to
+ * decide which machine-surface writes must stop for a confirm panel. It is
+ * declared HERE rather than there for the same reason FENCE_INPUTS is: the list
+ * has to sit next to the clause it describes, or the next module to grow a
+ * fenced column will be added to the fence and forgotten by the panel — which is
+ * exactly what happened to `help`. `update_help_ticket` exposed `accountId`, the
+ * door set it on any ticket that had none, and no panel ever opened, because the
+ * derivation only knew about tables the fence READS. */
+export const FENCED_ROW_OWNERS: Record<string, string> = {
+  // Set once and never moved (workers/content/src/lib/help.ts), so the write
+  // this guards is the ONE that takes an agency ticket and hands it to a client.
+  help: "account_id",
+}
+
 /** Resolve the caller's account set — the ONE place it is decided. Costs one
  * read for staff (the portal_users miss) and three for a portal caller. */
 export async function accountScope(cfg: D1Rest, guard: MemberGuard): Promise<AccountScope> {

@@ -28,7 +28,13 @@ export async function getErrors(request: Request, env: Env): Promise<Response> {
   if (blocked) return blocked
   const url = new URL(request.url)
   const status = queryText(url.searchParams.get("status"), "Status") ?? "open"
-  const limit = Math.min(Number(url.searchParams.get("limit")) || 100, 200)
+  // R14 — the cap has to survive a hostile number, not just an absent one.
+  // `Math.min(Number(x) || 100, 200)` looks bounded and isn't: ?limit=-1 is a
+  // finite negative, so it beats the min, and SQLite reads a NEGATIVE LIMIT as
+  // NO LIMIT — the ceiling on the one table designed to grow turned off by a
+  // minus sign. Clamped from BOTH ends, and truncated, so the value interpolated
+  // below is always an integer in [1, 200].
+  const limit = Math.min(Math.max(1, Math.trunc(Number(url.searchParams.get("limit")) || 100)), 200)
   const where = status === "all" ? "" : "WHERE status = ?"
   const stmt = env.DB.prepare(
     `SELECT id, at, source, place, message, stack, team_id, user_id, url, status, resolved_at, resolution_note

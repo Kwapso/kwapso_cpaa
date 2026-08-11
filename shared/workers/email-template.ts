@@ -35,6 +35,20 @@ function esc(s: string): string {
     .replace(/"/g, "&quot;")
 }
 
+/** A URL going into an `href`/`src` ATTRIBUTE. Four values in this template were
+ * escaped and the fifth — `ctaUrl` — was not, which is the one that lands inside
+ * quotes in an attribute, the position where a stray `"` stops being text and
+ * starts being markup. Today every caller builds it from `PUBLIC_APP_URL` (config,
+ * not a request), so this was a gap rather than a hole; it is closed here because
+ * the next caller to build a CTA from a row value would not think to check.
+ *
+ * Scheme allow-list as well as escaping: an email client that follows
+ * `javascript:` or `data:text/html` is rare but the cost of excluding them is
+ * nothing. Anything else falls back to the app origin. */
+function safeUrl(url: string, origin?: string): string {
+  return /^https?:\/\//i.test(url) || url.startsWith("/") ? esc(url) : esc(origin ?? "#")
+}
+
 export function brandedEmail(o: BrandedEmail): { html: string; text: string } {
   const { primary, surface, ink } = brand.accentHex
   const font =
@@ -64,7 +78,7 @@ export function brandedEmail(o: BrandedEmail): { html: string; text: string } {
   const ctaBlock =
     o.ctaLabel && o.ctaUrl
       ? `<tr><td style="padding:12px 0 4px">
-           <a href="${o.ctaUrl}" style="display:inline-block;background:${primary};color:#ffffff;font:600 15px ${font};text-decoration:none;padding:12px 22px;border-radius:10px">${esc(o.ctaLabel)}</a>
+           <a href="${safeUrl(o.ctaUrl, o.origin)}" style="display:inline-block;background:${primary};color:#ffffff;font:600 15px ${font};text-decoration:none;padding:12px 22px;border-radius:10px">${esc(o.ctaLabel)}</a>
          </td></tr>`
       : ""
 

@@ -31,11 +31,27 @@ const cfg = { accountId: "a", apiToken: "t" } as never
 const guard = { userId: "ME", teamId: "TEAM", roleId: "ADMIN", databaseId: "db" }
 const actor = { id: "ME", email: "me@x.com", name: "Me" }
 
-/** Make d1Query answer the role lookup with the given row (or none = missing). */
+/** Make d1Query answer the role lookup with the given row (or none = missing).
+ *
+ * The caller here is an ADMIN, so their own permission sheet reads FULL. That
+ * second answer is not decoration: `setRolePermissions` now checks the sheet it
+ * is being asked to write against the CALLER's own (requireGrantableRights — you
+ * cannot hand out a right you do not hold), so a mock that answered "no rights"
+ * would refuse every case below for a reason none of them is about. The rule
+ * itself is tested against a REAL database in grant-ceiling.test.ts. */
 function roleLookup(role: { id: string; title: string; is_default: number } | null) {
-  d1Query.mockImplementation(async (_c, _db, sql: string) =>
-    sql.includes("FROM member_roles") ? (role ? [role] : []) : []
-  )
+  d1Query.mockImplementation(async (_c, _db, sql: string) => {
+    if (sql.includes("FROM member_roles")) return role ? [role] : []
+    if (sql.includes("FROM role_permissions"))
+      return TEAM_MODULE_CATALOG.map((m) => ({
+        module: m.key,
+        can_read: 1,
+        can_create: 1,
+        can_edit: 1,
+        can_delete: 1,
+      }))
+    return []
+  })
 }
 
 beforeEach(() => {

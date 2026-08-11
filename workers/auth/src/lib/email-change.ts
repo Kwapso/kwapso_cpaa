@@ -121,12 +121,6 @@ export async function verifyEmailChange(
   if (!/^\d{6}$/.test(code))
     return { error: "invalid_input", message: "Enter the 6-digit code.", status: 400 }
 
-  // Re-check uniqueness at the last moment (someone may have grabbed it during
-  // the 10-minute window); the UNIQUE constraint is the final backstop.
-  const existing = await findUserByEmail(env, newEmail)
-  if (existing && existing.id !== user.id)
-    return { error: "email_taken", message: "That email is already in use.", status: 409 }
-
   const row = await env.DB.prepare(
     `SELECT id, code_hash, attempts, expires_at FROM email_change_codes
      WHERE user_id = ? AND new_email = ? AND consumed_at IS NULL
@@ -150,6 +144,27 @@ export async function verifyEmailChange(
     return { error: "too_many_attempts", message: "Too many wrong tries. Request a new code.", status: 429 }
   if (row.code_hash !== (await sha256Hex(`${code}:${newEmail}`)))
     return { error: "wrong_code", message: "That code isn't right. Check and try again.", status: 400 }
+
+  // NOW re-check uniqueness — someone may have grabbed the address during the
+  // 10-minute window, and the UNIQUE constraint below is the final backstop.
+  //
+  // AFTER the code is proved, deliberately. This check used to run FIRST, before
+  // the code row was even looked up, which made this door an ORACLE: any signed-
+  // in caller could POST {email: "someone@elsewhere.com", code: "000000"} and read
+  // the answer off the status — 409 "email taken" means that address holds an
+  // account, anything else means it doesn't. No code needed, no pending change
+  // needed, no attempt counter touched (the cap is two statements further down),
+  // and this door carries no throttle of its own — the throttles all live on
+  // .../change/start. In an invite-only product the global users table IS the
+  // agency's staff-and-client roster, and a client contact reaches this door at
+  // the agency origin because /api/auth/* is forwarded by prefix.
+  //
+  // Behind the hash comparison it answers only someone who already holds a live
+  // code for that exact address, which is a person the address's owner was
+  // emailed about.
+  const existing = await findUserByEmail(env, newEmail)
+  if (existing && existing.id !== user.id)
+    return { error: "email_taken", message: "That email is already in use.", status: 409 }
 
   const oldEmail = user.email
   // CLAIM THE CODE FIRST, and with the predicate ON the write (R17 / the login
