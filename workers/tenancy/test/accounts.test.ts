@@ -134,14 +134,87 @@ describe("reference codes are labels, never identifiers", () => {
     await createAccount(cfg, guard, staff, actor, { accountType: "entity", name: "One", code: "BERG" })
     // The partial unique index is the race guard: the SECOND writer loses at the
     // database, not at an application check two statements earlier.
+    //
+    // WHAT IT LOSES WITH MATTERS AS MUCH AS THAT IT LOSES. This assertion used
+    // to be a bare `.rejects.toThrow()`, which the raw constraint error passed —
+    // a green test agreeing with a 500. A duplicate reference is a TYPO, and a
+    // typo must come back as an answer (R20).
     await expect(
       createAccount(cfg, guard, staff, actor, { accountType: "entity", name: "Two", code: "BERG" })
-    ).rejects.toThrow()
+    ).rejects.toMatchObject({ status: 409, code: "duplicate" })
     // …while the many code-less rows coexist happily (that's what partial buys).
     await createAccount(cfg, guard, staff, actor, { accountType: "entity", name: "Three" })
     await createAccount(cfg, guard, staff, actor, { accountType: "entity", name: "Four" })
     const codeless = db().prepare("SELECT COUNT(*) n FROM accounts WHERE code IS NULL").get() as { n: number }
     expect(codeless.n).toBeGreaterThan(3)
+  })
+
+  // A TYPO MUST NOT BE ABLE TO WRITE TO THE ERROR LOG.
+  //
+  // Nothing checked the reference before the write and nothing caught the index
+  // refusing it, so a duplicate came back through the central catch as a 500 —
+  // and the central catch records every 500 in the GLOBAL core error_logs table.
+  // Retype the same reference, get another row. An everyday mistake, holding the
+  // pen. This is checked through the ROUTE, because "the handler throws the right
+  // thing" is only half the sentence: the other half is what the worker's catch
+  // does with it.
+  describe("a duplicate reference is an answer, not a crash", () => {
+    /** The core table the central catch writes 500s into (db/core/0012). It is not
+     * in the spine harness's core fixtures — it is created here because counting
+     * its rows IS the assertion. */
+    const withErrorLog = () => {
+      db().exec(
+        `CREATE TABLE IF NOT EXISTS error_logs (id TEXT PRIMARY KEY, at TEXT NOT NULL,
+           source TEXT NOT NULL, place TEXT NOT NULL, message TEXT NOT NULL, stack TEXT,
+           team_id TEXT, user_id TEXT, url TEXT, status TEXT NOT NULL DEFAULT 'open',
+           resolved_at TEXT, resolution_note TEXT);`
+      )
+    }
+    const errorsLogged = () =>
+      (db().prepare("SELECT COUNT(*) n FROM error_logs").get() as { n: number }).n
+    const post = async (path: string, body: unknown) => {
+      const res = await worker.fetch(req(`POST ${path}`, body), makeEnv(() => db(), IDS.staffUser))
+      return { status: res.status, body: (await res.json()) as { error?: string; message?: string } }
+    }
+
+    it("creating with a taken reference answers 409 and logs nothing", async () => {
+      withErrorLog()
+      expect(await post("/api/tenancy/accounts", { accountType: "entity", name: "One", code: "BERG" })).toMatchObject({ status: 200 })
+
+      const clash = await post("/api/tenancy/accounts", { accountType: "entity", name: "Two", code: "BERG" })
+      expect(clash.status, "a duplicate reference is bad input, never a 500").toBe(409)
+      expect(clash.body.error).toBe("duplicate")
+      expect(
+        clash.body.message,
+        "and it is said in the words a manager uses — never the database's"
+      ).not.toMatch(/UNIQUE|constraint|SQLITE|D1/i)
+      expect(clash.body.message).toMatch(/reference/i)
+
+      // The part that made a typo worth an attacker's time: every repeat wrote a
+      // row to the GLOBAL error log.
+      await post("/api/tenancy/accounts", { accountType: "entity", name: "Three", code: "BERG" })
+      await post("/api/tenancy/accounts", { accountType: "entity", name: "Four", code: "BERG" })
+      expect(errorsLogged(), "a refusal is not a crash, so it records no crash").toBe(0)
+    })
+
+    it("editing an account onto a taken reference answers the same way", async () => {
+      withErrorLog()
+      await post("/api/tenancy/accounts", { accountType: "entity", name: "One", code: "BERG" })
+
+      const clash = await post("/api/tenancy/accounts/update", {
+        id: IDS.victimAccount,
+        name: "Bergman S.A.",
+        code: "BERG", // already worn by the row above
+      })
+      expect(clash.status).toBe(409)
+      expect(clash.body.error).toBe("duplicate")
+      expect(errorsLogged()).toBe(0)
+      // …and the edit did not half-happen.
+      const row = db().prepare("SELECT code FROM accounts WHERE id = ?").get(IDS.victimAccount) as {
+        code: string | null
+      }
+      expect(row.code).toBeNull()
+    })
   })
 
   it("re-coding an account changes nothing about what points at it", async () => {
