@@ -76,6 +76,32 @@ export const AGENT_REPLY_ENVELOPE_TOKENS = 512
  * enforces, and the number that physically fits are one number. */
 export const BULK_IDS_LIMIT = Math.floor((AGENT_MAX_TOKENS - AGENT_REPLY_ENVELOPE_TOKENS) / TOKENS_PER_EMITTED_ID)
 
+// ── what one caller may add to the SHARED core database ──────────────────────
+// The per-team databases are a tenant's own problem: fill one and you have filled
+// YOURS. The core database is everybody's. So every write a signed-in person can
+// repeat at will against it carries a ceiling, and — CONCURRENCY.md — the ceiling
+// rides the INSERT rather than being read first.
+
+/** Account-activity rows one PERSON may write in an hour. Every identity edit
+ * (name, photo, email) appends a row to the shared core database AND pings that
+ * person's live channel, so a session alternating its own first name grows the one
+ * database every team depends on, for free, from an ordinary signed-in door.
+ * Generous for a real person tidying their profile; a wall for a loop. */
+export const ACCOUNT_ACTIVITY_PER_HOUR = 60
+
+/** Rows one retention sweep will delete PER TABLE per nightly tick. A DELETE is
+ * as unbounded as a SELECT: an estate that has never been swept would otherwise
+ * try to remove millions of rows in one statement and time out, night after
+ * night, deleting nothing at all. Bounded work catches up over a few nights and
+ * always finishes. */
+export const RETENTION_DELETE_CAP = 5_000
+
+/** How long a spent or expired sign-in artefact is kept before the sweep takes
+ * it. Everything that reads these tables looks back ONE hour (the send budget,
+ * the per-address code cap), and a code lives ten minutes — so a day is already
+ * far past the last moment any rule can still see the row. */
+export const AUTH_RETENTION_HOURS = 24
+
 /** Per-user ceiling on CREATED teams. Every team provisions a REAL database, so
  * an uncapped create door lets one signed-up person exhaust the platform's
  * database quota. Low on purpose — a person runs a handful of teams, not fifty;

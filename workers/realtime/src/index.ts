@@ -211,6 +211,15 @@ async function handle(request: Request, env: Env): Promise<Response> {
         // membership alone put them on a channel that names, by row id, every
         // account in the agency as it changes. Ids are the currency of the leak
         // this base already fixed once. So the caller's fence rides the socket.
+        //
+        // THE FENCE IS RESOLVED HERE, EVERY TIME, FROM THE SESSION. The client
+        // also puts where it thinks it is standing in the query string (`?fence=`
+        // — see shared/web/realtime.ts), and this worker deliberately never reads
+        // it: it exists so that a client whose fence MOVES opens a new socket
+        // instead of keeping one stamped with the world they have left. It is a
+        // cache key on their side, and nothing at all on ours. Reading it would
+        // turn a URL a client controls into the fence that decides what they may
+        // hear, which is precisely the shape this stamp exists to refuse.
         let stamp: ScopeStamp
         try {
           const guard = await requireMember(env, user.id, teamId)

@@ -324,8 +324,27 @@ export async function createAccount(
   return id
 }
 
+/** A field the caller may have left out entirely. `undefined` = "say nothing
+ * about it"; `null` = "clear it"; a string = "set it to this". */
+type Patch = string | null | undefined
+
 /** Edit an account's own fields (never its parent — that's setAccountParent, which
- * has a cycle to answer for). The fence rides the UPDATE. */
+ * has a cycle to answer for). The fence rides the UPDATE.
+ *
+ * THIS IS A PATCH, NOT A REPLACE, AND IT DID NOT USED TO BE. Every optional field
+ * was written as `input.X ?? null`, so a caller who sent only `{id, name}` did not
+ * edit the name — it silently erased the email, phone, address, reference,
+ * currency, language and time zone with it. Two callers were doing exactly that
+ * every day. The assistant's `update_account` tool drops absent fields, so an
+ * agent turn asked to "rename this account" destroyed the rest of the record and
+ * showed the owner nothing to approve. And the app's OWN account form never sends
+ * currency, language or time zone at all, so saving any edit from the screen wiped
+ * all three — a data-loss bug that had nothing to do with the agent.
+ *
+ * So absence now means absence. `undefined` keeps what is there (`before`), and
+ * clearing a field is something a caller has to SAY, by sending it empty. `status`
+ * and `commercialsVisible` already worked this way; the other seven now agree
+ * with them, which is the point — one rule for the whole record, not two. */
 export async function updateAccount(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -334,14 +353,14 @@ export async function updateAccount(
   id: string,
   input: {
     name: string
-    email?: string
-    phone?: string
-    address?: string
-    code?: string
-    currency?: string
-    locale?: string
-    timezone?: string
-    status?: string
+    email?: Patch
+    phone?: Patch
+    address?: Patch
+    code?: Patch
+    currency?: Patch
+    locale?: Patch
+    timezone?: Patch
+    status?: Patch
     commercialsVisible?: boolean
   }
 ): Promise<void> {
@@ -349,23 +368,43 @@ export async function updateAccount(
   const fence = accountScopeClause(scope, "id")
   const audit = editedBy(actor, new Date().toISOString())
 
+  /** What this field becomes: the caller's value when they mentioned it at all,
+   * otherwise exactly what the row already holds. */
+  const keep = (value: Patch, current: string | null): string | null =>
+    value === undefined ? current : value
+
+  const next = {
+    email: keep(input.email, before.email),
+    phone: keep(input.phone, before.phone),
+    address: keep(input.address, before.address),
+    code: keep(input.code, before.code),
+    currency: keep(input.currency, before.currency),
+    locale: keep(input.locale, before.locale),
+    timezone: keep(input.timezone, before.timezone),
+    // Status is the one field with no "cleared" state to reach: the column is NOT
+    // NULL with a default, so an empty status is not a blank commercial stage, it
+    // is a constraint violation and a 500. Absent OR empty both keep what's there
+    // — the behaviour it has always had, said out loud rather than left to `??`.
+    status: input.status ?? before.status,
+  }
+
   const changed = await refusingDuplicate(REFERENCE_TAKEN, () =>
     d1Query<{ id: string }>(
       cfg,
       guard.databaseId,
       `UPDATE accounts SET name = ?, email = ?, phone = ?, address = ?, code = ?, currency = ?,
-       locale = ?, timezone = ?, status = ?, commercials_visible = ?, ${audit.sql}
-     ${where([fence.sql, "id = ?"])} RETURNING id`,
+         locale = ?, timezone = ?, status = ?, commercials_visible = ?, ${audit.sql}
+       ${where([fence.sql, "id = ?"])} RETURNING id`,
       [
         input.name,
-        input.email ?? null,
-        input.phone ?? null,
-        input.address ?? null,
-        input.code ?? null,
-        input.currency ?? null,
-        input.locale ?? null,
-        input.timezone ?? null,
-        input.status ?? before.status,
+        next.email,
+        next.phone,
+        next.address,
+        next.code,
+        next.currency,
+        next.locale,
+        next.timezone,
+        next.status,
         input.commercialsVisible === undefined ? (before.commercialsVisible ? 1 : 0) : input.commercialsVisible ? 1 : 0,
         ...audit.params,
         ...fence.params,
@@ -377,10 +416,10 @@ export async function updateAccount(
 
   const changes = describeChanges([
     { label: "Name", from: before.name, to: input.name },
-    { label: "Reference", from: before.code, to: input.code ?? null },
-    { label: "Email", from: before.email, to: input.email ?? null },
-    { label: "Phone", from: before.phone, to: input.phone ?? null },
-    { label: "Status", from: before.status, to: input.status ?? before.status },
+    { label: "Reference", from: before.code, to: next.code },
+    { label: "Email", from: before.email, to: next.email },
+    { label: "Phone", from: before.phone, to: next.phone },
+    { label: "Status", from: before.status, to: next.status },
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Account edited",

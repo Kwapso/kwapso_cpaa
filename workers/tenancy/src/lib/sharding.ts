@@ -1,8 +1,9 @@
 // The sharding machinery (locked decision: built up front).
 //
 // Relief valves, in order of reach:
-//  1. ALARM  — nightly cron sizes every team database; ≥80% of D1's 10GB cap
-//              writes a db_alerts row + screams into the worker logs.
+//  1. ALARM  — nightly cron sizes every database in the account (the team ones
+//              AND the shared core); ≥80% of D1's 10GB cap writes a db_alerts
+//              row + screams into the worker logs.
 //  2. MOVER  — relocates one module's tables out of a team's database into a
 //              dedicated database, recorded in team_module_databases.
 //  3. SPLIT  — reads for a (team, module) can span several databases via
@@ -26,7 +27,20 @@ import type { Env } from "../env"
 export const ALERT_THRESHOLD_BYTES = 8 * 1024 * 1024 * 1024
 const COPY_BATCH = 250
 
-/** Nightly: size every team database, alarm on anything ≥ the threshold.
+/** Nightly: size EVERY database in the account, alarm on anything ≥ the threshold.
+ *
+ * IT USED TO WATCH ONLY `team-*`, AND THAT WAS THE HOLE. The prefix filter read
+ * like a tidy scope and was actually a blind spot over the one database that
+ * matters most: `kwapso-core` holds every user, session, team, error log and
+ * usage row in the platform, it is the ONLY database whose growth is driven by
+ * strangers (sign-in codes come from an unauthenticated door), and it is the one
+ * whose 10GB ceiling takes the whole product down rather than one tenant. It
+ * could never raise an alarm, because it does not begin with "team-".
+ *
+ * So the filter is gone rather than widened: an app owns its Cloudflare account
+ * (BOOTSTRAP.md), so "every database this listing returns" IS "every database we
+ * run", and a database added tomorrow is watched the day it exists instead of the
+ * day someone remembers to add its prefix here.
  *
  * BOUNDED WORK PER TICK. The scan itself is cheap, but every ALARMING database
  * costs a core-DB read plus an insert, and nobody is watching a cron: a tick that
@@ -38,12 +52,11 @@ export async function checkDatabaseSizes(
   env: Env,
   cfg: D1Rest
 ): Promise<{ checked: number; alerted: string[]; capped: boolean }> {
-  const all = await d1ListDatabases(cfg)
-  const teamDbs = all.filter((db) => db.name.startsWith("team-"))
+  const databases = await d1ListDatabases(cfg)
   const alerted: string[] = []
   let capped = false
 
-  for (const db of teamDbs) {
+  for (const db of databases) {
     if ((db.file_size ?? 0) < ALERT_THRESHOLD_BYTES) continue
     if (alerted.length >= CRON_ALERT_CAP) {
       capped = true
@@ -78,7 +91,7 @@ export async function checkDatabaseSizes(
     )
     alerted.push(db.name)
   }
-  return { checked: teamDbs.length, alerted, capped }
+  return { checked: databases.length, alerted, capped }
 }
 
 /**

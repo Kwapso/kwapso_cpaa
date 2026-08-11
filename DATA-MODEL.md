@@ -206,6 +206,42 @@ audit → a tiny GLOBAL reference of dropdown GROUPS. But the values table also
 uses `Help status` (not listed as a type) and `Learning category` has no
 values. So the types list and the values were loosely coupled in Glide.
 
+### Retention in core — the ONE place rows are actually deleted
+
+"Deactivate, never delete" is a rule about **records**: a person, a role, an
+account, a ticket. It has never been a rule about **spent sign-in artefacts**,
+and treating it as one is how the shared database grew with no ceiling and no
+sweep.
+
+Three tables in core are written by callers who are not signed in — anyone who
+types an email address mints a `login_codes` row and a `login_sends` row — so
+their totals were bounded by nothing at all, in the one database whose 10GB cap
+takes the whole product down rather than one tenant. A nightly sweep
+(`shared/workers/retention.ts`, run from tenancy's cron beside the size alarms)
+takes:
+
+| table | what goes | why it is safe |
+| --- | --- | --- |
+| `login_codes` | older than `AUTH_RETENTION_HOURS` (24h) | a code lives ten minutes; the per-address cap looks back one hour |
+| `login_sends` | older than `AUTH_RETENTION_HOURS` | the send budget's whole window is one hour |
+| `sessions` | already past their own `expires_at` | that cookie is already dead — every read re-checks expiry |
+
+Sessions are judged by **expiry, not age**: `expires_at` slides forward while a
+session is in use, so an age-based sweep would sign out every long-lived user.
+
+Nothing anyone might have to answer for is touched: activity, account activity,
+`error_logs`, `agent_usage_log`, invite audits and every audit block stay. Each
+delete is bounded (`RETENTION_DELETE_CAP` rows per table per night, via an inner
+`SELECT … LIMIT`) — an estate swept for the first time catches up over a few
+nights instead of timing out every night and deleting nothing. A run that hits
+its ceiling is recorded to `error_logs`, not merely logged (R12).
+
+The other half of the same problem is RATE, and a sweep does not solve it: every
+repeatable core write now carries a per-caller ceiling that rides its INSERT
+(`ACCOUNT_ACTIVITY_PER_HOUR`, the login-send budget). And the nightly size alarm
+watches **every** database in the account, core included — it used to filter
+`team-*`, so `kwapso-core` could never raise one.
+
 ---
 
 ## PER-TEAM (each lives in that team's own database)

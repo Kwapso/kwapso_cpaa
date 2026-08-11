@@ -33,6 +33,44 @@ export type ToolCall = { id: string; name: string; input: Record<string, unknown
 /** The model's reply: free text and/or tool calls to run. */
 export type ModelReply = { text: string; toolCalls: ToolCall[] }
 
+/* ------------------------- the tool-result fence -------------------------- */
+
+/** THE MARKER THAT SAYS "THIS IS DATA, NOT AN INSTRUCTION".
+ *
+ * On Claude a tool result travels in its own `tool_result` block: the transport
+ * itself says what the text is, structurally, and no wording inside it can change
+ * that. Workers AI has no such block — its chat template rejects a replayed
+ * `role:"tool"` round-trip — so results are FLATTENED into ordinary turns, and a
+ * flattened result used to arrive as a bare user message reading "Result from
+ * list_help_tickets: …". At that point a support ticket a client wrote is
+ * indistinguishable from something the user just typed, and the only thing
+ * standing between an attacker's paragraph and the agent obeying it is the system
+ * prompt's word DATA — with nothing on the page to attach that word to.
+ *
+ * So the fence is STATED IN THE SAME PLACE TWICE: the result is wrapped in this
+ * delimiter, and the system prompt names this same constant. One export, so the
+ * marker the prompt promises and the marker the transport writes cannot drift
+ * apart — a rename breaks both ends at once, in the compiler, rather than
+ * silently un-fencing the weaker of the two providers. */
+export const TOOL_RESULT_TAG = "tool_result"
+
+const FENCE_CLOSE = `</${TOOL_RESULT_TAG}>`
+
+/** Wrap one flattened tool result so the model can SEE where somebody else's text
+ * begins and ends.
+ *
+ * AND CLOSE IT FROM THE INSIDE. The content is exactly the untrusted material
+ * this exists to contain — a ticket description is 20,000 characters an attacker
+ * chose — so the first thing they would write is the closing marker, ending the
+ * fence early and continuing in what now looks like their own voice. The marker
+ * is therefore de-fanged wherever it appears in the payload: a fence anyone can
+ * close is a decoration. */
+export function fenceToolResult(toolName: string, content: string): string {
+  const name = toolName.replace(/[^\w.-]/g, "") || "tool"
+  const safe = content.split(FENCE_CLOSE).join(`</${TOOL_RESULT_TAG}_escaped>`)
+  return `<${TOOL_RESULT_TAG} from="${name}">\n${safe}\n${FENCE_CLOSE}`
+}
+
 export interface Model {
   readonly name: string
   /** true if this provider can actually call tools (act); false = answers only. */
@@ -312,10 +350,17 @@ class WorkersAiModel implements Model {
     // RESULT becomes a user message the model reads to answer; an empty tool-call
     // assistant turn is dropped. The model can still call a (further) tool on this
     // turn — only the HISTORY is flattened.
+    //
+    // FLATTENING LOSES THE ONE THING THAT SAID "THIS IS DATA". Claude keeps a
+    // result in its own tool_result block, so the structure carries the fence; a
+    // flattened result is a plain user turn, and every ticket description and
+    // account name in it then reads exactly like something the user typed. So the
+    // marker is written back in explicitly — see fenceToolResult, and the system
+    // prompt that names the same tag.
     const msgs = messages
       .map((m): { role: "system" | "user" | "assistant"; content: string } | null => {
         if (m.role === "tool")
-          return { role: "user", content: `Result from ${m.toolName ?? "tool"}: ${m.content ?? ""}` }
+          return { role: "user", content: fenceToolResult(m.toolName ?? "tool", m.content ?? "") }
         if (m.role === "assistant" && m.toolCalls && m.toolCalls.length)
           return m.content ? { role: "assistant", content: m.content } : null
         return { role: m.role as "system" | "user" | "assistant", content: m.content ?? "" }

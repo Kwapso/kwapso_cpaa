@@ -155,13 +155,19 @@ export function AccountDetailScreen({
     const nextParent = values.parentAccountId || null
     if (nextParent !== account.parentAccountId)
       await tenancy.setAccountParent(accountId, nextParent)
+    // An emptied box is NULL, not a missing key. The door treats a field it never
+    // heard about as "leave it alone" (so an assistant renaming an account can't
+    // erase the rest of the record), which means clearing one is now something
+    // this form has to SAY. It also means the three fields this form doesn't
+    // carry — currency, language, time zone — survive a save, where they used to
+    // be wiped by every edit made from this screen.
     await tenancy.updateAccount({
       id: accountId,
       name: values.name.trim(),
-      code: values.code.trim() || undefined,
-      email: values.email.trim() || undefined,
-      phone: values.phone.trim() || undefined,
-      address: values.address.trim() || undefined,
+      code: values.code.trim() || null,
+      email: values.email.trim() || null,
+      phone: values.phone.trim() || null,
+      address: values.address.trim() || null,
       status: values.status.trim() || undefined,
     })
     refresh()

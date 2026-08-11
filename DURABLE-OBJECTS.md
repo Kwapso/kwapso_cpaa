@@ -180,10 +180,30 @@ Two consequences worth knowing:
   the team channel **refuses the socket** (`503`): we cannot tell staff from a
   client login, so nobody joins. The `user:<id>` channel is unaffected, so
   identity events and a forced sign-out still reach every device.
-- **The stamp is taken at connect.** A fence that changes (a client switches
-  company, or their access is revoked) takes effect on the next connect. The
-  standing socket keeps the fence it was given — narrower or equal to what its
-  doors allow, never wider, and every door re-checks anyway.
+- **The stamp is taken at connect, so a fence that MOVES has to force one.** This
+  was written down once as a harmless caveat and it was not: the client re-opened
+  only when `teamId` changed, and switching company does not change the team. So
+  after a switch the socket carried the OLD company's account set and
+  `mayHearChange` dropped the NEW company's pings — the portal went **silently
+  deaf**, which is the worst failure shape available (nothing looks broken; the
+  data is just quietly stale). The fence is therefore part of the socket's
+  IDENTITY: `useRealtime(teamId, …, currentAccountId)` puts it in the query
+  string, so a switch is a different URL, a different socket, and a fresh stamp.
+
+  **The realtime worker never reads that parameter, and must never start.** It is
+  a cache key on the client's side and nothing on ours — the stamp is always
+  resolved server-side from the caller's session, so editing the value in the URL
+  re-opens a socket and hands back exactly the same fence. Reading it would turn a
+  string the client controls into the fence that decides what they may hear, which
+  is the shape the stamp exists to refuse.
+
+  **What is still bounded by socket lifetime:** a REVOKED grant. Withdrawing a
+  portal login does not close the sockets that person already holds, so until the
+  link drops (or their next session read moves them out of `ready`, which closes
+  it) they keep hearing account-owned pings for the world they have just left —
+  row ids only, and every door refuses them from the first request. Closing that
+  properly needs a server-initiated close or a user-channel listener on the
+  portal, which is an ARCHITECTURE decision, not a quiet patch.
 
 ### Two channel scopes
 

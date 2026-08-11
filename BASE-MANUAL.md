@@ -225,7 +225,16 @@ Four more structural guards layer on top (all in `agent.ts` / `tools.ts`):
   simply *not in the catalogue*; `identityBlocked` is the belt-and-braces backstop
   in `executeTool`.
 - **Fenced tool results** — a tool's output goes back to the model as DATA
-  (`role:"tool"`), never as instructions.
+  (`role:"tool"`), never as instructions. **On both providers, and they fence
+  differently.** Claude carries it in a real `tool_result` block, so the transport
+  itself says what the text is. Workers AI (the model chosen whenever
+  `ANTHROPIC_API_KEY` is unset — a fresh environment's default) rejects a replayed
+  tool round-trip, so results are flattened into ordinary turns — and a flattened
+  result used to arrive as a bare user message, indistinguishable from something
+  the signed-in person typed. It is now wrapped in `<tool_result from="…"> … </>`,
+  the system prompt names the same constant (`TOOL_RESULT_TAG`, so the promise and
+  the wrapper cannot be renamed apart), and a closing marker written INTO the data
+  is de-fanged — a fence the attacker can close is a decoration.
 - **A step cap** (`MAX_STEPS`) and a **credit quota** (the app's own daily allowance via
   `agent_usage` — `AGENT_FREE_DAILY`, code default 25/day, but both environments
   ship 50 — + a purchasable balance in `agent_credits`) bound runaways and

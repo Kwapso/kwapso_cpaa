@@ -2,7 +2,8 @@
 // This file is just the SWITCHBOARD: it maps each route to a handler (grouped
 // by domain under ./routes/*) and centrally maps thrown GuardErrors to clean
 // HTTP responses. The shared opening (whoAmI / teamContext / adminGuard) lives
-// in ./context. Nightly cron drives the 80% DB-size alarms.
+// in ./context. Nightly cron drives the estate's housekeeping: the 80% DB-size
+// alarms and the shared core database's retention sweep.
 //
 //   POST /api/tenancy/bootstrap            -> accept invites OR make the personal team
 //   GET  /api/tenancy/active               -> current team + your role + teams
@@ -48,14 +49,17 @@
 //                                             census says why)
 //   POST /api/tenancy/admin/migrate-teams  -> roll team-schema migrations (x-admin-key)
 //   POST /api/tenancy/admin/create-team    -> seed a team (x-admin-key; the user door is closed)
-//   GET  /api/tenancy/admin/db-sizes       -> size every team DB + open alarms
+//   GET  /api/tenancy/admin/db-sizes       -> size every DB (core included) + open alarms
 //   POST /api/tenancy/admin/move-module    -> relocate a heavy module (the mover)
 //   GET  /api/tenancy/health
-//   cron (nightly)                         -> the 80% size alarms
+//   cron (nightly)                         -> the 80% size alarms (every database in
+//                                             the account, core included) + the core
+//                                             database's retention sweep
 
 import { brand } from "@shared/brand"
 import { fail, json } from "@shared/workers/http"
 import { recordWorkerError } from "@shared/workers/error-log"
+import { sweepCoreRetention } from "@shared/workers/retention"
 import { GuardError } from "./lib/permissions"
 import { checkDatabaseSizes } from "./lib/sharding"
 import { d1Config } from "./lib/teams"
@@ -219,8 +223,38 @@ export default {
     }
   },
 
-  /** Nightly cron: the 80% database-size alarms (locked sharding machinery). */
+  /** Nightly cron: the estate's housekeeping — the 80% database-size alarms
+   * (locked sharding machinery) and the core database's retention sweep.
+   *
+   * The sweep clears AUTH's spent rows (sign-in codes, the send ledger, expired
+   * sessions) from a cron that lives in TENANCY, which reads oddly until you say
+   * why: the sweep is about the shared CORE DATABASE, not about auth, and tenancy
+   * is the worker that already owns the estate's nightly work and already holds
+   * the core binding. Giving auth a cron of its own to run one delete would be a
+   * second unattended schedule, a second deploy surface and a second thing to
+   * forget — for no more safety than this line. */
   async scheduled(_controller, env): Promise<void> {
+    // Two independent jobs, two try blocks. A failing size check must not cost
+    // the estate its sweep, and a failing sweep must not hide an 80% alarm.
+    try {
+      const swept = await sweepCoreRetention(env.DB)
+      console.log(`retention sweep: ${JSON.stringify(swept.deleted)}`)
+      // R12 IN SPIRIT, the same lesson as the alarm ceiling below: a sweep that
+      // stopped at its ceiling has NOT caught up, and a cheerful count is the
+      // only thing anyone would read. Say what is still there.
+      if (swept.capped.length)
+        await recordWorkerError(
+          env.DB,
+          "tenancy",
+          "cron/retention",
+          new Error(
+            `retention sweep hit its per-table ceiling on ${swept.capped.join(", ")} — those tables still hold rows past their retention window and were NOT fully swept tonight. Tomorrow's run continues.`
+          )
+        )
+    } catch (e) {
+      console.error("nightly retention sweep failed:", e)
+      await recordWorkerError(env.DB, "tenancy", "cron/retention", e)
+    }
     try {
       const result = await checkDatabaseSizes(env, d1Config(env))
       console.log(
