@@ -1,31 +1,33 @@
 # Brimba
 
 **The multi-tenant SaaS base by Swift Struck.** Not an app for one industry —
-the reusable foundation every future app (ERP, CRM, portal…) is built on:
-login (strict email codes), teams, Member roles (module key `member_roles`;
-UPDATED 2026-06-21: was "roles & permissions"), invites, learning,
-help desk, dropdown management, CSV data import, and an in-app **AI agent** that
-acts AS the signed-in user through the same gated endpoints (never exceeding
-their rights), all hosted on Cloudflare.
+the reusable foundation every future app (ERP, CRM, portal…) is built on: login
+(strict email codes), teams, Member roles (module key `member_roles`), invites,
+learning, help desk, dropdown management, CSV data import, and an in-app **AI
+agent** that acts AS the signed-in user through the same gated endpoints (never
+exceeding their rights), all hosted on Cloudflare.
 
-UPDATED 2026-06-23: the **agent-modules build** landed (branch `agent-modules`) —
-learning, help, CSV import, and the AI agent are all BUILT. UPDATED 2026-08-10:
-**eight workers are on disk** — six shared brains (auth, tenancy, realtime,
+**Eight workers are on disk** — six shared brains (auth, tenancy, realtime,
 **content** (learning + help), **data-ops** (import + the AI agent), and **mcp**)
 under **two front doors**: `gateway` (the agency app, `web/`) and `portal-gateway`
-(the client portal, `web-portal/`). The mcp worker is the external machine surface
-(BUILT 2026-07-07): personal access tokens (hashed, shown-once, team-pinned,
-revocable; managed under Settings → Access tokens) bridged to short-lived
-team-pinned sessions, exposing the gated doors as MCP tools at `/mcp`. The agent's
-model is swappable: Claude when `ANTHROPIC_API_KEY` is set, else Cloudflare
-Workers AI (both do full tool use); it confirms on destructive + bulk actions
-and is metered by a credit quota — **the app's own daily allowance** (the
-`AGENT_FREE_DAILY` var: code default 25, but both environments ship **50**) plus a
-purchasable balance.
+(the client portal, `web-portal/`). The mcp worker is the external machine
+surface: personal access tokens (hashed, shown-once, team-pinned, revocable;
+managed under Settings → Access tokens) bridged to short-lived team-pinned
+sessions, exposing the gated doors as MCP tools at `/mcp`. The agent's model is
+swappable: Claude when `ANTHROPIC_API_KEY` is set, else Cloudflare Workers AI
+(both do full tool use); it confirms on destructive + bulk actions and is metered
+by a credit quota — **the app's own daily allowance** (the `AGENT_FREE_DAILY` var:
+code default 25, but both environments ship **50**) plus a purchasable balance.
 
-UPDATED 2026-06-21: the team area (Overview, Members, Member roles, Invites)
-now lives at `/t/<teamId>/…` deep-link URLs (rendered by the screen engine),
-not under Settings; top-level `/members` and `/roles` are thin redirects there.
+The team area (Overview, Members, Member roles, Invites) lives at `/t/<teamId>/…`
+deep-link URLs, rendered by the screen engine — not under Settings; top-level
+`/members` and `/roles` are thin redirects there.
+
+*This section says what is true now.* When each piece landed is in
+[BASE-IMPROVEMENTS.md](BASE-IMPROVEMENTS.md) § *When each piece landed*: dated
+stamps used to accumulate here, in the first thing every reader and every agent
+opens, which is the one place current state should not have to be sifted out of
+history.
 
 The agency app and the client portal each have their own address:
 
@@ -91,6 +93,10 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
    developer): the **Laws of the Base** (machine-enforced rules), the build
    style, and this doc map. **[RULES.md](RULES.md)** is the law-book it enforces
    (pinned to `shared/rules/registry.ts`, checked by `web/test/rules.test.ts`).
+   **[AGENTS.md](AGENTS.md)** is the cross-tool convention filename — one
+   paragraph pointing here, so an agent that opens it by habit lands in the same
+   place. It exists to have exactly that content and no more; anything it
+   restated would be a second copy of the rules, drifting.
 1. **[ARCHITECTURE.md](ARCHITECTURE.md)** — the locked decisions (incl. the
    workers, the live layer, and the Durable Object code-vs-runtime model). Read
    before building anything; do not relitigate without the user.

@@ -43,12 +43,22 @@ describe("no login code ever leaves through anything but the inbox", () => {
   })
 
   it("the web client has no code-toast path left", () => {
-    for (const f of [
-      join(ROOT, "web", "components", "temp", "auth-card.tsx"),
-      join(ROOT, "web", "components", "email-change-dialog.tsx"),
-      join(ROOT, "web", "lib", "api.ts"),
-    ])
-      expect(readFileSync(f, "utf8"), `${f} must not reference devCode`).not.toContain("devCode")
+    const files = [
+      { path: join(ROOT, "web", "components", "temp", "auth-card.tsx"), rel: "auth-card.tsx" },
+      {
+        path: join(ROOT, "web", "components", "email-change-dialog.tsx"),
+        rel: "email-change-dialog.tsx",
+      },
+      // The WHOLE API client, not the one file it used to be: the door lists live
+      // one per worker under web/lib/api/ now, and a code-echoing call could be
+      // declared in any of them.
+      ...sourceFiles(join(ROOT, "web", "lib", "api"), { extensions: [".ts"] }),
+    ]
+    expect(files.length, "the scan must see the client's files").toBeGreaterThan(4)
+    for (const f of files)
+      expect(readFileSync(f.path, "utf8"), `${f.rel} must not reference devCode`).not.toContain(
+        "devCode"
+      )
   })
 
   it("the admin test-login door exists, shares the mint, and FAILS CLOSED", () => {

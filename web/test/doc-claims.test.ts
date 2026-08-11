@@ -221,3 +221,43 @@ describe("docs agree with the roster on disk", () => {
     ).toEqual([])
   })
 })
+
+// README.md IS THE CURRENT-STATE FILE, NOT THE CHANGELOG.
+//
+// Its opening prose had grown five `UPDATED <date>:` stamps INSIDE the sentences
+// describing what is true now — including "was 'roles & permissions'" and two
+// competing dates for the same fact. It is the first thing every new reader and
+// every agent opens, and it was the one place where current state had to be
+// sifted out of history. The history is not worthless; it lives in
+// BASE-IMPROVEMENTS.md § "When each piece landed", where changes already go.
+//
+// Scoped to README.md on purpose. ROADMAP.md and SCREEN-ENGINE-PLAN.md are
+// declared HISTORY (README says so), so a dated amendment there is the content.
+describe("README.md states what is true now, not when it became true", () => {
+  const readme = read(join(ROOT, "README.md"))
+
+  it("carries no inline UPDATED/ADDED date stamps", () => {
+    const stamps = [...readme.matchAll(/\b(UPDATED|ADDED|BUILT)\s+20\d\d-\d\d-\d\d/g)].map(
+      (m) => m[0]
+    )
+    expect(
+      stamps,
+      `README.md is the doc map and the current-state file. Put the change in ` +
+        `BASE-IMPROVEMENTS.md and write the present tense here: ${stamps.join(", ")}`
+    ).toEqual([])
+  })
+
+  it("its doc map really does name every root document", () => {
+    // The map claims to list them all, and AGENTS.md — the cross-tool filename an
+    // agent opens by habit — was the one it never mentioned. A map with a hole in
+    // it is worse than no map: a reader trusts it and stops looking.
+    const roots = readdirSync(ROOT)
+      .filter((f) => f.endsWith(".md") && f !== "README.md")
+      .sort()
+    const missing = roots.filter((f) => !readme.includes(f))
+    expect(
+      missing,
+      `these root documents are not reachable from README.md's doc map: ${missing.join(", ")}`
+    ).toEqual([])
+  })
+})

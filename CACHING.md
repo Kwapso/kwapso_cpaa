@@ -79,10 +79,14 @@ worker publishes must reach a listener: a `TEAM_RESOURCES` row-level entry, a
 coarse `SIMPLE_INVALIDATIONS` entry (team meta, screen recipes), or a reasoned
 `DEAF_EXEMPT` line in the rules registry (today: `help_threads`, `agent_usage`).
 The `selectable_data` manager was a deaf listener before R15 — its worker pinged
-and nothing heard — so it now has a row-level entry. A server-PAGED screen's rows
-live in page state outside these caches, so the shell fans every team ping (and a
-reconnect) into a bus (`web/lib/live-bus.ts`) and each paged screen re-pulls its
-current page via `useLiveRefetch`.
+and nothing heard — so it now has a row-level entry. A paged screen needs nothing
+extra: paging moved to opaque cursors over the SHARED STORE, so its rows live in a
+cache key with the cursor in a sidecar — the very caches the registry patches. (It
+used to need a fan-out bus feeding a `useLiveRefetch` subscription, because page
+state sat outside the caches. That premise went away, so R15's paged-screen clause
+was retired and `web/lib/use-live-refetch.ts` deleted; the bus that fed it,
+`web/lib/live-bus.ts`, outlived its only subscriber and is now gone too. See
+RULES.md R15.)
 
 ### 4 · Every mutation publishes (structurally can't-forget)
 Every state-changing route broadcasts a change ping — it is **not** per-call

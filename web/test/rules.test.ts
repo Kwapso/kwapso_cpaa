@@ -18,6 +18,7 @@ import {
   DEAF_EXEMPT,
   FORM_DIALOGS,
   GROWING_COLLECTIONS,
+  MUTATING_WORKERS,
   RAW_BODY_EXEMPT,
   RECORD_DETAIL_COMPONENTS,
   RECORD_TAB_COUNT_EXCEPTIONS,
@@ -205,7 +206,7 @@ describe("RULES — the laws of the base", () => {
   it("generic-activity-path: the activity read path has a generic record scope", () => {
     const src = read(join(ROOT, "workers", "tenancy", "src", "lib", "activity-read.ts"))
     expect(src, "activity-read must support the generic `record` scope").toContain('scope === "record"')
-    const api = read(join(WEB, "lib", "api.ts"))
+    const api = read(join(WEB, "lib", "api", "tenancy.ts"))
     expect(api, "the web app reads record activity through the one fetcher").toContain("recordActivity")
   })
 
@@ -219,6 +220,51 @@ describe("RULES — the laws of the base", () => {
       expect(terms.has(entry.term), `duplicate term "${entry.term}"`).toBe(false)
       terms.add(entry.term)
     }
+  })
+
+  // R1, the ROSTER half. The per-worker publish-seam suites prove each mutation in
+  // the workers that HAVE one publishes. Nothing proved the roster: MUTATING_WORKERS
+  // sat in the registry saying "a new mutating worker without a publish-seam test is
+  // a gap — track it here", and no check read it, so a ninth worker that published
+  // and shipped no suite would have been exactly that gap, silently. Both directions,
+  // derived from disk.
+  it("publish-seam-roster: every worker that publishes has a publish-seam suite", () => {
+    const publishers = readdirSync(join(ROOT, "workers"), { withFileTypes: true })
+      .filter((w) => w.isDirectory())
+      .filter((w) =>
+        sourceFiles(join(ROOT, "workers", w.name, "src"), { extensions: [".ts"] }).some((f) =>
+          /publish(Change|UserChange|SignOut)\s*\(/.test(stripComments(f.source))
+        )
+      )
+      .map((w) => w.name)
+
+    // The scan must not go blind: three workers are the known floor.
+    expect(publishers.length, "the publisher scan found almost nothing").toBeGreaterThanOrEqual(3)
+
+    // auth is the reviewed exception CLAUDE.md and CACHING.md rule 5 already name:
+    // it publishes on the USER channel (identity events + a forced sign-out), not a
+    // team resource, so there is no ROUTES-table mutation set for a seam to walk.
+    const EXEMPT: Record<string, string> = {
+      auth: "publishes on the per-user identity channel, not a team resource — no ROUTES mutation set to walk (CACHING.md rule 5)",
+    }
+    const unguarded = publishers.filter((w) => !MUTATING_WORKERS.includes(w as never) && !EXEMPT[w])
+    expect(
+      unguarded,
+      `these workers publish and have no publish-seam suite — add one and list them in ` +
+        `MUTATING_WORKERS, or add a reasoned exemption: ${unguarded.join(", ")}`
+    ).toEqual([])
+
+    // …and the other direction: a name in MUTATING_WORKERS must be a worker that
+    // really carries the suite, so the list can't rot into a wish.
+    for (const w of MUTATING_WORKERS) {
+      expect(publishers, `MUTATING_WORKERS lists ${w}, which publishes nothing`).toContain(w)
+      expect(
+        existsSync(join(ROOT, "workers", w, "test", "publish-seam.test.ts")),
+        `MUTATING_WORKERS lists ${w}, which has no publish-seam.test.ts`
+      ).toBe(true)
+    }
+    for (const w of Object.keys(EXEMPT))
+      expect(publishers, `${w} is exempted from R1's roster but publishes nothing`).toContain(w)
   })
 
   // R11 — every EXTERNAL fetch (a bare global fetch() to the internet) carries an
@@ -494,10 +540,13 @@ describe("RULES — the laws of the base", () => {
       lengthBadges,
       `a capped list's length is a ceiling, not a total (R16) — badge from the server total via formatCount: ${lengthBadges.join(", ")}`
     ).toEqual([])
-    // …and the badge builders route through the seam.
+    // …and the badge builders route through the seam. The deep-link switch's
+    // badges are all on the COLLECTION half (a record detail badges its tabs
+    // through withTabCounts instead), so that is the file named here — it used to
+    // be module-content.tsx, before the switch became two files.
     expect(read(join(WEB, "components", "team-section-nav.tsx"))).toContain("formatCount")
-    const moduleContent = read(join(WEB, "components", "deep-link", "module-content.tsx"))
-    expect(moduleContent).toContain("formatCount")
+    const collections = read(join(WEB, "components", "deep-link", "collection-content.tsx"))
+    expect(collections).toContain("formatCount")
 
     // (ii) THE PLACE — every registry section with a count key whose placement
     // isn't "tab" renders a CollectionHeading (derived, never hand-listed).

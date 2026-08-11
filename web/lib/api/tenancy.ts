@@ -1,172 +1,35 @@
-// The ONE place the web app talks to the workers. Same-origin /api calls —
-// the gateway routes them — so cookies flow automatically, no config needed.
+// TENANCY — teams, members, roles, invites, accounts, screen config.
+//
+// One of the five door lists behind `@/lib/api`. They are split by WORKER,
+// because that is the boundary the doors already have: a path under
+// `/api/tenancy/…` is answered by the tenancy worker and nothing else.
+//
+// THE WHOLE DIRECTORY IS THE ATTACK SURFACE the two gateway suites derive from —
+// workers/gateway/test/agency-door.test.ts walks every file here to prove each
+// door reaches a worker, and workers/portal-gateway/test/portal-door.test.ts
+// walks the same files to prove none of them reaches the CLIENT door. They read
+// the DIRECTORY, not one file, so a door added in a new domain file is covered
+// the day it lands.
 
+import { ApiFailure } from "@shared/web/api"
 import type {
   Account,
   AccountDetail,
   ActiveContext,
   ActivityItem,
-  AgentMessage,
-  AgentQuota,
-  AgentThread,
-  ApiError,
-  ChatOutcome,
-  HelpMessage,
-  HelpStakeholder,
-  HelpTicket,
-  ImportBatchReport,
-  ImportBatchSummary,
-  McpTokenSummary,
-  ImportBatchView,
-  ImportableTarget,
   Invite,
   InviteAudit,
-  Learning,
-  LearningProgressEntry,
-  PendingCall,
   PermissionValue,
   ReceivedInvite,
   RolePermissions,
   SelectableValue,
-  SessionUser,
   TeamMeta,
   TeamMember,
   TeamRole,
   TeamSummary,
 } from "@shared/types"
-
-// The plumbing — one fetch wrapper, one error class, one paged shape, the two
-// URL/POST one-liners — is shared with the client portal (shared/web/api.ts).
-// Only the DOOR LIST below is this app's own; it is also the attack surface the
-// portal gateway's closed-door suite fires at, so it stays here, whole.
-import { api, ApiFailure, enc, post, type PagedResponse } from "@shared/web/api"
-
-export { ApiFailure }
-export type { PagedResponse }
-
-/** One row of the agent usage log (written once per turn): who ran it, when, how
- * many AI units it used, whether that was free / credit / mixed, and a short line.
- * `kind` says what the summary IS — an action taken (team-visible) or the author's
- * own prompt (redacted to null on teammates' rows; NULL kind = legacy, private). */
-export type UsageLogRow = {
-  id: string
-  createdAt: string
-  actorName?: string
-  credits: number
-  source: string
-  summary: string | null
-  kind?: "action" | "prompt" | null
-}
-
-/** One Server-Sent Event from an agent turn. `text` deltas + `step_*` may repeat any
- * number of times; exactly one TERMINAL event (`confirm` | `final` | `error`) ends the
- * stream. Everything the assistant says arrives as `text` events — `final` only
- * settles the turn. Keys are terse + stable — the wire contract data-ops emits. */
-export type AgentStreamEvent =
-  | { t: "text"; d: string }
-  | { t: "step_start"; tool: string; summary: string; ids?: Record<string, string> }
-  | { t: "step_end"; tool: string; ok: boolean; summary: string; error?: string }
-  | { t: "confirm"; threadId: string; calls: PendingCall[]; text?: string }
-  | { t: "final"; outcome: ChatOutcome }
-  | { t: "error"; message: string }
-
-/** Read a POST's `text/event-stream` body, splitting on the blank-line record
- * separator and calling `onEvent` for each `data:` line's JSON. Shared by the two
- * streaming agent callers. Throws ApiFailure if the response isn't OK (before any
- * event flows) so callers surface a clean message like the non-streaming path. */
-async function streamSse(
-  path: string,
-  body: unknown,
-  onEvent: (ev: AgentStreamEvent) => void
-): Promise<void> {
-  const res = await fetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok || !res.body) {
-    const err = (await res.json().catch(() => null)) as ApiError | null
-    throw new ApiFailure(res.status, err?.error ?? "unknown", err?.message ?? "Something went wrong. Try again.")
-  }
-  const reader = res.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ""
-  // Events are separated by a blank line ("\n\n"); a partial record stays buffered
-  // until its terminator arrives. Parse each record's `data:` payload as one event.
-  const flush = (raw: string) => {
-    const line = raw.split("\n").find((l) => l.startsWith("data:"))
-    if (!line) return
-    const json = line.slice(5).trim()
-    if (!json) return
-    try {
-      onEvent(JSON.parse(json) as AgentStreamEvent)
-    } catch {
-      /* skip a malformed frame rather than break the stream */
-    }
-  }
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    let sep: number
-    while ((sep = buffer.indexOf("\n\n")) !== -1) {
-      flush(buffer.slice(0, sep))
-      buffer = buffer.slice(sep + 2)
-    }
-  }
-  // A final record with no trailing blank line (some servers omit it on close).
-  if (buffer.trim()) flush(buffer)
-}
-
-export const auth = {
-  /** Request a 6-digit code. The code goes ONLY to the inbox — never the response. */
-  startEmail: (email: string) =>
-    api<{ ok: true }>("/api/auth/email/start", {
-      method: "POST",
-      body: JSON.stringify({ email }),
-    }),
-
-  verifyEmail: (email: string, code: string) =>
-    api<{ user: SessionUser; isNew: boolean }>("/api/auth/email/verify", {
-      method: "POST",
-      body: JSON.stringify({ email, code }),
-    }),
-
-  me: () => api<{ user: SessionUser }>("/api/auth/me"),
-
-  /** Your own account activity (name / photo / email changes) — identity-level,
-   * not tied to any team. */
-  activity: () => api<{ activity: ActivityItem[] }>("/api/auth/activity"),
-
-  /** Onboarding / profile edit: names + optional photo (as a data URL). */
-  updateProfile: (input: {
-    firstName: string
-    lastName: string
-    imageDataUrl?: string
-  }) =>
-    api<{ user: SessionUser }>("/api/auth/profile", {
-      method: "POST",
-      body: JSON.stringify(input),
-    }),
-
-  /** Change email, step 1: send a 6-digit code to the NEW address (inbox only —
-   * same law as login, the code never rides the response). */
-  startEmailChange: (email: string) =>
-    api<{ ok: true }>("/api/auth/email/change/start", {
-      method: "POST",
-      body: JSON.stringify({ email }),
-    }),
-
-  /** Change email, step 2: verify the code → switched email (other devices are
-   * signed out server-side; the old address is warned). */
-  verifyEmailChange: (email: string, code: string) =>
-    api<{ user: SessionUser }>("/api/auth/email/change/verify", {
-      method: "POST",
-      body: JSON.stringify({ email, code }),
-    }),
-
-  logout: () => api<{ ok: true }>("/api/auth/logout", { method: "POST" }),
-}
+import { api, enc, post } from "@shared/web/api"
+import type { PagedResponse } from "@shared/web/api"
 
 export const tenancy = {
   /** After onboarding: accept waiting invites OR create the personal team. */
@@ -455,111 +318,3 @@ export const tenancy = {
 }
 
 /** Content worker — Learning + Help (team-DB content modules). */
-export const content = {
-  learning: () => api<{ learning: Learning[]; total: number }>("/api/content/learning"),
-  learningOne: (id: string) =>
-    api<{ learning: Learning[] }>(`/api/content/learning?id=${enc(id)}`).then((r) => r.learning[0] ?? null),
-  createLearning: (input: Partial<Learning>) =>
-    api<{ learning: Learning[] }>("/api/content/learning", post(input)),
-  updateLearning: (input: Partial<Learning> & { id: string }) =>
-    api<{ learning: Learning[] }>("/api/content/learning/update", post(input)),
-  setLearningActive: (id: string, active: boolean) =>
-    api<{ learning: Learning[] }>("/api/content/learning/active", post({ id, active })),
-  /** Upload a file for an article (gated by learning:create). Send the raw
-   * base64 data URL; get back the served /media URL + its content type. */
-  uploadLearningFile: (dataUrl: string, filename?: string) =>
-    api<{ url: string; contentType: string }>(
-      "/api/content/learning/upload",
-      post({ dataUrl, filename })
-    ),
-  markLearningDone: (id: string, done: boolean) =>
-    api<{ ok: true }>("/api/content/learning/done", post({ id, done })),
-  learningProgress: () =>
-    api<{ progress: LearningProgressEntry[] }>("/api/content/learning/progress"),
-
-  /** R14: a PAGE of tickets (a GROWING collection) — hand back `nextCursor` from
-   * the previous response to get the next one. `total`/`mineTotal` are exact. */
-  help: (scope: "mine" | "all" = "all", cursor?: string | null) =>
-    api<PagedResponse<{ tickets: HelpTicket[]; mineTotal: number }>>(
-      `/api/content/help?scope=${scope}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`
-    ),
-  helpOne: (id: string) =>
-    api<{ tickets: HelpTicket[] }>(`/api/content/help?id=${enc(id)}`).then((r) => r.tickets[0] ?? null),
-  helpThread: (id: string) =>
-    api<{ replies: HelpMessage[]; total: number }>(`/api/content/help/thread?id=${enc(id)}`),
-  createHelp: (input: { description: string; helpType?: string; sourceScreen?: string }) =>
-    api<{ tickets: HelpTicket[] }>("/api/content/help", post(input)),
-  updateHelp: (input: { id: string; description: string; helpType?: string }) =>
-    api<{ tickets: HelpTicket[] }>("/api/content/help/update", post(input)),
-  setHelpStatus: (id: string, status: HelpTicket["status"]) =>
-    api<{ tickets: HelpTicket[] }>("/api/content/help/status", post({ id, status })),
-  replyHelp: (helpId: string, body: string, taggedUserIds?: string[]) =>
-    api<{ replies: HelpMessage[]; total: number }>("/api/content/help/reply", post({ helpId, body, taggedUserIds })),
-  helpStakeholders: (id: string) =>
-    api<{ stakeholders: HelpStakeholder[] }>(`/api/content/help/stakeholders?id=${enc(id)}`),
-  addStakeholder: (id: string, userId: string) =>
-    api<{ stakeholders: HelpStakeholder[] }>("/api/content/help/stakeholders", post({ id, userId })),
-}
-
-/** Data-ops worker — the agentic file import + the AI agent. */
-export const dataOps = {
-  importTargets: () => api<{ targets: ImportableTarget[] }>("/api/data-ops/import/targets"),
-
-  /** A downloadable sample CSV href for a target — a good-file template. */
-  importSampleHref: (tableKey: string) => `/api/data-ops/import/sample?tableKey=${enc(tableKey)}`,
-  // Agentic multi-file batch import (AGENTIC-IMPORT.md).
-  batchStart: () => api<{ batch: ImportBatchView }>("/api/data-ops/import/batch", post({})),
-  batchAddFile: (batchId: string, name: string, csv: string) =>
-    api<{ batch: ImportBatchView }>("/api/data-ops/import/batch/file", post({ batchId, name, csv })),
-  batchPlan: (batchId: string) =>
-    api<{ batch: ImportBatchView; quota: AgentQuota }>("/api/data-ops/import/batch/plan", post({ batchId })),
-  importBatches: () => api<{ batches: ImportBatchSummary[] }>("/api/data-ops/import/batches"),
-  batchConfirm: (batchId: string) =>
-    api<{ report: ImportBatchReport }>("/api/data-ops/import/batch/confirm", post({ batchId })),
-  batchGet: (id: string) => api<{ batch: ImportBatchView }>(`/api/data-ops/import/batch?id=${enc(id)}`),
-
-  agentUsage: () => api<{ quota: AgentQuota }>("/api/data-ops/agent/usage"),
-  /** The team's agent usage log — one row per turn, newest-first. Powers the
-   * "where did my credits go" view behind the quota badge. */
-  agentUsageLog: (limit?: number) =>
-    api<{ rows: UsageLogRow[] }>(
-      "/api/data-ops/agent/usage-log" + (limit ? `?limit=${limit}` : "")
-    ),
-  agentChat: (message: string, threadId?: string) =>
-    api<ChatOutcome>("/api/data-ops/agent/chat", post({ message, threadId })),
-  agentConfirm: (threadId: string, approve: boolean, calls: PendingCall[]) =>
-    api<{ reply: string; quota: AgentQuota; overQuota?: boolean }>(
-      "/api/data-ops/agent/confirm",
-      post({ threadId, approve, calls })
-    ),
-
-  /** Streaming chat turn: text arrives word-by-word, each tool run bookended by
-   * step_start/step_end, ending in one terminal event (confirm | final | error).
-   * The non-streaming agentChat above stays as a fallback. */
-  agentChatStream: (
-    body: { message: string; threadId?: string; files?: { name: string; csv: string }[] },
-    onEvent: (ev: AgentStreamEvent) => void
-  ) => streamSse("/api/data-ops/agent/chat", body, onEvent),
-
-  /** Streaming confirm continuation — approving a paused turn resumes it as a
-   * stream too, so steps accumulate across the confirm boundary. */
-  agentConfirmStream: (
-    body: { threadId: string; approve: boolean; calls: PendingCall[] },
-    onEvent: (ev: AgentStreamEvent) => void
-  ) => streamSse("/api/data-ops/agent/confirm", body, onEvent),
-  agentThreads: () => api<{ threads: AgentThread[] }>("/api/data-ops/agent/threads"),
-  agentThread: (id: string) =>
-    api<{ messages: AgentMessage[] }>(`/api/data-ops/agent/thread?id=${enc(id)}`),
-}
-
-/** The MCP front desk (personal access tokens; the /mcp endpoint itself is for
- * machines with a Bearer token, not this session client). */
-export const mcp = {
-  tokens: () => api<{ tokens: McpTokenSummary[] }>("/api/mcp/tokens"),
-  createToken: (label: string) =>
-    api<{
-      token: { id: string; label: string; teamId: string; createdAt: string; expiresAt: string }
-      secret: string
-    }>("/api/mcp/tokens", post({ label })),
-  revokeToken: (id: string) => api<{ ok: true }>("/api/mcp/tokens/revoke", post({ id })),
-}
