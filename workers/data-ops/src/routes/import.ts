@@ -13,6 +13,7 @@
 import { fail, json } from "../../../../shared/workers/http"
 import { optionalText, queryText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
 import { publishChange } from "../../../../shared/workers/realtime"
+import { refusePortalCaller } from "../../../../shared/workers/account-scope"
 import { GuardError, hasRight, requireRight, teamContext } from "../../../../shared/workers/gating"
 import { getActiveCatalog } from "../lib/import"
 import {
@@ -33,7 +34,12 @@ import type { Env } from "../env"
 
 /** GET /api/data-ops/import/targets — the active, supported import targets. */
 export async function getImportTargets(request: Request, env: Env): Promise<Response> {
-  await teamContext(request, env) // any signed-in member may see the catalog
+  const { cfg, guard } = await teamContext(request, env) // any signed-in STAFF member
+  // Import is an agency tool — the portal gateway forwards no /api/data-ops path
+  // and says why. But "any signed-in member" includes a client login at the
+  // AGENCY origin, and this catalogue is the app's own inner shape: every table
+  // the agency can bulk-load, column by column. Nothing here is any client's.
+  await refusePortalCaller(cfg, guard)
   return json({ targets: await getActiveCatalog(env) })
 }
 
@@ -42,7 +48,8 @@ export async function getImportTargets(request: Request, env: Env): Promise<Resp
  * template (no team data), so any signed-in member may fetch it. Every import place
  * offers this — AGENTIC-IMPORT §10 (show a good file before people prepare theirs). */
 export async function getImportSample(request: Request, env: Env): Promise<Response> {
-  await teamContext(request, env)
+  const { cfg, guard } = await teamContext(request, env)
+  await refusePortalCaller(cfg, guard) // the catalogue's shape, by another route
   const key = queryText(new URL(request.url).searchParams.get("tableKey"), "Table") ?? ""
   // `TARGETS[key]` alone resolves INHERITED members: ?tableKey=constructor hands
   // back a function, sails past a truthiness check and crashes downstream as a
@@ -57,8 +64,16 @@ export async function getImportSample(request: Request, env: Env): Promise<Respo
 
 /** The caller may use the import batch only if they can `create` into at least one
  * catalog target — otherwise a Viewer could burn credits planning an import they
- * could never run. Each write is still re-gated per target at confirm + per row. */
+ * could never run. Each write is still re-gated per target at confirm + per row.
+ *
+ * AND THEY MUST BE STAFF. A right-shaped gate is the wrong shape for this
+ * question: it says "does your role allow it", and whether a CLIENT LOGIN can
+ * drive the agency's bulk importer must not depend on how carefully somebody
+ * built the Client role. One mis-ticked `create` and a client is running the
+ * agentic import — and spending the team's AI allowance, which the portal was
+ * built never to touch. The refusal leads, so the right never gets asked. */
 async function requireAnyImportRight(cfg: D1Rest, guard: MemberGuard): Promise<void> {
+  await refusePortalCaller(cfg, guard)
   for (const t of Object.values(TARGETS)) if (await hasRight(cfg, guard, t.module, "create")) return
   throw new GuardError(403, "forbidden", "You don't have permission to import into any table on this team.")
 }
@@ -100,6 +115,9 @@ export async function postBatchPlan(request: Request, env: Env): Promise<Respons
  * coarse ping per changed module. */
 export async function postBatchConfirm(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard } = await teamContext(request, env)
+  // The one batch door that does not open with requireAnyImportRight (it gates
+  // per target instead) — so it says the other half of that guard itself.
+  await refusePortalCaller(cfg, guard)
   const body = (await request.json().catch(() => ({}))) as { batchId?: unknown }
   const batchId = requireText(body.batchId, "Batch", TEXT_LIMITS.short)
   const view = await getBatchView(cfg, guard, batchId)
@@ -116,12 +134,18 @@ export async function postBatchConfirm(request: Request, env: Env): Promise<Resp
  * row contents and rejection reasons stay on the creator-scoped batch. */
 export async function getBatches(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await teamContext(request, env)
+  // TEAM-visible, by design, and that is exactly why it must refuse a client
+  // login: this is the agency's own operating history — who bulk-loaded what,
+  // into which tables, from which file, how many rows. The working batch below
+  // is creator-scoped and would have refused them anyway; this one would not.
+  await refusePortalCaller(cfg, guard)
   return json({ batches: await listBatchSummaries(cfg, guard) })
 }
 
 /** GET /api/data-ops/import/batch?id= — the batch (files + plan + report). */
 export async function getBatch(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await teamContext(request, env)
+  await refusePortalCaller(cfg, guard) // creator-scoped already; not theirs to ask
   const id = queryText(new URL(request.url).searchParams.get("id"), "Id")
   if (!id) return fail(400, "invalid_input", "A batch id is required.")
   return json({ batch: await getBatchView(cfg, guard, id) })

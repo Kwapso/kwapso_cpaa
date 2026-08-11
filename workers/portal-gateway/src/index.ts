@@ -86,8 +86,10 @@ export const PORTAL_DOORS: Record<string, Upstream> = {
   "GET /api/tenancy/accounts/detail": "TENANCY",
 
   // ── support ────────────────────────────────────────────────────────────────
-  // A client raises tickets and follows their own. The list, the count and the
-  // thread are all pinned to the caller by the help fence.
+  // A client raises tickets and follows their COMPANY's. The list, the count and
+  // the thread are all pinned by the help fence to the account they are standing
+  // in and everything nested beneath it — the same fence as the accounts doors
+  // above, reading the account a ticket was raised for.
   "GET /api/content/help": "CONTENT",
   "GET /api/content/help/thread": "CONTENT",
   "POST /api/content/help": "CONTENT",

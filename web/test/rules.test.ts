@@ -10,8 +10,10 @@ import { describe, expect, it } from "vitest"
 
 import { GLOSSARY } from "@shared/glossary"
 import {
+  ACCOUNT_SCOPED_MODULES,
   ACTIVITY_GATE_MAP,
   ACTIVITY_TABLE_EXEMPT,
+  CLIENT_REACHABLE_EXEMPT,
   DEAF_EXEMPT,
   FORM_DIALOGS,
   GROWING_COLLECTIONS,
@@ -420,9 +422,25 @@ describe("RULES — the laws of the base", () => {
       ["workers/content/src/lib/help.ts", "setStatus"],
     ] as const) {
       const src = read(join(ROOT, ...file.split("/")))
-      const body = src.slice(src.indexOf(`export async function ${fn}`))
+      // THE FUNCTION, not the rest of the file. This window used to run to EOF,
+      // so a `return false` in any later function satisfied it — and the moment
+      // one of these writers needed to return something richer than a boolean
+      // (setStatus now reports WHICH account's ticket moved, for the live ping)
+      // the check failed for a reason that had nothing to do with the law.
+      const from = src.indexOf(`export async function ${fn}`)
+      const next = src.indexOf("\nexport ", from + 1)
+      const body = src.slice(from, next === -1 ? src.length : next)
       expect(/RETURNING id/.test(body), `${fn} must read the changed-row count (RETURNING id)`).toBe(true)
-      expect(/return false/.test(body), `${fn} must skip activity/publish when zero rows moved`).toBe(true)
+      // The law, said as the code must say it: a zero-row move RETURNS, and it
+      // returns BEFORE the activity row is written. Anything after that early
+      // exit is the "something really changed" path.
+      const early = body.indexOf("if (!changed[0]) return")
+      const history = body.indexOf("logActivity")
+      expect(early, `${fn} must return early when zero rows moved`).toBeGreaterThan(-1)
+      expect(
+        history === -1 || early < history,
+        `${fn} must skip the activity row when zero rows moved`
+      ).toBe(true)
     }
   })
 
@@ -647,6 +665,139 @@ describe("RULES — the laws of the base", () => {
   })
 
   // Every enforced law in the registry maps to one of the checks above (or a
+  // R21 — A DOOR ON THE AGENCY'S OWN MATERIAL REFUSES A CLIENT LOGIN.
+  //
+  // Earned twice, the same way both times. The client portal's gateway forwards
+  // a NAMED allow-list and leaves the agency's own doors out, with a comment
+  // saying why. The AGENCY gateway forwards by PREFIX, and a client login is an
+  // ordinary team member holding an ordinary role — so every door the portal
+  // deliberately withheld was served to the same person at the other hostname.
+  // First the learning library and the dropdown vocabulary; then, because the
+  // enumeration that followed listed "what the accounts module owns" instead of
+  // "what a client can reach", the help STAKEHOLDER list — a door that names the
+  // agency's staff admins, with their email addresses, and answers on a POST as
+  // well as a GET.
+  //
+  // So this check enumerates the only way that cannot go stale: DERIVED, from
+  // four sources that are each already the truth about themselves —
+  //   • the CLIENT ROLE's rights, read out of the seed;
+  //   • every route, read out of each worker's own ROUTES table;
+  //   • the gate each one opens with, read out of the handler (and the
+  //     route-local helpers it calls — a refusal one frame down still counts);
+  //   • the portal's own surface, read out of PORTAL_DOORS.
+  // A door a Client-role caller can pass, that the portal does not open, must
+  // refuse them or fence them. Add a door tomorrow and it is judged today.
+  it("client-reachable-doors: every agency door a client login can pass refuses or fences them", () => {
+    // ── 1. what the Client role may do (derived from the seed, never retyped) ──
+    const seed = read(join(ROOT, "scripts", "seed-staging.mjs"))
+    const rightsAt = seed.indexOf("rights: {", seed.indexOf("const CLIENT_ROLE"))
+    expect(rightsAt, "the seed no longer declares CLIENT_ROLE.rights — re-read this check").toBeGreaterThan(-1)
+    const block = seed.slice(rightsAt, seed.indexOf("\n  },", rightsAt))
+    const clientRights = new Set<string>()
+    for (const m of block.matchAll(/(\w+):\s*\{([^}]*)\}/g))
+      for (const r of m[2].matchAll(/(\w+):\s*true/g)) clientRights.add(`${m[1]}:${r[1]}`)
+    // Guard the derivation: an empty right set would make every door "unreachable"
+    // and pass this whole law without reading a line of worker source.
+    expect(clientRights.has("help:read"), "the Client role must still hold help:read").toBe(true)
+    expect(clientRights.size, "the Client role's rights did not parse").toBeGreaterThan(4)
+
+    // ── 2. the portal's own surface ──────────────────────────────────────────
+    const portalSrc = read(join(ROOT, "workers", "portal-gateway", "src", "index.ts"))
+    const portalDoors = new Set([...portalSrc.matchAll(/"([A-Z]+ \/[^"]+)":\s*"\w+"/g)].map((m) => m[1]))
+    expect(portalDoors.size, "PORTAL_DOORS did not parse").toBeGreaterThan(5)
+
+    // ── 3. every route, and the source its handler actually runs ─────────────
+    // auth and realtime answer from a switch rather than a ROUTES table, and
+    // neither has a door onto the agency's material: auth answers only about the
+    // caller's own identity, and the realtime handshake carries the account
+    // stamp itself (workers/realtime/test/realtime.test.ts owns that one). mcp's
+    // equivalent refusal is requireStaff, proven by its own identity-gate suite.
+    const offenders: string[] = []
+    const stale = new Set(Object.keys(CLIENT_REACHABLE_EXEMPT))
+    for (const worker of ["tenancy", "content", "data-ops"]) {
+      const dir = join(ROOT, "workers", worker, "src", "routes")
+      // Every function in the worker's routes/, exported or not — a gate or a
+      // refusal is routinely one route-local helper down (agencyContext,
+      // requireAnyImportRight), and a walk that stopped at exported names would
+      // read those doors as ungated and unrefused.
+      const fns = new Map<string, string>()
+      for (const file of readdirSync(dir).filter((f) => f.endsWith(".ts"))) {
+        const code = read(join(dir, file))
+        const starts = [...code.matchAll(/(?:export\s+)?(?:async\s+)?function\s+(\w+)/g)]
+        starts.forEach((m, i) => fns.set(m[1], code.slice(m.index, starts[i + 1]?.index ?? code.length)))
+      }
+      const reach = (name: string, seen = new Set<string>()): string => {
+        if (seen.has(name) || seen.size > 6) return ""
+        seen.add(name)
+        const body = fns.get(name)
+        if (!body) return ""
+        let out = body
+        for (const other of fns.keys())
+          if (other !== name && new RegExp(`(?<![\\w.])${other}\\s*\\(`).test(body)) out += reach(other, seen)
+        return out
+      }
+
+      const index = read(join(ROOT, "workers", worker, "src", "index.ts"))
+      const table = /export const ROUTES[^=]*=\s*\{([\s\S]*?)\n\}/.exec(index)
+      expect(table, `workers/${worker} has no ROUTES table — did it move?`).toBeTruthy()
+      const routes = [...(table as RegExpExecArray)[1].matchAll(/"([A-Z]+ \/[^"]+)":\s*\{\s*handler:\s*(\w+)/g)]
+      expect(routes.length, `workers/${worker}'s ROUTES did not parse`).toBeGreaterThan(3)
+
+      for (const [, door, handler] of routes) {
+        if (door.endsWith("/health")) continue
+        if (portalDoors.has(door)) continue // the portal opens it ON PURPOSE
+        const body = stripComments(reach(handler))
+        expect(body.length, `handler ${handler} for ${door} not found in workers/${worker}/src/routes`).toBeGreaterThan(0)
+        if (/adminGuard\s*\(/.test(body)) continue // key-gated: no session reaches it
+
+        // Which module rights does this door demand? A door that demands none is
+        // open to ANY member — which includes a client login, and is exactly how
+        // the screen recipes and the import history were reachable.
+        const gates = [
+          ...body.matchAll(/\bgated(?:Body)?(?:<[^>]*>)?\s*\(\s*request,\s*env,\s*"(\w+)",\s*"(\w+)"/g),
+          ...body.matchAll(/\brequireRight\s*\(\s*\w+,\s*\w+,\s*"(\w+)",\s*"(\w+)"/g),
+        ].map((m) => `${m[1]}:${m[2]}`)
+        const passable = gates.length === 0 || gates.some((g) => clientRights.has(g))
+        if (!passable) continue // their role stops them before the door has to
+
+        // Reachable. So the door must have made a decision about client logins,
+        // and there are only two that count.
+        //
+        // FIRST: it refuses them. That is the answer for anything of the
+        // agency's, whatever it is gated on.
+        //
+        // SECOND — and ONLY second: every right it demands is on a module whose
+        // rows belong to a CUSTOMER (ACCOUNT_SCOPED_MODULES), and it resolves
+        // the fence. Then "a client can reach it" is the point: they are reading
+        // their own company, through the clause that decides which rows those
+        // are.
+        //
+        // "It resolves accountScope" ALONE is not enough, and that loophole is
+        // the whole reason this check exists. The stakeholder door resolved the
+        // caller's scope and fenced the TICKET with it — and still answered with
+        // the agency's staff admins, by name and email address. A fence over
+        // somebody's rows says nothing about an answer made of somebody else's.
+        if (/refusePortalCaller\s*\(/.test(body)) continue
+        const customerRows =
+          gates.length > 0 &&
+          gates.every((g) => (ACCOUNT_SCOPED_MODULES as readonly string[]).includes(g.split(":")[0]))
+        if (customerRows && /accountScope(Clause)?\s*\(/.test(body)) continue
+        stale.delete(door)
+        if (!(door in CLIENT_REACHABLE_EXEMPT)) offenders.push(`${door} (${worker}/${handler})`)
+      }
+    }
+    expect(
+      offenders,
+      `these doors serve the AGENCY's own material to a client login — refuse them (refusePortalCaller), fence them (accountScope), or write down in CLIENT_REACHABLE_EXEMPT why the door answers only about the caller themselves: ${offenders.join(", ")}`
+    ).toEqual([])
+    // An exemption that is no longer an offender reads as a decision somebody
+    // made on purpose. It isn't; it's a line nobody reread.
+    expect(
+      [...stale],
+      `CLIENT_REACHABLE_EXEMPT names doors that are no longer reachable-and-unguarded — delete these lines: ${[...stale].join(", ")}`
+    ).toEqual([])
+  })
+
   // per-worker seam test) — a law can't exist without a check.
   it("every enforced law has a known check", () => {
     const known = new Set([
@@ -670,6 +821,7 @@ describe("RULES — the laws of the base", () => {
       "counted-collections", // R16: the seam/place/arbitration scan above + format-count.test.ts
       "catalog-coverage", // R13: workers/data-ops/test/catalog-coverage.test.ts
       "agent-filter-parity", // R19: workers/mcp/test/filter-parity.test.ts
+      "client-reachable-doors", // R21: the client-reach scan above
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

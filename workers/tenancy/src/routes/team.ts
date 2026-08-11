@@ -22,7 +22,7 @@ import {
 } from "../lib/teams"
 import { MAX_TEAMS_PER_USER, numberVar } from "../../../../shared/workers/limits"
 import { TEAM_CREATION_CLOSED } from "../../../../shared/product"
-import { accountScope } from "../../../../shared/workers/account-scope"
+import { accountScope, refusePortalCaller } from "../../../../shared/workers/account-scope"
 import { gatedBody } from "../../../../shared/workers/route"
 import { teamContext, toActor, whoAmI } from "../context"
 import type { Env } from "../env"
@@ -80,15 +80,13 @@ export async function myTeams(request: Request, env: Env): Promise<Response> {
  * Refused, not trimmed: there is no version of these answers a client needs. The
  * one field the portal ever wanted (the team id its live channel is keyed by)
  * `/api/auth/me` already carries. Costs the portal_users miss, the same toll
- * every fenced door pays. */
-async function refuseClientLogin(cfg: D1Rest, guard: MemberGuard): Promise<void> {
-  if ((await accountScope(cfg, guard)).kind === "portal")
-    throw new GuardError(
-      403,
-      "client_login",
-      "This sign-in is a client login — your company's work is on the client portal."
-    )
-}
+ * every fenced door pays.
+ *
+ * ONE REFUSAL, not two. This file used to carry its own private copy of the
+ * shared `refusePortalCaller` — same sentence, same 403, same code — under a
+ * second name. Two spellings of one security decision is one that can be fixed
+ * in the wrong place, and a guard that scans for the shared name cannot see the
+ * private one. The copy is gone; this reads the seam beside the fence. */
 
 async function agencyContext(env: Env, userId: string) {
   const cfg = d1Config(env)
@@ -96,7 +94,7 @@ async function agencyContext(env: Env, userId: string) {
   // Resolved from the ANSWER, never from the stored pointer — getActiveContext
   // self-heals a stale current team, and a guard built from the un-healed value
   // would refuse a member who is simply looking at a different team today.
-  if (ctx.team) await refuseClientLogin(cfg, await requireMember(env, userId, ctx.team.id))
+  if (ctx.team) await refusePortalCaller(cfg, await requireMember(env, userId, ctx.team.id))
   return ctx
 }
 
@@ -267,6 +265,6 @@ export async function getActivityFeed(request: Request, env: Env): Promise<Respo
  * it names who created the team, by name and email address). */
 export async function getTeamMetaFeed(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await teamContext(request, env)
-  await refuseClientLogin(cfg, guard)
+  await refusePortalCaller(cfg, guard)
   return json(await getTeamMeta(env, guard.teamId))
 }

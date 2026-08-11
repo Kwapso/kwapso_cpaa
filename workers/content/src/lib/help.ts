@@ -9,6 +9,7 @@
 //   • the AI agent's first-draft reply is a HOOK (maybeDraftFirstReply) left off
 //     until the agent worker exists — a ticket always opens regardless.
 
+import { accountScopeClause, type AccountScope } from "../../../../shared/workers/account-scope"
 import { describeChanges, logActivity, type Actor } from "../../../../shared/workers/activity"
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "../../../../shared/workers/d1-rest"
 import { ulid } from "../../../../shared/workers/id"
@@ -33,6 +34,7 @@ type TicketRow = {
   status: string
   resolved: number
   resolved_at: string | null
+  account_id: string | null
   creator_id: string
   creator_name: string | null
   editor_name: string | null
@@ -57,6 +59,7 @@ function toTicket(r: TicketRow): HelpTicket {
     editorName: r.editor_name,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
+    accountId: r.account_id,
   }
 }
 
@@ -96,7 +99,7 @@ function toMessage(r: ReplyRow): HelpMessage {
 }
 
 const TICKET_COLS =
-  "id, help_type, description, screen_recording_link, source_screen, status, resolved, resolved_at, creator_id, creator_name, editor_name, created_at, updated_at"
+  "id, help_type, description, screen_recording_link, source_screen, status, resolved, resolved_at, account_id, creator_id, creator_name, editor_name, created_at, updated_at"
 
 /** Fetch one ticket (the raw row the gating + notify need), or throw a clean 404.
  *
@@ -110,10 +113,10 @@ const TICKET_COLS =
 async function ticketOrThrow(
   cfg: D1Rest,
   guard: MemberGuard,
-  id: string,
-  portal: boolean
+  scope: AccountScope,
+  id: string
 ): Promise<TicketRow> {
-  const fence = authorScope(guard, portal, "all")
+  const fence = ticketFence(guard, scope, "all")
   const rows = await d1Query<TicketRow>(
     cfg,
     guard.databaseId,
@@ -137,10 +140,28 @@ const TICKET_ORDER = "COALESCE(updated_at, created_at)"
  * anyone else, and the team-wide default handed them everyone else's: names,
  * problems, and whatever they pasted into the description.
  *
- * A portal caller is pinned to their own, whatever scope they ask for. Staff are
- * unchanged. Returned as a clause rather than a pre-check so it rides the same
- * WHERE as the page AND the count — a total that didn't pass the same filter
- * would say how many tickets it is refusing to show.
+ * WHAT A CLIENT SEES, since the owner's ruling of 11 Aug 2026: their COMPANY's
+ * questions, not merely their own. The first version of this fence pinned a
+ * portal caller to `creator_id = <them>`, and at a real client that made the
+ * finance person and the ops person invisible to each other — two people at the
+ * same company, each told the other's question does not exist. So the fence is
+ * now the ORDINARY account fence (`accountScopeClause`) over the account the
+ * ticket was raised for: the company they are standing in, everything nested
+ * beneath it, and nothing else. It cannot reach further than the account scope
+ * because it IS the account scope — the same clause the accounts list is built
+ * from, reading a column instead of a second idea of who the caller is.
+ *
+ * The agency's own tickets carry NO account, and NULL never matches an IN list,
+ * so they stay the agency's. Staff get no clause at all.
+ *
+ * `tab` is the My/All choice, and it is now a real choice for a client too:
+ * "mine" adds `creator_id`, on top of the fence and never instead of it.
+ *
+ * `table` prefixes the columns for a joined/EXISTS read (the thread fence).
+ *
+ * Returned as a clause rather than a pre-check so it rides the same WHERE as the
+ * page AND the count — a total that didn't pass the same filter would say how
+ * many tickets it is refusing to show.
  *
  * NO DEFAULT ANYWHERE BELOW, deliberately. Every reader in this file used to
  * take `portal = false`, which is a fence that fails OPEN when a call site
@@ -148,21 +169,30 @@ const TICKET_ORDER = "COALESCE(updated_at, created_at)"
  * whole team's list, so a client asking a question was handed every other
  * client's. A required parameter turns that miss into a compile error, which is
  * the only kind of reminder that never gets tired. */
-export function authorScope(guard: MemberGuard, portal: boolean, scope: "mine" | "all") {
-  const own = portal || scope === "mine"
-  return { sql: own ? "creator_id = ?" : "", params: own ? [guard.userId] : [] }
+export function ticketFence(
+  guard: MemberGuard,
+  scope: AccountScope,
+  tab: "mine" | "all",
+  table = ""
+): { sql: string; params: string[] } {
+  const col = (name: string) => (table ? `${table}.${name}` : name)
+  const parts = [
+    accountScopeClause(scope, col("account_id")),
+    tab === "mine" ? { sql: `${col("creator_id")} = ?`, params: [guard.userId] } : { sql: "", params: [] },
+  ].filter((p) => p.sql)
+  return { sql: parts.map((p) => p.sql).join(" AND "), params: parts.flatMap((p) => p.params) }
 }
 
 export async function listTickets(
   cfg: D1Rest,
   guard: MemberGuard,
-  scope: "mine" | "all",
-  cursor: string | null,
-  portal: boolean
+  scope: AccountScope,
+  tab: "mine" | "all",
+  cursor: string | null
 ): Promise<Page<HelpTicket>> {
   const pos = decodeCursor(cursor)
   const after = keysetAfter(pos, TICKET_ORDER)
-  const fence = authorScope(guard, portal, scope)
+  const fence = ticketFence(guard, scope, tab)
   const clauses = [...(fence.sql ? [fence.sql] : []), ...(after.sql ? [after.sql] : [])]
   const params = [...fence.params, ...after.params]
   const rows = await d1Query<TicketRow>(
@@ -182,12 +212,14 @@ export async function listTickets(
 export async function countTickets(
   cfg: D1Rest,
   guard: MemberGuard,
-  portal: boolean
+  scope: AccountScope
 ): Promise<{ total: number; mineTotal: number }> {
   // R16 says the count is exact; the fence says exact ABOUT WHAT THEY MAY SEE.
   // An unfenced total would tell a client how many tickets exist that it is
-  // refusing to show them — a smaller leak, but the same leak.
-  const fence = authorScope(guard, portal, "all")
+  // refusing to show them — a smaller leak, but the same leak. Both totals ride
+  // the SAME clause: "All" is their company's, "My" is the part they raised, and
+  // for a client login those two numbers now genuinely differ.
+  const fence = ticketFence(guard, scope, "all")
   const rows = await d1Query<{ total: number; mine: number }>(
     cfg,
     guard.databaseId,
@@ -203,12 +235,12 @@ export async function countTickets(
 export async function getTicket(
   cfg: D1Rest,
   guard: MemberGuard,
-  id: string,
-  portal: boolean
+  scope: AccountScope,
+  id: string
 ): Promise<HelpTicket | null> {
   // The fence rides the WHERE here too: a by-id lookup that skipped it would be
   // the leak in its most convenient form (one id, one ticket, no list to page).
-  const fence = authorScope(guard, portal, "all")
+  const fence = ticketFence(guard, scope, "all")
   const rows = await d1Query<TicketRow>(
     cfg,
     guard.databaseId,
@@ -230,32 +262,55 @@ export async function getTicket(
  *
  * Expressed as a subquery rather than a pre-check so it rides the SAME WHERE as
  * the rows AND the count: a total that didn't pass the same filter would say how
- * many replies it is refusing to show. `authorScope` yields `creator_id = ?`,
- * a column on `help` — hence the alias. */
-function threadFence(guard: MemberGuard, portal: boolean): { sql: string; params: string[] } {
-  const fence = authorScope(guard, portal, "all")
+ * many replies it is refusing to show. The fence reads columns on `help`, not on
+ * `help_threads` — hence the alias it is built with. */
+function threadFence(guard: MemberGuard, scope: AccountScope): { sql: string; params: string[] } {
+  const fence = ticketFence(guard, scope, "all", "h")
   if (!fence.sql) return { sql: "", params: [] }
   return {
-    sql: ` AND EXISTS (SELECT 1 FROM help h WHERE h.id = help_id AND h.${fence.sql})`,
+    sql: ` AND EXISTS (SELECT 1 FROM help h WHERE h.id = help_id AND ${fence.sql})`,
     params: fence.params,
   }
 }
 
-/** Every reply on a ticket, oldest first (the conversation order). */
+/** Every reply on a ticket, oldest first (the conversation order).
+ *
+ * WHOSE NAME TRAVELS. "The portal shows work status but never which staff member
+ * is doing it" (SCOPE ch.06), and the portal used to keep that promise in the
+ * BROWSER: it printed "You" for the signed-in person and the agency's name for
+ * everyone else, on the reasoning that a client could only ever see their own
+ * tickets, so "everyone else" meant staff. The staff member's real name was on
+ * the wire the whole time; only the component declined to draw it.
+ *
+ * Both halves of that changed at once. Now that a contact sees their COMPANY's
+ * questions, "everyone else" includes their own colleagues — and calling a
+ * colleague "kwapso" is worse than a leak, it is a lie about who is talking. So
+ * the decision moves to the server, where the caller's kind is known: a client
+ * login is told the names of the people on THEIR side of the fence and nothing
+ * about ours. A reply from someone with no portal login is the agency, and it
+ * arrives with no name at all for the portal to render as us.
+ *
+ * Anyone who could reply on this ticket had to pass the same fence to see it, so
+ * "has a portal login" is exactly "is one of this company's people". Staff
+ * readers are unaffected — the agency app shows every name, as it must. */
 export async function listReplies(
   cfg: D1Rest,
   guard: MemberGuard,
-  ticketId: string,
-  portal: boolean
+  scope: AccountScope,
+  ticketId: string
 ): Promise<HelpMessage[]> {
-  const fence = threadFence(guard, portal)
-  const rows = await d1Query<ReplyRow>(
+  const fence = threadFence(guard, scope)
+  const rows = await d1Query<ReplyRow & { from_client: number }>(
     cfg,
     guard.databaseId,
-    `SELECT id, help_id, message_body, tagged_user_ids, is_agent, creator_id, creator_name, created_at FROM help_threads WHERE help_id = ?${fence.sql} ORDER BY created_at ASC LIMIT ${THREAD_HARD_CAP}`, // R14 hard cap
+    `SELECT id, help_id, message_body, tagged_user_ids, is_agent, creator_id, creator_name, created_at,
+            EXISTS (SELECT 1 FROM portal_users pu WHERE pu.user_id = help_threads.creator_id) AS from_client
+       FROM help_threads WHERE help_id = ?${fence.sql} ORDER BY created_at ASC LIMIT ${THREAD_HARD_CAP}`, // R14 hard cap
     [ticketId, ...fence.params]
   )
-  return rows.map(toMessage)
+  return rows.map((r) =>
+    toMessage(scope.kind === "portal" && r.from_client !== 1 ? { ...r, creator_name: null } : r)
+  )
 }
 
 /** R16: the thread's exact reply COUNT(*) — the Conversation badge shows this,
@@ -263,10 +318,10 @@ export async function listReplies(
 export async function countReplies(
   cfg: D1Rest,
   guard: MemberGuard,
-  ticketId: string,
-  portal: boolean
+  scope: AccountScope,
+  ticketId: string
 ): Promise<number> {
-  const fence = threadFence(guard, portal)
+  const fence = threadFence(guard, scope)
   const rows = await d1Query<{ n: number }>(
     cfg,
     guard.databaseId,
@@ -287,22 +342,32 @@ export type TicketInput = {
 }
 
 /** Raise a ticket. Description is required; everything else optional. Opens in the
- * `open` status. Returns the new ticket's id. */
+ * `open` status. Returns the new ticket's id AND the account it was raised for —
+ * the live ping needs the account to reach the raiser's colleagues and nobody
+ * else.
+ *
+ * WHICH ACCOUNT. The one the caller is STANDING IN, taken from the guard
+ * corridor and never from the body: a client raises a question for the company
+ * they are looking at, which is the same company every other read on that screen
+ * was fenced to. Staff raise the agency's own questions, which belong to no
+ * client and are stamped NULL. */
 export async function createTicket(
   cfg: D1Rest,
   guard: MemberGuard,
+  scope: AccountScope,
   actor: Actor,
   input: TicketInput
-): Promise<string> {
+): Promise<{ id: string; accountId: string | null }> {
   const description = requireText(input.description, "Description", TEXT_LIMITS.long)
 
   const id = ulid()
+  const accountId = scope.kind === "portal" ? scope.currentAccountId : null
   const now = new Date().toISOString()
   await d1ExecScript(
     cfg,
     guard.databaseId,
-    `INSERT INTO help (id, help_type, description, screen_recording_link, source_screen, source_related_table, source_related_row_id, status, resolved, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString((optionalText(input.helpType, "Type", TEXT_LIMITS.short) ?? null))}, ${sqlString(description)}, ${sqlString((optionalText(input.screenRecordingLink, "Screen recording link", TEXT_LIMITS.link) ?? null))}, ${sqlString((optionalText(input.sourceScreen, "Source", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedTable, "Source table", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedRowId, "Source row", TEXT_LIMITS.short) ?? null))}, 'open', 0, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+    `INSERT INTO help (id, help_type, description, screen_recording_link, source_screen, source_related_table, source_related_row_id, status, resolved, account_id, created_at, creator_id, creator_email, creator_name)
+VALUES (${sqlString(id)}, ${sqlString((optionalText(input.helpType, "Type", TEXT_LIMITS.short) ?? null))}, ${sqlString(description)}, ${sqlString((optionalText(input.screenRecordingLink, "Screen recording link", TEXT_LIMITS.link) ?? null))}, ${sqlString((optionalText(input.sourceScreen, "Source", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedTable, "Source table", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedRowId, "Source row", TEXT_LIMITS.short) ?? null))}, 'open', 0, ${sqlString(accountId)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
   )
 
   await logActivity(cfg, guard.databaseId, actor, {
@@ -312,31 +377,48 @@ VALUES (${sqlString(id)}, ${sqlString((optionalText(input.helpType, "Type", TEXT
     relatedRowId: id,
   })
 
-  return id
+  return { id, accountId }
 }
 
 /** Edit a ticket's content (description / type / screen recording / source). Stamps
- * the editor audit block + updated_at (which also re-sorts it to the top). */
+ * the editor audit block + updated_at (which also re-sorts it to the top).
+ * Returns the account the ticket belongs to, for the live ping. */
 export async function updateTicket(
   cfg: D1Rest,
   guard: MemberGuard,
+  scope: AccountScope,
   actor: Actor,
   id: string,
-  input: TicketInput,
-  portal: boolean
-): Promise<void> {
-  const before = await ticketOrThrow(cfg, guard, id, portal)
+  input: TicketInput
+): Promise<string | null> {
+  const before = await ticketOrThrow(cfg, guard, scope, id)
   const description = requireText(input.description, "Description", TEXT_LIMITS.long)
 
   const now = new Date().toISOString()
   // The fence rides the UPDATE as well as the read above — same sentence, same
   // statement, so neither can be removed while the other keeps the door honest.
-  const fence = authorScope(guard, portal, "all")
-  const fenceSql = fence.sql ? ` AND creator_id = ${sqlString(guard.userId)}` : ""
-  await d1ExecScript(
+  // Parameterised (the house shape for a fenced UPDATE, as in lib/accounts):
+  // the clause carries a placeholder PER account id, so it cannot be spelled out
+  // by hand and cannot drift from the one the read used.
+  const fence = ticketFence(guard, scope, "all")
+  await d1Query(
     cfg,
     guard.databaseId,
-    `UPDATE help SET help_type = ${sqlString((optionalText(input.helpType, "Type", TEXT_LIMITS.short) ?? null))}, description = ${sqlString(description)}, screen_recording_link = ${sqlString((optionalText(input.screenRecordingLink, "Screen recording link", TEXT_LIMITS.link) ?? null))}, source_screen = ${sqlString((optionalText(input.sourceScreen, "Source", TEXT_LIMITS.short) ?? null))}, updated_at = ${sqlString(now)}, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE id = ${sqlString(id)}${fenceSql};`
+    `UPDATE help SET help_type = ?, description = ?, screen_recording_link = ?, source_screen = ?,
+       updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ?
+     WHERE id = ?${fence.sql ? ` AND ${fence.sql}` : ""}`,
+    [
+      optionalText(input.helpType, "Type", TEXT_LIMITS.short) ?? null,
+      description,
+      optionalText(input.screenRecordingLink, "Screen recording link", TEXT_LIMITS.link) ?? null,
+      optionalText(input.sourceScreen, "Source", TEXT_LIMITS.short) ?? null,
+      now,
+      actor.id,
+      actor.email,
+      actor.name,
+      id,
+      ...fence.params,
+    ]
   )
 
   const changes = describeChanges([
@@ -356,20 +438,22 @@ export async function updateTicket(
     relatedTable: "help",
     relatedRowId: id,
   })
+  return before.account_id
 }
 
 /** Move a ticket along its fixed lifecycle. Resolving stamps the resolver block +
  * resolved flag; any non-resolved status clears it. Caller-permission lives in the
- * route — every status move (incl. reopen) needs help:edit. */
+ * route — every status move (incl. reopen) needs help:edit. Reports whether a row
+ * actually moved (R17) and which account's ticket it was (for the live ping). */
 export async function setStatus(
   cfg: D1Rest,
   guard: MemberGuard,
+  scope: AccountScope,
   actor: Actor,
   id: string,
-  status: HelpStatus,
-  portal: boolean
-): Promise<boolean> {
-  await ticketOrThrow(cfg, guard, id, portal)
+  status: HelpStatus
+): Promise<{ moved: boolean; accountId: string | null }> {
+  const before = await ticketOrThrow(cfg, guard, scope, id)
   // R17: the `status <> ?` predicate makes the move idempotent — re-resolving an
   // already-resolved ticket moves zero rows, so it writes no duplicate history,
   // re-stamps no editor/updated_at (no phantom re-sort), and pings nothing.
@@ -379,14 +463,14 @@ export async function setStatus(
     ? `resolved = 1, resolved_at = ${sqlString(now)}, resolver_id = ${sqlString(actor.id)}, resolver_email = ${sqlString(actor.email)}, resolver_name = ${sqlString(actor.name)}`
     : "resolved = 0, resolved_at = NULL, resolver_id = NULL, resolver_email = NULL, resolver_name = NULL"
   // The fence rides the move itself, beside the R17 predicate.
-  const fence = authorScope(guard, portal, "all")
+  const fence = ticketFence(guard, scope, "all")
   const changed = await d1Query<{ id: string }>(
     cfg,
     guard.databaseId,
     `UPDATE help SET status = ?, ${resolveBlock}, updated_at = ?, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE id = ? AND status <> ?${fence.sql ? ` AND ${fence.sql}` : ""} RETURNING id`,
     [status, now, id, status, ...fence.params]
   )
-  if (!changed[0]) return false
+  if (!changed[0]) return { moved: false, accountId: before.account_id }
 
   await logActivity(cfg, guard.databaseId, actor, {
     type: `Help ticket ${status === "resolved" ? "resolved" : status === "reopened" ? "reopened" : "updated"}`,
@@ -394,28 +478,30 @@ export async function setStatus(
     relatedTable: "help",
     relatedRowId: id,
   })
-  return true
+  return { moved: true, accountId: before.account_id }
 }
 
 /** Move MANY tickets to the same status in one call (the bulk sibling of
  * setStatus). Applies the SAME per-row change — same UPDATE, same resolver block,
  * same activity row — and reports how many actually changed vs. were skipped
  * (an id with no matching ticket, or one ALREADY at the target status — R17:
- * a re-run bulk writes no duplicate history and pings nothing). Returns the ids
- * that really changed so the route publishes one row-level ping EACH. */
+ * a re-run bulk writes no duplicate history and pings nothing). Returns the rows
+ * that really changed — id AND the account each belongs to — so the route
+ * publishes one row-level ping EACH, aimed at the people who may hear it. */
 export async function bulkSetStatus(
   cfg: D1Rest,
   guard: MemberGuard,
+  scope: AccountScope,
   actor: Actor,
   ids: string[],
-  status: HelpStatus,
-  portal: boolean
-): Promise<{ changed: string[]; skipped: number }> {
-  const changed: string[] = []
+  status: HelpStatus
+): Promise<{ changed: { id: string; accountId: string | null }[]; skipped: number }> {
+  const changed: { id: string; accountId: string | null }[] = []
   let skipped = 0
   for (const id of ids) {
     try {
-      if (await setStatus(cfg, guard, actor, id, status, portal)) changed.push(id)
+      const { moved, accountId } = await setStatus(cfg, guard, scope, actor, id, status)
+      if (moved) changed.push({ id, accountId })
       else skipped++ // already at the target status — a no-op, not an event
     } catch (e) {
       // A missing ticket is skipped, not fatal — the rest of the batch still applies.
@@ -441,12 +527,12 @@ export async function bulkSetStatus(
 export async function bulkSetStatusByFilter(
   cfg: D1Rest,
   guard: MemberGuard,
+  scope: AccountScope,
   actor: Actor,
   filter: { status?: HelpStatus; helpType?: string },
   toStatus: HelpStatus,
-  dryRun: boolean,
-  portal: boolean
-): Promise<{ matched: number; changed: number }> {
+  dryRun: boolean
+): Promise<{ matched: number; changed: number; accounts: string[] }> {
   // The same facet set the Help screen sends (status / type). The R17 predicate
   // (`status <> ?`) is INLINE in both statements below — source-visible for the
   // idempotent-transitions scan — so "matched" is already "would change".
@@ -454,7 +540,7 @@ export async function bulkSetStatusByFilter(
   // The fence leads the extras: a set-shaped write must not reach a ticket the
   // caller cannot even see, and the COUNT it confirms with must be a count of
   // the same rows the UPDATE will touch.
-  const authored = authorScope(guard, portal, "all")
+  const authored = ticketFence(guard, scope, "all")
   const extra: string[] = [...(authored.sql ? [authored.sql] : [])]
   const extraParams: (string | number)[] = [...authored.params]
   if (filter.status) {
@@ -474,7 +560,7 @@ export async function bulkSetStatusByFilter(
     [toStatus, ...extraParams]
   )
   const matched = countRows[0]?.n ?? 0
-  if (dryRun || matched === 0) return { matched, changed: 0 }
+  if (dryRun || matched === 0) return { matched, changed: 0, accounts: [] }
   if (matched > BULK_IDS_LIMIT)
     throw new GuardError(
       400,
@@ -487,10 +573,13 @@ export async function bulkSetStatusByFilter(
   const resolveBlock = resolved
     ? `resolved = 1, resolved_at = ${sqlString(now)}, resolver_id = ${sqlString(actor.id)}, resolver_email = ${sqlString(actor.email)}, resolver_name = ${sqlString(actor.name)}`
     : "resolved = 0, resolved_at = NULL, resolver_id = NULL, resolver_email = NULL, resolver_name = NULL"
-  const changedRows = await d1Query<{ id: string }>(
+  // `account_id` rides the RETURNING beside the id: ONE activity row and ONE
+  // coarse ping is right for the agency's screens, but a client login hears only
+  // its own world, so the route needs to know WHICH worlds this set touched.
+  const changedRows = await d1Query<{ id: string; account_id: string | null }>(
     cfg,
     guard.databaseId,
-    `UPDATE help SET status = ?, ${resolveBlock}, updated_at = ?, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE status <> ?${extraSql} RETURNING id`,
+    `UPDATE help SET status = ?, ${resolveBlock}, updated_at = ?, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE status <> ?${extraSql} RETURNING id, account_id`,
     [toStatus, now, toStatus, ...extraParams]
   )
   const changed = changedRows.length
@@ -501,7 +590,11 @@ export async function bulkSetStatusByFilter(
       description: `${actor.name} set ${changed} support ticket${changed === 1 ? "" : "s"}${filter.helpType ? ` of type "${filter.helpType}"` : ""}${filter.status ? ` from ${filter.status.replace("_", " ")}` : ""} to ${toStatus.replace("_", " ")}`,
       relatedTable: "help",
     })
-  return { matched, changed }
+  return {
+    matched,
+    changed,
+    accounts: [...new Set(changedRows.map((r) => r.account_id).filter((a): a is string => !!a))],
+  }
 }
 
 /** Add a reply to a ticket's thread, and bump the ticket's updated_at so it
@@ -511,16 +604,16 @@ export async function bulkSetStatusByFilter(
 export async function addReply(
   cfg: D1Rest,
   guard: MemberGuard,
+  scope: AccountScope,
   actor: Actor,
   ticketId: string,
   body: string,
   taggedUserIds: string[],
-  isAgent: boolean,
-  portal: boolean
+  isAgent: boolean
 ): Promise<string> {
   const clean = body.trim()
   if (!clean) throw new GuardError(400, "invalid_input", "A reply can't be empty.")
-  await ticketOrThrow(cfg, guard, ticketId, portal)
+  await ticketOrThrow(cfg, guard, scope, ticketId)
 
   const id = ulid()
   const now = new Date().toISOString()

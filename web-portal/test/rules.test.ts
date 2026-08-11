@@ -157,14 +157,22 @@ describe("portal rules the agency app doesn't have", () => {
   // not for the word "stakeholder", which is a legitimate thing to render about
   // the client's OWN people (their main contact is theirs to know). Comments are
   // stripped first, or stating the rule would break it.
-  it("staff stay anonymous: a reply is either you or the agency, never a name", () => {
+  it("staff stay anonymous: a reply is you, a colleague, or the agency — never a staff name", () => {
     const src = read(join(PORTAL, "components", "ticket-screen.tsx"))
     expect(src, "an agency reply must be attributed to the brand, not a person").toContain(
       "brand.name"
     )
-    // Every server field that carries a staff person's name. `personName` (a
-    // contact of the client's own company) is deliberately not on this list.
-    const staffNaming = /\b(authorName|actorName|raiserName|creatorName|editorName|assigneeName|stakeholders)\b/
+    // Every server field that carries a STAFF person's name. `personName` (a
+    // contact of the client's own company) is deliberately not on this list —
+    // and neither, since 11 Aug 2026, is `authorName`, for the same reason: a
+    // contact now sees their COMPANY's questions, so a thread has colleagues on
+    // it, and calling a colleague "kwapso" is not anonymity, it is a lie about
+    // who is talking. What changed is WHERE the promise is kept, and it moved
+    // the right way — the field used to arrive carrying a staff name and this
+    // list stopped the screen drawing it; now the server never sends one, which
+    // the assertion below pins so removing a name from this regex can never be
+    // the whole edit.
+    const staffNaming = /\b(actorName|raiserName|creatorName|editorName|assigneeName|stakeholders)\b/
     const leaky: string[] = []
     for (const f of componentFiles()) {
       const visible = read(f)
@@ -173,6 +181,17 @@ describe("portal rules the agency app doesn't have", () => {
       if (staffNaming.test(visible)) leaky.push(f.split("/").pop() as string)
     }
     expect(leaky, "the portal shows work status, never which staff member is doing it").toEqual([])
+
+    // The wire, not the widget: a staff name must not reach a client login at
+    // all. (workers/content/test/help-fence.test.ts proves it against a real
+    // database; this pins the seam so the source can't quietly drop it.)
+    const lib = read(join(PORTAL, "..", "workers", "content", "src", "lib", "help.ts"))
+    const at = lib.indexOf("export async function listReplies(")
+    expect(at, "listReplies is where a thread's names are decided — did it move?").toBeGreaterThan(-1)
+    const body = lib.slice(at, lib.indexOf("\nexport ", at + 1)).replace(/\/\*[\s\S]*?\*\//g, "")
+    expect(body, "a portal caller must be sent NO name for an author outside their world").toMatch(
+      /scope\.kind === "portal"[\s\S]*creator_name: null/
+    )
   })
 
   // SCOPE ch.02, the iron rule: "account" NEVER means a login. People are portal

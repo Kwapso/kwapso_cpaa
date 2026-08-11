@@ -8,6 +8,7 @@
 // screen it draws; a machine client has no screen. The decision is recorded where
 // the machine surface's other decisions are (TOOLLESS_DOORS in the R19 census).
 
+import { refusePortalCaller } from "../../../../shared/workers/account-scope"
 import { fail, json } from "../../../../shared/workers/http"
 import { publishChange } from "../../../../shared/workers/realtime"
 import { getScreenOverrides, setScreenOverride } from "../lib/screens-config"
@@ -18,6 +19,12 @@ import type { Env } from "../env"
 
 export async function getScreens(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await teamContext(request, env)
+  // "Any member" means any member of the AGENCY. A recipe describes an agency
+  // screen — which modules it shows, which columns, which tabs — and the client
+  // portal draws none of them (it has its own screens and this door is not on
+  // its surface). A client login is an ordinary member, so the refusal has to be
+  // here rather than on the other gateway's allow-list.
+  await refusePortalCaller(cfg, guard)
   return json({ screens: await getScreenOverrides(cfg, guard) })
 }
 

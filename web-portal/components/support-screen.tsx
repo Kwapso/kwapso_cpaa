@@ -2,11 +2,20 @@
 
 // SUPPORT — everything this client has asked us, newest first.
 //
-// No tabs. The agency's help screen splits My / All because a team member cares
-// which tickets are theirs among everyone's; a client's list is already all
-// theirs (the help fence pins a portal caller to their own, whatever scope they
-// ask for), so a tab strip here would offer a choice between a list and the same
-// list. R3 is satisfied by having no toggle at all rather than a prettier one.
+// No tabs — still, and now for a better reason than the one this comment used
+// to give. It said a client's list was "already all theirs" because the help
+// fence pinned a portal caller to the tickets they personally raised, so a My /
+// All strip would offer a choice between a list and the same list. Since the
+// owner ruled that a contact sees their COMPANY's questions (11 Aug 2026) those
+// two lists genuinely differ, and the door serves both (`?scope=mine`). We are
+// still not drawing the strip: this screen is the company's record of what it
+// has asked us, and a filter is not what makes that readable — attribution is.
+// A row saying WHO raised it is the open piece of work here, and it is not a
+// one-liner: `raiserName` can be a staff name the day staff raise a ticket on an
+// account's behalf (SCOPE ch.07), so it needs the same server-side decision the
+// thread's authors now get (lib/help listReplies) rather than a field the screen
+// prints and hopes about.
+// R3 is satisfied by having no toggle at all rather than a prettier one.
 //
 // R14: the list PAGES. "Show older" walks the opaque cursor the door handed us,
 // so a client four years in can still reach their first request.

@@ -103,6 +103,8 @@ const ticket: HelpTicket = {
   editorName: null,
   createdAt: "2026-06-13T10:00:00.000Z",
   updatedAt: null,
+  // The agency's own question belongs to no client, so it names no account.
+  accountId: null,
 }
 
 const meta: TeamMeta = {

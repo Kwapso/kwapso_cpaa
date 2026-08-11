@@ -17,12 +17,18 @@
 // 2. NO STATUS CONTROL. Moving a ticket along its lifecycle is gated on
 //    help:edit, which is the agency's job. The client sees where it stands.
 //
-// THE ONE PIECE OF REAL LOGIC: who wrote a reply. Everything on a portal thread
-// was written by either this person or the agency — the help fence guarantees it
-// (a portal caller only ever reads their own tickets). So an author who isn't
-// the signed-in person is "kwapso", by name, rather than whichever colleague
-// happened to type it. That is the staff-anonymity rule applied where it would
-// otherwise leak by accident.
+// THE ONE PIECE OF REAL LOGIC: who wrote a reply. A thread now has three kinds
+// of author, not two — since the owner ruled that a contact sees their COMPANY's
+// questions (11 Aug 2026), the people on a thread are this person, their
+// COLLEAGUES, and the agency.
+//
+// The server decides which is which, because only the server knows: it sends a
+// name for everyone on the client's side of the fence and NO name for anyone on
+// ours (lib/help listReplies). So the rule here is simply "you, or the name we
+// were given, or us" — and the staff-anonymity rule (SCOPE ch.06) is kept by the
+// wire rather than by this component choosing not to draw something it was sent.
+// Which matters: the old version printed the agency's name for every author who
+// wasn't you, and would have introduced a client's own colleague as "kwapso".
 
 import * as React from "react"
 import Link from "next/link"
@@ -109,7 +115,7 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
   const me = ready.user.id
   const replies = (threadQ.data ?? []).map((m) => ({
     id: m.id,
-    author: m.authorId === me ? "You" : brand.name,
+    author: m.authorId === me ? "You" : (m.authorName ?? brand.name),
     time: formatRelative(m.createdAt),
     body: m.body,
   }))

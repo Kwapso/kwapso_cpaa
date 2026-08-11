@@ -68,12 +68,13 @@ export class TeamChannel extends DurableObject<Env> {
   }
 
   /** Fan a tiny message out to everyone on this channel who may hear it. A ping
-   * carries a ROW ID, so "may hear" is the account fence, not just membership —
-   * see mayHearChange (shared/workers/account-scope.ts). */
+   * carries a ROW ID — and, for a resource a client login is meant to hear, the
+   * ACCOUNT that row belongs to — so "may hear" is the account fence, not just
+   * membership. See mayHearChange (shared/workers/account-scope.ts). */
   broadcast(message: string): void {
-    let event: { resource?: string; id?: string } | null = null
+    let event: { resource?: string; id?: string; scope?: string } | null = null
     try {
-      event = JSON.parse(message) as { resource?: string; id?: string }
+      event = JSON.parse(message) as { resource?: string; id?: string; scope?: string }
     } catch {
       // Unparsable event: staff still get it (this worker wrote it), fenced
       // listeners don't — a ping nobody can check is a ping nobody fenced.
