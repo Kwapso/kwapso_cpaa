@@ -5,7 +5,8 @@
 
 import { refusePortalCaller } from "@shared/workers/account-scope"
 import { fail, json } from "@shared/workers/http"
-import { csvResponse, toCsv } from "@shared/workers/csv"
+import { csvResponse, exportTooLarge, toCsv } from "@shared/workers/csv"
+import { EXPORT_HARD_CAP } from "@shared/workers/limits"
 import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { gated, gatedBody } from "@shared/workers/route"
@@ -33,7 +34,10 @@ export async function getSelectable(request: Request, env: Env): Promise<Respons
 export async function getSelectableExport(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "selectable_data", "read")
   await refusePortalCaller(cfg, guard)
-  const rows = await listSelectableForExport(cfg, guard)
+  const { rows, complete } = await listSelectableForExport(cfg, guard)
+  // Whole, or an error — never a short file that looks like the vocabulary.
+  if (!complete)
+    return exportTooLarge(EXPORT_HARD_CAP, "dropdown values", "Read the Dropdown values screen instead, or retire the options you no longer offer.")
   const csv = toCsv(
     ["type", "value", "active", "created_at", "created_by"],
     rows.map((r) => [r.type, r.value, r.deactivated_at == null, r.created_at, r.creator_name])
@@ -43,6 +47,13 @@ export async function getSelectableExport(request: Request, env: Env): Promise<R
 
 export async function postCreateSelectable(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<{ type?: string; value?: string }>(request, env, "selectable_data", "create")
+  // R21 AT THE DOOR, ON THE WRITE HALF TOO. Every READ door on this module already
+  // refuses a client login; not one WRITE door did, so the refusal existed on the
+  // module and was missing on exactly the half that changes things. It held only
+  // because the shipped Client role happens not to carry the right — and R21's own
+  // sentence is that the decision belongs at the door, precisely so it does not
+  // depend on how carefully a role was built.
+  await refusePortalCaller(cfg, guard)
   const type = requireText(body.type, "Group", TEXT_LIMITS.short)
   const value = requireText(body.value, "Option", TEXT_LIMITS.short)
   const id = await createSelectable(cfg, guard, actor, type, value)
@@ -53,6 +64,13 @@ export async function postCreateSelectable(request: Request, env: Env): Promise<
 
 export async function postUpdateSelectable(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<{ id?: string; value?: string }>(request, env, "selectable_data", "edit")
+  // R21 AT THE DOOR, ON THE WRITE HALF TOO. Every READ door on this module already
+  // refuses a client login; not one WRITE door did, so the refusal existed on the
+  // module and was missing on exactly the half that changes things. It held only
+  // because the shipped Client role happens not to carry the right — and R21's own
+  // sentence is that the decision belongs at the door, precisely so it does not
+  // depend on how carefully a role was built.
+  await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Option", TEXT_LIMITS.short)
   const value = requireText(body.value, "Option", TEXT_LIMITS.short)
   await updateSelectable(cfg, guard, actor, id, value)
@@ -62,6 +80,13 @@ export async function postUpdateSelectable(request: Request, env: Env): Promise<
 
 export async function postSetSelectableActive(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<{ id?: string; active?: boolean }>(request, env, "selectable_data", "delete")
+  // R21 AT THE DOOR, ON THE WRITE HALF TOO. Every READ door on this module already
+  // refuses a client login; not one WRITE door did, so the refusal existed on the
+  // module and was missing on exactly the half that changes things. It held only
+  // because the shipped Client role happens not to carry the right — and R21's own
+  // sentence is that the decision belongs at the door, precisely so it does not
+  // depend on how carefully a role was built.
+  await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Option", TEXT_LIMITS.short)
   if (typeof body.active !== "boolean") return fail(400, "invalid_input", "id and active are required.")
   // R17: no-op repeat → no ping, no duplicate history (see setSelectableActive).

@@ -45,6 +45,22 @@ export const INVITE_SWEEP_CAP = 25
  * unbounded send from a trusted sender. */
 export const MENTIONS_LIMIT = 50
 
+/** Bytes one agent chat request may declare. The per-file caps (8 files × ~5 MB)
+ * are real, and they were all enforced AFTER `request.json()` had already parsed
+ * the whole body — so the caps described what could be imported while the parse
+ * described what could be sent, and the parse was 40 MB into a 128 MB isolate.
+ * A ceiling is only a ceiling if it is checked BEFORE the expensive step. Sized
+ * to fit the caps it guards plus the envelope around them. */
+export const AGENT_CHAT_MAX_BYTES = 42 * 1024 * 1024
+
+/** Bytes one attached CSV may carry into a chat import. Named here beside the
+ * request ceiling rather than inline at the door, because the two numbers are a
+ * pair: the outer one is only correct while it is bigger than 8 × this. */
+export const AGENT_FILE_MAX_BYTES = 5_000_000
+
+/** Files one agent chat message may attach. */
+export const AGENT_MAX_FILES = 8
+
 /** How far up the account tree the loop guard will walk. The tree is self-nesting,
  * so the ancestor walk is the only unbounded recursion in the base. Past this depth
  * the guard cannot PROVE a move is ring-free, so it refuses — fails closed, never
@@ -101,6 +117,15 @@ export const RETENTION_DELETE_CAP = 5_000
  * the per-address code cap), and a code lives ten minutes — so a day is already
  * far past the last moment any rule can still see the row. */
 export const AUTH_RETENTION_HOURS = 24
+
+/** Roles one team may hold. A role is cheap on its own and expensive in company:
+ * every one adds a row per module to `role_permissions` (the export's biggest
+ * read), a row to the roles list, and an entry to the title lookup two hot member
+ * screens do on every open. None of those was capped at the CREATE end, so the
+ * size of three reads was set by whoever held `member_roles:create` — the
+ * ordinary grant an office manager gets. Far above any real org chart, low enough
+ * that the reads it feeds stay reads. */
+export const MAX_ROLES_PER_TEAM = 200
 
 /** Per-user ceiling on CREATED teams. Every team provisions a REAL database, so
  * an uncapped create door lets one signed-up person exhaust the platform's

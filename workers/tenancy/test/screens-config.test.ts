@@ -24,6 +24,11 @@ const actor = { id: "ME", email: "me@x.com", name: "Me" }
 
 beforeEach(() => {
   d1Query.mockReset()
+  // An EMPTY team by default: no row under this key yet, and nothing in the
+  // table. The write now reads both before it inserts (the row-count ceiling —
+  // test/growth-bounds.test.ts owns that rule against a real database), so a mock
+  // with no default answers `undefined` and the reads crash on their own guard.
+  d1Query.mockResolvedValue([])
   d1ExecScript.mockReset()
   d1ExecScript.mockResolvedValue(undefined)
 })

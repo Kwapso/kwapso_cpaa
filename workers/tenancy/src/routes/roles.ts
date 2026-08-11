@@ -3,7 +3,8 @@
 // (Admin is locked, auto-flip-read) live in lib/roles.
 
 import { fail, json } from "@shared/workers/http"
-import { csvResponse, toCsv } from "@shared/workers/csv"
+import { csvResponse, exportTooLarge, toCsv } from "@shared/workers/csv"
+import { LIST_HARD_CAP, MAX_ROLES_PER_TEAM } from "@shared/workers/limits"
 import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { listRoles, countRoles } from "../lib/members"
@@ -45,15 +46,38 @@ export async function getRoles(request: Request, env: Env): Promise<Response> {
  * (spreadsheet-filterable), and the whole audit block. The cross-cutting rule:
  * EXPORT NEEDS READ (import needs create). Team-bound by construction
  * (teamContext → the caller's own team database). Leading columns still match
- * the import format (title, description) so the file round-trips. */
+ * the import format (title, description) so the file round-trips.
+ *
+ * AND IT IS WHOLE, OR IT IS AN ERROR — the accounts door's rule, and this door
+ * needed it more than any other. Three reads sit behind one file here, and two of
+ * them could truncate: the role rows came back on the SCREEN cap (a thousand,
+ * because the export borrowed the list reader), and the permission sheet is roles
+ * × modules. The second one is the dangerous half. `buildPermissionValue` renders
+ * a role with no rows as every right OFF, and the columns lead with the import
+ * format — so a short file was not merely missing roles, it was an instruction to
+ * REVOKE the ones it kept. Refused now, at the door, before a single line is
+ * written: the exact server count against what the list returned, and the
+ * permission read's own `complete`. */
 export async function getRolesExport(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await teamContext(request, env)
   await requireRight(cfg, guard, "member_roles", "read")
-  const [roles, audit, permsByRole] = await Promise.all([
+  const [roles, audit, perms, total] = await Promise.all([
     listRoles(env, cfg, guard),
     listRoleAudit(cfg, guard),
     listAllRolePermissions(cfg, guard),
+    // R16's exact COUNT(*), read here as a COMPLETENESS signal: more roles in the
+    // table than the capped list returned means the file would be short. It also
+    // covers the audit read, whose ceiling is ten times the list's — if the roles
+    // fit, the audit fit.
+    countRoles(cfg, guard),
   ])
+  if (total > roles.length || !perms.complete)
+    return exportTooLarge(
+      Math.min(total, LIST_HARD_CAP),
+      "roles",
+      "Retire the roles you no longer use, or read the Roles screen instead — a file this size would import back as a permission change nobody asked for."
+    )
+  const permsByRole = perms.byRole
   const auditBy = new Map(audit.map((a) => [a.id, a]))
   const RIGHTS = ["read", "create", "edit", "delete"] as const
   const header = [
@@ -123,6 +147,20 @@ export async function postCreateRole(request: Request, env: Env): Promise<Respon
     permissions?: PermissionValue
   }
   const title = requireText(body.title, "Name", TEXT_LIMITS.short)
+  // CAP THE DOOR. Every read of `member_roles` is bounded (R14), and every one of
+  // those bounds was a promise about a table with no ceiling at the other end: a
+  // role is one row here, a row per module in `role_permissions`, and an entry in
+  // the title lookup the members list and the invitations list each do on open.
+  // An uncapped create door is how an ordinary `member_roles:create` grant sets
+  // the size of somebody else's screen — and the roles CSV export, which reads
+  // roles × modules, is where it lands first. Counted exactly, through the seam
+  // the count badge already uses.
+  if ((await countRoles(cfg, guard)) >= MAX_ROLES_PER_TEAM)
+    return fail(
+      403,
+      "role_limit",
+      `This team already has ${MAX_ROLES_PER_TEAM} roles, which is the limit. Retire one you no longer use and try again.`
+    )
   // Creating WITH a permission matrix (the import round-trip / a matrix-carrying
   // CSV) is create + edit in one move, so it demands BOTH rights — the same gate
   // setting a matrix on the Roles screen goes through. A plain create is unchanged.

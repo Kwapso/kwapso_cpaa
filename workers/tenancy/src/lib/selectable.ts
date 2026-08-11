@@ -44,13 +44,23 @@ export type SelectableExportRow = {
   created_at: string | null
   creator_name: string | null
 }
-export async function listSelectableForExport(cfg: D1Rest, guard: MemberGuard): Promise<SelectableExportRow[]> {
-  return d1Query<SelectableExportRow>(
+/** AN EXPORT IS ONE WHOLE DOCUMENT, OR IT IS AN ERROR (shared/workers/csv
+ * exportTooLarge). Past the deliberate-download cap the door refuses rather than
+ * serving a short file that looks whole: these columns lead with the import
+ * format, and a vocabulary re-imported from a truncated file is a picker missing
+ * options nobody removed. */
+export async function listSelectableForExport(
+  cfg: D1Rest,
+  guard: MemberGuard
+): Promise<{ rows: SelectableExportRow[]; complete: boolean }> {
+  const rows = await d1Query<SelectableExportRow>(
     cfg,
     guard.databaseId,
-    // R14 hard cap — never unbounded; move to real paging before this bites (exports get the larger deliberate-download cap).
-    `SELECT type, value, is_default, deactivated_at, created_at, creator_name FROM selectable_data ORDER BY type ASC, value ASC LIMIT ${EXPORT_HARD_CAP}`
+    // R14 hard cap (export tier). +1 is how "there was more" is known without a
+    // second query.
+    `SELECT type, value, is_default, deactivated_at, created_at, creator_name FROM selectable_data ORDER BY type ASC, value ASC LIMIT ${EXPORT_HARD_CAP + 1}`
   )
+  return { rows: rows.slice(0, EXPORT_HARD_CAP), complete: rows.length <= EXPORT_HARD_CAP }
 }
 
 /** R16: exact server COUNT(*) for the badge — never rows.length. */

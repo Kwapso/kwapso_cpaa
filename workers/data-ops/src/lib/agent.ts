@@ -19,7 +19,7 @@ import type { Env } from "../env"
 import { selectModel, TOOL_RESULT_TAG, type ChatMessage, type Model, type ModelReply, type ToolCall, type ToolSpec } from "./model"
 import { executeTool, getTool, requiresConfirm, toolSpecs, type ToolResult } from "./tools"
 import { appendMessage, consumePendingProposal, createThread, getPendingProposal, listMessages, requireOwnThread } from "./threads"
-import { addBatchFile, createBatch, planBatch } from "./import-batch"
+import { addBatchFile, createBatch, getBatchView, planBatch } from "./import-batch"
 import { GuardError } from "@shared/workers/gating"
 import { recordWorkerError } from "@shared/workers/error-log"
 
@@ -325,6 +325,56 @@ async function planAttachedFiles(
   return lines.join("\n")
 }
 
+/** WHAT THE CONFIRM PANEL IS ALLOWED TO SAY ABOUT AN IMPORT.
+ *
+ * The panel is the designated defence against the assistant being talked into
+ * something, and it earns that by showing the BODY THE DOOR WILL RECEIVE
+ * (shared/workers/confirm-payload). Every other tool's body is ids and values the
+ * door acts on, so showing it is showing the truth. `run_import_batch` is the one
+ * exception, and it is the worst possible one to have: its body is a `batchId`
+ * the human cannot read plus a `summary` the MODEL wrote — free prose, from the
+ * one participant an attacker gets to influence. "Import 3 contacts" over a plan
+ * that writes five thousand rows was a confirm panel telling the human the wrong
+ * thing, on the highest-blast tool in the catalogue, with the file's own contents
+ * in the same context window.
+ *
+ * So the server overwrites it. The plan is already stored, already built by the
+ * app from the actual files, and already the thing `confirmBatch` will execute —
+ * this reads that row back and says what it says: total rows first (so a clipped
+ * line can never hide the blast radius), then each file and the table it lands
+ * in. The model's sentence never reaches the panel. Nothing else about the call
+ * changes: the stored proposal /confirm runs is `tc.input` as the model wrote it,
+ * and `batchId` is what actually decides what happens.
+ *
+ * Exported for the suite that reads the rendered lines rather than trusting the
+ * call site — the confirm defence has been a green test asserting the wrong
+ * intent once already. */
+export async function panelInput(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  tc: ToolCall
+): Promise<Record<string, unknown>> {
+  if (tc.name !== "run_import_batch") return tc.input
+  const batchId = typeof tc.input.batchId === "string" ? tc.input.batchId : ""
+  // Creator-scoped, so somebody else's batch reads as no batch — a 404 here is
+  // not an error to report, it is the panel refusing to describe what it cannot see.
+  const plan = batchId ? await getBatchView(cfg, guard, batchId).then((v) => v.plan).catch(() => null) : null
+  const steps = plan?.steps ?? []
+  const n = (x: number) => x.toLocaleString("en-GB")
+  const total = steps.reduce((sum, s) => sum + Math.max(0, s.rowCount - s.predictedRejects), 0)
+  const summary = steps.length
+    ? `${n(total)} rows in total — ` +
+      steps
+        .map(
+          (s) =>
+            `${n(Math.max(0, s.rowCount - s.predictedRejects))} from ${s.fileName} into ${s.targetName}` +
+            (s.predictedRejects ? ` (${n(s.predictedRejects)} skipped)` : "")
+        )
+        .join("; ")
+    : "Nothing — this import has no plan, so it would write no rows."
+  return { ...tc.input, summary }
+}
+
 export async function runChat(
   env: Env,
   request: Request,
@@ -543,13 +593,17 @@ async function runPlanLoop(
       // Surface ALL of the turn's calls (not just the dangerous subset) so a mixed
       // turn doesn't silently drop its non-confirm calls. Each one goes through the
       // ONE pendingCall seam, so the panel gets the summary AND the payload behind
-      // it — the human is approving what the door will actually receive.
+      // it — the human is approving what the door will actually receive. Through
+      // panelInput first, which is where the ONE tool whose body is model prose
+      // rather than door arguments has that prose replaced with the stored plan.
       return {
         done: false,
         threadId,
         assistantText: reply.text,
         quota,
-        needsConfirm: valid.map((tc) => pendingCall(getTool(tc.name)!, tc.input, names)),
+        needsConfirm: await Promise.all(
+          valid.map(async (tc) => pendingCall(getTool(tc.name)!, await panelInput(cfg, guard, tc), names))
+        ),
       }
     }
 

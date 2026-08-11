@@ -11,7 +11,7 @@ import { logActivity, type Actor } from "@shared/workers/activity"
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { type AccountScope } from "@shared/workers/account-scope"
-import { GuardError, type MemberGuard } from "@shared/workers/gating"
+import { GuardError, hasRight, type MemberGuard } from "@shared/workers/gating"
 import type { HelpStakeholder } from "@shared/types"
 import { getTicket } from "./help"
 import type { Env } from "../env"
@@ -159,8 +159,25 @@ export async function listStakeholders(
   for (const r of replyRows) for (const id of parseTagged(r.tagged_user_ids)) claim(id, "mentioned")
   for (const r of addedRows) claim(r.user_id, "added")
 
-  // 4b. current team admins (TEAM DB role id → GLOBAL holders).
-  if (adminId) for (const id of await adminUserIds(env, guard.teamId, adminId)) claim(id, "admin")
+  // 4b. current team admins (TEAM DB role id → GLOBAL holders) — AND ONLY FOR A
+  // CALLER WHO MAY READ THE MEMBER DIRECTORY.
+  //
+  // Every other name in this set is a PROPERTY OF THE TICKET: the person who
+  // raised it, the people someone @mentioned on it, the people somebody pulled
+  // in. The admins are not. They are "whoever currently holds the Admin role",
+  // resolved from the role table and handed back with each one's name, email
+  // address and photograph — the staff roster, keyed by a ticket id, behind
+  // `help:read` alone. Anyone with a support screen could read the org chart of
+  // the people who run the place, and any ticket they could already see was the
+  // key. That is R18's sentence in a module that had not heard it: a cross-module
+  // read carries the caller's rights, and this one reaches into `team_members`.
+  //
+  // So the derived admins now cost the right that owns the directory. A caller
+  // without it still gets a correct, complete stakeholder set for the TICKET —
+  // nothing about their own ticket is hidden from them — it simply stops carrying
+  // a roster they were never granted.
+  if (adminId && (await hasRight(cfg, guard, "team_members", "read")))
+    for (const id of await adminUserIds(env, guard.teamId, adminId)) claim(id, "admin")
 
   // 5. join all unique ids to the global users table for display (drops anyone no
   //    longer an active member of this team).

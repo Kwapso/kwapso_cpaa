@@ -52,6 +52,14 @@ export async function bootstrap(request: Request, env: Env): Promise<Response> {
     teams = await listMyTeams(env, user.id)
   }
 
+  // THE SAME REFUSAL THE REST OF THIS FILE MAKES, and it belongs here because
+  // this door hands back the SAME `TeamSummary` rows: the agency's name, its
+  // logo, and `db_status` — an internal provisioning state no client has any use
+  // for. Refused only once a team is resolved: a caller with none cannot be a
+  // client login (portal-ness is a row in a TEAM database), and refusing before
+  // that would lock the very first sign-in out of onboarding.
+  await refuseClientOnTeams(env, user.id, teams)
+
   const current = await env.DB.prepare("SELECT current_team_id FROM users WHERE id = ?")
     .bind(user.id)
     .first<{ current_team_id: string | null }>()
@@ -59,10 +67,43 @@ export async function bootstrap(request: Request, env: Env): Promise<Response> {
   return json({ teams, currentTeamId: current?.current_team_id ?? null })
 }
 
+/** A CLIENT LOGIN IS REFUSED THE TEAM LIST TOO.
+ *
+ * `/active` was closed against a client login because it answers with the team's
+ * name, its logo, the caller's role title and the agency's member count — and the
+ * comment above says why the refusal had to live on the door rather than on the
+ * portal gateway's allow-list. Then the two doors that hand back the team ROWS
+ * kept answering: `GET /teams` and the onboarding bootstrap both return
+ * `TeamSummary[]`, which is the name and the logo again, plus `dbStatus`. Two of
+ * the five fields `/active` was closed for, out of its siblings, to the same
+ * person, at the same origin — "a door that returns a payload another door guards
+ * is that payload's second front door", written twelve lines below where it kept
+ * happening.
+ *
+ * The R21 exemption these doors carried said "the caller's own membership list",
+ * and that sentence is true about the QUESTION and silent about the ANSWER. A
+ * client knows perfectly well which team they belong to; what they were being
+ * handed is what the team LOOKS LIKE from the inside. The exemption is gone from
+ * the registry with this. */
+async function refuseClientOnTeams(env: Env, userId: string, teams: { id: string }[]): Promise<void> {
+  // Which team they are STANDING in, resolved the same way `active` resolves it
+  // (stored pointer if it is still one of theirs, else the first) — so the two
+  // doors can never disagree about who is being asked about.
+  const stored = await env.DB.prepare("SELECT current_team_id FROM users WHERE id = ?")
+    .bind(userId)
+    .first<{ current_team_id: string | null }>()
+  const current = teams.find((t) => t.id === stored?.current_team_id) ?? teams[0]
+  if (!current) return
+  const cfg = d1Config(env)
+  await refusePortalCaller(cfg, await requireMember(env, userId, current.id))
+}
+
 export async function myTeams(request: Request, env: Env): Promise<Response> {
   const user = await whoAmI(request, env)
   if (!user) return fail(401, "signed_out", "Not signed in.")
-  return json({ teams: await listMyTeams(env, user.id), currentTeamId: user.currentTeamId })
+  const teams = await listMyTeams(env, user.id)
+  await refuseClientOnTeams(env, user.id, teams)
+  return json({ teams, currentTeamId: user.currentTeamId })
 }
 
 /** THE AGENCY'S OWN DOORS — the ones that answer with the AGENCY rather than
@@ -165,6 +206,13 @@ export async function postUpdateTeam(request: Request, env: Env): Promise<Respon
   const { actor, cfg, guard, body } = await gatedBody<{ name?: unknown; logoDataUrl?: unknown }>(
     request, env, "teams", "edit"
   )
+  // R21 AT THE DOOR, ON THE WRITE HALF TOO. Every READ door on this module already
+  // refuses a client login; not one WRITE door did, so the refusal existed on the
+  // module and was missing on exactly the half that changes things. It held only
+  // because the shipped Client role happens not to carry the right — and R21's own
+  // sentence is that the decision belongs at the door, precisely so it does not
+  // depend on how carefully a role was built.
+  await refusePortalCaller(cfg, guard)
   const name = requireText(body.name, "Name", TEXT_LIMITS.short)
   // A data URL is bytes, not prose — parseDataUrl caps and refuses it downstream,
   // so the boundary's job here is only to prove it IS a string (a number would

@@ -290,6 +290,8 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
   await publishChange(env, guard.teamId, "help", helpId, "edit", ticket.accountId ?? undefined)
   await notifyReplyAndMentions(
     env,
+    cfg,
+    guard,
     guard.teamId,
     { id: ticket.id, raiserId: ticket.raiserId },
     { id: actor.id, name: actor.name },

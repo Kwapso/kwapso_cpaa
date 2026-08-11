@@ -32,6 +32,13 @@ export async function postScreen(request: Request, env: Env): Promise<Response> 
   const { actor, cfg, guard, body } = await gatedBody<{ module?: string; recipe?: unknown }>(
     request, env, "teams", "edit"
   )
+  // R21 AT THE DOOR, ON THE WRITE HALF TOO. Every READ door on this module already
+  // refuses a client login; not one WRITE door did, so the refusal existed on the
+  // module and was missing on exactly the half that changes things. It held only
+  // because the shipped Client role happens not to carry the right — and R21's own
+  // sentence is that the decision belongs at the door, precisely so it does not
+  // depend on how carefully a role was built.
+  await refusePortalCaller(cfg, guard)
   const module = requireText(body.module, "Module", TEXT_LIMITS.short)
   if (typeof body.recipe === "undefined")
     return fail(400, "invalid_input", "module and recipe are required.")

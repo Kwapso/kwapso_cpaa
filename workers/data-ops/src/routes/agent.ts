@@ -9,6 +9,7 @@ import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/worke
 import { publishChange } from "@shared/workers/realtime"
 import { GuardError, adminGuard, requireRight, teamContext } from "@shared/workers/gating"
 import { recordWorkerError } from "@shared/workers/error-log"
+import { AGENT_CHAT_MAX_BYTES, AGENT_FILE_MAX_BYTES, AGENT_MAX_FILES } from "@shared/workers/limits"
 import { getQuota, grantCredits, readUsageLog } from "../lib/credits"
 import { confirmAndRun, runChat, type Emit } from "../lib/agent"
 import { listMessages, listThreads } from "../lib/threads"
@@ -136,6 +137,15 @@ export async function postGrantCredits(request: Request, env: Env): Promise<Resp
 export async function postAgentChat(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, user } = await teamContext(request, env)
   await requireRight(cfg, guard, "agent", "create")
+  // THE CEILING GOES IN FRONT OF THE PARSE. Every cap below is real and every one
+  // of them used to be read AFTER `request.json()` had already buffered and
+  // parsed the whole body — so the caps bounded what could be IMPORTED while the
+  // parse bounded what could be SENT, and the parse's own bound was 8 × 5 MB of
+  // JSON string in a 128 MB isolate. Checking the declared length first costs one
+  // header read and turns an out-of-memory into a sentence.
+  const declared = Number(request.headers.get("content-length"))
+  if (Number.isFinite(declared) && declared > AGENT_CHAT_MAX_BYTES)
+    return fail(413, "request_too_large", "That message is too big to send. Attach fewer or smaller files.")
   const body = (await request.json().catch(() => ({}))) as {
     threadId?: unknown
     message?: unknown
@@ -147,13 +157,14 @@ export async function postAgentChat(request: Request, env: Env): Promise<Respons
   // engine re-enforces its own caps (file count, rows, bytes) when they're added.
   let files: { name: string; csv: string }[] | undefined
   if (Array.isArray(body.files) && body.files.length) {
-    if (body.files.length > 8) return fail(400, "too_many_files", "Attach up to 8 files at a time.")
+    if (body.files.length > AGENT_MAX_FILES)
+      return fail(400, "too_many_files", `Attach up to ${AGENT_MAX_FILES} files at a time.`)
     files = body.files.map((f) => {
       const raw = (f ?? {}) as { name?: unknown; csv?: unknown }
       const name = optionalText(raw.name, "File name", 200) ?? "file"
       if (typeof raw.csv !== "string" || !raw.csv.trim())
         throw new GuardError(400, "invalid_input", "Each attached file needs CSV text.")
-      if (raw.csv.length > 5_000_000)
+      if (raw.csv.length > AGENT_FILE_MAX_BYTES)
         throw new GuardError(413, "file_too_large", `"${name}" is too large. Export a smaller CSV (up to about 5 MB).`)
       return { name, csv: raw.csv }
     })

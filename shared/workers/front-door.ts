@@ -72,10 +72,14 @@ export async function serveMedia(
  * AND the central error_logs table via auth's internal door, so a crash on a
  * user's phone is queryable + resolvable later, not just visible for a week.
  *
- * Only forwarded once the session is VERIFIED with auth: a Cookie header is
- * attacker-controlled, so `Cookie: kwapso_session=x` used to be enough to write
- * a row into the GLOBAL core database from an anonymous request. Recording is
- * best-effort — a failed lookup drops the row and keeps the console line.
+ * Only recorded — in EITHER store — once the session is VERIFIED with auth: a
+ * Cookie header is attacker-controlled, so `Cookie: kwapso_session=x` used to be
+ * enough to write a row into the GLOBAL core database from an anonymous request.
+ * The console half was left in front of that check and so kept the hole open in
+ * its cheaper form: an unauthenticated caller could still push 4,000 characters
+ * of their own text per request into the log stream. Both writes now sit behind
+ * the same door. Recording stays best-effort — a failed lookup drops the row —
+ * but a caller auth cannot name gets neither.
  *
  * AND THE ROW IS CHARGED TO WHOEVER AUTH JUST NAMED. Every FIELD of a beacon is
  * length-capped in logError, but the number of ROWS was not: a signed-in caller
@@ -100,12 +104,19 @@ export async function recordClientError(
   internalKey: string | undefined
 ): Promise<Response> {
   const raw = await request.text().catch(() => "")
-  console.error(`${source}_client_error`, raw.slice(0, 4000))
   const cookie = request.headers.get("Cookie") ?? ""
   const me = cookie.includes("kwapso_session=")
     ? await auth.fetch("https://internal/api/auth/me", { headers: { Cookie: cookie } }).catch(() => null)
     : null
   if (me?.ok) {
+    // THE CONSOLE LINE IS ALSO A WRITE, and it used to happen first. Four
+    // thousand characters of attacker-authored text went into the observability
+    // stream on an anonymous POST, before the session was checked — the same
+    // unverified-caller hole the error_logs row was closed for, one line above
+    // where it was closed. Nothing about an anonymous beacon is useful: no user,
+    // no team, no team channel it belongs to. So the log line moved behind the
+    // same door as the row, and the two now cost the same thing to reach.
+    console.error(`${source}_client_error`, raw.slice(0, 4000))
     // Whose it is, best-effort: a session that verified but whose body we can't
     // read still gets its crash recorded, on the shared bucket.
     const who = await me

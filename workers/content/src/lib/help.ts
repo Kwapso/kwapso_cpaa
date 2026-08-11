@@ -69,7 +69,8 @@ type ReplyRow = {
   message_body: string
   tagged_user_ids: string | null
   is_agent: number
-  creator_id: string
+  /** Null only on the way OUT, and only to a client login — see listReplies. */
+  creator_id: string | null
   creator_name: string | null
   created_at: string
 }
@@ -308,8 +309,16 @@ export async function listReplies(
        FROM help_threads WHERE help_id = ?${fence.sql} ORDER BY created_at ASC LIMIT ${THREAD_HARD_CAP}`, // R14 hard cap
     [ticketId, ...fence.params]
   )
+  // THE NAME AND THE HANDLE, not just the name. Blanking `creator_name` alone
+  // left `creator_id` on every staff reply, which is a STABLE PSEUDONYM: the same
+  // ULID against the same person on every ticket, for as long as they work here.
+  // A pseudonym is anonymity only until something links it to a name once, and
+  // the reply notification used to do exactly that ("Alice Smith replied to your
+  // ticket") for the very reply the client is looking at. Two halves of one
+  // promise; both are kept now, and this is the half that makes the linkage
+  // worthless even if a name escapes somewhere else.
   return rows.map((r) =>
-    toMessage(scope.kind === "portal" && r.from_client !== 1 ? { ...r, creator_name: null } : r)
+    toMessage(scope.kind === "portal" && r.from_client !== 1 ? { ...r, creator_id: null, creator_name: null } : r)
   )
 }
 

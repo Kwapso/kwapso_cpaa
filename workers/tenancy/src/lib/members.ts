@@ -67,7 +67,12 @@ export async function listMembers(
   const roles = await d1Query<RoleRow>(
     cfg,
     guard.databaseId,
-    "SELECT id, title, is_default FROM member_roles"
+    // R14 hard cap. A title lookup is not exempt from the law just because it is
+    // a lookup: `member_roles` is a table any holder of `member_roles:create` can
+    // add to without limit, so an uncapped read of it is an uncapped read
+    // somebody else controls the size of — on the members screen, which everyone
+    // opens. (The create door is capped too now; both halves, or neither works.)
+    `SELECT id, title, is_default FROM member_roles LIMIT ${LIST_HARD_CAP}`
   )
   const roleById = new Map(roles.map((r) => [r.id, r]))
 

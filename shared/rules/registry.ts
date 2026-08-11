@@ -205,10 +205,18 @@ export const CATALOG_EXEMPT: Record<string, string> = {
  * fails on a line that no longer names a route — a rotting exemption is worse
  * than none, because it reads as a decision somebody made on purpose. */
 export const CLIENT_REACHABLE_EXEMPT: Record<string, string> = {
-  "POST /api/tenancy/bootstrap":
-    "teamless onboarding: it answers with the caller's OWN first team, and a client login already has one, so there is nothing of the agency's behind it",
-  "GET /api/tenancy/teams":
-    "the caller's own membership list — the teams THEY belong to, read through their own session and no id at all",
+  // GONE, both of them, and worth recording why the reasons READ so well.
+  //
+  // `POST /api/tenancy/bootstrap` said "it answers with the caller's OWN first
+  // team". `GET /api/tenancy/teams` said "the caller's own membership list — the
+  // teams THEY belong to, no id at all". Both sentences are true about the
+  // QUESTION and say nothing about the ANSWER, which in both cases is a
+  // `TeamSummary` row: the agency's name, its logo, and `dbStatus`. Two of the
+  // five fields `/api/tenancy/active` had already been closed for, walking out of
+  // its two siblings. Both doors now refuse a client login (routes/team.ts
+  // refuseClientOnTeams) — which is why these lines are deleted rather than
+  // reworded: an exemption is a claim about what is BEHIND a door, and "it is
+  // about you" is not one.
   "GET /api/tenancy/my-permissions":
     "the caller's own rights, which they are entitled to know; it names no other person and no record",
   "GET /api/tenancy/invitations":
