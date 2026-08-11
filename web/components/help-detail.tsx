@@ -49,24 +49,36 @@ import { LoadMore } from "@/components/load-more"
 import { HelpStakeholders } from "@/components/help-stakeholders"
 import { HelpStatusStepper, type HelpStatusValue } from "@/components/help-status-stepper"
 
-// library (hyphen) ⇄ server (underscore) status — only "in progress" differs.
+// LIBRARY ⇄ SERVER status. These were one-to-one until the work engine gave the
+// ticket its five states (SCOPE ch.07); the library's `TicketStatus` has four,
+// and the library is a separate repo we do not edit from here (UI-CONVENTIONS,
+// "the library is lego"). So this is a MAPPING, not a mismatch — and the
+// narrowing only reaches the library's own badge, because the real control is
+// HelpStatusStepper below, which speaks all five.
+const TO_LIBRARY: Record<HelpTicket["status"], TicketStatus> = {
+  // Read but not started, and read and triaged, are both "with us, not begun".
+  new: "open",
+  triaged: "open",
+  in_progress: "in-progress",
+  // Every story is done and the client has not been told yet — still in motion,
+  // because the telling is the part that finishes it.
+  ready: "in-progress",
+  resolved: "resolved",
+}
 const TO_SERVER: Record<TicketStatus, HelpTicket["status"]> = {
-  open: "open",
+  open: "new",
   "in-progress": "in_progress",
   resolved: "resolved",
-  reopened: "reopened",
-}
-const TO_LIBRARY: Record<HelpTicket["status"], TicketStatus> = {
-  open: "open",
-  in_progress: "in-progress",
-  resolved: "resolved",
-  reopened: "reopened",
+  // The library's "reopened" is a staff member pulling a ticket back into play,
+  // which in our five states is exactly `triaged`: read, and not yet started.
+  reopened: "triaged",
 }
 const STATUS_LABEL: Record<HelpTicket["status"], string> = {
-  open: "Open",
+  new: "New",
+  triaged: "Triaged",
   in_progress: "In progress",
+  ready: "Ready",
   resolved: "Resolved",
-  reopened: "Reopened",
 }
 
 export function HelpDetailScreen({

@@ -146,7 +146,7 @@ beforeEach(() => {
   const ticket = (id: string, who: string, name: string, text: string, account: string | null) =>
     db().exec(
       `INSERT INTO help (id, description, status, resolved, account_id, created_at, creator_id, creator_email, creator_name)
-       VALUES ('${id}', '${text}', 'open', 0, ${account ? `'${account}'` : "NULL"}, '2026-03-01', '${who}', '${name}@example', '${name}');`
+       VALUES ('${id}', '', 'new', 0, ${account ? `'${account}'` : "NULL"}, '2026-03-01', '${who}', '${name}@example', '${name}');`
     )
   ticket(TICKETS.burglar, IDS.burglarUser, "Diego", "Cannot download last quarter", IDS.burglarAccount)
   ticket(TICKETS.staff, IDS.staffUser, "Staff", "Internal: migrate the Delaval records", null)
@@ -227,7 +227,7 @@ describe("the help WRITES carry the fence, not just the reads", () => {
     })
     expect(res.status).toBe(404)
     const row = db().prepare(`SELECT status FROM help WHERE id = '${TICKETS.victim}'`).get() as { status: string }
-    expect(row.status).toBe("open")
+    expect(row.status).toBe("new")
   })
 
   it("replying on another client's ticket is a 404, and appends nothing", async () => {

@@ -169,7 +169,7 @@ export function buildSpineDb(): DatabaseSync {
   // company, must be able to see it; Diego at Delaval must not.
   db.exec(
     `INSERT INTO help (id, description, status, resolved, account_id, created_at, creator_id, creator_email, creator_name)
-     VALUES ('${IDS.victimTicket}', 'Bergman S.A. cannot see the March invoice run', 'open', 0, '${IDS.victimAccount}', '2026-02-05', '${IDS.victimUser}', 'marta@bergman.example', 'Marta Ruiz');`
+     VALUES ('${IDS.victimTicket}', 'Bergman S.A. cannot see the March invoice run', 'new', 0, '${IDS.victimAccount}', '2026-02-05', '${IDS.victimUser}', 'marta@bergman.example', 'Marta Ruiz');`
   )
 
   // REAL HISTORY on the victim's world. Without it the activity burglaries pass

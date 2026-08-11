@@ -277,12 +277,49 @@ R2 (`kwapso-learning-media`), not a DB column.
 ### help + help_threads — KEEP (BUILT 2026-06-23, team migration `0004_modules`, two-tier)
 `help` (parent ticket): audit + `help_type` (selectable), `description`,
 `screen_recording_link`, the source screen/record capture, `status` on a FIXED
-lifecycle (`open` → `in_progress` → `resolved`, with `reopened`; the raiser may
-reopen without edit rights), `resolved`, `resolved_on`, `resolver_id/email/name`.
+lifecycle, `resolved`, `resolved_on`, `resolver_id/email/name`.
 `help_threads` (messages): audit + `help_id` (the parent ticket),
 `tagged_team_member_user_ids` (@mention → email notify), `message_body`. A ticket
 with a threaded conversation. (Help attachments to R2 `kwapso-help-media` are a
 deferred hook — see AGENT-MODULES-PLAN.)
+
+**The work engine's ticket** (team migration `0011_ticket_work_engine`, BUILT
+2026-08-11 — SCOPE ch.07). The same table, grown into the thing the scope
+describes; there is no second ticket beside it, and there never will be.
+
+- **The five states.** `status` now runs `new` → `triaged` → `in_progress` →
+  `ready` → `resolved`. The two old names moved onto the two that mean the same
+  thing: `open` → `new`, `reopened` → `triaged`. Reopening still happens — a
+  staff member moves a resolved ticket back to `triaged` — it just is not a state
+  of its own any more, and there is deliberately no client-side reopen button.
+- **`ref`** — the number the client quotes (`BERG-T0412`): the account's own short
+  code, a `T`, and a sequence counted PER ACCOUNT. Null when there is nothing to
+  build one from (the agency's own tickets carry no account; a client may have no
+  code yet). Unique where present.
+- **`rank`** — drag-rank, the ONLY priority signal the product has. A sparse text
+  key (`shared/workers/rank.ts`), so a drag writes one row and two people
+  dragging different rows cannot collide. The list reads `ORDER BY COALESCE(rank,
+  id) DESC, id DESC`, which is also the keyset the page is cut on.
+- **`locked_at`** — when we first read it. The account owns the wording until
+  then (a client may edit and re-rank their own unread ticket, and only their
+  own); the first staff touch closes it, and never moves again.
+- **`draft_resolution`** — the unsent working text each story's closing note will
+  append to. Never sent to a client login.
+- **`archived_at` + archiver block** — put away, available from any state.
+  Nothing is deleted; the row drops out of the everyday list and its count, and
+  is still reachable by id and in the archive view.
+- **`title_de` / `title_en`** — both titles, and neither derived from the other.
+  788 of the tickets arriving from Glide exist only in German, so a translation
+  SETS the empty one and never overwrites the original.
+
+### ref_counters — BUILT (per-team, team migration `0011_ticket_work_engine`)
+One row per (`account_id`, `kind`) holding `next_no`. The reference numbers SCOPE
+ch.02 describes are sequential **per account**, and allocation is a SINGLE
+statement — `INSERT … ON CONFLICT DO UPDATE … RETURNING` — so two people raising a
+ticket on one account in the same second are serialized by the database instead of
+both reading the same number (CONCURRENCY.md rule 1: the counter rides the write).
+`kind` is the letter the reference wears: `T` ticket today, `S` story and `SPR`
+sprint when those land.
 
 ### invite_logs — BUILT (per-team, team migration `0003_invite_logs`) + invite_index (GLOBAL, built)
 `invite_logs` (full record in the team DB): audit + a FROZEN inviter snapshot
@@ -464,10 +501,13 @@ these rows are a record of intent, never a separate set of powers.
   import, BUILT 2026-07-04), the customer spine — accounts + account_links +
   portal_users (per-team `0007_customer_spine`, BUILT 2026-08-09) — and
   `portal_users.current_account_id` (per-team `0008_portal_current_account`,
-  BUILT 2026-08-10; see below).
+  BUILT 2026-08-10; see below). **The work engine (BUILT 2026-08-11):**
+  `help.account_id` (`0009_help_account`), the Tickets rename's data half
+  (`0010_ticket_vocabulary`), and the ticket's work-engine columns + `ref_counters`
+  (`0011_ticket_work_engine`).
 - **The per-team migration list is `TEAM_MIGRATIONS` in
-  `workers/tenancy/src/team-schema.ts`** — eight today, `0001_team_base` through
-  `0008_portal_current_account`. A new team's database runs all of them at
+  `workers/tenancy/src/team-schema.ts`** — eleven today, `0001_team_base` through
+  `0011_ticket_work_engine`. A new team's database runs all of them at
   creation; existing teams get the gap rolled to them by `POST
   /api/tenancy/admin/migrate-teams`. That file is the source; any list written
   down elsewhere (here, OPERATIONS, BOOTSTRAP) is a copy of it.

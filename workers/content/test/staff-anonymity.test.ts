@@ -109,7 +109,7 @@ beforeEach(() => {
   )
   db().exec(
     `INSERT INTO help (id, description, status, resolved, account_id, created_at, creator_id, creator_email, creator_name)
-     VALUES ('${STAFF_TICKET}', 'Internal: migrate the Delaval records', 'open', 0, NULL, '2026-03-01', '${IDS.staffUser}', 'staff@kwapso.app', 'Staff');`
+     VALUES ('${STAFF_TICKET}', 'Internal: migrate the Delaval records', 'new', 0, NULL, '2026-03-01', '${IDS.staffUser}', 'staff@kwapso.app', 'Staff');`
   )
 })
 
@@ -228,7 +228,7 @@ describe("the ticket row itself names nobody on the agency's side", () => {
   beforeEach(() => {
     db().exec(
       `INSERT INTO help (id, description, status, resolved, account_id, created_at, creator_id, creator_email, creator_name)
-       VALUES ('${STAFF_RAISED}', 'Called in by phone: the April statement is missing a line', 'open', 0,
+       VALUES ('${STAFF_RAISED}', 'Called in by phone: the April statement is missing a line', 'new', 0,
                '${IDS.victimAccount}', '2026-03-02', '${IDS.staffUser}', 'staff@kwapso.app', 'Staff');`
     )
   })

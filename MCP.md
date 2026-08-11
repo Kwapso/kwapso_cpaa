@@ -136,7 +136,8 @@ Today it covers:
   `list_imports`, `get_import`, `get_ai_allowance`, `list_ai_usage`,
   `list_agent_threads`, `get_agent_thread`. Each list tool that sits on a door with an
   `?id=` filter EXPOSES + FORWARDS it (R19 parity) — pass `id` to fetch one record
-  instead of pulling the whole collection (`list_help_tickets` also takes `scope`;
+  instead of pulling the whole collection (`list_help_tickets` also takes `scope`
+  and `view`, the latter choosing the everyday list or the archive drawer;
   `list_accounts` takes `q`, `type` and `parentId`).
 
   **`my_permissions` is the one to call first.** `whoami` says who the token is and
@@ -220,8 +221,15 @@ Today it covers:
   - portal access — `grant_portal_access`, `set_portal_access_active`
   - dropdown values — `create_dropdown_value`, `update_dropdown_value`, `set_dropdown_value_active`
   - learning — `create_learning`, `update_learning`, `set_learning_active`
-  - help — `create_help_ticket`, `update_help_ticket`, `set_help_status`,
-    `reply_help_ticket`, `add_help_stakeholder`
+  - tickets — `create_help_ticket`, `update_help_ticket`, `set_help_status`,
+    `rank_help_ticket`, `archive_help_ticket`, `reply_help_ticket`,
+    `add_help_stakeholder`. (The tool NAMES still say `help`: they are a published
+    external contract that outside clients call by name, so the rename of the
+    section a person reads deliberately stopped at them.) `rank_help_ticket` is
+    how priority is expressed — the list's ORDER is the priority, and there is no
+    priority field to set. `archive_help_ticket` puts a ticket away without
+    deleting anything; read them back with `list_help_tickets` and `view:
+    'archived'`.
 - **Bulk create:** the import pipeline — `start_import` → `add_import_file` →
   `plan_import` → `run_import`. Accounts are importable AND exportable (they were
   importable only, which made the customer spine a one-way street).

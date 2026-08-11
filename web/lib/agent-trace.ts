@@ -101,7 +101,15 @@ export function traceFor(
     case "update_help_ticket":
     case "set_help_status":
     case "add_help_stakeholder":
+    // Archiving lands on the ticket too: the record is still there, and its
+    // detail is where you see that it has been put away (and put it back).
+    case "archive_help_ticket":
       return { path: `${seg(teamId, "tickets")}/${str(input, "id")}`, highlight: "main" }
+    // Reordering is a change to the LIST, not to the ticket — the whole point of
+    // it is where the row now sits relative to its neighbours, which is a thing
+    // you can only see on the list.
+    case "rank_help_ticket":
+      return { path: seg(teamId, "tickets"), highlight: "main" }
 
     /* ------------------------------- accounts ------------------------------- */
     // Create → the accounts list, where the new account appears live. Every other

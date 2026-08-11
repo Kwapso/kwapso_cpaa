@@ -23,6 +23,8 @@ import {
   listTickets,
   maybeDraftFirstReply,
   setStatus,
+  setTicketArchived,
+  setTicketRank,
   updateTicket,
   type HelpStatus,
   type TicketInput,
@@ -72,13 +74,29 @@ async function ticketPage(
   guard: Parameters<typeof listTickets>[1],
   scope: AccountScope,
   tab: "mine" | "all",
+  view: "live" | "archived",
   cursor: string | null
 ): Promise<Response> {
   const [page, counts] = await Promise.all([
-    listTickets(cfg, guard, scope, tab, cursor),
-    countTickets(cfg, guard, scope),
+    listTickets(cfg, guard, scope, tab, view, cursor),
+    // R16: the total is counted over the SAME view the page came from, or the
+    // badge is a number the list cannot reach.
+    countTickets(cfg, guard, scope, view),
   ])
   return pagedJson("tickets", { ...page, total: counts.total }, { mineTotal: counts.mineTotal })
+}
+
+/** LIVE, or the archive drawer. One word, decided in one place, so the list and
+ * its count can never be asked different questions. Anything but the exact word
+ * "archived" means the everyday list — a fail-safe default, because the everyday
+ * list is the one a mistyped parameter should land you in.
+ *
+ * It takes an ALREADY-VALIDATED string: the `queryText` cap belongs at the call
+ * site, on the `searchParams.get` itself, where the boundary actually is (and
+ * where workers/content/test/validate.test.ts insists on seeing it — a seam one
+ * function inside is a seam a reader of the door cannot see). */
+function ticketView(raw: string | undefined): "live" | "archived" {
+  return raw === "archived" ? "archived" : "live"
 }
 
 /** GET /api/content/help?scope=mine|all  (?id=<ticketId> → just that one). */
@@ -89,12 +107,15 @@ export async function getHelp(request: Request, env: Env): Promise<Response> {
   const scope = await callerScope(cfg, guard)
   const url = new URL(request.url)
   const tab = queryText(url.searchParams.get("scope"), "Scope") === "mine" ? "mine" : "all"
+  const view = ticketView(queryText(url.searchParams.get("view"), "View"))
   const id = queryText(url.searchParams.get("id"), "Id")
   // One ticket by id is a LOOKUP, not a page — answer it directly rather than
-  // filtering a page (which could legitimately not contain it once paged).
+  // filtering a page (which could legitimately not contain it once paged). It
+  // deliberately ignores the view: opening an ARCHIVED ticket by id has to work,
+  // or nothing could ever be restored.
   if (id) {
     const one = await getTicket(cfg, guard, scope, id)
-    const counts = await countTickets(cfg, guard, scope)
+    const counts = await countTickets(cfg, guard, scope, view)
     return pagedJson(
       "tickets",
       { rows: one ? [one] : [], total: counts.total, hasMore: false, nextCursor: null },
@@ -104,7 +125,7 @@ export async function getHelp(request: Request, env: Env): Promise<Response> {
   // R14: tickets are a GROWING collection, so the door pages by key — the opaque
   // cursor comes straight back from the previous response. R16: the exact server
   // totals (All + the caller's My) ride every list response.
-  return ticketPage(cfg, guard, scope, tab, queryText(url.searchParams.get("cursor"), "Cursor") ?? null)
+  return ticketPage(cfg, guard, scope, tab, view, queryText(url.searchParams.get("cursor"), "Cursor") ?? null)
 }
 
 /** GET /api/content/help/thread?id=<ticketId> → the ticket's replies (oldest first).
@@ -138,7 +159,7 @@ export async function postCreateHelp(request: Request, env: Env): Promise<Respon
   // HOOK (Phase 3): the agent drafts the first reply here; a no-op today, so the
   // ticket simply opens awaiting a human (per "ticket always opens").
   await maybeDraftFirstReply(cfg, guard, id, description)
-  return ticketPage(cfg, guard, scope, "all", null)
+  return ticketPage(cfg, guard, scope, "all", "live", null)
 }
 
 /** POST /api/content/help/update — edit a ticket (help:edit). */
@@ -149,7 +170,7 @@ export async function postUpdateHelp(request: Request, env: Env): Promise<Respon
   const scope = await callerScope(cfg, guard)
   const accountId = await updateTicket(cfg, guard, scope, actor, id, body)
   await publishChange(env, guard.teamId, "help", id, undefined, accountId ?? undefined)
-  return ticketPage(cfg, guard, scope, "all", null)
+  return ticketPage(cfg, guard, scope, "all", "live", null)
 }
 
 /** POST /api/content/help/status — move a ticket along its fixed lifecycle.
@@ -168,7 +189,7 @@ export async function postHelpStatus(request: Request, env: Env): Promise<Respon
   // R17: already at that status → zero rows moved → no ping, no duplicate history.
   const { moved, accountId } = await setStatus(cfg, guard, scope, actor, id, status)
   if (moved) await publishChange(env, guard.teamId, "help", id, undefined, accountId ?? undefined)
-  return ticketPage(cfg, guard, scope, "all", null)
+  return ticketPage(cfg, guard, scope, "all", "live", null)
 }
 
 /** POST /api/content/help/bulk-status-by-filter — the SET-shaped bulk: move every
@@ -305,6 +326,56 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
     replies: await listReplies(cfg, guard, scope, helpId),
     total: await countReplies(cfg, guard, scope, helpId),
   })
+}
+
+/** POST /api/content/help/rank — put a ticket between two others (SCOPE ch.07:
+ * drag-rank is the only priority signal there is, and there is no priority
+ * dropdown to fall back on).
+ *
+ * Gated by help:EDIT — reordering is editing the ticket, and a client's own right
+ * to do it is decided a layer down by the lock, not by a second permission. That
+ * matters: `help:edit` is a right the seeded Client role does NOT hold, so this
+ * door is closed to a client login today and opens the moment an owner grants it.
+ * The lock is what keeps that grant safe.
+ *
+ * The body names NEIGHBOURS, never a position: a position is arithmetic over a
+ * list the browser loaded seconds ago, and the list has moved since. */
+export async function postHelpRank(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{
+    id?: unknown
+    afterId?: unknown
+    beforeId?: unknown
+  }>(request, env, "help", "edit")
+  const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
+  const afterId = optionalText(body.afterId, "Ticket above", TEXT_LIMITS.short) ?? null
+  const beforeId = optionalText(body.beforeId, "Ticket below", TEXT_LIMITS.short) ?? null
+  const scope = await callerScope(cfg, guard)
+  // R17: dropped back where it started → zero rows moved → no history, no ping.
+  const { moved, accountId } = await setTicketRank(cfg, guard, scope, actor, id, afterId, beforeId)
+  if (moved) await publishChange(env, guard.teamId, "help", id, "edit", accountId ?? undefined)
+  return ticketPage(cfg, guard, scope, "all", "live", null)
+}
+
+/** POST /api/content/help/archive — put a ticket away, or take it back out
+ * (SCOPE ch.07: archive is available from any state). Nothing is deleted; the
+ * conversation and the history survive exactly as they were.
+ *
+ * Gated by help:edit, like every other move along the row. */
+export async function postHelpArchive(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown; archived?: unknown }>(
+    request,
+    env,
+    "help",
+    "edit"
+  )
+  const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
+  if (typeof body.archived !== "boolean")
+    return fail(400, "invalid_input", "archived must be true or false.")
+  const scope = await callerScope(cfg, guard)
+  // R17: archiving an archived ticket moves zero rows — no second history line.
+  const { moved, accountId } = await setTicketArchived(cfg, guard, scope, actor, id, body.archived)
+  if (moved) await publishChange(env, guard.teamId, "help", id, "edit", accountId ?? undefined)
+  return ticketPage(cfg, guard, scope, "all", "live", null)
 }
 
 /** GET /api/content/help/stakeholders?id=<ticketId> — the full derived ∪ added

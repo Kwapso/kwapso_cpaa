@@ -97,10 +97,11 @@ export function shapeInvitesList(invites: Invite[]): ScreenData {
  * One source for the list detail line; the thread's own status badge uses the
  * library's hyphen labels. */
 export const HELP_STATUS: Record<HelpTicket["status"], string> = {
-  open: "Open",
+  new: "New",
+  triaged: "Triaged",
   in_progress: "In progress",
+  ready: "Ready",
   resolved: "Resolved",
-  reopened: "Reopened",
 }
 
 /** Trim a ticket description to a single readable list line. */
