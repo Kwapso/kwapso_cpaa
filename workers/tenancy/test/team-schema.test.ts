@@ -119,6 +119,12 @@ describe("team schema", () => {
       "selectable_data",
       "screens",
       "agent",
+      // The map and the money, kept apart on purpose. `processes` is CUSTOMER
+      // material — a contact reads their own company's maps, so its doors are
+      // fenced rather than refused. `commercials` is the agency's own books, and
+      // no client login passes one of its doors at all.
+      "processes",
+      "commercials",
     ])
   })
 })

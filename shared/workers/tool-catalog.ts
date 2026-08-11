@@ -763,6 +763,335 @@ export const SHARED_TOOLS: SharedTool[] = [
     buildBody: (i) => ({ id: str(i, "id"), userId: str(i, "userId") }),
     agent: { write: true, confirm: false, summarize: (i) => `Add someone to ticket ${str(i, "id")}` },
   },
+
+  /* ------------------------- process maps and value ------------------------- */
+  // App → Process → Step, the versions cut over them, and the savings drilled
+  // through all three. Every one of these doors is fenced by the caller's account
+  // set on the way in, and the AUTHORING ones refuse a client login outright — so
+  // a machine caller reaches exactly what the person holding the token reaches.
+  {
+    name: "list_apps",
+    summary:
+      "List the systems we have built — an App is the thing with its own address and its own stage (SCOPE ch.02). `accountId` narrows to one client's systems. Bounded: an agency has tens of apps, so there is no cursor here; the collection that grows underneath is process maps.",
+    binding: "TENANCY", method: "GET", path: "/api/tenancy/apps",
+    schema: obj({ accountId: S }),
+    buildQuery: (i) => (str(i, "accountId") ? `?accountId=${encodeURIComponent(str(i, "accountId"))}` : ""),
+    agent: { write: false, summarize: () => "List the apps we've built" },
+  },
+  {
+    name: "create_app",
+    summary:
+      "Record a system we have built. `accountId` is whose it is (leave it out for the agency's own). `toolCostCentsPerMonth` is what it costs US to keep running — an internal figure, never shown to a client.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/apps",
+    schema: obj({ name: S, accountId: S, url: S, stage: S, toolCostCentsPerMonth: N }, ["name"]),
+    buildBody: (i) => ({
+      name: str(i, "name"),
+      accountId: opt(i, "accountId"),
+      url: opt(i, "url"),
+      stage: opt(i, "stage"),
+      toolCostCentsPerMonth: typeof i.toolCostCentsPerMonth === "number" ? i.toolCostCentsPerMonth : undefined,
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Record the app "${str(i, "name")}"` },
+  },
+  {
+    name: "update_app",
+    summary:
+      "Edit an app's own details (by id) — never which account it belongs to, which is set once when it is created. Send ONLY the fields you are changing; anything you leave out keeps its current value.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/apps/update",
+    schema: obj({ id: S, name: S, url: S, stage: S, toolCostCentsPerMonth: N }, ["id", "name"]),
+    buildBody: (i) => ({
+      id: str(i, "id"),
+      name: str(i, "name"),
+      url: sent(i, "url"),
+      stage: sent(i, "stage"),
+      toolCostCentsPerMonth: typeof i.toolCostCentsPerMonth === "number" ? i.toolCostCentsPerMonth : undefined,
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Edit the app "${str(i, "name")}"` },
+  },
+  {
+    name: "set_app_active",
+    summary:
+      "Archive an app (`active: false`) or restore it (`active: true`). Never deleted — its maps, its versions and every saving computed from them stay exactly where they are. An archived app drops out of the value figures.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/apps/active",
+    schema: obj({ id: S, active: B }, ["id", "active"]),
+    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
+    agent: {
+      write: true,
+      confirm: (i) => i.active !== true,
+      summarize: (i) => `${i.active === true ? "Restore" : "Archive"} app ${str(i, "id")}`,
+    },
+  },
+  {
+    name: "list_processes",
+    summary:
+      "List process maps — a Process is a way of working inside an App. Filters: `q` (searches the name and description), `appId` (only that app's maps). Returns ONE page plus the exact `total`, `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
+    binding: "TENANCY", method: "GET", path: "/api/tenancy/processes",
+    schema: obj({ q: S, appId: S, cursor: S }),
+    buildQuery: (i) => {
+      const q: string[] = []
+      for (const key of ["q", "appId", "cursor"])
+        if (str(i, key)) q.push(`${key}=${encodeURIComponent(str(i, key))}`)
+      return q.length ? `?${q.join("&")}` : ""
+    },
+    agent: {
+      write: false,
+      summarize: (i) => (str(i, "q") ? `Search process maps for "${str(i, "q")}"` : "List process maps"),
+    },
+  },
+  {
+    name: "get_process",
+    summary:
+      "One process map in full (by id): its versions newest-first, the steps of its CURRENT version with their times, and the exact number of comments on it. Version 1 is always the baseline — how the work was done before us — and every saving is measured from it.",
+    binding: "TENANCY", method: "GET", path: "/api/tenancy/processes/detail",
+    schema: obj({ id: S }, ["id"]),
+    buildQuery: (i) => `?id=${encodeURIComponent(str(i, "id"))}`,
+    agent: { write: false, summarize: (i) => `Look up process map ${str(i, "id")}` },
+  },
+  {
+    name: "create_process",
+    summary:
+      "Map a way of working inside an app. It is created WITH its version 1 — the way the work was done before we touched anything — because a process with no baseline can never produce a saving. `baselineLabel` is what the client calls that old way.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/processes",
+    schema: obj({ appId: S, name: S, description: S, baselineLabel: S }, ["appId", "name"]),
+    buildBody: (i) => ({
+      appId: str(i, "appId"),
+      name: str(i, "name"),
+      description: opt(i, "description"),
+      baselineLabel: opt(i, "baselineLabel"),
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Map the process "${str(i, "name")}"` },
+  },
+  {
+    name: "update_process",
+    summary:
+      "Rename or re-describe a process map (by id). Send ONLY what you are changing; to empty the description, send it as an empty string.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/update",
+    schema: obj({ id: S, name: S, description: S }, ["id", "name"]),
+    buildBody: (i) => ({ id: str(i, "id"), name: str(i, "name"), description: sent(i, "description") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Edit the process "${str(i, "name")}"` },
+  },
+  {
+    name: "set_process_active",
+    summary:
+      "Archive a process map (`active: false`) or restore it (`active: true`). Never deleted: every version, every step and the whole conversation survive, and an archived map simply stops counting toward the value figures.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/active",
+    schema: obj({ id: S, active: B }, ["id", "active"]),
+    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
+    agent: {
+      write: true,
+      confirm: (i) => i.active !== true,
+      summarize: (i) => `${i.active === true ? "Restore" : "Archive"} process map ${str(i, "id")}`,
+    },
+  },
+  {
+    name: "add_process_step",
+    summary:
+      "Add a step to a process map's CURRENT version. `secondsPerRun` is how long it takes each time and `runsPerMonth` how often it happens — both are AGREED ESTIMATES, and every savings figure in the app is a subtraction between two of them, so do not guess: ask.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/steps",
+    schema: obj(
+      { processId: S, name: S, description: S, secondsPerRun: N, runsPerMonth: N, position: N },
+      ["processId", "name", "secondsPerRun", "runsPerMonth"]
+    ),
+    buildBody: (i) => ({
+      processId: str(i, "processId"),
+      name: str(i, "name"),
+      description: opt(i, "description"),
+      secondsPerRun: typeof i.secondsPerRun === "number" ? i.secondsPerRun : undefined,
+      runsPerMonth: typeof i.runsPerMonth === "number" ? i.runsPerMonth : undefined,
+      position: typeof i.position === "number" ? i.position : undefined,
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Add the step "${str(i, "name")}"` },
+  },
+  {
+    name: "update_process_step",
+    summary:
+      "Edit ONE step (by id) — only in the map's CURRENT version. Editing an older version is refused: a baseline that can be changed after the fact is a saving anybody can dial up, and the whole point of these numbers is that a client can check them.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/steps/update",
+    schema: obj(
+      { id: S, name: S, description: S, secondsPerRun: N, runsPerMonth: N, position: N },
+      ["id", "name", "secondsPerRun", "runsPerMonth"]
+    ),
+    buildBody: (i) => ({
+      id: str(i, "id"),
+      name: str(i, "name"),
+      description: sent(i, "description"),
+      secondsPerRun: typeof i.secondsPerRun === "number" ? i.secondsPerRun : undefined,
+      runsPerMonth: typeof i.runsPerMonth === "number" ? i.runsPerMonth : undefined,
+      position: typeof i.position === "number" ? i.position : undefined,
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Edit the step "${str(i, "name")}"` },
+  },
+  {
+    name: "remove_process_step",
+    summary:
+      "Record that a step NO LONGER HAPPENS (by id). Not a delete: the step keeps its place and its frequency and drops to zero time, which is exactly what turns work we removed entirely into the largest saving there is.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/steps/remove",
+    schema: obj({ id: S }, ["id"]),
+    buildBody: (i) => ({ id: str(i, "id") }),
+    agent: { write: true, confirm: true, summarize: (i) => `Record that step ${str(i, "id")} stopped happening` },
+  },
+  {
+    name: "cut_process_version",
+    summary:
+      "Cut a new version of a process map: today's steps are copied forward and the current version is frozen exactly as it was agreed. `sprintId` marks the cut as the automatic one a completed sprint makes — pass the same sprint twice and the second call answers `alreadyCut: true` rather than cutting again.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/versions",
+    schema: obj({ processId: S, label: S, sprintId: S }, ["processId"]),
+    buildBody: (i) => ({
+      processId: str(i, "processId"),
+      label: opt(i, "label"),
+      sprintId: opt(i, "sprintId"),
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Cut a new version of map ${str(i, "processId")}` },
+  },
+  {
+    name: "list_process_comments",
+    summary:
+      "The conversation on one process map (`processId`) — the client's questions and the team's answers, oldest first. A comment marked `explainsStepKey` is the team's explanation for a step that now takes LONGER than it used to.",
+    binding: "TENANCY", method: "GET", path: "/api/tenancy/processes/comments",
+    schema: obj({ processId: S }, ["processId"]),
+    buildQuery: (i) => `?processId=${encodeURIComponent(str(i, "processId"))}`,
+    agent: { write: false, summarize: (i) => `Read the conversation on map ${str(i, "processId")}` },
+  },
+  {
+    name: "comment_on_process",
+    summary:
+      "Say something on a process map. A comment is a CONVERSATION, never an edit — it changes no step, no time and no figure. `explainsStepKey` marks it as the explanation for a step that got slower, which is what the client's own screen shows beside it; only the team may set that.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/comments",
+    schema: obj({ processId: S, body: S, explainsStepKey: S }, ["processId", "body"]),
+    buildBody: (i) => ({
+      processId: str(i, "processId"),
+      body: str(i, "body"),
+      explainsStepKey: opt(i, "explainsStepKey"),
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Comment on map ${str(i, "processId")}` },
+  },
+  {
+    name: "read_value",
+    summary:
+      "THE SAVINGS, drilled App → Process → Step: for each step, what it took before, what it takes now, how often it happens, and the subtraction between them. `accountId` / `appId` narrow it. Every answer carries the caption that makes it honest — the times are agreed estimates, the subtraction is arithmetic — and a `prices` block appears ONLY for an account whose price visibility is switched on. A step that got slower is included and counted, never filtered out.",
+    binding: "TENANCY", method: "GET", path: "/api/tenancy/value",
+    schema: obj({ accountId: S, appId: S }),
+    buildQuery: (i) => {
+      const q: string[] = []
+      for (const key of ["accountId", "appId"])
+        if (str(i, key)) q.push(`${key}=${encodeURIComponent(str(i, key))}`)
+      return q.length ? `?${q.join("&")}` : ""
+    },
+    agent: { write: false, summarize: () => "Work out the value: hours saved, App → Process → Step" },
+  },
+
+  /* ------------------------------- the money -------------------------------- */
+  // BOTH rate cards and the margin. Every door below refuses a client login, and
+  // the internal two are the figures SCOPE says a client must never see under any
+  // flag, ever — a machine caller reaches them only as a staff member whose role
+  // holds `commercials`, which no client role does (R23).
+  {
+    name: "list_account_rates",
+    summary:
+      "What one account is CHARGED per hour, by kind of work (`accountId`). This is the client-facing rate card — what they agreed — not what our own hour costs us.",
+    binding: "TENANCY", method: "GET", path: "/api/tenancy/rates",
+    schema: obj({ accountId: S }, ["accountId"]),
+    buildQuery: (i) => `?accountId=${encodeURIComponent(str(i, "accountId"))}`,
+    agent: { write: false, summarize: (i) => `Read the rate card for ${accountLabel(i, "accountId")}` },
+  },
+  {
+    name: "create_account_rate",
+    summary:
+      "Add a line to an account's rate card: a kind of work and what it is charged per hour, in whole CENTS (4,500 = 45.00). One live line per kind of work per account.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/rates",
+    schema: obj({ accountId: S, label: S, centsPerHour: N, currency: S }, ["accountId", "label", "centsPerHour"]),
+    buildBody: (i) => ({
+      accountId: str(i, "accountId"),
+      label: str(i, "label"),
+      centsPerHour: typeof i.centsPerHour === "number" ? i.centsPerHour : undefined,
+      currency: opt(i, "currency"),
+    }),
+    agent: { write: true, confirm: true, summarize: (i) => `Set the rate for ${str(i, "label")}` },
+  },
+  {
+    name: "update_account_rate",
+    summary: "Edit one line of an account's rate card (by id). `centsPerHour` is whole cents.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/rates/update",
+    schema: obj({ id: S, label: S, centsPerHour: N, currency: S }, ["id", "label", "centsPerHour"]),
+    buildBody: (i) => ({
+      id: str(i, "id"),
+      label: str(i, "label"),
+      centsPerHour: typeof i.centsPerHour === "number" ? i.centsPerHour : undefined,
+      currency: sent(i, "currency"),
+    }),
+    agent: { write: true, confirm: true, summarize: (i) => `Change the rate for ${str(i, "label")}` },
+  },
+  {
+    name: "set_account_rate_active",
+    summary:
+      "Retire a rate (`active: false`) or bring it back (`active: true`). Never deleted — what an account was charged last year has to stay true.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/rates/active",
+    schema: obj({ id: S, active: B }, ["id", "active"]),
+    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
+    agent: {
+      write: true,
+      confirm: true,
+      summarize: (i) => `${i.active === true ? "Restore" : "Retire"} rate ${str(i, "id")}`,
+    },
+  },
+  {
+    name: "list_internal_rates",
+    summary:
+      "What an hour of OUR OWN work costs us, by kind of work. INTERNAL: this is the agency's own cost, it is never shown to a client under any setting, and the one marked `isDefault` is the rate a margin applies to logged time whose kind of work is not yet named.",
+    binding: "TENANCY", method: "GET", path: "/api/tenancy/internal-rates",
+    schema: obj({}),
+    buildQuery: () => "",
+    agent: { write: false, summarize: () => "Read what our own hours cost" },
+  },
+  {
+    name: "create_internal_rate",
+    summary:
+      "Add what a kind of our own work costs per hour, in whole CENTS. `isDefault: true` makes it the rate a margin applies to time whose kind of work is unknown — there can be only one, and setting a second is refused.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/internal-rates",
+    schema: obj({ label: S, centsPerHour: N, currency: S, isDefault: B }, ["label", "centsPerHour"]),
+    buildBody: (i) => ({
+      label: str(i, "label"),
+      centsPerHour: typeof i.centsPerHour === "number" ? i.centsPerHour : undefined,
+      currency: opt(i, "currency"),
+      isDefault: typeof i.isDefault === "boolean" ? i.isDefault : undefined,
+    }),
+    agent: { write: true, confirm: true, summarize: (i) => `Set our internal rate for ${str(i, "label")}` },
+  },
+  {
+    name: "update_internal_rate",
+    summary: "Edit one of our own cost lines (by id). `centsPerHour` is whole cents.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/internal-rates/update",
+    schema: obj({ id: S, label: S, centsPerHour: N, currency: S, isDefault: B }, ["id", "label", "centsPerHour"]),
+    buildBody: (i) => ({
+      id: str(i, "id"),
+      label: str(i, "label"),
+      centsPerHour: typeof i.centsPerHour === "number" ? i.centsPerHour : undefined,
+      currency: sent(i, "currency"),
+      isDefault: typeof i.isDefault === "boolean" ? i.isDefault : undefined,
+    }),
+    agent: { write: true, confirm: true, summarize: (i) => `Change our internal rate for ${str(i, "label")}` },
+  },
+  {
+    name: "set_internal_rate_active",
+    summary: "Retire one of our own cost lines (`active: false`) or bring it back. Never deleted.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/internal-rates/active",
+    schema: obj({ id: S, active: B }, ["id", "active"]),
+    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
+    agent: {
+      write: true,
+      confirm: true,
+      summarize: (i) => `${i.active === true ? "Restore" : "Retire"} internal rate ${str(i, "id")}`,
+    },
+  },
+  {
+    name: "read_margin",
+    summary:
+      "Revenue minus our own logged time minus tool costs, for one account (`accountId`), with every line it was built from. INTERNAL — never repeat this figure to a client, in any form; it is the one number SCOPE says they must never see. `loggedTimeAvailable: false` means the work engine's time records are not in this database yet, so the time half of the subtraction is missing and the number is not yet a margin.",
+    binding: "TENANCY", method: "GET", path: "/api/tenancy/margin",
+    schema: obj({ accountId: S }, ["accountId"]),
+    buildQuery: (i) => `?accountId=${encodeURIComponent(str(i, "accountId"))}`,
+    agent: { write: false, summarize: (i) => `Work out the margin on ${accountLabel(i, "accountId")}` },
+  },
 ]
 
 /** The permission each WRITE needs (module:right) — every write tool on either machine
@@ -814,6 +1143,30 @@ export const TOOL_GATES: Record<string, string> = {
   bulk_set_help_status: "help:edit",
   set_help_status_by_filter: "help:edit",
   bulk_set_learning_active: "learning:delete",
+  // The map: one module, four rights, and the same three-way split every other
+  // module has — create maps and steps, edit them, and `delete` for the two acts
+  // that take something out of the picture (archiving, and recording that a step
+  // stopped happening).
+  create_app: "processes:create",
+  update_app: "processes:edit",
+  set_app_active: "processes:delete",
+  create_process: "processes:create",
+  update_process: "processes:edit",
+  set_process_active: "processes:delete",
+  add_process_step: "processes:create",
+  update_process_step: "processes:edit",
+  remove_process_step: "processes:delete",
+  cut_process_version: "processes:create",
+  comment_on_process: "processes:create",
+  // The money. Both rate cards live under one module because they are one
+  // decision-maker's job — and they live in two TABLES and two FILES because they
+  // are two audiences (R23).
+  create_account_rate: "commercials:create",
+  update_account_rate: "commercials:edit",
+  set_account_rate_active: "commercials:delete",
+  create_internal_rate: "commercials:create",
+  update_internal_rate: "commercials:edit",
+  set_internal_rate_active: "commercials:delete",
 }
 
 /** Writes that genuinely have no single `module:right` to name, each with its reason.

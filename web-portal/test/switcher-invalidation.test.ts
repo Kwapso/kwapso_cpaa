@@ -70,10 +70,13 @@ describe("switching company drops what the old company filled", () => {
     expect(declared.length, "cacheKeys must be readable from live-resources").toBeGreaterThan(4)
 
     const body = standBody()
-    // `thread` and `threadTotal` are per-ticket and keyed by a ticket id the new
-    // company's screens will never ask for; they age out rather than being
-    // enumerated. Everything else must be named.
-    const keptOnPurpose = new Set(["thread", "threadTotal"])
+    // `thread` and `threadTotal` are per-ticket, and `processComments` is
+    // per-process — all three are keyed by an id the new company's screens will
+    // never ask for, so they age out rather than being enumerated. (The VALUE
+    // read is not one of them: it is keyed by nothing but the caller, so the new
+    // company would read the old company's savings straight out of the cache.)
+    // Everything else must be named.
+    const keptOnPurpose = new Set(["thread", "threadTotal", "processComments"])
     const missed = declared.filter((k) => !keptOnPurpose.has(k) && !body.includes(`cacheKeys.${k}`))
     expect(missed, `these caches survive a company switch with nobody deciding they should: ${missed.join(", ")}`).toEqual([])
   })

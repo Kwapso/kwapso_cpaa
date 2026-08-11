@@ -313,6 +313,7 @@ function teamTabStrip(
     module === "accounts" ||
     module === "learning" ||
     module === "tickets" ||
+    module === "processes" ||
     module === "import"
       ? module
       : "overview"

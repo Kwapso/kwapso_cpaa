@@ -109,6 +109,20 @@ export const PORTAL_DOORS: Record<string, Upstream> = {
   "POST /api/content/help": "CONTENT",
   "POST /api/content/help/reply": "CONTENT",
 
+  // ── the value, and the conversation about it ───────────────────────────────
+  // THREE doors, and the list of what is NOT here is the point. `/value` answers
+  // with the savings drilled App → Process → Step for the accounts this caller
+  // may see, plus — only when the owner has switched price visibility on for that
+  // account — what they bought. The process LIST and DETAIL doors are absent: a
+  // client reads their value and talks about it, they do not browse the agency's
+  // map inventory. Every money door is absent, `/api/tenancy/margin` and
+  // `/api/tenancy/internal-rates` most of all: those are the agency's own books,
+  // refused at the door as well as unnamed here, and R23 fails the build if a
+  // line for one of them ever appears in this table.
+  "GET /api/tenancy/value": "TENANCY",
+  "GET /api/tenancy/processes/comments": "TENANCY",
+  "POST /api/tenancy/processes/comments": "TENANCY",
+
   // ── live ───────────────────────────────────────────────────────────────────
   // The WebSocket upgrade. The realtime worker re-checks membership on the
   // handshake with the same rule the API uses, so this is a pass-through.

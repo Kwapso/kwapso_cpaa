@@ -309,12 +309,18 @@ export function scopeStamp(scope: AccountScope): ScopeStamp {
  * about whose ticket it is — so the publisher names the account instead
  * (`ChangeEvent.scope`), and this is the list of resources allowed to use it.
  *
- * This is the "one line at a time" the note below promised, and it is exactly
- * one line: the portal has a support screen (PORTAL_LISTENERS), the owner has
- * ruled that a contact sees their company's questions, and a screen that cannot
- * hear its own colleague's question appear is a screen that lies until you
- * reload it. A resource NOT named here is silence, whatever it carries. */
-const SCOPE_STAMPED_RESOURCES = ["help", "help_threads"] as const
+ * This is the "one line at a time" the note below promised. Three lines now, and
+ * each was added the same way: the portal has a screen that reads it, the owner
+ * has ruled the client may see it, and a screen that cannot hear its own row
+ * change is a screen that lies until you reload it. A resource NOT named here is
+ * silence, whatever it carries.
+ *
+ * `process_comments` is the third. A client comments on their own process map
+ * and a staff member answers — that is a conversation, and a conversation whose
+ * other half only appears on refresh is not one. The ping carries a PROCESS id,
+ * which says nothing about whose map it is, so the publisher names the account
+ * (routes/processes.ts) and this line is what lets the fence read it. */
+const SCOPE_STAMPED_RESOURCES = ["help", "help_threads", "process_comments"] as const
 
 /** The fence, for a LIVE CHANGE PING (`{resource, id, scope}` on a team's channel).
  *

@@ -542,3 +542,130 @@ export type PortalUser = {
   grantedByName: string | null
   active: boolean
 }
+
+// ── Process maps, versions and the money (SCOPE ch.02 · .plans/BUILD-3) ───────
+// App → Process → Step, and the two rate cards. The one rule these shapes carry
+// on their face: an INTERNAL number (what our own hour costs, what an app costs
+// us to run, what a margin is) is a separate type from anything the client side
+// can ask for — never an optional field on a shared one. See R23.
+
+/** An App: the built system, the thing with its own address (SCOPE ch.02). */
+export type AppRow = {
+  id: string
+  /** whose system it is; null is the agency's own */
+  accountId: string | null
+  name: string
+  url: string | null
+  stage: string | null
+  /** what it costs US to run each month, in cents. `null` on the way OUT to a
+   * client login — an internal number, withheld on the row (see listApps). */
+  toolCostCentsPerMonth: number | null
+  active: boolean
+  createdAt?: string | null
+  createdByName?: string | null
+  updatedAt?: string | null
+  editedByName?: string | null
+}
+
+/** One process in a list: what it is, and how much of it there is. */
+export type ProcessSummary = {
+  id: string
+  appId: string
+  appName: string
+  accountId: string | null
+  name: string
+  description: string | null
+  /** how many versions have been cut (1 = the baseline alone) */
+  versionCount: number
+  /** steps in the CURRENT version */
+  stepCount: number
+  active: boolean
+  createdAt: string
+}
+
+/** One version of a process. v1 is the pre-kwapso baseline, always. */
+export type ProcessVersion = {
+  id: string
+  processId: string
+  versionNo: number
+  label: string | null
+  isBaseline: boolean
+  /** the sprint whose completion cut it; null = the manual button. `null` on the
+   * way out to a client login — which sprint we ran is the agency's own record. */
+  cutFromSprintId: string | null
+  createdAt: string
+  createdByName: string | null
+}
+
+/** One step of one version. */
+export type ProcessStep = {
+  id: string
+  processId: string
+  versionId: string
+  /** the SAME step across versions — what makes the saving a subtraction */
+  stepKey: string
+  name: string
+  description: string | null
+  position: number
+  secondsPerRun: number
+  runsPerMonth: number
+  /** true once the work stopped happening (kept, at zero seconds — never deleted) */
+  removed: boolean
+}
+
+/** One process opened: its versions, its current steps, and the exact comment
+ * total its tab is badged with (R16). */
+export type ProcessDetail = {
+  process: ProcessSummary
+  versions: ProcessVersion[]
+  steps: ProcessStep[]
+  commentsTotal: number
+}
+
+/** A comment on a process map — a conversation, never an edit. */
+export type ProcessComment = {
+  id: string
+  processId: string
+  body: string
+  /** set = this comment is the staff explanation for that step's regression */
+  explainsStepKey: string | null
+  fromStaff: boolean
+  createdAt: string
+  /** null when a client login is reading a STAFF comment: the portal never says
+   * which staff member is doing the work (SCOPE ch.06). */
+  createdByName: string | null
+}
+
+/** What an account is CHARGED per hour, by kind of work. A client may be shown
+ * this when their price visibility is switched on. */
+export type AccountRate = {
+  id: string
+  accountId: string
+  label: string
+  centsPerHour: number
+  currency: string | null
+  active: boolean
+  createdAt?: string | null
+  createdByName?: string | null
+  updatedAt?: string | null
+  editedByName?: string | null
+}
+
+/** What an hour of OUR work costs US. A separate type from AccountRate on
+ * purpose: the two are the same shape and opposite audiences, and one type with
+ * a `kind` field is one wrong filter away from the figure SCOPE says a client
+ * must never see. No shape the client side can ask for carries one of these. */
+export type InternalRate = {
+  id: string
+  label: string
+  centsPerHour: number
+  currency: string | null
+  /** the rate a margin applies to an hour of logged time whose kind of work the
+   * work log does not yet name. At most one, enforced by a partial unique index. */
+  isDefault: boolean
+  active: boolean
+  createdAt?: string | null
+  createdByName?: string | null
+  updatedAt?: string | null
+  editedByName?: string | null
+}

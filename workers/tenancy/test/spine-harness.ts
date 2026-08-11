@@ -58,6 +58,16 @@ export const IDS = {
   // The activity feed reads history by (table, id) — so a ticket id is a handle
   // on another client's support history, one table along from the account rows.
   victimTicket: "H_VICTIM",
+  // The victim's PROCESS MAP — an app, a way of working inside it, its baseline
+  // version, one step with a real duration, and a comment on the conversation.
+  // Seeded here rather than in the leak suite because the fixture IS the proof: a
+  // burglar can only be caught stealing something that exists, and a map is worth
+  // stealing — it names how a client's own people work, and what we changed.
+  victimApp: "AP_VICTIM",
+  victimProcess: "PR_VICTIM",
+  victimVersion: "PV_VICTIM",
+  victimStep: "PS_VICTIM",
+  victimComment: "PC_VICTIM",
   burglarAccount: "A_BURGLAR",
   burglarPerson: "A_BURGLAR_PERSON",
   burglarLink: "L_BURGLAR",
@@ -78,6 +88,11 @@ export const VICTIM_IDS = [
   IDS.contactPortal,
   IDS.clientPerson,
   IDS.victimTicket,
+  IDS.victimApp,
+  IDS.victimProcess,
+  IDS.victimVersion,
+  IDS.victimStep,
+  IDS.victimComment,
 ] as const
 
 /** A fresh team database: the real migrations, the real seed, then the two
@@ -124,7 +139,7 @@ export function buildSpineDb(): DatabaseSync {
       SELECT '${roleId}_' || m.module, '${roleId}', m.module, 1, 1, 1, 1
         FROM (SELECT 'accounts' AS module UNION ALL SELECT 'portal_users'
               UNION ALL SELECT 'team_members' UNION ALL SELECT 'member_roles'
-              UNION ALL SELECT 'help') m;`)
+              UNION ALL SELECT 'help' UNION ALL SELECT 'processes') m;`)
   grantAll(IDS.adminRole)
   grantAll(IDS.clientRole)
 
@@ -171,6 +186,22 @@ export function buildSpineDb(): DatabaseSync {
     `INSERT INTO help (id, description, status, resolved, account_id, created_at, creator_id, creator_email, creator_name)
      VALUES ('${IDS.victimTicket}', 'Bergman S.A. cannot see the March invoice run', 'open', 0, '${IDS.victimAccount}', '2026-02-05', '${IDS.victimUser}', 'marta@bergman.example', 'Marta Ruiz');`
   )
+
+  // THE VICTIM'S PROCESS MAP. Every row carries the account, because that is what
+  // the fence reads — and the names are the client's own, so a leak is caught by
+  // the "not Bergman" assertion as well as by id.
+  db.exec(`
+    INSERT INTO apps (id, account_id, name, url, stage, tool_cost_cents_per_month, created_at, creator_id)
+      VALUES ('${IDS.victimApp}', '${IDS.victimAccount}', 'Bergman dispatch', 'https://dispatch.example', 'live', 42000, '2026-02-01', '${IDS.staffUser}');
+    INSERT INTO processes (id, app_id, account_id, name, description, created_at, creator_id)
+      VALUES ('${IDS.victimProcess}', '${IDS.victimApp}', '${IDS.victimAccount}', 'Bergman invoice approval', 'How Bergman approves a supplier invoice', '2026-02-01', '${IDS.staffUser}');
+    INSERT INTO process_versions (id, process_id, account_id, version_no, label, created_at, creator_id)
+      VALUES ('${IDS.victimVersion}', '${IDS.victimProcess}', '${IDS.victimAccount}', 1, 'How it worked before', '2026-02-01', '${IDS.staffUser}');
+    INSERT INTO process_steps (id, process_id, version_id, account_id, step_key, name, position, seconds_per_run, runs_per_month, created_at, creator_id)
+      VALUES ('${IDS.victimStep}', '${IDS.victimProcess}', '${IDS.victimVersion}', '${IDS.victimAccount}', 'SK_VICTIM', 'Check it against the order', 0, 2400, 20, '2026-02-01', '${IDS.staffUser}');
+    INSERT INTO process_comments (id, process_id, account_id, body, is_staff, created_at, creator_id, creator_name)
+      VALUES ('${IDS.victimComment}', '${IDS.victimProcess}', '${IDS.victimAccount}', 'Bergman asked whether the check can be skipped for repeat suppliers', 0, '2026-02-02', '${IDS.victimUser}', 'Marta Ruiz');
+  `)
 
   // REAL HISTORY on the victim's world. Without it the activity burglaries pass
   // trivially — there is nothing to steal, so an unfenced feed and a fenced one

@@ -30,6 +30,22 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
 - **A door on the agency's own material refuses a client login — AT THE DOOR (R21).** The client portal's gateway forwards a named allow-list and leaves the agency's doors out; the agency gateway forwards **by prefix**, and a client login is an ordinary team member holding an ordinary role. So every door the portal withheld was being served to the same person at the other hostname. Every route a Client-role caller can pass must refuse a portal caller, resolve the account fence, be a door the portal itself opens, or be a reasoned exemption. Nothing hand-listed: rights from the seed, routes from each `ROUTES` table, gates from handler source. **Enumerate by what a client can REACH, never by what a module owns** — that substitution is how it leaked the second time. (`client-reachable-doors`)
 - **Agent/MCP body-field parity (R22)** — R19's sentence about the other half of the request. A tool on a WRITE door exposes and forwards every field that door reads off the **body**, derived from the door's own `body.<field>` reads and proved by RUNNING the tool's `buildBody`, not by reading it. R19 inspected only the query string, so four write tools offered a narrower contract than their door accepted for six weeks under a green build. (`agent-body-parity`)
 
+- **An internal number cannot reach the client's side (R23).** What our own hour costs
+  (`internal_rates`) and the margin computed from it live in ONE file —
+  `workers/tenancy/src/lib/internal-money.ts` — and the check DERIVES the doors that call
+  into it from that file's own exports: none of them is on the portal gateway's surface,
+  every one opens with `refusePortalCaller`, and nothing in `web-portal/` names the
+  internal table or those doors. SCOPE's ruling has no exceptions clause, so the defence
+  is not a condition somebody can invert: a condition can be inverted and a permission can
+  be granted, an import cannot be forgotten. The ACCOUNT rate card (what a client *is
+  charged*) is a separate table and a separate file for the same reason.
+  (`internal-money-never-in-portal`)
+- **A savings figure never renders without saying what it is made of (R24).** Every screen
+  on either front door that shows a saving renders `SAVINGS_CAPTION` from
+  `shared/workers/savings.ts`, word for word — the times are agreed estimates, the
+  subtraction is arithmetic — and the screens are derived from the payload they read.
+  (`savings-caption`)
+
 A law cannot be added without its check (`registry-integrity`). When you add a rule, add it to RULES.md **and** the registry **and** a check — or the build fails.
 
 ## Before you build — the planning ritual
@@ -46,7 +62,7 @@ Answer these seven, in order, *before* you write code. It's the thinking that ke
 
 ## Build style — how code here is written
 
-- **Workers (8):** six private brains — auth, tenancy, realtime, content (learning + tickets), data-ops (import + AI agent), mcp (the external machine surface: personal access tokens → team-pinned sessions → MCP tools over the same gated doors; reached only through the agency gateway at `/mcp` + `/api/mcp/*`) — under **two public doors**: `gateway` (the agency app, `web/`, routes `/api/*` by prefix) and `portal-gateway` (the client portal, `web-portal/`, forwards a named allow-list only). **Only those two are public**; every other worker sets `workers_dev:false` + `preview_urls:false`, so no public route can reach `/internal/*`, the agent, or the act-as-user surface. Per-team D1 databases reached over the REST door (`CF_D1_TOKEN`); the global core DB via the native `env.DB` binding. Shared worker code lives in `shared/workers/` (gating, http, validate, …).
+- **Workers (8):** six private brains — auth, tenancy (teams, the customer spine, process maps + the money), realtime, content (learning + tickets), data-ops (import + AI agent), mcp (the external machine surface: personal access tokens → team-pinned sessions → MCP tools over the same gated doors; reached only through the agency gateway at `/mcp` + `/api/mcp/*`) — under **two public doors**: `gateway` (the agency app, `web/`, routes `/api/*` by prefix) and `portal-gateway` (the client portal, `web-portal/`, forwards a named allow-list only). **Only those two are public**; every other worker sets `workers_dev:false` + `preview_urls:false`, so no public route can reach `/internal/*`, the agent, or the act-as-user surface. Per-team D1 databases reached over the REST door (`CF_D1_TOKEN`); the global core DB via the native `env.DB` binding. Shared worker code lives in `shared/workers/` (gating, http, validate, …).
 - **Worker handler shape:** a declarative `ROUTES` table (each route tagged read / mutation / housekeeping) → gate with `requireRight` from `shared/workers/gating` → team-DB CRUD via `d1Query` / `d1ExecScript` + `sqlString` + `ulid` → `publishChange` → return. Throw `GuardError(status, code, msg)`; the central catch maps it to a response.
 - **Deactivate, never delete** (data + audit survive). Keep an audit block (actor + timestamp) on every write.
 - **Permissions are the spine.** The AI agent **acts AS the signed-in user through the same gated endpoints** and never exceeds their rights. There is no separate agent role.

@@ -186,6 +186,22 @@ const CLIENT_ROLE = {
   // eight CSVs, be shown the import catalogue's inner shape, and spend the team's
   // AI allowance that the portal was built never to touch. A right the seed does
   // not hold is a door the law does not walk.
+  //
+  // `processes` is the one right on this list a client GENUINELY needs, rather
+  // than one held to make the worst case worse. It is what opens their value
+  // screen — the savings drilled App → Process → Step — and `create` is what
+  // lets them say something on a map, one of the six things SCOPE says a contact
+  // can do. The AUTHORING doors on the same module (map a process, edit a step,
+  // cut a version) hold the same right and refuse a portal caller at the door,
+  // which is exactly the shape R21 exists to check: the rights let them through
+  // and the door turns them away.
+  //
+  // `commercials` is DELIBERATELY ABSENT, and it is the only module on this list
+  // that could not be here even as a worst case. Every one of its doors refuses a
+  // client login anyway (R23 + the refusal-symmetry suite), so granting it would
+  // test one more refusal — but the seed is also a working example an owner
+  // copies, and a Client role with a tick beside "Rates & margin" is a screenshot
+  // nobody should ever be able to take.
   rights: {
     teams: { read: true },
     accounts: { read: true },
@@ -194,6 +210,7 @@ const CLIENT_ROLE = {
     help: { read: true, create: true },
     selectable_data: { read: true },
     agent: { read: true, create: true },
+    processes: { read: true, create: true },
   },
 }
 

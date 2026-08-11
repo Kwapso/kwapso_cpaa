@@ -21,6 +21,7 @@ import {
   MUTATING_WORKERS,
   RAW_BODY_EXEMPT,
   RECORD_DETAIL_COMPONENTS,
+  PORTAL_VISIBLE_READS,
   RECORD_TAB_COUNT_EXCEPTIONS,
   RULES_REGISTRY,
   TAB_COUNT_EXCEPTIONS,
@@ -826,6 +827,154 @@ describe("RULES — the laws of the base", () => {
     ).toEqual([])
   })
 
+  // R23 — AN INTERNAL NUMBER CANNOT REACH THE CLIENT'S SIDE.
+  //
+  // SCOPE's ruling is one of the few in this codebase with no exceptions clause
+  // at all: internal rates and margin never render in the portal under any flag,
+  // ever — "not behind a permission, not behind a feature toggle, not for an
+  // admin viewing the portal". The instruction that came with it was to make
+  // that STRUCTURALLY true rather than a condition someone can invert later, and
+  // this is what "structurally" means in a codebase: the figures live in ONE
+  // file, and nothing a client login can reach imports it.
+  //
+  // A condition can be inverted. A permission can be granted. A flag can be
+  // flipped by whoever writes next year's screen. An import cannot be forgotten,
+  // because it is not a decision anybody re-makes — it is either in the graph or
+  // it is not, and this reads the graph.
+  //
+  // Nothing here is hand-listed. The INTERNAL SURFACE is the exported names of
+  // internal-money.ts, read off that file. The INTERNAL DOORS are the tenancy
+  // routes whose handlers call one of them, read off the handler source. Add a
+  // door tomorrow that reads a margin and it is judged today.
+  it("internal-money-never-in-portal: no client-reachable path reaches the agency's own cost", () => {
+    const INTERNAL = join(ROOT, "workers", "tenancy", "src", "lib", "internal-money.ts")
+    const internalSrc = stripComments(read(INTERNAL))
+
+    // ── the internal surface, derived from the file itself ────────────────────
+    const exported = [...internalSrc.matchAll(/export\s+(?:async\s+)?function\s+(\w+)/g)].map((m) => m[1])
+    const tables = [...new Set([...internalSrc.matchAll(/(?:FROM|INTO|UPDATE)\s+([a-z_]+)/g)].map((m) => m[1]))]
+    expect(exported.length, "the internal-money scan found no exports — it has gone blind").toBeGreaterThan(3)
+    expect(tables, "internal_rates is the table this law is about — did it move?").toContain("internal_rates")
+
+    // ── the internal doors, derived from the handlers that call into it ───────
+    const tenancyIndex = read(join(ROOT, "workers", "tenancy", "src", "index.ts"))
+    const routeFns = new Map<string, string>()
+    for (const { source } of sourceFiles(join(ROOT, "workers", "tenancy", "src", "routes"), { extensions: [".ts"] })) {
+      const starts = [...source.matchAll(/(?:export\s+)?(?:async\s+)?function\s+(\w+)/g)]
+      starts.forEach((m, i) => routeFns.set(m[1], source.slice(m.index, starts[i + 1]?.index ?? source.length)))
+    }
+    const routes = [...tenancyIndex.matchAll(/"([A-Z]+ \/[^"]+)":\s*\{\s*handler:\s*(\w+)/g)]
+    expect(routes.length, "tenancy's ROUTES did not parse").toBeGreaterThan(10)
+
+    const internalDoors = routes
+      .filter(([, , handler]) => {
+        const body = stripComments(routeFns.get(handler) ?? "")
+        return exported.some((fn) => new RegExp(`(?<![\\w.])${fn}\\s*\\(`).test(body))
+      })
+      .map(([, door, handler]) => ({ door, handler }))
+    expect(
+      internalDoors.length,
+      "no door was derived as internal — the walk has gone blind, and a blind check reports 'all clear' exactly like a passing one"
+    ).toBeGreaterThan(3)
+
+    // ── 1. none of them is on the portal's surface ────────────────────────────
+    const portalSrc = read(join(ROOT, "workers", "portal-gateway", "src", "index.ts"))
+    const portalDoors = new Set([...portalSrc.matchAll(/"([A-Z]+ \/[^"]+)":\s*"\w+"/g)].map((m) => m[1]))
+    expect(portalDoors.size, "PORTAL_DOORS did not parse").toBeGreaterThan(5)
+    const published = internalDoors.filter((d) => portalDoors.has(d.door))
+    expect(
+      published.map((d) => d.door),
+      "the portal gateway opens a door that reads the agency's own cost — SCOPE says a client never sees this, under any flag (R23)"
+    ).toEqual([])
+
+    // ── 2. every one of them refuses a client login at the door ───────────────
+    // Belt and braces on purpose: the gateway's allow-list is the first answer
+    // and the door's own refusal is the one that survives somebody adding a line
+    // to the allow-list. That mistake has been made twice in this codebase.
+    const unrefused = internalDoors.filter(
+      (d) => !/refusePortalCaller\s*\(/.test(stripComments(routeFns.get(d.handler) ?? ""))
+    )
+    expect(
+      unrefused.map((d) => `${d.door} (${d.handler})`),
+      "a door that reads the agency's own cost must refuse a portal caller AT THE DOOR (R23 · R21)"
+    ).toEqual([])
+
+    // ── 3. the client's own front end names none of it ────────────────────────
+    //
+    // WHICH TABLES ARE "INTERNAL" IS ITSELF DERIVED, and it has to be: the margin
+    // reads `apps` for what a system costs us to run, and `apps` is not an
+    // internal table — a client's own value screen names their apps by design. So
+    // the forbidden set is the tables the internal file reads MINUS every table a
+    // file that ANSWERS A CLIENT reads (PORTAL_VISIBLE_READS, whose completeness
+    // is the portal-fence suite's job). What survives that subtraction is exactly
+    // "a table only the agency's own side ever touches", which is the thing this
+    // law is about. Hand-listing it would have been the fourth version of the
+    // mistake this codebase keeps making.
+    const clientReadable = new Set<string>()
+    for (const file of Object.keys(PORTAL_VISIBLE_READS))
+      for (const m of stripComments(read(join(ROOT, file))).matchAll(/(?:FROM|INTO|UPDATE|JOIN)\s+([a-z_]+)/g))
+        clientReadable.add(m[1])
+    const internalTables = tables.filter((t) => !clientReadable.has(t))
+    expect(
+      internalTables,
+      "the internal-table derivation subtracted everything — internal_rates must survive it"
+    ).toContain("internal_rates")
+
+    // The paths and the table are unambiguous strings; `marginCents` is the field
+    // a screen would have to read to render one. Comments are stripped first — a
+    // note explaining why the portal does NOT show a margin must not read as one.
+    const forbidden = [...internalTables, ...internalDoors.map((d) => d.door.split(" ")[1]), "marginCents"]
+    const portalFiles = sourceFiles(
+      ["lib", "components", "app"].map((d) => join(ROOT, "web-portal", d)),
+      { extensions: [".ts", ".tsx"], relativeTo: join(ROOT, "web-portal") }
+    )
+    expect(portalFiles.length, "the portal source walk found nothing").toBeGreaterThan(10)
+    const leaks: string[] = []
+    for (const f of portalFiles) {
+      const src = stripComments(f.source)
+      for (const needle of forbidden) if (src.includes(needle)) leaks.push(`${f.rel} names ${needle}`)
+    }
+    expect(
+      leaks,
+      `the client portal names the agency's own cost figures (R23): ${leaks.join(", ")}`
+    ).toEqual([])
+  })
+
+  // R24 — A SAVINGS FIGURE NEVER RENDERS WITHOUT SAYING WHAT IT IS MADE OF.
+  //
+  // "The numbers stop being believable" is one of the three things the owner
+  // named as what would make him abandon this and go back to a spreadsheet. A
+  // savings figure a client cannot account for is worse than no figure at all:
+  // the first time they question it and nobody can answer, every other number in
+  // the app loses its credit too.
+  //
+  // So the caption ships WITH the number, on both front doors, in one sentence
+  // that is honest about both halves — the inputs are estimates we agreed, the
+  // subtraction is arithmetic. The screens are DERIVED from the payload they
+  // read, so a new one is held to this the day it is written rather than the day
+  // somebody remembers to add it to a list.
+  it("savings-caption: every screen showing a saving renders the caption it came with", () => {
+    const savings = read(join(ROOT, "shared", "workers", "savings.ts"))
+    expect(savings, "SAVINGS_CAPTION is the one sentence — did it move?").toContain("export const SAVINGS_CAPTION")
+
+    const screens = sourceFiles(
+      [join(WEB, "components"), join(ROOT, "web-portal", "components")],
+      { extensions: [".tsx"], relativeTo: ROOT }
+    )
+    // The payload's own field names: a screen that shows a saving has to read one.
+    const showsSaving = screens.filter((f) => /savedSecondsPerMonth|savedHours\s*\(/.test(stripComments(f.source)))
+    expect(
+      showsSaving.length,
+      "no screen reads a savings figure — the derivation has gone blind (a blind check reports 'all clear' exactly like a passing one)"
+    ).toBeGreaterThan(1)
+
+    const silent = showsSaving.filter((f) => !f.source.includes("SAVINGS_CAPTION"))
+    expect(
+      silent.map((f) => f.rel),
+      `these screens show a saving without the sentence that makes it honest — render SAVINGS_CAPTION beside it (R24): ${silent.map((f) => f.rel).join(", ")}`
+    ).toEqual([])
+  })
+
   // per-worker seam test) — a law can't exist without a check.
   it("every enforced law has a known check", () => {
     const known = new Set([
@@ -851,6 +1000,8 @@ describe("RULES — the laws of the base", () => {
       "agent-filter-parity", // R19: workers/mcp/test/filter-parity.test.ts
       "client-reachable-doors", // R21: the client-reach scan above
       "agent-body-parity", // R22: the request BODY half, beside R19 in the mcp suite
+      "internal-money-never-in-portal", // R23: the import-graph scan above
+      "savings-caption", // R24: the derived-screens scan above
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

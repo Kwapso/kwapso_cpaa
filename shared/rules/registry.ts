@@ -171,6 +171,20 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "agent-body-parity",
     status: "enforced",
   },
+  {
+    id: "R23",
+    dimension: "arch",
+    law: "AN INTERNAL NUMBER CANNOT REACH THE CLIENT'S SIDE — structurally, not conditionally. What an hour of our own work costs (internal_rates) and the margin computed from it live in ONE file, workers/tenancy/src/lib/internal-money.ts, and every door that calls into it refuses a portal caller. The check derives the internal doors from that file's own exports and each handler's source, then asserts three things the portal cannot then get around: none of those doors is on the portal gateway's surface, every one of them opens with refusePortalCaller, and no file in web-portal/ names the internal table, the internal doors' paths or a margin field. SCOPE's ruling is absolute — internal rates and margin never render in the portal under any flag, ever: not behind a permission, not behind a feature toggle, not for an admin viewing the portal — and the instruction with it was to make that structurally true rather than a condition somebody can invert later. A condition can be inverted and a permission can be granted; an import cannot be forgotten. The account rate card — what a client IS charged, which they may be shown when their price visibility is on — is a SEPARATE file and a separate table for exactly this reason: two numbers of identical shape and opposite audiences must not share a WHERE clause.",
+    checkId: "internal-money-never-in-portal",
+    status: "enforced",
+  },
+  {
+    id: "R24",
+    dimension: "ui",
+    law: "A SAVINGS FIGURE NEVER RENDERS WITHOUT SAYING WHAT IT IS MADE OF. Every screen on either front door that shows a saving renders SAVINGS_CAPTION from shared/workers/savings.ts, word for word: the times are estimates we agreed with you, the subtraction is arithmetic. The check derives the screens from the payload they read (savedSecondsPerMonth / savedHours) rather than a hand-list, so a new screen is held to it the day it is written. Earned by the sentence the owner used about what would make him abandon this and go back to a spreadsheet — 'the numbers stop being believable'. A client who understands that the inputs are agreed and the arithmetic is arithmetic trusts the figure; one who believes we held a stopwatch stops trusting every other number in the app the day one of them looks wrong. The caption is not decoration around the feature, it is half of it.",
+    checkId: "savings-caption",
+    status: "enforced",
+  },
 ]
 
 /** R13 — reviewed exemptions: modules that are deliberately NOT import targets,
@@ -183,6 +197,10 @@ export const CATALOG_EXEMPT: Record<string, string> = {
   agent: "the assistant's threads/usage are system records, not importable content",
   portal_users:
     "a login is a granted identity, not importable content — a CSV cannot consent for a person (the same reason team_members is exempt)",
+  processes:
+    "a process map's numbers are AGREED estimates — a time a client and a staff member settled together, in front of each other, about the client's own work. Every savings figure in the app is a subtraction of two of them, so a CSV would import estimates nobody agreed and produce figures nobody can defend, which is the exact failure this module exists to prevent. A map is authored a step at a time, with the person whose work it describes.",
+  commercials:
+    "a rate card is a commercial agreement and an internal rate is the agency's own cost. A bulk overwrite of either silently changes what a client is charged or what a margin says, with no conversation attached and no one row to point at afterwards — and the write it would replace is four fields typed once a year.",
 }
 
 /** R21 — the doors a CLIENT LOGIN can reach at the agency origin that neither
@@ -234,7 +252,7 @@ export const CLIENT_REACHABLE_EXEMPT: Record<string, string> = {
  * named here is derived off disk and must have a burglar attacking it
  * (workers/tenancy/test/account-leak.test.ts), and a module added here with no
  * attack turns the build red. */
-export const ACCOUNT_SCOPED_MODULES = ["accounts", "portal_users"] as const
+export const ACCOUNT_SCOPED_MODULES = ["accounts", "portal_users", "processes"] as const
 
 /** EVERY read a CLIENT LOGIN can reach that returns rows belonging to someone —
  * file → the fence it must carry, or a reasoned exemption.
@@ -277,6 +295,18 @@ export const PORTAL_VISIBLE_READS: Record<string, { fence: string | null; why: s
   "workers/content/src/lib/stakeholders.ts": {
     fence: "getTicket",
     why: "a stakeholder set is a PROPERTY of a ticket, so the fenced getTicket decides visibility first and an invisible ticket yields an empty set — otherwise the door names staff admins and another client's colleagues by ticket id alone.",
+  },
+  "workers/tenancy/src/lib/rates.ts": {
+    fence: "accountScopeClause",
+    why: "what an account is CHARGED per hour. The rate-card DOOR refuses a client login outright — it answers with every account's card, the retired lines and the audit block naming who set the price — but the value door reads this file to PROJECT the live lines for one account, and only when that account's price visibility is switched on. So the same fence the accounts list carries rides these statements too: a client login can only ever be shown their own company's rates. What our own hour COSTS us is a different table in a different file, and no client-reachable path touches it (R23).",
+  },
+  "workers/tenancy/src/lib/work-engine.ts": {
+    fence: null,
+    why: "it returns no rows — two aggregate SUMs (what has been sold to one account, and how many seconds we have logged against it) over the work engine's own tables, for an account id the CALLER has already resolved through the fence before calling. A SUM discloses no record, and the one figure a client may be shown from it (what they bought) is projected by the value door behind their own account's price-visibility switch. The seconds half never reaches a client at all: it is only meaningful once an internal rate is applied to it, which happens in a file no portal-reachable path may import.",
+  },
+  "workers/tenancy/src/lib/processes.ts": {
+    fence: "accountScopeClause",
+    why: "the whole App → Process → Step chain, and the value drilled through it. Every table here carries `account_id` so the fence is the SAME clause the accounts list uses, with no join to forget — and every exported reader takes the caller's AccountScope, which the burglar suite (workers/tenancy/test/account-leak.test.ts) then tries the handle of. A map names how a client's own people work; another client's map is as far out of bounds as their account row.",
   },
 }
 
@@ -335,6 +365,12 @@ export const PORTAL_VISIBLE_WRITES: Record<string, { fence: string | null; why: 
     fence: "accountScope",
     why: "appends to a ticket named by a caller-supplied id — so the fence decides whose ticket it is BEFORE a word is appended, and answers 404 rather than 403 so 'not yours' never confirms the ticket exists. A reply cannot be un-appended.",
   },
+
+  // ── the process map ────────────────────────────────────────────────────────
+  "POST /api/tenancy/processes/comments": {
+    fence: "accountScope",
+    why: "comments on a map named by a caller-supplied id — so the fence decides whose map it is BEFORE a word is appended, and answers 404 rather than 403 so 'not yours' never confirms the map exists. It is the ONLY write in the process-map build a client login can reach: a comment is a conversation, never an edit, so it changes no duration, cuts no version and moves no savings figure. The one field that WOULD change what the portal shows — `explainsStepKey`, the staff explanation a regression must carry — is refused from a portal caller at the door.",
+  },
 }
 
 /** THE ACTIVITY FEED'S OWN FENCE — for every table it will answer about, what a
@@ -373,6 +409,22 @@ export const PORTAL_ACTIVITY_FENCE: Record<string, { fence: "account" | null; wh
   users: { fence: null, why: "a member's joins, role changes and removals — the agency's staff, never a client's business" },
   member_roles: { fence: null, why: "the agency's permission structure — knowing its shape helps only an attacker" },
   invite_logs: { fence: null, why: "who the agency invited and when — the agency's own hiring, by another name" },
+
+  // THE PROCESS MAP'S SEVEN TABLES. The ROWS are the client's — a contact reads
+  // their company's maps and the value drilled through them, fenced by
+  // accountScopeClause on every statement. Their HISTORY is a different question,
+  // and it has the answer SCOPE ch.06 gives every other feed on this side: the
+  // portal shows work status and never which staff member is doing it. An
+  // activity row here would say "Ana changed 'Approve the invoice' from 40
+  // minutes to 8" — the client's own number, with our name on it, and the portal
+  // ships no activity feed at all to put it in (PORTAL_ACTIVITY_EXEMPT).
+  apps: { fence: null, why: "an app's history names the staff who recorded it and quotes what it costs US to run — the client sees the system, never our ledger about it" },
+  processes: { fence: null, why: "a map's history names the staff who mapped and re-mapped it; the client is shown the map itself, which is the part that is theirs" },
+  process_versions: { fence: null, why: "a cut names the staff member who cut it and the sprint it came from — the client sees the version and its date" },
+  process_steps: { fence: null, why: "a step's history is our record of changing THEIR agreed number; the current number, and the saving from it, is what the portal shows" },
+  process_comments: { fence: null, why: "the conversation itself is fenced and readable; its history would name the staff author of every line, which the ticket thread already withholds" },
+  account_rates: { fence: null, why: "who set a client's price, and what it was before — the agency's own commercial record, even about their own rate" },
+  internal_rates: { fence: null, why: "what our own hour costs. The one figure SCOPE says a client must never see under any flag, ever — its history least of all (R23)" },
 }
 
 /** R2 on the CLIENT surface — the reasoned exemption, not a quiet skip.
@@ -411,6 +463,16 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
   accounts: "accounts",
   account_links: "accounts",
   portal_users: "portal_users",
+  // The map and the money. Five tables gate on `processes` because they are one
+  // record from a reader's point of view — an app with maps inside it — and two
+  // on `commercials`, which is the module a client login never holds.
+  apps: "processes",
+  processes: "processes",
+  process_versions: "processes",
+  process_steps: "processes",
+  process_comments: "processes",
+  account_rates: "commercials",
+  internal_rates: "commercials",
 }
 
 /** R15 — reviewed DEAF exemptions: resources a worker publishes that reach NO
@@ -463,6 +525,15 @@ export const GROWING_COLLECTIONS: Record<
     rowsKey: "activity",
     webKey: "useRecordActivity(",
     why: "one record's slice of the same ever-growing feed — a long-running ticket outgrows a page on its own",
+  },
+  processes: {
+    lib: "workers/tenancy/src/lib/processes.ts",
+    fn: "listProcesses",
+    routes: "workers/tenancy/src/routes/processes.ts",
+    rowsKey: "processes",
+    listRecipe: "processes.list",
+    webKey: "processesKey(",
+    why: "every app of every client grows maps, and every map is kept rather than replaced — a process is archived, never deleted, because the savings computed from its baseline have to stay checkable years later. An agency two years in has more of these than it has clients, and the oldest is the one a client is most likely to ask about",
   },
 }
 
@@ -566,4 +637,11 @@ export const FORM_DIALOGS = [
   "account-form-dialog",
   "contact-link-dialog",
   "portal-access-dialog",
+  // Process maps and the numbers under them. The step form is the one that
+  // matters most here: it collects the two figures every savings number in the
+  // app is a subtraction between, so a draft lost to a mis-tap is an agreed
+  // estimate somebody has to go and ask for again.
+  "app-form-dialog",
+  "process-form-dialog",
+  "step-form-dialog",
 ] as const

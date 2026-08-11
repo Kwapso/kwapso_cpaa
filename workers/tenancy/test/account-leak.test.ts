@@ -280,17 +280,206 @@ const BURGLARIES: Burglary[] = [
     honest: () => req("POST /api/tenancy/portal-users/active", { id: IDS.victimPortal, active: false }),
     expect: "refused",
   },
+
+  // ── THE PROCESS MAP ────────────────────────────────────────────────────────
+  //
+  // Sixteen doors, and they are worth stealing for two different reasons. The
+  // READS name how another company's people work, step by step, with the times
+  // they agreed and the conversation they had about it — a competitor's
+  // operations manual, in other words. The WRITES are worse: every savings figure
+  // in the app is a subtraction from a baseline, so an attacker who can edit
+  // somebody's version 1 can make their agency look like it saved them a hundred
+  // hours a month, or none.
+  //
+  // The burglar holds every right on `processes` (the harness grants it), exactly
+  // as they hold every right on the spine — their ROLE is not what stops them
+  // here, and if they get through, the fence is broken.
+  {
+    route: "GET /api/tenancy/apps",
+    why: "list every system in the team and read the victim's off the page",
+    attack: () => req("GET /api/tenancy/apps"),
+    honest: () => req("GET /api/tenancy/apps"),
+    expect: "nothing",
+  },
+  {
+    route: "GET /api/tenancy/apps",
+    why: "ask for the victim's systems directly by account id",
+    attack: () => req("GET /api/tenancy/apps", undefined, `?accountId=${IDS.victimAccount}`),
+    honest: () => req("GET /api/tenancy/apps", undefined, `?accountId=${IDS.victimAccount}`),
+    expect: "nothing",
+  },
+  {
+    route: "POST /api/tenancy/apps",
+    why: "hang a system on the victim's account, then read their world through it",
+    attack: () => req("POST /api/tenancy/apps", { name: "Mole", accountId: IDS.victimAccount }),
+    honest: () => req("POST /api/tenancy/apps", { name: "New system", accountId: IDS.victimAccount }),
+    expect: "refused",
+  },
+  {
+    route: "POST /api/tenancy/apps/update",
+    why: "rewrite the victim's system — its name, its address, what it costs to run",
+    attack: () => req("POST /api/tenancy/apps/update", { id: IDS.victimApp, name: "Owned" }),
+    honest: () => req("POST /api/tenancy/apps/update", { id: IDS.victimApp, name: "Bergman dispatch" }),
+    expect: "refused",
+  },
+  {
+    route: "POST /api/tenancy/apps/active",
+    why: "archive the victim's system, taking its whole map out of their value figure",
+    attack: () => req("POST /api/tenancy/apps/active", { id: IDS.victimApp, active: false }),
+    honest: () => req("POST /api/tenancy/apps/active", { id: IDS.victimApp, active: false }),
+    expect: "refused",
+  },
+  {
+    route: "GET /api/tenancy/processes",
+    why: "list every map in the team — how every other client works, in one page",
+    attack: () => req("GET /api/tenancy/processes"),
+    honest: () => req("GET /api/tenancy/processes"),
+    expect: "nothing",
+  },
+  {
+    route: "GET /api/tenancy/processes",
+    why: "narrow to the victim's app and read its maps by name",
+    attack: () => req("GET /api/tenancy/processes", undefined, `?appId=${IDS.victimApp}`),
+    honest: () => req("GET /api/tenancy/processes", undefined, `?appId=${IDS.victimApp}`),
+    expect: "nothing",
+  },
+  {
+    route: "GET /api/tenancy/processes/detail",
+    why: "open another client's map by id — its steps, its times, its versions",
+    attack: () => req("GET /api/tenancy/processes/detail", undefined, `?id=${IDS.victimProcess}`),
+    honest: () => req("GET /api/tenancy/processes/detail", undefined, `?id=${IDS.victimProcess}`),
+    expect: "refused",
+  },
+  {
+    route: "POST /api/tenancy/processes",
+    why: "map a process onto the victim's app, then read the app through it",
+    attack: () => req("POST /api/tenancy/processes", { appId: IDS.victimApp, name: "Mole" }),
+    honest: () => req("POST /api/tenancy/processes", { appId: IDS.victimApp, name: "Another way of working" }),
+    expect: "refused",
+  },
+  {
+    route: "POST /api/tenancy/processes/update",
+    why: "rewrite the victim's map",
+    attack: () => req("POST /api/tenancy/processes/update", { id: IDS.victimProcess, name: "Owned" }),
+    honest: () =>
+      req("POST /api/tenancy/processes/update", { id: IDS.victimProcess, name: "Bergman invoice approval" }),
+    expect: "refused",
+  },
+  {
+    route: "POST /api/tenancy/processes/active",
+    why: "archive the victim's map so their savings quietly drop",
+    attack: () => req("POST /api/tenancy/processes/active", { id: IDS.victimProcess, active: false }),
+    honest: () => req("POST /api/tenancy/processes/active", { id: IDS.victimProcess, active: false }),
+    expect: "refused",
+  },
+  {
+    route: "POST /api/tenancy/processes/steps",
+    why: "add a step to another client's map",
+    attack: () =>
+      req("POST /api/tenancy/processes/steps", {
+        processId: IDS.victimProcess,
+        name: "Mole",
+        secondsPerRun: 60,
+        runsPerMonth: 1,
+      }),
+    honest: () =>
+      req("POST /api/tenancy/processes/steps", {
+        processId: IDS.victimProcess,
+        name: "File the paperwork",
+        secondsPerRun: 60,
+        runsPerMonth: 1,
+      }),
+    expect: "refused",
+  },
+  {
+    // THE ONE THAT MOVES A NUMBER. Editing somebody's baseline step is editing
+    // the figure their agency quotes them — up or down, at the attacker's choice.
+    route: "POST /api/tenancy/processes/steps/update",
+    why: "dial the victim's baseline, and with it every savings figure computed from it",
+    attack: () =>
+      req("POST /api/tenancy/processes/steps/update", {
+        id: IDS.victimStep,
+        name: "Owned",
+        secondsPerRun: 86_000,
+        runsPerMonth: 9_999,
+      }),
+    honest: () =>
+      req("POST /api/tenancy/processes/steps/update", {
+        id: IDS.victimStep,
+        name: "Check it against the order",
+        secondsPerRun: 2400,
+        runsPerMonth: 20,
+      }),
+    expect: "refused",
+  },
+  {
+    route: "POST /api/tenancy/processes/steps/remove",
+    why: "record that the victim's step stopped happening, inventing a saving nobody made",
+    attack: () => req("POST /api/tenancy/processes/steps/remove", { id: IDS.victimStep }),
+    honest: () => req("POST /api/tenancy/processes/steps/remove", { id: IDS.victimStep }),
+    expect: "refused",
+  },
+  {
+    route: "POST /api/tenancy/processes/versions",
+    why: "cut a version on another client's map, freezing a baseline they never agreed",
+    attack: () => req("POST /api/tenancy/processes/versions", { processId: IDS.victimProcess }),
+    honest: () => req("POST /api/tenancy/processes/versions", { processId: IDS.victimProcess }),
+    expect: "refused",
+  },
+  {
+    route: "GET /api/tenancy/processes/comments",
+    why: "read the conversation another client had with us about their own work",
+    attack: () =>
+      req("GET /api/tenancy/processes/comments", undefined, `?processId=${IDS.victimProcess}`),
+    honest: () =>
+      req("GET /api/tenancy/processes/comments", undefined, `?processId=${IDS.victimProcess}`),
+    expect: "refused",
+  },
+  {
+    route: "POST /api/tenancy/processes/comments",
+    why: "speak into another client's conversation, where their staff will read it as theirs",
+    attack: () =>
+      req("POST /api/tenancy/processes/comments", { processId: IDS.victimProcess, body: "Mole" }),
+    honest: () =>
+      req("POST /api/tenancy/processes/comments", { processId: IDS.victimProcess, body: "Noted." }),
+    expect: "refused",
+  },
+  {
+    // The door with no id in it at all — which is exactly why it is here. The
+    // value read walks every app and every process the CALLER may see, so a fence
+    // that had been left off this one statement would hand a burglar the whole
+    // estate's maps in a single unauthenticated-looking GET.
+    route: "GET /api/tenancy/value",
+    why: "read the savings drill-down, which names every app, map and step in the team",
+    attack: () => req("GET /api/tenancy/value"),
+    honest: () => req("GET /api/tenancy/value"),
+    expect: "nothing",
+  },
 ]
 
 // ── running them ─────────────────────────────────────────────────────────────
 
-/** Every spine row, verbatim — the "did anything move?" witness. */
+/** Every account-owned row, verbatim — the "did anything move?" witness.
+ *
+ * The process-map tables are here for a reason worth stating: a burglar who
+ * cannot READ another client's map can still do damage by WRITING one. Every
+ * savings figure this app produces is a subtraction from a baseline step, so a
+ * single successful UPDATE on somebody else's version 1 rewrites the number
+ * their agency quotes them — and a snapshot that watched only the spine would
+ * have called that a pass. */
 function snapshot(db: DatabaseSync): string {
-  return JSON.stringify([
-    db.prepare("SELECT * FROM accounts ORDER BY id").all(),
-    db.prepare("SELECT * FROM account_links ORDER BY id").all(),
-    db.prepare("SELECT * FROM portal_users ORDER BY id").all(),
-  ])
+  return JSON.stringify(
+    [
+      "accounts",
+      "account_links",
+      "portal_users",
+      "apps",
+      "processes",
+      "process_versions",
+      "process_steps",
+      "process_comments",
+    ].map((table) => db.prepare(`SELECT * FROM ${table} ORDER BY id`).all())
+  )
 }
 
 async function call(request: Request, userId: string): Promise<{ status: number; text: string }> {

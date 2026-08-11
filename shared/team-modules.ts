@@ -16,6 +16,8 @@ export const TEAM_MODULES = [
   "selectable_data",
   "screens",
   "agent",
+  "processes",
+  "commercials",
 ] as const
 
 /** Plain-English label for each module, shown as the rows of the permission
@@ -39,6 +41,19 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   selectable_data: "Dropdown data",
   screens: "Screens",
   agent: "AI agent",
+  // THE MAP AND THE MONEY, kept apart on purpose — one is the client's own world
+  // and the other is the agency's books.
+  //
+  // `processes` covers the whole App → Process → Step chain, its versions, and
+  // the comments a client leaves on a map. It is CUSTOMER material: a contact
+  // sees their own company's maps and the value they got, so every door on it
+  // carries the account fence.
+  //
+  // `commercials` covers the two rate cards and the margin. It is AGENCY
+  // material, and no client login ever passes one of its doors — which is why
+  // it is a second module and not four more rights on the first.
+  processes: "Process maps",
+  commercials: "Rates & margin",
 }
 
 /** The matrix rows: { key, label } per module, in display order. */

@@ -10,7 +10,8 @@
 // It is NOT web/lib/api.ts with a filter. The agency client carries ~90 calls
 // across roles, invites, imports and the assistant; the portal has fourteen.
 
-import type { AccountDetail, HelpMessage, HelpTicket, SessionUser } from "@shared/types"
+import type { AccountDetail, HelpMessage, HelpTicket, ProcessComment, SessionUser } from "@shared/types"
+import type { SavingsView } from "@shared/workers/savings"
 // The plumbing — one fetch wrapper, one error class, one paged shape — is shared
 // with the agency app (shared/web/api.ts). Only the DOOR LIST below is the
 // portal's own, and it is meant to be: it is this surface's honest inventory.
@@ -64,6 +65,34 @@ export const portal = {
    * Fenced server-side by the caller's account set — the portal never asks for
    * an account it wasn't handed. */
   company: (id: string) => api<AccountDetail>(`/api/tenancy/accounts/detail?id=${enc(id)}`),
+}
+
+/** WHAT THE WORK GAVE BACK, and — only for the accounts the agency has switched
+ * price visibility on for — what it cost. `prices` is ABSENT when the switch is
+ * off: the door does not send it, so no screen can render it, and there is no
+ * flag on this side to get wrong. The one figure that is never here under any
+ * setting is the agency's own margin (R23). */
+export type PortalValue = SavingsView & {
+  prices?: {
+    rates: { label: string; centsPerHour: number; currency: string | null }[]
+    soldCents: number | null
+  }
+}
+
+export const value = {
+  /** The savings, drilled App → Process → Step, for the company this person is
+   * standing in. The account is decided by the SERVER from their own stamp — the
+   * portal never composes an account id. */
+  read: () => api<PortalValue>("/api/tenancy/value"),
+  /** The conversation on one process map. */
+  comments: (processId: string) =>
+    api<{ comments: ProcessComment[]; total: number }>(
+      `/api/tenancy/processes/comments?processId=${enc(processId)}`
+    ),
+  /** Say something about a map. A comment is a conversation, never an edit: it
+   * changes no step, no duration and no figure. */
+  comment: (processId: string, body: string) =>
+    api<{ id: string }>("/api/tenancy/processes/comments", post({ processId, body })),
 }
 
 export const support = {

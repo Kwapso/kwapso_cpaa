@@ -444,6 +444,61 @@ turn is persisted here, so the conversation is replayable and auditable. The
 agent acts AS the signed-in user through the same gated endpoints the UI uses, so
 these rows are a record of intent, never a separate set of powers.
 
+### apps + processes + process_versions + process_steps + process_comments — KEEP (BUILT 2026-08-11, team migration `0012_process_maps_and_money`) — THE PROCESS MAP
+
+**App → Process → Step**, and the versions cut over them (SCOPE ch.02). An **App**
+is the built system — the thing with its own address and its own stage; a client
+wanting dispatch fixed, served by a driver app and a back-office screen, is TWO
+rows. A **Process** is a way of working inside one. A **Step** is one part of it,
+and it carries the two numbers every savings figure in the app is computed from:
+how long it takes each time, and how often it happens.
+
+**Version 1 is the pre-kwapso baseline** — how the work was done before we touched
+anything — and it is written WITH the process, because a process with no baseline
+can never produce a saving and would report zero for ever while looking healthy.
+Later versions are cut automatically when a sprint completes (`cut_from_sprint_id`)
+or from a button (null). The partial unique index on
+`(process_id, cut_from_sprint_id)` is **R17 for a transition that is an INSERT**:
+the predicate cannot ride a WHERE, so the database refuses a second cut for the
+same sprint rather than a check a retry could slip past.
+
+**`process_steps.step_key` is the identity that makes a saving a SUBTRACTION**
+rather than a name match: the row id belongs to one version, the key is the same
+step across all of them, and a cut copies it forward. A step that STOPS happening
+is carried forward with its frequency intact and its time at zero (`removed_at`) —
+deleting the row would drop it out of the baseline join and report no saving at
+all for the work we removed entirely, which is the largest saving there is.
+
+Every table carries `account_id`, denormalised on purpose: the fence is then the
+same one clause the accounts list uses, with no join for the next reader to
+forget. An app's account is written once at creation and there is no move-app
+door — moving one would silently republish a whole map, its savings and its
+conversation into somebody else's portal.
+
+`process_comments` is the conversation on a map: one of the six things a contact
+can do (SCOPE ch.06), and a conversation rather than an edit — it changes no
+duration and cuts no version. A STAFF comment carrying `explains_step_key` is the
+explanation attached to a step that got slower; the client's own screen shows the
+regression either way (no filter hides one) and shows our explanation beside it.
+
+### account_rates + internal_rates — KEEP (BUILT 2026-08-11, same migration) — THE TWO RATE CARDS
+
+**Two tables, never one with a `kind` column, and that is the security control.**
+One is what an ACCOUNT IS CHARGED per hour; the other is what an hour of OUR OWN
+work COSTS US. They are the same shape — a label and a rate — which is exactly the
+danger: one table would put both numbers a single forgotten predicate apart, and
+the wrong one of them is the one figure SCOPE says a client must never see under
+any flag, ever. A door that reads `account_rates` cannot return an internal rate,
+because the internal rate is not in the table it named. The same split runs
+through the code (`lib/rates.ts` vs `lib/internal-money.ts`) and is what **Law
+R23** checks: no door the client portal opens can reach the internal file.
+
+`internal_rates.is_default` (at most one, by partial unique index) is the rate a
+margin applies to logged time whose kind of work is not yet named. Tool costs are
+a COLUMN on the app (`tool_cost_cents_per_month`) rather than a table: what a
+system costs us to keep running is one number about one system, and the margin is
+the only thing that reads it.
+
 ---
 
 ## Status: what's built vs. to build
