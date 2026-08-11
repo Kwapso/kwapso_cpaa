@@ -22,7 +22,7 @@
 // so a new worker is covered the day it lands.
 
 import { describe, expect, it } from "vitest"
-import { readdirSync, readFileSync, statSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 
 const ROOT = join(__dirname, "..", "..", "..")
@@ -30,10 +30,14 @@ const ROOT = join(__dirname, "..", "..", "..")
 /** The two front doors. Everything else is reachable only by service binding. */
 const GATEWAYS = ["gateway", "portal-gateway"]
 
+/** A worker is a directory under workers/ that HAS a wrangler config — asked by
+ * trying to read it, because that is the only question this suite cares about and
+ * a config it cannot read is one it cannot check. */
 const WORKERS = readdirSync(join(ROOT, "workers"))
   .filter((d) => {
     try {
-      return statSync(join(ROOT, "workers", d, "wrangler.jsonc")).isFile()
+      readFileSync(join(ROOT, "workers", d, "wrangler.jsonc"), "utf8")
+      return true
     } catch {
       return false
     }
