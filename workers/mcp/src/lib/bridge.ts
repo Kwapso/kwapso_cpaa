@@ -12,7 +12,34 @@ import { requireStaff } from "./staff"
 import type { McpTokenRow } from "./tokens"
 
 const SESSION_COOKIE = "kwapso_session" // auth's cookie name (sessions.ts)
-const CACHE_MS = 10 * 60 * 1000 // well inside the 60-min pinned-session TTL
+
+/** HOW LONG A PASSED STAFF CHECK MAY STAND.
+ *
+ * The cookie cache exists to avoid a session INSERT per tool call, and nothing
+ * is cached until `requireStaff` has passed — so the window is also how long a
+ * PASSED AUTHORIZATION DECISION stands without being re-asked. That is a posture
+ * worth being precise about, even though the decision it caches has no
+ * transition that could invalidate it:
+ *
+ *   • to hold a working token you must be an ACTIVE member of the pinned team
+ *     (auth's /internal/mcp-session refuses anyone else, on every mint);
+ *   • to read as a CLIENT you must have a `portal_users` row, and the only door
+ *     that writes one refuses an active team member outright — a 409 `is_staff`,
+ *     because a client login would fence a colleague out of the agency app.
+ *
+ * The two are mutually exclusive at every instant, so "staff at mint, client a
+ * moment later" is not a state this app can reach. That refutation is not a
+ * paragraph to be taken on trust: `test/staff-only.test.ts` reads tenancy's own
+ * source and fails if that refusal ever relaxes, at which point this cache has
+ * to go rather than quietly become the hole.
+ *
+ * It was ten minutes, on the reasoning that anything inside the 60-minute
+ * pinned-session TTL is safe. "Safe" was the wrong measure — the right one is
+ * how long a decision may stand unasked, and a minute is what the cache is
+ * actually FOR (a burst of tool calls in one conversation shares one session).
+ * Ten minutes bought a rounding error of extra sharing and held an answer for
+ * ten times as long. */
+const CACHE_MS = 60 * 1000
 
 const cache = new Map<string, { cookie: string; expires: number }>()
 

@@ -107,12 +107,13 @@ function editedBy(actor: Actor, now: string): { sql: string; params: string[] } 
  * `q` searches name, code and email. `type` narrows to entities or individuals.
  * Archived rows are included and carry `active` (the manager greys them with a
  * Restore button — the same shape as a retired role). */
-export async function listAccounts(
-  cfg: D1Rest,
-  guard: MemberGuard,
-  scope: AccountScope,
-  opts: { q?: string; type?: "entity" | "individual"; parentId?: string; cursor?: string | null } = {}
-): Promise<Page<Account> & { total: number }> {
+/** WHAT A CALLER MAY NARROW an accounts read to — the fence plus the three
+ * filters, built ONCE so the paged list and the CSV export can never disagree
+ * about what a filter means. They are the same question asked for a screen and
+ * for a file; two copies of this would be two answers waiting to drift. */
+export type AccountFilters = { q?: string; type?: "entity" | "individual"; parentId?: string }
+
+function accountsWhere(scope: AccountScope, opts: AccountFilters): { sql: string; params: string[] } {
   const fence = accountScopeClause(scope, "id")
   const filters: string[] = []
   const params: string[] = [...fence.params]
@@ -130,8 +131,16 @@ export async function listAccounts(
     filters.push("parent_account_id = ?")
     params.push(opts.parentId)
   }
+  return { sql: where([fence.sql, ...filters]), params }
+}
 
-  const base = where([fence.sql, ...filters])
+export async function listAccounts(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  opts: AccountFilters & { cursor?: string | null } = {}
+): Promise<Page<Account> & { total: number }> {
+  const { sql: base, params } = accountsWhere(scope, opts)
   const after = keysetAfter(decodeCursor(opts.cursor), "created_at")
   const pageWhere = after.sql ? `${base ? `${base} AND` : " WHERE"} ${after.sql}` : base
 
@@ -153,32 +162,41 @@ export async function listAccounts(
   return { ...page, rows: page.rows.map(toAccount), total: counted[0]?.n ?? 0 }
 }
 
-/** Every account this caller may see, as full rows for the CSV export.
+/** Every account this caller may see — NARROWED the same way the list narrows —
+ * as full rows for the CSV export.
  *
- * The SAME fence as the list — an export that skipped it would be the leak in
- * its most convenient form (one request, every row, in a file). Ordered by name
- * so the download is readable, and capped at the deliberate-download ceiling
- * rather than paged: a person clicking Export wants one file, and past the cap
- * the honest answer is a bigger tool, not a slower refusal.
+ * The SAME fence as the list (an export that skipped it would be the leak in its
+ * most convenient form: one request, every row, in a file) and now the same
+ * FILTERS, through the one `accountsWhere` above. Ordered by name so the
+ * download is readable.
  *
- * Columns lead with the import format (Name, Type, Reference, Email, Phone,
- * Address, Status) so an exported file imports straight back — the round-trip
- * the roles and dropdown exports already promise. */
+ * AN EXPORT IS ONE WHOLE DOCUMENT, OR IT IS AN ERROR. R14 says a growing
+ * collection must page rather than cap, and accounts is a GROWING_COLLECTIONS
+ * row — but a CSV download is not a page, it is the file, and half a file is the
+ * one answer nobody can act on. So this reads the cap PLUS ONE and hands back
+ * `complete`, and the door refuses rather than serving a short file that looks
+ * whole. That matters most here of all: these columns lead with the import
+ * format so the file goes straight back in through the importer — a silently
+ * truncated export, re-imported, is data loss that looks like a round trip.
+ * Past the cap the caller narrows (q / type / parentId, the same three the
+ * screen and `list_accounts` use) or reads the paged list. */
 export async function listAccountsForExport(
   cfg: D1Rest,
   guard: MemberGuard,
-  scope: AccountScope
-): Promise<Account[]> {
-  const fence = accountScopeClause(scope, "id")
+  scope: AccountScope,
+  opts: AccountFilters = {}
+): Promise<{ rows: Account[]; complete: boolean }> {
+  const { sql, params } = accountsWhere(scope, opts)
   const rows = await d1Query<AccountRow>(
     cfg,
     guard.databaseId,
-    // R14 hard cap — never unbounded (exports get the larger deliberate-download cap).
-    `SELECT ${ACCOUNT_COLUMNS} FROM accounts${where([fence.sql])}
-      ORDER BY name ASC, id ASC LIMIT ${EXPORT_HARD_CAP}`,
-    fence.params
+    // R14 hard cap — never unbounded (exports get the larger deliberate-download
+    // cap). +1 is how "there was more" is known without a second query.
+    `SELECT ${ACCOUNT_COLUMNS} FROM accounts${sql}
+      ORDER BY name ASC, id ASC LIMIT ${EXPORT_HARD_CAP + 1}`,
+    params
   )
-  return rows.map(toAccount)
+  return { rows: rows.slice(0, EXPORT_HARD_CAP).map(toAccount), complete: rows.length <= EXPORT_HARD_CAP }
 }
 
 /** One account with its people and its logins — the detail read. Outside the

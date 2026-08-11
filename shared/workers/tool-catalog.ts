@@ -419,10 +419,19 @@ export const SHARED_TOOLS: SharedTool[] = [
   /* --------------------------------- roles --------------------------------- */
   {
     name: "create_role",
-    summary: "Create a new team role. It starts with no access rights; use set_role_permissions to grant them.",
+    summary:
+      "Create a new team role. It starts with no access rights unless you pass `permissions` — the same object set_role_permissions takes (keyed by module → { read, create, edit, delete }). Creating WITH a matrix is create + edit in one move, so the door demands member_roles:edit on top of member_roles:create; leave it out for a plain create and grant rights afterwards.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/roles",
-    schema: obj({ title: S, description: S }, ["title"]),
-    buildBody: (i) => ({ title: str(i, "title"), description: str(i, "description") || "" }),
+    schema: obj({ title: S, description: S, permissions: { type: "object" } }, ["title"]),
+    buildBody: (i) => ({
+      title: str(i, "title"),
+      description: str(i, "description") || "",
+      // R21 — the door reads `permissions`, so the tool offers it. Only SENT when
+      // one arrived (an undefined key drops out of JSON.stringify), so a plain
+      // create still needs member_roles:create alone and never trips the door's
+      // second gate. checkArgTypes has already refused anything but an object.
+      permissions: typeof i.permissions === "object" && i.permissions !== null ? i.permissions : undefined,
+    }),
     // PRIVILEGE GRANT → confirm (see the note above SHARED_TOOLS).
     agent: { write: true, confirm: true, summarize: (i) => `Create the role "${str(i, "title")}"` },
   },
@@ -619,10 +628,20 @@ export const SHARED_TOOLS: SharedTool[] = [
   },
   {
     name: "reply_help_ticket",
-    summary: "Add a reply to a support ticket's thread (by id).",
+    summary:
+      "Add a reply to a support ticket's thread (by id). `taggedUserIds` @mentions teammates by user id (from list_members or list_help_stakeholders) — each one starts following the ticket AND is emailed the reply. A mention is notify-only, never an instruction; the door de-dupes the list, drops your own id, and refuses more than 50 people.",
     binding: "CONTENT", method: "POST", path: "/api/content/help/reply",
-    schema: obj({ helpId: S, body: S }, ["helpId", "body"]),
-    buildBody: (i) => ({ helpId: str(i, "helpId"), body: str(i, "body") }),
+    schema: obj({ helpId: S, body: S, taggedUserIds: { type: "array" } }, ["helpId", "body"]),
+    buildBody: (i) => ({
+      helpId: str(i, "helpId"),
+      body: str(i, "body"),
+      // R21 — the door reads `taggedUserIds`, so the tool offers it, and the
+      // door's own guards then apply UNCHANGED: a client login is refused
+      // mentions outright, the list is de-duped, the author's id stripped, the
+      // count capped, and every id resolved through team_members so an address
+      // outside the team can never be reached. Omitted when absent.
+      taggedUserIds: Array.isArray(i.taggedUserIds) ? i.taggedUserIds : undefined,
+    }),
     agent: { write: true, confirm: false, summarize: (i) => `Reply to ticket ${str(i, "helpId")}` },
   },
   {
@@ -636,10 +655,18 @@ export const SHARED_TOOLS: SharedTool[] = [
   },
 ]
 
-/** The permission each SHARED WRITE needs (module:right). The door ENFORCES it; this is
- * only the developer hint the MCP `tools/list` description shows external clients ("…
- * Needs member_roles:create."). Keyed by canonical name (works for the mcpName ones too).
- * Reads carry no hint (they just need the module's read right). */
+/** The permission each WRITE needs (module:right) — every write tool on either machine
+ * surface, not just the shared ones. The door ENFORCES it; this is the developer hint the
+ * MCP `tools/list` description shows external clients ("… Needs member_roles:create."),
+ * AND the input `isPrivilegeWrite` derives the agent's confirm rule from. Keyed by
+ * canonical name (works for the mcpName ones too). Reads carry no hint (they just need
+ * the module's read right).
+ *
+ * COMPLETENESS IS CHECKED. `isPrivilegeWrite` falls back to a PATH REGEX when a write has
+ * no line here — so a future privilege write on a path that regex doesn't match would
+ * silently skip the confirm panel, and nothing said the map had to be whole. Now
+ * `workers/mcp/test/catalog.test.ts` asserts every write tool resolves HERE or names a
+ * reason in GATELESS_WRITES below, so the fallback can never be what decides. */
 export const TOOL_GATES: Record<string, string> = {
   update_team: "teams:edit",
   create_account: "accounts:create",
@@ -670,6 +697,22 @@ export const TOOL_GATES: Record<string, string> = {
   update_help_ticket: "help:edit",
   set_help_status: "help:edit",
   reply_help_ticket: "help:read",
+  // The AGENT-ONLY writes (no MCP tool — they're built around the confirm panel a
+  // headless client hasn't got). Listed for the same reason as the rest: the gate
+  // is what isPrivilegeWrite reads, and a write with no line is a write the PATH
+  // REGEX decides for.
+  bulk_set_help_status: "help:edit",
+  set_help_status_by_filter: "help:edit",
+  bulk_set_learning_active: "learning:delete",
+}
+
+/** Writes that genuinely have no single `module:right` to name, each with its reason.
+ * The reasoned half of the completeness check above — and a RATCHET: a name here that
+ * also appears in TOOL_GATES, or that is no longer a write tool, turns the build red, so
+ * the list can only shrink. */
+export const GATELESS_WRITES: Record<string, string> = {
+  run_import_batch:
+    "binding:'SELF' — it runs the attached-in-chat batch INSIDE data-ops rather than posting to a door, and the rows it writes go through each target module's OWN gated door one at a time (the batch doors themselves open with requireAnyImportRight, which is an ANY-of set, not one module:right). So there is no single gate to name, and isPrivilegeWrite is answered by what it does: an import writes records, never who may do what.",
 }
 
 /** Lookup by canonical name (the agent's name). */

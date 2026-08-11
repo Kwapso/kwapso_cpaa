@@ -117,11 +117,17 @@ const MCP_ONLY: McpTool[] = [
   {
     name: "export_accounts_csv",
     description:
-      "Every account you can see as CSV — companies and people, full fields + audit. The columns lead with the import format, so the file goes straight back in through the importer.",
-    inputSchema: obj({}),
+      "Every account you can see as CSV — companies and people, full fields + audit. The columns lead with the import format, so the file goes straight back in through the importer. Narrows by the SAME three filters as list_accounts: `q` (name, reference, email), `type` ('entity' or 'individual'), `parentId`. THE FILE IS WHOLE OR IT IS AN ERROR — a collection bigger than one file comes back `export_too_large` rather than as a short CSV that looks complete; narrow it, or read list_accounts a page at a time.",
+    inputSchema: obj({ q: S, type: S, parentId: S }),
     binding: "TENANCY",
     method: "GET",
     path: "/api/tenancy/accounts/export",
+    buildQuery: (i) => {
+      const q: string[] = []
+      for (const key of ["q", "type", "parentId"])
+        if (typeof i[key] === "string" && i[key]) q.push(`${key}=${encodeURIComponent(String(i[key]))}`)
+      return q.length ? `?${q.join("&")}` : ""
+    },
   },
   // ---- the agentic import (plan is METERED on the app's own daily AI allowance) ----
   {
@@ -336,7 +342,14 @@ export async function forwardTool(
       ok: false,
       text: JSON.stringify({
         error: "result_too_large",
-        message: `${tool.name} answered with ${raw.length} characters; one call may return ${MAX_RESULT_CHARS}. Narrow it with a filter, take one page at a time, or pull the whole table through its export tool.`,
+        // "Use the export tool" is no advice at all when the tool IS the export —
+        // that sentence sent a caller in a circle. An export answers with the
+        // filters it declares, or with fewer rows.
+        message: `${tool.name} answered with ${raw.length} characters; one call may return ${MAX_RESULT_CHARS}. ${
+          tool.name.startsWith("export_")
+            ? "Narrow the export with the filters it declares, or read the same rows through the paged list tool."
+            : "Narrow it with a filter, take one page at a time, or pull the whole table through its export tool."
+        }`,
         limit: MAX_RESULT_CHARS,
         size: raw.length,
       }),

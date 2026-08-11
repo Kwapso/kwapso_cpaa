@@ -157,6 +157,13 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "validated-bodies",
     status: "enforced",
   },
+  {
+    id: "R21",
+    dimension: "ai",
+    law: "Agent/MCP BODY-FIELD parity — R19's sentence about the other half of the request. A tool sitting on a WRITE door EXPOSES and FORWARDS every field that door reads off the request body: the required set is DERIVED from the handler's own `body.<field>` reads (R20 is what makes them legible — a body is never destructured at the read), and the forwarding half is proved by RUNNING the tool's buildBody on a filled-in call rather than reading its source, so a builder that delegates to a helper is judged by what the door receives. A field deliberately left off is a named line in NARROWED_BODY_FIELDS with its reason, said again in developer English in MCP.md §3, and the list is a RATCHET: an excuse in front of a field the tool now exposes turns the build red. Earned by: R19 deriving its obligations from searchParams.get() only, so four write tools offered a narrower contract than their door accepted, for six weeks, under a green build — update_team could not set the logo, create_role could not carry its permission matrix, reply_help_ticket could not @mention, agent_chat could not attach a file. A law that only inspects the query string measures query strings.",
+    checkId: "agent-body-parity",
+    status: "enforced",
+  },
 ]
 
 /** R13 — reviewed exemptions: modules that are deliberately NOT import targets,

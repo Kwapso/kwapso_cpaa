@@ -670,6 +670,7 @@ describe("RULES — the laws of the base", () => {
       "counted-collections", // R16: the seam/place/arbitration scan above + format-count.test.ts
       "catalog-coverage", // R13: workers/data-ops/test/catalog-coverage.test.ts
       "agent-filter-parity", // R19: workers/mcp/test/filter-parity.test.ts
+      "agent-body-parity", // R21: the same file's other half (the request's BODY)
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

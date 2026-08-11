@@ -194,6 +194,20 @@ Today it covers:
   nothing to read. A timeout is not a rollback: read before retrying a write.
 - **Export (full-field CSV):** `export_roles_csv`, `export_learning_csv`,
   `export_dropdown_values_csv`, `export_accounts_csv`.
+
+  **An export is ONE WHOLE DOCUMENT — never a page, and never a short file.** That is
+  the deliberate answer to "why doesn't an export take a cursor?", and it is R14's own
+  answer: three of these four sit on **bounded** collections (a team's roles, its
+  how-to articles, its dropdown vocabulary are curated by hand and stop growing), and
+  the law says in as many words that a bounded collection doesn't need a cursor to be
+  honest. **Accounts is the one that grows** — every company and every person an agency
+  works with — so `export_accounts_csv` narrows by the same three filters as
+  `list_accounts` (`q`, `type`, `parentId`), and past what one file can carry the door
+  answers `export_too_large` rather than handing back the first rows as though they
+  were all of them. The browser's Export CSV button gets exactly the same sentence from
+  exactly the same door: a truncated export re-imported is data loss that looks like a
+  round trip, and the columns lead with the import format precisely so it can be
+  re-imported.
 - **Write — deterministic create / edit / deactivate** (free, no AI; each needs the
   matching role right, e.g. `member_roles:create`):
   - the team — `update_team` (rename the team this token is pinned to; needs `teams:edit`)
@@ -265,6 +279,34 @@ Today it covers:
    draws; the upload is a base64 data URL up to 25 MB, two orders of magnitude past
    what one call here is built to carry. A machine writes the article and references
    media it already has a URL for.
+
+7. **Two BODY FIELDS, on doors that are otherwise fully here.** A tool may offer a
+   narrower contract than its door accepts — but only in writing, and only for a
+   reason. Both of these are the same reason as item 6: **bytes, not prose.**
+   - **`update_team` takes `name`, not `logoDataUrl`.** A logo is a base64 image data
+     URL up to 2.5 MB — around 3.4 million characters of *argument* on a surface whose
+     whole *answer* is capped at 400,000. Renaming is unaffected: the door treats an
+     absent logo as "leave it as it is", so a machine rename can never blank a logo it
+     cannot send. Set the logo in the app, on the Team screen.
+   - **`agent_chat` takes `message`, not `files`.** Attaching up to 8 CSVs of 5 MB each
+     is up to 40 MB on the same surface — and the capability is already here in a
+     better machine shape: `start_import` → `add_import_file` → `plan_import` →
+     `run_import` is deterministic, resumable, and re-readable for free through
+     `get_import` when a client loses a plan. Conversational file-drop is the shape a
+     person supervises on a screen.
+
+   Two other narrowings **were** here and are now closed, because neither had a reason
+   that survived being written down: `create_role` takes its `permissions` matrix (the
+   door demands `member_roles:edit` on top of `member_roles:create` when one arrives —
+   its own double gate is the control, and the two-call path via `set_role_permissions`
+   reached the same end state anyway), and `reply_help_ticket` takes `taggedUserIds` (a
+   client login is refused mentions at the door and cannot hold a token at all, so every
+   caller here is staff, inside the envelope the door already reasons about; the ids come
+   from `list_members`, and the door still de-dupes them, strips your own, caps the list
+   at 50 and resolves each through `team_members` so no address outside the team is
+   reachable). **Law R21 keeps this list honest**: every field a write door reads must be
+   in its tool's schema and forwarded by its `buildBody`, or be a named line beside the
+   check — derived from the door's own source, so a fifth narrowing cannot land unseen.
 
 Every tool is a thin forward to the **same gated door the app's own screens use** — so
 input is validated, **your live role is re-checked** (a Viewer's `create_role` is
@@ -356,6 +398,24 @@ of that allowance; `get_import` re-reads the same plan for free. A client that d
   back to precisely the caller it excludes, on precisely the day something is wrong.
   Revoked grants count as client too: portal-ness is decided by the PRESENCE of the
   row, never by its absence.
+  **How fresh is that answer?** The bridge mints one short-lived team-pinned session
+  per token and re-uses it for **60 seconds**, so a burst of tool calls in one
+  conversation shares one session instead of writing a session row each time —
+  and nothing is cached until the staff check has passed. For that minute, then,
+  a passed authorization decision stands without being re-asked, which is worth
+  being precise about rather than waving at. The decision has **no transition to
+  miss**: to hold a working token you must be an *active member* of the pinned
+  team (auth's mint refuses anyone else, every time), and to read as a *client*
+  you must have a portal-access row — which the only door that writes one refuses
+  to give an active team member, because a client login would fence a colleague
+  out of the agency app. The two states are mutually exclusive at every instant.
+  That refutation isn't a paragraph to be taken on trust: `staff-only.test.ts`
+  reads tenancy's and auth's own source and turns red if either refusal relaxes,
+  which is the moment the cache goes rather than quietly becoming the hole.
+  (Everything else stays live regardless: the token is re-verified per request, a
+  revoke drops the cached session immediately, and every door re-runs
+  `requireRight`, the account fence and the internal-material refusal on each
+  call.)
 - **Acts AS the owner, capped by their LIVE role** — re-checked on every call. Demote
   the person and the token weakens the same instant.
 - **One team only.** The token is pinned to the team it was made in; it can never read
