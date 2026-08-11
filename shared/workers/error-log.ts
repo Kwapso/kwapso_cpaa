@@ -27,23 +27,54 @@ export type ErrorReport = {
   url?: string
 }
 
+/** How many rows one BUCKET may write to the store in a trailing hour.
+ *
+ * A bucket is the caller a row is charged to: the signed-in person whose browser
+ * beaconed it, or — for a worker's own central catch, which has no user — the
+ * worker that crashed. Per-bucket rather than global, so a flood of client
+ * beacons can never spend the budget a crashing worker needs to report itself.
+ *
+ * The number is deliberately generous for a HUMAN and useless for a LOOP. Two a
+ * minute is far more than any real debugging session produces; nobody diagnoses
+ * anything from row 121 of the same hour, and the live console tail still has
+ * every one of them. What it buys is that `POST /api/log/client` — whose body is
+ * entirely the caller's — can no longer grow the GLOBAL core database without
+ * limit. Field lengths were already capped; the row COUNT was not. */
+export const MAX_ERROR_LOGS_PER_HOUR = 120
+
 export async function logError(db: CoreDb, r: ErrorReport): Promise<void> {
   try {
+    const now = new Date()
+    // THE BUDGET RIDES THE WRITE (CONCURRENCY.md, and the same shape as the
+    // login-send ledger): the ceiling sits in the INSERT's own WHERE, so a burst
+    // of beacons cannot all read "under the line" and all write. Over the line
+    // the statement simply moves zero rows — which is not an error and must not
+    // become one: this seam's whole contract is that recording never throws and
+    // never changes the response, so a dropped row is silence, exactly as a
+    // failed insert already was.
     await db
       .prepare(
         `INSERT INTO error_logs (id, at, source, place, message, stack, team_id, user_id, url)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+          WHERE (SELECT COUNT(*) FROM error_logs
+                  WHERE COALESCE(user_id, source) = ? AND at > ?) < ?`
       )
       .bind(
         ulid(),
-        new Date().toISOString(),
+        now.toISOString(),
         String(r.source).slice(0, 40),
         String(r.place).slice(0, 200),
         String(r.message).slice(0, 500),
         r.stack ? String(r.stack).slice(0, 2000) : null,
         r.teamId ?? null,
         r.userId ?? null,
-        r.url ? String(r.url).slice(0, 300) : null
+        r.url ? String(r.url).slice(0, 300) : null,
+        // The bucket, matching the row this statement would write — and matching
+        // idx_error_logs_bucket_at (core 0019), so the count is an index seek and
+        // not a scan of the one table built to grow.
+        r.userId ?? String(r.source).slice(0, 40),
+        new Date(now.getTime() - 60 * 60 * 1000).toISOString(),
+        MAX_ERROR_LOGS_PER_HOUR
       )
       .run()
   } catch {

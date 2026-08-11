@@ -14,6 +14,7 @@ import { fail, json } from "../../../../shared/workers/http"
 import { optionalText, queryText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
 import { publishChange } from "../../../../shared/workers/realtime"
 import { GuardError, hasRight, requireRight, teamContext } from "../../../../shared/workers/gating"
+import { refusePortalCaller } from "../../../../shared/workers/account-scope"
 import { getActiveCatalog } from "../lib/import"
 import {
   addBatchFile,
@@ -111,11 +112,28 @@ export async function postBatchConfirm(request: Request, env: Env): Promise<Resp
 }
 
 /** GET /api/data-ops/import/batches — the team's import history (newest first).
- * Any signed-in member may see it: summaries only (who, when, files → tables,
- * totals) — the same altitude as the activity feed's "imported N rows" line;
- * row contents and rejection reasons stay on the creator-scoped batch. */
+ * Summaries only (who, when, files → tables, totals); row contents and rejection
+ * reasons stay on the creator-scoped batch.
+ *
+ * GATED LIKE THE WRITE DOOR, and it used to gate on nothing at all. The comment
+ * here read "any signed-in member may see it — the same altitude as the activity
+ * feed's 'imported N rows' line", and that comparison was wrong twice over: the
+ * activity feed SUBTRACTS the modules a caller may not read (R18), and these
+ * summaries carry UPLOADED FILE NAMES, which the feed's line does not. So a
+ * member with no import right anywhere — and a client login signing in on the
+ * agency origin, which is an ordinary team member by construction — read the
+ * agency's whole data-operations history.
+ *
+ * The history is TEAM-visible on purpose (unlike the working batch, which stays
+ * creator-scoped in loadBatch): an import is a team act, and the person cleaning
+ * up after one is rarely the person who ran it. "Team" means the people who can
+ * import — the same right the door that CREATES this history asks for. */
 export async function getBatches(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await teamContext(request, env)
+  await requireAnyImportRight(cfg, guard)
+  // …and never a client login: importing is the agency's own work, there is no
+  // portal screen for it, and a role alone doesn't tell the two apart.
+  await refusePortalCaller(cfg, guard)
   return json({ batches: await listBatchSummaries(cfg, guard) })
 }
 

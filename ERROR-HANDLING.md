@@ -62,6 +62,26 @@ environment (staging and production errors never mix), cross-team by design
 - **NOT captured:** clean `GuardError` refusals (4xx — working as designed).
   Recording is best-effort by contract — a logging hiccup never changes a
   response.
+- **BOUNDED per caller (2026-08-11 — core migration `0019_error_log_bound`):**
+  `MAX_ERROR_LOGS_PER_HOUR` (120) rows per bucket per trailing hour, where a
+  bucket is `COALESCE(user_id, source)` — the person whose browser beaconed it,
+  or the worker that crashed. The ceiling rides the INSERT's own `WHERE`
+  (CONCURRENCY.md: a read-then-write throttle is a suggestion under load), and
+  going over moves zero rows, which is **silence, not an error** — the seam's
+  contract is that recording never breaks the request it is recording.
+  **Why it exists:** `POST /api/log/client` forwards a browser's crash into the
+  GLOBAL core DB. Every FIELD was capped; the row COUNT was not, so a signed-in
+  caller with a loop could grow the core database until it hit its size alarm —
+  the store that says what broke becoming the thing that broke. **Why a ceiling
+  and not a dedup window:** the message is the caller's own body, so anything
+  keyed on repeated CONTENT is defeated by putting a counter in the string; a
+  ceiling bounds rows whatever the body says. **Why per bucket:** a flood of
+  client beacons must never spend the budget a crashing worker needs to report
+  itself, and one noisy browser must not mute anybody else's.
+  **Retention:** there is none yet — the ceiling bounds the RATE, not the total,
+  so the table still grows at up to 120 rows per active caller per hour. The
+  nightly size alarms (OPERATIONS.md) are what notice; a trim job for resolved
+  rows older than 90 days is the next step if the store ever shows up in them.
 - **View (owner-only, x-admin-key — the maintenance key):**
   `GET /api/data-ops/admin/errors?status=open|resolved|all&limit=N` — newest
   first. In practice: ask Claude to read it, or curl it.

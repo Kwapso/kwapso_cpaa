@@ -1,0 +1,21 @@
+-- THE ERROR LOG GETS A CEILING, so a caller cannot fill the global core database
+-- through it.
+--
+-- `POST /api/log/client` on both gateways forwards a browser's crash report into
+-- error_logs. It has been session-verified since the anonymous-write fix, and
+-- every FIELD is length-capped in logError — but the ROW COUNT was not capped at
+-- all: no rate limit, no per-caller ceiling, no dedup. One signed-in person with
+-- a loop could write rows until the core DB hit its size alarm, and the store
+-- that exists to tell you what broke would be the thing that broke.
+--
+-- The bound rides the INSERT (the login_sends pattern — CONCURRENCY.md: the
+-- predicate in the WHERE, so N concurrent beacons cannot all read "under the
+-- line" and all write). This index is what keeps that COUNT from turning every
+-- error write into a full scan of a table whose whole purpose is to grow.
+--
+-- COALESCE(user_id, source) is the bucket a row is CHARGED to: the person whose
+-- browser beaconed it, or — for a worker's own central catch, which has no user
+-- — the worker that crashed. Per-bucket, so a flood of client beacons can never
+-- spend the budget a crashing worker needs to report itself.
+CREATE INDEX IF NOT EXISTS idx_error_logs_bucket_at
+  ON error_logs (COALESCE(user_id, source), at);

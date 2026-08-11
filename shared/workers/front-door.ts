@@ -77,6 +77,18 @@ export async function serveMedia(
  * a row into the GLOBAL core database from an anonymous request. Recording is
  * best-effort — a failed lookup drops the row and keeps the console line.
  *
+ * AND THE ROW IS CHARGED TO WHOEVER AUTH JUST NAMED. Every FIELD of a beacon is
+ * length-capped in logError, but the number of ROWS was not: a signed-in caller
+ * with a loop could grow the global core database until it hit its size alarm,
+ * and the store that exists to say what broke would be the thing that broke. The
+ * ceiling lives in logError (it has to — every path into the table needs it),
+ * and it is per CALLER, so it needs a caller. The body cannot name one: it is
+ * the attacker's. The `/me` answer can, and it is one call we already make. A
+ * beacon we could not attribute is still RECORDED — it simply shares the door's
+ * own bucket ("web" / "portal"), the same fail-toward-refusing bargain
+ * login-codes' "unknown" IP bucket makes, so a change in auth's shape can never
+ * silently stop the error log filling.
+ *
  * `source` labels which door the crash came from ("web" / "portal"), which is
  * the only thing the two callers legitimately differ on. The swappable client
  * seam is shared/web/log.ts; the ruleset is ERROR-HANDLING.md.
@@ -90,13 +102,16 @@ export async function recordClientError(
   const raw = await request.text().catch(() => "")
   console.error(`${source}_client_error`, raw.slice(0, 4000))
   const cookie = request.headers.get("Cookie") ?? ""
-  const signedIn =
-    cookie.includes("kwapso_session=") &&
-    (await auth
-      .fetch("https://internal/api/auth/me", { headers: { Cookie: cookie } })
-      .then((r) => r.ok)
-      .catch(() => false))
-  if (signedIn) {
+  const me = cookie.includes("kwapso_session=")
+    ? await auth.fetch("https://internal/api/auth/me", { headers: { Cookie: cookie } }).catch(() => null)
+    : null
+  if (me?.ok) {
+    // Whose it is, best-effort: a session that verified but whose body we can't
+    // read still gets its crash recorded, on the shared bucket.
+    const who = await me
+      .json()
+      .then((d) => (d as { user?: { id?: unknown } })?.user?.id)
+      .catch(() => undefined)
     let b: { where?: string; message?: string; stack?: string; url?: string } = {}
     try {
       b = JSON.parse(raw)
@@ -114,6 +129,7 @@ export async function recordClientError(
             message: b.message,
             stack: b.stack,
             url: b.url,
+            userId: typeof who === "string" ? who : undefined,
           }),
         })
         .catch(() => null) // recording must never break the beacon

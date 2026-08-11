@@ -15,6 +15,7 @@
 // import-catalogue reads + the agentic-import batch tools + the AI-allowance reads +
 // the saved conversations + agent_chat/agent_confirm.
 
+import { FENCE_INPUTS } from "./account-scope"
 import { GuardError } from "./gating"
 
 /* ------------------------------- schema helpers ------------------------------- */
@@ -149,19 +150,25 @@ export type SharedTool = {
 
 /** WHY SOME CONSTRUCTIVE WRITES STILL CONFIRM. The rule is that only DESTRUCTIVE
  * acts stop for a yes/no panel — creating an article or replying to a ticket just
- * runs. Privilege WRITES are the reviewed exception: anything gated on
- * member_roles: or team_members: decides WHO CAN DO WHAT,
- * and the model reaches them while reading team data an attacker can author (a
+ * runs. ACCESS writes are the reviewed exception, and access has two halves:
+ *   • WHO CAN DO WHAT — anything gated on member_roles: or team_members:;
+ *   • WHO CAN SEE WHOSE — anything that writes an input to the ACCOUNT FENCE
+ *     (`FENCE_INPUTS` in account-scope.ts: the parent pointer, account_links,
+ *     portal_users). A client login's whole world is resolved from those rows,
+ *     so linking a contact or re-parenting an account widens what an outside
+ *     company can read — without touching a permission at all.
+ * The model reaches all of them while reading team data an attacker can author (a
  * ticket description is up to 20,000 characters of someone else's text). Fenced
  * tool output plus one system-prompt sentence is a soft defence; a confirm panel
- * the admin must click is a hard one. So these four confirm — not because they are
- * destructive, but because a silent one is a silent privilege escalation.
- * The set is DERIVED, not listed: isPrivilegeWrite() reads each tool's own gate,
- * so a write added tomorrow to any of those tables confirms the moment it
- * exists. A name list would have locked the four above and waved through the
- * fifth — which is exactly where update_role was found, and the derivation is
- * what carried the rule, unprompted, onto the two portal-access writes the
- * customer spine brought with it.
+ * the admin must click is a hard one. So these confirm — not because they are
+ * destructive, but because a silent one is a silent widening of someone's reach.
+ * The set is DERIVED, not listed: isPrivilegeWrite() reads each tool's own gate
+ * AND matches its door against the fence's own declared inputs, so a write added
+ * tomorrow to any of those tables confirms the moment it exists. A name list
+ * would have locked the tools above and waved through the next one — which is
+ * exactly where update_role was found, and then where link_contact and
+ * set_account_parent were found sitting at confirm:false because the derivation
+ * only knew about module NAMES and the fence is not a module.
  * The MCP surface ignores `agent.confirm` — it has no panel to show, and the
  * confirming UI belongs to the connecting client. Same door, same gate, same
  * audit row; the asymmetry is documented in MCP.md, not a capability gap. */
@@ -299,7 +306,11 @@ export const SHARED_TOOLS: SharedTool[] = [
       parentAccountId: opt(i, "parentAccountId"),
       ...accountFields(i),
     }),
-    agent: { write: true, confirm: false, summarize: (i) => `Create the account "${str(i, "name")}"` },
+    // FENCE WRITE (accounts.parent_account_id) → confirm. It takes a parent, so
+    // it hangs a row inside a client's world; and it is how an email address
+    // enters the books, which is what a later portal grant resolves a login
+    // from. See the note above SHARED_TOOLS.
+    agent: { write: true, confirm: true, summarize: (i) => `Create the account "${str(i, "name")}"` },
   },
   {
     name: "update_account",
@@ -325,8 +336,12 @@ export const SHARED_TOOLS: SharedTool[] = [
     binding: "TENANCY", method: "POST", path: "/api/tenancy/accounts/parent",
     schema: obj({ id: S, parentAccountId: S }, ["id"]),
     buildBody: (i) => ({ id: str(i, "id"), parentAccountId: opt(i, "parentAccountId") ?? null }),
+    // FENCE WRITE (accounts.parent_account_id) → confirm BOTH ways. The fence
+    // reaches DOWN from the company a client stands in, so moving an account
+    // under another hands that client everything nested beneath it — and moving
+    // one out takes it away. See the note above SHARED_TOOLS.
     agent: {
-      write: true, confirm: false,
+      write: true, confirm: true,
       summarize: (i) =>
         str(i, "parentAccountId")
           ? `Move account ${str(i, "id")} under ${str(i, "parentAccountId")}`
@@ -357,7 +372,12 @@ export const SHARED_TOOLS: SharedTool[] = [
       relationship: opt(i, "relationship"),
       isMainStakeholder: i.isMainStakeholder === true,
     }),
-    agent: { write: true, confirm: false, summarize: (i) => `Link ${str(i, "personAccountId")} to account ${str(i, "accountId")}` },
+    // FENCE WRITE (account_links) → confirm. A link IS a "you belong to this
+    // company": a person already holding a portal login gains that company as a
+    // place they may stand, and with it everything nested beneath it. No
+    // permission changes hands, which is exactly why the old privilege-module
+    // list waved it through. See the note above SHARED_TOOLS.
+    agent: { write: true, confirm: true, summarize: (i) => `Link ${str(i, "personAccountId")} to account ${str(i, "accountId")}` },
   },
   {
     name: "set_contact_link_active",
@@ -366,9 +386,11 @@ export const SHARED_TOOLS: SharedTool[] = [
     binding: "TENANCY", method: "POST", path: "/api/tenancy/accounts/links/active",
     schema: obj({ id: S, active: B }, ["id", "active"]),
     buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
+    // FENCE WRITE (account_links) → confirm BOTH ways. Unlinking takes a company
+    // away from a client login; RELINKING hands it straight back, which the old
+    // "destructive only" predicate ran silently. See the note above SHARED_TOOLS.
     agent: {
-      write: true,
-      confirm: (i) => i.active !== true, // destructive only when UNLINKING
+      write: true, confirm: true,
       summarize: (i) => `${i.active === true ? "Relink" : "Unlink"} contact link ${str(i, "id")}`,
     },
   },
@@ -673,20 +695,62 @@ export const TOOL_GATES: Record<string, string> = {
 }
 
 /** Lookup by canonical name (the agent's name). */
-/** The tables whose rows decide WHO CAN DO WHAT — or, in `portal_users`' case,
- * who can SEE WHOSE. A portal grant is not a permission on the matrix, but it is
- * the same kind of decision: it hands a person outside the team sight of a
- * customer's whole world, and it is reachable while the model is reading text an
- * attacker can author. Same reasoning, same panel. */
+/** The MODULES whose rows decide WHO CAN DO WHAT — the permission matrix, and
+ * `portal_users` because a portal grant is the same order of decision: it hands
+ * a person outside the team sight of a customer's whole world. One half of
+ * "access"; the other half is the ACCOUNT FENCE below. */
 export const PRIVILEGE_MODULES = ["member_roles", "team_members", "portal_users"]
 
-/** Is this a PRIVILEGE write — one that changes who can do what? DERIVED from the
- * tool's own declared gate (falling back to the door it posts to, so an agent-only
- * tool can't slip through by being absent from TOOL_GATES). Never a list of names:
- * a name list locks the tools you thought of and waves through the next one — which
- * is exactly how `update_role` sat at confirm:false beside four that confirmed. */
-export function isPrivilegeWrite(tool: { name: string; path: string; write?: boolean }): boolean {
+/** A path or a field name, as a bag of lowercase words. */
+const words = (s: string): Set<string> => new Set(s.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean))
+
+/** A body field is its column in camel: "parentAccountId" → "parent_account_id". */
+const snake = (s: string): string => s.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase()
+
+/** Does this tool's door write an input to the ACCOUNT FENCE?
+ *
+ * DERIVED from the fence's own inputs — `FENCE_INPUTS`, declared beside the SQL
+ * that reads them — against the two things a catalogued tool declares about its
+ * door: the PATH (a door is named after the table it writes: /accounts/links →
+ * `account_links`, /portal-users → `portal_users`) and, for a table the fence
+ * reads only ONE column of, the BODY FIELD carrying that column
+ * (`parent_account_id` → `parentAccountId`). Editing an account's name touches
+ * no fence input and stays free; re-parenting it or linking a contact does not.
+ *
+ * This reads NAMES, so it is the belt, not the proof: a door named something
+ * else would slip past it. The proof is `workers/tenancy/test/fence-confirm.test.ts`,
+ * which reads the tenancy doors' own SOURCE, works out which of them really
+ * write a fence input, and fails if any is reachable from a tool this missed. */
+function touchesAccountFence(tool: { path: string; schema?: Record<string, unknown> }): boolean {
+  const inPath = words(tool.path)
+  const fields = Object.keys((tool.schema?.properties ?? {}) as Record<string, unknown>).map(snake)
+  for (const [table, columns] of Object.entries(FENCE_INPUTS)) {
+    // "account_links" is the door at /accounts/links; "portal_users" at /portal-users.
+    if (!table.split("_").every((w) => inPath.has(w) || inPath.has(`${w}s`))) continue
+    if (columns.length === 0 || columns.some((c) => fields.includes(c))) return true
+  }
+  return false
+}
+
+/** Is this an ACCESS write — one that changes who can do what, or who can see
+ * whose? DERIVED, never a list of names: a name list locks the tools you thought
+ * of and waves through the next one, which is exactly how `update_role` sat at
+ * confirm:false beside four that confirmed, and then how `link_contact` and
+ * `set_account_parent` did the same to the account fence.
+ *
+ * Two derivations, because there are two ways to widen someone's reach:
+ *   • the tool's own declared GATE lands on a privilege module (falling back to
+ *     the door it posts to, so an agent-only tool can't slip through by being
+ *     absent from TOOL_GATES) — who can DO what;
+ *   • or its door writes an input to the account fence — who can SEE whose. */
+export function isPrivilegeWrite(tool: {
+  name: string
+  path: string
+  write?: boolean
+  schema?: Record<string, unknown>
+}): boolean {
   if (tool.write === false) return false
+  if (touchesAccountFence(tool)) return true
   const gate = TOOL_GATES[tool.name]
   if (gate) return PRIVILEGE_MODULES.includes(gate.split(":")[0])
   return /\/api\/tenancy\/(roles|members|invites)\b/.test(tool.path)

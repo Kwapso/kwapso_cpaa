@@ -121,10 +121,32 @@ describe("one tool-execution seam — the audit trail can't depend on which loop
   })
 })
 
-// A turn that changed NOTHING the user wanted — a refused action (inviting an existing
-// member) or a model hiccup — must not cost a credit. The turn meters up front (before the
-// outcome is known), then hands the units back on the failure exits when no write succeeded.
-describe("credit fairness — a refused/failed turn is refunded", () => {
+// REFUND WHAT WAS NEVER SPENT — and only that.
+//
+// The rule used to be "if no WRITE succeeded this turn, hand back every paid unit", on
+// BOTH failure exits. That refunded units the model had already been paid for (a turn
+// meters one unit per step, and every step the model answered burned real tokens), and it
+// fired on the failed-STEP exit — a failure any caller can produce on demand: ask to
+// invite someone who is already a member. So the same turn could run forever, spending
+// the app's Anthropic balance and handing its credit straight back every time. The credit
+// lane became the unbounded one, in a function whose own comment explains at length why
+// the FREE allowance must never be refunded for exactly that reason.
+//
+// A unit is SPENT the moment the model answers. Whether the answer pleased anyone,
+// whether the door then refused the write — none of that un-burns the tokens. So exactly
+// one unit is refundable: the one metered for the step whose model call THREW. These
+// scans hold both halves — the refund that survives, and the two that must not come back.
+describe("credit fairness — only a unit that bought nothing comes back", () => {
+  const refundBody = (() => {
+    const start = agent.indexOf("const refundUnspentUnit")
+    return start === -1
+      ? ""
+      : agent
+          .slice(start, agent.indexOf("\n  for (", start))
+          .replace(/\/\*[\s\S]*?\*\//g, " ")
+          .replace(/(^|[^:])\/\/[^\n]*/gm, "$1")
+  })()
+
   it("refundAiUnits reverses BOTH pools (paid credits back, free units un-counted)", () => {
     const start = credits.indexOf("export async function refundAiUnits")
     expect(start, "refundAiUnits must exist").toBeGreaterThan(-1)
@@ -133,48 +155,92 @@ describe("credit fairness — a refused/failed turn is refunded", () => {
     expect(/used = MAX\(0, used - \?\)/.test(body), "un-counts today's free units, bounded at zero").toBe(true)
   })
 
-  // …but the FREE allowance is not a price, it is the daily BOUND on how much
-  // model spend this team can cause. Refunding it dissolved the bound: a turn
-  // that reliably ends in a refusal (ask to invite someone who is already a
-  // member) burns real tokens and hands its unit straight back, so the same turn
-  // runs all day for nothing. Paid credits still come back — someone bought
-  // those. The rule lived only in a comment; this is the check that holds it.
+  // The free allowance is not a price, it is the daily BOUND on how much model
+  // spend this team can cause. Refunding it dissolves the bound.
   it("the app's own daily allowance is NEVER refunded — only the paid pool comes back", () => {
-    const start = agent.indexOf("const refundIfNothingDone")
-    expect(start, "refundIfNothingDone must exist").toBeGreaterThan(-1)
-    // Comments are not code — this very block explains the rule in prose, and a
-    // scan satisfied by prose would stay green through the rule being deleted.
-    const body = agent
-      .slice(start, agent.indexOf("\n  for (", start))
-      .replace(/\/\*[\s\S]*?\*\//g, " ")
-      .replace(/(^|[^:])\/\/[^\n]*/gm, "$1")
+    expect(refundBody, "refundUnspentUnit must exist").toBeTruthy()
     // The free argument is a literal 0: nothing goes back to today's counter.
     expect(
-      /refundAiUnits\(\s*env,\s*guard\.teamId,\s*0\s*,/.test(body),
+      /refundAiUnits\(\s*env,\s*guard\.teamId,\s*0\s*,/.test(refundBody),
       "the refund must hand back ZERO free units"
     ).toBe(true)
     expect(
-      /refundAiUnits\([^)]*tally\.free/.test(body),
+      /refundAiUnits\([^)]*tally\.free/.test(refundBody),
       "the free pool must never be an argument to the refund"
     ).toBe(false)
     // …and the turn still REMEMBERS the free units it spent, so the usage row and
     // the day's counter tell the same story.
     expect(
-      /tally\.free\s*=\s*0/.test(body),
+      /tally\.free\s*=\s*0/.test(refundBody),
       "zeroing the tally's free units hides a spend that really happened"
     ).toBe(false)
-    expect(/tally\.credits = opts\.tally\.free/.test(body), "the logged row keeps the free units").toBe(true)
   })
 
-  it("the agent refunds ONLY when nothing succeeded, on the failure exits", () => {
-    expect(/refundAiUnits/.test(agent), "agent must use the refund").toBe(true)
-    // Guarded on okWrites === 0 — a turn with a successful write keeps its charge.
-    expect(/okWrites === 0/.test(agent), "refund only when no write succeeded this turn").toBe(true)
-    expect(/okWrites \+= 1/.test(agent), "successful writes are counted so a partial success isn't refunded").toBe(true)
-    // Wired into the two failure exits (a failed step, and a model hiccup) — not the answer path.
+  // ONE unit, and only a credit-lane one. The old shape handed back
+  // `opts.tally.credit` — the whole turn's accumulated paid units, every earlier
+  // one of which had already bought a completion.
+  it("at most ONE unit comes back, never the turn's accumulated total", () => {
     expect(
-      (agent.match(/refundIfNothingDone\(\)/g) ?? []).length >= 2,
-      "refund is called on the failure exits"
+      /refundAiUnits\(\s*env,\s*guard\.teamId,\s*0\s*,\s*1\s*\)/.test(refundBody),
+      "the refund is a literal 1 — a turn's accumulated credits were already spent on completions"
+    ).toBe(true)
+    expect(
+      /refundAiUnits\([^)]*tally\.credit\b/.test(refundBody),
+      "handing back tally.credit refunds units the model was already paid for"
+    ).toBe(false)
+    expect(
+      /stepUnit !== "credit"/.test(refundBody),
+      "only THIS step's unit, and only from the paid lane, is refundable"
+    ).toBe(true)
+    // The tally is decremented by the same one, so the logged row and the balance agree.
+    expect(/tally\.credits -= 1/.test(refundBody) && /tally\.credit -= 1/.test(refundBody), "the tally must follow the balance").toBe(true)
+  })
+
+  // The predicate is "was this unit spent", NOT "did the turn achieve anything".
+  // okWrites answered the second question and is gone with it; if it comes back
+  // as a refund guard, so does the hole.
+  it("the refund does not ask whether the turn ACHIEVED anything", () => {
+    expect(/okWrites/.test(agent), "okWrites was the old 'did it achieve anything' guard — it must not return").toBe(false)
+  })
+
+  // THE HOLE ITSELF: the failed-step exit is the one a caller reaches on demand.
+  // The model answered (twice — the failure wrap-up reads the failure and
+  // explains it), so the unit is spent and must stay spent.
+  it("a FAILED STEP is not refunded — that exit is reachable on demand", () => {
+    const loop = agent.slice(agent.indexOf("async function runPlanLoop"), agent.indexOf("export async function confirmAndRun"))
+    const failedExit = loop.slice(loop.indexOf("if (failed) {"))
+    expect(failedExit, "the plan loop's failed-step exit must exist").toBeTruthy()
+    expect(
+      /refund/i.test(failedExit.replace(/\/\/[^\n]*/g, "")),
+      "a refused action costs its credit: the model answered, so the unit is spent"
+    ).toBe(false)
+    // …and confirmAndRun's own failure exit, for the same reason.
+    expect(/refund/i.test(confirmBody.replace(/\/\/[^\n]*/g, "")), "the confirm path never refunds either").toBe(false)
+  })
+
+  it("…but a model call that THREW still hands its unit back (the fairness that survives)", () => {
+    const loop = agent.slice(agent.indexOf("async function runPlanLoop"), agent.indexOf("export async function confirmAndRun"))
+    const modelCatch = loop.slice(loop.indexOf("} catch (e) {"), loop.indexOf("if (!reply.toolCalls.length)"))
+    expect(
+      /await refundUnspentUnit\(\)/.test(modelCatch),
+      "a model outage is ours, not the customer's — the unit bought no completion"
+    ).toBe(true)
+    // Called on that exit and NOWHERE else: one call site is the whole rule.
+    expect((agent.match(/await refundUnspentUnit\(\)/g) ?? []).length, "exactly one refund call site").toBe(1)
+  })
+
+  // A confirm continuation's first step is PREPAID by confirmAndRun, and that
+  // unit already bought its writes. It must never be refundable here.
+  it("a prepaid confirm step has no unit of its own to refund", () => {
+    const meter = agent.slice(agent.indexOf("for (let step = 0"), agent.indexOf("let reply: ModelReply"))
+    expect(/stepUnit = null/.test(meter), "each step starts owing nothing").toBe(true)
+    expect(
+      /stepUnit = c\.source/.test(meter),
+      "stepUnit is set only INSIDE the metering block, so a prepaid step leaves it null"
+    ).toBe(true)
+    expect(
+      meter.indexOf("stepUnit = c.source") > meter.indexOf("if (!(loopOpts.prepaid && step === 0))"),
+      "…and that assignment sits after the prepaid guard, never before it"
     ).toBe(true)
   })
 })

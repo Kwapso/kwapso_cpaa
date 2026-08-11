@@ -86,6 +86,33 @@ WITH RECURSIVE reach(id) AS (
 )
 SELECT id FROM reach LIMIT ${SCOPE_HARD_CAP}`
 
+/** THE FENCE'S OWN INPUTS — everything the three statements above read to decide
+ * which rows a client login may see. Declared HERE, beside them, so the two
+ * cannot drift: change the SQL and this is the line you change with it.
+ *
+ * `[]` means the WHOLE ROW is an input; a list names the ONLY columns that are.
+ *
+ * WHO READS THIS. `shared/workers/tool-catalog.ts` — to decide which machine-
+ * surface writes must stop for a confirm panel. A write that changes one of
+ * these changes WHO CAN SEE WHOSE, which is the same order of decision as a
+ * permission grant, and the model reaches it while reading team text an attacker
+ * can author. Deriving the confirm set from the fence's inputs is what stops it
+ * being a hand-kept list of module names that forgets the next door: a link and
+ * a re-parent both widen a client's world without touching a permission at all,
+ * and both used to run silently. */
+export const FENCE_INPUTS: Record<string, string[]> = {
+  // The row that makes a caller PORTAL at all, the account they are pinned to,
+  // the restriction they carry, and whether their login is live.
+  portal_users: [],
+  // Its very existence is a "you belong to this company" (ROOTS_SQL), and
+  // deactivating it withdraws one — so the whole row is an input.
+  account_links: [],
+  // ONE column. The fence walks PARENTS and nothing else off an account row, so
+  // editing a name, an address or a status is not a fence write and must not
+  // spend a confirm panel on one.
+  accounts: ["parent_account_id"],
+}
+
 /** Resolve the caller's account set — the ONE place it is decided. Costs one
  * read for staff (the portal_users miss) and three for a portal caller. */
 export async function accountScope(cfg: D1Rest, guard: MemberGuard): Promise<AccountScope> {
