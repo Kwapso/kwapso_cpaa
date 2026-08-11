@@ -41,6 +41,10 @@ glide/data/
 glide/files/
 # Derived from both, so it holds exactly the same customer data.
 glide/normalised.json
+# Where each rescued file now lives in OUR R2, and the row that referenced it —
+# written by `node scripts/glide-to-r2.mjs <staging|production>`, and the map the
+# migration will read to repoint those rows. Same customer data, one more shape.
+glide/r2-manifest.json
 
 # Parallel agent worktrees — working copies, never content
 .claude/worktrees/
