@@ -13,6 +13,8 @@
 // Driven through the worker's real handlers, with tenancy answering the way the
 // real door does: `{ kind: "staff" | "portal", accounts, currentAccountId }`.
 
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
 import worker from "../src/index"
@@ -138,6 +140,49 @@ describe("acting with a token: staff only, on every session it mints", () => {
     await expect(sessionCookieFor(bridgeEnv("staff"), token("TK_STAFF") as never)).resolves.toBe(
       "kwapso_session=sess"
     )
+  })
+})
+
+// WHAT MAKES THE CACHED VERDICT SAFE — read off the other worker's source, not
+// taken on trust.
+//
+// The bridge caches a PASSED staff check for a minute, so for that minute the
+// question "is this caller staff or a client?" is answered from memory. That is
+// only sound while the app cannot produce the transition it would miss: a token
+// holder who becomes a client. It cannot — and the reason lives in tenancy, one
+// worker away, where nothing about the cache would ever remind anyone. So the
+// reason is asserted here, beside the cache it protects: relax that refusal and
+// this suite goes red, which is the moment the cache has to go rather than
+// quietly become the hole.
+describe("the cached staff verdict has no transition to miss", () => {
+  const grantDoor = readFileSync(join(__dirname, "../../tenancy/src/routes/accounts.ts"), "utf8")
+  const handler = grantDoor.slice(grantDoor.indexOf("export async function postGrantPortalAccess"))
+
+  it("the ONE door that makes a client login refuses an active team member", () => {
+    const body = handler.slice(0, handler.indexOf("\n}\n"))
+    // It asks whether the person is a live member of this team…
+    expect(body).toMatch(/FROM team_members WHERE team_id = \? AND user_id = \? AND deactivated_at IS NULL/)
+    // …and refuses when they are, rather than fencing a colleague out.
+    expect(body).toMatch(/if \(staff\)\s*\n?\s*return fail\(/)
+    expect(body).toContain('"is_staff"')
+    // The refusal comes BEFORE the row is written — a grant that landed and then
+    // apologised would be exactly the transition this argument denies.
+    expect(body.indexOf('"is_staff"')).toBeLessThan(body.indexOf("grantPortalAccess("))
+  })
+
+  it("and a token cannot outlive its team membership either (the other half of the pair)", () => {
+    // The bridge mints through auth's internal door, which refuses a caller who
+    // is no longer an active member — so "reads as a client" and "holds a working
+    // token" cannot both be true, whatever the cache remembers.
+    const authSrc = readFileSync(join(__dirname, "../../auth/src/index.ts"), "utf8")
+    const at = authSrc.indexOf("async function internalMcpSession")
+    expect(at, "auth must still own the mint the bridge calls").toBeGreaterThan(-1)
+    const mintDoor = authSrc.slice(at, authSrc.indexOf("\n}\n", at))
+    expect(mintDoor).toMatch(/FROM team_members WHERE team_id = \? AND user_id = \? AND deactivated_at IS NULL/)
+    expect(mintDoor).toContain('"not_a_member"')
+    // Refused BEFORE the session exists — a minted-then-checked door would hand
+    // out the very cookie this argument says cannot exist.
+    expect(mintDoor.indexOf('"not_a_member"')).toBeLessThan(mintDoor.indexOf("createPinnedSession("))
   })
 })
 

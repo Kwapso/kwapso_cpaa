@@ -13,6 +13,7 @@
 
 import { fail, json, pagedJson } from "../../../../shared/workers/http"
 import { csvResponse, toCsv } from "../../../../shared/workers/csv"
+import { EXPORT_HARD_CAP } from "../../../../shared/workers/limits"
 import { optionalText, queryText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
 import { publishChange } from "../../../../shared/workers/realtime"
 import { gated, gatedBody, openTeam } from "../../../../shared/workers/route"
@@ -67,12 +68,8 @@ export async function getAccounts(request: Request, env: Env): Promise<Response>
   const { cfg, guard } = await gated(request, env, "accounts", "read")
   const scope = await accountScope(cfg, guard)
   const url = new URL(request.url)
-  const rawType = queryText(url.searchParams.get("type"), "Type")
-  const type = rawType === "entity" || rawType === "individual" ? rawType : undefined
   const page = await listAccounts(cfg, guard, scope, {
-    q: queryText(url.searchParams.get("q"), "Search"),
-    type,
-    parentId: queryText(url.searchParams.get("parentId"), "Parent"),
+    ...accountQuery(url),
     // Capped like every other query parameter — an opaque cursor is ~70 chars, so a
     // megabyte of it is a bad request, not an atob + JSON.parse of a megabyte.
     cursor: queryText(url.searchParams.get("cursor"), "Cursor") ?? null,
@@ -80,14 +77,43 @@ export async function getAccounts(request: Request, env: Env): Promise<Response>
   return pagedJson("accounts", page)
 }
 
+/** The three filters an accounts read accepts, parsed ONCE — the list door and
+ * the export door narrow by the same words, so "export what I'm looking at" and
+ * "list what I'm looking at" can never mean two different things. */
+function accountQuery(url: URL): { q?: string; type?: "entity" | "individual"; parentId?: string } {
+  const rawType = queryText(url.searchParams.get("type"), "Type")
+  return {
+    q: queryText(url.searchParams.get("q"), "Search"),
+    type: rawType === "entity" || rawType === "individual" ? rawType : undefined,
+    parentId: queryText(url.searchParams.get("parentId"), "Parent"),
+  }
+}
+
 /** GET /api/tenancy/accounts/export — the caller's accounts as a full-field CSV
  * (EXPORT NEEDS READ, like every other export door). Same gate, same fence, same
- * rows as the list — a machine caller pulls the whole book in one call exactly
- * as the Export CSV button does, and a client login pulls only their own. */
+ * FILTERS as the list — a machine caller pulls the same book the Export CSV
+ * button does, and a client login pulls only their own.
+ *
+ * AND IT IS WHOLE, OR IT IS AN ERROR. Accounts grow with the business, so this
+ * is the one export whose collection can outrun the deliberate-download ceiling
+ * — and it used to answer that by handing back the first 10,000 rows with
+ * nothing to say they weren't all of them. A short file that looks whole is the
+ * worst of the three possible answers, and worse here than anywhere: the columns
+ * lead with the import format, so re-importing a silently-truncated export is
+ * data loss wearing a round trip's clothes. Over the cap the caller narrows with
+ * q / type / parentId (the same three the screen and `list_accounts` take), or
+ * reads the paged list. Both surfaces get this same sentence from this same
+ * door. */
 export async function getAccountsExport(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "accounts", "read")
   const scope = await accountScope(cfg, guard)
-  const rows = await listAccountsForExport(cfg, guard, scope)
+  const { rows, complete } = await listAccountsForExport(cfg, guard, scope, accountQuery(new URL(request.url)))
+  if (!complete)
+    return fail(
+      413,
+      "export_too_large",
+      `That's more than ${EXPORT_HARD_CAP.toLocaleString("en-GB")} accounts, which is more than one file can carry. Narrow it — search for a name, pick companies or people, or ask for one parent's accounts — or read the list a page at a time.`
+    )
   const csv = toCsv(
     [
       "name", "accountType", "code", "email", "phone", "address", "status",

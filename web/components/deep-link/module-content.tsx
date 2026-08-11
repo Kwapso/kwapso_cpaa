@@ -331,6 +331,14 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
                 label: "Import CSV",
                 onClick: () => go(`/t/${teamId}/import/accounts`),
               }}
+              download={{
+                // A machine could export accounts and a person could not — the one
+                // place the two surfaces disagreed about what exists. Same door, same
+                // gate: export needs READ, implied by seeing this list.
+                show: (data.rows?.length ?? 0) > 0,
+                label: "Export CSV",
+                href: "/api/tenancy/accounts/export",
+              }}
               onCreate={() => go(sectionPath, { panel: "add", module: "accounts" })}
             >
               <ScreenRenderer recipe={accountsRecipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />

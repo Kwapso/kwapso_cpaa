@@ -822,6 +822,7 @@ describe("RULES — the laws of the base", () => {
       "catalog-coverage", // R13: workers/data-ops/test/catalog-coverage.test.ts
       "agent-filter-parity", // R19: workers/mcp/test/filter-parity.test.ts
       "client-reachable-doors", // R21: the client-reach scan above
+      "agent-body-parity", // R22: the request BODY half, beside R19 in the mcp suite
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

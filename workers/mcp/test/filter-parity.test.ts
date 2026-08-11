@@ -1,18 +1,28 @@
-// R19 — AGENT/MCP FILTER PARITY, standing on a full DOOR CENSUS.
+// R19 — AGENT/MCP FILTER PARITY and R22 — BODY-FIELD PARITY, both standing on
+// one full DOOR CENSUS.
 //
-// Two things are checked here, in that order, because the second is worthless
-// without the first:
+// Three things are checked here, in that order, because the later two are
+// worthless without the first:
 //
 //   1. COVERAGE — every door a person can reach on the four workers that serve
 //      the app's own doors (tenancy, content, data-ops, auth) either has a tool
 //      on SOME machine surface (the shared catalog, the MCP's own, or the
 //      agent's own), or is a named line in TOOLLESS_DOORS with a written reason.
-//   2. PARITY — a tool sitting on a door that FILTERS must expose and forward
-//      every filter that door parses, or the assistant falls back to free text
-//      and answers a DIFFERENT question (downstream: 3,465 descriptions that
-//      merely mentioned the words instead of the 134 records carrying the
-//      value). The required filter set is DERIVED from the door's own parameter
-//      parsing — never hand-listed here.
+//   2. PARITY, the QUERY half (R19) — a tool sitting on a door that FILTERS must
+//      expose and forward every filter that door parses, or the assistant falls
+//      back to free text and answers a DIFFERENT question (downstream: 3,465
+//      descriptions that merely mentioned the words instead of the 134 records
+//      carrying the value). The required filter set is DERIVED from the door's
+//      own parameter parsing — never hand-listed here.
+//   3. PARITY, the BODY half (R22) — the same sentence about the other half of
+//      an HTTP request. A tool on a WRITE door must expose and forward every
+//      field that door reads off the body, or a named line in
+//      NARROWED_BODY_FIELDS says why not. R19 alone measured query strings, so
+//      four write tools quietly offered a narrower contract than their door
+//      accepted for six weeks under a green build: update_team could not set the
+//      logo, create_role could not carry its permission matrix,
+//      reply_help_ticket could not @mention, agent_chat could not attach a file.
+//      Same census, same derivation, other half of the request.
 //
 // THE SCAN STARTS AT THE DOORS, NOT THE TOOLS — and now at ALL of them. It once
 // iterated SHARED_TOOLS, so a door with no tool was not a failure, it was
@@ -100,6 +110,21 @@ const TOOLLESS_DOORS: Record<string, string> = {
     "destroys the browser session behind a cookie. This surface mints its own short-lived, team-pinned session per call and lets it expire; the way to end a token's access is to revoke the token, on the Access tokens screen — which bites on the very next call.",
 }
 
+/** R22 — a body field a WRITE door reads that its tool deliberately does NOT
+ * offer, keyed "METHOD /path::field". Each line is a decision someone made, in
+ * writing, and the same line is said in developer English in MCP.md §3 — the
+ * alternative is a narrower contract nobody ever notices, which is exactly what
+ * this half of the census exists to end.
+ *
+ * A RATCHET, like every other deny-list in the base: a line whose field the tool
+ * now DOES expose turns the build red, so the list can only shrink. */
+const NARROWED_BODY_FIELDS: Record<string, string> = {
+  "POST /api/tenancy/teams/update::logoDataUrl":
+    "a logo is BYTES, not prose — a base64 image data URL up to 2.5 MB (MAX_IMAGE_BYTES), which is ~3.4 million characters of argument on a surface whose whole ANSWER is capped at 400,000. It is the same objection, and the same order-of-magnitude arithmetic, that keeps POST /api/content/learning/upload off this surface entirely (MCP.md §3 item 6). Renaming is unaffected: updateTeamDetails treats an absent logo as 'leave it as it is', so a machine rename can never blank a logo it cannot send.",
+  "POST /api/data-ops/agent/chat::files":
+    "attaching up to 8 CSVs of 5 MB each is up to 40 MB of argument on the same 400,000-character surface — and the capability is already here in a better machine shape: start_import → add_import_file → plan_import → run_import is deterministic, resumable, and re-readable for free through get_import when a client drops a plan. Conversational file-drop is the shape a person supervises on a screen; a headless client should use the pipeline that reports per-row what it did.",
+}
+
 /** The route-handler source for a worker: its routes/ directory if it has one,
  * else its index.ts (auth keeps its handlers in the switchboard file). */
 function handlerSources(worker: Worker): string[] {
@@ -132,20 +157,58 @@ function doorsOf(worker: Worker): Door[] {
   return out
 }
 
-/** The params a door's handler parses, derived from ITS OWN source: the
- * switchboard names the handler for the path, and the handler's
+/** One function's body: from its declaration to the next top-level `}` (or the
+ * next export, whichever comes first) — never into the function that follows. */
+function fnBody(src: string, name: string): string {
+  const at = src.search(new RegExp(`function ${name}\\(`))
+  if (at === -1) return ""
+  const ends = [src.indexOf("\n}\n", at), src.indexOf("\nexport ", at + 1)].filter((i) => i !== -1)
+  return src.slice(at, ends.length ? Math.min(...ends) : undefined)
+}
+
+/** What a door READS — its own handler, PLUS any helper in the same file it
+ * calls, one level deep.
+ *
+ * The one level is not a nicety, it is the law's blind spot closed. This scan
+ * once read the handler alone, so the moment a door factored its parsing into a
+ * `function accountQuery(url)` beside it — which is exactly what you do when two
+ * doors must narrow by the same words — the door dropped out of the census
+ * entirely and its tool's obligations silently became none. A law that stops
+ * looking when you tidy up is a law that rewards tidying up.
+ *
+ * One level, and only helpers declared in the SAME source: a `createLearning`
+ * imported from a lib declares its contract in a TYPE, which is not source a
+ * scan can follow, and pretending otherwise would be worse than saying so. */
+function handlerBody(door: Door): string {
+  for (const src of handlerSources(door.worker)) {
+    const own = fnBody(src, door.handler)
+    if (!own) continue
+    const called = [...new Set([...own.matchAll(/\b([a-zA-Z_]\w*)\s*\(/g)].map((m) => m[1]))]
+    return [own, ...called.filter((n) => n !== door.handler).map((n) => fnBody(src, n))].join("\n")
+  }
+  return ""
+}
+
+/** The params a door's handler parses, derived from ITS OWN source: its
  * `searchParams.get` calls are the truth. */
 function doorParams(door: Door): string[] {
-  for (const src of handlerSources(door.worker)) {
-    const at = src.search(new RegExp(`function ${door.handler}\\(`))
-    if (at === -1) continue
-    // The function's own body: to the next top-level `}` (or the next export,
-    // whichever comes first) — never into the helper that follows it.
-    const ends = [src.indexOf("\n}\n", at), src.indexOf("\nexport ", at + 1)].filter((i) => i !== -1)
-    const body = src.slice(at, ends.length ? Math.min(...ends) : undefined)
-    return [...body.matchAll(/searchParams\.get\("(\w+)"\)/g)].map((x) => x[1])
-  }
-  return []
+  return [...handlerBody(door).matchAll(/searchParams\.get\("(\w+)"\)/g)].map((x) => x[1])
+}
+
+/** The BODY fields a door's handler reads, derived the same way: its `body.<field>`
+ * reads are the truth. R20 is what makes this legible — a body may not be
+ * destructured at the read, so every field a door takes off the wire appears
+ * here, in one shape, whether it is validated with `requireText`, tested with
+ * `typeof`, or checked with `Array.isArray`.
+ *
+ * SCOPE, stated honestly: this reads the HANDLER, exactly as the query half
+ * does. A handler that hands the whole `body` object to a lib (createLearning,
+ * createTicket) declares its contract in that lib's input TYPE, which is not
+ * source a scan can follow — those tools were checked by hand and match. What
+ * this catches is the case that actually bit: a field the DOOR names and the
+ * TOOL doesn't. */
+function doorBodyFields(door: Door): string[] {
+  return [...new Set([...handlerBody(door).matchAll(/\bbody\.(\w+)\b/g)].map((x) => x[1]))]
 }
 
 /** Every tool on EITHER machine surface that forwards to a door — the shared
@@ -153,21 +216,46 @@ function doorParams(door: Door): string[] {
  * surface is not a gap; a capability reached from neither is. De-duplicated by
  * name: the three catalogs overlap by construction (each surface PROJECTS the
  * shared ones), so the same endpoint is checked once. */
-type ToolView = { name: string; method: string; path: string; schema: unknown; buildQuery: string }
+type Build = ((input: Record<string, unknown>) => Record<string, unknown>) | undefined
+type ToolView = {
+  name: string; method: string; path: string; schema: unknown; buildQuery: string; buildBody: Build
+}
 const ALL_TOOLS: ToolView[] = [
   ...SHARED_TOOLS.map((t) => ({
     name: t.name, method: t.method, path: t.path, schema: t.schema,
-    buildQuery: t.buildQuery?.toString() ?? "",
+    buildQuery: t.buildQuery?.toString() ?? "", buildBody: t.buildBody as Build,
   })),
   ...MCP_TOOLS.map((t) => ({
     name: t.name, method: t.method, path: t.path, schema: t.inputSchema,
-    buildQuery: t.buildQuery?.toString() ?? "",
+    buildQuery: t.buildQuery?.toString() ?? "", buildBody: t.buildBody as Build,
   })),
   ...TOOL_CATALOG.map((t) => ({
     name: t.name, method: t.method, path: t.path, schema: t.schema,
-    buildQuery: t.buildQuery?.toString() ?? "",
+    buildQuery: t.buildQuery?.toString() ?? "", buildBody: t.buildBody as Build,
   })),
 ]
+
+/** The schema's own properties, as the JSON-RPC caller sees them. */
+const propsOf = (tool: ToolView): Record<string, { type?: string }> =>
+  ((tool.schema as { properties?: Record<string, { type?: string }> }).properties ?? {})
+
+/** A FILLED-IN call of a tool, typed the way its own schema declares. R22's
+ * forwarding half RUNS the builder on this rather than reading its source: a
+ * builder that delegates (`(i) => learningBody(i)`) forwards perfectly and
+ * mentions not one field by name, so a substring scan would call it broken. What
+ * the door actually receives is the only honest question, and it is answerable —
+ * so ask it. */
+function probeInput(tool: ToolView): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const [key, spec] of Object.entries(propsOf(tool)))
+    out[key] =
+      spec?.type === "boolean" ? true
+      : spec?.type === "number" ? 1
+      : spec?.type === "array" ? ["probe"]
+      : spec?.type === "object" ? { probe: true }
+      : "probe"
+  return out
+}
 
 /** The tools ON a door (same method, same path), for the coverage census. */
 const toolsOn = (door: Door): ToolView[] => [
@@ -182,8 +270,15 @@ const toolsOn = (door: Door): ToolView[] => [
  * it to forward a filter would be asking the wrong question. */
 const readToolsOn = (door: Door): ToolView[] => (door.method === "GET" ? toolsOn(door) : [])
 
+/** The tools whose BODY must match a door's, for R22. POST only, and only the
+ * ones that actually build a body — a tool that sends `{}` on purpose
+ * (start_import) is not narrowing a contract, it is a door that takes nothing. */
+const writeToolsOn = (door: Door): ToolView[] =>
+  door.method === "POST" ? toolsOn(door).filter((t) => t.buildBody) : []
+
 const DOORS: Door[] = WORKERS.flatMap(doorsOf)
 const FILTERED = DOORS.filter((d) => doorParams(d).length > 0)
+const WRITES = DOORS.filter((d) => d.method === "POST" && doorBodyFields(d).length > 0)
 
 describe("agent-filter-parity (R19): the doors decide what the machine surface owes", () => {
   it("finds every door to check (the census must not silently go blind)", () => {
@@ -196,6 +291,21 @@ describe("agent-filter-parity (R19): the doors decide what the machine surface o
     // …and the two doors each earlier rewrite was earned by are still in it.
     expect(DOORS.map(key)).toContain("GET /api/tenancy/accounts")
     expect(DOORS.map(key)).toContain("GET /api/data-ops/agent/usage")
+  })
+
+  it("a door that tidies its parsing into a helper still owes its filters", () => {
+    // The blind spot this closed, pinned by the two doors that walked into it:
+    // both narrow accounts by the same three words, so both call one helper —
+    // and while the scan read the handler alone, factoring that out silently
+    // reduced what the list door owed to `cursor`, and made the export door
+    // invisible. Naming the obligation here means a future tidy-up cannot shrink
+    // it back without saying so out loud.
+    for (const k of ["GET /api/tenancy/accounts", "GET /api/tenancy/accounts/export"]) {
+      const door = DOORS.find((d) => key(d) === k)!
+      expect(doorParams(door), `${k} must still owe its three filters`).toEqual(
+        expect.arrayContaining(["q", "type", "parentId"])
+      )
+    }
   })
 
   it("every reasoned gap still names a real door (no rotting lines)", () => {
@@ -247,6 +357,62 @@ describe("agent-filter-parity (R19): the doors decide what the machine surface o
             tool.buildQuery.includes(p),
             `tool ${tool.name} exposes "${p}" but its buildQuery never forwards it — the door would silently ignore the filter`
           ).toBe(true)
+        }
+      })
+    }
+  }
+})
+
+describe("agent-body-parity (R22): a write tool offers its door's whole contract", () => {
+  it("finds write doors to check (this half must not go blind either)", () => {
+    // The blind spot R19 left was every door that takes no query string. So the
+    // scan has to prove it FOUND bodies at all, and found the four doors whose
+    // silence earned this law.
+    expect(WRITES.length).toBeGreaterThanOrEqual(30)
+    const found = WRITES.map(key)
+    for (const k of [
+      "POST /api/tenancy/teams/update",
+      "POST /api/tenancy/roles",
+      "POST /api/content/help/reply",
+      "POST /api/data-ops/agent/chat",
+    ])
+      expect(found, `${k} must be in the body census`).toContain(k)
+  })
+
+  it("every narrowing still names a real door and a real field it still narrows", () => {
+    for (const [k, why] of Object.entries(NARROWED_BODY_FIELDS)) {
+      const [doorKey, field] = k.split("::")
+      const door = WRITES.find((d) => key(d) === doorKey)
+      expect(door, `${k} is excused but ${doorKey} is not a write door — delete the line`).toBeDefined()
+      expect(
+        doorBodyFields(door!),
+        `${k} is excused but ${doorKey} no longer reads "${field}" — delete the line`
+      ).toContain(field)
+      // THE RATCHET: an excuse in front of a field the tool now offers is a lie.
+      for (const tool of writeToolsOn(door!))
+        expect(
+          field in propsOf(tool),
+          `${k} is excused but tool ${tool.name} now EXPOSES "${field}" — delete the line, the contract is whole`
+        ).toBe(false)
+      expect(why.length, `${k} needs a reason someone can disagree with`).toBeGreaterThan(40)
+    }
+  })
+
+  for (const door of WRITES) {
+    for (const tool of writeToolsOn(door)) {
+      it(`${tool.name} exposes + forwards every body field its door (${door.path}) reads`, () => {
+        // What the door RECEIVES when every field the tool declares is filled in.
+        const sent = tool.buildBody!(probeInput(tool))
+        for (const f of doorBodyFields(door)) {
+          if (`${key(door)}::${f}` in NARROWED_BODY_FIELDS) continue
+          expect(
+            f in propsOf(tool),
+            `door ${key(door)} reads body.${f} but tool ${tool.name}'s schema doesn't expose it — a machine gets a NARROWER contract than the screen, and nothing says so. Expose it, or add a reasoned line to NARROWED_BODY_FIELDS (and to MCP.md §3).`
+          ).toBe(true)
+          expect(
+            sent[f],
+            `tool ${tool.name} exposes "${f}" but its buildBody drops it — the door would never see the field the caller filled in`
+          ).toBeDefined()
         }
       })
     }

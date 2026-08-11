@@ -12,7 +12,7 @@ import { ROUTES as CONTENT_ROUTES } from "../../content/src/index"
 import { ROUTES as DATAOPS_ROUTES } from "../../data-ops/src/index"
 import { TARGETS } from "../../data-ops/src/lib/targets"
 import { TOOL_CATALOG } from "../../data-ops/src/lib/tools"
-import { SHARED_TOOLS, TOOL_GATES } from "../../../shared/workers/tool-catalog"
+import { GATELESS_WRITES, SHARED_TOOLS, TOOL_GATES } from "../../../shared/workers/tool-catalog"
 import { getMcpTool, MCP_TOOLS } from "../src/lib/tools"
 import { newTokenSecret, sha256Hex } from "../src/lib/tokens"
 
@@ -90,6 +90,38 @@ describe("the shared tool catalog — contracts that must not silently drift", (
     // …and the agent's canonical names for those endpoints are NOT the MCP names.
     for (const n of ["invite_member", "raise_help_ticket", "set_dropdown_active"])
       expect(getMcpTool(n), `"${n}" is the agent name, must NOT be an MCP tool name`).toBeUndefined()
+  })
+
+  // THE CONFIRM RULE IS ONLY AS COMPLETE AS THE MAP IT IS DERIVED FROM.
+  // isPrivilegeWrite reads each tool's declared gate and, when there ISN'T one,
+  // falls back to a path regex (`/api/tenancy/(roles|members|invites)`). Every
+  // write today has a line, so the fallback never fires — but nothing said it had
+  // to, so a privilege write added tomorrow on a path outside that regex would
+  // skip the confirm panel in silence. The map is the law; the fallback is the
+  // last resort. This asserts the last resort is never what decides.
+  it("every write tool resolves to a declared gate (TOOL_GATES completeness)", () => {
+    const writes = TOOL_CATALOG.filter((t) => t.write)
+    expect(writes.length, "the scan must find writes at all").toBeGreaterThan(20)
+    const ungated = writes.filter((t) => !TOOL_GATES[t.name] && !(t.name in GATELESS_WRITES)).map((t) => t.name)
+    expect(
+      ungated,
+      `these writes have no line in TOOL_GATES — isPrivilegeWrite would decide their confirm rule from a PATH REGEX. Add the gate, or a reason in GATELESS_WRITES:\n  ${ungated.join("\n  ")}`
+    ).toEqual([])
+    // …and so does every SHARED write, whichever surface projects it.
+    for (const s of SHARED_TOOLS)
+      if (s.agent.write)
+        expect(TOOL_GATES[s.name], `shared write "${s.name}" must declare its gate`).toBeTruthy()
+  })
+
+  // The reasoned half, held to the same ratchet as every other deny-list: a line
+  // that stops being an offender must GO, so the list can only shrink.
+  it("GATELESS_WRITES names only real, still-gateless writes — with a reason", () => {
+    const byName = new Map(TOOL_CATALOG.map((t) => [t.name, t]))
+    for (const [name, why] of Object.entries(GATELESS_WRITES)) {
+      expect(byName.get(name)?.write, `${name} is excused in GATELESS_WRITES but is not a write tool — delete the line`).toBe(true)
+      expect(TOOL_GATES[name], `${name} now HAS a gate — delete its GATELESS_WRITES line`).toBeUndefined()
+      expect(why.length, `${name} needs a reason someone can disagree with`).toBeGreaterThan(40)
+    }
   })
 
   it("restores the developer permission hint on every gated MCP write description", () => {

@@ -147,7 +147,16 @@ function renderGrid(grid: Record<string, unknown>): string[] {
  * silently dropped the nine modules being set to no access, while the door wrote
  * them anyway. The tool declares what a field means; the data does not get a
  * vote. */
-const PERMISSION_GRID_FIELDS = new Set(["set_role_permissions.value"])
+const PERMISSION_GRID_FIELDS = new Set([
+  "set_role_permissions.value",
+  // A role CREATED with its matrix is the same grant in one call — it reaches
+  // `setRolePermissions` through the same door, writing every module, so the
+  // panel owes the reader the same module-by-module sheet. (R21 put this field
+  // on the tool; the panel had to learn it in the same breath, or an admin would
+  // have approved "Permissions — Learning — Read: Yes" and never been shown the
+  // nine modules the same call sets to no access.)
+  "create_role.permissions",
+])
 
 function isPermissionGrid(tool: string, key: string): boolean {
   return PERMISSION_GRID_FIELDS.has(`${tool}.${key}`)
