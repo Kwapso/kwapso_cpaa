@@ -113,6 +113,39 @@ export const FENCE_INPUTS: Record<string, string[]> = {
   accounts: ["parent_account_id"],
 }
 
+/** COLUMNS THAT DECIDE **WHICH HUMAN** A GRANT LANDS ON — the third category,
+ * and the one both earlier rounds of this bug were missing in their own way.
+ *
+ * `FENCE_INPUTS` says what the fence READS to work out where a caller stands.
+ * `FENCED_ROW_OWNERS` says which column decides whose side of the fence a row
+ * sits on. Neither can see THIS one, because the fence never reads it at all:
+ * `accounts.email` is what `userIdForPerson` (workers/tenancy/src/routes/accounts.ts)
+ * resolves a portal grant's PERSON from — account row → its email → the `users`
+ * row with that email → the `user_id` the `portal_users` row is written for.
+ *
+ * So the sentence the three make together is: FENCE_INPUTS decides WHERE you
+ * stand, FENCED_ROW_OWNERS decides WHICH ROWS stand with you, and this decides
+ * WHO YOU ARE. Re-point the email and the next grant — approved in good faith,
+ * on an account whose name never changed — hands the login to somebody else.
+ * Anyone can put a `users` row behind an address of their choosing: signing in
+ * once at the open front door is the whole of it.
+ *
+ * WHY IT IS NOT JUST A LINE IN FENCE_INPUTS. That list is machine-checked to
+ * mean exactly "columns the corridor reads" — `fence-confirm.test.ts` walks the
+ * SQL and fails on a declared column the fence no longer reads. `email` is not
+ * one and never will be, so filing it there would have bought a confirm panel by
+ * making a true list untrue, and the next reader would have deleted it as stale.
+ *
+ * WHO READS THIS. `shared/workers/tool-catalog.ts`, beside the other two.
+ * `workers/tenancy/test/grant-identity.test.ts` proves the door really resolves
+ * a person this way, so the day it stops, the line goes red instead of quietly
+ * guarding nothing. */
+export const FENCE_IDENTITY_INPUTS: Record<string, string[]> = {
+  // The address a portal grant resolves a human being from. Editing it is not
+  // editing a contact detail; it is choosing who the next login belongs to.
+  accounts: ["email"],
+}
+
 /** TABLES THE FENCE IS APPLIED **TO** — the other half of the sentence above.
  *
  * `FENCE_INPUTS` names what `accountScope()` READS to work out where a caller

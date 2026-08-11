@@ -113,14 +113,23 @@ describe("every machine write that changes the account fence confirms", () => {
 
   it("…and an account write that changes NO fence input still runs freely", () => {
     // The other half of the rule: over-firing would put a panel in front of
-    // renaming a customer, which is the friction the confirm rule exists to
+    // archiving a customer, which is the friction the confirm rule exists to
     // avoid. The derivation is column-precise for exactly this reason.
-    for (const name of ["update_account", "set_account_active"]) {
+    //
+    // `update_account` USED TO BE ON THIS LIST — and it was the hole, not the
+    // control. It is quite true that it writes no FENCE input, which is all this
+    // suite knows how to ask; but it carries `email`, and a portal grant resolves
+    // the human it lets in from exactly that column. So this assertion sat green,
+    // in the file whose own header warns that "a green test that asserts the wrong
+    // intent is how the first confirm gap hid", pinning the very tool that could
+    // re-point a client contact's address in silence. It is asserted from the
+    // other side now, in grant-identity.test.ts, against FENCE_IDENTITY_INPUTS.
+    for (const name of ["set_account_active"]) {
       const tool = SHARED_TOOLS.find((t) => t.name === name)!
       expect(fenceDoors.has(`${tool.method} ${tool.path}`), `${name} writes no fence input`).toBe(false)
       expect(
         isPrivilegeWrite({ name: tool.name, path: tool.path, schema: tool.schema, write: tool.agent.write }),
-        `${name} touches no fence input — it must not be swept up`
+        `${name} touches no fence input and carries no identity column — it must not be swept up`
       ).toBe(false)
     }
   })

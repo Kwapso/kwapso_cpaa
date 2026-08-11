@@ -160,23 +160,49 @@ function replayable(history: { role: string; content: string | null }[]): ChatMe
     .map((m) => ({ role: m.role as "user" | "assistant", content: m.content as string }))
 }
 
-/** Does this call carry an id worth resolving to a human name (a member/invite/role)?
- * Used to skip the extra lookups on a turn of pure reads (list_*). */
+/** The body fields that carry an ACCOUNT id — a company, or a person on the books.
+ * Resolved for the confirm panel, because a grant names its person with one of
+ * these and a raw ULID tells the approver nothing about who they are letting in. */
+const ACCOUNT_ID_KEYS = ["personAccountId", "accountId"] as const
+
+/** R14 — one confirm turn must not fan out into an unbounded read. A turn naming
+ * more distinct accounts than this is already pathological (MAX_STEPS is 12); past
+ * it the extras keep their raw id, which is the old behaviour, not a new hole. */
+const ACCOUNT_LOOKUP_CAP = 12
+
+/** Does this call carry an id worth resolving to a human name (a member/invite/role,
+ * or an account)? Used to skip the extra lookups on a turn of pure reads (list_*). */
 function hasNameableId(input: Record<string, unknown>): boolean {
   return (
     typeof input.userId === "string" ||
     typeof input.inviteId === "string" ||
-    typeof input.roleId === "string"
+    typeof input.roleId === "string" ||
+    ACCOUNT_ID_KEYS.some((k) => typeof input[k] === "string")
   )
 }
 
 /** Resolve the ids a turn's tools echo — a member's userId, an invite's inviteId,
- * a role's roleId — to friendly names, so every step/confirm summary reads
- * "Invite sam@x.com as Viewer" / "Deactivate the Sub Admin role" instead of a raw
- * ULID. Only fetches the lists a turn actually needs (roles/members/invites), AS
- * the caller (forwarded cookie) via the same door executeTool uses; a miss falls
- * back to the raw id, and a lookup error never fails the turn. */
-async function resolveNames(
+ * a role's roleId, an account's id — to friendly names, so every step/confirm
+ * summary reads "Invite sam@x.com as Viewer" / "Deactivate the Sub Admin role"
+ * instead of a raw ULID. Only fetches the lists a turn actually needs
+ * (roles/members/invites), AS the caller (forwarded cookie) via the same door
+ * executeTool uses; a miss falls back to the raw id, and a lookup error never
+ * fails the turn.
+ *
+ * THE ACCOUNT HALF IS A SECURITY CONTROL, not a nicety. `grant_portal_access`
+ * names its person with `personAccountId`, and the door resolves that row's EMAIL
+ * to the platform user the login is written for. So a panel reading "Give
+ * 01JXXXX… a login on account 01JYYYY…" asks an admin to approve a login for
+ * somebody it declines to name — and approving a client contact's login is
+ * routine, so it gets approved. Resolving the id to NAME AND EMAIL puts the
+ * address the grant will actually land on in front of the person saying yes,
+ * which is what makes the panel a confirmation rather than a permission slip.
+ * It closes the class, too: whatever moved that email, the panel now shows it.
+ *
+ * Exported for the same reason `panelInput` is: a confirm panel's wording is a
+ * security control here, so a test has to be able to prove what it actually says
+ * rather than infer it from the call site. */
+export async function resolveNames(
   env: Env,
   request: Request,
   calls: ToolCall[]
@@ -208,6 +234,31 @@ async function resolveNames(
       const data = (await get("/api/tenancy/roles")) as { roles?: { id: string; title: string }[] } | null
       for (const r of data?.roles ?? []) names[r.id] = r.title
     }
+    // One EXACT read per account id, not one read of the accounts list. The list
+    // door is capped (R14), so on a large set of books the very row being granted
+    // a login is the one that falls off the end — and a panel that quietly
+    // degrades to a ULID is the hole this resolution exists to close.
+    const accountIds = [
+      ...new Set(
+        calls.flatMap((c) =>
+          ACCOUNT_ID_KEYS.map((k) => c.input[k]).filter((v): v is string => typeof v === "string")
+        )
+      ),
+    ].slice(0, ACCOUNT_LOOKUP_CAP)
+    await Promise.all(
+      accountIds.map(async (id) => {
+        const data = (await get(`/api/tenancy/accounts/detail?id=${encodeURIComponent(id)}`)) as {
+          account?: { name?: string; email?: string | null }
+        } | null
+        const name = data?.account?.name
+        if (!name) return
+        const email = data?.account?.email
+        // The email is the POINT — it is what the grant door resolves the person
+        // from. A name on its own would read reassuringly while hiding the field
+        // an attacker would have moved.
+        names[id] = email ? `${name} (${email})` : name
+      })
+    )
   } catch {
     /* a lookup hiccup just leaves the raw id in the summary — never fail the turn */
   }
@@ -672,6 +723,16 @@ export async function confirmAndRun(
   const history = await listMessages(cfg, guard, opts.threadId) // also asserts ownership
 
   if (!opts.approve) {
+    // "NO" IS DURABLE. This branch used to append the sentence and return, leaving
+    // the stored calls at status "proposed" — and it does not shadow them, because
+    // appendMessage writes tool_calls_json = NULL while getPendingProposal reads the
+    // newest assistant row that HAS a proposal. So the refused calls stayed pending
+    // for ever and a later {approve:true} on the same thread ran exactly what the
+    // person had turned down. Sharpest on MCP, where agent_confirm is a tool an
+    // autonomous client calls: the operator declines, the client retries, the write
+    // lands. A decline SPENDS the proposal, exactly as an approval does — and is
+    // recorded as a decline, not as work done.
+    await consumePendingProposal(cfg, guard, opts.threadId, "declined")
     const msg = "Okay — I've left that alone."
     await appendMessage(cfg, guard, actor, opts.threadId, { role: "assistant", content: msg, source: opts.source })
     return { done: true, threadId: opts.threadId, reply: msg, quota: await getQuota(env, guard.teamId) }
@@ -683,7 +744,7 @@ export async function confirmAndRun(
   // AFTERWARDS let two confirms both read the same approved calls and both execute
   // them; only the caller that wins the flip may proceed now, and the loser is
   // told the plain truth — there is nothing left waiting.
-  if (!proposed.length || !(await consumePendingProposal(cfg, guard, opts.threadId))) {
+  if (!proposed.length || !(await consumePendingProposal(cfg, guard, opts.threadId, "done"))) {
     const msg = "There's nothing waiting for your approval."
     await appendMessage(cfg, guard, actor, opts.threadId, { role: "assistant", content: msg, source: opts.source })
     return { done: true, threadId: opts.threadId, reply: msg, quota: await getQuota(env, guard.teamId) }

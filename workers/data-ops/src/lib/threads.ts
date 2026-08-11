@@ -183,7 +183,7 @@ export async function getPendingProposal(
   }
 }
 
-/** CLAIM the pending proposal: flip its statuses "proposed" → "done" and report
+/** SPEND the pending proposal: flip its statuses "proposed" → `outcome` and report
  * whether THIS caller is the one that won it. Rewrites the SAME row
  * getPendingProposal reads (owner-scoped).
  *
@@ -195,11 +195,21 @@ export async function getPendingProposal(
  * approval gate's one job is that a dangerous call runs when the person approved
  * it, and it ran twice. The claim is a compare-and-swap on the exact stored text,
  * so only one caller can win it; a failure mid-run leaves the proposal spent
- * (safe — nothing duplicates) and the person asks the agent again. */
+ * (safe — nothing duplicates) and the person asks the agent again.
+ *
+ * `outcome` is REQUIRED, not defaulted, because BOTH answers spend a proposal and
+ * the audit has to tell them apart. "no" is an answer: a decline that only
+ * appended a sentence left the calls at "proposed" for ever, and a later
+ * {approve:true} on the same thread executed exactly what the person had refused.
+ * A declined proposal marked "done" would be the same lie from the other side —
+ * these rows ARE the agent's audit log (top of this file). The compare-and-swap
+ * is a bonus here: a decline racing an approve means one of them wins and the
+ * calls run once or not at all, never both. */
 export async function consumePendingProposal(
   cfg: D1Rest,
   guard: MemberGuard,
-  threadId: string
+  threadId: string,
+  outcome: "done" | "declined"
 ): Promise<boolean> {
   await ownThreadOrThrow(cfg, guard, threadId)
   const rows = await d1Query<{ id: string; tool_calls_json: string | null }>(
@@ -214,7 +224,7 @@ export async function consumePendingProposal(
   try {
     const arr = JSON.parse(row.tool_calls_json) as { status?: string }[]
     if (!Array.isArray(arr)) return false
-    updated = JSON.stringify(arr.map((x) => (x && x.status === "proposed" ? { ...x, status: "done" } : x)))
+    updated = JSON.stringify(arr.map((x) => (x && x.status === "proposed" ? { ...x, status: outcome } : x)))
   } catch {
     return false
   }
