@@ -2,10 +2,10 @@
 // rename a role, and read / save a role's permission matrix. Locked rules
 // (Admin is locked, auto-flip-read) live in lib/roles.
 
-import { fail, json } from "../../../../shared/workers/http"
-import { csvResponse, toCsv } from "../../../../shared/workers/csv"
-import { optionalText, queryText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
-import { publishChange } from "../../../../shared/workers/realtime"
+import { fail, json } from "@shared/workers/http"
+import { csvResponse, toCsv } from "@shared/workers/csv"
+import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { publishChange } from "@shared/workers/realtime"
 import { listRoles, countRoles } from "../lib/members"
 import { TEAM_MODULE_CATALOG } from "../team-schema"
 import { requireRight } from "../lib/permissions"

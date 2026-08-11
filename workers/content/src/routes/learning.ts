@@ -6,13 +6,13 @@
 // op) so open lists patch just that row. Locked module rules (pick-or-create
 // category, deactivate-not-delete) live in lib/learning.
 
-import { refusePortalCaller } from "../../../../shared/workers/account-scope"
-import { fail, json } from "../../../../shared/workers/http"
-import { csvResponse, toCsv } from "../../../../shared/workers/csv"
-import { queryText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
-import { publishChange } from "../../../../shared/workers/realtime"
-import { mediaKey, parseUploadDataUrl } from "../../../../shared/workers/image"
-import { gated, gatedBody } from "../../../../shared/workers/route"
+import { refusePortalCaller } from "@shared/workers/account-scope"
+import { fail, json } from "@shared/workers/http"
+import { csvResponse, toCsv } from "@shared/workers/csv"
+import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { publishChange } from "@shared/workers/realtime"
+import { mediaKey, parseUploadDataUrl } from "@shared/workers/image"
+import { gated, gatedBody } from "@shared/workers/route"
 import { requireIdList } from "../lib/bulk"
 import {
   bulkSetLearningActive,

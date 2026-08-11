@@ -15,10 +15,10 @@
 //   GET  /api/data-ops/agent/thread     -> one conversation's messages (?id=)
 //   GET  /api/data-ops/health
 
-import { brand } from "../../../shared/brand"
-import { fail, json } from "../../../shared/workers/http"
-import { GuardError } from "../../../shared/workers/gating"
-import { recordWorkerError } from "../../../shared/workers/error-log"
+import { brand } from "@shared/brand"
+import { fail, json } from "@shared/workers/http"
+import { GuardError } from "@shared/workers/gating"
+import { recordWorkerError } from "@shared/workers/error-log"
 import type { Env } from "./env"
 import {
   getBatch,

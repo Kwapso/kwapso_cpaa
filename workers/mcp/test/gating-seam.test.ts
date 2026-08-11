@@ -4,20 +4,21 @@
 // signed-in session user — so this suite asserts every non-GET route opens with
 // token/user verification. Reads handler source off disk (rules-test style) so no
 // ungated door can ship on this surface either.
+//
+// The route SHAPE is why this file exists rather than calling gatingSeam(): mcp has
+// no ROUTES table and no routes/ directory — its doors are `case` arms in one
+// switchboard, and its gates are verifyToken/requireUser, not requireRight. What it
+// does NOT hand-roll is the comment stripping: that is the shared stripComments, so
+// hardening the scanner hardens this surface too. It used to be a private copy, and
+// a private copy of a security check is one that stops being the check.
 
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
-const src = readFileSync(join(__dirname, "..", "src", "index.ts"), "utf8")
+import { stripComments } from "@shared/rules/source-scan"
 
-/** Comments are NOT code — a comment naming a seam must never stand in for
- * calling it (the same flaw that let a deleted gate stay green in the other
- * workers' suites). Block comments first; line comments only when the `//` isn't
- * part of a `https://` URL. */
-function stripComments(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/gm, "$1")
-}
+const src = readFileSync(join(__dirname, "..", "src", "index.ts"), "utf8")
 
 /** The body of a top-level `async function <name>(` in index.ts. */
 function fnBody(name: string): string {

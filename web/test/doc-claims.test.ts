@@ -221,3 +221,58 @@ describe("docs agree with the roster on disk", () => {
     ).toEqual([])
   })
 })
+
+// README.md IS THE CURRENT-STATE FILE, NOT THE CHANGELOG.
+//
+// Its opening prose had grown five `UPDATED <date>:` stamps INSIDE the sentences
+// describing what is true now — including "was 'roles & permissions'" and two
+// competing dates for the same fact. It is the first thing every new reader and
+// every agent opens, and it was the one place where current state had to be
+// sifted out of history. The history is not worthless; it lives in
+// BASE-IMPROVEMENTS.md § "When each piece landed", where changes already go.
+//
+// Scoped to README.md on purpose. ROADMAP.md and SCREEN-ENGINE-PLAN.md are
+// declared HISTORY (README says so), so a dated amendment there is the content.
+describe("README.md states what is true now, not when it became true", () => {
+  const readme = read(join(ROOT, "README.md"))
+
+  it("carries no inline UPDATED/ADDED date stamps", () => {
+    const stamps = [...readme.matchAll(/\b(UPDATED|ADDED|BUILT)\s+20\d\d-\d\d-\d\d/g)].map(
+      (m) => m[0]
+    )
+    expect(
+      stamps,
+      `README.md is the doc map and the current-state file. Put the change in ` +
+        `BASE-IMPROVEMENTS.md and write the present tense here: ${stamps.join(", ")}`
+    ).toEqual([])
+  })
+
+  it("its doc map really does name every root document", () => {
+    // The map claims to list them all, and AGENTS.md — the cross-tool filename an
+    // agent opens by habit — was the one it never mentioned. A map with a hole in
+    // it is worse than no map: a reader trusts it and stops looking.
+    // TRACKED documents only. A skill that writes its report to the repo root
+    // (lean-mean-report.md, interface-lessness-report.md) leaves a .md file that
+    // is git-ignored precisely because it is an ARTEFACT, not a document — and
+    // demanding README link to a file that is not in the repository would make
+    // the build red on a machine that had merely run an audit. So the ignore
+    // list is the definition of "is this ours": root-level entries in
+    // .gitignore, read from the file rather than hard-coded, so a new artefact
+    // is excused the moment somebody ignores it and never before.
+    const ignoredAtRoot = new Set(
+      read(join(ROOT, ".gitignore"))
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l.startsWith("/") && l.endsWith(".md"))
+        .map((l) => l.slice(1))
+    )
+    const roots = readdirSync(ROOT)
+      .filter((f) => f.endsWith(".md") && f !== "README.md" && !ignoredAtRoot.has(f))
+      .sort()
+    const missing = roots.filter((f) => !readme.includes(f))
+    expect(
+      missing,
+      `these root documents are not reachable from README.md's doc map: ${missing.join(", ")}`
+    ).toEqual([])
+  })
+})

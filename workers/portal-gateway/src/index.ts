@@ -31,9 +31,8 @@
 // crash, and answer their own crash without leaking a raw 1101. ONE implementation,
 // deliberately: this door's media serving was once written a second time from memory
 // and shipped without the key check the agency door had carried for weeks.
-import { recordClientError, recordGatewayCrash, serveMedia } from "../../../shared/workers/front-door"
-import { fail } from "../../../shared/workers/http"
-import { safeMediaKey } from "../../../shared/workers/image"
+import { recordClientError, recordGatewayCrash, serveMedia } from "@shared/workers/front-door"
+import { fail } from "@shared/workers/http"
 
 /** The workers a portal door may be forwarded to. */
 type Upstream = "AUTH" | "TENANCY" | "CONTENT" | "REALTIME"

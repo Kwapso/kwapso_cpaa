@@ -17,7 +17,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { TEAM_CREATION_CLOSED } from "../../../shared/product"
+import { TEAM_CREATION_CLOSED } from "@shared/product"
 
 const created: string[] = []
 vi.mock("../src/context", () => ({

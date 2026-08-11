@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest"
 
-import { csvResponse, toCsv } from "../../../shared/workers/csv"
+import { csvResponse, toCsv } from "@shared/workers/csv"
 
 describe("toCsv — RFC-4180 quoting", () => {
   it("quotes commas, quotes and newlines; doubles internal quotes", () => {

@@ -9,19 +9,19 @@
 // hand-listed:
 //
 //   1. EVERY /api PATH THE APP ACTUALLY CALLS reaches a worker — read off
-//      web/lib/api.ts, so a door the app gains tomorrow is covered today. (The
-//      portal suite reads the same file to prove the opposite: that none of them
-//      reaches the CLIENT door.)
+//      web/lib/api/ (every file in it, one per worker), so a door the app gains
+//      tomorrow is covered today. (The portal suite reads the same directory to
+//      prove the opposite: that none of them reaches the CLIENT door.)
 //   2. NOTHING /api EVER FALLS THROUGH TO THE ASSET LAYER. An unknown API path
 //      is "No such API.", not the SPA shell with a 200 on it.
 //   3. THE MEDIA DOORS VALIDATE. This gateway serves any object whose key you
 //      know — a recorded, deliberate capability-URL decision — which rests
 //      entirely on the key being unguessable, so a probe must never reach R2.
 
-import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
+import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 import worker from "../src/index"
 
 const ROOT = join(__dirname, "..", "..", "..")
@@ -96,11 +96,19 @@ describe("agency gateway — /api reaches the worker its path names", () => {
   /** Every /api path literal the app's own API client calls, read off its source
    * rather than retyped — so a route the app gains tomorrow is in this set the
    * moment it ships. The portal's closed-door suite derives its attack list from
-   * exactly the same place. */
+   * exactly the same place.
+   *
+   * It walks the DIRECTORY, not one file. The client used to be a single
+   * `web/lib/api.ts` and this read it by name — so the day a door was declared in
+   * any new file beside it, this suite would have gone on passing while covering
+   * less. The client is now one file per worker under web/lib/api/. */
   function appApiPaths(): string[] {
-    const src = readFileSync(join(ROOT, "web", "lib", "api.ts"), "utf8")
     const found = new Set<string>()
-    for (const m of src.matchAll(/["'`](\/api\/[a-z0-9\-/]*)/g)) found.add(m[1].replace(/\/$/, ""))
+    for (const file of sourceFiles(join(ROOT, "web", "lib", "api"), { extensions: [".ts"] }))
+      // Comments first: these files DISCUSS their own paths in prose, and a door
+      // named in a sentence is not a door the app calls.
+      for (const m of stripComments(file.source).matchAll(/["'`](\/api\/[a-z0-9\-/]*)/g))
+        found.add(m[1].replace(/\/$/, ""))
     return [...found]
   }
 

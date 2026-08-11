@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
+import { stripComments } from "@shared/rules/source-scan"
+
 // THE UNAUTHENTICATED DOOR MUST NOT CRASH ON A WRONG-TYPED FIELD.
 //
 // `POST /api/auth/email/start` with `{"email": 123}` used to be a 500: the code
@@ -22,8 +24,11 @@ import { describe, expect, it } from "vitest"
 
 const SRC = readFileSync(join(__dirname, "../src/index.ts"), "utf8")
 
-/** Comment-stripped source: a rule satisfied by prose is not satisfied. */
-const CODE = SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
+/** Comment-stripped source: a rule satisfied by prose is not satisfied. The ONE
+ * stripper (shared/rules/source-scan.ts) — this file used to carry its own, a
+ * weaker one that left TRAILING comments standing, so a `// body.email` note at
+ * the end of a line still read as a body field being used. */
+const CODE = stripComments(SRC)
 
 describe("auth validates at the boundary", () => {
   it("reads no request field without checking its type", () => {
@@ -45,7 +50,7 @@ describe("auth validates at the boundary", () => {
 
   it("puts every body field through the one validation seam", () => {
     expect(CODE, "auth must import the shared validator").toMatch(
-      /requireText[\s\S]{0,80}from "\.\.\/\.\.\/\.\.\/shared\/workers\/validate"/
+      /requireText[\s\S]{0,80}from "@shared\/workers\/validate"/
     )
     // Every door that reads a body must validate: email start, verify, and both
     // halves of the email change.

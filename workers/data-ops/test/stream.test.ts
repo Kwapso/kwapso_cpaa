@@ -11,8 +11,8 @@ import { describe, expect, it } from "vitest"
 import { sseFrame, terminalEvent } from "../src/routes/agent"
 import { parseAnthropicStream, supportsEffort, toAnthropicMessages } from "../src/lib/model"
 import type { ChatMessage } from "../src/lib/model"
-import type { ChatOutcome, StreamEvent } from "../../../shared/types"
-import type { AgentQuota } from "../../../shared/types"
+import type { ChatOutcome, StreamEvent } from "@shared/types"
+import type { AgentQuota } from "@shared/types"
 
 describe("toAnthropicMessages: canonical wire shape (coalescing is API-safe)", () => {
   it("collapses a multi-tool turn's results into ONE user message, wrap-up ask riding it", () => {

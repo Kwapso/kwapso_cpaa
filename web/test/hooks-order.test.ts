@@ -15,29 +15,32 @@
 // a return counts unless it is inside a NESTED FUNCTION (a callback's own return
 // is its own; an `if`/`try`/`switch` block's return is the component's).
 
-import { readdirSync, readFileSync } from "node:fs"
+import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
+import { sourceFiles } from "@shared/rules/source-scan"
+
 const HERE = dirname(fileURLToPath(import.meta.url))
 const WEB = join(HERE, "..")
 
-function sourceFiles(): string[] {
-  const out: string[] = []
-  const walk = (dir: string) => {
-    for (const e of readdirSync(dir, { withFileTypes: true })) {
-      const p = join(dir, e.name)
-      if (e.isDirectory()) walk(p)
-      else if (/\.(tsx|ts)$/.test(e.name) && !e.name.endsWith(".test.ts")) out.push(p)
-    }
-  }
-  for (const d of ["components", "lib", "app"]) walk(join(WEB, d))
-  return out
+/** Every component, hook and page in the agency app. */
+function scannedFiles(): string[] {
+  return sourceFiles(
+    ["components", "lib", "app"].map((d) => join(WEB, d)),
+    { extensions: [".ts", ".tsx"], skipTests: true }
+  ).map((f) => f.path)
 }
 
 /** Strip strings/template literals/comments so braces inside them don't skew the
- * depth walk (heuristic, good enough for house-style code). */
+ * depth walk (heuristic, good enough for house-style code).
+ *
+ * NOT the shared stripComments: this one is LENGTH-PRESERVING — it blanks each
+ * comment and string with the same number of characters, because every index the
+ * brace walk below computes has to keep pointing at the same place in the
+ * original text. The shared one deletes, which would shift every offset. Two
+ * different jobs, so two functions, and this is the reason. */
 function stripNoise(src: string): string {
   return src
     .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
@@ -159,7 +162,7 @@ export function findOffendersIn(src: string, label: string): string[] {
 }
 
 function findOffenders(): string[] {
-  return sourceFiles().flatMap((f) => findOffendersIn(readFileSync(f, "utf8"), f.slice(WEB.length)))
+  return scannedFiles().flatMap((f) => findOffendersIn(readFileSync(f, "utf8"), f.slice(WEB.length)))
 }
 
 describe("hooks never follow a top-level early return (the React #310 crash class)", () => {
@@ -175,7 +178,7 @@ describe("hooks never follow a top-level early return (the React #310 crash clas
   // silently gone blind — this is the sanity tripwire).
   it("the scan actually parses the codebase (sees many components)", () => {
     let fns = 0
-    for (const file of sourceFiles()) fns += functionStarts(readFileSync(file, "utf8")).length
+    for (const file of scannedFiles()) fns += functionStarts(readFileSync(file, "utf8")).length
     expect(fns).toBeGreaterThan(40)
   })
 
@@ -206,5 +209,51 @@ describe("hooks never follow a top-level early return (the React #310 crash clas
       ["hooks then return", "function D() {\n  const [v] = useState(0)\n  if (!v) return null\n  return v\n}"],
     ]
     for (const [what, src] of legal) expect(findOffendersIn(src, what), `false positive: ${what}`).toEqual([])
+  })
+})
+
+// THE CONTAINMENT HALF (ERROR-HANDLING.md C1).
+//
+// Prevention is above: no hook below an early return. Containment is the
+// ErrorBoundary, because prevention only covers the crash class we know about —
+// a render throw of any other kind still blanks the tree, and window.onerror
+// does not fire for React's render phase.
+//
+// This exists because the boundary was NOT mounted. web/app/layout.tsx imported
+// it and rendered it nowhere, while ERROR-HANDLING.md said in as many words that
+// it is mounted in the root layout "around the routed screens AND the co-pilot
+// host". The portal's layout had it; the agency app's did not, and nothing was
+// red. The lint step added alongside this found it as a dead import — which is a
+// fair description of what a containment guard nobody renders actually is.
+describe("the ErrorBoundary is MOUNTED, not merely imported", () => {
+  const layouts = {
+    "web/app/layout.tsx": readFileSync(join(WEB, "app", "layout.tsx"), "utf8"),
+    "web-portal/app/layout.tsx": readFileSync(
+      join(WEB, "..", "web-portal", "app", "layout.tsx"),
+      "utf8"
+    ),
+  }
+
+  for (const [file, src] of Object.entries(layouts)) {
+    it(`${file} renders it, not just imports it`, () => {
+      expect(src, `${file} must import the boundary`).toContain("ErrorBoundary")
+      expect(
+        /<ErrorBoundary[\s>]/.test(src),
+        `${file} imports ErrorBoundary and never renders it — a render throw blanks the whole tree`
+      ).toBe(true)
+    })
+  }
+
+  it("the agency app wraps the routed screens AND the co-pilot host", () => {
+    // Both, because the agent panel outlives navigation: it renders above the
+    // routed screens, so a throw inside it is not contained by anything a route
+    // owns. ERROR-HANDLING.md names both.
+    const src = layouts["web/app/layout.tsx"]
+    const open = src.indexOf("<ErrorBoundary>")
+    const close = src.indexOf("</ErrorBoundary>")
+    expect(open, "the boundary must be rendered").toBeGreaterThan(-1)
+    const inside = src.slice(open, close)
+    expect(inside, "the routed screens are inside it").toContain("{children}")
+    expect(inside, "the co-pilot host is inside it").toContain("<AgentHost />")
   })
 })

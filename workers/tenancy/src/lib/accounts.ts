@@ -13,18 +13,18 @@
 // <scope>` is one statement D1 runs atomically, and zero rows changed is the
 // refusal. Same shape as the last-admin guard (CONCURRENCY rule 1).
 
-import { logActivity, describeChanges, type Actor } from "../../../../shared/workers/activity"
+import { logActivity, describeChanges, type Actor } from "@shared/workers/activity"
 import {
   accountScopeClause,
   requireAccountInScope,
   requireStandableRoot,
   type AccountScope,
-} from "../../../../shared/workers/account-scope"
-import { d1Query, type D1Rest } from "../../../../shared/workers/d1-rest"
-import { ulid } from "../../../../shared/workers/id"
-import { EXPORT_HARD_CAP, LIST_HARD_CAP, MAX_ACCOUNT_DEPTH } from "../../../../shared/workers/limits"
-import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "../../../../shared/workers/paging"
-import type { Account, AccountDetail, AccountLink, PortalUser } from "../../../../shared/types"
+} from "@shared/workers/account-scope"
+import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
+import { ulid } from "@shared/workers/id"
+import { EXPORT_HARD_CAP, LIST_HARD_CAP, MAX_ACCOUNT_DEPTH } from "@shared/workers/limits"
+import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
+import type { Account, AccountDetail, AccountLink, PortalUser } from "@shared/types"
 import { GuardError, type MemberGuard } from "./permissions"
 
 type AccountRow = {

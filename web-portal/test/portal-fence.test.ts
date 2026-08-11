@@ -40,11 +40,12 @@
 // workers/tenancy/test/account-leak.test.ts is for. It proves no portal-reachable
 // read is built without one, which is the failure that has now happened three times.
 
-import { readFileSync, readdirSync } from "node:fs"
+import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
 import { PORTAL_VISIBLE_READS, PORTAL_VISIBLE_WRITES } from "@shared/rules/registry"
+import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 
 const ROOT = join(__dirname, "..", "..")
 const read = (p: string) => readFileSync(p, "utf8")
@@ -85,8 +86,7 @@ function workerOf(path: string): string | null {
  * one that leaked (`ticketPage`). */
 function indexFunctions(dir: string): Map<string, string> {
   const out = new Map<string, string>()
-  for (const file of readdirSync(dir).filter((f) => f.endsWith(".ts"))) {
-    const code = read(join(dir, file))
+  for (const { source: code } of sourceFiles(dir, { extensions: [".ts"] })) {
     const starts = [...code.matchAll(/(?:export\s+)?(?:async\s+)?function\s+(\w+)/g)]
     starts.forEach((m, i) => out.set(m[1], code.slice(m.index, starts[i + 1]?.index ?? code.length)))
   }
@@ -109,8 +109,9 @@ function reachOf(name: string, fns: Map<string, string>, seen = new Set<string>(
 }
 
 /** Strip comments — a sentence ABOUT a SELECT is not a SELECT, and a note naming
- * the fence must never stand in for calling it. */
-const code = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/gm, "$1")
+ * the fence must never stand in for calling it. The ONE stripper, shared with
+ * every other law that reads source. */
+const code = stripComments
 
 /** Does this function hand rows back — itself, or through a helper in the same
  * file? That is what makes a fence load-bearing. A function that only INSERTs or
@@ -135,8 +136,7 @@ function readsRows(fn: string, fns: Map<string, string>, seen = new Set<string>(
 function indexLib(worker: string): Map<string, { exported: Map<string, string>; all: Map<string, string> }> {
   const dir = join(ROOT, "workers", worker, "src", "lib")
   const out = new Map<string, { exported: Map<string, string>; all: Map<string, string> }>()
-  for (const file of readdirSync(dir).filter((f) => f.endsWith(".ts"))) {
-    const code = read(join(dir, file))
+  for (const { rel: file, source: code } of sourceFiles(dir, { extensions: [".ts"] })) {
     const exported = new Map<string, string>()
     const all = new Map<string, string>()
     const starts = [...code.matchAll(/(export\s+)?(?:async\s+)?function\s+(\w+)/g)]
@@ -334,8 +334,7 @@ describe("portal fence — every write a client can reach is declared and reason
       // Comments are not code: this repo's handlers DISCUSS their fences at
       // length ("the fence decides WHOSE ticket this is"), and prose that names
       // a fence must never stand in for calling one.
-      const code = body.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/gm, "$1")
-      if (!new RegExp(`(?<![\\w.])${declared.fence}\\s*\\(`).test(code)) naked.push(door)
+      if (!new RegExp(`(?<![\\w.])${declared.fence}\\s*\\(`).test(stripComments(body))) naked.push(door)
     }
     expect(
       naked,
@@ -451,25 +450,11 @@ describe("portal fence — every resource the portal listens for can actually be
 })
 
 describe("portal fence — the portal never builds its own idea of scope", () => {
-  function portalSources(): { file: string; src: string }[] {
-    const out: { file: string; src: string }[] = []
-    for (const dir of ["lib", "components", "app"]) {
-      const walk = (p: string) => {
-        for (const entry of readdirSync(join(__dirname, "..", p), { withFileTypes: true } as never) as unknown as {
-          name: string
-          isDirectory: () => boolean
-        }[]) {
-          const rel = `${p}/${entry.name}`
-          if (entry.isDirectory()) walk(rel)
-          else if (/\.tsx?$/.test(entry.name)) out.push({ file: rel, src: read(join(__dirname, "..", rel)) })
-        }
-      }
-      walk(dir)
-    }
-    return out
-  }
-
-  const sources = portalSources()
+  const PORTAL = join(__dirname, "..")
+  const sources = sourceFiles(
+    ["lib", "components", "app"].map((d) => join(PORTAL, d)),
+    { extensions: [".ts", ".tsx"], relativeTo: PORTAL }
+  ).map((f) => ({ file: f.rel, src: f.source }))
 
   it("sees the portal's own source (guards the walk)", () => {
     expect(sources.length).toBeGreaterThan(10)
@@ -498,8 +483,8 @@ describe("portal fence — the portal never builds its own idea of scope", () =>
     for (const { src } of sources) {
       // Comments are stripped first: a note explaining WHY a door is deliberately
       // not called must not read as a call to it.
-      const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
-      for (const m of code.matchAll(/["'`](\/api\/[a-z0-9\-/]*)/g)) called.add(m[1].replace(/\/$/, ""))
+      for (const m of stripComments(src).matchAll(/["'`](\/api\/[a-z0-9\-/]*)/g))
+        called.add(m[1].replace(/\/$/, ""))
     }
     const unreachable = [...called].filter((p) => !named.has(p))
     expect(

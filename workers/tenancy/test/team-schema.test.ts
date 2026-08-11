@@ -1,7 +1,7 @@
 // Unit tests for the team factory's pure logic: schema + seed building.
 import { describe, expect, it } from "vitest"
 
-import { sqlString } from "../../../shared/workers/d1-rest"
+import { sqlString } from "@shared/workers/d1-rest"
 import {
   buildTeamSeed,
   DEFAULT_SELECTABLE,

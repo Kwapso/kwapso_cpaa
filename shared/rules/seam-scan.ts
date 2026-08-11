@@ -20,39 +20,36 @@
 // reason. That data stays beside the worker it describes, because that is what
 // a reviewer reads.
 //
+// The file-reading it stands on — the directory walk and stripComments — lives in
+// source-scan.ts beside this file, shared with every other law that reads source.
+//
 // It reads handler SOURCE off disk rather than calling anything, on purpose: a
 // gate that is present in the code is the only kind that can be proved without
 // running the whole worker, and a mutation that "forgets" to publish is invisible
 // to any behavioural test that doesn't already know what it forgot.
 
-import { readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
+
+import { sourceFiles, stripComments } from "./source-scan"
 
 /** A worker's declarative route table, as every domain worker exports it. */
 export type SeamRoutes = Record<string, { handler: { name: string }; kind: string }>
 
-/** Every `export async function NAME` body in a dir of .ts files, keyed by name.
- * Each body runs to the next top-level export, which is why stripComments below
- * is load-bearing: the slice swallows the doc comment introducing the NEXT
- * function. */
+/** Every `export async function NAME` body under a directory of .ts files, keyed
+ * by name. Each body runs to the next top-level export, which is why
+ * stripComments is load-bearing: the slice swallows the doc comment introducing
+ * the NEXT function. The walk RECURSES — a handler that moves into
+ * routes/<something>/ must not fall out of R1 and R10 by being moved. */
 export function indexFunctions(dir: string): Map<string, string> {
   const out = new Map<string, string>()
-  for (const file of readdirSync(dir).filter((f) => f.endsWith(".ts"))) {
-    const code = readFileSync(join(dir, file), "utf8")
-    const starts = [...code.matchAll(/export\s+async\s+function\s+(\w+)/g)]
-    starts.forEach((m, i) => out.set(m[1], code.slice(m.index, starts[i + 1]?.index ?? code.length)))
+  for (const file of sourceFiles(dir, { extensions: [".ts"] })) {
+    const starts = [...file.source.matchAll(/export\s+async\s+function\s+(\w+)/g)]
+    starts.forEach((m, i) =>
+      out.set(m[1], file.source.slice(m.index, starts[i + 1]?.index ?? file.source.length))
+    )
   }
   return out
-}
-
-/** Comments are NOT code. This repo comments heavily and its comments DISCUSS
- * the very seams being scanned ("no requireRight (it's about you)") — without
- * this, a handler whose real gate was deleted stayed GREEN, satisfied by prose
- * below it. Block comments go first; line comments only when the `//` isn't part
- * of a `https://` URL. */
-export function stripComments(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/gm, "$1")
 }
 
 /** The permission gates. Any ONE of these opening a handler satisfies R10. The

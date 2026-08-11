@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest"
 
-import { describeChanges } from "../../../shared/workers/activity"
+import { describeChanges } from "@shared/workers/activity"
 
 describe("describeChanges: name what changed, old → new", () => {
   it("shows changed values, drops unchanged ones", () => {

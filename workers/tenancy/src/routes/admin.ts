@@ -2,11 +2,11 @@
 // on-demand DB size check, and the module mover. The sharding machinery lives
 // in lib/sharding; these just guard + drive it.
 
-import { fail, json } from "../../../../shared/workers/http"
-import { d1Query } from "../../../../shared/workers/d1-rest"
+import { fail, json } from "@shared/workers/http"
+import { d1Query } from "@shared/workers/d1-rest"
 import { checkDatabaseSizes, moveModuleToOwnDatabase } from "../lib/sharding"
 import { applyMigration, createTeam, d1Config } from "../lib/teams"
-import { requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
+import { requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { adminGuard } from "../context"
 import { TEAM_MIGRATIONS } from "../team-schema"
 import type { Env } from "../env"

@@ -25,15 +25,15 @@
 // -byte what they were. Not "a 403" — a 200 with the name in it leaks just as
 // hard as a successful write.
 
-import { readFileSync, readdirSync } from "node:fs"
+import { readFileSync } from "node:fs"
 import type { DatabaseSync } from "node:sqlite"
 import { join } from "node:path"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const holder = vi.hoisted(() => ({ db: null as DatabaseSync | null }))
 
-vi.mock("../../../shared/workers/d1-rest", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../shared/workers/d1-rest")>()
+vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@shared/workers/d1-rest")>()
   const { d1Impl } = await import("./d1-sqlite")
   return { ...actual, ...d1Impl(() => holder.db as DatabaseSync) }
 })
@@ -42,8 +42,10 @@ import {
   ACTIVITY_GATE_MAP,
   ACCOUNT_SCOPED_MODULES,
   PORTAL_ACTIVITY_FENCE,
-} from "../../../shared/rules/registry"
-import { ACCOUNT_OWNED_TABLES, accountScope } from "../../../shared/workers/account-scope"
+} from "@shared/rules/registry"
+import { indexFunctions } from "@shared/rules/seam-scan"
+import { sourceFiles } from "@shared/rules/source-scan"
+import { ACCOUNT_OWNED_TABLES, accountScope } from "@shared/workers/account-scope"
 import { createAccount, grantPortalAccess, linkPerson } from "../src/lib/accounts"
 import { FIXED_SCOPE_TABLES } from "../src/lib/activity-read"
 import worker, { ROUTES } from "../src/index"
@@ -52,17 +54,6 @@ import { buildSpineDb, IDS, makeEnv, req, VICTIM_IDS } from "./spine-harness"
 const SRC = join(__dirname, "..", "src")
 
 // ── which routes are account-scoped (DERIVED, never hand-listed) ─────────────
-
-/** Every `export async function NAME` body in a dir, keyed by name. */
-function indexFunctions(dir: string): Map<string, string> {
-  const out = new Map<string, string>()
-  for (const file of readdirSync(dir).filter((f) => f.endsWith(".ts"))) {
-    const code = readFileSync(join(dir, file), "utf8")
-    const starts = [...code.matchAll(/export\s+async\s+function\s+(\w+)/g)]
-    starts.forEach((m, i) => out.set(m[1], code.slice(m.index, starts[i + 1]?.index ?? code.length)))
-  }
-  return out
-}
 
 const routeFns = indexFunctions(join(SRC, "routes"))
 
@@ -559,11 +550,13 @@ describe("leak-test coverage: every account-scoped door has a burglar on it", ()
     // …and nothing ELSE in the worker writes SQL against those tables behind its back.
     const offenders: string[] = []
     for (const dir of ["lib", "routes"]) {
-      for (const file of readdirSync(join(SRC, dir)).filter((f) => f.endsWith(".ts"))) {
-        if (file === "accounts.ts") continue
-        const code = readFileSync(join(SRC, dir, file), "utf8")
-        if (/(FROM|INTO|UPDATE)\s+(accounts|account_links|portal_users)\b/.test(code))
-          offenders.push(`${dir}/${file}`)
+      // Recursive, through the one shared walker: a spine query that moved into
+      // lib/<anything>/ would have walked straight out of this boundary when the
+      // scan read one directory flat.
+      for (const file of sourceFiles(join(SRC, dir), { extensions: [".ts"] })) {
+        if (file.rel === "accounts.ts") continue
+        if (/(FROM|INTO|UPDATE)\s+(accounts|account_links|portal_users)\b/.test(file.source))
+          offenders.push(`${dir}/${file.rel}`)
       }
     }
     expect(

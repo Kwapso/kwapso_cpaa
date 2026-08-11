@@ -101,7 +101,7 @@ export function usePortalSession(): {
   error: unknown
   refresh: () => void
 } {
-  const { data, loading, error, refresh } = useCached<Resolved>(cacheKeys.session, resolveSession)
+  const { data, error, refresh } = useCached<Resolved>(cacheKeys.session, resolveSession)
 
   const session = React.useMemo<PortalSession>(() => {
     // A REAL ERROR IS NOT A SIGN-OUT. `resolveSession` already turns a 401/403/409
@@ -126,7 +126,7 @@ export function usePortalSession(): {
       accounts: data.context.accounts,
       currentAccountId: data.context.currentAccountId as string,
     }
-  }, [data, loading, error])
+  }, [data, error])
 
   return { session, error, refresh }
 }

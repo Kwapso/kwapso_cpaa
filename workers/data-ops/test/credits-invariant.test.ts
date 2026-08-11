@@ -15,12 +15,14 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
+import { stripComments } from "@shared/rules/source-scan"
+
 const SRC = readFileSync(join(__dirname, "../src/lib/credits.ts"), "utf8")
 
-/** Comments are NOT code (the same rule shared/rules/seam-scan.ts applies): this
- * file's comments DISCUSS every invariant below, so an unstripped scan can be
- * satisfied by prose describing the very line that was deleted. */
-const CODE = SRC.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/gm, "$1")
+/** Comments are NOT code: this file's comments DISCUSS every invariant below, so
+ * an unstripped scan can be satisfied by prose describing the very line that was
+ * deleted. The one shared stripper does it (shared/rules/source-scan.ts). */
+const CODE = stripComments(SRC)
 
 /** Where the PAID decrement is — every guard below is asserted RELATIVE to it, so
  * a sibling statement's `changes` can never stand in for this one's. */

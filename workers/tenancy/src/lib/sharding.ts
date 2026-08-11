@@ -17,9 +17,9 @@ import {
   d1QueryAcross,
   sqlValue,
   type D1Rest,
-} from "../../../../shared/workers/d1-rest"
-import { ulid } from "../../../../shared/workers/id"
-import { CRON_ALERT_CAP } from "../../../../shared/workers/limits"
+} from "@shared/workers/d1-rest"
+import { ulid } from "@shared/workers/id"
+import { CRON_ALERT_CAP } from "@shared/workers/limits"
 import type { Env } from "../env"
 
 /** 80% of D1's 10GB per-database cap. */

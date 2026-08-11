@@ -29,7 +29,7 @@ import { join } from "node:path"
 import { DatabaseSync, type SqlValue } from "node:sqlite"
 import { describe, expect, it } from "vitest"
 
-import { logError, MAX_ERROR_LOGS_PER_HOUR } from "../../../shared/workers/error-log"
+import { logError, MAX_ERROR_LOGS_PER_HOUR } from "@shared/workers/error-log"
 
 const CORE = join(__dirname, "..", "..", "..", "db", "core")
 const migration = (name: string) => readFileSync(join(CORE, name), "utf8")

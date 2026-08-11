@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-import { CRON_ALERT_CAP } from "../../../shared/workers/limits"
+import { CRON_ALERT_CAP } from "@shared/workers/limits"
 import { ALERT_THRESHOLD_BYTES, checkDatabaseSizes } from "../src/lib/sharding"
 import type { Env } from "../src/env"
 

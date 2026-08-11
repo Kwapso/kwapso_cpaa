@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "react", "promise"],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "unicorn/prefer-string-starts-ends-with": "off"
+  },
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/.next/**",
+    "**/out/**",
+    "glide/**",
+    "**/next-env.d.ts",
+    ".claude/**"
+  ]
+}

@@ -5,9 +5,9 @@
 // a team's database. The code lives in its own table so it can't be replayed as
 // a login (see db/core/0005_email_change.sql).
 
-import type { SessionUser } from "../../../../shared/types"
-import { ulid } from "../../../../shared/workers/id"
-import { publishSignOut } from "../../../../shared/workers/realtime"
+import type { SessionUser } from "@shared/types"
+import { ulid } from "@shared/workers/id"
+import { publishSignOut } from "@shared/workers/realtime"
 import type { Env } from "../env"
 import { logAccountActivity } from "./account-activity"
 import { randomCode, sha256Hex } from "./crypto"

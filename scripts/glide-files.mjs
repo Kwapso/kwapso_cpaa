@@ -206,7 +206,7 @@ writeFileSync(
     {
       generatedAt: new Date().toISOString(),
       source: `${GLIDE_UPLOAD_HOST}${GLIDE_UPLOAD_PREFIX}`,
-      files: ok.map(({ skipped, ...keep }) => keep),
+      files: ok.map(({ skipped: _skipped, ...keep }) => keep),
       failures: failed.map(({ url, error, refs }) => ({ url, error, refs })),
     },
     null,

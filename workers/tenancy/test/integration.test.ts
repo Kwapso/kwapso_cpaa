@@ -9,11 +9,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 // The team-DB reads (admin-role lookup, role existence) go through d1Query (the
 // REST door) — mock those; the global-DB writes hit our real-SQLite env.DB.
 const { d1Query } = vi.hoisted(() => ({ d1Query: vi.fn() }))
-vi.mock("../../../shared/workers/d1-rest", () => ({ d1Query }))
-vi.mock("../../../shared/workers/activity", () => ({
+vi.mock("@shared/workers/d1-rest", () => ({ d1Query }))
+vi.mock("@shared/workers/activity", () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock("../../../shared/workers/realtime", () => ({
+vi.mock("@shared/workers/realtime", () => ({
   publishChange: vi.fn().mockResolvedValue(undefined),
   publishUserChange: vi.fn().mockResolvedValue(undefined),
 }))

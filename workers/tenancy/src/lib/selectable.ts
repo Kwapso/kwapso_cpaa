@@ -4,12 +4,12 @@
 // stay theirs to shape. Deactivate-only (ARCHITECTURE §4): a removed value is
 // retired, never hard-deleted, so old rows that referenced it stay truthful.
 
-import { logActivity, type Actor } from "../../../../shared/workers/activity"
-import { d1ExecScript, d1Query, sqlString, type D1Rest } from "../../../../shared/workers/d1-rest"
-import { ulid } from "../../../../shared/workers/id"
-import type { SelectableValue } from "../../../../shared/types"
+import { logActivity, type Actor } from "@shared/workers/activity"
+import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
+import { ulid } from "@shared/workers/id"
+import type { SelectableValue } from "@shared/types"
 import { GuardError, type MemberGuard } from "./permissions"
-import { EXPORT_HARD_CAP, LIST_HARD_CAP } from "../../../../shared/workers/limits"
+import { EXPORT_HARD_CAP, LIST_HARD_CAP } from "@shared/workers/limits"
 
 type Row = { id: string; type: string; value: string; is_default: number; deactivated_at: string | null }
 

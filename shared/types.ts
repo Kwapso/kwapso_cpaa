@@ -278,18 +278,6 @@ export type ImportableTarget = {
   active: boolean
 }
 
-/** A 3-stage data-import session (file validation → extraction → import). */
-export type ImportSession = {
-  id: string
-  tableId: string
-  tableName: string | null
-  overallStatus: string
-  fileValidated: boolean
-  extractionComplete: boolean
-  importComplete: boolean
-  createdAt: string
-}
-
 /** A saved agent conversation thread (per team — the agent's memory). */
 export type AgentThread = {
   id: string
@@ -339,14 +327,6 @@ export type UsageLogRow = {
 
 /** One column an import maps a file onto (matches a catalog target's columns). */
 export type ImportColumn = { key: string; label: string; required: boolean }
-
-/** The preview an import session produces — a capped sample of mapped rows + issues. */
-export type ImportPreview = {
-  columns: ImportColumn[]
-  rows: Record<string, string>[]
-  totalCount: number
-  issues: string[]
-}
 
 /* ---- Agentic multi-file import (AGENTIC-IMPORT.md) ---- */
 

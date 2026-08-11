@@ -19,6 +19,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
+import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 import worker, { PORTAL_DOORS } from "../src/index"
 
 const ROOT = join(__dirname, "..", "..", "..")
@@ -85,14 +86,19 @@ describe("portal gateway — everything else is closed", () => {
   /** The AGENCY app's whole /api surface, read off ITS source rather than
    * retyped: every path literal the agency's API client calls. A route the
    * agency gains tomorrow is in this set the moment it ships, so the portal can
-   * never silently inherit it. */
+   * never silently inherit it.
+   *
+   * It walks the DIRECTORY (web/lib/api/, one file per worker), not one file by
+   * name. When the agency client was a single api.ts this read that file — so a
+   * door declared in any new file beside it would have been an agency door this
+   * suite never fired at the client's gateway. */
   function agencyApiPaths(): string[] {
-    const src = readFileSync(join(ROOT, "web", "lib", "api.ts"), "utf8")
     const found = new Set<string>()
-    for (const m of src.matchAll(/["'`](\/api\/[a-z0-9\-/]*)/g)) {
-      // Trim a trailing slash left by a template literal that continues into an id.
-      found.add(m[1].replace(/\/$/, ""))
-    }
+    for (const file of sourceFiles(join(ROOT, "web", "lib", "api"), { extensions: [".ts"] }))
+      // Comments first (these files discuss their own paths in prose), then trim a
+      // trailing slash left by a template literal that continues into an id.
+      for (const m of stripComments(file.source).matchAll(/["'`](\/api\/[a-z0-9\-/]*)/g))
+        found.add(m[1].replace(/\/$/, ""))
     return [...found]
   }
 

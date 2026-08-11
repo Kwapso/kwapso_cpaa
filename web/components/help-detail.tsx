@@ -37,7 +37,7 @@ import type {
 } from "@shared/types"
 import { ApiFailure, content, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
-import { formatActivityWhen, formatRelative } from "@shared/web/format"
+import { formatRelative } from "@shared/web/format"
 import { personName } from "@/lib/identity"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"

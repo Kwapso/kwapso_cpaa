@@ -3,16 +3,16 @@
 // into the team (acceptPendingInvites reads it). The branded invite email is
 // sent THROUGH the auth worker (it owns the Resend key). All guards live here.
 
-import { brand } from "../../../../shared/brand"
-import { logActivity, type Actor } from "../../../../shared/workers/activity"
-import { d1ExecScript, d1Query, sqlString, type D1Rest } from "../../../../shared/workers/d1-rest"
-import { ulid } from "../../../../shared/workers/id"
-import { sendBrandedEmail } from "../../../../shared/workers/notify"
-import type { Invite, InviteAudit } from "../../../../shared/types"
+import { brand } from "@shared/brand"
+import { logActivity, type Actor } from "@shared/workers/activity"
+import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
+import { ulid } from "@shared/workers/id"
+import { sendBrandedEmail } from "@shared/workers/notify"
+import type { Invite, InviteAudit } from "@shared/types"
 import type { Env } from "../env"
 import { GuardError, type MemberGuard } from "./permissions"
 import { notifyInviteRevoked } from "./notify"
-import { LIST_HARD_CAP } from "../../../../shared/workers/limits"
+import { LIST_HARD_CAP } from "@shared/workers/limits"
 
 const INVITE_TTL_DAYS = 7
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/

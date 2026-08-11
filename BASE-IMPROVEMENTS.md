@@ -370,6 +370,24 @@ A sweep of real bugs surfaced by the team exercising the AI co-pilot on staging.
 
 ---
 
+## When each piece landed
+
+Lifted out of README.md's opening paragraphs, where five `UPDATED <date>:` stamps had
+grown inside the prose describing what is true NOW — including two competing dates for
+the same fact. That file is the first thing every reader and every agent opens; current
+state should not have to be sifted out of history. The history is not worthless, so it
+lives here, where changes already go.
+
+| When | What landed |
+|---|---|
+| 2026-06-21 | The module formerly called "roles & permissions" became **Member roles** (module key `member_roles`). |
+| 2026-06-21 | The team area (Overview, Members, Member roles, Invites) moved to `/t/<teamId>/…` deep-link URLs under the screen engine; top-level `/members` and `/roles` became thin redirects. |
+| 2026-06-23 | The **agent-modules build** landed (branch `agent-modules`): learning, help, CSV import and the AI agent all BUILT. |
+| 2026-07-07 | The **mcp** worker — the external machine surface — shipped: access tokens bridged to team-pinned sessions, gated doors exposed as MCP tools at `/mcp`. |
+| 2026-08-10 | The eighth worker made the roster **eight**: six brains under two front doors, `gateway` and `portal-gateway`. |
+
+---
+
 ## The meta-lesson (worth its own guardrail)
 
 Two of the worst issues (the agent confirm gap, the fork-sweep leaving live URLs) **slipped past our own checks because a check encoded the wrong intent** — a test that asserted the vulnerable behaviour as correct, and a sweep rule that treated a live URL as "history." An incumbent review rationalises what's already there. **Schedule a periodic fresh, no-prior-context review** (a clean clone, independent agents) — it finds what the incumbent gate accepts. This is why the base now recommends running the audits against a *pristine* clone, not the working tree.

@@ -13,7 +13,7 @@
 // recipe. Gated by the caller holding create on at least one import target.
 
 import * as React from "react"
-import { Download, FileSpreadsheet, Sparkles, Upload, X } from "lucide-react"
+import { Download, FileSpreadsheet, Sparkles, Upload } from "lucide-react"
 
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"

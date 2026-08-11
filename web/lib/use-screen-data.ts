@@ -11,8 +11,6 @@
 // whole team area (they back list + breadcrumb + a tab-count badge); members /
 // learning / help / team-meta load only on their own module.
 
-import * as React from "react"
-
 import { tenancy } from "@/lib/api"
 import { accountsKey, cursorKey, helpKey, listFetch, totalKey } from "@/lib/live-resources"
 import { primeCache, useCached, useCachedValue } from "@shared/web/store"

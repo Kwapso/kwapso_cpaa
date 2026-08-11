@@ -86,7 +86,7 @@ Start with **[README.md](README.md)** (the doc map), then:
 
 ## Working agreement
 
-- **`npm run check` must stay green** (TypeScript across every workspace + the full test suite, including the rule + seam tests). Run it before you commit. It is the gate.
+- **`npm run check` must stay green** (the lint, then TypeScript across every workspace, then the full test suite including the rule + seam tests). Run it before you commit. It is the gate. The lint (`npm run lint` — oxlint, ~15ms over the whole repo) runs FIRST because it is the cheapest of the three: dead imports, unused dependencies in a hook's array, a React hook rule broken. Its first clean run found an `ErrorBoundary` imported into the root layout and rendered nowhere.
 - **Ship gate** (before `/ship-staging`): `npm run check`, then the quality skills — `lean_mean` (≥ 92), `story_checks_out`, and `security_sentry` (no critical/high) — then deploy. Adversarially verify your own findings.
 - **Deploy order is realtime-FIRST**, then auth → tenancy → content → data-ops → mcp → gateway → portal-gateway. Both gateways go last, for the same reason: each service-binds the domain workers it forwards to. Production is owner-gated (apply new core + team migrations first). See OPERATIONS.md.
 - **Commit messages** end with the Co-Authored-By line. Branch off `main`; don't commit straight to it.

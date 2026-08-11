@@ -7,15 +7,15 @@
 // Reads the TEAM DB (help, help_threads, help_stakeholders) for the derived/stored
 // rows + the GLOBAL core (team_members for admins, users for display names).
 
-import { logActivity, type Actor } from "../../../../shared/workers/activity"
-import { d1ExecScript, d1Query, sqlString, type D1Rest } from "../../../../shared/workers/d1-rest"
-import { ulid } from "../../../../shared/workers/id"
-import { type AccountScope } from "../../../../shared/workers/account-scope"
-import { GuardError, type MemberGuard } from "../../../../shared/workers/gating"
-import type { HelpStakeholder } from "../../../../shared/types"
+import { logActivity, type Actor } from "@shared/workers/activity"
+import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
+import { ulid } from "@shared/workers/id"
+import { type AccountScope } from "@shared/workers/account-scope"
+import { GuardError, type MemberGuard } from "@shared/workers/gating"
+import type { HelpStakeholder } from "@shared/types"
 import { getTicket } from "./help"
 import type { Env } from "../env"
-import { THREAD_HARD_CAP } from "../../../../shared/workers/limits" // R14 hard cap
+import { THREAD_HARD_CAP } from "@shared/workers/limits" // R14 hard cap
 
 /** The four origins a stakeholder can have — drives the chip label in the UI. */
 export type StakeholderOrigin = "raiser" | "admin" | "mentioned" | "added"

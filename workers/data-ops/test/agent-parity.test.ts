@@ -7,11 +7,11 @@
 
 import { describe, expect, it } from "vitest"
 
-import { GLOSSARY } from "../../../shared/glossary"
+import { GLOSSARY } from "@shared/glossary"
 import { capabilityBrief } from "../src/lib/app-brief"
 import { DROPDOWN_ORDER_RULE, SYSTEM } from "../src/lib/agent"
 import { TARGETS } from "../src/lib/targets"
-import { sharedByName } from "../../../shared/workers/tool-catalog"
+import { sharedByName } from "@shared/workers/tool-catalog"
 
 describe("agent-app parity (Law R9): the agent knows what the app can do", () => {
   it("the system prompt carries the generated capability brief", () => {

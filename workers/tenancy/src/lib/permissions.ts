@@ -10,4 +10,4 @@ export {
   requireRight,
   type Right,
   type MemberGuard,
-} from "../../../../shared/workers/gating"
+} from "@shared/workers/gating"

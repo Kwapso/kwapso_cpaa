@@ -123,7 +123,7 @@ const API = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/r2`
 async function cf(path, init = {}) {
   const res = await fetch(`${API}${path}`, {
     ...init,
-    headers: { Authorization: `Bearer ${TOKEN}`, ...(init.headers ?? {}) },
+    headers: { Authorization: `Bearer ${TOKEN}`, ...init.headers },
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
   const isJson = (res.headers.get("content-type") ?? "").includes("json")

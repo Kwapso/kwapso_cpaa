@@ -8,6 +8,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
+import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 import { GLOSSARY } from "@shared/glossary"
 import {
   ACCOUNT_SCOPED_MODULES,
@@ -17,6 +18,7 @@ import {
   DEAF_EXEMPT,
   FORM_DIALOGS,
   GROWING_COLLECTIONS,
+  MUTATING_WORKERS,
   RAW_BODY_EXEMPT,
   RECORD_DETAIL_COMPONENTS,
   RECORD_TAB_COUNT_EXCEPTIONS,
@@ -28,47 +30,23 @@ import { SIMPLE_INVALIDATIONS, TEAM_RESOURCES } from "../lib/live-resources"
 import { TEAM_SECTIONS } from "../lib/pages"
 import { BASE_RECIPES, tabCountKey, withTabCounts } from "../lib/screens"
 
-/** Every worker's src .ts file (recursively), as [repo-relative path, source]. */
-function workerSources(): [string, string][] {
-  const out: [string, string][] = []
-  const walk = (d: string) => {
-    for (const e of readdirSync(d, { withFileTypes: true })) {
-      const p = join(d, e.name)
-      if (e.isDirectory()) walk(p)
-      else if (e.name.endsWith(".ts")) out.push([p.slice(ROOT.length), read(p)])
-    }
-  }
-  for (const w of readdirSync(join(ROOT, "workers"), { withFileTypes: true }))
-    if (w.isDirectory()) walk(join(ROOT, "workers", w.name, "src"))
-  return out
-}
-
 const HERE = dirname(fileURLToPath(import.meta.url)) // web/test
 const WEB = join(HERE, "..") // web/
 const ROOT = join(WEB, "..") // repo root
 const read = (p: string) => readFileSync(p, "utf8")
 
-/** Comments are NOT code. Without this, `// no LIMIT needed here` satisfies the
- * very bound it describes the ABSENCE of, and a comment naming a seam stands in
- * for calling it. Block comments go first; line comments only when the `//`
- * isn't part of a `https://` URL (SQL and template literals are left intact —
- * R14 reads LIMIT out of them). */
-function stripComments(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/gm, "$1")
+/** Every worker's src .ts file (recursively), as [repo-relative path, source]. */
+function workerSources(): [string, string][] {
+  const srcDirs = readdirSync(join(ROOT, "workers"), { withFileTypes: true })
+    .filter((w) => w.isDirectory())
+    .map((w) => join(ROOT, "workers", w.name, "src"))
+  return sourceFiles(srcDirs, { extensions: [".ts"], relativeTo: ROOT }).map((f) => [f.rel, f.source])
 }
 
-/** Every *.tsx under web/components (recursively). */
+/** Every *.tsx under web/components (recursively — the folder has subdirectories,
+ * and a component that moves into one must not fall out of the laws below). */
 function componentFiles(): string[] {
-  const out: string[] = []
-  const walk = (dir: string) => {
-    for (const e of readdirSync(dir, { withFileTypes: true })) {
-      const p = join(dir, e.name)
-      if (e.isDirectory()) walk(p)
-      else if (e.name.endsWith(".tsx")) out.push(p)
-    }
-  }
-  walk(join(WEB, "components"))
-  return out
+  return sourceFiles(join(WEB, "components"), { extensions: [".tsx"] }).map((f) => f.path)
 }
 
 describe("RULES — the laws of the base", () => {
@@ -228,7 +206,7 @@ describe("RULES — the laws of the base", () => {
   it("generic-activity-path: the activity read path has a generic record scope", () => {
     const src = read(join(ROOT, "workers", "tenancy", "src", "lib", "activity-read.ts"))
     expect(src, "activity-read must support the generic `record` scope").toContain('scope === "record"')
-    const api = read(join(WEB, "lib", "api.ts"))
+    const api = read(join(WEB, "lib", "api", "tenancy.ts"))
     expect(api, "the web app reads record activity through the one fetcher").toContain("recordActivity")
   })
 
@@ -244,6 +222,51 @@ describe("RULES — the laws of the base", () => {
     }
   })
 
+  // R1, the ROSTER half. The per-worker publish-seam suites prove each mutation in
+  // the workers that HAVE one publishes. Nothing proved the roster: MUTATING_WORKERS
+  // sat in the registry saying "a new mutating worker without a publish-seam test is
+  // a gap — track it here", and no check read it, so a ninth worker that published
+  // and shipped no suite would have been exactly that gap, silently. Both directions,
+  // derived from disk.
+  it("publish-seam-roster: every worker that publishes has a publish-seam suite", () => {
+    const publishers = readdirSync(join(ROOT, "workers"), { withFileTypes: true })
+      .filter((w) => w.isDirectory())
+      .filter((w) =>
+        sourceFiles(join(ROOT, "workers", w.name, "src"), { extensions: [".ts"] }).some((f) =>
+          /publish(Change|UserChange|SignOut)\s*\(/.test(stripComments(f.source))
+        )
+      )
+      .map((w) => w.name)
+
+    // The scan must not go blind: three workers are the known floor.
+    expect(publishers.length, "the publisher scan found almost nothing").toBeGreaterThanOrEqual(3)
+
+    // auth is the reviewed exception CLAUDE.md and CACHING.md rule 5 already name:
+    // it publishes on the USER channel (identity events + a forced sign-out), not a
+    // team resource, so there is no ROUTES-table mutation set for a seam to walk.
+    const EXEMPT: Record<string, string> = {
+      auth: "publishes on the per-user identity channel, not a team resource — no ROUTES mutation set to walk (CACHING.md rule 5)",
+    }
+    const unguarded = publishers.filter((w) => !MUTATING_WORKERS.includes(w as never) && !EXEMPT[w])
+    expect(
+      unguarded,
+      `these workers publish and have no publish-seam suite — add one and list them in ` +
+        `MUTATING_WORKERS, or add a reasoned exemption: ${unguarded.join(", ")}`
+    ).toEqual([])
+
+    // …and the other direction: a name in MUTATING_WORKERS must be a worker that
+    // really carries the suite, so the list can't rot into a wish.
+    for (const w of MUTATING_WORKERS) {
+      expect(publishers, `MUTATING_WORKERS lists ${w}, which publishes nothing`).toContain(w)
+      expect(
+        existsSync(join(ROOT, "workers", w, "test", "publish-seam.test.ts")),
+        `MUTATING_WORKERS lists ${w}, which has no publish-seam.test.ts`
+      ).toBe(true)
+    }
+    for (const w of Object.keys(EXEMPT))
+      expect(publishers, `${w} is exempted from R1's roster but publishes nothing`).toContain(w)
+  })
+
   // R11 — every EXTERNAL fetch (a bare global fetch() to the internet) carries an
   // AbortSignal timeout, so a hung socket can't stall a worker. Service-binding calls
   // (X.fetch()) are Cloudflare-bounded and exempt (the bare-fetch regex skips them).
@@ -256,32 +279,20 @@ describe("RULES — the laws of the base", () => {
         .filter((e) => e.isDirectory())
         .map((e) => join(ROOT, "workers", e.name, "src")),
     ]
-    const tsFiles = (dir: string): string[] => {
-      const out: string[] = []
-      const walk = (d: string) => {
-        for (const e of readdirSync(d, { withFileTypes: true })) {
-          const p = join(d, e.name)
-          if (e.isDirectory()) walk(p)
-          else if (e.name.endsWith(".ts") && !e.name.endsWith(".test.ts")) out.push(p)
-        }
-      }
-      walk(dir)
-      return out
-    }
     const offenders: string[] = []
-    for (const dir of serverDirs) {
-      for (const file of tsFiles(dir)) {
-        const src = read(file)
-        // `await fetch(` = an awaited call to the GLOBAL fetch (an external socket).
-        // This excludes service bindings (`X.fetch`), the Worker `async fetch(` handler,
-        // and type annotations (`{ fetch(url…) }`) — all of which aren't external calls.
-        const re = /\bawait fetch\(/g
-        let m: RegExpExecArray | null
-        while ((m = re.exec(src))) {
-          const window = src.slice(m.index, m.index + 600)
-          if (!/signal:\s*AbortSignal\.timeout/.test(window))
-            offenders.push(`${file.slice(ROOT.length)} @${m.index}`)
-        }
+    for (const file of sourceFiles(serverDirs, {
+      extensions: [".ts"],
+      skipTests: true,
+      relativeTo: ROOT,
+    })) {
+      // `await fetch(` = an awaited call to the GLOBAL fetch (an external socket).
+      // This excludes service bindings (`X.fetch`), the Worker `async fetch(` handler,
+      // and type annotations (`{ fetch(url…) }`) — all of which aren't external calls.
+      const re = /\bawait fetch\(/g
+      let m: RegExpExecArray | null
+      while ((m = re.exec(file.source))) {
+        const window = file.source.slice(m.index, m.index + 600)
+        if (!/signal:\s*AbortSignal\.timeout/.test(window)) offenders.push(`${file.rel} @${m.index}`)
       }
     }
     expect(offenders, `external fetch without an AbortSignal timeout (R11): ${offenders.join(", ")}`).toEqual([])
@@ -529,10 +540,13 @@ describe("RULES — the laws of the base", () => {
       lengthBadges,
       `a capped list's length is a ceiling, not a total (R16) — badge from the server total via formatCount: ${lengthBadges.join(", ")}`
     ).toEqual([])
-    // …and the badge builders route through the seam.
+    // …and the badge builders route through the seam. The deep-link switch's
+    // badges are all on the COLLECTION half (a record detail badges its tabs
+    // through withTabCounts instead), so that is the file named here — it used to
+    // be module-content.tsx, before the switch became two files.
     expect(read(join(WEB, "components", "team-section-nav.tsx"))).toContain("formatCount")
-    const moduleContent = read(join(WEB, "components", "deep-link", "module-content.tsx"))
-    expect(moduleContent).toContain("formatCount")
+    const collections = read(join(WEB, "components", "deep-link", "collection-content.tsx"))
+    expect(collections).toContain("formatCount")
 
     // (ii) THE PLACE — every registry section with a count key whose placement
     // isn't "tab" renders a CollectionHeading (derived, never hand-listed).
@@ -721,8 +735,7 @@ describe("RULES — the laws of the base", () => {
       // requireAnyImportRight), and a walk that stopped at exported names would
       // read those doors as ungated and unrefused.
       const fns = new Map<string, string>()
-      for (const file of readdirSync(dir).filter((f) => f.endsWith(".ts"))) {
-        const code = read(join(dir, file))
+      for (const { source: code } of sourceFiles(dir, { extensions: [".ts"] })) {
         const starts = [...code.matchAll(/(?:export\s+)?(?:async\s+)?function\s+(\w+)/g)]
         starts.forEach((m, i) => fns.set(m[1], code.slice(m.index, starts[i + 1]?.index ?? code.length)))
       }

@@ -12,8 +12,8 @@
 
 import { describe, expect, it } from "vitest"
 
-import { checkArgTypes, obj, S, B, N, str } from "../../../shared/workers/tool-catalog"
-import { GuardError } from "../../../shared/workers/gating"
+import { checkArgTypes, obj, S, B, N, str } from "@shared/workers/tool-catalog"
+import { GuardError } from "@shared/workers/gating"
 import { MCP_TOOLS } from "../src/lib/tools"
 
 const schema = obj({ name: S, active: B, count: N, value: { type: "object" }, ids: { type: "array" } })

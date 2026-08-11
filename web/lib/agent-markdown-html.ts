@@ -50,11 +50,17 @@ export function toHtml(text: string): string {
     const numbered = /^\s*\d+\.\s+(.*)$/.exec(line)
     if (bullet) {
       flushPara()
-      if (list?.tag !== "ul") flushList(), (list = { tag: "ul", items: [] })
+      if (list?.tag !== "ul") {
+        flushList()
+        list = { tag: "ul", items: [] }
+      }
       list.items.push(bullet[1])
     } else if (numbered) {
       flushPara()
-      if (list?.tag !== "ol") flushList(), (list = { tag: "ol", items: [] })
+      if (list?.tag !== "ol") {
+        flushList()
+        list = { tag: "ol", items: [] }
+      }
       list.items.push(numbered[1])
     } else if (line.trim() === "") {
       flushPara()

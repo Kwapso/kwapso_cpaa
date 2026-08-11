@@ -41,4 +41,3 @@ export const GLOSSARY = {
   status: { term: "Status", def: "Where a record sits in its lifecycle — a ticket is open or resolved; an account is a prospect, a client, or a past client." },
 } as const satisfies Record<string, GlossaryEntry>
 
-export type GlossaryKey = keyof typeof GLOSSARY

@@ -3,15 +3,15 @@
 // relation each row carries: the whole team, one user, or one role. See
 // the activity ruleset in ARCHITECTURE.md.
 
-import type { ActivityItem } from "../../../../shared/types"
-import { d1Query, type D1Rest } from "../../../../shared/workers/d1-rest"
+import type { ActivityItem } from "@shared/types"
+import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
 import {
   accountActivityClause,
   portalActivityClause,
   type AccountScope,
-} from "../../../../shared/workers/account-scope"
+} from "@shared/workers/account-scope"
 import type { MemberGuard } from "./permissions"
-import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "../../../../shared/workers/paging"
+import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 
 type ActivityRow = {
   id: string

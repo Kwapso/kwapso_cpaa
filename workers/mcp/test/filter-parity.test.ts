@@ -38,11 +38,12 @@
 // strings. So the denominator is now every non-admin door, filtered or not:
 // silence about a capability has to be written down before it is allowed.
 
-import { readFileSync, readdirSync, existsSync } from "node:fs"
+import { readFileSync, existsSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
-import { SHARED_TOOLS } from "../../../shared/workers/tool-catalog"
+import { sourceFiles } from "@shared/rules/source-scan"
+import { SHARED_TOOLS } from "@shared/workers/tool-catalog"
 import { MCP_TOOLS } from "../src/lib/tools"
 import { TOOL_CATALOG } from "../../data-ops/src/lib/tools"
 
@@ -130,9 +131,7 @@ const NARROWED_BODY_FIELDS: Record<string, string> = {
 function handlerSources(worker: Worker): string[] {
   const dir = join(ROOT, "workers", worker, "src", "routes")
   if (!existsSync(dir)) return [readFileSync(join(ROOT, "workers", worker, "src", "index.ts"), "utf8")]
-  return readdirSync(dir)
-    .filter((f) => f.endsWith(".ts"))
-    .map((f) => readFileSync(join(dir, f), "utf8"))
+  return sourceFiles(dir, { extensions: [".ts"] }).map((f) => f.source)
 }
 
 const indexSource = (worker: Worker) =>

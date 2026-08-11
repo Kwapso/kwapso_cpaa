@@ -3,13 +3,14 @@
 // on a non-string / over-long / NUL-containing value instead of a clean 400. These
 // helpers are the fix; this test locks their behavior so the 500s can't come back.
 
-import { readdirSync, readFileSync } from "node:fs"
+import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
-import { GuardError } from "../../../shared/workers/gating"
-import { MENTIONS_LIMIT } from "../../../shared/workers/limits"
-import { optionalText, queryText, requireText, TEXT_LIMITS } from "../../../shared/workers/validate"
+import { sourceFiles } from "@shared/rules/source-scan"
+import { GuardError } from "@shared/workers/gating"
+import { MENTIONS_LIMIT } from "@shared/workers/limits"
+import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 
 const NUL = String.fromCharCode(0)
 
@@ -128,9 +129,7 @@ describe("no query parameter reaches a handler uncapped", () => {
     const offenders: string[] = []
     let seen = 0
     for (const dir of ROUTE_DIRS) {
-      for (const name of readdirSync(join(ROOT, dir))) {
-        if (!name.endsWith(".ts")) continue
-        const src = readFileSync(join(ROOT, dir, name), "utf8")
+      for (const { rel: name, source: src } of sourceFiles(join(ROOT, dir), { extensions: [".ts"] })) {
         for (const m of src.matchAll(/searchParams\.get\(/g)) {
           seen++
           // The call this one sits INSIDE must be the seam. `Number(...)` is the one

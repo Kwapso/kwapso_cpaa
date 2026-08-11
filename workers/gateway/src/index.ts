@@ -7,8 +7,8 @@
 // its key validated at the boundary and its security headers), record a client
 // crash, and answer their own crash without leaking a raw 1101. One implementation,
 // so a hardening change cannot reach one door and miss the other.
-import { recordClientError, recordGatewayCrash, serveMedia } from "../../../shared/workers/front-door"
-import { fail } from "../../../shared/workers/http"
+import { recordClientError, recordGatewayCrash, serveMedia } from "@shared/workers/front-door"
+import { fail } from "@shared/workers/http"
 
 type Env = {
   ASSETS: Fetcher

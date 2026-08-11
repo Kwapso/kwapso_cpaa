@@ -7,9 +7,11 @@
 //   3. The attempt cap is ATOMIC — the limit check and the increment are one
 //      statement, so concurrent guesses can't each read a stale count.
 
-import { readFileSync, readdirSync } from "node:fs"
+import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
+
+import { sourceFiles } from "@shared/rules/source-scan"
 
 const SRC = join(__dirname, "..", "src")
 const ROOT = join(__dirname, "..", "..", "..")
@@ -17,18 +19,8 @@ const index = readFileSync(join(SRC, "index.ts"), "utf8")
 const emailChange = readFileSync(join(SRC, "lib", "email-change.ts"), "utf8")
 const loginCodes = readFileSync(join(SRC, "lib", "login-codes.ts"), "utf8")
 
-function authSources(): string[] {
-  const out: string[] = []
-  const walk = (d: string) => {
-    for (const e of readdirSync(d, { withFileTypes: true })) {
-      const p = join(d, e.name)
-      if (e.isDirectory()) walk(p)
-      else if (e.name.endsWith(".ts")) out.push(readFileSync(p, "utf8"))
-    }
-  }
-  walk(SRC)
-  return out
-}
+const authSources = (): string[] =>
+  sourceFiles(SRC, { extensions: [".ts"] }).map((f) => f.source)
 
 describe("no login code ever leaves through anything but the inbox", () => {
   it("the echo path AND its config var are gone from the auth worker", () => {
@@ -51,12 +43,22 @@ describe("no login code ever leaves through anything but the inbox", () => {
   })
 
   it("the web client has no code-toast path left", () => {
-    for (const f of [
-      join(ROOT, "web", "components", "temp", "auth-card.tsx"),
-      join(ROOT, "web", "components", "email-change-dialog.tsx"),
-      join(ROOT, "web", "lib", "api.ts"),
-    ])
-      expect(readFileSync(f, "utf8"), `${f} must not reference devCode`).not.toContain("devCode")
+    const files = [
+      { path: join(ROOT, "web", "components", "temp", "auth-card.tsx"), rel: "auth-card.tsx" },
+      {
+        path: join(ROOT, "web", "components", "email-change-dialog.tsx"),
+        rel: "email-change-dialog.tsx",
+      },
+      // The WHOLE API client, not the one file it used to be: the door lists live
+      // one per worker under web/lib/api/ now, and a code-echoing call could be
+      // declared in any of them.
+      ...sourceFiles(join(ROOT, "web", "lib", "api"), { extensions: [".ts"] }),
+    ]
+    expect(files.length, "the scan must see the client's files").toBeGreaterThan(4)
+    for (const f of files)
+      expect(readFileSync(f.path, "utf8"), `${f.rel} must not reference devCode`).not.toContain(
+        "devCode"
+      )
   })
 
   it("the admin test-login door exists, shares the mint, and FAILS CLOSED", () => {

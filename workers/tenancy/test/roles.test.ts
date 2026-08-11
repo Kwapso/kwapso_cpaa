@@ -9,11 +9,11 @@ const { d1Query, d1ExecScript } = vi.hoisted(() => ({
   d1Query: vi.fn(),
   d1ExecScript: vi.fn(),
 }))
-vi.mock("../../../shared/workers/d1-rest", async (importOriginal) => {
+vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
   const actual = await importOriginal<object>()
   return { ...actual, d1Query, d1ExecScript }
 })
-vi.mock("../../../shared/workers/activity", () => ({
+vi.mock("@shared/workers/activity", () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
 
@@ -162,7 +162,7 @@ describe("setRoleActive (deactivate / reactivate)", () => {
     d1Query.mockImplementation(async (_c, _db, sql: string) =>
       sql.startsWith("UPDATE") ? [] : [{ id: "R", title: "Editor", is_default: 0 }]
     )
-    const { logActivity } = await import("../../../shared/workers/activity")
+    const { logActivity } = await import("@shared/workers/activity")
     vi.mocked(logActivity).mockClear()
     expect(await setRoleActive(cfg, guard, actor, "R", false)).toBe(false)
     expect(logActivity).not.toHaveBeenCalled()

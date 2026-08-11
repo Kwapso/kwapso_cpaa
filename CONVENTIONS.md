@@ -649,15 +649,30 @@ between "I think it works" and "the laws still hold".
 
 ```jsonc
 // package.json
-"check": "npx tsc --noEmit -p web && npx tsc --noEmit -p web-portal
+"lint":  "npx oxlint --deny-warnings"
+"check": "npm run lint
+        && npx tsc --noEmit -p web && npx tsc --noEmit -p web-portal
         && npx tsc --noEmit -p workers/auth && … && npx tsc --noEmit -p workers/portal-gateway
         && npm test"
 ```
 
-`check` = **type-check every workspace** (both front ends — `web` and `web-portal` — and
-all eight workers, each against its own tsconfig) **then run the full test suite**
-(`npm test` fans out across nine workspaces: every worker that carries a suite, plus
-both front ends).
+`check` = **lint the whole repo**, then **type-check every workspace** (both front ends —
+`web` and `web-portal` — and all eight workers, each against its own tsconfig), then
+**run the full test suite** (`npm test` fans out across nine workspaces: every worker
+that carries a suite, plus both front ends).
+
+The lint goes first because it is the cheapest of the three — oxlint is a single binary
+and covers the repo in about 15ms, against tsc's tens of seconds — and because the class
+it catches is the one nothing else was catching. `.oxlintrc.json` sets `correctness` to
+**error** and nothing else: it is a bug-finder, not a formatter. There is deliberately no
+Prettier. The house style (no semicolons, the comment shapes in §1) is the existing code,
+and a formatter would rewrite thousands of lines to enforce an opinion nobody asked for.
+
+What it found on its first clean run is the argument for it: an `ErrorBoundary` imported
+into `web/app/layout.tsx` and rendered nowhere — the containment half of the white-screen
+guard that ERROR-HANDLING.md said was mounted — plus a `useMemo` carrying a dependency it
+never read and eleven dead imports. `web/test/lint-gate.test.ts` keeps the step in the
+gate, keeps findings fatal, and keeps the ignore list from quietly excluding the app.
 
 The test suite is not just unit tests of behaviour — it includes the **law checks and
 seam tests that read the source straight off disk**, so breaking a Law of the Base turns

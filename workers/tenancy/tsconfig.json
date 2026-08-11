@@ -8,7 +8,11 @@
     "noEmit": true,
     "skipLibCheck": true,
     "isolatedModules": true,
-    "types": ["@cloudflare/workers-types"]
+    "types": ["@cloudflare/workers-types"],
+    // `@shared/*` names what a worker imports instead of counting directory
+    // levels back to it. tsc reads this; so does wrangler's esbuild. Vitest
+    // does not — vitest.workers.config.ts (repo root) carries the same map.
+    "paths": { "@shared/*": ["../../shared/*"] }
   },
   // shared/web/ is the BROWSER half of shared/ — React modules both front doors
   // render. A worker compiles with no DOM and no React, so it never sees them.

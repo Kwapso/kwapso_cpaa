@@ -8,12 +8,12 @@
 // screen it draws; a machine client has no screen. The decision is recorded where
 // the machine surface's other decisions are (TOOLLESS_DOORS in the R19 census).
 
-import { refusePortalCaller } from "../../../../shared/workers/account-scope"
-import { fail, json } from "../../../../shared/workers/http"
-import { publishChange } from "../../../../shared/workers/realtime"
+import { refusePortalCaller } from "@shared/workers/account-scope"
+import { fail, json } from "@shared/workers/http"
+import { publishChange } from "@shared/workers/realtime"
 import { getScreenOverrides, setScreenOverride } from "../lib/screens-config"
-import { gatedBody } from "../../../../shared/workers/route"
-import { requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
+import { gatedBody } from "@shared/workers/route"
+import { requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { teamContext } from "../context"
 import type { Env } from "../env"
 

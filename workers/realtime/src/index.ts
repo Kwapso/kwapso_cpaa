@@ -15,12 +15,12 @@
 
 import { DurableObject } from "cloudflare:workers"
 
-import type { SessionUser } from "../../../shared/types"
-import { accountScope, mayHearChange, scopeStamp, type ScopeStamp } from "../../../shared/workers/account-scope"
-import { d1ConfigFrom, GuardError, requireMember } from "../../../shared/workers/gating"
-import { fail, json } from "../../../shared/workers/http"
-import { recordWorkerError } from "../../../shared/workers/error-log"
-import { requireText, TEXT_LIMITS } from "../../../shared/workers/validate"
+import type { SessionUser } from "@shared/types"
+import { accountScope, mayHearChange, scopeStamp, type ScopeStamp } from "@shared/workers/account-scope"
+import { d1ConfigFrom, GuardError, requireMember } from "@shared/workers/gating"
+import { fail, json } from "@shared/workers/http"
+import { recordWorkerError } from "@shared/workers/error-log"
+import { requireText, TEXT_LIMITS } from "@shared/workers/validate"
 
 export type Env = {
   /** The per-team live channels (one Durable Object instance per team). */

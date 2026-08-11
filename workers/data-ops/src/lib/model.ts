@@ -10,8 +10,8 @@ import type { Env } from "../env"
  * (Claude + Workers AI), and the number BULK_IDS_LIMIT is DERIVED from, so the cap
  * the model is told is one it can physically write. Lives in shared/workers/limits
  * with the caps it governs; re-exported here because this is where it is spent. */
-export { AGENT_MAX_TOKENS } from "../../../../shared/workers/limits"
-import { AGENT_MAX_TOKENS } from "../../../../shared/workers/limits"
+export { AGENT_MAX_TOKENS } from "@shared/workers/limits"
+import { AGENT_MAX_TOKENS } from "@shared/workers/limits"
 
 export type ChatMessage = {
   role: "system" | "user" | "assistant" | "tool"

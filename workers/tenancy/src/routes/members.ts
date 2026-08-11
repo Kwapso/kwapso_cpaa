@@ -1,11 +1,11 @@
 // Member routes: list the team's people, change a member's role, remove a
 // member. All guard rules (>=1 admin, not-self) live in lib/members.
 
-import { fail, json } from "../../../../shared/workers/http"
-import { publishChange, publishUserChange } from "../../../../shared/workers/realtime"
+import { fail, json } from "@shared/workers/http"
+import { publishChange, publishUserChange } from "@shared/workers/realtime"
 import { changeMemberRole, listMembers, removeMember } from "../lib/members"
-import { gated, gatedBody } from "../../../../shared/workers/route"
-import { queryText } from "../../../../shared/workers/validate"
+import { gated, gatedBody } from "@shared/workers/route"
+import { queryText } from "@shared/workers/validate"
 import type { Env } from "../env"
 
 export async function getMembers(request: Request, env: Env): Promise<Response> {

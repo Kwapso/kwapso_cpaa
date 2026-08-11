@@ -10,8 +10,8 @@ import {
   ownedMediaKey,
   parseDataUrl,
   reclaimMedia,
-} from "../../../../shared/workers/image"
-import { publishChange, publishUserChange } from "../../../../shared/workers/realtime"
+} from "@shared/workers/image"
+import { publishChange, publishUserChange } from "@shared/workers/realtime"
 import type { Env } from "../env"
 import { logAccountActivity } from "./account-activity"
 import { toSessionUser, type UserRow } from "./users"

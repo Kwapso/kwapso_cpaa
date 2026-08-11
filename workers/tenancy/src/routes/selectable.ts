@@ -3,12 +3,12 @@
 // (read to view, create/edit/delete to manage). Each mutation broadcasts a live
 // change ping (the publish-seam test enforces this).
 
-import { refusePortalCaller } from "../../../../shared/workers/account-scope"
-import { fail, json } from "../../../../shared/workers/http"
-import { csvResponse, toCsv } from "../../../../shared/workers/csv"
-import { queryText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
-import { publishChange } from "../../../../shared/workers/realtime"
-import { gated, gatedBody } from "../../../../shared/workers/route"
+import { refusePortalCaller } from "@shared/workers/account-scope"
+import { fail, json } from "@shared/workers/http"
+import { csvResponse, toCsv } from "@shared/workers/csv"
+import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { publishChange } from "@shared/workers/realtime"
+import { gated, gatedBody } from "@shared/workers/route"
 import {
   createSelectable,
   listSelectable,

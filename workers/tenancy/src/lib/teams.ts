@@ -1,8 +1,8 @@
 // Team lifecycle: the factory that gives every new team its OWN database
 // (locked architecture), seeded with default roles + dropdown values.
 
-import type { ActiveContext, ReceivedInvite, TeamMeta, TeamSummary } from "../../../../shared/types"
-import { logActivity } from "../../../../shared/workers/activity"
+import type { ActiveContext, ReceivedInvite, TeamMeta, TeamSummary } from "@shared/types"
+import { logActivity } from "@shared/workers/activity"
 import {
   d1CreateDatabase,
   d1DeleteDatabase,
@@ -10,21 +10,21 @@ import {
   d1Query,
   sqlString,
   type D1Rest,
-} from "../../../../shared/workers/d1-rest"
-import { ulid } from "../../../../shared/workers/id"
+} from "@shared/workers/d1-rest"
+import { ulid } from "@shared/workers/id"
 import {
   MAX_IMAGE_BYTES,
   mediaKey,
   ownedMediaKey,
   parseDataUrl,
   reclaimMedia,
-} from "../../../../shared/workers/image"
-import { publishChange, publishUserChange } from "../../../../shared/workers/realtime"
-import { d1ConfigFrom } from "../../../../shared/workers/gating"
+} from "@shared/workers/image"
+import { publishChange, publishUserChange } from "@shared/workers/realtime"
+import { d1ConfigFrom } from "@shared/workers/gating"
 import type { Env } from "../env"
 import { GuardError } from "./permissions"
 import { buildTeamSeed, TEAM_MIGRATIONS, type Actor } from "../team-schema"
-import { INVITE_SWEEP_CAP, LIST_HARD_CAP } from "../../../../shared/workers/limits"
+import { INVITE_SWEEP_CAP, LIST_HARD_CAP } from "@shared/workers/limits"
 
 export function d1Config(env: Env): D1Rest {
   return d1ConfigFrom(env)

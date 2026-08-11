@@ -14,7 +14,7 @@ import {
   AGENT_REPLY_ENVELOPE_TOKENS,
   BULK_IDS_LIMIT,
   TOKENS_PER_EMITTED_ID,
-} from "../../../shared/workers/limits"
+} from "@shared/workers/limits"
 import { TOOL_CATALOG } from "../src/lib/tools"
 
 describe("the agent's reply ceiling and the bulk cap are one number", () => {

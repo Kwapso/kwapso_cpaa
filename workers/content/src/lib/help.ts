@@ -9,15 +9,15 @@
 //   • the AI agent's first-draft reply is a HOOK (maybeDraftFirstReply) left off
 //     until the agent worker exists — a ticket always opens regardless.
 
-import { accountScopeClause, type AccountScope } from "../../../../shared/workers/account-scope"
-import { describeChanges, logActivity, type Actor } from "../../../../shared/workers/activity"
-import { d1ExecScript, d1Query, sqlString, type D1Rest } from "../../../../shared/workers/d1-rest"
-import { ulid } from "../../../../shared/workers/id"
-import { HELP_STATUSES, type HelpMessage, type HelpStatus, type HelpTicket } from "../../../../shared/types"
-import { GuardError, type MemberGuard } from "../../../../shared/workers/gating"
-import { optionalText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
-import { BULK_IDS_LIMIT, THREAD_HARD_CAP } from "../../../../shared/workers/limits"
-import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "../../../../shared/workers/paging"
+import { accountScopeClause, type AccountScope } from "@shared/workers/account-scope"
+import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
+import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
+import { ulid } from "@shared/workers/id"
+import { HELP_STATUSES, type HelpMessage, type HelpStatus, type HelpTicket } from "@shared/types"
+import { GuardError, type MemberGuard } from "@shared/workers/gating"
+import { optionalText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { BULK_IDS_LIMIT, THREAD_HARD_CAP } from "@shared/workers/limits"
+import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 
 // The fixed status lifecycle the code trusts (the team-editable dropdown is
 // display-only) — Anything outside this set is rejected. It lives in shared/types
@@ -597,7 +597,7 @@ export async function bulkSetStatusByFilter(
   // caller cannot even see, and the COUNT it confirms with must be a count of
   // the same rows the UPDATE will touch.
   const authored = ticketFence(guard, scope, "all")
-  const extra: string[] = [...(authored.sql ? [authored.sql] : [])]
+  const extra: string[] = authored.sql ? [authored.sql] : []
   const extraParams: (string | number)[] = [...authored.params]
   if (filter.status) {
     extra.push("status = ?")

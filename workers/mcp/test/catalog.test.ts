@@ -12,7 +12,7 @@ import { ROUTES as CONTENT_ROUTES } from "../../content/src/index"
 import { ROUTES as DATAOPS_ROUTES } from "../../data-ops/src/index"
 import { TARGETS } from "../../data-ops/src/lib/targets"
 import { TOOL_CATALOG } from "../../data-ops/src/lib/tools"
-import { GATELESS_WRITES, SHARED_TOOLS, TOOL_GATES } from "../../../shared/workers/tool-catalog"
+import { GATELESS_WRITES, SHARED_TOOLS, TOOL_GATES } from "@shared/workers/tool-catalog"
 import { getMcpTool, MCP_TOOLS } from "../src/lib/tools"
 import { newTokenSecret, sha256Hex } from "../src/lib/tokens"
 

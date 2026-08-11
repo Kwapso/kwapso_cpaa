@@ -1,6 +1,6 @@
-import type { SessionUser } from "../../../../shared/types"
+import type { SessionUser } from "@shared/types"
 import type { Env } from "../env"
-import { ulid } from "../../../../shared/workers/id"
+import { ulid } from "@shared/workers/id"
 
 /** Raw users row as D1 returns it. */
 export type UserRow = {

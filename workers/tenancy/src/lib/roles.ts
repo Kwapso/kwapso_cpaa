@@ -5,17 +5,17 @@
 //   • auto-flip-read — turning on any write right (create/edit/delete) forces
 //     Read on (you can't have write without read).
 
-import { describeChanges, logActivity, type Actor } from "../../../../shared/workers/activity"
+import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
 import {
   d1ExecScript,
   d1Query,
   sqlString,
   type D1Rest,
-} from "../../../../shared/workers/d1-rest"
-import { ulid } from "../../../../shared/workers/id"
+} from "@shared/workers/d1-rest"
+import { ulid } from "@shared/workers/id"
 import { TEAM_MODULE_CATALOG } from "../team-schema"
 import { GuardError, hasRight, type MemberGuard } from "./permissions"
-import { EXPORT_HARD_CAP } from "../../../../shared/workers/limits"
+import { EXPORT_HARD_CAP } from "@shared/workers/limits"
 
 /** The four switches for one module (matches the library PermissionMatrix). */
 export type RightSet = {

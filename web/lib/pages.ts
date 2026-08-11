@@ -105,7 +105,6 @@ export const CONCEPT_ICON = {
   activity: "history",
 } as const
 
-export type ConceptKey = keyof typeof CONCEPT_ICON
 
 /** A breadcrumb step. `href` omitted = the current (non-link) page. */
 export type Crumb = { label: string; href?: string }
