@@ -12,7 +12,7 @@
 // learning / tickets / team-meta load only on their own module.
 
 import { tenancy } from "@/lib/api"
-import { accountsKey, cursorKey, helpKey, listFetch, totalKey } from "@/lib/live-resources"
+import { accountsKey, cursorKey, helpKey, knowledgeKey, listFetch, totalKey } from "@/lib/live-resources"
 import { primeCache, useCached, useCachedValue } from "@shared/web/store"
 
 /** What the host needs to drive the reads: the resolved team, whether reads are
@@ -72,6 +72,13 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
     enabled && module === "accounts" ? accountsKey(teamId as string) : null,
     () => listFetch.accounts(teamId as string)
   )
+  // The knowledge base backs its list, the breadcrumb label and one source's
+  // screen. R14: PAGED, like accounts and tickets — page one lands here and its
+  // next cursor in the sidecar. Row-level live: a change patches one source.
+  const knowledgeQ = useCached(
+    enabled && module === "knowledge" ? knowledgeKey(teamId as string) : null,
+    () => listFetch.knowledge(teamId as string)
+  )
   // The team's dropdown values — feed the ticket/learning forms' Type/Category pickers
   // AND the Dropdown-values tab's count badge, so load them across the team area
   // (cache-first + live, like roles/invites, so the count stays honest).
@@ -89,6 +96,7 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
     help: useCachedValue<number>(enabled ? totalKey("help", teamId as string) : null),
     helpMine: useCachedValue<number>(enabled ? totalKey("help-mine", teamId as string) : null),
     accounts: useCachedValue<number>(enabled ? totalKey("accounts", teamId as string) : null),
+    knowledge: useCachedValue<number>(enabled ? totalKey("knowledge", teamId as string) : null),
   }
   const selectableValues = formSelectableQ.data ?? []
   // The list now includes DEACTIVATED values (so the manager can reactivate them),
@@ -146,6 +154,7 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
   return {
     overridesQ,
     accountsQ,
+    knowledgeQ,
     membersQ,
     rolesQ,
     invitesQ,

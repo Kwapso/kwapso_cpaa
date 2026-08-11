@@ -542,3 +542,75 @@ export type PortalUser = {
   grantedByName: string | null
   active: boolean
 }
+
+/* ------------------------------ knowledge base ------------------------------ */
+
+/** ONE SOURCE — a piece of material the assistant may read. Two families in one
+ * shape: a `note` a person typed here (the body is the truth), and a MIRROR of a
+ * row the app already owns (`ticket` / `article` / `account` — the row is the
+ * truth and the sweep keeps the body in step). `compartment` is which slice of
+ * the knowledge base it belongs to: "agency", or "account:<id>". */
+export type KnowledgeSource = {
+  id: string
+  kind: string
+  /** the table this mirrors, or null for a note somebody typed */
+  originTable: string | null
+  originRowId: string | null
+  compartment: string
+  accountId: string | null
+  title: string
+  body: string | null
+  sourceUrl: string | null
+  /** "team" = anyone who may read the knowledge base; "private" = only its owner */
+  visibility: "team" | "private"
+  ownerUserId: string | null
+  indexedAt: string | null
+  chunkCount: number
+  active: boolean
+  createdAt: string
+  creatorName: string | null
+  editorName: string | null
+  updatedAt: string | null
+}
+
+/** One piece of a source, as retrieval hands it back: the text, and where it came
+ * from. `score` is 0…1 — the blend of the vector's similarity and the lexical
+ * index's, rounded for the wire. */
+export type KnowledgePassage = {
+  sourceId: string
+  title: string
+  kind: string
+  url: string | null
+  compartment: string
+  seq: number
+  text: string
+  score: number
+}
+
+/** Where an answer came from. Law R23: an answer with no citation is not an
+ * answer, so this list is empty exactly when `found` is false. */
+export type KnowledgeCitation = {
+  sourceId: string
+  title: string
+  kind: string
+  url: string | null
+}
+
+/** What the knowledge base answers with. It never writes prose — the assistant
+ * does that, with these passages in front of it — so what a caller receives is
+ * the evidence plus the reasoning about WHERE it looked (`reason`), which is the
+ * part a person needs to see when the answer is wrong. */
+export type KnowledgeAnswer = {
+  question: string
+  found: boolean
+  /** the sentence to say when there is nothing — never an invented answer */
+  message: string
+  /** the compartments searched; empty means the whole knowledge base */
+  compartments: string[]
+  /** WHY those compartments, in a sentence a person can disagree with */
+  reason: string
+  passages: KnowledgePassage[]
+  citations: KnowledgeCitation[]
+  /** how many chunks the search considered (the bounded candidate set) */
+  candidates: number
+}

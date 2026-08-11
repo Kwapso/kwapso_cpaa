@@ -87,6 +87,15 @@ export const listFetch = {
   // R14: help is PAGED — the fetchers below load page ONE and park the next
   // cursor in its sidecar; <LoadMore> appends from there. A fresh load (or a
   // reconnect catch-up) resets to page one, which is what a reconnect should do.
+  // R14: sources are PAGED — the agency's own history is thousands of rows on
+  // day one. Page one lands in the cache, its next cursor in the sidecar
+  // <LoadMore> reads, exactly like accounts and tickets.
+  knowledge: (teamId: string) =>
+    contentApi.knowledge().then((r) => {
+      primeCache(totalKey("knowledge", teamId), r.total)
+      primeCache(cursorKey(knowledgeKey(teamId)), r.nextCursor)
+      return r.sources
+    }),
   help: (teamId: string) =>
     contentApi.help("all").then((r) => {
       primeCache(totalKey("help", teamId), r.total)
@@ -116,6 +125,11 @@ export function accountKey(accountId: string): string {
 }
 export function childrenKey(accountId: string): string {
   return `account-children:${accountId}`
+}
+
+/** The knowledge-source list's cache key. */
+export function knowledgeKey(teamId: string): string {
+  return `knowledge:${teamId}`
 }
 
 /** The ticket list's cache key. My/All is a SERVER scope, not a client filter:
@@ -212,6 +226,19 @@ export const TEAM_RESOURCES: Record<
     fetchOne: (id) => tenancy.accountRow(id),
     fetchList: (t) => listFetch.accounts(t),
     deps: (_t, id) => [accountKey(id), `activity:record:accounts:${id}`],
+  },
+  // The knowledge base — row-level live. Adding a source, correcting one or
+  // taking one away patches just that row in the cached list; the SWEEP's ping
+  // carries no id (a slice touches many rows and no one row is the change),
+  // which the shell reads as "re-read this collection" instead.
+  knowledge: {
+    key: (t) => knowledgeKey(t),
+    idField: "id",
+    fetchOne: (id) => contentApi.knowledgeOne(id),
+    fetchList: (t) => listFetch.knowledge(t),
+    // The source's own history — the Activity tab on its screen — and the
+    // by-id read the detail falls back to when the row is past page one.
+    deps: (_t, id) => [`activity:record:knowledge_sources:${id}`, `knowledge:one:${id}`],
   },
   // Tickets — row-level live. A status change / new reply (postHelpReply
   // pings `help` too) patches just that ticket in the cached "all" set.

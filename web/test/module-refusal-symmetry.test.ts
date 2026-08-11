@@ -124,10 +124,14 @@ describe("a module refuses a client login on both halves, or on neither", () => 
     // role. The seed now holds the right (worst case, on purpose), the doors now
     // refuse, and the write half — chat and confirm, the two that spend the
     // team's AI allowance — is checked below like every other module's.
+    // `knowledge` was agency-only from its first commit rather than by later
+    // discovery: it holds the agency's own material — its process notes, its
+    // internal tickets, what it knows about each client — so there is no fenced
+    // slice of it to serve a client, only a refusal, on every door of both halves.
     expect(
       [...agencyOnly].sort(),
       "the modules whose reads refuse a client login — if this set shrinks, a read door lost its refusal"
-    ).toEqual(["agent", "learning", "selectable_data"])
+    ).toEqual(["agent", "knowledge", "learning", "selectable_data"])
 
     const asymmetric = doors
       .filter((d) => agencyOnly.has(d.module) && d.right !== "read" && !d.refuses)

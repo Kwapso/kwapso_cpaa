@@ -27,6 +27,7 @@ import { type ScreenQuery, type ScreenRights } from "@kwapso/ui/lib/recipe"
 import { AccountDetailScreen } from "@/components/account-detail"
 import { RoleDetailScreen } from "@/components/role-detail"
 import { LearningDetailScreen } from "@/components/learning-detail"
+import { KnowledgeDetailScreen } from "@/components/knowledge-detail"
 import { HelpDetailScreen } from "@/components/help-detail"
 import { ImportScreen } from "@/components/import-screen"
 import { SelectableScreen } from "@/components/selectable-screen"
@@ -57,7 +58,7 @@ type ScreenData = ReturnType<typeof useScreenData>
  * The host owns all of it; this bundle is how it hands the render half a snapshot. */
 export type ModuleContentCtx = Pick<
   ScreenData,
-  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "learningQ" | "helpQ" | "helpMineQ" | "accountsQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "inviteAuditQ"
+  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "learningQ" | "helpQ" | "helpMineQ" | "accountsQ" | "knowledgeQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "inviteAuditQ"
 > & {
   noAccess: boolean
   enabled: boolean
@@ -240,6 +241,9 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     }
     if (module === "learning") {
       return <LearningDetailScreen teamId={teamId as string} learningId={recordId} />
+    }
+    if (module === "knowledge") {
+      return <KnowledgeDetailScreen teamId={teamId as string} sourceId={recordId} />
     }
     if (module === "tickets") {
       return <HelpDetailScreen teamId={teamId as string} helpId={recordId} myUserId={myUserId} />

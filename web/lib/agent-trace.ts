@@ -103,6 +103,20 @@ export function traceFor(
     case "add_help_stakeholder":
       return { path: `${seg(teamId, "tickets")}/${str(input, "id")}`, highlight: "main" }
 
+    /* ------------------------------ knowledge ------------------------------- */
+    // Add → the knowledge list, where the new source appears live. Correct /
+    // take away / give back → that source's own screen, where its text and the
+    // pieces the assistant reads from it are.
+    case "add_knowledge_source":
+      return { path: seg(teamId, "knowledge"), highlight: "main" }
+    case "update_knowledge_source":
+    case "set_knowledge_source_active":
+      return { path: `${seg(teamId, "knowledge")}/${str(input, "id")}`, highlight: "main" }
+    // A sweep touches many rows and names none of them — the list is where
+    // "it went and got the new material" is a thing you can see happening.
+    case "sync_knowledge":
+      return { path: seg(teamId, "knowledge"), highlight: "main" }
+
     /* ------------------------------- accounts ------------------------------- */
     // Create → the accounts list, where the new account appears live. Every other
     // account write → that account's detail: its own fields, its contacts and its

@@ -85,6 +85,7 @@ export function DeepLinkScreen() {
   const {
     overridesQ,
     accountsQ,
+    knowledgeQ,
     membersQ,
     rolesQ,
     invitesQ,
@@ -136,7 +137,7 @@ export function DeepLinkScreen() {
   // into one hook. Each action calls the permission-checked endpoint, primes the
   // actor's cache and invalidates any changed sibling count; runAction throws on
   // failure so the calling dialog / confirm surfaces it.
-  const { runAction, createLearning, createHelp, createAccount } = useScreenActions(teamId)
+  const { runAction, createLearning, createHelp, createAccount, createKnowledge } = useScreenActions(teamId)
 
   /* -------------------------- engine intent + action ------------------------- */
 
@@ -220,6 +221,7 @@ export function DeepLinkScreen() {
     learning: totals.learning,
     help: totals.help,
     accounts: totals.accounts,
+    knowledge: totals.knowledge,
   })
 
   const crumbs = buildCrumbs({
@@ -235,6 +237,7 @@ export function DeepLinkScreen() {
       roles,
       invites: invitesQ.data,
       learning: learningQ.data,
+      knowledge: knowledgeQ.data,
     },
   })
 
@@ -265,7 +268,7 @@ export function DeepLinkScreen() {
         <CountedTabs badged={showTabs && sectionCounts[section] !== undefined}>
           {renderModuleContent({
             noAccess, enabled, perms, can, module, recordId, teamId, canImport, go,
-            overridesQ, metaQ, membersQ, rolesQ, roles, invitesQ, learningQ, helpQ, accountsQ, totals,
+            overridesQ, metaQ, membersQ, rolesQ, roles, invitesQ, learningQ, helpQ, accountsQ, knowledgeQ, totals,
             activityQ, activityTotal, activityKey, activityScope, inviteAuditQ, teamName, active,
             rights, onAction, onIntent,
             sectionPath, helpScope, setHelpScope, myUserId, query, helpMineQ,
@@ -288,6 +291,7 @@ export function DeepLinkScreen() {
         createLearning={createLearning}
         createHelp={createHelp}
         createAccount={createAccount}
+        createKnowledge={createKnowledge}
         closePanel={closePanel}
         onRecordGone={() => replace(sectionPath)}
       />
@@ -313,6 +317,7 @@ function teamTabStrip(
     module === "accounts" ||
     module === "learning" ||
     module === "tickets" ||
+    module === "knowledge" ||
     module === "import"
       ? module
       : "overview"

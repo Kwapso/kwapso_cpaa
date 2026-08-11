@@ -13,6 +13,7 @@ export const TEAM_MODULES = [
   "portal_users",
   "learning",
   "help",
+  "knowledge",
   "selectable_data",
   "screens",
   "agent",
@@ -36,6 +37,12 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   // already carries, the table the rows live in, and the path the API answers on.
   // The LABEL is what a person reads, and the word for this is Tickets.
   help: "Tickets",
+  // The knowledge base: the material the assistant is allowed to read. Its four
+  // rights mean exactly what they say — `read` is "ask it questions", and
+  // `delete` is "take a source away from it". A person who cannot delete a
+  // source cannot ask the assistant to delete one either, because the assistant
+  // acts through this same sheet.
+  knowledge: "Knowledge base",
   selectable_data: "Dropdown data",
   screens: "Screens",
   agent: "AI agent",

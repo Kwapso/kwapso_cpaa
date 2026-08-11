@@ -6,7 +6,7 @@
 import { sectionTitle } from "@/components/deep-link/route"
 import { personName } from "@/lib/identity"
 import { type Crumb } from "@/lib/pages"
-import type { Account, Invite, Learning, TeamMember, TeamRole } from "@shared/types"
+import type { Account, Invite, KnowledgeSource, Learning, TeamMember, TeamRole } from "@shared/types"
 
 /** The already-loaded lists a record's own name can be read out of. Undefined =
  * still loading, and a crumb with no label is simply left off. */
@@ -16,6 +16,7 @@ export type CrumbRecords = {
   roles: TeamRole[]
   invites: Invite[] | undefined
   learning: Learning[] | undefined
+  knowledge: KnowledgeSource[] | undefined
 }
 
 /** The record's own name for the last crumb — read from the list already in cache
@@ -29,6 +30,8 @@ function recordLabel(module: string | null, recordId: string | null, records: Cr
   if (module === "roles") return records.roles.find((r) => r.id === recordId)?.title ?? "Role"
   if (module === "invites") return records.invites?.find((i) => i.id === recordId)?.email ?? "Invite"
   if (module === "learning") return records.learning?.find((l) => l.id === recordId)?.title ?? "Article"
+  if (module === "knowledge")
+    return records.knowledge?.find((k) => k.id === recordId)?.title ?? "Source"
   if (module === "tickets") return "Ticket"
   return ""
 }

@@ -116,6 +116,7 @@ describe("team schema", () => {
       "portal_users",
       "learning",
       "help",
+      "knowledge",
       "selectable_data",
       "screens",
       "agent",

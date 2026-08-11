@@ -435,6 +435,223 @@ UPDATE OR IGNORE screens SET module = 'tickets.list' WHERE module = 'help.list';
 DELETE FROM screens WHERE module = 'help.list';
 `,
   },
+  {
+    // THE WORK ENGINE, part one: the ticket grows into the thing SCOPE ch.07
+    // describes. Columns on the table that already exists, never a second ticket
+    // beside it — a second one means a second conversation, a second fence, a
+    // second activity trail and two things called a ticket forever.
+    version: "0011_ticket_work_engine",
+    sql: `
+-- The five states (SCOPE ch.07: new -> triaged -> in progress -> ready ->
+-- resolved). The two old names move onto the two new ones that mean the same
+-- thing: 'open' was a ticket nobody had read yet, which is 'new'; 'reopened' was
+-- one a staff member had deliberately pulled back into play, which is 'triaged'
+-- — it has been read, and it is not being worked on yet.
+--
+-- The redundant \`status <> \` half of each predicate is not decoration. A
+-- migration is recorded in _migrations and runs once, but the one time anybody
+-- types these statements again is during a recovery, by hand, under pressure —
+-- and a status move that is safe to re-run is one less thing to be frightened of
+-- then. It is also the law the rest of the file lives under (R17).
+UPDATE help SET status = 'new' WHERE status = 'open' AND status <> 'new';
+UPDATE help SET status = 'triaged' WHERE status = 'reopened' AND status <> 'triaged';
+
+-- THE REFERENCE NUMBER (SCOPE ch.02, "BERG-T0412"). Per ACCOUNT, not global:
+-- Glide's are global and fully interleaved, so continuity was never on offer, and
+-- a number a client quotes should count THEIR requests, not ours and every other
+-- client's. Nullable because most of the agency's own tickets have no account and
+-- no code to build one from — a ticket with no client has nobody to quote it to.
+ALTER TABLE help ADD COLUMN ref TEXT;
+-- The race guard AND the promise: two people raising a ticket on one account at
+-- the same instant cannot end up quoting the same number. Partial, so the many
+-- rows with no ref don't collide with each other.
+CREATE UNIQUE INDEX idx_help_ref ON help (ref) WHERE ref IS NOT NULL;
+
+-- DRAG-RANK — the only priority signal there is (SCOPE ch.07: no priority
+-- dropdown, ever). Sparse text keys, so moving one ticket writes one row; see
+-- shared/workers/rank.ts for why it is a string.
+ALTER TABLE help ADD COLUMN rank TEXT;
+-- Every existing ticket starts ranked by its own id, which is a ULID and
+-- therefore already in the order they were raised. So the list looks EXACTLY as
+-- it did the moment before this migration ran, and the first drag is the first
+-- change anybody sees.
+UPDATE help SET rank = id WHERE rank IS NULL;
+CREATE INDEX idx_help_rank ON help (rank);
+
+-- THE LOCK (SCOPE ch.07: "editing and ranking lock at first staff touch"). The
+-- account owns the wording while nobody here has read it; once we have, the
+-- record of what they asked for stops moving under the conversation about it.
+-- A timestamp rather than a flag, because "when" is the question anyone asks.
+ALTER TABLE help ADD COLUMN locked_at TEXT;
+-- A ticket that has already been worked is already locked — its wording was
+-- settled long ago, and back-dating that to the row's own last edit is the
+-- closest true answer available.
+UPDATE help SET locked_at = COALESCE(updated_at, created_at) WHERE status <> 'new';
+
+-- THE DRAFT REPLY the closing note of each story appends to (SCOPE ch.07,
+-- "story close is a transaction"). It is a draft, not a message: it becomes a
+-- reply only when a person sends it.
+ALTER TABLE help ADD COLUMN draft_resolution TEXT;
+
+-- ARCHIVE, available from any state (SCOPE ch.07) — the base's deactivate-never-
+-- delete, wearing the word the glossary already uses for it.
+ALTER TABLE help ADD COLUMN archived_at TEXT;
+ALTER TABLE help ADD COLUMN archiver_id TEXT;
+ALTER TABLE help ADD COLUMN archiver_email TEXT;
+ALTER TABLE help ADD COLUMN archiver_name TEXT;
+
+-- BOTH TITLES, kept (build brief §8). 1,764 of the tickets coming from Glide have
+-- a German title, 1,010 English, and 788 exist ONLY in German. The original is
+-- never overwritten by a translation — that is the whole reason there are two
+-- columns rather than one column and a language flag.
+ALTER TABLE help ADD COLUMN title_de TEXT;
+ALTER TABLE help ADD COLUMN title_en TEXT;
+
+-- THE REFERENCE COUNTER, one row per (account, kind of thing). Allocation is a
+-- SINGLE statement — INSERT … ON CONFLICT DO UPDATE … RETURNING — so two
+-- simultaneous writers cannot both read "11" and both write "12" (CONCURRENCY.md
+-- rule 1: the counter rides the write, never a read-then-write).
+CREATE TABLE ref_counters (
+  account_id TEXT NOT NULL REFERENCES accounts (id),
+  kind TEXT NOT NULL,                -- 'T' ticket, 'S' story, 'SPR' sprint, …
+  next_no INTEGER NOT NULL,
+  PRIMARY KEY (account_id, kind)
+);
+
+-- THE FOUR TICKET TYPES SCOPE names (feedback / bug / question / extra). Added,
+-- never swapped: SCOPE calls this an EDITABLE list, and a team's existing types
+-- are on tickets already — deleting them would blank the type of every ticket
+-- that names one. The old values stay pickable until somebody retires them on
+-- the Dropdown values screen, which is what that screen is for.
+INSERT INTO selectable_data (id, type, value, is_default, created_at, creator_name)
+SELECT lower(hex(randomblob(16))), 'Ticket type', v.value, 1, datetime('now'), 'kwapso'
+  FROM (SELECT 'Feedback' AS value UNION ALL SELECT 'Bug' UNION ALL SELECT 'Question' UNION ALL SELECT 'Extra') v
+ WHERE NOT EXISTS (
+   SELECT 1 FROM selectable_data s WHERE s.type = 'Ticket type' AND s.value = v.value
+ );
+`,
+  },
+  {
+    // THE KNOWLEDGE BASE — one knowledge base, many COMPARTMENTS, chosen for the
+    // reader rather than by them (.plans/BUILD-2-knowledge-base.md §1).
+    //
+    // WHY THE VECTORS LIVE HERE, in the team's own database, rather than in one
+    // account-wide index: "every vector, every chunk and every source row belongs
+    // to exactly one team, and retrieval can never cross that line." A per-team
+    // database makes that STRUCTURAL — a caller's guard resolves one database id
+    // and the SQL cannot name another. An account-global index with a team id in
+    // the metadata makes it a filter somebody wrote correctly today. The whole
+    // argument, and what would change our mind, is at the top of
+    // workers/content/src/lib/knowledge.ts.
+    version: "0012_knowledge",
+    sql: `
+-- A SOURCE is one piece of material the assistant may read. Two families in one
+-- table, because a person edits them in the same list:
+--   • TYPED here (kind 'note') — the body IS the truth, written in the app;
+--   • MIRRORED from a row we already own (kind 'ticket' / 'article' / 'account')
+--     — the ROW is the truth and the sweep keeps the body in step with it.
+-- Deactivating either means "stop reading this": the sweep SKIPS an excluded
+-- source rather than re-adding it, which is what makes "take out something
+-- wrong" stick. Deactivate-never-delete, so the decision and who made it survive.
+--
+-- \`compartment\` is the design in one column: 'agency' for our own material,
+-- 'account:<id>' for one client's. DERIVED on write from the row the source
+-- mirrors, correctable by hand, never free-typed.
+--
+-- \`owner_user_id\` is the second fence, and the one a personal Google connection
+-- will land on: NULL means the team's (what the organisation can see), a value
+-- means one person's. Retrieval ANDs it, so material that arrived through one
+-- member's own sight of it cannot be read out of somebody else's answer.
+CREATE TABLE knowledge_sources (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL,
+  origin_table TEXT,
+  origin_row_id TEXT,
+  compartment TEXT NOT NULL DEFAULT 'agency',
+  account_id TEXT REFERENCES accounts (id),
+  title TEXT NOT NULL,
+  body TEXT,
+  source_url TEXT,
+  owner_user_id TEXT,
+  content_hash TEXT,
+  indexed_at TEXT,
+  chunk_count INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+-- The mirror's identity: ONE source per row mirrored, so a sweep that runs twice
+-- — or two sweeps at once — updates rather than duplicates. Partial, because a
+-- typed note has no origin and they must not collide with each other.
+CREATE UNIQUE INDEX idx_knowledge_sources_origin ON knowledge_sources (origin_table, origin_row_id) WHERE origin_row_id IS NOT NULL;
+CREATE INDEX idx_knowledge_sources_compartment ON knowledge_sources (compartment);
+
+-- A CHUNK is a readable piece of a source: what retrieval scores, and what an
+-- answer cites. \`embedding\` is the quantised vector (lib/knowledge-vector.ts);
+-- NULL means "not embedded yet", which retrieval survives by falling back to the
+-- lexical score alone — an index half-built still answers, it just ranks worse.
+CREATE TABLE knowledge_chunks (
+  id TEXT PRIMARY KEY,
+  source_id TEXT NOT NULL REFERENCES knowledge_sources (id),
+  compartment TEXT NOT NULL,
+  owner_user_id TEXT,
+  seq INTEGER NOT NULL,
+  text TEXT NOT NULL,
+  embedding TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX idx_knowledge_chunks_source ON knowledge_chunks (source_id);
+CREATE INDEX idx_knowledge_chunks_compartment ON knowledge_chunks (compartment, id);
+
+-- THE INVERTED INDEX — retrieval's first stage, as an ordinary indexed table
+-- rather than an FTS5 virtual one. Deliberate, and the reason is the DELETE: a
+-- re-index removes a source's postings, and on FTS5 that is a scan of every
+-- posting in the team (a virtual table has no index on a non-text column), while
+-- here it is one keyed delete. It also behaves identically in the test harness
+-- and in D1, which a virtual table kept in step by triggers does not — and a
+-- search path that cannot be run in a test is a search path we cannot prove.
+--
+-- \`compartment\` and \`owner_user_id\` are COPIES of the chunk's, so stage one is
+-- a single-table read. They can only change when the chunk is rewritten, which
+-- rewrites these rows too.
+CREATE TABLE knowledge_terms (
+  term TEXT NOT NULL,
+  chunk_id TEXT NOT NULL REFERENCES knowledge_chunks (id),
+  compartment TEXT NOT NULL,
+  owner_user_id TEXT,
+  weight INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (term, chunk_id)
+);
+CREATE INDEX idx_knowledge_terms_chunk ON knowledge_terms (chunk_id);
+
+-- WHERE THE SWEEP GOT TO. One row per source kind: the position it reached, when
+-- it last ran, when it last SUCCEEDED, and what went wrong when it didn't (R12 —
+-- unattended work has nobody watching, so a failure has to leave a mark someone
+-- can find). The cursor is what makes ingestion resumable: a tick that dies
+-- halfway, or a source that is an hour behind, costs the next tick nothing but
+-- the rows it has not reached yet.
+CREATE TABLE knowledge_ingest (
+  kind TEXT PRIMARY KEY,
+  cursor TEXT,
+  last_run_at TEXT,
+  last_ok_at TEXT,
+  last_error TEXT,
+  runs INTEGER NOT NULL DEFAULT 0,
+  sources_indexed INTEGER NOT NULL DEFAULT 0
+);
+
+-- Existing teams: the locked Admin role gains the new module in full (it IS full
+-- access by definition, and it cannot be edited afterwards to grant it). Every
+-- other role gains nothing — a migration must never hand out sight of the
+-- agency's own material that nobody granted. \`is_default\` is 1 on Admin alone.
+INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+SELECT lower(hex(randomblob(16))), r.id, 'knowledge', r.is_default, r.is_default, r.is_default, r.is_default
+  FROM member_roles r
+ WHERE NOT EXISTS (
+   SELECT 1 FROM role_permissions p WHERE p.role_id = r.id AND p.module = 'knowledge'
+ );
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }
@@ -447,14 +664,22 @@ export const DEFAULT_SELECTABLE: { type: string; value: string }[] = [
   { type: "File type", value: "Video link" },
   { type: "File type", value: "Other file" },
   { type: "File type", value: "Other link" },
-  { type: "Ticket type", value: "Report user" },
-  { type: "Ticket type", value: "Bug report" },
-  { type: "Ticket type", value: "How to use ?" },
-  { type: "Ticket type", value: "Feature request" },
-  { type: "Ticket type", value: "Payment issue" },
-  { type: "Ticket status", value: "not started" },
-  { type: "Ticket status", value: "in progress" },
-  { type: "Ticket status", value: "resolved" },
+  // The four types SCOPE ch.07 names, and no more. It calls this an EDITABLE
+  // list, so these are a starting vocabulary rather than a fixed set — a team
+  // adds its own on the Dropdown values screen, and the migration that brought
+  // these to existing teams left their older types alone for the same reason.
+  { type: "Ticket type", value: "Feedback" },
+  { type: "Ticket type", value: "Bug" },
+  { type: "Ticket type", value: "Question" },
+  { type: "Ticket type", value: "Extra" },
+  // Display-only labels for the five built-in states. The STATUS the code trusts
+  // is TICKET_STATUSES in shared/types.ts — these rows are what a team may
+  // reword on screen, and renaming one can never move a ticket.
+  { type: "Ticket status", value: "New" },
+  { type: "Ticket status", value: "Triaged" },
+  { type: "Ticket status", value: "In progress" },
+  { type: "Ticket status", value: "Ready" },
+  { type: "Ticket status", value: "Resolved" },
 ]
 
 /**

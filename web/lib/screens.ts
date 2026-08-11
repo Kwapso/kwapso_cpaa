@@ -71,6 +71,8 @@ export const MODULE_PERMISSION: Record<string, string> = {
   // every role's permission sheet in every team database. This line is the only
   // place the two names meet.
   tickets: "help",
+  // The knowledge base: the segment IS the module.
+  knowledge: "knowledge",
   // The customer spine: the segment IS the module (portal_users is a second gate
   // ON the same screens, never a screen of its own — handing out a login is a
   // bigger decision than editing a phone number).
@@ -332,6 +334,34 @@ export const accountsListRecipe: ScreenRecipe = {
   ),
 }
 
+/* -------------------------------- knowledge ------------------------------- */
+
+/** Knowledge list — everything the assistant is allowed to read, newest first.
+ * A row's summary line says what it IS and where it is filed, because those are
+ * the two questions somebody scanning this list is actually asking ("why does it
+ * know that?" and "whose is it?"). PAGED (R14) — the sweep only ever adds — so
+ * the frame's own "Showing X of Y" stays off and the exact total is badged once,
+ * above. */
+export const knowledgeListRecipe: ScreenRecipe = {
+  type: "list",
+  display: "list",
+  surface: "none",
+  binding: { module: "knowledge" },
+  gate: { module: "knowledge", right: "read" },
+  fields: [field("name", "Source"), field("detail", "Details")],
+  actions: [],
+  collection: listCollection(
+    "Nothing in the knowledge base yet.",
+    "Search the knowledge base…",
+    [
+      { field: "kind", label: "Kind", control: "select" },
+      { field: "filed", label: "Filed under", control: "select" },
+      { field: "state", label: "Status", control: "select" },
+    ],
+    { paged: true }
+  ),
+}
+
 /* ------------------------------ the registry ------------------------------ */
 
 /** The in-code BASE recipe for each screen key — the shipped default every team
@@ -352,6 +382,10 @@ export const BASE_RECIPES: Record<string, ScreenRecipe> = {
   // nested under it are collections with their own actions, which no engine
   // block draws (see account-detail.tsx).
   "accounts.list": accountsListRecipe,
+  // Knowledge DETAIL has no recipe — its panel is the source's own text plus the
+  // controls that take it away from the assistant or give it back, which no
+  // engine block draws (see knowledge-detail.tsx).
+  "knowledge.list": knowledgeListRecipe,
 }
 
 /** A structural guard for a parsed override. The config store treats a recipe as

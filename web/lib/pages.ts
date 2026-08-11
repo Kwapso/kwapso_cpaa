@@ -41,6 +41,7 @@ export type TeamSection = {
     | "accounts"
     | "learning"
     | "tickets"
+    | "knowledge"
     | "import"
   title: string
   module: string
@@ -84,6 +85,12 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // in lib/screens.ts is the one seam that translates between the two.
   { key: "learning", title: "Learning", module: "learning", segment: "learning", placement: "sidebar", countCacheKey: "learning" },
   { key: "tickets", title: "Tickets", module: "help", segment: "tickets", placement: "sidebar", countCacheKey: "help" },
+  // The knowledge base — what the assistant is allowed to read, and the one
+  // screen where a person can see it, add to it, correct it and take something
+  // out. A first-class SIDEBAR page for the same reason Learning is one: it is
+  // the day's work, not an admin setting. Gated by its own module, so a role
+  // without it never sees the destination at all.
+  { key: "knowledge", title: "Knowledge base", module: "knowledge", segment: "knowledge", placement: "sidebar", countCacheKey: "knowledge" },
   // Import has NO read-right of its own — it's gated per-target (create on
   // member_roles or learning). Reached CONTEXTUALLY from an "Import CSV" button on
   // those pages (which land on /t/<team>/import/<tableKey>), never a tab.
@@ -108,6 +115,7 @@ export const CONCEPT_ICON = {
   contacts: "contact",
   portal: "key-round",
   learning: "graduation-cap",
+  knowledge: "library-big",
   tickets: "life-buoy",
   import: "upload",
   activity: "history",
