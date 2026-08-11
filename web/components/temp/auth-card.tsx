@@ -18,6 +18,7 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { brand } from "@shared/brand"
 import { CodeInput } from "@shared/web/code-input"
+import { GoogleMark, useSignInError } from "@shared/web/google-sign-in"
 import { useEmailSignIn } from "@shared/web/use-email-sign-in"
 
 import { auth } from "@/lib/api"
@@ -37,6 +38,8 @@ export function AuthCard({ onSignedIn }: { onSignedIn: () => void }) {
       onSignedIn,
       announce: toast.success,
     })
+  // Google sends someone back here with a `?error=` when the round-trip failed.
+  const googleError = useSignInError()
 
   return (
     <div className="animate-rise w-full max-w-sm">
@@ -73,6 +76,27 @@ export function AuthCard({ onSignedIn }: { onSignedIn: () => void }) {
               {busy ? <Spinner /> : null}
               Email me a code
             </Button>
+            {/* BESIDE the code, never instead of it. Both prove the same
+                identity and land on the same user record — a colleague who used
+                a code last week and Google today is one person. */}
+            <div className="flex items-center gap-3">
+              <span className="bg-border h-px flex-1" />
+              <span className="text-muted-foreground text-xs">or</span>
+              <span className="bg-border h-px flex-1" />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              disabled={busy}
+              onClick={() => window.location.assign(auth.googleStartUrl)}
+            >
+              <GoogleMark />
+              Continue with Google
+            </Button>
+            {googleError && (
+              <p className="text-destructive text-center text-xs">{googleError}</p>
+            )}
           </form>
         ) : (
           <>

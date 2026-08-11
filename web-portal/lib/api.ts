@@ -32,6 +32,12 @@ export const auth = {
   /** Prove it's you. Signing in NEVER creates access — the invite does (SCOPE ch.06). */
   verifyEmail: (email: string, code: string) =>
     api<{ user: SessionUser; isNew: boolean }>("/api/auth/email/verify", post({ email, code })),
+  /** "Continue with Google" — a NAVIGATION, not a fetch (the browser bounces to
+   * Google and back to the callback, which sets the cookie). Named here anyway:
+   * this list is the portal's honest inventory, and the fence suite checks every
+   * /api path the portal mentions against the gateway's allow-list. Same rule as
+   * the code: signing in proves who you are, it never creates access. */
+  googleStartUrl: "/api/auth/google/start",
   me: () => api<{ user: SessionUser }>("/api/auth/me"),
   /** First visit only: your name (and a photo if you'd like one). */
   updateProfile: (input: { firstName: string; lastName: string; imageDataUrl?: string }) =>

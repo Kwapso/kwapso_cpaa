@@ -1,7 +1,14 @@
-// The AUTH worker — kwapso's front-door brain: email-code login (strict OTP — no Google, no Clerk),
-// sessions. Top-level config = PRODUCTION; the staging variant is under env.
+// The AUTH worker — kwapso's front-door brain: email-code login and "Continue with
+// Google" (two ways to prove ONE identity — no Clerk), sessions.
+// Top-level config = PRODUCTION; the staging variant is under env.
 // Secrets (set via `wrangler secret put`, never in this file):
 //   RESEND_API_KEY        — lets us actually send code emails
+//   GOOGLE_CLIENT_ID      — the `kwapso-signin` OAuth client id
+//   GOOGLE_CLIENT_SECRET  — …and its secret. The id is not itself secret (it
+//                           rides the redirect URL), but it lives beside the
+//                           secret so BOTH are set by the same two commands from
+//                           the same keys file, and neither is ever committed.
+//                           Unset = no Google button; the code path is untouched.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "kwapso-auth",
@@ -29,6 +36,10 @@
   "services": [{ "binding": "REALTIME", "service": "kwapso-realtime" }],
   "vars": {
     "APP_ORIGIN": "https://agency.kwapso.app",
+    // The OTHER front door. Google sign-in bounces a person back to whichever of
+    // these two they came from, and to nothing else — so BOTH must be listed
+    // here AND registered as redirect URIs in the Google console.
+    "PORTAL_ORIGIN": "https://client.kwapso.app",
     "EMAIL_FROM": "kwapso <alerts@kwapso.app>",
     // Ships with the deploy: the test-login door refuses outright here.
     "ENVIRONMENT": "production"
@@ -53,6 +64,7 @@
       "services": [{ "binding": "REALTIME", "service": "kwapso-realtime-staging" }],
       "vars": {
         "APP_ORIGIN": "https://agency-staging.kwapso.app",
+        "PORTAL_ORIGIN": "https://staging-client.kwapso.app",
         "EMAIL_FROM": "kwapso <alerts@kwapso.app>",
         "ENVIRONMENT": "staging"
       }

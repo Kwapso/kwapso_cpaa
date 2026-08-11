@@ -1,6 +1,7 @@
 "use client"
 
-// SIGN IN — an email address and a six-digit code, and nothing else on screen.
+// SIGN IN — an email address and a six-digit code, or Google, and nothing else
+// on screen.
 //
 // This file is the portal door's CHROME. The behaviour behind it — email → code
 // → signed in, and the rule that a cooldown moves you ON rather than stranding
@@ -13,9 +14,13 @@
 // successfully lands on the "nothing here yet" screen rather than a new empty
 // world of their own — and this component says nothing that promises otherwise.
 //
-// Google sign-in exists as a product decision (same person as long as the email
-// matches) but is not wired in code yet, on either front door. It is deliberately
-// NOT stubbed here: a button that doesn't work is worse than one that isn't there.
+// GOOGLE IS THE SECOND WAY TO PROVE THE SAME THING, not a second account: the
+// verified Google address goes through the one identity seam the code path uses
+// (findOrCreateUserByEmail), so the person who used a code last week and Google
+// today is one row. It creates access no more than the code does — SCOPE ch.06
+// is explicit: "signing in with Google never creates access; the invite does."
+// The wording of a failure and the brand mark are shared with the agency door
+// (shared/web/google-sign-in.tsx) so the two can't drift apart.
 
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
@@ -26,6 +31,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { brand } from "@shared/brand"
 import { CodeInput } from "@shared/web/code-input"
+import { GoogleMark, useSignInError } from "@shared/web/google-sign-in"
 import { invalidate } from "@shared/web/store"
 import { useEmailSignIn } from "@shared/web/use-email-sign-in"
 import { auth } from "@/lib/api"
@@ -46,6 +52,8 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
       },
       announce: toast.success,
     })
+  // Google sends someone back here with a `?error=` when the round-trip failed.
+  const googleError = useSignInError()
 
   return (
     <div className="w-full max-w-sm">
@@ -55,7 +63,7 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
         <h1 className="text-2xl font-semibold tracking-tight">Sign in to {brand.name}</h1>
         <p className="text-muted-foreground">
           {step === "email"
-            ? "We'll email you a six-digit code. No password to remember."
+            ? "We'll email you a six-digit code, or you can use Google. No password to remember."
             : `Enter the code we sent to ${email}.`}
         </p>
       </div>
@@ -86,6 +94,27 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
               {busy ? <Spinner /> : null}
               Email me a code
             </Button>
+            {/* BESIDE the code, never instead of it — the same two ways in that
+                the agency door offers, landing on the same person either way. */}
+            <div className="flex items-center gap-3">
+              <span className="bg-border h-px flex-1" />
+              <span className="text-muted-foreground text-sm">or</span>
+              <span className="bg-border h-px flex-1" />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              className="w-full"
+              disabled={busy}
+              onClick={() => window.location.assign(auth.googleStartUrl)}
+            >
+              <GoogleMark />
+              Continue with Google
+            </Button>
+            {googleError ? (
+              <p className="text-destructive text-center text-sm">{googleError}</p>
+            ) : null}
           </form>
         ) : (
           <>

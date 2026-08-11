@@ -31,6 +31,14 @@ export const auth = {
       body: JSON.stringify({ email, code }),
     }),
 
+  /** "Continue with Google" — a NAVIGATION, not a fetch. The whole flow is the
+   * browser bouncing to Google and back to `/api/auth/google/callback`, which
+   * sets the session cookie and redirects home; there is nothing for `api()` to
+   * await. It is a door in this list anyway, because this directory IS the
+   * attack surface both gateway suites derive from (see the file header) — a
+   * path hidden in a component is a path nothing proves reaches a worker. */
+  googleStartUrl: "/api/auth/google/start",
+
   me: () => api<{ user: SessionUser }>("/api/auth/me"),
 
   /** Your own account activity (name / photo / email changes) — identity-level,

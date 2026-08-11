@@ -50,7 +50,7 @@ unit/integration suite across every workspace.
 
 | Worker | Owns |
 |---|---|
-| **auth** | Strict email-OTP login — 6-digit codes via Resend (NO Clerk, NO Google; parked 2026-06-12), sessions, email-change flow (code to the NEW email) |
+| **auth** | Sign-in — a 6-digit email code via Resend, **or Google** (UNPARKED 2026-08-11; see §5), sessions, email-change flow (code to the NEW email). No Clerk, no auth vendor |
 | **tenancy** | teams, team members, Member roles (module key `member_roles`) + permissions, invites; also the per-team screen-recipe config store (`GET/POST /api/tenancy/config/screens`) |
 | **content** *(BUILT 2026-06-23; `kwapso-content`)* | **Learning** (how-to articles, in-app body, manual sequence, pick-or-create category → `selectable_data`, per-user `mark done` progress, deactivate-not-delete) + **Help** (team-wide tickets + threaded replies, fixed status lifecycle `open/in_progress/resolved/reopened`, raiser-can-reopen, @mention + reply email notify, source screen/record capture). Routes under `/api/content/*`. Binds AUTH (whoami) + REALTIME (live pings) + the core DB (gating) + per-module R2 (`LEARNING_MEDIA`, `HELP_MEDIA`). Gated by the `learning` / `help` permission modules; not public (`workers_dev:false`) |
 | **data-ops** *(BUILT 2026-06-23; `kwapso-data-ops`)* | **(a) CSV import** — the 3-stage session (file → mapping → confirm) against the GLOBAL owner-maintained `importable_databases` catalog, **INSERT-ONLY**, gated by the **target's `create` right** (no key of its own), writing **act-as-user** through the gated create endpoints (three targets today: `selectable_data` + `member_roles` + `learning`), PLUS the agentic multi-file **batch** import (AGENTIC-IMPORT.md — analyze → plan → ordered run with foreign-key resolution). **(b) the AI agent** — a swappable model seam, an opt-in tool catalog, an act-as-user executor, the confirm rule, identity-act blocks, fenced tool results, a step cap, saved per-team threads (audit), and a credit-based quota (the quota tables + rules live in DATA-MODEL.md `agent_usage`/`agent_credits` + EDGE-CASES.md §8). Routes under `/api/data-ops/*`. Binds AUTH/REALTIME/CONTENT/TENANCY + Workers AI (`AI`) + the core DB; not public (`workers_dev:false`) |
@@ -252,8 +252,26 @@ on top follows [CACHING.md](CACHING.md).
 
 ## 5 · Users, onboarding, invites (LOCKED)
 
-- Sign-in: email + 6-digit code ONLY (strict OTP; Resend sends ALL email). Google login is parked. All user
-  data lives in OUR database — no auth vendor holds anything.
+- Sign-in: a 6-digit email code (Resend sends ALL email) **or Google** — two ways to prove ONE
+  identity, never two accounts. All user data lives in OUR database; no auth vendor holds anything.
+  - **Google was parked on 2026-06-12** and its `users.google_sub` column dropped (`db/core/0003`).
+    That was a **Brimba** scope decision ("strict email-OTP only") for the generic base, not a
+    security finding. kwapso's SCOPE re-decides it: ch.03 names `kwapso-auth` as "OTP + Google
+    sign-in", ch.06 says "email one-time code … or Google — same person as long as the email
+    matches", and SCOPE wins where it speaks. Rebuilt 2026-08-11 **without** re-adding `google_sub`:
+    the verified email IS the identity, so both doors go through the one seam
+    (`findOrCreateUserByEmail`) and a person who used a code yesterday and Google today is one row.
+  - The flow is the OAuth **authorization-code** flow with PKCE (`GET /api/auth/google/start` →
+    Google → `GET /api/auth/google/callback`), not the Identity-Services button: that button POSTs
+    its credential cross-site from `accounts.google.com`, which `refuseForeignOrigin` refuses at
+    both front doors, and loosening that check is not a trade worth making.
+  - **Google's assertion is verified server-side** — RS256 signature against Google's published
+    JWKS, plus issuer (by exact match, never `.includes`), audience, expiry and `email_verified`.
+  - **Two redirect URIs**, one per front door (`<agency>/api/auth/google/callback` and
+    `<portal>/api/auth/google/callback`); the worker will bounce a person back to those two origins
+    and nothing else, so the callback can never become an open redirect carrying a session cookie.
+  - **Signing in still is not getting in**: a Google account nobody invited gets exactly what a
+    stranger typing a code gets — a teamless user row and the "nothing here yet" screen.
 - Onboarding: first name, last name, optional photo.
 - Invites are by email, with a shelf life. At onboarding, **all active invites
   auto-accept** (the user lands in those teams). A personal "Chris' team" is
