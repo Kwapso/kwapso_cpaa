@@ -55,6 +55,17 @@ describe("chunkText", () => {
     expect(chunks.length).toBe(MAX_CHUNKS_PER_SOURCE)
   })
 
+  it("strips a NUL byte, which SQLite refuses and no request boundary can catch here", () => {
+    // The validation seam strips NULs from a REQUEST. A mirrored source's words
+    // come from a row written long ago — by an import, a migration, an older
+    // door — and one NUL in it would fail the sweep every fifteen minutes,
+    // forever, on a row nobody is looking at.
+    const withNul = `dispatch${String.fromCharCode(0)} outage`
+    expect(plainText(withNul)).toBe("dispatch outage")
+    expect(chunkText(withNul)[0]).not.toContain(String.fromCharCode(0))
+    expect([...tokenise(withNul).keys()]).toEqual(["dispatch", "outage"])
+  })
+
   it("reads the words out of rich text, not the markup", () => {
     expect(plainText("<p>Marta asked about <b>invoices</b>.</p><script>alert(1)</script>")).toBe(
       "Marta asked about invoices."

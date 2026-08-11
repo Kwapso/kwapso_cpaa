@@ -61,6 +61,14 @@ export function contentHash(text: string): string {
  * that quoted `<p class="x">` back at them would be a bug you can see. */
 export function plainText(input: string): string {
   return input
+    // A NUL byte is a 500 on the way into SQLite, and the boundary seam that
+    // strips them (shared/workers/validate.ts) only ever sees a REQUEST — a
+    // mirrored source's words come from a row that was written long ago, by an
+    // import or a migration or an older version of a door. One that carried a
+    // NUL would fail the sweep, get recorded, and fail again every fifteen
+    // minutes forever. Cheapest possible insurance, at the one place every piece
+    // of indexable text passes through.
+    .split(String.fromCharCode(0)).join("")
     .replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, " ")
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/(p|div|li|h[1-6]|tr)>/gi, "\n")
