@@ -119,7 +119,11 @@ describe("housekeeping never costs the person their save", () => {
     // visible somewhere (ERROR-HANDLING.md — the one recording seam).
     const logged = t.errorsLogged()
     expect(logged).toHaveLength(1)
-    expect(logged[0].place).toBe("profile/photo-cleanup")
+    // The place must say RECLAIM, not just the route. Whoever reads this row at
+    // 2am needs to know the save worked and only the housekeeping did not — a
+    // bare "POST /api/auth/profile" reads as "the person could not save".
+    expect(logged[0].place, "the place must name the step that failed").toContain("reclaim")
+    expect(logged[0].place).toContain("/api/auth/profile")
     expect(logged[0].message).toContain("R2 said no")
   })
 })

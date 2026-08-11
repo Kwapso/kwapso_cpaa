@@ -210,7 +210,7 @@ export async function updateTeamDetails(
   await reclaimMedia(env.MEDIA, [supersededKey], {
     db: env.DB,
     source: "tenancy",
-    place: "POST /api/tenancy/teams/update",
+    place: "POST /api/tenancy/teams/update — logo reclaim",
   })
 }
 

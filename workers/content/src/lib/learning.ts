@@ -353,7 +353,7 @@ export async function updateLearning(
   await reclaimMedia(
     env.LEARNING_MEDIA,
     superseded.filter((key) => !kept.has(key)),
-    { db: env.DB, source: "content", place: "POST /api/content/learning/update" }
+    { db: env.DB, source: "content", place: "POST /api/content/learning/update — attachment reclaim" }
   )
 
   const changes = describeChanges([
