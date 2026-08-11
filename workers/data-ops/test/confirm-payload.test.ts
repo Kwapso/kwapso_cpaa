@@ -205,7 +205,14 @@ describe("the agent loop builds its proposals through that one seam", () => {
   const agentSrc = readFileSync(join(__dirname, "..", "src", "lib", "agent.ts"), "utf8")
 
   it("needsConfirm comes from pendingCall(), not a hand-rolled summary", () => {
-    expect(agentSrc).toMatch(/needsConfirm:[^\n]*pendingCall\(/)
+    // Read to the end of the EXPRESSION, not to the end of the line: the value
+    // became a `Promise.all` over the calls when the import panel learned to
+    // resolve its stored plan, and a one-line regex would have called that a
+    // hand-rolled summary. The property it guards is unchanged — whatever shape
+    // the expression takes, the object under it is built by the seam.
+    const at = agentSrc.indexOf("needsConfirm:")
+    expect(at, "the loop no longer returns needsConfirm — re-read this test").toBeGreaterThan(-1)
+    expect(agentSrc.slice(at, agentSrc.indexOf("\n      }", at))).toMatch(/pendingCall\(/)
     expect(agentSrc).toContain('from "@shared/workers/confirm-payload"')
   })
 })

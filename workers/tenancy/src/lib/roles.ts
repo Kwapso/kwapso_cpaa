@@ -70,30 +70,46 @@ export async function listRoleAudit(cfg: D1Rest, guard: MemberGuard): Promise<Ro
   return d1Query<RoleAuditRow>(
     cfg,
     guard.databaseId,
-    `SELECT id, created_at, creator_name, updated_at, editor_name, deactivated_at, deactivator_name FROM member_roles LIMIT ${EXPORT_HARD_CAP}` // R14 hard cap (export tier)
+    // R14 hard cap (export tier). ORDERED, because an unordered cap truncates a
+    // DIFFERENT arbitrary set on every call — the roles door refuses past its own
+    // ceiling (countRoles vs the list) long before this one bites, and a
+    // deterministic tail is what makes that refusal reproducible rather than lucky.
+    `SELECT id, created_at, creator_name, updated_at, editor_name, deactivated_at, deactivator_name FROM member_roles ORDER BY id LIMIT ${EXPORT_HARD_CAP}`
   )
 }
 
 /** Export-only reader: the whole team's permission sheet in ONE read, shaped into
- * a PermissionValue per role id (missing modules → all-off via the one builder). */
+ * a PermissionValue per role id (missing modules → all-off via the one builder).
+ *
+ * AND IT SAYS WHETHER IT GOT ALL OF IT. This read is roles × modules, so it is
+ * the one that outruns the export ceiling first — and it is the one where
+ * truncation is not an omission but a REVERSAL. A role whose permission rows fell
+ * off the end resolves through `buildPermissionValue([])` in the export, which
+ * renders every right as `no`; re-import that file and the role is stripped. So
+ * the read takes the cap PLUS ONE and hands `complete` back to the door, which
+ * refuses rather than shipping a sheet that says "off" where the database says
+ * "on". `ORDER BY role_id, module` on top: a truncated read then loses whole
+ * roles off the tail instead of scattering half-matrices through the middle. */
 export async function listAllRolePermissions(
   cfg: D1Rest,
   guard: MemberGuard
-): Promise<Map<string, PermissionValue>> {
+): Promise<{ byRole: Map<string, PermissionValue>; complete: boolean }> {
   const rows = await d1Query<PermRow & { role_id: string }>(
     cfg,
     guard.databaseId,
-    `SELECT role_id, module, can_read, can_create, can_edit, can_delete FROM role_permissions LIMIT ${EXPORT_HARD_CAP}` // R14 hard cap (roles × modules)
+    // R14 hard cap (roles × modules). +1 is how "there was more" is known without
+    // a second query — the same trick listAccountsForExport uses.
+    `SELECT role_id, module, can_read, can_create, can_edit, can_delete FROM role_permissions ORDER BY role_id, module LIMIT ${EXPORT_HARD_CAP + 1}`
   )
   const byRole = new Map<string, PermRow[]>()
-  for (const row of rows) {
+  for (const row of rows.slice(0, EXPORT_HARD_CAP)) {
     const list = byRole.get(row.role_id) ?? []
     list.push(row)
     byRole.set(row.role_id, list)
   }
   const out = new Map<string, PermissionValue>()
   for (const [roleId, list] of byRole) out.set(roleId, buildPermissionValue(list))
-  return out
+  return { byRole: out, complete: rows.length <= EXPORT_HARD_CAP }
 }
 
 /** Fetch an active role in this team, or throw a clean 404. */

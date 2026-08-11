@@ -165,6 +165,23 @@ export function sqlString(value: unknown): string {
   return `'${String(value).replaceAll("'", "''")}'`
 }
 
+/** A user's search text as a LITERAL inside a LIKE pattern.
+ *
+ * Binding a needle as a parameter stops it becoming SQL — it does NOT stop it
+ * becoming a PATTERN, and those are two different escapes. `%` and `_` are LIKE's
+ * own wildcards, so an unescaped search for "PO_1" matches "PO-1"; and because
+ * SQLite compares a pattern by recursing at every `%`, a needle of alternating
+ * `%` and letters costs the worker exponential time over the whole table — a
+ * denial of service that fits in a query string.
+ *
+ * The backslash is escaped FIRST (or it would escape the escapes this adds), and
+ * every statement using this must say `ESCAPE '\'` — the marker is not SQLite's
+ * default. Beside sqlString because it is the same kind of promise: one seam that
+ * makes untrusted text mean only itself. */
+export function likeLiteral(value: string): string {
+  return value.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_")
+}
+
 /** Inline any copied cell value into a script (numbers, NULLs, strings). */
 export function sqlValue(value: string | number | null): string {
   if (value === null) return "NULL"

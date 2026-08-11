@@ -5,7 +5,8 @@
 
 import { refusePortalCaller } from "@shared/workers/account-scope"
 import { fail, json } from "@shared/workers/http"
-import { csvResponse, toCsv } from "@shared/workers/csv"
+import { csvResponse, exportTooLarge, toCsv } from "@shared/workers/csv"
+import { EXPORT_HARD_CAP } from "@shared/workers/limits"
 import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { gated, gatedBody } from "@shared/workers/route"
@@ -33,7 +34,10 @@ export async function getSelectable(request: Request, env: Env): Promise<Respons
 export async function getSelectableExport(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "selectable_data", "read")
   await refusePortalCaller(cfg, guard)
-  const rows = await listSelectableForExport(cfg, guard)
+  const { rows, complete } = await listSelectableForExport(cfg, guard)
+  // Whole, or an error — never a short file that looks like the vocabulary.
+  if (!complete)
+    return exportTooLarge(EXPORT_HARD_CAP, "dropdown values", "Read the Dropdown values screen instead, or retire the options you no longer offer.")
   const csv = toCsv(
     ["type", "value", "active", "created_at", "created_by"],
     rows.map((r) => [r.type, r.value, r.deactivated_at == null, r.created_at, r.creator_name])

@@ -73,16 +73,27 @@ export async function listMessages(
   return rows.map(toMessage)
 }
 
+/** The READ half of "own conversations only" — and it answers the same sentence
+ * its write-side sibling does.
+ *
+ * `requireOwnThread`, forty lines down, resolves ownership INSIDE the WHERE and
+ * says why in one line: "404, not 403: 'that thread isn't yours' confirms the
+ * thread exists." This one read the row first and then judged it, so it split the
+ * two answers apart — a colleague's thread id came back 403 and a made-up one
+ * 404, which is a working existence oracle over every private conversation in the
+ * team, from the door that exists to keep them private. The same door, on the
+ * same table, telling two callers apart in the one way it had promised not to.
+ *
+ * Ownership rides the statement now, exactly as the sibling does it. Outside your
+ * own conversations, a real id and an invented one are the same sentence. */
 async function ownThreadOrThrow(cfg: D1Rest, guard: MemberGuard, threadId: string): Promise<void> {
-  const rows = await d1Query<{ creator_id: string }>(
+  const rows = await d1Query<{ id: string }>(
     cfg,
     guard.databaseId,
-    "SELECT creator_id FROM agent_threads WHERE id = ?",
-    [threadId]
+    "SELECT id FROM agent_threads WHERE id = ? AND creator_id = ? LIMIT 1",
+    [threadId, guard.userId]
   )
   if (!rows[0]) throw new GuardError(404, "thread_not_found", "That conversation doesn't exist.")
-  if (rows[0].creator_id !== guard.userId)
-    throw new GuardError(403, "forbidden", "That conversation isn't yours.")
 }
 
 export async function createThread(

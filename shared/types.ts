@@ -246,14 +246,20 @@ export type HelpTicket = {
 }
 
 /** One reply on a ticket. `isAgent` marks the AI-drafted first reply; a mention
- * is notification-only (every member can see every ticket via the All tab). */
+ * is notification-only (every member can see every ticket via the All tab).
+ *
+ * `authorId` and `authorName` are BOTH nullable because the wire is where staff
+ * anonymity is kept (SCOPE ch.06): to a client login, a reply written on the
+ * agency's side of the fence arrives with no id and no name. Nulling only the
+ * name left a stable per-person handle in the payload — a pseudonym, which is
+ * anonymity right up until one email addresses the same person by name. */
 export type HelpMessage = {
   id: string
   ticketId: string
   body: string
   taggedUserIds: string[]
   isAgent: boolean
-  authorId: string
+  authorId: string | null
   authorName: string | null
   createdAt: string
 }

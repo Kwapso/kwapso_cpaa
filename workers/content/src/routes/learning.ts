@@ -8,7 +8,8 @@
 
 import { refusePortalCaller } from "@shared/workers/account-scope"
 import { fail, json } from "@shared/workers/http"
-import { csvResponse, toCsv } from "@shared/workers/csv"
+import { csvResponse, exportTooLarge, toCsv } from "@shared/workers/csv"
+import { EXPORT_HARD_CAP } from "@shared/workers/limits"
 import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { mediaKey, parseUploadDataUrl } from "@shared/workers/image"
@@ -46,7 +47,10 @@ export async function getLearning(request: Request, env: Env): Promise<Response>
 export async function getLearningExport(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "learning", "read")
   await refusePortalCaller(cfg, guard)
-  const items = await listLearningForExport(cfg, guard)
+  const { rows: items, complete } = await listLearningForExport(cfg, guard)
+  // Whole, or an error — never a short file that looks like the library.
+  if (!complete)
+    return exportTooLarge(EXPORT_HARD_CAP, "articles", "Read the Learning screen instead, or retire the articles you no longer publish.")
   const csv = toCsv(
     [
       "title", "category", "description", "contentType", "contentLink", "body",

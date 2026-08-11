@@ -10,6 +10,18 @@ import { GuardError, type MemberGuard } from "./permissions"
 
 const MAX_RECIPE_BYTES = 64 * 1024
 
+/** How many screens one team may override.
+ *
+ * The key is a screen key (`<module>.<view>`), and this worker cannot check it
+ * against a list — it treats a recipe as opaque on purpose, because the web app
+ * owns the `ScreenRecipe` shape. So the key space here is ANY string, every
+ * distinct one mints a row through the upsert, and each row carries up to 64 KB.
+ * That made the table's size a choice belonging to whoever holds `teams:edit`,
+ * and the read below runs on EVERY page load. A ceiling on the rows is the
+ * bounded thing this worker can honestly assert without borrowing the web app's
+ * vocabulary. Ten screens ship today; this is room for a fork to grow. */
+const MAX_SCREEN_OVERRIDES = 100
+
 /** Every screen override this team has set: { module: recipeJSON }. The web app
  * merges these over the in-code base recipes (override wins per screen). */
 export async function getScreenOverrides(
@@ -19,7 +31,11 @@ export async function getScreenOverrides(
   const rows = await d1Query<{ module: string; recipe: string }>(
     cfg,
     guard.databaseId,
-    "SELECT module, recipe FROM screens"
+    // R14 hard cap — this is the read behind every page load, and until the write
+    // door was capped the number of rows it returned (× 64 KB each) was set by
+    // whoever last called the write. Ordered so a team at the ceiling gets the
+    // same screens back on every request rather than an arbitrary subset.
+    `SELECT module, recipe FROM screens ORDER BY module LIMIT ${MAX_SCREEN_OVERRIDES}`
   )
   const out: Record<string, string> = {}
   for (const r of rows) out[r.module] = r.recipe
@@ -44,6 +60,20 @@ export async function setScreenOverride(
   }
   if (recipe.length > MAX_RECIPE_BYTES)
     throw new GuardError(400, "recipe_too_large", "That screen recipe is too large.")
+
+  // CAP THE TABLE, not just the row. An UPSERT on an existing key is always
+  // allowed (that is the ordinary edit, and it changes no row count); a key that
+  // does not exist yet is a new row, and new rows are what the ceiling is for.
+  const [existing, counted] = await Promise.all([
+    d1Query<{ module: string }>(cfg, guard.databaseId, "SELECT module FROM screens WHERE module = ?", [key]),
+    d1Query<{ n: number }>(cfg, guard.databaseId, "SELECT COUNT(*) AS n FROM screens"),
+  ])
+  if (!existing[0] && (counted[0]?.n ?? 0) >= MAX_SCREEN_OVERRIDES)
+    throw new GuardError(
+      400,
+      "too_many_screens",
+      `This team already customises ${MAX_SCREEN_OVERRIDES} screens, which is the limit. Reset one before adding another.`
+    )
 
   const now = new Date().toISOString()
   await d1ExecScript(

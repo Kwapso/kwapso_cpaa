@@ -42,7 +42,11 @@ export async function listInvites(
   const roles = await d1Query<{ id: string; title: string }>(
     cfg,
     guard.databaseId,
-    "SELECT id, title FROM member_roles"
+    // R14 hard cap — the same title lookup, and the same reason as listMembers:
+    // the row count here is attacker-influenced by whoever holds
+    // `member_roles:create`, so "it is only a small join table" is a statement
+    // about today's data, not about the code.
+    `SELECT id, title FROM member_roles LIMIT ${LIST_HARD_CAP}`
   )
   const titleById = new Map(roles.map((r) => [r.id, r.title]))
   const now = new Date().toISOString()

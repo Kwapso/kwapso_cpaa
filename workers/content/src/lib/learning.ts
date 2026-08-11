@@ -255,18 +255,26 @@ export type LearningExportRow = {
   updated_at: string | null
   editor_name: string | null
 }
+/** AN EXPORT IS ONE WHOLE DOCUMENT, OR IT IS AN ERROR (shared/workers/csv
+ * exportTooLarge). The cap is still R14's, but the door refuses past it instead
+ * of handing back the first ten thousand articles with nothing to say they
+ * weren't all of them — these columns lead with the import format, so a short
+ * file re-imported is a library that quietly lost its tail. */
 export async function listLearningForExport(
   cfg: D1Rest,
   guard: MemberGuard
-): Promise<LearningExportRow[]> {
-  return d1Query<LearningExportRow>(
+): Promise<{ rows: LearningExportRow[]; complete: boolean }> {
+  const rows = await d1Query<LearningExportRow>(
     cfg,
     guard.databaseId,
+    // R14 hard cap (export tier). +1 is how "there was more" is known without a
+    // second query.
     `SELECT content_title, category, content_description, content_type, content_link, content_body,
             sequence, is_required, deactivated_at, deactivator_name,
             created_at, creator_name, updated_at, editor_name
-     FROM learning ORDER BY sequence, created_at LIMIT ${EXPORT_HARD_CAP}` // R14 hard cap (export tier)
+     FROM learning ORDER BY sequence, created_at LIMIT ${EXPORT_HARD_CAP + 1}`
   )
+  return { rows: rows.slice(0, EXPORT_HARD_CAP), complete: rows.length <= EXPORT_HARD_CAP }
 }
 
 export async function createLearning(

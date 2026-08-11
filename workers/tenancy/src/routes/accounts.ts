@@ -12,7 +12,7 @@
 // right on the matrix and still reach exactly one account's data.
 
 import { fail, json, pagedJson } from "@shared/workers/http"
-import { csvResponse, toCsv } from "@shared/workers/csv"
+import { csvResponse, exportTooLarge, toCsv } from "@shared/workers/csv"
 import { EXPORT_HARD_CAP } from "@shared/workers/limits"
 import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
@@ -109,10 +109,10 @@ export async function getAccountsExport(request: Request, env: Env): Promise<Res
   const scope = await accountScope(cfg, guard)
   const { rows, complete } = await listAccountsForExport(cfg, guard, scope, accountQuery(new URL(request.url)))
   if (!complete)
-    return fail(
-      413,
-      "export_too_large",
-      `That's more than ${EXPORT_HARD_CAP.toLocaleString("en-GB")} accounts, which is more than one file can carry. Narrow it — search for a name, pick companies or people, or ask for one parent's accounts — or read the list a page at a time.`
+    return exportTooLarge(
+      EXPORT_HARD_CAP,
+      "accounts",
+      "Narrow it — search for a name, pick companies or people, or ask for one parent's accounts — or read the list a page at a time."
     )
   const csv = toCsv(
     [

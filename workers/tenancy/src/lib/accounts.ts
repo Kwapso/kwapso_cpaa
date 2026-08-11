@@ -20,7 +20,7 @@ import {
   requireStandableRoot,
   type AccountScope,
 } from "@shared/workers/account-scope"
-import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
+import { d1Query, likeLiteral, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { EXPORT_HARD_CAP, LIST_HARD_CAP, MAX_ACCOUNT_DEPTH } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
@@ -119,8 +119,16 @@ function accountsWhere(scope: AccountScope, opts: AccountFilters): { sql: string
   const params: string[] = [...fence.params]
 
   if (opts.q) {
-    filters.push("(name LIKE ? OR code LIKE ? OR email LIKE ?)")
-    const like = `%${opts.q}%`
+    // ESCAPED, because a search box is not a pattern box. `%` and `_` are LIKE's
+    // own wildcards, so an unescaped needle meant a person searching for the
+    // literal string "PO_1" silently matched "PO-1" and "POx1" — a filter quietly
+    // answering a different question, which is the same defect R19 was written
+    // for. It is also the cheap half of a denial: SQLite compares a LIKE pattern
+    // by recursing on every `%`, so "%a%a%a%a%a%a%a%a%a%a%a%" is a handful of
+    // bytes that costs the worker exponential time over the whole table. One
+    // escape closes both. The backslash goes first or it would escape the escapes.
+    filters.push("(name LIKE ? ESCAPE '\\' OR code LIKE ? ESCAPE '\\' OR email LIKE ? ESCAPE '\\')")
+    const like = `%${likeLiteral(opts.q)}%`
     params.push(like, like, like)
   }
   if (opts.type) {
