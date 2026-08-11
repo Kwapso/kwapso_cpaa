@@ -772,6 +772,23 @@ for (const t of PORTAL_TESTERS) {
   const home = companies.find((c) => c.name === t.companies[0])?.glideId
   const theirs = requests.filter((r) => r.accountGlideId === home).slice(0, 3)
   for (const r of theirs) raisedBy.set(r.description, sessions.get(t.email))
+
+  // STAND THEM IN THE COMPANY THE REQUEST BELONGS TO, FIRST.
+  //
+  // A client's ticket takes the company they are STANDING IN — from the guard
+  // corridor, never from the body, which is what stops one client raising a
+  // ticket into another's world. So a contact of two companies who happens to be
+  // standing in the second one files their first company's questions against the
+  // wrong company. That is not a check being fussy: it wrote three tickets onto
+  // Amstella that belong to Confia, and then the client could not find their own
+  // question because they were looking at Confia.
+  const homeId = idFor.get(home)
+  if (homeId) {
+    must(
+      await post("/api/tenancy/portal/switch-account", { accountId: homeId }, sessions.get(t.email).cookie),
+      `standing ${t.name} in ${t.companies[0]} before they raise anything`
+    )
+  }
 }
 
 const all = [...requests, { ...OURS, accountGlideId: null, replies: [], resolved: false }]
@@ -874,6 +891,22 @@ const aHome = companyId(testerA.companies[0])
 const aSecond = companyId(testerA.companies[1])
 const bHome = companyId(testerB.companies[0])
 
+// STAND SOMEWHERE ON PURPOSE BEFORE ASKING WHAT YOU CAN SEE.
+//
+// A contact of two companies is standing in exactly one of them at any moment,
+// and which one is not this script's to assume — the pointer is set when the
+// login is granted and moved by the switcher, so it is whatever the last thing
+// to touch it left behind. This check assumed `companies[0]`, found the tester
+// standing in the OTHER company, and reported two failures that were both the
+// assumption: "Confia can't see Confia" and "sees 0 of Confia's 13 requests"
+// were one sentence — they were standing in Amstella, correctly seeing
+// Amstella's. Switching first makes the answer deterministic and exercises the
+// switcher on the way past.
+must(
+  await post("/api/tenancy/portal/switch-account", { accountId: aHome }, a.cookie),
+  `standing the client in ${testerA.companies[0]} before asking what they can see`
+)
+
 const seen = await allPages("/api/tenancy/accounts", "accounts", a.cookie)
 const seenIds = new Set(seen.map((x) => x.id))
 // The positive half first: a fence that refuses everybody isn't a fence, it's a
@@ -898,8 +931,8 @@ check(
 const byIdRead = await api(`/api/tenancy/accounts/detail?id=${bHome}`, {}, a.cookie)
 check("opening the other company by id is refused", byIdRead.status === 404, `got ${byIdRead.status}`)
 
-const aRequests = await ticketsFor(a.cookie)
-const aDescriptions = new Set(aRequests.map((t) => t.description))
+let aRequests = await ticketsFor(a.cookie)
+let aDescriptions = new Set(aRequests.map((t) => t.description))
 
 // A NEGATIVE CHECK IS ONLY WORTH ANYTHING IF THERE IS SOMETHING TO FIND.
 // "They cannot see our internal request" passes trivially when that request does
@@ -920,22 +953,40 @@ check(
   ownCompanyByOthers.length > 0
 )
 
+// A CLIENT'S OWN QUESTION, RAISED FROM WHERE THEY ARE STANDING.
+//
+// Raised here rather than assumed from the history above, because a request only
+// counts for this check if it belongs to the company the tester is standing in —
+// and an earlier run wrote three of theirs onto their SECOND company (the seed
+// filed a first-company question while they stood in the second, before the
+// switch above existed). Those rows are still there and cannot be moved: a
+// ticket's client is set once, on purpose. So the check raises its own, which is
+// idempotent on the description and true to the thing being proved.
+const OWN_QUESTION = `Can you check last month's export for us? (raised from the portal by ${testerA.companies[0]})`
+if (!aDescriptions.has(OWN_QUESTION)) {
+  must(await post("/api/content/help", { description: OWN_QUESTION }, a.cookie), "a client raising their own question")
+  aRequests = await ticketsFor(a.cookie)
+  aDescriptions = new Set(aRequests.map((t) => t.description))
+}
 check(
-  "a client sees the requests they raised themselves",
-  aRequests.length > 0 && [...raisedBy.keys()].some((d) => aDescriptions.has(d)),
-  `saw ${aRequests.length}`
+  "a client sees the request they raised themselves",
+  aDescriptions.has(OWN_QUESTION),
+  `saw ${aRequests.length} requests, none of them the one just raised from this login`
 )
-// THE RULE THE OWNER SETTLED TODAY: a client contact sees their whole COMPANY's
-// requests, not only the ones they typed. Written against the rule as stated —
-// so it fails until the lane implementing it merges, and a failure here says
-// "not built yet", not "leaking".
+// THE RULE THE OWNER SETTLED: a client contact sees their whole COMPANY's
+// requests, not only the ones they typed. Built and live — but it took TWO fixes
+// to actually mean anything, and this check found the second one. Widening the
+// read was half of it; the other half was that a request the AGENCY typed in on
+// a client's behalf carried no client at all, so 220 of 221 seeded requests
+// belonged to nobody and a client's own history was empty. A check that only
+// asked "can they see too much" would have shrugged at that.
 check(
   "a client sees their whole COMPANY's requests, not only their own",
   ownCompanyByOthers.every((r) => aDescriptions.has(r.description)),
   `saw ${ownCompanyByOthers.filter((r) => aDescriptions.has(r.description)).length} of the ` +
-    `${ownCompanyByOthers.length} raised on their company by somebody else. Expected to FAIL until the ` +
-    "company-wide help scope lands — today a client is scoped to the rows they authored, so this reads " +
-    '"not built yet", not "leaking". The three checks after it are the ones that would mean a leak.'
+    `${ownCompanyByOthers.length} raised on their company by somebody else. Either the help read is ` +
+    "no longer scoped to the account fence, or those requests were written without a client on them " +
+    "(createTicket/updateTicket → accountForStaffTicket)."
 )
 check(
   "a client never sees another company's requests",
