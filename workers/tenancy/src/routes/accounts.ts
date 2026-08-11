@@ -18,7 +18,7 @@ import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/worke
 import { publishChange } from "@shared/workers/realtime"
 import { gated, gatedBody, openTeam } from "@shared/workers/route"
 import { accountScope, type AccountScope } from "@shared/workers/account-scope"
-import { GuardError, teamContext, whoAmI, type MemberGuard } from "@shared/workers/gating"
+import { GuardError, hasRight, teamContext, whoAmI, type MemberGuard } from "@shared/workers/gating"
 import type { D1Rest } from "@shared/workers/d1-rest"
 import type { PortalUser } from "@shared/types"
 import {
@@ -136,7 +136,23 @@ export async function getAccountDetail(request: Request, env: Env): Promise<Resp
   const id = queryText(new URL(request.url).searchParams.get("id"), "Id")
   if (!id) return fail(400, "invalid_input", "Which account?")
   const detail = await getAccount(cfg, guard, scope, id)
-  return json({ ...detail, portalUsers: await withEmails(env, detail.portalUsers) })
+  // THE LOGINS ARE A SEPARATELY GRANTED MODULE, and this door is gated on
+  // `accounts:read`. `portal_users` exists as its own module precisely because
+  // "granting someone a login hands out sight of customer data, which is a bigger
+  // decision than editing a phone number" (shared/team-modules.ts) — and its own
+  // door, GET /portal-users, gates on `portal_users:read`.
+  //
+  // This one shipped the same rows anyway, with the global users.email joined on,
+  // to anyone holding `accounts:read`. The Portal-access tab is already hidden
+  // client-side by exactly this check (web/components/account-detail.tsx) — which
+  // is the shape the gating seam's own header forbids: "security is never just
+  // hiding UI". The server now decides it too.
+  const maySeeLogins = await hasRight(cfg, guard, "portal_users", "read")
+  return json({
+    ...detail,
+    portalUsers: maySeeLogins ? await withEmails(env, detail.portalUsers) : [],
+    portalUsersTotal: maySeeLogins ? detail.portalUsersTotal : 0,
+  })
 }
 
 export async function postCreateAccount(request: Request, env: Env): Promise<Response> {
