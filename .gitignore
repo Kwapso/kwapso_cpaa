@@ -32,13 +32,14 @@ out/
 # The pulled Glide rows are real customer data — the catalogue is tracked, the
 # data never is. Re-pull with `node scripts/glide-pull.mjs`.
 glide/data/
-# The rescued Glide FILES — 79 MB of clients' own logos, photos and PDFs,
-# copied off Google's storage before the Glide account dies. Same rule as the
-# rows: the catalogue is tracked, the customer data never is. Re-fetch with
-# `node scripts/glide-files.mjs`; `glide/files/manifest.json` maps every one
-# back to the row that referenced it.
+# The rescued Glide FILES — 79 MB of the clients' own logos, photos, PDFs and
+# video, copied off Google's storage before the Glide account lapses. Same rule
+# as the rows: the SCRIPTS that fetch and shape them are tracked, their output
+# never is. `glide/files/manifest.json` maps every file back to the row that
+# referenced it. BACK THIS UP SOMEWHERE REAL — once the Glide account is closed,
+# re-running `node scripts/glide-files.mjs` gets nothing.
 glide/files/
-# The normalised intermediate is DERIVED from both, so it holds the same data.
+# Derived from both, so it holds exactly the same customer data.
 glide/normalised.json
 
 # Parallel agent worktrees — working copies, never content
