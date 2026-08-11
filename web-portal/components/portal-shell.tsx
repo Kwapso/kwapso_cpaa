@@ -22,6 +22,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { ModeToggle } from "@kwapso/ui/registry/primitives/mode-toggle/mode-toggle"
+import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { Building2, House, LifeBuoy, LogOut } from "lucide-react"
 
@@ -53,6 +54,9 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
   const router = useRouter()
   const pathname = usePathname()
   const { session, refresh } = usePortalSession()
+  /** A company switch is in flight. Held HERE rather than in the switcher because
+   * the thing that has to wait is the body, not the menu. */
+  const [switching, setSwitching] = React.useState(false)
 
   // Signed out is a NAVIGATION, not a screen: the sign-in door lives at /login so
   // the address bar always says where you are.
@@ -125,6 +129,7 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
             accounts={session.accounts}
             currentAccountId={session.currentAccountId}
             onSwitched={refresh}
+            onSwitching={setSwitching}
           />
           <div className="flex-1" />
           <ModeToggle />
@@ -134,7 +139,23 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-5 py-8">{children(session)}</main>
+      <main className="mx-auto w-full max-w-3xl flex-1 px-5 py-8">
+        {/* Mid-switch the rows below still belong to the company being left, so
+         * they are held back rather than shown under the new company's name.
+         * Skeletons in the SHAPE of what's coming — a heading, then request rows
+         * — which is how every other wait in this app is drawn (home-screen),
+         * not a spinner floating in an empty page. */}
+        {switching ? (
+          <div className="flex flex-col gap-6" aria-busy="true" aria-live="polite">
+            <span className="sr-only">Switching company…</span>
+            <Skeleton className="h-8 w-56 rounded-lg" />
+            <Skeleton className="h-20 w-full rounded-xl" />
+            <Skeleton className="h-20 w-full rounded-xl" />
+          </div>
+        ) : (
+          children(session)
+        )}
+      </main>
 
       {/* The nav sits at the BOTTOM on a phone, where a thumb is — and it is the
        * same three items on every screen, always in the same order, always
