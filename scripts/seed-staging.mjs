@@ -162,9 +162,18 @@ const PORTAL_TESTERS = [
 const CLIENT_ROLE = {
   title: "Client",
   description:
-    "A client login. Sees only their own accounts and their company's requests, plus the learning articles you publish.",
+    "A client login. Sees their own company's people and its requests — every request their colleagues raise, not only their own — and nothing else.",
   // Anything not named here is off. A client never touches members, roles, the
   // AI agent, or anyone else's records.
+  //
+  // `learning` and `selectable_data` are DELIBERATELY still granted even though
+  // every one of those doors now refuses a client login outright (d7512f1). They
+  // are not a leftover: a real owner building their own client role would plausibly
+  // tick them, so leaving them on makes this seeded client the WORST CASE — a
+  // caller holding rights the doors must refuse on grounds other than the role.
+  // R21's enumeration reads these rights to decide which doors to walk, so taking
+  // them away would quietly stop the check testing the very doors that were leaking
+  // a week ago. The defence must not depend on how carefully the role was built.
   rights: {
     teams: { read: true },
     accounts: { read: true },
