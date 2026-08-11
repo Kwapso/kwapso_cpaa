@@ -55,7 +55,39 @@ const ACCOUNT_COLUMNS = `id, account_type, parent_account_id, name, email, phone
   currency, locale, timezone, commercials_visible, status, deactivated_at,
   created_at, creator_name, updated_at, editor_name`
 
-function toAccount(r: AccountRow): Account {
+/** WHAT AN ACCOUNT ROW SAYS, AND TO WHOM.
+ *
+ * Most of this row is the client's own information, which is exactly why the
+ * portal opens the door: their name, address, reference, the people in it. Four
+ * fields on it are not theirs at all — they are the AGENCY'S RECORD ABOUT THEM:
+ *
+ *   • `status` — the commercial lifecycle. "prospect", "client", "past client"
+ *     is our view of the relationship, and a client reading "prospect" about
+ *     themselves has learned something we never chose to tell them.
+ *   • `commercialsVisible` — our own switch governing what money they may see.
+ *     A setting about somebody is not a setting for them to read.
+ *   • `createdByName` / `editedByName` — which staff member opened the record and
+ *     which one last touched it. The same promise the ticket row and the reply
+ *     thread keep (SCOPE ch.06); there is no reason it changes table.
+ *
+ * THE REPO ALREADY SAYS THIS, ABOUT THE HISTORY OF THESE VERY FIELDS. The portal
+ * has no activity feed, and shared/rules/registry.ts gives the reason: "an
+ * account's history names the staff who edited the record and shows the agency's
+ * own before/after values (status moves, commercial flags) — none of which is the
+ * client's to read." The history was closed and the CURRENT values rode out on
+ * the row underneath it, which is the whole finding: the portal drew none of
+ * this, and the server sent all of it.
+ *
+ * The projection lives HERE rather than at the three call sites, because a
+ * redaction you have to remember is one somebody forgets — the same argument
+ * `ticketFence` makes for having no default. Every reader in this file goes
+ * through this function, so the wire cannot disagree with it.
+ *
+ * The one thing that must NOT come through here is a WRITE's before-image: an
+ * edit compares against what is stored, not against what the caller may see.
+ * `accountRowOrThrow` below is the raw read updateAccount uses for that. */
+function toAccount(r: AccountRow, scope: AccountScope): Account {
+  const ours = scope.kind === "portal"
   return {
     id: r.id,
     accountType: r.account_type === "individual" ? "individual" : "entity",
@@ -68,13 +100,13 @@ function toAccount(r: AccountRow): Account {
     currency: r.currency,
     locale: r.locale,
     timezone: r.timezone,
-    commercialsVisible: r.commercials_visible === 1,
-    status: r.status,
+    commercialsVisible: ours ? null : r.commercials_visible === 1,
+    status: ours ? null : r.status,
     active: r.deactivated_at == null,
     createdAt: r.created_at,
-    createdByName: r.creator_name,
+    createdByName: ours ? null : r.creator_name,
     updatedAt: r.updated_at,
-    editedByName: r.editor_name,
+    editedByName: ours ? null : r.editor_name,
   }
 }
 
@@ -167,7 +199,7 @@ export async function listAccounts(
   ])
 
   const page = toPage(rows, PAGE_SIZE, (r) => [r.created_at, r.id])
-  return { ...page, rows: page.rows.map(toAccount), total: counted[0]?.n ?? 0 }
+  return { ...page, rows: page.rows.map((r) => toAccount(r, scope)), total: counted[0]?.n ?? 0 }
 }
 
 /** Every account this caller may see — NARROWED the same way the list narrows —
@@ -204,7 +236,7 @@ export async function listAccountsForExport(
       ORDER BY name ASC, id ASC LIMIT ${EXPORT_HARD_CAP + 1}`,
     params
   )
-  return { rows: rows.slice(0, EXPORT_HARD_CAP).map(toAccount), complete: rows.length <= EXPORT_HARD_CAP }
+  return { rows: rows.slice(0, EXPORT_HARD_CAP).map((r) => toAccount(r, scope)), complete: rows.length <= EXPORT_HARD_CAP }
 }
 
 /** One account with its people and its logins — the detail read. Outside the
@@ -227,7 +259,7 @@ export async function getAccount(
     [...fence.params, id]
   )
   if (!rows[0]) throw new GuardError(404, "not_found", "That account doesn't exist.")
-  const account = toAccount(rows[0])
+  const account = toAccount(rows[0], scope)
 
   // The parent is read through the SAME fence: a pinned caller who can see a
   // subsidiary must not learn its holding company's name by opening the child.
@@ -248,7 +280,7 @@ export async function getAccount(
 
   return {
     account,
-    parent: parentRows[0] ? toAccount(parentRows[0]) : null,
+    parent: parentRows[0] ? toAccount(parentRows[0], scope) : null,
     links,
     portalUsers,
     linksTotal,
@@ -372,7 +404,8 @@ export async function updateAccount(
     commercialsVisible?: boolean
   }
 ): Promise<void> {
-  const before = await accountOrThrow(cfg, guard, scope, id)
+  // THE STORED ROW, not the caller's view of it — see accountRowOrThrow.
+  const before = await accountRowOrThrow(cfg, guard, scope, id)
   const fence = accountScopeClause(scope, "id")
   const audit = editedBy(actor, new Date().toISOString())
 
@@ -413,7 +446,7 @@ export async function updateAccount(
         next.locale,
         next.timezone,
         next.status,
-        input.commercialsVisible === undefined ? (before.commercialsVisible ? 1 : 0) : input.commercialsVisible ? 1 : 0,
+        input.commercialsVisible === undefined ? before.commercials_visible : input.commercialsVisible ? 1 : 0,
         ...audit.params,
         ...fence.params,
         id,
@@ -760,7 +793,12 @@ export async function listPortalUsers(
     email: null,
     appRestriction: r.app_restriction,
     grantedAt: r.created_at,
-    grantedByName: r.creator_name,
+    // WHICH STAFF MEMBER HANDED OUT THIS LOGIN is the agency's decision, not the
+    // client's reading — the same sentence toAccount makes about the audit block
+    // one table over, and the same one the ticket row and the reply thread make
+    // about ours. The client portal draws no login list at all; the row went out
+    // regardless, which is the version that survives a UI rewrite.
+    grantedByName: scope.kind === "portal" ? null : r.creator_name,
     active: r.deactivated_at == null,
   }))
 }
@@ -901,13 +939,18 @@ export async function setPortalAccessActive(
 
 // ── shared internals ─────────────────────────────────────────────────────────
 
-/** One account inside the fence, or a clean 404 (identical to a made-up id). */
-async function accountOrThrow(
+/** One account inside the fence AS STORED, or a clean 404 (identical to a made-up
+ * id). The raw row, deliberately: a WRITE's before-image has to be what is in the
+ * database, not what this caller is allowed to be told about it — `toAccount`
+ * withholds `status` and `commercialsVisible` from a client login, and an edit
+ * that carried those forward from a redacted view would blank a NOT NULL column
+ * and flip a commercial flag nobody touched. Readers want `accountOrThrow`. */
+async function accountRowOrThrow(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
   id: string
-): Promise<Account> {
+): Promise<AccountRow> {
   const fence = accountScopeClause(scope, "id")
   const rows = await d1Query<AccountRow>(
     cfg,
@@ -916,7 +959,17 @@ async function accountOrThrow(
     [...fence.params, id]
   )
   if (!rows[0]) throw new GuardError(404, "not_found", "That account doesn't exist.")
-  return toAccount(rows[0])
+  return rows[0]
+}
+
+/** One account inside the fence, as this caller may be told it. */
+async function accountOrThrow(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  id: string
+): Promise<Account> {
+  return toAccount(await accountRowOrThrow(cfg, guard, scope, id), scope)
 }
 
 /** Does a row hang off an account inside the fence? Used by the archive/restore

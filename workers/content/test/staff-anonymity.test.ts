@@ -15,6 +15,17 @@
 // id. Every other name in that set is a property of the TICKET; the admins are a
 // property of the role table, which is R18's sentence in a module that had not
 // heard it.
+//
+// The third is the TICKET ITSELF, and it is the largest of the three by volume.
+// `listReplies` redacted a thread's authors while `toTicket`, forty lines above
+// it, emitted `raiserId`, `raiserName` and `editorName` with no portal branch at
+// all — so every row of a client's support list named the staff member who
+// raised it and the one who last touched it. Staff raise a client's questions
+// for them (SCOPE ch.07): 220 of the 221 seeded historical requests are
+// staff-raised, which makes this the majority case rather than an edge. The
+// portal's own screen has carried a note about it for weeks
+// (web-portal/components/support-screen.tsx) saying the decision belonged on the
+// server, next to the one the thread already made.
 
 import type { DatabaseSync } from "node:sqlite"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -205,5 +216,97 @@ describe("the stakeholder list does not hand out the staff roster", () => {
     const { stakeholders } = (await res.json()) as { stakeholders: { userId: string; origin: string }[] }
     expect(stakeholders.map((s) => s.origin)).toContain("admin")
     expect(stakeholders.map((s) => s.userId)).toContain("U_ADMIN2")
+  })
+})
+
+describe("the ticket row itself names nobody on the agency's side", () => {
+  /** A question STAFF raised on the client's behalf — the majority case. It sits
+   * on the victim's account, so the fence lets the client read it; who raised it
+   * is the only thing in question here. */
+  const STAFF_RAISED = "H_FOR_CLIENT"
+
+  beforeEach(() => {
+    db().exec(
+      `INSERT INTO help (id, description, status, resolved, account_id, created_at, creator_id, creator_email, creator_name)
+       VALUES ('${STAFF_RAISED}', 'Called in by phone: the April statement is missing a line', 'open', 0,
+               '${IDS.victimAccount}', '2026-03-02', '${IDS.staffUser}', 'staff@kwapso.app', 'Staff');`
+    )
+  })
+
+  /** One ticket as this caller is shown it. The by-id lookup is its own branch in
+   * the route (a lookup, not a filtered page), so the tests below drive both. */
+  async function readOne(userId: string, ticketId: string) {
+    const res = await call(userId, "GET /api/content/help", undefined, `?id=${ticketId}`)
+    expect(res.status).toBe(200)
+    const { tickets } = (await res.json()) as {
+      tickets: {
+        id: string
+        description: string
+        raiserId: string | null
+        raiserName: string | null
+        editorName: string | null
+      }[]
+    }
+    return tickets[0]
+  }
+
+  it("a staff-raised ticket reaches the client with NEITHER the name NOR the handle", async () => {
+    const one = await readOne(IDS.victimUser, STAFF_RAISED)
+    expect(one, "the client must still SEE the ticket — anonymity is not silence").toBeDefined()
+    expect(one.description).toContain("April statement")
+    expect(one.raiserName, "no staff name on the wire").toBeNull()
+    // The HANDLE. A ULID is the same person on every ticket they ever touch, and
+    // one linkage anywhere turns the whole history into a name.
+    expect(one.raiserId, "no staff handle on the wire either").toBeNull()
+  })
+
+  it("and not through the LIST either — the door a client's screen actually calls", async () => {
+    const res = await call(IDS.victimUser, "GET /api/content/help", undefined, "?scope=all")
+    const { tickets } = (await res.json()) as { tickets: { id: string }[] }
+    expect(
+      tickets.map((t) => t.id),
+      "the staff-raised ticket is in their company's list"
+    ).toContain(STAFF_RAISED)
+    expect(JSON.stringify(tickets), "no staff handle anywhere in the page").not.toContain(IDS.staffUser)
+    expect(JSON.stringify(tickets), "no staff name anywhere in the page").not.toContain("Staff")
+  })
+
+  it("their own question is still theirs — a colleague is named, not called 'kwapso'", async () => {
+    const one = await readOne(IDS.victimUser, IDS.victimTicket)
+    expect(one.raiserId, "one of their own people keeps their handle").toBe(IDS.victimUser)
+    expect(one.raiserName).toBeTruthy()
+  })
+
+  it("a staff EDIT does not sign itself either", async () => {
+    // Staff move the client's own ticket along. The raiser stays their colleague;
+    // the editor is ours, and the client is told a status, not a person.
+    expect(
+      (await call(IDS.staffUser, "POST /api/content/help/status", { id: IDS.victimTicket, status: "in_progress" }))
+        .status
+    ).toBe(200)
+    const one = await readOne(IDS.victimUser, IDS.victimTicket)
+    expect(one.raiserName, "their own colleague is still named").toBeTruthy()
+    expect(one.editorName, "who moved it is ours, not theirs").toBeNull()
+  })
+
+  it("staff still see every name — this is about clients, not secrecy", async () => {
+    const one = await readOne(IDS.staffUser, STAFF_RAISED)
+    expect(one.raiserId).toBe(IDS.staffUser)
+    expect(one.raiserName).toBe("Staff")
+  })
+
+  // THE FUNCTIONAL HALF. The route used to read the raiser off the ticket it had
+  // just fetched, which is now redacted for exactly this caller — so a client
+  // replying to a staff-raised question could have silently stopped notifying
+  // anyone. Redaction is about what leaves the building, never about who gets told.
+  it("a client's reply still reaches the staff member who raised the question", async () => {
+    expect(
+      (await call(IDS.victimUser, "POST /api/content/help/reply", { helpId: STAFF_RAISED, body: "Here is the line." }))
+        .status
+    ).toBe(200)
+    expect(
+      sent.find((m) => m.to === "staff@kwapso.app"),
+      "the raiser must still be told there is an answer"
+    ).toBeDefined()
   })
 })

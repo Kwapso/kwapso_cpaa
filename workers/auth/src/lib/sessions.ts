@@ -13,6 +13,14 @@ const LAST_SEEN_THROTTLE_MS = 5 * 60 * 1000
 
 const days = (n: number) => n * 24 * 60 * 60 * 1000
 
+/** `SameSite=Lax` IS NOT THE CROSS-SITE DEFENCE — say it here, because this line
+ * is where a reader goes looking for one. "Site" means the registrable domain,
+ * kwapso.app, which we share with a live third-party app on portal.kwapso.app
+ * (it resolves to Glide's edge, and the portal gateway's own config says so). A
+ * page there is same-SITE, so this cookie rides its form POSTs happily. What
+ * actually stops them is `refuseForeignOrigin` in shared/workers/front-door.ts,
+ * which both gateways run in front of every non-GET they forward. Lax is kept
+ * for what it IS good at — keeping the cookie off third-party GET embeds. */
 function buildCookie(env: Env, value: string, maxAgeSeconds: number): string {
   const secure = env.INSECURE_COOKIE === "1" ? "" : "; Secure"
   return `${SESSION_COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax${secure}; Max-Age=${maxAgeSeconds}`
