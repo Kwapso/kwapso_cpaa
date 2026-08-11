@@ -157,15 +157,34 @@ function doorsOf(worker: Worker): Door[] {
   return out
 }
 
-/** A door handler's OWN source — the switchboard names the handler for the path;
- * the function body from there to the next top-level `}` (or the next export,
- * whichever comes first) is what it reads, and never the helper that follows. */
+/** One function's body: from its declaration to the next top-level `}` (or the
+ * next export, whichever comes first) — never into the function that follows. */
+function fnBody(src: string, name: string): string {
+  const at = src.search(new RegExp(`function ${name}\\(`))
+  if (at === -1) return ""
+  const ends = [src.indexOf("\n}\n", at), src.indexOf("\nexport ", at + 1)].filter((i) => i !== -1)
+  return src.slice(at, ends.length ? Math.min(...ends) : undefined)
+}
+
+/** What a door READS — its own handler, PLUS any helper in the same file it
+ * calls, one level deep.
+ *
+ * The one level is not a nicety, it is the law's blind spot closed. This scan
+ * once read the handler alone, so the moment a door factored its parsing into a
+ * `function accountQuery(url)` beside it — which is exactly what you do when two
+ * doors must narrow by the same words — the door dropped out of the census
+ * entirely and its tool's obligations silently became none. A law that stops
+ * looking when you tidy up is a law that rewards tidying up.
+ *
+ * One level, and only helpers declared in the SAME source: a `createLearning`
+ * imported from a lib declares its contract in a TYPE, which is not source a
+ * scan can follow, and pretending otherwise would be worse than saying so. */
 function handlerBody(door: Door): string {
   for (const src of handlerSources(door.worker)) {
-    const at = src.search(new RegExp(`function ${door.handler}\\(`))
-    if (at === -1) continue
-    const ends = [src.indexOf("\n}\n", at), src.indexOf("\nexport ", at + 1)].filter((i) => i !== -1)
-    return src.slice(at, ends.length ? Math.min(...ends) : undefined)
+    const own = fnBody(src, door.handler)
+    if (!own) continue
+    const called = [...new Set([...own.matchAll(/\b([a-zA-Z_]\w*)\s*\(/g)].map((m) => m[1]))]
+    return [own, ...called.filter((n) => n !== door.handler).map((n) => fnBody(src, n))].join("\n")
   }
   return ""
 }
@@ -272,6 +291,21 @@ describe("agent-filter-parity (R19): the doors decide what the machine surface o
     // …and the two doors each earlier rewrite was earned by are still in it.
     expect(DOORS.map(key)).toContain("GET /api/tenancy/accounts")
     expect(DOORS.map(key)).toContain("GET /api/data-ops/agent/usage")
+  })
+
+  it("a door that tidies its parsing into a helper still owes its filters", () => {
+    // The blind spot this closed, pinned by the two doors that walked into it:
+    // both narrow accounts by the same three words, so both call one helper —
+    // and while the scan read the handler alone, factoring that out silently
+    // reduced what the list door owed to `cursor`, and made the export door
+    // invisible. Naming the obligation here means a future tidy-up cannot shrink
+    // it back without saying so out loud.
+    for (const k of ["GET /api/tenancy/accounts", "GET /api/tenancy/accounts/export"]) {
+      const door = DOORS.find((d) => key(d) === k)!
+      expect(doorParams(door), `${k} must still owe its three filters`).toEqual(
+        expect.arrayContaining(["q", "type", "parentId"])
+      )
+    }
   })
 
   it("every reasoned gap still names a real door (no rotting lines)", () => {
