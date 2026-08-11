@@ -2,7 +2,7 @@
 
 **The multi-tenant SaaS base by Swift Struck.** Not an app for one industry —
 the reusable foundation every future app (ERP, CRM, portal…) is built on: login
-(strict email codes), teams, Member roles (module key `member_roles`), invites,
+(an email code or Google), teams, Member roles (module key `member_roles`), invites,
 learning, help desk, dropdown management, CSV data import, and an in-app **AI
 agent** that acts AS the signed-in user through the same gated endpoints (never
 exceeding their rights), all hosted on Cloudflare.

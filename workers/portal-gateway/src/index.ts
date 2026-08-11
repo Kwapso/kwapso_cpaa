@@ -70,6 +70,15 @@ export const PORTAL_DOORS: Record<string, Upstream> = {
   // routes creates access; they only prove who you already are.
   "POST /api/auth/email/start": "AUTH",
   "POST /api/auth/email/verify": "AUTH",
+  // "Continue with Google" — the same two halves the agency app opens, named
+  // here DELIBERATELY rather than inherited, because this file names everything.
+  // Both are GET: Google's flow is a browser redirect, and the callback is the
+  // address Google itself sends the browser to, so it has to answer at THIS
+  // hostname (it is registered with Google separately from the agency's). A
+  // client login proves the same identity through the same auth worker either
+  // way; what it may then SEE is decided by every other door on this list.
+  "GET /api/auth/google/start": "AUTH",
+  "GET /api/auth/google/callback": "AUTH",
   "GET /api/auth/me": "AUTH",
   "POST /api/auth/profile": "AUTH",
   "POST /api/auth/logout": "AUTH",

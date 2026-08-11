@@ -1,5 +1,22 @@
 # Local-dev settings for the auth worker. Copy to `.dev.vars` (gitignored).
 APP_ORIGIN=http://localhost:3000
+# The client portal's own address — the SECOND front door. Google sign-in will
+# only ever bounce someone back to one of these two origins.
+PORTAL_ORIGIN=http://localhost:3001
+# "Continue with Google" (the `kwapso-signin` OAuth client). Leave both blank and
+# the button simply isn't offered; the email-code path is unaffected. Whatever
+# origins you set above must ALSO be registered in the Google console as
+# <origin>/api/auth/google/callback.
+#
+# LOCAL DEV, HONESTLY: `next dev` REWRITES /api/auth/* to this worker on :8787,
+# so the worker sees its own origin, not localhost:3000 — and the Google door
+# refuses an origin it wasn't given (that refusal is the open-redirect defence,
+# and it is not worth weakening for convenience). To exercise the round trip
+# locally, run the GATEWAY with `wrangler dev` so screens and /api share one
+# origin, and register that origin's callback with Google. Otherwise test Google
+# on staging, which is what the redirect URIs are registered for anyway.
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
 # (login codes are inbox-only — no echo var exists; STAGING dev/test sign-in uses
 #  the test-login door on this worker, gated by its OWN TEST_LOGIN_KEY secret —
 #  deliberately NOT ADMIN_KEY, so the maintenance key can never arm impersonation.

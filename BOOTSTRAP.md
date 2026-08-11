@@ -57,7 +57,7 @@ route may reach `/internal/*`, the agent, or the act-as-user surface).
 | Worker | Public? | Does |
 |---|---|---|
 | `realtime` | no | the `TeamChannel` Durable Object — fans out live change pings |
-| `auth` | no | email-code login, sessions, the email sender |
+| `auth` | no | email-code and Google login, sessions, the email sender |
 | `tenancy` | no | teams, members, Member roles + permissions, invites, dropdown values, the customer spine |
 | `content` | no | Learning + Help |
 | `data-ops` | no | CSV import + the AI agent |
@@ -152,6 +152,7 @@ ARCHITECTURE.md `/media/*` note before storing anything sensitive.
 | Secret | On workers | Why |
 |---|---|---|
 | `RESEND_API_KEY` | auth | send login codes + notifications. Login codes are NEVER echoed in an API response, in any environment — until this is set, sign-in emails simply don't send. Automated tests sign in through the non-production test-login door (`POST /api/auth/admin/test-login`, its own `TEST_LOGIN_KEY` secret; see OPERATIONS.md § secrets).
+| `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` | auth | *optional* — "Continue with Google" (the `kwapso-signin` OAuth client; SCOPE ch.03). Set BOTH or neither: with either missing the button isn't offered and the email-code path is untouched. Register `<APP_ORIGIN>/api/auth/google/callback` **and** `<PORTAL_ORIGIN>/api/auth/google/callback` as Authorized redirect URIs on that client — one per front door, per environment (OPERATIONS.md § secrets has the four for this project). |
 | `CF_D1_TOKEN` | tenancy, content, data-ops, **realtime** | the scoped D1 REST token (Cloudflare → D1 → Edit) that reaches per-team databases. realtime needs it to fence a joining socket (a client-portal login must not hear the agency's row ids — DURABLE-OBJECTS §2); with no token the team channel refuses every socket, which is the fail-closed direction but costs live sync until it's set. |
 | `ADMIN_KEY` | tenancy, data-ops | guards the maintenance endpoints (migrate-teams, db-sizes, grant credits). Set it in both environments. |
 | `TEST_LOGIN_KEY` | auth (**NON-PRODUCTION ONLY**) | the test-login door's own secret — its holder can sign in as ANY account on that environment. Deliberately a different name from `ADMIN_KEY` so the maintenance-key rollout can never arm it, and the door refuses outright when the worker's `ENVIRONMENT` var is `production`. |

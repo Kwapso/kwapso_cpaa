@@ -11,6 +11,16 @@ export async function sha256Hex(input: string): Promise<string> {
     .join("")
 }
 
+/** Raw SHA-256 bytes — the PKCE code challenge is base64url of the DIGEST, not
+ * of its hex spelling, so this cannot be built from sha256Hex. */
+export async function sha256Bytes(input: string): Promise<Uint8Array> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(input) as BufferSource
+  )
+  return new Uint8Array(digest)
+}
+
 export function base64Url(bytes: Uint8Array): string {
   let binary = ""
   for (const b of bytes) binary += String.fromCharCode(b)

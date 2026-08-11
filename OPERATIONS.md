@@ -64,7 +64,7 @@ obviously fictional client world so there is something to click around.
 |---|---|---|---|
 | gateway (`workers/gateway`) | kwapso-staging | kwapso | The AGENCY front door: serves web/out (marks `/_next/static/**` immutable) + routes /api/* (incl. the /api/realtime WebSocket) via service bindings, by PREFIX |
 | portal-gateway (`workers/portal-gateway`) | kwapso-portal-staging | kwapso-portal | BUILT 2026-08-10. The CLIENT front door: serves web-portal/out + forwards a NAMED, CLOSED set of /api doors (an allow-list keyed `METHOD /path`, not a prefix fan-out) to auth / tenancy / content / realtime. Binds only those four — no DATAOPS, no MCP — so import, the assistant and the machine surface are unreachable from the client internet by construction. Its closed-door suite (`workers/portal-gateway/test`) derives the agency's whole /api surface off `web/lib/api.ts` and asserts every door the portal does not name 404s |
-| auth (`workers/auth`) | kwapso-auth-staging | kwapso-auth | Login (strict email codes only), sessions, users |
+| auth (`workers/auth`) | kwapso-auth-staging | kwapso-auth | Login (a 6-digit email code, or Google — UPDATED 2026-08-11), sessions, users |
 | realtime (`workers/realtime`) | kwapso-realtime-staging | kwapso-realtime | The live switchboard: one `TeamChannel` Durable Object per **channel** fans out row-level `{resource,id,op}` pings over WebSockets. TWO channel scopes — `team:<id>` (per active team) and `user:<id>` (per signed-in user) — so each open browser holds two sockets; idle channels hibernate (≈ free). Binds AUTH + the core DB (to gate connections); holds no app data |
 | tenancy (`workers/tenancy`) | kwapso-tenancy-staging | kwapso-tenancy | Members/roles/invites/config: team membership, role permissions, invitations + the nightly team-DB sizing cron + the per-team screen-recipe config store (served at GET/POST `/api/tenancy/config/screens`). UPDATED 2026-06-21: the planned `workers/config` worker was folded into tenancy — there is NO separate config worker |
 | content (`workers/content`) | kwapso-content-staging | kwapso-content | BUILT 2026-06-23. The team-DB content modules: **Learning** (how-to items + per-user "mark done" progress) + **Help** (team-wide tickets + threaded replies, fixed status lifecycle). Routes `/api/content/*`. Binds AUTH + REALTIME + the core DB (gating) + two R2 buckets (`LEARNING_MEDIA`, `HELP_MEDIA`). No cron |
@@ -83,6 +83,22 @@ New migrations must be applied to BOTH databases before deploying workers that n
 ## Secrets (set once per env, never in git)
 
 - `cd workers/auth && npx wrangler secret put RESEND_API_KEY --env staging` (and again without `--env` for production)
+- `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` on **kwapso-auth + kwapso-auth-staging** (ADDED 2026-08-11 — "Continue with Google"). Both halves, both environments; wrangler envs do NOT inherit, and the door checks for BOTH before it offers the button, so a half-set environment simply shows the email code and says so. The id is not itself a secret (it rides the redirect URL) but is set the same way so neither value is ever committed. From the `kwapso-signin` OAuth client (SCOPE ch.03 — External, basic scopes only, no Google review); **never** the `kwapso sync` client, which carries Drive/Gmail/Calendar scopes and has no business on the sign-in door.
+  ```
+  cd workers/auth
+  npx wrangler secret put GOOGLE_CLIENT_ID     --env staging   # and again with no --env for production
+  npx wrangler secret put GOOGLE_CLIENT_SECRET --env staging   # and again with no --env for production
+  ```
+  **The four redirect URIs to register in the Google console** (Authorized redirect URIs on the `kwapso-signin` client) — one per front door per environment, character for character, because the callback must answer at the hostname the person started at:
+
+  | Environment | Front door | Authorized redirect URI |
+  |---|---|---|
+  | production | agency app | `https://agency.kwapso.app/api/auth/google/callback` |
+  | production | client portal | `https://client.kwapso.app/api/auth/google/callback` |
+  | staging | agency app | `https://agency-staging.kwapso.app/api/auth/google/callback` |
+  | staging | client portal | `https://staging-client.kwapso.app/api/auth/google/callback` |
+
+  The two origins the worker will bounce a person back to are its `APP_ORIGIN` + `PORTAL_ORIGIN` **vars** (in `workers/auth/wrangler.jsonc`, per environment) — anything else is refused before the request ever reaches Google, so the callback cannot become an open redirect carrying a session cookie. Change a hostname and you must change it in BOTH places: the var and the Google console.
 - `CF_D1_TOKEN` (Account→D1→Edit) on kwapso-tenancy + kwapso-tenancy-staging — SET 2026-06-12 (team creation live). `ADMIN_KEY` (maintenance endpoints: migrate-teams, db-sizes, move-module) — SET on both envs 2026-06-12; rotate anytime with `wrangler secret put ADMIN_KEY`.
 - `INTERNAL_KEY` — shared secret guarding auth's `/internal/send-email` (tenancy sends it; auth enforces it). UPDATED 2026-08-04: every internal door now **FAILS CLOSED** — send-email, log-error and mcp-session all REFUSE every caller while `INTERNAL_KEY` is unset (a half-finished bootstrap must not run with the doors open), and a mismatch is a hard reject. The key MUST match across `kwapso-auth*` + `kwapso-tenancy*` + `kwapso-content*` (help/notify emails via auth) + `kwapso`/`kwapso-staging` (the AGENCY GATEWAY — it forwards client error beacons to auth's /internal/log-error; ADDED 2026-07-03) + `kwapso-portal*` (the PORTAL GATEWAY — same beacon door, same seam; ADDED 2026-08-10 — without it a crash on a client's phone is console-only) + `kwapso-mcp*` (it mints team-pinned sessions via auth's `/internal/mcp-session`; ADDED 2026-07-07 — omit it and the whole MCP surface can't authenticate), and it MUST be set in EVERY env before the member-notification email feature ships (so "when set" is not an optional/skippable path in production). Defense-in-depth alongside `workers_dev:false`.
 - `PUBLIC_APP_URL` — a **var** (not a secret) in `workers/tenancy/wrangler.jsonc`, set per env (staging + production, SET 2026-07-01): the absolute origin used in outbound email links (invites). Without it an agent-sent invite email would link to the internal binding host — see EDGE-CASES §4.
@@ -126,7 +142,8 @@ The two gateways set `"preview_urls": false` too — the reasoning above ("a per
   on production: four worker healths, the test-login door refused (403) even when
   handed the staging key (`ENVIRONMENT: "production"` ships in the config), the
   activity door gating before scope resolution, and a forged-cookie beacon writing
-  zero rows. Production auth holds only `INTERNAL_KEY` + `RESEND_API_KEY` — no
+  zero rows. Production auth holds only `INTERNAL_KEY` + `RESEND_API_KEY` (plus
+  the two `GOOGLE_*` values once Google sign-in is switched on) — no
   `TEST_LOGIN_KEY`, and the door would refuse it anyway.
 - **Sign-in codes: a 60-second cooldown, never an hour-long lockout.** Asking for
   a code twice inside a minute returns `429 too_soon`. Past the hourly cap the

@@ -99,6 +99,10 @@ const TOOLLESS_DOORS: Record<string, string> = {
     "the sign-in exchange, step one: post an address and a 6-digit code is emailed to the person. A machine holds a token that is the finished RESULT of somebody doing this, and the code appears nowhere but a human's inbox — by law, in every environment.",
   "POST /api/auth/email/verify":
     "the sign-in exchange, step two: trade the emailed code for a session. A tool here would be a second way to BECOME somebody, on the one surface whose whole posture is that a token is already exactly one somebody.",
+  "GET /api/auth/google/start":
+    "the first half of a BROWSER REDIRECT: it answers 302 to Google's account picker and sets a ten-minute cookie that only the matching callback can spend. There is nothing here for a machine to call — the useful part of the answer is a consent screen a person looks at — and the surface it leads to is the same one email/verify leads to: a second way to BECOME somebody, on the one surface whose whole posture is that a token is already exactly one somebody.",
+  "GET /api/auth/google/callback":
+    "the second half of that redirect, and it is not really addressed to a caller at all: Google sends the BROWSER here with a one-time code, which is spendable exactly once, only alongside the cookie the start door set, and only at the front door that asked. Everything it parses (code, state) is Google's own, meaningless to anyone else and worthless a second time. Like email/verify, a tool here would mint a session, which is the one thing a token holder already has.",
   "POST /api/auth/email/change/start":
     "changes the address the person signs in with — everywhere, in every team they belong to, and for every future login code. No team role gates it, so a token's pin and a token's role both have no opinion about it: it is outside what this surface is capped by.",
   "POST /api/auth/email/change/verify":
