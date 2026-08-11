@@ -172,14 +172,24 @@ export async function getPendingProposal(
   }
 }
 
-/** Flip the pending proposal's statuses "proposed" → "done" once its calls have run,
- * so a stray re-POST to /confirm finds nothing waiting and can't replay a remove.
- * Rewrites the SAME row getPendingProposal reads (owner-scoped). */
+/** CLAIM the pending proposal: flip its statuses "proposed" → "done" and report
+ * whether THIS caller is the one that won it. Rewrites the SAME row
+ * getPendingProposal reads (owner-scoped).
+ *
+ * Called BEFORE the approved calls run, not after — the CONCURRENCY.md shape for
+ * "a retryable multi-row operation that must run at most once" (the CSV importer's
+ * planned→running flip is its twin). Read-then-write ran the proposal after the
+ * work and checked nothing, so two /confirm posts — a double-tap, a retried
+ * request — both read the same "proposed" calls and both EXECUTED them: the
+ * approval gate's one job is that a dangerous call runs when the person approved
+ * it, and it ran twice. The claim is a compare-and-swap on the exact stored text,
+ * so only one caller can win it; a failure mid-run leaves the proposal spent
+ * (safe — nothing duplicates) and the person asks the agent again. */
 export async function consumePendingProposal(
   cfg: D1Rest,
   guard: MemberGuard,
   threadId: string
-): Promise<void> {
+): Promise<boolean> {
   await ownThreadOrThrow(cfg, guard, threadId)
   const rows = await d1Query<{ id: string; tool_calls_json: string | null }>(
     cfg,
@@ -188,18 +198,21 @@ export async function consumePendingProposal(
     [threadId]
   )
   const row = rows[0]
-  if (!row?.tool_calls_json) return
+  if (!row?.tool_calls_json) return false
   let updated: string
   try {
     const arr = JSON.parse(row.tool_calls_json) as { status?: string }[]
-    if (!Array.isArray(arr)) return
+    if (!Array.isArray(arr)) return false
     updated = JSON.stringify(arr.map((x) => (x && x.status === "proposed" ? { ...x, status: "done" } : x)))
   } catch {
-    return
+    return false
   }
-  await d1ExecScript(
+  // The predicate rides the write: the row must still hold the text we read.
+  // Whoever gets here second finds it already rewritten and moves zero rows.
+  const claimed = await d1Query<{ id: string }>(
     cfg,
     guard.databaseId,
-    `UPDATE agent_messages SET tool_calls_json = ${sqlString(updated)} WHERE id = ${sqlString(row.id)};`
+    `UPDATE agent_messages SET tool_calls_json = ${sqlString(updated)} WHERE id = ${sqlString(row.id)} AND tool_calls_json = ${sqlString(row.tool_calls_json)} RETURNING id;`
   )
+  return claimed.length > 0
 }

@@ -13,7 +13,7 @@ import { ulid } from "./id"
 /** The slice of a D1 binding this seam uses — structural, so shared/ compiles in
  * every workspace (the web tsconfig has no Workers types). The real `env.DB`
  * satisfies it. */
-type CoreDb = {
+export type CoreDb = {
   prepare(sql: string): { bind(...values: unknown[]): { run(): Promise<unknown> } }
 }
 

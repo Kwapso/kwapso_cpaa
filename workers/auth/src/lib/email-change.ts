@@ -152,15 +152,37 @@ export async function verifyEmailChange(
     return { error: "wrong_code", message: "That code isn't right. Check and try again.", status: 400 }
 
   const oldEmail = user.email
-  // One transaction: consume the code, switch the email, write the audit row.
-  await env.DB.batch([
-    env.DB.prepare("UPDATE email_change_codes SET consumed_at = ? WHERE id = ?").bind(nowIso, row.id),
-    env.DB.prepare("UPDATE users SET email = ?, updated_at = ? WHERE id = ?").bind(newEmail, nowIso, user.id),
-    env.DB.prepare(
-      `INSERT INTO email_change_logs (id, user_id, old_email, new_email, created_at)
-       VALUES (?, ?, ?, ?, ?)`
-    ).bind(ulid(), user.id, oldEmail, newEmail, nowIso),
-  ])
+  // CLAIM THE CODE FIRST, and with the predicate ON the write (R17 / the login
+  // door's twin): `consumed_at IS NULL` is in the SELECT above, but a SELECT is
+  // not a write — two verifies holding one code both read it unspent, and the
+  // consume that didn't check would let both switch the address, writing the
+  // change twice into the person's security history. Zero rows moved = already
+  // spent, and the answer is the one a later retry already gets.
+  const consumed = await env.DB.prepare(
+    "UPDATE email_change_codes SET consumed_at = ? WHERE id = ? AND consumed_at IS NULL"
+  )
+    .bind(nowIso, row.id)
+    .run()
+  if ((consumed.meta.changes ?? 0) === 0)
+    return { error: "code_expired", message: "That code expired. Request a new one.", status: 400 }
+
+  // The code is spent; now the switch + its audit row, together.
+  try {
+    await env.DB.batch([
+      env.DB.prepare("UPDATE users SET email = ?, updated_at = ? WHERE id = ?").bind(newEmail, nowIso, user.id),
+      env.DB.prepare(
+        `INSERT INTO email_change_logs (id, user_id, old_email, new_email, created_at)
+         VALUES (?, ?, ?, ?, ?)`
+      ).bind(ulid(), user.id, oldEmail, newEmail, nowIso),
+    ])
+  } catch (e) {
+    // The `users.email` UNIQUE index is the real authority, and the pre-check
+    // above is only a fast path — someone else can take the address inside the
+    // window. Report it in the door's own words rather than as a 500 (the same
+    // kindness createInvite does for a raced invite).
+    if (!String((e as Error)?.message ?? "").includes("UNIQUE")) throw e
+    return { error: "email_taken", message: "That email is already in use.", status: 409 }
+  }
 
   // Chosen behavior: drop other devices, then warn the old address (best-effort).
   await signOutOtherSessions(env, user.id, currentTokenHash)

@@ -24,14 +24,19 @@ import {
   acceptPendingInvites,
   createTeam,
   listMyTeams,
+  updateTeamDetails,
 } from "../src/lib/teams"
 import { INVITE_SWEEP_CAP } from "../../../shared/workers/limits"
 import type { Env } from "../src/env"
 
 const ACTOR = { id: "01USER", email: "chris@x.com", name: "Chris Martin" }
 
-/** A minimal fake D1: dispatches on SQL substrings, records every call. */
-function fakeDb(handlers: { match: string; first?: unknown; all?: unknown[] }[] = []) {
+/** A minimal fake D1: dispatches on SQL substrings, records every call.
+ * `changes` is what the statement's WHERE would have matched — 0 is how a test
+ * says "the predicate on that write refused it". */
+function fakeDb(
+  handlers: { match: string; first?: unknown; all?: unknown[]; changes?: number }[] = []
+) {
   const calls: { sql: string; params: unknown[] }[] = []
   const db = {
     prepare(sql: string) {
@@ -41,7 +46,7 @@ function fakeDb(handlers: { match: string; first?: unknown; all?: unknown[] }[] 
           const h = handlers.find((h) => sql.includes(h.match))
           return {
             async run() {
-              return {}
+              return { meta: { changes: h?.changes ?? 1 } }
             },
             async first() {
               return h?.first ?? null
@@ -164,6 +169,117 @@ describe("acceptPendingInvites (locked onboarding flow)", () => {
     // Oldest first: without a stable order, a capped sweep can starve the
     // earliest invitation forever while newer ones keep jumping the queue.
     expect(sweep?.sql).toContain("ORDER BY i.created_at ASC")
+  })
+})
+
+// A REVOKED INVITE MUST NEVER GRANT MEMBERSHIP. acceptInvite (the in-app path)
+// has always claimed pending→accepted atomically and bailed on zero rows; the
+// ONBOARDING sweep beside it read 'pending' in the SELECT and then wrote
+// 'accepted' unconditionally — so an invite revoked inside that window was
+// flipped back to accepted and still joined the person, and two sweeps racing (a
+// double-submitted onboarding) each joined and each wrote history.
+describe("the onboarding sweep claims each invite before joining", () => {
+  it("an invite it does not win joins nobody", async () => {
+    const { db, calls } = fakeDb([
+      { match: "FROM invite_index", all: [{ id: "i1", team_id: "team-A", role_id: "role-1" }] },
+      { match: "SET status = 'accepted'", changes: 0 }, // revoked in the window
+    ])
+
+    expect(await acceptPendingInvites(envWith(db), ACTOR), "nothing was accepted").toBe(0)
+    const sqls = calls.map((c) => c.sql)
+    expect(
+      sqls.some((s) => s.includes("INTO team_members")),
+      "a revoked invite must not grant membership"
+    ).toBe(false)
+    expect(sqls.some((s) => s.includes("SET current_team_id"))).toBe(false)
+  })
+
+  it("the claim carries the pending predicate, and comes BEFORE the join", async () => {
+    const { db, calls } = fakeDb([
+      { match: "FROM invite_index", all: [{ id: "i1", team_id: "team-A", role_id: "role-1" }] },
+    ])
+    await acceptPendingInvites(envWith(db), ACTOR)
+    const sqls = calls.map((c) => c.sql)
+    const claim = sqls.findIndex((s) => s.includes("SET status = 'accepted'"))
+    const join = sqls.findIndex((s) => s.includes("INTO team_members"))
+    expect(sqls[claim], "the predicate must ride the write, not sit in the SELECT").toContain(
+      "AND status = 'pending'"
+    )
+    expect(join, "claim first, join second — or a lost race still joins").toBeGreaterThan(claim)
+  })
+})
+
+// NOTHING IN THIS REPO HAD EVER DELETED AN R2 OBJECT. Every logo change left its
+// predecessor in the bucket forever. The reclaim is only safe because the key is
+// proved to be THIS team's from the caller's own teamId — /media/* is served with
+// no session, so a key is a reach, and a delete handed a key from anywhere else
+// would be a cross-tenant destroy.
+describe("a changed team logo reclaims the one it replaced", () => {
+  const PNG = "data:image/png;base64,AAAA"
+  /** An R2 stub that records what was written and what was destroyed. */
+  function bucket() {
+    const puts: string[] = []
+    const deletes: string[] = []
+    return {
+      puts,
+      deletes,
+      r2: {
+        async put(key: string) {
+          puts.push(key)
+        },
+        async delete(key: string) {
+          deletes.push(key)
+        },
+      } as unknown as R2Bucket,
+    }
+  }
+
+  it("deletes the superseded object — and only after the row has moved", async () => {
+    const old = "teams/01TEAM/01OLDOLDOLDOLDOLDOLDOLDOLD"
+    const { db, calls } = fakeDb([
+      { match: "logo_url FROM teams", first: { logo_url: `/media/${old}?v=1` } },
+    ])
+    const b = bucket()
+    await updateTeamDetails({ ...envWith(db), MEDIA: b.r2 }, "01TEAM", "New name", PNG)
+
+    expect(b.deletes, "the replaced logo must not be left in the bucket forever").toEqual([old])
+    expect(b.puts[0], "the new logo lands under a fresh key").not.toBe(old)
+    expect(
+      calls.some((c) => c.sql.includes("UPDATE teams SET name = ?, logo_url = ?")),
+      "the row moved"
+    ).toBe(true)
+  })
+
+  it("destroys nothing when the stored logo isn't this team's own object", async () => {
+    for (const logo of [
+      null,
+      "/media/teams/01OTHERTEAM/01KEYKEYKEYKEYKEYKEYKEYKEY", // another team's
+      "/media/users/01USER/01KEYKEYKEYKEYKEYKEYKEYKEY", // another bucket prefix
+      "https://evil.example/media/teams/01TEAM/01KEY", // not ours at all
+      "/media/teams/01TEAM/../../users/01USER/01KEY", // a traversal probe
+    ]) {
+      const { db } = fakeDb([{ match: "logo_url FROM teams", first: { logo_url: logo } }])
+      const b = bucket()
+      await updateTeamDetails({ ...envWith(db), MEDIA: b.r2 }, "01TEAM", "New name", PNG)
+      expect(b.deletes, `must not delete for ${logo}`).toEqual([])
+    }
+  })
+
+  it("a bucket that refuses the delete never costs the person their edit", async () => {
+    const { db } = fakeDb([
+      { match: "logo_url FROM teams", first: { logo_url: "/media/teams/01TEAM/01OLD" } },
+    ])
+    const env = {
+      ...envWith(db),
+      MEDIA: {
+        async put() {},
+        async delete() {
+          throw new Error("R2 is having a day")
+        },
+      } as unknown as R2Bucket,
+    }
+    // Fail-soft by contract: the write is the authority, the reclaim follows it.
+    await expect(updateTeamDetails(env, "01TEAM", "New name", PNG)).resolves.toBeUndefined()
   })
 })
 

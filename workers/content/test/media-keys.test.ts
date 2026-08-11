@@ -19,7 +19,7 @@ import { readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
-import { mediaKey, safeMediaKey } from "../../../shared/workers/image"
+import { mediaKey, ownedMediaKey, safeMediaKey } from "../../../shared/workers/image"
 
 const ROOT = join(__dirname, "..", "..", "..")
 
@@ -76,6 +76,62 @@ describe("mediaKey — an uploaded object's URL is a capability, not a guess", (
     }
     // The derivation must actually be finding the uploads (photos, logos, learning).
     expect(writes.length, `expected to find the R2 uploads, found: ${writes.join(", ")}`).toBeGreaterThanOrEqual(3)
+  })
+})
+
+// THE SAME SENTENCE, POINTED THE OTHER WAY. If only the holder of a key can READ
+// an object, then a key is also the only thing that can DESTROY one — so a delete
+// handed a key from anywhere but a row the caller already owns is a cross-tenant
+// destroy. Nothing in this repo deleted an R2 object at all until the orphan leak
+// was closed; this is the rule that keeps the first delete's discipline as more
+// get written.
+describe("a delete may only ever name an object the caller owns", () => {
+  it("no worker destroys an object by hand — every delete goes through the seam", () => {
+    for (const [path, src] of workerSources())
+      for (const m of src.matchAll(/(\w+)\.delete\(/g))
+        expect(
+          /MEDIA|BUCKET|R2/i.test(m[1]),
+          `${path} calls ${m[1]}.delete() directly — reclaim through reclaimMedia so the key is ownership-proved and the failure is recorded`
+        ).toBe(false)
+  })
+
+  it("…and every reclaim's keys are proved against the caller's own ids", () => {
+    let reclaimers = 0
+    for (const [path, src] of workerSources()) {
+      if (!/\breclaimMedia\(/.test(src)) continue
+      reclaimers++
+      expect(
+        /\bownedMediaKey\(/.test(src),
+        `${path} reclaims media with a key that didn't come from ownedMediaKey() — a delete is a reach, and the key must be re-proved from the caller's guard`
+      ).toBe(true)
+    }
+    // The tripwire: a scan that finds no reclaims would report "all clear".
+    expect(
+      reclaimers,
+      "expected the three reclaims (profile photo, team logo, learning attachment)"
+    ).toBeGreaterThanOrEqual(3)
+  })
+})
+
+describe("ownedMediaKey — what a reclaim is allowed to name", () => {
+  const key = mediaKey("teams", "01TEAM")
+
+  it("accepts a stored URL we minted for THIS owner, cache-buster and all", () => {
+    expect(ownedMediaKey(`/media/${key}?v=1754900000000`, "/media/", "teams", "01TEAM")).toBe(key)
+    expect(ownedMediaKey(`/media/${key}`, "/media/", "teams", "01TEAM")).toBe(key)
+  })
+
+  it("refuses anything that isn't this owner's own single object", () => {
+    for (const [url, ...owners] of [
+      [`/media/${key}`, "teams", "01OTHER"], // another team's
+      [`/media/${key}`, "users", "01TEAM"], // another prefix
+      [`https://elsewhere.example/media/${key}`, "teams", "01TEAM"], // not our origin
+      ["/media/teams/01TEAM/", "teams", "01TEAM"], // the folder, not an object
+      ["/media/teams/01TEAM/sub/01KEY", "teams", "01TEAM"], // a deeper path
+      ["/media/teams/01TEAM/../users/01USER/01KEY", "teams", "01TEAM"], // a probe
+      [null as unknown as string, "teams", "01TEAM"], // no logo at all
+    ] as [string, ...string[]][])
+      expect(ownedMediaKey(url, "/media/", ...owners), `${url} as ${owners.join("/")}`).toBeNull()
   })
 })
 

@@ -12,7 +12,13 @@ import {
   type D1Rest,
 } from "../../../../shared/workers/d1-rest"
 import { ulid } from "../../../../shared/workers/id"
-import { MAX_IMAGE_BYTES, mediaKey, parseDataUrl } from "../../../../shared/workers/image"
+import {
+  MAX_IMAGE_BYTES,
+  mediaKey,
+  ownedMediaKey,
+  parseDataUrl,
+  reclaimMedia,
+} from "../../../../shared/workers/image"
 import { publishChange, publishUserChange } from "../../../../shared/workers/realtime"
 import { d1ConfigFrom } from "../../../../shared/workers/gating"
 import type { Env } from "../env"
@@ -166,11 +172,20 @@ export async function updateTeamDetails(
   if (!clean) throw new GuardError(400, "invalid_input", "A team needs a name.")
 
   let logoUrl: string | undefined // undefined = leave the existing logo as-is
+  // The key the row points at NOW, read BEFORE anything moves — a new logo mints
+  // a new key, so after the write nothing else can name the old object. Proved to
+  // belong to THIS team from the caller's own teamId (ownedMediaKey), never from
+  // a string a caller handed us.
+  let supersededKey: string | null = null
   if (logoDataUrl) {
     const parsed = parseDataUrl(logoDataUrl)
     if (!parsed) throw new GuardError(400, "bad_image", "That image format isn't supported.")
     if (parsed.bytes.byteLength > MAX_IMAGE_BYTES)
       throw new GuardError(400, "image_too_large", "That image is too large.")
+    const current = await env.DB.prepare("SELECT logo_url FROM teams WHERE id = ?")
+      .bind(teamId)
+      .first<{ logo_url: string | null }>()
+    supersededKey = ownedMediaKey(current?.logo_url, "/media/", "teams", teamId)
     // Unguessable by construction — the logo is served with no session, so the
     // key is the credential (mediaKey; see the gateway's /media/* door).
     const key = mediaKey("teams", teamId)
@@ -188,6 +203,15 @@ export async function updateTeamDetails(
       .bind(clean, now, teamId)
       .run()
   }
+
+  // THE ROW HAS MOVED — now reclaim the logo it no longer points at (one leaked
+  // object per logo change, before this). After the write and fail-soft: see
+  // reclaimMedia for why that order is the safe one.
+  await reclaimMedia(env.MEDIA, [supersededKey], {
+    db: env.DB,
+    source: "tenancy",
+    place: "POST /api/tenancy/teams/update",
+  })
 }
 
 /**
@@ -216,8 +240,22 @@ export async function acceptPendingInvites(
     .bind(actor.email, now)
     .all<{ id: string; team_id: string; role_id: string; invite_row_id: string }>()
 
-  const invites = pending.results ?? []
-  for (const invite of invites) {
+  const sweeping = pending.results ?? []
+  const invites: typeof sweeping = []
+  for (const invite of sweeping) {
+    // CLAIM IT FIRST, atomically — the same gate acceptInvite opens with, and for
+    // the same two reasons. The SELECT above filtered on 'pending', but a SELECT
+    // is not a write: two sweeps racing (a double-submitted onboarding) would each
+    // join and each write history, and an invite REVOKED inside the window would
+    // still be flipped to 'accepted' and still grant membership. Zero rows moved
+    // here means this invite is no longer ours to accept, so nothing follows it.
+    const claim = await env.DB.prepare(
+      "UPDATE invite_index SET status = 'accepted' WHERE id = ? AND status = 'pending'"
+    )
+      .bind(invite.id)
+      .run()
+    if (!claim.meta?.changes) continue
+
     // UPSERT (not INSERT OR IGNORE): a previously-removed member's row is only
     // soft-deactivated (ARCHITECTURE §4), so reactivate + apply the invited role
     // — otherwise re-joining via a fresh signup would silently no-op.
@@ -229,10 +267,8 @@ export async function acceptPendingInvites(
     )
       .bind(ulid(), invite.team_id, actor.id, invite.role_id, now, actor.id, actor.email, actor.name)
       .run()
-    await env.DB.prepare("UPDATE invite_index SET status = 'accepted' WHERE id = ?")
-      .bind(invite.id)
-      .run()
     await stampInviteAccepted(env, invite.team_id, invite.invite_row_id, now)
+    invites.push(invite)
   }
 
   if (invites.length > 0) {

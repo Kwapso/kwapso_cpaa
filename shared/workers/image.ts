@@ -2,11 +2,13 @@
 // before upload) into bytes + content type for R2. Pure + web-safe (atob is a
 // browser/worker global). Used for profile photos AND team logos — one copy.
 //
-// It also owns THE KEY: what an uploaded object is called in R2, and which
-// key a request is allowed to ask for. `/media/*` is served with no session
-// (SCOPE ch.06 — a deliberate, recorded decision), so the key IS the credential
-// and both halves of that sentence live here.
+// It also owns THE KEY, all three halves of it: what an uploaded object is
+// called in R2 (mediaKey), which key a request may ask for (safeMediaKey), and
+// which key a write may DESTROY (ownedMediaKey + reclaimMedia). `/media/*` is
+// served with no session (SCOPE ch.06 — a deliberate, recorded decision), so the
+// key IS the credential, and every sentence about that lives here.
 
+import { logError, type CoreDb } from "./error-log"
 import { ulid } from "./id"
 
 export const MAX_IMAGE_BYTES = 2_500_000 // ~2.5MB after the client-side downsize
@@ -45,6 +47,74 @@ export function safeMediaKey(rawPath: string): string | null {
   if (!key || key.length > 512) return null
   if (key.includes("..") || key.includes("//")) return null
   return /^[A-Za-z0-9][A-Za-z0-9/_-]*$/.test(key) ? key : null
+}
+
+/** THE ONLY KEY A DELETE MAY EVER BE HANDED: the R2 key inside a STORED media
+ * URL, and only when that URL is one we minted for THIS owner.
+ *
+ * A key is a credential (see safeMediaKey), which makes it a REACH: hand a delete
+ * a key that came from a request and any caller could destroy any object in the
+ * bucket, including another team's — the destructive mirror of the exposure the
+ * random tail was added to close. So a reclaim never takes a key from the caller.
+ * It reads the URL off a row it has ALREADY gated, and re-proves the ownership
+ * prefix from the caller's own guard: `users/<their id>/`, `teams/<their team>/`,
+ * `<their team>/`. A foreign prefix, a deeper path, a probe, an absolute URL
+ * somewhere else — all return null, and nothing is deleted.
+ *
+ * `owners` is the SAME argument list the key was minted with (mediaKey), so the
+ * two can't drift apart. */
+export function ownedMediaKey(
+  storedUrl: unknown,
+  base: string,
+  ...owners: string[]
+): string | null {
+  if (typeof storedUrl !== "string") return null
+  // ?v= (the cache-buster every stored URL carries) and any fragment are not key.
+  const path = storedUrl.split("?")[0].split("#")[0]
+  if (!path.startsWith(base)) return null
+  const key = safeMediaKey(path.slice(base.length)) // the SAME shape rule the read door uses
+  if (!key) return null
+  const prefix = `${owners.join("/")}/`
+  if (!key.startsWith(prefix)) return null
+  // EXACTLY the random tail after the prefix: one segment, and a real one. An
+  // empty tail is the prefix itself — a key that names a whole owner's folder
+  // rather than one object, and the last thing a delete should ever be handed.
+  const tail = key.slice(prefix.length)
+  return tail && !tail.includes("/") ? key : null
+}
+
+/** Structural — the one method a reclaim touches, so this file still needs no R2
+ * types (front-door.ts does the same for the read side). */
+type ReclaimBucket = { delete(key: string): Promise<void> }
+
+/** Delete the objects a row no longer points at. ALWAYS called AFTER the row has
+ * moved, and always FAIL-SOFT.
+ *
+ * Nothing in this repo had ever deleted an R2 object, so every changed photo,
+ * logo and attachment left its predecessor behind forever — and an attachment can
+ * be a 25 MB video. Reclaiming is the fix, but the ORDER and the softness are the
+ * rules that make it safe: delete before the write and a failed write leaves a row
+ * pointing at nothing; throw on a bucket hiccup and a person loses the edit they
+ * just saved. An orphan costs storage. A lost save costs trust. So the write is
+ * the authority, this runs after it, and a failure is RECORDED, never thrown
+ * (ERROR-HANDLING.md rule 1 — best-effort side-effects log, they don't swallow). */
+export async function reclaimMedia(
+  bucket: ReclaimBucket,
+  keys: (string | null | undefined)[],
+  log: { db: CoreDb; source: string; place: string }
+): Promise<void> {
+  for (const key of keys) {
+    if (!key) continue // not ours to delete — ownedMediaKey already said so
+    try {
+      await bucket.delete(key)
+    } catch (e) {
+      await logError(log.db, {
+        source: log.source,
+        place: log.place,
+        message: `media reclaim failed for ${key}: ${e instanceof Error ? e.message : String(e)}`,
+      })
+    }
+  }
 }
 
 /** MEASURE BEFORE YOU DECODE. How many bytes a data URL's base64 payload will

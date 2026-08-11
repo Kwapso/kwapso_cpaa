@@ -285,15 +285,30 @@ export async function verifyLoginCode(
     return { error: "wrong_code", message: "That code isn't right. Check and try again.", status: 400 }
   }
 
-  // Right code — but it still needs a live lane, or a brute-forcer who finally
-  // lands on the digits past the cap would be waved through.
+  // Right code — but it still needs a live lane (or a brute-forcer who finally
+  // lands on the digits past the cap would be waved through) AND it must still be
+  // UNSPENT. `consumed_at IS NULL` is checked in the SELECT above, but a SELECT is
+  // not a write: two verifies holding the same correct code both read an unspent
+  // row, and without the predicate down here both UPDATEs "succeeded" and ONE code
+  // minted TWO sessions. The predicate rides the write (R17 / CONCURRENCY.md rule
+  // 1) — zero rows moved is a refusal, never a second session.
   const consumed = await env.DB.prepare(
-    `UPDATE login_codes SET consumed_at = ? WHERE id = ? AND ${ATTEMPTS_LEFT}`
+    `UPDATE login_codes SET consumed_at = ? WHERE id = ? AND consumed_at IS NULL AND ${ATTEMPTS_LEFT}`
   )
     .bind(now, row.id, ...attemptsLeftArgs(callerIp))
     .run()
-  if ((consumed.meta.changes ?? 0) === 0)
+  if ((consumed.meta.changes ?? 0) === 0) {
+    // Which wall — read once, and only on the refusal path (same shape as
+    // `refusal` below). Two different things stop a correct code now, and telling
+    // someone whose code was simply already spent that they made "too many wrong
+    // tries" sends them hunting for a mistake they never made.
+    const spent = await env.DB.prepare("SELECT consumed_at FROM login_codes WHERE id = ?")
+      .bind(row.id)
+      .first<{ consumed_at: string | null }>()
+    if (spent?.consumed_at)
+      return { error: "code_used", message: "That code has already been used. Request a new one.", status: 400 }
     return { error: "too_many_attempts", message: "Too many wrong tries. Request a new code.", status: 429 }
+  }
   return { id: row.id }
 }
 

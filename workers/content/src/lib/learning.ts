@@ -19,6 +19,8 @@ import type { Learning, LearningProgressEntry } from "../../../../shared/types"
 import { GuardError, type MemberGuard } from "../../../../shared/workers/gating"
 import { optionalText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
 import { EXPORT_HARD_CAP, LIST_HARD_CAP } from "../../../../shared/workers/limits"
+import { ownedMediaKey, reclaimMedia } from "../../../../shared/workers/image"
+import type { Env } from "../env"
 
 /** The dropdown `type` a learning item's category is stored under. */
 const CATEGORY_TYPE = "Learning category"
@@ -72,6 +74,35 @@ function previewFromBody(html: string | null): string | null {
     .replace(/\s+/g, " ")
     .trim()
   return text ? text.slice(0, 140) : null
+}
+
+/** Every learning-media object THIS TEAM owns that is referenced by the given
+ * text — a `content_link`, or an `<img src>`/`<video src>` inside an article body
+ * (the upload door hands back a URL the editor pastes into the article, so an
+ * attachment can live in either field).
+ *
+ * Ownership is re-proved from the CALLER'S team on every hit (ownedMediaKey), so
+ * a URL naming another team's object — or anything that isn't a key we minted —
+ * simply isn't in the answer. That matters because the "after" text comes from
+ * the request: a caller can drop a reference, but only ever to an object that was
+ * already in their own row. */
+function ownedLearningKeys(teamId: string, ...texts: (string | null)[]): string[] {
+  const found = new Set<string>()
+  for (const text of texts) {
+    if (!text) continue
+    // ROOT-RELATIVE ONLY. The lookbehind is what makes this a reference to OUR
+    // object rather than any string that happens to contain our path:
+    // `https://elsewhere.example/media/learning/<team>/<key>` is a URL on someone
+    // else's host, and reading our own object out of it would let a pasted link
+    // decide what gets deleted. A quote, a space or the start of the value is a
+    // real reference — exactly the shape postUploadLearningFile hands out. The
+    // character class then stops at the `?v=` cache-buster and at any quote.
+    for (const match of text.matchAll(/(?<![\w:.\-/])\/media\/learning\/[A-Za-z0-9/_%-]+/g)) {
+      const key = ownedMediaKey(match[0], "/media/learning/", teamId)
+      if (key) found.add(key)
+    }
+  }
+  return [...found]
 }
 
 /** Raw learning row (DB column names) joined with the caller's own progress. */
@@ -278,8 +309,10 @@ VALUES (${sqlString(id)}, ${sqlString(category)}, ${sqlString(title)}, ${sqlStri
 }
 
 /** Edit a learning item's content. Title stays required; a (possibly new)
- * category is picked-or-created. Stamps the editor audit block. */
+ * category is picked-or-created. Stamps the editor audit block, and reclaims any
+ * uploaded attachment the edit dropped (`env` is here for that bucket alone). */
 export async function updateLearning(
+  env: Env,
   cfg: D1Rest,
   guard: MemberGuard,
   actor: Actor,
@@ -298,12 +331,29 @@ export async function updateLearning(
   // then the XSS scrub. Two different jobs; both are required.
   const body = safeBody(optionalText(input.body, "Body", TEXT_LIMITS.long))
   const description = optionalText(input.description, "Description", TEXT_LIMITS.long) ?? previewFromBody(body)
+  // Hoisted: the value that is WRITTEN is the value the activity row reports and
+  // the value the reclaim below compares against — three readings of one link
+  // were three chances for them to disagree.
+  const link = safeLink(optionalText(input.contentLink, "Link", TEXT_LIMITS.link))
 
   const now = new Date().toISOString()
   await d1ExecScript(
     cfg,
     guard.databaseId,
-    `UPDATE learning SET category = ${sqlString(category)}, content_title = ${sqlString(title)}, content_description = ${sqlString(description)}, content_type = ${sqlString(contentType)}, content_link = ${sqlString(safeLink(optionalText(input.contentLink, "Link", TEXT_LIMITS.link)))}, content_body = ${sqlString(body)}, sequence = ${intOr(input.sequence, 0)}, is_required = ${input.required ? 1 : 0}, updated_at = ${sqlString(now)}, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE id = ${sqlString(id)};`
+    `UPDATE learning SET category = ${sqlString(category)}, content_title = ${sqlString(title)}, content_description = ${sqlString(description)}, content_type = ${sqlString(contentType)}, content_link = ${sqlString(link)}, content_body = ${sqlString(body)}, sequence = ${intOr(input.sequence, 0)}, is_required = ${input.required ? 1 : 0}, updated_at = ${sqlString(now)}, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE id = ${sqlString(id)};`
+  )
+
+  // THE ROW HAS MOVED — reclaim the attachments it no longer points at: this
+  // team's uploaded objects that the OLD link/body named and the new one doesn't.
+  // An orphan here is far worse than a stale photo: parseUploadDataUrl allows
+  // video, audio and PDF up to 25 MB, so every replaced attachment used to leave
+  // that much behind forever. Fail-soft and AFTER the write (see reclaimMedia).
+  const superseded = ownedLearningKeys(guard.teamId, before.content_link, before.content_body)
+  const kept = new Set(ownedLearningKeys(guard.teamId, link, body))
+  await reclaimMedia(
+    env.LEARNING_MEDIA,
+    superseded.filter((key) => !kept.has(key)),
+    { db: env.DB, source: "content", place: "POST /api/content/learning/update" }
   )
 
   const changes = describeChanges([
@@ -311,7 +361,7 @@ export async function updateLearning(
     { label: "Category", from: before.category, to: category },
     { label: "Description", from: before.content_description, to: description },
     { label: "Type", from: before.content_type, to: contentType },
-    { label: "Link", from: before.content_link, to: safeLink(input.contentLink) },
+    { label: "Link", from: before.content_link, to: link },
     { label: "Body", from: before.content_body, to: body, hideValues: true },
   ])
   await logActivity(cfg, guard.databaseId, actor, {
@@ -325,7 +375,18 @@ export async function updateLearning(
 /** Deactivate or reactivate a learning item. Deactivate-only model (ARCHITECTURE
  * §4): the row + everyone's progress are NEVER deleted — deactivating just retires
  * the item (hidden from the active list, history preserved). Stamps the
- * deactivator audit block; reactivating clears it. */
+ * deactivator audit block; reactivating clears it.
+ *
+ * AND ITS ATTACHMENTS ARE NOT RECLAIMED HERE — deliberately. updateLearning
+ * reclaims, this does not, and the difference is the law: an EDIT supersedes an
+ * attachment (nothing points at it any more, so it is garbage), while a
+ * DEACTIVATION is a reversible retirement of a row that survives on purpose.
+ * Delete the bytes here and reactivating hands back an article whose images 404 —
+ * "the data survives" would mean the row survives without its content, which is
+ * not what the law promises. Storage held by retired items is a RETENTION
+ * question, and the in-rule answer to it is an explicit sweep of objects no live
+ * row references (or a real hard-delete path that takes the row and its objects
+ * together), not a quiet delete on a reversible transition. */
 export async function setLearningActive(
   cfg: D1Rest,
   guard: MemberGuard,

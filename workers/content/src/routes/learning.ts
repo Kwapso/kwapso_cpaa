@@ -75,7 +75,7 @@ export async function postUpdateLearning(request: Request, env: Env): Promise<Re
   const { actor, cfg, guard, body } = await gatedBody<LearningInput & { id?: string }>(request, env, "learning", "edit")
   const id = requireText(body.id, "Article", TEXT_LIMITS.short)
   requireText(body.title, "Title", TEXT_LIMITS.short)
-  await updateLearning(cfg, guard, actor, id, body)
+  await updateLearning(env, cfg, guard, actor, id, body)
   await publishChange(env, guard.teamId, "learning", id)
   return json({ learning: await listLearning(cfg, guard), total: await countLearning(cfg, guard) })
 }

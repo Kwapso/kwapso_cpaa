@@ -618,7 +618,12 @@ export async function confirmAndRun(
   }
 
   const proposed = await getPendingProposal(cfg, guard, opts.threadId)
-  if (!proposed.length) {
+  // CLAIM IT BEFORE RUNNING ANYTHING (CONCURRENCY.md — a retryable operation that
+  // must run at most once claims first). Reading the proposal and marking it spent
+  // AFTERWARDS let two confirms both read the same approved calls and both execute
+  // them; only the caller that wins the flip may proceed now, and the loser is
+  // told the plain truth — there is nothing left waiting.
+  if (!proposed.length || !(await consumePendingProposal(cfg, guard, opts.threadId))) {
     const msg = "There's nothing waiting for your approval."
     await appendMessage(cfg, guard, actor, opts.threadId, { role: "assistant", content: msg, source: opts.source })
     return { done: true, threadId: opts.threadId, reply: msg, quota: await getQuota(env, guard.teamId) }
@@ -659,9 +664,7 @@ export async function confirmAndRun(
     toolMsgs.push(message)
     if (!ok) failed = true
   }
-  // Mark the proposal consumed ("proposed" → "done") now the calls have run, so a stray
-  // re-POST to /confirm finds nothing waiting and can't replay a remove/revoke.
-  await consumePendingProposal(cfg, guard, opts.threadId)
+  // (The proposal was already claimed above, before any of this ran.)
 
   // Reattach the tool_use to the ORIGINAL proposing assistant turn (the last history
   // message) instead of emitting a second, empty assistant turn — two consecutive
