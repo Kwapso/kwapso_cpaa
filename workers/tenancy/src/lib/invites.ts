@@ -11,6 +11,7 @@ import { sendBrandedEmail } from "@shared/workers/notify"
 import type { Invite, InviteAudit } from "@shared/types"
 import type { Env } from "../env"
 import { GuardError, type MemberGuard } from "./permissions"
+import { requireGrantableRole } from "./roles"
 import { notifyInviteRevoked } from "./notify"
 import { LIST_HARD_CAP } from "@shared/workers/limits"
 
@@ -146,6 +147,16 @@ export async function createInvite(
     [roleId]
   )
   if (!roles[0]) throw new GuardError(400, "role_not_found", "That role doesn't exist.")
+
+  // NO GRANTING WHAT YOU WERE NOT GIVEN. An invite HANDS OUT a role, which makes
+  // this door a permission grant wearing an email address. `team_members:create`
+  // is an ordinary right (an office manager invites people) and `GET /members`
+  // publishes every role id with an `isAdmin` flag on `team_members:read` alone —
+  // so without this line, "can invite people" was "can become an admin": invite a
+  // second address you own to Admin, accept it, hold every right in the team.
+  // The roles door has said this in words since it was written ("must not be a
+  // ladder to every right you weren't given"); it just never said it here.
+  await requireGrantableRole(cfg, guard, roleId)
 
   const alreadyMember = await env.DB.prepare(
     `SELECT 1 FROM team_members tm JOIN users u ON u.id = tm.user_id

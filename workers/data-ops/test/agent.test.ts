@@ -52,11 +52,17 @@ describe("agent tool catalog + confirm rule (destructive + privilege grants)", (
   // The set is written out so it cannot quietly GROW back into "confirm
   // everything", which is the friction this rule was written to remove.
   const DESTRUCTIVE = ["remove_member", "revoke_invite"]
+  // NOT here any more, and worth saying why: `raise_help_ticket` and
+  // `update_help_ticket`. Both carry `accountId`, which decides WHICH CLIENT CAN
+  // READ THE TICKET — the update door sets it on a ticket that had none, handing
+  // over the whole reply history, and the raise door can post agency content into
+  // a named client's portal from birth. Both are reachable from a model that has
+  // just been reading ticket text a client wrote, so both stop for the panel now.
+  // See workers/content/test/fence-row-confirm.test.ts and FENCED_ROW_OWNERS.
   const RUNS_FREELY = [
     "update_team",
     "create_learning",
     "update_learning",
-    "raise_help_ticket",
     "reply_help_ticket",
     "create_dropdown_value",
     "update_dropdown_value",

@@ -168,6 +168,68 @@ export async function getMyPermissions(
   return buildPermissionValue(rows)
 }
 
+/** NO GRANTING WHAT YOU WERE NOT GIVEN — the general form of the no-self-grant
+ * rule below, applied to whoever is on the receiving end.
+ *
+ * `setRolePermissions` already refuses to widen the caller's OWN role, with the
+ * sentence "member_roles:edit must not be a ladder to every right you weren't
+ * given". That guard names the caller's role id, so it only ever caught the most
+ * direct spelling. Two doors walked around it:
+ *
+ *   • CREATE a role with a full matrix. The self-grant check compares against
+ *     `guard.roleId`, and a role that did not exist a moment ago never matches —
+ *     so a caller holding member_roles:{create,edit} could mint Admin's twin.
+ *   • INVITE someone to a role. `team_members:create` is a perfectly ordinary
+ *     grant (an office manager invites people), and `GET /members` hands out
+ *     every role id with an `isAdmin` flag on `team_members:read` alone. Invite a
+ *     second address you own to the Admin role, accept it, and you hold every
+ *     right in the team — no member_roles right involved at any point.
+ *
+ * So the ceiling is checked against the RIGHTS, not the role id: whatever sheet
+ * you are handing out, every switch on it must already be on in your own. An
+ * Admin holds everything, so an Admin is unaffected; nobody else can hand out a
+ * right they do not personally hold. Fails closed — a caller whose own sheet
+ * cannot be read grants nothing. */
+export async function requireGrantableRights(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  wanted: PermissionValue
+): Promise<void> {
+  const mine = await getMyPermissions(cfg, guard)
+  const over: string[] = []
+  for (const m of TEAM_MODULE_CATALOG) {
+    // normalizeRights on BOTH sides: the auto-flip-read rule is what the door
+    // will actually write, so comparing the raw request against a normalized
+    // sheet would refuse a grant nobody asked for.
+    const want = normalizeRights(wanted?.[m.key])
+    const have = normalizeRights(mine[m.key])
+    for (const right of ["read", "create", "edit", "delete"] as const)
+      if (want[right] && !have[right]) over.push(`${m.label} — ${right}`)
+  }
+  if (over.length)
+    throw new GuardError(
+      403,
+      "grant_exceeds_own",
+      `You can only give someone rights you hold yourself, and your role is missing: ${over.join(", ")}.`
+    )
+}
+
+/** The same ceiling, for a door that names a ROLE rather than a sheet (the
+ * invite). Reads the target role's sheet, then asks the question above. */
+export async function requireGrantableRole(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  roleId: string
+): Promise<void> {
+  const rows = await d1Query<PermRow>(
+    cfg,
+    guard.databaseId,
+    "SELECT module, can_read, can_create, can_edit, can_delete FROM role_permissions WHERE role_id = ?",
+    [roleId]
+  )
+  await requireGrantableRights(cfg, guard, buildPermissionValue(rows))
+}
+
 /** Normalize one module's rights with the locked "any write needs read" rule:
  * if any of create/edit/delete is on, read is forced on. */
 export function normalizeRights(r: Partial<RightSet> | undefined): RightSet {
@@ -204,6 +266,10 @@ export async function setRolePermissions(
       "self_grant",
       "You can't change your own role's access rights — ask an admin."
     )
+  // …AND NO GRANTING WHAT YOU WERE NOT GIVEN. The line above names one role id,
+  // so it only ever caught the caller widening THEMSELVES; a role created a
+  // moment ago never matches it. See requireGrantableRights.
+  await requireGrantableRights(cfg, guard, value)
 
   const statements = TEAM_MODULE_CATALOG.map((m) => {
     const n = normalizeRights(value?.[m.key])

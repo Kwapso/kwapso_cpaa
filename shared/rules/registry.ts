@@ -482,8 +482,6 @@ export const RAW_BODY_EXEMPT: Record<string, string> = {
     "JSON-RPC 2.0 requires the request id be ECHOED BACK verbatim in the response envelope (`id` may be a string, a number or null by spec). It is never read as a value, never reaches a statement, and normalising it would break the protocol.",
   "workers/mcp/src/index.ts::rpc.params":
     "the params OBJECT itself is only ever indexed (`rpc.params?.name`, coerced with String()) and handed to the tool catalogue, which validates each argument against the tool's own schema before it reaches a door. The field read here is the envelope, not a value.",
-  "workers/mcp/src/index.ts::body.id":
-    "the token-revoke door names a caller-PRIVATE token row and is scoped to the caller's own tokens, so an unrecognised value refuses rather than reaching anything. Left listed rather than fixed because workers/mcp/ is a separate lane's file — the ratchet above forces this line out the moment it is validated.",
 }
 
 /** R18 — reviewed exemptions, pinned EXACTLY: tables whose activity every member

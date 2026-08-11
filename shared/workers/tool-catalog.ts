@@ -15,7 +15,7 @@
 // import-catalogue reads + the agentic-import batch tools + the AI-allowance reads +
 // the saved conversations + agent_chat/agent_confirm.
 
-import { FENCE_INPUTS } from "./account-scope"
+import { FENCE_INPUTS, FENCED_ROW_OWNERS } from "./account-scope"
 import { GuardError } from "./gating"
 
 /* ------------------------------- schema helpers ------------------------------- */
@@ -635,7 +635,12 @@ export const SHARED_TOOLS: SharedTool[] = [
     // Exposed by hand, deliberately: without it a machine can only raise tickets
     // that no client will ever see.
     buildBody: (i) => ({ description: str(i, "description"), helpType: opt(i, "helpType"), screenRecordingLink: opt(i, "screenRecordingLink"), accountId: opt(i, "accountId") }),
-    agent: { write: true, confirm: false, summarize: (i) => `Raise a support ticket: "${str(i, "description").slice(0, 60)}"` },
+    // CONFIRM, because `accountId` decides WHO CAN READ THIS TICKET. Naming a
+    // client puts the conversation in their portal — the same order of decision
+    // as a permission grant, reached by a model that has been reading ticket text
+    // a client wrote. (isPrivilegeWrite derives this too; the catalog declares it
+    // so it reads honestly — see workers/content/test/fence-row-confirm.test.ts.)
+    agent: { write: true, confirm: true, summarize: (i) => `Raise a support ticket: "${str(i, "description").slice(0, 60)}"` },
   },
   {
     name: "update_help_ticket",
@@ -646,7 +651,12 @@ export const SHARED_TOOLS: SharedTool[] = [
     // Same note as create_help_ticket: read in lib/help.ts, so R22's scan cannot
     // derive it. Exposed by hand.
     buildBody: (i) => ({ id: str(i, "id"), description: str(i, "description"), helpType: opt(i, "helpType"), screenRecordingLink: opt(i, "screenRecordingLink"), accountId: opt(i, "accountId") }),
-    agent: { write: true, confirm: false, summarize: (i) => `Edit support ticket ${str(i, "id")}` },
+    // CONFIRM, and this is the one that mattered. The door SETS `account_id` on a
+    // ticket that had none, and a ticket carries its whole reply history — so one
+    // silent call could hand an internal agency conversation to a client's portal.
+    // It ran with no panel because the confirm derivation only knew about tables
+    // the fence READS, and `help` is a table the fence is APPLIED TO.
+    agent: { write: true, confirm: true, summarize: (i) => `Edit support ticket ${str(i, "id")}` },
   },
   {
     name: "set_help_status",
@@ -779,6 +789,14 @@ function touchesAccountFence(tool: { path: string; schema?: Record<string, unkno
     // "account_links" is the door at /accounts/links; "portal_users" at /portal-users.
     if (!table.split("_").every((w) => inPath.has(w) || inPath.has(`${w}s`))) continue
     if (columns.length === 0 || columns.some((c) => fields.includes(c))) return true
+  }
+  // …and the other end of the fence: a tool that can set the column deciding
+  // WHICH ACCOUNT OWNS A ROW moves that row across the fence, replies and all.
+  // FENCE_INPUTS alone could never see this — `help` is not a table the fence
+  // READS — so `update_help_ticket` carried `accountId` and never confirmed.
+  for (const [table, column] of Object.entries(FENCED_ROW_OWNERS)) {
+    if (!table.split("_").every((w) => inPath.has(w) || inPath.has(`${w}s`))) continue
+    if (fields.includes(column)) return true
   }
   return false
 }

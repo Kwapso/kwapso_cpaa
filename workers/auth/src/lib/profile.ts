@@ -18,6 +18,9 @@ import { toSessionUser, type UserRow } from "./users"
 
 const MAX_NAME_LENGTH = 60
 
+/** Already validated at the door (index.ts). Kept as strings rather than
+ * `unknown` so this file can read them plainly — the door is where the proof
+ * happens, and R20's scan can see it there. */
 export type ProfileInput = {
   firstName?: string
   lastName?: string
@@ -29,8 +32,14 @@ export async function updateProfile(
   user: UserRow,
   input: ProfileInput
 ): Promise<{ user: ReturnType<typeof toSessionUser> } | { error: string; message: string }> {
-  const firstName = (input.firstName ?? "").trim()
-  const lastName = (input.lastName ?? "").trim()
+  // DEFENSIVE, even though the door now validates first. `??` only substitutes
+  // null/undefined, so `(1 ?? "").trim()` is a TypeError — a 500 and a row in the
+  // GLOBAL error log, from any signed-in caller at either front door. The door is
+  // where the clean 400 is decided; this is what stops the CLASS coming back
+  // through the next caller of an exported lib, which is exactly how the field
+  // escaped R20's scanner in the first place.
+  const firstName = typeof input.firstName === "string" ? input.firstName.trim() : ""
+  const lastName = typeof input.lastName === "string" ? input.lastName.trim() : ""
   if (!firstName || !lastName)
     return { error: "name_required", message: "First and last name are required." }
   if (firstName.length > MAX_NAME_LENGTH || lastName.length > MAX_NAME_LENGTH)
@@ -43,7 +52,9 @@ export async function updateProfile(
   // Proved to be THIS person's own photo from THEIR id (ownedMediaKey), never
   // from a string a caller handed us.
   let supersededKey: string | null = null
-  if (input.imageDataUrl) {
+  // A TYPE check, not a truthiness one, for the same reason as the names above:
+  // `dataUrlBytes({})` reaches `.indexOf` on an object and throws.
+  if (typeof input.imageDataUrl === "string" && input.imageDataUrl) {
     // SIZE FIRST, and from the ENCODED text (dataUrlBytes) — this door is on the
     // client portal's allow-list and gates on the session alone, so the one thing
     // it must not do is decode a stranger's payload to find out how big it is.
@@ -72,7 +83,9 @@ export async function updateProfile(
   const wasOnboarded = user.onboarding_completed_at != null
   const nameChanged =
     firstName !== (user.first_name ?? "") || lastName !== (user.last_name ?? "")
-  const photoChanged = Boolean(input.imageDataUrl)
+  // The same type check the upload branch makes, so "a photo changed" can never
+  // be true for a value that was never a photo.
+  const photoChanged = typeof input.imageDataUrl === "string" && input.imageDataUrl !== ""
 
   const now = new Date().toISOString()
   await env.DB.prepare(

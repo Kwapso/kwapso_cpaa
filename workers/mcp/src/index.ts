@@ -150,10 +150,17 @@ async function postToken(request: Request, env: Env): Promise<Response> {
 
 async function postRevoke(request: Request, env: Env): Promise<Response> {
   const user = await requireUser(request, env)
-  const body = (await request.json().catch(() => ({}))) as { id?: string }
-  if (!body.id) return fail(400, "invalid_input", "A token id is required.")
-  await revokeToken(env, user.id, body.id)
-  dropCachedSession(body.id)
+  // R20, properly. This used to be a cast plus `if (!body.id)` — the two shapes
+  // the law names as NOT checks. A truthiness guard passes `{}`, `[]` and `1`,
+  // and an object then reaches D1's `.bind()` in revokeToken, which raises a type
+  // error: a 500 and a global error_logs row, per request, from any session. The
+  // RAW_BODY_EXEMPT line that covered this said "an unrecognised value refuses
+  // rather than reaching anything", which was true of a wrong STRING and false of
+  // a wrong TYPE — the distinction the law exists for.
+  const body = (await request.json().catch(() => ({}))) as { id?: unknown }
+  const id = requireText(body.id, "Token", TEXT_LIMITS.short)
+  await revokeToken(env, user.id, id)
+  dropCachedSession(id)
   return json({ ok: true })
 }
 
