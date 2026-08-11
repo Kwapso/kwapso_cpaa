@@ -517,19 +517,41 @@ step("Accounts")
  * Read ONCE — a re-read after every create is 123 extra page walks, and the
  * create door hands back the id anyway. */
 const byKey = new Map() // "entity|name" → id
-const byEmail = new Map()
+const byEmail = new Map() // "individual|address" → id — KIND-SCOPED, see mailKey
 const byId = new Map()
+
+const keyOf = (kind, name) => `${kind}|${name.trim().toLowerCase()}`
+
+/** AN ADDRESS IDENTIFIES A PERSON. IT DOES NOT IDENTIFY AN ACCOUNT.
+ *
+ * Six of the agency's twenty companies carry the same address as one of their own
+ * people — the company's contact email IS the main contact's inbox, which is
+ * completely ordinary for a business this size. Keyed on the address alone, this
+ * seed created the company, then looked for the person, found the COMPANY, and
+ * handed back its id. The contact link then had the same account at both ends and
+ * the door refused it: "An account can't be its own contact." The door was right;
+ * the key was wrong.
+ *
+ * So the kind is part of the key. A company record and a person record are two
+ * different accounts however they are reached, and the seed must not quietly
+ * merge them. (Also lower-cases and trims on BOTH sides — it used to store
+ * lower-case and look up raw, so a capitalised address matched nothing and
+ * created a duplicate on the second run.) */
+const mailKey = (kind, email) => `${kind}|${String(email).trim().toLowerCase()}`
+
 for (const a of await allPages("/api/tenancy/accounts", "accounts", staff.cookie)) {
-  byKey.set(`${a.accountType}|${a.name.toLowerCase()}`, a.id)
-  if (a.email) byEmail.set(a.email.toLowerCase(), a.id)
+  byKey.set(keyOf(a.accountType, a.name), a.id)
+  if (a.email) byEmail.set(mailKey(a.accountType, a.email), a.id)
   byId.set(a.id, a)
 }
-const keyOf = (kind, name) => `${kind}|${name.toLowerCase()}`
 
 /** A person is found by their address first (the identity), by name second (the
- * eight contacts whose email column holds a placeholder). */
+ * eight contacts whose email column holds a placeholder) — both within their own
+ * kind, never across it. */
 const findAccount = (row) =>
-  (row.email && byEmail.get(row.email)) || byKey.get(keyOf(row.kind, row.name)) || null
+  (row.email && byEmail.get(mailKey(row.kind, row.email))) ||
+  byKey.get(keyOf(row.kind, row.name)) ||
+  null
 
 const idFor = new Map() // glideId → the account id in this app
 
@@ -559,7 +581,7 @@ for (const c of companies) {
   )
   idFor.set(c.glideId, id)
   byKey.set(keyOf("entity", c.name), id)
-  if (c.email) byEmail.set(c.email, id)
+  if (c.email) byEmail.set(mailKey("entity", c.email), id)
   say("created", c.name, "companies")
 }
 
@@ -590,7 +612,7 @@ for (const p of people) {
   )
   idFor.set(p.glideId, id)
   byKey.set(keyOf("individual", p.name), id)
-  if (p.email) byEmail.set(p.email, id)
+  if (p.email) byEmail.set(mailKey("individual", p.email), id)
   say("created", p.name, "people")
 }
 
@@ -649,14 +671,14 @@ for (const t of PORTAL_TESTERS) {
   // The tester is an ordinary contact of a real company, held exactly like any
   // other contact — the portal is a view of the same rows, so a login has to
   // hang off a row that was already there.
-  let personId = byEmail.get(t.email)
+  let personId = byEmail.get(mailKey("individual", t.email))
   if (!personId) {
     const created = must(
       await post("/api/tenancy/accounts", { accountType: "individual", name: t.name, email: t.email }, staff.cookie),
       `creating ${t.name}`
     )
     personId = created.id
-    byEmail.set(t.email, personId)
+    byEmail.set(mailKey("individual", t.email), personId)
     say("created", `${t.name}, a contact of ${t.companies.join(" and ")}`)
   } else {
     say("reused", `${t.name}`)
