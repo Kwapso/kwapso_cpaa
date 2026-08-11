@@ -370,6 +370,82 @@ A sweep of real bugs surfaced by the team exercising the AI co-pilot on staging.
 
 ---
 
+## OPEN — the Google connector layer (the knowledge base's other half)
+
+The knowledge base shipped on 2026-08-11 reading the app's OWN rows — tickets and
+their conversations, learning articles, accounts. `.plans/BUILD-2-knowledge-base.md`
+§3 also asks for six Google sources (Calendar two-way, Drive folders, Drive files,
+Gmail threads, Chat spaces, Meet transcripts). Those are NOT built, and this is the
+note that says so out loud rather than leaving a reader to notice.
+
+**Why not.** There are no Google credentials in this environment and nothing that
+could be verified against Google's APIs — so it would be a few thousand lines that
+no test in this repo can run. "Too much code is a defect" cuts hardest on code that
+cannot be proved. The brief's own sequence agrees: §3 puts the in-app sources first
+precisely because "they are how you prove retrieval works", and §7 puts the
+connector layer at step 6, after the screens and the agent's tools.
+
+**Where it plugs in, so this is a seam and not a rewrite.**
+
+- `INGEST_KINDS` in `workers/content/src/lib/knowledge-ingest.ts` is DATA: a kind
+  is `{ kind, table, label, read(cfg, guard, cursor, limit) }`. A Google source is
+  one more entry whose `read` calls Google instead of D1 and returns the same
+  `IngestRow[]`. Everything around it — the resumable cursor, the bounded slice,
+  the content-hash skip, the failure recording (R12), the compartment derivation,
+  the "an excluded source is never put back" rule — is written once and inherited.
+- `knowledge_sources.owner_user_id` is already the fence the TWO CONNECTION LAYERS
+  need: NULL = what the organisation can see (a service account), a value = what
+  one member can see (their own OAuth). Retrieval already ANDs it, and
+  `workers/content/test/knowledge.test.ts` already proves a colleague cannot read
+  somebody's personal material out of an answer.
+- The sweep already runs on a 15-minute cron, which is exactly the backstop §3
+  asks for beside push where Google supports it.
+
+**What it still needs, and none of it is code we can write blind:** a Google Cloud
+project with the six scopes, an OAuth client for the personal layer, a service
+account with domain-wide delegation for the organisation layer, a `knowledge_connections`
+table (per team: kind, owner, refresh token, scopes, status, last error), token
+refresh with R11 timeouts, and — for Calendar — the two-way write half, which is
+the only one of the six that is not just ingestion and deserves its own design.
+Note that `workers/auth/src/lib/google.ts` (Google SIGN-IN, landed 2026-08-11)
+already establishes a Google client in this project; the data scopes are a
+different consent screen, but not a different account.
+
+---
+
+## NOTE — the bulk-triage flow, and whose door the last piece is
+
+`.plans/BUILD-2-knowledge-base.md` §2 names two flows as the acceptance test.
+Both are reachable TODAY with the tools that shipped, and the confirm panel
+already does the part that sounded like it needed building:
+
+**"Triage everything that came in this week."** `list_help_tickets` → then, per
+client, `ask_knowledge` with that account's id (so the compartment is the
+client's own material plus the agency's) → then the per-ticket writes. The panel
+is ONE panel for the whole batch already: `runTurn` surfaces **all** of a turn's
+calls through the one `pendingCall` seam ("so a mixed turn doesn't silently drop
+its non-confirm calls"), each carrying the summary AND the body the door will
+receive. So twenty proposed triage writes are twenty rows in one yes/no, which is
+exactly what the brief asks for, with no bulk-triage door at all.
+
+**What was deliberately NOT built here:** a `POST /api/content/help/bulk-triage`
+door taking `[{id, helpType, status}]`. It would be tidier than N calls — and it
+belongs to the WORK ENGINE's lane, not this one. That lane owns the ticket
+lifecycle (`new → triaged → in progress → ready → resolved`), the first-staff-
+touch lock, the per-account reference and the drag-rank, and it is mid-flight in
+the same two files. A second definition of "triaged", written from the outside,
+is precisely the kind of parallel world CLAUDE.md exists to prevent. When that
+lane lands its own batch door, the assistant gets it for free: it is one entry in
+the shared tool catalogue.
+
+**"Stories from a transcript"** cannot be finished by anyone yet: there is no
+`stories` table. The work engine's migration `0011_ticket_work_engine` landed the
+ticket's own columns; the story is still to come. The knowledge half of that flow
+— find the transcript, retrieve the app and process context — needs the Google
+connector above.
+
+---
+
 ## When each piece landed
 
 Lifted out of README.md's opening paragraphs, where five `UPDATED <date>:` stamps had
