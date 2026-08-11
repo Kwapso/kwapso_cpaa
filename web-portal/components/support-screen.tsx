@@ -48,9 +48,15 @@ export function SupportScreen({ ready }: { ready: PortalReady }) {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* R16: the collection's count, once, from the server's exact total. */}
+      {/* R16: the collection's count, once, from the server's exact total.
+       *
+       * "Your company's", not "Your". A contact now sees every request their
+       * colleagues raise, not only the ones they typed — so a heading that says
+       * "Your requests" over a colleague's question is the screen telling the
+       * reader something untrue about who can see what. The copy changed the day
+       * the rule did. */}
       <CollectionHeading
-        label="Your requests"
+        label="Your company's requests"
         total={total}
         action={
           <Button onClick={() => setRaising(true)}>

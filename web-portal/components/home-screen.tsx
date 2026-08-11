@@ -72,7 +72,9 @@ export function HomeScreen({ ready }: { ready: PortalReady }) {
       <section>
         {/* R16: the exact server total for the WHOLE collection, in the one place
          * the portal renders a count — not the length of the three rows below. */}
-        <CollectionHeading label="Your requests" total={total} />
+        {/* "Your company's", for the reason support-screen.tsx gives at its own
+         * heading: this list holds colleagues' requests too, now. */}
+        <CollectionHeading label="Your company's requests" total={total} />
 
         {loading && !tickets ? (
           <div className="flex flex-col gap-3">
