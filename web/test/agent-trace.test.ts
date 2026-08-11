@@ -44,7 +44,7 @@ describe("traceFor — write tools land on the RESULT screen, never an input for
 
   it("dropdown writes → the one dropdown-values screen (no per-value URL)", () => {
     for (const tool of ["create_dropdown_value", "update_dropdown_value", "set_dropdown_active"]) {
-      expect(traceFor(tool, { id: "d1", type: "Help type", value: "Bug" }, TEAM)?.path).toBe(
+      expect(traceFor(tool, { id: "d1", type: "Ticket type", value: "Bug" }, TEAM)?.path).toBe(
         `/t/${TEAM}/dropdowns`
       )
     }
@@ -57,21 +57,26 @@ describe("traceFor — write tools land on the RESULT screen, never an input for
     }
   })
 
-  it("raise_help_ticket → help list; reply/update/status → the ticket detail", () => {
+  // The TOOL names still say `help` (they are the external contract the machine
+  // surface publishes); the SCREEN they land on is /tickets, because that is the
+  // address a person sees. This test is where the two meet.
+  it("raise_help_ticket → the tickets list; reply/update/status → the ticket detail", () => {
     expect(traceFor("raise_help_ticket", { description: "Printer down" }, TEAM)?.path).toBe(
-      `/t/${TEAM}/help`
+      `/t/${TEAM}/tickets`
     )
     expect(traceFor("reply_help_ticket", { helpId: "h5", body: "on it" }, TEAM)?.path).toBe(
-      `/t/${TEAM}/help/h5`
+      `/t/${TEAM}/tickets/h5`
     )
     for (const tool of ["update_help_ticket", "set_help_status"]) {
-      expect(traceFor(tool, { id: "h5", status: "resolved" }, TEAM)?.path).toBe(`/t/${TEAM}/help/h5`)
+      expect(traceFor(tool, { id: "h5", status: "resolved" }, TEAM)?.path).toBe(
+        `/t/${TEAM}/tickets/h5`
+      )
     }
   })
 
   it("set_help_status specifically maps to the ticket detail", () => {
     expect(traceFor("set_help_status", { id: "h5", status: "in_progress" }, TEAM)).toEqual({
-      path: `/t/${TEAM}/help/h5`,
+      path: `/t/${TEAM}/tickets/h5`,
       highlight: "main",
     })
   })

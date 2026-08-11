@@ -91,7 +91,7 @@ export function SelectableFormDialog({
           list="dropdown-types"
           value={values.type}
           onChange={(e) => setValues((v) => ({ ...v, type: e.target.value }))}
-          placeholder="e.g. Help type"
+          placeholder="e.g. Ticket type"
           disabled={busy}
           autoFocus
         />

@@ -114,7 +114,7 @@ export function shapeHelpList(tickets: HelpTicket[]): ScreenData {
     rows: tickets.map((t) => ({
       id: t.id,
       name: truncate(t.description),
-      detail: `${t.helpType || "Help"} · ${HELP_STATUS[t.status]}`,
+      detail: `${t.helpType || "General"} · ${HELP_STATUS[t.status]}`,
       // Facet column (read by the filter engine, not the renderer).
       status: HELP_STATUS[t.status],
     })),

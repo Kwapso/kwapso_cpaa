@@ -90,9 +90,9 @@ export const PORTAL_DOORS: Record<string, Upstream> = {
   "GET /api/tenancy/accounts": "TENANCY",
   "GET /api/tenancy/accounts/detail": "TENANCY",
 
-  // ── support ────────────────────────────────────────────────────────────────
+  // ── tickets ────────────────────────────────────────────────────────────────
   // A client raises tickets and follows their COMPANY's. The list, the count and
-  // the thread are all pinned by the help fence to the account they are standing
+  // the thread are all pinned by the ticket fence to the account they are standing
   // in and everything nested beneath it — the same fence as the accounts doors
   // above, reading the account a ticket was raised for.
   "GET /api/content/help": "CONTENT",
@@ -159,14 +159,14 @@ async function handle(request: Request, env: Env): Promise<Response> {
     if (pathname.startsWith("/media/") && request.method === "GET")
       return serveMedia(env.MEDIA, pathname, "/media/")
 
-    // The support tree: /support/<ticketId> is ONE client-resolved screen. The
-    // static export emits a single shell, so serve it for any /support/* depth
+    // The tickets tree: /tickets/<ticketId> is ONE client-resolved screen. The
+    // static export emits a single shell, so serve it for any /tickets/* depth
     // (the browser keeps the real URL; the page parses it client-side). Without
     // this, a deep link a client was emailed would 404 before the worker saw it
     // — the static-export reload trap, EDGE-CASES.md.
-    if (pathname.startsWith("/support/")) {
+    if (pathname.startsWith("/tickets/")) {
       const shell = new URL(request.url)
-      shell.pathname = "/support"
+      shell.pathname = "/tickets"
       return env.ASSETS.fetch(new Request(shell, request))
     }
 

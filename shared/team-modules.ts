@@ -32,7 +32,10 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   accounts: "Accounts",
   portal_users: "Portal access",
   learning: "Learning",
-  help: "Help",
+  // The module KEY stays `help` — it is the permission string every role's sheet
+  // already carries, the table the rows live in, and the path the API answers on.
+  // The LABEL is what a person reads, and the word for this is Tickets.
+  help: "Tickets",
   selectable_data: "Dropdown data",
   screens: "Screens",
   agent: "AI agent",

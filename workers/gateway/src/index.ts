@@ -52,7 +52,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
 
     if (pathname.startsWith("/api/auth/")) return env.AUTH.fetch(request)
     if (pathname.startsWith("/api/tenancy/")) return env.TENANCY.fetch(request)
-    // Content modules (Learning, Help) and data-ops (import + the AI agent).
+    // Content modules (Learning, Tickets) and data-ops (import + the AI agent).
     if (pathname.startsWith("/api/content/")) return env.CONTENT.fetch(request)
     if (pathname.startsWith("/api/data-ops/")) return env.DATAOPS.fetch(request)
     // The MCP front desk: token management (session-gated) + the MCP endpoint
@@ -100,11 +100,11 @@ async function handle(request: Request, env: Env): Promise<Response> {
       return env.ASSETS.fetch(new Request(shell, request))
     }
 
-    // Top-level module pages (/accounts, /learning, /help) are ALSO client-resolved
+    // Top-level module pages (/accounts, /learning, /tickets) are ALSO client-resolved
     // deep-link shells (their own clean URLs, active team from context). Serve the
     // module's shell for any sub-path (e.g. /accounts/<id>); the bare /accounts is a
     // real static file served below.
-    for (const mod of ["accounts", "learning", "help"]) {
+    for (const mod of ["accounts", "learning", "tickets"]) {
       if (pathname.startsWith(`/${mod}/`)) {
         const shell = new URL(request.url)
         shell.pathname = `/${mod}`

@@ -41,7 +41,7 @@ invalidates on writes. The worker does the filtering with ordinary indexed
 
 ### Layer 3 — full-text "search anything" (FTS5)
 For record modules where Glide-style "match anything on the detail screen" is
-wanted (learning, help, imported datasets), each per-team database gets a
+wanted (learning, tickets, imported datasets), each per-team database gets a
 **SQLite FTS5** virtual table mirroring the record table's text columns. The
 worker queries it with `MATCH` and returns ranked hits. This is what makes search
 span *all* of a record's fields, not just a column, at scale.

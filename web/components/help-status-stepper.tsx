@@ -1,6 +1,6 @@
 "use client"
 
-// Help status as a left-to-right STEPPER (not a dropdown): Open → In progress →
+// Ticket status as a left-to-right STEPPER (not a dropdown): Open → In progress →
 // Resolved, conveying start / in-motion / done by colour + fill (left-to-right fill
 // = progress). `reopened` is not a track stage — it sits at "Open" with a small
 // "Reopened" pill (needs attention again). Clicking a stage moves the ticket there

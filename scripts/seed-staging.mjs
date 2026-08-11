@@ -768,7 +768,7 @@ for (const t of PORTAL_TESTERS) {
 // written into the feed directly, because a feed you can write to directly is a
 // feed that can say something that never happened.
 
-step("Help requests")
+step("Tickets")
 const ticketsFor = (cookie) => allPages("/api/content/help?scope=all", "tickets", cookie)
 const existing = new Map()
 for (const t of await ticketsFor(staff.cookie)) existing.set(t.description, t)
@@ -1050,7 +1050,7 @@ console.log("\nOpen these to see it:")
 console.log(`  ${BASE}/accounts            the companies and their people`)
 console.log(`  ${BASE}/t/${TEAM_ID}/accounts/${aHome}`)
 console.log(`                              ${testerA.companies[0]} — contacts, logins, activity`)
-console.log(`  ${BASE}/help                the requests, ours and the clients'`)
+console.log(`  ${BASE}/tickets             the tickets, ours and the clients'`)
 console.log(`  ${BASE}/learning            the articles`)
 console.log(`  ${BASE}/members             the team, including the client logins`)
 console.log(`\nSign in as a client with ${PORTAL_TESTERS.map((t) => t.email).join(" or ")}`)

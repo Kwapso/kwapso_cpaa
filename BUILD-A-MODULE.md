@@ -347,8 +347,8 @@ export const content = {
 
 Add a `TeamSection` (pages.ts). `module` is the read-right that reveals it;
 `segment` is the URL segment; `placement` is `"sidebar"` (a first-class page, like
-Learning/Help), `"tab"` (an admin section in the team tab strip), or `"contextual"`
-(reached from a button). Learning/Help are `"sidebar"`.
+Learning/Tickets), `"tab"` (an admin section in the team tab strip), or `"contextual"`
+(reached from a button). Learning/Tickets are `"sidebar"`.
 
 **Law R8 — the count badge is derived.** Any `placement:"tab"` section that leads
 with a collection **must** declare a `countCacheKey` — the cache-key prefix whose
@@ -512,7 +512,7 @@ red colour + a confirm.
 
 > Note the two R2 flavours: a **recipe** detail (like `memberDetailRecipe`) carries
 > the tabs as recipe *data* and gets them for free; a **bespoke** detail (Learning,
-> Help, and your Notes) must render `TabsView` + `ActivityFeed` itself and is checked
+> Tickets, and your Notes) must render `TabsView` + `ActivityFeed` itself and is checked
 > by the `record-detail-tabs` test.
 
 ---

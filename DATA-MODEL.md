@@ -204,7 +204,9 @@ global standard GROUPS + per-team VALUES)
 Glide: 3 rows (`File type`, `Learning category`, `Help type`), no team key, no
 audit → a tiny GLOBAL reference of dropdown GROUPS. But the values table also
 uses `Help status` (not listed as a type) and `Learning category` has no
-values. So the types list and the values were loosely coupled in Glide.
+values. (We seed those two groups as **`Ticket type`** and **`Ticket status`** —
+the Help section is called Tickets, and team migration `0010_ticket_vocabulary`
+relabelled the rows every existing team already had.) So the types list and the values were loosely coupled in Glide.
 
 ### Retention in core — the ONE place rows are actually deleted
 
@@ -250,7 +252,8 @@ watches **every** database in the account, core included — it used to filter
 Glide `Member roles` was WIDE: `Identity/Title`, `Description`, `Is default`,
 then **24 boolean columns** = 6 modules × {read,create,edit,delete}. Modules:
 **Teams, Team members, Member roles, Learning, Help, Selectable data** — exactly
-our `TEAM_MODULES`. We store the 24 booleans as a TALL `role_permissions` sheet
+our `TEAM_MODULES` (the module a person now reads as **Tickets** is still keyed
+`help`, because that string sits in every role's permission sheet). We store the 24 booleans as a TALL `role_permissions` sheet
 (role × module × 4 bits) so a new module = new rows, not new columns. `is_default`
 flags the seeded Admin (locked) + Viewer. Roles are **edit-live + deactivate-only,
 never delete** (holders keep the role). Q4 RESOLVED (see Resolutions): Admin

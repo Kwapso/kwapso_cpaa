@@ -24,7 +24,7 @@ export type BrandedEmail = {
 }
 
 /** Build { html, text } for a branded email. `text` is the plaintext fallback. */
-/** HTML-escape any value that may carry user-supplied content (e.g. a help-reply
+/** HTML-escape any value that may carry user-supplied content (e.g. a ticket-reply
  * snippet or a mentioner's name flows into heading/intro). Without this, attacker
  * text could inject markup/links into the branded email body. */
 function esc(s: string): string {

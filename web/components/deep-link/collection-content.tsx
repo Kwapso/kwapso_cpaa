@@ -243,7 +243,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
       </div>
     )
   }
-  if (module === "help") {
+  if (module === "tickets") {
     // R14: My/All is a SERVER scope, each its own paged cache — filtering a
     // loaded PAGE by raiser would disagree with the exact badge above it.
     const scopedQ = helpScope === "mine" ? helpMineQ : helpQ
@@ -257,12 +257,12 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     return (
       <CountedAbove active={helpBadge !== ""}>
       <div className="flex flex-col gap-4">
-      <CollectionHeading sectionKey="help" total={totals.help} />
+      <CollectionHeading sectionKey="tickets" total={totals.help} />
       <SectionWithCreate
         show={can("help", "create")}
         label="Raise ticket"
         icon="plus"
-        onCreate={() => go(sectionPath, { panel: "add", module: "help" })}
+        onCreate={() => go(sectionPath, { panel: "add", module: "tickets" })}
         // The My/All raiser strip sits ABOVE the boxed list — it scopes which
         // tickets the collection card shows, so it isn't part of that unit.
         aboveCard={

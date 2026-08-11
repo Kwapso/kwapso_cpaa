@@ -1,7 +1,7 @@
 "use client"
 
-// The /support resolver. Reads the REAL address rather than route params,
-// because the static export served here is one shell emitted at `/support` —
+// The /tickets resolver. Reads the REAL address rather than route params,
+// because the static export served here is one shell emitted at `/tickets` —
 // its params are always empty, whatever the browser's address bar says
 // (EDGE-CASES.md, the static-export reload trap).
 //
@@ -13,16 +13,16 @@
 import * as React from "react"
 
 import { PortalShell } from "@/components/portal-shell"
-import { SupportScreen } from "@/components/support-screen"
+import { TicketsScreen } from "@/components/tickets-screen"
 import { TicketScreen } from "@/components/ticket-screen"
 
-/** "/support/01J…" → "01J…" ; "/support" (or "/support/") → null. */
+/** "/tickets/01J…" → "01J…" ; "/tickets" (or "/tickets/") → null. */
 export function ticketIdFromPath(pathname: string): string | null {
-  const rest = pathname.replace(/^\/support\/?/, "").split("/").filter(Boolean)
+  const rest = pathname.replace(/^\/tickets\/?/, "").split("/").filter(Boolean)
   return rest[0] ?? null
 }
 
-export function SupportRoute() {
+export function TicketsRoute() {
   const [ticketId, setTicketId] = React.useState<string | null>(null)
 
   React.useEffect(() => {
@@ -49,7 +49,7 @@ export function SupportRoute() {
         ticketId ? (
           <TicketScreen ready={ready} ticketId={ticketId} />
         ) : (
-          <SupportScreen ready={ready} />
+          <TicketsScreen ready={ready} />
         )
       }
     </PortalShell>

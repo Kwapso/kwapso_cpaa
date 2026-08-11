@@ -4,7 +4,7 @@
 // (the standard every record gets). Article = the prose (library ArticleBody) + your
 // own Done toggle + Deactivate/Activate. Overview = audit metadata (DescriptionList).
 // Activity = the article's history via the GENERIC record-activity feed. Edit gated
-// by learning:edit; deactivate by learning:delete. Host-composed, like role/help.
+// by learning:edit; deactivate by learning:delete. Host-composed, like role/ticket.
 
 import * as React from "react"
 

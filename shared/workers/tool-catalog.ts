@@ -668,7 +668,7 @@ export const SHARED_TOOLS: SharedTool[] = [
     },
   },
 
-  /* ---------------------------------- help --------------------------------- */
+  /* --------------------------------- tickets -------------------------------- */
   {
     name: "raise_help_ticket",
     mcpName: "create_help_ticket",

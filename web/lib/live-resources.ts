@@ -213,7 +213,7 @@ export const TEAM_RESOURCES: Record<
     fetchList: (t) => listFetch.accounts(t),
     deps: (_t, id) => [accountKey(id), `activity:record:accounts:${id}`],
   },
-  // Help tickets — row-level live. A status change / new reply (postHelpReply
+  // Tickets — row-level live. A status change / new reply (postHelpReply
   // pings `help` too) patches just that ticket in the cached "all" set.
   help: {
     key: (t) => `help:${t}`,

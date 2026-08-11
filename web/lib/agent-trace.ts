@@ -91,17 +91,17 @@ export function traceFor(
     case "mark_learning_done":
       return { path: `${seg(teamId, "learning")}/${str(input, "id")}`, highlight: "main" }
 
-    /* --------------------------------- help -------------------------------- */
-    // Raise → the help list (the new ticket appears live). Reply / edit / status →
-    // that ticket's detail thread.
+    /* -------------------------------- tickets ------------------------------- */
+    // Raise → the Tickets list (the new ticket appears live). Reply / edit / status
+    // → that ticket's detail thread.
     case "raise_help_ticket":
-      return { path: seg(teamId, "help"), highlight: "main" }
+      return { path: seg(teamId, "tickets"), highlight: "main" }
     case "reply_help_ticket":
-      return { path: `${seg(teamId, "help")}/${str(input, "helpId")}`, highlight: "main" }
+      return { path: `${seg(teamId, "tickets")}/${str(input, "helpId")}`, highlight: "main" }
     case "update_help_ticket":
     case "set_help_status":
     case "add_help_stakeholder":
-      return { path: `${seg(teamId, "help")}/${str(input, "id")}`, highlight: "main" }
+      return { path: `${seg(teamId, "tickets")}/${str(input, "id")}`, highlight: "main" }
 
     /* ------------------------------- accounts ------------------------------- */
     // Create → the accounts list, where the new account appears live. Every other
@@ -131,7 +131,7 @@ export function traceFor(
       return { path: seg(teamId, "import"), highlight: "main" }
     case "bulk_set_help_status":
     case "set_help_status_by_filter":
-      return { path: seg(teamId, "help"), highlight: "main" }
+      return { path: seg(teamId, "tickets"), highlight: "main" }
     case "bulk_set_learning_active":
       return { path: seg(teamId, "learning"), highlight: "main" }
 

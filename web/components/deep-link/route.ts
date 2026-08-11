@@ -15,7 +15,7 @@ export type SectionKey =
   | "dropdowns"
   | "accounts"
   | "learning"
-  | "help"
+  | "tickets"
   | "import"
 
 export type Route = {
@@ -25,18 +25,18 @@ export type Route = {
   /** "" = the list / overview level (no record selected) */
   recordId: string
   query: ScreenQuery
-  /** true when reached via a clean top-level module URL (/learning, /help) rather
+  /** true when reached via a clean top-level module URL (/learning, /tickets) rather
    * than /t/<teamId>/… — the host resolves the team from the active context, like
    * /home does. */
   topLevel: boolean
 }
 
 /** Top-level app URLs that resolve INSIDE the one deep-link shell (not nested under
- * /t/<teamId>) — the team sidebar pages (/learning, /help) AND the account screens
+ * /t/<teamId>) — the team sidebar pages (/learning, /tickets) AND the account screens
  * (/home, /settings, /invitations). Everything here is in-app, so `go()` moves to it
  * with the History API (no reload); only pre-auth routes (/login, /onboarding) are left
  * out, so leaving the app is a real navigation. */
-export const TOP_LEVEL_MODULES = ["accounts", "learning", "help", "home", "settings", "invitations"]
+export const TOP_LEVEL_MODULES = ["accounts", "learning", "tickets", "home", "settings", "invitations"]
 
 /** The account-level screens the shell renders directly (not team-scoped module content). */
 export const ACCOUNT_MODULES = ["home", "settings", "invitations"]
@@ -54,7 +54,7 @@ export function parseRoute(pathname: string, search: string): Route {
       topLevel: false,
     }
   }
-  // Top-level module URL: /learning, /learning/<id>, /help, /help/<id>.
+  // Top-level module URL: /learning, /learning/<id>, /tickets, /tickets/<id>.
   const levels = parseScreenPath(segs)
   return {
     teamId: "",

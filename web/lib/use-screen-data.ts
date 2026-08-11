@@ -9,7 +9,7 @@
 // the prefixes in pages.ts (LAW R8) and app-shell's realtime registry — don't
 // rename one without the others. Roles / invites / dropdown values load across the
 // whole team area (they back list + breadcrumb + a tab-count badge); members /
-// learning / help / team-meta load only on their own module.
+// learning / tickets / team-meta load only on their own module.
 
 import { tenancy } from "@/lib/api"
 import { accountsKey, cursorKey, helpKey, listFetch, totalKey } from "@/lib/live-resources"
@@ -22,7 +22,7 @@ export type ScreenDataInput = {
   enabled: boolean
   module: string | null
   recordId: string | null
-  /** which ticket set the help screen is showing — a SERVER scope (R14/R16). */
+  /** which ticket set the Tickets screen is showing — a SERVER scope (R14/R16). */
   helpScope?: "mine" | "all"
 }
 
@@ -54,15 +54,15 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
   const learningQ = useCached(enabled && module === "learning" ? `learning:${teamId}` : null, () =>
     listFetch.learning(teamId as string)
   )
-  // Help backs its list, the breadcrumb label and the ticket thread. R14: the
+  // Tickets backs its list, the breadcrumb label and the ticket thread. R14: the
   // list is a PAGE, so My/All is a SERVER scope with its own cache — filtering a
   // loaded page client-side would disagree with the exact badge above it (R16).
   // The All cache is still the one the live registry patches row-by-row.
-  const helpQ = useCached(enabled && module === "help" ? helpKey(teamId as string, "all") : null, () =>
+  const helpQ = useCached(enabled && module === "tickets" ? helpKey(teamId as string, "all") : null, () =>
     listFetch.help(teamId as string)
   )
   const helpMineQ = useCached(
-    enabled && module === "help" && helpScope === "mine" ? helpKey(teamId as string, "mine") : null,
+    enabled && module === "tickets" && helpScope === "mine" ? helpKey(teamId as string, "mine") : null,
     () => listFetch.helpMine(teamId as string)
   )
   // Accounts back their list, the breadcrumb label and the record screen. R14:
@@ -72,7 +72,7 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
     enabled && module === "accounts" ? accountsKey(teamId as string) : null,
     () => listFetch.accounts(teamId as string)
   )
-  // The team's dropdown values — feed the help/learning forms' Type/Category pickers
+  // The team's dropdown values — feed the ticket/learning forms' Type/Category pickers
   // AND the Dropdown-values tab's count badge, so load them across the team area
   // (cache-first + live, like roles/invites, so the count stays honest).
   const formSelectableQ = useCached(
@@ -95,7 +95,7 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
   // so every form PICKER filters to `active` — a retired value never appears as a
   // pickable option (but old rows that referenced it still read truthfully).
   const activeSelectable = selectableValues.filter((v) => v.active)
-  const helpTypeOptions = activeSelectable.filter((v) => v.type === "Help type").map((v) => v.value)
+  const helpTypeOptions = activeSelectable.filter((v) => v.type === "Ticket type").map((v) => v.value)
   const learningCategoryOptions = activeSelectable
     .filter((v) => v.type === "Learning category")
     .map((v) => v.value)

@@ -124,7 +124,7 @@ const CHOICE = { value: "B0cSY", group: "Name", kind: "OpbEc" }
  * article's CHANNEL is the real grouping, and the learning door creates that
  * category itself on first use (pick-or-create). */
 const DROPDOWN_HOMES = {
-  "Tickets/Type": "Help type",
+  "Tickets/Type": "Ticket type",
   "Content/Format": "File type",
 }
 

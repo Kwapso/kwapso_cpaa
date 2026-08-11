@@ -5,7 +5,7 @@
 // type are pure DROPDOWNS from the team's dropdown values (with a gated "Manage
 // dropdowns" link to add options). The single rich-text CONTENT field (library Notes
 // editor → sanitized HTML) is the article — what your team reads and the assistant
-// reads to answer Help. Shared FormShell layout; per-session draft (CACHING.md §11).
+// reads to answer a ticket. Shared FormShell layout; per-session draft (CACHING.md §11).
 
 import * as React from "react"
 

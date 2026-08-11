@@ -1,4 +1,6 @@
 // Unit tests for the team factory's pure logic: schema + seed building.
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
 import { sqlString } from "@shared/workers/d1-rest"
@@ -8,6 +10,8 @@ import {
   TEAM_MIGRATIONS,
   TEAM_MODULES,
 } from "../src/team-schema"
+
+const ROOT = join(__dirname, "..", "..", "..")
 
 const ACTOR = { id: "01TEST", email: "chris@x.com", name: "Chris O'Brien" }
 
@@ -47,6 +51,55 @@ describe("sqlString", () => {
   it("doubles single quotes and handles null", () => {
     expect(sqlString("it's")).toBe("'it''s'")
     expect(sqlString(null)).toBe("NULL")
+  })
+})
+
+// A DROPDOWN GROUP'S NAME IS DATA, AND IT IS WRITTEN DOWN IN FOUR PLACES.
+//
+// The seed writes it into a fresh team. A migration relabels it in the teams that
+// already exist. And the two screens that draw the picker filter on it by string.
+// Nothing joined them, so renaming the Help section to Tickets could have moved
+// three of the four and left the fourth reading a name that no longer exists —
+// which does not throw, does not fail a type check, and does not go red. It shows
+// an empty Type dropdown, and only to teams that already had data.
+//
+// So: the seed's group names, the migration's target names, and the names the app
+// filters on all have to be the same strings. Derived on both ends — the seed from
+// the module, the readers off disk.
+describe("the ticket vocabulary is one name, everywhere it is written down", () => {
+  /** The `type` values the ticket screens filter selectable_data by. */
+  const filtered = ["web/lib/use-screen-data.ts", "web/components/help-detail.tsx"].map((f) => {
+    const src = readFileSync(join(ROOT, f), "utf8")
+    return { file: f, match: src.match(/v\.type === "([^"]+)"/)?.[1] }
+  })
+
+  it("the seed's group names are the ones the screens filter on", () => {
+    const seeded = new Set(DEFAULT_SELECTABLE.map((v) => v.type))
+    expect(seeded.has("Ticket type"), "the seed must ship a 'Ticket type' vocabulary").toBe(true)
+    for (const { file, match } of filtered) {
+      expect(match, `${file} does not filter selectable_data by a type at all`).toBeDefined()
+      expect(
+        seeded.has(match as string),
+        `${file} filters on "${match}", which the seed never writes — a fresh team's ticket Type dropdown would be empty`
+      ).toBe(true)
+    }
+  })
+
+  it("the migration renames the OLD group to exactly the name the seed now uses", () => {
+    const sql = TEAM_MIGRATIONS.map((m) => m.sql).join("\n")
+    const renames = [...sql.matchAll(/UPDATE selectable_data SET type = '([^']+)' WHERE type = '([^']+)'/g)]
+    expect(
+      renames.length,
+      "no vocabulary rename found — an existing team's rows still carry the old group name"
+    ).toBeGreaterThan(0)
+    const seeded = new Set(DEFAULT_SELECTABLE.map((v) => v.type))
+    for (const [, to, from] of renames) {
+      expect(
+        seeded.has(to),
+        `the migration renames '${from}' to '${to}', which the seed does not use — the two would disagree`
+      ).toBe(true)
+      expect(seeded.has(from), `'${from}' is being renamed AND still seeded`).toBe(false)
+    }
   })
 })
 

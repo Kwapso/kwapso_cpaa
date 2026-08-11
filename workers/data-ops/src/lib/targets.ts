@@ -109,7 +109,7 @@ export const TARGETS: Record<string, TargetDef> = {
     tableKey: "selectable_data",
     module: "selectable_data",
     displayName: "Dropdown values",
-    description: "Add selectable dropdown values in bulk (e.g. Learning categories, Help types).",
+    description: "Add selectable dropdown values in bulk (e.g. Learning categories, Ticket types).",
     columns: [
       { key: "type", label: "Group", required: true },
       { key: "value", label: "Value", required: true },

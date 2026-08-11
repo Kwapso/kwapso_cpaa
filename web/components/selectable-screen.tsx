@@ -113,7 +113,7 @@ export function SelectableScreen({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Dropdown values</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            The options behind your team&apos;s dropdowns — Help types, Learning categories and more.
+            The options behind your team&apos;s dropdowns — Ticket types, Learning categories and more.
             Pick a group, or start a new one.
           </p>
         </div>

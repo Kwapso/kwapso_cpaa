@@ -42,12 +42,12 @@ import { ProfileMenu } from "@/components/profile-menu"
 import { TeamSwitcher } from "@/components/team-switcher"
 
 const NAV_ICONS = { home: Home, settings: Settings } as const
-// The lucide component for each team SIDEBAR page (Accounts / Learning / Help) in
-// the rail — the same concept icons the tabs use (CONCEPT_ICON, pages.ts).
+// The lucide component for each team SIDEBAR page (Accounts / Learning / Tickets)
+// in the rail — the same concept icons the tabs use (CONCEPT_ICON, pages.ts).
 const SECTION_ICONS: Record<string, typeof Home> = {
   accounts: Building2,
   learning: GraduationCap,
-  help: LifeBuoy,
+  tickets: LifeBuoy,
 }
 
 export function AppShell({
@@ -100,7 +100,7 @@ export function AppShell({
   const here = activePath ?? pathname
 
   // The rail: the universal anchors (Home / Settings) with the team's first-class
-  // SIDEBAR pages (Learning / Help) slotted between them — each scoped to the
+  // SIDEBAR pages (Learning / Tickets) slotted between them — each scoped to the
   // active team and gated by its own read right, so it vanishes for anyone who
   // can't read it (and when teamless). ONE composed list drives both the desktop
   // rail and the mobile bottom bar.
@@ -116,7 +116,7 @@ export function AppShell({
         slug: s.key,
         title: s.title,
         Icon: SECTION_ICONS[s.key] ?? Home,
-        // Clean top-level URL (/learning, /help) — resolves the active team from
+        // Clean top-level URL (/learning, /tickets) — resolves the active team from
         // context, like Home. (The gateway serves the shell for any sub-path.)
         path: `/${s.segment}`,
       }))

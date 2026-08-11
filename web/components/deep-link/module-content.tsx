@@ -241,7 +241,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     if (module === "learning") {
       return <LearningDetailScreen teamId={teamId as string} learningId={recordId} />
     }
-    if (module === "help") {
+    if (module === "tickets") {
       return <HelpDetailScreen teamId={teamId as string} helpId={recordId} myUserId={myUserId} />
     }
     return <NotFound />

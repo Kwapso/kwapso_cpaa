@@ -153,7 +153,7 @@ rest of the base is request/response.
 
 **Decide, and write the decision into the code:**
 - Does the knowledge base live as a `knowledge` module on `workers/content`
-  (which already owns learning and help and binds R2), or does it earn a worker
+  (which already owns learning and tickets and binds R2), or does it earn a worker
   of its own? `CLAUDE.md` says prefer a route on an existing worker. Ingestion at
   this scale may genuinely earn one — argue it either way, but argue it.
 - Vectors: Cloudflare Vectorize with metadata filtering is the obvious fit for

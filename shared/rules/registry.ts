@@ -160,7 +160,7 @@ export const RULES_REGISTRY: Rule[] = [
   {
     id: "R21",
     dimension: "arch",
-    law: "A door on the AGENCY's own material refuses a client login, at the door. Every route reachable at the agency origin that a caller holding only the Client role's rights can pass — including every door gated by nothing but membership — must either refuse a portal caller (refusePortalCaller), resolve the caller's account fence (accountScope), be a door the client portal itself opens, or be a reasoned CLIENT_REACHABLE_EXEMPT line. The reachable set is DERIVED: the Client role's rights come from the seed, the routes from each worker's own ROUTES table, the gates from the handler source, the portal's surface from PORTAL_DOORS. Earned TWICE: the learning library and the dropdown vocabulary, then the help stakeholder list — each defended only by the OTHER gateway's allow-list, which is to say not defended, because the agency gateway forwards by prefix and a client login is an ordinary team member. Enumerate by WHAT A CLIENT CAN REACH, never by what a module owns.",
+    law: "A door on the AGENCY's own material refuses a client login, at the door. Every route reachable at the agency origin that a caller holding only the Client role's rights can pass — including every door gated by nothing but membership — must either refuse a portal caller (refusePortalCaller), resolve the caller's account fence (accountScope), be a door the client portal itself opens, or be a reasoned CLIENT_REACHABLE_EXEMPT line. The reachable set is DERIVED: the Client role's rights come from the seed, the routes from each worker's own ROUTES table, the gates from the handler source, the portal's surface from PORTAL_DOORS. Earned TWICE: the learning library and the dropdown vocabulary, then the ticket stakeholder list — each defended only by the OTHER gateway's allow-list, which is to say not defended, because the agency gateway forwards by prefix and a client login is an ordinary team member. Enumerate by WHAT A CLIENT CAN REACH, never by what a module owns.",
     checkId: "client-reachable-doors",
     status: "enforced",
   },
@@ -242,7 +242,7 @@ export const ACCOUNT_SCOPED_MODULES = ["accounts", "portal_users"] as const
  * Earned the hard way. The fence was applied door by door to the ACCOUNT doors,
  * and the first security sweep found three other doors that return account-owned
  * rows and never got it: the record activity feed, the team activity feed, and
- * the help list. The burglar suite could not have caught them, because it derived
+ * the ticket list. The burglar suite could not have caught them, because it derived
  * its targets from the account routes — the very set that excluded them. The
  * lesson is the shape of this list: enumerate by WHAT A CLIENT CAN REACH, never
  * by what the account module happens to own.
@@ -431,7 +431,7 @@ export const GROWING_COLLECTIONS: Record<
     fn: "listTickets",
     routes: "workers/content/src/routes/help.ts",
     rowsKey: "tickets",
-    listRecipe: "help.list",
+    listRecipe: "tickets.list",
     webKey: "helpKey(",
     why: "support tickets accumulate forever — a team that has raised 3,000 must still reach the oldest",
   },

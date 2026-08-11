@@ -11,7 +11,7 @@
 // any error. These are the EXACT keys + fetchers the team-area hooks use
 // (deep-link-screen's roles/invites/selectable + perms' my-perms), so a prewarmed
 // key is byte-for-byte what useCached would have fetched. It does NOT prewarm
-// learning/help (module-scoped — may never be visited) or members (loaded only on
+// learning/tickets (module-scoped — may never be visited) or members (loaded only on
 // the members tab, not team-wide). Pure seeding: no cache-first or live-sync change.
 
 import * as React from "react"

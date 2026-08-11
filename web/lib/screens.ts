@@ -65,9 +65,12 @@ export const MODULE_PERMISSION: Record<string, string> = {
   roles: "member_roles",
   invites: "team_members",
   dropdowns: "selectable_data",
-  // The content modules' URL segment IS their permission module (no alias).
   learning: "learning",
-  help: "help",
+  // The address bar says `tickets` because that is the word for the thing; the
+  // right the server enforces is still `help` — the string already written into
+  // every role's permission sheet in every team database. This line is the only
+  // place the two names meet.
+  tickets: "help",
   // The customer spine: the segment IS the module (portal_users is a second gate
   // ON the same screens, never a screen of its own — handing out a login is a
   // bigger decision than editing a phone number).
@@ -280,17 +283,17 @@ export const learningListRecipe: ScreenRecipe = {
   ]),
 }
 
-/* ---------------------------------- help --------------------------------- */
+/* --------------------------------- tickets -------------------------------- */
 
-/** Help list — clean rows (a truncated description + a type · status line). The
- * My/All scope is a host-owned toggle (the server filters by raiser); tapping a
- * row opens the ticket thread. "Raise ticket" is host-rendered above, gated by
- * help:create. */
-export const helpListRecipe: ScreenRecipe = {
+/** Tickets list — clean rows (a truncated description + a type · status line).
+ * The My/All scope is a host-owned toggle (the server filters by raiser); tapping
+ * a row opens the ticket thread. "Raise ticket" is host-rendered above, gated by
+ * the help:create right (the module key behind the Tickets section). */
+export const ticketsListRecipe: ScreenRecipe = {
   type: "list",
   display: "list",
   surface: "none",
-  binding: { module: "help" },
+  binding: { module: "tickets" },
   gate: { module: "help", right: "read" },
   fields: [field("name", "Ticket"), field("detail", "Details")],
   actions: [],
@@ -344,7 +347,7 @@ export const BASE_RECIPES: Record<string, ScreenRecipe> = {
   "invites.list": invitesListRecipe,
   "invites.detail": inviteDetailRecipe,
   "learning.list": learningListRecipe,
-  "help.list": helpListRecipe,
+  "tickets.list": ticketsListRecipe,
   // Accounts DETAIL has no recipe — its people, its logins and the accounts
   // nested under it are collections with their own actions, which no engine
   // block draws (see account-detail.tsx).

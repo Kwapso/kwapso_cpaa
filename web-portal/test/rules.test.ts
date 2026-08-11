@@ -116,8 +116,8 @@ describe("portal UI laws", () => {
     const tickets = read(join(PORTAL, "lib", "tickets.ts"))
     expect(tickets, "the ticket list must page by the opaque cursor").toContain("nextCursor")
     expect(tickets, "…and expose a way to load the next page").toContain("loadMore")
-    const support = read(join(PORTAL, "components", "support-screen.tsx"))
-    expect(support, "the support screen must CALL loadMore, not merely import it").toMatch(
+    const list = read(join(PORTAL, "components", "tickets-screen.tsx"))
+    expect(list, "the tickets screen must CALL loadMore, not merely import it").toMatch(
       /loadMore\(\)/
     )
   })
@@ -150,6 +150,42 @@ describe("portal rules the agency app doesn't have", () => {
   it("portal-activity-exempt: no portal screen reads an activity door", () => {
     const offenders = componentFiles().filter((f) => /activity/i.test(read(f).match(/["'`]\/api\/[^"'`]*/g)?.join() ?? ""))
     expect(offenders.map((f) => f.split("/").pop())).toEqual([])
+  })
+
+  // EVERY IN-APP LINK LANDS SOMEWHERE. The portal is a static export: a link to a
+  // path that has no page under `app/` is a 404 the browser only discovers when
+  // somebody taps it — and the type checker is perfectly happy, because an href is
+  // a string.
+  //
+  // Earned by: renaming /support to /tickets. Every gateway test, every fence
+  // test and the whole type check stayed green while `TicketRow` went on pointing
+  // at `/support/<id>`, which is to say the portal's ONE list linked to nothing.
+  // Three destinations and a ticket row is the entire navigable surface here, so
+  // there is no excuse for not walking it — the routes come off disk, and the
+  // links come out of the source.
+  it("every in-app link points at a page that exists", () => {
+    const pages = sourceFiles(join(PORTAL, "app"), { extensions: [".tsx"] })
+      .map((f) => f.path.slice(join(PORTAL, "app").length + 1))
+      .filter((p) => p.endsWith("page.tsx"))
+      // "tickets/[[...rest]]/page.tsx" → "tickets" ; "page.tsx" → "" (the root)
+      .map((p) => p.split("/")[0])
+      .filter((seg) => seg !== "page.tsx")
+    expect(pages.length, "the page scan found nothing — it is looking in the wrong place").toBeGreaterThan(2)
+
+    const offenders: string[] = []
+    for (const file of [...componentFiles(), ...sourceFiles(join(PORTAL, "app"), { extensions: [".tsx"] }).map((f) => f.path)]) {
+      const code = stripComments(read(file))
+      // href="/x…" , href={`/x/…`} , router.replace("/x") , router.push("/x")
+      for (const m of code.matchAll(/(?:href=|router\.(?:replace|push)\()\s*\{?\s*[`"']\/([a-z-]*)/g)) {
+        const seg = m[1]
+        if (seg === "" || pages.includes(seg)) continue
+        offenders.push(`${file.slice(PORTAL.length + 1)} → /${seg}`)
+      }
+    }
+    expect(
+      offenders,
+      `these links go nowhere — there is no web-portal/app/<segment>/page.tsx behind them: ${offenders.join(", ")}`
+    ).toEqual([])
   })
 
   // SCOPE ch.06 — "the portal shows work status but never which staff member is

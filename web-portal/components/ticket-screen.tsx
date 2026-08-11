@@ -164,11 +164,11 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
 
   const back = (
     <Link
-      href="/support"
+      href="/tickets"
       className="text-muted-foreground hover:text-foreground -ml-1 flex w-fit items-center gap-1.5 text-sm"
     >
       <ArrowLeft className="size-3.5" />
-      All requests
+      All tickets
     </Link>
   )
 

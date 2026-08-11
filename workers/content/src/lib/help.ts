@@ -1,4 +1,4 @@
-// Help module — team-wide support tickets + threaded replies, inside the team's
+// The TICKETS module — team-wide support tickets + threaded replies, inside the team's
 // OWN database. Locked model rules enforced HERE on the server:
 //   • status is a FIXED lifecycle the code trusts (open / in_progress / resolved /
 //     reopened) — help_type is a cosmetic selectable, never the source of truth;
@@ -641,7 +641,7 @@ export async function bulkSetStatusByFilter(
   toStatus: HelpStatus,
   dryRun: boolean
 ): Promise<{ matched: number; changed: number; accounts: string[] }> {
-  // The same facet set the Help screen sends (status / type). The R17 predicate
+  // The same facet set the Tickets screen sends (status / type). The R17 predicate
   // (`status <> ?`) is INLINE in both statements below — source-visible for the
   // idempotent-transitions scan — so "matched" is already "would change".
   //
