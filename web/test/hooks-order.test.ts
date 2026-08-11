@@ -15,29 +15,32 @@
 // a return counts unless it is inside a NESTED FUNCTION (a callback's own return
 // is its own; an `if`/`try`/`switch` block's return is the component's).
 
-import { readdirSync, readFileSync } from "node:fs"
+import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
+import { sourceFiles } from "@shared/rules/source-scan"
+
 const HERE = dirname(fileURLToPath(import.meta.url))
 const WEB = join(HERE, "..")
 
-function sourceFiles(): string[] {
-  const out: string[] = []
-  const walk = (dir: string) => {
-    for (const e of readdirSync(dir, { withFileTypes: true })) {
-      const p = join(dir, e.name)
-      if (e.isDirectory()) walk(p)
-      else if (/\.(tsx|ts)$/.test(e.name) && !e.name.endsWith(".test.ts")) out.push(p)
-    }
-  }
-  for (const d of ["components", "lib", "app"]) walk(join(WEB, d))
-  return out
+/** Every component, hook and page in the agency app. */
+function scannedFiles(): string[] {
+  return sourceFiles(
+    ["components", "lib", "app"].map((d) => join(WEB, d)),
+    { extensions: [".ts", ".tsx"], skipTests: true }
+  ).map((f) => f.path)
 }
 
 /** Strip strings/template literals/comments so braces inside them don't skew the
- * depth walk (heuristic, good enough for house-style code). */
+ * depth walk (heuristic, good enough for house-style code).
+ *
+ * NOT the shared stripComments: this one is LENGTH-PRESERVING — it blanks each
+ * comment and string with the same number of characters, because every index the
+ * brace walk below computes has to keep pointing at the same place in the
+ * original text. The shared one deletes, which would shift every offset. Two
+ * different jobs, so two functions, and this is the reason. */
 function stripNoise(src: string): string {
   return src
     .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
@@ -159,7 +162,7 @@ export function findOffendersIn(src: string, label: string): string[] {
 }
 
 function findOffenders(): string[] {
-  return sourceFiles().flatMap((f) => findOffendersIn(readFileSync(f, "utf8"), f.slice(WEB.length)))
+  return scannedFiles().flatMap((f) => findOffendersIn(readFileSync(f, "utf8"), f.slice(WEB.length)))
 }
 
 describe("hooks never follow a top-level early return (the React #310 crash class)", () => {
@@ -175,7 +178,7 @@ describe("hooks never follow a top-level early return (the React #310 crash clas
   // silently gone blind — this is the sanity tripwire).
   it("the scan actually parses the codebase (sees many components)", () => {
     let fns = 0
-    for (const file of sourceFiles()) fns += functionStarts(readFileSync(file, "utf8")).length
+    for (const file of scannedFiles()) fns += functionStarts(readFileSync(file, "utf8")).length
     expect(fns).toBeGreaterThan(40)
   })
 

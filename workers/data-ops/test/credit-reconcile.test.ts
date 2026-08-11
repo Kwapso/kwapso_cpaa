@@ -9,6 +9,8 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
+import { stripComments } from "@shared/rules/source-scan"
+
 const credits = readFileSync(join(__dirname, "..", "src", "lib", "credits.ts"), "utf8")
 const agent = readFileSync(join(__dirname, "..", "src", "lib", "agent.ts"), "utf8")
 
@@ -139,12 +141,7 @@ describe("one tool-execution seam — the audit trail can't depend on which loop
 describe("credit fairness — only a unit that bought nothing comes back", () => {
   const refundBody = (() => {
     const start = agent.indexOf("const refundUnspentUnit")
-    return start === -1
-      ? ""
-      : agent
-          .slice(start, agent.indexOf("\n  for (", start))
-          .replace(/\/\*[\s\S]*?\*\//g, " ")
-          .replace(/(^|[^:])\/\/[^\n]*/gm, "$1")
+    return start === -1 ? "" : stripComments(agent.slice(start, agent.indexOf("\n  for (", start)))
   })()
 
   it("refundAiUnits reverses BOTH pools (paid credits back, free units un-counted)", () => {

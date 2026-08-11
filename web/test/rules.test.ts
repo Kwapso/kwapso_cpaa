@@ -8,6 +8,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
+import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 import { GLOSSARY } from "@shared/glossary"
 import {
   ACCOUNT_SCOPED_MODULES,
@@ -28,47 +29,23 @@ import { SIMPLE_INVALIDATIONS, TEAM_RESOURCES } from "../lib/live-resources"
 import { TEAM_SECTIONS } from "../lib/pages"
 import { BASE_RECIPES, tabCountKey, withTabCounts } from "../lib/screens"
 
-/** Every worker's src .ts file (recursively), as [repo-relative path, source]. */
-function workerSources(): [string, string][] {
-  const out: [string, string][] = []
-  const walk = (d: string) => {
-    for (const e of readdirSync(d, { withFileTypes: true })) {
-      const p = join(d, e.name)
-      if (e.isDirectory()) walk(p)
-      else if (e.name.endsWith(".ts")) out.push([p.slice(ROOT.length), read(p)])
-    }
-  }
-  for (const w of readdirSync(join(ROOT, "workers"), { withFileTypes: true }))
-    if (w.isDirectory()) walk(join(ROOT, "workers", w.name, "src"))
-  return out
-}
-
 const HERE = dirname(fileURLToPath(import.meta.url)) // web/test
 const WEB = join(HERE, "..") // web/
 const ROOT = join(WEB, "..") // repo root
 const read = (p: string) => readFileSync(p, "utf8")
 
-/** Comments are NOT code. Without this, `// no LIMIT needed here` satisfies the
- * very bound it describes the ABSENCE of, and a comment naming a seam stands in
- * for calling it. Block comments go first; line comments only when the `//`
- * isn't part of a `https://` URL (SQL and template literals are left intact —
- * R14 reads LIMIT out of them). */
-function stripComments(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/gm, "$1")
+/** Every worker's src .ts file (recursively), as [repo-relative path, source]. */
+function workerSources(): [string, string][] {
+  const srcDirs = readdirSync(join(ROOT, "workers"), { withFileTypes: true })
+    .filter((w) => w.isDirectory())
+    .map((w) => join(ROOT, "workers", w.name, "src"))
+  return sourceFiles(srcDirs, { extensions: [".ts"], relativeTo: ROOT }).map((f) => [f.rel, f.source])
 }
 
-/** Every *.tsx under web/components (recursively). */
+/** Every *.tsx under web/components (recursively — the folder has subdirectories,
+ * and a component that moves into one must not fall out of the laws below). */
 function componentFiles(): string[] {
-  const out: string[] = []
-  const walk = (dir: string) => {
-    for (const e of readdirSync(dir, { withFileTypes: true })) {
-      const p = join(dir, e.name)
-      if (e.isDirectory()) walk(p)
-      else if (e.name.endsWith(".tsx")) out.push(p)
-    }
-  }
-  walk(join(WEB, "components"))
-  return out
+  return sourceFiles(join(WEB, "components"), { extensions: [".tsx"] }).map((f) => f.path)
 }
 
 describe("RULES — the laws of the base", () => {
@@ -256,32 +233,20 @@ describe("RULES — the laws of the base", () => {
         .filter((e) => e.isDirectory())
         .map((e) => join(ROOT, "workers", e.name, "src")),
     ]
-    const tsFiles = (dir: string): string[] => {
-      const out: string[] = []
-      const walk = (d: string) => {
-        for (const e of readdirSync(d, { withFileTypes: true })) {
-          const p = join(d, e.name)
-          if (e.isDirectory()) walk(p)
-          else if (e.name.endsWith(".ts") && !e.name.endsWith(".test.ts")) out.push(p)
-        }
-      }
-      walk(dir)
-      return out
-    }
     const offenders: string[] = []
-    for (const dir of serverDirs) {
-      for (const file of tsFiles(dir)) {
-        const src = read(file)
-        // `await fetch(` = an awaited call to the GLOBAL fetch (an external socket).
-        // This excludes service bindings (`X.fetch`), the Worker `async fetch(` handler,
-        // and type annotations (`{ fetch(url…) }`) — all of which aren't external calls.
-        const re = /\bawait fetch\(/g
-        let m: RegExpExecArray | null
-        while ((m = re.exec(src))) {
-          const window = src.slice(m.index, m.index + 600)
-          if (!/signal:\s*AbortSignal\.timeout/.test(window))
-            offenders.push(`${file.slice(ROOT.length)} @${m.index}`)
-        }
+    for (const file of sourceFiles(serverDirs, {
+      extensions: [".ts"],
+      skipTests: true,
+      relativeTo: ROOT,
+    })) {
+      // `await fetch(` = an awaited call to the GLOBAL fetch (an external socket).
+      // This excludes service bindings (`X.fetch`), the Worker `async fetch(` handler,
+      // and type annotations (`{ fetch(url…) }`) — all of which aren't external calls.
+      const re = /\bawait fetch\(/g
+      let m: RegExpExecArray | null
+      while ((m = re.exec(file.source))) {
+        const window = file.source.slice(m.index, m.index + 600)
+        if (!/signal:\s*AbortSignal\.timeout/.test(window)) offenders.push(`${file.rel} @${m.index}`)
       }
     }
     expect(offenders, `external fetch without an AbortSignal timeout (R11): ${offenders.join(", ")}`).toEqual([])
@@ -721,8 +686,7 @@ describe("RULES — the laws of the base", () => {
       // requireAnyImportRight), and a walk that stopped at exported names would
       // read those doors as ungated and unrefused.
       const fns = new Map<string, string>()
-      for (const file of readdirSync(dir).filter((f) => f.endsWith(".ts"))) {
-        const code = read(join(dir, file))
+      for (const { source: code } of sourceFiles(dir, { extensions: [".ts"] })) {
         const starts = [...code.matchAll(/(?:export\s+)?(?:async\s+)?function\s+(\w+)/g)]
         starts.forEach((m, i) => fns.set(m[1], code.slice(m.index, starts[i + 1]?.index ?? code.length)))
       }

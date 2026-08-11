@@ -25,6 +25,12 @@ import { describe, expect, it } from "vitest"
 import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 
+// JSONC → JSON, so JSON.parse gets the config rather than a fragment. It is NOT
+// the seam scans' stripComments and is named apart on purpose: that one is a
+// lossy TypeScript stripper for regex scanning, this one must keep every string
+// byte-exact. shared/rules/source-scan.ts holds both and says why.
+import { stripJsoncComments } from "@shared/rules/source-scan"
+
 const ROOT = join(__dirname, "..", "..", "..")
 
 /** The two front doors. Everything else is reachable only by service binding. */
@@ -44,48 +50,10 @@ const WORKERS = readdirSync(join(ROOT, "workers"))
   })
   .sort()
 
-/** Strip JSONC comments WITHOUT eating a `//` that lives inside a string — a var
- * holding "https://..." would otherwise silently truncate the rest of the file and
- * leave this suite parsing a fragment. Scans character by character, tracking quote
- * and escape state, which is the only way to be sure. */
-function stripComments(src: string): string {
-  let out = ""
-  let inString = false
-  let escaped = false
-  for (let i = 0; i < src.length; i++) {
-    const c = src[i]
-    if (inString) {
-      out += c
-      if (escaped) escaped = false
-      else if (c === "\\") escaped = true
-      else if (c === '"') inString = false
-      continue
-    }
-    if (c === '"') {
-      inString = true
-      out += c
-      continue
-    }
-    if (c === "/" && src[i + 1] === "/") {
-      while (i < src.length && src[i] !== "\n") i++
-      out += "\n"
-      continue
-    }
-    if (c === "/" && src[i + 1] === "*") {
-      i += 2
-      while (i < src.length && !(src[i] === "*" && src[i + 1] === "/")) i++
-      i++
-      continue
-    }
-    out += c
-  }
-  return out
-}
-
 type Block = Record<string, unknown>
 
 const configOf = (w: string): Block =>
-  JSON.parse(stripComments(readFileSync(join(ROOT, "workers", w, "wrangler.jsonc"), "utf8")))
+  JSON.parse(stripJsoncComments(readFileSync(join(ROOT, "workers", w, "wrangler.jsonc"), "utf8")))
 
 /** Every DEPLOYABLE environment in one config: the top level IS production, and
  * each key under `env` is another. A setting must be stated in each — they do not

@@ -10,28 +10,24 @@
 // So every numeric env var goes through ONE parse, and this file both tests that
 // parse at the boundaries and scans the workers so the raw spellings can't return.
 
-import { readdirSync, readFileSync } from "node:fs"
+import { readdirSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
+import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 import { numberVar } from "@shared/workers/limits"
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..")
 
 function serverSources(): [string, string][] {
-  const out: [string, string][] = []
-  const walk = (d: string) => {
-    for (const e of readdirSync(d, { withFileTypes: true })) {
-      const p = join(d, e.name)
-      if (e.isDirectory()) walk(p)
-      else if (e.name.endsWith(".ts")) out.push([p.slice(ROOT.length), readFileSync(p, "utf8")])
-    }
-  }
-  walk(join(ROOT, "shared", "workers"))
-  for (const w of readdirSync(join(ROOT, "workers"), { withFileTypes: true }))
-    if (w.isDirectory()) walk(join(ROOT, "workers", w.name, "src"))
-  return out
+  const dirs = [
+    join(ROOT, "shared", "workers"),
+    ...readdirSync(join(ROOT, "workers"), { withFileTypes: true })
+      .filter((w) => w.isDirectory())
+      .map((w) => join(ROOT, "workers", w.name, "src")),
+  ]
+  return sourceFiles(dirs, { extensions: [".ts"], relativeTo: ROOT }).map((f) => [f.rel, f.source])
 }
 
 describe("numeric env vars parse at the boundaries", () => {
@@ -60,7 +56,7 @@ describe("numeric env vars parse at the boundaries", () => {
   it("no worker reads a numeric env var without the one parse", () => {
     const offenders: string[] = []
     for (const [path, src] of serverSources()) {
-      const code = src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/gm, "$1")
+      const code = stripComments(src)
       for (const m of code.matchAll(/(?:Number|parseInt|parseFloat)\s*\(\s*env\.(\w+)/g))
         offenders.push(`${path} → ${m[0].trim()}… (use numberVar(env.${m[1]}, DEFAULT))`)
     }

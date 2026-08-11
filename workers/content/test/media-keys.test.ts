@@ -15,29 +15,21 @@
 //   3. the door refuses a key it would never have written (traversal probes and
 //      junk get the same 404 a miss gets).
 
-import { readFileSync, readdirSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
+import { sourceFiles } from "@shared/rules/source-scan"
 import { mediaKey, ownedMediaKey, safeMediaKey } from "@shared/workers/image"
 
 const ROOT = join(__dirname, "..", "..", "..")
 
 /** Every worker's src .ts file, as [repo-relative path, source]. */
 function workerSources(): [string, string][] {
-  const out: [string, string][] = []
-  const walk = (dir: string) => {
-    for (const name of readdirSync(dir)) {
-      const p = join(dir, name)
-      if (name.endsWith(".ts")) out.push([p.slice(ROOT.length + 1), readFileSync(p, "utf8")])
-      else if (!name.includes(".")) walk(p) // a directory
-    }
-  }
-  for (const w of readdirSync(join(ROOT, "workers"))) {
-    if (w.includes(".")) continue
-    walk(join(ROOT, "workers", w, "src"))
-  }
-  return out
+  const srcDirs = readdirSync(join(ROOT, "workers"), { withFileTypes: true })
+    .filter((w) => w.isDirectory())
+    .map((w) => join(ROOT, "workers", w.name, "src"))
+  return sourceFiles(srcDirs, { extensions: [".ts"], relativeTo: ROOT }).map((f) => [f.rel, f.source])
 }
 
 describe("mediaKey — an uploaded object's URL is a capability, not a guess", () => {

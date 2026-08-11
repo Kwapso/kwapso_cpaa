@@ -10,11 +10,12 @@
 // These lock both halves, plus the source-level rule that no screen may bind a
 // user-supplied URL to an attribute without going through the seam.
 
-import { readdirSync, readFileSync } from "node:fs"
+import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
+import { sourceFiles } from "@shared/rules/source-scan"
 import { richTextPlain, safeHref, safeSrc, sanitizeRichHtml } from "@/lib/rich-text"
 
 describe("sanitizeRichHtml", () => {
@@ -117,17 +118,9 @@ const WEB = join(HERE, "..")
 
 /** Every .tsx under web/ that renders (components + app routes). */
 function screenFiles(): string[] {
-  const out: string[] = []
-  const walk = (dir: string) => {
-    for (const e of readdirSync(dir, { withFileTypes: true })) {
-      const p = join(dir, e.name)
-      if (e.isDirectory()) walk(p)
-      else if (e.name.endsWith(".tsx")) out.push(p)
-    }
-  }
-  walk(join(WEB, "components"))
-  walk(join(WEB, "app"))
-  return out
+  return sourceFiles([join(WEB, "components"), join(WEB, "app")], { extensions: [".tsx"] }).map(
+    (f) => f.path
+  )
 }
 
 /** The `{...}` immediately after `at`, brace-balanced (JSX expressions nest). */

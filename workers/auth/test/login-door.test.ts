@@ -7,9 +7,11 @@
 //   3. The attempt cap is ATOMIC — the limit check and the increment are one
 //      statement, so concurrent guesses can't each read a stale count.
 
-import { readFileSync, readdirSync } from "node:fs"
+import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
+
+import { sourceFiles } from "@shared/rules/source-scan"
 
 const SRC = join(__dirname, "..", "src")
 const ROOT = join(__dirname, "..", "..", "..")
@@ -17,18 +19,8 @@ const index = readFileSync(join(SRC, "index.ts"), "utf8")
 const emailChange = readFileSync(join(SRC, "lib", "email-change.ts"), "utf8")
 const loginCodes = readFileSync(join(SRC, "lib", "login-codes.ts"), "utf8")
 
-function authSources(): string[] {
-  const out: string[] = []
-  const walk = (d: string) => {
-    for (const e of readdirSync(d, { withFileTypes: true })) {
-      const p = join(d, e.name)
-      if (e.isDirectory()) walk(p)
-      else if (e.name.endsWith(".ts")) out.push(readFileSync(p, "utf8"))
-    }
-  }
-  walk(SRC)
-  return out
-}
+const authSources = (): string[] =>
+  sourceFiles(SRC, { extensions: [".ts"] }).map((f) => f.source)
 
 describe("no login code ever leaves through anything but the inbox", () => {
   it("the echo path AND its config var are gone from the auth worker", () => {

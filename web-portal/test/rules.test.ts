@@ -18,21 +18,24 @@
 // header, that it gets deleted the day the library ships a replacement). The
 // last describe below is what keeps that door shut.
 
-import { readFileSync, readdirSync } from "node:fs"
+import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
 import { PORTAL_ACTIVITY_EXEMPT } from "@shared/rules/registry"
+import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 
 const PORTAL = join(__dirname, "..")
 const read = (p: string) => readFileSync(p, "utf8")
 
-/** Every component file in the portal. */
+/** Every component file in the portal — RECURSIVELY, through the same walker the
+ * agency app's laws use. This read one directory flat while web/test/rules.test.ts
+ * recursed, so the two suites said "every component" and meant different sets. The
+ * portal's folder is flat today, which is why nothing was red; the first component
+ * to move into a subdirectory would have dropped out of R3, R4, R7 and R16 in
+ * silence. */
 function componentFiles(): string[] {
-  const dir = join(PORTAL, "components")
-  return readdirSync(dir)
-    .filter((f) => f.endsWith(".tsx"))
-    .map((f) => join(dir, f))
+  return sourceFiles(join(PORTAL, "components"), { extensions: [".tsx"] }).map((f) => f.path)
 }
 
 /** Portal components that render a form (a submit handler + fields). */
@@ -175,10 +178,7 @@ describe("portal rules the agency app doesn't have", () => {
     const staffNaming = /\b(actorName|raiserName|creatorName|editorName|assigneeName|stakeholders)\b/
     const leaky: string[] = []
     for (const f of componentFiles()) {
-      const visible = read(f)
-        .replace(/\/\*[\s\S]*?\*\//g, "")
-        .replace(/^\s*\/\/.*$/gm, "")
-      if (staffNaming.test(visible)) leaky.push(f.split("/").pop() as string)
+      if (staffNaming.test(stripComments(read(f)))) leaky.push(f.split("/").pop() as string)
     }
     expect(leaky, "the portal shows work status, never which staff member is doing it").toEqual([])
 
@@ -204,10 +204,7 @@ describe("portal rules the agency app doesn't have", () => {
     for (const f of componentFiles()) {
       // Only the words a person sees: strip comments first, or the explanation of
       // the rule would break the rule.
-      const visible = read(f)
-        .replace(/\/\*[\s\S]*?\*\//g, "")
-        .replace(/^\s*\/\/.*$/gm, "")
-      if (banned.test(visible)) offenders.push(f.split("/").pop() as string)
+      if (banned.test(stripComments(read(f)))) offenders.push(f.split("/").pop() as string)
     }
     expect(offenders, "'account' is a company or a person we work for — never a login").toEqual([])
   })
@@ -227,22 +224,8 @@ describe("portal rules the agency app doesn't have", () => {
 // it reads the config AND the source, because removing the alias is only half of
 // it — a relative `../../web/lib/store` would compile just as happily.
 describe("the portal does not compile out of the agency app's tree", () => {
-  function portalFiles(): string[] {
-    const out: string[] = []
-    const walk = (p: string) => {
-      for (const entry of readdirSync(p, { withFileTypes: true } as never) as unknown as {
-        name: string
-        isDirectory: () => boolean
-      }[]) {
-        if (["node_modules", ".next", "out"].includes(entry.name)) continue
-        const full = join(p, entry.name)
-        if (entry.isDirectory()) walk(full)
-        else if (/\.(tsx?|mjs)$/.test(entry.name)) out.push(full)
-      }
-    }
-    walk(PORTAL)
-    return out
-  }
+  const portalFiles = (): string[] =>
+    sourceFiles(PORTAL, { extensions: [".ts", ".tsx", ".mjs"] }).map((f) => f.path)
 
   it("sees the portal's own source (guards the walk)", () => {
     expect(portalFiles().length).toBeGreaterThan(20)
