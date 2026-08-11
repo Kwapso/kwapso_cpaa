@@ -15,7 +15,6 @@ import { optionalText, queryText, requireText, TEXT_LIMITS } from "../../../../s
 import { publishChange } from "../../../../shared/workers/realtime"
 import { refusePortalCaller } from "../../../../shared/workers/account-scope"
 import { GuardError, hasRight, requireRight, teamContext } from "../../../../shared/workers/gating"
-import { refusePortalCaller } from "../../../../shared/workers/account-scope"
 import { getActiveCatalog } from "../lib/import"
 import {
   addBatchFile,
