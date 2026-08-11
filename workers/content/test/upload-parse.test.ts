@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest"
 
-import { parseUploadDataUrl } from "../../../shared/workers/image"
+import { parseUploadDataUrl } from "@shared/workers/image"
 
 const b64 = (s: string) => btoa(s)
 

@@ -14,7 +14,7 @@ const queries: string[] = []
  * (they are the generic read with the table supplied by the scope), so a check
  * that only reads SQL text could no longer see which record was asked for. */
 const bindings: unknown[][] = []
-vi.mock("../../../shared/workers/d1-rest", () => ({
+vi.mock("@shared/workers/d1-rest", () => ({
   d1Query: vi.fn(async (_cfg: unknown, _db: string, sql: string, params: unknown[] = []) => {
     queries.push(sql)
     bindings.push(params)

@@ -8,8 +8,8 @@ import {
   normalizeEmail,
   validateNewEmail,
 } from "../src/lib/email"
-import { ulid } from "../../../shared/workers/id"
-import { dataUrlBytes, MAX_IMAGE_BYTES, parseDataUrl } from "../../../shared/workers/image"
+import { ulid } from "@shared/workers/id"
+import { dataUrlBytes, MAX_IMAGE_BYTES, parseDataUrl } from "@shared/workers/image"
 
 describe("randomCode", () => {
   it("is always exactly 6 digits (zero-padded)", () => {

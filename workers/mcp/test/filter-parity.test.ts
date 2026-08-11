@@ -32,7 +32,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
-import { SHARED_TOOLS } from "../../../shared/workers/tool-catalog"
+import { SHARED_TOOLS } from "@shared/workers/tool-catalog"
 import { MCP_TOOLS } from "../src/lib/tools"
 import { TOOL_CATALOG } from "../../data-ops/src/lib/tools"
 

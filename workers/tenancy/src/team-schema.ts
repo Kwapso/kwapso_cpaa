@@ -3,15 +3,15 @@
 // Adding a future team-table = appending a migration here; the migration
 // runner (POST /api/tenancy/admin/migrate-teams) rolls it to every team.
 
-import { sqlString } from "../../../shared/workers/d1-rest"
-import { ulid } from "../../../shared/workers/id"
+import { sqlString } from "@shared/workers/d1-rest"
+import { ulid } from "@shared/workers/id"
 
 // The module list itself lives in shared/team-modules.ts — data-ops builds the
 // import/export permission-matrix columns from the SAME list, so the matrix a
 // role screen shows and the matrix a CSV carries can never drift apart.
 // Re-exported here so tenancy code keeps its one habitual import site.
-import { TEAM_MODULES } from "../../../shared/team-modules"
-export { TEAM_MODULES, TEAM_MODULE_CATALOG } from "../../../shared/team-modules"
+import { TEAM_MODULES } from "@shared/team-modules"
+export { TEAM_MODULES, TEAM_MODULE_CATALOG } from "@shared/team-modules"
 
 export const TEAM_MIGRATIONS: { version: string; sql: string }[] = [
   {

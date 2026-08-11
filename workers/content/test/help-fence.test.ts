@@ -21,14 +21,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const holder = vi.hoisted(() => ({ db: null as DatabaseSync | null }))
 
-vi.mock("../../../shared/workers/d1-rest", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../shared/workers/d1-rest")>()
+vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@shared/workers/d1-rest")>()
   const { d1Impl } = await import("../../tenancy/test/d1-sqlite")
   return { ...actual, ...d1Impl(() => holder.db as DatabaseSync) }
 })
 
 import worker from "../src/index"
-import { accountScope, mayHearChange, scopeStamp } from "../../../shared/workers/account-scope"
+import { accountScope, mayHearChange, scopeStamp } from "@shared/workers/account-scope"
 import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
 
 /** Ticket ids, so an assertion can name exactly what must not come back. The

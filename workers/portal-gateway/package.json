@@ -4,7 +4,7 @@
   "private": true,
   "description": "kwapso's CLIENT portal front door: serves the portal screens, forwards a named, closed set of /api doors to the shared workers.",
   "scripts": {
-    "test": "vitest run",
+    "test": "vitest run --config ../../vitest.workers.config.ts",
     "deploy:staging": "wrangler deploy --env staging",
     "deploy:production": "wrangler deploy"
   },

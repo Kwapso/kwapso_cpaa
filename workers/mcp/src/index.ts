@@ -23,10 +23,10 @@
 // see it), the same reviewed class as auth's session rows. Tool calls themselves
 // mutate nothing here — the REAL doors they forward to publish their own pings.
 
-import { fail, json } from "../../../shared/workers/http"
-import { GuardError, whoAmI } from "../../../shared/workers/gating"
-import { requireText, TEXT_LIMITS } from "../../../shared/workers/validate"
-import { recordWorkerError } from "../../../shared/workers/error-log"
+import { fail, json } from "@shared/workers/http"
+import { GuardError, whoAmI } from "@shared/workers/gating"
+import { requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { recordWorkerError } from "@shared/workers/error-log"
 import type { Env } from "./env"
 import { createToken, listTokens, revokeToken, verifyToken } from "./lib/tokens"
 import { dropCachedSession, sessionCookieFor } from "./lib/bridge"

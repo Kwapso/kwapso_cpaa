@@ -5,7 +5,7 @@
   "description": "kwapso's content worker: team-DB content modules (Learning, Help).",
   "scripts": {
     "dev": "wrangler dev --env staging --port 8789 --inspector-port 9232 --local --persist-to ../../.dev-state",
-    "test": "vitest run",
+    "test": "vitest run --config ../../vitest.workers.config.ts",
     "deploy:staging": "wrangler deploy --env staging",
     "deploy:production": "wrangler deploy"
   },

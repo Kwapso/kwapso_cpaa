@@ -16,8 +16,8 @@ import {
   mayHearChange,
   scopeStamp,
   type AccountScope,
-} from "../../../shared/workers/account-scope"
-import { publishChange } from "../../../shared/workers/realtime"
+} from "@shared/workers/account-scope"
+import { publishChange } from "@shared/workers/realtime"
 
 /** A client login standing in Bergman, whose fence reaches its subsidiary. */
 const portal: AccountScope = {

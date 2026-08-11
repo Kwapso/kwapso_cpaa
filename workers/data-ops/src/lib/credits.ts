@@ -5,10 +5,10 @@
 // the global core DB (agent_usage = the daily-free counter; agent_credits = the
 // balance) so it works without opening a team database.
 
-import type { AgentQuota, UsageLogRow } from "../../../../shared/types"
-import type { Actor } from "../../../../shared/workers/gating"
-import { ulid } from "../../../../shared/workers/id"
-import { numberVar } from "../../../../shared/workers/limits"
+import type { AgentQuota, UsageLogRow } from "@shared/types"
+import type { Actor } from "@shared/workers/gating"
+import { ulid } from "@shared/workers/id"
+import { numberVar } from "@shared/workers/limits"
 import type { Env } from "../env"
 
 /** Free AI requests per team per day before credits are spent. */

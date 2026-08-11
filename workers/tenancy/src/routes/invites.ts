@@ -1,8 +1,8 @@
 // Invite routes: list the team's invites, invite by email + role, revoke a
 // pending invite. Guards + the branded email live in lib/invites.
 
-import { fail, json } from "../../../../shared/workers/http"
-import { publishChange } from "../../../../shared/workers/realtime"
+import { fail, json } from "@shared/workers/http"
+import { publishChange } from "@shared/workers/realtime"
 import {
   createInvite,
   getInviteAudit as readInviteAudit,
@@ -11,8 +11,8 @@ import {
   countInvites,
 } from "../lib/invites"
 import { acceptInvite, listReceivedInvites } from "../lib/teams"
-import { gated, gatedBody } from "../../../../shared/workers/route"
-import { queryText } from "../../../../shared/workers/validate"
+import { gated, gatedBody } from "@shared/workers/route"
+import { queryText } from "@shared/workers/validate"
 import { toActor, whoAmI } from "../context"
 import type { Env } from "../env"
 

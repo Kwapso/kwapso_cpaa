@@ -6,7 +6,7 @@
 // cached per isolate (~10 min) to avoid a session INSERT per call; the token
 // itself is re-verified on EVERY request, so revocation bites immediately.
 
-import { GuardError } from "../../../../shared/workers/gating"
+import { GuardError } from "@shared/workers/gating"
 import type { Env } from "../env"
 import { requireStaff } from "./staff"
 import type { McpTokenRow } from "./tokens"

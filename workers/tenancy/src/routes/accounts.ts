@@ -11,15 +11,15 @@
 // to. Neither substitutes for the other: a client-side person can hold every
 // right on the matrix and still reach exactly one account's data.
 
-import { fail, json, pagedJson } from "../../../../shared/workers/http"
-import { csvResponse, toCsv } from "../../../../shared/workers/csv"
-import { optionalText, queryText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
-import { publishChange } from "../../../../shared/workers/realtime"
-import { gated, gatedBody, openTeam } from "../../../../shared/workers/route"
-import { accountScope, type AccountScope } from "../../../../shared/workers/account-scope"
-import { GuardError, teamContext, whoAmI, type MemberGuard } from "../../../../shared/workers/gating"
-import type { D1Rest } from "../../../../shared/workers/d1-rest"
-import type { PortalUser } from "../../../../shared/types"
+import { fail, json, pagedJson } from "@shared/workers/http"
+import { csvResponse, toCsv } from "@shared/workers/csv"
+import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { publishChange } from "@shared/workers/realtime"
+import { gated, gatedBody, openTeam } from "@shared/workers/route"
+import { accountScope, type AccountScope } from "@shared/workers/account-scope"
+import { GuardError, teamContext, whoAmI, type MemberGuard } from "@shared/workers/gating"
+import type { D1Rest } from "@shared/workers/d1-rest"
+import type { PortalUser } from "@shared/types"
 import {
   createAccount,
   getAccount,

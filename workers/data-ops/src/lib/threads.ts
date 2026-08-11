@@ -4,11 +4,11 @@
 // This is also the agent audit log: human turns are role "user"; agent output is
 // "assistant"/"tool"; `source` tags where the request came from.
 
-import { d1ExecScript, d1Query, sqlString, type D1Rest } from "../../../../shared/workers/d1-rest"
-import { ulid } from "../../../../shared/workers/id"
-import { GuardError, type MemberGuard } from "../../../../shared/workers/gating"
-import type { AgentMessage, AgentThread } from "../../../../shared/types"
-import { LIST_HARD_CAP, THREAD_HARD_CAP } from "../../../../shared/workers/limits"
+import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
+import { ulid } from "@shared/workers/id"
+import { GuardError, type MemberGuard } from "@shared/workers/gating"
+import type { AgentMessage, AgentThread } from "@shared/types"
+import { LIST_HARD_CAP, THREAD_HARD_CAP } from "@shared/workers/limits"
 
 type ThreadRow = { id: string; title: string | null; last_message_at: string | null; created_at: string }
 type MsgRow = {

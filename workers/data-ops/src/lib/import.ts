@@ -9,10 +9,10 @@
 //     act-as-user (the caller's cookie is forwarded), so every imported row respects the
 //     caller's permissions and the module's validation exactly like a typed-in one.
 
-import { ulid } from "../../../../shared/workers/id"
-import { type Actor } from "../../../../shared/workers/gating"
+import { ulid } from "@shared/workers/id"
+import { type Actor } from "@shared/workers/gating"
 import type { Env } from "../env"
-import type { ImportColumn } from "../../../../shared/types"
+import type { ImportColumn } from "@shared/types"
 import { TARGETS, type TargetDef } from "./targets"
 
 export type CatalogTarget = {

@@ -7,19 +7,19 @@
 //     'Learning category' selectable value gets added as one (Base v3 behaviour);
 //   • per-user progress is an explicit, reversible "mark as done" upsert.
 
-import { describeChanges, logActivity, type Actor } from "../../../../shared/workers/activity"
+import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
 import {
   d1ExecScript,
   d1Query,
   sqlString,
   type D1Rest,
-} from "../../../../shared/workers/d1-rest"
-import { ulid } from "../../../../shared/workers/id"
-import type { Learning, LearningProgressEntry } from "../../../../shared/types"
-import { GuardError, type MemberGuard } from "../../../../shared/workers/gating"
-import { optionalText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
-import { EXPORT_HARD_CAP, LIST_HARD_CAP } from "../../../../shared/workers/limits"
-import { ownedMediaKey, reclaimMedia } from "../../../../shared/workers/image"
+} from "@shared/workers/d1-rest"
+import { ulid } from "@shared/workers/id"
+import type { Learning, LearningProgressEntry } from "@shared/types"
+import { GuardError, type MemberGuard } from "@shared/workers/gating"
+import { optionalText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { EXPORT_HARD_CAP, LIST_HARD_CAP } from "@shared/workers/limits"
+import { ownedMediaKey, reclaimMedia } from "@shared/workers/image"
 import type { Env } from "../env"
 
 /** The dropdown `type` a learning item's category is stored under. */

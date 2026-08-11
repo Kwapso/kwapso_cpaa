@@ -8,7 +8,7 @@
 // deterministic fallback planner. One model call per batch (bounded cost).
 
 import type { Env } from "../env"
-import type { ImportPlan, ImportPlanStep, TransformKey } from "../../../../shared/types"
+import type { ImportPlan, ImportPlanStep, TransformKey } from "@shared/types"
 import { selectModel, type ChatMessage } from "./model"
 import { TARGETS, targetFor } from "./targets"
 import {

@@ -4,7 +4,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 // Mock ONLY the network functions of the data door; keep sqlString/sqlValue real.
-vi.mock("../../../shared/workers/d1-rest", async (importOriginal) => {
+vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
   const actual = await importOriginal<object>()
   return {
     ...actual,
@@ -19,14 +19,14 @@ import {
   d1CreateDatabase,
   d1DeleteDatabase,
   d1ExecScript,
-} from "../../../shared/workers/d1-rest"
+} from "@shared/workers/d1-rest"
 import {
   acceptPendingInvites,
   createTeam,
   listMyTeams,
   updateTeamDetails,
 } from "../src/lib/teams"
-import { INVITE_SWEEP_CAP } from "../../../shared/workers/limits"
+import { INVITE_SWEEP_CAP } from "@shared/workers/limits"
 import type { Env } from "../src/env"
 
 const ACTOR = { id: "01USER", email: "chris@x.com", name: "Chris Martin" }

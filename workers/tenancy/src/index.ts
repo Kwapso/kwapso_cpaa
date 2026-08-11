@@ -53,9 +53,9 @@
 //   GET  /api/tenancy/health
 //   cron (nightly)                         -> the 80% size alarms
 
-import { brand } from "../../../shared/brand"
-import { fail, json } from "../../../shared/workers/http"
-import { recordWorkerError } from "../../../shared/workers/error-log"
+import { brand } from "@shared/brand"
+import { fail, json } from "@shared/workers/http"
+import { recordWorkerError } from "@shared/workers/error-log"
 import { GuardError } from "./lib/permissions"
 import { checkDatabaseSizes } from "./lib/sharding"
 import { d1Config } from "./lib/teams"

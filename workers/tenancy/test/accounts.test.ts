@@ -8,14 +8,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const holder = vi.hoisted(() => ({ db: null as DatabaseSync | null }))
 
-vi.mock("../../../shared/workers/d1-rest", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../shared/workers/d1-rest")>()
+vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@shared/workers/d1-rest")>()
   const { d1Impl } = await import("./d1-sqlite")
   return { ...actual, ...d1Impl(() => holder.db as DatabaseSync) }
 })
 
-import { accountScope } from "../../../shared/workers/account-scope"
-import { MAX_ACCOUNT_DEPTH } from "../../../shared/workers/limits"
+import { accountScope } from "@shared/workers/account-scope"
+import { MAX_ACCOUNT_DEPTH } from "@shared/workers/limits"
 import {
   countAccountLinks,
   createAccount,

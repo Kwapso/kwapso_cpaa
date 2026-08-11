@@ -8,20 +8,20 @@
 // a canned "something went wrong"; a step cap prevents runaways; every turn is saved
 // with each step's outcome (the audit trail the panel rehydrates from).
 
-import type { AgentQuota, ChatOutcome, PendingCall, StreamEvent } from "../../../../shared/types"
-import { pendingCall } from "../../../../shared/workers/confirm-payload"
+import type { AgentQuota, ChatOutcome, PendingCall, StreamEvent } from "@shared/types"
+import { pendingCall } from "@shared/workers/confirm-payload"
 import { capabilityBrief } from "./app-brief"
-import { GLOSSARY } from "../../../../shared/glossary"
+import { GLOSSARY } from "@shared/glossary"
 import { consumeAiUnit, foldUsageIntoLatest, getQuota, logUsage, refundAiUnits, type ConsumeResult, type UsageSource } from "./credits"
-import type { Actor, MemberGuard } from "../../../../shared/workers/gating"
-import type { D1Rest } from "../../../../shared/workers/d1-rest"
+import type { Actor, MemberGuard } from "@shared/workers/gating"
+import type { D1Rest } from "@shared/workers/d1-rest"
 import type { Env } from "../env"
 import { selectModel, type ChatMessage, type Model, type ModelReply, type ToolCall, type ToolSpec } from "./model"
 import { executeTool, getTool, requiresConfirm, toolSpecs, type ToolResult } from "./tools"
 import { appendMessage, consumePendingProposal, createThread, getPendingProposal, listMessages, requireOwnThread } from "./threads"
 import { addBatchFile, createBatch, planBatch } from "./import-batch"
-import { GuardError } from "../../../../shared/workers/gating"
-import { recordWorkerError } from "../../../../shared/workers/error-log"
+import { GuardError } from "@shared/workers/gating"
+import { recordWorkerError } from "@shared/workers/error-log"
 
 const MAX_STEPS = 12
 

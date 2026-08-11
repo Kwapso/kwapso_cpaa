@@ -1,15 +1,15 @@
 // Team + session routes: onboarding bootstrap, the active context, the team
 // switcher, creating a team, editing it, the Overview metadata + Activity feed.
 
-import { fail, json, pagedJson } from "../../../../shared/workers/http"
-import { queryText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
-import { publishChange } from "../../../../shared/workers/realtime"
-import { logActivity } from "../../../../shared/workers/activity"
+import { fail, json, pagedJson } from "@shared/workers/http"
+import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { publishChange } from "@shared/workers/realtime"
+import { logActivity } from "@shared/workers/activity"
 import { getActivity } from "../lib/activity-read"
 import { getMyPermissions } from "../lib/roles"
-import { ACTIVITY_GATE_MAP, ACTIVITY_TABLE_EXEMPT } from "../../../../shared/rules/registry"
+import { ACTIVITY_GATE_MAP, ACTIVITY_TABLE_EXEMPT } from "@shared/rules/registry"
 import { GuardError, requireMember, requireRight, type MemberGuard } from "../lib/permissions"
-import type { D1Rest } from "../../../../shared/workers/d1-rest"
+import type { D1Rest } from "@shared/workers/d1-rest"
 import {
   acceptPendingInvites,
   createTeam,
@@ -20,10 +20,10 @@ import {
   switchTeam,
   updateTeamDetails,
 } from "../lib/teams"
-import { MAX_TEAMS_PER_USER, numberVar } from "../../../../shared/workers/limits"
-import { TEAM_CREATION_CLOSED } from "../../../../shared/product"
-import { accountScope, refusePortalCaller } from "../../../../shared/workers/account-scope"
-import { gatedBody } from "../../../../shared/workers/route"
+import { MAX_TEAMS_PER_USER, numberVar } from "@shared/workers/limits"
+import { TEAM_CREATION_CLOSED } from "@shared/product"
+import { accountScope, refusePortalCaller } from "@shared/workers/account-scope"
+import { gatedBody } from "@shared/workers/route"
 import { teamContext, toActor, whoAmI } from "../context"
 import type { Env } from "../env"
 

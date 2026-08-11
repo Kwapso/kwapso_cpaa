@@ -7,8 +7,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 // hoisted so the mock factory (which vitest lifts to the top) can see it.
 const { d1Query } = vi.hoisted(() => ({ d1Query: vi.fn() }))
-vi.mock("../../../shared/workers/d1-rest", () => ({ d1Query }))
-vi.mock("../../../shared/workers/activity", () => ({
+vi.mock("@shared/workers/d1-rest", () => ({ d1Query }))
+vi.mock("@shared/workers/activity", () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
 

@@ -4,7 +4,7 @@
 
 import { join } from "node:path"
 
-import { gatingSeam } from "../../../shared/rules/seam-scan"
+import { gatingSeam } from "@shared/rules/seam-scan"
 import { ROUTES } from "../src/index"
 
 /** The IDENTITY-gated writes: they can't ask "does your ROLE allow this?"

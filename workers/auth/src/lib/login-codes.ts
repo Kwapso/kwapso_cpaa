@@ -7,7 +7,7 @@
 // WHY it exists: login codes must never appear anywhere but the user's inbox —
 // the old staging echo (code in the API response + a toast) was deleted outright, and automated tests now sign in through the admin door instead.
 
-import { ulid } from "../../../../shared/workers/id"
+import { ulid } from "@shared/workers/id"
 import type { Env } from "../env"
 import {
   CODE_TTL_MINUTES,

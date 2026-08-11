@@ -1,6 +1,6 @@
 import type { Env } from "../env"
 import { randomToken, sha256Hex } from "./crypto"
-import { ulid } from "../../../../shared/workers/id"
+import { ulid } from "@shared/workers/id"
 import type { UserRow } from "./users"
 
 export const SESSION_COOKIE = "kwapso_session"

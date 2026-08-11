@@ -7,9 +7,9 @@ import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
-import { GuardError } from "../../../shared/workers/gating"
-import { MENTIONS_LIMIT } from "../../../shared/workers/limits"
-import { optionalText, queryText, requireText, TEXT_LIMITS } from "../../../shared/workers/validate"
+import { GuardError } from "@shared/workers/gating"
+import { MENTIONS_LIMIT } from "@shared/workers/limits"
+import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 
 const NUL = String.fromCharCode(0)
 

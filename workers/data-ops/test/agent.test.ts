@@ -12,7 +12,7 @@
 import { describe, expect, it } from "vitest"
 
 import { getTool, requiresConfirm, toolSpecs, TOOL_CATALOG } from "../src/lib/tools"
-import { isPrivilegeWrite, TOOL_GATES } from "../../../shared/workers/tool-catalog"
+import { isPrivilegeWrite, TOOL_GATES } from "@shared/workers/tool-catalog"
 
 describe("step/confirm summaries resolve ids to human names", () => {
   const names = { "01ROLE": "Sub Admin", "01USER": "Jane Doe" }

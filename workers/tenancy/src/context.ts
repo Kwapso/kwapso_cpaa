@@ -8,4 +8,4 @@ export {
   teamContext,
   adminGuard,
   type TeamCtx,
-} from "../../../shared/workers/gating"
+} from "@shared/workers/gating"

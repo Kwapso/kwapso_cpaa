@@ -4,13 +4,13 @@
 // own database. All guard rules (>=1 admin, no self-lockout, remove =
 // deactivate) live here.
 
-import type { TeamMember, TeamRole } from "../../../../shared/types"
-import { logActivity, type Actor } from "../../../../shared/workers/activity"
-import { d1Query, type D1Rest } from "../../../../shared/workers/d1-rest"
+import type { TeamMember, TeamRole } from "@shared/types"
+import { logActivity, type Actor } from "@shared/workers/activity"
+import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
 import type { Env } from "../env"
 import { GuardError, type MemberGuard } from "./permissions"
 import { notifyRemoved, notifyRoleChanged } from "./notify"
-import { LIST_HARD_CAP } from "../../../../shared/workers/limits"
+import { LIST_HARD_CAP } from "@shared/workers/limits"
 
 type RoleRow = {
   id: string

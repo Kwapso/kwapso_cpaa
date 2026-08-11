@@ -9,8 +9,8 @@
 // own errors. Mentions are notify-only: all tickets are team-visible anyway, so a
 // mention grants no access (locked decision), it just pings.
 
-import { brand } from "../../../../shared/brand"
-import { sendBrandedEmail as send, teamName } from "../../../../shared/workers/notify"
+import { brand } from "@shared/brand"
+import { sendBrandedEmail as send, teamName } from "@shared/workers/notify"
 import type { Env } from "../env"
 
 /** Look up email + display name for tagged ids — restricted to ACTIVE members of

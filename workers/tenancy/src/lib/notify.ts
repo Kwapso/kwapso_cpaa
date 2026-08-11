@@ -8,8 +8,8 @@
 // triggered it, so each helper swallows its own errors (the action already
 // happened and is logged in activity).
 
-import { brand } from "../../../../shared/brand"
-import { sendBrandedEmail as send, teamName } from "../../../../shared/workers/notify"
+import { brand } from "@shared/brand"
+import { sendBrandedEmail as send, teamName } from "@shared/workers/notify"
 import type { Env } from "../env"
 
 /** A member's role was changed by someone else. */

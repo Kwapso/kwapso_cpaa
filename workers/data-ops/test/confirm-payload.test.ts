@@ -19,8 +19,8 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
-import { describePayload, fieldLabel, pendingCall } from "../../../shared/workers/confirm-payload"
-import { TEAM_MODULE_CATALOG } from "../../../shared/team-modules"
+import { describePayload, fieldLabel, pendingCall } from "@shared/workers/confirm-payload"
+import { TEAM_MODULE_CATALOG } from "@shared/team-modules"
 import { getTool, requiresConfirm, TOOL_CATALOG, type AgentTool } from "../src/lib/tools"
 
 /** A sample input for a tool, built from the tool's OWN schema — so the coverage
@@ -206,6 +206,6 @@ describe("the agent loop builds its proposals through that one seam", () => {
 
   it("needsConfirm comes from pendingCall(), not a hand-rolled summary", () => {
     expect(agentSrc).toMatch(/needsConfirm:[^\n]*pendingCall\(/)
-    expect(agentSrc).toContain('from "../../../../shared/workers/confirm-payload"')
+    expect(agentSrc).toContain('from "@shared/workers/confirm-payload"')
   })
 })

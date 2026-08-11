@@ -48,7 +48,7 @@ describe("error seam: the roster is the fleet on disk", () => {
   for (const w of FLEET.filter((f) => f.bindsCoreDb)) {
     it(`${w.name} binds the core database, so it records crashes centrally`, () => {
       expect(w.src, `${w.name} must import the seam`).toMatch(
-        /from "\.\.\/\.\.\/\.\.\/shared\/workers\/error-log"/
+        /from "@shared\/workers\/error-log"/
       )
       expect(w.src, `${w.name} must record in its catch`).toMatch(/recordWorkerError\(env\.DB/)
     })

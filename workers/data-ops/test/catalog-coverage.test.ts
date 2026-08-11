@@ -13,8 +13,8 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
-import { CATALOG_EXEMPT } from "../../../shared/rules/registry"
-import { TEAM_MODULES } from "../../../shared/team-modules"
+import { CATALOG_EXEMPT } from "@shared/rules/registry"
+import { TEAM_MODULES } from "@shared/team-modules"
 import { TARGETS } from "../src/lib/targets"
 
 const importSrc = readFileSync(join(__dirname, "..", "src", "lib", "import.ts"), "utf8")

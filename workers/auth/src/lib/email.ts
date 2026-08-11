@@ -1,5 +1,5 @@
-import { brand } from "../../../../shared/brand"
-import { brandedEmail } from "../../../../shared/workers/email-template"
+import { brand } from "@shared/brand"
+import { brandedEmail } from "@shared/workers/email-template"
 import type { Env } from "../env"
 
 // Same rule as the old Glide email transformer: trim, then lowercase.

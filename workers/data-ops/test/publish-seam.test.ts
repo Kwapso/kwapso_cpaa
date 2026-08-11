@@ -7,7 +7,7 @@
 
 import { join } from "node:path"
 
-import { publishSeam } from "../../../shared/rules/seam-scan"
+import { publishSeam } from "@shared/rules/seam-scan"
 import { ROUTES } from "../src/index"
 
 /** The ONLY writes allowed to broadcast nothing — a conscious, reviewed

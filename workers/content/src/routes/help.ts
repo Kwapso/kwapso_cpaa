@@ -6,12 +6,12 @@
 // Locked module rules live in lib/help; the reply notify (raiser + @mentions) is
 // best-effort in lib/notify.
 
-import { fail, json, pagedJson } from "../../../../shared/workers/http"
-import { optionalText, queryText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
-import { MENTIONS_LIMIT } from "../../../../shared/workers/limits"
-import { publishChange } from "../../../../shared/workers/realtime"
-import { accountScope, refusePortalCaller, type AccountScope } from "../../../../shared/workers/account-scope"
-import { gated, gatedBody } from "../../../../shared/workers/route"
+import { fail, json, pagedJson } from "@shared/workers/http"
+import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { MENTIONS_LIMIT } from "@shared/workers/limits"
+import { publishChange } from "@shared/workers/realtime"
+import { accountScope, refusePortalCaller, type AccountScope } from "@shared/workers/account-scope"
+import { gated, gatedBody } from "@shared/workers/route"
 import { requireIdList } from "../lib/bulk"
 import {
   addReply,

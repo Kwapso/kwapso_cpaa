@@ -10,10 +10,10 @@
 //   POST /api/auth/logout                                -> forget me
 //   GET  /api/auth/health                                -> is this worker alive?
 
-import { fail, json } from "../../../shared/workers/http"
-import { GuardError } from "../../../shared/workers/gating"
-import { optionalText, requireText, TEXT_LIMITS } from "../../../shared/workers/validate"
-import { logError, recordWorkerError } from "../../../shared/workers/error-log"
+import { fail, json } from "@shared/workers/http"
+import { GuardError } from "@shared/workers/gating"
+import { optionalText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { logError, recordWorkerError } from "@shared/workers/error-log"
 import type { Env } from "./env"
 import { sha256Hex } from "./lib/crypto"
 import { isValidEmail, normalizeEmail, sendEmail, sendLoginCode } from "./lib/email"

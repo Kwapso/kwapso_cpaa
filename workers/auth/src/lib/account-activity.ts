@@ -5,9 +5,9 @@
 // + logs its own failures so a logging hiccup can never break the change it
 // describes. The actor is always the user themselves, so there's no Actor arg.
 
-import type { ActivityItem } from "../../../../shared/types"
-import { ulid } from "../../../../shared/workers/id"
-import { publishUserChange } from "../../../../shared/workers/realtime"
+import type { ActivityItem } from "@shared/types"
+import { ulid } from "@shared/workers/id"
+import { publishUserChange } from "@shared/workers/realtime"
 import type { Env } from "../env"
 
 export type AccountEvent = { type: string; description: string }

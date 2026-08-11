@@ -2,8 +2,8 @@
 // our own mistakes (4xx), surfaces clean errors.
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-import { d1ListDatabases, d1Query } from "../../../shared/workers/d1-rest"
-import { D1_LIST_PAGE_CAP } from "../../../shared/workers/limits"
+import { d1ListDatabases, d1Query } from "@shared/workers/d1-rest"
+import { D1_LIST_PAGE_CAP } from "@shared/workers/limits"
 
 const CFG = { accountId: "acct", apiToken: "tok" }
 

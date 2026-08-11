@@ -6,8 +6,8 @@
 
 import { describe, expect, it } from "vitest"
 
-import { GuardError } from "../../../shared/workers/gating"
-import { decodeCursor, encodeCursor, keysetAfter, PAGE_SIZE, toPage } from "../../../shared/workers/paging"
+import { GuardError } from "@shared/workers/gating"
+import { decodeCursor, encodeCursor, keysetAfter, PAGE_SIZE, toPage } from "@shared/workers/paging"
 
 describe("keyset paging (R14)", () => {
   it("a cursor round-trips through the query string untouched", () => {

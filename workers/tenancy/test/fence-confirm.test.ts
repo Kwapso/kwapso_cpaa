@@ -24,9 +24,9 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
-import { indexFunctions, stripComments } from "../../../shared/rules/seam-scan"
-import { FENCE_INPUTS } from "../../../shared/workers/account-scope"
-import { isPrivilegeWrite, SHARED_TOOLS } from "../../../shared/workers/tool-catalog"
+import { indexFunctions, stripComments } from "@shared/rules/seam-scan"
+import { FENCE_INPUTS } from "@shared/workers/account-scope"
+import { isPrivilegeWrite, SHARED_TOOLS } from "@shared/workers/tool-catalog"
 import { ROUTES } from "../src/index"
 
 const SHARED = join(__dirname, "..", "..", "..", "shared", "workers")

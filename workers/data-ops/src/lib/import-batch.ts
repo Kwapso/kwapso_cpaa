@@ -5,12 +5,12 @@
 // creator-scoping as data_import_sessions. The batch table is JSON columns; the
 // smarts are in import-plan (pure) + import-agent (model).
 
-import { logActivity } from "../../../../shared/workers/activity"
-import { d1ExecScript, d1Query, sqlString, type D1Rest } from "../../../../shared/workers/d1-rest"
-import { ulid } from "../../../../shared/workers/id"
-import { GuardError, type Actor, type MemberGuard } from "../../../../shared/workers/gating"
+import { logActivity } from "@shared/workers/activity"
+import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
+import { ulid } from "@shared/workers/id"
+import { GuardError, type Actor, type MemberGuard } from "@shared/workers/gating"
 import type { Env } from "../env"
-import type { ImportBatchReport, ImportBatchSummary, ImportBatchView, ImportPlan, ImportRejection } from "../../../../shared/types"
+import type { ImportBatchReport, ImportBatchSummary, ImportBatchView, ImportPlan, ImportRejection } from "@shared/types"
 import { parseCsv } from "./csv"
 import { norm, TARGETS, type TargetDef } from "./targets"
 import { resolveRow, scanRows } from "./import-plan"

@@ -12,7 +12,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-vi.mock("../../../shared/workers/d1-rest", async (importOriginal) => {
+vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
   const actual = await importOriginal<object>()
   return {
     ...actual,
@@ -21,9 +21,9 @@ vi.mock("../../../shared/workers/d1-rest", async (importOriginal) => {
   }
 })
 
-import { d1Query, type D1Rest } from "../../../shared/workers/d1-rest"
+import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
 import { updateLearning } from "../src/lib/learning"
-import type { MemberGuard } from "../../../shared/workers/gating"
+import type { MemberGuard } from "@shared/workers/gating"
 import type { Env } from "../src/env"
 
 const CFG = { accountId: "acct", token: "tok" } as unknown as D1Rest

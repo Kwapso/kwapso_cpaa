@@ -10,11 +10,11 @@
 // doors sat there gated and audited and unreachable. Two ways to import was one more than
 // the app has; the surviving one is the one that can read several files at once.
 
-import { fail, json } from "../../../../shared/workers/http"
-import { optionalText, queryText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
-import { publishChange } from "../../../../shared/workers/realtime"
-import { refusePortalCaller } from "../../../../shared/workers/account-scope"
-import { GuardError, hasRight, requireRight, teamContext } from "../../../../shared/workers/gating"
+import { fail, json } from "@shared/workers/http"
+import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { publishChange } from "@shared/workers/realtime"
+import { refusePortalCaller } from "@shared/workers/account-scope"
+import { GuardError, hasRight, requireRight, teamContext } from "@shared/workers/gating"
 import { getActiveCatalog } from "../lib/import"
 import {
   addBatchFile,
@@ -27,9 +27,9 @@ import {
 } from "../lib/import-batch"
 import { consumeAiUnit } from "../lib/credits"
 import { sampleRows, TARGETS, targetFor } from "../lib/targets"
-import { csvResponse, toCsv } from "../../../../shared/workers/csv"
-import type { D1Rest } from "../../../../shared/workers/d1-rest"
-import type { MemberGuard } from "../../../../shared/workers/gating"
+import { csvResponse, toCsv } from "@shared/workers/csv"
+import type { D1Rest } from "@shared/workers/d1-rest"
+import type { MemberGuard } from "@shared/workers/gating"
 import type { Env } from "../env"
 
 /** GET /api/data-ops/import/targets — the active, supported import targets. */

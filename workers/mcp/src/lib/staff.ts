@@ -28,8 +28,8 @@
 // out loud. One question, one existing door, no second implementation of who is
 // a client — which is the rule this whole lane exists to keep.
 
-import { forwardToDoor } from "../../../../shared/workers/http"
-import { GuardError } from "../../../../shared/workers/gating"
+import { forwardToDoor } from "@shared/workers/http"
+import { GuardError } from "@shared/workers/gating"
 import type { Env } from "../env"
 
 /** Refuse the machine surface to a client login. `cookie` is a session for the

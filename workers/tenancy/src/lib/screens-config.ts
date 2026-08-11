@@ -4,8 +4,8 @@
 // deploy. The worker treats a recipe as OPAQUE JSON (the web app owns the
 // ScreenRecipe shape + validates it); we only check it's valid, bounded JSON.
 
-import { logActivity, type Actor } from "../../../../shared/workers/activity"
-import { d1ExecScript, d1Query, sqlString, type D1Rest } from "../../../../shared/workers/d1-rest"
+import { logActivity, type Actor } from "@shared/workers/activity"
+import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { GuardError, type MemberGuard } from "./permissions"
 
 const MAX_RECIPE_BYTES = 64 * 1024

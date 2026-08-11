@@ -22,7 +22,7 @@ import {
   LIST_HARD_CAP,
   MAX_ACTIVE_MCP_TOKENS_PER_USER,
   MCP_TOKEN_TTL_DAYS,
-} from "../../../shared/workers/limits"
+} from "@shared/workers/limits"
 import { createToken, listTokens, revokeToken, sha256Hex, verifyToken } from "../src/lib/tokens"
 
 const CORE = join(__dirname, "..", "..", "..", "db", "core")

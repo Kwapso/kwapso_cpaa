@@ -5,14 +5,14 @@
 // MCP request, so both a revoke and an expiry bite immediately even while a
 // bridged session is still alive.
 
-import { GuardError } from "../../../../shared/workers/gating"
-import { ulid } from "../../../../shared/workers/id"
+import { GuardError } from "@shared/workers/gating"
+import { ulid } from "@shared/workers/id"
 import type { Env } from "../env"
 import {
   LIST_HARD_CAP, // R14 hard cap
   MAX_ACTIVE_MCP_TOKENS_PER_USER,
   MCP_TOKEN_TTL_DAYS,
-} from "../../../../shared/workers/limits"
+} from "@shared/workers/limits"
 
 export type McpTokenRow = {
   id: string

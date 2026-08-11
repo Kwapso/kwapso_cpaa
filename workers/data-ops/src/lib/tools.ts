@@ -21,10 +21,10 @@
 //   • Fence — tool RESULTS are returned to the model as DATA (role:"tool"), never as
 //     instructions; the system prompt reinforces it.
 
-import { GuardError, requireRight, teamContext } from "../../../../shared/workers/gating"
-import { forwardToDoor } from "../../../../shared/workers/http"
-import { BULK_IDS_LIMIT } from "../../../../shared/workers/limits"
-import { publishChange } from "../../../../shared/workers/realtime"
+import { GuardError, requireRight, teamContext } from "@shared/workers/gating"
+import { forwardToDoor } from "@shared/workers/http"
+import { BULK_IDS_LIMIT } from "@shared/workers/limits"
+import { publishChange } from "@shared/workers/realtime"
 import { checkArgTypes,
   isPrivilegeWrite,
   obj,
@@ -33,7 +33,7 @@ import { checkArgTypes,
   SHARED_TOOLS,
   str,
   type SharedTool,
-} from "../../../../shared/workers/tool-catalog"
+} from "@shared/workers/tool-catalog"
 import { confirmBatch, getBatchView, planModules } from "./import-batch"
 import type { Env } from "../env"
 import type { ToolSpec } from "./model"

@@ -5,8 +5,8 @@
 // to (act-as-user). A table is importable ONLY if it appears here AND is active in
 // the catalog. Locked for now (owner's call): member roles + learning content only.
 
-import type { ImportColumn } from "../../../../shared/types"
-import { MODULE_RIGHTS, TEAM_MODULE_CATALOG } from "../../../../shared/team-modules"
+import type { ImportColumn } from "@shared/types"
+import { MODULE_RIGHTS, TEAM_MODULE_CATALOG } from "@shared/team-modules"
 
 export type { ImportColumn }
 

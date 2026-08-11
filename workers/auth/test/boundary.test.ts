@@ -45,7 +45,7 @@ describe("auth validates at the boundary", () => {
 
   it("puts every body field through the one validation seam", () => {
     expect(CODE, "auth must import the shared validator").toMatch(
-      /requireText[\s\S]{0,80}from "\.\.\/\.\.\/\.\.\/shared\/workers\/validate"/
+      /requireText[\s\S]{0,80}from "@shared\/workers\/validate"/
     )
     // Every door that reads a body must validate: email start, verify, and both
     // halves of the email change.

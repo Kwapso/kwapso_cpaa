@@ -21,7 +21,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
-import { gatingSeam, indexFunctions, stripComments } from "../../../shared/rules/seam-scan"
+import { gatingSeam, indexFunctions, stripComments } from "@shared/rules/seam-scan"
 import { ROUTES } from "../src/index"
 
 const SRC = join(__dirname, "..", "src")

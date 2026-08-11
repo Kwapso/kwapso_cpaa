@@ -4,15 +4,15 @@
 // (read = view history; create = use it). The agent's ACTIONS are gated again at the
 // real endpoint it calls (act-as-user), so it can never exceed the caller's rights.
 
-import { fail, json } from "../../../../shared/workers/http"
-import { optionalText, queryText, requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
-import { publishChange } from "../../../../shared/workers/realtime"
-import { GuardError, adminGuard, requireRight, teamContext } from "../../../../shared/workers/gating"
-import { recordWorkerError } from "../../../../shared/workers/error-log"
+import { fail, json } from "@shared/workers/http"
+import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { publishChange } from "@shared/workers/realtime"
+import { GuardError, adminGuard, requireRight, teamContext } from "@shared/workers/gating"
+import { recordWorkerError } from "@shared/workers/error-log"
 import { getQuota, grantCredits, readUsageLog } from "../lib/credits"
 import { confirmAndRun, runChat, type Emit } from "../lib/agent"
 import { listMessages, listThreads } from "../lib/threads"
-import type { ChatOutcome, StreamEvent } from "../../../../shared/types"
+import type { ChatOutcome, StreamEvent } from "@shared/types"
 import type { Env } from "../env"
 
 /** One SSE frame: `data: <json>\n\n` on a text/event-stream body. The whole wire format

@@ -7,11 +7,11 @@ const { d1Query, d1ExecScript } = vi.hoisted(() => ({
   d1Query: vi.fn(),
   d1ExecScript: vi.fn(),
 }))
-vi.mock("../../../shared/workers/d1-rest", async (importOriginal) => {
+vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
   const actual = await importOriginal<object>()
   return { ...actual, d1Query, d1ExecScript }
 })
-vi.mock("../../../shared/workers/activity", () => ({
+vi.mock("@shared/workers/activity", () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
 

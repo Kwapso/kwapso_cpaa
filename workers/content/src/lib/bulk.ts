@@ -4,9 +4,9 @@
 // and cap the batch so one request can't fan out unboundedly. Throws the clean 400
 // GuardError the worker already maps (bad input is a 400, never a 500).
 
-import { GuardError } from "../../../../shared/workers/gating"
-import { BULK_IDS_LIMIT } from "../../../../shared/workers/limits"
-import { requireText, TEXT_LIMITS } from "../../../../shared/workers/validate"
+import { GuardError } from "@shared/workers/gating"
+import { BULK_IDS_LIMIT } from "@shared/workers/limits"
+import { requireText, TEXT_LIMITS } from "@shared/workers/validate"
 
 // The cap itself lives in shared/workers/limits.ts — ONE constant that the door
 // enforces AND the agent's tool schemas declare (maxItems + description), so the
