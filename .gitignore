@@ -31,7 +31,14 @@ out/
 
 # The pulled Glide rows are real customer data — the catalogue is tracked, the
 # data never is. Re-pull with `node scripts/glide-pull.mjs`.
-glide/data/
+glide/data
+# The rescued files (logos, photos, attachments) and the normalised shape built
+# from them are the same customer data in another form. The SCRIPTS that make
+# them are tracked; their output never is. `glide/files/` is 79 MB of images
+# and PDFs pulled off Glide's storage before the account lapses — back it up
+# somewhere real, because re-running the rescue after that date gets nothing.
+glide/files
+glide/normalised.json
 
 # Parallel agent worktrees — working copies, never content
 .claude/worktrees/
