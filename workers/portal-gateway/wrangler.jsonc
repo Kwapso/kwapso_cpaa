@@ -14,6 +14,13 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-06-01",
   "observability": { "enabled": true },
+  // PRODUCTION's one public address is client.kwapso.app. Same reasoning as the
+  // agency gateway: a *.workers.dev name is a second door to the same worker that
+  // answers before anything bound to the custom hostname, and a per-version
+  // preview URL is a third. Both off in production; preview URLs off everywhere.
+  // It matters more here than anywhere: this door is the one a CLIENT reaches.
+  "workers_dev": false,
+  "preview_urls": false,
   "assets": {
     "directory": "../../web-portal/out",
     "binding": "ASSETS",
@@ -41,6 +48,10 @@
     "staging": {
       "name": "kwapso-portal-staging",
       "observability": { "enabled": true },
+      // Staging keeps its *.workers.dev name (the smoke and the seed use it).
+      // Said out loud because envs do NOT inherit the top-level value.
+      "workers_dev": true,
+      "preview_urls": false,
       "assets": {
         "directory": "../../web-portal/out",
         "binding": "ASSETS",

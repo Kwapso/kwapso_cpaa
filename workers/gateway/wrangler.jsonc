@@ -6,6 +6,20 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-06-01",
   "observability": { "enabled": true },
+  // PRODUCTION's one public address is the custom domain, agency.kwapso.app.
+  // workers_dev is OFF here so there is no SECOND address for the same door: a
+  // *.workers.dev name answers before anything bound to the custom hostname
+  // (rate limits, WAF rules, country rules, an Access policy), so leaving it on
+  // quietly undoes whatever is configured there. It was on until 11 Aug 2026 —
+  // kwapso.kwapso.workers.dev answered 200 while the docs said production had no
+  // public address at all.
+  //
+  // preview_urls is OFF in BOTH environments for the reason OPERATIONS.md already
+  // gives for the six domain workers: a per-version preview URL is another public
+  // door to the same worker, and an UPLOADED-but-undeployed version is exactly the
+  // code nobody has decided to ship.
+  "workers_dev": false,
+  "preview_urls": false,
   "assets": {
     "directory": "../../web/out",
     "binding": "ASSETS",
@@ -35,6 +49,11 @@
     "staging": {
       "name": "kwapso-staging",
       "observability": { "enabled": true },
+      // Staging keeps its *.workers.dev name — the smoke and the seed use it, and
+      // there is nothing on staging worth fencing a second address away from.
+      // Said out loud because envs do NOT inherit the top-level value.
+      "workers_dev": true,
+      "preview_urls": false,
       "assets": {
         "directory": "../../web/out",
         "binding": "ASSETS",

@@ -9,9 +9,10 @@ How this project ships. /ship-staging and /ship-production read the config below
 - production_url: https://agency.kwapso.app
 - portal_staging_url: https://staging-client.kwapso.app
 - portal_production_url: https://client.kwapso.app
-  (the custom domains are attached and serving — see "Custom domains" below. The
-  `*.workers.dev` names still resolve as the workers' own subdomains; nothing
-  advertises them any more, and two scripts still DEFAULT to the staging one:
+  (the TWO STAGING domains are attached and serving. The two PRODUCTION domains
+  are not attached yet — see "Custom domains" below for what is true and why.
+  Staging also answers on its `*.workers.dev` names; production answers on none,
+  by config. Two scripts still DEFAULT to the staging workers.dev name:
   `scripts/smoke-staging.mjs` and `scripts/smoke-mcp.mjs` read `SMOKE_BASE`, so
   export it to run either against a custom domain.)
 - build_command: npm run build (root; builds BOTH static exports — web/ → web/out and web-portal/ → web-portal/out). `npm run build:portal` builds the portal alone.
@@ -115,6 +116,8 @@ Create with `npx wrangler r2 bucket create <name>` (run once per bucket per acco
 ### Public surface (LOCKED): only the two gateways are public
 
 auth, tenancy, realtime, content, data-ops and mcp — the six domain workers — all set `"workers_dev": false` **and `"preview_urls": false`** (BOTH, top-level AND env.staging — envs don't inherit, and a per-version preview URL would be another public door), so they have NO public `*.workers.dev` URL and are reachable ONLY via service bindings. The two public addresses are the **agency gateway** (`kwapso` / `kwapso-staging`) and the **portal gateway** (`kwapso-portal` / `kwapso-portal-staging`) — one per front door, and no more. That is what makes `/internal/send-email` (and the agent/import act-as-user surface) safe: no public route can reach `/internal/*`, the agent, or the act-as-user surface. Never add a public route/`workers_dev` to a worker that isn't one of the two gateways.
+
+The two gateways set `"preview_urls": false` too — the reasoning above ("a per-version preview URL would be another public door") always applied to them and was simply never written down, so until 11 Aug 2026 every uploaded-but-undeployed version of BOTH front doors had a public address. They also set `"workers_dev": false` in production and `true` only under `env.staging`, so production is custom-domain-only. The whole posture is asserted per worker, per environment, in `workers/gateway/test/public-surface.test.ts` — a claim in this file is no longer the thing standing between a door and the internet.
 - **Both environments are on the same commit as of 2026-08-06** — production was
   brought up from the pre-hardening build in one rollout: core migration `0014`
   applied to `kwapso-core` first, then every worker then on disk, realtime-first
@@ -215,12 +218,25 @@ Manager (paid per zone), so staging uses a hyphen instead of a dot.
 below, which is the decision this table follows. The earlier `clients.kwapso.app` /
 `clients-staging.kwapso.app` pair was never attached.)
 
-**All four are attached and serving** (agency: production + staging; client portal:
-staging on `staging-client.kwapso.app`, production on `client.kwapso.app`). These are
-the addresses to hand anyone — the `*.workers.dev` names are no longer advertised
-anywhere in the docs. Attach a new one from the gateway worker: Workers & Pages → the
-worker → Settings → Domains & Routes → Add custom domain. Cloudflare writes the DNS
-record and issues the cert.
+**The two STAGING names are attached and serving.** The two PRODUCTION names —
+`agency.kwapso.app` and `client.kwapso.app` — are **not attached**: no DNS record for
+either exists, deliberately, until the owner has a real client to point at them
+(decided 11 Aug 2026). This paragraph claimed all four were live until that date; they
+were not, and the claim survived a doc sweep because nothing checked it. If you change
+this, check it with `dig +short agency.kwapso.app` before you write the sentence.
+
+Attach one from the gateway worker: Workers & Pages → the worker → Settings → Domains
+& Routes → Add custom domain. Cloudflare writes the DNS record and issues the cert.
+
+**The addresses production answers on: none, until a custom domain is attached.** Both
+gateways set `"workers_dev": false` at the top level (production) and `true` only under
+`env.staging`, and `"preview_urls": false` everywhere. Until 11 Aug 2026 neither
+declared either setting, so both defaulted to ON and `kwapso.kwapso.workers.dev`
+answered 200 — a live production front door, with a live sign-in behind it, at an
+address no document mentioned. A `*.workers.dev` name answers BEFORE anything bound to
+the custom hostname (a rate limit, a WAF rule, a country rule, an Access policy), so
+leaving it on undoes whatever is configured there. `workers/gateway/test/public-surface.test.ts`
+now asks every config this question per environment, and fails if the answer moves.
 
 NOTE: `portal.kwapso.app` is NOT ours — it is the legacy Glide client portal, live and
 serving clients. It stays untouched until cutover, which is a single DNS record change.
