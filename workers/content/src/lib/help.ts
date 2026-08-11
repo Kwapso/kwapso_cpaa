@@ -339,6 +339,38 @@ export type TicketInput = {
   sourceScreen?: string
   sourceRelatedTable?: string
   sourceRelatedRowId?: string
+  /** STAFF ONLY: the client this ticket is raised FOR. Ignored outright for a
+   * portal caller, whose account is never taken from the body. See
+   * `accountForStaffTicket`. */
+  accountId?: string
+}
+
+/** WHICH CLIENT IS THIS TICKET FOR, when the agency raises it?
+ *
+ * A ticket's `account_id` is what the account fence reads, so a ticket with none
+ * belongs to nobody and no client will ever see it. That is correct for the
+ * agency's own internal questions, and it was silently wrong for everything else:
+ * most of a client's history is typed in by US, on the phone, on their behalf —
+ * 220 of the 221 requests the staging seed wrote were staff-raised, and a client
+ * signed in to look at their own history saw zero of them.
+ *
+ * So a staff caller may NAME the client. A portal caller may not, ever: their
+ * account comes from the guard corridor and the body is not consulted, or a
+ * client could raise a ticket into another company's world by typing an id.
+ *
+ * The id is proved to be a live account in the caller's OWN team database before
+ * it is written — an unchecked string here would mint a ticket fenced to
+ * something that does not exist, which is a row nobody can ever reach again. */
+async function accountForStaffTicket(cfg: D1Rest, guard: MemberGuard, raw: unknown): Promise<string | null> {
+  const id = optionalText(raw, "Client", TEXT_LIMITS.short)
+  if (!id) return null
+  const rows = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    `SELECT id FROM accounts WHERE id = ${sqlString(id)} AND deactivated_at IS NULL LIMIT 1`
+  )
+  if (!rows[0]) throw new GuardError(400, "invalid_input", "That client isn't on your books any more.")
+  return rows[0].id
 }
 
 /** Raise a ticket. Description is required; everything else optional. Opens in the
@@ -361,7 +393,11 @@ export async function createTicket(
   const description = requireText(input.description, "Description", TEXT_LIMITS.long)
 
   const id = ulid()
-  const accountId = scope.kind === "portal" ? scope.currentAccountId : null
+  // A CLIENT's ticket belongs to the company they are standing in — from the
+  // guard corridor, never from the body. THE AGENCY's ticket belongs to whichever
+  // client it names, or to nobody when it is our own internal question.
+  const accountId =
+    scope.kind === "portal" ? scope.currentAccountId : await accountForStaffTicket(cfg, guard, input.accountId)
   const now = new Date().toISOString()
   await d1ExecScript(
     cfg,
@@ -394,6 +430,22 @@ export async function updateTicket(
   const before = await ticketOrThrow(cfg, guard, scope, id)
   const description = requireText(input.description, "Description", TEXT_LIMITS.long)
 
+  // NAMING THE CLIENT ON A TICKET THAT HAS NONE — set once, never moved.
+  //
+  // A ticket raised without a client (ours, or one we forgot to attribute) can be
+  // given one. A ticket that already HAS a client cannot be moved to another:
+  // that would retroactively take a conversation away from the people reading it
+  // and hand it, replies and all, to strangers. If we ever want that, it is a
+  // deliberate feature with a confirm panel, not a quiet field on an edit form.
+  // A portal caller never reaches this: their own ticket already carries their
+  // company, so the branch below is unreachable for them by construction.
+  const namedAccount =
+    scope.kind === "portal" ? null : await accountForStaffTicket(cfg, guard, input.accountId)
+  if (namedAccount && before.account_id && namedAccount !== before.account_id) {
+    throw new GuardError(409, "account_fixed", "This ticket already belongs to another client, and can't be moved.")
+  }
+  const accountAfter = before.account_id ?? namedAccount
+
   const now = new Date().toISOString()
   // The fence rides the UPDATE as well as the read above — same sentence, same
   // statement, so neither can be removed while the other keeps the door honest.
@@ -405,13 +457,14 @@ export async function updateTicket(
     cfg,
     guard.databaseId,
     `UPDATE help SET help_type = ?, description = ?, screen_recording_link = ?, source_screen = ?,
-       updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ?
+       account_id = ?, updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ?
      WHERE id = ?${fence.sql ? ` AND ${fence.sql}` : ""}`,
     [
       optionalText(input.helpType, "Type", TEXT_LIMITS.short) ?? null,
       description,
       optionalText(input.screenRecordingLink, "Screen recording link", TEXT_LIMITS.link) ?? null,
       optionalText(input.sourceScreen, "Source", TEXT_LIMITS.short) ?? null,
+      accountAfter,
       now,
       actor.id,
       actor.email,
@@ -438,7 +491,10 @@ export async function updateTicket(
     relatedTable: "help",
     relatedRowId: id,
   })
-  return before.account_id
+  // The ping names the account the ticket has AFTER the edit — otherwise the
+  // moment a ticket is finally attributed to a client, the one ping that would
+  // have told their people it exists is addressed to nobody.
+  return accountAfter
 }
 
 /** Move a ticket along its fixed lifecycle. Resolving stamps the resolver block +

@@ -781,7 +781,25 @@ for (const r of all) {
 
   let ticket = existing.get(r.description)
   if (ticket) {
-    say("reused", "a request", "help requests")
+    // BACKFILL. An earlier run wrote these before the door could be told which
+    // client a staff-raised request was FOR, so 220 of them belonged to nobody
+    // and no client could see their own history. Idempotence means "converge on
+    // the right row", not "never touch it again" — a run that leaves a known-
+    // wrong row alone is not idempotent, it is stuck.
+    const wants = r.accountGlideId ? idFor.get(r.accountGlideId) : null
+    if (wants && !ticket.accountId) {
+      must(
+        await post(
+          "/api/content/help/update",
+          { id: ticket.id, description: r.description, helpType: r.helpType ?? undefined, accountId: wants },
+          staff.cookie
+        ),
+        "naming the client on a request that had none"
+      )
+      say("named the client on", "a request", "help requests")
+    } else {
+      say("reused", "a request", "help requests")
+    }
   } else {
     const page = must(
       await post(
@@ -789,8 +807,14 @@ for (const r of all) {
         {
           description: r.description,
           helpType: r.helpType ?? undefined,
-          // What the request is ABOUT. The account is the record it was raised
-          // against, which is what lets a client's own company's work reach them.
+          // WHO IT IS FOR. This is the account fence's own column, and it is why
+          // the client's colleagues can see a request the agency typed in for
+          // them. The door ignores it for a portal caller (theirs comes from the
+          // guard corridor) and proves it is a live account for anyone else.
+          accountId: r.accountGlideId ? idFor.get(r.accountGlideId) : undefined,
+          // What the request is ABOUT — the record it was raised against. A
+          // display link, not a fence: the two were conflated once, and 220
+          // staff-raised requests belonged to nobody as a result.
           sourceRelatedTable: r.accountGlideId ? "accounts" : undefined,
           sourceRelatedRowId: r.accountGlideId ? idFor.get(r.accountGlideId) : undefined,
           sourceScreen: r.accountGlideId ? companyByGlideId.get(r.accountGlideId)?.name : undefined,

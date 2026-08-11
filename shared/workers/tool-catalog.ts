@@ -626,18 +626,26 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "raise_help_ticket",
     mcpName: "create_help_ticket",
-    summary: "Raise a new support ticket for the team (description required).",
+    summary:
+      "Raise a new support ticket (description required). `accountId` names the CLIENT it is raised for — use it whenever the ticket is on a client's behalf, because the client's own people see their company's tickets and a ticket with no client belongs to nobody. Leave it off only for the agency's own internal questions. A client-portal caller cannot set it; theirs is always their own company.",
     binding: "CONTENT", method: "POST", path: "/api/content/help",
-    schema: obj({ description: S, helpType: S, screenRecordingLink: S }, ["description"]),
-    buildBody: (i) => ({ description: str(i, "description"), helpType: opt(i, "helpType"), screenRecordingLink: opt(i, "screenRecordingLink") }),
+    schema: obj({ description: S, helpType: S, screenRecordingLink: S, accountId: S }, ["description"]),
+    // accountId is read in lib/help.ts, not in the handler, so R22's source scan
+    // cannot derive it (see its own note on fields forwarded wholesale to a lib).
+    // Exposed by hand, deliberately: without it a machine can only raise tickets
+    // that no client will ever see.
+    buildBody: (i) => ({ description: str(i, "description"), helpType: opt(i, "helpType"), screenRecordingLink: opt(i, "screenRecordingLink"), accountId: opt(i, "accountId") }),
     agent: { write: true, confirm: false, summarize: (i) => `Raise a support ticket: "${str(i, "description").slice(0, 60)}"` },
   },
   {
     name: "update_help_ticket",
-    summary: "Edit a support ticket's details (by id).",
+    summary:
+      "Edit a support ticket's details (by id). `accountId` names the client a ticket has none for — it can be SET once and never moved, because moving a ticket would take the conversation away from the people reading it.",
     binding: "CONTENT", method: "POST", path: "/api/content/help/update",
-    schema: obj({ id: S, description: S, helpType: S, screenRecordingLink: S }, ["id", "description"]),
-    buildBody: (i) => ({ id: str(i, "id"), description: str(i, "description"), helpType: opt(i, "helpType"), screenRecordingLink: opt(i, "screenRecordingLink") }),
+    schema: obj({ id: S, description: S, helpType: S, screenRecordingLink: S, accountId: S }, ["id", "description"]),
+    // Same note as create_help_ticket: read in lib/help.ts, so R22's scan cannot
+    // derive it. Exposed by hand.
+    buildBody: (i) => ({ id: str(i, "id"), description: str(i, "description"), helpType: opt(i, "helpType"), screenRecordingLink: opt(i, "screenRecordingLink"), accountId: opt(i, "accountId") }),
     agent: { write: true, confirm: false, summarize: (i) => `Edit support ticket ${str(i, "id")}` },
   },
   {

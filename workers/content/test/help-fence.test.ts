@@ -310,6 +310,83 @@ describe("a contact sees their company's questions, and no further", () => {
     expect(await (await call(IDS.contactUser, "GET /api/content/help")).text()).toContain(VICTIM_WORDS)
   })
 
+  // THE HALF THAT WAS MISSING, and it was most of the product.
+  //
+  // A ticket's account is what the fence reads, and it used to be set ONLY for a
+  // portal caller — so every ticket the agency typed in on a client's behalf
+  // belonged to nobody and reached nobody. That is not an edge case here: it is
+  // how this agency works. 220 of the 221 requests in the staging seed were
+  // staff-raised, and a client signed in to read their own history saw zero.
+  it("a ticket the AGENCY raises for a client reaches that client's people", async () => {
+    const raised = await call(IDS.staffUser, "POST /api/content/help", {
+      description: "Phoned in: the Tuesday export is arriving empty",
+      accountId: IDS.victimAccount,
+    })
+    expect(raised.status, "staff may name the client a ticket is for").toBe(200)
+
+    const seen = await (await call(IDS.contactUser, "GET /api/content/help")).text()
+    expect(seen, "the client's own people must see what we typed in for them").toContain("Tuesday export")
+
+    const stranger = await (await call(IDS.burglarUser, "GET /api/content/help")).text()
+    expect(stranger, "and nobody else's").not.toContain("Tuesday export")
+  })
+
+  it("the agency's own internal ticket still belongs to nobody", async () => {
+    // The other half of the same decision: no account named means no client, and
+    // that must stay reachable — otherwise every internal note leaks to whoever
+    // was last mentioned.
+    await call(IDS.staffUser, "POST /api/content/help", { description: "Internal: rotate the D1 token" })
+    for (const who of [IDS.contactUser, IDS.burglarUser]) {
+      expect(await (await call(who, "GET /api/content/help")).text()).not.toContain("rotate the D1 token")
+    }
+  })
+
+  it("a CLIENT cannot name someone else's company — the body is not consulted", async () => {
+    // A portal caller's account comes from the guard corridor. If the body could
+    // override it, a client would raise a ticket straight into another company's
+    // world, and the fence would faithfully deliver it there.
+    await call(IDS.burglarUser, "POST /api/content/help", {
+      description: "Planted: this must not land at Bergman",
+      accountId: IDS.victimAccount,
+    })
+    const victimSees = await (await call(IDS.contactUser, "GET /api/content/help")).text()
+    expect(victimSees, "a client's own account is the only one they can raise into").not.toContain("Planted")
+  })
+
+  it("a made-up client is refused, not written", async () => {
+    const res = await call(IDS.staffUser, "POST /api/content/help", {
+      description: "For a client that isn't there",
+      accountId: "A_DOES_NOT_EXIST",
+    })
+    expect(res.status, "an unchecked id would fence a ticket to nothing, forever").toBe(400)
+    expect(await (await call(IDS.staffUser, "GET /api/content/help")).text()).not.toContain("client that isn't there")
+  })
+
+  it("a ticket that belongs to nobody can be given a client, once", async () => {
+    const orphan = await (
+      await call(IDS.staffUser, "POST /api/content/help", { description: "Orphan: raised before we asked whose" })
+    ).json() as { tickets?: { id: string; description: string }[] }
+    const id = (orphan.tickets ?? []).find((t) => t.description.startsWith("Orphan:"))!.id
+
+    const named = await call(IDS.staffUser, "POST /api/content/help/update", {
+      id,
+      description: "Orphan: raised before we asked whose",
+      accountId: IDS.victimAccount,
+    })
+    expect(named.status).toBe(200)
+    expect(await (await call(IDS.contactUser, "GET /api/content/help")).text()).toContain("Orphan:")
+
+    // …and MOVED, never. Reassigning would take the thread away from the people
+    // who have been reading it and hand it to strangers.
+    const moved = await call(IDS.staffUser, "POST /api/content/help/update", {
+      id,
+      description: "Orphan: raised before we asked whose",
+      accountId: IDS.burglarAccount,
+    })
+    expect(moved.status, "a ticket's client is set once").toBe(409)
+    expect(await (await call(IDS.burglarUser, "GET /api/content/help")).text()).not.toContain("Orphan:")
+  })
+
   it("a contact at a DIFFERENT company still sees none of it", async () => {
     const res = await call(IDS.burglarUser, "GET /api/content/help")
     const ids = await ticketIds(res)
