@@ -541,7 +541,7 @@ export async function bulkSetStatusByFilter(
   // caller cannot even see, and the COUNT it confirms with must be a count of
   // the same rows the UPDATE will touch.
   const authored = ticketFence(guard, scope, "all")
-  const extra: string[] = [...(authored.sql ? [authored.sql] : [])]
+  const extra: string[] = authored.sql ? [authored.sql] : []
   const extraParams: (string | number)[] = [...authored.params]
   if (filter.status) {
     extra.push("status = ?")

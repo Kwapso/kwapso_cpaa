@@ -43,12 +43,19 @@ export default function RootLayout({
           <AmbientBackground />
           <ErrorReporter />
           <VersionWatch />
-          {children}
-          {/* The AI co-pilot rides ABOVE the routed screens (not inside any per-route
-           * AppShell), so navigation — including the assistant's own screen-trace —
-           * moves the page beneath it without ever closing the panel or dropping the
-           * live run. Renders nothing until you're signed in with a team. */}
-          <AgentHost />
+          {/* CONTAINMENT (ERROR-HANDLING.md C1). A thrown RENDER error is not caught
+           * by the window.onerror reporter above — that fires for events, not React's
+           * render phase — so without this the tree blanks. The boundary wraps the
+           * routed screens AND the co-pilot host, which is what the doc has always
+           * said; the import sat here unrendered until a lint step noticed. */}
+          <ErrorBoundary>
+            {children}
+            {/* The AI co-pilot rides ABOVE the routed screens (not inside any per-route
+             * AppShell), so navigation — including the assistant's own screen-trace —
+             * moves the page beneath it without ever closing the panel or dropping the
+             * live run. Renders nothing until you're signed in with a team. */}
+            <AgentHost />
+          </ErrorBoundary>
           <InstallPrompt />
           <Toaster />
         </ThemeProvider>

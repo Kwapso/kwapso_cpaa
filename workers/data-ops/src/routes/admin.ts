@@ -4,7 +4,7 @@
 // today selectable_data (Dropdown values) + member_roles + learning.
 // Re-running the seed is idempotent (upsert by table_key), so it's safe at deploy.
 
-import { fail, json } from "@shared/workers/http"
+import { json } from "@shared/workers/http"
 import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { adminGuard } from "@shared/workers/gating"
 import { DEFAULT_CATALOG } from "../lib/targets"

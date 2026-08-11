@@ -32,13 +32,17 @@ async function cf<T>(
     if (attempt > 0) await new Promise((r) => setTimeout(r, 250 * attempt))
     let res: Response
     try {
+      // A GET carries no body, so the key is ABSENT rather than present-and-
+      // undefined. Same bytes on the wire, but it states the invariant (`method`
+      // only defaults to GET when there is no body) in one place instead of
+      // leaving a reader — or a linter — to correlate two lines to find it.
       res = await fetch(`${API}/accounts/${cfg.accountId}${path}`, {
         method,
         headers: {
           Authorization: `Bearer ${cfg.apiToken}`,
           "Content-Type": "application/json",
         },
-        body: body === undefined ? undefined : JSON.stringify(body),
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
         // LAW R11: bound the socket. A hung D1 REST call would otherwise never return
         // and stall the worker; a timeout throws → the retry loop above handles it.
         signal: AbortSignal.timeout(15_000),

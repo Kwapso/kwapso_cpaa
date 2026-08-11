@@ -211,3 +211,49 @@ describe("hooks never follow a top-level early return (the React #310 crash clas
     for (const [what, src] of legal) expect(findOffendersIn(src, what), `false positive: ${what}`).toEqual([])
   })
 })
+
+// THE CONTAINMENT HALF (ERROR-HANDLING.md C1).
+//
+// Prevention is above: no hook below an early return. Containment is the
+// ErrorBoundary, because prevention only covers the crash class we know about —
+// a render throw of any other kind still blanks the tree, and window.onerror
+// does not fire for React's render phase.
+//
+// This exists because the boundary was NOT mounted. web/app/layout.tsx imported
+// it and rendered it nowhere, while ERROR-HANDLING.md said in as many words that
+// it is mounted in the root layout "around the routed screens AND the co-pilot
+// host". The portal's layout had it; the agency app's did not, and nothing was
+// red. The lint step added alongside this found it as a dead import — which is a
+// fair description of what a containment guard nobody renders actually is.
+describe("the ErrorBoundary is MOUNTED, not merely imported", () => {
+  const layouts = {
+    "web/app/layout.tsx": readFileSync(join(WEB, "app", "layout.tsx"), "utf8"),
+    "web-portal/app/layout.tsx": readFileSync(
+      join(WEB, "..", "web-portal", "app", "layout.tsx"),
+      "utf8"
+    ),
+  }
+
+  for (const [file, src] of Object.entries(layouts)) {
+    it(`${file} renders it, not just imports it`, () => {
+      expect(src, `${file} must import the boundary`).toContain("ErrorBoundary")
+      expect(
+        /<ErrorBoundary[\s>]/.test(src),
+        `${file} imports ErrorBoundary and never renders it — a render throw blanks the whole tree`
+      ).toBe(true)
+    })
+  }
+
+  it("the agency app wraps the routed screens AND the co-pilot host", () => {
+    // Both, because the agent panel outlives navigation: it renders above the
+    // routed screens, so a throw inside it is not contained by anything a route
+    // owns. ERROR-HANDLING.md names both.
+    const src = layouts["web/app/layout.tsx"]
+    const open = src.indexOf("<ErrorBoundary>")
+    const close = src.indexOf("</ErrorBoundary>")
+    expect(open, "the boundary must be rendered").toBeGreaterThan(-1)
+    const inside = src.slice(open, close)
+    expect(inside, "the routed screens are inside it").toContain("{children}")
+    expect(inside, "the co-pilot host is inside it").toContain("<AgentHost />")
+  })
+})

@@ -8,8 +8,7 @@ import { logActivity } from "@shared/workers/activity"
 import { getActivity } from "../lib/activity-read"
 import { getMyPermissions } from "../lib/roles"
 import { ACTIVITY_GATE_MAP, ACTIVITY_TABLE_EXEMPT } from "@shared/rules/registry"
-import { GuardError, requireMember, requireRight, type MemberGuard } from "../lib/permissions"
-import type { D1Rest } from "@shared/workers/d1-rest"
+import { requireMember, requireRight } from "../lib/permissions"
 import {
   acceptPendingInvites,
   createTeam,

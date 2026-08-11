@@ -33,7 +33,6 @@
 // and shipped without the key check the agency door had carried for weeks.
 import { recordClientError, recordGatewayCrash, serveMedia } from "@shared/workers/front-door"
 import { fail } from "@shared/workers/http"
-import { safeMediaKey } from "@shared/workers/image"
 
 /** The workers a portal door may be forwarded to. */
 type Upstream = "AUTH" | "TENANCY" | "CONTENT" | "REALTIME"

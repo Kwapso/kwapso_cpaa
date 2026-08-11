@@ -204,11 +204,12 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
 npm install        # also pulls the UI library from GitHub
 npm run dev        # the agency app on http://localhost:3000
 npm run dev:portal # the client portal on http://localhost:3001
-npm run check      # THE GATE — types across every workspace + the full test suite
+npm run lint       # the fast half of the gate — oxlint over every workspace (~15ms)
+npm run check      # THE GATE — lint, then types across every workspace, then the full test suite
 ```
 
-`npm run check` is what you run before any commit. It type-checks both front ends and
-all eight workers and then runs every test, including the law checks that read the
+`npm run check` is what you run before any commit. It lints, then type-checks both front
+ends and all eight workers, then runs every test, including the law checks that read the
 source off disk — a plain `npx tsc --noEmit` proves far less.
 
 Ship by saying **"ship to staging"** / **"ship to production"** — the skills

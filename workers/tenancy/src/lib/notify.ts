@@ -58,7 +58,10 @@ export async function notifyInviteRevoked(
   env: Env,
   teamId: string,
   to: string,
-  actorName: string
+  // Who withdrew it, kept in the signature and NOT in the email: the caller has
+  // to know the actor anyway, and every sibling notice takes it — but naming a
+  // staff member to someone outside the team is not this message's job.
+  _actorName: string
 ): Promise<void> {
   if (!to) return
   try {

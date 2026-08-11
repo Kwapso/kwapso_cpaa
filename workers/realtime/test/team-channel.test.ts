@@ -1,0 +1,392 @@
+// THE REALTIME WORKER, RUN — not read.
+//
+// TeamChannel is the base's only Durable Object and its subtlest piece: one
+// instance per channel, holding N hibernatable sockets, fanning a ping out to
+// every one of them that may hear it. Everything about it happens BETWEEN
+// listeners — a fence that belongs to one socket and not its neighbour, a socket
+// that closed after getWebSockets() returned it, an event nobody can parse — and
+// none of that is visible to a source scan. realtime.test.ts checks the WIRING
+// with regexes (the gate is called, the stamp is attached); this file checks the
+// BEHAVIOUR, by constructing the class against a DurableObjectState the test
+// controls (vitest.config.ts aliases `cloudflare:workers` to a two-line shim).
+//
+// What is being defended, in one sentence: a broadcast must reach everyone
+// entitled to it, reach nobody else, and never be stopped by one bad socket.
+// CONCURRENCY.md is explicit that this DO is pub/sub and NOT a lock — so the
+// invariant is not serialization, it is that the fan-out is per-socket and
+// total.
+
+import { describe, expect, it, vi } from "vitest"
+
+import type { ScopeStamp } from "@shared/workers/account-scope"
+import { TEXT_LIMITS } from "@shared/workers/validate"
+import worker, { TeamChannel } from "../src/index"
+
+/** One hibernatable socket, as the runtime hands it back from getWebSockets(). */
+type FakeSocket = {
+  sent: string[]
+  closed: number
+  attachment: unknown
+  send(message: string): void
+  close(): void
+  serializeAttachment(value: unknown): void
+  deserializeAttachment(): unknown
+}
+
+/** A socket. `breaks` makes it behave like one that died between the runtime
+ * listing it and us writing to it — the ordinary race on a busy channel. */
+function socket(options: { breaks?: "send" | "read" | "close" } = {}): FakeSocket {
+  const ws: FakeSocket = {
+    sent: [],
+    closed: 0,
+    attachment: undefined,
+    send(message) {
+      if (options.breaks === "send") throw new Error("socket is closed")
+      ws.sent.push(message)
+    },
+    close() {
+      if (options.breaks === "close") throw new Error("already closing")
+      ws.closed++
+    },
+    serializeAttachment(value) {
+      ws.attachment = value
+    },
+    deserializeAttachment() {
+      if (options.breaks === "read") throw new Error("attachment unreadable")
+      return ws.attachment
+    },
+  }
+  return ws
+}
+
+/** A channel holding the given sockets, plus whatever fetch() accepts later. */
+function channel(sockets: FakeSocket[] = []) {
+  const accepted: FakeSocket[] = []
+  const ctx = {
+    acceptWebSocket: (ws: FakeSocket) => {
+      accepted.push(ws)
+      sockets.push(ws)
+    },
+    getWebSockets: () => sockets,
+  }
+  return {
+    accepted,
+    channel: new TeamChannel(ctx as never, {} as never),
+  }
+}
+
+/** A client login standing in Bergman — the same fixture realtime.test.ts uses. */
+const CLIENT: ScopeStamp = { accountIds: ["BERGMAN", "BERGMAN_SUB"] }
+
+describe("broadcast: the fan-out is per socket, and total", () => {
+  it("reaches every listener on the channel", () => {
+    const a = socket()
+    const b = socket()
+    const c = socket()
+    const { channel: ch } = channel([a, b, c])
+
+    ch.broadcast(JSON.stringify({ resource: "members", id: "M1" }))
+
+    for (const ws of [a, b, c]) expect(ws.sent).toHaveLength(1)
+  })
+
+  it("applies each socket's OWN fence — one call, different subsets", () => {
+    // The whole reason the stamp rides the socket instead of the channel: one
+    // team channel carries staff and client logins at the same time.
+    const staff = socket()
+    const bergman = socket()
+    bergman.serializeAttachment(CLIENT)
+    const delaval = socket()
+    delaval.serializeAttachment({ accountIds: ["DELAVAL"] })
+    const { channel: ch } = channel([staff, bergman, delaval])
+
+    ch.broadcast(JSON.stringify({ resource: "accounts", id: "BERGMAN_SUB" }))
+
+    expect(staff.sent, "staff carry no stamp and hear the whole team").toHaveLength(1)
+    expect(bergman.sent, "the row is inside their fence").toHaveLength(1)
+    expect(delaval.sent, "another client's row id is silence").toHaveLength(0)
+  })
+
+  it("a socket that died mid-broadcast does not silence the ones after it", () => {
+    // THE RACE. getWebSockets() returns a snapshot; a browser can close between
+    // that line and the send. If the loop let the throw escape, one closing tab
+    // would stop the ping for every listener listed after it — a whole team's
+    // screens quietly stale, with nothing in any log.
+    const before = socket()
+    const dead = socket({ breaks: "send" })
+    const after = socket()
+    const { channel: ch } = channel([before, dead, after])
+
+    ch.broadcast(JSON.stringify({ resource: "members", id: "M1" }))
+
+    expect(before.sent).toHaveLength(1)
+    expect(dead.sent).toHaveLength(0)
+    expect(after.sent, "the listener AFTER the dead one still gets the ping").toHaveLength(1)
+  })
+
+  it("a socket whose fence cannot be read is skipped, not trusted", () => {
+    // Fail-closed, and it must not take the broadcast down with it.
+    const broken = socket({ breaks: "read" })
+    const fine = socket()
+    const { channel: ch } = channel([broken, fine])
+
+    ch.broadcast(JSON.stringify({ resource: "accounts", id: "BERGMAN" }))
+
+    expect(broken.sent, "no stamp we can read = nothing we can prove they may hear").toHaveLength(0)
+    expect(fine.sent).toHaveLength(1)
+  })
+
+  it("an unparsable event reaches staff and no fenced listener", () => {
+    // The comment in the source says exactly this, and it is the fail-closed
+    // direction: a ping nobody can check is a ping nobody fenced.
+    const staff = socket()
+    const client = socket()
+    client.serializeAttachment(CLIENT)
+    const { channel: ch } = channel([staff, client])
+
+    ch.broadcast("not json at all")
+
+    expect(staff.sent).toEqual(["not json at all"])
+    expect(client.sent).toHaveLength(0)
+  })
+
+  it("sends the message through untouched — the DO stores and rewrites nothing", () => {
+    // It holds NO application data (ARCHITECTURE.md); the databases stay the
+    // source of truth. The relay must not become a place state can hide.
+    const ws = socket()
+    const { channel: ch } = channel([ws])
+    const message = JSON.stringify({ resource: "help", id: "H1", scope: "BERGMAN" })
+
+    ch.broadcast(message)
+
+    expect(ws.sent[0]).toBe(message)
+  })
+
+  it("an empty channel is not an error", () => {
+    const { channel: ch } = channel([])
+    expect(() => ch.broadcast(JSON.stringify({ resource: "members" }))).not.toThrow()
+  })
+})
+
+describe("fetch: joining the channel stamps the socket", () => {
+  /** The Workers globals this method needs. `Response` is stubbed because a 101
+   * is illegal in Node's Response and legal in the runtime — the one place the
+   * two genuinely disagree. */
+  function withWorkerGlobals<T>(run: () => T): T {
+    const pair = { 0: socket(), 1: socket() }
+    vi.stubGlobal(
+      "WebSocketPair",
+      class {
+        constructor() {
+          return pair
+        }
+      }
+    )
+    vi.stubGlobal(
+      "Response",
+      class {
+        constructor(
+          readonly body: unknown,
+          readonly init: { status?: number; webSocket?: unknown } = {}
+        ) {}
+      }
+    )
+    try {
+      return run()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  }
+
+  it("accepts through the HIBERNATION api, so an idle channel costs nothing", async () => {
+    // ctx.acceptWebSocket, never server.accept(). This is the cost model:
+    // 10,000 quiet teams stay affordable only because the runtime owns the
+    // socket and the instance is evicted.
+    const { accepted, channel: ch } = channel([])
+    await withWorkerGlobals(() => ch.fetch(new Request("https://do/")))
+    expect(accepted, "the server half must be handed to the runtime").toHaveLength(1)
+  })
+
+  it("a staff listener is stamped with NOTHING, and hears the whole team", async () => {
+    const { accepted, channel: ch } = channel([])
+    await withWorkerGlobals(() => ch.fetch(new Request("https://do/")))
+
+    expect(accepted[0].attachment, "no header = no stamp = staff").toBeUndefined()
+    ch.broadcast(JSON.stringify({ resource: "members", id: "M1" }))
+    expect(accepted[0].sent).toHaveLength(1)
+  })
+
+  it("a client login's fence is serialized onto the socket, so it survives hibernation", async () => {
+    const { accepted, channel: ch } = channel([])
+    await withWorkerGlobals(() =>
+      ch.fetch(
+        new Request("https://do/", { headers: { "x-listener-scope": JSON.stringify(CLIENT) } })
+      )
+    )
+
+    expect(accepted[0].attachment).toEqual(CLIENT)
+    // And it is really in force: a row outside the fence is silence.
+    ch.broadcast(JSON.stringify({ resource: "accounts", id: "DELAVAL" }))
+    expect(accepted[0].sent).toHaveLength(0)
+  })
+
+  it("an UNREADABLE stamp attaches the EMPTY fence, never none", async () => {
+    // The inversion this guards is the dangerous one: `none` means STAFF, so a
+    // stamp we failed to parse must not be dropped — it must become a fence that
+    // hears nothing. Attaching none would broadcast the agency's whole world to
+    // a client login.
+    const { accepted, channel: ch } = channel([])
+    await withWorkerGlobals(() =>
+      ch.fetch(new Request("https://do/", { headers: { "x-listener-scope": "{not json" } }))
+    )
+
+    expect(accepted[0].attachment).toEqual({ accountIds: [] })
+    ch.broadcast(JSON.stringify({ resource: "accounts", id: "BERGMAN" }))
+    expect(accepted[0].sent, "a fence with no accounts hears nothing at all").toHaveLength(0)
+  })
+})
+
+// THE DOOR THAT CAN REACH ANY CHANNEL.
+//
+// /publish is internal — service binding only, never routed by either gateway.
+// That is network isolation, and network isolation is a configuration away from
+// being wrong, which is why the door is ALSO keyed and fails closed. Nothing
+// exercised this: the publisher's side was tested (it sends the key) and the
+// door's side was not, so an unset secret waving everyone through would have
+// been invisible here.
+describe("/publish — the one door that reaches every team's channel", () => {
+  function env(overrides: Record<string, unknown> = {}) {
+    const broadcasts: { channel: string; message: string }[] = []
+    return {
+      broadcasts,
+      env: {
+        INTERNAL_KEY: "shhh",
+        CHANNELS: {
+          getByName: (channel: string) => ({
+            broadcast: (message: string) => broadcasts.push({ channel, message }),
+          }),
+        },
+        ...overrides,
+      } as never,
+    }
+  }
+
+  const post = (body: unknown, key?: string) =>
+    new Request("https://realtime/publish", {
+      method: "POST",
+      headers: key === undefined ? {} : { "x-internal-key": key },
+      body: JSON.stringify(body),
+    })
+
+  it("broadcasts to the named channel when the key is right", async () => {
+    const { env: e, broadcasts } = env()
+    const res = await worker.fetch(post({ channel: "team:T1", event: { resource: "members" } }, "shhh"), e)
+
+    expect(res.status).toBe(200)
+    expect(broadcasts).toEqual([
+      { channel: "team:T1", message: JSON.stringify({ resource: "members" }) },
+    ])
+  })
+
+  it("refuses a wrong key, and broadcasts nothing", async () => {
+    const { env: e, broadcasts } = env()
+    const res = await worker.fetch(post({ channel: "team:T1", event: {} }, "guess"), e)
+
+    expect(res.status).toBe(403)
+    expect(broadcasts).toEqual([])
+  })
+
+  it("refuses when the key header is absent", async () => {
+    const { env: e, broadcasts } = env()
+    expect((await worker.fetch(post({ channel: "team:T1", event: {} }), e)).status).toBe(403)
+    expect(broadcasts).toEqual([])
+  })
+
+  it("FAILS CLOSED when INTERNAL_KEY is unset — never waves everyone through", async () => {
+    // The direction matters. An unset secret must refuse everyone, not accept
+    // everyone: this door can address ANY team's channel, so reading "no key
+    // configured" as "no key required" is a cross-tenant broadcast.
+    const { env: e, broadcasts } = env({ INTERNAL_KEY: undefined })
+    expect((await worker.fetch(post({ channel: "team:T1", event: {} }, "shhh"), e)).status).toBe(403)
+    expect((await worker.fetch(post({ channel: "team:T1", event: {} }), e)).status).toBe(403)
+    expect(broadcasts).toEqual([])
+  })
+
+  it("checks the key BEFORE reading the body", async () => {
+    // An unauthenticated caller must cost a header comparison, not a JSON parse
+    // of whatever they sent.
+    const { env: e } = env()
+    let read = false
+    const request = new Request("https://realtime/publish", {
+      method: "POST",
+      headers: { "x-internal-key": "guess" },
+      body: "{}",
+    })
+    Object.defineProperty(request, "json", {
+      value: async () => {
+        read = true
+        return {}
+      },
+    })
+    expect((await worker.fetch(request, e)).status).toBe(403)
+    expect(read, "the body must not be parsed for a caller who failed the key").toBe(false)
+  })
+
+  it("caps the channel name — it NAMES a Durable Object", async () => {
+    // The key-holder is trusted to be a worker, not to be well-formed. An
+    // unbounded string here is an unbounded object name.
+    const { env: e, broadcasts } = env()
+    const res = await worker.fetch(
+      post({ channel: "t".repeat(TEXT_LIMITS.short + 1), event: {} }, "shhh"),
+      e
+    )
+    expect(res.status, "an over-long channel is a 400, never a 500").toBe(400)
+    expect(broadcasts).toEqual([])
+  })
+
+  it("refuses a body with no channel or no event", async () => {
+    const { env: e, broadcasts } = env()
+    expect((await worker.fetch(post({ event: {} }, "shhh"), e)).status).toBe(400)
+    expect((await worker.fetch(post({ channel: "team:T1" }, "shhh"), e)).status).toBe(400)
+    expect(broadcasts).toEqual([])
+  })
+
+  it("a WebSocket-less GET on the live endpoint is a refusal, not a crash", async () => {
+    const { env: e } = env()
+    const res = await worker.fetch(new Request("https://realtime/api/realtime?team=T1"), e)
+    expect(res.status).toBe(426)
+  })
+
+  it("health answers without a key (it is the only open door)", async () => {
+    const { env: e } = env()
+    expect((await worker.fetch(new Request("https://realtime/api/realtime/health"), e)).status).toBe(200)
+  })
+})
+
+describe("the hibernation handlers", () => {
+  it("ignores anything a client sends — the channel is listen-only", async () => {
+    const { channel: ch } = channel([])
+    await expect(ch.webSocketMessage()).resolves.toBeUndefined()
+  })
+
+  it("closes the socket on disconnect", async () => {
+    const ws = socket()
+    const { channel: ch } = channel([ws])
+    await ch.webSocketClose(ws as never)
+    expect(ws.closed).toBe(1)
+  })
+
+  it("a socket already closing is not an error", async () => {
+    // The other half of the same race: the runtime calls webSocketClose for a
+    // socket the browser has already torn down. Throwing here would surface as a
+    // Durable Object exception on an ordinary tab close.
+    const ws = socket({ breaks: "close" })
+    const { channel: ch } = channel([ws])
+    await expect(ch.webSocketClose(ws as never)).resolves.toBeUndefined()
+  })
+
+  it("an error on a socket does not take the channel down", async () => {
+    const { channel: ch } = channel([])
+    await expect(ch.webSocketError()).resolves.toBeUndefined()
+  })
+})
