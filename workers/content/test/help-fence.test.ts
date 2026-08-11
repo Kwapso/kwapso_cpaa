@@ -28,6 +28,7 @@ vi.mock("../../../shared/workers/d1-rest", async (importOriginal) => {
 })
 
 import worker from "../src/index"
+import { accountScope, mayHearChange, scopeStamp } from "../../../shared/workers/account-scope"
 import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
 
 /** Ticket ids, so an assertion can name exactly what must not come back. The
@@ -50,6 +51,13 @@ const db = () => holder.db as DatabaseSync
  * inbox, so "how many went out" has to be observable. */
 let sent: { to: string; subject: string }[] = []
 
+/** Every live ping the worker published, captured instead of broadcast. A ping
+ * carries a row id AND (since a client may hear their company's tickets) the
+ * ACCOUNT the row belongs to — and whether a colleague hears it is decided from
+ * that field alone, by mayHearChange, on a socket with no database. So the
+ * publisher's side of that bargain has to be observable too. */
+let published: { resource?: string; id?: string; op?: string; scope?: string }[] = []
+
 function env(userId: string) {
   const base = makeEnv(() => db(), userId) as unknown as Record<string, unknown>
   return {
@@ -67,8 +75,28 @@ function env(userId: string) {
         return (base.AUTH as { fetch: (u: string, i?: unknown) => Promise<Response> }).fetch(url, init)
       },
     },
+    REALTIME: {
+      fetch: async (_url: string, init?: { body?: string }) => {
+        const body = JSON.parse(init?.body ?? "{}") as { event?: Record<string, string> }
+        if (body.event) published.push(body.event)
+        return new Response("{}")
+      },
+    },
   } as never
 }
+
+/** The caller's fence, resolved through the SHIPPED guard corridor against this
+ * database — never hand-built. A stamp typed out by hand would prove only that
+ * the assertion agrees with itself. */
+const stampFor = async (userId: string) =>
+  scopeStamp(
+    await accountScope({ accountId: "acct", token: "token" } as never, {
+      userId,
+      teamId: IDS.team,
+      roleId: IDS.clientRole,
+      databaseId: "db_team",
+    })
+  )
 
 const call = (userId: string, route: string, body?: unknown, query = "") => {
   const [method, path] = route.split(" ")
@@ -88,8 +116,15 @@ async function ticketIds(res: Response): Promise<string[]> {
   return (body.tickets ?? []).map((t) => t.id)
 }
 
+/** A contact of the NESTED company, and nothing above it: their record hangs
+ * under Bergman Workshop, which hangs under Bergman S.A. The fence reaches DOWN
+ * and never climbs, so this person is the proof of the second half of that
+ * sentence — and there is no one in the shared fixture standing that far in. */
+const CHILD = { user: "U_CHILD", person: "A_CHILD_PERSON", portal: "P_CHILD", ticket: "H_CHILD" } as const
+
 beforeEach(() => {
   sent = []
+  published = []
   holder.db = buildSpineDb()
   // The shared spine fixture grants BOTH roles every right on `help` already —
   // stated here because it is the premise of the whole suite: the burglar's role
@@ -106,13 +141,28 @@ beforeEach(() => {
   }
   // Three tickets, three worlds. The victim's comes from the shared fixture; the
   // other two are this suite's, so there is something for each caller to see.
-  const ticket = (id: string, who: string, name: string, text: string) =>
+  // Each carries the ACCOUNT it was raised for — the agency's own carries none,
+  // because it belongs to no client and NULL never matches an account fence.
+  const ticket = (id: string, who: string, name: string, text: string, account: string | null) =>
     db().exec(
-      `INSERT INTO help (id, description, status, resolved, created_at, creator_id, creator_email, creator_name)
-       VALUES ('${id}', '${text}', 'open', 0, '2026-03-01', '${who}', '${name}@example', '${name}');`
+      `INSERT INTO help (id, description, status, resolved, account_id, created_at, creator_id, creator_email, creator_name)
+       VALUES ('${id}', '${text}', 'open', 0, ${account ? `'${account}'` : "NULL"}, '2026-03-01', '${who}', '${name}@example', '${name}');`
     )
-  ticket(TICKETS.burglar, IDS.burglarUser, "Diego", "Cannot download last quarter")
-  ticket(TICKETS.staff, IDS.staffUser, "Staff", "Internal: migrate the Delaval records")
+  ticket(TICKETS.burglar, IDS.burglarUser, "Diego", "Cannot download last quarter", IDS.burglarAccount)
+  ticket(TICKETS.staff, IDS.staffUser, "Staff", "Internal: migrate the Delaval records", null)
+
+  // The nested company's own contact + login. Local to this suite: it is the
+  // only one that asks what a subsidiary may see, and a fixture nobody else
+  // reads is one nobody else has to reason about.
+  db().exec(`
+    INSERT INTO users (id, email, first_name, current_team_id) VALUES ('${CHILD.user}', 'ana@workshop.example', 'Ana', '${IDS.team}');
+    INSERT INTO team_members (id, team_id, user_id, role_id, created_at) VALUES ('m5', '${IDS.team}', '${CHILD.user}', '${IDS.clientRole}', '2026-01-01');
+    INSERT INTO accounts (id, account_type, parent_account_id, name, created_at, creator_id)
+      VALUES ('${CHILD.person}', 'individual', '${IDS.victimChild}', 'Ana Soler', '2026-01-01', '${IDS.staffUser}');
+    INSERT INTO portal_users (id, account_id, user_id, created_at, creator_id)
+      VALUES ('${CHILD.portal}', '${CHILD.person}', '${CHILD.user}', '2026-01-01', '${IDS.staffUser}');
+  `)
+  ticket(CHILD.ticket, CHILD.user, "Ana", "The Workshop scales are offline", IDS.victimChild)
 })
 
 describe("raising a ticket answers with YOUR tickets, never the team's", () => {
@@ -229,6 +279,138 @@ describe("a client login cannot aim the app's email at staff", () => {
     })
     expect(res.status).toBe(200)
     expect(sent.map((s) => s.to)).toContain("burglar@delaval.example")
+  })
+})
+
+// A CONTACT SEES THEIR COMPANY'S QUESTIONS (owner decision, 11 Aug 2026).
+//
+// The first version of this fence pinned a client login to `creator_id = them`,
+// which is safe and wrong: at a real client the finance person and the ops
+// person are two people at ONE company, and each was told the other's question
+// did not exist. The ruling widens "me" to "my company and everything nested
+// beneath it" — which is not a new idea, it is the account fence that already
+// decides which companies and contacts they can see.
+//
+// So these are the three questions the widening has to answer, and they are
+// answered against a real database through the shipped handlers, because the
+// scan next door (web-portal/test/portal-fence.test.ts) can prove the fence is
+// BUILT and only this can prove where it stops.
+describe("a contact sees their company's questions, and no further", () => {
+  // Marta (linked to Bergman S.A.) raised H_VICTIM. Luis's own record hangs
+  // UNDER Bergman S.A. — two contacts of one company, attached the two different
+  // ways the fence recognises. Neither can see the other's ticket under the old
+  // rule, and that is what the owner overruled.
+  it("a second contact at the same company sees the first one's request", async () => {
+    const res = await call(IDS.contactUser, "GET /api/content/help")
+    const ids = await ticketIds(res)
+    expect(res.status).toBe(200)
+    expect(ids, "his colleague's question is his company's question").toContain(TICKETS.victim)
+    // …and the DESCRIPTION really is served, not just the id: the whole point is
+    // that he can read and answer it.
+    expect(await (await call(IDS.contactUser, "GET /api/content/help")).text()).toContain(VICTIM_WORDS)
+  })
+
+  it("a contact at a DIFFERENT company still sees none of it", async () => {
+    const res = await call(IDS.burglarUser, "GET /api/content/help")
+    const ids = await ticketIds(res)
+    expect(ids, "another company's question is not theirs").not.toContain(TICKETS.victim)
+    expect(ids, "nor is the nested company's").not.toContain(CHILD.ticket)
+    expect(ids, "nor the agency's own").not.toContain(TICKETS.staff)
+    expect(ids, "their own is still theirs").toContain(TICKETS.burglar)
+  })
+
+  // WHAT WE DECIDED ABOUT A NESTED COMPANY, and why. The fence reaches DOWN and
+  // never climbs (shared/workers/account-scope.ts: "a person at a subsidiary
+  // does not inherit the parent group"), so the group's contact sees the
+  // subsidiary's questions and the subsidiary's contact does not see the
+  // group's. We did not invent a rule for tickets — a ticket is just another row
+  // in the world the account scope already draws, and a second rule would be a
+  // second thing to get wrong.
+  it("the fence reaches DOWN into a nested company, and never climbs", async () => {
+    const group = await ticketIds(await call(IDS.victimUser, "GET /api/content/help"))
+    expect(group, "the group's contact sees the subsidiary's question").toContain(CHILD.ticket)
+
+    const nested = await ticketIds(await call(CHILD.user, "GET /api/content/help"))
+    expect(nested, "the subsidiary's contact sees their own").toContain(CHILD.ticket)
+    expect(nested, "and never the parent group's").not.toContain(TICKETS.victim)
+  })
+
+  // R16 — the two totals are exact, both fenced, and for a client login they
+  // finally DIFFER: "All" is the company's, "My" is the part they raised. Under
+  // the old fence those two numbers were always the same, which is the shape of
+  // a tab that was quietly lying.
+  it("My and All are exact, fenced, and no longer the same number", async () => {
+    const res = await call(IDS.contactUser, "POST /api/content/help", { description: "Ana asked me to chase this" })
+    const body = (await res.json()) as { total: number; mineTotal: number }
+    // Bergman S.A.'s world: Marta's, the Workshop's (nested beneath), and his own.
+    expect(body.total).toBe(3)
+    expect(body.mineTotal, "only the one he raised is his").toBe(1)
+  })
+
+  it("a colleague may reply on the company's ticket; a stranger still cannot", async () => {
+    const mine = await call(IDS.contactUser, "POST /api/content/help/reply", {
+      helpId: TICKETS.victim,
+      body: "Adding what I know about the invoice run",
+    })
+    expect(mine.status, "a company's question is answerable by the company").toBe(200)
+    const theirs = await call(IDS.burglarUser, "POST /api/content/help/reply", {
+      helpId: TICKETS.victim,
+      body: "Reading your thread",
+    })
+    expect(theirs.status).toBe(404)
+  })
+
+  // THE LIVE HALF, which is not a detail: a support screen that cannot hear its
+  // own colleague's question appear is a screen that lies until you reload it.
+  // A socket has no database — it carries the caller's account set and reads the
+  // ping. So the ping must NAME the account, and the fence must read it. Both
+  // halves, in one test, because either alone passes while the feature is dead.
+  it("a colleague HEARS the new question appear, and a stranger hears nothing", async () => {
+    await call(IDS.contactUser, "POST /api/content/help", { description: "New question from the Bergman office" })
+    const ping = published.find((p) => p.resource === "help" && p.op === "add")
+    expect(ping, "raising a ticket must publish").toBeTruthy()
+    expect((ping as { scope?: string }).scope, "the ping must name the company it belongs to").toBe(IDS.victimAccount)
+
+    const colleague = await stampFor(IDS.victimUser) // Marta, same company
+    const stranger = await stampFor(IDS.burglarUser) // Diego, another company
+    expect(mayHearChange(colleague, ping as { resource: string }), "his colleague must hear it").toBe(true)
+    expect(mayHearChange(stranger, ping as { resource: string }), "the other client must not").toBe(false)
+    expect(mayHearChange(null, ping as { resource: string }), "staff hear everything").toBe(true)
+  })
+
+  // A thread now has three kinds of author. The portal draws "You", a colleague
+  // by NAME, and the agency as itself — and it can only do that if the server
+  // sends a name for one and withholds it for the other. Withholding is the part
+  // that must not slip: SCOPE ch.06 says the portal never names which staff
+  // member is doing the work, and until now that promise was kept by a component
+  // choosing not to render a name it had been sent.
+  it("a client is told their colleague's name, and never a staff member's", async () => {
+    await call(IDS.contactUser, "POST /api/content/help/reply", { helpId: TICKETS.victim, body: "Chasing this" })
+    await call(IDS.staffUser, "POST /api/content/help/reply", { helpId: TICKETS.victim, body: "Looking now" })
+
+    const asClient = (await (await call(IDS.victimUser, "GET /api/content/help/thread", undefined, `?id=${TICKETS.victim}`)).json()) as {
+      replies: { body: string; authorName: string | null }[]
+    }
+    const colleague = asClient.replies.find((r) => r.body === "Chasing this")
+    const agency = asClient.replies.find((r) => r.body === "Looking now")
+    expect(colleague?.authorName, "a colleague is a person, with a name").toBe("Luis")
+    expect(agency?.authorName, "a staff member is the agency, and has no name here").toBeNull()
+
+    // Staff read the same thread with every name on it — the anonymity is about
+    // the client's surface, not about hiding colleagues from the people answering.
+    const asStaff = (await (await call(IDS.staffUser, "GET /api/content/help/thread", undefined, `?id=${TICKETS.victim}`)).json()) as {
+      replies: { body: string; authorName: string | null }[]
+    }
+    expect(asStaff.replies.find((r) => r.body === "Looking now")?.authorName).toBe("Staff")
+  })
+
+  it("a reply the AGENCY types reaches the client's screen, and only theirs", async () => {
+    await call(IDS.staffUser, "POST /api/content/help/reply", { helpId: TICKETS.victim, body: "On it" })
+    const thread = published.find((p) => p.resource === "help_threads")
+    expect(thread, "a reply must publish the thread row").toBeTruthy()
+    expect((thread as { scope?: string }).scope).toBe(IDS.victimAccount)
+    expect(mayHearChange(await stampFor(IDS.contactUser), thread as { resource: string })).toBe(true)
+    expect(mayHearChange(await stampFor(IDS.burglarUser), thread as { resource: string })).toBe(false)
   })
 })
 

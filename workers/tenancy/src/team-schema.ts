@@ -377,6 +377,37 @@ SELECT lower(hex(randomblob(16))), r.id, m.module, r.is_default, r.is_default, r
 ALTER TABLE portal_users ADD COLUMN current_account_id TEXT REFERENCES accounts (id);
 `,
   },
+  {
+    version: "0009_help_account",
+    sql: `
+-- WHOSE QUESTION IS THIS? (owner decision, 11 Aug 2026.) A client contact used
+-- to see only the tickets they personally raised, because the only thing on the
+-- row that could fence them was \`creator_id\`. At a real client the finance
+-- person and the ops person were invisible to each other, which is not what a
+-- company's portal means. The owner's ruling: a contact sees their COMPANY's
+-- world — the company they are standing in and everything nested beneath it,
+-- which is the account fence, already written, already tested.
+--
+-- So the ticket carries the account it was raised for, and the fence becomes the
+-- ORDINARY one (\`accountScopeClause\`) instead of a second idea of who you are.
+-- A staff-raised ticket stays NULL: it belongs to no client, and NULL never
+-- matches an IN list, so the agency's own questions stay the agency's.
+ALTER TABLE help ADD COLUMN account_id TEXT REFERENCES accounts (id);
+CREATE INDEX idx_help_account ON help (account_id);
+
+-- BACKFILL, in the SAFE direction. An existing ticket has no record of which
+-- company it was raised for (the raiser may belong to two), so guessing a
+-- company could hand one client another's question — the exact failure this
+-- change exists to end. Instead each old ticket lands on its raiser's OWN person
+-- row, which is inside that person's fence and nobody else's unless their record
+-- genuinely hangs under the company. Old tickets therefore keep EXACTLY today's
+-- visibility; the widening starts with the next question raised.
+UPDATE help SET account_id = (
+  SELECT pu.account_id FROM portal_users pu WHERE pu.user_id = help.creator_id
+   ORDER BY (pu.deactivated_at IS NULL) DESC LIMIT 1
+) WHERE account_id IS NULL AND creator_id IS NOT NULL;
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

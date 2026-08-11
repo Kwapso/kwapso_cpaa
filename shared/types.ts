@@ -238,6 +238,11 @@ export type HelpTicket = {
   editorName: string | null
   createdAt: string
   updatedAt: string | null
+  /** The account this question was raised FOR — the company a client contact was
+   * standing in when they asked. `null` on the agency's own tickets. It is what
+   * the account fence reads, and what a live ping carries so a colleague's
+   * question can reach their screen without reaching anyone else's. */
+  accountId: string | null
 }
 
 /** One reply on a ticket. `isAgent` marks the AI-drafted first reply; a mention

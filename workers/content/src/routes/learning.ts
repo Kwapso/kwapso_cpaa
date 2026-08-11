@@ -116,6 +116,12 @@ export async function postBulkSetLearningActive(request: Request, env: Env): Pro
  * viewer's done badge. */
 export async function postLearningDone(request: Request, env: Env): Promise<Response> {
   const { cfg, guard, body } = await gatedBody<{ id?: unknown; done?: unknown }>(request, env, "learning", "read")
+  // The odd one out: its three sibling learning doors refuse a client login and
+  // this one did not, because it answers `{ok:true}` and looked like it had
+  // nothing to disclose. It marks an INTERNAL article read, on a module a client
+  // has no screen for — and it puts their name in the agency's curator
+  // dashboard. A door on agency-only material refuses, whatever it returns.
+  await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Article", TEXT_LIMITS.short)
   if (typeof body.done !== "boolean")
     return fail(400, "invalid_input", "id and done are required.")

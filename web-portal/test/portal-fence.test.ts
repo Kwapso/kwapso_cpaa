@@ -209,6 +209,14 @@ function portalWriteHandlers(): { door: string; worker: string; body: string }[]
     const name = handlerFor(worker, door)
     expect(name, `${door} is named by the portal door but has no handler in workers/${worker}`).toBeTruthy()
     const routeFns = indexFunctions(join(ROOT, "workers", worker, "src", "routes"))
+    // Guard the walk, exactly as the read side does: a handler this index cannot
+    // find yields an EMPTY body, and an empty body satisfies every assertion
+    // below. A write door that went unwalked would pass for the same reason the
+    // GET-only walk passed over the leak.
+    expect(
+      routeFns.has(name as string),
+      `handler ${name} for ${door} not found in workers/${worker}/src/routes`
+    ).toBe(true)
     out.push({ door, worker, body: reachOf(name as string, routeFns) })
   }
   return out
@@ -350,6 +358,95 @@ describe("portal fence — every write a client can reach is declared and reason
       expect(open.has(door), `PORTAL_VISIBLE_WRITES declares ${door}, which the portal no longer opens`).toBe(
         true
       )
+  })
+})
+
+// THE FENCE'S WIDTH, not just its existence.
+//
+// Everything above proves a portal-reachable read is BUILT with a fence. It
+// cannot tell a fence one person wide from a fence one company wide, and the
+// owner has ruled which one help is: a contact sees their COMPANY's questions —
+// the company they are standing in and everything nested beneath it, which is
+// the account scope, and never one row further.
+//
+// So this pins the SHAPE of that fence to the seam that defines it. The
+// behavioural proof (a colleague sees it, another company does not, a
+// subsidiary's contact does not inherit the group's) is next door in
+// workers/content/test/help-fence.test.ts, which drives the shipped handlers
+// against a real database — a source scan cannot answer "who sees what", and a
+// browser-side test cannot run a worker.
+describe("portal fence — the help fence is the ACCOUNT fence", () => {
+  const helpLib = read(join(ROOT, "workers", "content", "src", "lib", "help.ts"))
+
+  it("the fence declared in the registry is the one the code exports", () => {
+    const declared = PORTAL_VISIBLE_READS["workers/content/src/lib/help.ts"]?.fence
+    expect(declared, "help.ts must declare its fence").toBeTruthy()
+    expect(helpLib, `help.ts declares ${declared} but exports no such function`).toContain(
+      `export function ${declared}(`
+    )
+  })
+
+  it("it is built from accountScopeClause — a client sees their company, not just themselves", () => {
+    const at = helpLib.indexOf("export function ticketFence(")
+    expect(at, "ticketFence is the help fence — did it move?").toBeGreaterThan(-1)
+    const body = code(helpLib.slice(at, helpLib.indexOf("\nexport ", at + 1)))
+    // The account scope IS the fence. Narrowing it back to the raiser would make
+    // two people at one company invisible to each other, which is what the owner
+    // overruled; widening it past accountScopeClause would reach another client.
+    expect(body, "the help fence must be the account fence").toMatch(/accountScopeClause\(\s*scope/)
+    // The creator pin survives, but only as the My/All tab — ON TOP of the
+    // fence, never instead of it.
+    expect(body).toMatch(/tab === "mine"/)
+  })
+})
+
+// A FENCE THAT REFUSES EVERYTHING IS A BROKEN DOOR — the live half.
+//
+// The portal's screens are kept fresh by pings on the team channel, and a client
+// login's socket is fenced by mayHearChange, which has no database: it reads the
+// caller's account set and the ping itself. An account-owned ping carries an
+// ACCOUNT id, which that fence can check. A ticket ping carries a TICKET id,
+// which it cannot — so a scope-stamped resource must be named in the fence's own
+// list, or the portal listens for something it can never hear.
+//
+// That was not hypothetical. `help` and `help_threads` sat in PORTAL_LISTENERS
+// from the day the portal shipped, and mayHearChange dropped every one of those
+// pings on the floor: a client's support screen was live in the code and dead in
+// the browser, and nothing said so.
+describe("portal fence — every resource the portal listens for can actually be heard", () => {
+  const fenceSrc = read(join(ROOT, "shared", "workers", "account-scope.ts"))
+  const listSrc = read(join(__dirname, "..", "lib", "live-resources.ts"))
+
+  const namesIn = (src: string, constName: string) => {
+    const m = new RegExp(`${constName}\\s*=\\s*\\[([^\\]]*)\\]`).exec(src)
+    expect(m, `${constName} not found — did it move?`).toBeTruthy()
+    return [...(m as RegExpExecArray)[1].matchAll(/"(\w+)"/g)].map((x) => x[1])
+  }
+
+  it("derives both lists (guards the scan)", () => {
+    expect(namesIn(fenceSrc, "ACCOUNT_OWNED_TABLES").length).toBeGreaterThan(2)
+    expect(namesIn(fenceSrc, "SCOPE_STAMPED_RESOURCES").length).toBeGreaterThan(0)
+  })
+
+  it("no listener waits on a ping a client login can never receive", () => {
+    const hearable = new Set([
+      ...namesIn(fenceSrc, "ACCOUNT_OWNED_TABLES"),
+      ...namesIn(fenceSrc, "SCOPE_STAMPED_RESOURCES"),
+    ])
+    // Anchored on the declaration rather than a `=`: the type annotation itself
+    // contains one (`(a: string | null) => string[]`), so a lazy scan for the
+    // assignment finds the arrow instead of the table.
+    const from = listSrc.indexOf("PORTAL_LISTENERS")
+    const open = listSrc.indexOf("= {", from)
+    const table = open === -1 ? null : listSrc.slice(open, listSrc.indexOf("\n}", open))
+    expect(table, "PORTAL_LISTENERS not found in the portal's live registry").toBeTruthy()
+    const listened = [...(table as string).matchAll(/^\s{2}(\w+):/gm)].map((m) => m[1])
+    expect(listened.length, "the listener map did not parse").toBeGreaterThan(3)
+    const deaf = listened.filter((r) => !hearable.has(r))
+    expect(
+      deaf,
+      `the portal listens for these and mayHearChange silences every one — either the resource carries its account (SCOPE_STAMPED_RESOURCES) or the screen is dead: ${deaf.join(", ")}`
+    ).toEqual([])
   })
 })
 

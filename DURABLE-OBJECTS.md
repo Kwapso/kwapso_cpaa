@@ -156,14 +156,22 @@ So the gate resolves the caller's account scope through the one guard corridor
 | Listener | Stamp | Hears |
 |---|---|---|
 | **Staff** (no `portal_users` row) | none | every ping on the team channel — unchanged |
-| **Client login** | `{ accountIds }` | account-owned pings (`accounts`, `account_links`, `portal_users`) **inside their fence**, and nothing else |
+| **Client login** | `{ accountIds }` | account-owned pings (`accounts`, `account_links`, `portal_users`) whose **row id** is inside their fence, plus scope-stamped pings (`help`, `help_threads`) whose **named account** is — and nothing else |
 
 `mayHearChange(stamp, event)` is the whole rule, and it lives beside the SQL
 fence so the two can never disagree. A client hears silence for the agency's
-members, roles, invites, tickets and articles — they have no screen in this app
-that reads any of them, and that is the fail-closed direction: when the client
-portal needs its own tickets live, the fence extends to that resource
-deliberately, rather than having been open to everything all along.
+members, roles, invites and articles — they have no screen in this app that
+reads any of them.
+
+**Tickets are the one resource that needed the promised extension, and it was
+made one line at a time.** A ping carries a row id, and a *ticket* id tells the
+fence nothing about whose ticket it is — so a help ping additionally NAMES the
+account it belongs to (`ChangeEvent.scope`), and `SCOPE_STAMPED_RESOURCES` is
+the short, reviewed list of resources allowed to be heard that way. A publisher
+that forgets the stamp makes a screen stale; a fence that guessed would make it
+a disclosure, so the unstamped case is silence. That is the fail-closed
+direction, kept: the door opened for exactly the resource that needed it, rather
+than having been open to everything all along.
 
 Two consequences worth knowing:
 

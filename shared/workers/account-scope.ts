@@ -243,7 +243,19 @@ export function scopeStamp(scope: AccountScope): ScopeStamp {
   return scope.kind === "staff" ? null : { accountIds: scope.accountIds }
 }
 
-/** The fence, for a LIVE CHANGE PING (`{resource, id}` on a team's channel).
+/** Resources a CLIENT LOGIN may hear about that are NOT account-owned: a ticket
+ * and its replies. The row id on those pings is a TICKET id, which says nothing
+ * about whose ticket it is — so the publisher names the account instead
+ * (`ChangeEvent.scope`), and this is the list of resources allowed to use it.
+ *
+ * This is the "one line at a time" the note below promised, and it is exactly
+ * one line: the portal has a support screen (PORTAL_LISTENERS), the owner has
+ * ruled that a contact sees their company's questions, and a screen that cannot
+ * hear its own colleague's question appear is a screen that lies until you
+ * reload it. A resource NOT named here is silence, whatever it carries. */
+const SCOPE_STAMPED_RESOURCES = ["help", "help_threads"] as const
+
+/** The fence, for a LIVE CHANGE PING (`{resource, id, scope}` on a team's channel).
  *
  * A ping carries no row data, but it does carry a ROW ID — and row ids are how
  * the activity-feed leak was reachable in the first place ("row ids are not
@@ -251,24 +263,27 @@ export function scopeStamp(scope: AccountScope): ScopeStamp {
  * stop at "are you a member of this team": a client login is a member, and it
  * was hearing every account in the agency change, by id, in real time.
  *
- * Staff hear everything. A client login hears its OWN WORLD and nothing else:
- * an account-owned ping whose id is inside their fence. Everything else — the
- * agency's members, roles, invites, tickets, articles — is silence, because a
- * client has no screen in this app that reads any of it. That is the fail-closed
- * direction: when the client portal lands and needs its own tickets live, the
- * fence extends to that resource on purpose, one line at a time, rather than
- * having been open to everything all along. */
+ * Staff hear everything. A client login hears its OWN WORLD and nothing else,
+ * and there are exactly two shapes of that:
+ *   • an ACCOUNT-OWNED row, whose id IS an account inside their fence;
+ *   • a SCOPE-STAMPED row (a ticket, a reply), whose publisher NAMED the account
+ *     it belongs to, and that account is inside their fence.
+ * Everything else — the agency's members, roles, invites, articles — is silence,
+ * because a client has no screen in this app that reads any of it. Fail-closed
+ * in both directions: a ping that names nothing is heard by nobody fenced. */
 export function mayHearChange(
   stamp: ScopeStamp,
-  event: { resource?: string; id?: string }
+  event: { resource?: string; id?: string; scope?: string }
 ): boolean {
   if (!stamp) return true
-  if (!ACCOUNT_OWNED_TABLES.includes(event.resource as (typeof ACCOUNT_OWNED_TABLES)[number]))
-    return false
-  // Every account-owned publish carries the ACCOUNT the row hangs off (a contact
-  // and a login are only ever read on their account's detail). No id = nothing to
-  // check it against = not theirs to hear.
-  return !!event.id && stamp.accountIds.includes(event.id)
+  if (ACCOUNT_OWNED_TABLES.includes(event.resource as (typeof ACCOUNT_OWNED_TABLES)[number]))
+    // Every account-owned publish carries the ACCOUNT the row hangs off (a contact
+    // and a login are only ever read on their account's detail). No id = nothing to
+    // check it against = not theirs to hear.
+    return !!event.id && stamp.accountIds.includes(event.id)
+  if (SCOPE_STAMPED_RESOURCES.includes(event.resource as (typeof SCOPE_STAMPED_RESOURCES)[number]))
+    return !!event.scope && stamp.accountIds.includes(event.scope)
+  return false
 }
 
 /** The fence, for a feed that stores a TABLE NAME and a ROW ID rather than an
@@ -331,12 +346,19 @@ export function portalActivityClause(
  * by construction, so the module right alone lets them through.
  *
  * A 403 that says which door they want, rather than a 404 — they are a person we
- * know, signed in correctly, on the wrong front door. */
-export async function refusePortalCaller(cfg: D1Rest, guard: MemberGuard): Promise<void> {
-  if ((await accountScope(cfg, guard)).kind === "portal")
+ * know, signed in correctly, on the wrong front door.
+ *
+ * Hands BACK the scope it resolved (always staff, or it threw), so a door that
+ * has both decisions to make — refuse a client, then fence what staff may read —
+ * pays for the guard corridor once instead of twice. Ignoring the return value
+ * is the ordinary case and stays correct. */
+export async function refusePortalCaller(cfg: D1Rest, guard: MemberGuard): Promise<AccountScope> {
+  const scope = await accountScope(cfg, guard)
+  if (scope.kind === "portal")
     throw new GuardError(
       403,
       "client_login",
       "This sign-in is a client login — your company's work is on the client portal."
     )
+  return scope
 }

@@ -10,6 +10,7 @@
 import { logActivity, type Actor } from "../../../../shared/workers/activity"
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "../../../../shared/workers/d1-rest"
 import { ulid } from "../../../../shared/workers/id"
+import { type AccountScope } from "../../../../shared/workers/account-scope"
 import { GuardError, type MemberGuard } from "../../../../shared/workers/gating"
 import type { HelpStakeholder } from "../../../../shared/types"
 import { getTicket } from "./help"
@@ -113,8 +114,8 @@ export async function listStakeholders(
   cfg: D1Rest,
   env: Env,
   guard: MemberGuard,
-  ticketId: string,
-  portal: boolean
+  scope: AccountScope,
+  ticketId: string
 ): Promise<HelpStakeholder[]> {
   // Best origin wins per user id (lowest rank).
   const origin = new Map<string, StakeholderOrigin>()
@@ -131,7 +132,7 @@ export async function listStakeholders(
   const [ticket, replyRows, addedRows, adminId] = await Promise.all([
     // 1. raiser (from the help row) — read through the FENCE, which is also what
     //    decides whether this caller may know anything about the ticket at all.
-    getTicket(cfg, guard, ticketId, portal),
+    getTicket(cfg, guard, scope, ticketId),
     // 2. mentioned: every tagged id across the ticket's replies.
     d1Query<{ tagged_user_ids: string | null }>(
       cfg,
@@ -185,14 +186,14 @@ export async function addStakeholder(
   cfg: D1Rest,
   env: Env,
   guard: MemberGuard,
+  scope: AccountScope,
   actor: Actor,
   ticketId: string,
-  userId: string,
-  portal: boolean
+  userId: string
 ): Promise<HelpStakeholder[]> {
   // The ticket must be VISIBLE to this caller (reuse the fenced getTicket) and
   // the target must be on this team.
-  const ticket = await getTicket(cfg, guard, ticketId, portal)
+  const ticket = await getTicket(cfg, guard, scope, ticketId)
   if (!ticket) throw new GuardError(404, "help_not_found", "That ticket doesn't exist.")
   if (!(await isActiveMember(env, guard.teamId, userId)))
     throw new GuardError(400, "not_member", "That person isn't on this team.")
@@ -213,5 +214,5 @@ VALUES (${sqlString(id)}, ${sqlString(ticketId)}, ${sqlString(userId)}, ${sqlStr
     relatedRowId: ticketId,
   })
 
-  return listStakeholders(cfg, env, guard, ticketId, portal)
+  return listStakeholders(cfg, env, guard, scope, ticketId)
 }

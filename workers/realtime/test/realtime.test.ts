@@ -73,8 +73,40 @@ describe("mayHearChange (the fence, applied to a live ping)", () => {
   it("a client login hears none of the agency's own world", () => {
     // They have no screen in this app that reads any of it, so a ping is pure
     // exposure — an id to try against every door, plus who-is-busy-when.
+    // `help` belongs here TOO, by row id: a ticket id says nothing about whose
+    // ticket it is, so an unstamped help ping is still silence.
     for (const resource of ["members", "member_roles", "invites", "learning", "help", "team"])
       expect(mayHearChange(client, { resource, id: "ROW1" }), resource).toBe(false)
+  })
+
+  // THE ONE THING A CLIENT HEARS THAT IS NOT AN ACCOUNT ROW. Their company's
+  // support questions — because the owner ruled that a contact sees their
+  // company's world, and a support screen that cannot hear a colleague's
+  // question appear is one that lies until you reload it. The ping cannot be
+  // checked by its row id (a ticket id is not an account), so the publisher
+  // NAMES the account and the fence reads that field and nothing else.
+  it("a client login hears their own company's tickets — by the account, never the row id", () => {
+    for (const resource of ["help", "help_threads"]) {
+      // Theirs: the company they stand in, or anything nested beneath it.
+      expect(mayHearChange(client, { resource, id: "H_1", scope: "BERGMAN" }), resource).toBe(true)
+      expect(mayHearChange(client, { resource, id: "H_1", scope: "BERGMAN_SUB" }), resource).toBe(true)
+      // Another client's company: silence, even though the resource is one they
+      // are allowed to hear about in general.
+      expect(mayHearChange(client, { resource, id: "H_1", scope: "DELAVAL" }), resource).toBe(false)
+      // No account named = nothing to check = silence. A publisher that forgets
+      // the stamp makes a screen stale; a fence that guessed would make it a leak.
+      expect(mayHearChange(client, { resource, id: "H_1" }), resource).toBe(false)
+      // And the row id is NEVER what decides it — an id that happens to equal an
+      // account in their fence must not smuggle a ticket through.
+      expect(mayHearChange(client, { resource, id: "BERGMAN" }), resource).toBe(false)
+    }
+  })
+
+  it("a scope stamp does not open a resource the client has no business hearing", () => {
+    // The stamp is not a skeleton key: naming an account they stand in does not
+    // make the agency's members or articles theirs to hear about.
+    for (const resource of ["members", "member_roles", "learning", "invites"])
+      expect(mayHearChange(client, { resource, id: "ROW1", scope: "BERGMAN" }), resource).toBe(false)
   })
 
   it("an account ping with no id is not heard by a fenced listener", () => {

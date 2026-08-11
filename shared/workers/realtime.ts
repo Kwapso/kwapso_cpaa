@@ -34,6 +34,13 @@ export type ChangeEvent = {
   id?: string
   /** add | edit | remove | session — advisory; the client verifies by re-pull. */
   op?: "add" | "edit" | "remove" | "session"
+  /** WHOSE row this is: the account it belongs to, when the row is not itself an
+   * account. A CLIENT LOGIN's socket carries the set of accounts they may hear
+   * about (`mayHearChange`), and a ticket id tells that fence nothing — so a
+   * resource a client is allowed to hear names its account here, or it is heard
+   * only by staff. Never a secret in its own right: it is the id of a company
+   * the listener already stands in, or the listener never receives it. */
+  scope?: string
 }
 
 async function publish(env: RealtimeEnv, channel: string, event: ChangeEvent): Promise<void> {
@@ -55,15 +62,18 @@ async function publish(env: RealtimeEnv, channel: string, event: ChangeEvent): P
   }
 }
 
-/** Tell a TEAM's channel that one row in `resource` changed. */
+/** Tell a TEAM's channel that one row in `resource` changed. `scope` is the
+ * account the row belongs to — pass it for anything a client login is meant to
+ * hear, because their socket is fenced by account and cannot check a row id. */
 export async function publishChange(
   env: RealtimeEnv,
   teamId: string,
   resource: string,
   id?: string,
-  op?: ChangeEvent["op"]
+  op?: ChangeEvent["op"],
+  scope?: string
 ): Promise<void> {
-  await publish(env, `team:${teamId}`, { resource, id, op })
+  await publish(env, `team:${teamId}`, { resource, id, op, scope })
 }
 
 /** Tell ONE user's channel (all their devices) that one identity row changed. */

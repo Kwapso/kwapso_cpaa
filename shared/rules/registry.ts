@@ -157,6 +157,13 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "validated-bodies",
     status: "enforced",
   },
+  {
+    id: "R21",
+    dimension: "arch",
+    law: "A door on the AGENCY's own material refuses a client login, at the door. Every route reachable at the agency origin that a caller holding only the Client role's rights can pass — including every door gated by nothing but membership — must either refuse a portal caller (refusePortalCaller), resolve the caller's account fence (accountScope), be a door the client portal itself opens, or be a reasoned CLIENT_REACHABLE_EXEMPT line. The reachable set is DERIVED: the Client role's rights come from the seed, the routes from each worker's own ROUTES table, the gates from the handler source, the portal's surface from PORTAL_DOORS. Earned TWICE: the learning library and the dropdown vocabulary, then the help stakeholder list — each defended only by the OTHER gateway's allow-list, which is to say not defended, because the agency gateway forwards by prefix and a client login is an ordinary team member. Enumerate by WHAT A CLIENT CAN REACH, never by what a module owns.",
+    checkId: "client-reachable-doors",
+    status: "enforced",
+  },
 ]
 
 /** R13 — reviewed exemptions: modules that are deliberately NOT import targets,
@@ -169,6 +176,40 @@ export const CATALOG_EXEMPT: Record<string, string> = {
   agent: "the assistant's threads/usage are system records, not importable content",
   portal_users:
     "a login is a granted identity, not importable content — a CSV cannot consent for a person (the same reason team_members is exempt)",
+}
+
+/** R21 — the doors a CLIENT LOGIN can reach at the agency origin that neither
+ * refuse them nor read a customer-owned module through the fence, each with the
+ * reason that is fine.
+ *
+ * Only two shapes of reason belong here. **The door answers about the caller
+ * themselves** (their own teams, their own rights, their own invitations), or
+ * **the door carries a fence the check cannot see from the gate alone** — which
+ * today means exactly one door, the activity feed, whose module is resolved from
+ * the table being asked about rather than written at the gate.
+ *
+ * A door that answers about the AGENCY — its articles, its vocabulary, its
+ * screens, its imports, its staff — does not belong on this list; it belongs
+ * behind `refusePortalCaller`. If you are writing a new line here and the
+ * sentence you want is "a client would never call it", stop: that is not a
+ * reason, that is the assumption both leaks were built on.
+ *
+ * Enforced by web/test/rules.test.ts (`client-reachable-doors`), which also
+ * fails on a line that no longer names a route — a rotting exemption is worse
+ * than none, because it reads as a decision somebody made on purpose. */
+export const CLIENT_REACHABLE_EXEMPT: Record<string, string> = {
+  "POST /api/tenancy/bootstrap":
+    "teamless onboarding: it answers with the caller's OWN first team, and a client login already has one, so there is nothing of the agency's behind it",
+  "GET /api/tenancy/teams":
+    "the caller's own membership list — the teams THEY belong to, read through their own session and no id at all",
+  "GET /api/tenancy/my-permissions":
+    "the caller's own rights, which they are entitled to know; it names no other person and no record",
+  "GET /api/tenancy/invitations":
+    "invitations addressed to the caller's own email address — theirs to see, and theirs alone (the lookup is by their identity, never by an id they pass)",
+  "POST /api/tenancy/invitations/accept":
+    "accepts an invitation addressed to the caller — ownership is re-checked inside acceptInvite against their own email, so the body can only name their own invitation or be refused",
+  "GET /api/tenancy/activity":
+    "its module gate is RESOLVED from the table being asked about (ACTIVITY_GATE_MAP), so no module is written at the door for the R21 scan to read — but the fence is there and it is the strictest one in the codebase: portalActivityClause answers `0 = 1` for every table PORTAL_ACTIVITY_FENCE does not mark account-owned, which is every table except the client's own company, its contacts and its logins. This is the door that leaked twice; the clause, its data table and the burglar suite in workers/tenancy/test/account-leak.test.ts are the three things holding it.",
 }
 
 /** THE ACCOUNT-SCOPED MODULES — the ones whose rows belong to a CUSTOMER, not to
@@ -211,8 +252,8 @@ export const PORTAL_VISIBLE_READS: Record<string, { fence: string | null; why: s
     why: "history rows NAME records; the row id is not a secret (the live channel broadcasts it). WHICH fence each (table, id) read carries is decided by PORTAL_ACTIVITY_FENCE below — deciding it from the account module's own tables is what left `help` open.",
   },
   "workers/content/src/lib/help.ts": {
-    fence: "authorScope",
-    why: "a client raises tickets; the team-wide default handed them every other client's — the thread doors, one table along, had to be taught the same sentence, and the door that RAISES a ticket answered with the whole list until the check learned that a POST can be a read.",
+    fence: "ticketFence",
+    why: "a client raises tickets; the team-wide default handed them every other client's — the thread doors, one table along, had to be taught the same sentence, and the door that RAISES a ticket answered with the whole list until the check learned that a POST can be a read. It is called ticketFence and no longer authorScope because it no longer fences by AUTHOR: the owner ruled on 11 Aug 2026 that a contact sees their COMPANY's questions, so the ticket carries the account it was raised for and this is accountScopeClause over that column — the same fence as the accounts list, reading a ticket.",
   },
   "workers/content/src/lib/notify.ts": {
     fence: null,
@@ -273,7 +314,7 @@ export const PORTAL_VISIBLE_WRITES: Record<string, { fence: string | null; why: 
   // ── support ────────────────────────────────────────────────────────────────
   "POST /api/content/help": {
     fence: null,
-    why: "raises a NEW ticket, stamped with the caller as creator. There is no existing record to be fenced away from, and the fence that matters (who may read it back) is on the list door.",
+    why: "raises a NEW ticket. There is no existing record to be fenced away from — but the row it writes is stamped with the account the caller is STANDING IN, taken from the guard corridor and never from the body, because that stamp is what every later read of it is fenced by (and what a live ping names so their colleagues, and only their colleagues, hear it appear).",
   },
   "POST /api/content/help/reply": {
     fence: "accountScope",
@@ -310,7 +351,7 @@ export const PORTAL_ACTIVITY_FENCE: Record<string, { fence: "account" | null; wh
   portal_users: { fence: "account", why: "a login granted on an account they may stand in" },
   help: {
     fence: null,
-    why: "a ticket's history names the staff who moved it and quotes the problem statement — the client is shown the STATUS instead (PORTAL_ACTIVITY_EXEMPT says the same thing about the screen). THE LEAK: help sat outside the deciding list, so another client's support history came back by ticket id.",
+    why: "a ticket's history names the staff who moved it and quotes the problem statement — the client is shown the STATUS instead (PORTAL_ACTIVITY_EXEMPT says the same thing about the screen). THE LEAK: help sat outside the deciding list, so another client's support history came back by ticket id. STILL null after the 11 Aug 2026 widening: a contact now sees their whole company's TICKETS, which is a decision about the rows; their HISTORY is a different question, and its answer is the one SCOPE ch.06 gives — the portal never says which staff member is doing the work.",
   },
   learning: { fence: null, why: "the agency's own knowledge base — a client has no screen on it" },
   selectable_data: { fence: null, why: "the agency's dropdown vocabulary — app furniture, and none of it is the client's" },
