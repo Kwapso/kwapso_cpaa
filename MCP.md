@@ -134,7 +134,8 @@ Today it covers:
   `list_help_tickets`, `get_help_thread`, `list_help_stakeholders`, `list_accounts`,
   `get_account`, `list_portal_access`, `list_import_targets`, `get_import_sample`,
   `list_imports`, `get_import`, `get_ai_allowance`, `list_ai_usage`,
-  `list_agent_threads`, `get_agent_thread`. Each list tool that sits on a door with an
+  `list_agent_threads`, `get_agent_thread`, `ask_knowledge`, `list_knowledge_sources`,
+  `get_knowledge_status`. Each list tool that sits on a door with an
   `?id=` filter EXPOSES + FORWARDS it (R19 parity) — pass `id` to fetch one record
   instead of pulling the whole collection (`list_help_tickets` also takes `scope`;
   `list_accounts` takes `q`, `type` and `parentId`).
@@ -222,6 +223,20 @@ Today it covers:
   - learning — `create_learning`, `update_learning`, `set_learning_active`
   - help — `create_help_ticket`, `update_help_ticket`, `set_help_status`,
     `reply_help_ticket`, `add_help_stakeholder`
+  - the knowledge base — `add_knowledge_source`, `update_knowledge_source`,
+    `set_knowledge_source_active`, `sync_knowledge`. The same three acts a person
+    has on the Knowledge base screen, gated by the same `knowledge:create` /
+    `:edit` / `:delete` rights — so a token whose role cannot take a source away
+    cannot ask the assistant to take one away either. `sync_knowledge` brings the
+    base into step with the app's own rows one bounded slice at a time (call it
+    while `caughtUp` is false); the 15-minute sweep does the same unattended.
+
+  **`ask_knowledge` never writes prose.** It answers with the passages it found and
+  the SOURCES they came from, plus the compartment it searched and the sentence
+  explaining why that one. When it finds nothing it says so — `found:false`, no
+  passages, and a line to repeat instead of answering from memory (Law R23). A client
+  building an answer out of it should quote the source titles; an answer with no
+  citation is the exact failure that law exists to prevent.
 - **Bulk create:** the import pipeline — `start_import` → `add_import_file` →
   `plan_import` → `run_import`. Accounts are importable AND exportable (they were
   importable only, which made the customer spine a one-way street).
@@ -337,6 +352,14 @@ pay Anthropic — they're hitting our endpoints.
 | `agent_chat`, `agent_confirm` | Yes — one assistant turn each | The **team's AI quota** (free per day + purchased credits) AND needs the **AI-agent right** |
 | `plan_import` | Yes — one assistant unit per plan | The team's AI quota |
 | everything else | No | — |
+
+**Where the knowledge tools fall.** `ask_knowledge` is a READ and sits on the free
+side of that table: it spends ONE embedding of the question — a rounding error beside
+an assistant turn — and no model writes a word. `sync_knowledge` spends one embedding
+per CHANGED chunk and nothing at all for a row whose text has not moved, so filling the
+base for the first time over an agency's entire history measured at roughly a cent, and
+the steady state at about nothing. `agent_chat` and `agent_confirm` remain the only
+tools here that draw a whole assistant turn.
 
 That AI cost lands on **the team's quota** (our Anthropic key), **not** on the
 developer. So two levers keep it under control:
