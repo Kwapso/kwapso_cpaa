@@ -37,6 +37,7 @@ import type {
 } from "@shared/types"
 import { ApiFailure, content, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
+import { useFollowNewest } from "@shared/web/follow-newest"
 import { formatRelative } from "@shared/web/format"
 import { personName } from "@/lib/identity"
 import { usePermissions } from "@/lib/perms"
@@ -110,6 +111,18 @@ export function HelpDetailScreen({
   const [tab, setTab] = React.useState("conversation")
   const [editing, setEditing] = React.useState(false)
   const [statusBusy, setStatusBusy] = React.useState(false)
+
+  // Land on the newest reply, and follow the one you just sent — the same
+  // behaviour the client gets on their side of this same conversation, from the
+  // same seam, so the two can't drift. It sits here, above the three early
+  // returns below, because it is a hook.
+  //
+  // The optimistic echo makes this fire twice on a send (once for the local
+  // `optimistic-…` row, once when the server's real id reconciles) and that is
+  // correct — both are yours, so both follow.
+  const replyRows = repliesQ.data ?? []
+  const newestReply = replyRows[replyRows.length - 1]
+  useFollowNewest(newestReply?.id ?? null, Boolean(myUserId) && newestReply?.authorId === myUserId)
 
   const helpTypeOptions = (selectableQ.data ?? [])
     .filter((v) => v.type === "Help type")

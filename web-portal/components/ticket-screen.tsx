@@ -29,20 +29,36 @@
 // wire rather than by this component choosing not to draw something it was sent.
 // Which matters: the old version printed the agency's name for every author who
 // wasn't you, and would have introduced a client's own colleague as "kwapso".
+//
+// WHY THE CONVERSATION IS COMPOSED HERE INSTEAD OF USING THE LIBRARY'S
+// TicketThread (it used to). The owner asked for WhatsApp-style sides, and no
+// component in @kwapso/ui can express them on a NAMED thread:
+//   • TicketThread renders every reply in one left-aligned <li> — there is no
+//     per-reply side, and its <ol> is not ours to reach into.
+//   • Chat has the sides (and has them the right way round), but a ChatMessage
+//     carries no author, so a colleague and the agency would look identical —
+//     and it composes a single-line Input where a client needs to type a
+//     paragraph about a problem.
+// The library is a separate repo and is never edited from here, so the thread is
+// assembled from the primitives it does ship (Card, Badge, Textarea, Button) and
+// the bubbles reuse Chat's OWN token vocabulary — same rounded-2xl, same
+// bg-primary / bg-muted pair — so the day the library ships a Bubble the swap is
+// mechanical rather than a redesign. The ask is written up in the report.
 
 import * as React from "react"
 import Link from "next/link"
 
+import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
+import { Button } from "@kwapso/ui/registry/primitives/button/button"
+import { Card } from "@kwapso/ui/registry/primitives/card/card"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
+import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import {
-  TicketThread,
-  type TicketStatus,
-} from "@kwapso/ui/registry/collections/ticket-thread/ticket-thread"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Send } from "lucide-react"
 
 import { brand } from "@shared/brand"
 import type { HelpMessage } from "@shared/types"
+import { useFollowNewest } from "@shared/web/follow-newest"
 import { formatRelative } from "@shared/web/format"
 import { primeCache, useCached } from "@shared/web/store"
 import { ApiFailure, support } from "@/lib/api"
@@ -51,13 +67,41 @@ import { useTickets } from "@/lib/tickets"
 import { STATUS_WORDS } from "@/components/ticket-row"
 import type { PortalReady } from "@/components/portal-shell"
 
-/** wire (underscore) → the library's hyphenated status. */
-const TO_LIBRARY: Record<string, TicketStatus> = {
-  open: "open",
-  in_progress: "in-progress",
-  resolved: "resolved",
-  reopened: "reopened",
+/** WHICH SIDE A MESSAGE SITS ON — and why it is this way round.
+ *
+ * The owner asked to "show a clear distinction between chats sent by the current
+ * active user and chats sent by another user… similar to WhatsApp". He typed
+ * "ours on the left, theirs on the right" — but WhatsApp, the app he NAMED, puts
+ * YOUR OWN messages on the RIGHT. This builds the convention he named rather
+ * than the direction he typed. That is a decision, not a slip: to flip it, swap
+ * these two values and change nothing else.
+ *
+ * It is also deliberately BINARY, and that is a security property, not tidiness.
+ * The only question it asks is "did I write this". It must never key on the
+ * author id for anything more — no per-author grouping, no per-author colour, no
+ * collapsing consecutive messages by author — because two replies typed by two
+ * different staff members have to be indistinguishable. The moment the unnamed
+ * side splits into groups, it stops being "the agency" and starts being a
+ * fingerprint you can count people with (SCOPE ch.06).
+ *
+ * The wire already holds that line: to a client login a reply from our side of
+ * the fence arrives with authorId AND authorName null (shared/types HelpMessage
+ * says why). So `null === me` is false and every agency reply lands on the same
+ * side by the same route — this function must never become the second place that
+ * decision is made. */
+export const OWN_SIDE = "items-end"
+export const OTHER_SIDE = "items-start"
+export function sideFor(authorId: string | null, meId: string): string {
+  return authorId === meId ? OWN_SIDE : OTHER_SIDE
 }
+
+/** The bubble, in the library's own vocabulary — @kwapso/ui's Chat uses exactly
+ * these tokens for its me/them pair. Same radius, same surfaces, so the portal
+ * and the library don't drift into two chat languages while we wait for a
+ * primitive that can do both sides AND a name. */
+const BUBBLE = "max-w-[85%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap break-words"
+const OWN_BUBBLE = `${BUBBLE} bg-primary text-primary-foreground`
+const OTHER_BUBBLE = `${BUBBLE} bg-muted text-foreground`
 
 export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId: string }) {
   // The list is usually already warm (they tapped a row to get here), so read the
@@ -76,13 +120,45 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
     })
   )
 
-  async function reply(body: string) {
+  const me = ready.user.id
+  // ONE decision per message, taken here and never re-taken. The alignment and
+  // the bubble surface both hang off `side`, so they cannot disagree — and the
+  // author id does not survive this map, so nothing downstream can accidentally
+  // key on it (see sideFor's note on fingerprints).
+  const messages = (threadQ.data ?? []).map((m) => {
+    const side = sideFor(m.authorId, me)
+    return {
+      id: m.id,
+      side,
+      own: side === OWN_SIDE,
+      author: m.authorId === me ? "You" : (m.authorName ?? brand.name),
+      time: formatRelative(m.createdAt),
+      body: m.body,
+    }
+  })
+
+  const [draft, setDraft] = React.useState("")
+  const [sending, setSending] = React.useState(false)
+
+  // Land on the newest reply, and follow the one you just sent. Every hook here
+  // sits ABOVE the `if (!ticket)` return below, deliberately — a hook under an
+  // early return changes the hook count the first day that return fires.
+  const newest = messages[messages.length - 1] ?? null
+  useFollowNewest(newest?.id ?? null, newest?.own ?? false)
+
+  async function send() {
+    const body = draft.trim()
+    if (!body || sending) return
+    setSending(true)
     try {
       const r = await support.reply(ticketId, body)
       primeCache(cacheKeys.thread(ticketId), r.replies)
       primeCache(cacheKeys.threadTotal(ticketId), r.total)
+      setDraft("")
     } catch (e) {
       toast.error(e instanceof ApiFailure ? e.message : "Couldn't send that. Try again.")
+    } finally {
+      setSending(false)
     }
   }
 
@@ -112,31 +188,61 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
       </div>
     )
 
-  const me = ready.user.id
-  const replies = (threadQ.data ?? []).map((m) => ({
-    id: m.id,
-    author: m.authorId === me ? "You" : (m.authorName ?? brand.name),
-    time: formatRelative(m.createdAt),
-    body: m.body,
-  }))
+  const status = STATUS_WORDS[ticket.status]
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
       {back}
-      <TicketThread
-        ticket={{
-          description: ticket.description,
-          type: STATUS_WORDS[ticket.status].label,
-          status: TO_LIBRARY[ticket.status] ?? "open",
-        }}
-        replies={replies}
-        // No @mentions from this surface: a client has no business naming which
-        // staff member picks their request up.
-        members={[]}
-        canResolve={false}
-        showStatusControl={false}
-        onReply={(body) => void reply(body)}
-      />
+
+      {/* What you asked, and where it stands — in the portal's own words. One
+       * badge, not two: the library's header showed its own English status
+       * ("Open", "In progress") beside this one, so the same fact appeared twice
+       * and half of it was the agency's vocabulary rather than the client's. */}
+      <Card className="hover-lift-none flex flex-col gap-3 p-4">
+        <Badge variant={status.variant} className="w-fit">
+          {status.label}
+        </Badge>
+        <p className="break-words">{ticket.description}</p>
+      </Card>
+
+      <ol className="flex flex-col gap-3">
+        {messages.map((m) => (
+          <li key={m.id} className={`flex flex-col gap-1 ${m.side}`}>
+            {/* Who and when, above the bubble. Your own side says only the time —
+             * the side IS the attribution, which is the whole point. */}
+            <span className="text-muted-foreground px-1 text-xs">
+              {m.own ? m.time : `${m.author} · ${m.time}`}
+            </span>
+            <div className={m.own ? OWN_BUBBLE : OTHER_BUBBLE}>{m.body}</div>
+          </li>
+        ))}
+      </ol>
+
+      {/* No @mentions from this surface: a client has no business naming which
+       * staff member picks their request up — so no mention hint in the
+       * placeholder either, which the library's composer showed while the portal
+       * passed it an empty member list and the "@" did nothing. */}
+      <Card className="hover-lift-none flex flex-col gap-2 p-3">
+        <Textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="Write a reply…"
+          rows={3}
+          className="resize-none"
+          aria-label="Reply"
+          disabled={sending}
+        />
+        <Button
+          type="button"
+          size="sm"
+          className="self-end"
+          disabled={!draft.trim() || sending}
+          onClick={() => void send()}
+        >
+          <Send className="size-3.5" />
+          {sending ? "Sending…" : "Reply"}
+        </Button>
+      </Card>
     </div>
   )
 }

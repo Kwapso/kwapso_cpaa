@@ -40,7 +40,18 @@ export function FormShell({
       <Separator />
       <div className="flex flex-col gap-4 py-4">{children}</div>
       <Separator />
-      <div className="flex flex-wrap justify-end gap-2 pt-4">{footer}</div>
+      {/* pt-6, not pt-4, and this is the ONE value that governs it everywhere.
+       * Separator is used in exactly one place across both front doors — right
+       * here — so every form in the agency app AND the portal shared the same
+       * 1rem gap between the hairline and the action button, and at the portal's
+       * larger reading size a 42px pill sitting 17px under a full-width rule
+       * reads as a collision (owner, staging, Aug 2026). 1.5rem matches the
+       * dialog's own p-6, so the action row now breathes the same as the card.
+       * Deliberately ASYMMETRIC with the pb-4/py-4 above: those separate text
+       * from text, this one separates a heavy control from everything else.
+       * Nothing to ask of the library — its Separator is a bare h-px with no
+       * margin, which is correct; the spacing was always ours to set. */}
+      <div className="flex flex-wrap justify-end gap-2 pt-6">{footer}</div>
     </form>
   )
 }
