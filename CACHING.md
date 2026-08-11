@@ -255,7 +255,7 @@ cache (rule 9) — defeating cache-first entirely and multiplying server calls (
 enforces "no spinner on navigation" from Loading rule 2 above).
 
 The **whole post-auth app** is ONE static shell (`deep-link-screen.tsx` resolves
-`/home`, `/settings`, `/invitations`, `/learning`, `/help`, and the `/t/**` tree
+`/home`, `/settings`, `/invitations`, `/learning`, `/tickets`, and the `/t/**` tree
 from the URL). Move between any of them with the **History API**
 (`window.history.pushState` / `replaceState`) — Next observes it, the route
 segment never changes, nothing reloads, the cache stays warm — then re-render from

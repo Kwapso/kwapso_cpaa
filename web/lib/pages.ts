@@ -20,7 +20,7 @@ export const NAV: NavItem[] = [
 
 /** The mobile bottom-bar set: only destinations the user can reach, capped at 5
  * (extras would fold into a "More" entry), in the SAME order as the desktop rail —
- * Home, Learning, Help, Settings (the owner's locked order; no centre-pinning).
+ * Home, Learning, Tickets, Settings (the owner's locked order; no centre-pinning).
  * Generic over the link shape so the shell can pass its composed Home + team
  * sidebar pages + Settings list, not just the bare NAV. */
 export function bottomNavItems<T extends { slug: string }>(items: T[]): T[] {
@@ -40,7 +40,7 @@ export type TeamSection = {
     | "dropdowns"
     | "accounts"
     | "learning"
-    | "help"
+    | "tickets"
     | "import"
   title: string
   module: string
@@ -72,10 +72,18 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // setting. Its count is an exact server total (R16) keyed off the same
   // `accounts:<teamId>` cache the list reads, so the badge and the rows agree.
   { key: "accounts", title: "Accounts", module: "accounts", segment: "accounts", placement: "sidebar", countCacheKey: "accounts" },
-  // Learning + Help are first-class SIDEBAR pages (not buried tabs) — team-scoped,
-  // each gated by its own read right. The URL segment IS the permission module.
+  // Learning + Tickets are first-class SIDEBAR pages (not buried tabs) —
+  // team-scoped, each gated by its own read right.
+  //
+  // Tickets is the one place in this table where the URL segment is NOT the
+  // permission module. The section, the page and the address bar say `tickets`,
+  // because that is the word for the thing (glossary, SCOPE ch.02). The right the
+  // server enforces is still `help`: it is the string sitting in every role's
+  // permission sheet, in every team database, and renaming it would be a data
+  // migration that could only ever take somebody's access away. `MODULE_PERMISSION`
+  // in lib/screens.ts is the one seam that translates between the two.
   { key: "learning", title: "Learning", module: "learning", segment: "learning", placement: "sidebar", countCacheKey: "learning" },
-  { key: "help", title: "Help", module: "help", segment: "help", placement: "sidebar", countCacheKey: "help" },
+  { key: "tickets", title: "Tickets", module: "help", segment: "tickets", placement: "sidebar", countCacheKey: "help" },
   // Import has NO read-right of its own — it's gated per-target (create on
   // member_roles or learning). Reached CONTEXTUALLY from an "Import CSV" button on
   // those pages (which land on /t/<team>/import/<tableKey>), never a tab.
@@ -100,7 +108,7 @@ export const CONCEPT_ICON = {
   contacts: "contact",
   portal: "key-round",
   learning: "graduation-cap",
-  help: "life-buoy",
+  tickets: "life-buoy",
   import: "upload",
   activity: "history",
 } as const

@@ -1,4 +1,4 @@
-// Help routes: list tickets (My/All tabs = a creator filter), read one ticket's
+// Ticket routes: list tickets (My/All tabs = a creator filter), read one ticket's
 // thread, raise a ticket, edit it, move its fixed status, and reply. Mirrors the
 // learning routes: open with the shared gated opening (teamContext + requireRight
 // on the `help` module + defensive body read), parse + 400 on bad input, then
@@ -258,7 +258,7 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
   // makes the app SEND EMAIL, from the team's own verified sender, carrying the
   // caller's text — and a mention is what aims it. Everything a client needs is
   // already here without one: the reply lands on their ticket and the agency
-  // reads it in Help. What a mention adds is a list of staff ids to fire at, and
+  // reads it in Tickets. What a mention adds is a list of staff ids to fire at, and
   // a client has no way to legitimately know one (the portal serves no member
   // list, and the stakeholder door — which NAMES staff — is deliberately off its
   // surface). So an array here can only have been hand-written, and it is

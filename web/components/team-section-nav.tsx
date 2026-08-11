@@ -29,7 +29,7 @@ export function TeamSectionNav({
   onNavigate: (href: string) => void
 }) {
   if (!perms) return null
-  // Only "tab" sections live in this strip — Learning/Help are sidebar pages and
+  // Only "tab" sections live in this strip — Learning/Tickets are sidebar pages and
   // Import is reached contextually. Each tab is gated by its own read right.
   const visible = TEAM_SECTIONS.filter((s) => s.placement === "tab" && perms[s.module]?.read)
   if (visible.length <= 1) return null

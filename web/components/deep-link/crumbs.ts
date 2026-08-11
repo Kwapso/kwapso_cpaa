@@ -29,7 +29,7 @@ function recordLabel(module: string | null, recordId: string | null, records: Cr
   if (module === "roles") return records.roles.find((r) => r.id === recordId)?.title ?? "Role"
   if (module === "invites") return records.invites?.find((i) => i.id === recordId)?.email ?? "Invite"
   if (module === "learning") return records.learning?.find((l) => l.id === recordId)?.title ?? "Article"
-  if (module === "help") return "Ticket"
+  if (module === "tickets") return "Ticket"
   return ""
 }
 
@@ -56,7 +56,7 @@ export function buildCrumbs({
     if (label) crumbs.push({ label })
   }
   if (topLevel) {
-    // A top-level page (Learning / Help) — its OWN page, not under Settings.
+    // A top-level page (Learning / Tickets) — its OWN page, not under Settings.
     crumbs.push({ label: sectionTitle(module ?? ""), href: recordId ? sectionPath : undefined })
     if (recordId) last()
     return crumbs

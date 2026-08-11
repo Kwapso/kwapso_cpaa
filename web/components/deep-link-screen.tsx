@@ -64,7 +64,7 @@ export function DeepLinkScreen() {
   const query = route?.query ?? {}
   const topLevel = route?.topLevel ?? false
 
-  // Top-level pages (/learning, /help) run against the ACTIVE team (like /home);
+  // Top-level pages (/learning, /tickets) run against the ACTIVE team (like /home);
   // /t/<id> URLs name their team explicitly, so only those switch teams.
   const { teamId, onTeam, enabled, isMemberOfUrlTeam, teamCount, noAccess } = useRouteTeam({
     active,
@@ -75,7 +75,7 @@ export function DeepLinkScreen() {
 
   /* --------------------------------- the data -------------------------------- */
 
-  // Which ticket set the help screen shows. It is a SERVER scope (R14: the list
+  // Which ticket set the Tickets screen shows. It is a SERVER scope (R14: the list
   // is paged, so the door filters by raiser — not a client filter over a page),
   // so it must be declared ABOVE the reads that key off it.
   const [helpScope, setHelpScope] = React.useState<"mine" | "all">("all")
@@ -296,7 +296,7 @@ export function DeepLinkScreen() {
 }
 
 /** The team tab strip for a module: which section is current, whether the strip
- * shows at all, and the badge on each tab. Learning/Help are sidebar PAGES and
+ * shows at all, and the badge on each tab. Learning/Tickets are sidebar PAGES and
  * Import is contextual, so the strip shows only on the "tab" sections (Overview /
  * Members / Roles / Invites). The badges are DERIVED from each section's own
  * countCacheKey (LAW R8) — never hand-listed — and a total that hasn't loaded
@@ -312,7 +312,7 @@ function teamTabStrip(
     module === "dropdowns" ||
     module === "accounts" ||
     module === "learning" ||
-    module === "help" ||
+    module === "tickets" ||
     module === "import"
       ? module
       : "overview"

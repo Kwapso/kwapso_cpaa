@@ -1,7 +1,7 @@
 "use client"
 
-// The ticket list, as the portal reads it — one place, because Home and Support
-// both show it and must never disagree about what "your requests" means.
+// The ticket list, as the portal reads it — one place, because Home and Tickets
+// both show it and must never disagree about what "your company's tickets" means.
 //
 // R14: tickets are a GROWING collection, so the door PAGES by key. This hook
 // holds page one plus everything appended since, and `loadMore` walks the opaque

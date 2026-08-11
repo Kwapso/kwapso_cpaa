@@ -1,4 +1,4 @@
-// Help notifications — when someone replies to a ticket or @mentions a member,
+// Ticket notifications — when someone replies to a ticket or @mentions a member,
 // tell the people who'd want to know: the ticket's raiser (someone answered them)
 // and anyone mentioned. Required communication: it happened to them but they
 // didn't trigger it. Sent through the SAME branded template + auth-worker sender
@@ -126,7 +126,7 @@ export async function notifyReplyAndMentions(
         await send(env, u.email, subject, {
           heading,
           intro,
-          footnote: "Open the ticket in Help to read the full conversation and reply.",
+          footnote: "Open the ticket to read the full conversation and reply.",
         }).catch((e) => console.error("help reply notice failed:", e))
       })
     )

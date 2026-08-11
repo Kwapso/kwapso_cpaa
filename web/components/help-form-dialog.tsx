@@ -1,8 +1,8 @@
 "use client"
 
-// Help form dialog — raise a NEW ticket, or EDIT one (when `initial` is present).
+// Ticket form dialog — raise a NEW ticket, or EDIT one (when `initial` is present).
 // Description is required; Type is an optional DROPDOWN drawn from the team's
-// "Help type" dropdown values (selectable_data). Every member can see every ticket
+// "Ticket type" dropdown values (selectable_data). Every member can see every ticket
 // (the My/All tabs are just a raiser filter), so there's no audience picker.
 // Library primitives.
 
@@ -50,7 +50,7 @@ export function HelpFormDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
   onSubmit: (input: { description: string; helpType?: string }) => Promise<void>
-  /** The team's active "Help type" dropdown values. */
+  /** The team's active "Ticket type" dropdown values. */
   helpTypeOptions: string[]
   /** Present = EDIT mode (prefilled). */
   initial?: { description: string; helpType?: string | null }

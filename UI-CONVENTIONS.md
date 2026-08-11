@@ -115,7 +115,7 @@ export const BASE_RECIPES: Record<string, ScreenRecipe> = {
   "invites.list":   invitesListRecipe,
   "invites.detail": inviteDetailRecipe,
   "learning.list":  learningListRecipe,
-  "help.list":      helpListRecipe,
+  "tickets.list":   ticketsListRecipe,
   "accounts.list":  accountsListRecipe,
 }
 ```
@@ -192,8 +192,8 @@ The `deep-link-screen.tsx` resolver holds both worlds together: it renders a
 
 One static shell (`deep-link-screen.tsx`) backs the whole `/t/*` tree.
 `/t/<teamId>/<module>/<id>` is resolved **client-side** (a static export can't
-prerender ids). Learning and Help also have clean top-level URLs (`/learning`,
-`/help`) that run against the active team. The friendly URL segment maps to the real
+prerender ids). Learning and Tickets also have clean top-level URLs (`/learning`,
+`/tickets`) that run against the active team. The friendly URL segment maps to the real
 permission module the server enforces:
 
 ```ts
@@ -201,12 +201,12 @@ permission module the server enforces:
 export const MODULE_PERMISSION: Record<string, string> = {
   team: "teams", members: "team_members", roles: "member_roles",
   invites: "team_members", dropdowns: "selectable_data",
-  learning: "learning", help: "help", accounts: "accounts",
+  learning: "learning", tickets: "help", accounts: "accounts",
 }
 ```
 
 Learning, Help and **Accounts** each have a clean top-level URL too (`/learning`,
-`/help`, `/accounts`) — a sidebar page resolves the team from context, like `/home`.
+`/tickets`, `/accounts`) — a sidebar page resolves the team from context, like `/home`.
 A new one needs three lines: `TOP_LEVEL_MODULES` (`deep-link/route.ts`), the
 gateway's top-level shell loop, and its own `web/app/<segment>/[[...rest]]/page.tsx`.
 
@@ -277,7 +277,7 @@ expect(offenders, `use the library TabsView instead of hand-rolled toggles`).toE
 ```
 
 Real `TabsView` usage — the learning list's Articles / Team-progress strip and the
-Help list's All / My raiser strip in `deep-link-screen.tsx` — is `variant: "line"`
+Tickets list's All / My raiser strip in `deep-link-screen.tsx` — is `variant: "line"`
 config with `tabs`, `badge`, `badgeVariant`, and an `onValueChange` that drives the URL
 (`?tab=…`) so Back works.
 

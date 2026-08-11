@@ -169,7 +169,7 @@ describe("agency gateway — the screens (the static-export trap)", () => {
   })
 
   it("serves each module's own shell for its sub-paths", async () => {
-    for (const mod of ["accounts", "learning", "help"]) {
+    for (const mod of ["accounts", "learning", "tickets"]) {
       const log: string[] = []
       await call("GET", `/${mod}/01RECORD`, log)
       expect(log, `/${mod}/<id> must resolve to the ${mod} shell`).toEqual([`ASSETS /${mod}`])

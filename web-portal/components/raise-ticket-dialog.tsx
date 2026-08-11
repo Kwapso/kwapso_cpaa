@@ -3,7 +3,7 @@
 // RAISE A TICKET — one box, one button.
 //
 // The agency's version of this form also offers a Type dropdown (drawn from the
-// team's editable "Help type" values) and a link to manage those values. Neither
+// team's editable "Ticket type" values) and a link to manage those values. Neither
 // belongs here: choosing a category is a job the client shouldn't have to do to
 // ask for help, and the dropdown door isn't on the portal's surface at all. The
 // agency can type the ticket after it lands.

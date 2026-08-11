@@ -14,7 +14,7 @@ description: The one-shot foundation builder — given an app name, it clones th
 
 Given an **app name** (and an optional platform — default Cloudflare), stand up a
 complete new product on the Brimba base: multi-tenant auth, teams, roles, invites,
-learning, help, CSV import, the AI agent, and the MCP surface — all working on the
+learning, tickets, CSV import, the AI agent, and the MCP surface — all working on the
 new account under the new name, backed up to GitHub, verified end to end, and ready
 to brand. The owner is low-code: keep talk short and plain, summarize, don't dump logs.
 

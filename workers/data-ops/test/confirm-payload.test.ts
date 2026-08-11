@@ -113,7 +113,9 @@ describe("the confirm panel shows the payload it asks an admin to approve", () =
     })
     const text = lines.join("\n")
     expect(text).toContain("Learning: read, create")
-    expect(text).toContain("Help: read")
+    // The permission KEY is still `help` (the string in every role's sheet); the
+    // LABEL the panel prints is the word a person reads, and that word is Tickets.
+    expect(text).toContain("Tickets: read")
     expect(text).toContain("Members: no access")
     expect(text).toContain("Roles & permissions: no access")
     // Every module in the app's own words, none skipped.

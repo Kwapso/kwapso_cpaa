@@ -63,7 +63,7 @@ export type PermissionValue = Record<string, RightSet>
 
 /** A per-team dropdown value ("selectable data"): a `value` inside a `type` group
  * (e.g. "Video link" in "File type"). Managed on the team Settings page; powers
- * the Learning-category / Help-type pickers. */
+ * the Learning-category / Ticket-type pickers. */
 export type SelectableValue = {
   id: string
   type: string

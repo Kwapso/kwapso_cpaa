@@ -99,7 +99,7 @@ const AGENT_ONLY: AgentTool[] = [
     name: "set_help_status_by_filter",
     description:
       "The SET-shaped bulk: move EVERY support ticket matching a facet filter (status and/or type — the " +
-      "same facets the Help screen sends; free text is NOT accepted for a write) to one status, in one " +
+      "same facets the Tickets screen sends; free text is NOT accepted for a write) to one status, in one " +
       "call. Call it FIRST with dryRun:true to learn the TRUE match count, then again for real — the " +
       `count you state must come from that dry run. Refuses a filter matching more than ${BULK_IDS_LIMIT} ` +
       "tickets; a re-run changes nothing (idempotent).",

@@ -16,7 +16,7 @@ import { parseRoute, TOP_LEVEL_MODULES, type Route } from "@/components/deep-lin
 type HostRouter = ReturnType<typeof useRouter>
 
 /** A path this host owns, so it can be reached with the History API (no reload):
- * the whole /t/* tree, plus the top-level module pages (/learning, /help). */
+ * the whole /t/* tree, plus the top-level module pages (/learning, /tickets). */
 export function isInAppPath(p: string): boolean {
   return p.startsWith("/t") || TOP_LEVEL_MODULES.some((m) => p === `/${m}` || p.startsWith(`/${m}/`))
 }

@@ -23,7 +23,7 @@ the concrete form of the planning ritual's step 4 (CLAUDE.md).
 
 - **A new capability → a route on an existing worker.** Almost never a new worker — the
   seven are locked (ARCHITECTURE.md). A new module = new routes on the worker that owns
-  its domain (tenancy for team-scoped config, content for learning/help-shaped modules,
+  its domain (tenancy for team-scoped config, content for learning/ticket-shaped modules,
   data-ops for import/agent). A new worker is an ARCHITECTURE decision (a genuinely new
   bounded context with its own scaling/security boundary), not a build-time one.
 - **New data → a column, then a table, then a database.** A column on an existing table

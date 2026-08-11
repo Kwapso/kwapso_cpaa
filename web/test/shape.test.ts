@@ -239,9 +239,12 @@ describe("shapeHelpList", () => {
     expect(String(shapeHelpList([long]).rows?.[0].name).endsWith("…")).toBe(true)
   })
 
-  it('falls back the type to "Help" when helpType is null', () => {
+  // The untyped fallback is "General" — the SAME word the ticket detail's
+  // Overview prints, so a ticket with no type doesn't read as two things. It used
+  // to say "Help", which was the section's old name doing duty as a type.
+  it('falls back the type to "General" when helpType is null', () => {
     const { rows } = shapeHelpList([{ ...ticket, helpType: null }])
-    expect(String(rows?.[0].detail).startsWith("Help · ")).toBe(true)
+    expect(String(rows?.[0].detail).startsWith("General · ")).toBe(true)
   })
 })
 

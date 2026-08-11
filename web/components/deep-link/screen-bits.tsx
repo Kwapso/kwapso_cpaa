@@ -62,7 +62,7 @@ export function SectionWithCreate({
    * anyone who can see the screen (hidden while the list is empty). */
   download?: { show: boolean; label: string; href: string }
   /** Content shown between the create row and the boxed collection, OUTSIDE the
-   * card — e.g. Help's My/All raiser strip (it scopes the list, not part of it). */
+   * card — e.g. the Tickets My/All raiser strip (it scopes the list, not part of it). */
   aboveCard?: React.ReactNode
   children: React.ReactNode
 }) {

@@ -1,7 +1,7 @@
 "use client"
 
-// One ticket, as a row — shared by Home (the newest few) and Support (all of
-// them), so the same request never looks like two different things.
+// One ticket, as a row — shared by Home (the newest few) and Tickets (all of
+// them), so the same ticket never looks like two different things.
 //
 // What it shows: what you asked, where it stands, and when. What it does NOT
 // show: who at the agency has it. "The portal shows work status but never which
@@ -29,7 +29,7 @@ export function TicketRow({ ticket }: { ticket: HelpTicket }) {
   const status = STATUS_WORDS[ticket.status]
   return (
     <Link
-      href={`/support/${ticket.id}`}
+      href={`/tickets/${ticket.id}`}
       className="hover:bg-accent/50 flex items-center gap-3 rounded-xl border p-4 transition-colors"
     >
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">

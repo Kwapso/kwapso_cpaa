@@ -41,7 +41,7 @@ import { AccountSwitcher } from "@/components/account-switcher"
  * thing to wonder about. */
 const DESTINATIONS = [
   { href: "/home", label: "Home", icon: House },
-  { href: "/support", label: "Support", icon: LifeBuoy },
+  { href: "/tickets", label: "Tickets", icon: LifeBuoy },
   { href: "/company", label: "My company", icon: Building2 },
 ] as const
 

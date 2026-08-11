@@ -32,20 +32,43 @@ logging in for. Nothing else in the product matters if this is wrong.
 
 ## 1 · The one decision that shapes everything
 
-**The work engine's Ticket GROWS OUT OF the base's Help module. It is not a new
-table beside it.**
+**The module is already called Tickets. There is ONE of it. Your job is to
+extend it — types, states, triage, stories, reference numbers — not to build a
+second one beside it.**
 
-The owner confirmed this after it was explained. The reasoning, so you do not
+There was never a Help section *and* a ticket section. There was one module
+wearing the wrong name, and the rename shipped on 11 Aug 2026. What a person sees
+now says **Tickets** everywhere: the sidebar, the heading, the breadcrumb, the
+address (`/tickets`, `/t/<teamId>/tickets/<id>` in the agency app,
+`/tickets` in the portal), the dropdown vocabulary (`Ticket type`,
+`Ticket status`) and the glossary. The portal says the same word the agency does —
+one dictionary, both front doors (Law R6).
+
+**Underneath, the name is still `help`, on purpose.** Do not "finish the rename"
+by changing these; each is a data migration whose only possible outcome is
+breaking something:
+
+| Still `help` | Why it stays |
+|---|---|
+| the permission module key (`help:read/create/edit/delete`) | it is the string sitting in `role_permissions` in every team database — renaming it can only take somebody's access away |
+| the tables `help` + `help_threads`, and `activity.related_table = 'help'` | renaming orphans every activity row already written about a ticket |
+| the API paths `/api/content/help*` | they are `PORTAL_DOORS` entries, `PORTAL_VISIBLE_READS/WRITES` keys and R21's derivation input |
+| the MCP tool names (`list_help_tickets`, `create_help_ticket`, …) | a published external contract — outside clients call these by name |
+
+`web/lib/screens.ts` `MODULE_PERMISSION` is the ONE seam where the two names
+meet (`tickets: "help"`), and `web/test/nav.test.ts` fails if it is removed —
+without it the whole section renders NotFound.
+
+The reasoning behind extending rather than starting fresh, so you do not
 relitigate it: `workers/content/src/lib/help.ts` already holds a ticket, a
 threaded conversation, a status lifecycle, an account fence, live updates, an
-activity trail and a client-portal screen (`web-portal/`, the "support" screens)
-— all built and tested. A second ticket means a second one of each of those,
-forever, plus two things called a ticket in every conversation anyone has about
-this product.
+activity trail and a client-portal screen — all built and tested. A second ticket
+means a second one of each of those, forever, plus two things called a ticket in
+every conversation anyone has about this product.
 
-So: **extend `help` into the work engine's ticket.** Keep the existing rows
-working. Do not hide the Help section in either app — it becomes the ticket
-section. Rename in the glossary (§9), not by building a parallel world.
+So: **extend it.** Keep the existing rows working. Add the work engine's
+vocabulary on top — the four types, the five states, drag-rank, triage, the
+reference number, and the stories that hang off a ticket (§2 onward).
 
 The client portal is **not** a separate application. `web-portal/` lives in this
 repository, is served by `workers/portal-gateway`, and reads the *same rows* as
@@ -218,7 +241,7 @@ client; everything else lives in the portal for them to look at.
 ## 9 · Glossary and naming
 
 `shared/glossary.ts` is the single source of product terms (Law R6) and it
-currently has **no word** for story, sprint, work log, timer, triage, engagement
+already says **Ticket** (rewritten with the rename) but has **no word** for story, sprint, work log, timer, triage, engagement
 type, to-do or App. SCOPE ch.02 defines all of them. **Port ch.02 into the
 glossary rather than inventing anything.**
 
@@ -253,7 +276,7 @@ with no home today are listed in `normalised.json` under `deferred`.
 ## 11 · The order to build in
 
 1. **Glossary first** (§9). Every screen and column name depends on it.
-2. **Extend `help` into Ticket**: types, the five states, the ranking, `account_id`
+2. **Extend the ticket** (the `help` table): types, the five states, the ranking, `account_id`
    (already there), the reference number.
 3. **Stories**, with the sprint link and the required process-step-on-close.
 4. **The ticket↔story transaction**: Ready flips exactly once, idempotently (R17).
@@ -276,7 +299,7 @@ Ship each step green. Do not build all ten and then test.
   all grow) must **page by key**: opaque cursor, exact total, `hasMore`, through
   `pagedJson`, with a client that can reach page two.
 - **R15** every published resource reaches a listener, via
-  `web/lib/live-resources.ts` or `PORTAL_LISTENERS`. Note the portal's help pings
+  `web/lib/live-resources.ts` or `PORTAL_LISTENERS`. Note the portal's ticket pings
   were silently dead until today — a resource must be in
   `SCOPE_STAMPED_RESOURCES` and carry its account on the event, or the fence
   discards it.

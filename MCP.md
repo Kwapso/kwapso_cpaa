@@ -2,7 +2,7 @@
 
 Kwapso has an **external machine surface**: an AI agent, a script, or an automation
 can do the same things a person can — invite/manage members, read and write learning
-and help, run imports, pull CSV exports, even talk to the in-app assistant — over the
+and tickets, run imports, pull CSV exports, even talk to the in-app assistant — over the
 **Model Context Protocol (MCP)**. This is the `mcp` worker (ARCHITECTURE → the MCP
 front desk). This doc is for the **developer** who wants to connect a tool to it.
 

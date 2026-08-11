@@ -1,6 +1,6 @@
 "use client"
 
-// Help detail — one ticket as a tabbed record: a status STEPPER (the hero control)
+// Ticket detail — one ticket as a tabbed record: a status STEPPER (the hero control)
 // above Conversation / Overview / Activity tabs. Conversation = the chat (library
 // TicketThread), Overview = audit metadata (DescriptionList), Activity = the
 // ticket's history (the GENERIC record-activity feed). Edit + every status move are
@@ -112,7 +112,7 @@ export function HelpDetailScreen({
   const [statusBusy, setStatusBusy] = React.useState(false)
 
   const helpTypeOptions = (selectableQ.data ?? [])
-    .filter((v) => v.type === "Help type")
+    .filter((v) => v.type === "Ticket type")
     .map((v) => v.value)
 
   async function changeStatus(next: HelpStatusValue) {

@@ -10,7 +10,7 @@ export type Env = {
   REALTIME: Fetcher
   /** Learning media (uploaded files), served by the gateway. */
   LEARNING_MEDIA: R2Bucket
-  /** Help media (screen recordings, attachments), served by the gateway. */
+  /** Ticket media (screen recordings, attachments), served by the gateway. */
   HELP_MEDIA: R2Bucket
 
   /** Cloudflare account id (plain var) — for reaching per-team databases. */

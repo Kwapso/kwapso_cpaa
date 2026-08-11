@@ -1,7 +1,7 @@
 "use client"
 
 // Which team the screen runs against, and whether you may be here. A /t/<id> URL
-// names its team explicitly; a top-level page (/learning, /help) runs against the
+// names its team explicitly; a top-level page (/learning, /tickets) runs against the
 // ACTIVE team, like /home does. A deep link to another of your teams switches to
 // it; a link to a team you've left hands you back to the active team's home.
 

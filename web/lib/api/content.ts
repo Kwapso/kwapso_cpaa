@@ -1,4 +1,4 @@
-// CONTENT — learning articles and the help desk.
+// CONTENT — learning articles and tickets.
 //
 // One of the five door lists behind `@/lib/api`. They are split by WORKER,
 // because that is the boundary the doors already have: a path under
@@ -21,7 +21,7 @@ import type {
 import { api, enc, post } from "@shared/web/api"
 import type { PagedResponse } from "@shared/web/api"
 
-/** Content worker — Learning + Help (team-DB content modules). */
+/** Content worker — Learning + Tickets (team-DB content modules). */
 export const content = {
   learning: () => api<{ learning: Learning[]; total: number }>("/api/content/learning"),
   learningOne: (id: string) =>

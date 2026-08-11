@@ -59,7 +59,7 @@ route may reach `/internal/*`, the agent, or the act-as-user surface).
 | `realtime` | no | the `TeamChannel` Durable Object — fans out live change pings |
 | `auth` | no | email-code login, sessions, the email sender |
 | `tenancy` | no | teams, members, Member roles + permissions, invites, dropdown values, the customer spine |
-| `content` | no | Learning + Help |
+| `content` | no | Learning + Tickets |
 | `data-ops` | no | CSV import + the AI agent |
 | `mcp` | no | the external machine surface: personal access tokens → team-pinned sessions → the MCP tool catalog at `/mcp` (routed only via the agency gateway) |
 | `gateway` | **YES** | the AGENCY front desk: serves `web/out` + routes `/api/*` (incl. `/mcp` + `/api/mcp/*`) by PREFIX + serves `/media/*` |

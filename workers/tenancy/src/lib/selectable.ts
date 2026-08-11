@@ -1,6 +1,6 @@
 // Dropdown values ("Selectable data") module — the per-team dropdown VALUES,
 // grouped by TYPE (e.g. "File type" → Image file / Video link…), in the team's
-// OWN database. Admins manage them so the Learning-category / Help-type pickers
+// OWN database. Admins manage them so the Learning-category / Ticket-type pickers
 // stay theirs to shape. Deactivate-only (ARCHITECTURE §4): a removed value is
 // retired, never hard-deleted, so old rows that referenced it stay truthful.
 

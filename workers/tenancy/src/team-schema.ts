@@ -111,7 +111,7 @@ CREATE TABLE invite_logs (
   {
     // The next-build modules (learning + help + import + the agent's saved
     // conversations), all per-team. See AGENT-MODULES-PLAN.md + the design notes.
-    // Help is team-wide (My/All tabs = a creator filter, no row-level privacy).
+    // Tickets are team-wide (My/All tabs = a creator filter, no row-level privacy).
     // Agent conversations get their OWN tables (not help's). Module file storage
     // lives in per-module R2 buckets with a per-team key prefix (not in D1).
     version: "0004_modules",
@@ -145,7 +145,7 @@ CREATE TABLE learning_progress (
   UNIQUE (learning_id, user_id)
 );
 
--- Help tickets (team-wide). The built-in status (open/in_progress/resolved/
+-- Tickets (team-wide). The built-in status (open/in_progress/resolved/
 -- reopened) is the source of truth the code trusts; help_type is a cosmetic
 -- selectable value. source_* captures the screen/record a ticket was raised from.
 CREATE TABLE help (
@@ -408,6 +408,33 @@ UPDATE help SET account_id = (
 ) WHERE account_id IS NULL AND creator_id IS NOT NULL;
 `,
   },
+  {
+    version: "0010_ticket_vocabulary",
+    sql: `
+-- THE SECTION IS CALLED TICKETS (owner ruling, 11 Aug 2026). The dropdown
+-- vocabulary carried the old name in its DATA, not its code: every team's
+-- selectable_data holds rows typed 'Help type' and 'Help status', and that
+-- string is what the Dropdown values screen prints as a group heading and what
+-- the ticket form filters on. Renaming the seed alone would rename it for teams
+-- created AFTER this deploy and leave every existing team's type picker empty,
+-- because the reader looks for the new name and the rows still say the old one.
+--
+-- So the rows move too. Only the LABEL changes — each value ('Bug report',
+-- 'resolved') and each id is untouched, so a ticket that already names a type
+-- goes on naming it.
+UPDATE selectable_data SET type = 'Ticket type' WHERE type = 'Help type';
+UPDATE selectable_data SET type = 'Ticket status' WHERE type = 'Help status';
+
+-- The same sentence about the screen-recipe store, which is keyed by the recipe
+-- key and whose key changed with the URL segment ('help.list' -> 'tickets.list').
+-- A team that had reshaped its ticket list would find its override silently
+-- ignored: the resolver would ask for a key nobody wrote and fall back to the
+-- base recipe. INSERT OR IGNORE-shaped on purpose — if somebody has already
+-- written the new key, theirs wins and the stale row is dropped.
+UPDATE OR IGNORE screens SET module = 'tickets.list' WHERE module = 'help.list';
+DELETE FROM screens WHERE module = 'help.list';
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }
@@ -420,14 +447,14 @@ export const DEFAULT_SELECTABLE: { type: string; value: string }[] = [
   { type: "File type", value: "Video link" },
   { type: "File type", value: "Other file" },
   { type: "File type", value: "Other link" },
-  { type: "Help type", value: "Report user" },
-  { type: "Help type", value: "Bug report" },
-  { type: "Help type", value: "How to use ?" },
-  { type: "Help type", value: "Feature request" },
-  { type: "Help type", value: "Payment issue" },
-  { type: "Help status", value: "not started" },
-  { type: "Help status", value: "in progress" },
-  { type: "Help status", value: "resolved" },
+  { type: "Ticket type", value: "Report user" },
+  { type: "Ticket type", value: "Bug report" },
+  { type: "Ticket type", value: "How to use ?" },
+  { type: "Ticket type", value: "Feature request" },
+  { type: "Ticket type", value: "Payment issue" },
+  { type: "Ticket status", value: "not started" },
+  { type: "Ticket status", value: "in progress" },
+  { type: "Ticket status", value: "resolved" },
 ]
 
 /**

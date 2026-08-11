@@ -24,7 +24,7 @@ the whole SPA — a running agent included — down.
 **Why it's a non-issue now.** The **entire post-auth app is ONE client-resolved
 shell** — `deep-link-screen.tsx` mounts once and never unmounts, and it resolves
 *every* app URL from `window.location`: the team tree `/t/**`, the sidebar pages
-`/learning` + `/help`, AND the account screens `/home` + `/settings` +
+`/learning` + `/tickets`, AND the account screens `/home` + `/settings` +
 `/invitations` (each renders `<DeepLinkScreen/>` and is dispatched to a screen
 component — `ACCOUNT_MODULES` in `deep-link/route.ts`). So there is no cross-route
 boundary left to cross *inside the app*. Only the **pre-auth** routes (`/login`,

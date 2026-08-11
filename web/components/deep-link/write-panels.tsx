@@ -137,7 +137,7 @@ export function WritePanels({
 
       {/* Raise a help ticket (?panel=add&module=help) — gated by create. */}
       <HelpFormDialog
-        open={query.panel === "add" && query.module === "help" && can("help", "create")}
+        open={query.panel === "add" && query.module === "tickets" && can("help", "create")}
         onOpenChange={(o) => !o && closePanel()}
         draftKey={teamId ? `help:new:${teamId}` : undefined}
         teamId={teamId}

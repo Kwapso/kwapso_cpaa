@@ -317,4 +317,4 @@ export const tenancy = {
     api<{ ok: true }>("/api/tenancy/portal-users/active", post({ id, active })),
 }
 
-/** Content worker — Learning + Help (team-DB content modules). */
+/** Content worker — Learning + Tickets (team-DB content modules). */

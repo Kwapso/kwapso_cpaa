@@ -1,4 +1,4 @@
-// kwapso CONTENT worker — team-DB content modules (Learning today; Help next).
+// kwapso CONTENT worker — team-DB content modules (Learning + Tickets).
 // This file is just the SWITCHBOARD: it maps each route to a handler (grouped by
 // domain under ./routes/*) and centrally maps thrown GuardErrors to clean HTTP
 // responses. The shared opening (whoAmI / teamContext / requireRight) lives in

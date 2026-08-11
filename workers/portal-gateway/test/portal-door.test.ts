@@ -173,13 +173,13 @@ describe("portal gateway — everything else is closed", () => {
 })
 
 describe("portal gateway — the screens", () => {
-  it("serves the support shell for a deep-linked ticket (static-export trap)", async () => {
+  it("serves the tickets shell for a deep-linked ticket (static-export trap)", async () => {
     const log: string[] = []
-    const res = await call("GET", "/support/01JABCDEF", log)
+    const res = await call("GET", "/tickets/01JABCDEF", log)
     expect(res.status).toBe(200)
     // The SHELL is fetched, not the deep path — otherwise the asset layer 404s a
     // ticket link before the page can resolve it client-side.
-    expect(log).toEqual(["ASSETS /support"])
+    expect(log).toEqual(["ASSETS /tickets"])
   })
 
   it("serves ordinary screens straight from assets", async () => {

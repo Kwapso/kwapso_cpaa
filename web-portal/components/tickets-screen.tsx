@@ -1,9 +1,9 @@
 "use client"
 
-// SUPPORT — everything this client has asked us, newest first.
+// TICKETS — everything this client has asked us, newest first.
 //
 // No tabs — still, and now for a better reason than the one this comment used
-// to give. It said a client's list was "already all theirs" because the help
+// to give. It said a client's list was "already all theirs" because the ticket
 // fence pinned a portal caller to the tickets they personally raised, so a My /
 // All strip would offer a choice between a list and the same list. Since the
 // owner ruled that a contact sees their COMPANY's questions (11 Aug 2026) those
@@ -18,7 +18,7 @@
 // R3 is satisfied by having no toggle at all rather than a prettier one.
 //
 // R14: the list PAGES. "Show older" walks the opaque cursor the door handed us,
-// so a client four years in can still reach their first request.
+// so a client four years in can still reach their first ticket.
 
 import * as React from "react"
 
@@ -36,7 +36,7 @@ import { RaiseTicketDialog } from "@/components/raise-ticket-dialog"
 import { TicketRow } from "@/components/ticket-row"
 import type { PortalReady } from "@/components/portal-shell"
 
-export function SupportScreen({ ready }: { ready: PortalReady }) {
+export function TicketsScreen({ ready }: { ready: PortalReady }) {
   const { tickets, total, loading, hasMore, loadingMore, loadMore } = useTickets()
   const [raising, setRaising] = React.useState(false)
 
@@ -50,13 +50,13 @@ export function SupportScreen({ ready }: { ready: PortalReady }) {
     <div className="flex flex-col gap-6">
       {/* R16: the collection's count, once, from the server's exact total.
        *
-       * "Your company's", not "Your". A contact now sees every request their
+       * "Your company's", not "Your". A contact now sees every ticket their
        * colleagues raise, not only the ones they typed — so a heading that says
-       * "Your requests" over a colleague's question is the screen telling the
+       * "Your tickets" over a colleague's question is the screen telling the
        * reader something untrue about who can see what. The copy changed the day
        * the rule did. */}
       <CollectionHeading
-        label="Your company's requests"
+        label="Your company's tickets"
         total={total}
         action={
           <Button onClick={() => setRaising(true)}>

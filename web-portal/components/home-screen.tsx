@@ -4,7 +4,7 @@
 //
 // Every dashboard is a series of decisions about what someone cares about most.
 // Here it is: am I waiting on anything, and how do I ask for something? So the
-// screen is a greeting, the one action, the newest few requests, and a way to
+// screen is a greeting, the one action, the newest few tickets, and a way to
 // the rest. There is no chart, no metric tile, no "recent activity" feed — a
 // feed of internal history would name the staff moving the work, which the
 // portal never does (SCOPE ch.06).
@@ -29,7 +29,7 @@ import { RaiseTicketDialog } from "@/components/raise-ticket-dialog"
 import { TicketRow } from "@/components/ticket-row"
 import type { PortalReady } from "@/components/portal-shell"
 
-/** How many requests Home shows before handing over to Support. Three is enough
+/** How many tickets Home shows before handing over to Tickets. Three is enough
  * to recognise "yes, that's mine" and short enough to read without scrolling. */
 const PREVIEW = 3
 
@@ -72,9 +72,9 @@ export function HomeScreen({ ready }: { ready: PortalReady }) {
       <section>
         {/* R16: the exact server total for the WHOLE collection, in the one place
          * the portal renders a count — not the length of the three rows below. */}
-        {/* "Your company's", for the reason support-screen.tsx gives at its own
-         * heading: this list holds colleagues' requests too, now. */}
-        <CollectionHeading label="Your company's requests" total={total} />
+        {/* "Your company's", for the reason tickets-screen.tsx gives at its own
+         * heading: this list holds colleagues' tickets too, now. */}
+        <CollectionHeading label="Your company's tickets" total={total} />
 
         {loading && !tickets ? (
           <div className="flex flex-col gap-3">
@@ -93,7 +93,7 @@ export function HomeScreen({ ready }: { ready: PortalReady }) {
             ))}
             {(total ?? 0) > newest.length ? (
               <Link
-                href="/support"
+                href="/tickets"
                 className="text-muted-foreground hover:text-foreground flex items-center justify-center gap-1.5 py-2 text-sm"
               >
                 See all of them
