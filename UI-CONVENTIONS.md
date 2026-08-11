@@ -205,8 +205,11 @@ export const MODULE_PERMISSION: Record<string, string> = {
 }
 ```
 
-Learning, Help and **Accounts** each have a clean top-level URL too (`/learning`,
+Learning, Tickets and **Accounts** each have a clean top-level URL too (`/learning`,
 `/tickets`, `/accounts`) — a sidebar page resolves the team from context, like `/home`.
+Tickets is the one page whose segment isn't its permission module: the address says
+`tickets`, the right the server checks is `help`. That is the only place the two
+names meet — DATA-MODEL.md § *help + help_threads* says why the key never moves.
 A new one needs three lines: `TOP_LEVEL_MODULES` (`deep-link/route.ts`), the
 gateway's top-level shell loop, and its own `web/app/<segment>/[[...rest]]/page.tsx`.
 

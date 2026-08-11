@@ -9,6 +9,13 @@
 // This file is the agency door's CHROME. The email → code → signed-in BEHAVIOUR
 // (including the cooldown rule) lives once, in shared/web/use-email-sign-in.ts,
 // which the portal's own sign-in screen renders too.
+//
+// TWO WAYS IN, ONE IDENTITY: a six-digit email code, or Google. Google is a plain
+// browser redirect with no state machine to share, so only its mark and its
+// failure wording are shared (shared/web/google-sign-in.tsx). The button sits
+// BESIDE the code, never instead of it — the verified email is the identity, so
+// the person who used a code last week and Google today is one row. Unset
+// credentials simply mean no button; the code path is untouched (ARCHITECTURE §5).
 
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"

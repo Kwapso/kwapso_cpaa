@@ -220,8 +220,10 @@ Today it covers:
   - portal access — `grant_portal_access`, `set_portal_access_active`
   - dropdown values — `create_dropdown_value`, `update_dropdown_value`, `set_dropdown_value_active`
   - learning — `create_learning`, `update_learning`, `set_learning_active`
-  - help — `create_help_ticket`, `update_help_ticket`, `set_help_status`,
-    `reply_help_ticket`, `add_help_stakeholder`
+  - tickets — `create_help_ticket`, `update_help_ticket`, `set_help_status`,
+    `reply_help_ticket`, `add_help_stakeholder` (the module is Tickets; the tool
+    names carry the old `help` spelling because they are a published contract
+    outside developers already call — DATA-MODEL.md says why it never moves)
 - **Bulk create:** the import pipeline — `start_import` → `add_import_file` →
   `plan_import` → `run_import`. Accounts are importable AND exportable (they were
   importable only, which made the customer spine a one-way street).

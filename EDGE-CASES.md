@@ -33,8 +33,9 @@ navigation, and a reload there is fine (one-time).
 
 **The rule.** In-app navigation goes through the **History API**, never the
 router. `go()` in `deep-link-screen.tsx` pushes state for any `isInAppPath` (the
-whole `/t/*` tree + every `TOP_LEVEL_MODULES` entry — now `learning · help · home
-· settings · invitations`) and swaps the screen from local `route` state; the
+whole `/t/*` tree + every `TOP_LEVEL_MODULES` entry — now `accounts · learning ·
+tickets · home · settings · invitations`) and swaps the screen from local `route`
+state; the
 segment never changes, so nothing reloads. Deep components that can't reach `go()`
 (the profile menu, team switcher, invite inbox) call **`softNavigate`** from
 `web/lib/nav.ts` — the shell registers its `go()` there on mount (`registerHostGo`),

@@ -2,10 +2,8 @@
 
 **The multi-tenant SaaS base by Swift Struck.** Not an app for one industry —
 the reusable foundation every future app (ERP, CRM, portal…) is built on: login
-(strict email codes), teams, Member roles (module key `member_roles`), invites,
-learning, tickets, dropdown management, CSV data import, and an in-app **AI
 (an email code or Google), teams, Member roles (module key `member_roles`), invites,
-learning, help desk, dropdown management, CSV data import, and an in-app **AI
+learning, tickets, dropdown management, CSV data import, and an in-app **AI
 agent** that acts AS the signed-in user through the same gated endpoints (never
 exceeding their rights), all hosted on Cloudflare.
 
@@ -68,7 +66,7 @@ concrete + checkable:
 
 - **The global habits every Swift Struck build follows** — [SWIFT-STRUCK-WAY.md](SWIFT-STRUCK-WAY.md): the cross-app rules (lean, machine-checked laws, act-as-user, every route gates, deactivate-not-delete, the ship pipeline). Travels with every fork; the `new-app` skill reads it first.
 - **The two prime directives** (stay lean; obey the Laws) — [CLAUDE.md](CLAUDE.md), the entry point.
-- **The Laws of the Base** (R1–R19) — [RULES.md](RULES.md), *machine-checked*: pinned to `shared/rules/registry.ts` and enforced by tests that read the source off disk (`web/test/rules.test.ts`, the per-worker `publish-seam.test.ts` for live-sync R1, the `gating-seam` suites — incl. the external mcp surface — for R10, `fetch-timeout` R11, `cron-records` R12, plus the scale/safety round: R13 self-healing catalog, R14 bounded lists, R15 live listeners, R16 exact counts, R17 idempotent transitions, R18 cross-module activity gating, R19 agent/MCP filter parity). Break one → the build goes red. Adding a Law requires the rule, the registry entry, and a check — all three.
+- **The Laws of the Base** (R1–R22) — [RULES.md](RULES.md), *machine-checked*: pinned to `shared/rules/registry.ts` and enforced by tests that read the source off disk (`web/test/rules.test.ts`, the per-worker `publish-seam.test.ts` for live-sync R1, the `gating-seam` suites — incl. the external mcp surface — for R10, `fetch-timeout` R11, `cron-records` R12, plus the scale/safety round: R13 self-healing catalog, R14 bounded lists, R15 live listeners, R16 exact counts, R17 idempotent transitions, R18 cross-module activity gating, R19 agent/MCP filter parity, R20 scanned boundary validation, R21 no agency door for a client login, R22 agent/MCP body-field parity). Break one → the build goes red. Adding a Law requires the rule, the registry entry, and a check — all three.
   **And the check must be able to fail:** every source-scan strips comments before matching (this repo's comments discuss the very seams being scanned), matches a CALL not a word, boundaries each identifier, knows both export shapes, and carries a tripwire asserting it matched something. See CONVENTIONS.md § *Reading config, and writing a check that can fail* — each of those rules was earned by a check that passed its own sabotage.
 - **Code house style** — [CONVENTIONS.md](CONVENTIONS.md): the handler shape, the two data doors, gating, boundary validation, deactivate-not-delete, the comment style.
 - **UI conventions** — [UI-CONVENTIONS.md](UI-CONVENTIONS.md): library-is-lego, recipe vs bespoke, the enforced UI Laws, the action-icon mapping, the *action-button rows never clip* responsive rule, the voice.
@@ -76,7 +74,7 @@ concrete + checkable:
 - **Error rules** — [ERROR-HANDLING.md](ERROR-HANDLING.md): never swallow; one client seam; every worker records to the central store.
 - **The single vocabulary** — `shared/glossary.ts` (Law R6, machine-checked): one word per concept, used in all UI copy.
 
-- **The docs themselves are checked too** — `web/test/doc-claims.test.ts` derives the worker roster from `workers/` on disk and reads each `wrangler.jsonc` to see which are public, then fails if any doc states a worker count or a public-door count that disagrees. Add a worker, and every stale sentence goes red the same day.
+- **The docs themselves are checked too** — `web/test/doc-claims.test.ts` derives the worker roster from `workers/` on disk, reads each `wrangler.jsonc` to see which are public, and reads the Laws' range off `shared/rules/registry.ts`, then fails if any doc (the root canon, the fork skills, or a `.plans/` build plan) states a worker count, a public-door count or a `R1–Rn` range that disagrees. Add a worker or a Law, and every stale sentence goes red the same day.
 
 If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says so and names where it's applied.
 

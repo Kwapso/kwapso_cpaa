@@ -43,11 +43,17 @@ Postgres + RLS).
    `npx wrangler login` completed against it.
 2. **A scoped D1 API token** (`CF_D1_TOKEN`: Cloudflare dashboard → API tokens → D1
    Edit) — powers the per-team database door.
-3. **A Resend API key** (login + notification emails; staging works without it by
-   echoing codes, production refuses email login until it's set).
+3. **A Resend API key** (login + notification emails). A sign-in code appears
+   ONLY in the person's inbox, in every environment — there is no echo to fall
+   back on — so without this key nobody signs in by email at all. Automated runs
+   use the test-login door instead (`TEST_LOGIN_KEY`, staging only).
 4. *(Optional)* an **Anthropic API key** — makes the agent's brain Claude instead of
    the keyless Workers AI fallback.
-5. **GitHub**: if the `gh` CLI is authed you create the repo yourself; otherwise the
+5. *(Optional)* a **Google OAuth client** — id + secret for "Continue with
+   Google" beside the email code. Set both halves or neither; unset simply means
+   the button isn't offered and the email-code path is untouched. BOOTSTRAP.md
+   has the redirect URIs (one per front door, per environment).
+6. **GitHub**: if the `gh` CLI is authed you create the repo yourself; otherwise the
    owner creates an empty repo and pastes the link (their one GitHub step).
 
 Collect what's available, note what's missing, and say which steps will wait on it.
@@ -149,7 +155,8 @@ Follow the cloned repo's `BOOTSTRAP.md` — it is the runbook; this is the order
    staging --remote` and again without `--env` for production. Per-team databases
    are NOT created here — each team's DB is created at runtime when the team is.
 3. **R2 buckets** (six): `<name>-media`, `<name>-learning-media`,
-   `<name>-help-media`, each plus its `-staging` twin
+   `<name>-help-media` (ticket attachments — the bucket name follows the table),
+   each plus its `-staging` twin
    (`npx wrangler r2 bucket create <bucket>`).
 4. **Secrets** (per env: `npx wrangler secret put <NAME>` in the worker's folder,
    plus `--env staging`; mirror into git-ignored `.dev.vars`, never print values):
@@ -161,6 +168,8 @@ Follow the cloned repo's `BOOTSTRAP.md` — it is the runbook; this is the order
      client error beacon through auth, so without the key a crash on a client's
      phone is console-only
    - `ANTHROPIC_API_KEY` (optional) → data-ops
+   - `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` (optional, both or neither) →
+     auth — "Continue with Google" beside the email code
 5. **Deploy, realtime-first:** `npm run deploy:staging` — builds BOTH static
    exports (`web/out` and `web-portal/out`) and deploys all EIGHT workers in the
    locked order realtime → auth → tenancy → content → data-ops → mcp → gateway →
@@ -199,7 +208,7 @@ git-ignored; secrets never reach the repo.
 - The **three quality gates**: `lean_mean_check` (92 or better), `story_checks_out`,
   `security_sentry` (no critical/high). Adversarially verify your own findings.
 - A **browser sanity pass** on staging, on BOTH doors: on the agency app sign in,
-  land in a team, see Home / Learning / Help / Settings, open the AI assistant and get
+  land in a team, see Home / Accounts / Learning / Tickets / Settings, open the AI assistant and get
   a reply; on the client portal confirm its own sign-in screen loads and that
   `/api/data-ops/agent` there returns 404 (the portal names no such door — proof the
   allow-list survived the fork).

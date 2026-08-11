@@ -1,8 +1,14 @@
 # Agent + Modules — the build plan (LOCKED 2026-06-22; Phases 1–4 DONE 2026-06-23)
 
 > **Status: SHIPPED (Phases 1–4).** Kept because OPERATIONS.md and DATA-MODEL.md
-> cite it for the two deferred hooks (help attachments, agent auto-draft). For how
+> cite it for the two deferred hooks (ticket attachments, agent auto-draft). For how
 > the agent works TODAY, read MCP.md + EDGE-CASES §4–5; this file is the *why*.
+>
+> **"Help" below is the module now called Tickets.** It was renamed on
+> 2026-08-11; there was never a help section *and* a ticket section, and there is
+> no help section today. This file keeps the old word because it is the record of
+> what was built under it. DATA-MODEL.md § *help + help_threads* has the current
+> name and the four places `help` deliberately survives underneath.
 
 The next big build on top of the shipped base: **learning + help + data import + the
 AI agent + MCP**, as ONE continuous build on branch `agent-modules`, green at every

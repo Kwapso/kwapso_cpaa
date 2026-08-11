@@ -385,6 +385,8 @@ lives here, where changes already go.
 | 2026-06-23 | The **agent-modules build** landed (branch `agent-modules`): learning, help, CSV import and the AI agent all BUILT. |
 | 2026-07-07 | The **mcp** worker — the external machine surface — shipped: access tokens bridged to team-pinned sessions, gated doors exposed as MCP tools at `/mcp`. |
 | 2026-08-10 | The eighth worker made the roster **eight**: six brains under two front doors, `gateway` and `portal-gateway`. |
+| 2026-08-11 | The module called "help" became **Tickets** — everywhere a person or a URL can see it. There was never a help section *and* a ticket section; there was one module wearing the wrong name, and an agency does not need somewhere to file complaints about its own app. The permission key, the tables, the API path and the MCP tool names stay `help` on purpose (DATA-MODEL.md § *help + help_threads* lists all four and why each never moves). |
+| 2026-08-11 | **Google sign-in came back on** — a decision REVERSED, not a new feature. `db/core/0003` parked it on 2026-06-12 as a *Brimba* scope call (the generic base, email codes only); kwapso's SCOPE re-decides it in ch.03 and ch.06, and SCOPE wins where it speaks. Rebuilt without re-adding `google_sub` — the verified email is the identity, so both doors go through one seam. The migration is not reverted; it carries a comment pointing forward. The Brimba base upstream may still be email-only. |
 
 ---
 

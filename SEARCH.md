@@ -103,7 +103,7 @@ so turning on search for a new screen is a recipe edit, not new plumbing.
 
 - **Layer 1 + the library search/filter UI**: SHIPPED — the library search/filter
   bar landed and the app turned it on across the collections (members / roles /
-  invites / dropdowns / learning / help) via the recipes (`listCollection` +
+  invites / dropdowns / learning / tickets) via the recipes (`listCollection` +
   `withDataDrivenCollection`, which hides search/filters when a list is empty or
   a facet has no options). See UI-CONVENTIONS §6.
 - **Layer 2 (server-side filters)**: available through the recipes' hints where a
