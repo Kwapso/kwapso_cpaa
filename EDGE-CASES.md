@@ -380,7 +380,13 @@ the token budget trying to feed it everything.
   turns breaks provider APIs.
 - Tool results are handed back **fenced as DATA**, capped at 2000 chars
   (`fence`), never as instructions — a big list can't blow context,
-  and data can't smuggle in a prompt.
+  and data can't smuggle in a prompt. **The fence is provider-shaped, and the
+  weaker one had to be built by hand:** Claude's `tool_result` block is structural,
+  but Workers AI (selected whenever `ANTHROPIC_API_KEY` is unset) flattens tool
+  history into plain turns, where an attacker's ticket description read exactly
+  like the user's own words. Flattened results now carry an explicit
+  `<tool_result from="…">` marker that the system prompt names, and a closing
+  marker inside the payload is escaped so the fence can't be closed from within.
 
 **Resume is per-device and best-effort.** The panel remembers the last thread
 per team in **`localStorage`** (`agent-panel.tsx`) so reopening

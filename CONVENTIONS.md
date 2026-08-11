@@ -171,16 +171,36 @@ never let a cron failure escape:
 
 ```ts
 // workers/tenancy/src/index.ts
-/** Nightly cron: the 80% database-size alarms (locked sharding machinery). */
+/** Nightly cron: the estate's housekeeping — size alarms + the core retention sweep. */
 async scheduled(_controller, env): Promise<void> {
+  // ONE TRY PER JOB. Sharing a catch means a failing sweep hides an 80% alarm.
+  try {
+    const swept = await sweepCoreRetention(env.DB)
+    console.log(`retention sweep: ${JSON.stringify(swept.deleted)}`)
+    if (swept.capped.length) await recordWorkerError(env.DB, "tenancy", "cron/retention", …)
+  } catch (e) {
+    console.error("nightly retention sweep failed:", e)
+    await recordWorkerError(env.DB, "tenancy", "cron/retention", e)
+  }
   try {
     const result = await checkDatabaseSizes(env, d1Config(env))
-    console.log(`size check: ${result.checked} team DBs, ${result.alerted.length} alarm(s)`)
+    console.log(`size check: ${result.checked} DBs, ${result.alerted.length} alarm(s)`)
+    if (result.capped) await recordWorkerError(env.DB, "tenancy", "cron/size-check", …)
   } catch (e) {
     console.error("nightly size check failed:", e)
+    await recordWorkerError(env.DB, "tenancy", "cron/size-check", e)
   }
 },
 ```
+
+Two rules the shape above encodes, both learned the hard way:
+
+- **R12 covers the CEILING, not just the crash.** Bounded unattended work that stops
+  early is not an exception, so the catch never sees it — and a cheerful "N alarm(s)"
+  line is the only thing anyone reads. A run that hit its ceiling is RECORDED, saying
+  what was *not* done.
+- **One try per independent job.** Two jobs under one catch means the first one's
+  failure silently cancels the second.
 
 Only add a cron when there's real housekeeping — `content` has none, and says so in a
 comment rather than shipping an empty stub.

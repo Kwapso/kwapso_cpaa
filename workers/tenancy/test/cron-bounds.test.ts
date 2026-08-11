@@ -16,13 +16,21 @@ const CFG = { accountId: "acct", apiToken: "tok" }
 
 afterEach(() => vi.unstubAllGlobals())
 
-/** Every team database is over the threshold; none has an open alert yet. */
-function stubAccount(teamDbs: number) {
-  const page = Array.from({ length: teamDbs }, (_, i) => ({
-    uuid: `u${i}`,
-    name: `team-${i}`,
-    file_size: ALERT_THRESHOLD_BYTES + 1,
-  }))
+/** Every team database is over the threshold; none has an open alert yet.
+ * `extra` names databases that are NOT team ones — the core database, mostly. */
+function stubAccount(teamDbs: number, extra: string[] = []) {
+  const page = [
+    ...Array.from({ length: teamDbs }, (_, i) => ({
+      uuid: `u${i}`,
+      name: `team-${i}`,
+      file_size: ALERT_THRESHOLD_BYTES + 1,
+    })),
+    ...extra.map((name, i) => ({
+      uuid: `x${i}`,
+      name,
+      file_size: ALERT_THRESHOLD_BYTES + 1,
+    })),
+  ]
   vi.stubGlobal("fetch", () =>
     // ONE short page: the listing is complete, so nothing here is testing the
     // page ceiling (that lives in d1-rest.test.ts) — only the alarm ceiling.
@@ -72,6 +80,39 @@ describe("the nightly size check does bounded work per tick", () => {
 
     expect(inserted.length).toBe(3)
     expect(result.capped).toBe(false)
+  })
+})
+
+// THE ONE DATABASE IT COULD NEVER ALARM ON WAS THE SHARED ONE.
+//
+// The scan filtered `db.name.startsWith("team-")`, which reads like a tidy scope
+// and was a blind spot over `kwapso-core`: every user, session, team, error log
+// and usage row in the platform, the only database strangers can grow (sign-in
+// codes come from an unauthenticated door), and the only one whose 10GB ceiling
+// takes the WHOLE product down instead of one tenant. It sat at 100% in silence,
+// because its name does not begin with "team-".
+describe("the nightly check watches the SHARED core database too", () => {
+  it("alarms on kwapso-core when it crosses the threshold", async () => {
+    stubAccount(1, ["kwapso-core"])
+    const { db, inserted } = fakeCoreDb()
+
+    const result = await checkDatabaseSizes({ DB: db } as Env, CFG as never)
+
+    expect(result.alerted, "the core database raises an alarm like any other").toContain("kwapso-core")
+    expect(inserted).toContain("kwapso-core")
+    expect(result.checked, "and it is counted among what was checked").toBe(2)
+  })
+
+  it("watches anything else the account holds, without being told its name", async () => {
+    // The filter is GONE rather than widened to a second prefix: an app owns its
+    // Cloudflare account, so a database added tomorrow is watched the day it
+    // exists rather than the day someone remembers to name it here.
+    stubAccount(0, ["kwapso-core", "some-future-store"])
+    const { db } = fakeCoreDb()
+
+    const result = await checkDatabaseSizes({ DB: db } as Env, CFG as never)
+
+    expect(result.alerted.sort()).toEqual(["kwapso-core", "some-future-store"])
   })
 })
 

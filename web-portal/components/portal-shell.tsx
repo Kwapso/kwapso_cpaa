@@ -60,11 +60,19 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
     if (session.state === "signed-out") router.replace("/login")
   }, [session.state, router])
 
+  // The team channel, keyed on WHERE THIS PERSON IS STANDING as well as which
+  // team it is. Switching company changes the account fence but not the team, so
+  // without the fourth argument the socket was never re-opened: the server had
+  // stamped it with the previous company's account set at the handshake and went
+  // on filtering the new company's pings out. Everything looked fine and nothing
+  // arrived. Passing the account id makes a switch a NEW socket, re-stamped from
+  // the session — see useRealtime for why this is a key and never a claim.
   const accountId = session.state === "ready" ? session.currentAccountId : null
   useRealtime(
     session.state === "ready" ? session.teamId : null,
     React.useCallback((e) => applyLivePing(e.resource, accountId), [accountId]),
-    React.useCallback(() => replayAfterReconnect(accountId), [accountId])
+    React.useCallback(() => replayAfterReconnect(accountId), [accountId]),
+    accountId
   )
 
   if (session.state === "loading" || session.state === "signed-out")

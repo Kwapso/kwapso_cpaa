@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { describe, expect, it } from "vitest"
 
+import { teamChannelQuery } from "@shared/web/realtime"
+
 // SWITCHING COMPANY MUST SWITCH THE SCREEN, NOT JUST THE SERVER.
 //
 // `POST /api/tenancy/portal/switch-account` moves where the person stands and
@@ -74,5 +76,55 @@ describe("switching company drops what the old company filled", () => {
     const keptOnPurpose = new Set(["thread", "threadTotal"])
     const missed = declared.filter((k) => !keptOnPurpose.has(k) && !body.includes(`cacheKeys.${k}`))
     expect(missed, `these caches survive a company switch with nobody deciding they should: ${missed.join(", ")}`).toEqual([])
+  })
+})
+
+// AND SWITCHING COMPANY MUST SWITCH THE LIVE SOCKET.
+//
+// Dropping the caches fixes what the screen SHOWS the moment you switch. It does
+// nothing about what arrives afterwards, and that half was broken in a way you
+// could not see: the realtime worker resolves the listener's account fence ONCE,
+// at the handshake, and serializes it onto the socket so no ping costs a database
+// read. The client re-opened only when `teamId` changed — and a company switch
+// does not change the team. So the socket kept filtering the NEW company's pings
+// against the OLD company's account set, and the portal went silently deaf. Not
+// broken: silent. Nothing on screen says a live update never came.
+//
+// The fix is that the fence is part of the socket's IDENTITY, so a fence that
+// moves is a different socket.
+describe("the live socket is keyed on where the person is standing", () => {
+  it("carries the current account, so a switch is a different URL", () => {
+    const before = teamChannelQuery("T1", "A_ONE")
+    const after = teamChannelQuery("T1", "A_TWO")
+    // Presence first: two nulls would be "equal" in the wrong direction, and a
+    // query that dropped the fence entirely would compare identical here.
+    expect(before, "the fence must reach the URL").toContain("A_ONE")
+    expect(after).toContain("A_TWO")
+    expect(before, "same team, different company = a NEW socket").not.toBe(after)
+  })
+
+  it("still names the team, and stays quiet when there is no team", () => {
+    expect(teamChannelQuery("T1", "A_ONE")).toContain("team=T1")
+    expect(teamChannelQuery(null, "A_ONE"), "no team = no socket").toBeNull()
+  })
+
+  it("staff, who have no fence, get the URL they always had", () => {
+    // The agency app has no account fence (the stamp is null server-side), so
+    // adding this must not churn its socket or change its shape.
+    expect(teamChannelQuery("T1")).toBe("team=T1")
+    expect(teamChannelQuery("T1", null)).toBe("team=T1")
+  })
+
+  it("the portal shell actually passes it", () => {
+    // The seam being right is worthless if the one caller that needs it doesn't
+    // use it. Read the shell: the fence argument must be the account id it
+    // already computes for the ping handlers, not a fresh guess.
+    const shell = readFileSync(resolve(__dirname, "../components/portal-shell.tsx"), "utf8")
+    const at = shell.indexOf("useRealtime(")
+    expect(at, "the shell must open the team channel").toBeGreaterThan(-1)
+    const call = shell.slice(at, shell.indexOf("\n  )", at))
+    expect(call, "the socket must carry the current account as its fence key").toMatch(
+      /\n\s*accountId\s*,?\s*$/
+    )
   })
 })

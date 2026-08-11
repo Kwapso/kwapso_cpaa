@@ -136,6 +136,23 @@ export async function postCreateAccount(request: Request, env: Env): Promise<Res
   return json({ id })
 }
 
+/** An EDIT is a patch, so the door has to tell "leave it alone" apart from "make
+ * it empty" — and `optionalText` deliberately cannot: it folds absent, null and
+ * blank into one `undefined`, which is right for a CREATE (all three mean "no
+ * value") and was silently wrong for an update (they meant "keep it", "clear it"
+ * and "clear it"). Presence is therefore read from the body itself, AFTER the
+ * value has been through the validator — the field still crosses the boundary
+ * exactly once, at `accountFields` above, and this only decides what its absence
+ * means. Absent → undefined ("say nothing"); sent → the clean value, or null. */
+function accountPatch(body: Record<string, unknown>): Record<string, string | null | undefined> {
+  return Object.fromEntries(
+    Object.entries(accountFields(body)).map(([field, clean]) => [
+      field,
+      field in body ? (clean ?? null) : undefined,
+    ])
+  )
+}
+
 export async function postUpdateAccount(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<Body>(
     request,
@@ -148,7 +165,7 @@ export async function postUpdateAccount(request: Request, env: Env): Promise<Res
   const name = requireText(body.name, "Name", TEXT_LIMITS.short)
   await updateAccount(cfg, guard, scope, actor, id, {
     name,
-    ...accountFields(body),
+    ...accountPatch(body),
     commercialsVisible: typeof body.commercialsVisible === "boolean" ? body.commercialsVisible : undefined,
   })
   await publishChange(env, guard.teamId, "accounts", id)

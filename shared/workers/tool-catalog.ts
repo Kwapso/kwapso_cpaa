@@ -89,18 +89,28 @@ export const memberLabel = (input: Record<string, unknown>, names?: Record<strin
   return names?.[id] ?? `member ${id}`
 }
 
+/** A field EXACTLY as the caller sent it, or nothing at all if they didn't.
+ *
+ * `opt` cannot express this: it folds an empty string into `undefined`, which
+ * JSON.stringify then drops, so "" and "never mentioned" arrive at the door as
+ * the same request. On the account EDIT door those are now opposite instructions
+ * — clear this field, versus leave it alone — so the distinction has to survive
+ * the trip. (On create both still mean "no value", so nothing changes there.) */
+const sent = (i: Record<string, unknown>, key: string): string | undefined =>
+  key in i ? str(i, key) : undefined
+
 /** The optional fields an account carries — the SAME set on create and edit, so
  * the two tools can't drift into different shapes (the door validates them
  * identically for exactly that reason). */
 const accountFields = (i: Record<string, unknown>): Record<string, unknown> => ({
-  code: opt(i, "code"),
-  email: opt(i, "email"),
-  phone: opt(i, "phone"),
-  address: opt(i, "address"),
-  currency: opt(i, "currency"),
-  locale: opt(i, "locale"),
-  timezone: opt(i, "timezone"),
-  status: opt(i, "status"),
+  code: sent(i, "code"),
+  email: sent(i, "email"),
+  phone: sent(i, "phone"),
+  address: sent(i, "address"),
+  currency: sent(i, "currency"),
+  locale: sent(i, "locale"),
+  timezone: sent(i, "timezone"),
+  status: sent(i, "status"),
 })
 
 /** The learning create/edit body — the same optional field set both surfaces send
@@ -304,7 +314,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_account",
     summary:
-      "Edit an account's own details (by id) — never its place in the hierarchy; that's set_account_parent. Any field you leave out is CLEARED (status and commercialsVisible keep their current value), so send the whole record — read it with get_account first.",
+      "Edit an account's own details (by id) — never its place in the hierarchy; that's set_account_parent. Send ONLY the fields you are changing: anything you leave out keeps its current value. To empty a field, send it as an empty string.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/accounts/update",
     schema: obj(
       { id: S, name: S, code: S, email: S, phone: S, address: S, currency: S, locale: S, timezone: S, status: S, commercialsVisible: B },
