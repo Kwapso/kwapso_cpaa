@@ -263,12 +263,29 @@ write (the parent pointer, `account_links`, `portal_users`). Linking a contact t
 a company, or re-parenting an account, hands an outside company sight of data it
 could not see a second ago, with no permission changing hands and no panel. Both
 ran silently, and `set_contact_link_active` ran silently in the *relink*
-direction for the same reason. So the derivation now has two halves, and the
-second reads the fence's own inputs: `FENCE_INPUTS` is declared in
+direction for the same reason. So the derivation grew a second half, which reads
+the fence's own inputs: `FENCE_INPUTS` is declared in
 `shared/workers/account-scope.ts` beside the SQL that reads them, and
 `isPrivilegeWrite()` matches a tool's door and body fields against it — the
-parent pointer is a single named column, so renaming or archiving an account is
-*not* a fence write and stays free.
+parent pointer is a single named column, so archiving an account is *not* a fence
+write and stays free.
+
+Twice since, the same bug came back wearing a different column, because *the
+derivation did not know about that kind of column*. There are **three** kinds, all
+declared in `account-scope.ts` beside the fence itself, and together they say who
+can see whose:
+
+- **`FENCE_INPUTS`** — what `accountScope()` READS to decide **where you stand**
+  (`portal_users`, `account_links`, `accounts.parent_account_id`).
+- **`FENCED_ROW_OWNERS`** — the column deciding **which rows stand with you**
+  (`help.account_id`). Writing it moves a row *across* the fence, and a ticket
+  carries its whole reply history with it.
+- **`FENCE_IDENTITY_INPUTS`** — the column a grant resolves **who you are** from
+  (`accounts.email`). The portal-grant door reads a person's email off their
+  account row and hands the login to the platform user holding that address, so
+  re-pointing it decides who walks in. It is *not* a line in `FENCE_INPUTS`: that
+  list is machine-checked to mean "columns the corridor reads", and `email` is not
+  one — filing it there would buy a panel by making a true list untrue.
 
 A write added tomorrow to any of those tables confirms the moment it exists:
 `requiresConfirm` derives it at runtime, so the safe behaviour doesn't wait for
@@ -286,11 +303,13 @@ input-aware toggles):
 
 | Behaviour | Tools | Why |
 |---|---|---|
-| **Pause for a yes/no panel** | the destructive acts — `remove_member`, `revoke_invite` — plus `set_role_active` / `set_learning_active` / `set_dropdown_active` **only when deactivating** (`active !== true`) | It removes/withdraws access, or switches an existing record OFF. Reversible, but destructive-feeling — the app double-checks, exactly as the red UI action does. |
+| **Pause for a yes/no panel** | the destructive acts — `remove_member`, `revoke_invite` — plus `set_account_active` / `set_role_active` / `set_learning_active` / `set_dropdown_active` **only when deactivating** (`active !== true`) | It removes/withdraws access, or switches an existing record OFF. Reversible, but destructive-feeling — the app double-checks, exactly as the red UI action does. |
 | **Pause for a yes/no panel (privilege writes)** | DERIVED — every write gated on `member_roles:`, `team_members:` or `portal_users:` (today: `create_role`, `update_role`, `set_role_active`, `set_role_permissions`, `set_member_role`, `remove_member`, `invite_member`, `revoke_invite`, `grant_portal_access`, `set_portal_access_active`) | They decide WHO CAN DO WHAT, and the model reaches them while reading team data an attacker can author. A silent one is a silent privilege escalation. Derived, so the next such tool is covered the day it lands. |
 | **Pause for a yes/no panel (account-fence writes)** | DERIVED from `FENCE_INPUTS` — every write whose door writes `portal_users`, `account_links`, or `accounts.parent_account_id` (today: `create_account`, `set_account_parent`, `link_contact`, `set_contact_link_active`, plus the two portal-access writes above) | They decide WHO CAN SEE WHOSE. `accountScope()` builds a client login's whole world from these rows, so a silent link or re-parent widens what an outside company reads — without touching a permission. Both directions confirm: a relink hands a company back as surely as an unlink takes it away. |
+| **Pause for a yes/no panel (row-owner writes)** | DERIVED from `FENCED_ROW_OWNERS` — every tool exposing the column that says which account owns a row (today: `raise_help_ticket`, `update_help_ticket`, via `help.account_id`) | It moves a ROW across the fence rather than moving the fence. Naming a client on an agency ticket publishes that whole conversation into their portal in one call. |
+| **Pause for a yes/no panel (identity writes)** | DERIVED from `FENCE_IDENTITY_INPUTS` — every tool exposing the column a portal grant resolves a person from (today: `create_account`, `update_account`, via `accounts.email`) | It decides WHO a later login goes to. The grant door reads a person's email off their account row and grants to whoever holds that address — and anyone can put a `users` row behind an address by signing in once. `create_account` always confirmed for this reason; `update_account` did not, so the address could be re-pointed in silence under the trace line "Edit account 01J…". |
 | **Confirm-with-a-count** | `bulk_set_help_status`, `bulk_set_learning_active`, `run_import_batch` | High-blast: "Set 12 tickets to resolved" / a whole imported file is confirmed by the count before it runs. |
-| **Run straight away** | every OTHER constructive write — `update_team`, `update_account`, `create_dropdown_value`, `update_dropdown_value`, the content (re)activations, and all single content edits | Ordinary re-gated + reversible + audited CRUD; the server gates each call, so no panel. |
+| **Run straight away** | every OTHER constructive write — `update_team`, `create_dropdown_value`, `update_dropdown_value`, the content (re)activations, and all single content edits | Ordinary re-gated + reversible + audited CRUD; the server gates each call, so no panel. |
 
 The system prompt (`agent.ts`) tells the model **not** to also ask in
 chat for a confirmed action — the app shows one yes/no panel, and a chat-level

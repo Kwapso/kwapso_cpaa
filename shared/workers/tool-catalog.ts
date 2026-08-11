@@ -15,7 +15,7 @@
 // import-catalogue reads + the agentic-import batch tools + the AI-allowance reads +
 // the saved conversations + agent_chat/agent_confirm.
 
-import { FENCE_INPUTS, FENCED_ROW_OWNERS } from "./account-scope"
+import { FENCE_IDENTITY_INPUTS, FENCE_INPUTS, FENCED_ROW_OWNERS } from "./account-scope"
 import { GuardError } from "./gating"
 
 /* ------------------------------- schema helpers ------------------------------- */
@@ -88,6 +88,24 @@ export const roleLabel = (input: Record<string, unknown>, names?: Record<string,
 export const memberLabel = (input: Record<string, unknown>, names?: Record<string, string>): string => {
   const id = str(input, "userId")
   return names?.[id] ?? `member ${id}`
+}
+
+/** An ACCOUNT reference for a summary — "Jane Patel (jane@patel.co)" when the id
+ * resolved, else "account <id>".
+ *
+ * This is the line that makes a portal-grant panel readable, and readable is the
+ * whole of its security value: the door resolves the person's login from the
+ * EMAIL on their account row, so a panel naming only a ULID asks an admin to
+ * approve an address it won't show them. `resolveNames` (workers/data-ops) fills
+ * `names` with name AND email for exactly this reason. Falling back to the raw id
+ * is honest about knowing less, rather than inventing a name. */
+export const accountLabel = (
+  input: Record<string, unknown>,
+  key: string,
+  names?: Record<string, string>
+): string => {
+  const id = str(input, key)
+  return names?.[id] ?? `account ${id}`
 }
 
 /** A field EXACTLY as the caller sent it, or nothing at all if they didn't.
@@ -337,7 +355,14 @@ export const SHARED_TOOLS: SharedTool[] = [
       ...accountFields(i),
       commercialsVisible: typeof i.commercialsVisible === "boolean" ? i.commercialsVisible : undefined,
     }),
-    agent: { write: true, confirm: false, summarize: (i) => `Edit account ${str(i, "id")}` },
+    // IDENTITY WRITE (accounts.email) → confirm. It carries the same field
+    // create_account confirms for, and for the same stated reason: an account's
+    // email "is what a later portal grant resolves a login from". Only the CREATE
+    // half was ever guarded, so the UPDATE could re-point an existing customer
+    // contact's address in silence — its trace line reads "Edit account 01J…" —
+    // and the next grant on that person hands their portal to the new address.
+    // See FENCE_IDENTITY_INPUTS and the note above SHARED_TOOLS.
+    agent: { write: true, confirm: true, summarize: (i) => `Edit account ${str(i, "id")}` },
   },
   {
     name: "set_account_parent",
@@ -431,7 +456,18 @@ export const SHARED_TOOLS: SharedTool[] = [
     }),
     // PRIVILEGE WRITE (portal_users) → confirm. Handing out a login decides who
     // can SEE a customer's world; see the note above SHARED_TOOLS.
-    agent: { write: true, confirm: true, summarize: (i) => `Give ${str(i, "personAccountId")} a login on account ${str(i, "accountId")}` },
+    //
+    // And the panel NAMES BOTH ENDS. It used to print the two raw ULIDs — "Give
+    // 01JXXXX… a login on account 01JYYYY…" — which is a yes/no question an admin
+    // cannot actually answer, on the one write where the answer matters most: the
+    // door resolves this person's login from the EMAIL on their account row, so
+    // whoever holds that address gets the customer's whole world. Resolving to
+    // name AND email is what lets the human check the address before saying yes.
+    agent: {
+      write: true, confirm: true,
+      summarize: (i, names) =>
+        `Give ${accountLabel(i, "personAccountId", names)} a login on ${accountLabel(i, "accountId", names)}`,
+    },
   },
   {
     name: "set_portal_access_active",
@@ -831,6 +867,17 @@ function touchesAccountFence(tool: { path: string; schema?: Record<string, unkno
   for (const [table, column] of Object.entries(FENCED_ROW_OWNERS)) {
     if (!table.split("_").every((w) => inPath.has(w) || inPath.has(`${w}s`))) continue
     if (fields.includes(column)) return true
+  }
+  // …and the third way in, which neither of the two above can see: the column a
+  // GRANT resolves a person from. `accounts.email` is not a fence input (the
+  // corridor never reads it) and not a row owner (it says nothing about which
+  // account owns the row) — it decides WHO the login goes to. `update_account`
+  // shipped it at confirm:false while `create_account`, the same field, confirmed
+  // and said why. Re-point the address, then let a routine-looking portal grant be
+  // approved, and the login lands on whoever owns the new address.
+  for (const [table, columns] of Object.entries(FENCE_IDENTITY_INPUTS)) {
+    if (!table.split("_").every((w) => inPath.has(w) || inPath.has(`${w}s`))) continue
+    if (columns.some((c) => fields.includes(c))) return true
   }
   return false
 }
