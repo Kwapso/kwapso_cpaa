@@ -1,5 +1,5 @@
-// WHAT BOTH FRONT DOORS DO IDENTICALLY — serve an uploaded file, and record a
-// crash a browser posted home.
+// WHAT BOTH FRONT DOORS DO IDENTICALLY — refuse a write that another site
+// started, serve an uploaded file, and record a crash a browser posted home.
 //
 // The two gateways differ where they should: one forwards by prefix for the
 // agency, one by a named allow-list for clients. They do NOT differ here, and
@@ -14,6 +14,56 @@ import { safeMediaKey } from "./image"
 
 /** Anything with `.fetch()` — a service binding, in worker terms. */
 type Upstream = { fetch(url: string, init?: RequestInit): Promise<Response> }
+
+/**
+ * THE WRITE HAS TO HAVE STARTED HERE. The cross-site request forgery check,
+ * on both front doors, in front of everything they forward.
+ *
+ * WHY THE COOKIE ALONE WAS NOT ENOUGH. `SameSite=Lax` is same-SITE, and "site"
+ * means the registrable domain — kwapso.app, not agency.kwapso.app. There is a
+ * live third-party no-code SaaS parked on portal.kwapso.app (it resolves to
+ * Glide's edge), so "any page on our site" is not a set we control. And a form
+ * POST needs no JSON content type to reach a door that parses JSON regardless:
+ * `<form enctype="text/plain">` shapes its own body, `name=value` becomes
+ * `{"userId":"…","roleId":"<admin>","x":"…"}`, no preflight is triggered, the
+ * session cookie rides along as a same-site request, `requireRight` passes on
+ * the VICTIM's rights, and the member-role door promotes whoever asked. The
+ * gates were all working; nobody had asked who started the request.
+ *
+ * THE RULE, AND WHY IT IS SHAPED THIS WAY. A browser sets `Origin` on EVERY
+ * request whose method is not GET or HEAD — form submissions included, that
+ * being the whole point of the header. So:
+ *
+ *   • Origin present → it must be this door's own origin, or the answer is 403.
+ *     That is every browser-driven write, and it is the entire attack surface,
+ *     because an attacker's page cannot forge the header or suppress it.
+ *   • Origin ABSENT → allowed, deliberately. Nothing with a cookie jar omits it;
+ *     an absent Origin is a NON-BROWSER caller — the MCP surface answering an
+ *     outside tool on a bearer token, `scripts/seed-staging.mjs` building
+ *     staging through the front door, the two smoke scripts, curl. None of them
+ *     carries an ambient credential a third-party page could ride, which is the
+ *     only thing this check exists to stop.
+ *
+ * The alternative — refuse an absent Origin and teach every script to send a
+ * fake one — buys nothing (an attacker cannot get into that branch) and costs
+ * the thing that matters: the seed IS how staging is built, so the day it 403s,
+ * somebody switches the check off rather than the seed on. A control that makes
+ * the ordinary path harder is a control with a short life.
+ *
+ * `Origin: null` (a sandboxed iframe, a data: URL) is PRESENT and not ours, so
+ * it is refused — which is right: that is a browser, with a cookie jar.
+ *
+ * Deliberately not read: `Referer`. It is stripped by privacy tooling often
+ * enough that trusting it means either a fallback that fails open or a door that
+ * breaks for careful users. Origin survives that.
+ */
+export function refuseForeignOrigin(request: Request): Response | null {
+  if (request.method === "GET" || request.method === "HEAD") return null
+  const origin = request.headers.get("Origin")
+  if (origin === null) return null // a non-browser caller: no cookie jar to ride
+  if (origin === new URL(request.url).origin) return null
+  return fail(403, "foreign_origin", "That request didn't come from this site.")
+}
 
 /** What an R2 object body looks like to us — just enough to serve it, so this
  * module needs no R2 types beyond what it actually touches. */

@@ -283,7 +283,10 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
     return fail(400, "too_many_mentions", `A reply can mention up to ${MENTIONS_LIMIT} people.`)
   for (const id of tagged) requireText(id, "Mentioned person", TEXT_LIMITS.short)
 
-  const replyId = await addReply(cfg, guard, scope, actor, helpId, replyBody, tagged, false)
+  // `raiserId` comes back from the WRITE, not off the ticket above: a client
+  // login is no longer sent the raiser's id (staff anonymity, lib/help toTicket),
+  // and the person who asked the question still has to be told there's an answer.
+  const { id: replyId, raiserId } = await addReply(cfg, guard, scope, actor, helpId, replyBody, tagged, false)
   // Both pings carry the ticket's account: a reply typed by the agency has to
   // land on the client's screen, and on their colleagues' — and on nobody else's.
   await publishChange(env, guard.teamId, "help_threads", replyId, "add", ticket.accountId ?? undefined)
@@ -293,7 +296,7 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
     cfg,
     guard,
     guard.teamId,
-    { id: ticket.id, raiserId: ticket.raiserId },
+    { id: ticket.id, raiserId },
     { id: actor.id, name: actor.name },
     replyBody,
     tagged

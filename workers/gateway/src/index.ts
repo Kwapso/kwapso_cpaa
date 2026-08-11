@@ -3,11 +3,17 @@
 // worker behind it. Same address for screens and brains = login cookies just
 // work everywhere. This is also where the MCP front desk will live.
 
-// The three things BOTH front doors do identically — serve an uploaded file (with
-// its key validated at the boundary and its security headers), record a client
-// crash, and answer their own crash without leaking a raw 1101. One implementation,
-// so a hardening change cannot reach one door and miss the other.
-import { recordClientError, recordGatewayCrash, serveMedia } from "@shared/workers/front-door"
+// The four things BOTH front doors do identically — refuse a write another site
+// started, serve an uploaded file (with its key validated at the boundary and its
+// security headers), record a client crash, and answer their own crash without
+// leaking a raw 1101. One implementation, so a hardening change cannot reach one
+// door and miss the other.
+import {
+  recordClientError,
+  recordGatewayCrash,
+  refuseForeignOrigin,
+  serveMedia,
+} from "@shared/workers/front-door"
 import { fail } from "@shared/workers/http"
 
 type Env = {
@@ -36,6 +42,13 @@ export default {
 
 async function handle(request: Request, env: Env): Promise<Response> {
     const { pathname } = new URL(request.url)
+
+    // CROSS-SITE WRITES DIE HERE, in front of every forward below — the session
+    // cookie is SameSite=Lax, and "site" is kwapso.app, which we share with a
+    // third-party app on portal.kwapso.app. See refuseForeignOrigin: a browser
+    // always announces itself on a non-GET, and a script never does.
+    const foreign = refuseForeignOrigin(request)
+    if (foreign) return foreign
 
     if (pathname.startsWith("/api/auth/")) return env.AUTH.fetch(request)
     if (pathname.startsWith("/api/tenancy/")) return env.TENANCY.fetch(request)

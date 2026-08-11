@@ -233,7 +233,11 @@ export type HelpTicket = {
   status: HelpStatus
   resolved: boolean
   resolvedAt: string | null
-  raiserId: string
+  /** Who raised it, and who last touched it. All three are null on the way OUT,
+   * and only to a client login, when the person is on the AGENCY's side of the
+   * fence — SCOPE ch.06, "the portal shows work status but never which staff
+   * member is doing it". See toTicket in workers/content/src/lib/help.ts. */
+  raiserId: string | null
   raiserName: string | null
   editorName: string | null
   createdAt: string
@@ -485,10 +489,13 @@ export type Account = {
   currency: string | null
   locale: string | null
   timezone: string | null
-  /** may this account see money figures on its own work? */
-  commercialsVisible: boolean
-  /** the commercial lifecycle (prospect / client / past client) */
-  status: string
+  /** may this account see money figures on its own work? `null` on the way OUT
+   * to a client login — the agency's own switch ABOUT them, never for them. */
+  commercialsVisible: boolean | null
+  /** the commercial lifecycle (prospect / client / past client). `null` on the
+   * way OUT to a client login: our view of the relationship is not their reading.
+   * See toAccount in workers/tenancy/src/lib/accounts.ts. */
+  status: string | null
   /** false once archived (deactivate-never-delete) */
   active: boolean
   /** the audit block, for the detail Overview tab (the same shape every record

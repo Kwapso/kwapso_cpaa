@@ -49,6 +49,24 @@ function gatesOf(body: string): { module: string; right: string }[] {
   ].map((m) => ({ module: m[1], right: m[2] }))
 }
 
+/** A handler's source PLUS the source of the route-local helpers it calls —
+ * R21's own `reach`, for R21's own stated reason: "a refusal one frame down
+ * still counts". This scan read the handler alone and so accused
+ * `POST /import/batch/plan` of not refusing a client login, when it refuses in
+ * the first line of `requireAnyImportRight` — a false alarm that would have
+ * taught the next reader to distrust the check, which is worse than no check.
+ * Bounded, so a mutually recursive pair cannot run away. */
+function reach(fns: Map<string, string>, name: string, seen = new Set<string>()): string {
+  if (seen.has(name) || seen.size > 6) return ""
+  seen.add(name)
+  const body = fns.get(name)
+  if (!body) return ""
+  let out = body
+  for (const other of fns.keys())
+    if (other !== name && new RegExp(`(?<![\\w.])${other}\\s*\\(`).test(body)) out += reach(fns, other, seen)
+  return out
+}
+
 describe("a module refuses a client login on both halves, or on neither", () => {
   it("every module whose reads refuse a client login refuses them on its writes too", () => {
     // door → { module, right, refuses }, for every gated door in the three
@@ -65,12 +83,16 @@ describe("a module refuses a client login on both halves, or on neither", () => 
       )) {
         const body = fns.get(handler)
         if (!body) continue
+        // The GATE is read off the handler's own opening (that is where a door
+        // states its terms); the REFUSAL is read one frame down as well, because
+        // that is where several of them legitimately live.
+        const withHelpers = reach(fns, handler)
         for (const g of gatesOf(body))
           doors.push({
             key: `${door} (${worker}/${handler})`,
             module: g.module,
             right: g.right,
-            refuses: /refusePortalCaller\s*\(/.test(body),
+            refuses: /refusePortalCaller\s*\(/.test(withHelpers),
           })
       }
     }
@@ -92,10 +114,20 @@ describe("a module refuses a client login on both halves, or on neither", () => 
     // their read doors gate on identity (`teamContext`), not on a module right,
     // so there is no `<module>:read` gate for this scan to read. They are named
     // by hand below, which is the only place in this file anything is.
+    //
+    // `agent` joined the set when the assistant's six doors started refusing a
+    // client login. It was the module R21 could not see AT ALL: the derivation
+    // reads the Client role's rights out of the seed to decide which doors to
+    // walk, the seed named no `agent` right, so `if (!passable) continue` skipped
+    // the whole surface — while the DEFAULT Viewer template ships
+    // `agent: read + create`, which is what an owner clones to build a client
+    // role. The seed now holds the right (worst case, on purpose), the doors now
+    // refuse, and the write half — chat and confirm, the two that spend the
+    // team's AI allowance — is checked below like every other module's.
     expect(
       [...agencyOnly].sort(),
       "the modules whose reads refuse a client login — if this set shrinks, a read door lost its refusal"
-    ).toEqual(["learning", "selectable_data"])
+    ).toEqual(["agent", "learning", "selectable_data"])
 
     const asymmetric = doors
       .filter((d) => agencyOnly.has(d.module) && d.right !== "read" && !d.refuses)

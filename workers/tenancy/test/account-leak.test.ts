@@ -623,3 +623,121 @@ describe("a portal grant on a nested company does not climb to its parent", () =
     expect(scope.accountIds, "…nor another company's person").not.toContain(IDS.victimPerson)
   })
 })
+
+// WHAT THE AGENCY'S RECORD SAYS *ABOUT* A CLIENT IS NOT THE CLIENT'S TO READ.
+//
+// The fence above answers "whose rows?". This answers the other half: given a row
+// that IS theirs, which of its columns are theirs. Most of an account is the
+// client's own information — that is why the portal opens the door at all — but
+// four fields on it are the agency's record about them: `status` (prospect /
+// client / past client), `commercialsVisible` (our switch governing what money
+// they see), and the two audit names, plus `grantedByName` on every login row.
+//
+// The repo had already ruled on exactly these fields, one layer up. The portal
+// has no activity feed, and shared/rules/registry.ts gives the reason in so many
+// words: an account's history "names the staff who edited the record and shows
+// the agency's own before/after values (status moves, commercial flags) — none of
+// which is the client's to read". The history was closed; the current values rode
+// out on the row beneath it. The portal draws none of them, which is what kept it
+// invisible — and precisely why it needs a test on the WIRE rather than a habit
+// in a component.
+describe("an account row does not carry the agency's own view of the client", () => {
+  /** Values a client must never read back, planted on every row so the assertions
+   * are about a redaction rather than about an empty fixture. */
+  const STATUS = "prospect"
+  const OPENED_BY = "Nils Opener"
+  const TOUCHED_BY = "Nora Editor"
+
+  beforeEach(() => {
+    const db = holder.db as DatabaseSync
+    db.exec(
+      `UPDATE accounts SET status = '${STATUS}', commercials_visible = 1,
+         creator_name = '${OPENED_BY}', editor_name = '${TOUCHED_BY}';
+       UPDATE portal_users SET creator_name = '${OPENED_BY}';`
+    )
+  })
+
+  /** Every agency-only value, in one place, so a test cannot check three of four. */
+  const AGENCY_ONLY = [STATUS, OPENED_BY, TOUCHED_BY]
+
+  // THE CONTROL. Each assertion below is "this string is absent", and a door that
+  // answered nothing at all would satisfy every one of them. So first: the agency
+  // app is still served the whole record, which is also the point — this is a
+  // projection for one kind of caller, not a column being deleted.
+  it("staff still read the whole record (or the absences below prove nothing)", async () => {
+    const { status, text } = await call(req("GET /api/tenancy/accounts"), IDS.staffUser)
+    expect(status).toBe(200)
+    for (const secret of AGENCY_ONLY) expect(text, `staff must still see ${secret}`).toContain(secret)
+    expect(text).toContain('"commercialsVisible":true')
+  })
+
+  it("the client's own list carries their company and none of our notes on it", async () => {
+    const { status, text } = await call(req("GET /api/tenancy/accounts"), IDS.victimUser)
+    expect(status).toBe(200)
+    // They can see themselves — this is their door, and it still works.
+    expect(text, "the client must still get their own company back").toContain("Bergman")
+    for (const secret of AGENCY_ONLY)
+      expect(text, `a client login was sent the agency's "${secret}"`).not.toContain(secret)
+    expect(text, "the commercial flag is a switch ABOUT them, not for them").not.toContain(
+      '"commercialsVisible":true'
+    )
+    expect(text).toContain('"commercialsVisible":null')
+    expect(text).toContain('"status":null')
+  })
+
+  it("nor through the detail door the portal actually calls — on EVERY row it opens", async () => {
+    const { text: mine } = await call(req("GET /api/tenancy/accounts"), IDS.victimUser)
+    const visible = (JSON.parse(mine) as { accounts: { id: string; name: string }[] }).accounts
+    expect(visible.length, "the client must have accounts to open, or this walks nothing").toBeGreaterThan(0)
+
+    let logins = 0
+    let parents = 0
+    for (const row of visible) {
+      const { status, text } = await call(
+        req("GET /api/tenancy/accounts/detail", undefined, `?id=${row.id}`),
+        IDS.victimUser
+      )
+      expect(status, `the detail door must answer for ${row.name}`).toBe(200)
+      for (const secret of AGENCY_ONLY)
+        expect(text, `the detail door sent a client login the agency's "${secret}"`).not.toContain(secret)
+
+      const detail = JSON.parse(text) as {
+        account: { name: string; status: string | null; createdByName: string | null; editedByName: string | null }
+        parent: { status: string | null; createdByName: string | null } | null
+        portalUsers: { grantedByName: string | null }[]
+      }
+      expect(detail.account.name, "the door answered with a real record").toBeTruthy()
+      expect(detail.account.status).toBeNull()
+      expect(detail.account.createdByName).toBeNull()
+      expect(detail.account.editedByName).toBeNull()
+      // The PARENT is a second row built by a second query — the place a
+      // redaction applied "at the call site" is the one somebody forgets.
+      if (detail.parent) {
+        parents++
+        expect(detail.parent.status, "the parent row goes through the projection too").toBeNull()
+        expect(detail.parent.createdByName).toBeNull()
+      }
+      // Who handed out the login is a staff decision with a staff name on it.
+      for (const p of detail.portalUsers) {
+        logins++
+        expect(p.grantedByName).toBeNull()
+      }
+    }
+    // The walk has to have MET both of those, or two of the assertions above ran
+    // zero times and said so in silence.
+    expect(logins, "no login row was reached — the grantedByName check ran on nothing").toBeGreaterThan(0)
+    expect(parents, "no nested account was reached — the parent check ran on nothing").toBeGreaterThan(0)
+  })
+
+  // The EXPORT is the same rows in a file, and it is reachable at the agency
+  // origin by anyone holding accounts:read — a client login included. A CSV that
+  // leaked what the JSON withheld would be the same disclosure, one Content-Type
+  // along; it is the shape of leak this codebase has already been bitten by.
+  it("and not in the CSV either — the export is the same rows in a file", async () => {
+    const { status, text } = await call(req("GET /api/tenancy/accounts/export"), IDS.victimUser)
+    expect(status).toBe(200)
+    expect(text, "the export must still contain their own company").toContain("Bergman")
+    for (const secret of AGENCY_ONLY)
+      expect(text, `the CSV export sent a client login the agency's "${secret}"`).not.toContain(secret)
+  })
+})

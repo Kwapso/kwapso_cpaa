@@ -163,9 +163,11 @@ const CLIENT_ROLE = {
   title: "Client",
   description:
     "A client login. Sees their own company's people and its requests — every request their colleagues raise, not only their own — and nothing else.",
-  // Anything not named here is off. A client never touches members, roles, the
-  // AI agent, or anyone else's records.
+  // Anything not named here is off. A client never touches members, roles, or
+  // anyone else's records — and the doors below say so themselves, which is the
+  // point of the list.
   //
+  // THIS ROLE IS THE WORST CASE ON PURPOSE, NOT A DESCRIPTION OF A GOOD ONE.
   // `learning` and `selectable_data` are DELIBERATELY still granted even though
   // every one of those doors now refuses a client login outright (d7512f1). They
   // are not a leftover: a real owner building their own client role would plausibly
@@ -174,6 +176,16 @@ const CLIENT_ROLE = {
   // R21's enumeration reads these rights to decide which doors to walk, so taking
   // them away would quietly stop the check testing the very doors that were leaking
   // a week ago. The defence must not depend on how carefully the role was built.
+  //
+  // `agent` is here for the same reason, and it is the sharpest case of it. An
+  // owner does not have to be careless to grant it: the DEFAULT Viewer template
+  // ships `agent: read + create` (workers/tenancy/src/team-schema.ts), and
+  // "clone Viewer, untick the obvious things" is how a client role gets built.
+  // Without this line R21 read the agent doors as unreachable and skipped the
+  // whole surface — the one place in the app where a client login could attach
+  // eight CSVs, be shown the import catalogue's inner shape, and spend the team's
+  // AI allowance that the portal was built never to touch. A right the seed does
+  // not hold is a door the law does not walk.
   rights: {
     teams: { read: true },
     accounts: { read: true },
@@ -181,6 +193,7 @@ const CLIENT_ROLE = {
     learning: { read: true },
     help: { read: true, create: true },
     selectable_data: { read: true },
+    agent: { read: true, create: true },
   },
 }
 

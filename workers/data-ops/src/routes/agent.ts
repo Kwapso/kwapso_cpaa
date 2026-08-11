@@ -3,7 +3,24 @@
 // saved conversations. Using the agent is gated by the `agent` module right
 // (read = view history; create = use it). The agent's ACTIONS are gated again at the
 // real endpoint it calls (act-as-user), so it can never exceed the caller's rights.
+//
+// AND EVERY DOOR HERE IS STAFF-ONLY, SAID AT THE DOOR (R21). The assistant is an
+// agency tool: the portal gateway forwards no /api/data-ops path and says so in
+// its own table. But the AGENCY gateway forwards by prefix, and a client login is
+// an ordinary team member — so the only thing standing between a client and the
+// assistant was the shape of the role somebody built for them, and the default
+// Viewer template ships `agent: read + create` (workers/tenancy/src/team-schema).
+// An owner cloning Viewer for a client role inherits it without ever deciding to.
+//
+// What that reached is not a small thing: the chat door accepts eight attached
+// CSVs, hands back the import catalogue's inner shape — precisely what
+// `getImportTargets` refuses a client login two files over — and spends the
+// team's AI allowance, which the portal was built never to touch. So the refusal
+// leads on every door below, before the right is asked, exactly as
+// `requireAnyImportRight` does for the importer: whether a client login can drive
+// the agency's assistant must not depend on how carefully a role was ticked.
 
+import { refusePortalCaller } from "@shared/workers/account-scope"
 import { fail, json } from "@shared/workers/http"
 import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
@@ -102,6 +119,7 @@ function streamRun(env: Env, run: (emit: Emit) => Promise<ChatOutcome>): Respons
 /** GET /api/data-ops/agent/usage — the active team's AI quota (free + credits). */
 export async function getAgentUsage(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await teamContext(request, env)
+  await refusePortalCaller(cfg, guard) // the AGENCY's allowance, and its spend
   await requireRight(cfg, guard, "agent", "read")
   return json({ quota: await getQuota(env, guard.teamId) })
 }
@@ -110,6 +128,7 @@ export async function getAgentUsage(request: Request, env: Env): Promise<Respons
  * (one row per turn). Gated + team-scoped exactly like GET /agent/usage. */
 export async function getAgentUsageLog(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard } = await teamContext(request, env)
+  await refusePortalCaller(cfg, guard) // who on the agency's staff asked the assistant what
   await requireRight(cfg, guard, "agent", "read")
   const raw = Number(new URL(request.url).searchParams.get("limit"))
   const limit = Number.isFinite(raw) && raw > 0 ? Math.min(Math.trunc(raw), 200) : 50
@@ -136,6 +155,7 @@ export async function postGrantCredits(request: Request, env: Env): Promise<Resp
  * events) and end with the single terminal event; otherwise we return the JSON outcome. */
 export async function postAgentChat(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, user } = await teamContext(request, env)
+  await refusePortalCaller(cfg, guard) // an agency tool, and the team's AI allowance
   await requireRight(cfg, guard, "agent", "create")
   // THE CEILING GOES IN FRONT OF THE PARSE. Every cap below is real and every one
   // of them used to be read AFTER `request.json()` had already buffered and
@@ -179,6 +199,7 @@ export async function postAgentChat(request: Request, env: Env): Promise<Respons
  * action(s) the last turn returned, then resume. */
 export async function postAgentConfirm(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, user } = await teamContext(request, env)
+  await refusePortalCaller(cfg, guard) // the other half of the same turn
   await requireRight(cfg, guard, "agent", "create")
   const body = (await request.json().catch(() => ({}))) as { threadId?: unknown; approve?: unknown }
   const threadId = requireText(body.threadId, "Thread", 64)
@@ -195,6 +216,7 @@ export async function postAgentConfirm(request: Request, env: Env): Promise<Resp
 /** GET /api/data-ops/agent/threads — the caller's saved conversations. */
 export async function getAgentThreads(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await teamContext(request, env)
+  await refusePortalCaller(cfg, guard) // the agency's own conversations with its assistant
   await requireRight(cfg, guard, "agent", "read")
   return json({ threads: await listThreads(cfg, guard) })
 }
@@ -202,6 +224,7 @@ export async function getAgentThreads(request: Request, env: Env): Promise<Respo
 /** GET /api/data-ops/agent/thread?id= — one conversation's messages. */
 export async function getAgentThread(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await teamContext(request, env)
+  await refusePortalCaller(cfg, guard) // …and one of them, by id
   await requireRight(cfg, guard, "agent", "read")
   const id = queryText(new URL(request.url).searchParams.get("id"), "Id")
   if (!id) return fail(400, "invalid_input", "A conversation id is required.")

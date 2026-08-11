@@ -40,9 +40,42 @@ type TicketRow = {
   editor_name: string | null
   created_at: string
   updated_at: string | null
+  /** Computed in TICKET_COLS: does the person who raised / last edited this row
+   * have a portal login? "Is one of the client's own people", in other words —
+   * see toTicket. */
+  raiser_is_client: number
+  editor_is_client: number
 }
 
-function toTicket(r: TicketRow): HelpTicket {
+/** WHOSE NAME TRAVELS ON A TICKET — the same promise `listReplies` keeps on a
+ * thread, kept one table up, where it was not being kept at all.
+ *
+ * SCOPE ch.06: "the portal shows work status but never which staff member is
+ * doing it." That sentence is why `/help/stakeholders` is withheld from the
+ * portal surface entirely — and every ticket row was carrying the same fact for
+ * free: `raiserName` and `editorName` are the staff member's real name, and
+ * `raiserId` is their stable ULID, the same one against the same person on every
+ * ticket they ever touch. The portal drew none of it and the wire sent all of
+ * it, which is the version of this mistake that survives a UI rewrite.
+ *
+ * Not a hypothetical, and not an edge: 220 of the 221 seeded historical requests
+ * are staff-raised, because staff raise a client's questions on their behalf
+ * (SCOPE ch.07). Staff-authored is the majority case here.
+ *
+ * The rule is `listReplies`'s rule, for the same reason: a client login is told
+ * the names of the people on THEIR side of the fence — a colleague who raised
+ * the question is theirs to know, and calling them "kwapso" would be a lie about
+ * who is talking — and nothing at all about ours. "Has a portal login" is
+ * exactly "is one of this company's people"; anyone else is the agency, and
+ * arrives with no name and no handle. Staff readers are unaffected.
+ *
+ * `scope` is REQUIRED rather than defaulted, for the reason written over
+ * `ticketFence`: a redaction that defaults to "not a client" is a redaction that
+ * fails open the day somebody writes a new reader. */
+function toTicket(r: TicketRow, scope: AccountScope): HelpTicket {
+  // Ours = the agency's. A portal caller learns nothing about our side of it.
+  const hideRaiser = scope.kind === "portal" && r.raiser_is_client !== 1
+  const hideEditor = scope.kind === "portal" && r.editor_is_client !== 1
   return {
     id: r.id,
     helpType: r.help_type,
@@ -54,9 +87,13 @@ function toTicket(r: TicketRow): HelpTicket {
       : "open",
     resolved: r.resolved === 1,
     resolvedAt: r.resolved_at,
-    raiserId: r.creator_id,
-    raiserName: r.creator_name,
-    editorName: r.editor_name,
+    // The HANDLE dies with the name. Blanking `raiserName` alone would leave a
+    // per-staff-member pseudonym on every ticket, and a pseudonym is anonymity
+    // only until one thing links it to a name once — which is precisely the
+    // linkage the reply notification used to make (see listReplies).
+    raiserId: hideRaiser ? null : r.creator_id,
+    raiserName: hideRaiser ? null : r.creator_name,
+    editorName: hideEditor ? null : r.editor_name,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     accountId: r.account_id,
@@ -99,8 +136,14 @@ function toMessage(r: ReplyRow): HelpMessage {
   }
 }
 
-const TICKET_COLS =
-  "id, help_type, description, screen_recording_link, source_screen, status, resolved, resolved_at, account_id, creator_id, creator_name, editor_name, created_at, updated_at"
+// The last two are computed, not stored: "does this person have a portal login",
+// asked of the raiser and of the last editor. Exactly the subselect listReplies
+// uses on an author, and it rides the SAME read as the row so a name and the
+// answer about that name can never come from two different moments.
+const TICKET_COLS = `id, help_type, description, screen_recording_link, source_screen, status, resolved, resolved_at,
+  account_id, creator_id, creator_name, editor_name, created_at, updated_at,
+  EXISTS (SELECT 1 FROM portal_users pu WHERE pu.user_id = help.creator_id) AS raiser_is_client,
+  EXISTS (SELECT 1 FROM portal_users pu WHERE pu.user_id = help.editor_id) AS editor_is_client`
 
 /** Fetch one ticket (the raw row the gating + notify need), or throw a clean 404.
  *
@@ -205,7 +248,7 @@ export async function listTickets(
     params
   )
   const page = toPage(rows, PAGE_SIZE, (r) => [r.updated_at ?? r.created_at, r.id])
-  return { ...page, rows: page.rows.map(toTicket) }
+  return { ...page, rows: page.rows.map((r) => toTicket(r, scope)) }
 }
 
 /** R16: exact server COUNT(*) for the badges — the All total and the caller's
@@ -248,7 +291,7 @@ export async function getTicket(
     `SELECT ${TICKET_COLS} FROM help WHERE id = ?${fence.sql ? ` AND ${fence.sql}` : ""}`,
     [id, ...fence.params]
   )
-  return rows[0] ? toTicket(rows[0]) : null
+  return rows[0] ? toTicket(rows[0], scope) : null
 }
 
 /** THE THREAD FENCE — the same fence, one table along.
@@ -664,8 +707,14 @@ export async function bulkSetStatusByFilter(
 
 /** Add a reply to a ticket's thread, and bump the ticket's updated_at so it
  * re-sorts to the top of both tabs. `taggedUserIds` are notify-only mentions (the
- * notify happens in the route). `isAgent` marks the AI-drafted reply. Returns the
- * new reply's id. */
+ * notify happens in the route). `isAgent` marks the AI-drafted reply.
+ *
+ * Returns the new reply's id AND THE RAISER'S, which is not tidiness: the route
+ * has to email whoever asked the question, and since a client login is no longer
+ * SENT the raiser's id (see toTicket) it cannot read one off the ticket it just
+ * fetched. So the notify path takes it from the write path, which had already
+ * read the row and was throwing the answer away. The redaction is about what
+ * leaves the building; a staff raiser still gets told a client replied. */
 export async function addReply(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -675,10 +724,10 @@ export async function addReply(
   body: string,
   taggedUserIds: string[],
   isAgent: boolean
-): Promise<string> {
+): Promise<{ id: string; raiserId: string }> {
   const clean = body.trim()
   if (!clean) throw new GuardError(400, "invalid_input", "A reply can't be empty.")
-  await ticketOrThrow(cfg, guard, scope, ticketId)
+  const ticket = await ticketOrThrow(cfg, guard, scope, ticketId)
 
   const id = ulid()
   const now = new Date().toISOString()
@@ -691,7 +740,7 @@ VALUES (${sqlString(id)}, ${sqlString(ticketId)}, ${sqlString(clean)}, ${tagged}
 UPDATE help SET updated_at = ${sqlString(now)} WHERE id = ${sqlString(ticketId)};`
   )
 
-  return id
+  return { id, raiserId: ticket.creator_id }
 }
 
 /** HOOK (Phase 3) — the AI agent drafts the FIRST reply here, labelled "Drafted by

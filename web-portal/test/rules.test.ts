@@ -183,15 +183,80 @@ describe("portal rules the agency app doesn't have", () => {
     expect(leaky, "the portal shows work status, never which staff member is doing it").toEqual([])
 
     // The wire, not the widget: a staff name must not reach a client login at
-    // all. (workers/content/test/help-fence.test.ts proves it against a real
-    // database; this pins the seam so the source can't quietly drop it.)
+    // all. (workers/content/test/staff-anonymity.test.ts proves both halves
+    // against a real database; this pins the seams so the source can't quietly
+    // drop one.)
+    //
+    // TWO SEAMS, not one, and the second is why this assertion moved. A thread's
+    // authors were decided in `listReplies` and this line watched it — while
+    // `toTicket`, forty lines up the same file, emitted the staff RAISER's name,
+    // their id and the last EDITOR's name on every ticket row, with no portal
+    // branch at all. Watching one of two places that make the same decision is
+    // how a rule reads as kept while half of it is broken; a promise with two
+    // seams needs two lines here.
     const lib = read(join(PORTAL, "..", "workers", "content", "src", "lib", "help.ts"))
-    const at = lib.indexOf("export async function listReplies(")
-    expect(at, "listReplies is where a thread's names are decided — did it move?").toBeGreaterThan(-1)
-    const body = lib.slice(at, lib.indexOf("\nexport ", at + 1)).replace(/\/\*[\s\S]*?\*\//g, "")
-    expect(body, "a portal caller must be sent NO name for an author outside their world").toMatch(
-      /scope\.kind === "portal"[\s\S]*creator_name: null/
-    )
+    const seamBody = (needle: string) => {
+      const at = lib.indexOf(needle)
+      expect(at, `${needle.trim()} is where names are decided — did it move?`).toBeGreaterThan(-1)
+      // Comments stripped, or the prose ABOVE the seam explaining the rule would
+      // satisfy the assertion in place of the code that implements it.
+      return lib.slice(at, lib.indexOf("\n}", at)).replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")
+    }
+    expect(
+      seamBody("export async function listReplies("),
+      "a portal caller must be sent NO name for an author outside their world"
+    ).toMatch(/scope\.kind === "portal"[\s\S]*creator_name: null/)
+
+    // The ticket row: the NAME and the HANDLE, and the editor's name too. A ULID
+    // is a stable pseudonym for one staff member across every ticket they touch,
+    // so blanking only the name would leave the linkage that makes a name
+    // recoverable (the reason listReplies kills both).
+    const ticket = seamBody("function toTicket(")
+    expect(ticket, "toTicket must decide about a client login at all").toContain('scope.kind === "portal"')
+    for (const field of ["raiserId", "raiserName", "editorName"])
+      expect(ticket, `${field} must be withheld from a client login, not just left off the screen`).toMatch(
+        new RegExp(`${field}: hide\\w+ \\? null :`)
+      )
+  })
+
+  // THE SAME SENTENCE, ONE TABLE OVER. An account row is mostly the client's own
+  // information — which is why the portal opens the door — but four of its fields
+  // are the agency's record ABOUT them: the commercial `status` (prospect /
+  // client / past client), `commercialsVisible` (our switch governing what money
+  // they see), and the two audit names. Plus `grantedByName` on a login row: which
+  // staff member handed out the sign-in.
+  //
+  // The repo had already ruled on exactly these fields one layer up.
+  // shared/rules/registry.ts closes the portal's activity feed because an
+  // account's history "names the staff who edited the record and shows the
+  // agency's own before/after values (status moves, commercial flags) — none of
+  // which is the client's to read". The history was shut and the CURRENT values
+  // rode out on the row underneath it.
+  //
+  // (workers/tenancy/test/account-leak.test.ts proves it against a real database
+  // through both doors and the CSV export; this pins the seam so the source can't
+  // quietly drop it.)
+  it("an account row carries none of the agency's own view of the client", () => {
+    const lib = read(join(PORTAL, "..", "workers", "tenancy", "src", "lib", "accounts.ts"))
+    const seamBody = (needle: string) => {
+      const at = lib.indexOf(needle)
+      expect(at, `${needle.trim()} is where an account's fields are decided — did it move?`).toBeGreaterThan(-1)
+      // Comments stripped, or the prose explaining the rule would satisfy the
+      // assertion in place of the code that implements it.
+      return lib.slice(at, lib.indexOf("\n}", at)).replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")
+    }
+    const account = seamBody("function toAccount(")
+    expect(account, "toAccount must decide about a client login at all").toContain('scope.kind === "portal"')
+    for (const field of ["commercialsVisible", "status", "createdByName", "editedByName"])
+      expect(account, `${field} is the agency's, and must not be sent to a client login`).toMatch(
+        new RegExp(`${field}: ours \\? null :`)
+      )
+
+    // The login row's own staff name, decided in the reader that builds it.
+    expect(
+      seamBody("export async function listPortalUsers("),
+      "who granted a login is a staff decision with a staff name on it"
+    ).toMatch(/grantedByName: scope\.kind === "portal" \? null :/)
   })
 
   // SCOPE ch.02, the iron rule: "account" NEVER means a login. People are portal

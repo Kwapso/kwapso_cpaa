@@ -26,12 +26,18 @@
 // see what; it only decides which questions may be asked. Every answer comes
 // from a door that already resolves the caller's account set.
 
-// The three things BOTH front doors do identically — serve an uploaded file (with
-// its key validated at the boundary and its security headers), record a client
-// crash, and answer their own crash without leaking a raw 1101. ONE implementation,
-// deliberately: this door's media serving was once written a second time from memory
-// and shipped without the key check the agency door had carried for weeks.
-import { recordClientError, recordGatewayCrash, serveMedia } from "@shared/workers/front-door"
+// The four things BOTH front doors do identically — refuse a write another site
+// started, serve an uploaded file (with its key validated at the boundary and its
+// security headers), record a client crash, and answer their own crash without
+// leaking a raw 1101. ONE implementation, deliberately: this door's media serving
+// was once written a second time from memory and shipped without the key check the
+// agency door had carried for weeks.
+import {
+  recordClientError,
+  recordGatewayCrash,
+  refuseForeignOrigin,
+  serveMedia,
+} from "@shared/workers/front-door"
 import { fail } from "@shared/workers/http"
 
 /** The workers a portal door may be forwarded to. */
@@ -123,6 +129,13 @@ export default {
 
 async function handle(request: Request, env: Env): Promise<Response> {
     const { pathname } = new URL(request.url)
+
+    // CROSS-SITE WRITES DIE HERE, in front of the allow-list below — the SAME
+    // check the agency door runs, from the same function, because the cookie
+    // both doors mint is the same cookie and the site it is loose on is the same
+    // site. See refuseForeignOrigin.
+    const foreign = refuseForeignOrigin(request)
+    if (foreign) return foreign
 
     // The client error beacon → console AND the central error_logs table, the
     // same never-swallow seam the agency door uses (ERROR-HANDLING.md). The only
