@@ -34,9 +34,7 @@
 // agree with a broken WHERE clause, and the whole point here is what SQL does
 // when two requests arrive at once.
 
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
-import { DatabaseSync, type SqlValue } from "node:sqlite"
+import { DatabaseSync } from "node:sqlite"
 import { describe, expect, it } from "vitest"
 
 import {
@@ -50,9 +48,7 @@ import {
   TEST_LOGIN_BUCKET,
 } from "../src/lib/constants"
 import { clientIp, mintLoginCode, verifyLoginCode } from "../src/lib/login-codes"
-
-const CORE = join(__dirname, "..", "..", "..", "db", "core")
-const migration = (name: string) => readFileSync(join(CORE, name), "utf8")
+import { d1, migration } from "./core-sqlite"
 
 type Row = {
   id: string
@@ -75,35 +71,6 @@ function coreDb() {
   db.exec(migration("0015_login_send_throttle.sql")) // the throttle's own columns
   db.exec(migration("0017_login_send_ledger.sql")) // the send ledger the budget reads
   return db
-}
-
-/** The slice of the D1 binding this path uses, over real SQLite. Each statement
- * runs ATOMICALLY (as D1 does); the awaits in between are where concurrent
- * requests interleave — which is exactly the race being tested. */
-function d1(db: DatabaseSync) {
-  const statements: string[] = []
-  return {
-    statements,
-    prepare(sql: string) {
-      statements.push(sql.replace(/\s+/g, " ").trim())
-      const stmt = db.prepare(sql)
-      let args: unknown[] = []
-      const api = {
-        bind(...a: unknown[]) {
-          args = a
-          return api
-        },
-        async first<T>(): Promise<T | null> {
-          return (stmt.get(...(args as SqlValue[])) ?? null) as T | null
-        },
-        async run() {
-          const r = stmt.run(...(args as SqlValue[]))
-          return { meta: { changes: Number(r.changes) } }
-        },
-      }
-      return api
-    },
-  }
 }
 
 const EMAIL = "person@example.com"

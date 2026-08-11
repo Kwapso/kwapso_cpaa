@@ -19,7 +19,12 @@ import {
 } from "./email"
 import { signOutOtherSessions } from "./sessions"
 import { findUserByEmail, toSessionUser, type UserRow } from "./users"
-import { CODE_TTL_MINUTES, MAX_CODE_ATTEMPTS, MAX_CODES_PER_HOUR } from "./constants"
+import {
+  CODE_TTL_MINUTES,
+  MAX_CHANGE_CODES_PER_TARGET_PER_HOUR,
+  MAX_CODE_ATTEMPTS,
+  MAX_CODES_PER_HOUR,
+} from "./constants"
 
 /** A handled failure — the route turns this into the HTTP error response. */
 export type ChangeFail = { error: string; message: string; status: number }
@@ -36,43 +41,67 @@ export async function startEmailChange(
   if (shape) return { ...shape, status: 400 }
   const newEmail = normalizeEmail(newEmailRaw)
 
-  // Throttle FIRST, and count every ATTEMPT — not just issued codes. The
-  // "already in use" answer below is a yes/no oracle on any address in the
-  // platform, so an unthrottled probe would enumerate the whole user base at
-  // full request rate (the login door is deliberately non-enumerable; this
-  // door must not undo that).
-  // Throttle: at most 5 change-codes per user per hour.
-  const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
-  const recent = await env.DB.prepare(
-    "SELECT COUNT(*) AS n FROM email_change_codes WHERE user_id = ? AND created_at > ?"
+  // THE ROW IS THE BUDGET (the discipline login-codes.ts already learned).
+  //
+  // This used to be SELECT COUNT(*) → compare → INSERT → send: four statements
+  // with awaits between them, so a hundred simultaneous requests all read "none
+  // this hour" and all sent. A read-then-write throttle is a suggestion under
+  // load. The count now rides the INSERT's own WHERE, and SQLite serializes it —
+  // one statement, so a burst spends exactly one budget.
+  //
+  // TWO ceilings, because this door has TWO victims:
+  //   • the CALLER's, so one account can't spend the hour;
+  //   • the TARGET's, so any number of accounts can't gang up on one inbox.
+  // The second is the one that matters here. Unlike every other throttle in this
+  // file, the person who receives this mail never asked for it and has no
+  // account here — the caller names them. A per-user cap alone bounds what an
+  // ACCOUNT spends, and accounts are free to anyone with an inbox of their own.
+  //
+  // ONE refusal for both, on purpose: "you have asked too often" and "this
+  // address has been asked about too often" are different sentences, and telling
+  // them apart would say whether someone ELSE is already asking about that
+  // address. A throttle must not become an oracle.
+  const now = new Date()
+  const nowIso = now.toISOString()
+  const hourAgo = new Date(now.getTime() - 60 * 60 * 1000).toISOString()
+  const code = randomCode()
+  const id = ulid()
+
+  const charged = await env.DB.prepare(
+    `INSERT INTO email_change_codes (id, user_id, new_email, code_hash, expires_at, created_at)
+     SELECT ?, ?, ?, ?, ?, ?
+      WHERE (SELECT COUNT(*) FROM email_change_codes WHERE user_id = ? AND created_at > ?) < ?
+        AND (SELECT COUNT(*) FROM email_change_codes WHERE new_email = ? AND created_at > ?) < ?`
   )
-    .bind(user.id, hourAgo)
-    .first<{ n: number }>()
-  if ((recent?.n ?? 0) >= MAX_CODES_PER_HOUR)
+    .bind(
+      id,
+      user.id,
+      newEmail,
+      await sha256Hex(`${code}:${newEmail}`),
+      new Date(now.getTime() + CODE_TTL_MINUTES * 60 * 1000).toISOString(),
+      nowIso,
+      user.id, hourAgo, MAX_CODES_PER_HOUR,
+      newEmail, hourAgo, MAX_CHANGE_CODES_PER_TARGET_PER_HOUR
+    )
+    .run()
+  if ((charged.meta.changes ?? 0) === 0)
     return {
       error: "too_many_codes",
       message: "Too many codes requested. Try again in an hour.",
       status: 429,
     }
 
-  const code = randomCode()
-  const now = new Date()
-  await env.DB.prepare(
-    `INSERT INTO email_change_codes (id, user_id, new_email, code_hash, expires_at, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`
-  )
-    .bind(
-      ulid(),
-      user.id,
-      newEmail,
-      await sha256Hex(`${code}:${newEmail}`),
-      new Date(now.getTime() + CODE_TTL_MINUTES * 60 * 1000).toISOString(),
-      now.toISOString()
-    )
-    .run()
-
   const sent = await sendEmailChangeCode(env, newEmail, code)
   if (sent) return {}
+
+  // Nothing left, so hand the charge back — this table IS the ledger, and a slot
+  // spent on mail nobody received refuses the person, not the attacker.
+  // ONLY on this path. A send that THREW is deliberately left charged: which
+  // addresses the mail service rejects is something a caller can choose, so an
+  // uncharge there would hand an attacker an unlimited retry and a row in the
+  // error log each time. "No email key configured" is one state for the whole
+  // environment, which nobody can induce per request.
+  await env.DB.prepare("DELETE FROM email_change_codes WHERE id = ?").bind(id).run()
   return {
     error: "email_not_configured",
     message: "Email sending isn't set up yet.",

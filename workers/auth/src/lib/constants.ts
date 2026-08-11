@@ -81,3 +81,26 @@ export const TEST_LOGIN_BUCKET = "test-login"
 /** …and its own ceiling, so the door is still bounded rather than free. Sized for
  * a day of automated runs, not for a person. */
 export const MAX_TEST_LOGIN_SENDS_PER_HOUR = 400
+
+// ── the EMAIL-CHANGE door (its victim is a THIRD PARTY) ──────────────────────
+// Every number above bounds mail to an address that ASKED for it. The
+// email-change door is the other shape: a signed-in caller names ANY address and
+// we mail it. The recipient is a stranger to that account, and a session costs
+// nothing but an inbox of your own — so MAX_CODES_PER_HOUR, counted per USER, is
+// only half a bound. It says how much one account can spend; it says nothing
+// about how much mail one INBOX can be made to receive.
+
+/** Email-change codes ONE TARGET ADDRESS may be sent in an hour, counting every
+ * account together. This is the ceiling that actually protects the stranger:
+ * signing up is open, so "how many accounts can an attacker hold?" is not a
+ * bound, and only a ceiling on the ADDRESS bounds what lands in their inbox.
+ *
+ * Deliberately the SAME number as the per-user cap: one honest person changing
+ * their own address is stopped by their own ceiling long before this one, so it
+ * costs them nothing and bites only when several accounts aim at one inbox.
+ * THE PRICE, SAID PLAINLY: a stranger who knows the address you are moving TO
+ * can spend this hour and make you wait for it. That is a delay on a settings
+ * change you can retry — not the login door, where the same trade would be a
+ * lockout from the only entrance to the product, and is why that door rations
+ * instead of refusing. */
+export const MAX_CHANGE_CODES_PER_TARGET_PER_HOUR = MAX_CODES_PER_HOUR

@@ -276,24 +276,26 @@ export async function createAccount(
 
   const id = ulid()
   const now = new Date().toISOString()
-  await insertRow(cfg, guard, "accounts", {
-    id,
-    account_type: input.accountType,
-    parent_account_id: input.parentAccountId ?? null,
-    name: input.name,
-    email: input.email ?? null,
-    phone: input.phone ?? null,
-    address: input.address ?? null,
-    code: input.code ?? null,
-    currency: input.currency ?? null,
-    locale: input.locale ?? null,
-    timezone: input.timezone ?? null,
-    status: input.status ?? "active",
-    created_at: now,
-    creator_id: actor.id,
-    creator_email: actor.email,
-    creator_name: actor.name,
-  })
+  await refusingDuplicate(REFERENCE_TAKEN, () =>
+    insertRow(cfg, guard, "accounts", {
+      id,
+      account_type: input.accountType,
+      parent_account_id: input.parentAccountId ?? null,
+      name: input.name,
+      email: input.email ?? null,
+      phone: input.phone ?? null,
+      address: input.address ?? null,
+      code: input.code ?? null,
+      currency: input.currency ?? null,
+      locale: input.locale ?? null,
+      timezone: input.timezone ?? null,
+      status: input.status ?? "active",
+      created_at: now,
+      creator_id: actor.id,
+      creator_email: actor.email,
+      creator_name: actor.name,
+    })
+  )
 
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Account created",
@@ -329,27 +331,29 @@ export async function updateAccount(
   const fence = accountScopeClause(scope, "id")
   const audit = editedBy(actor, new Date().toISOString())
 
-  const changed = await d1Query<{ id: string }>(
-    cfg,
-    guard.databaseId,
-    `UPDATE accounts SET name = ?, email = ?, phone = ?, address = ?, code = ?, currency = ?,
+  const changed = await refusingDuplicate(REFERENCE_TAKEN, () =>
+    d1Query<{ id: string }>(
+      cfg,
+      guard.databaseId,
+      `UPDATE accounts SET name = ?, email = ?, phone = ?, address = ?, code = ?, currency = ?,
        locale = ?, timezone = ?, status = ?, commercials_visible = ?, ${audit.sql}
      ${where([fence.sql, "id = ?"])} RETURNING id`,
-    [
-      input.name,
-      input.email ?? null,
-      input.phone ?? null,
-      input.address ?? null,
-      input.code ?? null,
-      input.currency ?? null,
-      input.locale ?? null,
-      input.timezone ?? null,
-      input.status ?? before.status,
-      input.commercialsVisible === undefined ? (before.commercialsVisible ? 1 : 0) : input.commercialsVisible ? 1 : 0,
-      ...audit.params,
-      ...fence.params,
-      id,
-    ]
+      [
+        input.name,
+        input.email ?? null,
+        input.phone ?? null,
+        input.address ?? null,
+        input.code ?? null,
+        input.currency ?? null,
+        input.locale ?? null,
+        input.timezone ?? null,
+        input.status ?? before.status,
+        input.commercialsVisible === undefined ? (before.commercialsVisible ? 1 : 0) : input.commercialsVisible ? 1 : 0,
+        ...audit.params,
+        ...fence.params,
+        id,
+      ]
+    )
   )
   if (!changed[0]) throw new GuardError(404, "not_found", "That account doesn't exist.")
 
@@ -572,29 +576,32 @@ export async function linkPerson(
   ])
 
   // The partial unique index is the real duplicate guard (two people adding the
-  // same contact at once); this read just turns the raced loser's constraint
-  // error into a sentence a person can act on.
+  // same contact at once); this read is the fast, friendly path. The INSERT
+  // carries the same answer for the raced loser — see refusingDuplicate.
+  const already = `${person.name} is already a contact of ${account.name}.`
   const dup = await d1Query<{ id: string }>(
     cfg,
     guard.databaseId,
     "SELECT id FROM account_links WHERE account_id = ? AND person_account_id = ? AND deactivated_at IS NULL LIMIT 1",
     [input.accountId, input.personAccountId]
   )
-  if (dup[0]) throw new GuardError(409, "duplicate", `${person.name} is already a contact of ${account.name}.`)
+  if (dup[0]) throw new GuardError(409, "duplicate", already)
 
   const id = ulid()
   const now = new Date().toISOString()
-  await insertRow(cfg, guard, "account_links", {
-    id,
-    account_id: input.accountId,
-    person_account_id: input.personAccountId,
-    relationship: input.relationship ?? null,
-    is_main_stakeholder: input.isMainStakeholder ? 1 : 0,
-    created_at: now,
-    creator_id: actor.id,
-    creator_email: actor.email,
-    creator_name: actor.name,
-  })
+  await refusingDuplicate(already, () =>
+    insertRow(cfg, guard, "account_links", {
+      id,
+      account_id: input.accountId,
+      person_account_id: input.personAccountId,
+      relationship: input.relationship ?? null,
+      is_main_stakeholder: input.isMainStakeholder ? 1 : 0,
+      created_at: now,
+      creator_id: actor.id,
+      creator_email: actor.email,
+      creator_name: actor.name,
+    })
+  )
 
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Contact linked",
@@ -759,20 +766,23 @@ export async function grantPortalAccess(
   )
   // The partial unique index enforces this under a race; the read makes the
   // refusal readable. One live grant per person is what pins them to one fence.
-  if (live[0]) throw new GuardError(409, "duplicate", "That person already has portal access.")
+  const already = "That person already has portal access."
+  if (live[0]) throw new GuardError(409, "duplicate", already)
 
   const id = ulid()
   const now = new Date().toISOString()
-  await insertRow(cfg, guard, "portal_users", {
-    id,
-    account_id: input.personAccountId, // the PERSON — see the note above
-    user_id: input.userId,
-    app_restriction: input.appRestriction ?? null,
-    created_at: now,
-    creator_id: actor.id,
-    creator_email: actor.email,
-    creator_name: actor.name,
-  })
+  await refusingDuplicate(already, () =>
+    insertRow(cfg, guard, "portal_users", {
+      id,
+      account_id: input.personAccountId, // the PERSON — see the note above
+      user_id: input.userId,
+      app_restriction: input.appRestriction ?? null,
+      created_at: now,
+      creator_id: actor.id,
+      creator_email: actor.email,
+      creator_name: actor.name,
+    })
+  )
 
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Portal access granted",
@@ -913,6 +923,41 @@ export async function switchPortalAccount(
   )
   return !!changed[0]
 }
+
+/** A UNIQUE INDEX REFUSING A ROW IS BAD INPUT, NOT A CRASH.
+ *
+ * Three of the spine's rules are unique indexes (team-schema): one `reference`
+ * per account, one live link per (account, person), one live login per person.
+ * They are the authority and they ride the write — a pre-check is two steps a
+ * concurrent write slips between. But the refusal arrived here as a raw Error,
+ * which the worker's central catch turned into a 500 AND a row in the GLOBAL
+ * error log. `accounts.code` had no pre-check at all, so retyping a reference
+ * someone else already uses — an everyday mistake — was a repeatable 500 that
+ * wrote a fresh error row every time: an ordinary typo, holding an attacker's
+ * pen. Bad input is a clean refusal (R20), never a 500.
+ *
+ * So the pre-check and the index now give the SAME answer in the same words: the
+ * check is the fast, friendly path, this is the one that cannot be raced.
+ * ONLY a duplicate is caught; anything else is rethrown untouched, because a
+ * swallowed database error is exactly what this must not become.
+ *
+ * Both data doors say it the same way — the native D1 binding raises
+ * "D1_ERROR: UNIQUE constraint failed: …", the REST door wraps that same
+ * sentence — which is why one test is enough for a write on either.
+ * (createInvite in lib/invites.ts is the same shape on the core DB.) */
+async function refusingDuplicate<T>(message: string, write: () => Promise<T>): Promise<T> {
+  try {
+    return await write()
+  } catch (e) {
+    if (!/UNIQUE constraint/i.test(String((e as Error)?.message ?? ""))) throw e
+    throw new GuardError(409, "duplicate", message)
+  }
+}
+
+/** What a caller is told when a reference is already taken. It names no other
+ * account on purpose: a pinned portal caller can create accounts too, and the
+ * refusal must not become a way to read a name from outside their fence. */
+const REFERENCE_TAKEN = "Another account already uses that reference. Give this one a different reference."
 
 /** A parameterised INSERT — the table name is a code literal, every value is
  * bound. Deliberately NOT d1ExecScript + sqlString: the spine's values are the
