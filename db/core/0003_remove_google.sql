@@ -1,6 +1,18 @@
--- Google login was parked (2026-06-12): Brimba is strict email-OTP only.
+-- Google login was parked (2026-06-12): a BRIMBA scope decision — the generic
+-- base narrowed to email one-time codes only. Not a security finding.
 -- google_sub was a UNIQUE column, which SQLite can't drop in place — so the
 -- users table is rebuilt without it (standard SQLite column-removal pattern).
+--
+-- REVERSED FOR KWAPSO (2026-08-11) — read this before you conclude Google is off.
+-- kwapso's SCOPE re-decides it (ch.03 "OTP + Google sign-in", ch.06 "email
+-- one-time code … or Google — same person as long as the email matches"), and
+-- SCOPE wins where it speaks. "Continue with Google" is BUILT and deployed on
+-- both front doors. This migration is NOT reverted and google_sub is NOT coming
+-- back: the identity key is the verified EMAIL, so a person who used a code
+-- yesterday and Google today is one row, and there is no second key to keep in
+-- step. See ARCHITECTURE.md §5 for the flow and OPERATIONS.md for the secrets.
+-- The Brimba base itself may still be email-only; kwapso is the fork that
+-- turned Google back on.
 
 PRAGMA defer_foreign_keys = true;
 

@@ -92,8 +92,10 @@ environment (staging and production errors never mix), cross-team by design
 - **Why owner-gated, not a team screen:** stack traces are maintainer material,
   not tenant data. An in-app owner console is a later milestone — it needs a
   "platform owner" identity concept the base deliberately doesn't have yet.
-- **User-reported bugs stay in Help** (tickets); this store is the system's own
-  telemetry. The two meet when you resolve an error and answer the ticket.
+- **What a person reports lives in Tickets**; this store is the system's own
+  telemetry. The two meet when you resolve an error and answer the ticket. There
+  is no separate help section and no in-app bug-report channel for the app
+  itself — a ticket is something an account asked us for.
 
 ## Analysing the store — the `error_analyst` skill
 

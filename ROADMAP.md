@@ -10,7 +10,8 @@
 > 2026-07-02 and has been overtaken.
 >
 > **Two whole eras shipped after this file stopped moving**, and neither is
-> described here: the agent-modules build (learning, help, CSV import, the
+> described here: the agent-modules build (learning, the module then called help
+> and now called **Tickets**, CSV import, the
 > streaming AI co-pilot, and the external machine surface) and the client-portal
 > build (the second front end, the account fence, and the closed-allow-list door
 > in front of it).

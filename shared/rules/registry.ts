@@ -433,7 +433,7 @@ export const GROWING_COLLECTIONS: Record<
     rowsKey: "tickets",
     listRecipe: "tickets.list",
     webKey: "helpKey(",
-    why: "support tickets accumulate forever — a team that has raised 3,000 must still reach the oldest",
+    why: "tickets accumulate forever — a team that has raised 3,000 must still reach the oldest",
   },
   accounts: {
     lib: "workers/tenancy/src/lib/accounts.ts",

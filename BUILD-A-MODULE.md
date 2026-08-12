@@ -2,7 +2,8 @@
 
 A **module** is one team-scoped thing users work with: a collection of records
 that live in the team's own database, are gated by the role matrix, publish live
-changes, log activity, and show up as a screen. `learning` and `help` are
+changes, log activity, and show up as a screen. `learning` and `help` (the module
+a person reads as **Tickets** — DATA-MODEL.md says why the key stayed) are
 modules. So are `member_roles`, `team_members` and `selectable_data`. This
 document is the golden path for adding the next one — read it top to bottom, then
 follow the checklist at the end.
@@ -80,7 +81,7 @@ The **shape rules**, every one visible above and non-negotiable:
   is no `DELETE`. Retiring a row sets `deactivated_at`; reactivating clears it. Data
   and history survive (ARCHITECTURE.md §4).
 - **Indexes** for the columns you'll filter/join on (e.g. Learning's
-  `learning_progress` has `UNIQUE (learning_id, user_id)`; Help has
+  `learning_progress` has `UNIQUE (learning_id, user_id)`; Tickets has
   `idx_help_status`).
 
 Append your migration. The version prefix is monotonic:

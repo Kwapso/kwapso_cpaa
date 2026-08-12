@@ -205,7 +205,7 @@ Glide: 3 rows (`File type`, `Learning category`, `Help type`), no team key, no
 audit → a tiny GLOBAL reference of dropdown GROUPS. But the values table also
 uses `Help status` (not listed as a type) and `Learning category` has no
 values. (We seed those two groups as **`Ticket type`** and **`Ticket status`** —
-the Help section is called Tickets, and team migration `0010_ticket_vocabulary`
+the module is called Tickets, and team migration `0010_ticket_vocabulary`
 relabelled the rows every existing team already had.) So the types list and the values were loosely coupled in Glide.
 
 ### Retention in core — the ONE place rows are actually deleted
@@ -275,14 +275,38 @@ curator dashboard can show every member's done state. Per-module file storage is
 R2 (`kwapso-learning-media`), not a DB column.
 
 ### help + help_threads — KEEP (BUILT 2026-06-23, team migration `0004_modules`, two-tier)
+
+**This is the Tickets module.** There is no help section and there is no second
+ticket module — one thing, wearing the name it was born with underneath. What a
+person or a URL sees says **Tickets**: the sidebar, the heading, the breadcrumb,
+the address (`/tickets`, `/t/<teamId>/tickets/<id>`, and `/tickets` in the
+portal), the dropdown vocabulary (`Ticket type`, `Ticket status`) and the
+glossary. It is not a place to report bugs about the app itself — a ticket is
+something an account asked us for.
+
+**Four things stay `help`, deliberately.** Each is data already written down or a
+contract already published, so renaming it can only take something away:
+
+| Still `help` | Why it stays |
+|---|---|
+| the permission module key (`help:read/create/edit/delete`) | it is the string sitting in `role_permissions` in every team database — renaming it takes somebody's access away |
+| the tables `help` + `help_threads`, and `activity.related_table = 'help'` | renaming orphans every history row already written about a ticket |
+| the API paths `/api/content/help*` | they are `PORTAL_DOORS` entries, `PORTAL_VISIBLE_READS/WRITES` keys and R21's derivation input |
+| the MCP tool names (`list_help_tickets`, `create_help_ticket`, …) | a published external contract — outside developers call these by name |
+
+The rule, in one line: **what a person or a URL sees says tickets; what the
+database and the wire say stays `help`.** The two names meet in exactly one seam,
+`MODULE_PERMISSION` in `web/lib/screens.ts` (`tickets: "help"`), and
+`web/test/nav.test.ts` fails if it is removed. Do not "finish the rename".
+
 `help` (parent ticket): audit + `help_type` (selectable), `description`,
 `screen_recording_link`, the source screen/record capture, `status` on a FIXED
 lifecycle (`open` → `in_progress` → `resolved`, with `reopened`; the raiser may
 reopen without edit rights), `resolved`, `resolved_on`, `resolver_id/email/name`.
 `help_threads` (messages): audit + `help_id` (the parent ticket),
 `tagged_team_member_user_ids` (@mention → email notify), `message_body`. A ticket
-with a threaded conversation. (Help attachments to R2 `kwapso-help-media` are a
-deferred hook — see AGENT-MODULES-PLAN.)
+with a threaded conversation. (Ticket attachments to R2 `kwapso-help-media` — the
+bucket name follows the table — are a deferred hook, see AGENT-MODULES-PLAN.)
 
 ### invite_logs — BUILT (per-team, team migration `0003_invite_logs`) + invite_index (GLOBAL, built)
 `invite_logs` (full record in the team DB): audit + a FROZEN inviter snapshot

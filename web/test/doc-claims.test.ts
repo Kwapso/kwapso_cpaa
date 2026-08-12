@@ -58,12 +58,19 @@ const isPublic = (w: string) => {
 const PUBLIC_WORKERS = WORKERS.filter(isPublic)
 
 /** Docs this check reads: the canon in the repo root, plus the skills that stand a
- * fork up (a skill with a stale count builds a broken product). */
+ * fork up (a skill with a stale count builds a broken product), plus `.plans/` —
+ * each build plan opens "for a fresh agent with no prior context", so a stale
+ * claim there is read as law by the one reader least able to catch it. */
+const PLANS = readdirSync(join(ROOT, ".plans"))
+  .filter((f) => f.endsWith(".md"))
+  .map((f) => join(".plans", f))
+
 const DOCS = [
   ...readdirSync(ROOT).filter((f) => f.endsWith(".md")),
   join("skills", "README.md"),
   join("skills", "new-app", "SKILL.md"),
   join("web", "e2e", "README.md"),
+  ...PLANS,
 ]
 
 const WORDS: Record<string, number> = {
@@ -183,6 +190,42 @@ describe("docs agree with the roster on disk", () => {
     expect(
       wrong,
       `A doc names a different number of public doors than the wrangler configs allow:\n` + wrong.join("\n")
+    ).toEqual([])
+  })
+
+  // THE LAWS' RANGE IS DERIVED FROM THE REGISTRY, NEVER TYPED.
+  //
+  // Earned the same way the worker count was: README.md still advertised
+  // "R1–R19" three laws after R22 shipped, and two build plans said "R1–R21".
+  // Every one of those sentences was true when written. The range is the single
+  // most load-bearing pointer in the rulebook — a reader who trusts it simply
+  // never learns that R20, R21 and R22 exist, which is how a law goes unread.
+  //
+  // `registry-integrity` already forbids a law without its check; this forbids a
+  // law the docs never mention.
+  it("no doc states a Laws range that stops short of the registry", () => {
+    const registry = read(join(ROOT, "shared", "rules", "registry.ts"))
+    const ids = [...registry.matchAll(/\bid:\s*"R(\d+)"/g)].map((m) => Number(m[1]))
+    expect(ids.length, "registry.ts must declare rule ids as `id: \"R<n>\"`").toBeGreaterThan(0)
+    const highest = Math.max(...ids)
+
+    const wrong: string[] = []
+    for (const doc of DOCS) {
+      const src = prose(read(join(ROOT, doc)))
+      // "R1–R19" / "R1-R22" — the range shape only. A bare "R14" cites ONE law
+      // and stays sayable; policing every mention would make the check noisy,
+      // and a noisy check gets switched off.
+      for (const m of src.matchAll(/\bR1\s*[–-]\s*R(\d+)\b/g)) {
+        if (Number(m[1]) === highest) continue
+        wrong.push(`${doc}: "${m[0].trim()}" — the registry declares ${ids.length} laws, up to R${highest}`)
+      }
+    }
+
+    expect(
+      wrong,
+      `A doc names a Laws range that disagrees with shared/rules/registry.ts. A reader who ` +
+        `trusts the range never learns the newest laws exist — fix the sentence, and say what ` +
+        `the new laws are while you are there:\n` + wrong.join("\n")
     ).toEqual([])
   })
 

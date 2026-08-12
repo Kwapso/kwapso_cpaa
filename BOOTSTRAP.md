@@ -132,7 +132,7 @@ npx wrangler r2 bucket create kwapso-media                    # profile photos +
 npx wrangler r2 bucket create kwapso-media-staging
 npx wrangler r2 bucket create kwapso-learning-media           # learning attachments (content LEARNING_MEDIA)
 npx wrangler r2 bucket create kwapso-learning-media-staging
-npx wrangler r2 bucket create kwapso-help-media               # help attachments (content HELP_MEDIA)
+npx wrangler r2 bucket create kwapso-help-media               # ticket attachments — name follows the table (content HELP_MEDIA)
 npx wrangler r2 bucket create kwapso-help-media-staging
 ```
 
@@ -238,7 +238,7 @@ npm run smoke:staging     # scripted end-to-end: health, login, team, context, l
 ```
 
 Or by hand: the agency gateway's URL returns the app (HTTP 200); you can sign in, land
-in a team, see Home / Learning / Help / Settings, and open the AI assistant. Then the
+in a team, see Home / Accounts / Learning / Tickets / Settings, and open the AI assistant. Then the
 portal gateway's URL: a client login lands in its own company's world. If the smoke's
 login step reports `too_soon`, that's the 60-second cooldown between code requests, and
 `too_many_sends` is the hourly cap on the address or the caller — both are the send
