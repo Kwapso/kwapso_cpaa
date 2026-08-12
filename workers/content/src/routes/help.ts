@@ -32,7 +32,7 @@ import {
   countReplies,
   bulkSetStatusByFilter,
 } from "../lib/help"
-import { notifyReplyAndMentions } from "../lib/notify"
+import { notifyReplyAndMentions, notifyTicketResolved } from "../lib/notify"
 import { addStakeholder, listStakeholders } from "../lib/stakeholders"
 import type { Env } from "../env"
 
@@ -177,6 +177,16 @@ export async function postUpdateHelp(request: Request, env: Env): Promise<Respon
  * Gated PURELY by help:edit (every status move, including reopen — no raiser exception). */
 export async function postHelpStatus(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown; status?: unknown }>(request, env, "help", "edit")
+  // R21 AT THE DOOR, and it became necessary the day a client login was granted
+  // `help:edit` so they could re-rank their own company's tickets (SCOPE ch.07).
+  // That grant is safe for the ORDER and for the WORDING, both of which the lock
+  // governs — and it would have been a disaster here: the same right would have
+  // let a contact set their own request to `resolved`, or drag it back out of it,
+  // which is precisely the client-side reopen button SCOPE says does not exist.
+  // The portal gateway does not open this door; the AGENCY gateway forwards
+  // /api/content/* by prefix, so leaving it at that would be defending it at the
+  // wrong hostname. The refusal belongs here.
+  await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
   if (typeof body.status !== "string" || !(HELP_STATUSES as readonly string[]).includes(body.status))
     return fail(400, "invalid_input", "id and a valid status are required.")
@@ -205,6 +215,9 @@ export async function postBulkHelpStatusByFilter(request: Request, env: Env): Pr
     helpType?: unknown
     dryRun?: unknown
   }>(request, env, "help", "edit")
+  // R21: the set-shaped sibling of the status door, refused for the same reason
+  // — and more so, because one call moves many.
+  await refusePortalCaller(cfg, guard)
   if (typeof body.toStatus !== "string" || !(HELP_STATUSES as readonly string[]).includes(body.toStatus))
     return fail(400, "invalid_input", "A valid toStatus is required.")
   const filter: { status?: HelpStatus; helpType?: string } = {}
@@ -241,6 +254,8 @@ export async function postBulkHelpStatusByFilter(request: Request, env: Env): Pr
  * that row, never refetch the list). Returns { updated, skipped }. */
 export async function postBulkHelpStatus(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<{ ids?: unknown; status?: unknown }>(request, env, "help", "edit")
+  // R21: the many-ids sibling of the status door, refused for the same reason.
+  await refusePortalCaller(cfg, guard)
   const ids = requireIdList(body.ids)
   if (typeof body.status !== "string" || !(HELP_STATUSES as readonly string[]).includes(body.status))
     return fail(400, "invalid_input", "A valid status is required.")
@@ -328,6 +343,53 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
   })
 }
 
+/** POST /api/content/help/resolve — COME BACK TO THE CLIENT (help:edit).
+ *
+ * The second and last thing in the product that emails a client (BUILD-1 §7),
+ * and the reason it is its own door rather than a side effect of the status
+ * move: a resolution is SENT BY A PERSON. The words arrive in the body — the
+ * screen pre-fills them from the ticket's draft, which each story's closing note
+ * has been building as the work finished — and a person edits them and presses
+ * send. A status that emailed on its own would make "resolved" a thing you can
+ * do by accident.
+ *
+ * THREE THINGS, IN ONE CALL AND IN THIS ORDER:
+ *   1. move the ticket to resolved. R17 gates everything after it — an already-
+ *      resolved ticket moves zero rows, so the client is not emailed twice about
+ *      the same answer, which is the failure this order exists to prevent;
+ *   2. append the resolution to the conversation, so what we said lives where
+ *      everything else about the request lives rather than only in an inbox;
+ *   3. email their people.
+ *
+ * Refused to a client login (R21), like every other status move on this module. */
+export async function postResolveHelp(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown; resolution?: unknown }>(
+    request,
+    env,
+    "help",
+    "edit"
+  )
+  const scope = await refusePortalCaller(cfg, guard)
+  const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
+  const resolution = requireText(body.resolution, "Resolution", TEXT_LIMITS.long)
+
+  const ticket = await getTicket(cfg, guard, scope, id)
+  if (!ticket) return fail(404, "help_not_found", "That ticket doesn't exist.")
+
+  // R17 IS THE SEND GUARD. Zero rows moved = already answered = nothing appended
+  // and nobody emailed. A second press of a button is not a second answer.
+  const { moved, accountId } = await setStatus(cfg, guard, scope, actor, id, "resolved")
+  if (!moved) return json({ sent: false, alreadyResolved: true })
+
+  const { id: replyId } = await addReply(cfg, guard, scope, actor, id, resolution, [], false)
+  await publishChange(env, guard.teamId, "help_threads", replyId, "add", accountId ?? undefined)
+  await publishChange(env, guard.teamId, "help", id, "edit", accountId ?? undefined)
+  // Best-effort and last: a failed email must never fail the answer. It is on
+  // their screen either way.
+  await notifyTicketResolved(env, cfg, guard, id, resolution)
+  return json({ sent: true, alreadyResolved: false })
+}
+
 /** POST /api/content/help/rank — put a ticket between two others (SCOPE ch.07:
  * drag-rank is the only priority signal there is, and there is no priority
  * dropdown to fall back on).
@@ -368,6 +430,9 @@ export async function postHelpArchive(request: Request, env: Env): Promise<Respo
     "help",
     "edit"
   )
+  // R21: putting a request away is our filing, not theirs. A client who thinks a
+  // ticket is finished says so in the conversation, and a staff member decides.
+  await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
   if (typeof body.archived !== "boolean")
     return fail(400, "invalid_input", "archived must be true or false.")

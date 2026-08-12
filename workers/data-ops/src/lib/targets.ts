@@ -241,6 +241,42 @@ export const TARGETS: Record<string, TargetDef> = {
       body: r.body || undefined,
     }),
   },
+  // THE WORK ENGINE'S BACKLOG. Importable, and unusually for this catalogue that
+  // is not a convenience: two years of history arrive from the previous system
+  // as 3,677 rows (.plans/BUILD-1 §10), and the alternative to a file is nobody
+  // typing them and the margin having nothing to subtract.
+  //
+  // NO ASSIGNEE, NO SPRINT, NO STEP COLUMN, deliberately. Those three are ids in
+  // this app and names in a spreadsheet, and a wrong guess is worse than a blank:
+  // an assignee resolved by fuzzy name puts somebody else's work on your list, a
+  // step resolved by name attaches a saving to the wrong part of a map. They are
+  // set afterwards, on the story, by the person who knows. The file's job is
+  // getting the work IN — the same sentence the accounts target makes about a
+  // parent account, and for the same reason.
+  stories: {
+    tableKey: "stories",
+    module: "work",
+    displayName: "Stories",
+    description:
+      "Create stories in bulk — one row per piece of work. The sprint, the assignee and the process step each story changes are set afterwards on the story itself, because those are records here and only names in a file.",
+    columns: [
+      { key: "title", label: "Title", required: true },
+      { key: "detail", label: "Detail", required: false },
+      { key: "dueOn", label: "Due date", required: false },
+    ],
+    endpoint: { binding: "CONTENT", path: "/api/content/stories" },
+    naturalKey: "title",
+    sample: {
+      title: "Move dispatch onto the driver app",
+      detail: "Replace the paper run sheet with the list on the phone.",
+      dueOn: "2026-09-30",
+    },
+    buildBody: (r) => ({
+      title: r.title,
+      detail: r.detail || undefined,
+      dueOn: r.dueOn || undefined,
+    }),
+  },
 }
 
 /** A downloadable SAMPLE CSV for a target: a header row of the column LABELS + one

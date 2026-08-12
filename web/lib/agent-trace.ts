@@ -100,6 +100,9 @@ export function traceFor(
       return { path: `${seg(teamId, "tickets")}/${str(input, "helpId")}`, highlight: "main" }
     case "update_help_ticket":
     case "set_help_status":
+    // Answering lands on the ticket, where the words that were sent are now the
+    // last thing in the conversation.
+    case "resolve_help_ticket":
     case "add_help_stakeholder":
     // Archiving lands on the ticket too: the record is still there, and its
     // detail is where you see that it has been put away (and put it back).
@@ -198,6 +201,41 @@ export function traceFor(
     case "update_internal_rate":
     case "set_internal_rate_active":
       return { path: `/t/${teamId}`, highlight: "main" }
+
+    /* ----------------------------- the work engine -------------------------- */
+    // Every work-engine write lands on the Work page, and that is not a shortcut:
+    // the backlog, the sprint block and each sprint's "3 of 8 done" counts are all
+    // on that one screen, so a story moving to in review and a sprint completing
+    // are both visible there. A story has no detail URL of its own to land on.
+    case "create_story":
+    case "update_story":
+    case "set_story_status":
+    case "rank_story":
+    case "create_sprint":
+    case "complete_sprint":
+      return { path: seg(teamId, "work"), highlight: "main" }
+    // Time lands on the same page, and the header timer is on every screen
+    // anyway — so a person who asked for a timer sees it start wherever they
+    // already were, and the trace takes them to the list it joined.
+    case "start_timer":
+    case "stop_timer":
+    case "log_time":
+    case "resolve_runaway_timer":
+    case "set_timer_auto_stop":
+      return { path: seg(teamId, "work"), highlight: "main" }
+    // To-dos and tasks land on the same page: the Work screen is where all four
+    // nouns are managed, and a to-do's other home is a screen we do not own (the
+    // client's portal).
+    case "raise_todo":
+    case "complete_todo":
+    case "cancel_todo":
+    case "create_task":
+    case "set_task_done":
+      return { path: seg(teamId, "work"), highlight: "main" }
+    // The rota and the unread backlog are both read on the Tickets screen — the
+    // triage strip sits above the list, which is where "what is waiting" belongs.
+    case "set_triage_duty":
+      return { path: seg(teamId, "tickets"), highlight: "main" }
 
     /* --------------------------------- team -------------------------------- */
     // Rename the team → the team Overview (the bare /t/<team> path), where the new

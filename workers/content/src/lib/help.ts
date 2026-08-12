@@ -26,6 +26,10 @@ import { optionalText, requireText, TEXT_LIMITS } from "@shared/workers/validate
 import { BULK_IDS_LIMIT, THREAD_HARD_CAP } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { rankAtTop, rankBetween } from "@shared/workers/rank"
+// The reference number moved out to its own file the moment a second noun needed
+// one (a story, a task, a to-do, a sprint). One counter, one race guard, one
+// spelling of the format — see lib/refs.ts.
+import { nextRef, REF_KINDS } from "./refs"
 
 // The fixed status lifecycle the code trusts (the team-editable dropdown is
 // display-only) — Anything outside this set is rejected. It lives in shared/types
@@ -47,6 +51,9 @@ type TicketRow = {
   rank: string | null
   locked_at: string | null
   archived_at: string | null
+  draft_resolution: string | null
+  story_count: number
+  done_story_count: number
   title_de: string | null
   title_en: string | null
   creator_id: string
@@ -115,12 +122,25 @@ function toTicket(r: TicketRow, scope: AccountScope): HelpTicket {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     accountId: r.account_id,
-    // The work-engine fields. None of these is a staff FACT the way a name is, so
-    // none is redacted: a client is meant to know their own reference number, the
-    // order they dragged their requests into, whether their wording is still
-    // theirs to change, and whether it has been put away. `draft_resolution` is
-    // deliberately NOT here — it is our unsent working text (see setDraftResolution).
+    // The work-engine fields. Most of these are not a staff FACT the way a name
+    // is, so most are not redacted: a client is meant to know their own reference
+    // number, the order they dragged their requests into, whether their wording
+    // is still theirs to change, and whether it has been put away.
+    //
+    // `draftResolution` is the ONE exception, and it goes out to staff only. It
+    // is our unsent working text — each story's closing note, appended as the
+    // work finishes (lib/ready-flip.ts) — so half of it may be wrong and all of
+    // it is written in the register colleagues use with each other. The
+    // resolution a client reads is the one a person SENDS.
     ref: r.ref,
+    draftResolution: scope.kind === "portal" ? null : r.draft_resolution,
+    // TWO NUMBERS, NEVER A LIST. This is the whole of what a client login learns
+    // about the work on their request (BUILD-1 §7: "stories as a COUNT only —
+    // never the titles"), and it is deliberately the same two numbers we show
+    // ourselves: a count nobody can check against the list beside it is a count
+    // somebody stops believing.
+    storyCount: r.story_count,
+    doneStoryCount: r.done_story_count,
     rank: r.rank,
     lockedAt: r.locked_at,
     archivedAt: r.archived_at,
@@ -170,10 +190,12 @@ function toMessage(r: ReplyRow): HelpMessage {
 // uses on an author, and it rides the SAME read as the row so a name and the
 // answer about that name can never come from two different moments.
 const TICKET_COLS = `id, help_type, description, screen_recording_link, source_screen, status, resolved, resolved_at,
-  account_id, ref, rank, locked_at, archived_at, title_de, title_en,
+  account_id, ref, rank, locked_at, archived_at, draft_resolution, title_de, title_en,
   creator_id, creator_name, editor_name, created_at, updated_at,
   EXISTS (SELECT 1 FROM portal_users pu WHERE pu.user_id = help.creator_id) AS raiser_is_client,
-  EXISTS (SELECT 1 FROM portal_users pu WHERE pu.user_id = help.editor_id) AS editor_is_client`
+  EXISTS (SELECT 1 FROM portal_users pu WHERE pu.user_id = help.editor_id) AS editor_is_client,
+  (SELECT COUNT(*) FROM stories s WHERE s.ticket_id = help.id) AS story_count,
+  (SELECT COUNT(*) FROM stories s WHERE s.ticket_id = help.id AND s.status = 'done') AS done_story_count`
 
 /** Fetch one ticket (the raw row the gating + notify need), or throw a clean 404.
  *
@@ -331,51 +353,6 @@ export async function countTickets(
     [guard.userId, ...fence.params]
   )
   return { total: rows[0]?.total ?? 0, mineTotal: rows[0]?.mine ?? 0 }
-}
-
-/** THE REFERENCE NUMBER, allocated race-safely (SCOPE ch.02: "BERG-T0412").
- *
- * ONE STATEMENT, and that is the whole design. The obvious version reads
- * `MAX(ref)` and writes the next one, and two people raising a ticket on the same
- * account in the same second both read 11 and both write 12 — a number the client
- * quotes, pointing at two different requests. `INSERT … ON CONFLICT DO UPDATE …
- * RETURNING` is atomic in SQLite (CONCURRENCY.md rule 1: the counter rides the
- * write), so the two callers are serialized by the database and get 12 and 13.
- *
- * The insert path seeds `next_no` at 2 and returns 2, the conflict path returns
- * the incremented value — so in both cases the number just allocated is one less
- * than what came back. Reading that off the RETURNING rather than from a second
- * query is what keeps it one statement.
- *
- * Returns null when there is nothing to build a reference OUT of: an account with
- * no short code, or no account at all (the agency's own questions). A reference
- * nobody can quote is worse than none — it looks like it means something.
- */
-async function nextRef(
-  cfg: D1Rest,
-  guard: MemberGuard,
-  accountId: string | null,
-  kind: string
-): Promise<string | null> {
-  if (!accountId) return null
-  const codes = await d1Query<{ code: string | null }>(
-    cfg,
-    guard.databaseId,
-    `SELECT code FROM accounts WHERE id = ? LIMIT 1`,
-    [accountId]
-  )
-  const code = codes[0]?.code
-  if (!code) return null
-  const taken = await d1Query<{ next_no: number }>(
-    cfg,
-    guard.databaseId,
-    `INSERT INTO ref_counters (account_id, kind, next_no) VALUES (?, ?, 2)
-     ON CONFLICT(account_id, kind) DO UPDATE SET next_no = next_no + 1
-     RETURNING next_no`,
-    [accountId, kind]
-  )
-  const no = (taken[0]?.next_no ?? 2) - 1
-  return `${code}-${kind}${String(no).padStart(4, "0")}`
 }
 
 /** The rank a new ticket takes: above every one the caller can already see.
@@ -580,7 +557,7 @@ export async function createTicket(
   // resolved BEFORE the insert so the row is complete the first time anybody
   // reads it — a ticket that exists for a moment with no number is a ticket
   // somebody screenshots with no number.
-  const ref = await nextRef(cfg, guard, accountId, "T")
+  const ref = await nextRef(cfg, guard, accountId, REF_KINDS.ticket)
   const rank = await topRank(cfg, guard)
   // WHO IS RAISING IT decides whether the wording is still the account's. A
   // ticket a STAFF member types is locked the instant it exists: the first staff

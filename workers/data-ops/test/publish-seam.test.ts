@@ -26,6 +26,13 @@ const HOUSEKEEPING = [
   // any team-visible effect is published by the gated endpoint the executor calls.
   "POST /api/data-ops/agent/chat",
   "POST /api/data-ops/agent/confirm",
+  // TRANSLATING A TICKET writes through content's OWN gated update door,
+  // act-as-user — and that door publishes the ticket's row change on the way
+  // through, which is the whole point of writing act-as-user rather than
+  // reaching into the table. A second ping from here would be the same row said
+  // twice; a first one from here would mean this worker had found a way into a
+  // ticket that a person's edit does not use.
+  "POST /api/data-ops/agent/translate-ticket",
   // Resolving an error-log row is private maintainer bookkeeping in the core DB
   // (owner-only, x-admin-key) — no team screen shows it, so nothing to broadcast.
   "POST /api/data-ops/admin/errors/resolve",

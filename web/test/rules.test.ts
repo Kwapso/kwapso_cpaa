@@ -435,11 +435,23 @@ describe("RULES — the laws of the base", () => {
         if (/excluded\./.test(stmt)) continue
         if (!/deactivated_at IS (NOT )?NULL/.test(stmt)) offenders.push(`${path} @${idx}`)
       }
-      // Status moves too: a help status UPDATE must carry `status <> ?`.
+      // Status moves too: a help status UPDATE must carry a CURRENT-STATUS
+      // predicate. Two spellings count, and only two:
+      //   • `status <> ?`      — "not already there" (a move to one named state);
+      //   • `status IN (…)` / `status NOT IN (…)` — "only out of these" (a move
+      //     whose ALLOWED starting states are a list, which is what the Ready
+      //     flip needs: a ticket may become ready from new / triaged / in
+      //     progress, and must never be dragged back out of resolved).
+      // The second spelling was added when the flip landed. It is the same law
+      // and, for a list, the stricter statement of it — `<> 'ready'` alone would
+      // have let a RESOLVED ticket be un-answered by a straggler story closing.
+      // The pattern is deliberately anchored to the word `status` so an unrelated
+      // `account_id IN (…)` on the same statement cannot satisfy it.
       let s = -1
       while ((s = src.indexOf("UPDATE help SET status", s + 1)) !== -1) {
         const stmt = src.slice(s, Math.min(src.length, s + 500))
-        if (!/status <>/.test(stmt)) offenders.push(`${path} @${s} (status move without <> predicate)`)
+        if (!/status\s*(?:<>|NOT\s+IN\s*\(|IN\s*\()/.test(stmt))
+          offenders.push(`${path} @${s} (status move without a current-status predicate)`)
       }
     }
     expect(
@@ -453,6 +465,10 @@ describe("RULES — the laws of the base", () => {
       ["workers/tenancy/src/lib/selectable.ts", "setSelectableActive"],
       ["workers/content/src/lib/learning.ts", "setLearningActive"],
       ["workers/content/src/lib/help.ts", "setStatus"],
+      // The Ready flip is a status writer like any other, and the one with the
+      // most to lose from a double: it fires off the back of a story closing, and
+      // a story close is exactly the kind of thing a person double-clicks.
+      ["workers/content/src/lib/ready-flip.ts", "readyFlipForTicket"],
     ] as const) {
       const src = read(join(ROOT, ...file.split("/")))
       // THE FUNCTION, not the rest of the file. This window used to run to EOF,
@@ -658,14 +674,20 @@ describe("RULES — the laws of the base", () => {
           const at2 = u.index as number
           const before = region.slice(Math.max(0, at2 - 60), at2).trimEnd()
           const after = region.slice(at2 + u[0].length, at2 + u[0].length + 30)
-          // The checkers. `parseUploadDataUrl` earns its place beside the text
-          // seam because it IS the seam's binary half: it takes `unknown`,
+          // The checkers. `requireMoment` / `optionalMoment` are the text seam's
+          // TIME half and live in the same file (shared/workers/validate.ts):
+          // requireText, then a parse, then a clean 400 — because Date.parse
+          // returns NaN for a great deal of plausible nonsense and a NaN reaching
+          // a duration is an hour that never happened, sitting in a total nobody
+          // can explain. Locked with the rest of the seam by
+          // workers/content/test/validate.test.ts. `parseUploadDataUrl` earns its
+          // place beside them because it IS the seam's binary half: it takes `unknown`,
           // type-checks, and caps BYTES before decoding (a data URL is megabytes,
           // so a character cap would be the wrong refusal) — locked by
           // workers/content/test/upload-parse.test.ts. `parseDataUrl` beside it
           // does NOT qualify: it declares `dataUrl: string`, which is a claim.
           const checked =
-            /(?<![\w$.])(?:requireText|optionalText|queryText|requireIdList|parseUploadDataUrl|Array\.isArray|Number|includes)\($/.test(
+            /(?<![\w$.])(?:requireText|optionalText|queryText|requireIdList|requireMoment|optionalMoment|parseUploadDataUrl|Array\.isArray|Number|includes)\($/.test(
               before
             ) ||
             /(?<![\w$.])typeof\s*$/.test(before) ||

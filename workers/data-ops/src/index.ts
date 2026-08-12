@@ -37,6 +37,7 @@ import {
   getAgentUsage,
   getAgentUsageLog,
   postAgentChat,
+  postTranslateTicket,
   postAgentConfirm,
   postGrantCredits,
 } from "./routes/agent"
@@ -82,6 +83,11 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // conversation (agent_threads/messages); any team-visible change is published by
   // the gated endpoint the executor calls act-as-user, not by these handlers.
   "POST /api/data-ops/agent/chat": { handler: postAgentChat, kind: "housekeeping" },
+  // TRANSLATE A TICKET AND SET THE TEXT. It writes through content's own gated
+  // update door act-as-user, and that door publishes the ticket's row change on
+  // the way through — so there is nothing left here to broadcast, which is a
+  // reviewed housekeeping line rather than a forgotten publish.
+  "POST /api/data-ops/agent/translate-ticket": { handler: postTranslateTicket, kind: "housekeeping" },
   "POST /api/data-ops/agent/confirm": { handler: postAgentConfirm, kind: "housekeeping" },
 }
 

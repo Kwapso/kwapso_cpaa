@@ -100,6 +100,10 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
     // R16: the exact server total the process-maps heading badges. Primed by the
     // same fetcher that loads page one, so the number and the rows agree.
     processes: useCachedValue<number>(enabled ? totalKey("processes", teamId as string) : null),
+    // R16: the exact server total of the BACKLOG, which is the collection the
+    // Work page leads with. Primed by the same fetcher that loads page one, so
+    // the number and the rows agree.
+    work: useCachedValue<number>(enabled ? totalKey("work", teamId as string) : null),
   }
   const selectableValues = formSelectableQ.data ?? []
   // The list now includes DEACTIVATED values (so the manager can reactivate them),

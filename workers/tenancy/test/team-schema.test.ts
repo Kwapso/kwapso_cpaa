@@ -126,6 +126,15 @@ describe("team schema", () => {
       // no client login passes one of its doors at all.
       "processes",
       "commercials",
+      // THE WORK ENGINE — stories, the sprints they sit in, and the time logged
+      // against them. Agency material: a client login never holds it, and every
+      // door on it refuses a portal caller rather than fencing one.
+      "work",
+      // TO-DOS are the exception in this list: the one module a CLIENT login is
+      // meant to hold rights on, because a to-do is aimed at them and they
+      // complete it themselves. That is why it is not four more rights on
+      // `work`, which no client holds at all.
+      "todos",
     ])
   })
 })

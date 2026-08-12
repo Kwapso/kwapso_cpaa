@@ -856,6 +856,328 @@ SELECT lower(hex(randomblob(16))), r.id, m.module, r.is_default, r.is_default, r
  );
 `,
   },
+  {
+    // THE WORK ENGINE, part two: what WE DO about a ticket (.plans/BUILD-1 §2).
+    //
+    // A ticket is what an account ASKS FOR. A story is one piece of work we do,
+    // and it is the only place an assignee and a due date live — the ticket
+    // deliberately has neither and derives its picture from its stories
+    // (BUILD-1 §2, "no assignee and no due date on a ticket… do not add them").
+    //
+    // A SPRINT is the block of work sold to one account. It carries the flat
+    // price, which is the revenue half of the margin the money lane already
+    // reads (workers/tenancy/src/lib/work-engine.ts declares the contract from
+    // the other side: `sprints.sold_price_cents` and `work_logs.seconds`). Whole
+    // CENTS, like every other money column in this database — a price in major
+    // units loses a half-penny somewhere between a float and a subtraction.
+    version: "0014_stories_and_sprints",
+    sql: `
+-- A SPRINT belongs to ONE app or goal, and an account may have several running
+-- at once (BUILD-1 §3). \`sprint_type\` is the editable vocabulary Planning /
+-- Implementation / Iteration — a "blueprint" is a PRICED PLANNING sprint, not a
+-- fourth type, so it is a price on a planning row and not a value here.
+--
+-- \`completed_at\` rather than a status word for "finished": the money lane's
+-- version cut keys off the MOMENT a sprint completed (process_versions
+-- .cut_from_sprint_id), and a moment is the thing that question actually asks.
+CREATE TABLE sprints (
+  id TEXT PRIMARY KEY,
+  ref TEXT,
+  account_id TEXT REFERENCES accounts (id),
+  app_id TEXT REFERENCES apps (id),
+  name TEXT NOT NULL,
+  sprint_type TEXT,
+  goal TEXT,
+  starts_on TEXT,
+  ends_on TEXT,
+  sold_price_cents INTEGER NOT NULL DEFAULT 0 CHECK (sold_price_cents >= 0),
+  currency TEXT,
+  completed_at TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+-- The same race guard the ticket's reference carries: two sprints sold on one
+-- account in the same instant cannot end up quoting the same number.
+CREATE UNIQUE INDEX idx_sprints_ref ON sprints (ref) WHERE ref IS NOT NULL;
+CREATE INDEX idx_sprints_account ON sprints (account_id);
+CREATE INDEX idx_sprints_app ON sprints (app_id);
+
+-- A STORY is one piece of work we do. The field list is BUILD-1 §2's, and that
+-- list is the spec:
+--   ref, ticket?, app?, process?, step?, sprint_id, assignee, due dates,
+--   reviewer?, status, closing_note.
+--
+-- STORIES HAVE NO TYPE, settled by the owner: the ticket carries the type and
+-- the process step carries the classification that matters. Do not add one.
+--
+-- \`ticket_id\` IS NULLABLE, also settled: four out of five stories in the real
+-- history stand on their own, with no request behind them.
+--
+-- \`step_key\` and \`changes_no_step\` are the pair BUILD-1 §2 requires: "a story
+-- cannot close without naming the process step it changes, or explicitly saying
+-- it changes none". Two columns rather than one nullable one, because "nobody
+-- filled this in" and "we looked, and it changes no step" are different answers
+-- and the savings maths later has to be able to tell them apart. It is a step
+-- KEY rather than a step id on purpose — a key is the same step across every
+-- version of a map (see process_steps), and a story outlives the version it was
+-- written against.
+--
+-- \`title\` is not in §2's list and is added deliberately: a piece of work with
+-- no name cannot be read in a list, assigned, or said out loud on a call. It is
+-- the only field here the plan does not name.
+CREATE TABLE stories (
+  id TEXT PRIMARY KEY,
+  ref TEXT,
+  account_id TEXT REFERENCES accounts (id),
+  ticket_id TEXT REFERENCES help (id),
+  app_id TEXT REFERENCES apps (id),
+  process_id TEXT REFERENCES processes (id),
+  step_key TEXT,
+  changes_no_step INTEGER NOT NULL DEFAULT 0,
+  sprint_id TEXT REFERENCES sprints (id),
+  title TEXT NOT NULL,
+  detail TEXT,
+  assignee_id TEXT,
+  assignee_name TEXT,
+  reviewer_id TEXT,
+  reviewer_name TEXT,
+  starts_on TEXT,
+  due_on TEXT,
+  status TEXT NOT NULL DEFAULT 'open',
+  closed_at TEXT,
+  closing_note TEXT,
+  rank TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT
+);
+CREATE UNIQUE INDEX idx_stories_ref ON stories (ref) WHERE ref IS NOT NULL;
+-- The two reads that matter most: "what is left on this ticket" (the Ready flip
+-- asks it on every story close) and "what is in this sprint".
+CREATE INDEX idx_stories_ticket ON stories (ticket_id);
+CREATE INDEX idx_stories_sprint ON stories (sprint_id);
+CREATE INDEX idx_stories_account ON stories (account_id);
+CREATE INDEX idx_stories_assignee ON stories (assignee_id);
+CREATE INDEX idx_stories_rank ON stories (rank);
+
+-- The sprint vocabulary SCOPE names, seeded the same way the ticket types were:
+-- ADDED, never swapped, because a team's existing values are on rows already.
+INSERT INTO selectable_data (id, type, value, is_default, created_at, creator_name)
+SELECT lower(hex(randomblob(16))), 'Sprint type', v.value, 1, datetime('now'), 'kwapso'
+  FROM (SELECT 'Planning' AS value UNION ALL SELECT 'Implementation' UNION ALL SELECT 'Iteration') v
+ WHERE NOT EXISTS (
+   SELECT 1 FROM selectable_data s WHERE s.type = 'Sprint type' AND s.value = v.value
+ );
+
+-- Existing teams: the locked Admin role gains the new module in full (it IS full
+-- access by definition and cannot be edited afterwards to grant it). Every other
+-- role gains nothing — a migration must never hand out sight of the agency's own
+-- delivery plan, its assignees or its dates that nobody granted.
+INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+SELECT lower(hex(randomblob(16))), r.id, 'work', r.is_default, r.is_default, r.is_default, r.is_default
+  FROM member_roles r
+ WHERE NOT EXISTS (
+   SELECT 1 FROM role_permissions p WHERE p.role_id = r.id AND p.module = 'work'
+ );
+`,
+  },
+  {
+    // WORK LOGS — the row of time this whole build is measured by.
+    //
+    // The owner named "logging time takes too many clicks" as the single thing
+    // most likely to make him quietly abandon this and go back to a spreadsheet
+    // (.plans/BUILD-1 §5). Everything about the shape below is downstream of
+    // that: a timer is a work log with no end yet, so starting one is ONE insert
+    // and stopping it is ONE update, and there is no second table, no session
+    // object and no state machine between a person and a click.
+    version: "0015_work_logs",
+    sql: `
+-- A ROW OF TIME: who, what they worked on, and how long, in whole seconds.
+--
+-- WHAT IT MAY ATTACH TO — a story, a ticket or a task, and nothing else (BUILD-1
+-- §5, settled by the owner). NOT a to-do: that is somebody else's time, not ours.
+-- NOT an account on its own: the owner was explicit that an account-level-only
+-- log must not exist, because a figure with no work behind it is a figure nobody
+-- can check. TICKETS are in the list deliberately — reading, triaging and
+-- resolving a request is real work and has to be loggable against the request.
+--
+-- There is NO CHECK constraint on \`target_table\`, and that is a decision rather
+-- than an omission. The allow-list is WORK_LOG_TARGETS in
+-- workers/content/src/lib/work-logs.ts, which is also where the 400 comes from
+-- and where each target's existence is proved before a row is written. A CHECK
+-- would be a second copy of the same list that only SQLite can see — and in
+-- SQLite a CHECK cannot be altered, so the day a fourth thing becomes loggable
+-- the migration would be a full table rebuild of the largest table here.
+--
+-- \`kind\` is the kind of work, and it is nullable ON PURPOSE. BUILD-1 §5 says a
+-- work log will eventually name it so the margin can group by it; until then
+-- lib/internal-money.ts applies the DEFAULT internal rate and says so on screen,
+-- which is the honest answer while the column is empty.
+--
+-- \`discarded_at\` is how a runaway timer is binned without deleting anything
+-- (BUILD-1 §5: somebody starts one on Friday and goes home). Deactivate-never-
+-- delete: the row, and the fact that somebody chose to bin it, both survive —
+-- every sum in the app subtracts it instead.
+CREATE TABLE work_logs (
+  id TEXT PRIMARY KEY,
+  account_id TEXT REFERENCES accounts (id),
+  target_table TEXT NOT NULL,
+  target_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  user_name TEXT,
+  kind TEXT,
+  note TEXT,
+  started_at TEXT NOT NULL,
+  ended_at TEXT,
+  seconds INTEGER NOT NULL DEFAULT 0 CHECK (seconds >= 0),
+  billable INTEGER NOT NULL DEFAULT 1,
+  discarded_at TEXT, discarder_id TEXT, discarder_email TEXT, discarder_name TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT
+);
+-- THE ONE THING A TIMER MAY NOT DO: run twice on the same work, for the same
+-- person. Parallel timers on DIFFERENT targets are allowed (BUILD-1 §5) — that
+-- is a real day — but the same person clocking the same story twice is a double
+-- count nobody would ever notice in a total. A partial unique index, so the
+-- database refuses it rather than a read-then-write racing itself.
+CREATE UNIQUE INDEX idx_work_logs_running
+  ON work_logs (user_id, target_table, target_id) WHERE ended_at IS NULL;
+CREATE INDEX idx_work_logs_target ON work_logs (target_table, target_id);
+CREATE INDEX idx_work_logs_account ON work_logs (account_id);
+CREATE INDEX idx_work_logs_user ON work_logs (user_id, started_at);
+
+-- ONE PERSON'S OWN PREFERENCES about their timers. One row per person, and today
+-- one column: whether starting a timer stops the ones they already have running.
+-- OFF by default, because parallel timers are legitimate and a setting that
+-- silently stopped your other work would be discovered by losing an hour.
+CREATE TABLE work_prefs (
+  user_id TEXT PRIMARY KEY,
+  auto_stop INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT
+);
+`,
+  },
+  {
+    // THE OTHER TWO NOUNS (.plans/BUILD-1 §2). The owner's own test for telling
+    // them apart: "Aurora spends forty minutes writing kwapso's own quarterly VAT
+    // return" is a TASK; "Marta at Bergman still hasn't sent us her brand logo and
+    // we can't finish without it" is a TO-DO.
+    //
+    // TWO TABLES, NOT ONE WITH A `kind` COLUMN, and the reason is the same one
+    // that split the two rate cards in 0013: they are the same SHAPE and opposite
+    // AUDIENCES. A to-do is aimed at the client and appears in their portal; a
+    // task is our own admin and must never leave the building. One table with a
+    // flag would put both a wrong WHERE clause apart, and the wrong one of them
+    // is a list of the agency's internal chores rendered on a client's screen.
+    // Two tables cannot be confused by a forgotten predicate.
+    version: "0016_todos_and_tasks",
+    sql: `
+-- A TO-DO is something we are waiting on the CLIENT for. It is the only row in
+-- the work engine a client login can WRITE to, and one of only two things in the
+-- whole product that emails them (BUILD-1 §7).
+--
+-- \`account_id\` is NOT NULL, unlike everywhere else in this build: a to-do with
+-- no client is a to-do aimed at nobody, and the fence that decides who may see it
+-- reads exactly this column. There is no such thing as an agency to-do — that is
+-- a task, in the table below.
+--
+-- \`file_url\` is what they uploaded against it. One file, not a collection: the
+-- request is "send us the logo", and a second attachment is a second to-do or a
+-- comment on the ticket it hangs off.
+--
+-- NO WORK LOG EVER ATTACHES TO ONE (BUILD-1 §5, settled by the owner) — it is
+-- somebody else's time, not ours. That is enforced in
+-- workers/content/src/lib/work-logs.ts by \`todos\` not being in WORK_LOG_TARGETS,
+-- and asserted against the list itself so it survives this table existing.
+CREATE TABLE todos (
+  id TEXT PRIMARY KEY,
+  ref TEXT,
+  account_id TEXT NOT NULL REFERENCES accounts (id),
+  ticket_id TEXT REFERENCES help (id),
+  story_id TEXT REFERENCES stories (id),
+  title TEXT NOT NULL,
+  detail TEXT,
+  due_on TEXT,
+  completed_at TEXT, completer_id TEXT, completer_name TEXT,
+  file_url TEXT,
+  file_name TEXT,
+  cancelled_at TEXT, canceller_id TEXT, canceller_email TEXT, canceller_name TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT
+);
+CREATE UNIQUE INDEX idx_todos_ref ON todos (ref) WHERE ref IS NOT NULL;
+CREATE INDEX idx_todos_account ON todos (account_id, completed_at);
+CREATE INDEX idx_todos_ticket ON todos (ticket_id);
+
+-- A TASK is kwapso's own internal admin. Nobody outside the agency ever sees one,
+-- so unlike every other table in this build it carries no fence and no portal
+-- story at all — every door on it refuses a client login outright.
+--
+-- \`account_id\` is nullable and usually null: our own VAT return belongs to no
+-- client. A task that IS about a client (chasing an invoice, preparing a review)
+-- may name one, which is what lets its time land in the right margin.
+--
+-- WORK LOGS DO ATTACH (BUILD-1 §2), which is the whole reason this is a table
+-- rather than a checklist somewhere: forty minutes on the VAT return is real
+-- time, it is ours, and it costs us the same as forty minutes of delivery.
+--
+-- The reference number is nullable here for a duller reason than elsewhere: a
+-- reference is built out of an ACCOUNT's short code, and most tasks have no
+-- account. A number nobody can quote is worse than none.
+CREATE TABLE tasks (
+  id TEXT PRIMARY KEY,
+  ref TEXT,
+  account_id TEXT REFERENCES accounts (id),
+  title TEXT NOT NULL,
+  detail TEXT,
+  assignee_id TEXT,
+  assignee_name TEXT,
+  due_on TEXT,
+  status TEXT NOT NULL DEFAULT 'open',
+  completed_at TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT
+);
+CREATE UNIQUE INDEX idx_tasks_ref ON tasks (ref) WHERE ref IS NOT NULL;
+CREATE INDEX idx_tasks_status ON tasks (status, due_on);
+CREATE INDEX idx_tasks_assignee ON tasks (assignee_id);
+
+-- Existing teams: the locked Admin role gains the to-do module in full. Every
+-- other role gains nothing — including, deliberately, the Client role an owner
+-- may already have built: handing a client sight of their to-dos is a decision
+-- somebody makes on the Roles screen, not one a migration makes for them.
+-- (Tasks need no row: they live under \`work\`, which 0014 already granted.)
+INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+SELECT lower(hex(randomblob(16))), r.id, 'todos', r.is_default, r.is_default, r.is_default, r.is_default
+  FROM member_roles r
+ WHERE NOT EXISTS (
+   SELECT 1 FROM role_permissions p WHERE p.role_id = r.id AND p.module = 'todos'
+ );
+`,
+  },
+  {
+    // TRIAGE DUTY (.plans/BUILD-1 §6). "One named person is on triage duty, and
+    // it is visible whose week it is."
+    //
+    // A ROTA, not a flag on a member. Whose week it is changes every Monday and
+    // the answer to "whose week was it when this was missed?" has to survive —
+    // so it is a row per week, and the week is the key.
+    version: "0017_triage_duty",
+    sql: `
+CREATE TABLE triage_duty (
+  id TEXT PRIMARY KEY,
+  week_start TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  user_name TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT
+);
+-- ONE NAMED PERSON, and the database is what makes it one. "Visible whose week
+-- it is" has no answer if two rows claim the same week, and a check in code is a
+-- check two simultaneous writers race past.
+CREATE UNIQUE INDEX idx_triage_duty_week ON triage_duty (week_start);
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }
@@ -884,6 +1206,20 @@ export const DEFAULT_SELECTABLE: { type: string; value: string }[] = [
   { type: "Ticket status", value: "In progress" },
   { type: "Ticket status", value: "Ready" },
   { type: "Ticket status", value: "Resolved" },
+  // The three sprint types SCOPE ch.02 names, and no more. A "blueprint" is a
+  // PRICED PLANNING sprint, not a fourth type (BUILD-1 §3), so it is a price on
+  // a Planning row rather than a value here. Editable, like the ticket types:
+  // these are a starting vocabulary a team adds to on the Dropdown values screen.
+  { type: "Sprint type", value: "Planning" },
+  { type: "Sprint type", value: "Implementation" },
+  { type: "Sprint type", value: "Iteration" },
+  // Display-only labels for the four story states. The states the code trusts
+  // are STORY_STATUSES in shared/types.ts — rewording a row here can never move
+  // a story, exactly as with the ticket labels above.
+  { type: "Story status", value: "Open" },
+  { type: "Story status", value: "In progress" },
+  { type: "Story status", value: "In review" },
+  { type: "Story status", value: "Done" },
 ]
 
 /**

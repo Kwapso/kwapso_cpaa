@@ -6,7 +6,8 @@
 // portal hostname and false everywhere else — the AGENCY gateway forwards by
 // prefix, a client login is an ordinary team member, and every sibling door in
 // data-ops had already learned this (import.ts refuses a portal caller in six
-// places). The six agent doors were the only ones that had not.
+// places). The six agent doors were the only ones that had not — SEVEN now: the
+// translate button spends the same allowance and is refused the same way.
 //
 // And the role was never going to stop them. The DEFAULT Viewer template ships
 // `agent: read + create` (workers/tenancy/src/team-schema.ts), so an owner who
@@ -72,7 +73,7 @@ beforeEach(() => {
 
 describe("a client login never reaches the agency's assistant", () => {
   it("finds the agent doors (the scan must not go blind)", () => {
-    expect(AGENT_DOORS.length, "data-ops serves six agent doors").toBe(6)
+    expect(AGENT_DOORS.length, "data-ops serves seven agent doors").toBe(7)
   })
 
   // THE CONTROL, FIRST. Every refusal below is a status code, and a door that is

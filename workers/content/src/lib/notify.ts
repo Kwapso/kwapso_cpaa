@@ -134,3 +134,246 @@ export async function notifyReplyAndMentions(
     console.error("help notify failed:", e)
   }
 }
+
+/* ────────────────── the two emails the CLIENT ever receives ────────────────── */
+// BUILD-1 §7 is a closed list, and it is short on purpose: "only ticket
+// resolutions and to-dos. Nothing else emails the client; everything else lives
+// in the portal for them to look at."
+//
+// The reason is worth keeping in front of whoever adds the third one. This app
+// is a place a client goes to look at their own work — the moment it also becomes
+// a thing that arrives in their inbox twice a week, the portal stops being where
+// they look and the email becomes the product. So: something we NEED FROM THEM,
+// and the ANSWER to something they asked. Both are moments where the next move is
+// theirs and they cannot make it from a screen they are not on.
+//
+// Both sends are best-effort, like every other notification here: a failed email
+// must never fail the write that triggered it. The row is already saved and
+// already on their screen.
+
+/** Everybody at one account with a LIVE portal login, and their addresses.
+ *
+ * Two reads rather than a join, because the two halves live in two databases: who
+ * may sign in is a per-team fact (`portal_users`) and what their address is is a
+ * global one (`users`). Only LIVE grants: a revoked login is a person we stopped
+ * telling things, and mailing them anyway is the quiet half of an offboarding
+ * that looked complete. */
+async function accountInboxes(
+  env: Env,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  accountId: string
+): Promise<{ email: string; name: string }[]> {
+  // THE GUARD CORRIDOR'S QUESTION, ASKED FROM THE OTHER END. A portal grant sits
+  // on a PERSON's own account row, not on the company — the company is where the
+  // fence then reaches from (shared/workers/account-scope.ts ROOTS_SQL: their row
+  // hangs under it, or they are linked to it). So "who at this company can sign
+  // in" is not `portal_users WHERE account_id = <company>`; that finds only the
+  // freelancer whose own row IS the account, and misses every ordinary contact.
+  // Getting this wrong is silent: the to-do is written, nobody is told, and the
+  // client discovers it the next time they happen to open the portal.
+  const grants = await d1Query<{ user_id: string }>(
+    cfg,
+    guard.databaseId,
+    // Bounded (R14): the people at one company who can sign in.
+    `SELECT pu.user_id FROM portal_users pu
+      WHERE pu.deactivated_at IS NULL
+        AND (pu.account_id = ?
+             OR EXISTS (SELECT 1 FROM accounts a WHERE a.id = pu.account_id AND a.parent_account_id = ?)
+             OR EXISTS (SELECT 1 FROM account_links l
+                         WHERE l.person_account_id = pu.account_id AND l.account_id = ?
+                           AND l.deactivated_at IS NULL))
+      LIMIT 100`,
+    [accountId, accountId, accountId]
+  )
+  const ids = grants.map((g) => g.user_id).filter(Boolean)
+  if (!ids.length) return []
+  const { results } = await env.DB.prepare(
+    `SELECT email, first_name, last_name FROM users WHERE id IN (${ids.map(() => "?").join(", ")})`
+  )
+    .bind(...ids)
+    .all<{ email: string; first_name: string | null; last_name: string | null }>()
+  return (results ?? [])
+    .filter((r) => r.email)
+    .map((r) => ({
+      email: r.email,
+      name: [r.first_name, r.last_name].filter(Boolean).join(" ") || r.email,
+    }))
+}
+
+/** EMAIL ONE: we need something from you.
+ *
+ * A to-do is the only thing in the product where the next move is the client's
+ * and they have no way to know it without being told. The mail carries the
+ * reference they will quote back at us and the date, and nothing else — the
+ * detail is on the screen, and an email that reproduces the screen is an email
+ * that goes stale the moment somebody edits the row. */
+export async function notifyTodoRaised(
+  env: Env,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  todoId: string
+): Promise<void> {
+  try {
+    const rows = await d1Query<{
+      ref: string | null
+      title: string
+      due_on: string | null
+      account_id: string
+    }>(
+      cfg,
+      guard.databaseId,
+      `SELECT ref, title, due_on, account_id FROM todos WHERE id = ? LIMIT 1`,
+      [todoId]
+    )
+    const todo = rows[0]
+    if (!todo) return
+    const people = await accountInboxes(env, cfg, guard, todo.account_id)
+    if (!people.length) return
+    const name = await teamName(env, guard.teamId)
+    // NO STAFF NAME ANYWHERE IN IT. SCOPE ch.06 — the portal never says which
+    // staff member is doing the work — and an email is a surface that leaves the
+    // building, which is exactly where that promise is easiest to drop.
+    await Promise.all(
+      people.map((p) =>
+        send(env, p.email, `${brand.name}: we need something from you`, {
+          heading: "One thing from you",
+          intro: `${todo.title}${todo.due_on ? ` — by ${todo.due_on.slice(0, 10)}` : ""}.`,
+          footnote: `Open ${todo.ref ? `${todo.ref} ` : ""}in your ${name} portal to mark it done, and send the file with it if there is one.`,
+        }).catch((e) => console.error("to-do notice failed:", e))
+      )
+    )
+  } catch (e) {
+    console.error("to-do notify failed:", e)
+  }
+}
+
+/* ─────────────────── the ONE internal digest, once a morning ────────────────── */
+// TWO NUDGES, ONE EMAIL, and that is a decision rather than a saving. BUILD-1
+// asks for a morning digest of what has been sitting (§6) and a weekly nudge for
+// missing time (§5). Two crons and two sends would be two things arriving in the
+// same person's inbox on a Monday, from the same app, about the same week — and
+// the second one anybody filters is the one they stop reading. So it is one
+// message, to one person: the one on triage duty.
+
+/** Every ACTIVE member of a team, with the name to print. Read from the core
+ * database, which is where membership and identity both live. */
+export async function teamMemberNames(
+  env: { DB: D1Database },
+  teamId: string
+): Promise<{ userId: string; name: string; email: string }[]> {
+  const { results } = await env.DB.prepare(
+    // Bounded (R14): an agency's own staff list, and the digest reads it once a day.
+    `SELECT u.id, u.email, u.first_name, u.last_name
+       FROM users u JOIN team_members tm ON tm.user_id = u.id
+      WHERE tm.team_id = ? AND tm.deactivated_at IS NULL AND u.deactivated_at IS NULL
+      LIMIT 500`
+  )
+    .bind(teamId)
+    .all<{ id: string; email: string; first_name: string | null; last_name: string | null }>()
+  return (results ?? [])
+    .filter((r) => r.email)
+    .map((r) => ({
+      userId: r.id,
+      email: r.email,
+      name: [r.first_name, r.last_name].filter(Boolean).join(" ") || r.email,
+    }))
+}
+
+/** The morning digest, to the person whose week it is.
+ *
+ * TO ONE PERSON, not the team. "One named person is on triage duty" (§6) is the
+ * whole point of the rota: a nudge addressed to everybody is addressed to nobody.
+ * When nobody has been named for the week it falls back to the whole staff list,
+ * because an unread backlog with no owner is worse than a slightly noisy morning
+ * — and the fix for the noise is naming somebody, which is what the mail asks for.
+ *
+ * NOTHING CLIENT-FACING EVER (§6, and it is the reason the digest is not simply
+ * "email whoever raised it"): a ticket that has been sitting is our failure, and
+ * telling a client about it turns an internal prompt into an SLA nobody promised.
+ * Every recipient here comes off the team's own membership. */
+export async function sendTriageDigest(
+  env: Env,
+  teamId: string,
+  to: { email: string; name: string }[],
+  digest: { waiting: number; oldestDays: number; onDutyName: string | null; missingTime: string[] }
+): Promise<void> {
+  if (!to.length) return
+  if (digest.waiting === 0 && digest.missingTime.length === 0) return
+  try {
+    const team = await teamName(env, teamId)
+    const lines: string[] = []
+    if (digest.waiting > 0)
+      lines.push(
+        `${digest.waiting} ${digest.waiting === 1 ? "request has" : "requests have"} been waiting to be read — the oldest for ${digest.oldestDays} days.`
+      )
+    if (digest.missingTime.length > 0)
+      lines.push(
+        `No time was logged last week by: ${digest.missingTime.join(", ")}.`
+      )
+    await Promise.all(
+      to.map((p) =>
+        send(env, p.email, `${team}: this morning`, {
+          heading: digest.onDutyName ? `${digest.onDutyName} is on triage this week` : "Nobody is on triage this week",
+          intro: lines.join(" "),
+          footnote: digest.onDutyName
+            ? "Open Tickets to read them."
+            : "Put somebody on triage duty in Tickets — a backlog with no owner is the one nobody clears.",
+        }).catch((e) => console.error("triage digest failed:", e))
+      )
+    )
+  } catch (e) {
+    console.error("triage digest failed:", e)
+  }
+}
+
+/** EMAIL TWO — and the last one. THE ANSWER TO WHAT THEY ASKED.
+ *
+ * The other half of BUILD-1 §7's closed list, and the one the whole product is
+ * judged on: somebody asked us something, and this is us coming back. It is sent
+ * BY A PERSON pressing send, never by a status moving — which is why the door
+ * that calls it takes the words as an argument rather than reading them off the
+ * draft. A draft is our working text; a resolution is a sentence somebody chose
+ * to say.
+ *
+ * NO STAFF NAME, for the third time in this file and the same reason: SCOPE
+ * ch.06 is a promise about every surface that leaves the building. The client is
+ * told their request is answered and what the answer is; who wrote it is ours. */
+export async function notifyTicketResolved(
+  env: Env,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  ticketId: string,
+  resolution: string
+): Promise<void> {
+  try {
+    const rows = await d1Query<{ ref: string | null; description: string; account_id: string | null }>(
+      cfg,
+      guard.databaseId,
+      `SELECT ref, description, account_id FROM help WHERE id = ? LIMIT 1`,
+      [ticketId]
+    )
+    const ticket = rows[0]
+    // No account means the agency's own question, asked and answered inside the
+    // building. There is nobody outside it to tell.
+    if (!ticket?.account_id) return
+    const people = await accountInboxes(env, cfg, guard, ticket.account_id)
+    if (!people.length) return
+    const name = await teamName(env, guard.teamId)
+    const asked = snippet(ticket.description)
+    await Promise.all(
+      people.map((p) =>
+        send(env, p.email, `${name}: ${ticket.ref ? `${ticket.ref} — ` : ""}answered`, {
+          heading: "We've come back to you",
+          // The ANSWER in full, and what they asked in one line above it, because
+          // a resolution arriving with no reminder of the question is a paragraph
+          // people have to go and look something up to understand.
+          intro: `You asked: "${asked}"\n\n${resolution}`,
+          footnote: "Open the ticket if you want to reply — the whole conversation is there.",
+        }).catch((e) => console.error("resolution notice failed:", e))
+      )
+    )
+  } catch (e) {
+    console.error("resolution notify failed:", e)
+  }
+}

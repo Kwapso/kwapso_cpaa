@@ -261,6 +261,21 @@ export type HelpTicket = {
    * `titleDe` exactly as the person wrote it. */
   titleDe: string | null
   titleEn: string | null
+  /** OUR UNSENT WORKING TEXT — what we will tell them when the request is
+   * answered, assembled from each story's closing note as the work finishes so
+   * nobody is composing from a blank page at the end of a fortnight.
+   *
+   * Null on the way OUT to a client login, always. It is a draft: half of it may
+   * be wrong, and all of it is written in the register colleagues use with each
+   * other. The resolution the client reads is the one a person SENDS. */
+  draftResolution: string | null
+  /** HOW MUCH WORK IS ON IT, and nothing else about that work. "3 pieces of
+   * work, 1 done" is exactly what a client is shown (.plans/BUILD-1 §7) — never
+   * a title, an assignee or a date, because those are the answer to "which staff
+   * member is doing it" (SCOPE ch.06). Staff read the same two numbers and click
+   * through to the backlog for the rest. */
+  storyCount: number
+  doneStoryCount: number
   /** Who raised it, and who last touched it. All three are null on the way OUT,
    * and only to a client login, when the person is on the AGENCY's side of the
    * fence — SCOPE ch.06, "the portal shows work status but never which staff
@@ -768,4 +783,180 @@ export type InternalRate = {
   createdByName?: string | null
   updatedAt?: string | null
   editedByName?: string | null
+}
+
+/* ─────────────────────────── the work engine ─────────────────────────────── */
+// A ticket is what an account ASKS FOR; a story is one piece of work WE DO about
+// it (.plans/BUILD-1 §2). The four nouns are kept apart in the words, in the
+// glossary, and here in the types — a single "work item" type with a kind field
+// is how they stop being kept apart on the screens.
+
+/** The four states a story moves through (SCOPE ch.07). The review step is
+ * deliberate: work is checked before it is called done. FIXED — the code trusts
+ * this list; the team-editable "Story status" dropdown is display-only. */
+export const STORY_STATUSES = ["open", "in_progress", "in_review", "done"] as const
+export type StoryStatus = (typeof STORY_STATUSES)[number]
+
+/** The states a story is NOT yet finished in. Derived from the one list above
+ * rather than retyped, so a fifth state cannot be added and silently left out of
+ * the question the Ready flip asks ("is anything still open on this ticket?"). */
+export const OPEN_STORY_STATUSES = STORY_STATUSES.filter((s) => s !== "done")
+
+/** ONE PIECE OF WORK WE DO. The only place an assignee and a due date live — a
+ * ticket deliberately has neither and derives its picture from these. */
+export type Story = {
+  id: string
+  /** BERG-S0188 — the account's own short code, an S, and a per-account sequence.
+   * Null on a story with no account, or one whose account has no code yet. */
+  ref: string | null
+  title: string
+  detail: string | null
+  status: StoryStatus
+  /** the request this work answers, when there is one. Four out of five stories
+   * in the real history stand on their own. */
+  ticketId: string | null
+  ticketRef: string | null
+  sprintId: string | null
+  sprintName: string | null
+  appId: string | null
+  processId: string | null
+  /** WHICH STEP OF WHICH MAP THIS WORK CHANGED — a step KEY, so it means the same
+   * step across every version of that map. A story cannot close without this or
+   * `changesNoStep`; that pair is the hook the savings maths hangs off. */
+  stepKey: string | null
+  changesNoStep: boolean
+  assigneeId: string | null
+  assigneeName: string | null
+  reviewerId: string | null
+  reviewerName: string | null
+  startsOn: string | null
+  dueOn: string | null
+  closedAt: string | null
+  /** what we will tell the client. Closing a story appends this to the ticket's
+   * DRAFT resolution — a draft, never a sent message. */
+  closingNote: string | null
+  rank: string | null
+  accountId: string | null
+  createdAt: string
+  updatedAt: string | null
+  createdByName: string | null
+  editedByName: string | null
+}
+
+/** A BLOCK OF DELIVERY WORK SOLD TO ONE ACCOUNT. It carries the flat price, which
+ * is the revenue half of the margin (workers/tenancy/src/lib/internal-money.ts
+ * reads it and never writes it). Whole cents, like every money column here. */
+export type Sprint = {
+  id: string
+  ref: string | null
+  name: string
+  goal: string | null
+  sprintType: string | null
+  accountId: string | null
+  accountName: string | null
+  appId: string | null
+  appName: string | null
+  startsOn: string | null
+  endsOn: string | null
+  soldPriceCents: number
+  currency: string | null
+  /** the MOMENT it completed, not a status word — the version cut on the money
+   * side keys off exactly that (process_versions.cut_from_sprint_id). */
+  completedAt: string | null
+  active: boolean
+  /** exact server counts of the work inside it (R16) — never a loaded length. */
+  storyCount: number
+  openStoryCount: number
+  createdAt: string
+  createdByName: string | null
+}
+
+/** ONE ROW OF TIME: who, what they worked on, and how long, in whole seconds.
+ * A TIMER is one of these with no `endedAt` yet — there is no second concept and
+ * no state machine, which is what makes starting one a single click. */
+export type WorkLog = {
+  id: string
+  /** what it is against — one of WORK_LOG_TARGETS. Never a to-do (that is
+   * somebody else's time) and never an account on its own. */
+  targetTable: string
+  targetId: string
+  /** what the thing it is against is CALLED, so a list of time reads as a list
+   * of work rather than a list of ids. */
+  targetLabel: string | null
+  userId: string
+  userName: string | null
+  /** the kind of work, so the margin can group by it. Null until a team starts
+   * saying — the margin applies its default internal rate and says so. */
+  kind: string | null
+  note: string | null
+  startedAt: string
+  /** null = still running */
+  endedAt: string | null
+  seconds: number
+  billable: boolean
+  /** a runaway timer somebody binned. The row survives; every sum subtracts it. */
+  discarded: boolean
+  accountId: string | null
+}
+
+/** A timer still running, as the header shows it: what it is on, where clicking
+ * it goes, and when it started (the browser counts up from there rather than
+ * asking the server every second). */
+export type RunningTimer = {
+  id: string
+  targetTable: string
+  targetId: string
+  targetLabel: string | null
+  startedAt: string
+  /** whole seconds elapsed at the moment the server answered */
+  elapsedSeconds: number
+  /** true once it has been running longer than RUNAWAY_HOURS — the Monday prompt */
+  runaway: boolean
+}
+
+/** SOMETHING WE ARE WAITING ON THE CLIENT FOR. The one row in the work engine a
+ * client login can write to: they complete it and upload a file against it from
+ * their own portal. Never carries a work log — that would be their time in our
+ * margin. */
+export type Todo = {
+  id: string
+  /** BERG-D0007 — a to-do always belongs to a client, so it always has one (as
+   * long as that client has a short code). */
+  ref: string | null
+  title: string
+  detail: string | null
+  dueOn: string | null
+  completedAt: string | null
+  completedByName: string | null
+  /** what they sent us, and what it was called on their machine. One file: the
+   * request is "send us the logo", and a second attachment is a second to-do. */
+  fileUrl: string | null
+  fileName: string | null
+  /** withdrawn without being deleted — we stopped needing it. */
+  cancelled: boolean
+  accountId: string
+  accountName: string | null
+  ticketId: string | null
+  createdAt: string
+}
+
+/** KWAPSO'S OWN INTERNAL ADMIN. Nobody outside the agency ever sees one. Work
+ * logs DO attach — forty minutes on our own VAT return is real time and costs us
+ * the same as forty minutes of delivery. */
+export type Task = {
+  id: string
+  ref: string | null
+  title: string
+  detail: string | null
+  assigneeId: string | null
+  assigneeName: string | null
+  dueOn: string | null
+  status: "open" | "done"
+  completedAt: string | null
+  /** usually null — our own admin belongs to no client. A task that IS about one
+   * (chasing an invoice, preparing a review) may name it, which is what puts its
+   * time in the right margin. */
+  accountId: string | null
+  createdAt: string
+  createdByName: string | null
 }

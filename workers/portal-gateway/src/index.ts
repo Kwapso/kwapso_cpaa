@@ -108,6 +108,29 @@ export const PORTAL_DOORS: Record<string, Upstream> = {
   "GET /api/content/help/thread": "CONTENT",
   "POST /api/content/help": "CONTENT",
   "POST /api/content/help/reply": "CONTENT",
+  // EDIT AND RE-RANK, the two things SCOPE ch.07 says the account owns. Both are
+  // governed by the LOCK rather than by this table: a client may correct their
+  // own question and drag their company's requests into the order they want
+  // them in, right up until a staff member reads one. The doors that would move
+  // a ticket ALONG its lifecycle — status, bulk-status, archive — are absent
+  // here AND refuse a portal caller at the door, because "resolved" is our word
+  // and there is no client-side reopen button.
+  "POST /api/content/help/update": "CONTENT",
+  "POST /api/content/help/rank": "CONTENT",
+
+  // ── what we are waiting on them for ────────────────────────────────────────
+  // The only rows in the work engine a client writes to. They read their own
+  // company's and complete one, with the file we asked for. Raising and
+  // withdrawing are ours (`todos:create` / `todos:delete`), and both refuse a
+  // portal caller at the door as well as being absent from this list.
+  "GET /api/content/todos": "CONTENT",
+  "POST /api/content/todos/complete": "CONTENT",
+
+  // ── what they bought ───────────────────────────────────────────────────────
+  // Sprints as named blocks with dates and two counts. NOT the agency's sprint
+  // door — a different shape, with nowhere to put a price and no story titles in
+  // it at all.
+  "GET /api/content/portal/delivery": "CONTENT",
 
   // ── the value, and the conversation about it ───────────────────────────────
   // THREE doors, and the list of what is NOT here is the point. `/value` answers

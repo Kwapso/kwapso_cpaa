@@ -18,6 +18,10 @@ const HOUSEKEEPING = [
   // patch, so nothing to broadcast (the create/edit that references the file
   // pings its own row).
   "POST /api/content/learning/upload",
+  // The caller's OWN timer preference (does starting one stop the others?). It
+  // changes no record anybody else can see and no screen anybody else is looking
+  // at, so there is nothing for a ping to patch.
+  "POST /api/content/work-logs/auto-stop",
 ]
 
 publishSeam({

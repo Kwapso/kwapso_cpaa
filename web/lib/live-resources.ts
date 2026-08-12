@@ -120,6 +120,81 @@ export const listFetch = {
       primeCache(cursorKey(processesKey(teamId)), r.nextCursor)
       return r.processes
     }),
+  // R14: stories are PAGED — the backlog only grows, and the 3,677 rows arriving
+  // from the previous system are there on day one. Page one lands in the cache,
+  // its next cursor in the sidecar <LoadMore> reads.
+  stories: (teamId: string) =>
+    contentApi.stories().then((r) => {
+      primeCache(totalKey("work", teamId), r.total)
+      primeCache(totalKey("work-mine", teamId), r.mineTotal)
+      primeCache(cursorKey(storiesKey(teamId)), r.nextCursor)
+      return r.stories
+    }),
+  // R14: time is PAGED — 2,940 rows arrived from two years of the previous
+  // system and every piece of work produces several more.
+  workLogs: (teamId: string) =>
+    contentApi.workLogs().then((r) => {
+      primeCache(totalKey("work-logs", teamId), r.total)
+      primeCache(totalKey("work-seconds", teamId), r.totalSeconds)
+      primeCache(cursorKey(workLogsKey(teamId)), r.nextCursor)
+      return r.logs
+    }),
+  // Both BOUNDED (R14): a to-do is a thing we are WAITING on and a task is admin,
+  // so each shrinks as fast as it grows — a ceiling is an honest answer rather
+  // than an eventual refusal, and neither has a cursor sidecar to prime.
+  todos: (teamId: string) =>
+    contentApi.todos().then((r) => {
+      primeCache(totalKey("todos", teamId), r.total)
+      return r.todos
+    }),
+  tasks: (teamId: string) =>
+    contentApi.tasks().then((r) => {
+      primeCache(totalKey("tasks", teamId), r.total)
+      return r.tasks
+    }),
+  // Sprints are BOUNDED, not paged (a block of sold work grows at the speed of
+  // contracts), so there is no cursor sidecar to prime — just the exact total.
+  sprints: (teamId: string) =>
+    contentApi.sprints().then((r) => {
+      primeCache(totalKey("sprints", teamId), r.total)
+      return r.sprints
+    }),
+}
+
+/** The backlog's cache key (the paged stories list) and the sprint list beside
+ * it. Two keys, because they are two collections with two different R14 answers:
+ * one pages, one is capped. */
+export function storiesKey(teamId: string): string {
+  return `stories:${teamId}`
+}
+export function sprintsKey(teamId: string): string {
+  return `sprints:${teamId}`
+}
+
+/** The paged list of TIME, and — separately — the caller's running timers, which
+ * the header of every screen holds. Two keys because they answer two questions
+ * with two lifetimes: a page of somebody's week is opened deliberately, and the
+ * header's question is asked everywhere. */
+export function workLogsKey(teamId: string): string {
+  return `work-logs:${teamId}`
+}
+/** What we are waiting on clients for, and our own admin. Two keys, because they
+ * are two collections with two audiences — the same reason they are two tables. */
+export function todosKey(teamId: string): string {
+  return `todos:${teamId}`
+}
+export function tasksKey(teamId: string): string {
+  return `tasks:${teamId}`
+}
+
+/** The triage strip: whose week it is, and the requests nobody has read. One
+ * key, because the screen asks them as one question. */
+export function triageKey(teamId: string): string {
+  return `triage:${teamId}`
+}
+
+export function runningTimersKey(teamId: string): string {
+  return `running-timers:${teamId}`
 }
 
 /** The process-map list's cache key (the paged maps list). */
@@ -324,6 +399,58 @@ export const TEAM_RESOURCES: Record<
     fetchList: (t) => listFetch.processes(t),
     deps: (t, id) => [processKey(id), processCommentsKey(id), valueKey(t)],
   },
+  // THE WORK ENGINE — row-level live. Somebody else moving a story to in review
+  // patches just that row in the cached backlog; the deps carry the parts of the
+  // record that move with it: the story's own history, and the SPRINT list,
+  // whose per-sprint "3 of 8 done" counts are computed from exactly these rows.
+  stories: {
+    key: (t) => storiesKey(t),
+    idField: "id",
+    fetchOne: (id) => contentApi.storyOne(id),
+    fetchList: (t) => listFetch.stories(t),
+    deps: (t, id) => [`activity:record:stories:${id}`, sprintsKey(t)],
+  },
+  // A sprint has a list of its own, and its rows carry counts of the stories
+  // inside it — so a sprint ping patches the sprint row and leaves the backlog
+  // alone. (A story ping does the reverse, above.)
+  sprints: {
+    key: (t) => sprintsKey(t),
+    idField: "id",
+    fetchOne: (id) => contentApi.sprintOne(id),
+    fetchList: (t) => listFetch.sprints(t),
+    deps: (_t, id) => [`activity:record:sprints:${id}`],
+  },
+  // TIME — row-level live, and the one resource whose ping most often lands on
+  // the person who caused it: the header timer is on every screen, so starting
+  // one in a dialog has to show up in the bar above it without a reload. The deps
+  // carry the two things a row of time changes besides itself — the running-timer
+  // bar, and the backlog, whose stories now have more hours against them.
+  work_logs: {
+    key: (t) => workLogsKey(t),
+    idField: "id",
+    fetchOne: (id) => contentApi.workLogOne(id),
+    fetchList: (t) => listFetch.workLogs(t),
+    deps: (t, id) => [runningTimersKey(t), storiesKey(t), `activity:record:work_logs:${id}`],
+  },
+  // TO-DOS — row-level live, and the one work-engine resource a CLIENT hears
+  // about too (the portal has its own listener map). A contact completing one in
+  // their portal has to appear on our screen without a reload, because the next
+  // thing somebody here does is act on it.
+  todos: {
+    key: (t) => todosKey(t),
+    idField: "id",
+    fetchOne: (id) => contentApi.todoOne(id),
+    fetchList: (t) => listFetch.todos(t),
+    deps: (_t, id) => [`activity:record:todos:${id}`],
+  },
+  // TASKS — our own admin, agency-side only.
+  tasks: {
+    key: (t) => tasksKey(t),
+    idField: "id",
+    fetchOne: (id) => contentApi.taskOne(id),
+    fetchList: (t) => listFetch.tasks(t),
+    deps: (_t, id) => [`activity:record:tasks:${id}`],
+  },
   // A rate card ping carries the ACCOUNT it sits on — a card is only ever read on
   // its account's own screen, so the account is the row a listener can act on.
   // The same shape `account_links` and `portal_users` already have, and for the
@@ -353,4 +480,14 @@ export const SIMPLE_INVALIDATIONS: Record<string, (teamId: string) => string[]> 
   // the margin panel closes that itself by re-reading when the rate card it also
   // shows changes underneath it (see margin-panel.tsx).
   internal_rates: (t) => [internalRatesKey(t)],
+  // The rota has no list of its own: it is one line above the ticket list saying
+  // whose week it is, read together with the backlog it is about. A ping drops
+  // both, because the answer to "is anything sitting?" moves with the answer to
+  // "whose job is it?".
+  triage_duty: (t) => [triageKey(t)],
+  // `work` is not a table — it is the MODULE the import engine pings after it
+  // writes a file of stories, and a file writes many rows with no one row to
+  // patch. So the backlog is dropped and re-read, and the sprint list with it,
+  // because a sprint row carries the counts of the stories inside it.
+  work: (t) => [storiesKey(t), sprintsKey(t)],
 }

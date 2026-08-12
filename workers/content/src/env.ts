@@ -12,6 +12,12 @@ export type Env = {
   LEARNING_MEDIA: R2Bucket
   /** Ticket media (screen recordings, attachments), served by the gateway. */
   HELP_MEDIA: R2Bucket
+  /** The SHARED media bucket, and the only one BOTH front doors serve (`/media/*`
+   * on the agency gateway and on the portal gateway alike). A to-do's attachment
+   * goes here rather than into HELP_MEDIA for exactly that reason: the client
+   * uploads it from the portal and we read it in the agency app, so a bucket only
+   * one door can serve would be a file one of the two sides cannot open. */
+  MEDIA: R2Bucket
 
   /** Cloudflare account id (plain var) — for reaching per-team databases. */
   CF_ACCOUNT_ID: string

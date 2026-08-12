@@ -785,6 +785,414 @@ export const SHARED_TOOLS: SharedTool[] = [
       },
     },
   },
+  {
+    name: "resolve_help_ticket",
+    summary:
+      "ANSWER a ticket and TELL THE CLIENT: `resolution` is the words they will read. It resolves the ticket, appends those words to its conversation, and EMAILS the people at that client — one of only two things in the whole product that reach a customer's inbox. Read the ticket's draft resolution first (it is built from each story's closing note as the work finished) and send that, edited. An already-resolved ticket answers `{sent:false, alreadyResolved:true}` and emails nobody: a second call is not a second answer.",
+    binding: "CONTENT", method: "POST", path: "/api/content/help/resolve",
+    schema: obj({ id: S, resolution: S }, ["id", "resolution"]),
+    buildBody: (i) => ({ id: str(i, "id"), resolution: str(i, "resolution") }),
+    agent: {
+      write: true,
+      // CONFIRM, and of everything in this catalogue this is the one that most
+      // obviously must. It sends a customer an answer, in the agency's name,
+      // composed by a model that has been reading text a customer wrote. There
+      // is no un-sending it.
+      confirm: true,
+      summarize: (i) => `Answer ticket ${str(i, "id")} and email the client`,
+    },
+  },
+  /* ------------------------------ the work engine ---------------------------- */
+  // A ticket is what an account ASKS FOR; a story is what WE DO about it. Keeping
+  // the two apart matters more on this surface than anywhere else, because the
+  // model is the one caller that cannot see the screens: told only about tickets
+  // it would answer "what are we working on?" with a list of requests, which is a
+  // different question and a wrong answer. Every tool here sits on a door that
+  // refuses a client login outright (R21), so none of them can be reached by one.
+  {
+    name: "list_stories",
+    summary:
+      "List the team's STORIES — the pieces of work WE do, as opposed to the tickets a client raises. Filters: `status` (open / in_progress / in_review / done), `ticketId` (the work on one request), `sprintId`, `assigneeId`, and `view` ('open' by default, which hides finished work — pass 'all' to include it). Pass `id` to fetch one story. Returns ONE page plus the exact `total`, `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
+    binding: "CONTENT", method: "GET", path: "/api/content/stories",
+    schema: obj({ id: S, status: S, ticketId: S, sprintId: S, assigneeId: S, view: S, cursor: S }),
+    buildQuery: (i) => {
+      const q: string[] = []
+      for (const k of ["id", "status", "ticketId", "sprintId", "assigneeId", "view", "cursor"])
+        if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
+      return q.length ? `?${q.join("&")}` : ""
+    },
+    agent: { write: false, summarize: (i) => (str(i, "id") ? "Look up one story" : "List the work in hand") },
+  },
+  {
+    name: "create_story",
+    summary:
+      "Write down one piece of work. Only `title` is required. `ticketId` links it to the request it answers — most work has none, so leave it off unless you know the ticket. `stepKey` names the process step this work changes and `changesNoStep` says it changes none; one of the two is REQUIRED before the story can be marked done, so set it now if you know it. There is deliberately NO story type: the ticket carries the type.",
+    binding: "CONTENT", method: "POST", path: "/api/content/stories",
+    schema: obj(
+      {
+        title: S, detail: S, ticketId: S, sprintId: S, appId: S, processId: S,
+        stepKey: S, changesNoStep: B, assigneeId: S, reviewerId: S, startsOn: S, dueOn: S, accountId: S,
+      },
+      ["title"]
+    ),
+    // Every field the door reads off the body, forwarded. Most are read inside
+    // lib/stories.ts rather than in the handler, exactly as create_help_ticket's
+    // `accountId` is — exposed by hand for the same reason: without them a machine
+    // could only write a title.
+    buildBody: (i) => ({
+      title: str(i, "title"),
+      detail: opt(i, "detail"),
+      ticketId: opt(i, "ticketId"),
+      sprintId: opt(i, "sprintId"),
+      appId: opt(i, "appId"),
+      processId: opt(i, "processId"),
+      stepKey: opt(i, "stepKey"),
+      changesNoStep: i.changesNoStep === true ? true : undefined,
+      assigneeId: opt(i, "assigneeId"),
+      reviewerId: opt(i, "reviewerId"),
+      startsOn: opt(i, "startsOn"),
+      dueOn: opt(i, "dueOn"),
+      accountId: opt(i, "accountId"),
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Add a story: "${str(i, "title").slice(0, 60)}"` },
+  },
+  {
+    name: "update_story",
+    summary:
+      "Edit a story (by id). Same fields as create_story; `title` stays required. Re-pointing it at another ticket moves the work onto that client's books, which is why the reference number does NOT follow — a client may already be quoting it.",
+    binding: "CONTENT", method: "POST", path: "/api/content/stories/update",
+    schema: obj(
+      {
+        id: S, title: S, detail: S, ticketId: S, sprintId: S, appId: S, processId: S,
+        stepKey: S, changesNoStep: B, assigneeId: S, reviewerId: S, startsOn: S, dueOn: S, accountId: S,
+      },
+      ["id", "title"]
+    ),
+    buildBody: (i) => ({
+      id: str(i, "id"),
+      title: str(i, "title"),
+      detail: opt(i, "detail"),
+      ticketId: opt(i, "ticketId"),
+      sprintId: opt(i, "sprintId"),
+      appId: opt(i, "appId"),
+      processId: opt(i, "processId"),
+      stepKey: opt(i, "stepKey"),
+      changesNoStep: i.changesNoStep === true ? true : undefined,
+      assigneeId: opt(i, "assigneeId"),
+      reviewerId: opt(i, "reviewerId"),
+      startsOn: opt(i, "startsOn"),
+      dueOn: opt(i, "dueOn"),
+      accountId: opt(i, "accountId"),
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Edit story ${str(i, "id")}` },
+  },
+  {
+    name: "set_story_status",
+    summary:
+      "Move a story along its four states, by id: open, in_progress, in_review (someone is checking it), done. `closingNote` is what we will tell the client, and it is appended to the ticket's DRAFT resolution rather than sent. A story CANNOT be set to done until it names the process step it changed (`stepKey` on the story) or is marked as changing none — the door refuses with 'step_required' rather than guessing, because every savings figure is computed from that answer.",
+    binding: "CONTENT", method: "POST", path: "/api/content/stories/status",
+    schema: obj({ id: S, status: S, closingNote: S }, ["id", "status"]),
+    buildBody: (i) => ({ id: str(i, "id"), status: str(i, "status"), closingNote: opt(i, "closingNote") }),
+    agent: {
+      write: true,
+      confirm: false,
+      summarize: (i) => `Set story ${str(i, "id")} to "${str(i, "status")}"`,
+    },
+  },
+  {
+    name: "rank_story",
+    summary:
+      "Move a story up or down the backlog, by id. There is no priority field — the list's ORDER is the priority, exactly as it is for tickets. Name the neighbours it should sit between: `afterId` is the story it goes below (higher up) and `beforeId` the one it goes above. Omit `afterId` for the very top, `beforeId` for the very bottom.",
+    binding: "CONTENT", method: "POST", path: "/api/content/stories/rank",
+    schema: obj({ id: S, afterId: S, beforeId: S }, ["id"]),
+    buildBody: (i) => ({ id: str(i, "id"), afterId: str(i, "afterId"), beforeId: str(i, "beforeId") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Reorder story ${str(i, "id")}` },
+  },
+  {
+    name: "list_sprints",
+    summary:
+      "List the blocks of delivery work sold, newest first — each with its kind, its dates, the flat price it was sold for (in whole cents) and how many of its stories are done. Pass `accountId` for one client's. Bounded, not paged: a sprint is a contract, so there are few of them.",
+    binding: "CONTENT", method: "GET", path: "/api/content/sprints",
+    schema: obj({ accountId: S }),
+    buildQuery: (i) => (str(i, "accountId") ? `?accountId=${encodeURIComponent(str(i, "accountId"))}` : ""),
+    agent: { write: false, summarize: () => "List sprints" },
+  },
+  {
+    name: "create_sprint",
+    summary:
+      "Start a sprint — a block of delivery work sold to one account, with a start, an end and a flat price. `soldPriceCents` is WHOLE CENTS (4500 euros is 450000), because a fractional price loses money between here and a margin. `sprintType` is Planning, Implementation or Iteration; a 'blueprint' is a PRICED PLANNING sprint, not a fourth kind.",
+    binding: "CONTENT", method: "POST", path: "/api/content/sprints",
+    schema: obj(
+      { name: S, goal: S, sprintType: S, accountId: S, appId: S, startsOn: S, endsOn: S, soldPriceCents: N, currency: S },
+      ["name"]
+    ),
+    buildBody: (i) => ({
+      name: str(i, "name"),
+      goal: opt(i, "goal"),
+      sprintType: opt(i, "sprintType"),
+      accountId: opt(i, "accountId"),
+      appId: opt(i, "appId"),
+      startsOn: opt(i, "startsOn"),
+      endsOn: opt(i, "endsOn"),
+      soldPriceCents: typeof i.soldPriceCents === "number" ? i.soldPriceCents : undefined,
+      currency: opt(i, "currency"),
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Start sprint "${str(i, "name")}"` },
+  },
+  {
+    name: "complete_sprint",
+    summary:
+      "Mark a sprint finished, or reopen it (`complete`: true / false). Completing one CUTS A VERSION of every process map beneath it — the point from which the next savings figure is measured — so it is not a label, it is an event. Re-completing an already-complete sprint changes nothing and cuts nothing.",
+    binding: "CONTENT", method: "POST", path: "/api/content/sprints/complete",
+    schema: obj({ id: S, complete: B }, ["id", "complete"]),
+    buildBody: (i) => ({ id: str(i, "id"), complete: i.complete === true }),
+    agent: {
+      write: true,
+      // CONFIRM, and it is the only work-engine write that does. Completing a
+      // sprint is not an edit to a row — it is the moment a process map's next
+      // version is cut, which is the baseline every later savings figure a client
+      // is shown is subtracted from. A model reaching it while reading a ticket
+      // somebody else wrote should stop and ask.
+      confirm: (i) => i.complete === true,
+      summarize: (i) => `${i.complete === true ? "Complete" : "Reopen"} sprint ${str(i, "id")}`,
+    },
+  },
+  /* --------------------------------- triage --------------------------------- */
+  {
+    name: "get_triage",
+    summary:
+      "Whose week it is on triage duty, and every ticket nobody has read yet that has been sitting more than three days — oldest first, with how many days each has waited. An INTERNAL prompt: it is never shown to a client and implies no service-level promise. Pass `week` (any date in it) to ask who was on duty for a different week.",
+    binding: "CONTENT", method: "GET", path: "/api/content/triage",
+    schema: obj({ week: S }),
+    buildQuery: (i) => (str(i, "week") ? `?week=${encodeURIComponent(str(i, "week"))}` : ""),
+    agent: { write: false, summarize: () => "Check what's waiting to be triaged" },
+  },
+  {
+    name: "set_triage_duty",
+    summary:
+      "Put one named person on triage duty for a week — `userId` from list_members, and `week` as any date inside it (it snaps to that Monday; leave it off for this week). Exactly one person holds a week: naming a second replaces the first.",
+    binding: "CONTENT", method: "POST", path: "/api/content/triage",
+    schema: obj({ userId: S, week: S }, ["userId"]),
+    buildBody: (i) => ({ userId: str(i, "userId"), week: opt(i, "week") }),
+    agent: {
+      write: true,
+      confirm: false,
+      summarize: (i, names) => `Put ${memberLabel(i, names)} on triage duty`,
+    },
+  },
+  /* ---------------------------- to-dos and tasks ---------------------------- */
+  // The two nouns that are the same shape and opposite audiences, and the model
+  // needs to be told which is which more than a person does — a person reads two
+  // different screens, and the assistant reads two tool descriptions.
+  {
+    name: "list_todos",
+    summary:
+      "List the things we are WAITING ON A CLIENT FOR — never our own admin, which is list_tasks. Each carries the reference the client quotes, the due date, whether they have completed it and the file they sent if there is one. `view` is 'open' by default; pass 'all' to include the completed. `accountId` narrows to one client.",
+    binding: "CONTENT", method: "GET", path: "/api/content/todos",
+    schema: obj({ accountId: S, view: S }),
+    buildQuery: (i) => {
+      const q: string[] = []
+      for (const k of ["accountId", "view"]) if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
+      return q.length ? `?${q.join("&")}` : ""
+    },
+    agent: { write: false, summarize: () => "List what we're waiting on clients for" },
+  },
+  {
+    name: "raise_todo",
+    summary:
+      "Ask a client for something — `accountId` says which client and `title` says what we need. A to-do sits in THEIR portal with a due date, and they complete it and attach a file themselves. Use it only for something we genuinely cannot proceed without; our own admin is create_task and a piece of delivery work is create_story.",
+    binding: "CONTENT", method: "POST", path: "/api/content/todos",
+    schema: obj({ accountId: S, title: S, detail: S, dueOn: S, ticketId: S }, ["accountId", "title"]),
+    buildBody: (i) => ({
+      accountId: str(i, "accountId"),
+      title: str(i, "title"),
+      detail: opt(i, "detail"),
+      dueOn: opt(i, "dueOn"),
+      ticketId: opt(i, "ticketId"),
+    }),
+    agent: {
+      write: true,
+      // CONFIRM, and it is the only CONSTRUCTIVE write in the work engine that
+      // does. This door SENDS EMAIL to a client — one of two in the whole product
+      // that reach outside the building — from the team's verified sender, and
+      // the model reaches it while reading text a client wrote. A wrong story is
+      // a row somebody deletes; a wrong to-do is a demand in a customer's inbox.
+      confirm: true,
+      summarize: (i, names) =>
+        `Ask ${accountLabel(i, "accountId", names)} for "${str(i, "title").slice(0, 50)}" — this emails them`,
+    },
+  },
+  {
+    name: "complete_todo",
+    summary:
+      "Mark a to-do done, by id. Usually the client does this themselves in their portal; a staff member does it when the thing arrived another way (on the phone, by email). Completing an already-completed to-do changes nothing.",
+    binding: "CONTENT", method: "POST", path: "/api/content/todos/complete",
+    schema: obj({ id: S }, ["id"]),
+    // The file half is NOT on this surface — see NARROWED_BODY_FIELDS.
+    buildBody: (i) => ({ id: str(i, "id") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Mark to-do ${str(i, "id")} done` },
+  },
+  {
+    name: "cancel_todo",
+    summary:
+      "Withdraw a to-do we no longer need, by id. Nothing is deleted — it leaves the client's list and the decision stays on the record. Their side is simply told nothing, which is the point: an email saying 'ignore the last email' is worse than silence.",
+    binding: "CONTENT", method: "POST", path: "/api/content/todos/cancel",
+    schema: obj({ id: S }, ["id"]),
+    buildBody: (i) => ({ id: str(i, "id") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Withdraw to-do ${str(i, "id")}` },
+  },
+  {
+    name: "list_tasks",
+    summary:
+      "List KWAPSO'S OWN internal admin — never anything a client sees, which is list_todos. `view` is 'open' by default; pass 'all' for the finished ones. `assigneeId` narrows to one person's.",
+    binding: "CONTENT", method: "GET", path: "/api/content/tasks",
+    schema: obj({ view: S, assigneeId: S }),
+    buildQuery: (i) => {
+      const q: string[] = []
+      for (const k of ["view", "assigneeId"]) if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
+      return q.length ? `?${q.join("&")}` : ""
+    },
+    agent: { write: false, summarize: () => "List our own admin" },
+  },
+  {
+    name: "create_task",
+    summary:
+      "Write down a piece of OUR OWN admin — the quarterly VAT return, renewing a domain, preparing next week's review. Nobody outside the agency ever sees one. `accountId` is optional and usually left off; naming a client is for admin ABOUT them (chasing an invoice), which is what puts the time in the right margin. Time can be logged against a task, unlike a to-do.",
+    binding: "CONTENT", method: "POST", path: "/api/content/tasks",
+    schema: obj({ title: S, detail: S, dueOn: S, assigneeId: S, accountId: S }, ["title"]),
+    buildBody: (i) => ({
+      title: str(i, "title"),
+      detail: opt(i, "detail"),
+      dueOn: opt(i, "dueOn"),
+      assigneeId: opt(i, "assigneeId"),
+      accountId: opt(i, "accountId"),
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Add a task: "${str(i, "title").slice(0, 50)}"` },
+  },
+  {
+    name: "set_task_done",
+    summary: "Tick a task off, or put it back (`done`: true / false), by id. Ticking a done task changes nothing.",
+    binding: "CONTENT", method: "POST", path: "/api/content/tasks/done",
+    schema: obj({ id: S, done: B }, ["id", "done"]),
+    buildBody: (i) => ({ id: str(i, "id"), done: i.done === true }),
+    agent: {
+      write: true,
+      confirm: false,
+      summarize: (i) => `${i.done === true ? "Finish" : "Reopen"} task ${str(i, "id")}`,
+    },
+  },
+  /* ---------------------------------- time ---------------------------------- */
+  // "Logging time takes too many clicks" is the thing the owner named as most
+  // likely to make him abandon this (.plans/BUILD-1 §5), and a machine surface is
+  // one of the answers to it: "start a timer on the dispatch story" said out loud
+  // is fewer clicks than any screen can be. So the assistant can start, stop and
+  // write time down — and it can NEVER edit somebody's hours, which is a
+  // different act entirely (see the note on update_work_log's absence below).
+  {
+    name: "list_work_logs",
+    summary:
+      "List rows of time — who worked on what, and for how long in whole seconds. Filters: `scope` ('mine' for the caller's own, 'all' otherwise), `targetTable` + `targetId` (the time against one story or ticket), and `userId`. Returns ONE page plus the exact `total` (rows), `totalSeconds` (the number anybody actually wants), `hasMore` and an opaque `nextCursor` — call again passing that as `cursor` to read further. Binned runaway timers are never in the list.",
+    binding: "CONTENT", method: "GET", path: "/api/content/work-logs",
+    schema: obj({ scope: S, targetTable: S, targetId: S, userId: S, cursor: S }),
+    buildQuery: (i) => {
+      const q: string[] = []
+      for (const k of ["scope", "targetTable", "targetId", "userId", "cursor"])
+        if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
+      return q.length ? `?${q.join("&")}` : ""
+    },
+    agent: { write: false, summarize: (i) => (str(i, "scope") === "mine" ? "List my time" : "List logged time") },
+  },
+  {
+    name: "list_running_timers",
+    summary:
+      "What the caller has running RIGHT NOW — one row per timer, with what it is on, when it started and how many whole seconds it has been going. `runaway` is true once one has been running more than eight hours, which is the prompt to ask what they want done about it.",
+    binding: "CONTENT", method: "GET", path: "/api/content/work-logs/running",
+    schema: obj({}),
+    buildQuery: () => "",
+    agent: { write: false, summarize: () => "Check my running timers" },
+  },
+  {
+    name: "start_timer",
+    summary:
+      "Start a timer on a story or a ticket — `targetTable` is 'stories' or 'help' and `targetId` is that row's id. Time is logged against a story, a ticket or a task and NOTHING else: never a to-do (that is the client's time, not ours) and never an account on its own. Parallel timers on different things are fine; starting a second one on the SAME thing is refused. The start moment is the server's clock, never a time you pass.",
+    binding: "CONTENT", method: "POST", path: "/api/content/work-logs/start",
+    schema: obj({ targetTable: S, targetId: S, note: S, kind: S }, ["targetTable", "targetId"]),
+    buildBody: (i) => ({
+      targetTable: str(i, "targetTable"),
+      targetId: str(i, "targetId"),
+      note: opt(i, "note"),
+      kind: opt(i, "kind"),
+    }),
+    agent: {
+      write: true,
+      confirm: false,
+      summarize: (i) => `Start a timer on ${str(i, "targetTable") === "help" ? "ticket" : "story"} ${str(i, "targetId")}`,
+    },
+  },
+  {
+    name: "stop_timer",
+    summary:
+      "Stop one of the caller's running timers, by the timer's id (from list_running_timers). `endedAt` is optional and is how 'it really stopped at five o'clock on Friday' is said — leave it off and it stops now. Stopping an already-stopped timer changes nothing.",
+    binding: "CONTENT", method: "POST", path: "/api/content/work-logs/stop",
+    schema: obj({ id: S, endedAt: S }, ["id"]),
+    buildBody: (i) => ({ id: str(i, "id"), endedAt: opt(i, "endedAt") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Stop timer ${str(i, "id")}` },
+  },
+  {
+    name: "log_time",
+    summary:
+      "Write time down by hand, for work already finished. `startedAt` and `endedAt` are ISO moments and the duration is computed FROM them — there is no field for a number of hours, because two moments can be checked afterwards and a number cannot. `billable` defaults to true. Same targets as start_timer: a story or a ticket, never a to-do and never an account.",
+    binding: "CONTENT", method: "POST", path: "/api/content/work-logs",
+    schema: obj(
+      { targetTable: S, targetId: S, startedAt: S, endedAt: S, note: S, kind: S, billable: B },
+      ["targetTable", "targetId", "startedAt", "endedAt"]
+    ),
+    buildBody: (i) => ({
+      targetTable: str(i, "targetTable"),
+      targetId: str(i, "targetId"),
+      startedAt: str(i, "startedAt"),
+      endedAt: str(i, "endedAt"),
+      note: opt(i, "note"),
+      kind: opt(i, "kind"),
+      // R22 — forwarded ALWAYS, never conditionally. An `undefined` here would
+      // mean the door never sees the field a caller deliberately set, and the
+      // door's own default (billable on) would quietly overrule them.
+      billable: i.billable !== false,
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Log time on ${str(i, "targetId")}` },
+  },
+  {
+    name: "resolve_runaway_timer",
+    summary:
+      "Answer for a timer left running (from list_running_timers, where `runaway` is true). Three answers and no fourth — `answer`: 'keep' (it really did run that long; stop it now), 'stopAt' (it ran until the moment in `at`), or 'discard' (nothing happened; the row is kept and marked binned, and every total subtracts it). Nothing is ever stopped automatically: a number a person did not choose is a number nobody can defend.",
+    binding: "CONTENT", method: "POST", path: "/api/content/work-logs/runaway",
+    schema: obj({ id: S, answer: S, at: S }, ["id", "answer"]),
+    buildBody: (i) => ({ id: str(i, "id"), answer: str(i, "answer"), at: opt(i, "at") }),
+    agent: {
+      write: true,
+      // CONFIRM on the destructive answer only. "Keep" and "stop it at five" are
+      // ordinary stops; "discard" strikes hours off a timesheet, which is the one
+      // answer somebody would want to have been asked about.
+      confirm: (i) => str(i, "answer") === "discard",
+      summarize: (i) =>
+        str(i, "answer") === "discard"
+          ? `Bin the runaway timer ${str(i, "id")}`
+          : `Stop the runaway timer ${str(i, "id")}`,
+    },
+  },
+  {
+    name: "set_timer_auto_stop",
+    summary:
+      "The caller's OWN preference: does starting a timer stop the ones they already have running? Off by default, because working on two things in a morning is ordinary and a setting that silently stopped the other one would be discovered by losing an hour.",
+    binding: "CONTENT", method: "POST", path: "/api/content/work-logs/auto-stop",
+    schema: obj({ on: B }, ["on"]),
+    buildBody: (i) => ({ on: i.on === true }),
+    agent: {
+      write: true,
+      confirm: false,
+      summarize: (i) => `Turn auto-stop ${i.on === true ? "on" : "off"} for my timers`,
+    },
+  },
   /* ------------------------------- knowledge ------------------------------- */
   // THE ASSISTANT IS NOT JUST A READER HERE (the owner's own words): it can ask
   // the knowledge base a question AND add, correct or take away a source — each
@@ -1294,6 +1702,36 @@ export const TOOL_GATES: Record<string, string> = {
   rank_help_ticket: "help:edit",
   archive_help_ticket: "help:edit",
   reply_help_ticket: "help:read",
+  // Answering is a status move, so it sits on the same right every other move
+  // does — and the door refuses a portal caller, because "resolved" is our word.
+  resolve_help_ticket: "help:edit",
+  // THE WORK ENGINE. One module for stories and the sprints they sit in, and no
+  // client login holds it — so unlike the ticket doors above, the question "what
+  // happens when a contact reaches this?" has a shorter answer here: the door
+  // refuses them (refusePortalCaller), whatever an owner ticks.
+  create_story: "work:create",
+  update_story: "work:edit",
+  set_story_status: "work:edit",
+  rank_story: "work:edit",
+  create_sprint: "work:create",
+  complete_sprint: "work:edit",
+  raise_todo: "todos:create",
+  complete_todo: "todos:edit",
+  cancel_todo: "todos:delete",
+  create_task: "work:create",
+  set_task_done: "work:edit",
+  // The rota is about TICKETS, so it gates with them. `help:edit` is a right the
+  // seeded Client role does not hold — and the door refuses a portal caller
+  // anyway, because an unread backlog is our failure and not an SLA.
+  set_triage_duty: "help:edit",
+  // TIME. Logging your OWN is a create, not an edit — a person who may do the
+  // work may say how long it took them. Correcting a row that already exists is
+  // `work:edit`, and there is deliberately no tool on that door (see MCP.md).
+  start_timer: "work:create",
+  stop_timer: "work:create",
+  log_time: "work:create",
+  resolve_runaway_timer: "work:create",
+  set_timer_auto_stop: "work:create",
   // The AGENT-ONLY writes (no MCP tool — they're built around the confirm panel a
   // headless client hasn't got). Listed for the same reason as the rest: the gate
   // is what isPrivilegeWrite reads, and a write with no line is a write the PATH

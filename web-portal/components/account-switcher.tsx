@@ -114,6 +114,13 @@ export function AccountSwitcher({
       // Left cached, the header would name one company over another company's
       // savings — the one-at-a-time confusion, wearing its most quotable form.
       invalidate(cacheKeys.value)
+      // WHAT WE ARE WAITING ON, AND WHAT THEY BOUGHT — both are lists of one
+      // company's rows, and both would otherwise be the previous company's under
+      // the new company's name. The to-do list is the worse of the two: it is a
+      // list somebody ACTS on, so a stale one is not a wrong screen, it is a
+      // person sending us another client's logo.
+      invalidate(cacheKeys.todos)
+      invalidate(cacheKeys.delivery)
       // Dropping a cache marks it stale; this re-reads it. The shell holds the
       // context inside its session read, so the header, this menu's tick and
       // every screen below repaint from one call.

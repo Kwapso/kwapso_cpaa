@@ -211,6 +211,8 @@ export const CATALOG_EXEMPT: Record<string, string> = {
     "a source is either TYPED here — and indexed in the same call, because the owner asked for instant syncing, which costs one embedding per chunk — or MIRRORED from a row the app already owns and kept in step by the sweep. A CSV would be a third way in with the first one's cost and neither one's upkeep: the importer writes row by row through the module's own gated create door, so a 5,000-row file would be 5,000 chunkings and 5,000 model calls inside one request, against a €50/month ceiling. The in-rule answer to 'we have a spreadsheet of process notes' is to point the sweep at where they already live, or to import them into the module they belong to and let the mirror do it.",
   processes:
     "a process map's numbers are AGREED estimates — a time a client and a staff member settled together, in front of each other, about the client's own work. Every savings figure in the app is a subtraction of two of them, so a CSV would import estimates nobody agreed and produce figures nobody can defend, which is the exact failure this module exists to prevent. A map is authored a step at a time, with the person whose work it describes.",
+  todos:
+    "a to-do is a REQUEST WE MAKE OF A CLIENT, and raising one emails them. It is one of only two things in the whole product that reaches a client's inbox (BUILD-1 §7), and an import is the one shape of write that produces hundreds at once — a spreadsheet of forty rows would be forty emails into somebody's morning, from our own verified sender, before anybody had read the file back. The write it would replace is a title and a date typed while you are already talking to them. Stories ARE importable, for the opposite reason: nothing about a story leaves the building.",
   commercials:
     "a rate card is a commercial agreement and an internal rate is the agency's own cost. A bulk overwrite of either silently changes what a client is charged or what a margin says, with no conversation attached and no one row to point at afterwards — and the write it would replace is four fields typed once a year.",
 }
@@ -308,6 +310,10 @@ export const PORTAL_VISIBLE_READS: Record<string, { fence: string | null; why: s
     fence: "getTicket",
     why: "a stakeholder set is a PROPERTY of a ticket, so the fenced getTicket decides visibility first and an invisible ticket yields an empty set — otherwise the door names staff admins and another client's colleagues by ticket id alone.",
   },
+  "workers/content/src/lib/todos.ts": {
+    fence: "accountScopeClause",
+    why: "a to-do is the ONE row in the work engine a client login both reads and writes, so this is the only file in that build carrying a fence rather than a flat refusal. Every exported reader takes the caller's AccountScope and every statement — including the completing UPDATE, which a source-scan case in workers/content/test/todos-tasks.test.ts holds there — ANDs it in. `clientSprints` lives here for the same reason: it is the client's own SHAPE of a sprint (a named block with dates and two counts), with nowhere to put a price and no story titles in it, so a shape that cannot carry the number is doing half the fencing.",
+  },
   "workers/tenancy/src/lib/rates.ts": {
     fence: "accountScopeClause",
     why: "what an account is CHARGED per hour. The rate-card DOOR refuses a client login outright — it answers with every account's card, the retired lines and the audit block naming who set the price — but the value door reads this file to PROJECT the live lines for one account, and only when that account's price visibility is switched on. So the same fence the accounts list carries rides these statements too: a client login can only ever be shown their own company's rates. What our own hour COSTS us is a different table in a different file, and no client-reachable path touches it (R23).",
@@ -378,6 +384,19 @@ export const PORTAL_VISIBLE_WRITES: Record<string, { fence: string | null; why: 
     why: "appends to a ticket named by a caller-supplied id — so the fence decides whose ticket it is BEFORE a word is appended, and answers 404 rather than 403 so 'not yours' never confirms the ticket exists. A reply cannot be un-appended.",
   },
 
+  "POST /api/content/help/update": {
+    fence: "accountScope",
+    why: "corrects a ticket named by a caller-supplied id — so the fence decides whose it is BEFORE a word changes, and two more rules ride the same UPDATE: it must still be UNLOCKED (nobody here has read it) and it must be THEIRS, because a contact now sees a colleague's question and being allowed to read one is not being allowed to rewrite it. SCOPE ch.07: the account owns the wording until the first staff touch.",
+  },
+  "POST /api/content/help/rank": {
+    fence: "accountScope",
+    why: "drags one of their company's requests into the order they want them in — SCOPE ch.07's 'a client may re-rank their own company's tickets'. Both NEIGHBOUR ids are resolved through the same fence, so a client cannot pin their ticket next to one they cannot see (which would be an oracle for whether an id exists, and a way to learn another company's ordering); and the LOCK rides the UPDATE, so the order stops being theirs the moment we pick it up. The right this needs — `help:edit` — is the reason the STATUS and ARCHIVE doors now refuse a portal caller outright: the same grant would otherwise have let a contact resolve their own request.",
+  },
+  "POST /api/content/todos/complete": {
+    fence: "accountScope",
+    why: "the client's own act, on a row we created and named their company on: they mark it done and attach the one file we asked for. The fence decides whose to-do it is before anything is written and answers 404 rather than 403, so 'not yours' never confirms it exists. The file is capped and parsed at the boundary through the same seam every upload in the base uses, and its key carries a random ULID segment because the gateways serve /media with no session.",
+  },
+
   // ── the process map ────────────────────────────────────────────────────────
   "POST /api/tenancy/processes/comments": {
     fence: "accountScope",
@@ -441,6 +460,22 @@ export const PORTAL_ACTIVITY_FENCE: Record<string, { fence: "account" | null; wh
   process_comments: { fence: null, why: "the conversation itself is fenced and readable; its history would name the staff author of every line, which the ticket thread already withholds" },
   account_rates: { fence: null, why: "who set a client's price, and what it was before — the agency's own commercial record, even about their own rate" },
   internal_rates: { fence: null, why: "what our own hour costs. The one figure SCOPE says a client must never see under any flag, ever — its history least of all (R23)" },
+
+  // THE WORK ENGINE. Not "a client may not see enough of this" — a client may
+  // not see ANY of it, and the rows themselves are already refused at every door
+  // (routes/stories.ts opens with refusePortalCaller). A story's history says
+  // "Ana moved BERG-S0188 to in review", which is the staff member SCOPE ch.06
+  // says the portal never names, attached to the work they are doing. What a
+  // client sees of a story is a COUNT on their own ticket.
+  stories: { fence: null, why: "a story's history names the staff member doing the work and what they were asked to change — the client sees a count of the work on their own request, never a title, an assignee or a date" },
+  triage_duty: { fence: null, why: "the agency's own rota. Its rows say who was meant to be reading the client's questions in a given week, which is both a fact about our staff and a record of when we were slow — the two things SCOPE ch.06 and BUILD-1 §6 respectively keep off the client's side" },
+  tasks: { fence: null, why: "our own internal admin — the quarterly VAT return, a domain renewal. A client login cannot reach a single door on the table, let alone its history" },
+  todos: {
+    fence: null,
+    why: "a to-do's ROWS are the client's — they read theirs and complete them, fenced by accountScopeClause on every statement — but its HISTORY is ours: it names the staff member who asked for the thing and the one who withdrew it, which is the sentence SCOPE ch.06 keeps off the portal. The client is shown the to-do, its date and whether it is done, which is the part that is theirs; the portal ships no activity feed to put the rest in (PORTAL_ACTIVITY_EXEMPT).",
+  },
+  work_logs: { fence: null, why: "how long one of our people took over a piece of work, and who corrected the figure afterwards. It is the input to the agency's own margin, and the hours behind a price are never the client's to read — they see the VALUE the work produced (the savings drilled through their process map) and not what it cost us to produce it" },
+  sprints: { fence: null, why: "a sprint's history names who priced it and what the price was before. The client is shown the sprint as a NAMED BLOCK WITH DATES because it is what they bought (BUILD-1 §7); the record of us changing our minds about it is ours" },
 }
 
 /** R2 on the CLIENT surface — the reasoned exemption, not a quiet skip.
@@ -490,6 +525,23 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
   process_comments: "processes",
   account_rates: "commercials",
   internal_rates: "commercials",
+  // Time gates on the same module as the work it is against — a row of hours is
+  // not a separate kind of record from the story it belongs to, it is that
+  // story's cost. A client login holds neither.
+  work_logs: "work",
+  // A TASK is our own admin, so it gates with the rest of the work engine. A
+  // TO-DO is aimed at a client and is the one module in this build a client login
+  // is meant to hold — so it gates on its own.
+  tasks: "work",
+  todos: "todos",
+  // The rota is about TICKETS — whose week it is to read them — so its history
+  // gates with the module the tickets themselves do.
+  triage_duty: "help",
+  // The work engine. A story and the sprint it sits in are one record from a
+  // reader's point of view — a piece of work and the block it was sold inside —
+  // so both gate on `work`, the module a client login never holds.
+  stories: "work",
+  sprints: "work",
 }
 
 /** R15 — reviewed DEAF exemptions: resources a worker publishes that reach NO
@@ -560,6 +612,23 @@ export const GROWING_COLLECTIONS: Record<
     listRecipe: "processes.list",
     webKey: "processesKey(",
     why: "every app of every client grows maps, and every map is kept rather than replaced — a process is archived, never deleted, because the savings computed from its baseline have to stay checkable years later. An agency two years in has more of these than it has clients, and the oldest is the one a client is most likely to ask about",
+  },
+  workLogs: {
+    lib: "workers/content/src/lib/work-logs.ts",
+    fn: "listWorkLogs",
+    routes: "workers/content/src/routes/work-logs.ts",
+    rowsKey: "logs",
+    webKey: "workLogsKey(",
+    why: "the fastest-growing row in the work engine — 2,940 arrived from two years of the previous system and the rate only goes up, because every piece of work produces several. A ceiling here would eventually be a refusal to show somebody their own week",
+  },
+  stories: {
+    lib: "workers/content/src/lib/stories.ts",
+    fn: "listStories",
+    routes: "workers/content/src/routes/stories.ts",
+    rowsKey: "stories",
+    listRecipe: "work.list",
+    webKey: "storiesKey(",
+    why: "one piece of work per thing we do, kept forever — the two years arriving from Glide are 3,677 rows on day one, and a done story is never deleted because the savings and the margin computed from it have to stay checkable. SPRINTS are deliberately NOT here beside it: a sprint is a block of SOLD work, so that collection grows at the speed of contracts rather than of clicks and a hard ceiling is an honest answer",
   },
 }
 
@@ -676,4 +745,21 @@ export const FORM_DIALOGS = [
   "app-form-dialog",
   "process-form-dialog",
   "step-form-dialog",
+  // The work engine. The story form is the one a person opens most often in a
+  // day, so a draft lost to a mis-tap is the most expensive kind here; the
+  // sprint form collects a PRICE, which is the other kind.
+  "story-form-dialog",
+  "sprint-form-dialog",
+  // Logging time by hand. A draft matters here for a reason the others do not
+  // have: the two moments are remembered, not looked up, and a person who loses
+  // them to a mis-tap has to remember them again.
+  "time-form-dialog",
+  // The two nouns beside each other. The to-do form is the only one in the
+  // agency app whose Save reaches into a customer's inbox, so it says so.
+  "todo-form-dialog",
+  "task-form-dialog",
+  // Answering a ticket. It opens pre-filled from the draft each story's closing
+  // note has been building, and pressing its button emails a customer — so
+  // losing what somebody typed into it is the most expensive draft loss here.
+  "resolve-dialog",
 ] as const

@@ -64,3 +64,31 @@ export function queryText(
 ): string | undefined {
   return optionalText(value, field, max)
 }
+
+/** A MOMENT IN TIME at the boundary — required.
+ *
+ * It lives here rather than beside the work logs that needed it first because it
+ * is the same kind of thing as the three above: a type check, a cap, and a clean
+ * 400 instead of a 500. `Date.parse` accepts a great deal of nonsense and returns
+ * NaN for the rest, and NaN reaching a duration is an hour that never happened
+ * sitting in a total nobody can explain.
+ *
+ * NORMALISED on the way out, deliberately: whatever spelling arrived, what gets
+ * written is an ISO string in UTC. Two rows that mean the same instant must not
+ * sort differently because one of them said "+02:00". */
+export function requireMoment(value: unknown, field: string): string {
+  const text = requireText(value, field, TEXT_LIMITS.short)
+  const ms = Date.parse(text)
+  if (!Number.isFinite(ms)) throw new GuardError(400, "invalid_input", `${field} isn't a date and time.`)
+  return new Date(ms).toISOString()
+}
+
+/** The optional half: absent or blank → undefined; anything present must be a
+ * real moment. */
+export function optionalMoment(value: unknown, field: string): string | undefined {
+  const text = optionalText(value, field, TEXT_LIMITS.short)
+  if (text === undefined) return undefined
+  const ms = Date.parse(text)
+  if (!Number.isFinite(ms)) throw new GuardError(400, "invalid_input", `${field} isn't a date and time.`)
+  return new Date(ms).toISOString()
+}

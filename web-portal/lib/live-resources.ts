@@ -29,6 +29,9 @@ export const cacheKeys = {
   thread: (ticketId: string) => `portal:thread:${ticketId}`,
   threadTotal: (ticketId: string) => `portal:thread:${ticketId}:total`,
   value: "portal:value",
+  /** What we are waiting on them for, and what they bought. */
+  todos: "portal:todos",
+  delivery: "portal:delivery",
   processComments: (processId: string) => `portal:process-comments:${processId}`,
 }
 
@@ -44,6 +47,13 @@ export const PORTAL_LISTENERS: Record<string, (currentAccountId: string | null) 
   accounts: (a) => (a ? [cacheKeys.company(a)] : []),
   account_links: (a) => (a ? [cacheKeys.company(a)] : []),
   portal_users: (a) => (a ? [cacheKeys.company(a), cacheKeys.context] : []),
+  // A to-do we raised, withdrew, or that a colleague of theirs just completed.
+  todos: () => [cacheKeys.todos],
+  // A story moving changes the two counts on their ticket rows AND the "3 of 8
+  // done" on the sprint block they bought — neither of which they can see the
+  // inside of, and both of which they watch.
+  stories: () => [cacheKeys.tickets, cacheKeys.delivery],
+  sprints: () => [cacheKeys.delivery],
   // A comment on one of their process maps — theirs or ours. The whole value
   // read is dropped rather than the one conversation, because the comment that
   // just landed may be the explanation for a step that got slower, and that

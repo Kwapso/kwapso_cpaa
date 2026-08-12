@@ -27,6 +27,8 @@ import { useTickets } from "@/lib/tickets"
 import { CollectionHeading } from "@/components/collection-heading"
 import { RaiseTicketDialog } from "@/components/raise-ticket-dialog"
 import { TicketRow } from "@/components/ticket-row"
+import { WaitingOnYou } from "@/components/waiting-on-you"
+import { DeliveryBlock } from "@/components/delivery-block"
 import type { PortalReady } from "@/components/portal-shell"
 
 /** How many tickets Home shows before handing over to Tickets. Three is enough
@@ -63,6 +65,13 @@ export function HomeScreen({ ready }: { ready: PortalReady }) {
           {company ? `This is everything we're doing for ${company}.` : "This is your work with us."}
         </p>
       </div>
+
+      {/* IS ANYONE WAITING ON ME? — first, above their own requests and above
+          the button, because it is the only thing on this screen they can
+          finish in the next minute. Both panels render NOTHING when they are
+          empty, so a client with nothing outstanding sees the screen they saw
+          before this shipped. */}
+      <WaitingOnYou />
 
       <Button size="lg" className="w-full" onClick={() => setRaising(true)}>
         <Plus className="size-3.5" />
@@ -103,6 +112,11 @@ export function HomeScreen({ ready }: { ready: PortalReady }) {
           </div>
         )}
       </section>
+
+      {/* WHAT THEY BOUGHT, under what they asked — the blocks are the frame the
+          requests sit inside, and reading them in that order is how somebody
+          explains their own engagement out loud. */}
+      <DeliveryBlock />
 
       <RaiseTicketDialog
         open={raising}

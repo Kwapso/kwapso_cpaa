@@ -19,9 +19,74 @@ import type {
   KnowledgeSource,
   Learning,
   LearningProgressEntry,
+  RunningTimer,
+  Sprint,
+  Story,
+  Task,
+  Todo,
+  WorkLog,
 } from "@shared/types"
 import { api, enc, post } from "@shared/web/api"
 import type { PagedResponse } from "@shared/web/api"
+
+/** The facets the story list door parses — mirrored here so a caller cannot
+ * invent one the server ignores in silence. */
+export type StoryQuery = {
+  status?: Story["status"]
+  ticketId?: string
+  sprintId?: string
+  assigneeId?: string
+  /** "all" includes finished work; the default backlog view hides it. */
+  view?: "open" | "all"
+}
+
+/** What a story create / edit may set. */
+export type StoryWrite = {
+  title: string
+  detail?: string
+  ticketId?: string
+  sprintId?: string
+  appId?: string
+  processId?: string
+  stepKey?: string
+  changesNoStep?: boolean
+  assigneeId?: string
+  reviewerId?: string
+  startsOn?: string
+  dueOn?: string
+  accountId?: string
+}
+
+/** The facets the work-log list door parses. */
+export type LogQuery = {
+  scope?: "mine" | "all"
+  targetTable?: string
+  targetId?: string
+  userId?: string
+}
+
+function logQuery(filter: LogQuery | undefined, cursor: string | null | undefined): string {
+  const q = new URLSearchParams()
+  if (filter?.scope) q.set("scope", filter.scope)
+  if (filter?.targetTable) q.set("targetTable", filter.targetTable)
+  if (filter?.targetId) q.set("targetId", filter.targetId)
+  if (filter?.userId) q.set("userId", filter.userId)
+  if (cursor) q.set("cursor", cursor)
+  const s = q.toString()
+  return s ? `?${s}` : ""
+}
+
+function storyQuery(filter: StoryQuery | undefined, cursor: string | null | undefined): string {
+  const q = new URLSearchParams()
+  if (filter?.status) q.set("status", filter.status)
+  if (filter?.ticketId) q.set("ticketId", filter.ticketId)
+  if (filter?.sprintId) q.set("sprintId", filter.sprintId)
+  if (filter?.assigneeId) q.set("assigneeId", filter.assigneeId)
+  if (filter?.view) q.set("view", filter.view)
+  if (cursor) q.set("cursor", cursor)
+  const s = q.toString()
+  return s ? `?${s}` : ""
+}
 
 /** Content worker — Learning + Tickets (team-DB content modules). */
 export const content = {
@@ -64,10 +129,144 @@ export const content = {
     api<{ tickets: HelpTicket[] }>("/api/content/help/status", post({ id, status })),
   replyHelp: (helpId: string, body: string, taggedUserIds?: string[]) =>
     api<{ replies: HelpMessage[]; total: number }>("/api/content/help/reply", post({ helpId, body, taggedUserIds })),
+  /** ANSWER IT: resolve the ticket, add the words to its conversation, and email
+   * the client. One call, because they are one act — and `alreadyResolved` comes
+   * back rather than a second email when the answer has already gone. */
+  resolveHelp: (id: string, resolution: string) =>
+    api<{ sent: boolean; alreadyResolved: boolean }>("/api/content/help/resolve", post({ id, resolution })),
   helpStakeholders: (id: string) =>
     api<{ stakeholders: HelpStakeholder[] }>(`/api/content/help/stakeholders?id=${enc(id)}`),
   addStakeholder: (id: string, userId: string) =>
     api<{ stakeholders: HelpStakeholder[] }>("/api/content/help/stakeholders", post({ id, userId })),
+
+  /* --------------------------- the work engine ----------------------------- */
+  /** R14: a PAGE of stories (a GROWING collection) — hand `nextCursor` back to
+   * get the next one. `total`/`mineTotal` are the exact server counts, taken
+   * over the SAME filter the page came from. */
+  stories: (opts: { filter?: StoryQuery; cursor?: string | null } = {}) =>
+    api<PagedResponse<{ stories: Story[]; mineTotal: number }>>(
+      `/api/content/stories${storyQuery(opts.filter, opts.cursor)}`
+    ),
+  storyOne: (id: string) =>
+    api<{ stories: Story[] }>(`/api/content/stories?id=${enc(id)}`).then((r) => r.stories[0] ?? null),
+  createStory: (input: StoryWrite) => api<{ stories: Story[] }>("/api/content/stories", post(input)),
+  updateStory: (input: StoryWrite & { id: string }) =>
+    api<{ stories: Story[] }>("/api/content/stories/update", post(input)),
+  setStoryStatus: (id: string, status: Story["status"], closingNote?: string) =>
+    api<{ stories: Story[] }>("/api/content/stories/status", post({ id, status, closingNote })),
+  rankStory: (id: string, afterId: string | null, beforeId: string | null) =>
+    api<{ stories: Story[] }>("/api/content/stories/rank", post({ id, afterId, beforeId })),
+  sprints: (accountId?: string) =>
+    api<{ sprints: Sprint[]; total: number }>(
+      `/api/content/sprints${accountId ? `?accountId=${enc(accountId)}` : ""}`
+    ),
+  sprintOne: (id: string) =>
+    api<{ sprints: Sprint[] }>("/api/content/sprints").then(
+      (r) => r.sprints.find((s) => s.id === id) ?? null
+    ),
+  createSprint: (input: {
+    name: string
+    goal?: string
+    sprintType?: string
+    accountId?: string
+    appId?: string
+    startsOn?: string
+    endsOn?: string
+    soldPriceCents?: number
+    currency?: string
+  }) => api<{ sprints: Sprint[]; total: number }>("/api/content/sprints", post(input)),
+  setSprintComplete: (id: string, complete: boolean) =>
+    api<{ sprints: Sprint[]; total: number }>("/api/content/sprints/complete", post({ id, complete })),
+
+  /* --------------------------------- triage --------------------------------- */
+  /** Whose week it is, and the requests nobody has read past three days. One
+   * door, because the screen asks them as one question. Internal only — the door
+   * refuses a client login. */
+  triage: (week?: string) =>
+    api<{
+      onDuty: { userId: string; userName: string | null; weekStart: string } | null
+      waiting: { id: string; ref: string | null; description: string; createdAt: string; days: number }[]
+      total: number
+    }>(`/api/content/triage${week ? `?week=${enc(week)}` : ""}`),
+  setTriageDuty: (userId: string, week?: string) =>
+    api<{ onDuty: { userId: string; userName: string | null } | null; total: number }>(
+      "/api/content/triage",
+      post({ userId, week })
+    ),
+
+  /* ---------------------------- to-dos and tasks ---------------------------- */
+  /** What we are waiting on a client for. Fenced: a client login sees their own
+   * company's. Bounded rather than paged — a to-do is a thing we are WAITING on. */
+  todos: (opts: { accountId?: string; view?: "open" | "all" } = {}) =>
+    api<{ todos: Todo[]; total: number }>(
+      `/api/content/todos${opts.accountId || opts.view ? `?${new URLSearchParams({ ...(opts.accountId ? { accountId: opts.accountId } : {}), ...(opts.view ? { view: opts.view } : {}) }).toString()}` : ""}`
+    ),
+  todoOne: (id: string) =>
+    api<{ todos: Todo[] }>("/api/content/todos?view=all").then((r) => r.todos.find((t) => t.id === id) ?? null),
+  raiseTodo: (input: { accountId: string; title: string; detail?: string; dueOn?: string; ticketId?: string }) =>
+    api<{ todos: Todo[]; total: number }>("/api/content/todos", post(input)),
+  /** The client's own act — mark it done, and attach the one file they were asked
+   * for. `fileDataUrl` is a base64 data URL; the door caps and parses it. */
+  completeTodo: (id: string, file?: { dataUrl: string; name: string }) =>
+    api<{ todo: Todo }>(
+      "/api/content/todos/complete",
+      post({ id, fileDataUrl: file?.dataUrl, fileName: file?.name })
+    ),
+  cancelTodo: (id: string) => api<{ todos: Todo[]; total: number }>("/api/content/todos/cancel", post({ id })),
+  tasks: (view?: "open" | "all") =>
+    api<{ tasks: Task[]; total: number }>(`/api/content/tasks${view ? `?view=${view}` : ""}`),
+  taskOne: (id: string) =>
+    api<{ tasks: Task[] }>("/api/content/tasks?view=all").then((r) => r.tasks.find((t) => t.id === id) ?? null),
+  createTask: (input: { title: string; detail?: string; dueOn?: string; assigneeId?: string; accountId?: string }) =>
+    api<{ tasks: Task[]; total: number }>("/api/content/tasks", post(input)),
+  setTaskDone: (id: string, done: boolean) =>
+    api<{ tasks: Task[]; total: number }>("/api/content/tasks/done", post({ id, done })),
+
+  /* ---------------------------------- time ---------------------------------- */
+  /** R14: a PAGE of time. `total` is the row count and `totalSeconds` is the
+   * number anybody actually reads — both exact, both over the same filter. */
+  workLogs: (opts: { filter?: LogQuery; cursor?: string | null } = {}) =>
+    api<PagedResponse<{ logs: WorkLog[]; totalSeconds: number }>>(
+      `/api/content/work-logs${logQuery(opts.filter, opts.cursor)}`
+    ),
+  /** One row of time, read back off its own page — there is no by-id door,
+   * because a work log is only ever read in a list of its neighbours. */
+  workLogOne: (id: string) =>
+    api<PagedResponse<{ logs: WorkLog[]; totalSeconds: number }>>("/api/content/work-logs").then(
+      (r) => r.logs.find((l) => l.id === id) ?? null
+    ),
+  runningTimers: () => api<{ timers: RunningTimer[] }>("/api/content/work-logs/running"),
+  startTimer: (targetTable: string, targetId: string, note?: string) =>
+    api<{ timers: RunningTimer[] }>("/api/content/work-logs/start", post({ targetTable, targetId, note })),
+  stopTimer: (id: string, endedAt?: string) =>
+    api<{ timers: RunningTimer[] }>("/api/content/work-logs/stop", post({ id, endedAt })),
+  logTime: (input: {
+    targetTable: string
+    targetId: string
+    startedAt: string
+    endedAt: string
+    note?: string
+    kind?: string
+    billable?: boolean
+  }) => api<PagedResponse<{ logs: WorkLog[]; totalSeconds: number }>>("/api/content/work-logs", post(input)),
+  updateWorkLog: (input: {
+    id: string
+    startedAt?: string
+    endedAt?: string
+    note?: string
+    kind?: string
+    billable?: boolean
+  }) =>
+    api<PagedResponse<{ logs: WorkLog[]; totalSeconds: number }>>(
+      "/api/content/work-logs/update",
+      post(input)
+    ),
+  /** The Monday morning answer: keep the whole thing, stop it at a moment you
+   * name, or bin it. Never automatic. */
+  resolveRunaway: (id: string, answer: "keep" | "stopAt" | "discard", at?: string) =>
+    api<{ timers: RunningTimer[] }>("/api/content/work-logs/runaway", post({ id, answer, at })),
+  setTimerAutoStop: (on: boolean) =>
+    api<{ ok: true; autoStop: boolean }>("/api/content/work-logs/auto-stop", post({ on })),
 
   /* ------------------------------- knowledge ------------------------------- */
   /** R14: a PAGE of sources (a GROWING collection) — hand `nextCursor` back to

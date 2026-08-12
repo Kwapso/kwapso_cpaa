@@ -131,7 +131,15 @@ describe("a module refuses a client login on both halves, or on neither", () => 
     expect(
       [...agencyOnly].sort(),
       "the modules whose reads refuse a client login — if this set shrinks, a read door lost its refusal"
-    ).toEqual(["agent", "commercials", "knowledge", "learning", "selectable_data"])
+    // `work` joined the set the day the work engine shipped, and it is the one
+    // member whose exclusion would have been most tempting: a story is ABOUT a
+    // client's request, so a fence looks plausible. It is refused instead,
+    // because of what a story ROW says rather than whose request it answers —
+    // a title, an assignee, a reviewer and a date, which together are "which
+    // staff member is doing the work", the one thing SCOPE ch.06 says the portal
+    // never shows. What a client sees of a story is a COUNT on their own ticket,
+    // served by the ticket door. `processes` is the contrast, three lines down.
+    ).toEqual(["agent", "commercials", "knowledge", "learning", "selectable_data", "work"])
     //
     // `commercials` joined the set the day the money shipped, and it is the
     // clearest member of it: BOTH rate cards and the margin are the agency's own

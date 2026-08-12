@@ -4,10 +4,13 @@
 // GuardErrors to clean HTTP responses. The shared opening (whoAmI / teamContext
 // / requireRight) lives in the shared gating seam.
 //
-// IT HAS A CRON NOW, and exactly one job: keeping the knowledge base in step
-// with the rows this worker already owns. Bounded per tick, resumable from a
-// cursor, and it records its failures (R12) — see the scheduled handler at the
-// bottom and lib/knowledge-ingest.ts for why the work is shaped that way.
+// IT HAS TWO CRONS, and the scheduled handler branches on which one fired:
+//   • every 15 minutes — keep the knowledge base in step with the rows this
+//     worker owns. Bounded per tick, resumable from a cursor;
+//   • once a morning — the triage digest: what has been sitting unread past
+//     three days, and on Mondays who logged no time last week. One message, to
+//     the person whose week it is, and never to a client.
+// Both record their failures (R12): unattended work has nobody watching.
 //
 //   GET  /api/content/learning            -> the team's learning items (?id → one)
 //   POST /api/content/learning            -> create a learning item
@@ -27,8 +30,35 @@
 //   POST /api/content/help/rank           -> drag-rank a ticket between two others
 //   POST /api/content/help/archive        -> archive / restore a ticket (any state)
 //   POST /api/content/help/reply          -> add a reply to a ticket's thread
+//   POST /api/content/help/resolve        -> answer it: resolve + reply + email them
 //   GET  /api/content/help/stakeholders   -> a ticket's stakeholders (?id=<ticketId>)
 //   POST /api/content/help/stakeholders   -> manually add a stakeholder (add-only)
+//   GET  /api/content/stories             -> the backlog (?id → one; status/ticketId/sprintId/assigneeId/view filters)
+//   POST /api/content/stories             -> write one piece of work down
+//   POST /api/content/stories/update      -> edit a story
+//   POST /api/content/stories/status      -> move a story along its four states
+//   POST /api/content/stories/rank        -> drag-rank a story between two others
+//   GET  /api/content/sprints             -> the blocks of work sold (?accountId → one client's)
+//   POST /api/content/sprints             -> start a sprint
+//   POST /api/content/sprints/complete    -> mark a sprint finished / reopen it
+//   GET  /api/content/work-logs           -> time, newest first (scope/target/user filters)
+//   GET  /api/content/work-logs/running   -> what the caller has running right now
+//   POST /api/content/work-logs           -> write time down by hand
+//   POST /api/content/work-logs/start     -> start a timer (the one click)
+//   POST /api/content/work-logs/stop      -> stop one (?endedAt = "at five on Friday")
+//   POST /api/content/work-logs/update    -> correct a row (leaves a trail)
+//   POST /api/content/work-logs/runaway   -> keep it / stop it then / bin it
+//   POST /api/content/work-logs/auto-stop -> the caller's own timer preference
+//   GET  /api/content/todos               -> what we are waiting on a client for (fenced)
+//   POST /api/content/todos               -> ask a client for something (emails them)
+//   POST /api/content/todos/complete      -> the client marks it done, with a file
+//   POST /api/content/todos/cancel        -> we stopped needing it (nothing deleted)
+//   GET  /api/content/portal/delivery     -> the client's sprints, as named blocks with dates
+//   GET  /api/content/tasks               -> our own internal admin
+//   POST /api/content/tasks               -> write down a piece of admin
+//   POST /api/content/tasks/done          -> tick it / put it back
+//   GET  /api/content/triage              -> whose week it is + the tickets nobody has read
+//   POST /api/content/triage              -> put somebody on triage duty for a week
 //   GET  /api/content/knowledge           -> the sources the assistant may read (?id → one)
 //   GET  /api/content/knowledge/ask       -> answer a question from them, with citations
 //   GET  /api/content/knowledge/sync      -> how far the sweep has got with each kind
@@ -67,7 +97,39 @@ import {
   postHelpStatus,
   postUpdateHelp,
   postBulkHelpStatusByFilter,
+  postResolveHelp,
 } from "./routes/help"
+import {
+  getSprints,
+  getStories,
+  postCreateSprint,
+  postCreateStory,
+  postSprintComplete,
+  postStoryRank,
+  postStoryStatus,
+  postUpdateStory,
+} from "./routes/stories"
+import {
+  getRunningTimers,
+  getWorkLogs,
+  postAutoStop,
+  postLogTime,
+  postResolveRunaway,
+  postStartTimer,
+  postStopTimer,
+  postUpdateWorkLog,
+} from "./routes/work-logs"
+import {
+  getTasks,
+  getTodos,
+  postCancelTodo,
+  postCompleteTodo,
+  postCreateTask,
+  postCreateTodo,
+  postTaskDone,
+  getPortalDelivery,
+} from "./routes/todos"
+import { getTriage, postSetTriageDuty } from "./routes/triage"
 import {
   getKnowledge,
   getKnowledgeAsk,
@@ -78,9 +140,16 @@ import {
   postUpdateKnowledge,
 } from "./routes/knowledge"
 import { sweepAll } from "./lib/knowledge-ingest"
+import { sendTriageDigest, teamMemberNames } from "./lib/notify"
+import { dutyFor, loggedNothingLastWeek, needsTriage } from "./lib/triage"
 import { d1ConfigFrom } from "@shared/workers/gating"
 import { CRON_TEAM_CAP } from "@shared/workers/limits"
 import { publishChange } from "@shared/workers/realtime"
+
+/** THE MORNING TICK, as the expression wrangler.jsonc registers it. Named here
+ * rather than matched by hand so the scheduled handler and the config cannot
+ * drift into a cron that fires and does nothing. */
+const DIGEST_CRON = "0 7 * * *"
 
 /**
  * THE LIVE-SYNC SEAM (locked, CACHING.md "Every mutation publishes"). Every
@@ -119,8 +188,52 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/content/help/rank": { handler: postHelpRank, kind: "mutation" },
   "POST /api/content/help/archive": { handler: postHelpArchive, kind: "mutation" },
   "POST /api/content/help/reply": { handler: postHelpReply, kind: "mutation" },
+  // COME BACK TO THE CLIENT — the second and last thing that emails one.
+  "POST /api/content/help/resolve": { handler: postResolveHelp, kind: "mutation" },
   "GET /api/content/help/stakeholders": { handler: getHelpStakeholders, kind: "read" },
   "POST /api/content/help/stakeholders": { handler: postAddStakeholder, kind: "mutation" },
+  // THE WORK ENGINE — what we DO about a request, and the block of work it was
+  // sold inside. Every one of these doors refuses a client login at the door
+  // (R21): a story names the staff member doing the work, which the portal never
+  // shows. A client's view of a story is a COUNT on their own ticket.
+  "GET /api/content/stories": { handler: getStories, kind: "read" },
+  "POST /api/content/stories": { handler: postCreateStory, kind: "mutation" },
+  "POST /api/content/stories/update": { handler: postUpdateStory, kind: "mutation" },
+  "POST /api/content/stories/status": { handler: postStoryStatus, kind: "mutation" },
+  "POST /api/content/stories/rank": { handler: postStoryRank, kind: "mutation" },
+  "GET /api/content/sprints": { handler: getSprints, kind: "read" },
+  "POST /api/content/sprints": { handler: postCreateSprint, kind: "mutation" },
+  "POST /api/content/sprints/complete": { handler: postSprintComplete, kind: "mutation" },
+  // TIME. A timer is a work log with no end yet, so there is one table and one
+  // pair of doors rather than a timer service beside a timesheet.
+  "GET /api/content/work-logs": { handler: getWorkLogs, kind: "read" },
+  "GET /api/content/work-logs/running": { handler: getRunningTimers, kind: "read" },
+  "POST /api/content/work-logs": { handler: postLogTime, kind: "mutation" },
+  "POST /api/content/work-logs/start": { handler: postStartTimer, kind: "mutation" },
+  "POST /api/content/work-logs/stop": { handler: postStopTimer, kind: "mutation" },
+  "POST /api/content/work-logs/update": { handler: postUpdateWorkLog, kind: "mutation" },
+  "POST /api/content/work-logs/runaway": { handler: postResolveRunaway, kind: "mutation" },
+  // A PRIVATE PREFERENCE about how the caller's own timers behave. It changes no
+  // record anybody else can see and no screen anybody else is looking at, so it
+  // broadcasts nothing — a reviewed housekeeping line, not a forgotten publish.
+  "POST /api/content/work-logs/auto-stop": { handler: postAutoStop, kind: "housekeeping" },
+  // THE OTHER TWO NOUNS. A to-do is aimed at the CLIENT (fenced, and two of its
+  // doors are on the portal's surface); a task is our own admin (refused to a
+  // client login, like the rest of the work engine).
+  "GET /api/content/todos": { handler: getTodos, kind: "read" },
+  "POST /api/content/todos": { handler: postCreateTodo, kind: "mutation" },
+  "POST /api/content/todos/complete": { handler: postCompleteTodo, kind: "mutation" },
+  "POST /api/content/todos/cancel": { handler: postCancelTodo, kind: "mutation" },
+  // The CLIENT's own picture of the work they bought — named blocks with dates
+  // and two counts, in a shape that has nowhere to put a price.
+  "GET /api/content/portal/delivery": { handler: getPortalDelivery, kind: "read" },
+  "GET /api/content/tasks": { handler: getTasks, kind: "read" },
+  "POST /api/content/tasks": { handler: postCreateTask, kind: "mutation" },
+  "POST /api/content/tasks/done": { handler: postTaskDone, kind: "mutation" },
+  // TRIAGE — whose week it is, and what has been sitting unread. Both refused to
+  // a client login: an unread request is our failure, not an SLA we promised.
+  "GET /api/content/triage": { handler: getTriage, kind: "read" },
+  "POST /api/content/triage": { handler: postSetTriageDuty, kind: "mutation" },
   "GET /api/content/knowledge": { handler: getKnowledge, kind: "read" },
   "GET /api/content/knowledge/ask": { handler: getKnowledgeAsk, kind: "read" },
   "GET /api/content/knowledge/sync": { handler: getKnowledgeSync, kind: "read" },
@@ -173,7 +286,13 @@ export default {
    *
    * R12: every failure is recorded — per team, so one broken database cannot
    * hide the rest, and the sweep goes on to the next one. */
-  async scheduled(_controller, env): Promise<void> {
+  async scheduled(controller, env): Promise<void> {
+    // TWO CRONS, ONE HANDLER. The sweep runs every fifteen minutes and the digest
+    // once a morning, so the tick tells us which job it is. Branching on the
+    // EXPRESSION rather than on a clock reading is what keeps that honest: "is it
+    // about 7am?" is a question with a different answer in every timezone and a
+    // wrong one whenever a tick is late.
+    if (controller.cron === DIGEST_CRON) return morningDigest(env)
     let teams: { id: string; database_id: string }[] = []
     try {
       const rows = await env.DB.prepare(
@@ -222,3 +341,78 @@ export default {
     }
   },
 } satisfies ExportedHandler<Env>
+
+/** THE MORNING DIGEST (.plans/BUILD-1 §6 and §5, in one send).
+ *
+ * ONE MESSAGE PER TEAM, to the person whose week it is: what has been sitting
+ * unread past three days, and — on a Monday — who logged no time last week. Two
+ * nudges in one envelope, because the second thing that arrives in the same
+ * inbox on the same morning is the one people start filtering.
+ *
+ * NOTHING CLIENT-FACING. A ticket that has been sitting is our failure, not the
+ * client's business, and telling them would turn an internal prompt into an SLA
+ * nobody promised (§6 is explicit). Every recipient comes off the team's own
+ * membership.
+ *
+ * ACTS ON A TEAM, NOT AS A PERSON — the same guard shape the knowledge sweep
+ * uses, and for the same reason: `userId` is a value no user row can hold, so a
+ * read that ever grew a personal fence would match NOTHING rather than one
+ * unlucky member's private material. Fail-closed by construction.
+ *
+ * R12: every failure is recorded, per team, and the loop goes on to the next one.
+ * Unattended work has nobody watching. */
+async function morningDigest(env: Env): Promise<void> {
+  let teams: { id: string; database_id: string }[] = []
+  try {
+    const rows = await env.DB.prepare(
+      // Bounded like every other read (R14) — past this ceiling the rest wait for
+      // tomorrow, which for a daily nudge is the right kind of late.
+      `SELECT id, database_id FROM teams
+        WHERE db_status = 'ready' AND deactivated_at IS NULL
+        ORDER BY id LIMIT ${CRON_TEAM_CAP}`
+    ).all<{ id: string; database_id: string }>()
+    teams = rows.results ?? []
+  } catch (e) {
+    console.error("morning digest: could not list teams:", e)
+    await recordWorkerError(env.DB, "content", "cron/morning-digest", e)
+    return
+  }
+
+  const now = new Date()
+  // MONDAY decides whether the weekly half rides along. getUTCDay() is 1 on
+  // Monday; the digest is a UTC job, like the cron that fires it.
+  const isMonday = now.getUTCDay() === 1
+  const cfg = d1ConfigFrom(env)
+
+  for (const team of teams) {
+    try {
+      const guard = {
+        userId: "system:morning-digest",
+        teamId: team.id,
+        roleId: "system",
+        databaseId: team.database_id,
+      }
+      const [onDuty, waiting, members] = await Promise.all([
+        dutyFor(cfg, guard, now),
+        needsTriage(cfg, guard, now),
+        teamMemberNames(env, team.id),
+      ])
+      const missingTime = isMonday ? await loggedNothingLastWeek(cfg, guard, now, members) : []
+      // The person on duty, or — when nobody has been named — everybody, because
+      // a backlog with no owner is worse than a slightly noisy morning, and the
+      // mail's own footnote asks them to fix exactly that.
+      const to = onDuty
+        ? members.filter((m) => m.userId === onDuty.userId)
+        : members
+      await sendTriageDigest(env, team.id, to, {
+        waiting: waiting.total,
+        oldestDays: waiting.waiting[0]?.days ?? 0,
+        onDutyName: onDuty?.userName ?? null,
+        missingTime,
+      })
+    } catch (e) {
+      console.error(`morning digest failed for team ${team.id}:`, e)
+      await recordWorkerError(env.DB, "content", `cron/morning-digest (${team.id})`, e)
+    }
+  }
+}

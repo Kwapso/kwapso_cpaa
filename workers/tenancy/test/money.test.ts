@@ -106,22 +106,33 @@ describe("the margin is revenue minus our own time minus tool costs — in lines
 })
 
 describe("the two facts we borrow from the work engine", () => {
-  it("answers 'not here yet' rather than a confident zero when its tables are absent", async () => {
+  // THE WORK ENGINE HAS LANDED (12 Aug 2026), so these cases changed shape. They
+  // used to create a FAKE `sprints` table per case, because the real one did not
+  // exist yet and the borrow was written against BUILD-1's declaration rather
+  // than against code. Both tables are now in the team migrations, and with them
+  // the one contract ambiguity is settled: the price column is
+  // `sold_price_cents`, whole cents on both sides, so there is no longer a
+  // spelling for the adapter to detect or a major-unit conversion to prove.
+  it("answers 'not here yet' rather than a confident zero when a table is absent", async () => {
+    // A team database is migrated one at a time by an ops route, so "this one has
+    // not rolled that migration yet" is a real production state — reproduced here
+    // by taking a table away rather than by never having written it. A margin
+    // that read the price and silently subtracted nothing would report a
+    // beautiful 100%, which is the failure this build exists to prevent.
+    db().exec(`DROP TABLE work_logs`)
     const facts = await workEngineFacts(cfg, guard, IDS.victimAccount)
-    expect(facts.ready, "the work-engine lane has not landed in this database").toBe(false)
+    expect(facts.ready, "both work-engine tables must be present before a margin is claimed").toBe(false)
     expect(facts.soldCents).toBe(0)
     expect(facts.loggedSeconds).toBe(0)
   })
 
-  // The work engine declares `sold_price` (BUILD-1 §3) and every money column on
-  // this side is whole cents. Whichever spelling that lane ships, the borrow
-  // reads it and converts ONCE — so this proves the adapter against both.
-  it("reads a price in major units and converts it to whole cents", async () => {
+  it("reads the price in whole cents, and never multiplies it again", async () => {
     db().exec(`
-      CREATE TABLE sprints (id TEXT PRIMARY KEY, account_id TEXT, sold_price REAL);
-      CREATE TABLE work_logs (id TEXT PRIMARY KEY, account_id TEXT, seconds INTEGER);
-      INSERT INTO sprints (id, account_id, sold_price) VALUES ('S1', '${IDS.victimAccount}', 4999.99);
-      INSERT INTO work_logs (id, account_id, seconds) VALUES ('W1', '${IDS.victimAccount}', 3600), ('W2', '${IDS.victimAccount}', 1800);
+      INSERT INTO sprints (id, account_id, name, sold_price_cents, created_at)
+        VALUES ('S1', '${IDS.victimAccount}', 'Sprint 4', 499999, '2026-08-12T00:00:00.000Z');
+      INSERT INTO work_logs (id, account_id, target_table, target_id, user_id, started_at, ended_at, seconds, created_at) VALUES
+        ('W1', '${IDS.victimAccount}', 'stories', 'X', 'U', '2026-08-12T09:00:00.000Z', '2026-08-12T10:00:00.000Z', 3600, '2026-08-12T09:00:00.000Z'),
+        ('W2', '${IDS.victimAccount}', 'stories', 'X', 'U', '2026-08-12T10:00:00.000Z', '2026-08-12T10:30:00.000Z', 1800, '2026-08-12T10:00:00.000Z');
     `)
     const facts = await workEngineFacts(cfg, guard, IDS.victimAccount)
     expect(facts.ready).toBe(true)
@@ -129,22 +140,11 @@ describe("the two facts we borrow from the work engine", () => {
     expect(facts.loggedSeconds).toBe(5400)
   })
 
-  it("reads a price already in cents without multiplying it again", async () => {
-    db().exec(`
-      CREATE TABLE sprints (id TEXT PRIMARY KEY, account_id TEXT, sold_price_cents INTEGER);
-      CREATE TABLE work_logs (id TEXT PRIMARY KEY, account_id TEXT, seconds INTEGER);
-      INSERT INTO sprints (id, account_id, sold_price_cents) VALUES ('S1', '${IDS.victimAccount}', 499_999);
-    `)
-    const facts = await workEngineFacts(cfg, guard, IDS.victimAccount)
-    expect(facts.soldCents).toBe(499_999)
-  })
-
   it("counts only the named account's money and nobody else's", async () => {
     db().exec(`
-      CREATE TABLE sprints (id TEXT PRIMARY KEY, account_id TEXT, sold_price REAL);
-      CREATE TABLE work_logs (id TEXT PRIMARY KEY, account_id TEXT, seconds INTEGER);
-      INSERT INTO sprints (id, account_id, sold_price) VALUES
-        ('S1', '${IDS.victimAccount}', 100), ('S2', '${IDS.burglarAccount}', 900);
+      INSERT INTO sprints (id, account_id, name, sold_price_cents, created_at) VALUES
+        ('S1', '${IDS.victimAccount}', 'Theirs', 10000, '2026-08-12T00:00:00.000Z'),
+        ('S2', '${IDS.burglarAccount}', 'Somebody else''s', 90000, '2026-08-12T00:00:00.000Z');
     `)
     const facts = await workEngineFacts(cfg, guard, IDS.victimAccount)
     expect(facts.soldCents).toBe(10_000)

@@ -81,6 +81,9 @@ export const MODULE_PERMISSION: Record<string, string> = {
   // the same screens (the money panels on an account), never a screen of its own
   // — what an account is charged is a bigger decision than how long a step takes.
   processes: "processes",
+  // The work engine: the segment IS the module. Stories and the sprints they sit
+  // in share it — they are one record from a reader's point of view.
+  work: "work",
 }
 
 /* --------------------------------- team --------------------------------- */
@@ -392,6 +395,33 @@ export const processesListRecipe: ScreenRecipe = {
   ),
 }
 
+/* ------------------------------- the work ------------------------------- */
+
+/** The backlog — every piece of work we are doing, in the order somebody dragged
+ * it into. A row's summary line is what you would read out loud in a stand-up:
+ * who has it, when it is due, and which request it answers. PAGED (R14): the
+ * backlog only grows and a done story is never deleted, so the frame's own
+ * "Showing X of Y" stays off and the exact total is badged once, above. */
+export const workListRecipe: ScreenRecipe = {
+  type: "list",
+  display: "list",
+  surface: "none",
+  binding: { module: "work" },
+  gate: { module: "work", right: "read" },
+  fields: [field("name", "Story"), field("detail", "Details")],
+  actions: [],
+  collection: listCollection(
+    "No work in hand.",
+    "Search work…",
+    [
+      { field: "status", label: "Status", control: "select" },
+      { field: "assignee", label: "Assignee", control: "select" },
+      { field: "sprint", label: "Sprint", control: "select" },
+    ],
+    { paged: true }
+  ),
+}
+
 /* ------------------------------ the registry ------------------------------ */
 
 /** The in-code BASE recipe for each screen key — the shipped default every team
@@ -421,6 +451,10 @@ export const BASE_RECIPES: Record<string, ScreenRecipe> = {
   // and its versions and conversation are collections with their own actions
   // (see process-detail.tsx).
   "processes.list": processesListRecipe,
+  // Work has a LIST recipe and no detail recipe: a story's screen is its own
+  // panel plus the time logged against it, which no engine block draws (see
+  // work-screen.tsx / story-detail.tsx).
+  "work.list": workListRecipe,
 }
 
 /** A structural guard for a parsed override. The config store treats a recipe as
