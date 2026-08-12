@@ -57,15 +57,21 @@ export function KnowledgeDetailScreen({
   const sourcesQ = useCached<KnowledgeSource[]>(knowledgeKey(teamId), () =>
     content.knowledge().then((r) => r.sources)
   )
-  // The list is a PAGE (R14), so the record may not be in it — a link straight
-  // to a source the loaded prefix doesn't reach must still open. One read by id,
-  // only when the page didn't already have it.
+  // THE LIST ROW IS NOT THE RECORD, and on this screen that distinction is load-
+  // bearing. A source can be a 300-page contract, so the LIST deliberately does
+  // not carry the material (a page of fifty of them would be tens of megabytes
+  // on the way to a screen showing titles) — it carries the summary. This screen
+  // is the one that shows the words, so it ALWAYS reads the source by id.
+  //
+  // The list row is still used, as the instant paint: title, kind, filing and
+  // state appear from cache while the material arrives (CACHING.md, cache-first).
+  // Taking the row as the whole record instead is the trap EDGE-CASES.md calls
+  // "list cache as detail source", and it would have shown an empty document.
   const inPage = sourcesQ.data?.find((s) => s.id === sourceId) ?? null
-  const oneQ = useCached<KnowledgeSource | null>(
-    sourcesQ.data !== undefined && !inPage ? `knowledge:one:${sourceId}` : null,
-    () => content.knowledgeOne(sourceId)
+  const oneQ = useCached<KnowledgeSource | null>(`knowledge:one:${sourceId}`, () =>
+    content.knowledgeOne(sourceId)
   )
-  const item = inPage ?? oneQ.data ?? null
+  const item = oneQ.data ?? inPage ?? null
 
   // The generic record feed (R5) + the exact server total its tab badges (R8 for
   // the place, R16 for the number — never the loaded page's length).
@@ -238,6 +244,12 @@ export function KnowledgeDetailScreen({
                   Kept in step with the record it came from — its words change when that record does.
                 </p>
               )}
+              {item.bodyTruncated ? (
+                <p className="text-muted-foreground text-sm">
+                  Showing the first part of {Math.round(item.bodyBytes / 1000).toLocaleString()} KB of
+                  material. Every word of it is searchable — this is the screen being kind to itself.
+                </p>
+              ) : null}
               {item.body ? (
                 // The material itself, as text. Deliberately NOT rendered as
                 // rich text: what is shown here has to be what the assistant

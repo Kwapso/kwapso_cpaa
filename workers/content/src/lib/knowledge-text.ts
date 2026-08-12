@@ -11,6 +11,8 @@
 //   2. VECTOR — the quantised embedding codec and its similarity, so stage two
 //               can re-rank a bounded candidate set with no float array in D1.
 
+import { DOCUMENT_LIMIT_BYTES } from "@shared/workers/validate"
+
 /* ---------------------------------- text ---------------------------------- */
 
 /** How big one chunk gets. Small enough that a citation points at something a
@@ -18,12 +20,22 @@
  * being cut out of its source. */
 export const CHUNK_TARGET_CHARS = 900
 
-/** Chunks one source may hold. A ceiling, said out loud: a 400-page transcript
- * is a real thing to be handed, and without this one source could own the whole
- * index — and cost one embedding call per chunk while doing it. Past this the
- * source is indexed as far as the cap and `chunkText` says so by returning fewer
- * chunks than the text deserved; `indexSource` records the truncation on the row. */
-export const MAX_CHUNKS_PER_SOURCE = 200
+/** Chunks one source may hold — DERIVED from the ceiling the door enforces, not
+ * chosen separately, so the two numbers cannot disagree.
+ *
+ * It used to be 200, which is about eight pages of prose, and `chunkText`
+ * enforced it by silently returning fewer chunks than the text deserved. That is
+ * the exact shape the owner ruled out: "the upload is REFUSED with a clear
+ * message, never silently trimmed." Now the REFUSAL happens at the door
+ * (optionalDocument, in bytes, before anything is saved) and this is only the
+ * backstop for material that never passes a door — a mirrored row that some
+ * import made enormous. `indexSource` indexes what fits and RECORDS the overflow
+ * on the row in both numbers, because making an existing record unfindable would
+ * be a worse answer than an incomplete one, and neither may be silent.
+ *
+ * The 1.4 is headroom: a document of paragraphs shorter than the target cuts
+ * into more pieces than length alone predicts. */
+export const MAX_CHUNKS_PER_SOURCE = Math.ceil((DOCUMENT_LIMIT_BYTES / CHUNK_TARGET_CHARS) * 1.4)
 
 /** Distinct terms one chunk contributes to the inverted index. The tail of a
  * long chunk is mostly names and numbers that match nothing; the head is what
@@ -93,7 +105,11 @@ export function plainText(input: string): string {
  * table — a hard cut, so one unbroken 50,000-character line still gets indexed
  * instead of becoming one chunk nothing can cite precisely.
  *
- * Bounded by MAX_CHUNKS_PER_SOURCE. Returns [] for empty text, never [""]. */
+ * IT NO LONGER TRUNCATES. It returns every piece the text really has, and the
+ * caller decides what to do about a text that is too big — because a function
+ * that quietly returned the first two hundred pieces made "the whole document
+ * went in" impossible to tell from "the first eight pages went in", at the one
+ * place nobody was looking. Returns [] for empty text, never [""]. */
 export function chunkText(input: string): string[] {
   const text = plainText(input)
   if (!text) return []
@@ -111,7 +127,6 @@ export function chunkText(input: string): string[] {
     for (const sentence of paragraph.split(/(?<=[.!?])\s+/)) {
       for (const piece of hardCut(sentence)) {
         if (current && current.length + piece.length + 1 > CHUNK_TARGET_CHARS) flush()
-        if (chunks.length >= MAX_CHUNKS_PER_SOURCE) return chunks
         current = current ? `${current} ${piece}` : piece
       }
     }
@@ -120,7 +135,7 @@ export function chunkText(input: string): string[] {
     if (current.length >= CHUNK_TARGET_CHARS * 0.6) flush()
   }
   flush()
-  return chunks.slice(0, MAX_CHUNKS_PER_SOURCE)
+  return chunks
 }
 
 /** A run of text with no sentence boundary in it, cut into target-sized pieces. */

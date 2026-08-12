@@ -32,6 +32,7 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
 })
 
 import worker from "../src/index"
+import { fakeVectorize } from "./fake-vectorize"
 import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
 import { tokenise } from "../src/lib/knowledge-text"
 import type { KnowledgeAnswer, KnowledgeSource } from "@shared/types"
@@ -48,27 +49,47 @@ const OTHER_STAFF = "U_STAFF_2"
 let published: { resource?: string; id?: string; op?: string }[] = []
 /** Every text the "model" was asked to embed — how the hash-skip is observed. */
 let embedded: string[] = []
+/** The vector index, in memory. A stand-in that really partitions by namespace
+ * and really filters by metadata (see fake-vectorize.ts), so the fence is
+ * exercised rather than asserted. */
+let vectorIndex = fakeVectorize()
 
-/** A DETERMINISTIC stand-in for the embedding model: 64 dimensions, each token
+/** A DETERMINISTIC stand-in for the embedding model: 256 dimensions, each token
  * landing in one slot. Two texts sharing words point in similar directions,
- * which is all the ranking needs to be exercised honestly. */
+ * which is all the ranking needs to be exercised honestly.
+ *
+ * 256 RATHER THAN 64, and the reason matters now that there is a relevance floor
+ * to exercise. In 64 slots an ordinary pair of unrelated sentences collides on
+ * two or three dimensions and lands at a cosine of 0.4-0.5 — indistinguishable
+ * from a real match, so no floor could separate them and the suite could not
+ * tell "refuses what it has nothing on" from "answers everything". Four times
+ * the slots makes an accidental collision rare, which is the property a real
+ * embedding has and this needs to imitate. */
 function fakeVector(text: string): number[] {
-  const v = Array.from({ length: 64 }, () => 0)
+  const v = Array.from({ length: 256 }, () => 0)
   for (const [term, weight] of tokenise(text)) {
     let h = 0
     for (let i = 0; i < term.length; i++) h = (h * 31 + term.charCodeAt(i)) >>> 0
-    v[h % 64] += weight
+    v[h % 256] += weight
   }
   // A text with no indexable words at all has no direction — the codec refuses
   // to store a zero vector, which is the behaviour under test elsewhere.
   return v
 }
 
-function env(userId: string, opts: { brokenModel?: boolean } = {}) {
+function env(userId: string, opts: { brokenModel?: boolean; noVectorStore?: boolean } = {}) {
   const base = makeEnv(() => db(), userId) as unknown as Record<string, unknown>
   return {
     ...base,
     INTERNAL_KEY: "k",
+    KNOWLEDGE_INDEX: opts.noVectorStore ? undefined : vectorIndex.binding,
+    // THE RELEVANCE FLOOR BELONGS TO THE MODEL, and the model here is a
+    // stand-in whose cosine is on a different scale from bge-m3's (see
+    // fakeVector below). What this suite tests is that there IS a floor and
+    // that it refuses below it — not the shipped number, which was measured
+    // against the real model on 7,441 real chunks. Setting it here is the same
+    // act as setting it for a new model in production.
+    KNOWLEDGE_MIN_SCORE: "0.35",
     AI: {
       run: async (_model: string, input: { text: string[] }) => {
         embedded.push(...input.text)
@@ -121,6 +142,7 @@ const titles = (a: KnowledgeAnswer) => a.citations.map((c) => c.title)
 beforeEach(() => {
   published = []
   embedded = []
+  vectorIndex = fakeVectorize()
   holder.db = buildSpineDb()
   db().exec(
     `INSERT INTO users (id, email, first_name, current_team_id) VALUES ('${OTHER_STAFF}', 'aurora@kwapso.app', 'Aurora', '${IDS.team}');
@@ -410,7 +432,7 @@ describe("the sweep — the app's own rows become material, and stay in step", (
     const { ingest } = (await res.json()) as {
       ingest: { kind: string; lastOkAt: string | null; lastError: string | null; sourcesIndexed: number }[]
     }
-    expect(ingest.map((i) => i.kind).sort()).toEqual(["account", "article", "ticket"])
+    expect(ingest.map((i) => i.kind).sort()).toEqual(["account", "app", "article", "sprint", "story", "ticket"])
     for (const row of ingest) {
       expect(row.lastOkAt).not.toBeNull()
       expect(row.lastError).toBeNull()

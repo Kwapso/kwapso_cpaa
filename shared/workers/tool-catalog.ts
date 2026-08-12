@@ -1260,7 +1260,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "ask_knowledge",
     summary:
-      "Ask the team's knowledge base a question and get the passages that answer it, each with the source it came from. Pass `accountId` when the question is about one client and you know which — the answer is otherwise compartmented from the question's own words. It NEVER writes an answer for you: use the passages, quote the titles, and if `found` is false say so in the words of `message` rather than answering from memory. `reason` says which compartment it searched and why — repeat it when the answer looks wrong for the question.",
+      "Ask the team's knowledge base a question and get the passages that answer it, each with the source it came from. Pass `accountId` when the question is about one client and you know which — the answer is otherwise compartmented from the question's own words. It NEVER writes an answer for you: use the passages, quote the titles, and if `found` is false say so in the words of `message` rather than answering from memory (it refuses on purpose when nothing in the base is close enough — that is an answer, not a failure). `reason` says which compartment it searched and why, and `records` names what the question looks like it is ABOUT — repeat them when the answer looks wrong for the question. EVERY CITATION CARRIES `liveStatus`: the real row read at the moment of asking, which is what to say when it disagrees with the passage — the passage is what was indexed, `liveStatus` is what is true now.",
     binding: "CONTENT", method: "GET", path: "/api/content/knowledge/ask",
     schema: obj({ q: S, accountId: S, limit: N }, ["q"]),
     buildQuery: (i) => {
@@ -1274,7 +1274,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_knowledge_sources",
     summary:
-      "List what the assistant is allowed to read. Filters: `kind` ('note' for something typed here, or 'ticket' / 'article' / 'account' for material mirrored from the app's own rows), `compartment` ('agency' or 'account:<id>'), `q` (searches the title and the text). Pass `id` for one source. Returns ONE page plus the exact `total`, `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
+      "List what the assistant is allowed to read. Filters: `kind` ('note' for something typed here, or 'ticket' / 'article' / 'account' / 'app' / 'story' / 'sprint' for material mirrored from the app's own rows), `compartment` ('agency' or 'account:<id>'), `q` (searches the title and the summary). Pass `id` for one source — a list row carries the SUMMARY of each source rather than its material, because a source can be a three-hundred-page contract; read one by id for its words. Returns ONE page plus the exact `total`, `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
     binding: "CONTENT", method: "GET", path: "/api/content/knowledge",
     schema: obj({ id: S, kind: S, compartment: S, q: S, cursor: S }),
     buildQuery: (i) => {
@@ -1291,7 +1291,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "get_knowledge_status",
     summary:
-      "Is the knowledge base in step? One row per kind of material the app keeps in step for you (tickets, learning articles, accounts): how far the sweep has read, when it last ran, when it last SUCCEEDED, and what went wrong if it didn't. `lastError` set with an old `lastOkAt` is the shape of 'it has been failing since Tuesday' — read this before trusting an answer that seems to be missing something recent.",
+      "Is the knowledge base in step? One row per kind of material the app keeps in step for you (tickets, learning articles, accounts, apps, stories, sprints): how far the sweep has read, when it last ran, when it last SUCCEEDED, and what went wrong if it didn't. `lastError` set with an old `lastOkAt` is the shape of 'it has been failing since Tuesday' — read this before trusting an answer that seems to be missing something recent.",
     binding: "CONTENT", method: "GET", path: "/api/content/knowledge/sync",
     schema: obj({}),
     agent: { write: false, summarize: () => "Check whether the knowledge base is up to date" },
@@ -1299,7 +1299,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "add_knowledge_source",
     summary:
-      "Write something into the knowledge base so the assistant can use it from now on: `title` and `body` are the material itself. `accountId` files it under one client (leave it out for the agency's own); `visibility` 'private' keeps it to you alone, and anything else means the team. It is searchable immediately.",
+      "Write something into the knowledge base so the assistant can use it from now on: `title` and `body` are the material itself. `accountId` files it under one client (leave it out for the agency's own); `visibility` 'private' keeps it to you alone, and anything else means the team. It is searchable immediately. A whole document is fine — up to about 1.5 MB of text, roughly six hundred pages; past that it is REFUSED in words and nothing is saved, so split it and add the parts.",
     binding: "CONTENT", method: "POST", path: "/api/content/knowledge",
     schema: obj({ title: S, body: S, sourceUrl: S, accountId: S, visibility: S }, ["title"]),
     buildBody: (i) => ({
@@ -1348,7 +1348,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "sync_knowledge",
     summary:
-      "Bring the knowledge base into step with the app's own rows — tickets, learning articles and accounts — one bounded slice at a time. Every result carries `caughtUp`; keep calling while any of them is false. A 15-minute sweep does this on its own, so this is for 'do it now' and for the first fill.",
+      "Bring the knowledge base into step with the app's own rows — tickets, learning articles, accounts, apps, stories and sprints — one bounded slice at a time. Every result carries `caughtUp`; keep calling while any of them is false. You rarely need it: asking a question catches the base up first, and a 15-minute sweep is the backstop. This is for the FIRST FILL of a base that has never been indexed.",
     binding: "CONTENT", method: "POST", path: "/api/content/knowledge/sync",
     schema: obj({}),
     buildBody: () => ({}),
