@@ -45,6 +45,13 @@
 //   POST /api/content/work-logs/update    -> correct a row (leaves a trail)
 //   POST /api/content/work-logs/runaway   -> keep it / stop it then / bin it
 //   POST /api/content/work-logs/auto-stop -> the caller's own timer preference
+//   GET  /api/content/todos               -> what we are waiting on a client for (fenced)
+//   POST /api/content/todos               -> ask a client for something (emails them)
+//   POST /api/content/todos/complete      -> the client marks it done, with a file
+//   POST /api/content/todos/cancel        -> we stopped needing it (nothing deleted)
+//   GET  /api/content/tasks               -> our own internal admin
+//   POST /api/content/tasks               -> write down a piece of admin
+//   POST /api/content/tasks/done          -> tick it / put it back
 //   GET  /api/content/knowledge           -> the sources the assistant may read (?id → one)
 //   GET  /api/content/knowledge/ask       -> answer a question from them, with citations
 //   GET  /api/content/knowledge/sync      -> how far the sweep has got with each kind
@@ -104,6 +111,15 @@ import {
   postStopTimer,
   postUpdateWorkLog,
 } from "./routes/work-logs"
+import {
+  getTasks,
+  getTodos,
+  postCancelTodo,
+  postCompleteTodo,
+  postCreateTask,
+  postCreateTodo,
+  postTaskDone,
+} from "./routes/todos"
 import {
   getKnowledge,
   getKnowledgeAsk,
@@ -182,6 +198,16 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // record anybody else can see and no screen anybody else is looking at, so it
   // broadcasts nothing — a reviewed housekeeping line, not a forgotten publish.
   "POST /api/content/work-logs/auto-stop": { handler: postAutoStop, kind: "housekeeping" },
+  // THE OTHER TWO NOUNS. A to-do is aimed at the CLIENT (fenced, and two of its
+  // doors are on the portal's surface); a task is our own admin (refused to a
+  // client login, like the rest of the work engine).
+  "GET /api/content/todos": { handler: getTodos, kind: "read" },
+  "POST /api/content/todos": { handler: postCreateTodo, kind: "mutation" },
+  "POST /api/content/todos/complete": { handler: postCompleteTodo, kind: "mutation" },
+  "POST /api/content/todos/cancel": { handler: postCancelTodo, kind: "mutation" },
+  "GET /api/content/tasks": { handler: getTasks, kind: "read" },
+  "POST /api/content/tasks": { handler: postCreateTask, kind: "mutation" },
+  "POST /api/content/tasks/done": { handler: postTaskDone, kind: "mutation" },
   "GET /api/content/knowledge": { handler: getKnowledge, kind: "read" },
   "GET /api/content/knowledge/ask": { handler: getKnowledgeAsk, kind: "read" },
   "GET /api/content/knowledge/sync": { handler: getKnowledgeSync, kind: "read" },

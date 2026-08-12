@@ -220,6 +220,15 @@ export function traceFor(
     case "resolve_runaway_timer":
     case "set_timer_auto_stop":
       return { path: seg(teamId, "work"), highlight: "main" }
+    // To-dos and tasks land on the same page: the Work screen is where all four
+    // nouns are managed, and a to-do's other home is a screen we do not own (the
+    // client's portal).
+    case "raise_todo":
+    case "complete_todo":
+    case "cancel_todo":
+    case "create_task":
+    case "set_task_done":
+      return { path: seg(teamId, "work"), highlight: "main" }
 
     /* --------------------------------- team -------------------------------- */
     // Rename the team → the team Overview (the bare /t/<team> path), where the new

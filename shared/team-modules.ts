@@ -20,6 +20,7 @@ export const TEAM_MODULES = [
   "processes",
   "commercials",
   "work",
+  "todos",
 ] as const
 
 /** Plain-English label for each module, shown as the rows of the permission
@@ -73,6 +74,12 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   // To-dos are deliberately NOT here: a to-do is aimed at the client and they
   // must be able to complete one, so it is its own module with its own right.
   work: "Work",
+  // TO-DOS — the one part of the work engine a client login can WRITE to, which
+  // is exactly why it is its own module and not four more rights on `work`. A
+  // contact completes theirs and uploads a file against it from the portal
+  // (SCOPE ch.06, one of the six things a contact can do), so an owner grants
+  // `todos: read + edit` to their Client role and grants nothing else.
+  todos: "To-dos",
 }
 
 /** The matrix rows: { key, label } per module, in display order. */

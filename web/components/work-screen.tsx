@@ -36,6 +36,7 @@ import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { SprintFormDialog, type SprintFormValues } from "@/components/sprint-form-dialog"
 import { StoryFormDialog, type StoryFormValues } from "@/components/story-form-dialog"
 import { TimePanel } from "@/components/time-panel"
+import { TodoTaskPanel } from "@/components/todo-task-panel"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import { helpKey, listFetch, sprintsKey, storiesKey } from "@/lib/live-resources"
 import { withDataDrivenCollection } from "@/lib/screens"
@@ -100,6 +101,8 @@ export function WorkScreen({
   total,
   canCreate,
   canEdit,
+  canRaiseTodo,
+  canCancelTodo,
   onAction,
   onIntent,
 }: {
@@ -110,6 +113,8 @@ export function WorkScreen({
   total: number | undefined
   canCreate: boolean
   canEdit: boolean
+  canRaiseTodo: boolean
+  canCancelTodo: boolean
   onAction: (actionId: string, ctx: ScreenActionContext) => void
   onIntent: (intent: ScreenIntent) => void
 }) {
@@ -253,6 +258,16 @@ export function WorkScreen({
           Start a sprint
         </Button>
       )}
+
+      {/* The other two nouns, side by side, because that is the most useful thing
+          a screen can say about two records of the same shape and opposite
+          audiences: waiting on THEM, and ours to do. */}
+      <TodoTaskPanel
+        teamId={teamId}
+        canRaiseTodo={canRaiseTodo}
+        canCancelTodo={canCancelTodo}
+        canWriteTask={canCreate}
+      />
 
       {/* Time, under the work it is against. BUILD-1 §5: one click is the
           acceptance bar — the Start control is on the header bar once a timer is

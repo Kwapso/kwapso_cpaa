@@ -139,6 +139,19 @@ export const listFetch = {
       primeCache(cursorKey(workLogsKey(teamId)), r.nextCursor)
       return r.logs
     }),
+  // Both BOUNDED (R14): a to-do is a thing we are WAITING on and a task is admin,
+  // so each shrinks as fast as it grows — a ceiling is an honest answer rather
+  // than an eventual refusal, and neither has a cursor sidecar to prime.
+  todos: (teamId: string) =>
+    contentApi.todos().then((r) => {
+      primeCache(totalKey("todos", teamId), r.total)
+      return r.todos
+    }),
+  tasks: (teamId: string) =>
+    contentApi.tasks().then((r) => {
+      primeCache(totalKey("tasks", teamId), r.total)
+      return r.tasks
+    }),
   // Sprints are BOUNDED, not paged (a block of sold work grows at the speed of
   // contracts), so there is no cursor sidecar to prime — just the exact total.
   sprints: (teamId: string) =>
@@ -165,6 +178,15 @@ export function sprintsKey(teamId: string): string {
 export function workLogsKey(teamId: string): string {
   return `work-logs:${teamId}`
 }
+/** What we are waiting on clients for, and our own admin. Two keys, because they
+ * are two collections with two audiences — the same reason they are two tables. */
+export function todosKey(teamId: string): string {
+  return `todos:${teamId}`
+}
+export function tasksKey(teamId: string): string {
+  return `tasks:${teamId}`
+}
+
 export function runningTimersKey(teamId: string): string {
   return `running-timers:${teamId}`
 }
@@ -403,6 +425,25 @@ export const TEAM_RESOURCES: Record<
     fetchOne: (id) => contentApi.workLogOne(id),
     fetchList: (t) => listFetch.workLogs(t),
     deps: (t, id) => [runningTimersKey(t), storiesKey(t), `activity:record:work_logs:${id}`],
+  },
+  // TO-DOS — row-level live, and the one work-engine resource a CLIENT hears
+  // about too (the portal has its own listener map). A contact completing one in
+  // their portal has to appear on our screen without a reload, because the next
+  // thing somebody here does is act on it.
+  todos: {
+    key: (t) => todosKey(t),
+    idField: "id",
+    fetchOne: (id) => contentApi.todoOne(id),
+    fetchList: (t) => listFetch.todos(t),
+    deps: (_t, id) => [`activity:record:todos:${id}`],
+  },
+  // TASKS — our own admin, agency-side only.
+  tasks: {
+    key: (t) => tasksKey(t),
+    idField: "id",
+    fetchOne: (id) => contentApi.taskOne(id),
+    fetchList: (t) => listFetch.tasks(t),
+    deps: (_t, id) => [`activity:record:tasks:${id}`],
   },
   // A rate card ping carries the ACCOUNT it sits on — a card is only ever read on
   // its account's own screen, so the account is the row a listener can act on.

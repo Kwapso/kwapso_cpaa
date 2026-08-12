@@ -1057,6 +1057,104 @@ CREATE TABLE work_prefs (
 );
 `,
   },
+  {
+    // THE OTHER TWO NOUNS (.plans/BUILD-1 §2). The owner's own test for telling
+    // them apart: "Aurora spends forty minutes writing kwapso's own quarterly VAT
+    // return" is a TASK; "Marta at Bergman still hasn't sent us her brand logo and
+    // we can't finish without it" is a TO-DO.
+    //
+    // TWO TABLES, NOT ONE WITH A `kind` COLUMN, and the reason is the same one
+    // that split the two rate cards in 0013: they are the same SHAPE and opposite
+    // AUDIENCES. A to-do is aimed at the client and appears in their portal; a
+    // task is our own admin and must never leave the building. One table with a
+    // flag would put both a wrong WHERE clause apart, and the wrong one of them
+    // is a list of the agency's internal chores rendered on a client's screen.
+    // Two tables cannot be confused by a forgotten predicate.
+    version: "0016_todos_and_tasks",
+    sql: `
+-- A TO-DO is something we are waiting on the CLIENT for. It is the only row in
+-- the work engine a client login can WRITE to, and one of only two things in the
+-- whole product that emails them (BUILD-1 §7).
+--
+-- \`account_id\` is NOT NULL, unlike everywhere else in this build: a to-do with
+-- no client is a to-do aimed at nobody, and the fence that decides who may see it
+-- reads exactly this column. There is no such thing as an agency to-do — that is
+-- a task, in the table below.
+--
+-- \`file_url\` is what they uploaded against it. One file, not a collection: the
+-- request is "send us the logo", and a second attachment is a second to-do or a
+-- comment on the ticket it hangs off.
+--
+-- NO WORK LOG EVER ATTACHES TO ONE (BUILD-1 §5, settled by the owner) — it is
+-- somebody else's time, not ours. That is enforced in
+-- workers/content/src/lib/work-logs.ts by \`todos\` not being in WORK_LOG_TARGETS,
+-- and asserted against the list itself so it survives this table existing.
+CREATE TABLE todos (
+  id TEXT PRIMARY KEY,
+  ref TEXT,
+  account_id TEXT NOT NULL REFERENCES accounts (id),
+  ticket_id TEXT REFERENCES help (id),
+  story_id TEXT REFERENCES stories (id),
+  title TEXT NOT NULL,
+  detail TEXT,
+  due_on TEXT,
+  completed_at TEXT, completer_id TEXT, completer_name TEXT,
+  file_url TEXT,
+  file_name TEXT,
+  cancelled_at TEXT, canceller_id TEXT, canceller_email TEXT, canceller_name TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT
+);
+CREATE UNIQUE INDEX idx_todos_ref ON todos (ref) WHERE ref IS NOT NULL;
+CREATE INDEX idx_todos_account ON todos (account_id, completed_at);
+CREATE INDEX idx_todos_ticket ON todos (ticket_id);
+
+-- A TASK is kwapso's own internal admin. Nobody outside the agency ever sees one,
+-- so unlike every other table in this build it carries no fence and no portal
+-- story at all — every door on it refuses a client login outright.
+--
+-- \`account_id\` is nullable and usually null: our own VAT return belongs to no
+-- client. A task that IS about a client (chasing an invoice, preparing a review)
+-- may name one, which is what lets its time land in the right margin.
+--
+-- WORK LOGS DO ATTACH (BUILD-1 §2), which is the whole reason this is a table
+-- rather than a checklist somewhere: forty minutes on the VAT return is real
+-- time, it is ours, and it costs us the same as forty minutes of delivery.
+--
+-- The reference number is nullable here for a duller reason than elsewhere: a
+-- reference is built out of an ACCOUNT's short code, and most tasks have no
+-- account. A number nobody can quote is worse than none.
+CREATE TABLE tasks (
+  id TEXT PRIMARY KEY,
+  ref TEXT,
+  account_id TEXT REFERENCES accounts (id),
+  title TEXT NOT NULL,
+  detail TEXT,
+  assignee_id TEXT,
+  assignee_name TEXT,
+  due_on TEXT,
+  status TEXT NOT NULL DEFAULT 'open',
+  completed_at TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT
+);
+CREATE UNIQUE INDEX idx_tasks_ref ON tasks (ref) WHERE ref IS NOT NULL;
+CREATE INDEX idx_tasks_status ON tasks (status, due_on);
+CREATE INDEX idx_tasks_assignee ON tasks (assignee_id);
+
+-- Existing teams: the locked Admin role gains the to-do module in full. Every
+-- other role gains nothing — including, deliberately, the Client role an owner
+-- may already have built: handing a client sight of their to-dos is a decision
+-- somebody makes on the Roles screen, not one a migration makes for them.
+-- (Tasks need no row: they live under \`work\`, which 0014 already granted.)
+INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+SELECT lower(hex(randomblob(16))), r.id, 'todos', r.is_default, r.is_default, r.is_default, r.is_default
+  FROM member_roles r
+ WHERE NOT EXISTS (
+   SELECT 1 FROM role_permissions p WHERE p.role_id = r.id AND p.module = 'todos'
+ );
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

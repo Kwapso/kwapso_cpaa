@@ -22,6 +22,8 @@ import type {
   RunningTimer,
   Sprint,
   Story,
+  Task,
+  Todo,
   WorkLog,
 } from "@shared/types"
 import { api, enc, post } from "@shared/web/api"
@@ -170,6 +172,34 @@ export const content = {
   }) => api<{ sprints: Sprint[]; total: number }>("/api/content/sprints", post(input)),
   setSprintComplete: (id: string, complete: boolean) =>
     api<{ sprints: Sprint[]; total: number }>("/api/content/sprints/complete", post({ id, complete })),
+
+  /* ---------------------------- to-dos and tasks ---------------------------- */
+  /** What we are waiting on a client for. Fenced: a client login sees their own
+   * company's. Bounded rather than paged — a to-do is a thing we are WAITING on. */
+  todos: (opts: { accountId?: string; view?: "open" | "all" } = {}) =>
+    api<{ todos: Todo[]; total: number }>(
+      `/api/content/todos${opts.accountId || opts.view ? `?${new URLSearchParams({ ...(opts.accountId ? { accountId: opts.accountId } : {}), ...(opts.view ? { view: opts.view } : {}) }).toString()}` : ""}`
+    ),
+  todoOne: (id: string) =>
+    api<{ todos: Todo[] }>("/api/content/todos?view=all").then((r) => r.todos.find((t) => t.id === id) ?? null),
+  raiseTodo: (input: { accountId: string; title: string; detail?: string; dueOn?: string; ticketId?: string }) =>
+    api<{ todos: Todo[]; total: number }>("/api/content/todos", post(input)),
+  /** The client's own act — mark it done, and attach the one file they were asked
+   * for. `fileDataUrl` is a base64 data URL; the door caps and parses it. */
+  completeTodo: (id: string, file?: { dataUrl: string; name: string }) =>
+    api<{ todo: Todo }>(
+      "/api/content/todos/complete",
+      post({ id, fileDataUrl: file?.dataUrl, fileName: file?.name })
+    ),
+  cancelTodo: (id: string) => api<{ todos: Todo[]; total: number }>("/api/content/todos/cancel", post({ id })),
+  tasks: (view?: "open" | "all") =>
+    api<{ tasks: Task[]; total: number }>(`/api/content/tasks${view ? `?view=${view}` : ""}`),
+  taskOne: (id: string) =>
+    api<{ tasks: Task[] }>("/api/content/tasks?view=all").then((r) => r.tasks.find((t) => t.id === id) ?? null),
+  createTask: (input: { title: string; detail?: string; dueOn?: string; assigneeId?: string; accountId?: string }) =>
+    api<{ tasks: Task[]; total: number }>("/api/content/tasks", post(input)),
+  setTaskDone: (id: string, done: boolean) =>
+    api<{ tasks: Task[]; total: number }>("/api/content/tasks/done", post({ id, done })),
 
   /* ---------------------------------- time ---------------------------------- */
   /** R14: a PAGE of time. `total` is the row count and `totalSeconds` is the

@@ -906,3 +906,50 @@ export type RunningTimer = {
   /** true once it has been running longer than RUNAWAY_HOURS — the Monday prompt */
   runaway: boolean
 }
+
+/** SOMETHING WE ARE WAITING ON THE CLIENT FOR. The one row in the work engine a
+ * client login can write to: they complete it and upload a file against it from
+ * their own portal. Never carries a work log — that would be their time in our
+ * margin. */
+export type Todo = {
+  id: string
+  /** BERG-D0007 — a to-do always belongs to a client, so it always has one (as
+   * long as that client has a short code). */
+  ref: string | null
+  title: string
+  detail: string | null
+  dueOn: string | null
+  completedAt: string | null
+  completedByName: string | null
+  /** what they sent us, and what it was called on their machine. One file: the
+   * request is "send us the logo", and a second attachment is a second to-do. */
+  fileUrl: string | null
+  fileName: string | null
+  /** withdrawn without being deleted — we stopped needing it. */
+  cancelled: boolean
+  accountId: string
+  accountName: string | null
+  ticketId: string | null
+  createdAt: string
+}
+
+/** KWAPSO'S OWN INTERNAL ADMIN. Nobody outside the agency ever sees one. Work
+ * logs DO attach — forty minutes on our own VAT return is real time and costs us
+ * the same as forty minutes of delivery. */
+export type Task = {
+  id: string
+  ref: string | null
+  title: string
+  detail: string | null
+  assigneeId: string | null
+  assigneeName: string | null
+  dueOn: string | null
+  status: "open" | "done"
+  completedAt: string | null
+  /** usually null — our own admin belongs to no client. A task that IS about one
+   * (chasing an invoice, preparing a review) may name it, which is what puts its
+   * time in the right margin. */
+  accountId: string | null
+  createdAt: string
+  createdByName: string | null
+}

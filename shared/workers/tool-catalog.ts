@@ -940,6 +940,107 @@ export const SHARED_TOOLS: SharedTool[] = [
       summarize: (i) => `${i.complete === true ? "Complete" : "Reopen"} sprint ${str(i, "id")}`,
     },
   },
+  /* ---------------------------- to-dos and tasks ---------------------------- */
+  // The two nouns that are the same shape and opposite audiences, and the model
+  // needs to be told which is which more than a person does — a person reads two
+  // different screens, and the assistant reads two tool descriptions.
+  {
+    name: "list_todos",
+    summary:
+      "List the things we are WAITING ON A CLIENT FOR — never our own admin, which is list_tasks. Each carries the reference the client quotes, the due date, whether they have completed it and the file they sent if there is one. `view` is 'open' by default; pass 'all' to include the completed. `accountId` narrows to one client.",
+    binding: "CONTENT", method: "GET", path: "/api/content/todos",
+    schema: obj({ accountId: S, view: S }),
+    buildQuery: (i) => {
+      const q: string[] = []
+      for (const k of ["accountId", "view"]) if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
+      return q.length ? `?${q.join("&")}` : ""
+    },
+    agent: { write: false, summarize: () => "List what we're waiting on clients for" },
+  },
+  {
+    name: "raise_todo",
+    summary:
+      "Ask a client for something — `accountId` says which client and `title` says what we need. A to-do sits in THEIR portal with a due date, and they complete it and attach a file themselves. Use it only for something we genuinely cannot proceed without; our own admin is create_task and a piece of delivery work is create_story.",
+    binding: "CONTENT", method: "POST", path: "/api/content/todos",
+    schema: obj({ accountId: S, title: S, detail: S, dueOn: S, ticketId: S }, ["accountId", "title"]),
+    buildBody: (i) => ({
+      accountId: str(i, "accountId"),
+      title: str(i, "title"),
+      detail: opt(i, "detail"),
+      dueOn: opt(i, "dueOn"),
+      ticketId: opt(i, "ticketId"),
+    }),
+    agent: {
+      write: true,
+      // CONFIRM, and it is the only CONSTRUCTIVE write in the work engine that
+      // does. This door SENDS EMAIL to a client — one of two in the whole product
+      // that reach outside the building — from the team's verified sender, and
+      // the model reaches it while reading text a client wrote. A wrong story is
+      // a row somebody deletes; a wrong to-do is a demand in a customer's inbox.
+      confirm: true,
+      summarize: (i, names) =>
+        `Ask ${accountLabel(i, "accountId", names)} for "${str(i, "title").slice(0, 50)}" — this emails them`,
+    },
+  },
+  {
+    name: "complete_todo",
+    summary:
+      "Mark a to-do done, by id. Usually the client does this themselves in their portal; a staff member does it when the thing arrived another way (on the phone, by email). Completing an already-completed to-do changes nothing.",
+    binding: "CONTENT", method: "POST", path: "/api/content/todos/complete",
+    schema: obj({ id: S }, ["id"]),
+    // The file half is NOT on this surface — see NARROWED_BODY_FIELDS.
+    buildBody: (i) => ({ id: str(i, "id") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Mark to-do ${str(i, "id")} done` },
+  },
+  {
+    name: "cancel_todo",
+    summary:
+      "Withdraw a to-do we no longer need, by id. Nothing is deleted — it leaves the client's list and the decision stays on the record. Their side is simply told nothing, which is the point: an email saying 'ignore the last email' is worse than silence.",
+    binding: "CONTENT", method: "POST", path: "/api/content/todos/cancel",
+    schema: obj({ id: S }, ["id"]),
+    buildBody: (i) => ({ id: str(i, "id") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Withdraw to-do ${str(i, "id")}` },
+  },
+  {
+    name: "list_tasks",
+    summary:
+      "List KWAPSO'S OWN internal admin — never anything a client sees, which is list_todos. `view` is 'open' by default; pass 'all' for the finished ones. `assigneeId` narrows to one person's.",
+    binding: "CONTENT", method: "GET", path: "/api/content/tasks",
+    schema: obj({ view: S, assigneeId: S }),
+    buildQuery: (i) => {
+      const q: string[] = []
+      for (const k of ["view", "assigneeId"]) if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
+      return q.length ? `?${q.join("&")}` : ""
+    },
+    agent: { write: false, summarize: () => "List our own admin" },
+  },
+  {
+    name: "create_task",
+    summary:
+      "Write down a piece of OUR OWN admin — the quarterly VAT return, renewing a domain, preparing next week's review. Nobody outside the agency ever sees one. `accountId` is optional and usually left off; naming a client is for admin ABOUT them (chasing an invoice), which is what puts the time in the right margin. Time can be logged against a task, unlike a to-do.",
+    binding: "CONTENT", method: "POST", path: "/api/content/tasks",
+    schema: obj({ title: S, detail: S, dueOn: S, assigneeId: S, accountId: S }, ["title"]),
+    buildBody: (i) => ({
+      title: str(i, "title"),
+      detail: opt(i, "detail"),
+      dueOn: opt(i, "dueOn"),
+      assigneeId: opt(i, "assigneeId"),
+      accountId: opt(i, "accountId"),
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Add a task: "${str(i, "title").slice(0, 50)}"` },
+  },
+  {
+    name: "set_task_done",
+    summary: "Tick a task off, or put it back (`done`: true / false), by id. Ticking a done task changes nothing.",
+    binding: "CONTENT", method: "POST", path: "/api/content/tasks/done",
+    schema: obj({ id: S, done: B }, ["id", "done"]),
+    buildBody: (i) => ({ id: str(i, "id"), done: i.done === true }),
+    agent: {
+      write: true,
+      confirm: false,
+      summarize: (i) => `${i.done === true ? "Finish" : "Reopen"} task ${str(i, "id")}`,
+    },
+  },
   /* ---------------------------------- time ---------------------------------- */
   // "Logging time takes too many clicks" is the thing the owner named as most
   // likely to make him abandon this (.plans/BUILD-1 §5), and a machine surface is
@@ -1571,6 +1672,11 @@ export const TOOL_GATES: Record<string, string> = {
   rank_story: "work:edit",
   create_sprint: "work:create",
   complete_sprint: "work:edit",
+  raise_todo: "todos:create",
+  complete_todo: "todos:edit",
+  cancel_todo: "todos:delete",
+  create_task: "work:create",
+  set_task_done: "work:edit",
   // TIME. Logging your OWN is a create, not an edit — a person who may do the
   // work may say how long it took them. Correcting a row that already exists is
   // `work:edit`, and there is deliberately no tool on that door (see MCP.md).

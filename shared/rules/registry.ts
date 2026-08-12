@@ -211,6 +211,8 @@ export const CATALOG_EXEMPT: Record<string, string> = {
     "a source is either TYPED here — and indexed in the same call, because the owner asked for instant syncing, which costs one embedding per chunk — or MIRRORED from a row the app already owns and kept in step by the sweep. A CSV would be a third way in with the first one's cost and neither one's upkeep: the importer writes row by row through the module's own gated create door, so a 5,000-row file would be 5,000 chunkings and 5,000 model calls inside one request, against a €50/month ceiling. The in-rule answer to 'we have a spreadsheet of process notes' is to point the sweep at where they already live, or to import them into the module they belong to and let the mirror do it.",
   processes:
     "a process map's numbers are AGREED estimates — a time a client and a staff member settled together, in front of each other, about the client's own work. Every savings figure in the app is a subtraction of two of them, so a CSV would import estimates nobody agreed and produce figures nobody can defend, which is the exact failure this module exists to prevent. A map is authored a step at a time, with the person whose work it describes.",
+  todos:
+    "a to-do is a REQUEST WE MAKE OF A CLIENT, and raising one emails them. It is one of only two things in the whole product that reaches a client's inbox (BUILD-1 §7), and an import is the one shape of write that produces hundreds at once — a spreadsheet of forty rows would be forty emails into somebody's morning, from our own verified sender, before anybody had read the file back. The write it would replace is a title and a date typed while you are already talking to them. Stories ARE importable, for the opposite reason: nothing about a story leaves the building.",
   commercials:
     "a rate card is a commercial agreement and an internal rate is the agency's own cost. A bulk overwrite of either silently changes what a client is charged or what a margin says, with no conversation attached and no one row to point at afterwards — and the write it would replace is four fields typed once a year.",
 }
@@ -449,6 +451,11 @@ export const PORTAL_ACTIVITY_FENCE: Record<string, { fence: "account" | null; wh
   // says the portal never names, attached to the work they are doing. What a
   // client sees of a story is a COUNT on their own ticket.
   stories: { fence: null, why: "a story's history names the staff member doing the work and what they were asked to change — the client sees a count of the work on their own request, never a title, an assignee or a date" },
+  tasks: { fence: null, why: "our own internal admin — the quarterly VAT return, a domain renewal. A client login cannot reach a single door on the table, let alone its history" },
+  todos: {
+    fence: null,
+    why: "a to-do's ROWS are the client's — they read theirs and complete them, fenced by accountScopeClause on every statement — but its HISTORY is ours: it names the staff member who asked for the thing and the one who withdrew it, which is the sentence SCOPE ch.06 keeps off the portal. The client is shown the to-do, its date and whether it is done, which is the part that is theirs; the portal ships no activity feed to put the rest in (PORTAL_ACTIVITY_EXEMPT).",
+  },
   work_logs: { fence: null, why: "how long one of our people took over a piece of work, and who corrected the figure afterwards. It is the input to the agency's own margin, and the hours behind a price are never the client's to read — they see the VALUE the work produced (the savings drilled through their process map) and not what it cost us to produce it" },
   sprints: { fence: null, why: "a sprint's history names who priced it and what the price was before. The client is shown the sprint as a NAMED BLOCK WITH DATES because it is what they bought (BUILD-1 §7); the record of us changing our minds about it is ours" },
 }
@@ -504,6 +511,11 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
   // not a separate kind of record from the story it belongs to, it is that
   // story's cost. A client login holds neither.
   work_logs: "work",
+  // A TASK is our own admin, so it gates with the rest of the work engine. A
+  // TO-DO is aimed at a client and is the one module in this build a client login
+  // is meant to hold — so it gates on its own.
+  tasks: "work",
+  todos: "todos",
   // The work engine. A story and the sprint it sits in are one record from a
   // reader's point of view — a piece of work and the block it was sold inside —
   // so both gate on `work`, the module a client login never holds.
@@ -721,4 +733,8 @@ export const FORM_DIALOGS = [
   // have: the two moments are remembered, not looked up, and a person who loses
   // them to a mis-tap has to remember them again.
   "time-form-dialog",
+  // The two nouns beside each other. The to-do form is the only one in the
+  // agency app whose Save reaches into a customer's inbox, so it says so.
+  "todo-form-dialog",
+  "task-form-dialog",
 ] as const

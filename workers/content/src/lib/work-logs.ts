@@ -49,6 +49,10 @@ export const WORK_LOG_TARGETS: Record<string, { label: string; account: string; 
   // explicit that it must be loggable against the request — which is the only
   // reason tickets are in this list at all.
   help: { label: "description", account: "account_id", noun: "ticket" },
+  // OUR OWN ADMIN. Forty minutes on the quarterly VAT return is real time and
+  // costs us the same as forty minutes of delivery, so it is loggable — and it
+  // is the difference between a task and a to-do, which is never.
+  tasks: { label: "title", account: "account_id", noun: "task" },
 }
 
 /** How long a timer may run before Monday morning offers to do something about

@@ -132,6 +132,11 @@ export function buildSpineDb(): DatabaseSync {
   // activity door's module gate. Without it the help burglary below would be
   // refused by the gate and pass while the fence was wide open — a green test
   // asserting the wrong thing.
+  // `todos` is the one module on this list a REAL Client role is meant to hold:
+  // a to-do is aimed at the client and they complete it themselves. So the
+  // burglar holding it is not a worst case at all — it is the ordinary case, and
+  // what stops them reading Bergman's homework is the account fence rather than
+  // a refusal.
   // `work` is here for exactly that reason and no other. No real Client role
   // would ever hold it — every work-engine door refuses a portal caller outright
   // — which is precisely why the burglar must: a refusal proved against a caller
@@ -144,7 +149,7 @@ export function buildSpineDb(): DatabaseSync {
         FROM (SELECT 'accounts' AS module UNION ALL SELECT 'portal_users'
               UNION ALL SELECT 'team_members' UNION ALL SELECT 'member_roles'
               UNION ALL SELECT 'help' UNION ALL SELECT 'processes'
-              UNION ALL SELECT 'work') m;`)
+              UNION ALL SELECT 'work' UNION ALL SELECT 'todos') m;`)
   grantAll(IDS.adminRole)
   grantAll(IDS.clientRole)
 

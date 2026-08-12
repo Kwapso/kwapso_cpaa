@@ -27,8 +27,22 @@ const SECRET_KEY = /pass(word|phrase)|secret|token|credential|api[-_]?key|^key$|
 
 /** One line stays one line: past this a value is clipped with an ellipsis. */
 const MAX_VALUE = 160
-/** A panel, not a data dump. Extra lines collapse into "…and N more". */
-const MAX_LINES = 16
+/** A panel, not a data dump. Extra lines collapse into "…and N more".
+ *
+ * DERIVED FROM THE MODULE CATALOGUE, not hand-picked, and that is the whole
+ * point. A permission sheet is inherently one line per module plus the fields
+ * around it, so a fixed 16 was a truncation waiting for the fourteenth module —
+ * and it arrived: adding `work` and `todos` pushed a role-grant panel past the
+ * ceiling, so an admin would have been shown "…and 2 more" in place of the two
+ * modules the same call sets to NO ACCESS. That is the exact failure the panel
+ * exists to prevent, wearing the ellipsis instead of the empty renderer:
+ * "approved by an admin who was shown a different change from the one they
+ * authorised."
+ *
+ * So the floor moves with the app. `+ 6` is the room for the fields a grant
+ * carries beside its sheet (the role, its title, its description) with slack; 16
+ * stays the minimum so a payload that is NOT a sheet still reads as a panel. */
+const MAX_LINES = Math.max(16, TEAM_MODULE_CATALOG.length + 6)
 /** Ids listed from a bulk array before the count carries the rest. */
 const MAX_ITEMS = 3
 

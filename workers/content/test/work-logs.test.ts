@@ -96,7 +96,9 @@ describe("what time may be logged against", () => {
         await call(IDS.staffUser, "POST /api/content/help", { description: "Something to read" })
       ).json()) as { tickets: { id: string }[] }
     ).tickets[0].id
-    const ids: Record<string, string> = { stories: story, help: ticket }
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Our own VAT return" })
+    const task = (db().prepare(`SELECT id FROM tasks LIMIT 1`).get() as { id: string }).id
+    const ids: Record<string, string> = { stories: story, help: ticket, tasks: task }
     for (const table of Object.keys(WORK_LOG_TARGETS)) {
       const res = await call(IDS.staffUser, "POST /api/content/work-logs/start", {
         targetTable: table,

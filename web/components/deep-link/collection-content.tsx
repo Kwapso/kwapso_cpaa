@@ -231,6 +231,8 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         total={totals.work}
         canCreate={can("work", "create")}
         canEdit={can("work", "edit")}
+        canRaiseTodo={can("todos", "create")}
+        canCancelTodo={can("todos", "delete")}
         onAction={onAction}
         onIntent={onIntent}
       />
