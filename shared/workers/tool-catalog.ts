@@ -785,6 +785,118 @@ export const SHARED_TOOLS: SharedTool[] = [
       },
     },
   },
+  /* ------------------------------- knowledge ------------------------------- */
+  // THE ASSISTANT IS NOT JUST A READER HERE (the owner's own words): it can ask
+  // the knowledge base a question AND add, correct or take away a source — each
+  // one gated by exactly the right a PERSON needs for the same act, because it
+  // acts as the signed-in caller through these same doors. Someone who cannot
+  // delete a source cannot ask the assistant to delete one either; the door
+  // refuses them both with the same sentence.
+  {
+    name: "ask_knowledge",
+    summary:
+      "Ask the team's knowledge base a question and get the passages that answer it, each with the source it came from. Pass `accountId` when the question is about one client and you know which — the answer is otherwise compartmented from the question's own words. It NEVER writes an answer for you: use the passages, quote the titles, and if `found` is false say so in the words of `message` rather than answering from memory. `reason` says which compartment it searched and why — repeat it when the answer looks wrong for the question.",
+    binding: "CONTENT", method: "GET", path: "/api/content/knowledge/ask",
+    schema: obj({ q: S, accountId: S, limit: N }, ["q"]),
+    buildQuery: (i) => {
+      const q = [`q=${encodeURIComponent(str(i, "q"))}`]
+      if (str(i, "accountId")) q.push(`accountId=${encodeURIComponent(str(i, "accountId"))}`)
+      if (typeof i.limit === "number") q.push(`limit=${i.limit}`)
+      return `?${q.join("&")}`
+    },
+    agent: { write: false, summarize: (i) => `Ask the knowledge base: "${str(i, "q").slice(0, 60)}"` },
+  },
+  {
+    name: "list_knowledge_sources",
+    summary:
+      "List what the assistant is allowed to read. Filters: `kind` ('note' for something typed here, or 'ticket' / 'article' / 'account' for material mirrored from the app's own rows), `compartment` ('agency' or 'account:<id>'), `q` (searches the title and the text). Pass `id` for one source. Returns ONE page plus the exact `total`, `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
+    binding: "CONTENT", method: "GET", path: "/api/content/knowledge",
+    schema: obj({ id: S, kind: S, compartment: S, q: S, cursor: S }),
+    buildQuery: (i) => {
+      const q: string[] = []
+      for (const key of ["id", "kind", "compartment", "q", "cursor"])
+        if (str(i, key)) q.push(`${key}=${encodeURIComponent(str(i, key))}`)
+      return q.length ? `?${q.join("&")}` : ""
+    },
+    agent: {
+      write: false,
+      summarize: (i) => (str(i, "id") ? "Look up one knowledge source" : "List the knowledge base's sources"),
+    },
+  },
+  {
+    name: "get_knowledge_status",
+    summary:
+      "Is the knowledge base in step? One row per kind of material the app keeps in step for you (tickets, learning articles, accounts): how far the sweep has read, when it last ran, when it last SUCCEEDED, and what went wrong if it didn't. `lastError` set with an old `lastOkAt` is the shape of 'it has been failing since Tuesday' — read this before trusting an answer that seems to be missing something recent.",
+    binding: "CONTENT", method: "GET", path: "/api/content/knowledge/sync",
+    schema: obj({}),
+    agent: { write: false, summarize: () => "Check whether the knowledge base is up to date" },
+  },
+  {
+    name: "add_knowledge_source",
+    summary:
+      "Write something into the knowledge base so the assistant can use it from now on: `title` and `body` are the material itself. `accountId` files it under one client (leave it out for the agency's own); `visibility` 'private' keeps it to you alone, and anything else means the team. It is searchable immediately.",
+    binding: "CONTENT", method: "POST", path: "/api/content/knowledge",
+    schema: obj({ title: S, body: S, sourceUrl: S, accountId: S, visibility: S }, ["title"]),
+    buildBody: (i) => ({
+      title: str(i, "title"),
+      body: opt(i, "body"),
+      sourceUrl: opt(i, "sourceUrl"),
+      accountId: opt(i, "accountId"),
+      visibility: opt(i, "visibility"),
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Add "${str(i, "title")}" to the knowledge base` },
+  },
+  {
+    name: "update_knowledge_source",
+    summary:
+      "Correct a source (by id). A source MIRRORED from the app's own rows (a ticket, an article, an account) owns its own text — for those, only the filing can change here (`accountId`, `visibility`), because the sweep would overwrite anything else on its next pass. A note typed into the knowledge base is editable in full.",
+    binding: "CONTENT", method: "POST", path: "/api/content/knowledge/update",
+    schema: obj({ id: S, title: S, body: S, sourceUrl: S, accountId: S, visibility: S }, ["id", "title"]),
+    buildBody: (i) => ({
+      id: str(i, "id"),
+      title: str(i, "title"),
+      body: opt(i, "body"),
+      sourceUrl: opt(i, "sourceUrl"),
+      accountId: opt(i, "accountId"),
+      visibility: opt(i, "visibility"),
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Correct knowledge source ${str(i, "id")}` },
+  },
+  {
+    name: "set_knowledge_source_active",
+    summary:
+      "Take a source away from the assistant (active:false) or give it back (active:true), by id. Nothing is deleted: the row and its history survive, its searchable pieces do not — and the sweep will not quietly re-add a source somebody took away.",
+    binding: "CONTENT", method: "POST", path: "/api/content/knowledge/active",
+    schema: obj({ id: S, active: B }, ["id", "active"]),
+    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
+    agent: {
+      write: true,
+      // DESTRUCTIVE ONLY WHEN TAKING AWAY — the same predicate the three other
+      // (de)activate toggles carry. Removing a source changes what every future
+      // answer can be built from, which is the blast radius that earns a panel;
+      // giving one back does not.
+      confirm: (i) => i.active !== true,
+      summarize: (i) =>
+        `${i.active === true ? "Give the assistant back" : "Take away the assistant's sight of"} source ${str(i, "id")}`,
+    },
+  },
+  {
+    name: "sync_knowledge",
+    summary:
+      "Bring the knowledge base into step with the app's own rows — tickets, learning articles and accounts — one bounded slice at a time. Every result carries `caughtUp`; keep calling while any of them is false. A 15-minute sweep does this on its own, so this is for 'do it now' and for the first fill.",
+    binding: "CONTENT", method: "POST", path: "/api/content/knowledge/sync",
+    schema: obj({}),
+    buildBody: () => ({}),
+    agent: {
+      write: true,
+      // Writes only MIRRORS of rows the caller can already read, adds nothing a
+      // person did not already put in the app, and is idempotent by construction
+      // (a row whose text has not changed is skipped). Nothing to approve.
+      confirm: false,
+      summarize: () => "Bring the knowledge base up to date",
+    },
+  },
+
   {
     name: "add_help_stakeholder",
     summary:
@@ -834,6 +946,12 @@ export const TOOL_GATES: Record<string, string> = {
   update_learning: "learning:edit",
   set_learning_active: "learning:delete",
   mark_learning_done: "learning:read",
+  add_knowledge_source: "knowledge:create",
+  update_knowledge_source: "knowledge:edit",
+  set_knowledge_source_active: "knowledge:delete",
+  // It CREATES sources (mirrors of rows the caller can already read), so it is
+  // gated as a create — the same right a person needs to fill the base by hand.
+  sync_knowledge: "knowledge:create",
   raise_help_ticket: "help:create",
   update_help_ticket: "help:edit",
   set_help_status: "help:edit",

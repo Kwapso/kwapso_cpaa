@@ -171,6 +171,13 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "agent-body-parity",
     status: "enforced",
   },
+  {
+    id: "R23",
+    dimension: "ai",
+    law: "An answer from the knowledge base carries its sources, or it is not an answer. Retrieval never writes prose — it hands back the passages it found and the sources they came from, and the assistant composes the reply with those in front of it. So `found`, `passages` and `citations` are ONE decision made in ONE place (knowledgeAnswer): no citation means no passage, and a sentence the assistant must say instead of inventing one. No door may assemble that response by hand — the same shape as R14's pagedJson seam, and for the same reason: a door that builds half a contract ships half a contract, and here the missing half is the difference between \"we have nothing on that\" and a confident answer with nothing behind it. The compartment a question was answered from, and the REASONING that chose it, ride the same object, because a wrong compartment is invisible otherwise. Earned by: the owner's own sentence in the brief — \"an answer with no source is a bug, not a style choice\" — and by what a sourceless answer costs where this one is aimed: an agency repeating it to a client.",
+    checkId: "cited-answers",
+    status: "enforced",
+  },
 ]
 
 /** R13 — reviewed exemptions: modules that are deliberately NOT import targets,
@@ -183,6 +190,8 @@ export const CATALOG_EXEMPT: Record<string, string> = {
   agent: "the assistant's threads/usage are system records, not importable content",
   portal_users:
     "a login is a granted identity, not importable content — a CSV cannot consent for a person (the same reason team_members is exempt)",
+  knowledge:
+    "a source is either TYPED here — and indexed in the same call, because the owner asked for instant syncing, which costs one embedding per chunk — or MIRRORED from a row the app already owns and kept in step by the sweep. A CSV would be a third way in with the first one's cost and neither one's upkeep: the importer writes row by row through the module's own gated create door, so a 5,000-row file would be 5,000 chunkings and 5,000 model calls inside one request, against a €50/month ceiling. The in-rule answer to 'we have a spreadsheet of process notes' is to point the sweep at where they already live, or to import them into the module they belong to and let the mirror do it.",
 }
 
 /** R21 — the doors a CLIENT LOGIN can reach at the agency origin that neither
@@ -368,7 +377,11 @@ export const PORTAL_ACTIVITY_FENCE: Record<string, { fence: "account" | null; wh
     fence: null,
     why: "a ticket's history names the staff who moved it and quotes the problem statement — the client is shown the STATUS instead (PORTAL_ACTIVITY_EXEMPT says the same thing about the screen). THE LEAK: help sat outside the deciding list, so another client's support history came back by ticket id. STILL null after the 11 Aug 2026 widening: a contact now sees their whole company's TICKETS, which is a decision about the rows; their HISTORY is a different question, and its answer is the one SCOPE ch.06 gives — the portal never says which staff member is doing the work.",
   },
-  learning: { fence: null, why: "the agency's own knowledge base — a client has no screen on it" },
+  learning: { fence: null, why: "the agency's own how-to library — a client has no screen on it" },
+  knowledge_sources: {
+    fence: null,
+    why: "the knowledge base is the agency's own material — its process notes, its internal tickets, what it knows about each client — and a client login cannot reach a single door on it (every knowledge handler opens with refusePortalCaller). Its HISTORY would name what was filed under whom, which is a worse disclosure than the sources themselves: 'X filed \"the Delaval renewal\" under Delaval' tells a reader at another company that Delaval is a client. Silence, in the same fail-closed direction as everything else here.",
+  },
   selectable_data: { fence: null, why: "the agency's dropdown vocabulary — app furniture, and none of it is the client's" },
   users: { fence: null, why: "a member's joins, role changes and removals — the agency's staff, never a client's business" },
   member_roles: { fence: null, why: "the agency's permission structure — knowing its shape helps only an attacker" },
@@ -411,6 +424,7 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
   accounts: "accounts",
   account_links: "accounts",
   portal_users: "portal_users",
+  knowledge_sources: "knowledge",
 }
 
 /** R15 — reviewed DEAF exemptions: resources a worker publishes that reach NO
@@ -434,6 +448,15 @@ export const GROWING_COLLECTIONS: Record<
     listRecipe: "tickets.list",
     webKey: "helpKey(",
     why: "tickets accumulate forever — a team that has raised 3,000 must still reach the oldest",
+  },
+  knowledge: {
+    lib: "workers/content/src/lib/knowledge.ts",
+    fn: "listSources",
+    routes: "workers/content/src/routes/knowledge.ts",
+    rowsKey: "sources",
+    listRecipe: "knowledge.list",
+    webKey: "knowledgeKey(",
+    why: "one source per ticket, per article, per account, plus every note anybody writes — the agency's own history is thousands of rows on day one and the sweep only ever adds",
   },
   accounts: {
     lib: "workers/tenancy/src/lib/accounts.ts",
@@ -512,6 +535,7 @@ export const RECORD_DETAIL_COMPONENTS = [
   "learning-detail",
   "role-detail",
   "account-detail",
+  "knowledge-detail",
 ] as const
 
 /** R2 — reviewed bypasses. Each MUST get tabs over time; the reason is mandatory.
@@ -553,6 +577,10 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
   "help-detail.overview": "one ticket's type, source and audit block — one record, not a collection.",
   "account-detail.overview":
     "one account's own fields (type, reference, contact details, where it sits) — one record, not a collection. Its four collection tabs — contacts, children, portal access, activity — each carry a server count.",
+  "knowledge-detail.source":
+    "the source's own text — the exact words the assistant reads out of it, plus where they came from. One record's body, not a collection. (How many searchable pieces that text became is a FIELD on the Overview, not a tab: the pieces are derived from the text on this same panel, so a tab over them would be the same thing twice.)",
+  "knowledge-detail.overview":
+    "one source's kind, compartment, who may read it, how many pieces it was cut into and when it was last indexed — one record, not a collection.",
 }
 
 /** R4 — the form dialogs that MUST use FormShell. */
@@ -566,4 +594,5 @@ export const FORM_DIALOGS = [
   "account-form-dialog",
   "contact-link-dialog",
   "portal-access-dialog",
+  "knowledge-form-dialog",
 ] as const

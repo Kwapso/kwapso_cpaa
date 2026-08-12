@@ -505,6 +505,44 @@ turn is persisted here, so the conversation is replayable and auditable. The
 agent acts AS the signed-in user through the same gated endpoints the UI uses, so
 these rows are a record of intent, never a separate set of powers.
 
+### knowledge_sources + knowledge_chunks + knowledge_terms + knowledge_ingest — KEEP (BUILT 2026-08-11, team migration `0012_knowledge`) — THE KNOWLEDGE BASE
+One knowledge base, many **compartments**, chosen for the reader rather than by
+them. Four tables, one per job:
+
+- **`knowledge_sources`** — one row per piece of material the assistant may read.
+  Two families in one table, because a person edits them in one list: a `note`
+  somebody typed here (the body IS the truth) and a MIRROR of a row we already
+  own — `ticket` / `article` / `account` — where the row is the truth and the
+  15-minute sweep keeps the body in step. `compartment` is the design in one
+  column (`agency`, or `account:<id>`), DERIVED on write and correctable by hand,
+  never free-typed. `owner_user_id` is the second fence: NULL = the team's, a
+  value = one person's (what THEY can see, through their own connection).
+  `content_hash` + `indexed_at` are what let the sweep skip an unchanged row
+  before it costs a model call. Deactivating means "stop reading this": the row
+  survives, its chunks do not, and the sweep will not put it back.
+- **`knowledge_chunks`** — a readable piece of a source: what retrieval scores
+  and what an answer cites. `embedding` is the quantised vector (384 dimensions →
+  512 characters); NULL means "not embedded yet", which retrieval survives by
+  falling back to the lexical score alone.
+- **`knowledge_terms`** — the inverted index, as an ORDINARY indexed table rather
+  than an FTS5 virtual one. Deliberate, and the reason is the DELETE: a re-index
+  removes a source's postings, and on FTS5 that is a scan of every posting in the
+  team, while here it is one keyed delete. It also behaves identically in the
+  test harness and in D1, which a virtual table kept in step by triggers does not.
+- **`knowledge_ingest`** — one row per source KIND: the cursor it reached, when it
+  last ran, when it last SUCCEEDED, and what went wrong when it didn't (R12). The
+  cursor is what makes ingestion resumable — a tick that dies halfway costs the
+  next one nothing but the rows it has not reached.
+
+**Why the vectors live here and not in Vectorize** — the whole argument is at the
+top of `workers/content/src/lib/knowledge.ts`, but the short of it: every vector
+must belong to exactly one team, and a per-team database makes that STRUCTURAL
+(a caller's guard resolves one database id and the SQL cannot name another) where
+an account-wide index with a team id in its metadata makes it a filter somebody
+wrote correctly today.
+
+---
+
 ---
 
 ## Status: what's built vs. to build
@@ -519,6 +557,8 @@ these rows are a record of intent, never a separate set of powers.
   2026-06-23)**: importable_databases, agent_usage, agent_credits, mcp_tokens (GLOBAL core
   0008/0009/0010); learning, learning_progress, help, help_threads,
   data_import_sessions, agent_threads, agent_messages (per-team `0004_modules`).
+  **Knowledge base (BUILT 2026-08-11)**: knowledge_sources, knowledge_chunks,
+  knowledge_terms, knowledge_ingest (per-team `0012_knowledge`).
   **Since:** agent_usage_log (GLOBAL core `0011`, BUILT 2026-07-01), error_logs
   (GLOBAL core `0012`, the central error store, BUILT 2026-07-03),
   data_import_batches (per-team `0006_import_batches`, the agentic multi-file

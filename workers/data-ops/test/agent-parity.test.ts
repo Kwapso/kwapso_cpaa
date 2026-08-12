@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest"
 
 import { GLOSSARY } from "@shared/glossary"
 import { capabilityBrief } from "../src/lib/app-brief"
-import { DROPDOWN_ORDER_RULE, SYSTEM } from "../src/lib/agent"
+import { DROPDOWN_ORDER_RULE, KNOWLEDGE_CITATION_RULE, SYSTEM } from "../src/lib/agent"
 import { TARGETS } from "../src/lib/targets"
 import { sharedByName } from "@shared/workers/tool-catalog"
 
@@ -76,5 +76,33 @@ describe("agent-app parity (Law R9): the agent knows what the app can do", () =>
     }
     // The rule is worthless if it doesn't name the tool the model must reach for.
     expect(DROPDOWN_ORDER_RULE).toContain("create_dropdown_value")
+  })
+
+  // R9 meets R23. The knowledge door makes a sourceless answer impossible to
+  // RECEIVE — `found`, `passages` and `citations` are one decision, so an empty
+  // result arrives with no passages and a sentence saying so. This is the other
+  // half: what the model must DO with that. Both surfaces again, because the
+  // model only obeys what both agree on — and because the failure this prevents
+  // (answering a client's question from training data, confidently, with no
+  // source) is the one the whole module exists for.
+  it("both surfaces say an answer names its sources, and silence stays silence", () => {
+    const ask = sharedByName("ask_knowledge")
+    expect(ask, "the ask_knowledge tool must exist").toBeDefined()
+    expect(SYSTEM, "the system rule wall must carry the citation rule").toContain(KNOWLEDGE_CITATION_RULE)
+
+    for (const [surface, text] of [
+      ["the tool's own description", ask!.summary],
+      ["the system rule wall", KNOWLEDGE_CITATION_RULE],
+    ] as const) {
+      const t = text.toLowerCase()
+      expect(t, `${surface} must say the answer comes from the passages, not from memory`).toMatch(
+        /from memory/
+      )
+      expect(t, `${surface} must name what to do when there is nothing: say so`).toMatch(/say so/)
+      expect(t, `${surface} must tie the refusal to the door's own flag`).toMatch(/found/)
+    }
+    // And it must name the tool the model has to reach for — a rule about
+    // citations that never says how to get one is a rule about nothing.
+    expect(KNOWLEDGE_CITATION_RULE).toContain("ask_knowledge")
   })
 })

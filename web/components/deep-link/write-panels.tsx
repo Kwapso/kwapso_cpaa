@@ -13,6 +13,7 @@ import { type ScreenQuery } from "@kwapso/ui/lib/recipe"
 
 import { AccountFormDialog } from "@/components/account-form-dialog"
 import { LearningFormDialog } from "@/components/learning-form-dialog"
+import { KnowledgeFormDialog } from "@/components/knowledge-form-dialog"
 import { HelpFormDialog } from "@/components/help-form-dialog"
 import { RolePickerDialog } from "@/components/role-picker-dialog"
 import { RoleFormDialog } from "@/components/role-form-dialog"
@@ -38,7 +39,7 @@ export type WritePanelsProps = Pick<
 > &
   Pick<
     ReturnType<typeof useScreenActions>,
-    "runAction" | "createLearning" | "createHelp" | "createAccount"
+    "runAction" | "createLearning" | "createHelp" | "createAccount" | "createKnowledge"
   > & {
     query: ScreenQuery
     can: ReturnType<typeof usePermissions>["can"]
@@ -67,6 +68,7 @@ export function WritePanels({
   createLearning,
   createHelp,
   createAccount,
+  createKnowledge,
   closePanel,
   onRecordGone,
 }: WritePanelsProps) {
@@ -143,6 +145,17 @@ export function WritePanels({
         teamId={teamId}
         helpTypeOptions={helpTypeOptions}
         onSubmit={createHelp}
+      />
+
+      {/* Add a knowledge source (?panel=add&module=knowledge) — gated by create.
+          The account picker offers the accounts the caller can already see, so a
+          source can only ever be filed under a client they may read. */}
+      <KnowledgeFormDialog
+        open={query.panel === "add" && query.module === "knowledge" && can("knowledge", "create")}
+        onOpenChange={(o) => !o && closePanel()}
+        draftKey={teamId ? `knowledge:new:${teamId}` : undefined}
+        accountOptions={(accountsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
+        onSubmit={createKnowledge}
       />
 
       {/* Edit the team (?panel=edit&module=team) — gated by teams:edit. */}

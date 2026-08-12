@@ -378,11 +378,32 @@ describe("RULES — the laws of the base", () => {
       ).toBe(0)
 
       // …and something in web must be able to ask for page two.
+      //
+      // THE `<LoadMore>` AND THE KEY MUST BE THE SAME CONTROL, not two strings in
+      // one file. This used to be `src.includes("<LoadMore") && src.includes(key)`
+      // — a file-level AND — and the knowledge base walked straight through it:
+      // its LIST had no paging control at all while its record DETAIL had one (for
+      // the activity feed) and mentioned the list's cache key elsewhere, so a
+      // component with both substrings existed and the law reported "all clear".
+      // Deleting the whole control left the build green. So for a paged LIST
+      // SCREEN (one with a `listRecipe`) the key must appear INSIDE the LoadMore's
+      // own props — that is what makes it that collection's paging control.
+      //
+      // The two record feeds are excepted on purpose and it is not a loophole:
+      // their control reads `listKey={activity.listKey}`, a value the hook named
+      // `useRecordActivity(` hands them, so the key genuinely is not written at
+      // the call site. For those the file-level check is the strongest honest one
+      // — and R2's own check (record-detail-tabs) already demands a `<LoadMore>`
+      // in every one of those components by name.
       const wired = componentFiles().some((f) => {
         const src = read(f)
-        return src.includes("<LoadMore") && src.includes(c.webKey)
+        if (!c.listRecipe) return src.includes("<LoadMore") && src.includes(c.webKey)
+        return [...src.matchAll(/<LoadMore[\s\S]{0,400}?\/>/g)].some((m) => m[0].includes(c.webKey))
       })
-      expect(wired, `${name} pages on the server but nothing in web can reach page two`).toBe(true)
+      expect(
+        wired,
+        `${name} pages on the server but nothing in web can reach page two — a <LoadMore> whose listKey is built from ${c.webKey}`
+      ).toBe(true)
 
       // R14 meets R16: the collection frame's own "Showing X of Y" counts the
       // LOADED prefix, so on a paged screen it under-reports — and it is a
@@ -851,6 +872,7 @@ describe("RULES — the laws of the base", () => {
       "agent-filter-parity", // R19: workers/mcp/test/filter-parity.test.ts
       "client-reachable-doors", // R21: the client-reach scan above
       "agent-body-parity", // R22: the request BODY half, beside R19 in the mcp suite
+      "cited-answers", // R23: workers/content/test/cited-answers.test.ts
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

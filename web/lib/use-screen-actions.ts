@@ -18,10 +18,11 @@ import * as React from "react"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 
 import { content as contentApi, tenancy } from "@/lib/api"
-import { accountsKey, listFetch } from "@/lib/live-resources"
+import { accountsKey, knowledgeKey, listFetch } from "@/lib/live-resources"
 import { invalidate, primeCache } from "@shared/web/store"
 import type { AccountFormValues } from "@/components/account-form-dialog"
 import type { LearningFormValues } from "@/components/learning-form-dialog"
+import type { KnowledgeFormValues } from "@/components/knowledge-form-dialog"
 
 export function useScreenActions(teamId: string | null) {
   // The named-action dispatcher — the flat `{key: string}` payloads the engine emits.
@@ -122,5 +123,26 @@ export function useScreenActions(teamId: string | null) {
     [teamId]
   )
 
-  return { runAction, createLearning, createHelp, createAccount }
+  // Add a knowledge source. The list is PAGED, so the create call can't hand back
+  // "the new list" — page ONE is re-pulled instead, which is where the newest row
+  // now sits, and that same fetcher re-primes the exact total and the cursor
+  // (accounts does the same thing for the same reason). Everyone else gets the
+  // realtime "add" ping.
+  const createKnowledge = React.useCallback(
+    async (values: KnowledgeFormValues) => {
+      if (!teamId) return
+      await contentApi.createKnowledge({
+        title: values.title,
+        body: values.body || null,
+        sourceUrl: values.sourceUrl || null,
+        accountId: values.accountId || null,
+        visibility: values.visibility,
+      })
+      primeCache(knowledgeKey(teamId), await listFetch.knowledge(teamId))
+      toast.success(`The assistant can now use "${values.title}".`)
+    },
+    [teamId]
+  )
+
+  return { runAction, createLearning, createHelp, createAccount, createKnowledge }
 }

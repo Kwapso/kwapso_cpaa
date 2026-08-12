@@ -25,4 +25,16 @@ export type Env = {
   /** Shared secret for any internal worker-to-worker call (defense-in-depth
    * alongside workers_dev:false). */
   INTERNAL_KEY?: string
+
+  /** Cloudflare Workers AI — the knowledge base's embedding model, and nothing
+   * else on this worker. No external key, no external socket: it is a binding,
+   * so R11's timeout law is satisfied the way a service binding satisfies it. */
+  AI: Ai
+  /** The embedding model id, so swapping it is config rather than a deploy of
+   * new code. Whatever it is, it must be the SAME model that wrote the vectors
+   * already stored — a change here makes every existing embedding incomparable,
+   * and `similarity` reads that as "no evidence" (0) rather than as a wrong
+   * answer, so the base degrades to its lexical half until the sweep re-indexes.
+   * Defaults to @cf/baai/bge-small-en-v1.5 (384 dimensions). */
+  KNOWLEDGE_EMBED_MODEL?: string
 }

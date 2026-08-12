@@ -15,6 +15,8 @@ import type {
   HelpMessage,
   HelpStakeholder,
   HelpTicket,
+  KnowledgeAnswer,
+  KnowledgeSource,
   Learning,
   LearningProgressEntry,
 } from "@shared/types"
@@ -66,6 +68,63 @@ export const content = {
     api<{ stakeholders: HelpStakeholder[] }>(`/api/content/help/stakeholders?id=${enc(id)}`),
   addStakeholder: (id: string, userId: string) =>
     api<{ stakeholders: HelpStakeholder[] }>("/api/content/help/stakeholders", post({ id, userId })),
+
+  /* ------------------------------- knowledge ------------------------------- */
+  /** R14: a PAGE of sources (a GROWING collection) — hand `nextCursor` back to
+   * get the next one. `total` is the exact server count the badge shows. */
+  knowledge: (cursor?: string | null) =>
+    api<PagedResponse<{ sources: KnowledgeSource[] }>>(
+      `/api/content/knowledge${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`
+    ),
+  knowledgeOne: (id: string) =>
+    api<{ sources: KnowledgeSource[] }>(`/api/content/knowledge?id=${enc(id)}`).then(
+      (r) => r.sources[0] ?? null
+    ),
+  /** Ask the knowledge base a question. A READ — it writes nothing and answers
+   * with passages plus the sources they came from (Law R23). */
+  askKnowledge: (question: string, accountId?: string | null) =>
+    api<KnowledgeAnswer>(
+      `/api/content/knowledge/ask?q=${enc(question)}${accountId ? `&accountId=${enc(accountId)}` : ""}`
+    ),
+  knowledgeStatus: () =>
+    api<{
+      ingest: {
+        kind: string
+        lastRunAt: string | null
+        lastOkAt: string | null
+        lastError: string | null
+        sourcesIndexed: number
+      }[]
+    }>("/api/content/knowledge/sync"),
+  createKnowledge: (input: {
+    title: string
+    body?: string | null
+    sourceUrl?: string | null
+    accountId?: string | null
+    visibility?: string
+  }) => api<{ source: KnowledgeSource | null; total: number }>("/api/content/knowledge", post(input)),
+  updateKnowledge: (input: {
+    id: string
+    title: string
+    body?: string | null
+    sourceUrl?: string | null
+    accountId?: string | null
+    visibility?: string
+  }) =>
+    api<{ source: KnowledgeSource | null; total: number }>("/api/content/knowledge/update", post(input)),
+  setKnowledgeActive: (id: string, active: boolean) =>
+    api<{ source: KnowledgeSource | null; total: number }>(
+      "/api/content/knowledge/active",
+      post({ id, active })
+    ),
+  /** One bounded slice of the sweep. `caughtUp` false means there is more to do —
+   * the screen calls again rather than waiting a quarter of an hour. */
+  syncKnowledge: () =>
+    api<{
+      results: { kind: string; read: number; indexed: number; caughtUp: boolean; error?: string }[]
+      caughtUp: boolean
+      total: number
+    }>("/api/content/knowledge/sync", post({})),
 }
 
 /** Data-ops worker — the agentic file import + the AI agent. */

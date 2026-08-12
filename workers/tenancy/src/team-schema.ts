@@ -531,6 +531,127 @@ SELECT lower(hex(randomblob(16))), 'Ticket type', v.value, 1, datetime('now'), '
  );
 `,
   },
+  {
+    // THE KNOWLEDGE BASE — one knowledge base, many COMPARTMENTS, chosen for the
+    // reader rather than by them (.plans/BUILD-2-knowledge-base.md §1).
+    //
+    // WHY THE VECTORS LIVE HERE, in the team's own database, rather than in one
+    // account-wide index: "every vector, every chunk and every source row belongs
+    // to exactly one team, and retrieval can never cross that line." A per-team
+    // database makes that STRUCTURAL — a caller's guard resolves one database id
+    // and the SQL cannot name another. An account-global index with a team id in
+    // the metadata makes it a filter somebody wrote correctly today. The whole
+    // argument, and what would change our mind, is at the top of
+    // workers/content/src/lib/knowledge.ts.
+    version: "0012_knowledge",
+    sql: `
+-- A SOURCE is one piece of material the assistant may read. Two families in one
+-- table, because a person edits them in the same list:
+--   • TYPED here (kind 'note') — the body IS the truth, written in the app;
+--   • MIRRORED from a row we already own (kind 'ticket' / 'article' / 'account')
+--     — the ROW is the truth and the sweep keeps the body in step with it.
+-- Deactivating either means "stop reading this": the sweep SKIPS an excluded
+-- source rather than re-adding it, which is what makes "take out something
+-- wrong" stick. Deactivate-never-delete, so the decision and who made it survive.
+--
+-- \`compartment\` is the design in one column: 'agency' for our own material,
+-- 'account:<id>' for one client's. DERIVED on write from the row the source
+-- mirrors, correctable by hand, never free-typed.
+--
+-- \`owner_user_id\` is the second fence, and the one a personal Google connection
+-- will land on: NULL means the team's (what the organisation can see), a value
+-- means one person's. Retrieval ANDs it, so material that arrived through one
+-- member's own sight of it cannot be read out of somebody else's answer.
+CREATE TABLE knowledge_sources (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL,
+  origin_table TEXT,
+  origin_row_id TEXT,
+  compartment TEXT NOT NULL DEFAULT 'agency',
+  account_id TEXT REFERENCES accounts (id),
+  title TEXT NOT NULL,
+  body TEXT,
+  source_url TEXT,
+  owner_user_id TEXT,
+  content_hash TEXT,
+  indexed_at TEXT,
+  chunk_count INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+-- The mirror's identity: ONE source per row mirrored, so a sweep that runs twice
+-- — or two sweeps at once — updates rather than duplicates. Partial, because a
+-- typed note has no origin and they must not collide with each other.
+CREATE UNIQUE INDEX idx_knowledge_sources_origin ON knowledge_sources (origin_table, origin_row_id) WHERE origin_row_id IS NOT NULL;
+CREATE INDEX idx_knowledge_sources_compartment ON knowledge_sources (compartment);
+
+-- A CHUNK is a readable piece of a source: what retrieval scores, and what an
+-- answer cites. \`embedding\` is the quantised vector (lib/knowledge-vector.ts);
+-- NULL means "not embedded yet", which retrieval survives by falling back to the
+-- lexical score alone — an index half-built still answers, it just ranks worse.
+CREATE TABLE knowledge_chunks (
+  id TEXT PRIMARY KEY,
+  source_id TEXT NOT NULL REFERENCES knowledge_sources (id),
+  compartment TEXT NOT NULL,
+  owner_user_id TEXT,
+  seq INTEGER NOT NULL,
+  text TEXT NOT NULL,
+  embedding TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX idx_knowledge_chunks_source ON knowledge_chunks (source_id);
+CREATE INDEX idx_knowledge_chunks_compartment ON knowledge_chunks (compartment, id);
+
+-- THE INVERTED INDEX — retrieval's first stage, as an ordinary indexed table
+-- rather than an FTS5 virtual one. Deliberate, and the reason is the DELETE: a
+-- re-index removes a source's postings, and on FTS5 that is a scan of every
+-- posting in the team (a virtual table has no index on a non-text column), while
+-- here it is one keyed delete. It also behaves identically in the test harness
+-- and in D1, which a virtual table kept in step by triggers does not — and a
+-- search path that cannot be run in a test is a search path we cannot prove.
+--
+-- \`compartment\` and \`owner_user_id\` are COPIES of the chunk's, so stage one is
+-- a single-table read. They can only change when the chunk is rewritten, which
+-- rewrites these rows too.
+CREATE TABLE knowledge_terms (
+  term TEXT NOT NULL,
+  chunk_id TEXT NOT NULL REFERENCES knowledge_chunks (id),
+  compartment TEXT NOT NULL,
+  owner_user_id TEXT,
+  weight INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (term, chunk_id)
+);
+CREATE INDEX idx_knowledge_terms_chunk ON knowledge_terms (chunk_id);
+
+-- WHERE THE SWEEP GOT TO. One row per source kind: the position it reached, when
+-- it last ran, when it last SUCCEEDED, and what went wrong when it didn't (R12 —
+-- unattended work has nobody watching, so a failure has to leave a mark someone
+-- can find). The cursor is what makes ingestion resumable: a tick that dies
+-- halfway, or a source that is an hour behind, costs the next tick nothing but
+-- the rows it has not reached yet.
+CREATE TABLE knowledge_ingest (
+  kind TEXT PRIMARY KEY,
+  cursor TEXT,
+  last_run_at TEXT,
+  last_ok_at TEXT,
+  last_error TEXT,
+  runs INTEGER NOT NULL DEFAULT 0,
+  sources_indexed INTEGER NOT NULL DEFAULT 0
+);
+
+-- Existing teams: the locked Admin role gains the new module in full (it IS full
+-- access by definition, and it cannot be edited afterwards to grant it). Every
+-- other role gains nothing — a migration must never hand out sight of the
+-- agency's own material that nobody granted. \`is_default\` is 1 on Admin alone.
+INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+SELECT lower(hex(randomblob(16))), r.id, 'knowledge', r.is_default, r.is_default, r.is_default, r.is_default
+  FROM member_roles r
+ WHERE NOT EXISTS (
+   SELECT 1 FROM role_permissions p WHERE p.role_id = r.id AND p.module = 'knowledge'
+ );
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

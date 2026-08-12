@@ -16,6 +16,7 @@ export type SectionKey =
   | "accounts"
   | "learning"
   | "tickets"
+  | "knowledge"
   | "import"
 
 export type Route = {

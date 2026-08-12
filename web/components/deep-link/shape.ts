@@ -13,6 +13,7 @@ import type {
   HelpTicket,
   Invite,
   InviteAudit,
+  KnowledgeSource,
   Learning,
   TeamMeta,
   TeamMember,
@@ -133,6 +134,49 @@ export function shapeLearningList(items: Learning[]): ScreenData {
       // Facet columns (read by the filter engine, not the renderer).
       category: l.category || "—",
       state: l.active ? "Active" : "Inactive",
+    })),
+  }
+}
+
+/* -------------------------------- knowledge ------------------------------- */
+
+/** What a source IS, in the words a person uses for it. A `note` is something
+ * somebody wrote here; everything else MIRRORS a row the app already owns, and
+ * saying which row it mirrors is the honest answer to "why does it know that?". */
+export const KNOWLEDGE_KIND: Record<string, string> = {
+  note: "Note",
+  ticket: "From a ticket",
+  article: "From an article",
+  account: "From an account",
+}
+
+/** Where a source is filed, as a person reads it: an account compartment shows
+ * the account, the agency's own shows the agency. The id is deliberately NOT
+ * printed — a ULID in a filter dropdown is noise; the account's own name is what
+ * somebody is scanning for, and the detail screen names it in full. */
+export function knowledgeFiledUnder(source: KnowledgeSource, accountNames?: Map<string, string>): string {
+  if (!source.accountId) return "The agency"
+  return accountNames?.get(source.accountId) ?? "A client"
+}
+
+export function shapeKnowledgeList(
+  sources: KnowledgeSource[],
+  accountNames?: Map<string, string>
+): ScreenData {
+  return {
+    rows: sources.map((s) => ({
+      id: s.id,
+      // A source taken AWAY from the assistant stays in the list (deactivate-not-
+      // delete) and says so, the same way a retired article does — seeing what
+      // you excluded is half of trusting what you did not.
+      name: s.active ? s.title : `${s.title} (not in use)`,
+      detail: `${KNOWLEDGE_KIND[s.kind] ?? s.kind} · ${knowledgeFiledUnder(s, accountNames)}${
+        s.visibility === "private" ? " · private to you" : ""
+      }`,
+      // Facet columns (read by the filter engine, not the renderer).
+      kind: KNOWLEDGE_KIND[s.kind] ?? s.kind,
+      filed: knowledgeFiledUnder(s, accountNames),
+      state: s.active ? "In use" : "Not in use",
     })),
   }
 }

@@ -28,6 +28,13 @@ export const THREAD_HARD_CAP = 500
  * "incomplete", which the caller can at least survive. */
 export const D1_LIST_PAGE_CAP = 100
 
+/** Teams one knowledge-sweep tick will visit. The sweep runs every 15 minutes
+ * and does a BOUNDED slice per team (INGEST_SOURCES_PER_TICK), so this is the
+ * ceiling on the whole tick's work: past it the remaining teams wait for the
+ * next one, which starts from each kind's own cursor and loses nothing. A cron
+ * that would run for an hour is a cron that gets killed halfway. */
+export const CRON_TEAM_CAP = 200
+
 /** Alarm rows one nightly size-check tick will write. The scan itself is cheap
  * (a size field per database), but every ALARMING database costs a core-DB read
  * plus an insert — so the tick's write work is bounded and the rest waits for

@@ -26,13 +26,14 @@ import { NotFound, LoadError, SectionWithCreate, CollectionCard } from "@/compon
 import { CollectionHeading } from "@/components/collection-heading"
 import { LoadMore } from "@/components/load-more"
 import { content as contentApi, tenancy } from "@/lib/api"
-import { accountsKey, helpKey } from "@/lib/live-resources"
+import { accountsKey, helpKey, knowledgeKey } from "@/lib/live-resources"
 import { CountedAbove } from "@/components/counted-tabs"
 import { formatCount } from "@shared/web/format-count"
 import {
   shapeAccountsList,
   shapeHelpList,
   shapeInvitesList,
+  shapeKnowledgeList,
   shapeLearningList,
   shapeMembersList,
   shapeRolesList,
@@ -58,6 +59,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     learningQ,
     helpQ,
     accountsQ,
+    knowledgeQ,
     totals,
     rights,
     onAction,
@@ -238,6 +240,42 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
           label="Load more accounts"
           fetchPage={(c: string) =>
             tenancy.accounts({ cursor: c }).then((r) => ({ rows: r.accounts, nextCursor: r.nextCursor }))
+          }
+        />
+      </div>
+    )
+  }
+  if (module === "knowledge") {
+    if (knowledgeQ.error) return <LoadError what="the knowledge base" />
+    if (knowledgeQ.data === undefined) return <Skeleton variant="list" lines={4} />
+    // The account NAMES a source is filed under — the list says "Bergman S.A.",
+    // never `account:01J…`. Already loaded for the whole team area on the
+    // accounts screen; here it is cache-first and empty until it lands, which
+    // the shaping reads as the honest "A client".
+    const names = new Map((accountsQ.data ?? []).map((a) => [a.id, a.name]))
+    const data = shapeKnowledgeList(knowledgeQ.data, names)
+    const knowledgeRecipe = withDataDrivenCollection(recipe, data.rows ?? [])
+    // R16: the count lives in the heading (a sidebar page has no tab strip to
+    // badge), and it is the door's exact COUNT(*) — never the loaded page's
+    // length, which on a paged list is just "50" forever.
+    return (
+      <div className="flex flex-col gap-4">
+        <CollectionHeading sectionKey="knowledge" total={totals.knowledge} />
+        <SectionWithCreate
+          show={can("knowledge", "create")}
+          label="Add a source"
+          icon="plus"
+          onCreate={() => go(sectionPath, { panel: "add", module: "knowledge" })}
+        >
+          <ScreenRenderer recipe={knowledgeRecipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
+        </SectionWithCreate>
+        {/* R14: one source per ticket, per article, per account, plus every note
+            anybody writes — the list pages. */}
+        <LoadMore
+          listKey={knowledgeKey(teamId as string)}
+          label="Load more sources"
+          fetchPage={(c: string) =>
+            contentApi.knowledge(c).then((r) => ({ rows: r.sources, nextCursor: r.nextCursor }))
           }
         />
       </div>
