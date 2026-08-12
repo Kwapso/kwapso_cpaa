@@ -822,6 +822,22 @@ export async function retrieve(
     return knowledgeAnswer({ question, ...choice, passages: [], candidates: 0 })
 
   const ids = candidates.map((c) => c.chunk_id)
+  // ONE BOUND PARAMETER PER CANDIDATE IS ONE TOO MANY.
+  //
+  // This asked for the candidate rows as `IN (?, ?, … )` with an id bound to each
+  // placeholder — up to CANDIDATE_CAP of them. D1 refuses a statement carrying
+  // more than 100 bound parameters ("too many SQL variables"), and the top-up
+  // fills the candidate set to the cap on any question the lexical stage does not
+  // already answer. So EVERY question against a base holding more than a hundred
+  // chunks came back a 500, and the door had never once answered on real
+  // infrastructure. It went unseen because the suites run against local SQLite,
+  // whose limit is 999 — the harness was more permissive than the thing it stood
+  // in for, which is the only kind of harness gap that matters.
+  //
+  // These ids are ULIDs this worker generated and just read back out of its own
+  // table, never anything off a request, so they are interpolated through
+  // sqlString like every other server-owned value in this codebase (CONVENTIONS)
+  // and the statement carries no bound parameters at all.
   const rows = await d1Query<ScoredRow>(
     cfg,
     guard.databaseId,
@@ -829,9 +845,8 @@ export async function retrieve(
     // LIMIT says so at the statement, where the next reader is looking.
     `SELECT c.id, c.source_id, c.seq, c.text, c.embedding, s.title, s.kind, s.source_url, s.compartment
        FROM knowledge_chunks c JOIN knowledge_sources s ON s.id = c.source_id
-      WHERE c.id IN (${ids.map(() => "?").join(", ")}) AND s.deactivated_at IS NULL
-      LIMIT ${CANDIDATE_CAP}`,
-    ids
+      WHERE c.id IN (${ids.map((id) => sqlString(id)).join(", ")}) AND s.deactivated_at IS NULL
+      LIMIT ${CANDIDATE_CAP}`
   )
 
   // STAGE TWO — the vector, over exactly those rows. One embedding call for the
