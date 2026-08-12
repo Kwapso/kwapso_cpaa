@@ -441,6 +441,15 @@ export const PORTAL_ACTIVITY_FENCE: Record<string, { fence: "account" | null; wh
   process_comments: { fence: null, why: "the conversation itself is fenced and readable; its history would name the staff author of every line, which the ticket thread already withholds" },
   account_rates: { fence: null, why: "who set a client's price, and what it was before — the agency's own commercial record, even about their own rate" },
   internal_rates: { fence: null, why: "what our own hour costs. The one figure SCOPE says a client must never see under any flag, ever — its history least of all (R23)" },
+
+  // THE WORK ENGINE. Not "a client may not see enough of this" — a client may
+  // not see ANY of it, and the rows themselves are already refused at every door
+  // (routes/stories.ts opens with refusePortalCaller). A story's history says
+  // "Ana moved BERG-S0188 to in review", which is the staff member SCOPE ch.06
+  // says the portal never names, attached to the work they are doing. What a
+  // client sees of a story is a COUNT on their own ticket.
+  stories: { fence: null, why: "a story's history names the staff member doing the work and what they were asked to change — the client sees a count of the work on their own request, never a title, an assignee or a date" },
+  sprints: { fence: null, why: "a sprint's history names who priced it and what the price was before. The client is shown the sprint as a NAMED BLOCK WITH DATES because it is what they bought (BUILD-1 §7); the record of us changing our minds about it is ours" },
 }
 
 /** R2 on the CLIENT surface — the reasoned exemption, not a quiet skip.
@@ -490,6 +499,11 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
   process_comments: "processes",
   account_rates: "commercials",
   internal_rates: "commercials",
+  // The work engine. A story and the sprint it sits in are one record from a
+  // reader's point of view — a piece of work and the block it was sold inside —
+  // so both gate on `work`, the module a client login never holds.
+  stories: "work",
+  sprints: "work",
 }
 
 /** R15 — reviewed DEAF exemptions: resources a worker publishes that reach NO
@@ -560,6 +574,15 @@ export const GROWING_COLLECTIONS: Record<
     listRecipe: "processes.list",
     webKey: "processesKey(",
     why: "every app of every client grows maps, and every map is kept rather than replaced — a process is archived, never deleted, because the savings computed from its baseline have to stay checkable years later. An agency two years in has more of these than it has clients, and the oldest is the one a client is most likely to ask about",
+  },
+  stories: {
+    lib: "workers/content/src/lib/stories.ts",
+    fn: "listStories",
+    routes: "workers/content/src/routes/stories.ts",
+    rowsKey: "stories",
+    listRecipe: "work.list",
+    webKey: "storiesKey(",
+    why: "one piece of work per thing we do, kept forever — the two years arriving from Glide are 3,677 rows on day one, and a done story is never deleted because the savings and the margin computed from it have to stay checkable. SPRINTS are deliberately NOT here beside it: a sprint is a block of SOLD work, so that collection grows at the speed of contracts rather than of clicks and a hard ceiling is an honest answer",
   },
 }
 
@@ -676,4 +699,9 @@ export const FORM_DIALOGS = [
   "app-form-dialog",
   "process-form-dialog",
   "step-form-dialog",
+  // The work engine. The story form is the one a person opens most often in a
+  // day, so a draft lost to a mis-tap is the most expensive kind here; the
+  // sprint form collects a PRICE, which is the other kind.
+  "story-form-dialog",
+  "sprint-form-dialog",
 ] as const

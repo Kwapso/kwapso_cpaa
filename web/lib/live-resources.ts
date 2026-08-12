@@ -120,6 +120,33 @@ export const listFetch = {
       primeCache(cursorKey(processesKey(teamId)), r.nextCursor)
       return r.processes
     }),
+  // R14: stories are PAGED — the backlog only grows, and the 3,677 rows arriving
+  // from the previous system are there on day one. Page one lands in the cache,
+  // its next cursor in the sidecar <LoadMore> reads.
+  stories: (teamId: string) =>
+    contentApi.stories().then((r) => {
+      primeCache(totalKey("work", teamId), r.total)
+      primeCache(totalKey("work-mine", teamId), r.mineTotal)
+      primeCache(cursorKey(storiesKey(teamId)), r.nextCursor)
+      return r.stories
+    }),
+  // Sprints are BOUNDED, not paged (a block of sold work grows at the speed of
+  // contracts), so there is no cursor sidecar to prime — just the exact total.
+  sprints: (teamId: string) =>
+    contentApi.sprints().then((r) => {
+      primeCache(totalKey("sprints", teamId), r.total)
+      return r.sprints
+    }),
+}
+
+/** The backlog's cache key (the paged stories list) and the sprint list beside
+ * it. Two keys, because they are two collections with two different R14 answers:
+ * one pages, one is capped. */
+export function storiesKey(teamId: string): string {
+  return `stories:${teamId}`
+}
+export function sprintsKey(teamId: string): string {
+  return `sprints:${teamId}`
 }
 
 /** The process-map list's cache key (the paged maps list). */
@@ -324,6 +351,27 @@ export const TEAM_RESOURCES: Record<
     fetchList: (t) => listFetch.processes(t),
     deps: (t, id) => [processKey(id), processCommentsKey(id), valueKey(t)],
   },
+  // THE WORK ENGINE — row-level live. Somebody else moving a story to in review
+  // patches just that row in the cached backlog; the deps carry the parts of the
+  // record that move with it: the story's own history, and the SPRINT list,
+  // whose per-sprint "3 of 8 done" counts are computed from exactly these rows.
+  stories: {
+    key: (t) => storiesKey(t),
+    idField: "id",
+    fetchOne: (id) => contentApi.storyOne(id),
+    fetchList: (t) => listFetch.stories(t),
+    deps: (t, id) => [`activity:record:stories:${id}`, sprintsKey(t)],
+  },
+  // A sprint has a list of its own, and its rows carry counts of the stories
+  // inside it — so a sprint ping patches the sprint row and leaves the backlog
+  // alone. (A story ping does the reverse, above.)
+  sprints: {
+    key: (t) => sprintsKey(t),
+    idField: "id",
+    fetchOne: (id) => contentApi.sprintOne(id),
+    fetchList: (t) => listFetch.sprints(t),
+    deps: (_t, id) => [`activity:record:sprints:${id}`],
+  },
   // A rate card ping carries the ACCOUNT it sits on — a card is only ever read on
   // its account's own screen, so the account is the row a listener can act on.
   // The same shape `account_links` and `portal_users` already have, and for the
@@ -353,4 +401,9 @@ export const SIMPLE_INVALIDATIONS: Record<string, (teamId: string) => string[]> 
   // the margin panel closes that itself by re-reading when the rate card it also
   // shows changes underneath it (see margin-panel.tsx).
   internal_rates: (t) => [internalRatesKey(t)],
+  // `work` is not a table — it is the MODULE the import engine pings after it
+  // writes a file of stories, and a file writes many rows with no one row to
+  // patch. So the backlog is dropped and re-read, and the sprint list with it,
+  // because a sprint row carries the counts of the stories inside it.
+  work: (t) => [storiesKey(t), sprintsKey(t)],
 }

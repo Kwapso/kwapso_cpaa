@@ -199,6 +199,19 @@ export function traceFor(
     case "set_internal_rate_active":
       return { path: `/t/${teamId}`, highlight: "main" }
 
+    /* ----------------------------- the work engine -------------------------- */
+    // Every work-engine write lands on the Work page, and that is not a shortcut:
+    // the backlog, the sprint block and each sprint's "3 of 8 done" counts are all
+    // on that one screen, so a story moving to in review and a sprint completing
+    // are both visible there. A story has no detail URL of its own to land on.
+    case "create_story":
+    case "update_story":
+    case "set_story_status":
+    case "rank_story":
+    case "create_sprint":
+    case "complete_sprint":
+      return { path: seg(teamId, "work"), highlight: "main" }
+
     /* --------------------------------- team -------------------------------- */
     // Rename the team → the team Overview (the bare /t/<team> path), where the new
     // name now shows. (Not the edit dialog — the rename is already saved.)

@@ -769,3 +769,89 @@ export type InternalRate = {
   updatedAt?: string | null
   editedByName?: string | null
 }
+
+/* ─────────────────────────── the work engine ─────────────────────────────── */
+// A ticket is what an account ASKS FOR; a story is one piece of work WE DO about
+// it (.plans/BUILD-1 §2). The four nouns are kept apart in the words, in the
+// glossary, and here in the types — a single "work item" type with a kind field
+// is how they stop being kept apart on the screens.
+
+/** The four states a story moves through (SCOPE ch.07). The review step is
+ * deliberate: work is checked before it is called done. FIXED — the code trusts
+ * this list; the team-editable "Story status" dropdown is display-only. */
+export const STORY_STATUSES = ["open", "in_progress", "in_review", "done"] as const
+export type StoryStatus = (typeof STORY_STATUSES)[number]
+
+/** The states a story is NOT yet finished in. Derived from the one list above
+ * rather than retyped, so a fifth state cannot be added and silently left out of
+ * the question the Ready flip asks ("is anything still open on this ticket?"). */
+export const OPEN_STORY_STATUSES = STORY_STATUSES.filter((s) => s !== "done")
+
+/** ONE PIECE OF WORK WE DO. The only place an assignee and a due date live — a
+ * ticket deliberately has neither and derives its picture from these. */
+export type Story = {
+  id: string
+  /** BERG-S0188 — the account's own short code, an S, and a per-account sequence.
+   * Null on a story with no account, or one whose account has no code yet. */
+  ref: string | null
+  title: string
+  detail: string | null
+  status: StoryStatus
+  /** the request this work answers, when there is one. Four out of five stories
+   * in the real history stand on their own. */
+  ticketId: string | null
+  ticketRef: string | null
+  sprintId: string | null
+  sprintName: string | null
+  appId: string | null
+  processId: string | null
+  /** WHICH STEP OF WHICH MAP THIS WORK CHANGED — a step KEY, so it means the same
+   * step across every version of that map. A story cannot close without this or
+   * `changesNoStep`; that pair is the hook the savings maths hangs off. */
+  stepKey: string | null
+  changesNoStep: boolean
+  assigneeId: string | null
+  assigneeName: string | null
+  reviewerId: string | null
+  reviewerName: string | null
+  startsOn: string | null
+  dueOn: string | null
+  closedAt: string | null
+  /** what we will tell the client. Closing a story appends this to the ticket's
+   * DRAFT resolution — a draft, never a sent message. */
+  closingNote: string | null
+  rank: string | null
+  accountId: string | null
+  createdAt: string
+  updatedAt: string | null
+  createdByName: string | null
+  editedByName: string | null
+}
+
+/** A BLOCK OF DELIVERY WORK SOLD TO ONE ACCOUNT. It carries the flat price, which
+ * is the revenue half of the margin (workers/tenancy/src/lib/internal-money.ts
+ * reads it and never writes it). Whole cents, like every money column here. */
+export type Sprint = {
+  id: string
+  ref: string | null
+  name: string
+  goal: string | null
+  sprintType: string | null
+  accountId: string | null
+  accountName: string | null
+  appId: string | null
+  appName: string | null
+  startsOn: string | null
+  endsOn: string | null
+  soldPriceCents: number
+  currency: string | null
+  /** the MOMENT it completed, not a status word — the version cut on the money
+   * side keys off exactly that (process_versions.cut_from_sprint_id). */
+  completedAt: string | null
+  active: boolean
+  /** exact server counts of the work inside it (R16) — never a loaded length. */
+  storyCount: number
+  openStoryCount: number
+  createdAt: string
+  createdByName: string | null
+}

@@ -23,6 +23,7 @@ import {
 
 import { LearningProgressScreen } from "@/components/learning-progress"
 import { ProcessesScreen } from "@/components/processes-screen"
+import { WorkScreen } from "@/components/work-screen"
 import { NotFound, LoadError, SectionWithCreate, CollectionCard } from "@/components/deep-link/screen-bits"
 import { CollectionHeading } from "@/components/collection-heading"
 import { LoadMore } from "@/components/load-more"
@@ -212,6 +213,24 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         rights={rights}
         total={totals.processes}
         canCreate={can("processes", "create")}
+        onAction={onAction}
+        onIntent={onIntent}
+      />
+    )
+  }
+  if (module === "work") {
+    // Host-composed for the same reason the maps screen is: the sprint block
+    // sits under the backlog, and a story needs the sprints, the open requests
+    // and the team's people to be written at all. Its own file, so this switch
+    // stays a switch.
+    return (
+      <WorkScreen
+        teamId={teamId as string}
+        recipe={recipe}
+        rights={rights}
+        total={totals.work}
+        canCreate={can("work", "create")}
+        canEdit={can("work", "edit")}
         onAction={onAction}
         onIntent={onIntent}
       />

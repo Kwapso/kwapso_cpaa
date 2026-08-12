@@ -19,9 +19,51 @@ import type {
   KnowledgeSource,
   Learning,
   LearningProgressEntry,
+  Sprint,
+  Story,
 } from "@shared/types"
 import { api, enc, post } from "@shared/web/api"
 import type { PagedResponse } from "@shared/web/api"
+
+/** The facets the story list door parses — mirrored here so a caller cannot
+ * invent one the server ignores in silence. */
+export type StoryQuery = {
+  status?: Story["status"]
+  ticketId?: string
+  sprintId?: string
+  assigneeId?: string
+  /** "all" includes finished work; the default backlog view hides it. */
+  view?: "open" | "all"
+}
+
+/** What a story create / edit may set. */
+export type StoryWrite = {
+  title: string
+  detail?: string
+  ticketId?: string
+  sprintId?: string
+  appId?: string
+  processId?: string
+  stepKey?: string
+  changesNoStep?: boolean
+  assigneeId?: string
+  reviewerId?: string
+  startsOn?: string
+  dueOn?: string
+  accountId?: string
+}
+
+function storyQuery(filter: StoryQuery | undefined, cursor: string | null | undefined): string {
+  const q = new URLSearchParams()
+  if (filter?.status) q.set("status", filter.status)
+  if (filter?.ticketId) q.set("ticketId", filter.ticketId)
+  if (filter?.sprintId) q.set("sprintId", filter.sprintId)
+  if (filter?.assigneeId) q.set("assigneeId", filter.assigneeId)
+  if (filter?.view) q.set("view", filter.view)
+  if (cursor) q.set("cursor", cursor)
+  const s = q.toString()
+  return s ? `?${s}` : ""
+}
 
 /** Content worker — Learning + Tickets (team-DB content modules). */
 export const content = {
@@ -68,6 +110,45 @@ export const content = {
     api<{ stakeholders: HelpStakeholder[] }>(`/api/content/help/stakeholders?id=${enc(id)}`),
   addStakeholder: (id: string, userId: string) =>
     api<{ stakeholders: HelpStakeholder[] }>("/api/content/help/stakeholders", post({ id, userId })),
+
+  /* --------------------------- the work engine ----------------------------- */
+  /** R14: a PAGE of stories (a GROWING collection) — hand `nextCursor` back to
+   * get the next one. `total`/`mineTotal` are the exact server counts, taken
+   * over the SAME filter the page came from. */
+  stories: (opts: { filter?: StoryQuery; cursor?: string | null } = {}) =>
+    api<PagedResponse<{ stories: Story[]; mineTotal: number }>>(
+      `/api/content/stories${storyQuery(opts.filter, opts.cursor)}`
+    ),
+  storyOne: (id: string) =>
+    api<{ stories: Story[] }>(`/api/content/stories?id=${enc(id)}`).then((r) => r.stories[0] ?? null),
+  createStory: (input: StoryWrite) => api<{ stories: Story[] }>("/api/content/stories", post(input)),
+  updateStory: (input: StoryWrite & { id: string }) =>
+    api<{ stories: Story[] }>("/api/content/stories/update", post(input)),
+  setStoryStatus: (id: string, status: Story["status"], closingNote?: string) =>
+    api<{ stories: Story[] }>("/api/content/stories/status", post({ id, status, closingNote })),
+  rankStory: (id: string, afterId: string | null, beforeId: string | null) =>
+    api<{ stories: Story[] }>("/api/content/stories/rank", post({ id, afterId, beforeId })),
+  sprints: (accountId?: string) =>
+    api<{ sprints: Sprint[]; total: number }>(
+      `/api/content/sprints${accountId ? `?accountId=${enc(accountId)}` : ""}`
+    ),
+  sprintOne: (id: string) =>
+    api<{ sprints: Sprint[] }>("/api/content/sprints").then(
+      (r) => r.sprints.find((s) => s.id === id) ?? null
+    ),
+  createSprint: (input: {
+    name: string
+    goal?: string
+    sprintType?: string
+    accountId?: string
+    appId?: string
+    startsOn?: string
+    endsOn?: string
+    soldPriceCents?: number
+    currency?: string
+  }) => api<{ sprints: Sprint[]; total: number }>("/api/content/sprints", post(input)),
+  setSprintComplete: (id: string, complete: boolean) =>
+    api<{ sprints: Sprint[]; total: number }>("/api/content/sprints/complete", post({ id, complete })),
 
   /* ------------------------------- knowledge ------------------------------- */
   /** R14: a PAGE of sources (a GROWING collection) — hand `nextCursor` back to

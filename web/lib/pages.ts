@@ -43,6 +43,7 @@ export type TeamSection = {
     | "tickets"
     | "knowledge"
     | "processes"
+    | "work"
     | "import"
   title: string
   module: string
@@ -98,6 +99,12 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // of the PROCESSES (the collection the screen leads with and the one that
   // grows), keyed off the same `processes:<teamId>` cache the list reads.
   { key: "processes", title: "Process maps", module: "processes", segment: "processes", placement: "sidebar", countCacheKey: "processes" },
+  // Work — the backlog and the sprints it sits in. A first-class SIDEBAR page,
+  // and arguably the one the team lives in: a ticket is what a client asks for,
+  // a story is what somebody actually does today. Its count is the exact server
+  // total of the STORIES (the collection the screen leads with and the one that
+  // grows), keyed off the same `work:<teamId>` total the list primes.
+  { key: "work", title: "Work", module: "work", segment: "work", placement: "sidebar", countCacheKey: "work" },
   // Import has NO read-right of its own — it's gated per-target (create on
   // member_roles or learning). Reached CONTEXTUALLY from an "Import CSV" button on
   // those pages (which land on /t/<team>/import/<tableKey>), never a tab.
@@ -132,6 +139,11 @@ export const CONCEPT_ICON = {
   versions: "git-branch",
   value: "piggy-bank",
   comments: "message-square",
+  // The work engine: a story is a piece of work in hand, a sprint is the block
+  // it was sold inside, and a timer is the clock running on it.
+  work: "hammer",
+  sprints: "calendar-range",
+  timer: "timer",
   import: "upload",
   activity: "history",
 } as const

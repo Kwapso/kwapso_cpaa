@@ -126,6 +126,10 @@ describe("team schema", () => {
       // no client login passes one of its doors at all.
       "processes",
       "commercials",
+      // THE WORK ENGINE — stories, the sprints they sit in, and the time logged
+      // against them. Agency material: a client login never holds it, and every
+      // door on it refuses a portal caller rather than fencing one.
+      "work",
     ])
   })
 })

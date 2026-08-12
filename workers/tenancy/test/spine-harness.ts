@@ -132,6 +132,10 @@ export function buildSpineDb(): DatabaseSync {
   // activity door's module gate. Without it the help burglary below would be
   // refused by the gate and pass while the fence was wide open — a green test
   // asserting the wrong thing.
+  // `work` is here for exactly that reason and no other. No real Client role
+  // would ever hold it — every work-engine door refuses a portal caller outright
+  // — which is precisely why the burglar must: a refusal proved against a caller
+  // whose ROLE already stopped them proves nothing about the door.
   const grantAll = (roleId: string) =>
     db.exec(`
       INSERT INTO member_roles (id, title, is_default, created_at) VALUES ('${roleId}', '${roleId}', 0, '2026-01-01');
@@ -139,7 +143,8 @@ export function buildSpineDb(): DatabaseSync {
       SELECT '${roleId}_' || m.module, '${roleId}', m.module, 1, 1, 1, 1
         FROM (SELECT 'accounts' AS module UNION ALL SELECT 'portal_users'
               UNION ALL SELECT 'team_members' UNION ALL SELECT 'member_roles'
-              UNION ALL SELECT 'help' UNION ALL SELECT 'processes') m;`)
+              UNION ALL SELECT 'help' UNION ALL SELECT 'processes'
+              UNION ALL SELECT 'work') m;`)
   grantAll(IDS.adminRole)
   grantAll(IDS.clientRole)
 

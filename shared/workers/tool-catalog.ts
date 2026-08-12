@@ -785,6 +785,161 @@ export const SHARED_TOOLS: SharedTool[] = [
       },
     },
   },
+  /* ------------------------------ the work engine ---------------------------- */
+  // A ticket is what an account ASKS FOR; a story is what WE DO about it. Keeping
+  // the two apart matters more on this surface than anywhere else, because the
+  // model is the one caller that cannot see the screens: told only about tickets
+  // it would answer "what are we working on?" with a list of requests, which is a
+  // different question and a wrong answer. Every tool here sits on a door that
+  // refuses a client login outright (R21), so none of them can be reached by one.
+  {
+    name: "list_stories",
+    summary:
+      "List the team's STORIES — the pieces of work WE do, as opposed to the tickets a client raises. Filters: `status` (open / in_progress / in_review / done), `ticketId` (the work on one request), `sprintId`, `assigneeId`, and `view` ('open' by default, which hides finished work — pass 'all' to include it). Pass `id` to fetch one story. Returns ONE page plus the exact `total`, `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
+    binding: "CONTENT", method: "GET", path: "/api/content/stories",
+    schema: obj({ id: S, status: S, ticketId: S, sprintId: S, assigneeId: S, view: S, cursor: S }),
+    buildQuery: (i) => {
+      const q: string[] = []
+      for (const k of ["id", "status", "ticketId", "sprintId", "assigneeId", "view", "cursor"])
+        if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
+      return q.length ? `?${q.join("&")}` : ""
+    },
+    agent: { write: false, summarize: (i) => (str(i, "id") ? "Look up one story" : "List the work in hand") },
+  },
+  {
+    name: "create_story",
+    summary:
+      "Write down one piece of work. Only `title` is required. `ticketId` links it to the request it answers — most work has none, so leave it off unless you know the ticket. `stepKey` names the process step this work changes and `changesNoStep` says it changes none; one of the two is REQUIRED before the story can be marked done, so set it now if you know it. There is deliberately NO story type: the ticket carries the type.",
+    binding: "CONTENT", method: "POST", path: "/api/content/stories",
+    schema: obj(
+      {
+        title: S, detail: S, ticketId: S, sprintId: S, appId: S, processId: S,
+        stepKey: S, changesNoStep: B, assigneeId: S, reviewerId: S, startsOn: S, dueOn: S, accountId: S,
+      },
+      ["title"]
+    ),
+    // Every field the door reads off the body, forwarded. Most are read inside
+    // lib/stories.ts rather than in the handler, exactly as create_help_ticket's
+    // `accountId` is — exposed by hand for the same reason: without them a machine
+    // could only write a title.
+    buildBody: (i) => ({
+      title: str(i, "title"),
+      detail: opt(i, "detail"),
+      ticketId: opt(i, "ticketId"),
+      sprintId: opt(i, "sprintId"),
+      appId: opt(i, "appId"),
+      processId: opt(i, "processId"),
+      stepKey: opt(i, "stepKey"),
+      changesNoStep: i.changesNoStep === true ? true : undefined,
+      assigneeId: opt(i, "assigneeId"),
+      reviewerId: opt(i, "reviewerId"),
+      startsOn: opt(i, "startsOn"),
+      dueOn: opt(i, "dueOn"),
+      accountId: opt(i, "accountId"),
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Add a story: "${str(i, "title").slice(0, 60)}"` },
+  },
+  {
+    name: "update_story",
+    summary:
+      "Edit a story (by id). Same fields as create_story; `title` stays required. Re-pointing it at another ticket moves the work onto that client's books, which is why the reference number does NOT follow — a client may already be quoting it.",
+    binding: "CONTENT", method: "POST", path: "/api/content/stories/update",
+    schema: obj(
+      {
+        id: S, title: S, detail: S, ticketId: S, sprintId: S, appId: S, processId: S,
+        stepKey: S, changesNoStep: B, assigneeId: S, reviewerId: S, startsOn: S, dueOn: S, accountId: S,
+      },
+      ["id", "title"]
+    ),
+    buildBody: (i) => ({
+      id: str(i, "id"),
+      title: str(i, "title"),
+      detail: opt(i, "detail"),
+      ticketId: opt(i, "ticketId"),
+      sprintId: opt(i, "sprintId"),
+      appId: opt(i, "appId"),
+      processId: opt(i, "processId"),
+      stepKey: opt(i, "stepKey"),
+      changesNoStep: i.changesNoStep === true ? true : undefined,
+      assigneeId: opt(i, "assigneeId"),
+      reviewerId: opt(i, "reviewerId"),
+      startsOn: opt(i, "startsOn"),
+      dueOn: opt(i, "dueOn"),
+      accountId: opt(i, "accountId"),
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Edit story ${str(i, "id")}` },
+  },
+  {
+    name: "set_story_status",
+    summary:
+      "Move a story along its four states, by id: open, in_progress, in_review (someone is checking it), done. `closingNote` is what we will tell the client, and it is appended to the ticket's DRAFT resolution rather than sent. A story CANNOT be set to done until it names the process step it changed (`stepKey` on the story) or is marked as changing none — the door refuses with 'step_required' rather than guessing, because every savings figure is computed from that answer.",
+    binding: "CONTENT", method: "POST", path: "/api/content/stories/status",
+    schema: obj({ id: S, status: S, closingNote: S }, ["id", "status"]),
+    buildBody: (i) => ({ id: str(i, "id"), status: str(i, "status"), closingNote: opt(i, "closingNote") }),
+    agent: {
+      write: true,
+      confirm: false,
+      summarize: (i) => `Set story ${str(i, "id")} to "${str(i, "status")}"`,
+    },
+  },
+  {
+    name: "rank_story",
+    summary:
+      "Move a story up or down the backlog, by id. There is no priority field — the list's ORDER is the priority, exactly as it is for tickets. Name the neighbours it should sit between: `afterId` is the story it goes below (higher up) and `beforeId` the one it goes above. Omit `afterId` for the very top, `beforeId` for the very bottom.",
+    binding: "CONTENT", method: "POST", path: "/api/content/stories/rank",
+    schema: obj({ id: S, afterId: S, beforeId: S }, ["id"]),
+    buildBody: (i) => ({ id: str(i, "id"), afterId: str(i, "afterId"), beforeId: str(i, "beforeId") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Reorder story ${str(i, "id")}` },
+  },
+  {
+    name: "list_sprints",
+    summary:
+      "List the blocks of delivery work sold, newest first — each with its kind, its dates, the flat price it was sold for (in whole cents) and how many of its stories are done. Pass `accountId` for one client's. Bounded, not paged: a sprint is a contract, so there are few of them.",
+    binding: "CONTENT", method: "GET", path: "/api/content/sprints",
+    schema: obj({ accountId: S }),
+    buildQuery: (i) => (str(i, "accountId") ? `?accountId=${encodeURIComponent(str(i, "accountId"))}` : ""),
+    agent: { write: false, summarize: () => "List sprints" },
+  },
+  {
+    name: "create_sprint",
+    summary:
+      "Start a sprint — a block of delivery work sold to one account, with a start, an end and a flat price. `soldPriceCents` is WHOLE CENTS (4500 euros is 450000), because a fractional price loses money between here and a margin. `sprintType` is Planning, Implementation or Iteration; a 'blueprint' is a PRICED PLANNING sprint, not a fourth kind.",
+    binding: "CONTENT", method: "POST", path: "/api/content/sprints",
+    schema: obj(
+      { name: S, goal: S, sprintType: S, accountId: S, appId: S, startsOn: S, endsOn: S, soldPriceCents: N, currency: S },
+      ["name"]
+    ),
+    buildBody: (i) => ({
+      name: str(i, "name"),
+      goal: opt(i, "goal"),
+      sprintType: opt(i, "sprintType"),
+      accountId: opt(i, "accountId"),
+      appId: opt(i, "appId"),
+      startsOn: opt(i, "startsOn"),
+      endsOn: opt(i, "endsOn"),
+      soldPriceCents: typeof i.soldPriceCents === "number" ? i.soldPriceCents : undefined,
+      currency: opt(i, "currency"),
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Start sprint "${str(i, "name")}"` },
+  },
+  {
+    name: "complete_sprint",
+    summary:
+      "Mark a sprint finished, or reopen it (`complete`: true / false). Completing one CUTS A VERSION of every process map beneath it — the point from which the next savings figure is measured — so it is not a label, it is an event. Re-completing an already-complete sprint changes nothing and cuts nothing.",
+    binding: "CONTENT", method: "POST", path: "/api/content/sprints/complete",
+    schema: obj({ id: S, complete: B }, ["id", "complete"]),
+    buildBody: (i) => ({ id: str(i, "id"), complete: i.complete === true }),
+    agent: {
+      write: true,
+      // CONFIRM, and it is the only work-engine write that does. Completing a
+      // sprint is not an edit to a row — it is the moment a process map's next
+      // version is cut, which is the baseline every later savings figure a client
+      // is shown is subtracted from. A model reaching it while reading a ticket
+      // somebody else wrote should stop and ask.
+      confirm: (i) => i.complete === true,
+      summarize: (i) => `${i.complete === true ? "Complete" : "Reopen"} sprint ${str(i, "id")}`,
+    },
+  },
   /* ------------------------------- knowledge ------------------------------- */
   // THE ASSISTANT IS NOT JUST A READER HERE (the owner's own words): it can ask
   // the knowledge base a question AND add, correct or take away a source — each
@@ -1294,6 +1449,16 @@ export const TOOL_GATES: Record<string, string> = {
   rank_help_ticket: "help:edit",
   archive_help_ticket: "help:edit",
   reply_help_ticket: "help:read",
+  // THE WORK ENGINE. One module for stories and the sprints they sit in, and no
+  // client login holds it — so unlike the ticket doors above, the question "what
+  // happens when a contact reaches this?" has a shorter answer here: the door
+  // refuses them (refusePortalCaller), whatever an owner ticks.
+  create_story: "work:create",
+  update_story: "work:edit",
+  set_story_status: "work:edit",
+  rank_story: "work:edit",
+  create_sprint: "work:create",
+  complete_sprint: "work:edit",
   // The AGENT-ONLY writes (no MCP tool — they're built around the confirm panel a
   // headless client hasn't got). Listed for the same reason as the rest: the gate
   // is what isPrivilegeWrite reads, and a write with no line is a write the PATH

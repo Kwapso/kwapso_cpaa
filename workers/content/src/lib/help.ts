@@ -26,6 +26,10 @@ import { optionalText, requireText, TEXT_LIMITS } from "@shared/workers/validate
 import { BULK_IDS_LIMIT, THREAD_HARD_CAP } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { rankAtTop, rankBetween } from "@shared/workers/rank"
+// The reference number moved out to its own file the moment a second noun needed
+// one (a story, a task, a to-do, a sprint). One counter, one race guard, one
+// spelling of the format — see lib/refs.ts.
+import { nextRef, REF_KINDS } from "./refs"
 
 // The fixed status lifecycle the code trusts (the team-editable dropdown is
 // display-only) — Anything outside this set is rejected. It lives in shared/types
@@ -333,51 +337,6 @@ export async function countTickets(
   return { total: rows[0]?.total ?? 0, mineTotal: rows[0]?.mine ?? 0 }
 }
 
-/** THE REFERENCE NUMBER, allocated race-safely (SCOPE ch.02: "BERG-T0412").
- *
- * ONE STATEMENT, and that is the whole design. The obvious version reads
- * `MAX(ref)` and writes the next one, and two people raising a ticket on the same
- * account in the same second both read 11 and both write 12 — a number the client
- * quotes, pointing at two different requests. `INSERT … ON CONFLICT DO UPDATE …
- * RETURNING` is atomic in SQLite (CONCURRENCY.md rule 1: the counter rides the
- * write), so the two callers are serialized by the database and get 12 and 13.
- *
- * The insert path seeds `next_no` at 2 and returns 2, the conflict path returns
- * the incremented value — so in both cases the number just allocated is one less
- * than what came back. Reading that off the RETURNING rather than from a second
- * query is what keeps it one statement.
- *
- * Returns null when there is nothing to build a reference OUT of: an account with
- * no short code, or no account at all (the agency's own questions). A reference
- * nobody can quote is worse than none — it looks like it means something.
- */
-async function nextRef(
-  cfg: D1Rest,
-  guard: MemberGuard,
-  accountId: string | null,
-  kind: string
-): Promise<string | null> {
-  if (!accountId) return null
-  const codes = await d1Query<{ code: string | null }>(
-    cfg,
-    guard.databaseId,
-    `SELECT code FROM accounts WHERE id = ? LIMIT 1`,
-    [accountId]
-  )
-  const code = codes[0]?.code
-  if (!code) return null
-  const taken = await d1Query<{ next_no: number }>(
-    cfg,
-    guard.databaseId,
-    `INSERT INTO ref_counters (account_id, kind, next_no) VALUES (?, ?, 2)
-     ON CONFLICT(account_id, kind) DO UPDATE SET next_no = next_no + 1
-     RETURNING next_no`,
-    [accountId, kind]
-  )
-  const no = (taken[0]?.next_no ?? 2) - 1
-  return `${code}-${kind}${String(no).padStart(4, "0")}`
-}
-
 /** The rank a new ticket takes: above every one the caller can already see.
  *
  * Read-then-write, deliberately, and safe because of what it is FOR. Two tickets
@@ -580,7 +539,7 @@ export async function createTicket(
   // resolved BEFORE the insert so the row is complete the first time anybody
   // reads it — a ticket that exists for a moment with no number is a ticket
   // somebody screenshots with no number.
-  const ref = await nextRef(cfg, guard, accountId, "T")
+  const ref = await nextRef(cfg, guard, accountId, REF_KINDS.ticket)
   const rank = await topRank(cfg, guard)
   // WHO IS RAISING IT decides whether the wording is still the account's. A
   // ticket a STAFF member types is locked the instant it exists: the first staff

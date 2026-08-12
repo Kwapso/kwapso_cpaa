@@ -29,6 +29,14 @@
 //   POST /api/content/help/reply          -> add a reply to a ticket's thread
 //   GET  /api/content/help/stakeholders   -> a ticket's stakeholders (?id=<ticketId>)
 //   POST /api/content/help/stakeholders   -> manually add a stakeholder (add-only)
+//   GET  /api/content/stories             -> the backlog (?id → one; status/ticketId/sprintId/assigneeId/view filters)
+//   POST /api/content/stories             -> write one piece of work down
+//   POST /api/content/stories/update      -> edit a story
+//   POST /api/content/stories/status      -> move a story along its four states
+//   POST /api/content/stories/rank        -> drag-rank a story between two others
+//   GET  /api/content/sprints             -> the blocks of work sold (?accountId → one client's)
+//   POST /api/content/sprints             -> start a sprint
+//   POST /api/content/sprints/complete    -> mark a sprint finished / reopen it
 //   GET  /api/content/knowledge           -> the sources the assistant may read (?id → one)
 //   GET  /api/content/knowledge/ask       -> answer a question from them, with citations
 //   GET  /api/content/knowledge/sync      -> how far the sweep has got with each kind
@@ -68,6 +76,16 @@ import {
   postUpdateHelp,
   postBulkHelpStatusByFilter,
 } from "./routes/help"
+import {
+  getSprints,
+  getStories,
+  postCreateSprint,
+  postCreateStory,
+  postSprintComplete,
+  postStoryRank,
+  postStoryStatus,
+  postUpdateStory,
+} from "./routes/stories"
 import {
   getKnowledge,
   getKnowledgeAsk,
@@ -121,6 +139,18 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/content/help/reply": { handler: postHelpReply, kind: "mutation" },
   "GET /api/content/help/stakeholders": { handler: getHelpStakeholders, kind: "read" },
   "POST /api/content/help/stakeholders": { handler: postAddStakeholder, kind: "mutation" },
+  // THE WORK ENGINE — what we DO about a request, and the block of work it was
+  // sold inside. Every one of these doors refuses a client login at the door
+  // (R21): a story names the staff member doing the work, which the portal never
+  // shows. A client's view of a story is a COUNT on their own ticket.
+  "GET /api/content/stories": { handler: getStories, kind: "read" },
+  "POST /api/content/stories": { handler: postCreateStory, kind: "mutation" },
+  "POST /api/content/stories/update": { handler: postUpdateStory, kind: "mutation" },
+  "POST /api/content/stories/status": { handler: postStoryStatus, kind: "mutation" },
+  "POST /api/content/stories/rank": { handler: postStoryRank, kind: "mutation" },
+  "GET /api/content/sprints": { handler: getSprints, kind: "read" },
+  "POST /api/content/sprints": { handler: postCreateSprint, kind: "mutation" },
+  "POST /api/content/sprints/complete": { handler: postSprintComplete, kind: "mutation" },
   "GET /api/content/knowledge": { handler: getKnowledge, kind: "read" },
   "GET /api/content/knowledge/ask": { handler: getKnowledgeAsk, kind: "read" },
   "GET /api/content/knowledge/sync": { handler: getKnowledgeSync, kind: "read" },

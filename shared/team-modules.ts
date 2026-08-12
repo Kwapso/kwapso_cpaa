@@ -19,6 +19,7 @@ export const TEAM_MODULES = [
   "agent",
   "processes",
   "commercials",
+  "work",
 ] as const
 
 /** Plain-English label for each module, shown as the rows of the permission
@@ -61,6 +62,17 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   // it is a second module and not four more rights on the first.
   processes: "Process maps",
   commercials: "Rates & margin",
+  // THE WORK ENGINE — what we DO, as opposed to what an account asks for. One
+  // module covers stories, the sprints they sit in and the time logged against
+  // them, because they are one record from a reader's point of view: a piece of
+  // work, when it is due, and how long it took. It is AGENCY material — a client
+  // sees a COUNT of the stories on their own ticket and never a title, an
+  // assignee or a date (SCOPE ch.06) — so no client login holds it and every
+  // door on it refuses a portal caller.
+  //
+  // To-dos are deliberately NOT here: a to-do is aimed at the client and they
+  // must be able to complete one, so it is its own module with its own right.
+  work: "Work",
 }
 
 /** The matrix rows: { key, label } per module, in display order. */

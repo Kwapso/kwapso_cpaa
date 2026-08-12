@@ -856,6 +856,131 @@ SELECT lower(hex(randomblob(16))), r.id, m.module, r.is_default, r.is_default, r
  );
 `,
   },
+  {
+    // THE WORK ENGINE, part two: what WE DO about a ticket (.plans/BUILD-1 §2).
+    //
+    // A ticket is what an account ASKS FOR. A story is one piece of work we do,
+    // and it is the only place an assignee and a due date live — the ticket
+    // deliberately has neither and derives its picture from its stories
+    // (BUILD-1 §2, "no assignee and no due date on a ticket… do not add them").
+    //
+    // A SPRINT is the block of work sold to one account. It carries the flat
+    // price, which is the revenue half of the margin the money lane already
+    // reads (workers/tenancy/src/lib/work-engine.ts declares the contract from
+    // the other side: `sprints.sold_price_cents` and `work_logs.seconds`). Whole
+    // CENTS, like every other money column in this database — a price in major
+    // units loses a half-penny somewhere between a float and a subtraction.
+    version: "0014_stories_and_sprints",
+    sql: `
+-- A SPRINT belongs to ONE app or goal, and an account may have several running
+-- at once (BUILD-1 §3). \`sprint_type\` is the editable vocabulary Planning /
+-- Implementation / Iteration — a "blueprint" is a PRICED PLANNING sprint, not a
+-- fourth type, so it is a price on a planning row and not a value here.
+--
+-- \`completed_at\` rather than a status word for "finished": the money lane's
+-- version cut keys off the MOMENT a sprint completed (process_versions
+-- .cut_from_sprint_id), and a moment is the thing that question actually asks.
+CREATE TABLE sprints (
+  id TEXT PRIMARY KEY,
+  ref TEXT,
+  account_id TEXT REFERENCES accounts (id),
+  app_id TEXT REFERENCES apps (id),
+  name TEXT NOT NULL,
+  sprint_type TEXT,
+  goal TEXT,
+  starts_on TEXT,
+  ends_on TEXT,
+  sold_price_cents INTEGER NOT NULL DEFAULT 0 CHECK (sold_price_cents >= 0),
+  currency TEXT,
+  completed_at TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+-- The same race guard the ticket's reference carries: two sprints sold on one
+-- account in the same instant cannot end up quoting the same number.
+CREATE UNIQUE INDEX idx_sprints_ref ON sprints (ref) WHERE ref IS NOT NULL;
+CREATE INDEX idx_sprints_account ON sprints (account_id);
+CREATE INDEX idx_sprints_app ON sprints (app_id);
+
+-- A STORY is one piece of work we do. The field list is BUILD-1 §2's, and that
+-- list is the spec:
+--   ref, ticket?, app?, process?, step?, sprint_id, assignee, due dates,
+--   reviewer?, status, closing_note.
+--
+-- STORIES HAVE NO TYPE, settled by the owner: the ticket carries the type and
+-- the process step carries the classification that matters. Do not add one.
+--
+-- \`ticket_id\` IS NULLABLE, also settled: four out of five stories in the real
+-- history stand on their own, with no request behind them.
+--
+-- \`step_key\` and \`changes_no_step\` are the pair BUILD-1 §2 requires: "a story
+-- cannot close without naming the process step it changes, or explicitly saying
+-- it changes none". Two columns rather than one nullable one, because "nobody
+-- filled this in" and "we looked, and it changes no step" are different answers
+-- and the savings maths later has to be able to tell them apart. It is a step
+-- KEY rather than a step id on purpose — a key is the same step across every
+-- version of a map (see process_steps), and a story outlives the version it was
+-- written against.
+--
+-- \`title\` is not in §2's list and is added deliberately: a piece of work with
+-- no name cannot be read in a list, assigned, or said out loud on a call. It is
+-- the only field here the plan does not name.
+CREATE TABLE stories (
+  id TEXT PRIMARY KEY,
+  ref TEXT,
+  account_id TEXT REFERENCES accounts (id),
+  ticket_id TEXT REFERENCES help (id),
+  app_id TEXT REFERENCES apps (id),
+  process_id TEXT REFERENCES processes (id),
+  step_key TEXT,
+  changes_no_step INTEGER NOT NULL DEFAULT 0,
+  sprint_id TEXT REFERENCES sprints (id),
+  title TEXT NOT NULL,
+  detail TEXT,
+  assignee_id TEXT,
+  assignee_name TEXT,
+  reviewer_id TEXT,
+  reviewer_name TEXT,
+  starts_on TEXT,
+  due_on TEXT,
+  status TEXT NOT NULL DEFAULT 'open',
+  closed_at TEXT,
+  closing_note TEXT,
+  rank TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT
+);
+CREATE UNIQUE INDEX idx_stories_ref ON stories (ref) WHERE ref IS NOT NULL;
+-- The two reads that matter most: "what is left on this ticket" (the Ready flip
+-- asks it on every story close) and "what is in this sprint".
+CREATE INDEX idx_stories_ticket ON stories (ticket_id);
+CREATE INDEX idx_stories_sprint ON stories (sprint_id);
+CREATE INDEX idx_stories_account ON stories (account_id);
+CREATE INDEX idx_stories_assignee ON stories (assignee_id);
+CREATE INDEX idx_stories_rank ON stories (rank);
+
+-- The sprint vocabulary SCOPE names, seeded the same way the ticket types were:
+-- ADDED, never swapped, because a team's existing values are on rows already.
+INSERT INTO selectable_data (id, type, value, is_default, created_at, creator_name)
+SELECT lower(hex(randomblob(16))), 'Sprint type', v.value, 1, datetime('now'), 'kwapso'
+  FROM (SELECT 'Planning' AS value UNION ALL SELECT 'Implementation' UNION ALL SELECT 'Iteration') v
+ WHERE NOT EXISTS (
+   SELECT 1 FROM selectable_data s WHERE s.type = 'Sprint type' AND s.value = v.value
+ );
+
+-- Existing teams: the locked Admin role gains the new module in full (it IS full
+-- access by definition and cannot be edited afterwards to grant it). Every other
+-- role gains nothing — a migration must never hand out sight of the agency's own
+-- delivery plan, its assignees or its dates that nobody granted.
+INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+SELECT lower(hex(randomblob(16))), r.id, 'work', r.is_default, r.is_default, r.is_default, r.is_default
+  FROM member_roles r
+ WHERE NOT EXISTS (
+   SELECT 1 FROM role_permissions p WHERE p.role_id = r.id AND p.module = 'work'
+ );
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }
@@ -884,6 +1009,20 @@ export const DEFAULT_SELECTABLE: { type: string; value: string }[] = [
   { type: "Ticket status", value: "In progress" },
   { type: "Ticket status", value: "Ready" },
   { type: "Ticket status", value: "Resolved" },
+  // The three sprint types SCOPE ch.02 names, and no more. A "blueprint" is a
+  // PRICED PLANNING sprint, not a fourth type (BUILD-1 §3), so it is a price on
+  // a Planning row rather than a value here. Editable, like the ticket types:
+  // these are a starting vocabulary a team adds to on the Dropdown values screen.
+  { type: "Sprint type", value: "Planning" },
+  { type: "Sprint type", value: "Implementation" },
+  { type: "Sprint type", value: "Iteration" },
+  // Display-only labels for the four story states. The states the code trusts
+  // are STORY_STATUSES in shared/types.ts — rewording a row here can never move
+  // a story, exactly as with the ticket labels above.
+  { type: "Story status", value: "Open" },
+  { type: "Story status", value: "In progress" },
+  { type: "Story status", value: "In review" },
+  { type: "Story status", value: "Done" },
 ]
 
 /**
