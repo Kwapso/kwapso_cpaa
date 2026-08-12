@@ -13,6 +13,24 @@ import { ulid } from "@shared/workers/id"
 import { TEAM_MODULES } from "@shared/team-modules"
 export { TEAM_MODULES, TEAM_MODULE_CATALOG } from "@shared/team-modules"
 
+/** The two groups the legacy app never had, as data rather than as a UNION ALL
+ * chain — see the comment in 0018. Countries are the ones the customer records
+ * themselves evidence; the ten legacy labels pick-or-create into the same group
+ * when the choices import runs. */
+const INTERNAL_VOCABULARY: { type: string; value: string }[] = [
+  { type: "Country", value: "Germany" },
+  { type: "Country", value: "Austria" },
+  { type: "Country", value: "Switzerland" },
+  { type: "Country", value: "Spain" },
+  { type: "Country", value: "Andorra" },
+  { type: "Country", value: "United Kingdom" },
+  { type: "Company size", value: "1–10" },
+  { type: "Company size", value: "11–50" },
+  { type: "Company size", value: "51–200" },
+  { type: "Company size", value: "201–500" },
+  { type: "Company size", value: "More than 500" },
+]
+
 export const TEAM_MIGRATIONS: { version: string; sql: string }[] = [
   {
     version: "0001_team_base",
@@ -1358,24 +1376,18 @@ SELECT lower(hex(randomblob(16))), r.id, m.module, r.is_default, r.is_default, r
 -- these same two groups, which is the part that was at risk — a group that
 -- exists is a group the import lands IN, instead of sixteen more homeless rows.
 -- The stray hyphen is not carried across: it is not a value, it is a typo.
-INSERT INTO selectable_data (id, type, value, is_default, created_at, creator_id, creator_email, creator_name)
-SELECT lower(hex(randomblob(16))), v.type, v.value, 1, datetime('now'), NULL, NULL, 'System'
-  FROM (
-    SELECT 'Country' AS type, 'Germany' AS value
-    UNION ALL SELECT 'Country', 'Austria'
-    UNION ALL SELECT 'Country', 'Switzerland'
-    UNION ALL SELECT 'Country', 'Spain'
-    UNION ALL SELECT 'Country', 'Andorra'
-    UNION ALL SELECT 'Country', 'United Kingdom'
-    UNION ALL SELECT 'Company size', '1–10'
-    UNION ALL SELECT 'Company size', '11–50'
-    UNION ALL SELECT 'Company size', '51–200'
-    UNION ALL SELECT 'Company size', '201–500'
-    UNION ALL SELECT 'Company size', 'More than 500'
-  ) v
- WHERE NOT EXISTS (
-   SELECT 1 FROM selectable_data s WHERE s.type = v.type AND s.value = v.value
- );
+-- ONE STATEMENT PER VALUE, and that is not style — it is D1's hard limit.
+-- This was a single INSERT feeding off an eleven-term UNION ALL chain, which is
+-- ordinary SQLite and which D1 REFUSES: its compound-SELECT ceiling is FIVE
+-- terms, not SQLite's 500. The whole migration rolled back with "too many terms
+-- in compound SELECT" and every existing team stayed on the previous schema
+-- while the code above it had already shipped. Generated from
+-- INTERNAL_VOCABULARY below so the chain can never grow back.
+${INTERNAL_VOCABULARY.map(
+  (v) => `INSERT INTO selectable_data (id, type, value, is_default, created_at, creator_id, creator_email, creator_name)
+SELECT lower(hex(randomblob(16))), '${v.type}', '${v.value}', 1, datetime('now'), NULL, NULL, 'System'
+ WHERE NOT EXISTS (SELECT 1 FROM selectable_data s WHERE s.type = '${v.type}' AND s.value = '${v.value}');`
+).join("\n")}
 `,
   },
 ]
