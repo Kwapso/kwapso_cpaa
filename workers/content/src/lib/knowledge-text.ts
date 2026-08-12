@@ -1,17 +1,18 @@
 // THE PURE HALF OF THE KNOWLEDGE BASE — turning a piece of material into the
 // things retrieval actually scores: chunks, terms, and a vector. No database, no
-// network, no env; every function here is deterministic, which is what makes the
-// retrieval quality measurable rather than an impression (see
-// scripts/knowledge-backfill.mjs, which runs these against the agency's own
-// history and prints the numbers).
+// network, no env — AND NO IMPORTS AT ALL, which is a property worth keeping
+// rather than an accident: `scripts/knowledge-retrieval-bench.mjs` imports this
+// file straight into plain Node so that the "before" arm of every measurement is
+// really the shipped code. One `@shared/…` import here and that stops working,
+// which is exactly how it was found. The one constant that wanted to live here
+// and could not — the derived chunk ceiling — is in knowledge.ts beside the
+// validator it is derived from.
 //
 // Two sections, in the order the pipeline uses them:
 //   1. TEXT   — hash (has this changed?), chunk (what does a citation point at?),
 //               tokenise (what does stage one of retrieval match on?).
 //   2. VECTOR — the quantised embedding codec and its similarity, so stage two
 //               can re-rank a bounded candidate set with no float array in D1.
-
-import { DOCUMENT_LIMIT_BYTES } from "@shared/workers/validate"
 
 /* ---------------------------------- text ---------------------------------- */
 
@@ -20,22 +21,6 @@ import { DOCUMENT_LIMIT_BYTES } from "@shared/workers/validate"
  * being cut out of its source. */
 export const CHUNK_TARGET_CHARS = 900
 
-/** Chunks one source may hold — DERIVED from the ceiling the door enforces, not
- * chosen separately, so the two numbers cannot disagree.
- *
- * It used to be 200, which is about eight pages of prose, and `chunkText`
- * enforced it by silently returning fewer chunks than the text deserved. That is
- * the exact shape the owner ruled out: "the upload is REFUSED with a clear
- * message, never silently trimmed." Now the REFUSAL happens at the door
- * (optionalDocument, in bytes, before anything is saved) and this is only the
- * backstop for material that never passes a door — a mirrored row that some
- * import made enormous. `indexSource` indexes what fits and RECORDS the overflow
- * on the row in both numbers, because making an existing record unfindable would
- * be a worse answer than an incomplete one, and neither may be silent.
- *
- * The 1.4 is headroom: a document of paragraphs shorter than the target cuts
- * into more pieces than length alone predicts. */
-export const MAX_CHUNKS_PER_SOURCE = Math.ceil((DOCUMENT_LIMIT_BYTES / CHUNK_TARGET_CHARS) * 1.4)
 
 /** Distinct terms one chunk contributes to the inverted index. The tail of a
  * long chunk is mostly names and numbers that match nothing; the head is what

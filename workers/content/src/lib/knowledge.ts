@@ -110,7 +110,13 @@ import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { ulid } from "@shared/workers/id"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { numberVar } from "@shared/workers/limits"
-import { optionalDocument, optionalText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import {
+  DOCUMENT_LIMIT_BYTES,
+  optionalDocument,
+  optionalText,
+  requireText,
+  TEXT_LIMITS,
+} from "@shared/workers/validate"
 import type {
   KnowledgeAnswer,
   KnowledgeCitation,
@@ -119,10 +125,10 @@ import type {
 } from "@shared/types"
 import type { Env } from "../env"
 import {
+  CHUNK_TARGET_CHARS,
   chunkText,
   contentHash,
   encodeEmbedding,
-  MAX_CHUNKS_PER_SOURCE,
   plainText,
   questionTerms,
   tokenise,
@@ -236,6 +242,23 @@ const CHUNK_WRITE_BATCH = 20
 
 /** Texts handed to the embedding model in one call. Workers AI takes 100. */
 const EMBED_BATCH = 100
+
+/** Chunks one source may hold — DERIVED from the ceiling the door enforces, not
+ * chosen beside it, so the two numbers cannot disagree.
+ *
+ * It used to be 200 (about eight pages) and the CHUNKER enforced it by silently
+ * returning fewer pieces than the text had. That is the exact shape the owner
+ * ruled out: "the upload is REFUSED with a clear message, never silently
+ * trimmed." The refusal now happens at the door — `optionalDocument`, in bytes,
+ * before anything is saved — and this is only the backstop for material that
+ * never passes a door, a mirrored row some import made enormous. `indexSource`
+ * indexes what fits and RECORDS the overflow on the row in both numbers, because
+ * making an existing record unfindable would be a worse answer than an
+ * incomplete one, and neither may be silent.
+ *
+ * The 1.4 is headroom: text whose paragraphs are shorter than the target cuts
+ * into more pieces than its length alone predicts. */
+export const MAX_CHUNKS_PER_SOURCE = Math.ceil((DOCUMENT_LIMIT_BYTES / CHUNK_TARGET_CHARS) * 1.4)
 
 /** Chunks one INDEXING SLICE does. The unit of resumable work: a slice embeds,
  * writes and upserts this many chunks and then records where it got to. */

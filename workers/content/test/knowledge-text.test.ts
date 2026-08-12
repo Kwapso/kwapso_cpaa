@@ -10,7 +10,6 @@ import { describe, expect, it } from "vitest"
 
 import {
   CHUNK_TARGET_CHARS,
-  MAX_CHUNKS_PER_SOURCE,
   chunkText,
   contentHash,
   decodeEmbedding,
@@ -20,6 +19,7 @@ import {
   similarity,
   tokenise,
 } from "../src/lib/knowledge-text"
+import { MAX_CHUNKS_PER_SOURCE } from "../src/lib/knowledge"
 
 describe("chunkText", () => {
   it("returns nothing for empty text (never one empty chunk)", () => {
@@ -63,6 +63,9 @@ describe("chunkText", () => {
     expect(chunks.join(" ").length).toBeGreaterThan(book.length * 0.99)
     // The backstop is still a number, and it is DERIVED from the door's ceiling
     // rather than chosen beside it — 1.5 MB of text cannot make more than this.
+    // It lives in knowledge.ts, beside the validator it comes from: this file
+    // deliberately imports NOTHING, so that the benchmark can load it into plain
+    // Node and measure the shipped chunker rather than a copy of it.
     expect(MAX_CHUNKS_PER_SOURCE).toBeGreaterThan(1_500)
   })
 
