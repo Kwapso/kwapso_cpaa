@@ -148,6 +148,20 @@ describe("team schema", () => {
       "brand_assets",
       "delivery",
       "staff_profiles",
+      // GOOGLE — three modules, because the owner named three switches, and the
+      // tall sheet's unit of "a switch per role" is a module row.
+      //
+      // `google` is the connection itself: read what you shared, CONNECT an
+      // account (create), write back through it (edit), disconnect (delete).
+      // The other two exist to carry ONE right each — may kwapso send mail as
+      // you, and may it put an event in your calendar — deliberately separate
+      // from each other AND from the `agent` right, so granting somebody the
+      // assistant does not silently grant the assistant their outbox. A module
+      // whose four rights are not all meaningful is not new here: nothing reads
+      // `agent:edit` either.
+      "google",
+      "google_mail",
+      "google_events",
     ])
   })
 })

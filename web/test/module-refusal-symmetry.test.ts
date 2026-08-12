@@ -145,11 +145,23 @@ describe("a module refuses a client login on both halves, or on neither", () => 
     // publish, the material we publish it with, how we run delivery, and who our
     // people are — so there is no fenced slice of any of them to serve a client,
     // only a refusal, on every door of both halves.
+    //
+    // `google` is the newest, and the only member so far where the material on
+    // the far side of the door is not even ours: it is one colleague's own Drive,
+    // mailbox, diary and chat spaces. Clients get no assistant and no Google
+    // surface at all, so every door on it refuses rather than fences. Its two
+    // SWITCH modules — `google_mail` and `google_events` — are deliberately
+    // absent from this set and that is the derivation working, not a gap: they
+    // gate no read door at all (nothing asks for `google_mail:read`), so there is
+    // no read half for this test to compare a write half against. What guards
+    // them is that every door demanding one ALSO demands `google:edit`, and this
+    // set already holds `google`.
     ).toEqual([
       "agent",
       "brand_assets",
       "commercials",
       "delivery",
+      "google",
       "knowledge",
       "learning",
       "marketing",

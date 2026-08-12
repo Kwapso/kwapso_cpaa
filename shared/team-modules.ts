@@ -29,6 +29,18 @@ export const TEAM_MODULES = [
   "brand_assets",
   "delivery",
   "staff_profiles",
+  // GOOGLE — THREE MODULES, BECAUSE THE OWNER NAMED THREE SWITCHES.
+  //
+  // "May connect a Google account" is one switch per role. "kwapso may act in
+  // Google on my behalf" is TWO more — sending mail, and creating events —
+  // deliberately separate from each other AND from the `agent` right, so that
+  // giving somebody the assistant does not silently give the assistant their
+  // outbox. The tall sheet's unit of "a switch per role" is a module row, so
+  // three switches are three rows. (`agent` is the precedent for a module whose
+  // four rights are not all meaningful: nothing reads agent:edit either.)
+  "google",
+  "google_mail",
+  "google_events",
 ] as const
 
 /** Plain-English label for each module, shown as the rows of the permission
@@ -115,6 +127,34 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   // want everyone to see who their colleagues are without everyone being able to
   // change who is on the team.
   staff_profiles: "Staff profiles",
+
+  // ── GOOGLE ─────────────────────────────────────────────────────────────────
+  // What each right MEANS here, because three of these four are not the usual
+  // reading and a permission nobody can read is a permission nobody can grant
+  // safely:
+  //   read   — see your own connections, and read what you have shared through
+  //            them (files in the folders you named, mail with a known contact,
+  //            your calendar, the spaces you named);
+  //   create — CONNECT a Google account, and name a folder or a space for it;
+  //   edit   — write back through a connection: put a file in a folder you
+  //            named, leave a draft in your own Gmail, post in a space you named;
+  //   delete — disconnect an account, or take a folder or space away again.
+  //
+  // The two acts that reach OUTSIDE the world you connected — mail that actually
+  // leaves, and an event that lands in a calendar — are the owner's two extra
+  // switches and live in their own modules below. Only `create` is read on
+  // either: the module IS the switch. A space post is not a third switch because
+  // the owner named two, and a space is one you named yourself; it sits under
+  // `edit` with the other writes.
+  google: "Google connections",
+  // Read as a sentence with the role's name in front: "Ana may send mail on her
+  // behalf" is the wrong reading — it is "kwapso may send mail on Ana's behalf".
+  // The right is on the ROLE because that is where the agency decides it, and it
+  // applies whether the assistant pressed the button or Ana did: pressing "send
+  // it from kwapso" is the same act, done by the same product, from the same
+  // mailbox.
+  google_mail: "Mail on your behalf",
+  google_events: "Calendar on your behalf",
 }
 
 /** The matrix rows: { key, label } per module, in display order. */

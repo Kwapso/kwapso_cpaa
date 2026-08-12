@@ -185,6 +185,28 @@ import {
   postUpdateStaffCertificate,
   postUploadStaffFile,
 } from "./routes/staff"
+import {
+  getGoogleCallback,
+  getGoogleChat,
+  getGoogleConnections,
+  getGoogleDriveFile,
+  getGoogleDriveFiles,
+  getGoogleEvents,
+  getGoogleMail,
+  getGoogleMailMessage,
+  getGooglePick,
+  getGoogleStart,
+  postGoogleChat,
+  postGoogleConnect,
+  postGoogleDisconnect,
+  postGoogleDriveUpload,
+  postGoogleEvent,
+  postGoogleMailDraft,
+  postGoogleMailSend,
+  postGoogleSource,
+  postGoogleSourceActive,
+  postGoogleSprintEvent,
+} from "./routes/google"
 import { sweepAll } from "./lib/knowledge-ingest"
 import { sendTriageDigest, teamMemberNames } from "./lib/notify"
 import { dutyFor, loggedNothingLastWeek, needsTriage } from "./lib/triage"
@@ -327,6 +349,48 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/content/staff/certificates": { handler: postCreateStaffCertificate, kind: "mutation" },
   "POST /api/content/staff/certificates/update": { handler: postUpdateStaffCertificate, kind: "mutation" },
   "POST /api/content/staff/certificates/active": { handler: postSetStaffCertificateActive, kind: "mutation" },
+
+  // ── GOOGLE, CONNECTED ONE PERSON AT A TIME ─────────────────────────────────
+  // Four services, each asked for separately, each connected to the CALLER's own
+  // account. Every door below opens with `refusePortalCaller`: clients get no
+  // assistant and no Google surface at all, and the refusal lives on the handler
+  // because the agency gateway forwards by prefix (R21).
+  //
+  // Two of these are the browser's half of an OAuth round-trip and are worth
+  // reading together. `/start` bounces to Google's consent screen. `/callback`
+  // is where Google sends the browser back — and it CHANGES NO ROW: it checks
+  // the round-trip is the one we started and moves the authorization code into
+  // the same HttpOnly one-shot cookie, so the gated, publishing POST beside it
+  // is what actually stores the credential. A GET that wrote a token would be a
+  // mutation the seam tests are right to skip and wrong to have to trust.
+  "GET /api/content/google/connections": { handler: getGoogleConnections, kind: "read" },
+  "GET /api/content/google/start": { handler: getGoogleStart, kind: "read" },
+  "GET /api/content/google/callback": { handler: getGoogleCallback, kind: "read" },
+  "POST /api/content/google/connect": { handler: postGoogleConnect, kind: "mutation" },
+  "POST /api/content/google/disconnect": { handler: postGoogleDisconnect, kind: "mutation" },
+  // What a connection shares: the picker, and the named folders and spaces.
+  "GET /api/content/google/pick": { handler: getGooglePick, kind: "read" },
+  "POST /api/content/google/sources": { handler: postGoogleSource, kind: "mutation" },
+  "POST /api/content/google/sources/active": { handler: postGoogleSourceActive, kind: "mutation" },
+  // READING and WRITING, for all four. Every write publishes because every write
+  // moves the connection's own row: `last_used_at`, plus a history row saying
+  // what kwapso did as whom. An act in somebody else's system that left no trace
+  // in ours would be the one write in the base with no audit block.
+  "GET /api/content/google/drive/files": { handler: getGoogleDriveFiles, kind: "read" },
+  "GET /api/content/google/drive/file": { handler: getGoogleDriveFile, kind: "read" },
+  "POST /api/content/google/drive/upload": { handler: postGoogleDriveUpload, kind: "mutation" },
+  "GET /api/content/google/gmail/messages": { handler: getGoogleMail, kind: "read" },
+  "GET /api/content/google/gmail/message": { handler: getGoogleMailMessage, kind: "read" },
+  "POST /api/content/google/gmail/draft": { handler: postGoogleMailDraft, kind: "mutation" },
+  "POST /api/content/google/gmail/send": { handler: postGoogleMailSend, kind: "mutation" },
+  "GET /api/content/google/calendar/events": { handler: getGoogleEvents, kind: "read" },
+  "POST /api/content/google/calendar/events": { handler: postGoogleEvent, kind: "mutation" },
+  // FROM kwapso TO Google: a sprint's dates as a calendar entry. The other half
+  // the owner named — meetings booked in kwapso — has no record to push yet (see
+  // the handler); it is a second door beside this one the day a meeting is a row.
+  "POST /api/content/google/calendar/sprint": { handler: postGoogleSprintEvent, kind: "mutation" },
+  "GET /api/content/google/chat/messages": { handler: getGoogleChat, kind: "read" },
+  "POST /api/content/google/chat/messages": { handler: postGoogleChat, kind: "mutation" },
 }
 
 export default {

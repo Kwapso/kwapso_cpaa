@@ -25,7 +25,8 @@ import { GuardError, requireRight, teamContext } from "@shared/workers/gating"
 import { forwardToDoor } from "@shared/workers/http"
 import { BULK_IDS_LIMIT } from "@shared/workers/limits"
 import { publishChange } from "@shared/workers/realtime"
-import { checkArgTypes,
+import { B,
+  checkArgTypes,
   isPrivilegeWrite,
   obj,
   roleLabel,
@@ -180,6 +181,254 @@ const AGENT_ONLY: AgentTool[] = [
     confirm: true, // writing a whole file of rows is high-blast — always confirm
     summarize: (i) => (typeof i.summary === "string" && i.summary ? i.summary : "Run the attached file import"),
     run: (env, request, input) => runImportBatchTool(env, request, input),
+  },
+
+  /* ------------------------------- GOOGLE ---------------------------------- */
+  // Thirteen tools on the four services somebody has connected THEIR OWN account
+  // to. Act-as-user does all the work here, as it does everywhere else: the
+  // executor forwards the caller's cookie, the door resolves the connection from
+  // `guard.userId`, and there is no parameter anywhere in this module that could
+  // name a different person's Drive. So "the assistant sees only what that person
+  // can see" needs no rule of its own — it is what act-as-user already means,
+  // reaching one system further out.
+  //
+  // THE CONFIRM RULE, and the one asymmetry in it. The owner decided: the
+  // assistant may create calendar events WITHOUT asking; mail ALWAYS asks. So
+  // `google_create_event` and `google_sprint_to_calendar` run straight away, and
+  // `google_send_mail` pauses for a yes/no panel — because an event is a
+  // suggestion in a diary its owner can delete in one click, and a sent mail is
+  // in somebody else's inbox forever. `google_chat_post` confirms for the same
+  // reason as mail: a colleague reads it the moment it lands.
+  //
+  // WHAT THE ASSISTANT DELIBERATELY CANNOT DO: connect an account, disconnect
+  // one, or change which folders and spaces are shared. Those are decisions about
+  // WHO CAN READ WHAT, made by a person at a consent screen or a form that asks
+  // the question in words. The doors exist and refuse nobody with the right; they
+  // simply have no tool. See TOOLLESS_DOORS in workers/mcp/test/filter-parity.test.ts.
+  {
+    name: "list_google_connections",
+    description:
+      "Which Google services the signed-in person has connected (Drive, Gmail, Calendar, Google Chat), " +
+      "which Google account each is, and which folders and spaces they have shared. Call this FIRST if " +
+      "you are unsure whether you can read something — an unconnected service is not an error, it is a " +
+      "thing to tell them about.",
+    schema: obj({}),
+    binding: "CONTENT",
+    method: "GET",
+    path: "/api/content/google/connections",
+    write: false,
+    confirm: false,
+    summarize: () => "Check which Google services are connected",
+  },
+  {
+    name: "google_drive_files",
+    description:
+      "List files in the Drive FOLDERS this person has shared with kwapso — never their whole Drive. " +
+      "`q` narrows by name INSIDE those folders. A person who has shared no folders gets an empty list, " +
+      "which means 'nothing shared', not 'nothing there'.",
+    schema: obj({ q: S }),
+    binding: "CONTENT",
+    method: "GET",
+    path: "/api/content/google/drive/files",
+    write: false,
+    confirm: false,
+    buildQuery: (i) => (str(i, "q") ? `?q=${encodeURIComponent(str(i, "q"))}` : ""),
+    summarize: (i) => (str(i, "q") ? `Look for "${str(i, "q")}" in the shared Drive folders` : "List shared Drive files"),
+  },
+  {
+    name: "google_drive_file",
+    description:
+      "Read one Drive file's text by its file id (get ids from google_drive_files). Google Docs, Sheets " +
+      "and Slides are read as plain text; a file with no text comes back empty.",
+    schema: obj({ fileId: S }, ["fileId"]),
+    binding: "CONTENT",
+    method: "GET",
+    path: "/api/content/google/drive/file",
+    write: false,
+    confirm: false,
+    buildQuery: (i) => `?fileId=${encodeURIComponent(str(i, "fileId"))}`,
+    summarize: () => "Read a shared Drive file",
+  },
+  {
+    name: "google_drive_upload",
+    description:
+      "Write a text file INTO one of the folders this person has shared. `sourceId` is the shared " +
+      "folder's id from list_google_connections — not a Google folder id, because you can only ever " +
+      "write into a folder they chose.",
+    schema: obj({ sourceId: S, name: S, text: S, mimeType: S }, ["sourceId", "name", "text"]),
+    binding: "CONTENT",
+    method: "POST",
+    path: "/api/content/google/drive/upload",
+    write: true,
+    // Constructive, and inside a folder the person chose themselves — the same
+    // reading that lets every other create in the catalog run straight away.
+    confirm: false,
+    buildBody: (i) => ({
+      sourceId: str(i, "sourceId"),
+      name: str(i, "name"),
+      text: str(i, "text"),
+      ...(str(i, "mimeType") ? { mimeType: str(i, "mimeType") } : {}),
+    }),
+    summarize: (i) => `Write "${str(i, "name")}" into a shared Drive folder`,
+  },
+  {
+    name: "google_mail_search",
+    description:
+      "Search this person's mail — ONLY messages to or from someone on one of the team's accounts. " +
+      "That fence is built by the door from the accounts' own email addresses; `q` narrows INSIDE it " +
+      "and cannot widen it. If no contact has an email address yet, the answer says so.",
+    schema: obj({ q: S }),
+    binding: "CONTENT",
+    method: "GET",
+    path: "/api/content/google/gmail/messages",
+    write: false,
+    confirm: false,
+    buildQuery: (i) => (str(i, "q") ? `?q=${encodeURIComponent(str(i, "q"))}` : ""),
+    summarize: (i) => (str(i, "q") ? `Search mail for "${str(i, "q")}"` : "List recent mail with contacts"),
+  },
+  {
+    name: "google_mail_message",
+    description: "Read one message in full by its id (get ids from google_mail_search).",
+    schema: obj({ messageId: S }, ["messageId"]),
+    binding: "CONTENT",
+    method: "GET",
+    path: "/api/content/google/gmail/message",
+    write: false,
+    confirm: false,
+    buildQuery: (i) => `?messageId=${encodeURIComponent(str(i, "messageId"))}`,
+    summarize: () => "Read one message",
+  },
+  {
+    name: "google_draft_reply",
+    description:
+      "Write a reply and LEAVE IT IN THEIR GMAIL DRAFTS. Nothing is sent. This is the normal way to " +
+      "answer mail: the person opens the draft, changes what they like and sends it. Pass `threadId` " +
+      "(from google_mail_search) to keep it in the same conversation. The answer carries a link " +
+      "straight to the draft — always give them that link.",
+    schema: obj({ to: S, subject: S, body: S, threadId: S }, ["to", "subject", "body"]),
+    binding: "CONTENT",
+    method: "POST",
+    path: "/api/content/google/gmail/draft",
+    write: true,
+    // A draft is a sentence somebody can still change their mind about, so it
+    // does not spend a confirm panel. The panel belongs on the door that sends.
+    confirm: false,
+    buildBody: (i) => ({
+      to: str(i, "to"),
+      subject: str(i, "subject"),
+      body: str(i, "body"),
+      ...(str(i, "threadId") ? { threadId: str(i, "threadId") } : {}),
+    }),
+    summarize: (i) => `Draft a reply to ${str(i, "to")}`,
+  },
+  {
+    name: "google_send_mail",
+    description:
+      "ACTUALLY SEND mail as this person. Needs their role's own send switch — a role without it gets a " +
+      "refusal, and that is the intended answer, not a problem to work around. Prefer google_draft_reply " +
+      "unless the person has clearly asked for it to go now. Pass `draftId` to send a draft you already " +
+      "wrote, or the message fields to send a new one.",
+    schema: obj({ draftId: S, to: S, subject: S, body: S, threadId: S }),
+    binding: "CONTENT",
+    method: "POST",
+    path: "/api/content/google/gmail/send",
+    write: true,
+    // MAIL ALWAYS ASKS — the owner's rule, and the sharpest confirm in the
+    // catalog: a sent message is in somebody else's inbox and cannot be recalled.
+    confirm: true,
+    buildBody: (i) => ({
+      ...(str(i, "draftId") ? { draftId: str(i, "draftId") } : {}),
+      ...(str(i, "to") ? { to: str(i, "to") } : {}),
+      ...(str(i, "subject") ? { subject: str(i, "subject") } : {}),
+      ...(str(i, "body") ? { body: str(i, "body") } : {}),
+      ...(str(i, "threadId") ? { threadId: str(i, "threadId") } : {}),
+    }),
+    summarize: (i) => (str(i, "to") ? `Send mail to ${str(i, "to")}` : "Send the drafted reply"),
+  },
+  {
+    name: "google_calendar_events",
+    description:
+      "Read this person's own calendar between two moments. `from` and `to` are RFC-3339 timestamps " +
+      "(e.g. 2026-08-12T00:00:00Z); leave them out for what is coming up next.",
+    schema: obj({ from: S, to: S }),
+    binding: "CONTENT",
+    method: "GET",
+    path: "/api/content/google/calendar/events",
+    write: false,
+    confirm: false,
+    buildQuery: (i) =>
+      str(i, "from") || str(i, "to")
+        ? `?from=${encodeURIComponent(str(i, "from"))}&to=${encodeURIComponent(str(i, "to"))}`
+        : "",
+    summarize: () => "Read the calendar",
+  },
+  {
+    name: "google_create_event",
+    description:
+      "Put an event in this person's own calendar. `start` and `end` are RFC-3339 timestamps, or plain " +
+      "dates with allDay:true. Needs their role's own events switch.",
+    schema: obj({ summary: S, description: S, start: S, end: S, allDay: B }, ["summary", "start", "end"]),
+    binding: "CONTENT",
+    method: "POST",
+    path: "/api/content/google/calendar/events",
+    write: true,
+    // NO CONFIRM, on purpose and by the owner's decision: an event lands in a
+    // diary its owner can delete in one click, so asking every time would make
+    // the assistant slower at the one thing it was asked to do without making
+    // anything safer.
+    confirm: false,
+    buildBody: (i) => ({
+      summary: str(i, "summary"),
+      ...(str(i, "description") ? { description: str(i, "description") } : {}),
+      start: str(i, "start"),
+      end: str(i, "end"),
+      ...(i.allDay === true ? { allDay: true } : {}),
+    }),
+    summarize: (i) => `Put "${str(i, "summary")}" in the calendar`,
+  },
+  {
+    name: "google_sprint_to_calendar",
+    description:
+      "Put a sprint's dates in this person's calendar as an all-day block. Get the sprint id from " +
+      "list_sprints. Needs their role's events switch, and the right to read work.",
+    schema: obj({ sprintId: S }, ["sprintId"]),
+    binding: "CONTENT",
+    method: "POST",
+    path: "/api/content/google/calendar/sprint",
+    write: true,
+    confirm: false, // same reading as google_create_event — it IS one.
+    buildBody: (i) => ({ sprintId: str(i, "sprintId") }),
+    summarize: () => "Put a sprint's dates in the calendar",
+  },
+  {
+    name: "google_chat_messages",
+    description:
+      "Read recent messages in ONE Google Chat space this person has shared. `sourceId` is the shared " +
+      "space's id from list_google_connections — a space they have not shared cannot be named here.",
+    schema: obj({ sourceId: S }, ["sourceId"]),
+    binding: "CONTENT",
+    method: "GET",
+    path: "/api/content/google/chat/messages",
+    write: false,
+    confirm: false,
+    buildQuery: (i) => `?sourceId=${encodeURIComponent(str(i, "sourceId"))}`,
+    summarize: () => "Read a shared Chat space",
+  },
+  {
+    name: "google_chat_post",
+    description:
+      "Post a message in one of the shared Chat spaces, as this person. `sourceId` is the shared space's " +
+      "id from list_google_connections.",
+    schema: obj({ sourceId: S, text: S }, ["sourceId", "text"]),
+    binding: "CONTENT",
+    method: "POST",
+    path: "/api/content/google/chat/messages",
+    write: true,
+    // Confirmed for the same reason mail is: colleagues read it the moment it
+    // lands, and there is no version of "undo" that unreads it.
+    confirm: true,
+    buildBody: (i) => ({ sourceId: str(i, "sourceId"), text: str(i, "text") }),
+    summarize: () => "Post in a shared Chat space",
   },
 ]
 
