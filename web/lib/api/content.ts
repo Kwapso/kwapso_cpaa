@@ -129,6 +129,11 @@ export const content = {
     api<{ tickets: HelpTicket[] }>("/api/content/help/status", post({ id, status })),
   replyHelp: (helpId: string, body: string, taggedUserIds?: string[]) =>
     api<{ replies: HelpMessage[]; total: number }>("/api/content/help/reply", post({ helpId, body, taggedUserIds })),
+  /** ANSWER IT: resolve the ticket, add the words to its conversation, and email
+   * the client. One call, because they are one act — and `alreadyResolved` comes
+   * back rather than a second email when the answer has already gone. */
+  resolveHelp: (id: string, resolution: string) =>
+    api<{ sent: boolean; alreadyResolved: boolean }>("/api/content/help/resolve", post({ id, resolution })),
   helpStakeholders: (id: string) =>
     api<{ stakeholders: HelpStakeholder[] }>(`/api/content/help/stakeholders?id=${enc(id)}`),
   addStakeholder: (id: string, userId: string) =>

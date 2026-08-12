@@ -785,6 +785,23 @@ export const SHARED_TOOLS: SharedTool[] = [
       },
     },
   },
+  {
+    name: "resolve_help_ticket",
+    summary:
+      "ANSWER a ticket and TELL THE CLIENT: `resolution` is the words they will read. It resolves the ticket, appends those words to its conversation, and EMAILS the people at that client — one of only two things in the whole product that reach a customer's inbox. Read the ticket's draft resolution first (it is built from each story's closing note as the work finished) and send that, edited. An already-resolved ticket answers `{sent:false, alreadyResolved:true}` and emails nobody: a second call is not a second answer.",
+    binding: "CONTENT", method: "POST", path: "/api/content/help/resolve",
+    schema: obj({ id: S, resolution: S }, ["id", "resolution"]),
+    buildBody: (i) => ({ id: str(i, "id"), resolution: str(i, "resolution") }),
+    agent: {
+      write: true,
+      // CONFIRM, and of everything in this catalogue this is the one that most
+      // obviously must. It sends a customer an answer, in the agency's name,
+      // composed by a model that has been reading text a customer wrote. There
+      // is no un-sending it.
+      confirm: true,
+      summarize: (i) => `Answer ticket ${str(i, "id")} and email the client`,
+    },
+  },
   /* ------------------------------ the work engine ---------------------------- */
   // A ticket is what an account ASKS FOR; a story is what WE DO about it. Keeping
   // the two apart matters more on this surface than anywhere else, because the
@@ -1685,6 +1702,9 @@ export const TOOL_GATES: Record<string, string> = {
   rank_help_ticket: "help:edit",
   archive_help_ticket: "help:edit",
   reply_help_ticket: "help:read",
+  // Answering is a status move, so it sits on the same right every other move
+  // does — and the door refuses a portal caller, because "resolved" is our word.
+  resolve_help_ticket: "help:edit",
   // THE WORK ENGINE. One module for stories and the sprints they sit in, and no
   // client login holds it — so unlike the ticket doors above, the question "what
   // happens when a contact reaches this?" has a shorter answer here: the door

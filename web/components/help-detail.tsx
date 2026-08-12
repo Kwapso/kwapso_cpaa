@@ -26,7 +26,7 @@ import {
   type TicketMember,
   type TicketStatus,
 } from "@kwapso/ui/registry/collections/ticket-thread/ticket-thread"
-import { Pencil } from "lucide-react"
+import { Languages, Pencil, Send } from "lucide-react"
 
 import type {
   HelpMessage,
@@ -35,7 +35,7 @@ import type {
   SelectableValue,
   TeamMember,
 } from "@shared/types"
-import { ApiFailure, content, tenancy } from "@/lib/api"
+import { ApiFailure, content, dataOps, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
 import { useFollowNewest } from "@shared/web/follow-newest"
 import { formatRelative } from "@shared/web/format"
@@ -48,6 +48,7 @@ import { HelpFormDialog } from "@/components/help-form-dialog"
 import { LoadMore } from "@/components/load-more"
 import { HelpStakeholders } from "@/components/help-stakeholders"
 import { HelpStatusStepper, type HelpStatusValue } from "@/components/help-status-stepper"
+import { ResolveDialog, type ResolveFormValues } from "@/components/resolve-dialog"
 
 // LIBRARY ⇄ SERVER status. These were one-to-one until the work engine gave the
 // ticket its five states (SCOPE ch.07); the library's `TicketStatus` has four,
@@ -122,6 +123,8 @@ export function HelpDetailScreen({
 
   const [tab, setTab] = React.useState("conversation")
   const [editing, setEditing] = React.useState(false)
+  const [resolving, setResolving] = React.useState(false)
+  const [translating, setTranslating] = React.useState(false)
   const [statusBusy, setStatusBusy] = React.useState(false)
 
   // Land on the newest reply, and follow the one you just sent — the same
@@ -198,6 +201,32 @@ export function HelpDetailScreen({
     }
   }
 
+  /** ANSWER IT: resolve, append to the conversation, email the client — one call,
+   * because they are one act and a half-done answer is the worst of the three. */
+  async function resolve(values: ResolveFormValues) {
+    await content.resolveHelp(helpId, values.resolution)
+    invalidate(`help:${teamId}`)
+    invalidate(`help-thread:${helpId}`)
+    invalidate(recordActivityKey("help", helpId))
+    toast.success("Answered — and emailed to them.")
+  }
+
+  /** TRANSLATE AND SET IT. The door spends one unit of the team's AI allowance
+   * and refunds it if nothing usable came back, so a failure here costs nothing
+   * but the second it took. */
+  async function translate() {
+    setTranslating(true)
+    try {
+      await dataOps.translateTicket(helpId)
+      invalidate(`help:${teamId}`)
+      toast.success("Translated.")
+    } catch (err) {
+      toast.error(err instanceof ApiFailure ? err.message : "Couldn't translate that.")
+    } finally {
+      setTranslating(false)
+    }
+  }
+
   if (ticketsQ.error) return <p className="text-destructive text-sm">Couldn&apos;t load the ticket.</p>
   if (ticketsQ.data === undefined) return <Skeleton variant="list" lines={4} />
   if (!ticket) return <p className="text-muted-foreground text-sm">That ticket no longer exists.</p>
@@ -217,6 +246,12 @@ export function HelpDetailScreen({
 
   const overviewItems = [
     { label: "Type", value: ticket.helpType || "General" },
+    // BOTH TITLES, and the German one first when it is the original. 788 of the
+    // requests arriving from the previous system exist ONLY in German (BUILD-1
+    // §8), so "the title" is two fields here and the screen says so rather than
+    // picking one and hoping.
+    { label: "Title", value: ticket.titleDe || "" },
+    { label: "Title (English)", value: ticket.titleEn || "" },
     { label: "Raised from", value: ticket.sourceScreen || "" },
     ...auditItems({
       createdByName: ticket.raiserName,
@@ -265,6 +300,33 @@ export function HelpDetailScreen({
       <div className="flex flex-col gap-3">
         <div className="flex items-start gap-3">
           <p className="min-w-0 flex-1 truncate text-sm font-medium">{ticket.description}</p>
+          {/* TRANSLATE, on a ticket that has a German title and no English one
+              yet. It SETS the field rather than showing a preview (BUILD-1 §8):
+              a preview is a thing one person reads once, and a set field is a
+              thing the whole team, the search and the assistant read afterwards.
+              It disappears the moment there is an English title, because there
+              is then nothing to ask for. */}
+          {canEdit && ticket.titleDe && !ticket.titleEn && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void translate()}
+              disabled={translating}
+              className="shrink-0 gap-1.5"
+            >
+              <Languages className="size-3.5" />
+              {translating ? "Translating…" : "Translate"}
+            </Button>
+          )}
+          {/* ANSWER IT — the second and last thing in the product that emails a
+              client, so it is a deliberate button with a dialog behind it and
+              never a side effect of the stepper. Gone once it is answered. */}
+          {canEdit && ticket.status !== "resolved" && (
+            <Button size="sm" onClick={() => setResolving(true)} className="shrink-0 gap-1.5">
+              <Send className="size-3.5" />
+              Answer
+            </Button>
+          )}
           {canEdit && (
             <Button
               variant="outline"
@@ -342,6 +404,14 @@ export function HelpDetailScreen({
             />
           )
         }}
+      />
+
+      <ResolveDialog
+        open={resolving}
+        onOpenChange={setResolving}
+        draft={ticket.draftResolution}
+        draftKey={`help:resolve:${helpId}`}
+        onSubmit={resolve}
       />
 
       <HelpFormDialog

@@ -758,4 +758,8 @@ export const FORM_DIALOGS = [
   // agency app whose Save reaches into a customer's inbox, so it says so.
   "todo-form-dialog",
   "task-form-dialog",
+  // Answering a ticket. It opens pre-filled from the draft each story's closing
+  // note has been building, and pressing its button emails a customer — so
+  // losing what somebody typed into it is the most expensive draft loss here.
+  "resolve-dialog",
 ] as const

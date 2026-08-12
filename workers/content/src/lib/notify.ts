@@ -326,3 +326,54 @@ export async function sendTriageDigest(
     console.error("triage digest failed:", e)
   }
 }
+
+/** EMAIL TWO — and the last one. THE ANSWER TO WHAT THEY ASKED.
+ *
+ * The other half of BUILD-1 §7's closed list, and the one the whole product is
+ * judged on: somebody asked us something, and this is us coming back. It is sent
+ * BY A PERSON pressing send, never by a status moving — which is why the door
+ * that calls it takes the words as an argument rather than reading them off the
+ * draft. A draft is our working text; a resolution is a sentence somebody chose
+ * to say.
+ *
+ * NO STAFF NAME, for the third time in this file and the same reason: SCOPE
+ * ch.06 is a promise about every surface that leaves the building. The client is
+ * told their request is answered and what the answer is; who wrote it is ours. */
+export async function notifyTicketResolved(
+  env: Env,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  ticketId: string,
+  resolution: string
+): Promise<void> {
+  try {
+    const rows = await d1Query<{ ref: string | null; description: string; account_id: string | null }>(
+      cfg,
+      guard.databaseId,
+      `SELECT ref, description, account_id FROM help WHERE id = ? LIMIT 1`,
+      [ticketId]
+    )
+    const ticket = rows[0]
+    // No account means the agency's own question, asked and answered inside the
+    // building. There is nobody outside it to tell.
+    if (!ticket?.account_id) return
+    const people = await accountInboxes(env, cfg, guard, ticket.account_id)
+    if (!people.length) return
+    const name = await teamName(env, guard.teamId)
+    const asked = snippet(ticket.description)
+    await Promise.all(
+      people.map((p) =>
+        send(env, p.email, `${name}: ${ticket.ref ? `${ticket.ref} — ` : ""}answered`, {
+          heading: "We've come back to you",
+          // The ANSWER in full, and what they asked in one line above it, because
+          // a resolution arriving with no reminder of the question is a paragraph
+          // people have to go and look something up to understand.
+          intro: `You asked: "${asked}"\n\n${resolution}`,
+          footnote: "Open the ticket if you want to reply — the whole conversation is there.",
+        }).catch((e) => console.error("resolution notice failed:", e))
+      )
+    )
+  } catch (e) {
+    console.error("resolution notify failed:", e)
+  }
+}

@@ -32,7 +32,7 @@ import {
   countReplies,
   bulkSetStatusByFilter,
 } from "../lib/help"
-import { notifyReplyAndMentions } from "../lib/notify"
+import { notifyReplyAndMentions, notifyTicketResolved } from "../lib/notify"
 import { addStakeholder, listStakeholders } from "../lib/stakeholders"
 import type { Env } from "../env"
 
@@ -341,6 +341,53 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
     replies: await listReplies(cfg, guard, scope, helpId),
     total: await countReplies(cfg, guard, scope, helpId),
   })
+}
+
+/** POST /api/content/help/resolve — COME BACK TO THE CLIENT (help:edit).
+ *
+ * The second and last thing in the product that emails a client (BUILD-1 §7),
+ * and the reason it is its own door rather than a side effect of the status
+ * move: a resolution is SENT BY A PERSON. The words arrive in the body — the
+ * screen pre-fills them from the ticket's draft, which each story's closing note
+ * has been building as the work finished — and a person edits them and presses
+ * send. A status that emailed on its own would make "resolved" a thing you can
+ * do by accident.
+ *
+ * THREE THINGS, IN ONE CALL AND IN THIS ORDER:
+ *   1. move the ticket to resolved. R17 gates everything after it — an already-
+ *      resolved ticket moves zero rows, so the client is not emailed twice about
+ *      the same answer, which is the failure this order exists to prevent;
+ *   2. append the resolution to the conversation, so what we said lives where
+ *      everything else about the request lives rather than only in an inbox;
+ *   3. email their people.
+ *
+ * Refused to a client login (R21), like every other status move on this module. */
+export async function postResolveHelp(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown; resolution?: unknown }>(
+    request,
+    env,
+    "help",
+    "edit"
+  )
+  const scope = await refusePortalCaller(cfg, guard)
+  const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
+  const resolution = requireText(body.resolution, "Resolution", TEXT_LIMITS.long)
+
+  const ticket = await getTicket(cfg, guard, scope, id)
+  if (!ticket) return fail(404, "help_not_found", "That ticket doesn't exist.")
+
+  // R17 IS THE SEND GUARD. Zero rows moved = already answered = nothing appended
+  // and nobody emailed. A second press of a button is not a second answer.
+  const { moved, accountId } = await setStatus(cfg, guard, scope, actor, id, "resolved")
+  if (!moved) return json({ sent: false, alreadyResolved: true })
+
+  const { id: replyId } = await addReply(cfg, guard, scope, actor, id, resolution, [], false)
+  await publishChange(env, guard.teamId, "help_threads", replyId, "add", accountId ?? undefined)
+  await publishChange(env, guard.teamId, "help", id, "edit", accountId ?? undefined)
+  // Best-effort and last: a failed email must never fail the answer. It is on
+  // their screen either way.
+  await notifyTicketResolved(env, cfg, guard, id, resolution)
+  return json({ sent: true, alreadyResolved: false })
 }
 
 /** POST /api/content/help/rank — put a ticket between two others (SCOPE ch.07:

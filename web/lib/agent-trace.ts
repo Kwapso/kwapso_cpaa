@@ -100,6 +100,9 @@ export function traceFor(
       return { path: `${seg(teamId, "tickets")}/${str(input, "helpId")}`, highlight: "main" }
     case "update_help_ticket":
     case "set_help_status":
+    // Answering lands on the ticket, where the words that were sent are now the
+    // last thing in the conversation.
+    case "resolve_help_ticket":
     case "add_help_stakeholder":
     // Archiving lands on the ticket too: the record is still there, and its
     // detail is where you see that it has been put away (and put it back).

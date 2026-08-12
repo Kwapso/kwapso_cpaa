@@ -41,6 +41,13 @@ export type UsageLogRow = {
 
 /** Data-ops worker — the agentic file import + the AI agent. */
 export const dataOps = {
+  /** TRANSLATE A TICKET'S TITLE AND SET IT (never a preview). Spends one unit of
+   * the team's daily AI allowance and refunds it if nothing usable came back. */
+  translateTicket: (id: string) =>
+    api<{ translated: boolean; alreadyEnglish: boolean; titleEn: string }>(
+      "/api/data-ops/agent/translate-ticket",
+      post({ id })
+    ),
   importTargets: () => api<{ targets: ImportableTarget[] }>("/api/data-ops/import/targets"),
 
   /** A downloadable sample CSV href for a target — a good-file template. */
