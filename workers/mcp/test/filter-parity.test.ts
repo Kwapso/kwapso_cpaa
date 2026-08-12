@@ -94,6 +94,9 @@ const TOOLLESS_DOORS: Record<string, string> = {
   "POST /api/content/learning/upload":
     "shovels bytes — an image or short clip as a base64 data URL, up to 25 MB — into the learning-media bucket and hands back a URL to paste into an article. It writes no row and leaves no record of its own. One call on this surface may ANSWER with 400,000 characters; a 25 MB base64 argument is two orders of magnitude past what it is built to carry. A machine writes the article, and references media it already has a URL for.",
 
+  "GET /api/content/portal/delivery":
+    "the CLIENT's own picture of the work they bought — the same sprints list_sprints already answers with, minus the price, minus the story titles and minus the goal text. It exists because a shape that cannot carry a price cannot leak one, which is a fence for a browser on the other hostname, not a capability. A machine caller holds a STAFF token (this surface refuses client logins outright, MCP.md §5) and list_sprints gives it strictly more: the same blocks, with what they were sold for. A tool here would be a narrower duplicate of one already on the surface, which is how two answers to one question start disagreeing.",
+
   "POST /api/content/work-logs/update":
     "CORRECTING somebody's hours, which is a different act from logging your own and is gated a step higher (work:edit rather than work:create). The machine surface can start a timer, stop one, write time down and answer for a runaway — everything a person does about their OWN time — but a timesheet correction is the one write in this module that changes a number after the fact, and time is the record here that turns into money. It leaves a trail either way (lib/work-logs editWorkLog writes one); the reason it has no tool is that nobody should be able to say 'make last Tuesday four hours' to an assistant and have it happen. A person opens the row.",
 

@@ -52,6 +52,7 @@
 //   POST /api/content/todos               -> ask a client for something (emails them)
 //   POST /api/content/todos/complete      -> the client marks it done, with a file
 //   POST /api/content/todos/cancel        -> we stopped needing it (nothing deleted)
+//   GET  /api/content/portal/delivery     -> the client's sprints, as named blocks with dates
 //   GET  /api/content/tasks               -> our own internal admin
 //   POST /api/content/tasks               -> write down a piece of admin
 //   POST /api/content/tasks/done          -> tick it / put it back
@@ -124,6 +125,7 @@ import {
   postCreateTask,
   postCreateTodo,
   postTaskDone,
+  getPortalDelivery,
 } from "./routes/todos"
 import { getTriage, postSetTriageDuty } from "./routes/triage"
 import {
@@ -218,6 +220,9 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/content/todos": { handler: postCreateTodo, kind: "mutation" },
   "POST /api/content/todos/complete": { handler: postCompleteTodo, kind: "mutation" },
   "POST /api/content/todos/cancel": { handler: postCancelTodo, kind: "mutation" },
+  // The CLIENT's own picture of the work they bought — named blocks with dates
+  // and two counts, in a shape that has nowhere to put a price.
+  "GET /api/content/portal/delivery": { handler: getPortalDelivery, kind: "read" },
   "GET /api/content/tasks": { handler: getTasks, kind: "read" },
   "POST /api/content/tasks": { handler: postCreateTask, kind: "mutation" },
   "POST /api/content/tasks/done": { handler: postTaskDone, kind: "mutation" },

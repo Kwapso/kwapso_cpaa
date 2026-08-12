@@ -207,7 +207,21 @@ const CLIENT_ROLE = {
     accounts: { read: true },
     portal_users: { read: true },
     learning: { read: true },
-    help: { read: true, create: true },
+    // EDIT joined read + create when the work engine shipped, and it is the one
+    // right on this list that changes what a client can DO rather than what R21
+    // walks. SCOPE ch.07 gives the account two powers over its own requests —
+    // correct the wording, and drag them into the order they want — and both are
+    // `help:edit`. What makes that safe is not this line: it is the LOCK (both
+    // stop the moment a staff member reads the ticket) and the four doors on the
+    // same right that now refuse a portal caller outright — status, bulk-status,
+    // bulk-status-by-filter and archive. "Resolved" is our word, and SCOPE says
+    // there is no client-side reopen button.
+    help: { read: true, create: true, edit: true },
+    // The one module in the work engine a client is MEANT to hold. A to-do is
+    // aimed at them: they read their company's and complete one, with the file we
+    // asked for. `create` and `delete` are ours — asking for something emails
+    // them, and withdrawing a request is our decision to stop needing it.
+    todos: { read: true, edit: true },
     selectable_data: { read: true },
     agent: { read: true, create: true },
     processes: { read: true, create: true },

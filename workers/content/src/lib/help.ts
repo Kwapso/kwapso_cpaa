@@ -52,6 +52,8 @@ type TicketRow = {
   locked_at: string | null
   archived_at: string | null
   draft_resolution: string | null
+  story_count: number
+  done_story_count: number
   title_de: string | null
   title_en: string | null
   creator_id: string
@@ -132,6 +134,13 @@ function toTicket(r: TicketRow, scope: AccountScope): HelpTicket {
     // resolution a client reads is the one a person SENDS.
     ref: r.ref,
     draftResolution: scope.kind === "portal" ? null : r.draft_resolution,
+    // TWO NUMBERS, NEVER A LIST. This is the whole of what a client login learns
+    // about the work on their request (BUILD-1 §7: "stories as a COUNT only —
+    // never the titles"), and it is deliberately the same two numbers we show
+    // ourselves: a count nobody can check against the list beside it is a count
+    // somebody stops believing.
+    storyCount: r.story_count,
+    doneStoryCount: r.done_story_count,
     rank: r.rank,
     lockedAt: r.locked_at,
     archivedAt: r.archived_at,
@@ -184,7 +193,9 @@ const TICKET_COLS = `id, help_type, description, screen_recording_link, source_s
   account_id, ref, rank, locked_at, archived_at, draft_resolution, title_de, title_en,
   creator_id, creator_name, editor_name, created_at, updated_at,
   EXISTS (SELECT 1 FROM portal_users pu WHERE pu.user_id = help.creator_id) AS raiser_is_client,
-  EXISTS (SELECT 1 FROM portal_users pu WHERE pu.user_id = help.editor_id) AS editor_is_client`
+  EXISTS (SELECT 1 FROM portal_users pu WHERE pu.user_id = help.editor_id) AS editor_is_client,
+  (SELECT COUNT(*) FROM stories s WHERE s.ticket_id = help.id) AS story_count,
+  (SELECT COUNT(*) FROM stories s WHERE s.ticket_id = help.id AND s.status = 'done') AS done_story_count`
 
 /** Fetch one ticket (the raw row the gating + notify need), or throw a clean 404.
  *

@@ -17,7 +17,7 @@ import { publishChange } from "@shared/workers/realtime"
 import { accountScope, refusePortalCaller, type AccountScope } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
 import { mediaKey, parseUploadDataUrl } from "@shared/workers/image"
-import { cancelTodo, completeTodo, countTodos, createTodo, listTodos } from "../lib/todos"
+import { cancelTodo, clientSprints, completeTodo, countTodos, createTodo, listTodos } from "../lib/todos"
 import { countTasks, createTask, listTasks, setTaskDone } from "../lib/tasks"
 import { notifyTodoRaised } from "../lib/notify"
 import type { Env } from "../env"
@@ -143,6 +143,26 @@ export async function postCancelTodo(request: Request, env: Env): Promise<Respon
     todos: await listTodos(cfg, guard, scope, filter),
     total: await countTodos(cfg, guard, scope, filter),
   })
+}
+
+/** GET /api/content/portal/delivery — the client's own picture of the work they
+ * bought: their sprints, as named blocks with dates and two counts.
+ *
+ * GATED ON `help:read`, which is the right every client login already holds to
+ * see their own requests — and that is the honest gate rather than a convenient
+ * one: a client's window on our delivery is the same window as their requests,
+ * opened by the same grant, and inventing a second module for it would be a
+ * permission an owner has to reason about for no extra decision.
+ *
+ * FENCED, and the SHAPE is the second fence: `ClientSprint` has nowhere to put a
+ * price, so this door cannot leak one however it is called (R24's reasoning, one
+ * table along — a shape that cannot carry a number is stronger than a condition
+ * that decides not to). What they were CHARGED, when the owner has switched it
+ * on for them, comes from the value door in tenancy and nowhere else. */
+export async function getPortalDelivery(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "help", "read")
+  const scope = await callerScope(cfg, guard)
+  return json({ sprints: await clientSprints(cfg, guard, scope) })
 }
 
 /* ----------------------------------- tasks ---------------------------------- */

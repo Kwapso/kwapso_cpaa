@@ -220,12 +220,33 @@ describe("the help WRITES carry the fence, not just the reads", () => {
     expect(row.description).toContain(VICTIM_WORDS)
   })
 
-  it("moving another client's ticket along its lifecycle is a 404, and moves nothing", async () => {
+  // THIS CASE GOT STRONGER, and the number it asserts changed with it. It used to
+  // expect 404 — the fence answering "no such ticket" about somebody else's. The
+  // status door now refuses a CLIENT LOGIN outright (403) before the fence is
+  // consulted at all, because a client was granted `help:edit` so they could
+  // re-rank their own company's tickets (SCOPE ch.07) and the same right would
+  // otherwise have let a contact resolve their own request — the client-side
+  // reopen button SCOPE says does not exist.
+  //
+  // 403 rather than 404 is the right answer HERE and only here: it says nothing
+  // about whether the ticket exists, because it is not about the ticket. It is
+  // "this sign-in is a client login", which is a fact about the caller. Every
+  // door that answers about a ROW still answers 404 — the two cases either side
+  // of this one are exactly that, and they are why this one is safe.
+  it("moving another client's ticket along its lifecycle is refused, and moves nothing", async () => {
     const res = await call(IDS.burglarUser, "POST /api/content/help/status", {
       id: TICKETS.victim,
       status: "resolved",
     })
-    expect(res.status).toBe(404)
+    expect(res.status).toBe(403)
+    // …and it says the same thing about a ticket that does not exist at all, so
+    // the refusal is not an oracle for which ids are real.
+    const invented = await call(IDS.burglarUser, "POST /api/content/help/status", {
+      id: "01NOTATICKET",
+      status: "resolved",
+    })
+    expect(invented.status).toBe(403)
+    expect(await invented.text()).toBe(await res.text())
     const row = db().prepare(`SELECT status FROM help WHERE id = '${TICKETS.victim}'`).get() as { status: string }
     expect(row.status).toBe("new")
   })

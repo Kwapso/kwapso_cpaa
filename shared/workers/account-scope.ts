@@ -320,7 +320,29 @@ export function scopeStamp(scope: AccountScope): ScopeStamp {
  * other half only appears on refresh is not one. The ping carries a PROCESS id,
  * which says nothing about whose map it is, so the publisher names the account
  * (routes/processes.ts) and this line is what lets the fence read it. */
-const SCOPE_STAMPED_RESOURCES = ["help", "help_threads", "process_comments"] as const
+/* Six now, and the last three arrived together with the work engine.
+ *
+ * `todos` is the plainest: a to-do is aimed at the client, sits in their portal
+ * and is completed by them, so a colleague completing one has to leave their
+ * screen without a reload.
+ *
+ * `stories` and `sprints` are the interesting pair, because a client cannot see
+ * either row. What they see is a COUNT of the work on their own request and a
+ * named block with dates — and both are computed from rows that move without
+ * them. A ping that says "a story on your account changed" carries a story id,
+ * which tells a client nothing (it is not a row they can ask for: every story
+ * door refuses a portal caller), and it is what turns "3 pieces of work, 1 done"
+ * into "3 pieces of work, 2 done" while they are looking at it. Without these
+ * lines the counts are correct on load and wrong for the rest of the session,
+ * which is the exact failure this list exists to prevent. */
+const SCOPE_STAMPED_RESOURCES = [
+  "help",
+  "help_threads",
+  "process_comments",
+  "todos",
+  "stories",
+  "sprints",
+] as const
 
 /** The fence, for a LIVE CHANGE PING (`{resource, id, scope}` on a team's channel).
  *

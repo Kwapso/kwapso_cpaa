@@ -177,6 +177,16 @@ export async function postUpdateHelp(request: Request, env: Env): Promise<Respon
  * Gated PURELY by help:edit (every status move, including reopen — no raiser exception). */
 export async function postHelpStatus(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown; status?: unknown }>(request, env, "help", "edit")
+  // R21 AT THE DOOR, and it became necessary the day a client login was granted
+  // `help:edit` so they could re-rank their own company's tickets (SCOPE ch.07).
+  // That grant is safe for the ORDER and for the WORDING, both of which the lock
+  // governs — and it would have been a disaster here: the same right would have
+  // let a contact set their own request to `resolved`, or drag it back out of it,
+  // which is precisely the client-side reopen button SCOPE says does not exist.
+  // The portal gateway does not open this door; the AGENCY gateway forwards
+  // /api/content/* by prefix, so leaving it at that would be defending it at the
+  // wrong hostname. The refusal belongs here.
+  await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
   if (typeof body.status !== "string" || !(HELP_STATUSES as readonly string[]).includes(body.status))
     return fail(400, "invalid_input", "id and a valid status are required.")
@@ -205,6 +215,9 @@ export async function postBulkHelpStatusByFilter(request: Request, env: Env): Pr
     helpType?: unknown
     dryRun?: unknown
   }>(request, env, "help", "edit")
+  // R21: the set-shaped sibling of the status door, refused for the same reason
+  // — and more so, because one call moves many.
+  await refusePortalCaller(cfg, guard)
   if (typeof body.toStatus !== "string" || !(HELP_STATUSES as readonly string[]).includes(body.toStatus))
     return fail(400, "invalid_input", "A valid toStatus is required.")
   const filter: { status?: HelpStatus; helpType?: string } = {}
@@ -241,6 +254,8 @@ export async function postBulkHelpStatusByFilter(request: Request, env: Env): Pr
  * that row, never refetch the list). Returns { updated, skipped }. */
 export async function postBulkHelpStatus(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<{ ids?: unknown; status?: unknown }>(request, env, "help", "edit")
+  // R21: the many-ids sibling of the status door, refused for the same reason.
+  await refusePortalCaller(cfg, guard)
   const ids = requireIdList(body.ids)
   if (typeof body.status !== "string" || !(HELP_STATUSES as readonly string[]).includes(body.status))
     return fail(400, "invalid_input", "A valid status is required.")
@@ -368,6 +383,9 @@ export async function postHelpArchive(request: Request, env: Env): Promise<Respo
     "help",
     "edit"
   )
+  // R21: putting a request away is our filing, not theirs. A client who thinks a
+  // ticket is finished says so in the conversation, and a staff member decides.
+  await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
   if (typeof body.archived !== "boolean")
     return fail(400, "invalid_input", "archived must be true or false.")

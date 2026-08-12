@@ -310,6 +310,10 @@ export const PORTAL_VISIBLE_READS: Record<string, { fence: string | null; why: s
     fence: "getTicket",
     why: "a stakeholder set is a PROPERTY of a ticket, so the fenced getTicket decides visibility first and an invisible ticket yields an empty set — otherwise the door names staff admins and another client's colleagues by ticket id alone.",
   },
+  "workers/content/src/lib/todos.ts": {
+    fence: "accountScopeClause",
+    why: "a to-do is the ONE row in the work engine a client login both reads and writes, so this is the only file in that build carrying a fence rather than a flat refusal. Every exported reader takes the caller's AccountScope and every statement — including the completing UPDATE, which a source-scan case in workers/content/test/todos-tasks.test.ts holds there — ANDs it in. `clientSprints` lives here for the same reason: it is the client's own SHAPE of a sprint (a named block with dates and two counts), with nowhere to put a price and no story titles in it, so a shape that cannot carry the number is doing half the fencing.",
+  },
   "workers/tenancy/src/lib/rates.ts": {
     fence: "accountScopeClause",
     why: "what an account is CHARGED per hour. The rate-card DOOR refuses a client login outright — it answers with every account's card, the retired lines and the audit block naming who set the price — but the value door reads this file to PROJECT the live lines for one account, and only when that account's price visibility is switched on. So the same fence the accounts list carries rides these statements too: a client login can only ever be shown their own company's rates. What our own hour COSTS us is a different table in a different file, and no client-reachable path touches it (R23).",
@@ -378,6 +382,19 @@ export const PORTAL_VISIBLE_WRITES: Record<string, { fence: string | null; why: 
   "POST /api/content/help/reply": {
     fence: "accountScope",
     why: "appends to a ticket named by a caller-supplied id — so the fence decides whose ticket it is BEFORE a word is appended, and answers 404 rather than 403 so 'not yours' never confirms the ticket exists. A reply cannot be un-appended.",
+  },
+
+  "POST /api/content/help/update": {
+    fence: "accountScope",
+    why: "corrects a ticket named by a caller-supplied id — so the fence decides whose it is BEFORE a word changes, and two more rules ride the same UPDATE: it must still be UNLOCKED (nobody here has read it) and it must be THEIRS, because a contact now sees a colleague's question and being allowed to read one is not being allowed to rewrite it. SCOPE ch.07: the account owns the wording until the first staff touch.",
+  },
+  "POST /api/content/help/rank": {
+    fence: "accountScope",
+    why: "drags one of their company's requests into the order they want them in — SCOPE ch.07's 'a client may re-rank their own company's tickets'. Both NEIGHBOUR ids are resolved through the same fence, so a client cannot pin their ticket next to one they cannot see (which would be an oracle for whether an id exists, and a way to learn another company's ordering); and the LOCK rides the UPDATE, so the order stops being theirs the moment we pick it up. The right this needs — `help:edit` — is the reason the STATUS and ARCHIVE doors now refuse a portal caller outright: the same grant would otherwise have let a contact resolve their own request.",
+  },
+  "POST /api/content/todos/complete": {
+    fence: "accountScope",
+    why: "the client's own act, on a row we created and named their company on: they mark it done and attach the one file we asked for. The fence decides whose to-do it is before anything is written and answers 404 rather than 403, so 'not yours' never confirms it exists. The file is capped and parsed at the boundary through the same seam every upload in the base uses, and its key carries a random ULID segment because the gateways serve /media with no session.",
   },
 
   // ── the process map ────────────────────────────────────────────────────────

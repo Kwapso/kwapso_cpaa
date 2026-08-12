@@ -42,6 +42,18 @@ export function TicketRow({ ticket }: { ticket: HelpTicket }) {
         <p className="line-clamp-2">{ticket.description}</p>
         <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm">
           <Badge variant={status.variant}>{status.label}</Badge>
+          {/* HOW MUCH WORK IS ON IT, and nothing else about that work
+              (.plans/BUILD-1 §7: "stories as a COUNT only — never the titles").
+              Two numbers, because "3 pieces of work, 1 done" is a picture and "3
+              pieces of work" is a shrug. Absent when there is none, rather than
+              a "0 of 0" that reads as neglect on a request somebody answered
+              without needing to build anything. */}
+          {ticket.storyCount > 0 && (
+            <span>
+              {ticket.storyCount} {ticket.storyCount === 1 ? "piece" : "pieces"} of work,{" "}
+              {ticket.doneStoryCount} done
+            </span>
+          )}
           <span>{formatRelative(ticket.updatedAt ?? ticket.createdAt)}</span>
         </div>
       </div>

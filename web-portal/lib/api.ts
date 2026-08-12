@@ -10,7 +10,14 @@
 // It is NOT web/lib/api.ts with a filter. The agency client carries ~90 calls
 // across roles, invites, imports and the assistant; the portal has fourteen.
 
-import type { AccountDetail, HelpMessage, HelpTicket, ProcessComment, SessionUser } from "@shared/types"
+import type {
+  AccountDetail,
+  HelpMessage,
+  HelpTicket,
+  ProcessComment,
+  SessionUser,
+  Todo,
+} from "@shared/types"
 import type { SavingsView } from "@shared/workers/savings"
 // The plumbing — one fetch wrapper, one error class, one paged shape — is shared
 // with the agency app (shared/web/api.ts). Only the DOOR LIST below is the
@@ -119,4 +126,52 @@ export const support = {
    * business naming which staff member picks it up (SCOPE ch.06). */
   reply: (helpId: string, body: string) =>
     api<{ replies: HelpMessage[]; total: number }>("/api/content/help/reply", post({ helpId, body })),
+  /** CORRECT YOUR OWN WORDING, while it is still yours to correct. The door
+   * refuses once a staff member has read it (SCOPE ch.07's lock), and refuses a
+   * colleague's ticket outright — this side does not decide either. */
+  edit: (id: string, description: string) =>
+    api<PagedResponse<{ tickets: HelpTicket[]; mineTotal: number }>>(
+      "/api/content/help/update",
+      post({ id, description })
+    ),
+  /** PUT THEM IN YOUR OWN ORDER. Neighbours, never a position: a position is
+   * arithmetic over a list this browser loaded seconds ago. */
+  rank: (id: string, afterId: string | null, beforeId: string | null) =>
+    api<PagedResponse<{ tickets: HelpTicket[]; mineTotal: number }>>(
+      "/api/content/help/rank",
+      post({ id, afterId, beforeId })
+    ),
+}
+
+/** WHAT WE ARE WAITING ON YOU FOR, and WHAT YOU BOUGHT. The two halves of the
+ * client's own picture of delivery — one is a list they act on, the other is a
+ * block they read. */
+export const delivery = {
+  /** Their company's open to-dos. Bounded, not paged: a to-do is a thing we are
+   * waiting on, so there are a handful. */
+  todos: () => api<{ todos: Todo[]; total: number }>("/api/content/todos"),
+  /** Mark one done, and send the file with it if there is one. `fileDataUrl` is
+   * a base64 data URL; the door caps it, parses it and stores it under a key
+   * nobody can guess. */
+  completeTodo: (id: string, file?: { dataUrl: string; name: string }) =>
+    api<{ todo: Todo }>(
+      "/api/content/todos/complete",
+      post({ id, fileDataUrl: file?.dataUrl, fileName: file?.name })
+    ),
+  /** The blocks of work they bought — named, dated, and counted. No price here
+   * under any setting: what they were CHARGED comes from `value.read()` behind
+   * their own account's price-visibility switch, and there is one door for it. */
+  sprints: () =>
+    api<{
+      sprints: {
+        ref: string | null
+        name: string
+        sprintType: string | null
+        startsOn: string | null
+        endsOn: string | null
+        completedAt: string | null
+        storyCount: number
+        doneStoryCount: number
+      }[]
+    }>("/api/content/portal/delivery"),
 }

@@ -99,18 +99,32 @@ function relative(base: string, path: string): string {
  * this, a handler whose real gate was deleted stays GREEN, satisfied by the prose
  * below it, and a comment describing the ABSENCE of a bound satisfies the bound.
  *
- * Block comments go first; line comments only when the `//` isn't part of a
- * `https://` URL. It is deliberately LOSSY and deliberately NOT string-aware:
- * R14 reads `LIMIT` out of SQL held in template literals, so a stripper that
- * blanked string contents would blind it. When a caller needs JSONC instead, that
- * is stripJsoncComments below — a different job, named apart.
+ * LINE COMMENTS GO FIRST, and the order is load-bearing. Block-first looked
+ * right for years and had a hole a sentence wide: a `//` comment mentioning a
+ * path like `/api/content/<star>` contains the two characters `/` and `*` side
+ * by side, so the block regex opened a comment THERE and ran to the next `*​/`
+ * anywhere below — swallowing the rest of the function. Every seam scan then
+ * read that function as containing no publish call, no gate and no LIMIT.
+ *
+ * It cost exactly that: a comment added to `postHelpStatus` explaining WHY the
+ * door refuses a client login turned the R1 publish check red, on a handler
+ * whose `publishChange` had not moved. A scanner a comment can blind is a
+ * scanner that reports "all clear" for the wrong reason — and the direction of
+ * this one was lucky. The same shape in reverse (a function whose gate is eaten)
+ * reads as an offender; a function whose OFFENCE is eaten reads as clean.
+ *
+ * Line comments only when the `//` isn't part of a `https://` URL. Still
+ * deliberately LOSSY and deliberately NOT string-aware: R14 reads `LIMIT` out of
+ * SQL held in template literals, so a stripper that blanked string contents
+ * would blind it. When a caller needs JSONC instead, that is stripJsoncComments
+ * below — a different job, named apart.
  *
  * EIGHT COPIES OF THIS FUNCTION EXISTED: three named ones with three different doc
  * comments (one guarding the mcp worker — the external machine surface) and five
  * inline repetitions of the same two regexes. Harden the pattern in one and the
  * other seven are checks that only look like it. */
 export function stripComments(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/gm, "$1")
+  return src.replace(/(^|[^:])\/\/[^\n]*/gm, "$1").replace(/\/\*[\s\S]*?\*\//g, " ")
 }
 
 /** JSONC → JSON, for a caller that is about to JSON.parse the result (the

@@ -273,3 +273,78 @@ export async function cancelTodo(
   })
   return { moved: true, accountId: row.account_id }
 }
+
+/* ─────────────── the client's view of the work they bought ──────────────── */
+
+/** WHAT A CLIENT SEES OF A SPRINT: a named block with dates (.plans/BUILD-1 §7,
+ * "sprints as a named block with dates — it is what they bought"), and how much
+ * of it is finished.
+ *
+ * WHAT IS NOT ON THIS SHAPE, and each absence is a decision:
+ *   • NO PRICE. What a client was charged is projected by the value door behind
+ *     their own account's price-visibility switch (workers/tenancy). A price on
+ *     this shape would be a second route to the same figure with none of that
+ *     switch's reasoning attached, and money has one door on this side.
+ *   • NO STORY TITLES, NO ASSIGNEES, NO DATES ON THE WORK. Two counts, exactly
+ *     as a ticket carries two counts, because "which staff member is doing it"
+ *     is what SCOPE ch.06 keeps off this side.
+ *   • NO GOAL TEXT. It is written by us, for us, in the register colleagues use
+ *     with each other. The NAME is the thing a client agreed to. */
+export type ClientSprint = {
+  ref: string | null
+  name: string
+  sprintType: string | null
+  startsOn: string | null
+  endsOn: string | null
+  completedAt: string | null
+  storyCount: number
+  doneStoryCount: number
+}
+
+/** The blocks of work sold to the accounts this caller may see.
+ *
+ * FENCED, not refused — this is the one read of the sprint table a client login
+ * makes, and it is a different SHAPE from the agency's (see ClientSprint above)
+ * rather than the same rows with a flag. A shape that cannot carry a price
+ * cannot leak one.
+ *
+ * BOUNDED (R14): a sprint is a contract, so a client has a handful. */
+export async function clientSprints(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope
+): Promise<ClientSprint[]> {
+  const fence = accountScopeClause(scope, "sp.account_id")
+  const rows = await d1Query<{
+    ref: string | null
+    name: string
+    sprint_type: string | null
+    starts_on: string | null
+    ends_on: string | null
+    completed_at: string | null
+    story_count: number
+    done_story_count: number
+  }>(
+    cfg,
+    guard.databaseId,
+    // Only the columns above are SELECTed. `sold_price_cents` is not named here
+    // and must never be: the shape it would land in has nowhere to put it.
+    `SELECT sp.ref, sp.name, sp.sprint_type, sp.starts_on, sp.ends_on, sp.completed_at,
+       (SELECT COUNT(*) FROM stories s WHERE s.sprint_id = sp.id) AS story_count,
+       (SELECT COUNT(*) FROM stories s WHERE s.sprint_id = sp.id AND s.status = 'done') AS done_story_count
+     FROM sprints sp
+     WHERE sp.deactivated_at IS NULL${fence.sql ? ` AND ${fence.sql}` : ""}
+     ORDER BY sp.starts_on DESC, sp.id DESC LIMIT ${LIST_HARD_CAP}`, // R14 hard cap
+    fence.params
+  )
+  return rows.map((r) => ({
+    ref: r.ref,
+    name: r.name,
+    sprintType: r.sprint_type,
+    startsOn: r.starts_on,
+    endsOn: r.ends_on,
+    completedAt: r.completed_at,
+    storyCount: r.story_count,
+    doneStoryCount: r.done_story_count,
+  }))
+}
