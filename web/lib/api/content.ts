@@ -13,6 +13,10 @@
 
 import type {
   BrandAsset,
+  GoogleConnection,
+  GoogleService,
+  GoogleShelf,
+  GoogleSource,
   HelpMessage,
   HelpStakeholder,
   HelpTicket,
@@ -407,6 +411,132 @@ export const content = {
       "/api/content/staff/certificates/active",
       post({ id, active })
     ),
+
+  // ── GOOGLE ─────────────────────────────────────────────────────────────────
+  // Your own connections, and what you have chosen to share through them. Every
+  // door here answers about the CALLER — there is no `userId` to pass and no way
+  // to ask about a colleague's Drive, which is the module's whole promise
+  // expressed as an absence.
+  //
+  // `/start` is deliberately NOT here: it is a 302 to Google's consent screen, so
+  // the browser navigates to it (`window.location.href`) rather than fetching it.
+  // A door that answers with a redirect is not an API call, and wrapping it in
+  // one would only produce a promise that resolves to a page nobody rendered.
+  googleConnections: () =>
+    api<{ connections: GoogleConnection[]; sources: GoogleSource[]; ready: boolean }>(
+      "/api/content/google/connections"
+    ),
+  /** Finish a handshake. Takes nothing: the authorization code is in an HttpOnly
+   * cookie the callback left, which is why it never reached this code at all. */
+  googleConnect: () =>
+    api<{ connections: GoogleConnection[]; sources: GoogleSource[] }>(
+      "/api/content/google/connect",
+      post({})
+    ),
+  googleDisconnect: (service: GoogleService) =>
+    api<{
+      changed: boolean
+      revokedAtGoogle: boolean
+      connections: GoogleConnection[]
+      sources: GoogleSource[]
+    }>("/api/content/google/disconnect", post({ service })),
+
+  /** What could I name? Folders (Drive) or spaces (Chat) this person can see. */
+  googlePick: (service: "drive" | "chat", q?: string) =>
+    api<{ options: { externalId: string; name: string }[] }>(
+      `/api/content/google/pick?service=${enc(service)}${q ? `&q=${enc(q)}` : ""}`
+    ),
+  /** Share one — and say, in the same call, who may read it. */
+  googleAddSource: (input: {
+    service: "drive" | "chat"
+    externalId: string
+    name: string
+    shelf: GoogleShelf
+  }) => api<{ sources: GoogleSource[] }>("/api/content/google/sources", post(input)),
+  googleSetSourceActive: (id: string, active: boolean) =>
+    api<{ sources: GoogleSource[] }>("/api/content/google/sources/active", post({ id, active })),
+
+  googleDriveFiles: (q?: string) =>
+    api<{ files: { id: string; name: string; webViewLink: string | null; folderId: string }[] }>(
+      `/api/content/google/drive/files${q ? `?q=${enc(q)}` : ""}`
+    ),
+  googleMail: (q?: string) =>
+    api<{ messages: MailSummary[]; contactsUsed: number; note?: string }>(
+      `/api/content/google/gmail/messages${q ? `?q=${enc(q)}` : ""}`
+    ),
+  /** Write a reply and leave it in the person's OWN Gmail drafts. Nothing is
+   * sent — the answer carries the link that opens it, and the id that the send
+   * door can then send. */
+  googleDraftMail: (input: { to: string; subject: string; body: string; threadId?: string }) =>
+    api<{ draft: { draftId: string; messageId: string; threadId: string; url: string } }>(
+      "/api/content/google/gmail/draft",
+      post(input)
+    ),
+  /** "Send it from kwapso" — the button beside the draft link. It needs the
+   * role's own send switch, exactly as the assistant does. */
+  googleSendMail: (input: {
+    draftId?: string
+    to?: string
+    subject?: string
+    body?: string
+    threadId?: string
+  }) => api<{ sent: { messageId: string; threadId: string } }>("/api/content/google/gmail/send", post(input)),
+
+  googleEvents: (from?: string, to?: string) =>
+    api<{ events: CalendarEntry[] }>(
+      `/api/content/google/calendar/events${from || to ? `?from=${enc(from ?? "")}&to=${enc(to ?? "")}` : ""}`
+    ),
+  googleCreateEvent: (input: {
+    summary: string
+    description?: string
+    start: string
+    end: string
+    allDay?: boolean
+  }) => api<{ event: CalendarEntry }>("/api/content/google/calendar/events", post(input)),
+  /** A sprint's dates, in your calendar — the one FROM-kwapso push that has a
+   * record to push today. */
+  googleSprintToCalendar: (sprintId: string) =>
+    api<{ event: CalendarEntry }>("/api/content/google/calendar/sprint", post({ sprintId })),
+
+  googleChat: (sourceId: string) =>
+    api<{ messages: ChatLine[]; space: string }>(
+      `/api/content/google/chat/messages?sourceId=${enc(sourceId)}`
+    ),
+  googlePostChat: (sourceId: string, text: string) =>
+    api<{ message: ChatLine }>("/api/content/google/chat/messages", post({ sourceId, text })),
+}
+
+/** What the mail list shows — a subject, who it is with, and the link that opens
+ * it in the person's own Gmail. Declared here rather than in shared/types
+ * because it is a SHAPE OF AN ANSWER from Google, not a record this product
+ * owns: nothing writes one, nothing stores one, and a type in the shared file
+ * would invite somebody to try. */
+export type MailSummary = {
+  id: string
+  threadId: string
+  from: string
+  to: string
+  subject: string
+  snippet: string
+  date: string | null
+  url: string
+}
+
+export type CalendarEntry = {
+  id: string
+  summary: string
+  description: string
+  start: string
+  end: string
+  url: string | null
+}
+
+export type ChatLine = {
+  id: string
+  space: string
+  sender: string
+  text: string
+  createdAt: string | null
 }
 
 /** Data-ops worker — the agentic file import + the AI agent. */

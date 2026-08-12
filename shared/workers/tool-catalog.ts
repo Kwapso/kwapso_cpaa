@@ -2080,6 +2080,28 @@ export const TOOL_GATES: Record<string, string> = {
   create_internal_rate: "commercials:create",
   update_internal_rate: "commercials:edit",
   set_internal_rate_active: "commercials:delete",
+  // GOOGLE. Every write through somebody's own connection is `google:edit` —
+  // "change something in the world you connected" — because `create` on this
+  // module means CONNECT AN ACCOUNT, which is the switch an owner grants
+  // separately and which no tool here holds.
+  //
+  // The two doors that reach OUTSIDE that world demand a second right on top,
+  // and this map names only ONE gate per tool — so it names the one an owner
+  // would look for. Both are recorded here so a reader does not have to open the
+  // handler to learn that the send switch exists:
+  //   google_send_mail          — also google_mail:create
+  //   google_create_event       — also google_events:create
+  //   google_sprint_to_calendar — also google_events:create (and work:read, to
+  //                               read the sprint it is pushing)
+  // None of them is a PRIVILEGE write: they change what is in a person's own
+  // Drive, mailbox or diary, never who may do what, and never who can see whose.
+  // The confirm rule they DO get is the owner's own, written on each tool.
+  google_drive_upload: "google:edit",
+  google_draft_reply: "google:edit",
+  google_send_mail: "google:edit",
+  google_create_event: "google:edit",
+  google_sprint_to_calendar: "google:edit",
+  google_chat_post: "google:edit",
 }
 
 /** Writes that genuinely have no single `module:right` to name, each with its reason.

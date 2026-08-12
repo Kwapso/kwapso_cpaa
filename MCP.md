@@ -381,6 +381,25 @@ There is deliberately **no confirm step on the direct write tools** — calling
 genuinely uncertain, natural-language actions through `agent_chat` instead: it proposes,
 you approve with `agent_confirm`.
 
+**Google is not on this surface, and that is on purpose.** A person's Drive,
+Gmail, Calendar and Chat connections are reachable by the **in-app assistant**
+(thirteen tools, act-as-user, capped by the same role) and by nothing else: the
+MCP catalogue exposes none of them. A personal access token is a secret pasted
+into somebody's CI config, and the blast radius of a leaked one must not include
+a colleague's mailbox. If you need Google material through a machine, ask the
+assistant for it — `agent_chat` reaches those tools under the same rights, with
+the same confirm rules (mail always asks), and spends the team's AI allowance
+while doing so.
+
+Three Google doors have no tool on **either** surface, for a reason that is not
+about caution: connecting an account is a person standing at Google's own consent
+screen, and the credential it produces travels in an HttpOnly cookie no bearer
+caller holds. Four more — disconnecting, and changing which folders and spaces
+are shared — are decisions about **who can read what**, which is the one thing
+this module exists to keep conscious. All seven are written down with their
+reasons in `TOOLLESS_DOORS` (`workers/mcp/test/filter-parity.test.ts`), and the
+check fails if one of them quietly grows a tool.
+
 ---
 
 ## 4 · Who pays? (the cost model — read this)

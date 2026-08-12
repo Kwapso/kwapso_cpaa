@@ -88,5 +88,18 @@ export const GLOSSARY = {
   department: { term: "Department", def: "The part of the agency a person or a meeting belongs to." },
   staffProfile: { term: "Staff profile", def: "What a colleague is like and how they work best. The team can read it; a client never can." },
   certificate: { term: "Certificate", def: "A qualification someone on the team holds — who issued it, and when it lapses." },
+
+  // GOOGLE, CONNECTED ONE PERSON AT A TIME. Every word here carries the same
+  // sentence, because it is the decision the whole module is shaped around: the
+  // account is YOURS, the folders and spaces are ones YOU named, and the
+  // assistant sees exactly what you see and not one thing more. "Shelf" is the
+  // word for the question the answer key said we must answer at the moment
+  // somebody shares a folder — who will be able to read this?
+  googleConnection: { term: "Google connection", def: "Your own link to one Google service. You connect your account; nobody uses anyone else's." },
+  sharedFolder: { term: "Shared folder", def: "A Drive folder you named for kwapso. Nothing outside the folders you name is ever read." },
+  sharedSpace: { term: "Shared space", def: "A Google Chat space you named for kwapso. Nothing outside the spaces you name is ever read." },
+  shelf: { term: "Shelf", def: "Who may read something you shared: private means you alone, team means anyone whose role can read it." },
+  knownContact: { term: "Known contact", def: "An email address on one of your accounts. Mail is only read when it is to or from one of them." },
+  gmailDraft: { term: "Draft", def: "A reply written for you and left in your Gmail drafts. It is not sent until you say so." },
 } as const satisfies Record<string, GlossaryEntry>
 

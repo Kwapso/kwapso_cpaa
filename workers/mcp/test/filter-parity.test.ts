@@ -91,6 +91,35 @@ const TOOLLESS_DOORS: Record<string, string> = {
     "authoring a screen recipe changes what every person on the team sees, and the only way to judge one is to look at the screen it draws — which a machine client has not got. (The route table used to call this door 'agent-callable' while it sat on neither catalogue; the comment was the thing that was wrong, and it has been corrected rather than the door quietly opened.)",
 
   /* ------------------------------- content ------------------------------- */
+  // GOOGLE — seven doors with no tool, and they divide cleanly into two reasons.
+  //
+  // THE FIRST THREE ARE A BROWSER ROUND-TRIP. Connecting is a person standing at
+  // Google's own consent screen and saying yes; there is no version of that a
+  // machine can perform, and the credential it produces travels in an HttpOnly
+  // cookie a machine never holds. The other thirteen Google doors DO have tools,
+  // so this is not a module that was skipped — it is the three steps of a human
+  // decision, left out on purpose.
+  "GET /api/content/google/start":
+    "answers with a 302 to Google's own consent screen. A machine caller cannot consent on somebody's behalf — that is the entire point of a consent screen — and a tool here would hand back a redirect nobody can follow. Connecting is a person, at a browser, choosing which of their accounts kwapso may act as.",
+  "GET /api/content/google/callback":
+    "where Google sends the BROWSER back. It reads a one-shot HttpOnly cookie this surface never carries, verifies the round-trip is the one that was started, and redirects. There is nothing here to ask for and no way for a machine to be standing where it is answered.",
+  "POST /api/content/google/connect":
+    "finishes a handshake by consuming the authorization code out of that same HttpOnly cookie. It takes no arguments at all — everything it needs is a cookie a bearer-token caller does not have — so a tool on it could only ever fail, and would say 'connect a Google account' in the catalogue while being unable to.",
+  // THE OTHER FOUR ARE A DECISION ABOUT WHO CAN READ WHAT — the one thing this
+  // whole module exists to keep conscious. A person shares a folder through a
+  // form that asks, in words, whether it is theirs alone or the team's; taking a
+  // connection away is the same decision in reverse. An assistant that could
+  // widen its own sight, or drop somebody's connection while using it, would be
+  // the one place in the product where act-as-user stops being a fence.
+  "POST /api/content/google/disconnect":
+    "takes somebody's Google connection away and asks Google to revoke the grant. A person disconnects their own account, from their own settings, having decided to — it is not an errand, and an assistant able to end the connection it is working through is a strange thing to have built.",
+  "GET /api/content/google/pick":
+    "lists the Drive folders or Chat spaces a person COULD share, so a form can offer them. Its answer is only useful to the sharing door, which is deliberately toolless below — a picker for a form no machine fills in is a capability with nowhere to go.",
+  "POST /api/content/google/sources":
+    "shares a Drive folder or a Chat space, and in the same call decides WHO MAY READ IT — just this person, or the whole team. That is the decision the module is built around, asked in words at the moment of sharing, and it is not one an assistant should be able to make on somebody's behalf: an assistant that can widen what it is allowed to see is not fenced by anything.",
+  "POST /api/content/google/sources/active":
+    "stops sharing a folder or space, or shares it again. The same decision as the door above, in reverse, and out of the assistant's hands for the same reason — re-sharing something a person deliberately withdrew is exactly the act nobody should be able to delegate by accident.",
+
   "POST /api/content/learning/upload":
     "shovels bytes — an image or short clip as a base64 data URL, up to 25 MB — into the learning-media bucket and hands back a URL to paste into an article. It writes no row and leaves no record of its own. One call on this surface may ANSWER with 400,000 characters; a 25 MB base64 argument is two orders of magnitude past what it is built to carry. A machine writes the article, and references media it already has a URL for.",
 

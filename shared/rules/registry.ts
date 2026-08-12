@@ -215,6 +215,12 @@ export const CATALOG_EXEMPT: Record<string, string> = {
     "a to-do is a REQUEST WE MAKE OF A CLIENT, and raising one emails them. It is one of only two things in the whole product that reaches a client's inbox (BUILD-1 §7), and an import is the one shape of write that produces hundreds at once — a spreadsheet of forty rows would be forty emails into somebody's morning, from our own verified sender, before anybody had read the file back. The write it would replace is a title and a date typed while you are already talking to them. Stories ARE importable, for the opposite reason: nothing about a story leaves the building.",
   staff_profiles:
     "both tables here name a PERSON — by their member id, which is the one thing a spreadsheet cannot supply. A CSV column of names or email addresses would have to be resolved to members, and resolving it wrongly files somebody's personality profile, or somebody's qualification, against the wrong colleague. That is the same reason team_members is exempt, arriving from the other direction: a file cannot say who somebody is. A profile is written on the member's own page, where the question never comes up.",
+  google:
+    "a connection is a CAPABILITY, not a record: the row is worthless without the refresh token inside it, and that token can only be minted by a person standing at Google's own consent screen and saying yes. A CSV of connections would either import rows that authorise nothing, or — if it carried tokens — be a spreadsheet of other people's mailboxes travelling through an upload form. The named folders and spaces are exempt for the second reason team_members is: each one has to be a folder THAT PERSON can actually open, and a file of ids nobody checked would either fail at Google or, worse, quietly share the wrong thing under a familiar name.",
+  google_mail:
+    "not a table at all — the module exists to carry ONE switch on the permission sheet (may kwapso send mail as you). There is nothing to import into a right; it is granted on the Roles screen, one role at a time, by somebody who understands what they are granting.",
+  google_events:
+    "the same as google_mail, and for the same reason: a module that exists to hold one switch (may kwapso put an event in your calendar) has no rows for a file to bring.",
   commercials:
     "a rate card is a commercial agreement and an internal rate is the agency's own cost. A bulk overwrite of either silently changes what a client is charged or what a margin says, with no conversation attached and no one row to point at afterwards — and the write it would replace is four fields typed once a year.",
 }
@@ -491,6 +497,17 @@ export const PORTAL_ACTIVITY_FENCE: Record<string, { fence: "account" | null; wh
   meeting_purposes: { fence: null, why: "why the agency meets and which department owns it — a description of our own organisation" },
   staff_profiles: { fence: null, why: "what a colleague is like and what they are bad at. The sharpest case of agency-only material in the app, and its HISTORY names both the subject and the person who wrote it down" },
   staff_certificates: { fence: null, why: "what our people are qualified in, and when a qualification was corrected — the agency's own credential register" },
+
+  // GOOGLE. `null` twice, and neither is a hard call: a client login cannot
+  // reach a single door on this module (every handler opens with
+  // refusePortalCaller — the clients get no assistant and no Google surface at
+  // all), so silence here is the door's own sentence repeated where the feed can
+  // hear it. The history is also the sharpest disclosure in the build if it ever
+  // leaked: it names a colleague's own Google address, which folders of the
+  // agency's Drive they opened to the assistant, and every time we sent mail or
+  // booked something as them.
+  google_connections: { fence: null, why: "a staff member's own Google account, and every act kwapso performed as them — whose mailbox, whose calendar, and when. Agency material about an agency person; a client has no door on it and no business in its history" },
+  google_sources: { fence: null, why: "which of our own Drive folders and Chat spaces somebody opened to the assistant. Naming them would describe the shape of the agency's internal filing to an outsider, which is the same disclosure the knowledge base's own history is withheld for" },
 }
 
 /** R2 on the CLIENT surface — the reasoned exemption, not a quiet skip.
@@ -568,6 +585,14 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
   meeting_purposes: "delivery",
   staff_profiles: "staff_profiles",
   staff_certificates: "staff_profiles",
+  // GOOGLE. Both tables gate on `google` — one connection and the folders and
+  // spaces under it are one record from a reader's point of view, exactly as an
+  // app and its maps are. The two ACT modules (google_mail, google_events) own
+  // no table: they are switches, and what they permit is written into the
+  // connection's own history, so a person reading "kwapso sent mail as Ana"
+  // needs the same right that lets them see Ana has a connection at all.
+  google_connections: "google",
+  google_sources: "google",
 }
 
 /** R15 — reviewed DEAF exemptions: resources a worker publishes that reach NO
@@ -809,4 +834,10 @@ export const FORM_DIALOGS = [
   "internal-record-dialog",
   "staff-profile-dialog",
   "certificate-form-dialog",
+  // Naming a Drive folder or a Chat space for the assistant. Short, but it is
+  // the form that asks the question the whole module turns on — private, or the
+  // team's? — so it gets the same shell and the same kept draft as every other:
+  // a half-typed answer to "who may read this" must not be lost to a mis-tap and
+  // re-guessed.
+  "google-source-dialog",
 ] as const

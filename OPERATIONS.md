@@ -113,6 +113,48 @@ New migrations must be applied to BOTH databases before deploying workers that n
 - **Vars (in `workers/data-ops/wrangler.jsonc`, not secrets):** `AGENT_MODEL` (the Claude model id, default **`claude-sonnet-5`**, used only when `ANTHROPIC_API_KEY` is set) + `AGENT_EFFORT` (Claude reasoning effort, default **`low`** — the cheap setting; raise when more capability is worth the tokens) + `AGENT_FREE_DAILY` (**the app's own daily allowance** — how many free assistant actions a team gets each day inside kwapso. The code default is 25, but **both environments ship 50** in the checked-in wrangler vars, so 50 is what a team actually gets. This is not your Anthropic bill or any provider limit; it is a number this app enforces on itself) + `WORKERS_AI_MODEL` (the fallback model, default **`@cf/meta/llama-4-scout-17b-16e-instruct`**, verified live: chats, answers from real team data, takes actions). Swap the brain by editing one var or `selectModel()` — "model is a battery". Other good Workers AI swaps: `@cf/openai/gpt-oss-20b` / `gpt-oss-120b` (agentic), `@cf/moonshotai/kimi-k2.6` (frontier, premium, best chat). `cheapText` (inline jobs) always uses the Workers AI var. **HISTORY / GOTCHAS:** (1) the old default `@cf/meta/llama-3.1-8b-instruct` was DEPRECATED+removed 5/30/2026 — calling it threw and crashed the agent on EVERY message (even "hi"); always check a model id is still served. (2) Workers AI models need the **OpenAI-wrapped tools format** `{type:"function",function:{…}}` (a flat shape 400s); the seam handles this. (3) Never send `temperature`/`top_p`/`budget_tokens` to Claude Sonnet 5 — each is a 400; effort is the one knob. Docs: developers.cloudflare.com/workers-ai/function-calling/ + /models/llama-4-scout-17b-16e-instruct/.
 - **Workers AI binding:** `kwapso-data-ops*` declares `"ai": { "binding": "AI" }` in its wrangler.jsonc — no secret, just the binding (Workers AI is metered on the account). This is what powers the swappable model's fallback path + every `cheapText` call.
 
+### Google connections (per person — Drive, Gmail, Calendar, Chat)
+
+Three secrets on **kwapso-content + kwapso-content-staging**, and none of them is
+optional-in-parts: with any one missing, the Connect button is not offered and
+the rest of the product is untouched. That is deliberate — a half-configured
+environment must never walk somebody through a Google consent screen and then be
+unable to keep what they granted.
+
+- `GOOGLE_CONNECT_CLIENT_ID` + `GOOGLE_CONNECT_CLIENT_SECRET` — the **`kwapso sync`**
+  OAuth client (SCOPE ch.03), the one that carries Drive/Gmail/Calendar/Chat
+  scopes and goes through Google's verification. **Never** the `kwapso-signin`
+  client, whose whole point is that it asks for nothing frightening; and never
+  the reverse either — `workers/auth`'s `GOOGLE_CLIENT_ID` must stay the sign-in
+  client. Two apps, two purposes, and mixing them makes everybody who wants to
+  log in walk past a mailbox consent screen.
+- `GOOGLE_TOKEN_KEY` — 32 random bytes, base64. The key the stored refresh and
+  access tokens are encrypted under. It lives nowhere the database is, which is
+  the whole point: a dump of `google_connections` without it is a list of email
+  addresses. Mint one with `openssl rand -base64 32`. **Rotating it invalidates
+  every stored connection** — people reconnect, which is one click each, and no
+  data is lost.
+
+```bash
+cd workers/content
+npx wrangler secret put GOOGLE_CONNECT_CLIENT_ID     --env staging   # and again with no --env for production
+npx wrangler secret put GOOGLE_CONNECT_CLIENT_SECRET --env staging
+npx wrangler secret put GOOGLE_TOKEN_KEY             --env staging
+```
+
+**Two redirect URIs to register on the `kwapso sync` client**, one per
+environment, character for character — Google refuses a mismatch:
+`https://agency.kwapso.app/api/content/google/callback` and
+`https://agency-staging.kwapso.app/api/content/google/callback`. Only the AGENCY
+origin, ever: the client portal forwards none of these doors and clients get no
+Google surface at all.
+
+**Scopes to request on the client** (each service is consented separately, so a
+person connecting Drive is never shown a mailbox prompt): `drive.readonly` +
+`drive.file`; `gmail.readonly` + `gmail.compose` + `gmail.send`;
+`calendar.events`; `chat.messages` + `chat.spaces.readonly`; plus `openid email`
+on all four, to label which account was connected.
+
 ### R2 buckets (BUILT 2026-06-23 — bound to `kwapso-content*`)
 
 One bucket PER MODULE, per-team key prefix inside (the R2 golden rule). Create both per env before deploying content:

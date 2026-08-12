@@ -734,6 +734,81 @@ account, because a country typed free into an address is a country spelled five
 ways by five people. Both are seeded in `DEFAULT_SELECTABLE` and backfilled for
 existing teams by the same migration; the hyphen is not carried across.
 
+### google_connections + google_sources — KEEP (BUILT 2026-08-12, team migration `0019_google_connections`) — ONE PERSON'S OWN GOOGLE
+
+Two tables, and the shape of the first one is the whole product decision: a
+connection hangs off a **user id**, never a team. Each person connects their own
+Google account, one service at a time, and the assistant acting for them sees
+exactly what they can see. There is no service account anywhere in this module
+and deliberately nowhere to put one — "connect the agency's Drive once and let
+everybody read it" is not a mistake somebody could make here, it is a column that
+does not exist.
+
+**`google_connections`** — `user_id` (the GLOBAL user id, plain TEXT with no
+`REFERENCES`, exactly like `learning_progress.user_id` and
+`staff_profiles.user_id`: the members live in the core database, so a foreign key
+would name a table this one does not have), `service` (`drive` / `gmail` /
+`calendar` / `chat`), `google_email` (which account, so a person with two can
+tell them apart), `scopes` (**what Google actually granted**, not what we asked
+for — somebody can untick a box, and a connection that quietly works for less
+than it claims is how an assistant ends up saying "there is nothing in that
+folder" about a folder full of things), the two token columns, `last_used_at`,
+`last_error`, and the audit block.
+
+- **The tokens are ciphertext in the column**, not merely at rest under
+  Cloudflare's disk encryption. A refresh token is a standing key to somebody's
+  mailbox that survives their password change, and this database is reachable by
+  anything holding the account's D1 REST token — a backup, an export, a debug
+  query. AES-GCM with a fresh IV per value, the key in a secret the database has
+  no copy of (`GOOGLE_TOKEN_KEY`). A dump of this table without that secret is a
+  table of email addresses. One file reads them back
+  (`workers/content/src/lib/google-crypto.ts`), and no read a screen sees can
+  select one — the public column list is the enforcement, and a test proves it.
+- **`UNIQUE (user_id, service) WHERE deactivated_at IS NULL`** — one live
+  connection per person per service, on the database rather than in a handler.
+  Connecting is a browser round-trip a person can genuinely finish twice (two
+  tabs, an impatient second click), and a read-then-write would make two rows
+  holding two refresh tokens, one of which nothing would ever revoke
+  (CONCURRENCY rule 2). Partial, so disconnecting and connecting again — the
+  ordinary way somebody fixes a broken grant — is still allowed.
+
+**`google_sources`** — the Drive FOLDERS and Chat SPACES one person named. Drive
+is not "your Drive" and Chat is not "your Chat": both are reached only through
+rows here, so the unnamed rest is out of reach by construction rather than by a
+filter somebody has to remember to write. Gmail and Calendar have no rows here
+because there is nothing to name — mail is narrowed to a **known contact** (an
+address on one of the team's `accounts`) and the calendar is the person's own
+diary.
+
+- **`shelf`** (`private` / `team`) is the answer to the question the design round
+  said we must answer at the moment of sharing: who will be able to read this?
+  It is stored on the source rather than inferred later, because "I thought that
+  folder was just mine" is the failure the column exists to prevent. It defaults
+  to `private` — the safe answer is the one you get by not deciding — and it
+  rides the activity sentence as well as the row, so "who could read this?" is
+  answerable six months later.
+- `user_id` is denormalised off the connection: every read here is "mine", and a
+  join to answer the cheapest question in the module would be a join on every
+  list.
+
+**Permissions: three modules, because the owner named three switches.** `google`
+(read what you shared · **create = connect an account** and name a folder or
+space · edit = write back through it · delete = disconnect or stop sharing),
+plus `google_mail` and `google_events`, which exist to carry ONE right each —
+may kwapso send mail as you, and may it put an event in your calendar. Separate
+from each other and from `agent`, so granting somebody the assistant does not
+grant the assistant their outbox. A module whose four rights are not all
+meaningful is not new here: nothing reads `agent:edit` either.
+
+**Not importable** (three `CATALOG_EXEMPT` lines). A connection is a CAPABILITY,
+not a record — the row is worthless without the token inside it, and that token
+can only be minted by a person standing at Google's consent screen saying yes.
+The two switch modules have no rows at all.
+
+**No client-portal exposure, on any door.** Clients get no assistant and no
+Google surface; every handler opens with `refusePortalCaller` and both tables are
+`fence: null` in `PORTAL_ACTIVITY_FENCE`.
+
 ---
 
 ## Status: what's built vs. to build

@@ -1378,6 +1378,113 @@ SELECT lower(hex(randomblob(16))), v.type, v.value, 1, datetime('now'), NULL, NU
  );
 `,
   },
+  {
+    version: "0019_google_connections",
+    sql: `
+-- GOOGLE, CONNECTED ONE PERSON AT A TIME.
+--
+-- The decision the whole shape follows: each person connects their OWN Google
+-- account, and the assistant acting for them sees exactly what they can see and
+-- nothing else. There is no team-wide service account anywhere in this module,
+-- and there is deliberately nowhere to put one — the row hangs off a USER id, so
+-- "connect the agency's Drive once and let everybody read it" is not a
+-- configuration mistake somebody could make, it is a column that does not exist.
+--
+-- \`user_id\` is the GLOBAL user id, plain TEXT with no REFERENCES, for the same
+-- reason \`learning_progress.user_id\` and \`staff_profiles.user_id\` are: the
+-- members themselves live in the core database, so a foreign key here would name
+-- a table this database does not have.
+--
+-- THE TOKENS ARE ENCRYPTED IN THE COLUMN, not merely at rest under Cloudflare's
+-- own disk encryption. A refresh token is a standing key to somebody's mailbox
+-- that survives every password change, and this database is reachable by
+-- anything holding the account's D1 REST token — a backup, an export, a debug
+-- query. So both token columns hold AES-GCM ciphertext, and the one key lives in
+-- a secret the database has no copy of (workers/content/src/lib/google-crypto.ts).
+-- A dump of this table without that secret is a table of email addresses.
+--
+-- \`scopes\` is what Google ACTUALLY granted, not what we asked for. A person can
+-- untick a box at the consent screen, and a connection that quietly works for
+-- less than it claims is how an assistant ends up saying "there is nothing in
+-- that folder" about a folder full of things.
+CREATE TABLE google_connections (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  service TEXT NOT NULL,
+  google_email TEXT NOT NULL,
+  scopes TEXT NOT NULL DEFAULT '',
+  access_token TEXT,
+  access_expires_at TEXT,
+  refresh_token TEXT NOT NULL,
+  last_used_at TEXT,
+  last_error TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+
+-- ONE LIVE CONNECTION PER PERSON PER SERVICE — on the database, not in a
+-- handler. Connecting is a browser round-trip that a person can genuinely finish
+-- twice (two tabs, an impatient second click on "Connect"), and a read-then-write
+-- in the handler would make two rows holding two different refresh tokens, one of
+-- which nothing would ever revoke (CONCURRENCY rule 2). Partial, so that
+-- disconnecting and connecting again is still allowed — which a plain UNIQUE
+-- would refuse, and which is the ordinary way somebody fixes a broken grant.
+CREATE UNIQUE INDEX idx_google_connections_live
+  ON google_connections (user_id, service) WHERE deactivated_at IS NULL;
+CREATE INDEX idx_google_connections_user ON google_connections (user_id);
+
+-- THE FOLDERS AND SPACES SOMEBODY NAMED. Drive is not "your Drive" and Chat is
+-- not "your Chat": both are reached only through rows in this table, so the
+-- unnamed rest of a person's Drive is out of reach by construction rather than
+-- by a filter somebody has to remember to write. Gmail and Calendar have no rows
+-- here because there is nothing to name — mail is narrowed to known contacts and
+-- the calendar is the person's own diary.
+--
+-- \`shelf\` is the answer to the question the design round said we must answer at
+-- the moment of sharing: who will be able to read this? 'private' means this
+-- person alone (and the assistant acting as them); 'team' means anybody whose
+-- role can read it. It is stored on the SOURCE rather than inferred later,
+-- because "I thought that folder was just mine" is the failure this column
+-- exists to make impossible.
+--
+-- \`user_id\` is denormalised off the connection on purpose: every read here is
+-- "mine", and a join to answer that on every list is a join to answer the
+-- cheapest question in the module.
+CREATE TABLE google_sources (
+  id TEXT PRIMARY KEY,
+  connection_id TEXT NOT NULL REFERENCES google_connections(id),
+  user_id TEXT NOT NULL,
+  service TEXT NOT NULL,
+  external_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  shelf TEXT NOT NULL DEFAULT 'private',
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+CREATE UNIQUE INDEX idx_google_sources_live
+  ON google_sources (connection_id, external_id) WHERE deactivated_at IS NULL;
+CREATE INDEX idx_google_sources_user ON google_sources (user_id, service);
+
+-- Existing teams: the locked Admin role gains all three new modules in full (it
+-- is DEFINED as full access and cannot be edited afterwards to grant them).
+-- Every other role gains nothing — including, deliberately, the Client role an
+-- owner may have made, which must never hold one of these: clients get no
+-- assistant and no Google surface at all. Same shape as 0007, 0013 and 0018.
+INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+SELECT lower(hex(randomblob(16))), r.id, m.module, r.is_default, r.is_default, r.is_default, r.is_default
+  FROM member_roles r
+  CROSS JOIN (
+    SELECT 'google' AS module
+    UNION ALL SELECT 'google_mail'
+    UNION ALL SELECT 'google_events'
+  ) m
+ WHERE NOT EXISTS (
+   SELECT 1 FROM role_permissions p WHERE p.role_id = r.id AND p.module = m.module
+ );
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

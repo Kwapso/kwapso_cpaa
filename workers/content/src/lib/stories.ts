@@ -641,6 +641,20 @@ export async function listSprints(
   return rows.map(toSprint)
 }
 
+/** One sprint by id. Added for the door that puts a sprint's dates into somebody's
+ * Google calendar (routes/google.ts): pushing a block of work outward needs the
+ * block, and reading it through the module's own function is what keeps the
+ * dates, the name and the reference one definition rather than two. */
+export async function getSprint(cfg: D1Rest, guard: MemberGuard, id: string): Promise<Sprint | null> {
+  const rows = await d1Query<SprintRow>(
+    cfg,
+    guard.databaseId,
+    `SELECT ${SPRINT_COLS} FROM sprints sp WHERE sp.id = ? LIMIT 1`, // R14: one row by id
+    [id]
+  )
+  return rows[0] ? toSprint(rows[0]) : null
+}
+
 /** R16: the exact server COUNT(*) for the sprint badge. */
 export async function countSprints(
   cfg: D1Rest,

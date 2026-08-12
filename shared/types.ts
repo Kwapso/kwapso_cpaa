@@ -1071,3 +1071,85 @@ export type StaffCertificate = {
   updatedAt: string | null
   editorName: string | null
 }
+
+// ── GOOGLE, CONNECTED ONE PERSON AT A TIME ───────────────────────────────────
+// Four services, one shape. Nothing here ever carries a token: the tokens live
+// encrypted in the team database and are read by exactly one file
+// (workers/content/src/lib/google.ts). A type that COULD hold one would
+// eventually hold one, on a wire, in a log, in somebody's browser devtools.
+
+/** The four Google services a person may connect, each asked for separately. */
+export const GOOGLE_SERVICES = ["drive", "gmail", "calendar", "chat"] as const
+export type GoogleService = (typeof GOOGLE_SERVICES)[number]
+
+/** The two services whose material is reached through NAMED sources rather than
+ * wholesale — Drive folders and Chat spaces. Gmail is narrowed by known contact
+ * and Calendar is the person's own diary, so neither has anything to name. */
+export const GOOGLE_NAMED_SERVICES = ["drive", "chat"] as const
+export type GoogleNamedService = (typeof GOOGLE_NAMED_SERVICES)[number]
+
+/** Who may read what you shared. Declared at the moment you share it, shown on
+ * the row afterwards, and the only thing that decides whether a colleague's
+ * question can be answered from your material. */
+export const GOOGLE_SHELVES = ["private", "team"] as const
+export type GoogleShelf = (typeof GOOGLE_SHELVES)[number]
+
+/** One person's link to one Google service, as a screen sees it. */
+export type GoogleConnection = {
+  id: string
+  /** the GLOBAL user id — a connection belongs to a person, never to a team. */
+  userId: string
+  service: GoogleService
+  /** which Google account this is, so a person with two can tell them apart. */
+  googleEmail: string
+  /** what Google actually granted, space-separated, exactly as it said it. A
+   * person who unticked a box at the consent screen has a connection that works
+   * for less than we asked for, and the screen has to be able to say so. */
+  grantedScopes: string
+  /** the last time we used it, and the last thing that went wrong if anything
+   * did (an expired grant, a revoked account). Both are how a person finds out
+   * their connection stopped working without waiting for an answer to be wrong. */
+  lastUsedAt: string | null
+  lastError: string | null
+  active: boolean
+  createdAt: string
+  creatorName: string | null
+  updatedAt: string | null
+  editorName: string | null
+}
+
+/** A Drive folder or a Chat space one person named for kwapso. */
+export type GoogleSource = {
+  id: string
+  connectionId: string
+  userId: string
+  service: GoogleNamedService
+  /** Google's own id for it — a folder id, or a `spaces/AAAA…` space name. */
+  externalId: string
+  name: string
+  shelf: GoogleShelf
+  active: boolean
+  createdAt: string
+  creatorName: string | null
+  updatedAt: string | null
+  editorName: string | null
+}
+
+/** One thing read out of Google, in the shape the retrieval lane wants it. See
+ * workers/content/src/lib/google-read.ts for where that lane plugs in. */
+export type GoogleItem = {
+  service: GoogleService
+  /** the kwapso source row it came through, when it came through one. */
+  sourceId: string | null
+  externalId: string
+  title: string
+  /** a link a person can click to open it where it actually lives. */
+  url: string | null
+  /** the readable text, when the caller asked for it (a list read leaves it ""). */
+  text: string
+  updatedAt: string | null
+  /** who may read it — carried WITH the item, so nothing downstream has to go
+   * back and ask. A `private` item may only ever be shown to its owner. */
+  shelf: GoogleShelf
+  ownerUserId: string
+}

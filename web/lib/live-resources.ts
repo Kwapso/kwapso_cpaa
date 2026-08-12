@@ -613,4 +613,22 @@ export const SIMPLE_INVALIDATIONS: Record<string, (teamId: string) => string[]> 
   // word, so the row-level listener above already claims it.)
   marketing: (t) => [marketingKey(t)],
   delivery: (t) => [programmesKey(t), purposesKey(t)],
+  // GOOGLE CONNECTIONS. A coarse drop rather than a row-level patch, because the
+  // card holds ONE answer (your connections AND the folders and spaces under
+  // them) rather than a list of rows: a connection changing means the sources
+  // under it may have changed too, and there is no row-shaped cache to patch.
+  //
+  // It is pinged on the TEAM channel like everything else, so every member's
+  // cache is dropped when any member connects — a cheap and slightly wasteful
+  // honesty. It is not wrong: the key is per team and the door answers about the
+  // CALLER, so a colleague's ping only ever makes somebody re-read their own
+  // (unchanged) connections. Publishing to a person's own channel instead would
+  // be more precise and would leave the resource with no listener here at all,
+  // which is the shape R15 exists to prevent.
+  google: (t) => [googleKey(t)],
+}
+
+/** The one cache key the Google settings card lives in. */
+export function googleKey(teamId: string): string {
+  return `google:${teamId}`
 }

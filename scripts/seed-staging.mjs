@@ -225,6 +225,27 @@ const CLIENT_ROLE = {
     selectable_data: { read: true },
     agent: { read: true, create: true },
     processes: { read: true, create: true },
+    // GOOGLE, granted for exactly the reason `agent` is: not because a client
+    // should have it, but because an owner cloning the Viewer template and
+    // unticking the obvious things WOULD leave it on. The default Viewer ships
+    // read on every module, and "Google connections" is not one of the obvious
+    // things — it reads like a personal setting rather than a door onto the
+    // agency's material.
+    //
+    // Without this line R21 reads the whole Google surface as unreachable and
+    // skips it, exactly as it skipped the agent's six doors: a right the seed
+    // does not hold is a door the law does not walk. With it, seven doors are
+    // walked and every one must refuse — which is the shape this law exists to
+    // check, and the reason the module ALSO carries its own path-shaped suite
+    // (workers/content/test/google-doors.test.ts): that one holds the other
+    // thirteen, which no plausible client role reaches.
+    //
+    // READ only, deliberately. That is what cloning Viewer actually produces —
+    // `create` on this module means "connect a Google account", which the
+    // template does not grant and no owner would tick for a client. Inventing a
+    // grant nobody would make would test a door at the cost of making this seed a
+    // worse working example, which is the same reason `commercials` is absent.
+    google: { read: true },
   },
 }
 

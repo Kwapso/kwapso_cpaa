@@ -23,6 +23,7 @@ import { ChevronRight, Mail } from "lucide-react"
 
 import { AccessTokensSection } from "@/components/access-tokens"
 import { EmailChangeDialog } from "@/components/email-change-dialog"
+import { GoogleConnectionsSection } from "@/components/google-connections"
 import { InvitationsPanel, useReceivedInvites } from "@/components/invitations"
 import { ProfileDialog } from "@/components/profile-dialog"
 import { auth } from "@/lib/api"
@@ -97,6 +98,10 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
         </section>
 
         <AccessTokensSection teamName={ctx.team?.name ?? null} />
+
+        {/* Beside Access tokens on purpose: both are things a PERSON connects to
+         * their own account, and both hand something the power to act as them. */}
+        <GoogleConnectionsSection teamId={ctx.team?.id ?? null} />
 
         <section className="animate-rise flex flex-col gap-3">
           <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Account activity</h2>

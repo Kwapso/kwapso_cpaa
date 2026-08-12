@@ -52,7 +52,7 @@ unit/integration suite across every workspace.
 |---|---|
 | **auth** | Sign-in — a 6-digit email code via Resend, **or Google** (UNPARKED 2026-08-11; see §5), sessions, email-change flow (code to the NEW email). No Clerk, no auth vendor |
 | **tenancy** | teams, team members, Member roles (module key `member_roles`) + permissions, invites; also the per-team screen-recipe config store (`GET/POST /api/tenancy/config/screens`) |
-| **content** *(BUILT 2026-06-23; `kwapso-content`)* | **Learning** (how-to articles, in-app body, manual sequence, pick-or-create category → `selectable_data`, per-user `mark done` progress, deactivate-not-delete) + **Tickets** (account-fenced tickets + threaded replies, fixed status lifecycle `open/in_progress/resolved/reopened`, raiser-can-reopen, @mention + reply email notify, source screen/record capture). There is ONE ticket module and no help section — the permission key, the tables and the path are still `help` on purpose (DATA-MODEL.md § *help + help_threads* says why). Routes under `/api/content/*`. Binds AUTH (whoami) + REALTIME (live pings) + the core DB (gating) + per-module R2 (`LEARNING_MEDIA`, `HELP_MEDIA`). Gated by the `learning` / `help` permission modules; not public (`workers_dev:false`) |
+| **content** *(BUILT 2026-06-23; `kwapso-content`)* | Also **GOOGLE CONNECTIONS** (BUILT 2026-08-12; §5): per-person Drive / Gmail / Calendar / Chat, the second OAuth app, tokens encrypted at rest, and the neutral read seam (`lib/google-read.ts`) the knowledge-base lane plugs into. **Learning** (how-to articles, in-app body, manual sequence, pick-or-create category → `selectable_data`, per-user `mark done` progress, deactivate-not-delete) + **Tickets** (account-fenced tickets + threaded replies, fixed status lifecycle `open/in_progress/resolved/reopened`, raiser-can-reopen, @mention + reply email notify, source screen/record capture). There is ONE ticket module and no help section — the permission key, the tables and the path are still `help` on purpose (DATA-MODEL.md § *help + help_threads* says why). Routes under `/api/content/*`. Binds AUTH (whoami) + REALTIME (live pings) + the core DB (gating) + per-module R2 (`LEARNING_MEDIA`, `HELP_MEDIA`). Gated by the `learning` / `help` permission modules; not public (`workers_dev:false`) |
 | **data-ops** *(BUILT 2026-06-23; `kwapso-data-ops`)* | **(a) CSV import** — the 3-stage session (file → mapping → confirm) against the GLOBAL owner-maintained `importable_databases` catalog, **INSERT-ONLY**, gated by the **target's `create` right** (no key of its own), writing **act-as-user** through the gated create endpoints (three targets today: `selectable_data` + `member_roles` + `learning`), PLUS the agentic multi-file **batch** import (AGENTIC-IMPORT.md — analyze → plan → ordered run with foreign-key resolution). **(b) the AI agent** — a swappable model seam, an opt-in tool catalog, an act-as-user executor, the confirm rule, identity-act blocks, fenced tool results, a step cap, saved per-team threads (audit), and a credit-based quota (the quota tables + rules live in DATA-MODEL.md `agent_usage`/`agent_credits` + EDGE-CASES.md §8). Routes under `/api/data-ops/*`. Binds AUTH/REALTIME/CONTENT/TENANCY + Workers AI (`AI`) + the core DB; not public (`workers_dev:false`) |
 | **realtime** | the live "switchboard" (LOCKED 2026-06-13; ROW-LEVEL 2026-06-22): one **TeamChannel Durable Object** per channel holds its open WebSockets (hibernatable → idle channels cost ~nothing) and fans out tiny **row-level** change pings `{resource, id, op}` so screens patch just the changed row — no refetch. Holds NO app data — the databases stay the source of truth. **Two channel scopes**, both gated like the API: `team:<id>` (every active member; gated by active membership of THAT team) and `user:<id>` (one person's devices — identity/membership events + a forced sign-out; gated to your OWN id, open even when teamless). Channels are created on-demand by name, unlimited, reusable as-is. Workers publish via `publishChange` / `publishUserChange` / `publishSignOut`; the client re-pulls the one changed row through the normal permission-checked endpoint. The ping carries no row CONTENT (just `{resource,id,op}`), and the socket is gated at connect, so a listener never receives data it couldn't already fetch. |
 | **gateway / MCP** | the AGENCY front desk — one of the two public doors: serves the web screens (and marks `/_next/static/**` immutable so repeat loads don't re-validate), routes `/api/*` to the workers (incl. `/api/content/*`, `/api/data-ops/*`, and the `/api/realtime` WebSocket), and serves uploaded media from R2. Routes `/mcp` + `/api/mcp/*` to the mcp worker (the ONE master MCP catalog — BUILT, below). UI and agents call the SAME doors |
@@ -167,6 +167,19 @@ on top follows [CACHING.md](CACHING.md).
 | POST /api/data-ops/agent/confirm | data-ops | approve/decline a proposed dangerous action; resume the turn |
 | GET /api/data-ops/agent/threads | data-ops | the caller's saved agent conversations |
 | GET /api/data-ops/agent/thread | data-ops | one conversation's messages (`?id=`) |
+| GET /api/content/google/connections | content | my own Google connections + the folders/spaces I share |
+| GET /api/content/google/start · GET /api/content/google/callback | content | the consent round-trip for ONE service (the callback writes no row — it parks the code in the one-shot cookie) |
+| POST /api/content/google/connect · /disconnect | content | keep the handshake (`google:create`) · stop using it + revoke at Google (`google:delete`) |
+| GET /api/content/google/pick | content | the Drive folders / Chat spaces I could name |
+| POST /api/content/google/sources · /sources/active | content | name a folder or space + say who may read it (private/team) · stop sharing one |
+| GET /api/content/google/drive/files · /drive/file | content | files in the folders I named · one file's text |
+| POST /api/content/google/drive/upload | content | write a file INTO a folder I named (`google:edit`) |
+| GET /api/content/google/gmail/messages · /gmail/message | content | mail to/from a KNOWN CONTACT only · one message |
+| POST /api/content/google/gmail/draft | content | leave a reply in my own Gmail drafts + hand back its link (`google:edit`) |
+| POST /api/content/google/gmail/send | content | actually send it — `google:edit` **plus** the `google_mail` switch |
+| GET /api/content/google/calendar/events | content | my own diary, in a window |
+| POST /api/content/google/calendar/events · /calendar/sprint | content | add an event · put a sprint's dates in — `google:edit` **plus** the `google_events` switch |
+| GET /api/content/google/chat/messages · POST (same path) | content | one NAMED space's messages · post in it (`google:edit`) |
 | GET /media/* | gateway | serve uploaded files from R2 |
 | (WebSocket) /api/realtime?team= | realtime | join a team's live channel; receive row-level `{resource,id,op}` pings (gated by active membership of THAT team) |
 | (WebSocket) /api/realtime?user= | realtime | join your OWN identity channel (account/membership events + forced sign-out); gated to your own id, open even when teamless |
@@ -276,6 +289,36 @@ on top follows [CACHING.md](CACHING.md).
     and nothing else, so the callback can never become an open redirect carrying a session cookie.
   - **Signing in still is not getting in**: a Google account nobody invited gets exactly what a
     stranger typing a code gets — a teamless user row and the "nothing here yet" screen.
+- **CONNECTING a Google account is a different question from signing in with one (BUILT 2026-08-12).**
+  Sign-in asks Google "who is this?" and keeps nothing. A CONNECTION asks for Drive, Gmail, Calendar
+  or Google Chat and keeps a refresh token — so it is a **second OAuth app** (`kwapso sync`,
+  `GOOGLE_CONNECT_*` on the CONTENT worker), consented **one service at a time**, and stored **per
+  person**. There is no team-wide service account and nowhere to put one: the row hangs off a user
+  id, so "connect the agency's Drive once and let everybody read it" is a column that does not exist.
+  - **What each connection can see is narrowed at Google, not by our filter.** Drive is the FOLDERS
+    the person named (`google_sources`), Chat is the SPACES they named, Gmail is only mail to or
+    from an address on one of the team's accounts (the query is built from `accounts.email` and the
+    caller's words are ANDed inside it), Calendar is their own diary. Every empty case answers with
+    NOTHING rather than everything — the three fences are run, not read, in
+    `workers/content/test/google-fences.test.ts`.
+  - **Every source declares its SHELF at the moment it is shared** — `private` (this person alone)
+    or `team` — because "who will be able to read this?" is the question a person is actually
+    answering when they share a folder, and answering it later is answering it wrong.
+  - **Tokens are ciphertext in the column** (AES-GCM, `GOOGLE_TOKEN_KEY`), not merely on Cloudflare's
+    disk: the team database is reachable by anything holding the account's D1 REST token.
+  - **Three permission switches, not one**: `google` (may connect an account, and use it), plus
+    `google_mail` (kwapso may SEND mail as you) and `google_events` (kwapso may put an EVENT in your
+    calendar) — separate from each other and from the `agent` right, so granting somebody the
+    assistant does not grant the assistant their outbox. The two act switches are demanded of a
+    person pressing "send it from kwapso" exactly as they are of the assistant: same act, same
+    mailbox, same permission.
+  - **The assistant may create events without asking; mail always asks.** A reply is written into
+    the person's own Gmail DRAFTS with a link straight to it, and a "send it from kwapso" button
+    beside it. The confirm rule lives on the agent tools and is pinned by a test.
+  - **NO client-portal exposure of any of it.** The portal gateway forwards none of these doors and
+    every handler opens with `refusePortalCaller` — enforced path-shaped, not permission-shaped, by
+    `workers/content/test/google-doors.test.ts` (R21's own derivation reads the Client role's rights
+    and so walks past a module no client role holds).
 - Onboarding: first name, last name, optional photo.
 - Invites are by email, with a shelf life. At onboarding, **all active invites
   auto-accept** (the user lands in those teams). A personal "Chris' team" is

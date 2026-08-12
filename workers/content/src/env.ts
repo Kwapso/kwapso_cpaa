@@ -51,4 +51,26 @@ export type Env = {
    * answer, so the base degrades to its lexical half until the sweep re-indexes.
    * Defaults to @cf/baai/bge-small-en-v1.5 (384 dimensions). */
   KNOWLEDGE_EMBED_MODEL?: string
+
+  // ── GOOGLE CONNECTIONS ──────────────────────────────────────────────────────
+  // A DIFFERENT OAuth app from the one that signs people in (auth's
+  // GOOGLE_CLIENT_ID). That app asks Google "who is this?" and needs no review;
+  // this one asks for Drive, Gmail, Calendar and Chat, goes through Google's
+  // verification, and shows a consent screen nobody should be walked past just
+  // to log in. Unset = the Connect button is not offered and nothing else in the
+  // product changes.
+  /** The connect app's client id. */
+  GOOGLE_CONNECT_CLIENT_ID?: string
+  /** Its secret (wrangler secret put). */
+  GOOGLE_CONNECT_CLIENT_SECRET?: string
+  /** 32 random bytes, base64 — the key the stored Google tokens are encrypted
+   * under (lib/google-crypto.ts). Held nowhere the database is: a dump of
+   * `google_connections` without this is a list of email addresses. Unset = no
+   * connection can be made, deliberately, rather than a token written in the
+   * clear "for now". */
+  GOOGLE_TOKEN_KEY?: string
+  /** Local development only: drop `Secure` from the one-shot OAuth cookie so the
+   * round-trip works over plain http on localhost. Never set in either deployed
+   * environment — the same switch auth carries, for the same reason. */
+  INSECURE_COOKIE?: string
 }
