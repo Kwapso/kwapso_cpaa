@@ -187,6 +187,12 @@ export function tasksKey(teamId: string): string {
   return `tasks:${teamId}`
 }
 
+/** The triage strip: whose week it is, and the requests nobody has read. One
+ * key, because the screen asks them as one question. */
+export function triageKey(teamId: string): string {
+  return `triage:${teamId}`
+}
+
 export function runningTimersKey(teamId: string): string {
   return `running-timers:${teamId}`
 }
@@ -474,6 +480,11 @@ export const SIMPLE_INVALIDATIONS: Record<string, (teamId: string) => string[]> 
   // the margin panel closes that itself by re-reading when the rate card it also
   // shows changes underneath it (see margin-panel.tsx).
   internal_rates: (t) => [internalRatesKey(t)],
+  // The rota has no list of its own: it is one line above the ticket list saying
+  // whose week it is, read together with the backlog it is about. A ping drops
+  // both, because the answer to "is anything sitting?" moves with the answer to
+  // "whose job is it?".
+  triage_duty: (t) => [triageKey(t)],
   // `work` is not a table — it is the MODULE the import engine pings after it
   // writes a file of stories, and a file writes many rows with no one row to
   // patch. So the backlog is dropped and re-read, and the sprint list with it,

@@ -940,6 +940,29 @@ export const SHARED_TOOLS: SharedTool[] = [
       summarize: (i) => `${i.complete === true ? "Complete" : "Reopen"} sprint ${str(i, "id")}`,
     },
   },
+  /* --------------------------------- triage --------------------------------- */
+  {
+    name: "get_triage",
+    summary:
+      "Whose week it is on triage duty, and every ticket nobody has read yet that has been sitting more than three days — oldest first, with how many days each has waited. An INTERNAL prompt: it is never shown to a client and implies no service-level promise. Pass `week` (any date in it) to ask who was on duty for a different week.",
+    binding: "CONTENT", method: "GET", path: "/api/content/triage",
+    schema: obj({ week: S }),
+    buildQuery: (i) => (str(i, "week") ? `?week=${encodeURIComponent(str(i, "week"))}` : ""),
+    agent: { write: false, summarize: () => "Check what's waiting to be triaged" },
+  },
+  {
+    name: "set_triage_duty",
+    summary:
+      "Put one named person on triage duty for a week — `userId` from list_members, and `week` as any date inside it (it snaps to that Monday; leave it off for this week). Exactly one person holds a week: naming a second replaces the first.",
+    binding: "CONTENT", method: "POST", path: "/api/content/triage",
+    schema: obj({ userId: S, week: S }, ["userId"]),
+    buildBody: (i) => ({ userId: str(i, "userId"), week: opt(i, "week") }),
+    agent: {
+      write: true,
+      confirm: false,
+      summarize: (i, names) => `Put ${memberLabel(i, names)} on triage duty`,
+    },
+  },
   /* ---------------------------- to-dos and tasks ---------------------------- */
   // The two nouns that are the same shape and opposite audiences, and the model
   // needs to be told which is which more than a person does — a person reads two
@@ -1677,6 +1700,10 @@ export const TOOL_GATES: Record<string, string> = {
   cancel_todo: "todos:delete",
   create_task: "work:create",
   set_task_done: "work:edit",
+  // The rota is about TICKETS, so it gates with them. `help:edit` is a right the
+  // seeded Client role does not hold — and the door refuses a portal caller
+  // anyway, because an unread backlog is our failure and not an SLA.
+  set_triage_duty: "help:edit",
   // TIME. Logging your OWN is a create, not an edit — a person who may do the
   // work may say how long it took them. Correcting a row that already exists is
   // `work:edit`, and there is deliberately no tool on that door (see MCP.md).

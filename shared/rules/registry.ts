@@ -451,6 +451,7 @@ export const PORTAL_ACTIVITY_FENCE: Record<string, { fence: "account" | null; wh
   // says the portal never names, attached to the work they are doing. What a
   // client sees of a story is a COUNT on their own ticket.
   stories: { fence: null, why: "a story's history names the staff member doing the work and what they were asked to change — the client sees a count of the work on their own request, never a title, an assignee or a date" },
+  triage_duty: { fence: null, why: "the agency's own rota. Its rows say who was meant to be reading the client's questions in a given week, which is both a fact about our staff and a record of when we were slow — the two things SCOPE ch.06 and BUILD-1 §6 respectively keep off the client's side" },
   tasks: { fence: null, why: "our own internal admin — the quarterly VAT return, a domain renewal. A client login cannot reach a single door on the table, let alone its history" },
   todos: {
     fence: null,
@@ -516,6 +517,9 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
   // is meant to hold — so it gates on its own.
   tasks: "work",
   todos: "todos",
+  // The rota is about TICKETS — whose week it is to read them — so its history
+  // gates with the module the tickets themselves do.
+  triage_duty: "help",
   // The work engine. A story and the sprint it sits in are one record from a
   // reader's point of view — a piece of work and the block it was sold inside —
   // so both gate on `work`, the module a client login never holds.

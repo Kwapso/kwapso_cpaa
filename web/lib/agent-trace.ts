@@ -229,6 +229,10 @@ export function traceFor(
     case "create_task":
     case "set_task_done":
       return { path: seg(teamId, "work"), highlight: "main" }
+    // The rota and the unread backlog are both read on the Tickets screen — the
+    // triage strip sits above the list, which is where "what is waiting" belongs.
+    case "set_triage_duty":
+      return { path: seg(teamId, "tickets"), highlight: "main" }
 
     /* --------------------------------- team -------------------------------- */
     // Rename the team → the team Overview (the bare /t/<team> path), where the new

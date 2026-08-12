@@ -1155,6 +1155,29 @@ SELECT lower(hex(randomblob(16))), r.id, 'todos', r.is_default, r.is_default, r.
  );
 `,
   },
+  {
+    // TRIAGE DUTY (.plans/BUILD-1 §6). "One named person is on triage duty, and
+    // it is visible whose week it is."
+    //
+    // A ROTA, not a flag on a member. Whose week it is changes every Monday and
+    // the answer to "whose week was it when this was missed?" has to survive —
+    // so it is a row per week, and the week is the key.
+    version: "0017_triage_duty",
+    sql: `
+CREATE TABLE triage_duty (
+  id TEXT PRIMARY KEY,
+  week_start TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  user_name TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT
+);
+-- ONE NAMED PERSON, and the database is what makes it one. "Visible whose week
+-- it is" has no answer if two rows claim the same week, and a check in code is a
+-- check two simultaneous writers race past.
+CREATE UNIQUE INDEX idx_triage_duty_week ON triage_duty (week_start);
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

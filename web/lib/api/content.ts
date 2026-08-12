@@ -173,6 +173,22 @@ export const content = {
   setSprintComplete: (id: string, complete: boolean) =>
     api<{ sprints: Sprint[]; total: number }>("/api/content/sprints/complete", post({ id, complete })),
 
+  /* --------------------------------- triage --------------------------------- */
+  /** Whose week it is, and the requests nobody has read past three days. One
+   * door, because the screen asks them as one question. Internal only — the door
+   * refuses a client login. */
+  triage: (week?: string) =>
+    api<{
+      onDuty: { userId: string; userName: string | null; weekStart: string } | null
+      waiting: { id: string; ref: string | null; description: string; createdAt: string; days: number }[]
+      total: number
+    }>(`/api/content/triage${week ? `?week=${enc(week)}` : ""}`),
+  setTriageDuty: (userId: string, week?: string) =>
+    api<{ onDuty: { userId: string; userName: string | null } | null; total: number }>(
+      "/api/content/triage",
+      post({ userId, week })
+    ),
+
   /* ---------------------------- to-dos and tasks ---------------------------- */
   /** What we are waiting on a client for. Fenced: a client login sees their own
    * company's. Bounded rather than paged — a to-do is a thing we are WAITING on. */

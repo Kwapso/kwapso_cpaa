@@ -247,3 +247,82 @@ export async function notifyTodoRaised(
     console.error("to-do notify failed:", e)
   }
 }
+
+/* ─────────────────── the ONE internal digest, once a morning ────────────────── */
+// TWO NUDGES, ONE EMAIL, and that is a decision rather than a saving. BUILD-1
+// asks for a morning digest of what has been sitting (§6) and a weekly nudge for
+// missing time (§5). Two crons and two sends would be two things arriving in the
+// same person's inbox on a Monday, from the same app, about the same week — and
+// the second one anybody filters is the one they stop reading. So it is one
+// message, to one person: the one on triage duty.
+
+/** Every ACTIVE member of a team, with the name to print. Read from the core
+ * database, which is where membership and identity both live. */
+export async function teamMemberNames(
+  env: { DB: D1Database },
+  teamId: string
+): Promise<{ userId: string; name: string; email: string }[]> {
+  const { results } = await env.DB.prepare(
+    // Bounded (R14): an agency's own staff list, and the digest reads it once a day.
+    `SELECT u.id, u.email, u.first_name, u.last_name
+       FROM users u JOIN team_members tm ON tm.user_id = u.id
+      WHERE tm.team_id = ? AND tm.deactivated_at IS NULL AND u.deactivated_at IS NULL
+      LIMIT 500`
+  )
+    .bind(teamId)
+    .all<{ id: string; email: string; first_name: string | null; last_name: string | null }>()
+  return (results ?? [])
+    .filter((r) => r.email)
+    .map((r) => ({
+      userId: r.id,
+      email: r.email,
+      name: [r.first_name, r.last_name].filter(Boolean).join(" ") || r.email,
+    }))
+}
+
+/** The morning digest, to the person whose week it is.
+ *
+ * TO ONE PERSON, not the team. "One named person is on triage duty" (§6) is the
+ * whole point of the rota: a nudge addressed to everybody is addressed to nobody.
+ * When nobody has been named for the week it falls back to the whole staff list,
+ * because an unread backlog with no owner is worse than a slightly noisy morning
+ * — and the fix for the noise is naming somebody, which is what the mail asks for.
+ *
+ * NOTHING CLIENT-FACING EVER (§6, and it is the reason the digest is not simply
+ * "email whoever raised it"): a ticket that has been sitting is our failure, and
+ * telling a client about it turns an internal prompt into an SLA nobody promised.
+ * Every recipient here comes off the team's own membership. */
+export async function sendTriageDigest(
+  env: Env,
+  teamId: string,
+  to: { email: string; name: string }[],
+  digest: { waiting: number; oldestDays: number; onDutyName: string | null; missingTime: string[] }
+): Promise<void> {
+  if (!to.length) return
+  if (digest.waiting === 0 && digest.missingTime.length === 0) return
+  try {
+    const team = await teamName(env, teamId)
+    const lines: string[] = []
+    if (digest.waiting > 0)
+      lines.push(
+        `${digest.waiting} ${digest.waiting === 1 ? "request has" : "requests have"} been waiting to be read — the oldest for ${digest.oldestDays} days.`
+      )
+    if (digest.missingTime.length > 0)
+      lines.push(
+        `No time was logged last week by: ${digest.missingTime.join(", ")}.`
+      )
+    await Promise.all(
+      to.map((p) =>
+        send(env, p.email, `${team}: this morning`, {
+          heading: digest.onDutyName ? `${digest.onDutyName} is on triage this week` : "Nobody is on triage this week",
+          intro: lines.join(" "),
+          footnote: digest.onDutyName
+            ? "Open Tickets to read them."
+            : "Put somebody on triage duty in Tickets — a backlog with no owner is the one nobody clears.",
+        }).catch((e) => console.error("triage digest failed:", e))
+      )
+    )
+  } catch (e) {
+    console.error("triage digest failed:", e)
+  }
+}

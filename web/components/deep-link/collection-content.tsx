@@ -24,6 +24,7 @@ import {
 import { LearningProgressScreen } from "@/components/learning-progress"
 import { ProcessesScreen } from "@/components/processes-screen"
 import { WorkScreen } from "@/components/work-screen"
+import { TriageStrip } from "@/components/triage-strip"
 import { NotFound, LoadError, SectionWithCreate, CollectionCard } from "@/components/deep-link/screen-bits"
 import { CollectionHeading } from "@/components/collection-heading"
 import { LoadMore } from "@/components/load-more"
@@ -334,6 +335,10 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
       <CountedAbove active={helpBadge !== ""}>
       <div className="flex flex-col gap-4">
       <CollectionHeading sectionKey="tickets" total={totals.help} />
+      {/* WHOSE WEEK IT IS, above the list rather than in a screen of its own: it
+          is the sentence a person needs before they look, and a page they have
+          to go and open is a page nobody opens (BUILD-1 §6). */}
+      <TriageStrip teamId={teamId as string} canSetDuty={can("help", "edit")} />
       <SectionWithCreate
         show={can("help", "create")}
         label="Raise ticket"
