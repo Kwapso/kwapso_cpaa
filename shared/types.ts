@@ -219,8 +219,15 @@ export type LearningProgressEntry = {
  * validates against it, the stepper renders from it, and the agent's tool
  * descriptions name it. It was written out four times over; a fifth status was
  * four edits and TypeScript caught none of them. Now it's one edit. */
-export const HELP_STATUSES = ["open", "in_progress", "resolved", "reopened"] as const
+export const HELP_STATUSES = ["new", "triaged", "in_progress", "ready", "resolved"] as const
 export type HelpStatus = (typeof HELP_STATUSES)[number]
+
+/** The states a ticket is NOT yet finished in — "still ours to do something
+ * about". Derived from the one list above rather than retyped, so a sixth state
+ * cannot be added and silently left out of the sentence that matters most.
+ * `ready` counts as unfinished: every story is done, but nobody has told the
+ * client yet, and that telling is the resolution. */
+export const OPEN_HELP_STATUSES = HELP_STATUSES.filter((s) => s !== "resolved")
 
 /** A support ticket (team-wide; the My/All tabs filter by raiser). The built-in
  * `status` is the source of truth; `helpType` is a cosmetic selectable value. */
@@ -233,6 +240,27 @@ export type HelpTicket = {
   status: HelpStatus
   resolved: boolean
   resolvedAt: string | null
+  /** THE NUMBER THE CLIENT QUOTES (SCOPE ch.02, "BERG-T0412") — the account's own
+   * short code, a T, and a sequence counted PER ACCOUNT. Null on a ticket with no
+   * client, or one whose client has no code yet: a reference nobody can say out
+   * loud is worse than none, because it looks like it means something. */
+  ref: string | null
+  /** WHERE THE PERSON PUT IT. Drag-rank is the only priority signal in the
+   * product (SCOPE ch.07 — there is no priority dropdown and there will not be
+   * one), so this is the list's order, not a tiebreak. A sparse text key: see
+   * shared/workers/rank.ts. */
+  rank: string | null
+  /** WHEN WE FIRST READ IT. Until this is set the account still owns the wording
+   * and may edit it; after, the record of what they asked for holds still while
+   * the conversation about it moves. Null = nobody here has touched it yet. */
+  lockedAt: string | null
+  /** Put away without being lost (the glossary's Archive). Null = live. */
+  archivedAt: string | null
+  /** BOTH TITLES, never one overwriting the other. 788 of the tickets arriving
+   * from Glide exist only in German; a translation SETS `titleEn` and leaves
+   * `titleDe` exactly as the person wrote it. */
+  titleDe: string | null
+  titleEn: string | null
   /** Who raised it, and who last touched it. All three are null on the way OUT,
    * and only to a client login, when the person is on the AGENCY's side of the
    * fence — SCOPE ch.06, "the portal shows work status but never which staff

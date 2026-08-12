@@ -1,7 +1,14 @@
 // The TICKETS module — team-wide support tickets + threaded replies, inside the team's
 // OWN database. Locked model rules enforced HERE on the server:
-//   • status is a FIXED lifecycle the code trusts (open / in_progress / resolved /
-//     reopened) — help_type is a cosmetic selectable, never the source of truth;
+//   • status is a FIXED lifecycle the code trusts (new / triaged / in_progress /
+//     ready / resolved) — help_type is a cosmetic selectable, never the source of
+//     truth (SCOPE ch.07 calls the type an EDITABLE list, so the code never
+//     hard-codes the four values it seeds);
+//   • the account owns the WORDING until we read it: a client may edit and re-rank
+//     their own ticket while `locked_at` is null, and the first staff touch sets it
+//     (SCOPE ch.07, "editing and ranking lock at first staff touch");
+//   • the list's order IS the drag-rank — there is no priority dropdown and there
+//     will not be one;
 //   • tickets are team-wide: the My/All tabs are just a creator filter, no
 //     row-level privacy (a mention is notify-only — see lib/notify);
 //   • resolving stamps the resolver audit block + resolved flag; reopening clears
@@ -18,6 +25,7 @@ import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { optionalText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { BULK_IDS_LIMIT, THREAD_HARD_CAP } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
+import { rankAtTop, rankBetween } from "@shared/workers/rank"
 
 // The fixed status lifecycle the code trusts (the team-editable dropdown is
 // display-only) — Anything outside this set is rejected. It lives in shared/types
@@ -35,6 +43,12 @@ type TicketRow = {
   resolved: number
   resolved_at: string | null
   account_id: string | null
+  ref: string | null
+  rank: string | null
+  locked_at: string | null
+  archived_at: string | null
+  title_de: string | null
+  title_en: string | null
   creator_id: string
   creator_name: string | null
   editor_name: string | null
@@ -82,9 +96,13 @@ function toTicket(r: TicketRow, scope: AccountScope): HelpTicket {
     description: r.description,
     screenRecordingLink: r.screen_recording_link,
     sourceScreen: r.source_screen,
+    // A status the code does not know reads as "new" — the state a ticket nobody
+    // has dealt with sits in. It is the SAFE direction: an unrecognised value
+    // shows up as work still to do rather than as work already finished, so a
+    // row the migration somehow missed nags us instead of quietly disappearing.
     status: (HELP_STATUSES as readonly string[]).includes(r.status)
       ? (r.status as HelpStatus)
-      : "open",
+      : "new",
     resolved: r.resolved === 1,
     resolvedAt: r.resolved_at,
     // The HANDLE dies with the name. Blanking `raiserName` alone would leave a
@@ -97,6 +115,17 @@ function toTicket(r: TicketRow, scope: AccountScope): HelpTicket {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     accountId: r.account_id,
+    // The work-engine fields. None of these is a staff FACT the way a name is, so
+    // none is redacted: a client is meant to know their own reference number, the
+    // order they dragged their requests into, whether their wording is still
+    // theirs to change, and whether it has been put away. `draft_resolution` is
+    // deliberately NOT here — it is our unsent working text (see setDraftResolution).
+    ref: r.ref,
+    rank: r.rank,
+    lockedAt: r.locked_at,
+    archivedAt: r.archived_at,
+    titleDe: r.title_de,
+    titleEn: r.title_en,
   }
 }
 
@@ -141,7 +170,8 @@ function toMessage(r: ReplyRow): HelpMessage {
 // uses on an author, and it rides the SAME read as the row so a name and the
 // answer about that name can never come from two different moments.
 const TICKET_COLS = `id, help_type, description, screen_recording_link, source_screen, status, resolved, resolved_at,
-  account_id, creator_id, creator_name, editor_name, created_at, updated_at,
+  account_id, ref, rank, locked_at, archived_at, title_de, title_en,
+  creator_id, creator_name, editor_name, created_at, updated_at,
   EXISTS (SELECT 1 FROM portal_users pu WHERE pu.user_id = help.creator_id) AS raiser_is_client,
   EXISTS (SELECT 1 FROM portal_users pu WHERE pu.user_id = help.editor_id) AS editor_is_client`
 
@@ -171,8 +201,17 @@ async function ticketOrThrow(
   return rows[0]
 }
 
-/** The sort a ticket list is keyed by: newest activity first, id breaking ties. */
-const TICKET_ORDER = "COALESCE(updated_at, created_at)"
+/** THE SORT, and it is the drag-rank (SCOPE ch.07: "drag-rank is the only
+ * priority signal"). It used to be newest-activity-first, which is a fine default
+ * and a bad promise: a reply on an old ticket shoved it above the one somebody
+ * deliberately dragged to the top, so the order a person arranged survived only
+ * until the next comment.
+ *
+ * `COALESCE(rank, id)` so a row written before the rank column existed still
+ * sorts sensibly — a ULID carries its own creation time, so an un-ranked backlog
+ * reads newest-first exactly as it did. The id breaks ties, which makes the order
+ * TOTAL, which is what the keyset cursor needs to page without repeating a row. */
+const TICKET_ORDER = "COALESCE(rank, id)"
 
 /** Tickets for the team, newest-activity first. `scope: "mine"` returns only the
  * caller's own raised tickets (the My tab); "all" returns everyone's (All tab).
@@ -227,27 +266,42 @@ export function ticketFence(
   return { sql: parts.map((p) => p.sql).join(" AND "), params: parts.flatMap((p) => p.params) }
 }
 
+/** LIVE OR PUT AWAY — the everyday list against the archive drawer.
+ *
+ * A separate clause from `ticketFence` on purpose, and the distinction is worth
+ * keeping straight: the fence decides what a caller MAY see and rides every read
+ * AND every write, while this decides what they are LOOKING AT and rides only the
+ * list and its count. Folding it into the fence would quietly make an archived
+ * ticket unreplyable and un-unarchivable — you cannot take a record out of a
+ * drawer you can no longer reach into. */
+function archiveClause(view: "live" | "archived"): string {
+  return view === "archived" ? "archived_at IS NOT NULL" : "archived_at IS NULL"
+}
+
 export async function listTickets(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
   tab: "mine" | "all",
+  view: "live" | "archived",
   cursor: string | null
 ): Promise<Page<HelpTicket>> {
   const pos = decodeCursor(cursor)
   const after = keysetAfter(pos, TICKET_ORDER)
   const fence = ticketFence(guard, scope, tab)
-  const clauses = [...(fence.sql ? [fence.sql] : []), ...(after.sql ? [after.sql] : [])]
+  const clauses = [archiveClause(view), ...(fence.sql ? [fence.sql] : []), ...(after.sql ? [after.sql] : [])]
   const params = [...fence.params, ...after.params]
   const rows = await d1Query<TicketRow>(
     cfg,
     guard.databaseId,
     // LIMIT is PAGE_SIZE + 1 — the extra row is how hasMore is known (R14).
-    `SELECT ${TICKET_COLS} FROM help ${clauses.length ? `WHERE ${clauses.join(" AND ")}` : ""}
+    `SELECT ${TICKET_COLS} FROM help WHERE ${clauses.join(" AND ")}
      ORDER BY ${TICKET_ORDER} DESC, id DESC LIMIT ${PAGE_SIZE + 1}`,
     params
   )
-  const page = toPage(rows, PAGE_SIZE, (r) => [r.updated_at ?? r.created_at, r.id])
+  // The page's key is the SORT, and the sort is the rank — keyed off anything
+  // else and page two starts in a different place from where page one stopped.
+  const page = toPage(rows, PAGE_SIZE, (r) => [r.rank ?? r.id, r.id])
   return { ...page, rows: page.rows.map((r) => toTicket(r, scope)) }
 }
 
@@ -256,23 +310,88 @@ export async function listTickets(
 export async function countTickets(
   cfg: D1Rest,
   guard: MemberGuard,
-  scope: AccountScope
+  scope: AccountScope,
+  view: "live" | "archived"
 ): Promise<{ total: number; mineTotal: number }> {
   // R16 says the count is exact; the fence says exact ABOUT WHAT THEY MAY SEE.
   // An unfenced total would tell a client how many tickets exist that it is
   // refusing to show them — a smaller leak, but the same leak. Both totals ride
   // the SAME clause: "All" is their company's, "My" is the part they raised, and
   // for a client login those two numbers now genuinely differ.
+  // …and it counts the SAME VIEW the list is showing. A total taken across live
+  // and archived together would badge a number the list can never reach, which is
+  // the R16 failure in its quietest form: both numbers true, neither about the
+  // rows on screen.
   const fence = ticketFence(guard, scope, "all")
+  const where = [archiveClause(view), ...(fence.sql ? [fence.sql] : [])].join(" AND ")
   const rows = await d1Query<{ total: number; mine: number }>(
     cfg,
     guard.databaseId,
-    `SELECT COUNT(*) AS total, SUM(CASE WHEN creator_id = ? THEN 1 ELSE 0 END) AS mine FROM help${
-      fence.sql ? ` WHERE ${fence.sql}` : ""
-    }`,
+    `SELECT COUNT(*) AS total, SUM(CASE WHEN creator_id = ? THEN 1 ELSE 0 END) AS mine FROM help WHERE ${where}`,
     [guard.userId, ...fence.params]
   )
   return { total: rows[0]?.total ?? 0, mineTotal: rows[0]?.mine ?? 0 }
+}
+
+/** THE REFERENCE NUMBER, allocated race-safely (SCOPE ch.02: "BERG-T0412").
+ *
+ * ONE STATEMENT, and that is the whole design. The obvious version reads
+ * `MAX(ref)` and writes the next one, and two people raising a ticket on the same
+ * account in the same second both read 11 and both write 12 — a number the client
+ * quotes, pointing at two different requests. `INSERT … ON CONFLICT DO UPDATE …
+ * RETURNING` is atomic in SQLite (CONCURRENCY.md rule 1: the counter rides the
+ * write), so the two callers are serialized by the database and get 12 and 13.
+ *
+ * The insert path seeds `next_no` at 2 and returns 2, the conflict path returns
+ * the incremented value — so in both cases the number just allocated is one less
+ * than what came back. Reading that off the RETURNING rather than from a second
+ * query is what keeps it one statement.
+ *
+ * Returns null when there is nothing to build a reference OUT of: an account with
+ * no short code, or no account at all (the agency's own questions). A reference
+ * nobody can quote is worse than none — it looks like it means something.
+ */
+async function nextRef(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  accountId: string | null,
+  kind: string
+): Promise<string | null> {
+  if (!accountId) return null
+  const codes = await d1Query<{ code: string | null }>(
+    cfg,
+    guard.databaseId,
+    `SELECT code FROM accounts WHERE id = ? LIMIT 1`,
+    [accountId]
+  )
+  const code = codes[0]?.code
+  if (!code) return null
+  const taken = await d1Query<{ next_no: number }>(
+    cfg,
+    guard.databaseId,
+    `INSERT INTO ref_counters (account_id, kind, next_no) VALUES (?, ?, 2)
+     ON CONFLICT(account_id, kind) DO UPDATE SET next_no = next_no + 1
+     RETURNING next_no`,
+    [accountId, kind]
+  )
+  const no = (taken[0]?.next_no ?? 2) - 1
+  return `${code}-${kind}${String(no).padStart(4, "0")}`
+}
+
+/** The rank a new ticket takes: above every one the caller can already see.
+ *
+ * Read-then-write, deliberately, and safe because of what it is FOR. Two tickets
+ * raised in the same instant can land on the same rank; both are "newest", the
+ * `id DESC` tiebreak still gives the list a total order, and the first drag
+ * separates them for good. See rankAtTop — the alternative is a lock nobody could
+ * perceive the benefit of. */
+async function topRank(cfg: D1Rest, guard: MemberGuard): Promise<string> {
+  const rows = await d1Query<{ top: string | null }>(
+    cfg,
+    guard.databaseId,
+    `SELECT MAX(COALESCE(rank, id)) AS top FROM help LIMIT 1` // R14: one aggregate row
+  )
+  return rankAtTop(rows[0]?.top ?? null)
 }
 
 /** One ticket by id (or null). */
@@ -391,6 +510,12 @@ export type TicketInput = {
   sourceScreen?: string
   sourceRelatedTable?: string
   sourceRelatedRowId?: string
+  /** BOTH TITLES, and neither is derived from the other. 788 of the requests
+   * arriving from Glide exist only in German, so "the title" is not a single
+   * field with a language attached — it is two fields, one of which may be empty
+   * until somebody (or the translate door) fills it in. */
+  titleDe?: string
+  titleEn?: string
   /** STAFF ONLY: the client this ticket is raised FOR. Ignored outright for a
    * portal caller, whose account is never taken from the body. See
    * `accountForStaffTicket`. */
@@ -451,21 +576,55 @@ export async function createTicket(
   const accountId =
     scope.kind === "portal" ? scope.currentAccountId : await accountForStaffTicket(cfg, guard, input.accountId)
   const now = new Date().toISOString()
+  // The reference the client will quote, and the place in the list. Both are
+  // resolved BEFORE the insert so the row is complete the first time anybody
+  // reads it — a ticket that exists for a moment with no number is a ticket
+  // somebody screenshots with no number.
+  const ref = await nextRef(cfg, guard, accountId, "T")
+  const rank = await topRank(cfg, guard)
+  // WHO IS RAISING IT decides whether the wording is still the account's. A
+  // ticket a STAFF member types is locked the instant it exists: the first staff
+  // touch has already happened — it is us. A client's own question stays theirs
+  // to correct until we read it.
+  const lockedAt = scope.kind === "portal" ? null : now
   await d1ExecScript(
     cfg,
     guard.databaseId,
-    `INSERT INTO help (id, help_type, description, screen_recording_link, source_screen, source_related_table, source_related_row_id, status, resolved, account_id, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString((optionalText(input.helpType, "Type", TEXT_LIMITS.short) ?? null))}, ${sqlString(description)}, ${sqlString((optionalText(input.screenRecordingLink, "Screen recording link", TEXT_LIMITS.link) ?? null))}, ${sqlString((optionalText(input.sourceScreen, "Source", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedTable, "Source table", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedRowId, "Source row", TEXT_LIMITS.short) ?? null))}, 'open', 0, ${sqlString(accountId)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+    `INSERT INTO help (id, help_type, description, screen_recording_link, source_screen, source_related_table, source_related_row_id, status, resolved, account_id, ref, rank, locked_at, title_de, title_en, created_at, creator_id, creator_email, creator_name)
+VALUES (${sqlString(id)}, ${sqlString((optionalText(input.helpType, "Type", TEXT_LIMITS.short) ?? null))}, ${sqlString(description)}, ${sqlString((optionalText(input.screenRecordingLink, "Screen recording link", TEXT_LIMITS.link) ?? null))}, ${sqlString((optionalText(input.sourceScreen, "Source", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedTable, "Source table", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedRowId, "Source row", TEXT_LIMITS.short) ?? null))}, 'new', 0, ${sqlString(accountId)}, ${sqlString(ref)}, ${sqlString(rank)}, ${sqlString(lockedAt)}, ${sqlString((optionalText(input.titleDe, "German title", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.titleEn, "English title", TEXT_LIMITS.short) ?? null))}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
   )
 
   await logActivity(cfg, guard.databaseId, actor, {
-    type: "Help ticket raised",
-    description: `${actor.name} raised a support ticket`,
+    type: "Ticket raised",
+    description: `${actor.name} raised ${ref ? `ticket ${ref}` : "a ticket"}`,
     relatedTable: "help",
     relatedRowId: id,
   })
 
   return { id, accountId }
+}
+
+/** IS THE WORDING STILL THEIRS? (SCOPE ch.07: "editing and ranking lock at first
+ * staff touch".)
+ *
+ * The account owns what it asked for right up until we have read it; after that
+ * the record of the request holds still while the conversation about it moves.
+ * Staff are never stopped — they are the ones the lock is FOR.
+ *
+ * Expressed as a thrown refusal AND, at every call site, as a predicate on the
+ * UPDATE itself. Both, on purpose: the throw is what tells the person why, and
+ * the predicate is what makes it true when two requests arrive together — the
+ * check and the write are otherwise two steps, and a client editing at the same
+ * instant a staff member opens the ticket would pass the first and win the
+ * second. */
+function refuseIfLocked(scope: AccountScope, row: TicketRow, what: string): void {
+  if (scope.kind !== "portal") return
+  if (row.locked_at)
+    throw new GuardError(
+      409,
+      "ticket_locked",
+      `We've already picked this one up, so ${what} is fixed now — add a comment and we'll pick it up from there.`
+    )
 }
 
 /** Edit a ticket's content (description / type / screen recording / source). Stamps
@@ -481,6 +640,13 @@ export async function updateTicket(
 ): Promise<string | null> {
   const before = await ticketOrThrow(cfg, guard, scope, id)
   const description = requireText(input.description, "Description", TEXT_LIMITS.long)
+  // A client may correct their own question while it is still theirs. Two rules,
+  // not one: the ticket must be UNREAD by us (the lock), and it must be THEIRS —
+  // a contact sees their whole company's requests now, and being allowed to read
+  // a colleague's question is not being allowed to rewrite it.
+  refuseIfLocked(scope, before, "the wording")
+  if (scope.kind === "portal" && before.creator_id !== guard.userId)
+    throw new GuardError(403, "not_yours", "This one was raised by a colleague — add a comment instead.")
 
   // NAMING THE CLIENT ON A TICKET THAT HAS NONE — set once, never moved.
   //
@@ -505,26 +671,55 @@ export async function updateTicket(
   // the clause carries a placeholder PER account id, so it cannot be spelled out
   // by hand and cannot drift from the one the read used.
   const fence = ticketFence(guard, scope, "all")
-  await d1Query(
+  // THE LOCK RIDES THE WRITE, not just the check above. `refuseIfLocked` is what
+  // explains the refusal to a person; this is what makes it true when a client's
+  // edit and a staff member's first touch arrive in the same instant. For a
+  // portal caller the statement only matches a row that is still unlocked and
+  // still theirs, so losing the race means changing nothing.
+  const ownership =
+    scope.kind === "portal" ? " AND locked_at IS NULL AND creator_id = ?" : ""
+  const ownershipParams = scope.kind === "portal" ? [guard.userId] : []
+  // …and a STAFF edit IS the first staff touch. `COALESCE` so it records when we
+  // first read it, never the last time anyone typed — the lock is a moment, and
+  // re-stamping it would keep moving the moment the client's rights ended.
+  const lockSet = scope.kind === "portal" ? "" : ", locked_at = COALESCE(locked_at, ?)"
+  const lockParams = scope.kind === "portal" ? [] : [now]
+  const changed = await d1Query<{ id: string }>(
     cfg,
     guard.databaseId,
     `UPDATE help SET help_type = ?, description = ?, screen_recording_link = ?, source_screen = ?,
-       account_id = ?, updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ?
-     WHERE id = ?${fence.sql ? ` AND ${fence.sql}` : ""}`,
+       title_de = ?, title_en = ?,
+       account_id = ?, updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ?${lockSet}
+     WHERE id = ?${fence.sql ? ` AND ${fence.sql}` : ""}${ownership} RETURNING id`,
     [
       optionalText(input.helpType, "Type", TEXT_LIMITS.short) ?? null,
       description,
       optionalText(input.screenRecordingLink, "Screen recording link", TEXT_LIMITS.link) ?? null,
       optionalText(input.sourceScreen, "Source", TEXT_LIMITS.short) ?? null,
+      // An absent title means "leave it alone", not "blank it": the translate
+      // door writes ONE of these two and must not erase the other, and a portal
+      // form that only knows about its own language must not delete ours.
+      optionalText(input.titleDe, "German title", TEXT_LIMITS.short) ?? before.title_de,
+      optionalText(input.titleEn, "English title", TEXT_LIMITS.short) ?? before.title_en,
       accountAfter,
       now,
       actor.id,
       actor.email,
       actor.name,
+      ...lockParams,
       id,
       ...fence.params,
+      ...ownershipParams,
     ]
   )
+  // Lost the race with the staff member who just opened it. Same sentence the
+  // pre-check gives, so the person sees one explanation either way.
+  if (!changed[0])
+    throw new GuardError(
+      409,
+      "ticket_locked",
+      "We've already picked this one up, so the wording is fixed now — add a comment and we'll pick it up from there."
+    )
 
   const changes = describeChanges([
     { label: "Type", from: before.help_type, to: optionalText(input.helpType, "Type", TEXT_LIMITS.short) ?? null },
@@ -538,8 +733,8 @@ export async function updateTicket(
     { label: "Source", from: before.source_screen, to: optionalText(input.sourceScreen, "Source", TEXT_LIMITS.short) ?? null },
   ])
   await logActivity(cfg, guard.databaseId, actor, {
-    type: "Help ticket edited",
-    description: `${actor.name} edited a support ticket${changes ? ` — ${changes}` : ""}`,
+    type: "Ticket edited",
+    description: `${actor.name} edited ${before.ref ?? "a ticket"}${changes ? ` — ${changes}` : ""}`,
     relatedTable: "help",
     relatedRowId: id,
   })
@@ -572,21 +767,125 @@ export async function setStatus(
     : "resolved = 0, resolved_at = NULL, resolver_id = NULL, resolver_email = NULL, resolver_name = NULL"
   // The fence rides the move itself, beside the R17 predicate.
   const fence = ticketFence(guard, scope, "all")
+  // MOVING IT IS A STAFF TOUCH, so the lock closes here too — and it rides the
+  // same statement as the move, so a ticket cannot end up "in progress" while
+  // its wording is still the client's to change. COALESCE: the lock records when
+  // we FIRST read it, so a later move never pushes that moment forward.
   const changed = await d1Query<{ id: string }>(
     cfg,
     guard.databaseId,
-    `UPDATE help SET status = ?, ${resolveBlock}, updated_at = ?, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE id = ? AND status <> ?${fence.sql ? ` AND ${fence.sql}` : ""} RETURNING id`,
-    [status, now, id, status, ...fence.params]
+    `UPDATE help SET status = ?, ${resolveBlock}, locked_at = COALESCE(locked_at, ?), updated_at = ?, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE id = ? AND status <> ?${fence.sql ? ` AND ${fence.sql}` : ""} RETURNING id`,
+    [status, now, now, id, status, ...fence.params]
   )
   if (!changed[0]) return { moved: false, accountId: before.account_id }
 
   await logActivity(cfg, guard.databaseId, actor, {
-    type: `Help ticket ${status === "resolved" ? "resolved" : status === "reopened" ? "reopened" : "updated"}`,
-    description: `${actor.name} set a support ticket to ${status.replace("_", " ")}`,
+    type: `Ticket ${status === "resolved" ? "resolved" : status === "ready" ? "ready" : "updated"}`,
+    description: `${actor.name} set ${before.ref ?? "a ticket"} to ${status.replace("_", " ")}`,
     relatedTable: "help",
     relatedRowId: id,
   })
   return { moved: true, accountId: before.account_id }
+}
+
+/** DRAG-RANK — put a ticket between two others (SCOPE ch.07: the only priority
+ * signal there is).
+ *
+ * The caller names its NEIGHBOURS, not a position. A position would be a number
+ * computed from a list the caller loaded some seconds ago, and by the time it
+ * arrives the list has moved; two neighbours are a statement about the order that
+ * is still true whatever else happened, and they are what a drag actually knows.
+ *
+ * Both neighbour ids are read through the FENCE, so a client cannot pin their
+ * ticket next to one they cannot see — which would be a (very small) oracle for
+ * whether an id exists, and a way to learn another company's ordering. */
+export async function setTicketRank(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  actor: Actor,
+  id: string,
+  afterId: string | null,
+  beforeId: string | null
+): Promise<{ moved: boolean; accountId: string | null }> {
+  const row = await ticketOrThrow(cfg, guard, scope, id)
+  // Ranking locks with the wording, and for the same reason: once we are working
+  // on it, the order is ours to manage.
+  refuseIfLocked(scope, row, "the order")
+
+  // `afterId` sits ABOVE in the list (a higher rank) and `beforeId` BELOW, because
+  // the list reads rank DESC — so the new rank goes between beforeId's and
+  // afterId's, low bound first.
+  const neighbour = async (nid: string | null): Promise<string | null> => {
+    if (!nid) return null
+    const found = await ticketOrThrow(cfg, guard, scope, nid)
+    return found.rank ?? found.id
+  }
+  const rank = rankBetween(await neighbour(beforeId), await neighbour(afterId))
+
+  const fence = ticketFence(guard, scope, "all")
+  const ownership = scope.kind === "portal" ? " AND locked_at IS NULL" : ""
+  // R17: `rank <> ?` — dropping a ticket back exactly where it was moves zero
+  // rows, so it writes no history and pings nothing. A drag that ends where it
+  // started is not an event.
+  const changed = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    `UPDATE help SET rank = ? WHERE id = ? AND COALESCE(rank, id) <> ?${
+      fence.sql ? ` AND ${fence.sql}` : ""
+    }${ownership} RETURNING id`,
+    [rank, id, rank, ...fence.params]
+  )
+  if (!changed[0]) return { moved: false, accountId: row.account_id }
+
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: "Ticket reordered",
+    description: `${actor.name} moved ${row.ref ?? "a ticket"} in the list`,
+    relatedTable: "help",
+    relatedRowId: id,
+  })
+  return { moved: true, accountId: row.account_id }
+}
+
+/** ARCHIVE / UNARCHIVE — available from any state (SCOPE ch.07). The base's
+ * deactivate-never-delete under the word the glossary already uses: the row, its
+ * conversation and its history all survive; it simply stops appearing in the
+ * everyday list.
+ *
+ * R17: the current-state predicate rides the UPDATE (`archived_at IS NULL` /
+ * `IS NOT NULL`), so a double-clicked Archive moves zero rows the second time and
+ * writes no second sentence into the record's history. */
+export async function setTicketArchived(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  actor: Actor,
+  id: string,
+  archived: boolean
+): Promise<{ moved: boolean; accountId: string | null }> {
+  const row = await ticketOrThrow(cfg, guard, scope, id)
+  const now = new Date().toISOString()
+  const fence = ticketFence(guard, scope, "all")
+  const set = archived
+    ? `archived_at = ?, archiver_id = ${sqlString(actor.id)}, archiver_email = ${sqlString(actor.email)}, archiver_name = ${sqlString(actor.name)}`
+    : `archived_at = NULL, archiver_id = NULL, archiver_email = NULL, archiver_name = NULL`
+  const changed = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    `UPDATE help SET ${set} WHERE id = ? AND archived_at IS ${archived ? "" : "NOT "}NULL${
+      fence.sql ? ` AND ${fence.sql}` : ""
+    } RETURNING id`,
+    archived ? [now, id, ...fence.params] : [id, ...fence.params]
+  )
+  if (!changed[0]) return { moved: false, accountId: row.account_id }
+
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: archived ? "Ticket archived" : "Ticket restored",
+    description: `${actor.name} ${archived ? "archived" : "restored"} ${row.ref ?? "a ticket"}`,
+    relatedTable: "help",
+    relatedRowId: id,
+  })
+  return { moved: true, accountId: row.account_id }
 }
 
 /** Move MANY tickets to the same status in one call (the bulk sibling of
@@ -687,15 +986,17 @@ export async function bulkSetStatusByFilter(
   const changedRows = await d1Query<{ id: string; account_id: string | null }>(
     cfg,
     guard.databaseId,
-    `UPDATE help SET status = ?, ${resolveBlock}, updated_at = ?, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE status <> ?${extraSql} RETURNING id, account_id`,
-    [toStatus, now, toStatus, ...extraParams]
+    // The lock closes on every ticket the set touches, exactly as it does on a
+    // single move — a bulk is not a quieter kind of staff touch.
+    `UPDATE help SET status = ?, ${resolveBlock}, locked_at = COALESCE(locked_at, ?), updated_at = ?, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE status <> ?${extraSql} RETURNING id, account_id`,
+    [toStatus, now, now, toStatus, ...extraParams]
   )
   const changed = changedRows.length
   if (changed > 0)
     // ONE activity row for the set — history says what happened, not per-row noise.
     await logActivity(cfg, guard.databaseId, actor, {
-      type: `Help tickets ${toStatus === "resolved" ? "resolved" : "updated"} (bulk)`,
-      description: `${actor.name} set ${changed} support ticket${changed === 1 ? "" : "s"}${filter.helpType ? ` of type "${filter.helpType}"` : ""}${filter.status ? ` from ${filter.status.replace("_", " ")}` : ""} to ${toStatus.replace("_", " ")}`,
+      type: `Tickets ${toStatus === "resolved" ? "resolved" : "updated"} (bulk)`,
+      description: `${actor.name} set ${changed} ticket${changed === 1 ? "" : "s"}${filter.helpType ? ` of type "${filter.helpType}"` : ""}${filter.status ? ` from ${filter.status.replace("_", " ")}` : ""} to ${toStatus.replace("_", " ")}`,
       relatedTable: "help",
     })
   return {

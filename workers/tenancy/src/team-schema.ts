@@ -435,6 +435,102 @@ UPDATE OR IGNORE screens SET module = 'tickets.list' WHERE module = 'help.list';
 DELETE FROM screens WHERE module = 'help.list';
 `,
   },
+  {
+    // THE WORK ENGINE, part one: the ticket grows into the thing SCOPE ch.07
+    // describes. Columns on the table that already exists, never a second ticket
+    // beside it — a second one means a second conversation, a second fence, a
+    // second activity trail and two things called a ticket forever.
+    version: "0011_ticket_work_engine",
+    sql: `
+-- The five states (SCOPE ch.07: new -> triaged -> in progress -> ready ->
+-- resolved). The two old names move onto the two new ones that mean the same
+-- thing: 'open' was a ticket nobody had read yet, which is 'new'; 'reopened' was
+-- one a staff member had deliberately pulled back into play, which is 'triaged'
+-- — it has been read, and it is not being worked on yet.
+--
+-- The redundant \`status <> \` half of each predicate is not decoration. A
+-- migration is recorded in _migrations and runs once, but the one time anybody
+-- types these statements again is during a recovery, by hand, under pressure —
+-- and a status move that is safe to re-run is one less thing to be frightened of
+-- then. It is also the law the rest of the file lives under (R17).
+UPDATE help SET status = 'new' WHERE status = 'open' AND status <> 'new';
+UPDATE help SET status = 'triaged' WHERE status = 'reopened' AND status <> 'triaged';
+
+-- THE REFERENCE NUMBER (SCOPE ch.02, "BERG-T0412"). Per ACCOUNT, not global:
+-- Glide's are global and fully interleaved, so continuity was never on offer, and
+-- a number a client quotes should count THEIR requests, not ours and every other
+-- client's. Nullable because most of the agency's own tickets have no account and
+-- no code to build one from — a ticket with no client has nobody to quote it to.
+ALTER TABLE help ADD COLUMN ref TEXT;
+-- The race guard AND the promise: two people raising a ticket on one account at
+-- the same instant cannot end up quoting the same number. Partial, so the many
+-- rows with no ref don't collide with each other.
+CREATE UNIQUE INDEX idx_help_ref ON help (ref) WHERE ref IS NOT NULL;
+
+-- DRAG-RANK — the only priority signal there is (SCOPE ch.07: no priority
+-- dropdown, ever). Sparse text keys, so moving one ticket writes one row; see
+-- shared/workers/rank.ts for why it is a string.
+ALTER TABLE help ADD COLUMN rank TEXT;
+-- Every existing ticket starts ranked by its own id, which is a ULID and
+-- therefore already in the order they were raised. So the list looks EXACTLY as
+-- it did the moment before this migration ran, and the first drag is the first
+-- change anybody sees.
+UPDATE help SET rank = id WHERE rank IS NULL;
+CREATE INDEX idx_help_rank ON help (rank);
+
+-- THE LOCK (SCOPE ch.07: "editing and ranking lock at first staff touch"). The
+-- account owns the wording while nobody here has read it; once we have, the
+-- record of what they asked for stops moving under the conversation about it.
+-- A timestamp rather than a flag, because "when" is the question anyone asks.
+ALTER TABLE help ADD COLUMN locked_at TEXT;
+-- A ticket that has already been worked is already locked — its wording was
+-- settled long ago, and back-dating that to the row's own last edit is the
+-- closest true answer available.
+UPDATE help SET locked_at = COALESCE(updated_at, created_at) WHERE status <> 'new';
+
+-- THE DRAFT REPLY the closing note of each story appends to (SCOPE ch.07,
+-- "story close is a transaction"). It is a draft, not a message: it becomes a
+-- reply only when a person sends it.
+ALTER TABLE help ADD COLUMN draft_resolution TEXT;
+
+-- ARCHIVE, available from any state (SCOPE ch.07) — the base's deactivate-never-
+-- delete, wearing the word the glossary already uses for it.
+ALTER TABLE help ADD COLUMN archived_at TEXT;
+ALTER TABLE help ADD COLUMN archiver_id TEXT;
+ALTER TABLE help ADD COLUMN archiver_email TEXT;
+ALTER TABLE help ADD COLUMN archiver_name TEXT;
+
+-- BOTH TITLES, kept (build brief §8). 1,764 of the tickets coming from Glide have
+-- a German title, 1,010 English, and 788 exist ONLY in German. The original is
+-- never overwritten by a translation — that is the whole reason there are two
+-- columns rather than one column and a language flag.
+ALTER TABLE help ADD COLUMN title_de TEXT;
+ALTER TABLE help ADD COLUMN title_en TEXT;
+
+-- THE REFERENCE COUNTER, one row per (account, kind of thing). Allocation is a
+-- SINGLE statement — INSERT … ON CONFLICT DO UPDATE … RETURNING — so two
+-- simultaneous writers cannot both read "11" and both write "12" (CONCURRENCY.md
+-- rule 1: the counter rides the write, never a read-then-write).
+CREATE TABLE ref_counters (
+  account_id TEXT NOT NULL REFERENCES accounts (id),
+  kind TEXT NOT NULL,                -- 'T' ticket, 'S' story, 'SPR' sprint, …
+  next_no INTEGER NOT NULL,
+  PRIMARY KEY (account_id, kind)
+);
+
+-- THE FOUR TICKET TYPES SCOPE names (feedback / bug / question / extra). Added,
+-- never swapped: SCOPE calls this an EDITABLE list, and a team's existing types
+-- are on tickets already — deleting them would blank the type of every ticket
+-- that names one. The old values stay pickable until somebody retires them on
+-- the Dropdown values screen, which is what that screen is for.
+INSERT INTO selectable_data (id, type, value, is_default, created_at, creator_name)
+SELECT lower(hex(randomblob(16))), 'Ticket type', v.value, 1, datetime('now'), 'kwapso'
+  FROM (SELECT 'Feedback' AS value UNION ALL SELECT 'Bug' UNION ALL SELECT 'Question' UNION ALL SELECT 'Extra') v
+ WHERE NOT EXISTS (
+   SELECT 1 FROM selectable_data s WHERE s.type = 'Ticket type' AND s.value = v.value
+ );
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }
@@ -447,14 +543,22 @@ export const DEFAULT_SELECTABLE: { type: string; value: string }[] = [
   { type: "File type", value: "Video link" },
   { type: "File type", value: "Other file" },
   { type: "File type", value: "Other link" },
-  { type: "Ticket type", value: "Report user" },
-  { type: "Ticket type", value: "Bug report" },
-  { type: "Ticket type", value: "How to use ?" },
-  { type: "Ticket type", value: "Feature request" },
-  { type: "Ticket type", value: "Payment issue" },
-  { type: "Ticket status", value: "not started" },
-  { type: "Ticket status", value: "in progress" },
-  { type: "Ticket status", value: "resolved" },
+  // The four types SCOPE ch.07 names, and no more. It calls this an EDITABLE
+  // list, so these are a starting vocabulary rather than a fixed set — a team
+  // adds its own on the Dropdown values screen, and the migration that brought
+  // these to existing teams left their older types alone for the same reason.
+  { type: "Ticket type", value: "Feedback" },
+  { type: "Ticket type", value: "Bug" },
+  { type: "Ticket type", value: "Question" },
+  { type: "Ticket type", value: "Extra" },
+  // Display-only labels for the five built-in states. The status the code trusts
+  // is HELP_STATUSES in shared/types.ts — these rows are what a team may reword
+  // on screen, and renaming one can never move a ticket.
+  { type: "Ticket status", value: "New" },
+  { type: "Ticket status", value: "Triaged" },
+  { type: "Ticket status", value: "In progress" },
+  { type: "Ticket status", value: "Ready" },
+  { type: "Ticket status", value: "Resolved" },
 ]
 
 /**

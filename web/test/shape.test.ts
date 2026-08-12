@@ -103,8 +103,15 @@ const ticket: HelpTicket = {
   editorName: null,
   createdAt: "2026-06-13T10:00:00.000Z",
   updatedAt: null,
-  // The agency's own question belongs to no client, so it names no account.
+  // The agency's own question belongs to no client, so it names no account —
+  // and with no account there is no short code to build a reference out of.
   accountId: null,
+  ref: null,
+  rank: "M",
+  lockedAt: "2026-06-13T10:05:00.000Z",
+  archivedAt: null,
+  titleDe: null,
+  titleEn: null,
 }
 
 const meta: TeamMeta = {
@@ -218,10 +225,11 @@ describe("shapeLearningList", () => {
 describe("HELP_STATUS", () => {
   it("maps every status (underscore form) to a friendly label", () => {
     expect(HELP_STATUS).toMatchObject({
-      open: "Open",
+      new: "New",
+      triaged: "Triaged",
       in_progress: "In progress",
+      ready: "Ready",
       resolved: "Resolved",
-      reopened: "Reopened",
     })
   })
 })

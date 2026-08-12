@@ -247,11 +247,15 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_help_tickets",
     summary:
-      "List the team's support tickets. scope: 'mine' (yours) or 'all' (default all); pass `id` to fetch just one ticket. Returns ONE page plus the exact `total`, `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
+      "List the team's tickets. scope: 'mine' (yours) or 'all' (default all); view: 'live' (default — the everyday list) or 'archived' (tickets that have been put away); pass `id` to fetch just one ticket, archived or not. Returns ONE page plus the exact `total`, `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
     binding: "CONTENT", method: "GET", path: "/api/content/help",
-    schema: obj({ scope: S, id: S, cursor: S }),
+    schema: obj({ scope: S, view: S, id: S, cursor: S }),
     buildQuery: (i) => {
       const q = [str(i, "scope") === "mine" ? "scope=mine" : "scope=all"]
+      // Forwarded only when the caller asked for the archive: the door defaults
+      // to the live list, and sending `view=live` on every call would be noise
+      // the model has to keep re-reading.
+      if (str(i, "view") === "archived") q.push("view=archived")
       if (str(i, "id")) q.push(`id=${encodeURIComponent(str(i, "id"))}`)
       if (str(i, "cursor")) q.push(`cursor=${encodeURIComponent(str(i, "cursor"))}`)
       return `?${q.join("&")}`
@@ -706,11 +710,38 @@ export const SHARED_TOOLS: SharedTool[] = [
   },
   {
     name: "set_help_status",
-    summary: "Move a support ticket along its lifecycle (open, in_progress, resolved, reopened), by id.",
+    summary:
+      "Move a ticket along its lifecycle, by id. In order: new (raised, nobody has read it), triaged (read and sorted), in_progress (being worked on), ready (every piece of work is done, the client has not been told yet), resolved (answered and closed). Moving a resolved ticket back to triaged is how a ticket is reopened — there is no separate reopened state.",
     binding: "CONTENT", method: "POST", path: "/api/content/help/status",
     schema: obj({ id: S, status: S }, ["id", "status"]),
     buildBody: (i) => ({ id: str(i, "id"), status: str(i, "status") }),
     agent: { write: true, confirm: false, summarize: (i) => `Set ticket ${str(i, "id")} to "${str(i, "status")}"` },
+  },
+  {
+    // Drag-rank is the ONLY priority signal the product has (SCOPE ch.07), so
+    // "make this one more urgent" has exactly one honest answer on this surface,
+    // and this is it. Neighbours rather than a position, for the same reason the
+    // door takes them: a position is arithmetic over a list that has since moved.
+    name: "rank_help_ticket",
+    summary:
+      "Move a ticket up or down the list, by id. There is no priority field — the list's ORDER is the priority. Name the neighbours it should sit between: `afterId` is the ticket it goes below (higher up the list) and `beforeId` the one it goes above. Omit `afterId` to put it at the very top, `beforeId` to put it at the very bottom.",
+    binding: "CONTENT", method: "POST", path: "/api/content/help/rank",
+    schema: obj({ id: S, afterId: S, beforeId: S }, ["id"]),
+    buildBody: (i) => ({ id: str(i, "id"), afterId: str(i, "afterId"), beforeId: str(i, "beforeId") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Reorder ticket ${str(i, "id")}` },
+  },
+  {
+    name: "archive_help_ticket",
+    summary:
+      "Put a ticket away, or take it back out (`archived`: true to archive, false to restore). Available whatever state it is in. NOTHING is deleted — the ticket, its conversation and its history all survive; it simply stops appearing in the everyday list. Read them back with list_help_tickets and view: 'archived'.",
+    binding: "CONTENT", method: "POST", path: "/api/content/help/archive",
+    schema: obj({ id: S, archived: B }, ["id", "archived"]),
+    buildBody: (i) => ({ id: str(i, "id"), archived: i.archived === true }),
+    agent: {
+      write: true,
+      confirm: false,
+      summarize: (i) => `${i.archived === true ? "Archive" : "Restore"} ticket ${str(i, "id")}`,
+    },
   },
   {
     name: "reply_help_ticket",
@@ -806,6 +837,15 @@ export const TOOL_GATES: Record<string, string> = {
   raise_help_ticket: "help:create",
   update_help_ticket: "help:edit",
   set_help_status: "help:edit",
+  // Reordering and archiving are both moves along the row, so both sit on the
+  // same right the status move does. Note what that means for a client login:
+  // the seeded Client role holds help:read + help:create and NOT help:edit, so
+  // neither door is open to them today. SCOPE ch.07 does say a contact may
+  // re-rank their own company's tickets — when an owner grants that, the LOCK
+  // (workers/content/src/lib/help.ts refuseIfLocked) is what keeps it safe, not
+  // this line.
+  rank_help_ticket: "help:edit",
+  archive_help_ticket: "help:edit",
   reply_help_ticket: "help:read",
   // The AGENT-ONLY writes (no MCP tool — they're built around the confirm panel a
   // headless client hasn't got). Listed for the same reason as the rest: the gate

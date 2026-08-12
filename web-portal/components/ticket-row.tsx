@@ -19,10 +19,16 @@ import { formatRelative } from "@shared/web/format"
 /** Plain words for each state, and a colour that means the same thing every
  * time. "In progress" is the only one that needed translating from the wire. */
 export const STATUS_WORDS: Record<HelpTicket["status"], { label: string; variant: "secondary" | "default" | "success" | "outline" }> = {
-  open: { label: "With us", variant: "secondary" },
+  // THE CLIENT'S WORDS, not ours. "Triaged" is our word for having read and
+  // sorted it; what it means to them is that a person here has looked at it. And
+  // "Ready" is our word for every piece of work being done — to them it is us
+  // about to come back with an answer. SCOPE ch.06: the portal shows work
+  // status, and it says it the way the person reading it would.
+  new: { label: "With us", variant: "secondary" },
+  triaged: { label: "Looked at", variant: "secondary" },
   in_progress: { label: "Being worked on", variant: "default" },
+  ready: { label: "Almost there", variant: "default" },
   resolved: { label: "Done", variant: "success" },
-  reopened: { label: "Back with us", variant: "outline" },
 }
 
 export function TicketRow({ ticket }: { ticket: HelpTicket }) {
