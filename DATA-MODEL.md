@@ -599,6 +599,91 @@ the only thing that reads it.
 
 ---
 
+### stories + sprints — KEEP (BUILT 2026-08-12, team migration `0014_stories_and_sprints`) — WHAT WE DO
+
+A ticket is what an account ASKS FOR. A **story** is one piece of work WE do
+about it, and it is **the only place an assignee and a due date live** — a ticket
+deliberately has neither and derives its picture from its stories
+(.plans/BUILD-1 §2).
+
+- **Stories have no type.** The owner settled it: the ticket carries the type,
+  and the process step carries the classification that matters. There is no
+  column for one and no door that accepts one.
+- **`ticket_id` is nullable.** Four out of five stories in the real history stand
+  on their own, with no request behind them.
+- **`step_key` + `changes_no_step` are a PAIR, and one of them is required before
+  a story can be marked done.** Two columns rather than one nullable one, because
+  "nobody filled this in" and "we looked, and it changes no step" are different
+  answers and the savings maths has to be able to tell them apart. It is a step
+  KEY rather than a step id: a key is the same step across every version of a
+  map, and a story outlives the version it was written against.
+- **`title` is not in SCOPE's field list** and was added anyway: a piece of work
+  with no name cannot be read in a list, assigned, or said out loud on a call.
+
+A **sprint** is the block of delivery work sold to one account. It carries
+`sold_price_cents` — **whole cents**, which settled the one open contract between
+this build and the money lane (`workers/tenancy/src/lib/work-engine.ts` used to
+probe `sqlite_master` for which of two spellings had shipped). `completed_at` is
+a MOMENT rather than a status word, because the version cut on the money side
+keys off exactly that.
+
+### work_logs + work_prefs — KEEP (BUILT 2026-08-12, team migration `0015_work_logs`) — THE ROW OF TIME
+
+**A timer is a work log with no end yet.** There is no second table, no session
+object and no state machine: starting is one insert, stopping is one update, and
+the header asks "what am I running?" with one indexed read. That shape is what
+pays for the owner's own acceptance bar — "logging time takes too many clicks"
+was the single thing he named as most likely to make him abandon this.
+
+- **It attaches to a story, a ticket or a task, and nothing else.** Never a to-do
+  (that is the client's time, not ours) and never an account on its own (a figure
+  with no work behind it is one nobody can check). The allow-list is
+  `WORK_LOG_TARGETS` in `workers/content/src/lib/work-logs.ts` — **there is
+  deliberately no CHECK constraint**, because a CHECK would be a second copy only
+  SQLite can see, and in SQLite it cannot be altered without rebuilding the
+  largest table here.
+- **One partial unique index on (user, target) WHERE `ended_at IS NULL`.**
+  Parallel timers on different work are a real day and are allowed; the same
+  person on the same work twice is a double count nobody would spot in a total,
+  so the database refuses it rather than a check a race slips past.
+- **`discarded_at` is how a runaway timer is binned** without deleting anything.
+  The row and the name of whoever binned it survive; every sum subtracts it.
+- **`kind` is nullable on purpose** — a work log will eventually name its kind of
+  work so the margin can group by it. Until then `lib/internal-money.ts` applies
+  the default internal rate and says so on screen.
+
+`work_prefs` is one row per person and today one column: whether starting a timer
+stops the ones they already have running. **Off by default** — a setting that
+silently stopped your other work would be discovered by losing an hour.
+
+### todos + tasks — KEEP (BUILT 2026-08-12, team migration `0016_todos_and_tasks`) — THE OTHER TWO NOUNS
+
+**Two tables, not one with a `kind` column**, and the reason is the one that split
+the two rate cards: they are the same SHAPE and opposite AUDIENCES. A **to-do**
+is aimed at the client and appears in their portal; a **task** is our own admin
+and must never leave the building. One table with a flag would put both a
+forgotten `WHERE` clause apart, and the wrong one of them is a list of the
+agency's internal chores rendered on a customer's screen.
+
+- `todos.account_id` is **NOT NULL** — a to-do with no client is aimed at nobody,
+  and that column is what the fence reads. It is the ONE row in the work engine a
+  client login writes to: they complete it and attach one file.
+- Raising one **emails them**. It is one of only two things in the whole product
+  that reach a customer's inbox (the other is a ticket resolution).
+- `tasks.account_id` is nullable and usually null. **Work logs attach to a task**
+  and never to a to-do — forty minutes on our own VAT return costs us what forty
+  minutes of delivery costs us.
+
+### triage_duty — KEEP (BUILT 2026-08-12, team migration `0017_triage_duty`) — WHOSE WEEK IT IS
+
+A rota keyed by the **Monday**, with a unique index on the week. "One named
+person is on triage duty, and it is visible whose week it is" (.plans/BUILD-1 §6)
+has no answer if two rows claim a week, and a check in code is a check two
+simultaneous writers race past. A row per week rather than a flag on a member,
+because "whose week was it when this was missed?" has to survive.
+
+---
+
 ## Status: what's built vs. to build
 
 - **Built**: users, teams, team_members, invite_index, member_roles,
