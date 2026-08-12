@@ -51,6 +51,7 @@ type TicketRow = {
   rank: string | null
   locked_at: string | null
   archived_at: string | null
+  draft_resolution: string | null
   title_de: string | null
   title_en: string | null
   creator_id: string
@@ -119,12 +120,18 @@ function toTicket(r: TicketRow, scope: AccountScope): HelpTicket {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     accountId: r.account_id,
-    // The work-engine fields. None of these is a staff FACT the way a name is, so
-    // none is redacted: a client is meant to know their own reference number, the
-    // order they dragged their requests into, whether their wording is still
-    // theirs to change, and whether it has been put away. `draft_resolution` is
-    // deliberately NOT here — it is our unsent working text (see setDraftResolution).
+    // The work-engine fields. Most of these are not a staff FACT the way a name
+    // is, so most are not redacted: a client is meant to know their own reference
+    // number, the order they dragged their requests into, whether their wording
+    // is still theirs to change, and whether it has been put away.
+    //
+    // `draftResolution` is the ONE exception, and it goes out to staff only. It
+    // is our unsent working text — each story's closing note, appended as the
+    // work finishes (lib/ready-flip.ts) — so half of it may be wrong and all of
+    // it is written in the register colleagues use with each other. The
+    // resolution a client reads is the one a person SENDS.
     ref: r.ref,
+    draftResolution: scope.kind === "portal" ? null : r.draft_resolution,
     rank: r.rank,
     lockedAt: r.locked_at,
     archivedAt: r.archived_at,
@@ -174,7 +181,7 @@ function toMessage(r: ReplyRow): HelpMessage {
 // uses on an author, and it rides the SAME read as the row so a name and the
 // answer about that name can never come from two different moments.
 const TICKET_COLS = `id, help_type, description, screen_recording_link, source_screen, status, resolved, resolved_at,
-  account_id, ref, rank, locked_at, archived_at, title_de, title_en,
+  account_id, ref, rank, locked_at, archived_at, draft_resolution, title_de, title_en,
   creator_id, creator_name, editor_name, created_at, updated_at,
   EXISTS (SELECT 1 FROM portal_users pu WHERE pu.user_id = help.creator_id) AS raiser_is_client,
   EXISTS (SELECT 1 FROM portal_users pu WHERE pu.user_id = help.editor_id) AS editor_is_client`

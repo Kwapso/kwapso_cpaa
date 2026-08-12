@@ -98,6 +98,9 @@ const ticket: HelpTicket = {
   status: "in_progress",
   resolved: false,
   resolvedAt: null,
+  // Our unsent working text. Present on a STAFF read (this one) and always null
+  // to a client login — lib/help.ts toTicket.
+  draftResolution: null,
   raiserId: "u1",
   raiserName: "Alaap",
   editorName: null,

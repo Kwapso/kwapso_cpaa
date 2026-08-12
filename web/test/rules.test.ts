@@ -435,11 +435,23 @@ describe("RULES — the laws of the base", () => {
         if (/excluded\./.test(stmt)) continue
         if (!/deactivated_at IS (NOT )?NULL/.test(stmt)) offenders.push(`${path} @${idx}`)
       }
-      // Status moves too: a help status UPDATE must carry `status <> ?`.
+      // Status moves too: a help status UPDATE must carry a CURRENT-STATUS
+      // predicate. Two spellings count, and only two:
+      //   • `status <> ?`      — "not already there" (a move to one named state);
+      //   • `status IN (…)` / `status NOT IN (…)` — "only out of these" (a move
+      //     whose ALLOWED starting states are a list, which is what the Ready
+      //     flip needs: a ticket may become ready from new / triaged / in
+      //     progress, and must never be dragged back out of resolved).
+      // The second spelling was added when the flip landed. It is the same law
+      // and, for a list, the stricter statement of it — `<> 'ready'` alone would
+      // have let a RESOLVED ticket be un-answered by a straggler story closing.
+      // The pattern is deliberately anchored to the word `status` so an unrelated
+      // `account_id IN (…)` on the same statement cannot satisfy it.
       let s = -1
       while ((s = src.indexOf("UPDATE help SET status", s + 1)) !== -1) {
         const stmt = src.slice(s, Math.min(src.length, s + 500))
-        if (!/status <>/.test(stmt)) offenders.push(`${path} @${s} (status move without <> predicate)`)
+        if (!/status\s*(?:<>|NOT\s+IN\s*\(|IN\s*\()/.test(stmt))
+          offenders.push(`${path} @${s} (status move without a current-status predicate)`)
       }
     }
     expect(
@@ -453,6 +465,10 @@ describe("RULES — the laws of the base", () => {
       ["workers/tenancy/src/lib/selectable.ts", "setSelectableActive"],
       ["workers/content/src/lib/learning.ts", "setLearningActive"],
       ["workers/content/src/lib/help.ts", "setStatus"],
+      // The Ready flip is a status writer like any other, and the one with the
+      // most to lose from a double: it fires off the back of a story closing, and
+      // a story close is exactly the kind of thing a person double-clicks.
+      ["workers/content/src/lib/ready-flip.ts", "readyFlipForTicket"],
     ] as const) {
       const src = read(join(ROOT, ...file.split("/")))
       // THE FUNCTION, not the rest of the file. This window used to run to EOF,

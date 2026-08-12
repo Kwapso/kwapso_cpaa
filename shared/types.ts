@@ -261,6 +261,14 @@ export type HelpTicket = {
    * `titleDe` exactly as the person wrote it. */
   titleDe: string | null
   titleEn: string | null
+  /** OUR UNSENT WORKING TEXT — what we will tell them when the request is
+   * answered, assembled from each story's closing note as the work finishes so
+   * nobody is composing from a blank page at the end of a fortnight.
+   *
+   * Null on the way OUT to a client login, always. It is a draft: half of it may
+   * be wrong, and all of it is written in the register colleagues use with each
+   * other. The resolution the client reads is the one a person SENDS. */
+  draftResolution: string | null
   /** Who raised it, and who last touched it. All three are null on the way OUT,
    * and only to a client login, when the person is on the AGENCY's side of the
    * fence — SCOPE ch.06, "the portal shows work status but never which staff

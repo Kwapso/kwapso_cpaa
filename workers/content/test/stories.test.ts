@@ -333,3 +333,113 @@ describe("a client login cannot reach the work engine at all", () => {
     expect(db().prepare(`SELECT COUNT(*) AS n FROM stories`).get()).toEqual({ n: 0 })
   })
 })
+
+// THE TICKET↔STORY TRANSACTION (.plans/BUILD-1 §2 + §4). SCOPE ch.07: a ticket
+// flips to READY when the last of its stories closes — and the flip rides the
+// SAME call as the close, because a client is watching the request and a portal
+// that says "in progress" after the last piece of work is done is lying about
+// the thing the portal is for.
+describe("the Ready flip", () => {
+  /** Raise a ticket and hand back its id. */
+  async function addTicket(description: string): Promise<string> {
+    const res = await call(IDS.staffUser, "POST /api/content/help", {
+      description,
+      accountId: IDS.victimAccount,
+    })
+    expect(res.status).toBe(200)
+    return (db().prepare(`SELECT id FROM help WHERE description = ?`).get(description) as { id: string }).id
+  }
+  const ticketRow = (id: string) =>
+    db().prepare(`SELECT * FROM help WHERE id = ?`).get(id) as Record<string, string | number | null>
+
+  it("does NOT flip while any piece of work is still outstanding", async () => {
+    const ticket = await addTicket("Two jobs to do")
+    const a = await addStory({ title: "First", ticketId: ticket, changesNoStep: true })
+    await addStory({ title: "Second", ticketId: ticket, changesNoStep: true })
+    await call(IDS.staffUser, "POST /api/content/stories/status", { id: a, status: "done" })
+    expect(ticketRow(ticket).status).toBe("new")
+  })
+
+  it("flips the moment the LAST one closes, in the same call", async () => {
+    const ticket = await addTicket("One job to do")
+    const only = await addStory({ title: "The only one", ticketId: ticket, changesNoStep: true })
+    const res = await call(IDS.staffUser, "POST /api/content/stories/status", { id: only, status: "done" })
+    expect(res.status).toBe(200)
+    // One call. Nothing else has run in between, and the ticket is already there.
+    expect(ticketRow(ticket).status).toBe("ready")
+    expect(historyFor(ticket)).toContain("Ticket ready")
+  })
+
+  it("R17 — a re-run close moves no rows and writes no second 'Ticket ready'", async () => {
+    const ticket = await addTicket("Do it once")
+    const only = await addStory({ title: "Once", ticketId: ticket, changesNoStep: true })
+    await call(IDS.staffUser, "POST /api/content/stories/status", { id: only, status: "done" })
+    const stamp = ticketRow(ticket).updated_at
+    await call(IDS.staffUser, "POST /api/content/stories/status", { id: only, status: "done" })
+    expect(historyFor(ticket).filter((t) => t === "Ticket ready")).toHaveLength(1)
+    // …and the ticket did not re-sort to the top of somebody's list for nothing.
+    expect(ticketRow(ticket).updated_at).toBe(stamp)
+  })
+
+  it("never drags a RESOLVED ticket back out of resolved", async () => {
+    const ticket = await addTicket("Answered already")
+    const straggler = await addStory({ title: "Tidy up afterwards", ticketId: ticket, changesNoStep: true })
+    await call(IDS.staffUser, "POST /api/content/help/status", { id: ticket, status: "resolved" })
+    await call(IDS.staffUser, "POST /api/content/stories/status", { id: straggler, status: "done" })
+    // The client has been told. Un-answering their request because a loose end
+    // was tidied up afterwards would be the worst kind of "helpful".
+    expect(ticketRow(ticket).status).toBe("resolved")
+    expect(historyFor(ticket)).not.toContain("Ticket ready")
+  })
+
+  it("a ticket with no stories at all is never flipped by somebody else's close", async () => {
+    const bare = await addTicket("Nobody has planned this yet")
+    const other = await addTicket("A different request")
+    const s = await addStory({ title: "Work on the other one", ticketId: other, changesNoStep: true })
+    await call(IDS.staffUser, "POST /api/content/stories/status", { id: s, status: "done" })
+    expect(ticketRow(bare).status).toBe("new")
+    expect(ticketRow(other).status).toBe("ready")
+  })
+
+  it("each closing note lands in the ticket's DRAFT, in the order the work finished", async () => {
+    const ticket = await addTicket("Two halves, two sentences")
+    const a = await addStory({ title: "First half", ticketId: ticket, changesNoStep: true })
+    const b = await addStory({ title: "Second half", ticketId: ticket, changesNoStep: true })
+    await call(IDS.staffUser, "POST /api/content/stories/status", {
+      id: a,
+      status: "done",
+      closingNote: "Drivers now see the run sheet on the phone.",
+    })
+    await call(IDS.staffUser, "POST /api/content/stories/status", {
+      id: b,
+      status: "done",
+      closingNote: "The back-office screen shows the same list.",
+    })
+    expect(ticketRow(ticket).draft_resolution).toBe(
+      "Drivers now see the run sheet on the phone.\n\nThe back-office screen shows the same list."
+    )
+  })
+
+  it("the draft is OURS — a client reading their own ticket is never sent it", async () => {
+    const ticket = await addTicket("A request from the client's own company")
+    const s = await addStory({ title: "Work", ticketId: ticket, changesNoStep: true })
+    await call(IDS.staffUser, "POST /api/content/stories/status", {
+      id: s,
+      status: "done",
+      closingNote: "Internal wording: tell them the import is fixed, don't mention the retry loop.",
+    })
+    const staffRead = (await (
+      await call(IDS.staffUser, "GET /api/content/help", undefined, `?id=${ticket}`)
+    ).json()) as { tickets: { draftResolution: string | null }[] }
+    expect(staffRead.tickets[0].draftResolution).toContain("don't mention the retry loop")
+
+    // IDS.contactUser is a client login at the same company — they can read the
+    // ticket, and the draft must not be on the wire, not merely undrawn.
+    const clientRead = await call(IDS.contactUser, "GET /api/content/help", undefined, `?id=${ticket}`)
+    const body = await clientRead.text()
+    expect(body).not.toContain("retry loop")
+    expect((JSON.parse(body) as { tickets: { draftResolution: string | null }[] }).tickets[0].draftResolution).toBe(
+      null
+    )
+  })
+})

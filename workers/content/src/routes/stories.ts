@@ -39,6 +39,7 @@ import {
   type StoryInput,
   type SprintInput,
 } from "../lib/stories"
+import { readyFlipForTicket } from "../lib/ready-flip"
 import type { Env } from "../env"
 
 /** THE FILTERS THIS DOOR PARSES — read once, in one place, so the list and its
@@ -125,14 +126,22 @@ export async function postUpdateStory(request: Request, env: Env): Promise<Respo
 }
 
 /** POST /api/content/stories/status — move a story along its fixed lifecycle
- * (work:edit).
+ * (work:edit), and — when the move CLOSES it — settle the ticket half in the
+ * same call: the closing note lands in the ticket's draft resolution, and the
+ * ticket flips to READY if that was the last piece of work outstanding.
  *
- * Closing one requires that it names the process step it changed, or says it
- * changed none (lib/stories refuseUnstepped) — the hook every savings figure
- * hangs off, refused rather than defaulted.
+ * ONE CALL on purpose (BUILD-1 §2: "closing a story is a transaction with the
+ * ticket's Ready flip"). A client is watching their request; if the last story
+ * goes done and the request still says "in progress" because a second call had
+ * not been made yet, the portal is lying about the thing the portal is for.
  *
- * R17: the `status <> ?` predicate rides the UPDATE, so a double-clicked Done
- * moves zero rows, writes no second history line and pings nothing. */
+ * Closing also requires that the story names the process step it changed, or
+ * says it changed none (lib/stories refuseUnstepped) — the hook every savings
+ * figure hangs off, refused rather than defaulted.
+ *
+ * R17 twice over: the story move carries `status <> ?` and the ticket flip
+ * carries its own `status IN (…)`, so a double-clicked Done moves zero rows,
+ * writes no second history line and pings nothing — on either row. */
 export async function postStoryStatus(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<{
     id?: unknown
@@ -145,7 +154,7 @@ export async function postStoryStatus(request: Request, env: Env): Promise<Respo
     return fail(400, "invalid_input", "id and a valid status are required.")
   const closingNote = optionalText(body.closingNote, "Closing note", TEXT_LIMITS.long) ?? null
 
-  const { moved, accountId } = await setStoryStatus(
+  const { moved, story, ticketId, accountId } = await setStoryStatus(
     cfg,
     guard,
     actor,
@@ -154,6 +163,22 @@ export async function postStoryStatus(request: Request, env: Env): Promise<Respo
     closingNote
   )
   if (moved) await publishChange(env, guard.teamId, "stories", id, "edit", accountId ?? undefined)
+  // THE TICKET HALF. Reached only when a row actually moved, and only when the
+  // move was a CLOSE: a story going to in-review has changed nothing about
+  // whether the request is finished, and re-running a close that already
+  // happened moves zero rows above and never arrives here at all.
+  if (moved && story.status === "done" && ticketId) {
+    // The story's OWN settled note, not the one on this request: a note typed
+    // days ago on the story's edit form is still what we said we would tell the
+    // client, and closing without re-typing it must not lose it. (Close, reopen,
+    // close again and the paragraph appends twice — which is a draft somebody
+    // then edits, not a message anybody received.)
+    const flip = await readyFlipForTicket(cfg, guard, actor, ticketId, story.closingNote)
+    // The ping carries the ticket's OWN account, so the people who raised the
+    // request — and nobody else — watch it turn ready on their own screen.
+    if (flip.moved)
+      await publishChange(env, guard.teamId, "help", ticketId, "edit", flip.accountId ?? undefined)
+  }
   return storyPage(cfg, guard, storyFilterFrom(new URL(request.url)), null)
 }
 
