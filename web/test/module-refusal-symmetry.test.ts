@@ -131,7 +131,7 @@ describe("a module refuses a client login on both halves, or on neither", () => 
     expect(
       [...agencyOnly].sort(),
       "the modules whose reads refuse a client login — if this set shrinks, a read door lost its refusal"
-    ).toEqual(["agent", "knowledge", "learning", "selectable_data"])
+    ).toEqual(["agent", "commercials", "knowledge", "learning", "selectable_data"])
     //
     // `commercials` joined the set the day the money shipped, and it is the
     // clearest member of it: BOTH rate cards and the margin are the agency's own
@@ -142,10 +142,6 @@ describe("a module refuses a client login on both halves, or on neither", () => 
     // and the audit block naming who set the price. `processes` is deliberately
     // NOT here: its reads are FENCED rather than refused, because a process map
     // is the client's own way of working and they read theirs.
-    expect(
-      [...agencyOnly].sort(),
-      "the modules whose reads refuse a client login — if this set shrinks, a read door lost its refusal"
-    ).toEqual(["agent", "commercials", "learning", "selectable_data"])
 
     const asymmetric = doors
       .filter((d) => agencyOnly.has(d.module) && d.right !== "read" && !d.refuses)

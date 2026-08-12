@@ -641,11 +641,13 @@ export type KnowledgeAnswer = {
   citations: KnowledgeCitation[]
   /** how many chunks the search considered (the bounded candidate set) */
   candidates: number
+}
+
 // ── Process maps, versions and the money (SCOPE ch.02 · .plans/BUILD-3) ───────
 // App → Process → Step, and the two rate cards. The one rule these shapes carry
 // on their face: an INTERNAL number (what our own hour costs, what an app costs
 // us to run, what a margin is) is a separate type from anything the client side
-// can ask for — never an optional field on a shared one. See R23.
+// can ask for — never an optional field on a shared one. See R24.
 
 /** An App: the built system, the thing with its own address (SCOPE ch.02). */
 export type AppRow = {

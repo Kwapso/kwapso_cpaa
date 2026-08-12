@@ -104,8 +104,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
     // deep-link shells (their own clean URLs, active team from context). Serve the
     // module's shell for any sub-path (e.g. /accounts/<id>); the bare /accounts is a
     // real static file served below.
-    for (const mod of ["accounts", "learning", "tickets", "knowledge"]) {
-    for (const mod of ["accounts", "learning", "tickets", "processes"]) {
+    for (const mod of ["accounts", "learning", "tickets", "knowledge", "processes"]) {
       if (pathname.startsWith(`/${mod}/`)) {
         const shell = new URL(request.url)
         shell.pathname = `/${mod}`

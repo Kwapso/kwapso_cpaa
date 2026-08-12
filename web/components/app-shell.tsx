@@ -216,9 +216,21 @@ export function AppShell({
 
   return (
     <div className="flex min-h-[100svh]">
-      {/* Desktop sidebar (collapsible to an icon rail) */}
+      {/* Desktop sidebar (collapsible to an icon rail).
+       *
+       * PINNED TO THE WINDOW, NOT THE PAGE. The sidebar is a flex child of a
+       * min-h-screen row, so without an explicit height it stretches to the
+       * TALLEST column — the main one. On a long list that is thousands of
+       * pixels, and `mt-auto` then parks the profile / theme / collapse row at
+       * the bottom of the DOCUMENT instead of the bottom of the window. Home
+       * looked fine only because it is short enough to fit. The tell was the
+       * flash: the block rendered in view while the list was still empty, then
+       * left the screen the instant the rows arrived. h-[100svh] + sticky keeps
+       * the rail exactly one window tall whatever the main column does, and
+       * overflow-y-auto lets the nav scroll inside itself as modules are added
+       * rather than pushing the bottom row off again. */}
       <aside
-        className={`hidden shrink-0 flex-col border-r md:flex ${collapsed ? "w-16 items-center" : "w-60"}`}
+        className={`hidden shrink-0 flex-col border-r md:sticky md:top-0 md:flex md:h-[100svh] md:overflow-y-auto ${collapsed ? "w-16 items-center" : "w-60"}`}
       >
         <div className={collapsed ? "py-3" : "p-3"}>
           <TeamSwitcher

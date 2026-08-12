@@ -361,6 +361,11 @@ export const knowledgeListRecipe: ScreenRecipe = {
       { field: "kind", label: "Kind", control: "select" },
       { field: "filed", label: "Filed under", control: "select" },
       { field: "state", label: "Status", control: "select" },
+    ],
+    { paged: true }
+  ),
+}
+
 /* ------------------------------ process maps ------------------------------ */
 
 /** Process maps list — every way of working we have mapped, with the app it sits

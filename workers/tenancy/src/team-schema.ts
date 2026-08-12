@@ -576,44 +576,6 @@ CREATE TABLE knowledge_sources (
   content_hash TEXT,
   indexed_at TEXT,
   chunk_count INTEGER NOT NULL DEFAULT 0,
-    // PROCESS MAPS, THEIR VERSIONS, AND THE MONEY (SCOPE ch.02 + .plans/BUILD-3).
-    //
-    // The number 0012 leaves 0011 to the work-engine lane, which is building
-    // alongside this one and has already taken it (`0011_ticket_work_engine`).
-    // The runner applies this array in order and records each `version` string,
-    // so a gap is a key that never existed, not a missing step — and when the two
-    // lanes merge the order is already right.
-    //
-    // WHAT THIS BUILD OWNS, and what it borrows: it owns the chain App → Process
-    // → Step, the versions cut over it, the comments a client leaves on a map,
-    // and the two rate cards. It borrows exactly two facts from the work engine —
-    // a story's `step` (which step a piece of work changed) and a sprint's
-    // `sold_price` (what was sold) — and it never writes either.
-    version: "0013_process_maps_and_money",
-    sql: `
--- AN APP is the built system: the thing with its own address and its own stage
--- (SCOPE ch.02). Not the goal — a client wanting dispatch fixed, served by a
--- driver app and a back-office screen, is TWO rows here.
---
--- \`account_id\` is whose system it is, and it is written once at creation and
--- never edited: every process, version, step and comment beneath it carries the
--- same account so the fence rides one clause with no join (the shape
--- \`help.account_id\` already has). There is deliberately no "move this app to
--- another account" door — moving one would silently re-publish a whole map, its
--- savings and its conversation into somebody else's portal. NULL is the agency's
--- own system, which belongs to no client and so appears in no portal.
---
--- \`tool_cost_cents_per_month\` is what this app costs US to keep running
--- (hosting, the services behind it). It is a column rather than a table because
--- a cost line with no history is one number about one app, and margin is the
--- only thing that reads it — internal, always.
-CREATE TABLE apps (
-  id TEXT PRIMARY KEY,
-  account_id TEXT REFERENCES accounts (id),
-  name TEXT NOT NULL,
-  url TEXT,
-  stage TEXT,
-  tool_cost_cents_per_month INTEGER NOT NULL DEFAULT 0 CHECK (tool_cost_cents_per_month >= 0),
   created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
   updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
   deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
@@ -687,6 +649,52 @@ SELECT lower(hex(randomblob(16))), r.id, 'knowledge', r.is_default, r.is_default
   FROM member_roles r
  WHERE NOT EXISTS (
    SELECT 1 FROM role_permissions p WHERE p.role_id = r.id AND p.module = 'knowledge'
+ );
+`,
+  },
+  {
+    // PROCESS MAPS, THEIR VERSIONS, AND THE MONEY (SCOPE ch.02 + .plans/BUILD-3).
+    //
+    // The number 0012 leaves 0011 to the work-engine lane, which is building
+    // alongside this one and has already taken it (`0011_ticket_work_engine`).
+    // The runner applies this array in order and records each `version` string,
+    // so a gap is a key that never existed, not a missing step — and when the two
+    // lanes merge the order is already right.
+    //
+    // WHAT THIS BUILD OWNS, and what it borrows: it owns the chain App → Process
+    // → Step, the versions cut over it, the comments a client leaves on a map,
+    // and the two rate cards. It borrows exactly two facts from the work engine —
+    // a story's `step` (which step a piece of work changed) and a sprint's
+    // `sold_price` (what was sold) — and it never writes either.
+    version: "0013_process_maps_and_money",
+    sql: `
+-- AN APP is the built system: the thing with its own address and its own stage
+-- (SCOPE ch.02). Not the goal — a client wanting dispatch fixed, served by a
+-- driver app and a back-office screen, is TWO rows here.
+--
+-- \`account_id\` is whose system it is, and it is written once at creation and
+-- never edited: every process, version, step and comment beneath it carries the
+-- same account so the fence rides one clause with no join (the shape
+-- \`help.account_id\` already has). There is deliberately no "move this app to
+-- another account" door — moving one would silently re-publish a whole map, its
+-- savings and its conversation into somebody else's portal. NULL is the agency's
+-- own system, which belongs to no client and so appears in no portal.
+--
+-- \`tool_cost_cents_per_month\` is what this app costs US to keep running
+-- (hosting, the services behind it). It is a column rather than a table because
+-- a cost line with no history is one number about one app, and margin is the
+-- only thing that reads it — internal, always.
+CREATE TABLE apps (
+  id TEXT PRIMARY KEY,
+  account_id TEXT REFERENCES accounts (id),
+  name TEXT NOT NULL,
+  url TEXT,
+  stage TEXT,
+  tool_cost_cents_per_month INTEGER NOT NULL DEFAULT 0 CHECK (tool_cost_cents_per_month >= 0),
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
 CREATE INDEX idx_apps_account ON apps (account_id);
 
 -- A PROCESS is a way of working inside an app. It is the thing that is VERSIONED

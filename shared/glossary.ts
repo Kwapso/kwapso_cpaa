@@ -64,7 +64,6 @@ export const GLOSSARY = {
   // drilled through. `app` is the one word this build shares with the work-engine
   // lane (.plans/BUILD-1 §9 ports it too); the definition below is that lane's,
   // word for word, so a merge keeps one line rather than choosing between two.
-  app: { term: "App", def: "A system we build for an account — the thing with its own address. One goal can need two." },
   process: { term: "Process", def: "A way of working inside an app — the steps someone takes to get one job done." },
   step: { term: "Step", def: "One part of a process. It carries how long it takes and how often it runs." },
   processVersion: { term: "Version", def: "A process as it was at one moment. Version 1 is how they worked before us; each later one is what we changed it to." },

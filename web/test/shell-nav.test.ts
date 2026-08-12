@@ -53,3 +53,45 @@ describe("the one shell — no reload on in-app navigation", () => {
     expect(read("components/deep-link-screen.tsx")).toContain("registerHostGo(go)")
   })
 })
+
+describe("the shell's own chrome stays on screen", () => {
+  // The sidebar's LAST row — profile, theme, collapse — is placed with `mt-auto`,
+  // i.e. "the bottom of the rail". That is only the bottom of the WINDOW while the
+  // rail is exactly one window tall. As a bare flex child it stretches to the
+  // tallest column instead, so on a long list the row sat at the bottom of a
+  // several-thousand-pixel document and left the screen the moment the rows
+  // arrived — visible on Home (short) and nowhere else. Height + sticky are what
+  // make `mt-auto` mean what it reads as.
+  const asideTag = () => {
+    const src = read("components/app-shell.tsx")
+    const open = src.indexOf("<aside")
+    expect(open, "app-shell must still render an <aside> rail").toBeGreaterThan(-1)
+    return src.slice(open, src.indexOf(">", open))
+  }
+
+  it("the desktop rail is exactly one window tall, and pinned there", () => {
+    const tag = asideTag()
+    expect(tag, "the rail must be one window tall — without it, it stretches to the page")
+      .toContain("md:h-[100svh]")
+    expect(tag, "the rail must stay pinned as the main column scrolls").toContain("md:sticky")
+  })
+
+  it("a rail taller than the window scrolls inside itself, not off the bottom", () => {
+    // Every new module adds a nav row. Past ~a dozen on a short screen the rail
+    // overflows, and without this the bottom row is clipped exactly as before.
+    expect(asideTag(), "the rail must scroll internally once the nav outgrows it")
+      .toContain("md:overflow-y-auto")
+  })
+
+  it("the bottom row is still the thing being held down there", () => {
+    // If this ever stops being mt-auto the two tests above are guarding nothing.
+    // Anchored on the class list, not the bare word — the comment above the
+    // <aside> discusses mt-auto in prose, and matched first.
+    const src = read("components/app-shell.tsx")
+    const bottom = src.indexOf("mt-auto flex")
+    expect(bottom, "the profile/theme/collapse row must still be bottom-anchored").toBeGreaterThan(-1)
+    const row = src.slice(bottom, bottom + 400)
+    expect(row).toContain("<ProfileMenu")
+    expect(row).toContain("<ModeToggle")
+  })
+})
