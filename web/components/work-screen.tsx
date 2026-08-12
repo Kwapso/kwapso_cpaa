@@ -35,6 +35,7 @@ import { LoadMore } from "@/components/load-more"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { SprintFormDialog, type SprintFormValues } from "@/components/sprint-form-dialog"
 import { StoryFormDialog, type StoryFormValues } from "@/components/story-form-dialog"
+import { TimePanel } from "@/components/time-panel"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import { helpKey, listFetch, sprintsKey, storiesKey } from "@/lib/live-resources"
 import { withDataDrivenCollection } from "@/lib/screens"
@@ -252,6 +253,11 @@ export function WorkScreen({
           Start a sprint
         </Button>
       )}
+
+      {/* Time, under the work it is against. BUILD-1 §5: one click is the
+          acceptance bar — the Start control is on the header bar once a timer is
+          running, and this is where a person sees where their week went. */}
+      <TimePanel teamId={teamId} canCreate={canCreate} />
 
       <StoryFormDialog
         open={storyOpen}

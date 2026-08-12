@@ -940,6 +940,118 @@ export const SHARED_TOOLS: SharedTool[] = [
       summarize: (i) => `${i.complete === true ? "Complete" : "Reopen"} sprint ${str(i, "id")}`,
     },
   },
+  /* ---------------------------------- time ---------------------------------- */
+  // "Logging time takes too many clicks" is the thing the owner named as most
+  // likely to make him abandon this (.plans/BUILD-1 §5), and a machine surface is
+  // one of the answers to it: "start a timer on the dispatch story" said out loud
+  // is fewer clicks than any screen can be. So the assistant can start, stop and
+  // write time down — and it can NEVER edit somebody's hours, which is a
+  // different act entirely (see the note on update_work_log's absence below).
+  {
+    name: "list_work_logs",
+    summary:
+      "List rows of time — who worked on what, and for how long in whole seconds. Filters: `scope` ('mine' for the caller's own, 'all' otherwise), `targetTable` + `targetId` (the time against one story or ticket), and `userId`. Returns ONE page plus the exact `total` (rows), `totalSeconds` (the number anybody actually wants), `hasMore` and an opaque `nextCursor` — call again passing that as `cursor` to read further. Binned runaway timers are never in the list.",
+    binding: "CONTENT", method: "GET", path: "/api/content/work-logs",
+    schema: obj({ scope: S, targetTable: S, targetId: S, userId: S, cursor: S }),
+    buildQuery: (i) => {
+      const q: string[] = []
+      for (const k of ["scope", "targetTable", "targetId", "userId", "cursor"])
+        if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
+      return q.length ? `?${q.join("&")}` : ""
+    },
+    agent: { write: false, summarize: (i) => (str(i, "scope") === "mine" ? "List my time" : "List logged time") },
+  },
+  {
+    name: "list_running_timers",
+    summary:
+      "What the caller has running RIGHT NOW — one row per timer, with what it is on, when it started and how many whole seconds it has been going. `runaway` is true once one has been running more than eight hours, which is the prompt to ask what they want done about it.",
+    binding: "CONTENT", method: "GET", path: "/api/content/work-logs/running",
+    schema: obj({}),
+    buildQuery: () => "",
+    agent: { write: false, summarize: () => "Check my running timers" },
+  },
+  {
+    name: "start_timer",
+    summary:
+      "Start a timer on a story or a ticket — `targetTable` is 'stories' or 'help' and `targetId` is that row's id. Time is logged against a story, a ticket or a task and NOTHING else: never a to-do (that is the client's time, not ours) and never an account on its own. Parallel timers on different things are fine; starting a second one on the SAME thing is refused. The start moment is the server's clock, never a time you pass.",
+    binding: "CONTENT", method: "POST", path: "/api/content/work-logs/start",
+    schema: obj({ targetTable: S, targetId: S, note: S, kind: S }, ["targetTable", "targetId"]),
+    buildBody: (i) => ({
+      targetTable: str(i, "targetTable"),
+      targetId: str(i, "targetId"),
+      note: opt(i, "note"),
+      kind: opt(i, "kind"),
+    }),
+    agent: {
+      write: true,
+      confirm: false,
+      summarize: (i) => `Start a timer on ${str(i, "targetTable") === "help" ? "ticket" : "story"} ${str(i, "targetId")}`,
+    },
+  },
+  {
+    name: "stop_timer",
+    summary:
+      "Stop one of the caller's running timers, by the timer's id (from list_running_timers). `endedAt` is optional and is how 'it really stopped at five o'clock on Friday' is said — leave it off and it stops now. Stopping an already-stopped timer changes nothing.",
+    binding: "CONTENT", method: "POST", path: "/api/content/work-logs/stop",
+    schema: obj({ id: S, endedAt: S }, ["id"]),
+    buildBody: (i) => ({ id: str(i, "id"), endedAt: opt(i, "endedAt") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Stop timer ${str(i, "id")}` },
+  },
+  {
+    name: "log_time",
+    summary:
+      "Write time down by hand, for work already finished. `startedAt` and `endedAt` are ISO moments and the duration is computed FROM them — there is no field for a number of hours, because two moments can be checked afterwards and a number cannot. `billable` defaults to true. Same targets as start_timer: a story or a ticket, never a to-do and never an account.",
+    binding: "CONTENT", method: "POST", path: "/api/content/work-logs",
+    schema: obj(
+      { targetTable: S, targetId: S, startedAt: S, endedAt: S, note: S, kind: S, billable: B },
+      ["targetTable", "targetId", "startedAt", "endedAt"]
+    ),
+    buildBody: (i) => ({
+      targetTable: str(i, "targetTable"),
+      targetId: str(i, "targetId"),
+      startedAt: str(i, "startedAt"),
+      endedAt: str(i, "endedAt"),
+      note: opt(i, "note"),
+      kind: opt(i, "kind"),
+      // R22 — forwarded ALWAYS, never conditionally. An `undefined` here would
+      // mean the door never sees the field a caller deliberately set, and the
+      // door's own default (billable on) would quietly overrule them.
+      billable: i.billable !== false,
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Log time on ${str(i, "targetId")}` },
+  },
+  {
+    name: "resolve_runaway_timer",
+    summary:
+      "Answer for a timer left running (from list_running_timers, where `runaway` is true). Three answers and no fourth — `answer`: 'keep' (it really did run that long; stop it now), 'stopAt' (it ran until the moment in `at`), or 'discard' (nothing happened; the row is kept and marked binned, and every total subtracts it). Nothing is ever stopped automatically: a number a person did not choose is a number nobody can defend.",
+    binding: "CONTENT", method: "POST", path: "/api/content/work-logs/runaway",
+    schema: obj({ id: S, answer: S, at: S }, ["id", "answer"]),
+    buildBody: (i) => ({ id: str(i, "id"), answer: str(i, "answer"), at: opt(i, "at") }),
+    agent: {
+      write: true,
+      // CONFIRM on the destructive answer only. "Keep" and "stop it at five" are
+      // ordinary stops; "discard" strikes hours off a timesheet, which is the one
+      // answer somebody would want to have been asked about.
+      confirm: (i) => str(i, "answer") === "discard",
+      summarize: (i) =>
+        str(i, "answer") === "discard"
+          ? `Bin the runaway timer ${str(i, "id")}`
+          : `Stop the runaway timer ${str(i, "id")}`,
+    },
+  },
+  {
+    name: "set_timer_auto_stop",
+    summary:
+      "The caller's OWN preference: does starting a timer stop the ones they already have running? Off by default, because working on two things in a morning is ordinary and a setting that silently stopped the other one would be discovered by losing an hour.",
+    binding: "CONTENT", method: "POST", path: "/api/content/work-logs/auto-stop",
+    schema: obj({ on: B }, ["on"]),
+    buildBody: (i) => ({ on: i.on === true }),
+    agent: {
+      write: true,
+      confirm: false,
+      summarize: (i) => `Turn auto-stop ${i.on === true ? "on" : "off"} for my timers`,
+    },
+  },
   /* ------------------------------- knowledge ------------------------------- */
   // THE ASSISTANT IS NOT JUST A READER HERE (the owner's own words): it can ask
   // the knowledge base a question AND add, correct or take away a source — each
@@ -1459,6 +1571,14 @@ export const TOOL_GATES: Record<string, string> = {
   rank_story: "work:edit",
   create_sprint: "work:create",
   complete_sprint: "work:edit",
+  // TIME. Logging your OWN is a create, not an edit — a person who may do the
+  // work may say how long it took them. Correcting a row that already exists is
+  // `work:edit`, and there is deliberately no tool on that door (see MCP.md).
+  start_timer: "work:create",
+  stop_timer: "work:create",
+  log_time: "work:create",
+  resolve_runaway_timer: "work:create",
+  set_timer_auto_stop: "work:create",
   // The AGENT-ONLY writes (no MCP tool — they're built around the confirm panel a
   // headless client hasn't got). Listed for the same reason as the rest: the gate
   // is what isPrivilegeWrite reads, and a write with no line is a write the PATH

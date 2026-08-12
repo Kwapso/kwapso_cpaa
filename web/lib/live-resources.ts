@@ -130,6 +130,15 @@ export const listFetch = {
       primeCache(cursorKey(storiesKey(teamId)), r.nextCursor)
       return r.stories
     }),
+  // R14: time is PAGED — 2,940 rows arrived from two years of the previous
+  // system and every piece of work produces several more.
+  workLogs: (teamId: string) =>
+    contentApi.workLogs().then((r) => {
+      primeCache(totalKey("work-logs", teamId), r.total)
+      primeCache(totalKey("work-seconds", teamId), r.totalSeconds)
+      primeCache(cursorKey(workLogsKey(teamId)), r.nextCursor)
+      return r.logs
+    }),
   // Sprints are BOUNDED, not paged (a block of sold work grows at the speed of
   // contracts), so there is no cursor sidecar to prime — just the exact total.
   sprints: (teamId: string) =>
@@ -147,6 +156,17 @@ export function storiesKey(teamId: string): string {
 }
 export function sprintsKey(teamId: string): string {
   return `sprints:${teamId}`
+}
+
+/** The paged list of TIME, and — separately — the caller's running timers, which
+ * the header of every screen holds. Two keys because they answer two questions
+ * with two lifetimes: a page of somebody's week is opened deliberately, and the
+ * header's question is asked everywhere. */
+export function workLogsKey(teamId: string): string {
+  return `work-logs:${teamId}`
+}
+export function runningTimersKey(teamId: string): string {
+  return `running-timers:${teamId}`
 }
 
 /** The process-map list's cache key (the paged maps list). */
@@ -371,6 +391,18 @@ export const TEAM_RESOURCES: Record<
     fetchOne: (id) => contentApi.sprintOne(id),
     fetchList: (t) => listFetch.sprints(t),
     deps: (_t, id) => [`activity:record:sprints:${id}`],
+  },
+  // TIME — row-level live, and the one resource whose ping most often lands on
+  // the person who caused it: the header timer is on every screen, so starting
+  // one in a dialog has to show up in the bar above it without a reload. The deps
+  // carry the two things a row of time changes besides itself — the running-timer
+  // bar, and the backlog, whose stories now have more hours against them.
+  work_logs: {
+    key: (t) => workLogsKey(t),
+    idField: "id",
+    fetchOne: (id) => contentApi.workLogOne(id),
+    fetchList: (t) => listFetch.workLogs(t),
+    deps: (t, id) => [runningTimersKey(t), storiesKey(t), `activity:record:work_logs:${id}`],
   },
   // A rate card ping carries the ACCOUNT it sits on — a card is only ever read on
   // its account's own screen, so the account is the row a listener can act on.

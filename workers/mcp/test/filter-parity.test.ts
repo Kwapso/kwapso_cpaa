@@ -94,6 +94,9 @@ const TOOLLESS_DOORS: Record<string, string> = {
   "POST /api/content/learning/upload":
     "shovels bytes — an image or short clip as a base64 data URL, up to 25 MB — into the learning-media bucket and hands back a URL to paste into an article. It writes no row and leaves no record of its own. One call on this surface may ANSWER with 400,000 characters; a 25 MB base64 argument is two orders of magnitude past what it is built to carry. A machine writes the article, and references media it already has a URL for.",
 
+  "POST /api/content/work-logs/update":
+    "CORRECTING somebody's hours, which is a different act from logging your own and is gated a step higher (work:edit rather than work:create). The machine surface can start a timer, stop one, write time down and answer for a runaway — everything a person does about their OWN time — but a timesheet correction is the one write in this module that changes a number after the fact, and time is the record here that turns into money. It leaves a trail either way (lib/work-logs editWorkLog writes one); the reason it has no tool is that nobody should be able to say 'make last Tuesday four hours' to an assistant and have it happen. A person opens the row.",
+
   /* -------------------------------- auth --------------------------------- */
   "POST /api/auth/email/start":
     "the sign-in exchange, step one: post an address and a 6-digit code is emailed to the person. A machine holds a token that is the finished RESULT of somebody doing this, and the code appears nowhere but a human's inbox — by law, in every environment.",

@@ -19,8 +19,10 @@ import type {
   KnowledgeSource,
   Learning,
   LearningProgressEntry,
+  RunningTimer,
   Sprint,
   Story,
+  WorkLog,
 } from "@shared/types"
 import { api, enc, post } from "@shared/web/api"
 import type { PagedResponse } from "@shared/web/api"
@@ -51,6 +53,25 @@ export type StoryWrite = {
   startsOn?: string
   dueOn?: string
   accountId?: string
+}
+
+/** The facets the work-log list door parses. */
+export type LogQuery = {
+  scope?: "mine" | "all"
+  targetTable?: string
+  targetId?: string
+  userId?: string
+}
+
+function logQuery(filter: LogQuery | undefined, cursor: string | null | undefined): string {
+  const q = new URLSearchParams()
+  if (filter?.scope) q.set("scope", filter.scope)
+  if (filter?.targetTable) q.set("targetTable", filter.targetTable)
+  if (filter?.targetId) q.set("targetId", filter.targetId)
+  if (filter?.userId) q.set("userId", filter.userId)
+  if (cursor) q.set("cursor", cursor)
+  const s = q.toString()
+  return s ? `?${s}` : ""
 }
 
 function storyQuery(filter: StoryQuery | undefined, cursor: string | null | undefined): string {
@@ -149,6 +170,52 @@ export const content = {
   }) => api<{ sprints: Sprint[]; total: number }>("/api/content/sprints", post(input)),
   setSprintComplete: (id: string, complete: boolean) =>
     api<{ sprints: Sprint[]; total: number }>("/api/content/sprints/complete", post({ id, complete })),
+
+  /* ---------------------------------- time ---------------------------------- */
+  /** R14: a PAGE of time. `total` is the row count and `totalSeconds` is the
+   * number anybody actually reads — both exact, both over the same filter. */
+  workLogs: (opts: { filter?: LogQuery; cursor?: string | null } = {}) =>
+    api<PagedResponse<{ logs: WorkLog[]; totalSeconds: number }>>(
+      `/api/content/work-logs${logQuery(opts.filter, opts.cursor)}`
+    ),
+  /** One row of time, read back off its own page — there is no by-id door,
+   * because a work log is only ever read in a list of its neighbours. */
+  workLogOne: (id: string) =>
+    api<PagedResponse<{ logs: WorkLog[]; totalSeconds: number }>>("/api/content/work-logs").then(
+      (r) => r.logs.find((l) => l.id === id) ?? null
+    ),
+  runningTimers: () => api<{ timers: RunningTimer[] }>("/api/content/work-logs/running"),
+  startTimer: (targetTable: string, targetId: string, note?: string) =>
+    api<{ timers: RunningTimer[] }>("/api/content/work-logs/start", post({ targetTable, targetId, note })),
+  stopTimer: (id: string, endedAt?: string) =>
+    api<{ timers: RunningTimer[] }>("/api/content/work-logs/stop", post({ id, endedAt })),
+  logTime: (input: {
+    targetTable: string
+    targetId: string
+    startedAt: string
+    endedAt: string
+    note?: string
+    kind?: string
+    billable?: boolean
+  }) => api<PagedResponse<{ logs: WorkLog[]; totalSeconds: number }>>("/api/content/work-logs", post(input)),
+  updateWorkLog: (input: {
+    id: string
+    startedAt?: string
+    endedAt?: string
+    note?: string
+    kind?: string
+    billable?: boolean
+  }) =>
+    api<PagedResponse<{ logs: WorkLog[]; totalSeconds: number }>>(
+      "/api/content/work-logs/update",
+      post(input)
+    ),
+  /** The Monday morning answer: keep the whole thing, stop it at a moment you
+   * name, or bin it. Never automatic. */
+  resolveRunaway: (id: string, answer: "keep" | "stopAt" | "discard", at?: string) =>
+    api<{ timers: RunningTimer[] }>("/api/content/work-logs/runaway", post({ id, answer, at })),
+  setTimerAutoStop: (on: boolean) =>
+    api<{ ok: true; autoStop: boolean }>("/api/content/work-logs/auto-stop", post({ on })),
 
   /* ------------------------------- knowledge ------------------------------- */
   /** R14: a PAGE of sources (a GROWING collection) — hand `nextCursor` back to

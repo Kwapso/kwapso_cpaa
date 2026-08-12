@@ -211,6 +211,15 @@ export function traceFor(
     case "create_sprint":
     case "complete_sprint":
       return { path: seg(teamId, "work"), highlight: "main" }
+    // Time lands on the same page, and the header timer is on every screen
+    // anyway — so a person who asked for a timer sees it start wherever they
+    // already were, and the trace takes them to the list it joined.
+    case "start_timer":
+    case "stop_timer":
+    case "log_time":
+    case "resolve_runaway_timer":
+    case "set_timer_auto_stop":
+      return { path: seg(teamId, "work"), highlight: "main" }
 
     /* --------------------------------- team -------------------------------- */
     // Rename the team → the team Overview (the bare /t/<team> path), where the new

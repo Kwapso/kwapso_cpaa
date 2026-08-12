@@ -113,11 +113,13 @@ describe("the two facts we borrow from the work engine", () => {
   // the one contract ambiguity is settled: the price column is
   // `sold_price_cents`, whole cents on both sides, so there is no longer a
   // spelling for the adapter to detect or a major-unit conversion to prove.
-  it("answers 'not here yet' rather than a confident zero while HALF the lane has landed", async () => {
-    // Exactly today's state, and it is the state the probe exists for: `sprints`
-    // shipped with the stories migration and `work_logs` has not shipped yet. A
-    // margin that read the price and silently subtracted nothing would report a
+  it("answers 'not here yet' rather than a confident zero when a table is absent", async () => {
+    // A team database is migrated one at a time by an ops route, so "this one has
+    // not rolled that migration yet" is a real production state — reproduced here
+    // by taking a table away rather than by never having written it. A margin
+    // that read the price and silently subtracted nothing would report a
     // beautiful 100%, which is the failure this build exists to prevent.
+    db().exec(`DROP TABLE work_logs`)
     const facts = await workEngineFacts(cfg, guard, IDS.victimAccount)
     expect(facts.ready, "both work-engine tables must be present before a margin is claimed").toBe(false)
     expect(facts.soldCents).toBe(0)
@@ -125,14 +127,12 @@ describe("the two facts we borrow from the work engine", () => {
   })
 
   it("reads the price in whole cents, and never multiplies it again", async () => {
-    // The half that has not landed, stubbed here rather than waited for: this
-    // case is about the CONVERSION, and the conversion is settled.
     db().exec(`
-      CREATE TABLE work_logs (id TEXT PRIMARY KEY, account_id TEXT, seconds INTEGER);
       INSERT INTO sprints (id, account_id, name, sold_price_cents, created_at)
         VALUES ('S1', '${IDS.victimAccount}', 'Sprint 4', 499999, '2026-08-12T00:00:00.000Z');
-      INSERT INTO work_logs (id, account_id, seconds) VALUES
-        ('W1', '${IDS.victimAccount}', 3600), ('W2', '${IDS.victimAccount}', 1800);
+      INSERT INTO work_logs (id, account_id, target_table, target_id, user_id, started_at, ended_at, seconds, created_at) VALUES
+        ('W1', '${IDS.victimAccount}', 'stories', 'X', 'U', '2026-08-12T09:00:00.000Z', '2026-08-12T10:00:00.000Z', 3600, '2026-08-12T09:00:00.000Z'),
+        ('W2', '${IDS.victimAccount}', 'stories', 'X', 'U', '2026-08-12T10:00:00.000Z', '2026-08-12T10:30:00.000Z', 1800, '2026-08-12T10:00:00.000Z');
     `)
     const facts = await workEngineFacts(cfg, guard, IDS.victimAccount)
     expect(facts.ready).toBe(true)
@@ -142,7 +142,6 @@ describe("the two facts we borrow from the work engine", () => {
 
   it("counts only the named account's money and nobody else's", async () => {
     db().exec(`
-      CREATE TABLE work_logs (id TEXT PRIMARY KEY, account_id TEXT, seconds INTEGER);
       INSERT INTO sprints (id, account_id, name, sold_price_cents, created_at) VALUES
         ('S1', '${IDS.victimAccount}', 'Theirs', 10000, '2026-08-12T00:00:00.000Z'),
         ('S2', '${IDS.burglarAccount}', 'Somebody else''s', 90000, '2026-08-12T00:00:00.000Z');

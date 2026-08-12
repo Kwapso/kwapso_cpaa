@@ -863,3 +863,46 @@ export type Sprint = {
   createdAt: string
   createdByName: string | null
 }
+
+/** ONE ROW OF TIME: who, what they worked on, and how long, in whole seconds.
+ * A TIMER is one of these with no `endedAt` yet — there is no second concept and
+ * no state machine, which is what makes starting one a single click. */
+export type WorkLog = {
+  id: string
+  /** what it is against — one of WORK_LOG_TARGETS. Never a to-do (that is
+   * somebody else's time) and never an account on its own. */
+  targetTable: string
+  targetId: string
+  /** what the thing it is against is CALLED, so a list of time reads as a list
+   * of work rather than a list of ids. */
+  targetLabel: string | null
+  userId: string
+  userName: string | null
+  /** the kind of work, so the margin can group by it. Null until a team starts
+   * saying — the margin applies its default internal rate and says so. */
+  kind: string | null
+  note: string | null
+  startedAt: string
+  /** null = still running */
+  endedAt: string | null
+  seconds: number
+  billable: boolean
+  /** a runaway timer somebody binned. The row survives; every sum subtracts it. */
+  discarded: boolean
+  accountId: string | null
+}
+
+/** A timer still running, as the header shows it: what it is on, where clicking
+ * it goes, and when it started (the browser counts up from there rather than
+ * asking the server every second). */
+export type RunningTimer = {
+  id: string
+  targetTable: string
+  targetId: string
+  targetLabel: string | null
+  startedAt: string
+  /** whole seconds elapsed at the moment the server answered */
+  elapsedSeconds: number
+  /** true once it has been running longer than RUNAWAY_HOURS — the Monday prompt */
+  runaway: boolean
+}

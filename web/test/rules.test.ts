@@ -674,14 +674,20 @@ describe("RULES — the laws of the base", () => {
           const at2 = u.index as number
           const before = region.slice(Math.max(0, at2 - 60), at2).trimEnd()
           const after = region.slice(at2 + u[0].length, at2 + u[0].length + 30)
-          // The checkers. `parseUploadDataUrl` earns its place beside the text
-          // seam because it IS the seam's binary half: it takes `unknown`,
+          // The checkers. `requireMoment` / `optionalMoment` are the text seam's
+          // TIME half and live in the same file (shared/workers/validate.ts):
+          // requireText, then a parse, then a clean 400 — because Date.parse
+          // returns NaN for a great deal of plausible nonsense and a NaN reaching
+          // a duration is an hour that never happened, sitting in a total nobody
+          // can explain. Locked with the rest of the seam by
+          // workers/content/test/validate.test.ts. `parseUploadDataUrl` earns its
+          // place beside them because it IS the seam's binary half: it takes `unknown`,
           // type-checks, and caps BYTES before decoding (a data URL is megabytes,
           // so a character cap would be the wrong refusal) — locked by
           // workers/content/test/upload-parse.test.ts. `parseDataUrl` beside it
           // does NOT qualify: it declares `dataUrl: string`, which is a claim.
           const checked =
-            /(?<![\w$.])(?:requireText|optionalText|queryText|requireIdList|parseUploadDataUrl|Array\.isArray|Number|includes)\($/.test(
+            /(?<![\w$.])(?:requireText|optionalText|queryText|requireIdList|requireMoment|optionalMoment|parseUploadDataUrl|Array\.isArray|Number|includes)\($/.test(
               before
             ) ||
             /(?<![\w$.])typeof\s*$/.test(before) ||

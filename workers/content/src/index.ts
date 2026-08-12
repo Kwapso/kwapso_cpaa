@@ -37,6 +37,14 @@
 //   GET  /api/content/sprints             -> the blocks of work sold (?accountId → one client's)
 //   POST /api/content/sprints             -> start a sprint
 //   POST /api/content/sprints/complete    -> mark a sprint finished / reopen it
+//   GET  /api/content/work-logs           -> time, newest first (scope/target/user filters)
+//   GET  /api/content/work-logs/running   -> what the caller has running right now
+//   POST /api/content/work-logs           -> write time down by hand
+//   POST /api/content/work-logs/start     -> start a timer (the one click)
+//   POST /api/content/work-logs/stop      -> stop one (?endedAt = "at five on Friday")
+//   POST /api/content/work-logs/update    -> correct a row (leaves a trail)
+//   POST /api/content/work-logs/runaway   -> keep it / stop it then / bin it
+//   POST /api/content/work-logs/auto-stop -> the caller's own timer preference
 //   GET  /api/content/knowledge           -> the sources the assistant may read (?id → one)
 //   GET  /api/content/knowledge/ask       -> answer a question from them, with citations
 //   GET  /api/content/knowledge/sync      -> how far the sweep has got with each kind
@@ -86,6 +94,16 @@ import {
   postStoryStatus,
   postUpdateStory,
 } from "./routes/stories"
+import {
+  getRunningTimers,
+  getWorkLogs,
+  postAutoStop,
+  postLogTime,
+  postResolveRunaway,
+  postStartTimer,
+  postStopTimer,
+  postUpdateWorkLog,
+} from "./routes/work-logs"
 import {
   getKnowledge,
   getKnowledgeAsk,
@@ -151,6 +169,19 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "GET /api/content/sprints": { handler: getSprints, kind: "read" },
   "POST /api/content/sprints": { handler: postCreateSprint, kind: "mutation" },
   "POST /api/content/sprints/complete": { handler: postSprintComplete, kind: "mutation" },
+  // TIME. A timer is a work log with no end yet, so there is one table and one
+  // pair of doors rather than a timer service beside a timesheet.
+  "GET /api/content/work-logs": { handler: getWorkLogs, kind: "read" },
+  "GET /api/content/work-logs/running": { handler: getRunningTimers, kind: "read" },
+  "POST /api/content/work-logs": { handler: postLogTime, kind: "mutation" },
+  "POST /api/content/work-logs/start": { handler: postStartTimer, kind: "mutation" },
+  "POST /api/content/work-logs/stop": { handler: postStopTimer, kind: "mutation" },
+  "POST /api/content/work-logs/update": { handler: postUpdateWorkLog, kind: "mutation" },
+  "POST /api/content/work-logs/runaway": { handler: postResolveRunaway, kind: "mutation" },
+  // A PRIVATE PREFERENCE about how the caller's own timers behave. It changes no
+  // record anybody else can see and no screen anybody else is looking at, so it
+  // broadcasts nothing — a reviewed housekeeping line, not a forgotten publish.
+  "POST /api/content/work-logs/auto-stop": { handler: postAutoStop, kind: "housekeeping" },
   "GET /api/content/knowledge": { handler: getKnowledge, kind: "read" },
   "GET /api/content/knowledge/ask": { handler: getKnowledgeAsk, kind: "read" },
   "GET /api/content/knowledge/sync": { handler: getKnowledgeSync, kind: "read" },

@@ -40,6 +40,7 @@ import { CreateTeamDialog } from "@/components/create-team-dialog"
 import { TEAM_CREATION_CLOSED } from "@shared/product"
 import { ProfileMenu } from "@/components/profile-menu"
 import { TeamSwitcher } from "@/components/team-switcher"
+import { TimerBar } from "@/components/timer-bar"
 
 const NAV_ICONS = { home: Home, settings: Settings } as const
 // The lucide component for each team SIDEBAR page (Accounts / Learning / Tickets)
@@ -290,21 +291,30 @@ export function AppShell({
         <header className="glass sticky top-0 z-20 flex items-center justify-between gap-2 border-b px-4 py-2.5 md:hidden">
           <TeamSwitcher active={active} onCreateTeam={() => setCreating(true)} />
           <div className="flex items-center gap-1">
+            {/* BUILD-1 §5: the running timer is in the header of EVERY screen, so
+                it lives in the shell rather than on any one page. It renders
+                nothing when nothing is running, which is most of the time. */}
+            {teamId && <TimerBar teamId={teamId} onNavigate={onNavigate ?? softNavigate} />}
             <ModeToggle />
             <ProfileMenu active={active} />
           </div>
         </header>
 
         {/* Breadcrumbs — URL-derived, collapsing on small screens (library
-         * primitive). The host owns the router, so links route through onNavigate. */}
-        {breadcrumbs && breadcrumbs.length > 0 && (
-          <div className="px-4 pt-4">
-            <Breadcrumbs
-              items={breadcrumbs}
-              onNavigate={onNavigate ?? softNavigate}
-            />
+         * primitive). The host owns the router, so links route through onNavigate.
+         * The running timer sits on the same row on desktop (the mobile bar has
+         * its own copy above): one line that is present on every screen and shows
+         * nothing at all when nobody is timing anything. */}
+        <div className="flex items-center justify-between gap-3 px-4 pt-4">
+          <div className="min-w-0">
+            {breadcrumbs && breadcrumbs.length > 0 && (
+              <Breadcrumbs items={breadcrumbs} onNavigate={onNavigate ?? softNavigate} />
+            )}
           </div>
-        )}
+          <div className="hidden shrink-0 md:flex">
+            {teamId && <TimerBar teamId={teamId} onNavigate={onNavigate ?? softNavigate} />}
+          </div>
+        </div>
 
         <main className="min-w-0 flex-1 overflow-x-hidden px-4 py-6 pb-24 md:pb-8">
           {children}

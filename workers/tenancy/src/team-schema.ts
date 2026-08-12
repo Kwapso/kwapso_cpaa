@@ -981,6 +981,82 @@ SELECT lower(hex(randomblob(16))), r.id, 'work', r.is_default, r.is_default, r.i
  );
 `,
   },
+  {
+    // WORK LOGS — the row of time this whole build is measured by.
+    //
+    // The owner named "logging time takes too many clicks" as the single thing
+    // most likely to make him quietly abandon this and go back to a spreadsheet
+    // (.plans/BUILD-1 §5). Everything about the shape below is downstream of
+    // that: a timer is a work log with no end yet, so starting one is ONE insert
+    // and stopping it is ONE update, and there is no second table, no session
+    // object and no state machine between a person and a click.
+    version: "0015_work_logs",
+    sql: `
+-- A ROW OF TIME: who, what they worked on, and how long, in whole seconds.
+--
+-- WHAT IT MAY ATTACH TO — a story, a ticket or a task, and nothing else (BUILD-1
+-- §5, settled by the owner). NOT a to-do: that is somebody else's time, not ours.
+-- NOT an account on its own: the owner was explicit that an account-level-only
+-- log must not exist, because a figure with no work behind it is a figure nobody
+-- can check. TICKETS are in the list deliberately — reading, triaging and
+-- resolving a request is real work and has to be loggable against the request.
+--
+-- There is NO CHECK constraint on \`target_table\`, and that is a decision rather
+-- than an omission. The allow-list is WORK_LOG_TARGETS in
+-- workers/content/src/lib/work-logs.ts, which is also where the 400 comes from
+-- and where each target's existence is proved before a row is written. A CHECK
+-- would be a second copy of the same list that only SQLite can see — and in
+-- SQLite a CHECK cannot be altered, so the day a fourth thing becomes loggable
+-- the migration would be a full table rebuild of the largest table here.
+--
+-- \`kind\` is the kind of work, and it is nullable ON PURPOSE. BUILD-1 §5 says a
+-- work log will eventually name it so the margin can group by it; until then
+-- lib/internal-money.ts applies the DEFAULT internal rate and says so on screen,
+-- which is the honest answer while the column is empty.
+--
+-- \`discarded_at\` is how a runaway timer is binned without deleting anything
+-- (BUILD-1 §5: somebody starts one on Friday and goes home). Deactivate-never-
+-- delete: the row, and the fact that somebody chose to bin it, both survive —
+-- every sum in the app subtracts it instead.
+CREATE TABLE work_logs (
+  id TEXT PRIMARY KEY,
+  account_id TEXT REFERENCES accounts (id),
+  target_table TEXT NOT NULL,
+  target_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  user_name TEXT,
+  kind TEXT,
+  note TEXT,
+  started_at TEXT NOT NULL,
+  ended_at TEXT,
+  seconds INTEGER NOT NULL DEFAULT 0 CHECK (seconds >= 0),
+  billable INTEGER NOT NULL DEFAULT 1,
+  discarded_at TEXT, discarder_id TEXT, discarder_email TEXT, discarder_name TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT
+);
+-- THE ONE THING A TIMER MAY NOT DO: run twice on the same work, for the same
+-- person. Parallel timers on DIFFERENT targets are allowed (BUILD-1 §5) — that
+-- is a real day — but the same person clocking the same story twice is a double
+-- count nobody would ever notice in a total. A partial unique index, so the
+-- database refuses it rather than a read-then-write racing itself.
+CREATE UNIQUE INDEX idx_work_logs_running
+  ON work_logs (user_id, target_table, target_id) WHERE ended_at IS NULL;
+CREATE INDEX idx_work_logs_target ON work_logs (target_table, target_id);
+CREATE INDEX idx_work_logs_account ON work_logs (account_id);
+CREATE INDEX idx_work_logs_user ON work_logs (user_id, started_at);
+
+-- ONE PERSON'S OWN PREFERENCES about their timers. One row per person, and today
+-- one column: whether starting a timer stops the ones they already have running.
+-- OFF by default, because parallel timers are legitimate and a setting that
+-- silently stopped your other work would be discovered by losing an hour.
+CREATE TABLE work_prefs (
+  user_id TEXT PRIMARY KEY,
+  auto_stop INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT
+);
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

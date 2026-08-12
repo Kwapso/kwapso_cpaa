@@ -449,6 +449,7 @@ export const PORTAL_ACTIVITY_FENCE: Record<string, { fence: "account" | null; wh
   // says the portal never names, attached to the work they are doing. What a
   // client sees of a story is a COUNT on their own ticket.
   stories: { fence: null, why: "a story's history names the staff member doing the work and what they were asked to change — the client sees a count of the work on their own request, never a title, an assignee or a date" },
+  work_logs: { fence: null, why: "how long one of our people took over a piece of work, and who corrected the figure afterwards. It is the input to the agency's own margin, and the hours behind a price are never the client's to read — they see the VALUE the work produced (the savings drilled through their process map) and not what it cost us to produce it" },
   sprints: { fence: null, why: "a sprint's history names who priced it and what the price was before. The client is shown the sprint as a NAMED BLOCK WITH DATES because it is what they bought (BUILD-1 §7); the record of us changing our minds about it is ours" },
 }
 
@@ -499,6 +500,10 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
   process_comments: "processes",
   account_rates: "commercials",
   internal_rates: "commercials",
+  // Time gates on the same module as the work it is against — a row of hours is
+  // not a separate kind of record from the story it belongs to, it is that
+  // story's cost. A client login holds neither.
+  work_logs: "work",
   // The work engine. A story and the sprint it sits in are one record from a
   // reader's point of view — a piece of work and the block it was sold inside —
   // so both gate on `work`, the module a client login never holds.
@@ -574,6 +579,14 @@ export const GROWING_COLLECTIONS: Record<
     listRecipe: "processes.list",
     webKey: "processesKey(",
     why: "every app of every client grows maps, and every map is kept rather than replaced — a process is archived, never deleted, because the savings computed from its baseline have to stay checkable years later. An agency two years in has more of these than it has clients, and the oldest is the one a client is most likely to ask about",
+  },
+  workLogs: {
+    lib: "workers/content/src/lib/work-logs.ts",
+    fn: "listWorkLogs",
+    routes: "workers/content/src/routes/work-logs.ts",
+    rowsKey: "logs",
+    webKey: "workLogsKey(",
+    why: "the fastest-growing row in the work engine — 2,940 arrived from two years of the previous system and the rate only goes up, because every piece of work produces several. A ceiling here would eventually be a refusal to show somebody their own week",
   },
   stories: {
     lib: "workers/content/src/lib/stories.ts",
@@ -704,4 +717,8 @@ export const FORM_DIALOGS = [
   // sprint form collects a PRICE, which is the other kind.
   "story-form-dialog",
   "sprint-form-dialog",
+  // Logging time by hand. A draft matters here for a reason the others do not
+  // have: the two moments are remembered, not looked up, and a person who loses
+  // them to a mis-tap has to remember them again.
+  "time-form-dialog",
 ] as const
