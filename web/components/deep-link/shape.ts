@@ -10,11 +10,15 @@ import { personName } from "@/lib/identity"
 import type {
   Account,
   ActivityItem,
+  BrandAsset,
   HelpTicket,
   Invite,
   InviteAudit,
   KnowledgeSource,
   Learning,
+  MarketingPost,
+  MeetingPurpose,
+  Program,
   TeamMeta,
   TeamMember,
   TeamRole,
@@ -257,6 +261,135 @@ export function shapeInviteDetail(
       invited: formatDate(invite.createdAt),
       expires: formatDate(invite.expiresAt),
       accepted: audit?.accepted && audit.acceptedAt ? formatDate(audit.acceptedAt) : "—",
+    },
+    sets: { activity: shapeActivity(activity) },
+  }
+}
+
+/* ------------------- the agency's own housekeeping ------------------------ */
+// Four modules, one shaping pattern, and one thing to keep in view while reading
+// them: an ARCHIVED row stays in the list. That is deactivate-not-delete showing
+// through to the screen — the row is retired, not removed, so it is still there
+// to restore — and the `(archived)` suffix plus the `state` facet are how a
+// person tells the two apart at a glance. Roles and learning articles have said
+// "(inactive)" for the same reason since the base's first commit; these say
+// "(archived)" because that is the word this app's glossary uses for putting a
+// record away without losing it.
+
+export function shapeMarketingList(items: MarketingPost[]): ScreenData {
+  return {
+    rows: items.map((p) => ({
+      id: p.id,
+      name: p.active ? p.title : `${p.title} (archived)`,
+      detail: [p.channel, p.publishedOn ? formatDate(p.publishedOn) : "Not published"]
+        .filter(Boolean)
+        .join(" · ") || "—",
+      // Facet columns (read by the filter engine, not the renderer).
+      channel: p.channel || "—",
+      status: p.status || "—",
+      state: p.active ? "Live" : "Archived",
+    })),
+  }
+}
+
+export function shapeMarketingDetail(post: MarketingPost, activity: ActivityItem[]): ScreenData {
+  return {
+    record: {
+      id: post.id,
+      name: post.title,
+      detail: post.channel || "No channel",
+      channel: post.channel || "—",
+      status: post.status || "—",
+      published: post.publishedOn ? formatDate(post.publishedOn) : "Not published yet",
+      summary: post.summary || "—",
+      link: post.link || "—",
+      created: formatDateTime(post.createdAt),
+      createdBy: post.creatorName || "—",
+      updated: post.updatedAt ? formatDateTime(post.updatedAt) : "—",
+    },
+    sets: { activity: shapeActivity(activity) },
+  }
+}
+
+export function shapeBrandList(items: BrandAsset[]): ScreenData {
+  return {
+    rows: items.map((a) => ({
+      id: a.id,
+      name: a.active ? a.name : `${a.name} (archived)`,
+      detail: a.category || a.description || "—",
+      category: a.category || "—",
+      state: a.active ? "Live" : "Archived",
+    })),
+  }
+}
+
+export function shapeBrandDetail(asset: BrandAsset, activity: ActivityItem[]): ScreenData {
+  return {
+    record: {
+      id: asset.id,
+      name: asset.name,
+      detail: asset.category || "Uncategorised",
+      category: asset.category || "—",
+      description: asset.description || "—",
+      file: asset.fileUrl || "No file yet",
+      created: formatDateTime(asset.createdAt),
+      createdBy: asset.creatorName || "—",
+      updated: asset.updatedAt ? formatDateTime(asset.updatedAt) : "—",
+    },
+    sets: { activity: shapeActivity(activity) },
+  }
+}
+
+export function shapeProgrammesList(items: Program[]): ScreenData {
+  return {
+    rows: items.map((p) => ({
+      id: p.id,
+      name: p.active ? p.name : `${p.name} (archived)`,
+      detail: p.description || "—",
+      state: p.active ? "Live" : "Archived",
+    })),
+  }
+}
+
+export function shapeProgrammeDetail(programme: Program, activity: ActivityItem[]): ScreenData {
+  return {
+    record: {
+      id: programme.id,
+      name: programme.name,
+      detail: programme.description || "No description",
+      description: programme.description || "—",
+      order: String(programme.sequence),
+      created: formatDateTime(programme.createdAt),
+      createdBy: programme.creatorName || "—",
+      updated: programme.updatedAt ? formatDateTime(programme.updatedAt) : "—",
+    },
+    sets: { activity: shapeActivity(activity) },
+  }
+}
+
+export function shapePurposesList(items: MeetingPurpose[]): ScreenData {
+  return {
+    rows: items.map((p) => ({
+      id: p.id,
+      name: p.active ? p.name : `${p.name} (archived)`,
+      detail: p.department || p.description || "—",
+      department: p.department || "—",
+      state: p.active ? "Live" : "Archived",
+    })),
+  }
+}
+
+export function shapePurposeDetail(purpose: MeetingPurpose, activity: ActivityItem[]): ScreenData {
+  return {
+    record: {
+      id: purpose.id,
+      name: purpose.name,
+      detail: purpose.department || "No department",
+      department: purpose.department || "—",
+      description: purpose.description || "—",
+      created: formatDateTime(purpose.createdAt),
+      createdBy: purpose.creatorName || "—",
+      updated: purpose.updatedAt ? formatDateTime(purpose.updatedAt) : "—",
     },
     sets: { activity: shapeActivity(activity) },
   }

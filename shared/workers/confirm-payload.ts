@@ -29,20 +29,25 @@ const SECRET_KEY = /pass(word|phrase)|secret|token|credential|api[-_]?key|^key$|
 const MAX_VALUE = 160
 /** A panel, not a data dump. Extra lines collapse into "…and N more".
  *
- * DERIVED FROM THE MODULE CATALOGUE, not hand-picked, and that is the whole
- * point. A permission sheet is inherently one line per module plus the fields
- * around it, so a fixed 16 was a truncation waiting for the fourteenth module —
- * and it arrived: adding `work` and `todos` pushed a role-grant panel past the
- * ceiling, so an admin would have been shown "…and 2 more" in place of the two
- * modules the same call sets to NO ACCESS. That is the exact failure the panel
- * exists to prevent, wearing the ellipsis instead of the empty renderer:
- * "approved by an admin who was shown a different change from the one they
- * authorised."
+ * WITH ONE EXCEPTION, and it is the whole reason this file exists: a PERMISSION
+ * SHEET is never abbreviated. The grid renderer prints one line per module —
+ * including every module being set to NO ACCESS — because the door writes them
+ * all, and a panel that showed only the grants would let a silent removal
+ * through. Collapsing the tail of that grid into "…and 6 more" is the same
+ * stealth demotion arriving by a different route: the admin approves a sheet
+ * they were shown two thirds of.
  *
- * So the floor moves with the app. `+ 6` is the room for the fields a grant
- * carries beside its sheet (the role, its title, its description) with slack; 16
- * stays the minimum so a payload that is NOT a sheet still reads as a panel. */
-const MAX_LINES = Math.max(16, TEAM_MODULE_CATALOG.length + 6)
+ * It was not hypothetical. This cap was 16 while the app had 13 modules, so a
+ * sheet plus its role line fitted with two lines to spare — and the day four
+ * more modules shipped, the last of them fell off the panel. The fix is not a
+ * bigger number, which would rot again at the next module; it is that a grid is
+ * not subject to a line budget at all — `hasGrid` below.
+ *
+ * (Two lanes found this independently and fixed it two ways. The other derived
+ * the cap from the module catalogue, which also never rots; it is gone because
+ * once a grid is exempt outright the cap governs only payloads that are NOT
+ * sheets, and for those a plain 16 says what it means.) */
+const MAX_LINES = 16
 /** Ids listed from a bulk array before the count carries the rest. */
 const MAX_ITEMS = 3
 
@@ -185,17 +190,24 @@ export function describePayload(
   names?: Record<string, string>
 ): string[] {
   const lines: string[] = []
+  // Set the moment a permission sheet is rendered — see MAX_LINES for why that
+  // exempts the whole panel from the budget rather than just the grid's own
+  // lines: the grid is the payload, and the two or three lines beside it are the
+  // context that says WHOSE sheet it is.
+  let hasGrid = false
   for (const [key, value] of Object.entries(body)) {
     if (isPlainObject(value)) {
       if (SECRET_KEY.test(key)) lines.push(`${fieldLabel(tool, key)}: hidden`)
-      else if (isPermissionGrid(tool, key)) lines.push(...renderGrid(value))
-      else lines.push(...describePayload(tool, value, names).map((l) => `${fieldLabel(tool, key)} — ${l}`))
+      else if (isPermissionGrid(tool, key)) {
+        hasGrid = true
+        lines.push(...renderGrid(value))
+      } else lines.push(...describePayload(tool, value, names).map((l) => `${fieldLabel(tool, key)} — ${l}`))
       continue
     }
     const shown = renderValue(key, value, names)
     if (shown !== null) lines.push(`${fieldLabel(tool, key)}: ${shown}`)
   }
-  if (lines.length <= MAX_LINES) return lines
+  if (hasGrid || lines.length <= MAX_LINES) return lines
   const kept = lines.slice(0, MAX_LINES - 1)
   return [...kept, `…and ${lines.length - kept.length} more`]
 }

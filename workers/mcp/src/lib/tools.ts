@@ -114,6 +114,51 @@ const MCP_ONLY: McpTool[] = [
     method: "GET",
     path: "/api/tenancy/selectable/export",
   },
+  // The agency's own housekeeping. Each is the READ half of an import target, so
+  // a file exported here goes straight back in through the importer — which is
+  // what makes the legacy migration reversible while it is still being checked.
+  {
+    name: "export_marketing_posts_csv",
+    description:
+      "Every marketing post the agency has published, as CSV (full fields + audit). Internal — these never appear in a client's portal.",
+    inputSchema: obj({}),
+    binding: "CONTENT",
+    method: "GET",
+    path: "/api/content/marketing/export",
+  },
+  {
+    name: "export_brand_assets_csv",
+    description: "The whole brand library as CSV (full fields + audit).",
+    inputSchema: obj({}),
+    binding: "CONTENT",
+    method: "GET",
+    path: "/api/content/brand-assets/export",
+  },
+  {
+    name: "export_programmes_csv",
+    description: "Every delivery programme as CSV (full fields + audit).",
+    inputSchema: obj({}),
+    binding: "CONTENT",
+    method: "GET",
+    path: "/api/content/delivery/programs/export",
+  },
+  {
+    name: "export_meeting_purposes_csv",
+    description: "Every meeting purpose as CSV, with its department (full fields + audit).",
+    inputSchema: obj({}),
+    binding: "CONTENT",
+    method: "GET",
+    path: "/api/content/delivery/purposes/export",
+  },
+  {
+    name: "export_certificates_csv",
+    description:
+      "The team's credential register as CSV — who holds what, who issued it, when it lapses. Staff PROFILES have no export: a credential register is the kind of thing somebody hands an auditor, and a one-click spreadsheet of what the team is bad at is not.",
+    inputSchema: obj({}),
+    binding: "CONTENT",
+    method: "GET",
+    path: "/api/content/staff/certificates/export",
+  },
   {
     name: "export_accounts_csv",
     description:

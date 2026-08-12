@@ -681,6 +681,58 @@ person is on triage duty, and it is visible whose week it is" (.plans/BUILD-1 §
 has no answer if two rows claim a week, and a check in code is a check two
 simultaneous writers race past. A row per week rather than a flag on a member,
 because "whose week was it when this was missed?" has to survive.
+### marketing_posts + brand_assets + programs + meeting_purposes + staff_profiles + staff_certificates — KEEP (BUILT 2026-08-12, team migration `0018_agency_internal`) — THE AGENCY'S OWN HOUSEKEEPING
+
+Six tables, four permission modules, and the seven agency-internal tables of the
+legacy Glide app finally landed. What they have in common is the whole of their
+security story: **none of them carries an `account_id`**, because none of these
+rows belongs to a customer. There is nothing here for the account fence to fence
+— so the defence is at the door instead, and it is a REFUSAL rather than a
+filter: every handler on all four modules opens with `refusePortalCaller`, and
+`workers/content/test/agency-internal.test.ts` proves three things off disk (none
+of the doors is on the portal gateway's surface, every one of them refuses, and
+no file in `web-portal/` names these tables, paths or fields). That is the same
+structural shape R24 uses for margin, applied to a different secret.
+
+| Table | Module | From (Glide) | Rows | What it is |
+|---|---|---|---|---|
+| `marketing_posts` | `marketing` | `content` | 251 | What the agency published about itself — title, channel, status, body, link, and the DAY it went out. |
+| `brand_assets` | `brand_assets` | `branding` | 74 | The material everything else is made with: logos, decks, templates. `file_url` holds either an object we host or a link elsewhere. |
+| `programs` | `delivery` | `program` | 10 | How the agency runs an engagement. `sequence` is display order only. |
+| `meeting_purposes` | `delivery` | `purposes` | 27 | Why the agency meets, and the department it belongs to. |
+| `staff_profiles` | `staff_profiles` | `users` (six profile columns) | 6 | The person behind the member row: personality type, what they are best at, what they find hard, who they look up to, a photo. |
+| `staff_certificates` | `staff_profiles` | `certificates` | 5 | A qualification somebody holds — issuer, granted, lapses, the paper itself. |
+
+**Two of the seven legacy tables are deliberately NOT tables here.**
+`departments` (8 rows) and `channels` (6) are bare labels with no fields of their
+own, and the base already has exactly one home for a team's editable vocabulary:
+`selectable_data`, which carries its own permissions, screen, import, export and
+machine tools. They became the dropdown GROUPS "Department" and "Marketing
+channel", pick-or-created the way a learning article's category always has been
+(`workers/content/src/lib/vocabulary.ts`). A module built to hold a word is
+ceremony. `purposes` is the one that could NOT go the same way, and the reason is
+worth keeping: it carries a department, and a dropdown row is a single label with
+nowhere to put a second fact — so the purpose is a record and the department is
+the dropdown value, each fact stored the way its own shape asks.
+
+**`staff_profiles` holds ONE live profile per person**, and holds it in the
+database rather than in a handler: a partial unique index on `user_id WHERE
+deactivated_at IS NULL`, so two tabs saving a colleague's profile at the same
+instant settle into one row (CONCURRENCY rule 2). The write is a single upsert
+door for both "there wasn't one" and "there was" — a person either has a profile
+or they don't, and the screen filling in the form has no way of knowing which.
+
+**Dates are days, and a value that is nearly a day is refused** (`optionalDate`,
+`workers/content/src/lib/internal-fields.ts`): `2026-02-31` rolls over into March
+in every naive parser, and an expiry that half parses is a certificate that
+silently never lapses.
+
+**The two ungrouped legacy sets.** Sixteen of the legacy app's 154 dropdown
+values carried no group at all — ten country names, five company-size bands and
+one stray hyphen. The owner ruled for two GROUPS rather than two fields on the
+account, because a country typed free into an address is a country spelled five
+ways by five people. Both are seeded in `DEFAULT_SELECTABLE` and backfilled for
+existing teams by the same migration; the hyphen is not carried across.
 
 ---
 

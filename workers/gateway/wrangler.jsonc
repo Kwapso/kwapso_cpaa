@@ -43,7 +43,8 @@
   ],
   "r2_buckets": [
     { "binding": "MEDIA", "bucket_name": "kwapso-media" },
-    { "binding": "LEARNING_MEDIA", "bucket_name": "kwapso-learning-media" }
+    { "binding": "LEARNING_MEDIA", "bucket_name": "kwapso-learning-media" },
+    { "binding": "INTERNAL_MEDIA", "bucket_name": "kwapso-internal-media" }
   ],
   "env": {
     "staging": {
@@ -70,7 +71,8 @@
       ],
       "r2_buckets": [
         { "binding": "MEDIA", "bucket_name": "kwapso-media-staging" },
-        { "binding": "LEARNING_MEDIA", "bucket_name": "kwapso-learning-media-staging" }
+        { "binding": "LEARNING_MEDIA", "bucket_name": "kwapso-learning-media-staging" },
+        { "binding": "INTERNAL_MEDIA", "bucket_name": "kwapso-internal-media-staging" }
       ]
     }
   }

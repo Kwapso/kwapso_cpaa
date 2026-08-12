@@ -159,7 +159,45 @@ export const listFetch = {
       primeCache(totalKey("sprints", teamId), r.total)
       return r.sprints
     }),
+  // THE AGENCY'S OWN HOUSEKEEPING — four capped collections (R14: authored
+  // libraries and settled taxonomies, not feeds), so each fetcher primes its
+  // exact `total:` sidecar and there is no cursor to park.
+  marketing: (teamId: string) =>
+    contentApi.marketing().then((r) => {
+      primeCache(totalKey("marketing", teamId), r.total)
+      return r.posts
+    }),
+  brandAssets: (teamId: string) =>
+    contentApi.brandAssets().then((r) => {
+      primeCache(totalKey("brand_assets", teamId), r.total)
+      return r.assets
+    }),
+  programmes: (teamId: string) =>
+    contentApi.programmes().then((r) => {
+      primeCache(totalKey("programmes", teamId), r.total)
+      return r.programs
+    }),
+  purposes: (teamId: string) =>
+    contentApi.meetingPurposes().then((r) => {
+      primeCache(totalKey("purposes", teamId), r.total)
+      return r.purposes
+    }),
+  // Read WHOLE rather than per-member: one profile each and a handful of
+  // certificates, so the team's whole set is smaller than one page of tickets —
+  // and a member page that pulled its own would refetch on every colleague you
+  // clicked through to.
+  staffProfiles: (teamId: string) =>
+    contentApi.staffProfiles().then((r) => {
+      primeCache(totalKey("staff_profiles", teamId), r.total)
+      return r.profiles
+    }),
+  staffCertificates: (teamId: string) =>
+    contentApi.staffCertificates().then((r) => {
+      primeCache(totalKey("staff_certificates", teamId), r.total)
+      return r.certificates
+    }),
 }
+
 
 /** The backlog's cache key (the paged stories list) and the sprint list beside
  * it. Two keys, because they are two collections with two different R14 answers:
@@ -195,6 +233,31 @@ export function triageKey(teamId: string): string {
 
 export function runningTimersKey(teamId: string): string {
   return `running-timers:${teamId}`
+}
+/** The agency-internal collections' cache keys. Named functions rather than
+ * inline templates for the same reason the accounts and ticket keys are: the
+ * live registry, the screen read and the count sidecar all have to say the same
+ * string, and three places typing it is three places to mistype it. */
+export function marketingKey(teamId: string): string {
+  return `marketing:${teamId}`
+}
+export function brandAssetsKey(teamId: string): string {
+  return `brand_assets:${teamId}`
+}
+export function programmesKey(teamId: string): string {
+  return `programmes:${teamId}`
+}
+export function purposesKey(teamId: string): string {
+  return `purposes:${teamId}`
+}
+/** Staff profiles and certificates are read on a MEMBER's page, so they are
+ * keyed by the team (the whole set is small — one profile per member) and the
+ * member page picks its own out. */
+export function staffProfilesKey(teamId: string): string {
+  return `staff_profiles:${teamId}`
+}
+export function staffCertificatesKey(teamId: string): string {
+  return `staff_certificates:${teamId}`
 }
 
 /** The process-map list's cache key (the paged maps list). */
@@ -455,6 +518,57 @@ export const TEAM_RESOURCES: Record<
   // its account's own screen, so the account is the row a listener can act on.
   // The same shape `account_links` and `portal_users` already have, and for the
   // same reason: neither has a list of its own.
+  // ── THE AGENCY'S OWN HOUSEKEEPING ────────────────────────────────────────
+  // Six resources, row-level, one per table. Each patches just the changed row
+  // in its own list and refreshes that record's history — the same shape every
+  // other content module here has.
+  marketing_posts: {
+    key: (t) => marketingKey(t),
+    idField: "id",
+    fetchOne: (id) => contentApi.marketingOne(id),
+    fetchList: (t) => listFetch.marketing(t),
+    deps: (_t, id) => [`activity:record:marketing_posts:${id}`],
+  },
+  brand_assets: {
+    key: (t) => brandAssetsKey(t),
+    idField: "id",
+    fetchOne: (id) => contentApi.brandAssetOne(id),
+    fetchList: (t) => listFetch.brandAssets(t),
+    deps: (_t, id) => [`activity:record:brand_assets:${id}`],
+  },
+  programs: {
+    key: (t) => programmesKey(t),
+    idField: "id",
+    fetchOne: (id) => contentApi.programmeOne(id),
+    fetchList: (t) => listFetch.programmes(t),
+    deps: (_t, id) => [`activity:record:programs:${id}`],
+  },
+  meeting_purposes: {
+    key: (t) => purposesKey(t),
+    idField: "id",
+    fetchOne: (id) => contentApi.meetingPurposeOne(id),
+    fetchList: (t) => listFetch.purposes(t),
+    deps: (_t, id) => [`activity:record:meeting_purposes:${id}`],
+  },
+  // A profile and a certificate have no by-id read door of their own, because
+  // neither is ever opened on a screen of its own — both are read on the
+  // MEMBER's page, from the whole (small, one-per-member) set. So the row-level
+  // fetchOne re-reads the set and picks the row out, which is the honest way to
+  // patch one row when the door answers in collections.
+  staff_profiles: {
+    key: (t) => staffProfilesKey(t),
+    idField: "id",
+    fetchOne: (id) => contentApi.staffProfiles().then((r) => r.profiles.find((p) => p.id === id) ?? null),
+    fetchList: (t) => listFetch.staffProfiles(t),
+    deps: (_t, id) => [`activity:record:staff_profiles:${id}`],
+  },
+  staff_certificates: {
+    key: (t) => staffCertificatesKey(t),
+    idField: "id",
+    fetchOne: (id) => contentApi.staffCertificates().then((r) => r.certificates.find((c) => c.id === id) ?? null),
+    fetchList: (t) => listFetch.staffCertificates(t),
+    deps: (_t, id) => [`activity:record:staff_certificates:${id}`],
+  },
   account_rates: {
     key: (t) => accountsKey(t),
     idField: "id",
@@ -490,4 +604,13 @@ export const SIMPLE_INVALIDATIONS: Record<string, (teamId: string) => string[]> 
   // patch. So the backlog is dropped and re-read, and the sprint list with it,
   // because a sprint row carries the counts of the stories inside it.
   work: (t) => [storiesKey(t), sprintsKey(t)],
+  // THE IMPORT'S OWN PINGS. The import engine publishes each TargetDef's MODULE
+  // key (never a row id — a batch touches many rows and no one row is the
+  // change), so two module names reach the live layer that no single table
+  // owns: `marketing` and `delivery`. A coarse drop is the whole of the answer
+  // for both, and it is the same shape the knowledge sweep's ping already has.
+  // (`brand_assets` needs no line: its module key and its table name are one
+  // word, so the row-level listener above already claims it.)
+  marketing: (t) => [marketingKey(t)],
+  delivery: (t) => [programmesKey(t), purposesKey(t)],
 }

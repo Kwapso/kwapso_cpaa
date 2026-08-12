@@ -48,9 +48,17 @@ export function recordActivityKey(table: string, id: string): string {
  *
  * A later page appends rows and NEVER touches the total: the count is the whole
  * history's, not the loaded prefix's, so it must not move as you load more. */
+/**
+ * `table` / `id` may be NULL, and that is not a convenience — it is what lets
+ * the deep-link host read a record's history at all. The host resolves every
+ * module's data in ONE hook (use-screen-data), above a render switch full of
+ * early returns, so it cannot call this conditionally from inside a branch. A
+ * null pair keys the read to null, which fetches nothing and returns the same
+ * empty shape a first render sees.
+ */
 export function useRecordActivity(
-  table: string,
-  id: string
+  table: string | null,
+  id: string | null
 ): {
   rows: ActivityItem[]
   /** The same rows, ready to hand straight to the library ActivityFeed. */
@@ -60,9 +68,10 @@ export function useRecordActivity(
   listKey: string
   fetchPage: (cursor: string) => Promise<{ rows: ActivityItem[]; nextCursor: string | null }>
 } {
-  const key = recordActivityKey(table, id)
-  const query = useCached<ActivityItem[]>(key, () =>
-    tenancy.recordActivity(table, id).then((r) => {
+  const on = Boolean(table && id)
+  const key = recordActivityKey(table ?? "", id ?? "")
+  const query = useCached<ActivityItem[]>(on ? key : null, () =>
+    tenancy.recordActivity(table as string, id as string).then((r) => {
       primeCache(`total:${key}`, r.total)
       primeCache(cursorKey(key), r.nextCursor)
       return r.activity
@@ -77,12 +86,12 @@ export function useRecordActivity(
       actor: a.actorName ?? undefined,
       timestamp: formatActivityWhen(a.createdAt),
     })),
-    total: useCachedValue<number>(`total:${key}`),
+    total: useCachedValue<number>(on ? `total:${key}` : null),
     error: query.error,
     listKey: key,
     fetchPage: (cursor: string) =>
       tenancy
-        .recordActivity(table, id, cursor)
+        .recordActivity(table as string, id as string, cursor)
         .then((r) => ({ rows: r.activity, nextCursor: r.nextCursor })),
   }
 }

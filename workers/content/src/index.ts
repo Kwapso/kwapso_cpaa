@@ -66,6 +66,14 @@
 //   POST /api/content/knowledge/update    -> correct a source
 //   POST /api/content/knowledge/active    -> take a source away from the assistant / give it back
 //   POST /api/content/knowledge/sync      -> bring the base into step, one bounded slice
+//   GET  /api/content/marketing           -> the agency's own posts (?id → one)
+//   POST /api/content/marketing[/update|/active] -> write / edit / archive a post
+//   GET  /api/content/brand-assets        -> the brand library (?id → one)
+//   POST /api/content/brand-assets[/update|/active|/upload] -> write / edit / archive / store bytes
+//   GET  /api/content/delivery/programs   -> the delivery programmes (?id → one)
+//   GET  /api/content/delivery/purposes   -> why we meet (?id → one)
+//   GET  /api/content/staff/profiles      -> the team's own profiles (?userId → one)
+//   GET  /api/content/staff/certificates  -> what people hold (?userId → one person's)
 //   GET  /api/content/health
 
 import { brand } from "@shared/brand"
@@ -139,6 +147,44 @@ import {
   postSetKnowledgeActive,
   postUpdateKnowledge,
 } from "./routes/knowledge"
+import {
+  getMarketing,
+  getMarketingExport,
+  postCreateMarketing,
+  postSetMarketingActive,
+  postUpdateMarketing,
+} from "./routes/marketing"
+import {
+  getBrandAssets,
+  getBrandAssetsExport,
+  postCreateBrandAsset,
+  postSetBrandAssetActive,
+  postUpdateBrandAsset,
+  postUploadBrandAsset,
+} from "./routes/brand-assets"
+import {
+  getMeetingPurposes,
+  getMeetingPurposesExport,
+  getPrograms,
+  getProgramsExport,
+  postCreateMeetingPurpose,
+  postCreateProgram,
+  postSetMeetingPurposeActive,
+  postSetProgramActive,
+  postUpdateMeetingPurpose,
+  postUpdateProgram,
+} from "./routes/delivery"
+import {
+  getStaffCertificates,
+  getStaffCertificatesExport,
+  getStaffProfiles,
+  postCreateStaffCertificate,
+  postSaveStaffProfile,
+  postSetStaffCertificateActive,
+  postSetStaffProfileActive,
+  postUpdateStaffCertificate,
+  postUploadStaffFile,
+} from "./routes/staff"
 import { sweepAll } from "./lib/knowledge-ingest"
 import { sendTriageDigest, teamMemberNames } from "./lib/notify"
 import { dutyFor, loggedNothingLastWeek, needsTriage } from "./lib/triage"
@@ -243,6 +289,44 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // A slice of the sweep, by hand — it writes source rows, so it publishes (a
   // coarse ping: a slice touches many rows and no one row is the change).
   "POST /api/content/knowledge/sync": { handler: postKnowledgeSync, kind: "mutation" },
+
+  // ── THE AGENCY'S OWN HOUSEKEEPING ──────────────────────────────────────────
+  // Four modules, six tables, and one thing every door below has in common: it
+  // opens with `refusePortalCaller`. None of this material is a client's, so
+  // there is no fenced slice of it to serve one — only a refusal (R21).
+  "GET /api/content/marketing": { handler: getMarketing, kind: "read" },
+  "GET /api/content/marketing/export": { handler: getMarketingExport, kind: "read" },
+  "POST /api/content/marketing": { handler: postCreateMarketing, kind: "mutation" },
+  "POST /api/content/marketing/update": { handler: postUpdateMarketing, kind: "mutation" },
+  "POST /api/content/marketing/active": { handler: postSetMarketingActive, kind: "mutation" },
+  "GET /api/content/brand-assets": { handler: getBrandAssets, kind: "read" },
+  "GET /api/content/brand-assets/export": { handler: getBrandAssetsExport, kind: "read" },
+  "POST /api/content/brand-assets": { handler: postCreateBrandAsset, kind: "mutation" },
+  "POST /api/content/brand-assets/update": { handler: postUpdateBrandAsset, kind: "mutation" },
+  "POST /api/content/brand-assets/active": { handler: postSetBrandAssetActive, kind: "mutation" },
+  // Stores a file in R2 but changes NO record (no row to patch) → housekeeping,
+  // the same classification the learning upload carries.
+  "POST /api/content/brand-assets/upload": { handler: postUploadBrandAsset, kind: "housekeeping" },
+  "GET /api/content/delivery/programs": { handler: getPrograms, kind: "read" },
+  "GET /api/content/delivery/programs/export": { handler: getProgramsExport, kind: "read" },
+  "POST /api/content/delivery/programs": { handler: postCreateProgram, kind: "mutation" },
+  "POST /api/content/delivery/programs/update": { handler: postUpdateProgram, kind: "mutation" },
+  "POST /api/content/delivery/programs/active": { handler: postSetProgramActive, kind: "mutation" },
+  "GET /api/content/delivery/purposes": { handler: getMeetingPurposes, kind: "read" },
+  "GET /api/content/delivery/purposes/export": { handler: getMeetingPurposesExport, kind: "read" },
+  "POST /api/content/delivery/purposes": { handler: postCreateMeetingPurpose, kind: "mutation" },
+  "POST /api/content/delivery/purposes/update": { handler: postUpdateMeetingPurpose, kind: "mutation" },
+  "POST /api/content/delivery/purposes/active": { handler: postSetMeetingPurposeActive, kind: "mutation" },
+  "GET /api/content/staff/profiles": { handler: getStaffProfiles, kind: "read" },
+  // One door for "there wasn't a profile" and "there was" — see routes/staff.ts.
+  "POST /api/content/staff/profiles": { handler: postSaveStaffProfile, kind: "mutation" },
+  "POST /api/content/staff/profiles/active": { handler: postSetStaffProfileActive, kind: "mutation" },
+  "POST /api/content/staff/upload": { handler: postUploadStaffFile, kind: "housekeeping" },
+  "GET /api/content/staff/certificates": { handler: getStaffCertificates, kind: "read" },
+  "GET /api/content/staff/certificates/export": { handler: getStaffCertificatesExport, kind: "read" },
+  "POST /api/content/staff/certificates": { handler: postCreateStaffCertificate, kind: "mutation" },
+  "POST /api/content/staff/certificates/update": { handler: postUpdateStaffCertificate, kind: "mutation" },
+  "POST /api/content/staff/certificates/active": { handler: postSetStaffCertificateActive, kind: "mutation" },
 }
 
 export default {

@@ -213,6 +213,8 @@ export const CATALOG_EXEMPT: Record<string, string> = {
     "a process map's numbers are AGREED estimates — a time a client and a staff member settled together, in front of each other, about the client's own work. Every savings figure in the app is a subtraction of two of them, so a CSV would import estimates nobody agreed and produce figures nobody can defend, which is the exact failure this module exists to prevent. A map is authored a step at a time, with the person whose work it describes.",
   todos:
     "a to-do is a REQUEST WE MAKE OF A CLIENT, and raising one emails them. It is one of only two things in the whole product that reaches a client's inbox (BUILD-1 §7), and an import is the one shape of write that produces hundreds at once — a spreadsheet of forty rows would be forty emails into somebody's morning, from our own verified sender, before anybody had read the file back. The write it would replace is a title and a date typed while you are already talking to them. Stories ARE importable, for the opposite reason: nothing about a story leaves the building.",
+  staff_profiles:
+    "both tables here name a PERSON — by their member id, which is the one thing a spreadsheet cannot supply. A CSV column of names or email addresses would have to be resolved to members, and resolving it wrongly files somebody's personality profile, or somebody's qualification, against the wrong colleague. That is the same reason team_members is exempt, arriving from the other direction: a file cannot say who somebody is. A profile is written on the member's own page, where the question never comes up.",
   commercials:
     "a rate card is a commercial agreement and an internal rate is the agency's own cost. A bulk overwrite of either silently changes what a client is charged or what a margin says, with no conversation attached and no one row to point at afterwards — and the write it would replace is four fields typed once a year.",
 }
@@ -476,6 +478,19 @@ export const PORTAL_ACTIVITY_FENCE: Record<string, { fence: "account" | null; wh
   },
   work_logs: { fence: null, why: "how long one of our people took over a piece of work, and who corrected the figure afterwards. It is the input to the agency's own margin, and the hours behind a price are never the client's to read — they see the VALUE the work produced (the savings drilled through their process map) and not what it cost us to produce it" },
   sprints: { fence: null, why: "a sprint's history names who priced it and what the price was before. The client is shown the sprint as a NAMED BLOCK WITH DATES because it is what they bought (BUILD-1 §7); the record of us changing our minds about it is ours" },
+  // THE AGENCY'S OWN HOUSEKEEPING — six tables, one answer, and it is the
+  // EASIEST six entries in this table rather than the hardest. Everywhere else
+  // here the question is genuinely difficult ("the rows are theirs but the
+  // history names us"). Not here: the ROWS are not theirs either. A client login
+  // cannot reach a single door on any of these four modules (every handler opens
+  // with refusePortalCaller), so `null` is not a withholding — it is the same
+  // sentence the door already said, repeated where the feed can hear it.
+  marketing_posts: { fence: null, why: "what the agency publishes about ITSELF, and the record of editing it — the client is not the audience for the post, let alone for its drafts" },
+  brand_assets: { fence: null, why: "the agency's own brand material and who changed it — a client sees the work, never our library" },
+  programs: { fence: null, why: "how the agency runs an engagement, and every revision of it — our method, which is ours whoever it is applied to" },
+  meeting_purposes: { fence: null, why: "why the agency meets and which department owns it — a description of our own organisation" },
+  staff_profiles: { fence: null, why: "what a colleague is like and what they are bad at. The sharpest case of agency-only material in the app, and its HISTORY names both the subject and the person who wrote it down" },
+  staff_certificates: { fence: null, why: "what our people are qualified in, and when a qualification was corrected — the agency's own credential register" },
 }
 
 /** R2 on the CLIENT surface — the reasoned exemption, not a quiet skip.
@@ -542,6 +557,17 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
   // so both gate on `work`, the module a client login never holds.
   stories: "work",
   sprints: "work",
+  // THE AGENCY'S OWN HOUSEKEEPING. Six tables, four modules — grouped the way a
+  // reader meets them: two tables gate on `delivery` because a programme and a
+  // meeting purpose are one taxonomy, and two on `staff_profiles` because a
+  // person's profile and their certificates are one record from the member
+  // page's point of view.
+  marketing_posts: "marketing",
+  brand_assets: "brand_assets",
+  programs: "delivery",
+  meeting_purposes: "delivery",
+  staff_profiles: "staff_profiles",
+  staff_certificates: "staff_profiles",
 }
 
 /** R15 — reviewed DEAF exemptions: resources a worker publishes that reach NO
@@ -722,6 +748,14 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
     "one account's own fields (type, reference, contact details, where it sits) — one record, not a collection. Its four collection tabs — contacts, children, portal access, activity — each carry a server count.",
   "knowledge-detail.source":
     "the source's own text — the exact words the assistant reads out of it, plus where they came from. One record's body, not a collection. (How many searchable pieces that text became is a FIELD on the Overview, not a tab: the pieces are derived from the text on this same panel, so a tab over them would be the same thing twice.)",
+  // The agency's own housekeeping. Four engine-recipe details, each leading with
+  // a `description` block of the record's own fields — so there is no collection
+  // on the Overview tab to count, and its sibling Activity tab carries the exact
+  // server total like every other record in the app.
+  "marketing.detail.overview": "one post's channel, status, link and audit block — one record, not a collection.",
+  "brand.detail.overview": "one asset's category, description, file and audit block — one record, not a collection.",
+  "delivery.detail.overview": "one programme's description, order and audit block — one record, not a collection.",
+  "purposes.detail.overview": "one meeting purpose's department, description and audit block — one record, not a collection.",
   "knowledge-detail.overview":
     "one source's kind, compartment, who may read it, how many pieces it was cut into and when it was last indexed — one record, not a collection.",
 }
@@ -762,4 +796,17 @@ export const FORM_DIALOGS = [
   // note has been building, and pressing its button emails a customer — so
   // losing what somebody typed into it is the most expensive draft loss here.
   "resolve-dialog",
+  // The agency's own housekeeping. The staff-profile form is the one that most
+  // needs its draft kept: it is the longest form in the app and the hardest to
+  // retype, because its answers are a conversation somebody had with a colleague
+  // rather than facts they can look up again.
+  // ONE dialog for the four internal RECORD kinds (a post, a brand asset, a
+  // programme, a meeting purpose). They are the same form with different labels
+  // — a name, a vocabulary field, some prose — so four files would be four
+  // copies of one draft rule, one submit path and one busy state to keep in
+  // step. The two staff forms are separate because they are genuinely different
+  // shapes: one is about a person, the other about a piece of paper.
+  "internal-record-dialog",
+  "staff-profile-dialog",
+  "certificate-form-dialog",
 ] as const

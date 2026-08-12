@@ -26,6 +26,8 @@ type Env = {
   MCP: Fetcher
   MEDIA: R2Bucket
   LEARNING_MEDIA: R2Bucket
+  /** the agency's own files — brand assets, staff photos, certificate PDFs. */
+  INTERNAL_MEDIA: R2Bucket
   /** shared secret for auth's /internal/* doors (same value as auth/tenancy/content). */
   INTERNAL_KEY?: string
 }
@@ -82,6 +84,18 @@ async function handle(request: Request, env: Env): Promise<Response> {
     if (pathname.startsWith("/media/learning/") && request.method === "GET")
       return serveMedia(env.LEARNING_MEDIA, pathname, "/media/learning/")
 
+    // The agency's own files — brand assets, staff photos, certificate PDFs.
+    // Its own bucket, matched before the generic prefix for the same reason
+    // learning's is: a more specific prefix has to win, or every internal URL
+    // would be looked up in the wrong bucket and 404.
+    //
+    // ON THE AGENCY DOOR ONLY. The client portal serves no /media/internal/ path
+    // at all, so a capability URL that leaked into a client's hands would have
+    // nowhere to be redeemed — which is the same shape as the API refusal one
+    // layer up, said in routing instead of in a gate.
+    if (pathname.startsWith("/media/internal/") && request.method === "GET")
+      return serveMedia(env.INTERNAL_MEDIA, pathname, "/media/internal/")
+
     // Uploaded files (profile photos, team logos). URLs carry ?v= for cache
     // busting, so the file itself can be cached hard.
     if (pathname.startsWith("/media/") && request.method === "GET")
@@ -104,7 +118,14 @@ async function handle(request: Request, env: Env): Promise<Response> {
     // deep-link shells (their own clean URLs, active team from context). Serve the
     // module's shell for any sub-path (e.g. /accounts/<id>); the bare /accounts is a
     // real static file served below.
-    for (const mod of ["accounts", "learning", "tickets", "knowledge", "processes", "work"]) {
+    for (const mod of [
+      "accounts", "learning", "tickets", "knowledge", "processes", "work",
+      // The agency's own housekeeping. `purposes` is here too even though it is
+      // a CONTEXTUAL section rather than a sidebar one: it still has records
+      // with their own URLs, and a deep link that 404s on reload is a deep link
+      // whether or not the nav rail offers it.
+      "marketing", "brand", "delivery", "purposes",
+    ]) {
       if (pathname.startsWith(`/${mod}/`)) {
         const shell = new URL(request.url)
         shell.pathname = `/${mod}`

@@ -12,7 +12,20 @@
 // learning / tickets / team-meta load only on their own module.
 
 import { tenancy } from "@/lib/api"
-import { accountsKey, cursorKey, helpKey, knowledgeKey, listFetch, totalKey } from "@/lib/live-resources"
+import {
+  accountsKey,
+  brandAssetsKey,
+  cursorKey,
+  helpKey,
+  knowledgeKey,
+  listFetch,
+  marketingKey,
+  programmesKey,
+  purposesKey,
+  totalKey,
+} from "@/lib/live-resources"
+import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
+import { useRecordActivity } from "@/lib/use-record-activity"
 import { primeCache, useCached, useCachedValue } from "@shared/web/store"
 
 /** What the host needs to drive the reads: the resolved team, whether reads are
@@ -24,6 +37,16 @@ export type ScreenDataInput = {
   recordId: string | null
   /** which ticket set the Tickets screen is showing — a SERVER scope (R14/R16). */
   helpScope?: "mine" | "all"
+}
+
+/** Which TABLE a record under each agency-internal URL segment lives in — the
+ * one place that translation is written down, so the record feed, the live
+ * registry's `deps` and the activity gate map all name the same string. */
+const INTERNAL_ACTIVITY_TABLE: Record<string, string> = {
+  marketing: "marketing_posts",
+  brand: "brand_assets",
+  delivery: "programs",
+  purposes: "meeting_purposes",
 }
 
 export function useScreenData({ teamId, enabled, module, recordId, helpScope = "all" }: ScreenDataInput) {
@@ -79,6 +102,28 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
     enabled && module === "knowledge" ? knowledgeKey(teamId as string) : null,
     () => listFetch.knowledge(teamId as string)
   )
+  // ── THE AGENCY'S OWN HOUSEKEEPING ────────────────────────────────────────
+  // Four capped collections, each loaded only on its own module (cache-first +
+  // row-level live). The Delivery method screen shows BOTH of its collections at
+  // once, so both load on either of its two segments — a screen that offers a
+  // "meeting purposes" button has to know how many there are before you press it.
+  const marketingQ = useCached(enabled && module === "marketing" ? marketingKey(teamId as string) : null, () =>
+    listFetch.marketing(teamId as string)
+  )
+  const brandQ = useCached(enabled && module === "brand" ? brandAssetsKey(teamId as string) : null, () =>
+    listFetch.brandAssets(teamId as string)
+  )
+  const onDelivery = module === "delivery" || module === "purposes"
+  const programmesQ = useCached(enabled && onDelivery ? programmesKey(teamId as string) : null, () =>
+    listFetch.programmes(teamId as string)
+  )
+  const purposesQ = useCached(enabled && onDelivery ? purposesKey(teamId as string) : null, () =>
+    listFetch.purposes(teamId as string)
+  )
+  // Staff profiles + certificates are NOT read here. They are read by the panel
+  // on the member's own page (staff-panel.tsx), cache-first on the same keys the
+  // live registry patches — the same shape every bespoke record screen uses, and
+  // the right one for a collection that only ever appears on one screen.
   // The team's dropdown values — feed the ticket/learning forms' Type/Category pickers
   // AND the Dropdown-values tab's count badge, so load them across the team area
   // (cache-first + live, like roles/invites, so the count stays honest).
@@ -104,12 +149,34 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
     // Work page leads with. Primed by the same fetcher that loads page one, so
     // the number and the rows agree.
     work: useCachedValue<number>(enabled ? totalKey("work", teamId as string) : null),
+    // The agency's own housekeeping — the exact server totals the sidebar badges
+    // and the collection headings show, primed by the fetchers above.
+    marketing: useCachedValue<number>(enabled ? totalKey("marketing", teamId as string) : null),
+    brand_assets: useCachedValue<number>(enabled ? totalKey("brand_assets", teamId as string) : null),
+    programmes: useCachedValue<number>(enabled ? totalKey("programmes", teamId as string) : null),
+    purposes: useCachedValue<number>(enabled ? totalKey("purposes", teamId as string) : null),
+    staff_certificates: useCachedValue<number>(enabled ? totalKey("staff_certificates", teamId as string) : null),
   }
   const selectableValues = formSelectableQ.data ?? []
   // The list now includes DEACTIVATED values (so the manager can reactivate them),
   // so every form PICKER filters to `active` — a retired value never appears as a
   // pickable option (but old rows that referenced it still read truthfully).
   const activeSelectable = selectableValues.filter((v) => v.active)
+  // The pickers on the agency-internal forms. Every one is a PICK-OR-CREATE
+  // field, so these options are a convenience and never a constraint: typing a
+  // channel nobody has used adds it to the vocabulary rather than being refused.
+  const marketingChannelOptions = activeSelectable
+    .filter((v) => v.type === SELECTABLE_GROUPS.channel)
+    .map((v) => v.value)
+  const marketingStatusOptions = activeSelectable
+    .filter((v) => v.type === SELECTABLE_GROUPS.marketingStatus)
+    .map((v) => v.value)
+  const brandCategoryOptions = activeSelectable
+    .filter((v) => v.type === SELECTABLE_GROUPS.brandCategory)
+    .map((v) => v.value)
+  const departmentOptions = activeSelectable
+    .filter((v) => v.type === SELECTABLE_GROUPS.department)
+    .map((v) => v.value)
   const helpTypeOptions = activeSelectable.filter((v) => v.type === "Ticket type").map((v) => v.value)
   const learningCategoryOptions = activeSelectable
     .filter((v) => v.type === "Learning category")
@@ -151,6 +218,13 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
   // tab and the feed can never disagree. Undefined until page one lands, which
   // formatCount renders as nothing.
   const activityTotal = useCachedValue<number>(activityKey ? `total:${activityKey}` : null)
+  // THE GENERIC (table, id) RECORD FEED — Law R5, for the four agency-internal
+  // details. The three scopes above (team / user / invite) are the base's older
+  // fixed ones, named at the door; a module written today reads its history the
+  // generic way, and this map is the only thing that has to know which table a
+  // URL segment's records live in.
+  const internalTable = recordId ? (INTERNAL_ACTIVITY_TABLE[module ?? ""] ?? null) : null
+  const internalActivity = useRecordActivity(enabled ? internalTable : null, recordId)
   // The invite-detail audit (inviter snapshot + acceptance) — only when viewing
   // one invite. Cache-first + live (a revoke/accept ping refreshes its invite row).
   const inviteAuditQ = useCached(
@@ -175,10 +249,19 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
     helpTypeOptions,
     learningCategoryOptions,
     contentTypeOptions,
+    marketingQ,
+    brandQ,
+    programmesQ,
+    purposesQ,
+    marketingChannelOptions,
+    marketingStatusOptions,
+    brandCategoryOptions,
+    departmentOptions,
     activityScope,
     activityKey,
     activityQ,
     activityTotal,
+    internalActivity,
     inviteAuditQ,
   }
 }

@@ -139,7 +139,24 @@ describe("a module refuses a client login on both halves, or on neither", () => 
     // staff member is doing the work", the one thing SCOPE ch.06 says the portal
     // never shows. What a client sees of a story is a COUNT on their own ticket,
     // served by the ticket door. `processes` is the contrast, three lines down.
-    ).toEqual(["agent", "commercials", "knowledge", "learning", "selectable_data", "work"])
+    //
+    // The four agency-internal modules joined the day they shipped, not by later
+    // discovery: every one of them holds the agency's own material — what we
+    // publish, the material we publish it with, how we run delivery, and who our
+    // people are — so there is no fenced slice of any of them to serve a client,
+    // only a refusal, on every door of both halves.
+    ).toEqual([
+      "agent",
+      "brand_assets",
+      "commercials",
+      "delivery",
+      "knowledge",
+      "learning",
+      "marketing",
+      "selectable_data",
+      "staff_profiles",
+      "work",
+    ])
     //
     // `commercials` joined the set the day the money shipped, and it is the
     // clearest member of it: BOTH rate cards and the margin are the agency's own

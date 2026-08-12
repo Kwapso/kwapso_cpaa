@@ -102,6 +102,10 @@ const TOOLLESS_DOORS: Record<string, string> = {
 
   "POST /api/data-ops/agent/translate-ticket":
     "the ONE button in the app that spends the team's AI allowance without going through a chat turn, and that is exactly why it is not on this surface. MCP.md §6 is a promise about cost: a machine token's reads, writes, exports and imports are free endpoint hits, and only `agent_chat` / `agent_confirm` / `plan_import` draw the allowance — a role without the agent right spends zero AI. A tool here would put a fourth spender on that list, silently, from a headless client that cannot see the balance it is drawing down. Changing the cost model is the owner's decision, not a parity default. And the capability is already reachable in the shape this surface is built for: a chat turn translates the title (metered, visible in the usage log) and calls `update_help_ticket` with `titleEn`, which is one of the fields R22 makes it expose.",
+  "POST /api/content/brand-assets/upload":
+    "the same door as the learning upload, for the same bytes and the same reason: up to 25 MB of base64 argument on a surface whose whole ANSWER is capped at 400,000 characters. A machine writes the brand-asset ROW — create_brand_asset carries `fileUrl` — and references a file it already has a URL for. Uploading the bytes is a screen action.",
+  "POST /api/content/staff/upload":
+    "the third of the byte-shovels, and the narrowest: a profile photo or a certificate PDF, up to 25 MB of base64. save_staff_profile and create_staff_certificate both carry the URL field, so the record half is fully machine-writable; the bytes are not, for the arithmetic reason the other two give.",
 
   /* -------------------------------- auth --------------------------------- */
   "POST /api/auth/email/start":

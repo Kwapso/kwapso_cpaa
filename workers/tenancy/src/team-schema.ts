@@ -1178,6 +1178,206 @@ CREATE TABLE triage_duty (
 CREATE UNIQUE INDEX idx_triage_duty_week ON triage_duty (week_start);
 `,
   },
+  {
+    // THE AGENCY'S OWN HOUSEKEEPING — the seven Glide tables that describe how
+    // the agency runs itself. Six tables here, four permission modules, and two
+    // legacy tables that deliberately became dropdown GROUPS instead (see the
+    // INSERT at the bottom): a table of bare labels is a vocabulary, and the base
+    // already has one place for those.
+    //
+    // WHAT EVERY TABLE HERE HAS IN COMMON, and it is the whole security story:
+    // no `account_id` column, anywhere. These rows belong to the agency, not to a
+    // customer, so there is nothing for the account fence to fence — and a fence
+    // that could be forgotten is worse than one that was never needed. The
+    // defence is at the door instead: every handler on all four modules opens
+    // with `refusePortalCaller` (R21), and the refusal-symmetry suite holds both
+    // halves of each module to the same answer.
+    version: "0018_agency_internal",
+    sql: `
+-- MARKETING: what the agency publishes about itself — 251 posts across six
+-- channels in the legacy app. \`channel\` is a STRING, pick-or-created against the
+-- "Marketing channel" dropdown group, exactly as a learning article's category is
+-- pick-or-created against "Learning category". That is what makes six channels a
+-- canonical six instead of six spellings, without a second table to join.
+--
+-- \`published_on\` is a DATE (YYYY-MM-DD), not a timestamp: a post goes out on a
+-- day, and storing an instant would invent a precision nobody typed. NULL is a
+-- post that has not gone out yet, which is a real and common state.
+CREATE TABLE marketing_posts (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  channel TEXT,
+  status TEXT,
+  summary TEXT,
+  body TEXT,
+  link TEXT,
+  published_on TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+CREATE INDEX idx_marketing_posts_channel ON marketing_posts (channel);
+CREATE INDEX idx_marketing_posts_published ON marketing_posts (published_on);
+
+-- THE BRAND LIBRARY: 74 rows of the material everything else is made with —
+-- logos, decks, templates. \`file_url\` is either an object we host (a
+-- /media/internal/… URL minted by the upload door) or a link somewhere else, and
+-- the column does not care which: the legacy rows arrive as Google-hosted links
+-- that have to be re-hosted before Glide is switched off, and a schema that
+-- insisted on one shape would make that migration a rewrite instead of a copy.
+CREATE TABLE brand_assets (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  category TEXT,
+  description TEXT,
+  file_url TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+CREATE INDEX idx_brand_assets_category ON brand_assets (category);
+
+-- THE DELIVERY METHOD, in two tables under one module.
+--
+-- A PROGRAMME is a way we run an engagement — the ten rows the legacy app used
+-- to describe how delivery works. \`sequence\` is display order only, the same
+-- meaning it has on a learning article: nothing is locked to it.
+CREATE TABLE programs (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  sequence INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+
+-- A MEETING PURPOSE is why we meet — and it is the one legacy lookup that could
+-- NOT become a dropdown value, because a purpose belongs to a department and a
+-- dropdown row is a single label with nowhere to put the second fact. Dropping
+-- the link to make the table fit the vocabulary seam would have been a silent
+-- loss of the only structure the table has. So the purpose is a record, and the
+-- DEPARTMENT it belongs to is the dropdown value (pick-or-created against the
+-- "Department" group) — each of the two facts stored the way its own shape asks.
+CREATE TABLE meeting_purposes (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  department TEXT,
+  description TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+CREATE INDEX idx_meeting_purposes_department ON meeting_purposes (department);
+
+-- THE PERSON BEHIND THE MEMBER ROW. Six staff rows in the legacy app carry a
+-- personality profile — strengths, weaknesses, the people they look up to — and
+-- the reconciliation's recommendation was to leave them behind as "a team page,
+-- not a system record". The owner overruled it and asked for real storage, so
+-- this is a table with an audit block and a history like every other record.
+--
+-- \`user_id\` is the GLOBAL user id, held as plain TEXT with no REFERENCES — the
+-- members themselves live in the core database, so a foreign key here would name
+-- a table this database does not have. \`learning_progress.user_id\` has exactly
+-- the same shape for exactly the same reason.
+--
+-- The partial unique index is the invariant: ONE live profile per person. It
+-- rides the database rather than a read-then-write in a handler, so two tabs
+-- saving a profile at the same instant cannot make two of them (CONCURRENCY
+-- rule 2) — and it is partial so that deactivating a profile and writing a fresh
+-- one is still allowed, which a plain UNIQUE would refuse.
+CREATE TABLE staff_profiles (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  headline TEXT,
+  personality_type TEXT,
+  strengths TEXT,
+  weaknesses TEXT,
+  role_models TEXT,
+  about TEXT,
+  photo_url TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+CREATE UNIQUE INDEX idx_staff_profiles_user
+  ON staff_profiles (user_id) WHERE deactivated_at IS NULL;
+
+-- A CERTIFICATE a member holds. Five rows in the legacy app, described there as
+-- learning completions — which is why the columns are a CREDENTIAL's rather than
+-- a completion's (an issuer, the day it was granted, the day it lapses, the
+-- paper itself). A completion fits inside a credential; the reverse does not,
+-- and the base already records "this person finished this article" in
+-- learning_progress, so shaping these five rows as completions would have been a
+-- second, weaker copy of a thing that already exists.
+CREATE TABLE staff_certificates (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  issuer TEXT,
+  issued_on TEXT,
+  expires_on TEXT,
+  file_url TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+CREATE INDEX idx_staff_certificates_user ON staff_certificates (user_id);
+
+-- Existing teams: the locked Admin role gains all four new modules in full (it
+-- is DEFINED as full access and cannot be edited afterwards to grant them).
+-- Every other role gains nothing — a migration must never hand out sight of the
+-- agency's own material that nobody granted. Same shape as 0007 and 0013, for
+-- the same reason. New teams don't reach this: their seed already writes the rows.
+INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+SELECT lower(hex(randomblob(16))), r.id, m.module, r.is_default, r.is_default, r.is_default, r.is_default
+  FROM member_roles r
+  CROSS JOIN (
+    SELECT 'marketing' AS module
+    UNION ALL SELECT 'brand_assets'
+    UNION ALL SELECT 'delivery'
+    UNION ALL SELECT 'staff_profiles'
+  ) m
+ WHERE NOT EXISTS (
+   SELECT 1 FROM role_permissions p WHERE p.role_id = r.id AND p.module = m.module
+ );
+
+-- THE SIXTEEN UNGROUPED LEGACY VALUES, ANSWERED AS TWO GROUPS.
+--
+-- Sixteen of the legacy app's 154 dropdown values carried no group at all: ten
+-- country names, five company-size bands and one stray hyphen. The alternative
+-- was to make them two FIELDS on the account; the owner overruled it, and the
+-- reason holds up — a country typed free into an address is a country spelled
+-- five ways by five people, and the whole point of the dropdown module is that
+-- the fifth person picks what the first one wrote.
+--
+-- So the two groups are created here, seeded with the bands (five, as the legacy
+-- data has) and with the countries the customer records themselves evidence: the
+-- language field is German, Spanish, Catalan or English, and the addresses are
+-- European. The legacy labels arrive with the migration and pick-or-create into
+-- these same two groups, which is the part that was at risk — a group that
+-- exists is a group the import lands IN, instead of sixteen more homeless rows.
+-- The stray hyphen is not carried across: it is not a value, it is a typo.
+INSERT INTO selectable_data (id, type, value, is_default, created_at, creator_id, creator_email, creator_name)
+SELECT lower(hex(randomblob(16))), v.type, v.value, 1, datetime('now'), NULL, NULL, 'System'
+  FROM (
+    SELECT 'Country' AS type, 'Germany' AS value
+    UNION ALL SELECT 'Country', 'Austria'
+    UNION ALL SELECT 'Country', 'Switzerland'
+    UNION ALL SELECT 'Country', 'Spain'
+    UNION ALL SELECT 'Country', 'Andorra'
+    UNION ALL SELECT 'Country', 'United Kingdom'
+    UNION ALL SELECT 'Company size', '1–10'
+    UNION ALL SELECT 'Company size', '11–50'
+    UNION ALL SELECT 'Company size', '51–200'
+    UNION ALL SELECT 'Company size', '201–500'
+    UNION ALL SELECT 'Company size', 'More than 500'
+  ) v
+ WHERE NOT EXISTS (
+   SELECT 1 FROM selectable_data s WHERE s.type = v.type AND s.value = v.value
+ );
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }
@@ -1220,6 +1420,28 @@ export const DEFAULT_SELECTABLE: { type: string; value: string }[] = [
   { type: "Story status", value: "In progress" },
   { type: "Story status", value: "In review" },
   { type: "Story status", value: "Done" },
+  // THE TWO GROUPS THE LEGACY APP NEVER HAD. Sixteen of its 154 dropdown values
+  // carried no group: ten countries, five company-size bands and one stray
+  // hyphen. They could have become two FIELDS on the account; the owner ruled
+  // for two GROUPS instead, and the reason is the one the whole module exists
+  // for — a country typed free into an address is a country spelled five ways.
+  //
+  // These are a STARTING vocabulary, like the ticket types above: the ten legacy
+  // country labels arrive with the migration and pick-or-create into this same
+  // group (a label already here is a no-op, a new spelling is a new row), and a
+  // team adds or retires any of them on the Dropdown values screen. The hyphen
+  // is not carried across — it is not a value, it is a typo.
+  { type: "Country", value: "Germany" },
+  { type: "Country", value: "Austria" },
+  { type: "Country", value: "Switzerland" },
+  { type: "Country", value: "Spain" },
+  { type: "Country", value: "Andorra" },
+  { type: "Country", value: "United Kingdom" },
+  { type: "Company size", value: "1–10" },
+  { type: "Company size", value: "11–50" },
+  { type: "Company size", value: "51–200" },
+  { type: "Company size", value: "201–500" },
+  { type: "Company size", value: "More than 500" },
 ]
 
 /**

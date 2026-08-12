@@ -107,8 +107,35 @@ departments ← purposes, meetings, tasks
 `content` and `channels` are a marketing pipeline — 251 posts across six channels.
 `branding` is a 74-row asset library. `program` and `purposes` support meetings and
 the delivery method. None of these is client-facing, and none is in the scope
-document. **My recommendation is to archive the rows and build none of it** until
-you say otherwise — but 251 posts is not nothing, so it is your call, not mine.
+document. **My recommendation was to archive the rows and build none of it** — but
+251 posts is not nothing, so it was the owner's call, not mine.
+
+**ANSWERED, 2026-08-12: build all seven, as proper modules.** They landed as four
+team modules and two dropdown groups (team migration `0014_agency_internal`; see
+DATA-MODEL.md for the tables and the reasoning):
+
+| Glide | Rows | Became |
+|---|---|---|
+| `content` | 251 | `marketing_posts`, in the **Marketing** module |
+| `channels` | 6 | the **"Marketing channel"** dropdown group |
+| `branding` | 74 | `brand_assets`, in the **Brand library** module |
+| `program` | 10 | `programs`, in the **Delivery method** module |
+| `purposes` | 27 | `meeting_purposes`, in the same module |
+| `departments` | 8 | the **"Department"** dropdown group |
+| `certificates` | 5 | `staff_certificates`, in the **Staff profiles** module |
+
+Each module is a module in the full sense the owner asked for: a permission-matrix
+row, gated API doors, agent and MCP tools, an import target with a sample file, a
+CSV export, screens with record details, and its own tests. The two that became
+dropdown GROUPS are bare labels with no fields of their own, and the base already
+has one home for a team's editable vocabulary — a module built to hold a word is
+ceremony, and a dropdown group is itself a permissioned, importable, machine-
+readable thing.
+
+**Where the columns came from.** The Glide rows were never pulled (the API key was
+never granted to the build), so each table's columns are designed from the row
+counts and descriptions above and are deliberately generous. Anything the real
+data turns out to carry is a column on an existing table, not a redesign.
 
 ---
 
@@ -137,10 +164,14 @@ It is only ~12,000 rows, the client portal is far more convincing with two years
 behind it, and a partial import is a decision you cannot reverse without redoing
 the whole exercise.
 
-**4 · The staff profiles.**
+**4 · The staff profiles.** — **ANSWERED, 2026-08-12: overruled, and rightly.**
 The six `users` rows carry personality-test results, strengths, weaknesses and
-role models. Delightful, and completely outside the data model. *Recommendation:*
-leave them behind; they are a team page, not a system record.
+role models. My recommendation was to leave them behind as "a team page, not a
+system record". The owner asked for real storage instead — a table, and R2 for any
+upload — and the overrule holds up: a profile edited by a colleague, with no
+history and no permission behind it, is a page anybody can quietly change about
+somebody else. They are now `staff_profiles`, one live row per person, on each
+member's own page, visible to the team and reachable by no client login at all.
 
 **5 · The Google-hosted files.**
 Every logo, photo, asset and attachment is a `storage.googleapis.com/glide-prod...`
@@ -148,10 +179,13 @@ URL. Those links die with the Glide account. *Recommendation:* the import copies
 each file into R2 as it goes. This is the one piece of the migration with a
 deadline attached — do not cancel Glide before it runs.
 
-**6 · The uncategorised dropdown values.**
+**6 · The uncategorised dropdown values.** — **ANSWERED, 2026-08-12: overruled.**
 Sixteen of the 154 choices have no group and are really countries and company-size
-bands. *Recommendation:* they become proper fields on the account rather than
-dropdown rows.
+bands. My recommendation was to make them fields on the account; the owner ruled
+for two proper GROUPS in `selectable_data` — "Country" and "Company size" — so
+nobody types the same country five ways. Both groups ship seeded, for new teams
+and existing ones alike. The sixteenth value, a stray hyphen, is binned: it is not
+a value, it is a typo.
 
 ---
 

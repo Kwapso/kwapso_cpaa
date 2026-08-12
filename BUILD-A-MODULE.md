@@ -641,3 +641,23 @@ Beyond the golden path, a module that ships without these turns the build red:
   `ACTIVITY_GATE_MAP` (or a pinned `ACTIVITY_TABLE_EXEMPT` reason).
 - **Filter parity (R19):** any GET agent/MCP tool exposes + forwards every param
   its door parses.
+- **Body parity (R22):** any POST agent/MCP tool exposes + forwards every field
+  its door reads off the body, or names a reason in `NARROWED_BODY_FIELDS`.
+- **A tool, or a written reason (the door census):** every non-admin door on
+  tenancy / content / data-ops / auth must have a tool on some machine surface or
+  a line in `TOOLLESS_DOORS` (`workers/mcp/test/filter-parity.test.ts`). A byte
+  upload is the usual honest exemption — see the three there.
+- **A trace, or a written reason:** every WRITE tool maps to a screen in
+  `web/lib/agent-trace.ts` or joins `SCREENLESS_WRITE_TOOLS` with its reason.
+
+**Two seams a new module reuses rather than rewrites** (both earned by the
+agency-internal build, which needed five copies of the first and four of the
+second before they were lifted):
+
+- **Pick-or-create a vocabulary value** — `ensureSelectableValue`
+  (`workers/content/src/lib/vocabulary.ts`), with the group name declared once in
+  `shared/selectable-groups.ts`. A free-typed channel / category / department
+  becomes a canonical dropdown value instead of a fifth spelling.
+- **A typed field a form collects** — `optionalDate` / `safeExternalLink`
+  (`workers/content/src/lib/internal-fields.ts`). A date is a real calendar day or
+  a clean 400; a link is http/https/mailto or it is dropped.

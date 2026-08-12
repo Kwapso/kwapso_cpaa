@@ -76,5 +76,17 @@ export const GLOSSARY = {
   margin: { term: "Margin", def: "What is left of revenue after our own time and tool costs. Ours alone — never shown to a client." },
   toolCost: { term: "Tool cost", def: "What an app costs us to keep running each month — hosting and the services behind it." },
   priceVisibility: { term: "Price visibility", def: "The switch on an account that decides whether they see what they bought. Value is shown either way." },
+
+  // THE AGENCY'S OWN HOUSEKEEPING — the words for the four modules that describe
+  // how we run ourselves. Every definition here says, or implies, the same thing
+  // the code says at every door: this is ours, and a client never sees it.
+  marketingPost: { term: "Marketing post", def: "Something we published about ourselves — on a channel, on a day. Ours alone; it never reaches a client's portal." },
+  channel: { term: "Channel", def: "Where a marketing post goes out — the newsletter, a social account, the blog." },
+  brandAsset: { term: "Brand asset", def: "One piece of our own brand material: a logo, a deck, a template." },
+  programme: { term: "Programme", def: "A way we run an engagement, start to finish." },
+  meetingPurpose: { term: "Meeting purpose", def: "Why we meet — and the department it belongs to." },
+  department: { term: "Department", def: "The part of the agency a person or a meeting belongs to." },
+  staffProfile: { term: "Staff profile", def: "What a colleague is like and how they work best. The team can read it; a client never can." },
+  certificate: { term: "Certificate", def: "A qualification someone on the team holds — who issued it, and when it lapses." },
 } as const satisfies Record<string, GlossaryEntry>
 

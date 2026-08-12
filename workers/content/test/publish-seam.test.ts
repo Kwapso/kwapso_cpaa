@@ -22,6 +22,12 @@ const HOUSEKEEPING = [
   // changes no record anybody else can see and no screen anybody else is looking
   // at, so there is nothing for a ping to patch.
   "POST /api/content/work-logs/auto-stop",
+  // The agency's own housekeeping: two more byte-shovels, same reasoning. The
+  // brand library re-hosts 74 legacy files that die with the Glide account, and
+  // a staff photo or a certificate PDF lands the same way. Neither writes a row
+  // — the create/edit that references the URL pings its own.
+  "POST /api/content/brand-assets/upload",
+  "POST /api/content/staff/upload",
 ]
 
 publishSeam({

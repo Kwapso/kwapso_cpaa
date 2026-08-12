@@ -32,7 +32,8 @@
     // Shared with both gateways — the one bucket a CLIENT can both write to (a
     // to-do's attachment) and read back (`/media/*` is served by the portal door
     // as well as the agency one).
-    { "binding": "MEDIA", "bucket_name": "kwapso-media" }
+    { "binding": "MEDIA", "bucket_name": "kwapso-media" },
+    { "binding": "INTERNAL_MEDIA", "bucket_name": "kwapso-internal-media" }
   ],
   "ai": { "binding": "AI" },
   "vars": { "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7", "PUBLIC_APP_URL": "https://agency.kwapso.app" },
@@ -61,7 +62,8 @@
       "r2_buckets": [
         { "binding": "LEARNING_MEDIA", "bucket_name": "kwapso-learning-media-staging" },
         { "binding": "HELP_MEDIA", "bucket_name": "kwapso-help-media-staging" },
-        { "binding": "MEDIA", "bucket_name": "kwapso-media-staging" }
+        { "binding": "MEDIA", "bucket_name": "kwapso-media-staging" },
+        { "binding": "INTERNAL_MEDIA", "bucket_name": "kwapso-internal-media-staging" }
       ],
       "ai": { "binding": "AI" },
       "triggers": { "crons": ["*/15 * * * *", "0 7 * * *"] },

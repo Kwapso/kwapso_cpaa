@@ -138,7 +138,9 @@ Today it covers:
   `get_knowledge_status`. Each list tool that sits on a door with an
   `list_agent_threads`, `get_agent_thread`, `list_apps`, `list_processes`,
   `get_process`, `list_process_comments`, `read_value`, `list_account_rates`,
-  `list_internal_rates`, `read_margin`. Each list tool that sits on a door with an
+  `list_internal_rates`, `read_margin`, `list_marketing_posts`, `list_brand_assets`,
+  `list_programmes`, `list_meeting_purposes`, `list_staff_profiles`,
+  `list_staff_certificates`. Each list tool that sits on a door with an
   `?id=` filter EXPOSES + FORWARDS it (R19 parity) — pass `id` to fetch one record
   instead of pulling the whole collection (`list_help_tickets` also takes `scope`
   and `view`, the latter choosing the everyday list or the archive drawer;
@@ -197,8 +199,23 @@ Today it covers:
   for `run_import`, `plan_import`, `agent_chat` and `agent_confirm`, which are supposed
   to take a while) comes back `door_timeout` rather than holding your call open with
   nothing to read. A timeout is not a rollback: read before retrying a write.
+- **File uploads are not on this surface — three doors, one reason.**
+  `/api/content/learning/upload`, `/api/content/brand-assets/upload` and
+  `/api/content/staff/upload` each take up to 25 MB of base64 data URL, on a
+  surface whose whole ANSWER is capped at 400,000 characters. The RECORD half of
+  each is fully machine-writable — `create_brand_asset`, `save_staff_profile` and
+  `create_staff_certificate` all carry the URL field — so a machine writes the row
+  and references a file it already has a URL for. Uploading the bytes is a screen
+  action.
 - **Export (full-field CSV):** `export_roles_csv`, `export_learning_csv`,
-  `export_dropdown_values_csv`, `export_accounts_csv`.
+  `export_dropdown_values_csv`, `export_accounts_csv`, `export_marketing_posts_csv`,
+  `export_brand_assets_csv`, `export_programmes_csv`, `export_meeting_purposes_csv`,
+  `export_certificates_csv`.
+
+  **Staff PROFILES have no export, on purpose.** A credential register is the kind
+  of thing somebody hands an auditor; a one-click spreadsheet of what each of your
+  colleagues is bad at is not a capability anybody asked for, and the write door
+  that fills those fields is confirm-gated for the same reason.
 
   **An export is ONE WHOLE DOCUMENT — never a page, and never a short file.** That is
   the deliberate answer to "why doesn't an export take a cursor?", and it is R14's own

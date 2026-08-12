@@ -185,6 +185,11 @@ describe("safeMediaKey — the door validates the key at the boundary", () => {
       ).toBe(false)
     }
     // The tripwire: a scan that finds no doors reports "all clear" like a pass.
-    expect(doors, "the two gateways ship three media doors between them").toBe(3)
+    // FOUR now — the agency gateway grew /media/internal/ when the agency's own
+    // housekeeping landed (brand assets, staff photos, certificate PDFs). It is
+    // on the AGENCY door only, and deliberately: a capability URL that leaked
+    // into a client's hands has nowhere on the portal to be redeemed, which is
+    // the routing half of the refusal every one of those API doors already makes.
+    expect(doors, "the two gateways ship four media doors between them").toBe(4)
   })
 })

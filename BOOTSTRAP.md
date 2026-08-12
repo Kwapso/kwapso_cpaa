@@ -134,6 +134,8 @@ npx wrangler r2 bucket create kwapso-learning-media           # learning attachm
 npx wrangler r2 bucket create kwapso-learning-media-staging
 npx wrangler r2 bucket create kwapso-help-media               # ticket attachments — name follows the table (content HELP_MEDIA)
 npx wrangler r2 bucket create kwapso-help-media-staging
+npx wrangler r2 bucket create kwapso-internal-media            # the agency's OWN files: brand assets, staff photos, certificate PDFs (content INTERNAL_MEDIA)
+npx wrangler r2 bucket create kwapso-internal-media-staging
 ```
 
 Inside each bucket, keys are prefixed per team (`teams/<id>`, `learning/<teamId>/<fileId>`, …).
@@ -305,10 +307,10 @@ core `teams` table to find them).
    npx wrangler d1 delete <name>-core-staging
    ```
 
-4. **The six R2 buckets** (empty each first, then delete):
+4. **The eight R2 buckets** (empty each first, then delete):
 
    ```bash
-   for b in media learning-media help-media; do
+   for b in media learning-media help-media internal-media; do
      npx wrangler r2 bucket delete <name>-$b
      npx wrangler r2 bucket delete <name>-$b-staging
    done

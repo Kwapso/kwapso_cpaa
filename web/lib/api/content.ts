@@ -12,6 +12,7 @@
 // the day it lands.
 
 import type {
+  BrandAsset,
   HelpMessage,
   HelpStakeholder,
   HelpTicket,
@@ -25,6 +26,11 @@ import type {
   Task,
   Todo,
   WorkLog,
+  MarketingPost,
+  MeetingPurpose,
+  Program,
+  StaffCertificate,
+  StaffProfile,
 } from "@shared/types"
 import { api, enc, post } from "@shared/web/api"
 import type { PagedResponse } from "@shared/web/api"
@@ -324,6 +330,83 @@ export const content = {
       caughtUp: boolean
       total: number
     }>("/api/content/knowledge/sync", post({})),
+
+  /* ------------------- the agency's own housekeeping ------------------------
+   * Four modules, all CAPPED rather than paged (R14) — authored libraries and
+   * settled taxonomies, the same shape Learning is, so each door answers with
+   * the whole collection plus its exact `total` for the badge (R16). */
+  marketing: () => api<{ posts: MarketingPost[]; total: number }>("/api/content/marketing"),
+  marketingOne: (id: string) =>
+    api<{ posts: MarketingPost[] }>(`/api/content/marketing?id=${enc(id)}`).then((r) => r.posts[0] ?? null),
+  createMarketingPost: (input: Partial<MarketingPost>) =>
+    api<{ posts: MarketingPost[]; total: number }>("/api/content/marketing", post(input)),
+  updateMarketingPost: (input: Partial<MarketingPost> & { id: string }) =>
+    api<{ posts: MarketingPost[]; total: number }>("/api/content/marketing/update", post(input)),
+  setMarketingPostActive: (id: string, active: boolean) =>
+    api<{ posts: MarketingPost[]; total: number }>("/api/content/marketing/active", post({ id, active })),
+
+  brandAssets: () => api<{ assets: BrandAsset[]; total: number }>("/api/content/brand-assets"),
+  brandAssetOne: (id: string) =>
+    api<{ assets: BrandAsset[] }>(`/api/content/brand-assets?id=${enc(id)}`).then((r) => r.assets[0] ?? null),
+  createBrandAsset: (input: Partial<BrandAsset>) =>
+    api<{ assets: BrandAsset[]; total: number }>("/api/content/brand-assets", post(input)),
+  updateBrandAsset: (input: Partial<BrandAsset> & { id: string }) =>
+    api<{ assets: BrandAsset[]; total: number }>("/api/content/brand-assets/update", post(input)),
+  setBrandAssetActive: (id: string, active: boolean) =>
+    api<{ assets: BrandAsset[]; total: number }>("/api/content/brand-assets/active", post({ id, active })),
+  /** Upload the bytes behind an asset (gated brand_assets:create). Send the raw
+   * base64 data URL; get back the served /media/internal URL. */
+  uploadBrandAssetFile: (dataUrl: string) =>
+    api<{ url: string; contentType: string }>("/api/content/brand-assets/upload", post({ dataUrl })),
+
+  programmes: () => api<{ programs: Program[]; total: number }>("/api/content/delivery/programs"),
+  programmeOne: (id: string) =>
+    api<{ programs: Program[] }>(`/api/content/delivery/programs?id=${enc(id)}`).then((r) => r.programs[0] ?? null),
+  createProgramme: (input: Partial<Program>) =>
+    api<{ programs: Program[]; total: number }>("/api/content/delivery/programs", post(input)),
+  updateProgramme: (input: Partial<Program> & { id: string }) =>
+    api<{ programs: Program[]; total: number }>("/api/content/delivery/programs/update", post(input)),
+  setProgrammeActive: (id: string, active: boolean) =>
+    api<{ programs: Program[]; total: number }>("/api/content/delivery/programs/active", post({ id, active })),
+
+  meetingPurposes: () => api<{ purposes: MeetingPurpose[]; total: number }>("/api/content/delivery/purposes"),
+  meetingPurposeOne: (id: string) =>
+    api<{ purposes: MeetingPurpose[] }>(`/api/content/delivery/purposes?id=${enc(id)}`).then(
+      (r) => r.purposes[0] ?? null
+    ),
+  createMeetingPurpose: (input: Partial<MeetingPurpose>) =>
+    api<{ purposes: MeetingPurpose[]; total: number }>("/api/content/delivery/purposes", post(input)),
+  updateMeetingPurpose: (input: Partial<MeetingPurpose> & { id: string }) =>
+    api<{ purposes: MeetingPurpose[]; total: number }>("/api/content/delivery/purposes/update", post(input)),
+  setMeetingPurposeActive: (id: string, active: boolean) =>
+    api<{ purposes: MeetingPurpose[]; total: number }>("/api/content/delivery/purposes/active", post({ id, active })),
+
+  staffProfiles: () => api<{ profiles: StaffProfile[]; total: number }>("/api/content/staff/profiles"),
+  /** Write a colleague's profile — one door for "there wasn't one" and "there
+   * was" (see workers/content/src/routes/staff.ts for why it is not two). */
+  saveStaffProfile: (input: Partial<StaffProfile> & { userId: string }) =>
+    api<{ profiles: StaffProfile[]; total: number }>("/api/content/staff/profiles", post(input)),
+  setStaffProfileActive: (id: string, active: boolean) =>
+    api<{ profiles: StaffProfile[]; total: number }>("/api/content/staff/profiles/active", post({ id, active })),
+  uploadStaffFile: (dataUrl: string) =>
+    api<{ url: string; contentType: string }>("/api/content/staff/upload", post({ dataUrl })),
+
+  /** `userId` narrows at the DOOR, not in the client: a member's page shows one
+   * person's certificates, and filtering a capped list afterwards would disagree
+   * with the count beside it (R16). */
+  staffCertificates: (userId?: string) =>
+    api<{ certificates: StaffCertificate[]; total: number }>(
+      `/api/content/staff/certificates${userId ? `?userId=${enc(userId)}` : ""}`
+    ),
+  createStaffCertificate: (input: Partial<StaffCertificate> & { userId: string }) =>
+    api<{ certificates: StaffCertificate[]; total: number }>("/api/content/staff/certificates", post(input)),
+  updateStaffCertificate: (input: Partial<StaffCertificate> & { id: string }) =>
+    api<{ certificates: StaffCertificate[]; total: number }>("/api/content/staff/certificates/update", post(input)),
+  setStaffCertificateActive: (id: string, active: boolean) =>
+    api<{ certificates: StaffCertificate[]; total: number }>(
+      "/api/content/staff/certificates/active",
+      post({ id, active })
+    ),
 }
 
 /** Data-ops worker — the agentic file import + the AI agent. */

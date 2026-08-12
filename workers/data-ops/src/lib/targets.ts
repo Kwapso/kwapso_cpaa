@@ -277,6 +277,136 @@ export const TARGETS: Record<string, TargetDef> = {
       dueOn: r.dueOn || undefined,
     }),
   },
+
+  // ── THE AGENCY'S OWN HOUSEKEEPING ──────────────────────────────────────────
+  // Four of the seven legacy tables land here as import targets, which is what
+  // makes the migration a mapping exercise rather than a typing exercise: 251
+  // posts, 74 brand assets, 10 programmes and 27 meeting purposes go in through
+  // the SAME gated create doors a person uses, so every row lands audited,
+  // published and permission-checked. The fifth module (staff profiles) is a
+  // reasoned CATALOG_EXEMPT line instead — a CSV cannot say which colleague a
+  // profile belongs to.
+  //
+  // Each declares its vocabulary column as a `mode:"value"` reference to the
+  // dropdown target. The door auto-creates a missing value, so the reference's
+  // job is ORDER: import the vocabulary first and the channels, departments and
+  // categories are canonical before the rows that use them arrive — which is
+  // precisely the thing the two legacy label tables were folded in to achieve.
+  marketing_posts: {
+    tableKey: "marketing_posts",
+    module: "marketing",
+    displayName: "Marketing posts",
+    description:
+      "Bring the agency's own published posts in in bulk — what went out, on which channel, on which day. Ours alone: nothing here ever reaches a client's portal.",
+    columns: [
+      { key: "title", label: "Title", required: true },
+      { key: "channel", label: "Channel", required: false },
+      { key: "status", label: "Status", required: false },
+      { key: "summary", label: "Summary", required: false },
+      { key: "body", label: "Body", required: false },
+      { key: "link", label: "Link", required: false },
+      { key: "publishedOn", label: "Published on", required: false },
+    ],
+    endpoint: { binding: "CONTENT", path: "/api/content/marketing" },
+    exportPath: "/api/content/marketing/export",
+    naturalKey: "title",
+    sample: {
+      title: "How we halved a dispatch handover",
+      channel: "Newsletter",
+      status: "Published",
+      summary: "A short write-up of the Bergman process map",
+      body: "We mapped the handover, timed every step with them, and cut two of them entirely.",
+      link: "https://example.com/posts/dispatch-handover",
+      publishedOn: "2026-05-14",
+    },
+    references: [
+      { column: "channel", target: "selectable_data", by: "value", mode: "value", onMissing: "create" },
+    ],
+    buildBody: (r) => ({
+      title: r.title,
+      channel: r.channel || undefined,
+      status: r.status || undefined,
+      summary: r.summary || undefined,
+      body: r.body || undefined,
+      link: r.link || undefined,
+      publishedOn: r.publishedOn || undefined,
+    }),
+  },
+  brand_assets: {
+    tableKey: "brand_assets",
+    module: "brand_assets",
+    displayName: "Brand library",
+    description:
+      "Bring the agency's own brand material in in bulk — logos, decks, templates. The file column takes a link; the bytes are re-hosted separately.",
+    columns: [
+      { key: "name", label: "Name", required: true },
+      { key: "category", label: "Category", required: false },
+      { key: "description", label: "Description", required: false },
+      { key: "fileUrl", label: "File", required: false },
+    ],
+    endpoint: { binding: "CONTENT", path: "/api/content/brand-assets" },
+    exportPath: "/api/content/brand-assets/export",
+    naturalKey: "name",
+    sample: {
+      name: "Primary logo (dark)",
+      category: "Logos",
+      description: "For light backgrounds. SVG, no padding.",
+      fileUrl: "https://example.com/brand/logo-dark.svg",
+    },
+    references: [
+      { column: "category", target: "selectable_data", by: "value", mode: "value", onMissing: "create" },
+    ],
+    buildBody: (r) => ({
+      name: r.name,
+      category: r.category || undefined,
+      description: r.description || undefined,
+      fileUrl: r.fileUrl || undefined,
+    }),
+  },
+  programs: {
+    tableKey: "programs",
+    module: "delivery",
+    displayName: "Delivery programmes",
+    description: "Bring the ways the agency runs an engagement in in bulk, in the order they should read.",
+    columns: [
+      { key: "name", label: "Name", required: true },
+      { key: "description", label: "Description", required: false },
+      { key: "sequence", label: "Order", required: false },
+    ],
+    endpoint: { binding: "CONTENT", path: "/api/content/delivery/programs" },
+    exportPath: "/api/content/delivery/programs/export",
+    naturalKey: "name",
+    sample: { name: "Blueprint", description: "Two weeks mapping how the work is done today.", sequence: "1" },
+    buildBody: (r) => ({
+      name: r.name,
+      description: r.description || undefined,
+      sequence: r.sequence ? Number(r.sequence) : undefined,
+    }),
+  },
+  meeting_purposes: {
+    tableKey: "meeting_purposes",
+    module: "delivery",
+    displayName: "Meeting purposes",
+    description:
+      "Bring the reasons the agency meets in in bulk, each with the department it belongs to. A department that isn't a dropdown value yet is added as one.",
+    columns: [
+      { key: "name", label: "Name", required: true },
+      { key: "department", label: "Department", required: false },
+      { key: "description", label: "Description", required: false },
+    ],
+    endpoint: { binding: "CONTENT", path: "/api/content/delivery/purposes" },
+    exportPath: "/api/content/delivery/purposes/export",
+    naturalKey: "name",
+    sample: { name: "Sprint review", department: "Delivery", description: "Show the client what shipped." },
+    references: [
+      { column: "department", target: "selectable_data", by: "value", mode: "value", onMissing: "create" },
+    ],
+    buildBody: (r) => ({
+      name: r.name,
+      department: r.department || undefined,
+      description: r.description || undefined,
+    }),
+  },
 }
 
 /** A downloadable SAMPLE CSV for a target: a header row of the column LABELS + one

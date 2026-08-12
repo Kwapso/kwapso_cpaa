@@ -56,6 +56,10 @@ describe("no statement can bind more parameters than D1 accepts", () => {
       // rather than quietly passing, because the shape is the bug — see
       // BASE-IMPROVEMENTS.md.
       unique: "user ids to notify — bounded by team size, which is not a hard bound",
+      ids: "the same, one frame earlier in notify.ts — same bound, same admission",
+      FLIPPABLE:
+        "a module-level constant: the ticket statuses a Ready flip may move from. " +
+        "Five strings, fixed at author time — the one list here that is provably small.",
     }
     const found: string[] = []
     for (const file of sourceFiles(SRC, { extensions: [".ts"] })) {
