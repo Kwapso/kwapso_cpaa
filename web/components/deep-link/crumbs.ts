@@ -1,12 +1,31 @@
-// The breadcrumb trail for the current URL — pure, no React. Derived from the URL
-// spine (the library Breadcrumbs collapses the middle on small screens), so a
-// top-level page (/learning) reads as its own page and a /t page sits under
-// Settings › team. The last crumb is the current page, so it carries no href.
+// The breadcrumb trail for the current URL — pure, no React.
+//
+// TWO STEPS, and never more (the owner's ruling): WHERE YOU ARE, and WHAT IT IS
+// INSIDE. On a record that reads "Stories › BERG-S0188"; on a collection it is
+// the collection alone, because a page with nothing above it has nothing to say
+// in a second crumb.
+//
+// It used to be four on a team page — "Settings › Bergman S.A. › Members ›
+// Aurora" — which is the whole route rather than the position, and the route is
+// something the person just walked. The team's own admin sections keep their
+// team crumb because the team genuinely IS what they sit inside; the sidebar
+// pages sit inside nothing, so they get one crumb and stop.
 
 import { sectionTitle } from "@/components/deep-link/route"
 import { personName } from "@/lib/identity"
 import { type Crumb } from "@/lib/pages"
-import type { Account, Invite, KnowledgeSource, Learning, TeamMember, TeamRole } from "@shared/types"
+import type {
+  Account,
+  AppRow,
+  Invite,
+  KnowledgeSource,
+  Learning,
+  Sprint,
+  Story,
+  Task,
+  TeamMember,
+  TeamRole,
+} from "@shared/types"
 
 /** The already-loaded lists a record's own name can be read out of. Undefined =
  * still loading, and a crumb with no label is simply left off. */
@@ -17,6 +36,10 @@ export type CrumbRecords = {
   invites: Invite[] | undefined
   learning: Learning[] | undefined
   knowledge: KnowledgeSource[] | undefined
+  apps: AppRow[] | undefined
+  sprints: Sprint[] | undefined
+  stories: Story[] | undefined
+  tasks: Task[] | undefined
 }
 
 /** The record's own name for the last crumb — read from the list already in cache
@@ -32,6 +55,22 @@ function recordLabel(module: string | null, recordId: string | null, records: Cr
   if (module === "learning") return records.learning?.find((l) => l.id === recordId)?.title ?? "Article"
   if (module === "knowledge")
     return records.knowledge?.find((k) => k.id === recordId)?.title ?? "Source"
+  // The work engine. A story and a sprint are said out loud by their REFERENCE
+  // (BERG-S0188), which is the whole point of having one — so when the record
+  // carries one, that is what the crumb shows.
+  if (module === "apps") return records.apps?.find((a) => a.id === recordId)?.name ?? "App"
+  if (module === "sprints") {
+    const sprint = records.sprints?.find((s) => s.id === recordId)
+    return sprint ? (sprint.ref ?? sprint.name) : "Sprint"
+  }
+  if (module === "stories") {
+    const story = records.stories?.find((s) => s.id === recordId)
+    return story ? (story.ref ?? story.title) : "Story"
+  }
+  if (module === "tasks") {
+    const task = records.tasks?.find((t) => t.id === recordId)
+    return task ? (task.ref ?? task.title) : "Task"
+  }
   if (module === "tickets") return "Ticket"
   return ""
 }
@@ -53,21 +92,25 @@ export function buildCrumbs({
   sectionPath: string
   records: CrumbRecords
 }): Crumb[] {
-  const crumbs: Crumb[] = []
-  const last = () => {
-    const label = recordLabel(module, recordId, records)
-    if (label) crumbs.push({ label })
+  // STEP TWO — the record itself, the page you are on, so it carries no href.
+  const here = recordId ? recordLabel(module, recordId, records) : ""
+
+  // The team's own area. The team IS what these sit inside, so it is step one —
+  // and on the team overview itself there is nothing above it, so it stands alone.
+  if (!topLevel) {
+    if (!module || module === "team") return [{ label: teamName }]
+    const section: Crumb = { label: sectionTitle(module), href: recordId ? sectionPath : undefined }
+    // On a section list, step one is the team; on a record, step one is the
+    // section it came out of — always the thing DIRECTLY above, never the route.
+    return recordId
+      ? here
+        ? [section, { label: here }]
+        : [section]
+      : [{ label: teamName, href: teamPath }, { label: sectionTitle(module) }]
   }
-  if (topLevel) {
-    // A top-level page (Learning / Tickets) — its OWN page, not under Settings.
-    crumbs.push({ label: sectionTitle(module ?? ""), href: recordId ? sectionPath : undefined })
-    if (recordId) last()
-    return crumbs
-  }
-  crumbs.push({ label: "Settings", href: "/settings" }, { label: teamName, href: teamPath })
-  if (module && module !== "team") {
-    crumbs.push({ label: sectionTitle(module), href: sectionPath })
-    if (recordId) last()
-  }
-  return crumbs
+
+  // A sidebar page (/stories, /tickets, /apps…). It sits inside nothing, so a
+  // collection is one crumb and a record is two.
+  const section: Crumb = { label: sectionTitle(module ?? ""), href: recordId ? sectionPath : undefined }
+  return recordId && here ? [section, { label: here }] : [section]
 }

@@ -110,6 +110,17 @@ export const listFetch = {
       primeCache(cursorKey(helpKey(teamId, "mine")), r.nextCursor)
       return r.tickets
     }),
+  // PUT AWAY, AND FINDABLE. The archived view is its own paged read, and it has
+  // to exist: archive shipped as a door with no button, and giving it a button
+  // without giving the put-away pile a screen would only move the dead end one
+  // step along. Its `total` is the count over THIS view (the door counts the
+  // same question it listed), so it never collides with the live badge.
+  helpArchived: (teamId: string) =>
+    contentApi.help("all", null, "archived").then((r) => {
+      primeCache(totalKey("help-archived", teamId), r.total)
+      primeCache(cursorKey(helpKey(teamId, "archived")), r.nextCursor)
+      return r.tickets
+    }),
   // R14: process maps are PAGED — every app of every client grows them, and none
   // is ever deleted (the savings computed from a baseline have to stay checkable
   // years later). Page one lands in the cache, its next cursor in the sidecar
@@ -125,8 +136,12 @@ export const listFetch = {
   // its next cursor in the sidecar <LoadMore> reads.
   stories: (teamId: string) =>
     contentApi.stories().then((r) => {
-      primeCache(totalKey("work", teamId), r.total)
-      primeCache(totalKey("work-mine", teamId), r.mineTotal)
+      // The total prefix is `stories`, which is also the RESOURCE name the
+      // worker publishes — that is what lets the shell's ±1 bump on an add/remove
+      // land on the sidecar this screen reads. It used to be `work`, so a
+      // colleague adding a story moved a badge nobody was looking at.
+      primeCache(totalKey("stories", teamId), r.total)
+      primeCache(totalKey("stories-mine", teamId), r.mineTotal)
       primeCache(cursorKey(storiesKey(teamId)), r.nextCursor)
       return r.stories
     }),
@@ -158,6 +173,14 @@ export const listFetch = {
     contentApi.sprints().then((r) => {
       primeCache(totalKey("sprints", teamId), r.total)
       return r.sprints
+    }),
+  // THE SYSTEMS WE HAVE BUILT. Bounded like the sprints (an agency has tens of
+  // apps), read whole for the team — the same set backs the Apps page, the app
+  // picker on a map, and the app NAME beside a sprint or a story.
+  apps: (teamId: string) =>
+    tenancy.apps().then((r) => {
+      primeCache(totalKey("apps", teamId), r.total)
+      return r.apps
     }),
   // THE AGENCY'S OWN HOUSEKEEPING — four capped collections (R14: authored
   // libraries and settled taxonomies, not feeds), so each fetcher primes its
@@ -322,9 +345,16 @@ export function knowledgeKey(teamId: string): string {
 /** The ticket list's cache key. My/All is a SERVER scope, not a client filter:
  * once a list is paged, filtering the loaded page by raiser would show "my
  * tickets in the newest 50" under a badge counting all of them (R16). */
-export function helpKey(teamId: string, scope: "mine" | "all"): string {
-  return scope === "mine" ? `help-mine:${teamId}` : `help:${teamId}`
+export function helpKey(teamId: string, scope: HelpScope): string {
+  if (scope === "mine") return `help-mine:${teamId}`
+  if (scope === "archived") return `help-archived:${teamId}`
+  return `help:${teamId}`
 }
+
+/** Which pile of tickets a screen is showing. Two of these are a raiser filter
+ * (`mine` / `all`) and one is a VIEW (`archived`), and they are one type because
+ * a screen shows exactly one of the three at a time — the strip is one strip. */
+export type HelpScope = "mine" | "all" | "archived"
 
 /** Row-level live registry: a "<resource> row <id> changed" ping → re-pull JUST
  * that row and patch it into the cached list (never refetch the whole list);
@@ -576,6 +606,20 @@ export const TEAM_RESOURCES: Record<
     fetchList: (t) => listFetch.accounts(t),
     deps: (_t, id) => [ratesKey(id), marginKey(id), accountKey(id)],
   },
+  // APPS — row-level live now that they have a list and a record screen of their
+  // own. Like the staff profiles above, an app has no by-id read door (it is
+  // never opened from anywhere but the whole, small, bounded set), so the
+  // row-level fetchOne re-reads the set and picks the row out — the honest way
+  // to patch one row when the door answers in collections. The deps carry what
+  // moves with an app: the savings drilled through it, and the sprints and
+  // stories whose rows say its name.
+  apps: {
+    key: (t) => appsKey(t),
+    idField: "id",
+    fetchOne: (id) => tenancy.apps().then((r) => r.apps.find((a) => a.id === id) ?? null),
+    fetchList: (t) => listFetch.apps(t),
+    deps: (t, id) => [valueKey(t), sprintsKey(t), storiesKey(t), `activity:record:apps:${id}`],
+  },
 }
 
 /** Coarse listeners for resources with no row-shaped cache: the ping just drops
@@ -585,9 +629,6 @@ export const SIMPLE_INVALIDATIONS: Record<string, (teamId: string) => string[]> 
   team: (t) => [`team-meta:${t}`],
   // Per-team screen-recipe overrides (was a deaf publisher before R15).
   screens: (t) => [`screens:${t}`],
-  // An app has no list of its own — it is read on the maps screen (as a filter
-  // and a heading) and inside the value drill-down, so a ping drops both.
-  apps: (t) => [appsKey(t), valueKey(t)],
   // The agency's own cost card is TEAM-wide (an internal rate belongs to the
   // agency, not to any account), so a coarse drop is the whole of it. The MARGIN
   // caches it feeds are keyed per account and cannot be enumerated from here —

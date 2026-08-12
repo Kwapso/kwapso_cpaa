@@ -652,7 +652,7 @@ export const GROWING_COLLECTIONS: Record<
     fn: "listStories",
     routes: "workers/content/src/routes/stories.ts",
     rowsKey: "stories",
-    listRecipe: "work.list",
+    listRecipe: "stories.list",
     webKey: "storiesKey(",
     why: "one piece of work per thing we do, kept forever — the two years arriving from Glide are 3,677 rows on day one, and a done story is never deleted because the savings and the margin computed from it have to stay checkable. SPRINTS are deliberately NOT here beside it: a sprint is a block of SOLD work, so that collection grows at the speed of contracts rather than of clicks and a hard ceiling is an honest answer",
   },
@@ -756,6 +756,12 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
   "brand.detail.overview": "one asset's category, description, file and audit block — one record, not a collection.",
   "delivery.detail.overview": "one programme's description, order and audit block — one record, not a collection.",
   "purposes.detail.overview": "one meeting purpose's department, description and audit block — one record, not a collection.",
+  // The work engine's one recipe detail. Its three siblings (an app, a sprint, a
+  // story) are components because each carries a collection tab or a status
+  // track no engine block draws; a task carries neither, so its Overview is a
+  // description block like the housekeeping four above it.
+  "tasks.detail.overview":
+    "one task's status, who has it, when it is due and the note under it — one record, not a collection. Its sibling Activity tab carries the exact server total like every other record in the app.",
   "knowledge-detail.overview":
     "one source's kind, compartment, who may read it, how many pieces it was cut into and when it was last indexed — one record, not a collection.",
 }

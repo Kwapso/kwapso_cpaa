@@ -1,7 +1,7 @@
-// Top-level Work page — its own clean URL (/work, /work/<storyId>), resolving the
+// Top-level Meeting purposes page — its own clean URL (/purposes, /purposes/<id>), resolving the
 // active team from context like /home. Backed by the SAME deep-link host as /t/*
-// (one client-resolved shell); the gateway serves this shell for any /work/*
-// depth (workers/gateway run_worker_first + the /work/ rewrite).
+// (one client-resolved shell); the gateway serves this shell for any /purposes/*
+// depth (workers/gateway run_worker_first + the /purposes/ rewrite).
 
 import { DeepLinkScreen } from "@/components/deep-link-screen"
 
@@ -11,6 +11,6 @@ export function generateStaticParams() {
   return [{ rest: [] as string[] }]
 }
 
-export default function WorkPage() {
+export default function PurposesPage() {
   return <DeepLinkScreen />
 }

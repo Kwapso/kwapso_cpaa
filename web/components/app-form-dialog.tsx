@@ -26,7 +26,7 @@ import {
 } from "@kwapso/ui/registry/primitives/select/select"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { Plus } from "lucide-react"
+import { Pencil, Plus } from "lucide-react"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
@@ -62,18 +62,33 @@ export function AppFormDialog({
   open,
   onOpenChange,
   accounts,
+  initial,
   draftKey,
   onSubmit,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   accounts: { id: string; name: string }[]
+  /** Present = editing an existing app. The ACCOUNT picker disappears in that
+   * mode rather than being disabled: whose system it is was decided once, there
+   * is no door to change it, and a greyed-out control that can never be used is
+   * a question the form should not be asking. */
+  initial?: AppFormValues
   draftKey?: string
   onSubmit: (values: AppFormValues) => Promise<void>
 }) {
+  const editing = initial !== undefined
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
-    { name: "", accountId: "", url: "", stage: "", cost: "" },
+    initial
+      ? {
+          name: initial.name,
+          accountId: initial.accountId,
+          url: initial.url,
+          stage: initial.stage,
+          cost: initial.toolCostCentsPerMonth ? String(initial.toolCostCentsPerMonth / 100) : "",
+        }
+      : { name: "", accountId: "", url: "", stage: "", cost: "" },
     open
   )
   const [busy, setBusy] = React.useState(false)
@@ -112,16 +127,18 @@ export function AppFormDialog({
       busy={busy}
       clearDraft={clearDraft}
       onSubmit={submit}
-      title={<DialogTitle>Record an app</DialogTitle>}
+      title={<DialogTitle>{editing ? "Edit app" : "Record an app"}</DialogTitle>}
       subtitle={
         <DialogDescription>
-          A system we built — the thing with its own address. Process maps live inside one.
+          {editing
+            ? "Change what it's called, where it lives, or what it costs us."
+            : "A system we built — the thing with its own address. Process maps live inside one."}
         </DialogDescription>
       }
       footer={
         <Button type="submit" disabled={busy || !ready} className="gap-1.5">
-          {busy ? <Spinner /> : <Plus className="size-4" />}
-          {busy ? "Saving…" : "Record it"}
+          {busy ? <Spinner /> : editing ? <Pencil className="size-4" /> : <Plus className="size-4" />}
+          {busy ? "Saving…" : editing ? "Save changes" : "Record it"}
         </Button>
       }
     >
@@ -135,6 +152,7 @@ export function AppFormDialog({
           autoFocus
         />
       </Field>
+      {!editing && (
       <Field config={accountField} htmlFor="app-account" className={fieldSpacing}>
         <Select
           value={values.accountId}
@@ -153,6 +171,7 @@ export function AppFormDialog({
           </SelectContent>
         </Select>
       </Field>
+      )}
       <Field config={urlField} htmlFor="app-url" className={fieldSpacing}>
         <Input
           id="app-url"

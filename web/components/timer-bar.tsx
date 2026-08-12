@@ -37,11 +37,22 @@ export function clockFrom(seconds: number): string {
   return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`
 }
 
-/** Where clicking a timer goes. A story lives on the Work page and a ticket on
- * its own screen — "returns to what it is timing" means the screen the work is
- * on, not a screen about the timer. */
+/** Where clicking a timer goes: THE RECORD IT IS TIMING, not the list the record
+ * is in. It used to land on the backlog for anything that was not a ticket,
+ * because a story had no screen to land on — it does now, and "returns to what
+ * it is timing" can finally mean the thing itself. The three tables a work log
+ * may sit against each have a record screen; anything else falls back to the
+ * backlog rather than to a dead URL. */
 function targetPath(t: RunningTimer, teamId: string): string {
-  return t.targetTable === "help" ? `/t/${teamId}/tickets/${t.targetId}` : `/t/${teamId}/work`
+  const segment =
+    t.targetTable === "help"
+      ? "tickets"
+      : t.targetTable === "stories"
+        ? "stories"
+        : t.targetTable === "tasks"
+          ? "tasks"
+          : null
+  return segment ? `/t/${teamId}/${segment}/${t.targetId}` : `/t/${teamId}/stories`
 }
 
 export function TimerBar({

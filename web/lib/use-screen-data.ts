@@ -12,8 +12,10 @@
 // learning / tickets / team-meta load only on their own module.
 
 import { tenancy } from "@/lib/api"
+import type { HelpScope } from "@/lib/live-resources"
 import {
   accountsKey,
+  appsKey,
   brandAssetsKey,
   cursorKey,
   helpKey,
@@ -22,6 +24,9 @@ import {
   marketingKey,
   programmesKey,
   purposesKey,
+  sprintsKey,
+  storiesKey,
+  tasksKey,
   totalKey,
 } from "@/lib/live-resources"
 import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
@@ -36,7 +41,7 @@ export type ScreenDataInput = {
   module: string | null
   recordId: string | null
   /** which ticket set the Tickets screen is showing — a SERVER scope (R14/R16). */
-  helpScope?: "mine" | "all"
+  helpScope?: HelpScope
 }
 
 /** Which TABLE a record under each agency-internal URL segment lives in — the
@@ -47,6 +52,11 @@ const INTERNAL_ACTIVITY_TABLE: Record<string, string> = {
   brand: "brand_assets",
   delivery: "programs",
   purposes: "meeting_purposes",
+  // A task's segment and its table are one word, so this line looks redundant —
+  // it is not. This map is what the record feed READS to decide it should fetch
+  // anything at all, so a segment missing from it has an Activity tab with no
+  // feed under it, silently.
+  tasks: "tasks",
 }
 
 export function useScreenData({ teamId, enabled, module, recordId, helpScope = "all" }: ScreenDataInput) {
@@ -88,6 +98,12 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
     enabled && module === "tickets" && helpScope === "mine" ? helpKey(teamId as string, "mine") : null,
     () => listFetch.helpMine(teamId as string)
   )
+  const helpArchivedQ = useCached(
+    enabled && module === "tickets" && helpScope === "archived"
+      ? helpKey(teamId as string, "archived")
+      : null,
+    () => listFetch.helpArchived(teamId as string)
+  )
   // Accounts back their list, the breadcrumb label and the record screen. R14:
   // the list is a PAGE — page one lands here, its next cursor in the sidecar
   // <LoadMore> reads. Row-level live: a change patches the one account in place.
@@ -101,6 +117,25 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
   const knowledgeQ = useCached(
     enabled && module === "knowledge" ? knowledgeKey(teamId as string) : null,
     () => listFetch.knowledge(teamId as string)
+  )
+  // ── THE WORK ENGINE'S FOUR ───────────────────────────────────────────────
+  // Each loaded only on its own section (cache-first + row-level live), so
+  // opening Tasks costs one call rather than four. The RECORD screens read
+  // through these same keys — an app's detail comes out of the bounded set the
+  // list already holds — which is why they are keyed by team here rather than by
+  // record, and why a slice narrowed to one record gets a key of its own instead
+  // (see sliceKey in components/work-panels.tsx).
+  const storiesQ = useCached(enabled && module === "stories" ? storiesKey(teamId as string) : null, () =>
+    listFetch.stories(teamId as string)
+  )
+  const sprintsQ = useCached(enabled && module === "sprints" ? sprintsKey(teamId as string) : null, () =>
+    listFetch.sprints(teamId as string)
+  )
+  const appsQ = useCached(enabled && module === "apps" ? appsKey(teamId as string) : null, () =>
+    listFetch.apps(teamId as string)
+  )
+  const tasksQ = useCached(enabled && module === "tasks" ? tasksKey(teamId as string) : null, () =>
+    listFetch.tasks(teamId as string)
   )
   // ── THE AGENCY'S OWN HOUSEKEEPING ────────────────────────────────────────
   // Four capped collections, each loaded only on its own module (cache-first +
@@ -140,15 +175,21 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
     learning: useCachedValue<number>(enabled ? totalKey("learning", teamId as string) : null),
     help: useCachedValue<number>(enabled ? totalKey("help", teamId as string) : null),
     helpMine: useCachedValue<number>(enabled ? totalKey("help-mine", teamId as string) : null),
+    helpArchived: useCachedValue<number>(enabled ? totalKey("help-archived", teamId as string) : null),
     accounts: useCachedValue<number>(enabled ? totalKey("accounts", teamId as string) : null),
     knowledge: useCachedValue<number>(enabled ? totalKey("knowledge", teamId as string) : null),
     // R16: the exact server total the process-maps heading badges. Primed by the
     // same fetcher that loads page one, so the number and the rows agree.
     processes: useCachedValue<number>(enabled ? totalKey("processes", teamId as string) : null),
-    // R16: the exact server total of the BACKLOG, which is the collection the
-    // Work page leads with. Primed by the same fetcher that loads page one, so
-    // the number and the rows agree.
-    work: useCachedValue<number>(enabled ? totalKey("work", teamId as string) : null),
+    // R16: the exact server totals of the work engine's four collections, each
+    // primed by the fetcher that loaded its own rows so the number and the rows
+    // can never disagree. The story total's prefix is `stories` — the same word
+    // the worker publishes as a resource — so the shell's ±1 bump on an add
+    // lands on the sidecar the heading actually reads.
+    stories: useCachedValue<number>(enabled ? totalKey("stories", teamId as string) : null),
+    sprints: useCachedValue<number>(enabled ? totalKey("sprints", teamId as string) : null),
+    apps: useCachedValue<number>(enabled ? totalKey("apps", teamId as string) : null),
+    tasks: useCachedValue<number>(enabled ? totalKey("tasks", teamId as string) : null),
     // The agency's own housekeeping — the exact server totals the sidebar badges
     // and the collection headings show, primed by the fetchers above.
     marketing: useCachedValue<number>(enabled ? totalKey("marketing", teamId as string) : null),
@@ -236,6 +277,10 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
     overridesQ,
     accountsQ,
     knowledgeQ,
+    storiesQ,
+    sprintsQ,
+    appsQ,
+    tasksQ,
     membersQ,
     rolesQ,
     invitesQ,
@@ -243,6 +288,7 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
     learningQ,
     helpQ,
     helpMineQ,
+    helpArchivedQ,
     totals,
     formSelectableQ,
     selectableValues,

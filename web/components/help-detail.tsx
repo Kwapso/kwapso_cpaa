@@ -26,7 +26,7 @@ import {
   type TicketMember,
   type TicketStatus,
 } from "@kwapso/ui/registry/collections/ticket-thread/ticket-thread"
-import { Languages, Pencil, Send } from "lucide-react"
+import { ArchiveRestore, ArrowDown, ArrowUp, Archive, Hammer, Languages, Pencil, Send } from "lucide-react"
 
 import type {
   HelpMessage,
@@ -49,6 +49,11 @@ import { LoadMore } from "@/components/load-more"
 import { HelpStakeholders } from "@/components/help-stakeholders"
 import { HelpStatusStepper, type HelpStatusValue } from "@/components/help-status-stepper"
 import { ResolveDialog, type ResolveFormValues } from "@/components/resolve-dialog"
+import { StoryFormDialog } from "@/components/story-form-dialog"
+import { createStoryFrom, useStoryFormOptions } from "@/components/stories-screen"
+import { StoriesPanel, sliceKey } from "@/components/work-panels"
+import { totalKey } from "@/lib/live-resources"
+import { CONCEPT_ICON } from "@/lib/pages"
 
 // LIBRARY ⇄ SERVER status. These were one-to-one until the work engine gave the
 // ticket its five states (SCOPE ch.07); the library's `TicketStatus` has four,
@@ -86,10 +91,14 @@ export function HelpDetailScreen({
   teamId,
   helpId,
   myUserId,
+  basePath,
 }: {
   teamId: string
   helpId: string
   myUserId: string | null
+  /** the tickets list in the URL form we arrived through (/tickets or
+   * /t/<team>/tickets) — a cross-link off this record stays in that shape. */
+  basePath: string
 }) {
   const ticketsQ = useCached<HelpTicket[]>(`help:${teamId}`, () =>
     content.help("all").then((r) => r.tickets)
@@ -120,12 +129,30 @@ export function HelpDetailScreen({
   const stakeholderBadge = formatCount(stakeholdersQ.data?.length)
   const { can } = usePermissions(teamId)
   const canEdit = can("help", "edit") // single source — gates Edit, the stepper, and the thread's resolve
+  // Writing work down is the WORK module's right, not the ticket's: a person who
+  // may read and answer requests is not necessarily a person who may put things
+  // on the team's backlog, and all three routes to a story respect that.
+  const canWriteWork = can("work", "create")
 
   const [tab, setTab] = React.useState("conversation")
   const [editing, setEditing] = React.useState(false)
   const [resolving, setResolving] = React.useState(false)
   const [translating, setTranslating] = React.useState(false)
   const [statusBusy, setStatusBusy] = React.useState(false)
+  // THE WORK ANSWERING THIS REQUEST. One story may answer many tickets and one
+  // ticket may need many stories (the owner's ruling), so this is a collection
+  // on the record rather than a field on it. Its exact total badges the tab.
+  const storiesTotal = useCachedValue<number>(totalKey("stories-ticket", helpId))
+  const [storyOpen, setStoryOpen] = React.useState(false)
+  // THE TRIAGE PROMPT — the third of the three ways a ticket becomes a story.
+  // Set the moment a status move lands on `triaged`, which is exactly when a
+  // person has decided the request is real and not yet decided what to do about
+  // it. Held in state rather than the URL because it is a suggestion, not a
+  // destination: dismissing it should not be a page in the back history.
+  const [promptStory, setPromptStory] = React.useState(false)
+  const [ranking, setRanking] = React.useState(false)
+  const options = useStoryFormOptions(teamId)
+  const host = { base: basePath.replace(/\/tickets$/, "") }
 
   // Land on the newest reply, and follow the one you just sent — the same
   // behaviour the client gets on their side of this same conversation, from the
@@ -150,6 +177,11 @@ export function HelpDetailScreen({
       primeCache(`help:${teamId}`, tickets)
       invalidate(recordActivityKey("help", helpId))
       toast.success("Status updated.")
+      // Triaged means "we have read it and it is real". That is the moment to
+      // ask what we are going to DO about it — and only when nothing has been
+      // written down yet, because a ticket that already has work on it has been
+      // answered and the prompt would be noise.
+      if (next === "triaged" && (ticket?.storyCount ?? 0) === 0) setPromptStory(true)
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't update the status.")
     } finally {
@@ -198,6 +230,51 @@ export function HelpDetailScreen({
     } catch (err) {
       primeCache(`help-thread:${helpId}`, prev) // rollback the echo
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't post your reply.")
+    }
+  }
+
+  /** PUT IT AWAY, or take it back out. The door has answered this since archive
+   * shipped and no screen ever called it, so a ticket could be archived by the
+   * assistant and then be unreachable by a person. Nothing is deleted: the
+   * conversation and the history survive exactly as they were. */
+  async function setArchived(archived: boolean) {
+    setStatusBusy(true)
+    try {
+      const { tickets } = await content.archiveHelp(helpId, archived)
+      primeCache(`help:${teamId}`, tickets)
+      invalidate(recordActivityKey("help", helpId))
+      toast.success(archived ? "Put away." : "Taken back out.")
+    } catch (err) {
+      toast.error(err instanceof ApiFailure ? err.message : "Couldn't change that.")
+    } finally {
+      setStatusBusy(false)
+    }
+  }
+
+  /** WHERE THE PERSON PUT IT. Drag-rank is the only priority signal in the
+   * product (SCOPE ch.07 — there is no priority dropdown and there will not be
+   * one) and it had no control on any screen: the door shipped, the sparse-key
+   * algorithm shipped, and the order could only ever be the order rows arrived
+   * in. The door takes NEIGHBOURS rather than a position, which is what lets two
+   * people reorder at once without fighting over a number. */
+  async function move(delta: -1 | 1) {
+    const order = ticketsQ.data ?? []
+    const at = order.findIndex((t) => t.id === helpId)
+    if (at < 0) return
+    const target = at + delta
+    // The list reads highest-rank-first, so moving UP means landing between the
+    // two rows above this one.
+    const below = delta === -1 ? order[target - 1] : order[target]
+    const above = delta === -1 ? order[target] : order[target + 1]
+    setRanking(true)
+    try {
+      const { tickets } = await content.rankHelp(helpId, below?.id ?? null, above?.id ?? null)
+      primeCache(`help:${teamId}`, tickets)
+      toast.success("Moved.")
+    } catch (err) {
+      toast.error(err instanceof ApiFailure ? err.message : "Couldn't move that.")
+    } finally {
+      setRanking(false)
     }
   }
 
@@ -284,6 +361,13 @@ export function HelpDetailScreen({
         badgeVariant: "" as const,
       },
       {
+        value: "stories",
+        label: "Related stories",
+        icon: CONCEPT_ICON.stories,
+        badge: formatCount(storiesTotal),
+        badgeVariant: "" as const,
+      },
+      {
         value: "stakeholders",
         label: "Stakeholders",
         icon: "users",
@@ -298,8 +382,21 @@ export function HelpDetailScreen({
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-3">
-        <div className="flex items-start gap-3">
-          <p className="min-w-0 flex-1 truncate text-sm font-medium">{ticket.description}</p>
+        <div className="flex flex-wrap items-start gap-3">
+          <div className="min-w-0 flex-1">
+            {/* THE NUMBER THE CLIENT QUOTES. It has existed on this record since
+                the work engine landed and appeared on no screen — the one thing
+                a person needs when a client rings up saying "about BERG-T0412". */}
+            {(ticket.ref || ticket.archivedAt) && (
+              <p className="text-muted-foreground mb-0.5 flex flex-wrap items-center gap-2 text-xs">
+                {ticket.ref && <span>{ticket.ref}</span>}
+                {ticket.archivedAt && (
+                  <span className="text-muted-foreground">Archived</span>
+                )}
+              </p>
+            )}
+            <p className="truncate text-sm font-medium">{ticket.description}</p>
+          </div>
           {/* TRANSLATE, on a ticket that has a German title and no English one
               yet. It SETS the field rather than showing a preview (BUILD-1 §8):
               a preview is a thing one person reads once, and a set field is a
@@ -327,6 +424,20 @@ export function HelpDetailScreen({
               Answer
             </Button>
           )}
+          {/* MAKE IT A STORY — the first of the three ways (the owner asked for
+              all three): a button on the ticket. It opens the story form with
+              THIS request already filled in, so the link cannot be mistyped. */}
+          {canWriteWork && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setStoryOpen(true)}
+              className="shrink-0 gap-1.5"
+            >
+              <Hammer className="size-3.5" />
+              Make it a story
+            </Button>
+          )}
           {canEdit && (
             <Button
               variant="outline"
@@ -338,6 +449,33 @@ export function HelpDetailScreen({
               Edit
             </Button>
           )}
+          {/* PUT IT AWAY. Available from any state (SCOPE ch.07), destructive in
+              colour because it takes the request out of the everyday lists —
+              and reversible, which the confirm-free restore says out loud. */}
+          {canEdit &&
+            (ticket.archivedAt ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={statusBusy}
+                onClick={() => void setArchived(false)}
+                className="shrink-0 gap-1.5"
+              >
+                <ArchiveRestore className="size-3.5" />
+                Take it back out
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={statusBusy}
+                onClick={() => void setArchived(true)}
+                className="text-destructive hover:text-destructive shrink-0 gap-1.5"
+              >
+                <Archive className="size-3.5" />
+                Archive
+              </Button>
+            ))}
         </div>
         <HelpStatusStepper
           status={ticket.status}
@@ -345,7 +483,52 @@ export function HelpDetailScreen({
           onChange={(n) => void changeStatus(n)}
           busy={statusBusy}
         />
+        {/* WHERE IT SITS IN THE ORDER — the only priority signal in the product,
+            and until now the only one with no control anywhere. */}
+        {canEdit && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-muted-foreground text-sm">Order in the list</span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={ranking}
+              onClick={() => void move(-1)}
+              className="gap-1.5"
+            >
+              <ArrowUp className="size-3.5" />
+              Move up
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={ranking}
+              onClick={() => void move(1)}
+              className="gap-1.5"
+            >
+              <ArrowDown className="size-3.5" />
+              Move down
+            </Button>
+          </div>
+        )}
       </div>
+
+      {/* THE TRIAGE PROMPT — the third way in. It appears the moment somebody
+          moves this request to triaged with no work written down against it,
+          which is precisely the moment the question is live. */}
+      {promptStory && canWriteWork && (
+        <div className="border-border/60 flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2">
+          <p className="min-w-0 flex-1 text-sm">
+            Read and real. What are we going to do about it?
+          </p>
+          <Button size="sm" onClick={() => setStoryOpen(true)} className="gap-1.5">
+            <Hammer className="size-3.5" />
+            Write the first story
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setPromptStory(false)}>
+            Not yet
+          </Button>
+        </div>
+      )}
 
       <TabsView
         config={tabsConfig}
@@ -377,6 +560,20 @@ export function HelpDetailScreen({
                   label="Load more activity"
                 />
               </div>
+            )
+          // THE SECOND WAY IN — a tab on the ticket where MORE work can be
+          // added. One story may answer many tickets and one ticket may need
+          // many stories, so this is a collection with its own create action.
+          if (t.value === "stories")
+            return (
+              <StoriesPanel
+                ownerKind="ticket"
+                ownerId={helpId}
+                filter={{ ticketId: helpId }}
+                host={host}
+                onNew={canWriteWork ? () => setStoryOpen(true) : undefined}
+                emptyText="No work written down against this request yet."
+              />
             )
           if (t.value === "stakeholders")
             return (
@@ -412,6 +609,28 @@ export function HelpDetailScreen({
         draft={ticket.draftResolution}
         draftKey={`help:resolve:${helpId}`}
         onSubmit={resolve}
+      />
+
+      {/* All three ways in open this ONE form, with the request already filled
+          in and unchangeable — three doors into one room, which is the point. */}
+      <StoryFormDialog
+        open={storyOpen}
+        onOpenChange={setStoryOpen}
+        sprints={options.sprints}
+        apps={options.apps}
+        tickets={options.tickets}
+        fixedTicket={{
+          id: helpId,
+          label: ticket.ref ? `${ticket.ref} · ${ticket.description}` : ticket.description,
+        }}
+        members={options.members}
+        draftKey={`story:add:ticket:${helpId}`}
+        onSubmit={async (v) => {
+          await createStoryFrom(teamId, v)
+          invalidate(sliceKey("stories-ticket", helpId))
+          invalidate(`help:${teamId}`)
+          setPromptStory(false)
+        }}
       />
 
       <HelpFormDialog

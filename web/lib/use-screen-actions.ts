@@ -26,6 +26,7 @@ import {
   marketingKey,
   programmesKey,
   purposesKey,
+  tasksKey,
 } from "@/lib/live-resources"
 import { invalidate, primeCache } from "@shared/web/store"
 import type { AccountFormValues } from "@/components/account-form-dialog"
@@ -161,6 +162,17 @@ export function useScreenActions(teamId: string | null) {
           const { roles: next } = await tenancy.createRole(payload.title, payload.description)
           primeCache(`member_roles:${teamId}`, next)
           toast.success(`Created ${payload.title}.`)
+          break
+        }
+        // OUR OWN ADMIN, ticked off — and untickable, because a task marked done
+        // by mistake is a task somebody has to be able to put back. It needs no
+        // confirm: nothing is lost either way, and a confirm on a tick is the
+        // kind of ceremony that teaches people to click through dialogs.
+        case "tasks.done": {
+          const { tasks } = await contentApi.setTaskDone(payload.id, payload.done === "true")
+          primeCache(tasksKey(teamId), tasks)
+          invalidate(`activity:record:tasks:${payload.id}`)
+          toast.success(payload.done === "true" ? "Ticked off." : "Put back.")
           break
         }
       }

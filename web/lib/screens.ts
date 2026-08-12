@@ -81,9 +81,16 @@ export const MODULE_PERMISSION: Record<string, string> = {
   // the same screens (the money panels on an account), never a screen of its own
   // — what an account is charged is a bigger decision than how long a step takes.
   processes: "processes",
-  // The work engine: the segment IS the module. Stories and the sprints they sit
-  // in share it — they are one record from a reader's point of view.
-  work: "work",
+  // THE WORK ENGINE, as four segments over two modules. Stories, sprints and
+  // tasks all gate on `work` — they are one permission and three nouns, exactly
+  // as the delivery method is one permission and two. Apps gate on `processes`
+  // instead: an app is the thing a map hangs off, and the right that lets a
+  // person see the App → Process → Step chain is the one that lets them see the
+  // app at the top of it.
+  stories: "work",
+  sprints: "work",
+  tasks: "work",
+  apps: "processes",
   // THE AGENCY'S OWN HOUSEKEEPING. Two of these are the second and third places
   // in the app where the URL segment is NOT the permission module, and for the
   // same reason Tickets is the first: the address bar says the word a person
@@ -420,11 +427,11 @@ export const processesListRecipe: ScreenRecipe = {
  * who has it, when it is due, and which request it answers. PAGED (R14): the
  * backlog only grows and a done story is never deleted, so the frame's own
  * "Showing X of Y" stays off and the exact total is badged once, above. */
-export const workListRecipe: ScreenRecipe = {
+export const storiesListRecipe: ScreenRecipe = {
   type: "list",
   display: "list",
   surface: "none",
-  binding: { module: "work" },
+  binding: { module: "stories" },
   gate: { module: "work", right: "read" },
   fields: [field("name", "Story"), field("detail", "Details")],
   actions: [],
@@ -435,9 +442,110 @@ export const workListRecipe: ScreenRecipe = {
       { field: "status", label: "Status", control: "select" },
       { field: "assignee", label: "Assignee", control: "select" },
       { field: "sprint", label: "Sprint", control: "select" },
+      { field: "app", label: "App", control: "select" },
     ],
     { paged: true }
   ),
+}
+
+/** THE SPRINTS — the blocks the work was sold inside. A row's summary line is
+ * what somebody would say about one out loud: whose it is, which system, when it
+ * runs, and how much of it is finished. BOUNDED, not paged (R14): a sprint is a
+ * contract, so this collection grows at the speed of signatures. */
+export const sprintsListRecipe: ScreenRecipe = {
+  type: "list",
+  display: "list",
+  surface: "none",
+  binding: { module: "sprints" },
+  gate: { module: "work", right: "read" },
+  fields: [field("name", "Sprint"), field("detail", "Details")],
+  actions: [],
+  collection: listCollection("No sprints yet.", "Search sprints…", [
+    { field: "account", label: "Client", control: "select" },
+    { field: "app", label: "App", control: "select" },
+    { field: "state", label: "Status", control: "select" },
+  ]),
+}
+
+/** THE APPS — the systems we have built, one per row, each belonging to exactly
+ * one account (the owner's ruling: "an app belongs to ONE account, always").
+ * BOUNDED: an agency has tens of these, not thousands — the collection that
+ * grows underneath is the process maps. */
+export const appsListRecipe: ScreenRecipe = {
+  type: "list",
+  display: "list",
+  surface: "none",
+  binding: { module: "apps" },
+  gate: { module: "processes", right: "read" },
+  fields: [field("name", "App"), field("detail", "Details")],
+  actions: [],
+  collection: listCollection("No apps recorded yet.", "Search apps…", [
+    { field: "account", label: "Client", control: "select" },
+    { field: "stage", label: "Stage", control: "select" },
+    { field: "state", label: "Archived", control: "select" },
+  ]),
+}
+
+/** OUR OWN ADMIN. A task is never a client's — the summary line says who has it
+ * and when it is due, and nothing about a customer unless the task itself names
+ * one. BOUNDED (R14): admin is finished and ticked off as fast as it arrives. */
+export const tasksListRecipe: ScreenRecipe = {
+  type: "list",
+  display: "list",
+  surface: "none",
+  binding: { module: "tasks" },
+  gate: { module: "work", right: "read" },
+  fields: [field("name", "Task"), field("detail", "Details")],
+  actions: [],
+  collection: listCollection("Nothing on our own list.", "Search tasks…", [
+    { field: "status", label: "Status", control: "select" },
+    { field: "assignee", label: "Who has it", control: "select" },
+  ]),
+}
+
+/** One task, as a record: its own fields and its history. A recipe rather than a
+ * component for the same reason the four housekeeping details are — there is no
+ * control on it the engine has no block for. */
+export const taskDetailRecipe: ScreenRecipe = {
+  type: "detail",
+  binding: { module: "tasks" },
+  gate: { module: "work", right: "read" },
+  fields: [],
+  actions: [
+    {
+      id: "tasks.done",
+      label: "Tick it off",
+      action: "tasks.done",
+      variant: "outline",
+      gate: { module: "work", right: "edit" },
+    },
+  ],
+  header: { title: "name", subtitle: "detail" },
+  tabs: [
+    {
+      key: "overview",
+      label: "Overview",
+      icon: CONCEPT_ICON.overview,
+      block: {
+        kind: "description",
+        columns: 1,
+        rows: [
+          { label: "Status", column: "status" },
+          { label: "Who has it", column: "assignee" },
+          { label: "Due", column: "due" },
+          { label: "Detail", column: "detailText" },
+          { label: "Added", column: "created" },
+          { label: "Added by", column: "createdBy" },
+        ],
+      },
+    },
+    {
+      key: "activity",
+      label: "Activity",
+      icon: CONCEPT_ICON.activity,
+      block: { kind: "activity", source: "activity" },
+    },
+  ],
 }
 /* -------------------- the agency's own housekeeping ----------------------- */
 
@@ -646,10 +754,17 @@ export const BASE_RECIPES: Record<string, ScreenRecipe> = {
   // and its versions and conversation are collections with their own actions
   // (see process-detail.tsx).
   "processes.list": processesListRecipe,
-  // Work has a LIST recipe and no detail recipe: a story's screen is its own
-  // panel plus the time logged against it, which no engine block draws (see
-  // work-screen.tsx / story-detail.tsx).
-  "work.list": workListRecipe,
+  // THE WORK ENGINE'S FOUR. Three of them have a LIST recipe and a bespoke
+  // detail, because each record carries a control no engine block draws: an
+  // app's own sprints and stories, a sprint's backlog and its Complete button,
+  // a story's status stepper and the time logged against it. A TASK carries
+  // none of that — it is a title, a date and a tick — so it is the one of the
+  // four whose detail is a recipe.
+  "stories.list": storiesListRecipe,
+  "sprints.list": sprintsListRecipe,
+  "apps.list": appsListRecipe,
+  "tasks.list": tasksListRecipe,
+  "tasks.detail": taskDetailRecipe,
   // The agency's own housekeeping — the only four DETAILS in the app that are
   // pure recipes (see the note above them for why they can be).
   "marketing.list": marketingListRecipe,

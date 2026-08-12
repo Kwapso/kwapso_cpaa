@@ -18,6 +18,7 @@ import type {
   Learning,
   MarketingPost,
   MeetingPurpose,
+  Task,
   Program,
   TeamMeta,
   TeamMember,
@@ -119,8 +120,21 @@ export function shapeHelpList(tickets: HelpTicket[]): ScreenData {
   return {
     rows: tickets.map((t) => ({
       id: t.id,
-      name: truncate(t.description),
-      detail: `${t.helpType || "General"} · ${HELP_STATUS[t.status]}`,
+      // THE NUMBER THE CLIENT QUOTES, first (SCOPE ch.02 — "BERG-T0412"). The
+      // whole point of a reference is that somebody can say it out loud, and it
+      // was rendered on no screen at all: the column shipped, the sequence
+      // shipped, the machine surface returned it, and a person could not see it.
+      name: t.ref ? `${t.ref} · ${truncate(t.description)}` : truncate(t.description),
+      detail: [
+        t.helpType || "General",
+        HELP_STATUS[t.status],
+        // How much work is on it, and nothing else about that work — the same
+        // two numbers a client is shown on their own side of the fence.
+        t.storyCount > 0 ? `${t.doneStoryCount} of ${t.storyCount} done` : null,
+        t.archivedAt ? "archived" : null,
+      ]
+        .filter(Boolean)
+        .join(" · "),
       // Facet column (read by the filter engine, not the renderer).
       status: HELP_STATUS[t.status],
     })),
@@ -376,6 +390,27 @@ export function shapePurposesList(items: MeetingPurpose[]): ScreenData {
       department: p.department || "—",
       state: p.active ? "Live" : "Archived",
     })),
+  }
+}
+
+/** ONE TASK, as a record. The only work-engine detail that is a recipe rather
+ * than a component: an app, a sprint and a story each carry a collection tab or
+ * a status track that no engine block draws, and a task carries neither — it is
+ * a title, a date and a tick. */
+export function shapeTaskDetail(task: Task, activity: ActivityItem[]): ScreenData {
+  return {
+    record: {
+      id: task.id,
+      name: task.ref ? `${task.ref} · ${task.title}` : task.title,
+      detail: task.status === "done" ? "Done" : "Open",
+      status: task.status === "done" ? "Done" : "Open",
+      assignee: task.assigneeName || "Nobody yet",
+      due: task.dueOn ? formatDate(task.dueOn) : "—",
+      detailText: task.detail || "—",
+      created: formatDateTime(task.createdAt),
+      createdBy: task.createdByName || "—",
+    },
+    sets: { activity: shapeActivity(activity) },
   }
 }
 

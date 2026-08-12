@@ -1,6 +1,6 @@
 "use client"
 
-// TIME, on the Work page — the week as it actually went, and the two ways of
+// TIME, on the Stories page — the week as it actually went, and the two ways of
 // adding to it.
 //
 // ONE CLICK IS THE ACCEPTANCE BAR (.plans/BUILD-1 §5). The Start button on each

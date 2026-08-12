@@ -18,7 +18,11 @@ export type SectionKey =
   | "tickets"
   | "knowledge"
   | "processes"
-  | "work"
+  // The work engine's four destinations (see TEAM_SECTIONS for why four).
+  | "apps"
+  | "sprints"
+  | "stories"
+  | "tasks"
   // The agency's own housekeeping (staff profiles has no section — the owner's
   // ruling puts a profile on the member's own page, not on a page of its own).
   | "marketing"
@@ -47,6 +51,12 @@ export type Route = {
  * out, so leaving the app is a real navigation. */
 export const TOP_LEVEL_MODULES = [
   "accounts", "learning", "tickets", "processes",
+  // The knowledge base was MISSING from this list while being a sidebar page, so
+  // every tap on it left the History API and did a full reload — which throws
+  // away the warm in-memory cache the whole caching model is built on. The four
+  // work-engine destinations join it here on the way in rather than after the
+  // same bug is noticed again.
+  "knowledge", "apps", "sprints", "stories", "tasks",
   // The agency's own housekeeping — clean top-level URLs, like every other
   // sidebar page (`purposes` rides along because it has records of its own).
   "marketing", "brand", "delivery", "purposes",

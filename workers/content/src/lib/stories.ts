@@ -129,6 +129,13 @@ export type StoryFilter = {
   status?: StoryStatus
   ticketId?: string
   sprintId?: string
+  /** THE WORK ON ONE SYSTEM. A story hangs off an app ALWAYS and a sprint only
+   * sometimes (the owner's ruling), so the app is the one relation every story
+   * has — and "show me this app's other work" is the cross-link he named as
+   * mattering more than any single path through the screens. Without it the
+   * app's screen could only narrow a PAGE of the backlog in the browser, which
+   * answers "this app's work among the newest fifty" and looks like an answer. */
+  appId?: string
   assigneeId?: string
   /** "open" hides done stories — the everyday view of a backlog. */
   view?: "open" | "all"
@@ -149,6 +156,10 @@ function storyWhere(filter: StoryFilter): { sql: string; params: string[] } {
   if (filter.sprintId) {
     parts.push("s.sprint_id = ?")
     params.push(filter.sprintId)
+  }
+  if (filter.appId) {
+    parts.push("s.app_id = ?")
+    params.push(filter.appId)
   }
   if (filter.assigneeId) {
     parts.push("s.assignee_id = ?")
@@ -622,6 +633,28 @@ function toSprint(r: SprintRow): Sprint {
   }
 }
 
+/** WHICH SPRINTS — one client's, one system's, or all of them. Written once so
+ * the list and its count are asked the SAME question (R16): a badge computed
+ * over a different WHERE than the rows beneath it is a number nobody can
+ * reconcile, and the two calls sit in different functions. */
+export type SprintFilter = { accountId?: string | null; appId?: string | null }
+
+function sprintWhere(filter: SprintFilter): { sql: string; params: string[] } {
+  const parts: string[] = []
+  const params: string[] = []
+  if (filter.accountId) {
+    parts.push("sp.account_id = ?")
+    params.push(filter.accountId)
+  }
+  // A sprint covers ONE app (the owner's ruling), so the app is the record
+  // directly above it and its screen has to be able to ask for exactly its own.
+  if (filter.appId) {
+    parts.push("sp.app_id = ?")
+    params.push(filter.appId)
+  }
+  return { sql: parts.length ? ` WHERE ${parts.join(" AND ")}` : "", params }
+}
+
 /** Every sprint, newest first. BOUNDED, not paged (R14): a sprint is a block of
  * SOLD work — an agency runs a handful per client per year, so this is a
  * collection that grows at the speed of contracts rather than of clicks, and a
@@ -629,14 +662,15 @@ function toSprint(r: SprintRow): Sprint {
 export async function listSprints(
   cfg: D1Rest,
   guard: MemberGuard,
-  accountId: string | null
+  filter: SprintFilter
 ): Promise<Sprint[]> {
+  const where = sprintWhere(filter)
   const rows = await d1Query<SprintRow>(
     cfg,
     guard.databaseId,
-    `SELECT ${SPRINT_COLS} FROM sprints sp${accountId ? " WHERE sp.account_id = ?" : ""}
+    `SELECT ${SPRINT_COLS} FROM sprints sp${where.sql}
       ORDER BY sp.created_at DESC, sp.id DESC LIMIT ${LIST_HARD_CAP}`, // R14 hard cap
-    accountId ? [accountId] : []
+    where.params
   )
   return rows.map(toSprint)
 }
@@ -645,13 +679,14 @@ export async function listSprints(
 export async function countSprints(
   cfg: D1Rest,
   guard: MemberGuard,
-  accountId: string | null
+  filter: SprintFilter
 ): Promise<number> {
+  const where = sprintWhere(filter)
   const rows = await d1Query<{ n: number }>(
     cfg,
     guard.databaseId,
-    `SELECT COUNT(*) AS n FROM sprints sp${accountId ? " WHERE sp.account_id = ?" : ""}`,
-    accountId ? [accountId] : []
+    `SELECT COUNT(*) AS n FROM sprints sp${where.sql}`,
+    where.params
   )
   return rows[0]?.n ?? 0
 }

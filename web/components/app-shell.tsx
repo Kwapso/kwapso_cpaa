@@ -15,13 +15,22 @@ import { ModeToggle } from "@kwapso/ui/registry/primitives/mode-toggle/mode-togg
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import {
+  AppWindow,
   Building2,
+  CalendarRange,
+  Hammer,
   Home,
+  LibraryBig,
+  ListTodo,
+  Megaphone,
+  Palette,
+  Route,
   Settings,
   GraduationCap,
   LifeBuoy,
   PanelLeftClose,
   PanelLeftOpen,
+  Workflow,
 } from "lucide-react"
 
 import type { ActiveTeam } from "@/lib/use-active-team"
@@ -33,7 +42,7 @@ import { useRealtime, useUserRealtime } from "@shared/web/realtime"
 // deaf-exemptions live beside them in the rules registry.
 import { SIMPLE_INVALIDATIONS, TEAM_RESOURCES, totalKey } from "@/lib/live-resources"
 import { invalidate, patchRow, primeCache, readCache, reconcile } from "@shared/web/store"
-import { NAV, TEAM_SECTIONS, bottomNavItems, isNavActive, type Crumb } from "@/lib/pages"
+import { NAV, TEAM_SECTIONS, bottomNavItems, isNavActive, type Crumb, type NavGroup } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useTeamPrewarm } from "@/lib/use-team-prewarm"
 import { CreateTeamDialog } from "@/components/create-team-dialog"
@@ -43,12 +52,23 @@ import { TeamSwitcher } from "@/components/team-switcher"
 import { TimerBar } from "@/components/timer-bar"
 
 const NAV_ICONS = { home: Home, settings: Settings } as const
-// The lucide component for each team SIDEBAR page (Accounts / Learning / Tickets)
-// in the rail — the same concept icons the tabs use (CONCEPT_ICON, pages.ts).
+// The lucide component for each team SIDEBAR page in the rail — the same concept
+// icons the tabs use (CONCEPT_ICON, pages.ts), as components rather than names
+// because the rail renders them directly. Every sidebar section has a line here;
+// a section without one falls back to Home, which is the tell that one is missing.
 const SECTION_ICONS: Record<string, typeof Home> = {
   accounts: Building2,
   learning: GraduationCap,
   tickets: LifeBuoy,
+  knowledge: LibraryBig,
+  processes: Route,
+  stories: Hammer,
+  sprints: CalendarRange,
+  apps: AppWindow,
+  tasks: ListTodo,
+  marketing: Megaphone,
+  brand: Palette,
+  delivery: Workflow,
 }
 
 export function AppShell({
@@ -100,34 +120,65 @@ export function AppShell({
   const navigate = onNavigate ?? softNavigate
   const here = activePath ?? pathname
 
-  // The rail: the universal anchors (Home / Settings) with the team's first-class
-  // SIDEBAR pages (Learning / Tickets) slotted between them — each scoped to the
-  // active team and gated by its own read right, so it vanishes for anyone who
-  // can't read it (and when teamless). ONE composed list drives both the desktop
-  // rail and the mobile bottom bar.
-  type ShellLink = { slug: string; title: string; Icon: typeof Home; path: string }
+  // THE RAIL, IN TWO GROUPS WITH A DIVIDER (the owner's ruling — see NavGroup in
+  // pages.ts for why neither "keep it under nine" nor "show everything flat"
+  // was accepted). Every destination declares which half it belongs to, so this
+  // partition is DERIVED: the shell never names a page, it just asks each one
+  // where it goes. A section gated by a right the caller lacks vanishes from its
+  // group, and a group that empties out draws no divider.
+  type ShellLink = { slug: string; title: string; Icon: typeof Home; path: string; group: NavGroup }
   const universal: ShellLink[] = NAV.filter((i) => !i.need).map((i) => ({
     slug: i.slug,
     title: i.title,
     Icon: NAV_ICONS[i.icon],
     path: i.path,
+    group: i.group,
   }))
   const sidebarPages: ShellLink[] = teamId
     ? TEAM_SECTIONS.filter((s) => s.placement === "sidebar" && can(s.module, "read")).map((s) => ({
         slug: s.key,
         title: s.title,
         Icon: SECTION_ICONS[s.key] ?? Home,
-        // Clean top-level URL (/learning, /tickets) — resolves the active team from
+        // Clean top-level URL (/stories, /tickets) — resolves the active team from
         // context, like Home. (The gateway serves the shell for any sub-path.)
         path: `/${s.segment}`,
+        group: s.group ?? "occasional",
       }))
     : []
-  const homeIdx = universal.findIndex((i) => i.slug === "home")
-  const navLinks: ShellLink[] =
-    homeIdx >= 0
-      ? [...universal.slice(0, homeIdx + 1), ...sidebarPages, ...universal.slice(homeIdx + 1)]
-      : [...sidebarPages, ...universal]
+  // Home first, Settings last, everything else in registry order between them —
+  // the two anchors keep their ends of the rail whatever is added in the middle.
+  const inOrder = [...universal.filter((i) => i.slug === "home"), ...sidebarPages, ...universal.filter((i) => i.slug !== "home")]
+  const navGroups: ShellLink[][] = (["daily", "occasional"] as const)
+    .map((g) => inOrder.filter((i) => i.group === g))
+    .filter((g) => g.length > 0)
+  const navLinks = navGroups.flat()
   const bottomNav = bottomNavItems(navLinks)
+
+  /** One rail row. Drawn identically in both groups, so the divider is the only
+   * thing that separates them. */
+  const navButton = (item: ShellLink) => {
+    const Icon = item.Icon
+    const activeNav = isNavActive(item.path, here)
+    return (
+      <button
+        key={item.slug}
+        type="button"
+        onClick={() => navigate(item.path)}
+        aria-current={activeNav ? "page" : undefined}
+        title={collapsed ? item.title : undefined}
+        className={`flex items-center rounded-lg text-sm font-medium transition-colors ${
+          collapsed ? "justify-center p-2" : "gap-3 px-3 py-2"
+        } ${
+          activeNav
+            ? "bg-muted text-foreground"
+            : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+        }`}
+      >
+        <Icon className="size-4" />
+        {!collapsed && item.title}
+      </button>
+    )
+  }
 
   // The active team's live channel. A ping patches ONLY the changed row in place
   // (row-level), via the generic registry above — no full-collection refetch.
@@ -241,29 +292,14 @@ export function AppShell({
           />
         </div>
         <nav className={`flex flex-col gap-1 ${collapsed ? "px-2" : "px-3"}`}>
-          {navLinks.map((item) => {
-            const Icon = item.Icon
-            const activeNav = isNavActive(item.path, here)
-            return (
-              <button
-                key={item.slug}
-                type="button"
-                onClick={() => navigate(item.path)}
-                aria-current={activeNav ? "page" : undefined}
-                title={collapsed ? item.title : undefined}
-                className={`flex items-center rounded-lg text-sm font-medium transition-colors ${
-                  collapsed ? "justify-center p-2" : "gap-3 px-3 py-2"
-                } ${
-                  activeNav
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                }`}
-              >
-                <Icon className="size-4" />
-                {!collapsed && item.title}
-              </button>
-            )
-          })}
+          {navGroups.map((group, i) => (
+            <React.Fragment key={group[0].slug}>
+              {/* The divider between the daily half and the occasional one. It
+                  sits BETWEEN groups, never above the first or below the last. */}
+              {i > 0 && <div className="bg-border my-2 h-px w-full" role="separator" />}
+              {group.map(navButton)}
+            </React.Fragment>
+          ))}
         </nav>
         <div
           className={`mt-auto flex items-center gap-2 p-3 ${collapsed ? "flex-col" : "justify-between"}`}

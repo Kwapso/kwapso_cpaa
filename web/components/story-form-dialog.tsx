@@ -39,6 +39,10 @@ export type StoryFormValues = {
   title: string
   detail: string
   sprintId: string
+  /** THE SYSTEM THE WORK IS ON. A story hangs off an app ALWAYS and a sprint only
+   * sometimes (the owner's ruling), so this is the field that says where the work
+   * belongs — and the one the app's own screen reads back to show its other work. */
+  appId: string
   ticketId: string
   assigneeId: string
   dueOn: string
@@ -52,6 +56,12 @@ const NONE = "__none__"
 const titleField = { ...defaultFieldConfig, label: "What needs doing", required: true }
 const detailField = { ...defaultFieldConfig, label: "Detail", required: false }
 const sprintField = { ...defaultFieldConfig, label: "Sprint", required: false }
+const appField = {
+  ...defaultFieldConfig,
+  label: "App",
+  required: false,
+  hint: "The system this work is on. Unsprinted work still belongs somewhere.",
+}
 const ticketField = {
   ...defaultFieldConfig,
   label: "Request behind it",
@@ -65,6 +75,9 @@ export function StoryFormDialog({
   open,
   onOpenChange,
   sprints,
+  apps,
+  fixedApp,
+  fixedTicket,
   tickets,
   members,
   initial,
@@ -74,6 +87,15 @@ export function StoryFormDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
   sprints: { id: string; name: string }[]
+  apps: { id: string; name: string }[]
+  /** Set when the form is opened FROM an app's own screen — the app is then a
+   * fact about where you are standing rather than a question, so the picker is
+   * replaced by its name and cannot be changed by accident. */
+  fixedApp?: { id: string; name: string }
+  /** The same, from a TICKET: "turn this request into a piece of work". It is
+   * the first of the three ways a ticket becomes a story, and the request behind
+   * the work is the one thing about it nobody should be able to mistype. */
+  fixedTicket?: { id: string; label: string }
   tickets: { id: string; label: string }[]
   members: { id: string; name: string }[]
   /** Present = editing an existing story. */
@@ -84,7 +106,7 @@ export function StoryFormDialog({
   const editing = initial !== undefined
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
-    initial ?? { title: "", detail: "", sprintId: "", ticketId: "", assigneeId: "", dueOn: "" },
+    initial ?? { title: "", detail: "", sprintId: "", appId: "", ticketId: "", assigneeId: "", dueOn: "" },
     open
   )
   const [busy, setBusy] = React.useState(false)
@@ -99,7 +121,8 @@ export function StoryFormDialog({
         title: values.title.trim(),
         detail: values.detail.trim(),
         sprintId: values.sprintId,
-        ticketId: values.ticketId,
+        appId: fixedApp ? fixedApp.id : values.appId,
+        ticketId: fixedTicket ? fixedTicket.id : values.ticketId,
         assigneeId: values.assigneeId,
         dueOn: values.dueOn.trim(),
       })
@@ -148,7 +171,7 @@ export function StoryFormDialog({
         <DialogDescription>
           {editing
             ? "Change what it says, who has it, or when it's due."
-            : "One piece of work. It's the only place an owner and a date live."}
+            : "One piece of work, on one app. It's the only place an owner and a date live."}
         </DialogDescription>
       }
       footer={
@@ -187,13 +210,34 @@ export function StoryFormDialog({
           (v) => setValues((s) => ({ ...s, sprintId: v }))
         )}
       </Field>
+      <Field config={appField} htmlFor="story-app" className={fieldSpacing}>
+        {fixedApp ? (
+          <p className="text-muted-foreground text-sm" id="story-app">
+            {fixedApp.name}
+          </p>
+        ) : (
+          picker(
+            "story-app",
+            values.appId,
+            "No app yet",
+            apps.map((a) => ({ id: a.id, label: a.name })),
+            (v) => setValues((s) => ({ ...s, appId: v }))
+          )
+        )}
+      </Field>
       <Field config={ticketField} htmlFor="story-ticket" className={fieldSpacing}>
-        {picker(
-          "story-ticket",
-          values.ticketId,
-          "No request behind it",
-          tickets,
-          (v) => setValues((s) => ({ ...s, ticketId: v }))
+        {fixedTicket ? (
+          <p className="text-muted-foreground text-sm" id="story-ticket">
+            {fixedTicket.label}
+          </p>
+        ) : (
+          picker(
+            "story-ticket",
+            values.ticketId,
+            "No request behind it",
+            tickets,
+            (v) => setValues((s) => ({ ...s, ticketId: v }))
+          )
         )}
       </Field>
       <Field config={assigneeField} htmlFor="story-assignee" className={fieldSpacing}>

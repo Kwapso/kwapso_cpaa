@@ -41,6 +41,9 @@ export type SprintFormValues = {
   goal: string
   sprintType: string
   accountId: string
+  /** THE SYSTEM IT COVERS. A sprint covers ONE app (the owner's ruling), which is
+   * what lets the app's own screen show the blocks of work sold against it. */
+  appId: string
   startsOn: string
   endsOn: string
   /** whole cents — converted from the major units the form collects */
@@ -61,6 +64,12 @@ const SPRINT_TYPES = ["Planning", "Implementation", "Iteration"]
 const nameField = { ...defaultFieldConfig, label: "Sprint name", required: true }
 const typeField = { ...defaultFieldConfig, label: "Kind", required: false }
 const accountField = { ...defaultFieldConfig, label: "Client", required: false }
+const appField = {
+  ...defaultFieldConfig,
+  label: "App",
+  required: false,
+  hint: "The system this block of work covers.",
+}
 const goalField = { ...defaultFieldConfig, label: "What it's for", required: false }
 const startField = { ...defaultFieldConfig, label: "Starts", required: false }
 const endField = { ...defaultFieldConfig, label: "Ends", required: false }
@@ -74,11 +83,18 @@ const priceField = {
 export function SprintFormDialog({
   open,
   onOpenChange,
+  apps,
+  fixedApp,
   draftKey,
   onSubmit,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  apps: { id: string; name: string }[]
+  /** Set when the form is opened FROM an app's own screen — the app is then a
+   * fact about where you are standing rather than a question, so the picker is
+   * replaced by the app's name and the value cannot be changed by accident. */
+  fixedApp?: { id: string; name: string }
   draftKey?: string
   onSubmit: (values: SprintFormValues) => Promise<void>
 }) {
@@ -90,7 +106,7 @@ export function SprintFormDialog({
   )
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
-    { name: "", goal: "", sprintType: "", accountId: "", startsOn: "", endsOn: "", price: "", currency: "" },
+    { name: "", goal: "", sprintType: "", accountId: "", appId: "", startsOn: "", endsOn: "", price: "", currency: "" },
     open
   )
   const [busy, setBusy] = React.useState(false)
@@ -110,6 +126,7 @@ export function SprintFormDialog({
         goal: values.goal.trim(),
         sprintType: values.sprintType,
         accountId: values.accountId,
+        appId: fixedApp ? fixedApp.id : values.appId,
         startsOn: values.startsOn,
         endsOn: values.endsOn,
         soldPriceCents: cents,
@@ -193,6 +210,31 @@ export function SprintFormDialog({
             ))}
           </SelectContent>
         </Select>
+      </Field>
+      <Field config={appField} htmlFor="sprint-app" className={fieldSpacing}>
+        {fixedApp ? (
+          <p className="text-muted-foreground text-sm" id="sprint-app">
+            {fixedApp.name}
+          </p>
+        ) : (
+          <Select
+            value={values.appId || NONE}
+            onValueChange={(v) => setValues((s) => ({ ...s, appId: v === NONE ? "" : v }))}
+            disabled={busy}
+          >
+            <SelectTrigger id="sprint-app">
+              <SelectValue placeholder="No app yet" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>No app yet</SelectItem>
+              {apps.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {a.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </Field>
       <Field config={goalField} htmlFor="sprint-goal" className={fieldSpacing}>
         <Textarea

@@ -203,35 +203,44 @@ export function traceFor(
       return { path: `/t/${teamId}`, highlight: "main" }
 
     /* ----------------------------- the work engine -------------------------- */
-    // Every work-engine write lands on the Work page, and that is not a shortcut:
-    // the backlog, the sprint block and each sprint's "3 of 8 done" counts are all
-    // on that one screen, so a story moving to in review and a sprint completing
-    // are both visible there. A story has no detail URL of its own to land on.
+    // These all used to land on one Work page, because there was one — the
+    // backlog, the sprints, the to-dos and our own admin shared a screen and a
+    // story had no detail URL to land on. Each of them now has a section of its
+    // own and a record behind every row, so a trace can take somebody to the
+    // thing that changed rather than to the list it is in.
+    //
+    // A CREATE still lands on the list: row-level live-sync makes the new row
+    // appear there, and "here is where it went" is the useful answer when the
+    // record did not exist a second ago. An edit lands on the RECORD.
     case "create_story":
+      return { path: seg(teamId, "stories"), highlight: "main" }
     case "update_story":
     case "set_story_status":
     case "rank_story":
+      return { path: `${seg(teamId, "stories")}/${str(input, "id")}`, highlight: "main" }
     case "create_sprint":
+      return { path: seg(teamId, "sprints"), highlight: "main" }
     case "complete_sprint":
-      return { path: seg(teamId, "work"), highlight: "main" }
-    // Time lands on the same page, and the header timer is on every screen
-    // anyway — so a person who asked for a timer sees it start wherever they
-    // already were, and the trace takes them to the list it joined.
+      return { path: `${seg(teamId, "sprints")}/${str(input, "id")}`, highlight: "main" }
+    // Time lands on the backlog, where the week's rows are listed, and the
+    // header timer is on every screen anyway — so a person who asked for a timer
+    // sees it start wherever they already were.
     case "start_timer":
     case "stop_timer":
     case "log_time":
     case "resolve_runaway_timer":
     case "set_timer_auto_stop":
-      return { path: seg(teamId, "work"), highlight: "main" }
-    // To-dos and tasks land on the same page: the Work screen is where all four
-    // nouns are managed, and a to-do's other home is a screen we do not own (the
-    // client's portal).
+      return { path: seg(teamId, "stories"), highlight: "main" }
+    // To-dos and tasks share the Tasks screen — our own admin, and beside it
+    // what we are waiting on clients for. A to-do's other home is a screen we do
+    // not own (the client's portal).
     case "raise_todo":
     case "complete_todo":
     case "cancel_todo":
     case "create_task":
+      return { path: seg(teamId, "tasks"), highlight: "main" }
     case "set_task_done":
-      return { path: seg(teamId, "work"), highlight: "main" }
+      return { path: `${seg(teamId, "tasks")}/${str(input, "id")}`, highlight: "main" }
     // The rota and the unread backlog are both read on the Tickets screen — the
     // triage strip sits above the list, which is where "what is waiting" belongs.
     case "set_triage_duty":

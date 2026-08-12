@@ -54,6 +54,7 @@ function storyFilterFrom(url: URL): StoryFilter {
       : undefined,
     ticketId: queryText(url.searchParams.get("ticketId"), "Ticket"),
     sprintId: queryText(url.searchParams.get("sprintId"), "Sprint"),
+    appId: queryText(url.searchParams.get("appId"), "App"),
     assigneeId: queryText(url.searchParams.get("assigneeId"), "Assignee"),
     // Anything but the exact word "all" means the everyday backlog — a fail-safe
     // default, because the everyday list is where a mistyped parameter should land.
@@ -202,15 +203,26 @@ export async function postStoryRank(request: Request, env: Env): Promise<Respons
 
 /* ---------------------------------- sprints --------------------------------- */
 
+/** THE FILTERS THE SPRINT DOOR PARSES — read once, so the list and its count are
+ * asked the same question (R16) and the machine surface has one thing to mirror
+ * (R19). Same shape as storyFilterFrom above, for the same reasons. */
+function sprintFilterFrom(url: URL): { accountId: string | null; appId: string | null } {
+  return {
+    accountId: queryText(url.searchParams.get("accountId"), "Client") ?? null,
+    appId: queryText(url.searchParams.get("appId"), "App") ?? null,
+  }
+}
+
 /** GET /api/content/sprints — the blocks of work sold, newest first
- * (?accountId=<id> narrows to one client). R16: the exact server count rides it. */
+ * (?accountId=<id> narrows to one client, ?appId=<id> to one system). R16: the
+ * exact server count rides it, computed over the same filter. */
 export async function getSprints(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "work", "read")
   await refusePortalCaller(cfg, guard)
-  const accountId = queryText(new URL(request.url).searchParams.get("accountId"), "Client") ?? null
+  const filter = sprintFilterFrom(new URL(request.url))
   const [sprints, total] = await Promise.all([
-    listSprints(cfg, guard, accountId),
-    countSprints(cfg, guard, accountId),
+    listSprints(cfg, guard, filter),
+    countSprints(cfg, guard, filter),
   ])
   return json({ sprints, total })
 }
@@ -222,10 +234,10 @@ export async function postCreateSprint(request: Request, env: Env): Promise<Resp
   requireText(body.name, "Name", TEXT_LIMITS.short)
   const { id, accountId } = await createSprint(cfg, guard, actor, body)
   await publishChange(env, guard.teamId, "sprints", id, "add", accountId ?? undefined)
-  const listAccount = optionalText(body.accountId, "Client", TEXT_LIMITS.short) ?? null
+  const listFilter = { accountId: optionalText(body.accountId, "Client", TEXT_LIMITS.short) ?? null }
   return json({
-    sprints: await listSprints(cfg, guard, listAccount),
-    total: await countSprints(cfg, guard, listAccount),
+    sprints: await listSprints(cfg, guard, listFilter),
+    total: await countSprints(cfg, guard, listFilter),
   })
 }
 
@@ -248,7 +260,7 @@ export async function postSprintComplete(request: Request, env: Env): Promise<Re
   const { moved, accountId } = await setSprintComplete(cfg, guard, actor, id, body.complete)
   if (moved) await publishChange(env, guard.teamId, "sprints", id, "edit", accountId ?? undefined)
   return json({
-    sprints: await listSprints(cfg, guard, null),
-    total: await countSprints(cfg, guard, null),
+    sprints: await listSprints(cfg, guard, {}),
+    total: await countSprints(cfg, guard, {}),
   })
 }
