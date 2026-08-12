@@ -247,7 +247,22 @@ const NO_CONTROL: Record<string, string> = {
   "POST /api/tenancy/config/screens":
     "FOR A MACHINE. A team's screen-recipe override is app furniture rather than a record: the assistant writes one, and a screen for editing screens is a screen nobody asked for.",
 
+  "POST /api/content/google/calendar/events":
+    "FOR A MACHINE, by the owner's own ruling: the assistant may create a calendar event WITHOUT asking, where sending mail always asks. A person with a diary already has a diary — the door exists so the app can put a sprint or a booking in it.",
+  "POST /api/content/google/calendar/sprint":
+    "FOR A MACHINE. The same door aimed at one sprint's dates, called when a sprint is sold or moved rather than pressed. Its human control is the sprint's own date fields, which is the write that triggers it.",
+  "POST /api/content/google/drive/upload":
+    "FOR A MACHINE. Putting a file INTO Drive is the assistant answering 'save that to the Bergman folder'. A person with a folder open drags it there, and the app's own upload doors are the ones on the record it belongs to.",
+  "POST /api/content/google/chat/messages":
+    "FOR A MACHINE. Posting into a named space is an act the assistant performs on request; a person is already in the space. The owner asked for read AND post, and the post half is the assistant's.",
+
   /* ── a gap, owned by another lane ──────────────────────────────────────── */
+  "POST /api/content/google/gmail/draft":
+    "A GAP, and a named one. The owner asked for exactly this in words: 'a clear link or a very nice UI when the agent is done, so that I can just click inside of the kwapso app and it takes me to my Gmail.' The draft is written and its Gmail link is returned; nothing on any screen yet shows it to a person. The GOOGLE lane owns it.",
+  "POST /api/content/google/gmail/send":
+    "A GAP, the other half of the same sentence: 'Or I can just say send it from kwapso and it sends it.' The door demands the two act permissions of a person exactly as of the assistant, so the control is safe to draw — it just is not drawn. The GOOGLE lane owns it.",
+
+
   "POST /api/content/work-logs/update":
     "A GAP (the time lane). Correcting a row of time — its duration, its kind of work, whether it is billable — has a door and no control: the time panel lists the week and cannot fix a line in it, so a mistyped hour can only be repaired by the assistant.",
   "POST /api/content/brand-assets/upload":
