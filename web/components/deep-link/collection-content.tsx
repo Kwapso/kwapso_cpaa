@@ -23,7 +23,10 @@ import {
 
 import { LearningProgressScreen } from "@/components/learning-progress"
 import { ProcessesScreen } from "@/components/processes-screen"
-import { WorkScreen } from "@/components/work-screen"
+import { AppsScreen } from "@/components/apps-screen"
+import { SprintsScreen } from "@/components/sprints-screen"
+import { StoriesScreen } from "@/components/stories-screen"
+import { TasksScreen } from "@/components/tasks-screen"
 import { TriageStrip } from "@/components/triage-strip"
 import {
   BrandLibraryScreen,
@@ -35,7 +38,7 @@ import { NotFound, LoadError, SectionWithCreate, CollectionCard } from "@/compon
 import { CollectionHeading } from "@/components/collection-heading"
 import { LoadMore } from "@/components/load-more"
 import { content as contentApi, tenancy } from "@/lib/api"
-import { accountsKey, helpKey, knowledgeKey } from "@/lib/live-resources"
+import { accountsKey, helpKey, knowledgeKey, type HelpScope } from "@/lib/live-resources"
 import { CountedAbove } from "@/components/counted-tabs"
 import { formatCount } from "@shared/web/format-count"
 import {
@@ -229,19 +232,58 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
       />
     )
   }
-  if (module === "work") {
-    // Host-composed for the same reason the maps screen is: the sprint block
-    // sits under the backlog, and a story needs the sprints, the open requests
-    // and the team's people to be written at all. Its own file, so this switch
-    // stays a switch.
+  // ── THE WORK ENGINE'S FOUR ───────────────────────────────────────────────
+  // Each one host-composed for the same reason the maps screen is: it needs
+  // data the recipe has no way to ask for — a story needs the sprints, the
+  // apps, the open requests and the team's people to be written at all. Their
+  // own files, so this switch stays a switch.
+  if (module === "stories") {
     return (
-      <WorkScreen
+      <StoriesScreen
         teamId={teamId as string}
         recipe={recipe}
         rights={rights}
-        total={totals.work}
+        total={totals.stories}
         canCreate={can("work", "create")}
-        canEdit={can("work", "edit")}
+        onAction={onAction}
+        onIntent={onIntent}
+      />
+    )
+  }
+  if (module === "sprints") {
+    return (
+      <SprintsScreen
+        teamId={teamId as string}
+        recipe={recipe}
+        rights={rights}
+        total={totals.sprints}
+        canCreate={can("work", "create")}
+        onAction={onAction}
+        onIntent={onIntent}
+      />
+    )
+  }
+  if (module === "apps") {
+    return (
+      <AppsScreen
+        teamId={teamId as string}
+        recipe={recipe}
+        rights={rights}
+        total={totals.apps}
+        canCreate={can("processes", "create")}
+        onAction={onAction}
+        onIntent={onIntent}
+      />
+    )
+  }
+  if (module === "tasks") {
+    return (
+      <TasksScreen
+        teamId={teamId as string}
+        recipe={recipe}
+        rights={rights}
+        total={totals.tasks}
+        canCreate={can("work", "create")}
         canRaiseTodo={can("todos", "create")}
         canCancelTodo={can("todos", "delete")}
         onAction={onAction}
@@ -408,9 +450,10 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     )
   }
   if (module === "tickets") {
-    // R14: My/All is a SERVER scope, each its own paged cache — filtering a
-    // loaded PAGE by raiser would disagree with the exact badge above it.
-    const scopedQ = helpScope === "mine" ? helpMineQ : helpQ
+    // R14: each of the three is a SERVER scope with its own paged cache —
+    // filtering a loaded PAGE by raiser (or by whether it is put away) would
+    // disagree with the exact badge above it.
+    const scopedQ = helpScope === "mine" ? helpMineQ : helpScope === "archived" ? ctx.helpArchivedQ : helpQ
     if (scopedQ.error) return <LoadError what="tickets" />
     if (scopedQ.data === undefined) return <Skeleton variant="list" lines={4} />
     const data = shapeHelpList(scopedQ.data)
@@ -453,10 +496,20 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
                   badge: formatCount(totals.helpMine),
                   badgeVariant: "",
                 },
+                // THE PUT-AWAY PILE. Archive shipped as a door with no button;
+                // giving it a button without giving the pile a screen would have
+                // moved the dead end one step along instead of ending it.
+                {
+                  value: "archived",
+                  label: "Archived",
+                  icon: "archive",
+                  badge: formatCount(totals.helpArchived),
+                  badgeVariant: "",
+                },
               ],
             }}
             value={helpScope}
-            onValueChange={(v) => setHelpScope(v as "mine" | "all")}
+            onValueChange={(v) => setHelpScope(v as HelpScope)}
           />
         }
       >
@@ -465,7 +518,11 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
       <LoadMore
         listKey={helpKey(teamId as string, helpScope)}
         label="Load more tickets"
-        fetchPage={(c: string) => contentApi.help(helpScope, c).then((r) => ({ rows: r.tickets, nextCursor: r.nextCursor }))}
+        fetchPage={(c: string) =>
+          contentApi
+            .help(helpScope === "archived" ? "all" : helpScope, c, helpScope === "archived" ? "archived" : "live")
+            .then((r) => ({ rows: r.tickets, nextCursor: r.nextCursor }))
+        }
       />
       </div>
       </CountedAbove>

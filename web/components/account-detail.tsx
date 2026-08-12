@@ -57,6 +57,9 @@ import {
 } from "@/components/account-detail-panels"
 import { ContactLinkDialog, type ContactLinkValues } from "@/components/contact-link-dialog"
 import { PortalAccessDialog } from "@/components/portal-access-dialog"
+import { AppFormDialog } from "@/components/app-form-dialog"
+import { createAppFrom } from "@/components/apps-screen"
+import { AppsPanel, SprintsPanel, TodosPanel, sliceKey } from "@/components/work-panels"
 import { LoadMore } from "@/components/load-more"
 import { ACCOUNT_TYPE, accountStatus } from "@/components/deep-link/shape"
 import { ApiFailure, tenancy } from "@/lib/api"
@@ -104,12 +107,28 @@ export function AccountDetailScreen({
   const canSeeLogins = can("portal_users", "read")
   const canGrant = can("portal_users", "create")
   const canRevoke = can("portal_users", "delete")
+  // THE WORK HANGING OFF THIS CLIENT. Apps are the record directly below an
+  // account (an app belongs to ONE account, always — the owner's ruling), and
+  // the sprints and to-dos beside them are the two other collections a door
+  // will narrow to one account. Each tab is gated on its own module, so a role
+  // that cannot read the work engine simply does not see those tabs.
+  const canSeeApps = can("processes", "read")
+  const canWriteApps = can("processes", "create")
+  const canSeeWork = can("work", "read")
+  const canSeeTodos = can("todos", "read")
+  const canCancelTodo = can("todos", "delete")
+  // R16: the exact totals those tabs badge, each primed by the panel's own fetch
+  // over the same filter its rows came from.
+  const appsTotal = useCachedValue<number>(totalKey("apps-account", accountId))
+  const sprintsTotal = useCachedValue<number>(totalKey("sprints-account", accountId))
+  const todosTotal = useCachedValue<number>(totalKey("todos-account", accountId))
 
   const [tab, setTab] = React.useState("overview")
   const [editOpen, setEditOpen] = React.useState(false)
   const [linkOpen, setLinkOpen] = React.useState(false)
   const [grantOpen, setGrantOpen] = React.useState(false)
   const [confirm, setConfirm] = React.useState<Confirm | null>(null)
+  const [appOpen, setAppOpen] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
 
   /** Re-read what this screen shows after our own write. (Everyone else's screen
@@ -261,6 +280,40 @@ export function AccountDetailScreen({
         badge: formatCount(childrenTotal),
         badgeVariant: "" as const,
       },
+      // The work hanging off this client, each behind its own read right.
+      ...(canSeeApps
+        ? [
+            {
+              value: "apps",
+              label: "Apps",
+              icon: CONCEPT_ICON.apps,
+              badge: formatCount(appsTotal),
+              badgeVariant: "" as const,
+            },
+          ]
+        : []),
+      ...(canSeeWork
+        ? [
+            {
+              value: "sprints",
+              label: "Sprints",
+              icon: CONCEPT_ICON.sprints,
+              badge: formatCount(sprintsTotal),
+              badgeVariant: "" as const,
+            },
+          ]
+        : []),
+      ...(canSeeTodos
+        ? [
+            {
+              value: "todos",
+              label: "To-dos",
+              icon: CONCEPT_ICON.todos,
+              badge: formatCount(todosTotal),
+              badgeVariant: "" as const,
+            },
+          ]
+        : []),
       ...(canSeeLogins
         ? [
             {
@@ -423,6 +476,31 @@ export function AccountDetailScreen({
               <ChildrenPanel accountId={accountId} accounts={children} onOpen={openAccount} />
             )
 
+          // THE WORK HANGING OFF THIS CLIENT. Each panel asks the SERVER its own
+          // narrowed question (?accountId=), so the rows and the badge above are
+          // the same answer — never a page of everything filtered in the browser.
+          if (t.value === "apps")
+            return (
+              <AppsPanel
+                accountId={accountId}
+                accountName={account.name}
+                host={{ base: basePath.replace(/\/accounts$/, "") }}
+                onNew={canWriteApps ? () => setAppOpen(true) : undefined}
+              />
+            )
+          if (t.value === "sprints")
+            return (
+              <SprintsPanel
+                ownerKind="account"
+                ownerId={accountId}
+                filter={{ accountId }}
+                host={{ base: basePath.replace(/\/accounts$/, "") }}
+                emptyText={`Nothing has been sold to ${account.name} yet.`}
+              />
+            )
+          if (t.value === "todos")
+            return <TodosPanel teamId={teamId} accountId={accountId} canCancel={canCancelTodo} />
+
           // Portal access — the login switch. Only rendered for someone who may
           // see logins at all (the tab itself is hidden otherwise).
           return (
@@ -454,6 +532,21 @@ export function AccountDetailScreen({
         parentOptions={parentOptions}
         statusOptions={statusOptions}
         onSubmit={save}
+      />
+
+      {/* An app is recorded FROM the account it belongs to, with that account
+          already chosen — whose system it is is set once and there is no
+          move-app door, so being on the right record when you write it down is
+          the whole safeguard. */}
+      <AppFormDialog
+        open={appOpen}
+        onOpenChange={setAppOpen}
+        accounts={[{ id: accountId, name: account.name }]}
+        draftKey={`app:add:${accountId}`}
+        onSubmit={async (v) => {
+          await createAppFrom(teamId, { ...v, accountId })
+          invalidate(sliceKey("apps-account", accountId))
+        }}
       />
 
       <ContactLinkDialog

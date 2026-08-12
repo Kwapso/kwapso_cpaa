@@ -44,6 +44,10 @@ import { WritePanels } from "@/components/deep-link/write-panels"
 import { HomeScreen } from "@/components/screens/home-screen"
 import { SettingsScreen } from "@/components/screens/settings-screen"
 import { InvitationsScreen } from "@/components/screens/invitations-screen"
+import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+
+import { ApiFailure } from "@/lib/api"
+import type { HelpScope } from "@/lib/live-resources"
 import { registerHostGo } from "@/lib/nav"
 import { usePermissions } from "@/lib/perms"
 import { useScreenData } from "@/lib/use-screen-data"
@@ -78,7 +82,7 @@ export function DeepLinkScreen() {
   // Which ticket set the Tickets screen shows. It is a SERVER scope (R14: the list
   // is paged, so the door filters by raiser — not a client filter over a page),
   // so it must be declared ABOVE the reads that key off it.
-  const [helpScope, setHelpScope] = React.useState<"mine" | "all">("all")
+  const [helpScope, setHelpScope] = React.useState<HelpScope>("all")
 
   // Per-module data — cache-first + null-keyed (a screen fetches only the modules
   // it shows). Lifted into one hook so the host reads as "fetch, then render".
@@ -93,10 +97,15 @@ export function DeepLinkScreen() {
     learningQ,
     helpQ,
     helpMineQ,
+    helpArchivedQ,
     marketingQ,
     brandQ,
     programmesQ,
     purposesQ,
+    storiesQ,
+    sprintsQ,
+    appsQ,
+    tasksQ,
     marketingChannelOptions,
     marketingStatusOptions,
     brandCategoryOptions,
@@ -196,6 +205,17 @@ export function DeepLinkScreen() {
       case "purpose.edit":
         go(currentPath, { panel: "edit", module: module as string, id })
         break
+      // OUR OWN ADMIN, ticked off. The one action in this host that does NOT go
+      // through the ?panel / ?confirm route, and deliberately: those exist for
+      // writes that need input or a decision, and a tick needs neither. It is
+      // also reversible, which is what makes a confirm on it pure ceremony.
+      case "tasks.done": {
+        const done = ctx.record?.status !== "Done"
+        void runAction("tasks.done", { id, done: String(done) }).catch((err: unknown) => {
+          toast.error(err instanceof ApiFailure ? err.message : "Couldn't change that task.")
+        })
+        break
+      }
       case "marketing.archive":
       case "brand.archive":
       case "programme.archive":
@@ -255,6 +275,10 @@ export function DeepLinkScreen() {
     help: totals.help,
     accounts: totals.accounts,
     knowledge: totals.knowledge,
+    stories: totals.stories,
+    sprints: totals.sprints,
+    apps: totals.apps,
+    tasks: totals.tasks,
     marketing: totals.marketing,
     brand_assets: totals.brand_assets,
     programmes: totals.programmes,
@@ -275,6 +299,10 @@ export function DeepLinkScreen() {
       invites: invitesQ.data,
       learning: learningQ.data,
       knowledge: knowledgeQ.data,
+      apps: appsQ.data,
+      sprints: sprintsQ.data,
+      stories: storiesQ.data,
+      tasks: tasksQ.data,
     },
   })
 
@@ -307,9 +335,10 @@ export function DeepLinkScreen() {
             noAccess, enabled, perms, can, module, recordId, teamId, canImport, go,
             overridesQ, metaQ, membersQ, rolesQ, roles, invitesQ, learningQ, helpQ, accountsQ, knowledgeQ, totals,
             marketingQ, brandQ, programmesQ, purposesQ, internalActivity,
+            storiesQ, sprintsQ, appsQ, tasksQ,
             activityQ, activityTotal, activityKey, activityScope, inviteAuditQ, teamName, active,
             rights, onAction, onIntent,
-            sectionPath, helpScope, setHelpScope, myUserId, query, helpMineQ,
+            sectionPath, helpScope, setHelpScope, myUserId, query, helpMineQ, helpArchivedQ,
           })}
         </CountedTabs>
       </div>
@@ -367,7 +396,10 @@ function teamTabStrip(
     module === "tickets" ||
     module === "knowledge" ||
     module === "processes" ||
-    module === "work" ||
+    module === "stories" ||
+    module === "sprints" ||
+    module === "apps" ||
+    module === "tasks" ||
     module === "marketing" ||
     module === "brand" ||
     module === "delivery" ||

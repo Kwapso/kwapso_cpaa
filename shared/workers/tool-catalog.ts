@@ -865,12 +865,12 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_stories",
     summary:
-      "List the team's STORIES — the pieces of work WE do, as opposed to the tickets a client raises. Filters: `status` (open / in_progress / in_review / done), `ticketId` (the work on one request), `sprintId`, `assigneeId`, and `view` ('open' by default, which hides finished work — pass 'all' to include it). Pass `id` to fetch one story. Returns ONE page plus the exact `total`, `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
+      "List the team's STORIES — the pieces of work WE do, as opposed to the tickets a client raises. Filters: `status` (open / in_progress / in_review / done), `ticketId` (the work on one request), `sprintId`, `appId` (all the work on one system — a story always has an app and only sometimes a sprint), `assigneeId`, and `view` ('open' by default, which hides finished work — pass 'all' to include it). Pass `id` to fetch one story. Returns ONE page plus the exact `total`, `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
     binding: "CONTENT", method: "GET", path: "/api/content/stories",
-    schema: obj({ id: S, status: S, ticketId: S, sprintId: S, assigneeId: S, view: S, cursor: S }),
+    schema: obj({ id: S, status: S, ticketId: S, sprintId: S, appId: S, assigneeId: S, view: S, cursor: S }),
     buildQuery: (i) => {
       const q: string[] = []
-      for (const k of ["id", "status", "ticketId", "sprintId", "assigneeId", "view", "cursor"])
+      for (const k of ["id", "status", "ticketId", "sprintId", "appId", "assigneeId", "view", "cursor"])
         if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
       return q.length ? `?${q.join("&")}` : ""
     },
@@ -964,10 +964,14 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_sprints",
     summary:
-      "List the blocks of delivery work sold, newest first — each with its kind, its dates, the flat price it was sold for (in whole cents) and how many of its stories are done. Pass `accountId` for one client's. Bounded, not paged: a sprint is a contract, so there are few of them.",
+      "List the blocks of delivery work sold, newest first — each with its kind, its dates, the flat price it was sold for (in whole cents) and how many of its stories are done. Pass `accountId` for one client's, or `appId` for one system's (a sprint covers exactly one app). Bounded, not paged: a sprint is a contract, so there are few of them.",
     binding: "CONTENT", method: "GET", path: "/api/content/sprints",
-    schema: obj({ accountId: S }),
-    buildQuery: (i) => (str(i, "accountId") ? `?accountId=${encodeURIComponent(str(i, "accountId"))}` : ""),
+    schema: obj({ accountId: S, appId: S }),
+    buildQuery: (i) => {
+      const q: string[] = []
+      for (const k of ["accountId", "appId"]) if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
+      return q.length ? `?${q.join("&")}` : ""
+    },
     agent: { write: false, summarize: () => "List sprints" },
   },
   {

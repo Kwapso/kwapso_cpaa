@@ -119,7 +119,11 @@ async function handle(request: Request, env: Env): Promise<Response> {
     // module's shell for any sub-path (e.g. /accounts/<id>); the bare /accounts is a
     // real static file served below.
     for (const mod of [
-      "accounts", "learning", "tickets", "knowledge", "processes", "work",
+      "accounts", "learning", "tickets", "knowledge", "processes",
+      // THE WORK ENGINE'S FOUR. `work` became `stories` when the sprints moved
+      // out to a page of their own — the segment follows the heading, because a
+      // URL that disagrees with the title on the page is a cost paid for ever.
+      "stories", "sprints", "apps", "tasks",
       // The agency's own housekeeping. `purposes` is here too even though it is
       // a CONTEXTUAL section rather than a sidebar one: it still has records
       // with their own URLs, and a deep link that 404s on reload is a deep link

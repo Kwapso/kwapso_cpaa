@@ -41,6 +41,9 @@ export type StoryQuery = {
   status?: Story["status"]
   ticketId?: string
   sprintId?: string
+  /** all the work on one system — a story always has an app, and only sometimes
+   * a sprint, so this is the one narrowing every story answers to. */
+  appId?: string
   assigneeId?: string
   /** "all" includes finished work; the default backlog view hides it. */
   view?: "open" | "all"
@@ -87,6 +90,7 @@ function storyQuery(filter: StoryQuery | undefined, cursor: string | null | unde
   if (filter?.status) q.set("status", filter.status)
   if (filter?.ticketId) q.set("ticketId", filter.ticketId)
   if (filter?.sprintId) q.set("sprintId", filter.sprintId)
+  if (filter?.appId) q.set("appId", filter.appId)
   if (filter?.assigneeId) q.set("assigneeId", filter.assigneeId)
   if (filter?.view) q.set("view", filter.view)
   if (cursor) q.set("cursor", cursor)
@@ -119,9 +123,24 @@ export const content = {
 
   /** R14: a PAGE of tickets (a GROWING collection) — hand back `nextCursor` from
    * the previous response to get the next one. `total`/`mineTotal` are exact. */
-  help: (scope: "mine" | "all" = "all", cursor?: string | null) =>
+  help: (scope: "mine" | "all" = "all", cursor?: string | null, view: "live" | "archived" = "live") =>
     api<PagedResponse<{ tickets: HelpTicket[]; mineTotal: number }>>(
-      `/api/content/help?scope=${scope}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`
+      `/api/content/help?scope=${scope}&view=${view}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`
+    ),
+  /** PUT IT AWAY, or take it back out. The door has answered this since archive
+   * shipped; nothing on any screen called it, so a ticket could be archived by
+   * the assistant and then never found again by a person. */
+  archiveHelp: (id: string, archived: boolean) =>
+    api<PagedResponse<{ tickets: HelpTicket[]; mineTotal: number }>>(
+      "/api/content/help/archive",
+      post({ id, archived })
+    ),
+  /** WHERE THE PERSON PUT IT — the body names NEIGHBOURS, never a position, so two
+   * people reordering at once cannot fight over a number (shared/workers/rank.ts). */
+  rankHelp: (id: string, afterId: string | null, beforeId: string | null) =>
+    api<PagedResponse<{ tickets: HelpTicket[]; mineTotal: number }>>(
+      "/api/content/help/rank",
+      post({ id, afterId, beforeId })
     ),
   helpOne: (id: string) =>
     api<{ tickets: HelpTicket[] }>(`/api/content/help?id=${enc(id)}`).then((r) => r.tickets[0] ?? null),
@@ -162,10 +181,16 @@ export const content = {
     api<{ stories: Story[] }>("/api/content/stories/status", post({ id, status, closingNote })),
   rankStory: (id: string, afterId: string | null, beforeId: string | null) =>
     api<{ stories: Story[] }>("/api/content/stories/rank", post({ id, afterId, beforeId })),
-  sprints: (accountId?: string) =>
-    api<{ sprints: Sprint[]; total: number }>(
-      `/api/content/sprints${accountId ? `?accountId=${enc(accountId)}` : ""}`
-    ),
+  /** The blocks of sold work. `accountId` narrows to one client, `appId` to one
+   * system — the same two questions the door parses, so a caller cannot invent a
+   * third the server ignores in silence. */
+  sprints: (filter: { accountId?: string; appId?: string } = {}) => {
+    const q = new URLSearchParams()
+    if (filter.accountId) q.set("accountId", filter.accountId)
+    if (filter.appId) q.set("appId", filter.appId)
+    const qs = q.toString()
+    return api<{ sprints: Sprint[]; total: number }>(`/api/content/sprints${qs ? `?${qs}` : ""}`)
+  },
   sprintOne: (id: string) =>
     api<{ sprints: Sprint[] }>("/api/content/sprints").then(
       (r) => r.sprints.find((s) => s.id === id) ?? null

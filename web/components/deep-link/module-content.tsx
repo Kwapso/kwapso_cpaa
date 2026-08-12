@@ -30,12 +30,16 @@ import { LearningDetailScreen } from "@/components/learning-detail"
 import { KnowledgeDetailScreen } from "@/components/knowledge-detail"
 import { HelpDetailScreen } from "@/components/help-detail"
 import { ProcessDetailScreen } from "@/components/process-detail"
+import { AppDetailScreen } from "@/components/app-detail"
+import { SprintDetailScreen } from "@/components/sprint-detail"
+import { StoryDetailScreen } from "@/components/story-detail"
 import { ImportScreen } from "@/components/import-screen"
 import { StaffPanel } from "@/components/staff-panel"
 import { SelectableScreen } from "@/components/selectable-screen"
 import { NoAccess, NotFound, LoadError } from "@/components/deep-link/screen-bits"
 import { LoadMore } from "@/components/load-more"
 import { tenancy } from "@/lib/api"
+import type { HelpScope } from "@/lib/live-resources"
 import {
   shapeBrandDetail,
   shapeInviteDetail,
@@ -43,6 +47,7 @@ import {
   shapeMemberDetail,
   shapeProgrammeDetail,
   shapePurposeDetail,
+  shapeTaskDetail,
   shapeTeamDetail,
 } from "@/components/deep-link/shape"
 import type { ActivityItem } from "@shared/types"
@@ -66,8 +71,9 @@ type ScreenData = ReturnType<typeof useScreenData>
  * The host owns all of it; this bundle is how it hands the render half a snapshot. */
 export type ModuleContentCtx = Pick<
   ScreenData,
-  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "learningQ" | "helpQ" | "helpMineQ" | "accountsQ" | "knowledgeQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "inviteAuditQ"
+  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "learningQ" | "helpQ" | "helpMineQ" | "helpArchivedQ" | "accountsQ" | "knowledgeQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "inviteAuditQ"
   | "marketingQ" | "brandQ" | "programmesQ" | "purposesQ" | "internalActivity"
+  | "storiesQ" | "sprintsQ" | "appsQ" | "tasksQ"
 > & {
   noAccess: boolean
   enabled: boolean
@@ -85,8 +91,8 @@ export type ModuleContentCtx = Pick<
   onAction: (actionId: string, ctx: ScreenActionContext) => void
   onIntent: (intent: ScreenIntent) => void
   sectionPath: string
-  helpScope: "mine" | "all"
-  setHelpScope: (v: "mine" | "all") => void
+  helpScope: HelpScope
+  setHelpScope: (v: HelpScope) => void
   myUserId: string | null
   query: ScreenQuery
 }
@@ -303,10 +309,47 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       return <KnowledgeDetailScreen teamId={teamId as string} sourceId={recordId} />
     }
     if (module === "tickets") {
-      return <HelpDetailScreen teamId={teamId as string} helpId={recordId} myUserId={myUserId} />
+      return (
+        <HelpDetailScreen
+          teamId={teamId as string}
+          helpId={recordId}
+          myUserId={myUserId}
+          basePath={sectionPath}
+        />
+      )
     }
     if (module === "processes") {
       return <ProcessDetailScreen teamId={teamId as string} processId={recordId} />
+    }
+
+    // ── THE WORK ENGINE'S RECORDS ────────────────────────────────────────────
+    // Three bespoke, one recipe. The app, the sprint and the story each carry a
+    // collection tab with its own create action (or, on the story, a status
+    // stepper and the time logged against it) — controls no engine block draws.
+    // The TASK carries none of that: it is a title, a date and a tick, so its
+    // detail is the recipe below with the four housekeeping ones.
+    if (module === "apps") {
+      return <AppDetailScreen teamId={teamId as string} appId={recordId} basePath={sectionPath} />
+    }
+    if (module === "sprints") {
+      return (
+        <SprintDetailScreen teamId={teamId as string} sprintId={recordId} basePath={sectionPath} />
+      )
+    }
+    if (module === "stories") {
+      return (
+        <StoryDetailScreen teamId={teamId as string} storyId={recordId} basePath={sectionPath} />
+      )
+    }
+    if (module === "tasks") {
+      const base = resolveRecipe("tasks.detail", overridesQ.data)
+      if (!base) return <NotFound />
+      // R8/R16: the Activity tab badges this record's exact history total.
+      return internalDetail(ctx, withTabCounts(base, { activity: ctx.internalActivity.total }), {
+        what: "the tasks",
+        query: ctx.tasksQ,
+        shape: shapeTaskDetail as InternalShaper,
+      })
     }
 
     // ── THE AGENCY'S OWN HOUSEKEEPING ────────────────────────────────────────
