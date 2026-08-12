@@ -145,6 +145,59 @@ const learningBody = (i: Record<string, unknown>): Record<string, unknown> => ({
   required: typeof i.required === "boolean" ? i.required : undefined,
 })
 
+/** THE AGENCY-INTERNAL BODIES. Same reason `learningBody` exists: one builder per
+ * door shape, so create and edit send the SAME field set and cannot drift into
+ * two contracts. R22 proves the forwarding half by RUNNING these rather than
+ * reading them, which is exactly why they are shared functions — a builder that
+ * delegates is judged by what the door receives. */
+const marketingBody = (i: Record<string, unknown>): Record<string, unknown> => ({
+  title: str(i, "title"),
+  channel: opt(i, "channel"),
+  status: opt(i, "status"),
+  summary: opt(i, "summary"),
+  body: opt(i, "body"),
+  link: opt(i, "link"),
+  publishedOn: opt(i, "publishedOn"),
+})
+
+const brandAssetBody = (i: Record<string, unknown>): Record<string, unknown> => ({
+  name: str(i, "name"),
+  category: opt(i, "category"),
+  description: opt(i, "description"),
+  fileUrl: opt(i, "fileUrl"),
+})
+
+const programmeBody = (i: Record<string, unknown>): Record<string, unknown> => ({
+  name: str(i, "name"),
+  description: opt(i, "description"),
+  sequence: typeof i.sequence === "number" ? i.sequence : undefined,
+})
+
+const meetingPurposeBody = (i: Record<string, unknown>): Record<string, unknown> => ({
+  name: str(i, "name"),
+  department: opt(i, "department"),
+  description: opt(i, "description"),
+})
+
+const staffProfileBody = (i: Record<string, unknown>): Record<string, unknown> => ({
+  userId: str(i, "userId"),
+  headline: opt(i, "headline"),
+  personalityType: opt(i, "personalityType"),
+  strengths: opt(i, "strengths"),
+  weaknesses: opt(i, "weaknesses"),
+  roleModels: opt(i, "roleModels"),
+  about: opt(i, "about"),
+  photoUrl: opt(i, "photoUrl"),
+})
+
+const certificateBody = (i: Record<string, unknown>): Record<string, unknown> => ({
+  title: str(i, "title"),
+  issuer: opt(i, "issuer"),
+  issuedOn: opt(i, "issuedOn"),
+  expiresOn: opt(i, "expiresOn"),
+  fileUrl: opt(i, "fileUrl"),
+})
+
 /* ---------------------------------- the type ---------------------------------- */
 
 /** One endpoint both machine surfaces expose. Neutral wiring at the top; the agent-only
@@ -1235,6 +1288,249 @@ export const SHARED_TOOLS: SharedTool[] = [
     buildQuery: (i) => `?accountId=${encodeURIComponent(str(i, "accountId"))}`,
     agent: { write: false, summarize: (i) => `Work out the margin on ${accountLabel(i, "accountId")}` },
   },
+
+  /* ------------------- the agency's own housekeeping ------------------------ */
+  // Four modules the assistant reaches exactly as a person does — same doors,
+  // same gates, same audit rows. Every summary below says whose material it is,
+  // because the assistant repeats what it reads: an agency asking it to draft a
+  // client update must not be handed "what Ana is bad at" as context, and the
+  // structural defence (no portal door, refusePortalCaller everywhere) protects
+  // the CLIENT's session, not the assistant's own choice of words.
+
+  {
+    name: "list_marketing_posts",
+    summary:
+      "The agency's OWN published posts — what went out, on which channel, on which day. Internal: these never appear in a client's portal, and a client login cannot reach this door at all.",
+    binding: "CONTENT", method: "GET", path: "/api/content/marketing",
+    schema: obj({ id: S }),
+    buildQuery: (i) => (str(i, "id") ? `?id=${encodeURIComponent(str(i, "id"))}` : ""),
+    agent: { write: false, summarize: () => "Read the agency's marketing posts" },
+  },
+  {
+    name: "create_marketing_post",
+    summary:
+      "Record a post the agency published (title required). `channel` and `status` are picked-or-created as dropdown values, so a new channel becomes a canonical one rather than a spelling. `publishedOn` is a day, written YYYY-MM-DD.",
+    binding: "CONTENT", method: "POST", path: "/api/content/marketing",
+    schema: obj({ title: S, channel: S, status: S, summary: S, body: S, link: S, publishedOn: S }, ["title"]),
+    buildBody: (i) => marketingBody(i),
+    agent: { write: true, confirm: false, summarize: (i) => `Record the post "${str(i, "title")}"` },
+  },
+  {
+    name: "update_marketing_post",
+    summary: "Edit a marketing post (by id). Same fields as creating one.",
+    binding: "CONTENT", method: "POST", path: "/api/content/marketing/update",
+    schema: obj({ id: S, title: S, channel: S, status: S, summary: S, body: S, link: S, publishedOn: S }, ["id", "title"]),
+    buildBody: (i) => ({ id: str(i, "id"), ...marketingBody(i) }),
+    agent: { write: true, confirm: false, summarize: (i) => `Edit marketing post ${str(i, "id")}` },
+  },
+  {
+    name: "set_marketing_post_active",
+    summary: "Archive a marketing post, or put it back — never deleted, so a campaign's history survives it.",
+    binding: "CONTENT", method: "POST", path: "/api/content/marketing/active",
+    schema: obj({ id: S, active: B }, ["id", "active"]),
+    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
+    agent: {
+      write: true,
+      confirm: (i) => i.active !== true, // destructive only when ARCHIVING
+      summarize: (i) => `${i.active === true ? "Restore" : "Archive"} marketing post ${str(i, "id")}`,
+    },
+  },
+
+  {
+    name: "list_brand_assets",
+    summary:
+      "The agency's own brand material — logos, decks, templates, and where each one lives. Internal: a client login cannot reach this door.",
+    binding: "CONTENT", method: "GET", path: "/api/content/brand-assets",
+    schema: obj({ id: S }),
+    buildQuery: (i) => (str(i, "id") ? `?id=${encodeURIComponent(str(i, "id"))}` : ""),
+    agent: { write: false, summarize: () => "Read the brand library" },
+  },
+  {
+    name: "create_brand_asset",
+    summary:
+      "Add something to the brand library (name required). `category` is picked-or-created as a dropdown value. `fileUrl` may be a link anywhere; uploading the bytes themselves is a screen action, not a tool.",
+    binding: "CONTENT", method: "POST", path: "/api/content/brand-assets",
+    schema: obj({ name: S, category: S, description: S, fileUrl: S }, ["name"]),
+    buildBody: (i) => brandAssetBody(i),
+    agent: { write: true, confirm: false, summarize: (i) => `Add "${str(i, "name")}" to the brand library` },
+  },
+  {
+    name: "update_brand_asset",
+    summary: "Edit a brand asset (by id). Same fields as creating one.",
+    binding: "CONTENT", method: "POST", path: "/api/content/brand-assets/update",
+    schema: obj({ id: S, name: S, category: S, description: S, fileUrl: S }, ["id", "name"]),
+    buildBody: (i) => ({ id: str(i, "id"), ...brandAssetBody(i) }),
+    agent: { write: true, confirm: false, summarize: (i) => `Edit brand asset ${str(i, "id")}` },
+  },
+  {
+    name: "set_brand_asset_active",
+    summary:
+      "Archive a brand asset, or put it back. The FILE is never deleted either way — restoring an asset whose bytes had been thrown away would hand back a broken link.",
+    binding: "CONTENT", method: "POST", path: "/api/content/brand-assets/active",
+    schema: obj({ id: S, active: B }, ["id", "active"]),
+    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
+    agent: {
+      write: true,
+      confirm: (i) => i.active !== true,
+      summarize: (i) => `${i.active === true ? "Restore" : "Archive"} brand asset ${str(i, "id")}`,
+    },
+  },
+
+  {
+    name: "list_programmes",
+    summary: "How the agency runs an engagement, in the order the programmes read. Internal.",
+    binding: "CONTENT", method: "GET", path: "/api/content/delivery/programs",
+    schema: obj({ id: S }),
+    buildQuery: (i) => (str(i, "id") ? `?id=${encodeURIComponent(str(i, "id"))}` : ""),
+    agent: { write: false, summarize: () => "Read the delivery programmes" },
+  },
+  {
+    name: "create_programme",
+    summary: "Add a delivery programme (name required). `sequence` is display order only — nothing is locked to it.",
+    binding: "CONTENT", method: "POST", path: "/api/content/delivery/programs",
+    schema: obj({ name: S, description: S, sequence: N }, ["name"]),
+    buildBody: (i) => programmeBody(i),
+    agent: { write: true, confirm: false, summarize: (i) => `Add the "${str(i, "name")}" programme` },
+  },
+  {
+    name: "update_programme",
+    summary: "Edit a delivery programme (by id).",
+    binding: "CONTENT", method: "POST", path: "/api/content/delivery/programs/update",
+    schema: obj({ id: S, name: S, description: S, sequence: N }, ["id", "name"]),
+    buildBody: (i) => ({ id: str(i, "id"), ...programmeBody(i) }),
+    agent: { write: true, confirm: false, summarize: (i) => `Edit programme ${str(i, "id")}` },
+  },
+  {
+    name: "set_programme_active",
+    summary: "Archive a delivery programme, or put it back — never deleted.",
+    binding: "CONTENT", method: "POST", path: "/api/content/delivery/programs/active",
+    schema: obj({ id: S, active: B }, ["id", "active"]),
+    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
+    agent: {
+      write: true,
+      confirm: (i) => i.active !== true,
+      summarize: (i) => `${i.active === true ? "Restore" : "Archive"} programme ${str(i, "id")}`,
+    },
+  },
+
+  {
+    name: "list_meeting_purposes",
+    summary: "Why the agency meets, and which department each purpose belongs to. Internal.",
+    binding: "CONTENT", method: "GET", path: "/api/content/delivery/purposes",
+    schema: obj({ id: S }),
+    buildQuery: (i) => (str(i, "id") ? `?id=${encodeURIComponent(str(i, "id"))}` : ""),
+    agent: { write: false, summarize: () => "Read the meeting purposes" },
+  },
+  {
+    name: "create_meeting_purpose",
+    summary:
+      "Add a meeting purpose (name required). `department` is picked-or-created as a dropdown value — which is why a purpose is a record and a department is not.",
+    binding: "CONTENT", method: "POST", path: "/api/content/delivery/purposes",
+    schema: obj({ name: S, department: S, description: S }, ["name"]),
+    buildBody: (i) => meetingPurposeBody(i),
+    agent: { write: true, confirm: false, summarize: (i) => `Add the "${str(i, "name")}" meeting purpose` },
+  },
+  {
+    name: "update_meeting_purpose",
+    summary: "Edit a meeting purpose (by id).",
+    binding: "CONTENT", method: "POST", path: "/api/content/delivery/purposes/update",
+    schema: obj({ id: S, name: S, department: S, description: S }, ["id", "name"]),
+    buildBody: (i) => ({ id: str(i, "id"), ...meetingPurposeBody(i) }),
+    agent: { write: true, confirm: false, summarize: (i) => `Edit meeting purpose ${str(i, "id")}` },
+  },
+  {
+    name: "set_meeting_purpose_active",
+    summary: "Archive a meeting purpose, or put it back — never deleted.",
+    binding: "CONTENT", method: "POST", path: "/api/content/delivery/purposes/active",
+    schema: obj({ id: S, active: B }, ["id", "active"]),
+    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
+    agent: {
+      write: true,
+      confirm: (i) => i.active !== true,
+      summarize: (i) => `${i.active === true ? "Restore" : "Archive"} meeting purpose ${str(i, "id")}`,
+    },
+  },
+
+  {
+    name: "list_staff_profiles",
+    summary:
+      "What the team's own people are like and how they work best — pass `userId` for one person's. THE AGENCY'S OWN, and the sharpest case of it in the app: never repeat any of this to a client, or into anything a client will read. A client login cannot reach the door.",
+    binding: "CONTENT", method: "GET", path: "/api/content/staff/profiles",
+    schema: obj({ userId: S }),
+    buildQuery: (i) => (str(i, "userId") ? `?userId=${encodeURIComponent(str(i, "userId"))}` : ""),
+    agent: { write: false, summarize: (i) => (str(i, "userId") ? `Read ${memberLabel(i)}'s profile` : "Read the team's staff profiles") },
+  },
+  {
+    name: "save_staff_profile",
+    summary:
+      "Write a colleague's profile (`userId` required). ONE door for both cases: if they have no profile yet this writes one, and if they do this replaces its fields — a person either has a profile or they don't, and asking the caller which would be a race between two open tabs.",
+    binding: "CONTENT", method: "POST", path: "/api/content/staff/profiles",
+    schema: obj(
+      { userId: S, headline: S, personalityType: S, strengths: S, weaknesses: S, roleModels: S, about: S, photoUrl: S },
+      ["userId"]
+    ),
+    buildBody: (i) => staffProfileBody(i),
+    agent: {
+      write: true,
+      // A profile is about a PERSON and this door overwrites it whole, so it
+      // confirms — not because it is destructive in the permission sense, but
+      // because "the assistant rewrote what my colleagues read about me" is not
+      // something anybody should discover afterwards.
+      confirm: true,
+      summarize: (i) => `Write ${memberLabel(i)}'s staff profile`,
+    },
+  },
+  {
+    name: "set_staff_profile_active",
+    summary: "Take a staff profile down, or put it back — never deleted.",
+    binding: "CONTENT", method: "POST", path: "/api/content/staff/profiles/active",
+    schema: obj({ id: S, active: B }, ["id", "active"]),
+    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
+    agent: {
+      write: true,
+      confirm: true,
+      summarize: (i) => `${i.active === true ? "Restore" : "Take down"} staff profile ${str(i, "id")}`,
+    },
+  },
+
+  {
+    name: "list_staff_certificates",
+    summary:
+      "The qualifications the team holds — pass `userId` for one person's. The door narrows, not the caller: filtering a capped list afterwards would disagree with the count beside it. Internal.",
+    binding: "CONTENT", method: "GET", path: "/api/content/staff/certificates",
+    schema: obj({ userId: S }),
+    buildQuery: (i) => (str(i, "userId") ? `?userId=${encodeURIComponent(str(i, "userId"))}` : ""),
+    agent: { write: false, summarize: (i) => (str(i, "userId") ? `Read ${memberLabel(i)}'s certificates` : "Read the team's certificates") },
+  },
+  {
+    name: "create_staff_certificate",
+    summary:
+      "Record a qualification somebody holds (`userId` and `title` required). `issuedOn` / `expiresOn` are days, written YYYY-MM-DD — anything that is not a real calendar day is refused rather than stored, because an expiry that half parses is a certificate that silently never lapses.",
+    binding: "CONTENT", method: "POST", path: "/api/content/staff/certificates",
+    schema: obj({ userId: S, title: S, issuer: S, issuedOn: S, expiresOn: S, fileUrl: S }, ["userId", "title"]),
+    buildBody: (i) => ({ userId: str(i, "userId"), ...certificateBody(i) }),
+    agent: { write: true, confirm: false, summarize: (i) => `Record the "${str(i, "title")}" certificate for ${memberLabel(i)}` },
+  },
+  {
+    name: "update_staff_certificate",
+    summary: "Edit a certificate (by id). Same fields as recording one.",
+    binding: "CONTENT", method: "POST", path: "/api/content/staff/certificates/update",
+    schema: obj({ id: S, userId: S, title: S, issuer: S, issuedOn: S, expiresOn: S, fileUrl: S }, ["id", "title"]),
+    buildBody: (i) => ({ id: str(i, "id"), userId: opt(i, "userId"), ...certificateBody(i) }),
+    agent: { write: true, confirm: false, summarize: (i) => `Edit certificate ${str(i, "id")}` },
+  },
+  {
+    name: "set_staff_certificate_active",
+    summary: "Archive a certificate, or put it back — never deleted.",
+    binding: "CONTENT", method: "POST", path: "/api/content/staff/certificates/active",
+    schema: obj({ id: S, active: B }, ["id", "active"]),
+    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
+    agent: {
+      write: true,
+      confirm: (i) => i.active !== true,
+      summarize: (i) => `${i.active === true ? "Restore" : "Archive"} certificate ${str(i, "id")}`,
+    },
+  },
 ]
 
 /** The permission each WRITE needs (module:right) — every write tool on either machine
@@ -1271,6 +1567,27 @@ export const TOOL_GATES: Record<string, string> = {
   create_dropdown_value: "selectable_data:create",
   update_dropdown_value: "selectable_data:edit",
   set_dropdown_active: "selectable_data:delete",
+  create_marketing_post: "marketing:create",
+  update_marketing_post: "marketing:edit",
+  set_marketing_post_active: "marketing:delete",
+  create_brand_asset: "brand_assets:create",
+  update_brand_asset: "brand_assets:edit",
+  set_brand_asset_active: "brand_assets:delete",
+  create_programme: "delivery:create",
+  update_programme: "delivery:edit",
+  set_programme_active: "delivery:delete",
+  create_meeting_purpose: "delivery:create",
+  update_meeting_purpose: "delivery:edit",
+  set_meeting_purpose_active: "delivery:delete",
+  // The profile door is ONE door for "there wasn't one" and "there was", so it
+  // is gated once on `edit`: writing down what a colleague is like is the same
+  // act either way, and a permission that depends on invisible state is one
+  // nobody can reason about. `create` gates the certificate door instead.
+  save_staff_profile: "staff_profiles:edit",
+  set_staff_profile_active: "staff_profiles:delete",
+  create_staff_certificate: "staff_profiles:create",
+  update_staff_certificate: "staff_profiles:edit",
+  set_staff_certificate_active: "staff_profiles:delete",
   create_learning: "learning:create",
   update_learning: "learning:edit",
   set_learning_active: "learning:delete",

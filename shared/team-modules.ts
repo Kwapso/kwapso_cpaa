@@ -19,6 +19,14 @@ export const TEAM_MODULES = [
   "agent",
   "processes",
   "commercials",
+  // THE AGENCY'S OWN HOUSEKEEPING — four modules carrying the seven Glide tables
+  // that describe how the agency runs ITSELF rather than what it does for a
+  // client. None of them is customer material, so every door on all four refuses
+  // a client login outright (R21) rather than fencing.
+  "marketing",
+  "brand_assets",
+  "delivery",
+  "staff_profiles",
 ] as const
 
 /** Plain-English label for each module, shown as the rows of the permission
@@ -61,6 +69,33 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   // it is a second module and not four more rights on the first.
   processes: "Process maps",
   commercials: "Rates & margin",
+
+  // ── THE AGENCY'S OWN HOUSEKEEPING ──────────────────────────────────────────
+  // Four modules, seven legacy tables, and one sentence that decides all of it:
+  // none of this is any client's. It is what WE publish, the material we publish
+  // it with, how we run our own delivery, and who our people are — so these
+  // modules never appear in a portal, never carry an account fence, and every
+  // door on them refuses a client login the way `learning` and `knowledge` do.
+  //
+  // Two of the seven legacy tables are NOT here, on purpose. `departments` (8
+  // rows) and `channels` (6) are bare labels with no fields of their own, and the
+  // base already has exactly one home for a team's editable vocabulary — the
+  // dropdown values module, which carries its own permissions, screen, import,
+  // export and machine tools. Giving each of them a table, a screen and a
+  // permission row would be a module built to hold a word.
+  marketing: "Marketing",
+  brand_assets: "Brand library",
+  // Programmes and meeting purposes: two thin tables, one area. The legacy
+  // reconciliation groups them in a single sentence ("`program` and `purposes`
+  // support meetings and the delivery method"), and they are read together, so
+  // they are one module the same way apps, processes and steps are one.
+  delivery: "Delivery method",
+  // The person behind the member row: their profile and the certificates they
+  // hold. Visible to the team, never to a client — which is why it is its own
+  // permission row and not four more rights on `team_members`: an agency can
+  // want everyone to see who their colleagues are without everyone being able to
+  // change who is on the team.
+  staff_profiles: "Staff profiles",
 }
 
 /** The matrix rows: { key, label } per module, in display order. */

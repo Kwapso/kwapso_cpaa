@@ -27,7 +27,21 @@ const SECRET_KEY = /pass(word|phrase)|secret|token|credential|api[-_]?key|^key$|
 
 /** One line stays one line: past this a value is clipped with an ellipsis. */
 const MAX_VALUE = 160
-/** A panel, not a data dump. Extra lines collapse into "…and N more". */
+/** A panel, not a data dump. Extra lines collapse into "…and N more".
+ *
+ * WITH ONE EXCEPTION, and it is the whole reason this file exists: a PERMISSION
+ * SHEET is never abbreviated. The grid renderer prints one line per module —
+ * including every module being set to NO ACCESS — because the door writes them
+ * all, and a panel that showed only the grants would let a silent removal
+ * through. Collapsing the tail of that grid into "…and 6 more" is the same
+ * stealth demotion arriving by a different route: the admin approves a sheet
+ * they were shown two thirds of.
+ *
+ * It was not hypothetical. This cap was 16 while the app had 13 modules, so a
+ * sheet plus its role line fitted with two lines to spare — and the day four
+ * more modules shipped, the last of them fell off the panel. The fix is not a
+ * bigger number, which would rot again at the next module; it is that a grid is
+ * not subject to a line budget at all. */
 const MAX_LINES = 16
 /** Ids listed from a bulk array before the count carries the rest. */
 const MAX_ITEMS = 3
@@ -171,17 +185,24 @@ export function describePayload(
   names?: Record<string, string>
 ): string[] {
   const lines: string[] = []
+  // Set the moment a permission sheet is rendered — see MAX_LINES for why that
+  // exempts the whole panel from the budget rather than just the grid's own
+  // lines: the grid is the payload, and the two or three lines beside it are the
+  // context that says WHOSE sheet it is.
+  let hasGrid = false
   for (const [key, value] of Object.entries(body)) {
     if (isPlainObject(value)) {
       if (SECRET_KEY.test(key)) lines.push(`${fieldLabel(tool, key)}: hidden`)
-      else if (isPermissionGrid(tool, key)) lines.push(...renderGrid(value))
-      else lines.push(...describePayload(tool, value, names).map((l) => `${fieldLabel(tool, key)} — ${l}`))
+      else if (isPermissionGrid(tool, key)) {
+        hasGrid = true
+        lines.push(...renderGrid(value))
+      } else lines.push(...describePayload(tool, value, names).map((l) => `${fieldLabel(tool, key)} — ${l}`))
       continue
     }
     const shown = renderValue(key, value, names)
     if (shown !== null) lines.push(`${fieldLabel(tool, key)}: ${shown}`)
   }
-  if (lines.length <= MAX_LINES) return lines
+  if (hasGrid || lines.length <= MAX_LINES) return lines
   const kept = lines.slice(0, MAX_LINES - 1)
   return [...kept, `…and ${lines.length - kept.length} more`]
 }

@@ -93,6 +93,15 @@ export function DeepLinkScreen() {
     learningQ,
     helpQ,
     helpMineQ,
+    marketingQ,
+    brandQ,
+    programmesQ,
+    purposesQ,
+    marketingChannelOptions,
+    marketingStatusOptions,
+    brandCategoryOptions,
+    departmentOptions,
+    internalActivity,
     totals,
     helpTypeOptions,
     learningCategoryOptions,
@@ -137,7 +146,15 @@ export function DeepLinkScreen() {
   // into one hook. Each action calls the permission-checked endpoint, primes the
   // actor's cache and invalidates any changed sibling count; runAction throws on
   // failure so the calling dialog / confirm surfaces it.
-  const { runAction, createLearning, createHelp, createAccount, createKnowledge } = useScreenActions(teamId)
+  const {
+    runAction,
+    createLearning,
+    createHelp,
+    createAccount,
+    createKnowledge,
+    saveInternalRecord,
+    setInternalActive,
+  } = useScreenActions(teamId)
 
   /* -------------------------- engine intent + action ------------------------- */
 
@@ -168,6 +185,22 @@ export function DeepLinkScreen() {
         break
       case "team.edit":
         go(currentPath, { panel: "edit", module: "team" })
+        break
+      // The agency's own housekeeping. Four modules, two actions each, and the
+      // same routing every other write in this host uses: the action opens a
+      // URL (?panel / ?confirm) and the dialog behind it does the mutation, so
+      // Back closes it and the link is shareable.
+      case "marketing.edit":
+      case "brand.edit":
+      case "programme.edit":
+      case "purpose.edit":
+        go(currentPath, { panel: "edit", module: module as string, id })
+        break
+      case "marketing.archive":
+      case "brand.archive":
+      case "programme.archive":
+      case "purpose.archive":
+        go(currentPath, { confirm: `${module}.archive`, id })
         break
     }
   }
@@ -222,6 +255,10 @@ export function DeepLinkScreen() {
     help: totals.help,
     accounts: totals.accounts,
     knowledge: totals.knowledge,
+    marketing: totals.marketing,
+    brand_assets: totals.brand_assets,
+    programmes: totals.programmes,
+    purposes: totals.purposes,
   })
 
   const crumbs = buildCrumbs({
@@ -269,6 +306,7 @@ export function DeepLinkScreen() {
           {renderModuleContent({
             noAccess, enabled, perms, can, module, recordId, teamId, canImport, go,
             overridesQ, metaQ, membersQ, rolesQ, roles, invitesQ, learningQ, helpQ, accountsQ, knowledgeQ, totals,
+            marketingQ, brandQ, programmesQ, purposesQ, internalActivity,
             activityQ, activityTotal, activityKey, activityScope, inviteAuditQ, teamName, active,
             rights, onAction, onIntent,
             sectionPath, helpScope, setHelpScope, myUserId, query, helpMineQ,
@@ -286,12 +324,22 @@ export function DeepLinkScreen() {
         accountsQ={accountsQ}
         learningCategoryOptions={learningCategoryOptions}
         contentTypeOptions={contentTypeOptions}
+        marketingChannelOptions={marketingChannelOptions}
+        marketingStatusOptions={marketingStatusOptions}
+        brandCategoryOptions={brandCategoryOptions}
+        departmentOptions={departmentOptions}
+        marketingQ={marketingQ}
+        brandQ={brandQ}
+        programmesQ={programmesQ}
+        purposesQ={purposesQ}
         helpTypeOptions={helpTypeOptions}
         runAction={runAction}
         createLearning={createLearning}
         createHelp={createHelp}
         createAccount={createAccount}
         createKnowledge={createKnowledge}
+        saveInternalRecord={saveInternalRecord}
+        setInternalActive={setInternalActive}
         closePanel={closePanel}
         onRecordGone={() => replace(sectionPath)}
       />
@@ -319,6 +367,10 @@ function teamTabStrip(
     module === "tickets" ||
     module === "knowledge" ||
     module === "processes" ||
+    module === "marketing" ||
+    module === "brand" ||
+    module === "delivery" ||
+    module === "purposes" ||
     module === "import"
       ? module
       : "overview"

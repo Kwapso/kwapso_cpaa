@@ -81,6 +81,24 @@ export const MODULE_PERMISSION: Record<string, string> = {
   // the same screens (the money panels on an account), never a screen of its own
   // — what an account is charged is a bigger decision than how long a step takes.
   processes: "processes",
+  // THE AGENCY'S OWN HOUSEKEEPING. Two of these are the second and third places
+  // in the app where the URL segment is NOT the permission module, and for the
+  // same reason Tickets is the first: the address bar says the word a person
+  // uses, while the gate says the string in every role's permission sheet.
+  //   • `brand` reads better in a URL than `brand_assets`, and an underscore in
+  //     an address is a thing people mistype.
+  //   • `delivery` is one screen over two tables (programmes and meeting
+  //     purposes), so no single table name would be honest.
+  // `marketing` is the ordinary case — the segment and the module are one word.
+  marketing: "marketing",
+  brand: "brand_assets",
+  // The Delivery method is ONE module over TWO record kinds, so it needs two
+  // segments: a URL addresses one record, and `/t/<team>/delivery/<id>` cannot
+  // mean a programme on Tuesday and a meeting purpose on Wednesday. Both gate on
+  // the same right, which is the point — they are one permission and two nouns.
+  delivery: "delivery",
+  purposes: "delivery",
+  // Staff profiles has no segment at all: it is read on the member's own page.
 }
 
 /* --------------------------------- team --------------------------------- */
@@ -392,6 +410,184 @@ export const processesListRecipe: ScreenRecipe = {
   ),
 }
 
+/* -------------------- the agency's own housekeeping ----------------------- */
+
+/** THE FOUR RECORD SCREENS, AS RECIPES. Each of these details is the record's
+ * own fields plus its history — a description block and an activity block — so
+ * they are described as DATA rather than composed by hand, which is what the
+ * engine is for. The bespoke details in this app (a ticket's conversation, a
+ * map's arithmetic, an account's four collections) exist because no engine block
+ * draws them; none of these four has that problem, and writing four
+ * host-composed components to render two blocks each would be four files of
+ * ceremony where a recipe already says it.
+ *
+ * The Overview tabs are pinned in RECORD_TAB_COUNT_EXCEPTIONS with their reason
+ * (one record, not a collection); the Activity tabs are badged with the exact
+ * server total by the withTabCounts seam (R8 for the place, R16 for the number).
+ */
+function internalDetailTabs(rows: { label: string; column: string }[]): RecipeTab[] {
+  return [
+    {
+      key: "overview",
+      label: "Overview",
+      icon: CONCEPT_ICON.overview,
+      block: { kind: "description", columns: 1, rows },
+    },
+    {
+      key: "activity",
+      label: "Activity",
+      icon: CONCEPT_ICON.activity,
+      block: { kind: "activity", source: "activity" },
+    },
+  ]
+}
+
+/** The two actions every internal record carries, gated on its own module. Edit
+ * and archive are the whole write surface: these are records somebody keeps, not
+ * records somebody works through, so there is no status to move along. */
+function internalDetailActions(module: string, prefix: string, archiveLabel: string): RecipeAction[] {
+  return [
+    { id: `${prefix}.edit`, label: "Edit", action: `${prefix}.edit`, variant: "outline", gate: { module, right: "edit" } },
+    {
+      id: `${prefix}.archive`,
+      label: archiveLabel,
+      action: `${prefix}.archive`,
+      variant: "destructive",
+      gate: { module, right: "delete" },
+    },
+  ]
+}
+
+/** Marketing list — what the agency published, newest first. A row's summary
+ * line says where it went and when, because those are the two questions somebody
+ * scanning a marketing calendar is actually asking. */
+export const marketingListRecipe: ScreenRecipe = {
+  type: "list",
+  display: "list",
+  surface: "none",
+  binding: { module: "marketing" },
+  gate: { module: "marketing", right: "read" },
+  fields: [field("name", "Post"), field("detail", "Details")],
+  actions: [],
+  collection: listCollection("No marketing posts yet.", "Search posts…", [
+    { field: "channel", label: "Channel", control: "select" },
+    { field: "status", label: "Status", control: "select" },
+    { field: "state", label: "Archived", control: "select" },
+  ]),
+}
+
+export const marketingDetailRecipe: ScreenRecipe = {
+  type: "detail",
+  binding: { module: "marketing" },
+  gate: { module: "marketing", right: "read" },
+  fields: [],
+  actions: internalDetailActions("marketing", "marketing", "Archive post"),
+  header: { title: "name", subtitle: "detail" },
+  tabs: internalDetailTabs([
+    { label: "Channel", column: "channel" },
+    { label: "Status", column: "status" },
+    { label: "Published", column: "published" },
+    { label: "Summary", column: "summary" },
+    { label: "Link", column: "link" },
+    { label: "Added", column: "created" },
+    { label: "Added by", column: "createdBy" },
+    { label: "Last updated", column: "updated" },
+  ]),
+}
+
+/** Brand library list — the material everything else is made with. */
+export const brandListRecipe: ScreenRecipe = {
+  type: "list",
+  display: "list",
+  surface: "none",
+  binding: { module: "brand" },
+  gate: { module: "brand_assets", right: "read" },
+  fields: [field("name", "Asset"), field("detail", "Details")],
+  actions: [],
+  collection: listCollection("Nothing in the brand library yet.", "Search the brand library…", [
+    { field: "category", label: "Category", control: "select" },
+    { field: "state", label: "Archived", control: "select" },
+  ]),
+}
+
+export const brandDetailRecipe: ScreenRecipe = {
+  type: "detail",
+  binding: { module: "brand" },
+  gate: { module: "brand_assets", right: "read" },
+  fields: [],
+  actions: internalDetailActions("brand_assets", "brand", "Archive asset"),
+  header: { title: "name", subtitle: "detail" },
+  tabs: internalDetailTabs([
+    { label: "Category", column: "category" },
+    { label: "Description", column: "description" },
+    { label: "File", column: "file" },
+    { label: "Added", column: "created" },
+    { label: "Added by", column: "createdBy" },
+    { label: "Last updated", column: "updated" },
+  ]),
+}
+
+/** Delivery programmes list — the screen the Delivery method section leads with. */
+export const programmesListRecipe: ScreenRecipe = {
+  type: "list",
+  display: "list",
+  surface: "none",
+  binding: { module: "delivery" },
+  gate: { module: "delivery", right: "read" },
+  fields: [field("name", "Programme"), field("detail", "Details")],
+  actions: [],
+  collection: listCollection("No delivery programmes yet.", "Search programmes…", [
+    { field: "state", label: "Archived", control: "select" },
+  ]),
+}
+
+export const programmesDetailRecipe: ScreenRecipe = {
+  type: "detail",
+  binding: { module: "delivery" },
+  gate: { module: "delivery", right: "read" },
+  fields: [],
+  actions: internalDetailActions("delivery", "programme", "Archive programme"),
+  header: { title: "name", subtitle: "detail" },
+  tabs: internalDetailTabs([
+    { label: "Description", column: "description" },
+    { label: "Order", column: "order" },
+    { label: "Added", column: "created" },
+    { label: "Added by", column: "createdBy" },
+    { label: "Last updated", column: "updated" },
+  ]),
+}
+
+/** Meeting purposes — the second collection on the Delivery method screen. */
+export const purposesListRecipe: ScreenRecipe = {
+  type: "list",
+  display: "list",
+  surface: "none",
+  binding: { module: "purposes" },
+  gate: { module: "delivery", right: "read" },
+  fields: [field("name", "Purpose"), field("detail", "Details")],
+  actions: [],
+  collection: listCollection("No meeting purposes yet.", "Search meeting purposes…", [
+    { field: "department", label: "Department", control: "select" },
+    { field: "state", label: "Archived", control: "select" },
+  ]),
+}
+
+export const purposesDetailRecipe: ScreenRecipe = {
+  type: "detail",
+  binding: { module: "purposes" },
+  gate: { module: "delivery", right: "read" },
+  fields: [],
+  actions: internalDetailActions("delivery", "purpose", "Archive purpose"),
+  header: { title: "name", subtitle: "detail" },
+  tabs: internalDetailTabs([
+    { label: "Department", column: "department" },
+    { label: "Description", column: "description" },
+    { label: "Added", column: "created" },
+    { label: "Added by", column: "createdBy" },
+    { label: "Last updated", column: "updated" },
+  ]),
+}
+
 /* ------------------------------ the registry ------------------------------ */
 
 /** The in-code BASE recipe for each screen key — the shipped default every team
@@ -421,6 +617,16 @@ export const BASE_RECIPES: Record<string, ScreenRecipe> = {
   // and its versions and conversation are collections with their own actions
   // (see process-detail.tsx).
   "processes.list": processesListRecipe,
+  // The agency's own housekeeping — the only four DETAILS in the app that are
+  // pure recipes (see the note above them for why they can be).
+  "marketing.list": marketingListRecipe,
+  "marketing.detail": marketingDetailRecipe,
+  "brand.list": brandListRecipe,
+  "brand.detail": brandDetailRecipe,
+  "delivery.list": programmesListRecipe,
+  "delivery.detail": programmesDetailRecipe,
+  "purposes.list": purposesListRecipe,
+  "purposes.detail": purposesDetailRecipe,
 }
 
 /** A structural guard for a parsed override. The config store treats a recipe as

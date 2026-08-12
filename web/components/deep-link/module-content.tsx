@@ -22,7 +22,7 @@ import {
   type ScreenActionContext,
   type ScreenIntent,
 } from "@kwapso/ui/registry/collections/screen-renderer/screen-renderer"
-import { type ScreenQuery, type ScreenRights } from "@kwapso/ui/lib/recipe"
+import { type ScreenQuery, type ScreenRecipe, type ScreenRights } from "@kwapso/ui/lib/recipe"
 
 import { AccountDetailScreen } from "@/components/account-detail"
 import { RoleDetailScreen } from "@/components/role-detail"
@@ -31,15 +31,21 @@ import { KnowledgeDetailScreen } from "@/components/knowledge-detail"
 import { HelpDetailScreen } from "@/components/help-detail"
 import { ProcessDetailScreen } from "@/components/process-detail"
 import { ImportScreen } from "@/components/import-screen"
+import { StaffPanel } from "@/components/staff-panel"
 import { SelectableScreen } from "@/components/selectable-screen"
 import { NoAccess, NotFound, LoadError } from "@/components/deep-link/screen-bits"
 import { LoadMore } from "@/components/load-more"
 import { tenancy } from "@/lib/api"
 import {
+  shapeBrandDetail,
   shapeInviteDetail,
+  shapeMarketingDetail,
   shapeMemberDetail,
+  shapeProgrammeDetail,
+  shapePurposeDetail,
   shapeTeamDetail,
 } from "@/components/deep-link/shape"
+import type { ActivityItem } from "@shared/types"
 import type { useScreenData } from "@/lib/use-screen-data"
 import type { usePermissions } from "@/lib/perms"
 import type { useActiveTeam } from "@/lib/use-active-team"
@@ -50,6 +56,7 @@ import {
   withTabCounts,
 } from "@/lib/screens"
 import type { TeamRole } from "@shared/types"
+import { personName } from "@/lib/identity"
 import { renderCollection } from "@/components/deep-link/collection-content"
 
 type ScreenData = ReturnType<typeof useScreenData>
@@ -60,6 +67,7 @@ type ScreenData = ReturnType<typeof useScreenData>
 export type ModuleContentCtx = Pick<
   ScreenData,
   | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "learningQ" | "helpQ" | "helpMineQ" | "accountsQ" | "knowledgeQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "inviteAuditQ"
+  | "marketingQ" | "brandQ" | "programmesQ" | "purposesQ" | "internalActivity"
 > & {
   noAccess: boolean
   enabled: boolean
@@ -81,6 +89,49 @@ export type ModuleContentCtx = Pick<
   setHelpScope: (v: "mine" | "all") => void
   myUserId: string | null
   query: ScreenQuery
+}
+
+/** The row is whichever record kind a segment holds; each shaper takes its own
+ * type, so the four call sites erase it through this one alias rather than four
+ * inline casts. */
+type InternalShaper = (row: { id: string }, activity: ActivityItem[]) => ReturnType<typeof shapeMarketingDetail>
+
+/** The BODY of an agency-internal record detail, once: find the row in its
+ * loaded collection, render it through the engine, and hang the paged history
+ * under it. The four branches above each own the two things a law reads off
+ * them — which recipe, and that it went through withTabCounts — and share
+ * everything that is genuinely identical. */
+function internalDetail(
+  ctx: ModuleContentCtx,
+  recipe: ScreenRecipe,
+  spec: {
+    what: string
+    query: { data: { id: string }[] | undefined; error: unknown }
+    shape: InternalShaper
+  }
+): React.ReactNode {
+  if (spec.query.error) return <LoadError what={spec.what} />
+  if (spec.query.data === undefined) return <Skeleton variant="list" lines={4} />
+  const row = spec.query.data.find((r) => r.id === ctx.recordId) ?? null
+  if (!row) return <p className="text-muted-foreground text-sm">That record no longer exists.</p>
+  return (
+    <div className="flex flex-col gap-4">
+      <ScreenRenderer
+        recipe={recipe}
+        data={spec.shape(row, ctx.internalActivity.rows)}
+        rights={ctx.rights}
+        onAction={ctx.onAction}
+        onIntent={ctx.onIntent}
+      />
+      {/* R14: the badge above counts the WHOLE history, so the feed under it
+          must be able to reach all of it. */}
+      <LoadMore
+        listKey={ctx.internalActivity.listKey}
+        label="Load more activity"
+        fetchPage={ctx.internalActivity.fetchPage}
+      />
+    </div>
+  )
 }
 
 export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
@@ -206,6 +257,11 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
         <div className="flex flex-col gap-4">
           <ScreenRenderer recipe={recipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
           {activityMore}
+          {/* THE PERSON BEHIND THE MEMBER ROW — the owner's ruling, literally:
+              a profile and the certificates somebody holds go on their own page.
+              Gated on `staff_profiles`, so a role without that read right sees
+              nothing here and the member page is unchanged. */}
+          <StaffPanel teamId={teamId as string} userId={member.userId} memberName={personName(member)} />
         </div>
       )
     }
@@ -251,6 +307,62 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     }
     if (module === "processes") {
       return <ProcessDetailScreen teamId={teamId as string} processId={recordId} />
+    }
+
+    // ── THE AGENCY'S OWN HOUSEKEEPING ────────────────────────────────────────
+    // The only four RECORD details in the app that are pure recipes: each one is
+    // the record's own fields plus its history, which is exactly the pair of
+    // blocks the engine draws. The bespoke details beside them exist because no
+    // engine block draws a ticket's conversation or a map's arithmetic; none of
+    // these four has that problem, so none of them is a component.
+    //
+    // The history comes through the GENERIC (table, id) path (R5) — the same
+    // hook every bespoke detail uses, resolved once in use-screen-data because a
+    // render switch full of early returns cannot call a hook.
+    //
+    // FOUR BRANCHES, NOT A TABLE, and that is the law's doing rather than a
+    // preference. R8's check counts `resolveRecipe("<x>.detail"` literals and
+    // demands one `withTabCounts` per rendered detail — a table that resolved
+    // its recipe from a variable was invisible to the count, which means the law
+    // could no longer see whether these four tabs carried their badge. Code a
+    // law cannot read is a law quietly switched off, so the shape it measures is
+    // the shape they are written in.
+    if (module === "marketing") {
+      const base = resolveRecipe("marketing.detail", overridesQ.data)
+      if (!base) return <NotFound />
+      // R8/R16: the Activity tab badges this record's exact history total.
+      return internalDetail(ctx, withTabCounts(base, { activity: ctx.internalActivity.total }), {
+        what: "marketing posts",
+        query: ctx.marketingQ,
+        shape: shapeMarketingDetail as InternalShaper,
+      })
+    }
+    if (module === "brand") {
+      const base = resolveRecipe("brand.detail", overridesQ.data)
+      if (!base) return <NotFound />
+      return internalDetail(ctx, withTabCounts(base, { activity: ctx.internalActivity.total }), {
+        what: "the brand library",
+        query: ctx.brandQ,
+        shape: shapeBrandDetail as InternalShaper,
+      })
+    }
+    if (module === "delivery") {
+      const base = resolveRecipe("delivery.detail", overridesQ.data)
+      if (!base) return <NotFound />
+      return internalDetail(ctx, withTabCounts(base, { activity: ctx.internalActivity.total }), {
+        what: "the delivery programmes",
+        query: ctx.programmesQ,
+        shape: shapeProgrammeDetail as InternalShaper,
+      })
+    }
+    if (module === "purposes") {
+      const base = resolveRecipe("purposes.detail", overridesQ.data)
+      if (!base) return <NotFound />
+      return internalDetail(ctx, withTabCounts(base, { activity: ctx.internalActivity.total }), {
+        what: "the meeting purposes",
+        query: ctx.purposesQ,
+        shape: shapePurposeDetail as InternalShaper,
+      })
     }
     return <NotFound />
 }

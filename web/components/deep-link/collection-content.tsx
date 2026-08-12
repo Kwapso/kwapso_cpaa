@@ -23,6 +23,12 @@ import {
 
 import { LearningProgressScreen } from "@/components/learning-progress"
 import { ProcessesScreen } from "@/components/processes-screen"
+import {
+  BrandLibraryScreen,
+  MarketingScreen,
+  ProgrammesScreen,
+  PurposesScreen,
+} from "@/components/internal-screens"
 import { NotFound, LoadError, SectionWithCreate, CollectionCard } from "@/components/deep-link/screen-bits"
 import { CollectionHeading } from "@/components/collection-heading"
 import { LoadMore } from "@/components/load-more"
@@ -61,6 +67,10 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     helpQ,
     accountsQ,
     knowledgeQ,
+    marketingQ,
+    brandQ,
+    programmesQ,
+    purposesQ,
     totals,
     rights,
     onAction,
@@ -212,6 +222,83 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         rights={rights}
         total={totals.processes}
         canCreate={can("processes", "create")}
+        onAction={onAction}
+        onIntent={onIntent}
+      />
+    )
+  }
+  // ── THE AGENCY'S OWN HOUSEKEEPING ─────────────────────────────────────────
+  // Four collections, one shape, in their own file (internal-screens.tsx) so
+  // this switch stays a switch.
+  if (module === "marketing") {
+    if (marketingQ.error) return <LoadError what="marketing posts" />
+    if (marketingQ.data === undefined) return <Skeleton variant="list" lines={4} />
+    return (
+      <MarketingScreen
+        rows={marketingQ.data}
+        recipe={recipe}
+        rights={rights}
+        total={totals.marketing}
+        canCreate={can("marketing", "create")}
+        onCreate={() => go(sectionPath, { panel: "add", module: "marketing" })}
+        onImport={() => go(`/t/${teamId}/import/marketing_posts`)}
+        exportHref="/api/content/marketing/export"
+        onAction={onAction}
+        onIntent={onIntent}
+      />
+    )
+  }
+  if (module === "brand") {
+    if (brandQ.error) return <LoadError what="the brand library" />
+    if (brandQ.data === undefined) return <Skeleton variant="list" lines={4} />
+    return (
+      <BrandLibraryScreen
+        rows={brandQ.data}
+        recipe={recipe}
+        rights={rights}
+        total={totals.brand_assets}
+        canCreate={can("brand_assets", "create")}
+        onCreate={() => go(sectionPath, { panel: "add", module: "brand" })}
+        onImport={() => go(`/t/${teamId}/import/brand_assets`)}
+        exportHref="/api/content/brand-assets/export"
+        onAction={onAction}
+        onIntent={onIntent}
+      />
+    )
+  }
+  if (module === "delivery") {
+    if (programmesQ.error) return <LoadError what="the delivery programmes" />
+    if (programmesQ.data === undefined) return <Skeleton variant="list" lines={4} />
+    return (
+      <ProgrammesScreen
+        rows={programmesQ.data}
+        recipe={recipe}
+        rights={rights}
+        total={totals.programmes}
+        purposeCount={totals.purposes}
+        onPurposes={() => go(`/t/${teamId}/purposes`)}
+        canCreate={can("delivery", "create")}
+        onCreate={() => go(sectionPath, { panel: "add", module: "delivery" })}
+        onImport={() => go(`/t/${teamId}/import/programs`)}
+        exportHref="/api/content/delivery/programs/export"
+        onAction={onAction}
+        onIntent={onIntent}
+      />
+    )
+  }
+  if (module === "purposes") {
+    if (purposesQ.error) return <LoadError what="the meeting purposes" />
+    if (purposesQ.data === undefined) return <Skeleton variant="list" lines={4} />
+    return (
+      <PurposesScreen
+        rows={purposesQ.data}
+        recipe={recipe}
+        rights={rights}
+        total={totals.purposes}
+        canCreate={can("delivery", "create")}
+        onCreate={() => go(sectionPath, { panel: "add", module: "purposes" })}
+        onImport={() => go(`/t/${teamId}/import/meeting_purposes`)}
+        exportHref="/api/content/delivery/purposes/export"
         onAction={onAction}
         onIntent={onIntent}
       />

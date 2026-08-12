@@ -20,6 +20,7 @@ import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { optionalText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { EXPORT_HARD_CAP, LIST_HARD_CAP } from "@shared/workers/limits"
 import { ownedMediaKey, reclaimMedia } from "@shared/workers/image"
+import { ensureSelectableValue } from "./vocabulary"
 import type { Env } from "../env"
 
 /** The dropdown `type` a learning item's category is stored under. */
@@ -173,29 +174,14 @@ async function learningOrThrow(
 
 /** Pick-or-create a 'Learning category' selectable: if the team doesn't already
  * have this category as an active dropdown value, add it (so the picker offers it
- * next time). Free-typed categories never silently vanish. */
-async function ensureCategory(
-  cfg: D1Rest,
-  guard: MemberGuard,
-  actor: Actor,
-  category: string
-): Promise<void> {
-  const clean = category.trim()
-  if (!clean) return
-  const existing = await d1Query<{ id: string }>(
-    cfg,
-    guard.databaseId,
-    "SELECT id FROM selectable_data WHERE type = ? AND value = ? AND deactivated_at IS NULL",
-    [CATEGORY_TYPE, clean]
-  )
-  if (existing[0]) return
-  const now = new Date().toISOString()
-  await d1ExecScript(
-    cfg,
-    guard.databaseId,
-    `INSERT INTO selectable_data (id, type, value, is_default, created_at, creator_id, creator_email, creator_name) VALUES (${sqlString(ulid())}, ${sqlString(CATEGORY_TYPE)}, ${sqlString(clean)}, 0, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
-  )
-}
+ * next time). Free-typed categories never silently vanish.
+ *
+ * The rule itself now lives in lib/vocabulary.ts — it grew four more callers when
+ * the agency-internal modules landed (a post's channel and status, a brand
+ * asset's category, a meeting purpose's department), and five copies of a rule
+ * is five places for it to stop being the same rule. This is the group name. */
+const ensureCategory = (cfg: D1Rest, guard: MemberGuard, actor: Actor, category: string) =>
+  ensureSelectableValue(cfg, guard, actor, CATEGORY_TYPE, category)
 
 /** Every learning item (active + inactive) for the team, in display order
  * (sequence then created_at), with the CALLER's own `done` merged in from

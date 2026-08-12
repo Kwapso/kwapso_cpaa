@@ -94,6 +94,11 @@ const TOOLLESS_DOORS: Record<string, string> = {
   "POST /api/content/learning/upload":
     "shovels bytes — an image or short clip as a base64 data URL, up to 25 MB — into the learning-media bucket and hands back a URL to paste into an article. It writes no row and leaves no record of its own. One call on this surface may ANSWER with 400,000 characters; a 25 MB base64 argument is two orders of magnitude past what it is built to carry. A machine writes the article, and references media it already has a URL for.",
 
+  "POST /api/content/brand-assets/upload":
+    "the same door as the learning upload, for the same bytes and the same reason: up to 25 MB of base64 argument on a surface whose whole ANSWER is capped at 400,000 characters. A machine writes the brand-asset ROW — create_brand_asset carries `fileUrl` — and references a file it already has a URL for. Uploading the bytes is a screen action.",
+  "POST /api/content/staff/upload":
+    "the third of the byte-shovels, and the narrowest: a profile photo or a certificate PDF, up to 25 MB of base64. save_staff_profile and create_staff_certificate both carry the URL field, so the record half is fully machine-writable; the bytes are not, for the arithmetic reason the other two give.",
+
   /* -------------------------------- auth --------------------------------- */
   "POST /api/auth/email/start":
     "the sign-in exchange, step one: post an address and a 6-digit code is emailed to the person. A machine holds a token that is the finished RESULT of somebody doing this, and the code appears nowhere but a human's inbox — by law, in every environment.",

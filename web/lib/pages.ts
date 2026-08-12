@@ -43,6 +43,15 @@ export type TeamSection = {
     | "tickets"
     | "knowledge"
     | "processes"
+    // The agency's own housekeeping. Four sidebar pages rather than admin tabs:
+    // a marketing calendar and a brand library are somebody's actual work, not a
+    // setting. Staff profiles has NO section of its own — the owner's ruling is
+    // that a profile lives on the member's own page, so its screens hang off
+    // Members instead and its module never appears in this table.
+    | "marketing"
+    | "brand"
+    | "delivery"
+    | "purposes"
     | "import"
   title: string
   module: string
@@ -98,6 +107,23 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // of the PROCESSES (the collection the screen leads with and the one that
   // grows), keyed off the same `processes:<teamId>` cache the list reads.
   { key: "processes", title: "Process maps", module: "processes", segment: "processes", placement: "sidebar", countCacheKey: "processes" },
+  // THE AGENCY'S OWN HOUSEKEEPING — three sidebar pages, each gated by its own
+  // read right so a role without it never sees the destination at all. Their
+  // counts are exact server totals (R16) keyed off the same caches the lists
+  // read, so the badge and the rows can never disagree.
+  //
+  // `delivery` leads with the PROGRAMMES: a screen with two collections has to
+  // badge one of them, and the programme is the thing somebody arrives looking
+  // for (the meeting purposes sit under it on the same screen, with their own
+  // heading and their own count).
+  { key: "marketing", title: "Marketing", module: "marketing", segment: "marketing", placement: "sidebar", countCacheKey: "marketing" },
+  { key: "brand", title: "Brand library", module: "brand_assets", segment: "brand", placement: "sidebar", countCacheKey: "brand_assets" },
+  { key: "delivery", title: "Delivery method", module: "delivery", segment: "delivery", placement: "sidebar", countCacheKey: "programmes" },
+  // Meeting purposes: the SAME module, its own segment, reached CONTEXTUALLY
+  // from a button on the Delivery method screen. It is not a second sidebar page
+  // because it is not a second destination — it is the other half of one, and a
+  // nav rail that lists both halves of one idea reads as two ideas.
+  { key: "purposes", title: "Meeting purposes", module: "delivery", segment: "purposes", placement: "contextual", countCacheKey: "purposes" },
   // Import has NO read-right of its own — it's gated per-target (create on
   // member_roles or learning). Reached CONTEXTUALLY from an "Import CSV" button on
   // those pages (which land on /t/<team>/import/<tableKey>), never a tab.
@@ -134,6 +160,13 @@ export const CONCEPT_ICON = {
   comments: "message-square",
   import: "upload",
   activity: "history",
+  // The agency's own housekeeping: what we send out, the material we send it
+  // with, how we run delivery, and who our people are.
+  marketing: "megaphone",
+  brand: "palette",
+  delivery: "workflow",
+  purposes: "calendar-check",
+  staff: "id-card",
 } as const
 
 

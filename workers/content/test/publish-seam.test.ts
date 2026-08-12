@@ -18,6 +18,12 @@ const HOUSEKEEPING = [
   // patch, so nothing to broadcast (the create/edit that references the file
   // pings its own row).
   "POST /api/content/learning/upload",
+  // The agency's own housekeeping: two more byte-shovels, same reasoning. The
+  // brand library re-hosts 74 legacy files that die with the Glide account, and
+  // a staff photo or a certificate PDF lands the same way. Neither writes a row
+  // — the create/edit that references the URL pings its own.
+  "POST /api/content/brand-assets/upload",
+  "POST /api/content/staff/upload",
 ]
 
 publishSeam({

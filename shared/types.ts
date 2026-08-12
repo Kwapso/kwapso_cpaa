@@ -769,3 +769,115 @@ export type InternalRate = {
   updatedAt?: string | null
   editedByName?: string | null
 }
+
+/* ─────────────────────── THE AGENCY'S OWN HOUSEKEEPING ──────────────────────
+ * Four modules carrying the seven legacy tables that describe how the agency
+ * runs ITSELF. Every one of these shapes has the same three closing fields —
+ * `active`, the creator and the editor — because they are all the same kind of
+ * record: something a member of the agency wrote down about the agency, which is
+ * retired rather than deleted and whose history is worth reading.
+ *
+ * None of them carries an `accountId`. That is not an omission: these rows
+ * belong to no client, so there is nothing for the account fence to fence, and
+ * every door on all four refuses a client login outright instead (R21).
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/** Something the agency published about itself — the legacy `content` table. */
+export type MarketingPost = {
+  id: string
+  title: string
+  /** pick-or-created into the "Marketing channel" dropdown group. */
+  channel: string | null
+  status: string | null
+  summary: string | null
+  body: string | null
+  link: string | null
+  /** the DAY it went out (YYYY-MM-DD), or null while it hasn't. */
+  publishedOn: string | null
+  active: boolean
+  createdAt: string
+  creatorName: string | null
+  updatedAt: string | null
+  editorName: string | null
+}
+
+/** One piece of the agency's brand material — the legacy `branding` table. */
+export type BrandAsset = {
+  id: string
+  name: string
+  category: string | null
+  description: string | null
+  /** an object we host (/media/internal/…) or a link somewhere else. */
+  fileUrl: string | null
+  active: boolean
+  createdAt: string
+  creatorName: string | null
+  updatedAt: string | null
+  editorName: string | null
+}
+
+/** A way the agency runs an engagement — the legacy `program` table. */
+export type Program = {
+  id: string
+  name: string
+  description: string | null
+  /** display order only — nothing is locked to it. */
+  sequence: number
+  active: boolean
+  createdAt: string
+  creatorName: string | null
+  updatedAt: string | null
+  editorName: string | null
+}
+
+/** Why the agency meets — the legacy `purposes` table. The one legacy lookup
+ * that could not become a dropdown value, because it carries a department. */
+export type MeetingPurpose = {
+  id: string
+  name: string
+  /** pick-or-created into the "Department" dropdown group. */
+  department: string | null
+  description: string | null
+  active: boolean
+  createdAt: string
+  creatorName: string | null
+  updatedAt: string | null
+  editorName: string | null
+}
+
+/** The person behind a member row: how they work and what they are like. Visible
+ * to the team, never to a client — there is no portal door on this module. */
+export type StaffProfile = {
+  id: string
+  /** the GLOBAL user id (members live in the core database). */
+  userId: string
+  headline: string | null
+  personalityType: string | null
+  strengths: string | null
+  weaknesses: string | null
+  roleModels: string | null
+  about: string | null
+  photoUrl: string | null
+  active: boolean
+  createdAt: string
+  creatorName: string | null
+  updatedAt: string | null
+  editorName: string | null
+}
+
+/** A credential a member holds — the legacy `certificates` table. */
+export type StaffCertificate = {
+  id: string
+  userId: string
+  title: string
+  issuer: string | null
+  /** the day it was granted / the day it lapses (YYYY-MM-DD), either may be null. */
+  issuedOn: string | null
+  expiresOn: string | null
+  fileUrl: string | null
+  active: boolean
+  createdAt: string
+  creatorName: string | null
+  updatedAt: string | null
+  editorName: string | null
+}

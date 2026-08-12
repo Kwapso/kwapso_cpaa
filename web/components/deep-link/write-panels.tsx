@@ -20,6 +20,25 @@ import { RoleFormDialog } from "@/components/role-form-dialog"
 import { InviteDialog } from "@/components/invite-dialog"
 import { TeamEditDialog } from "@/components/team-edit-dialog"
 import { ConfirmAction } from "@/components/deep-link/confirm-action"
+import {
+  InternalRecordDialog,
+  brandAssetFields,
+  marketingFields,
+  programmeFields,
+  purposeFields,
+} from "@/components/internal-record-dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@kwapso/ui/registry/primitives/alert-dialog/alert-dialog"
+import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
+import type { InternalKind } from "@/lib/use-screen-actions"
 import { ApiFailure } from "@/lib/api"
 import { personName } from "@/lib/identity"
 import { type usePermissions } from "@/lib/perms"
@@ -35,11 +54,31 @@ import type { TeamRole } from "@shared/types"
  * snapshot rather than threading a dozen loose props. */
 export type WritePanelsProps = Pick<
   ReturnType<typeof useScreenData>,
-  "membersQ" | "accountsQ" | "learningCategoryOptions" | "contentTypeOptions" | "helpTypeOptions"
+  | "membersQ"
+  | "accountsQ"
+  | "learningCategoryOptions"
+  | "contentTypeOptions"
+  | "helpTypeOptions"
+  // The agency's own housekeeping: the pick-or-create vocabularies its forms
+  // offer, and the loaded rows an EDIT panel prefills from.
+  | "marketingChannelOptions"
+  | "marketingStatusOptions"
+  | "brandCategoryOptions"
+  | "departmentOptions"
+  | "marketingQ"
+  | "brandQ"
+  | "programmesQ"
+  | "purposesQ"
 > &
   Pick<
     ReturnType<typeof useScreenActions>,
-    "runAction" | "createLearning" | "createHelp" | "createAccount" | "createKnowledge"
+    | "runAction"
+    | "createLearning"
+    | "createHelp"
+    | "createAccount"
+    | "createKnowledge"
+    | "saveInternalRecord"
+    | "setInternalActive"
   > & {
     query: ScreenQuery
     can: ReturnType<typeof usePermissions>["can"]
@@ -52,6 +91,42 @@ export type WritePanelsProps = Pick<
     /** the record is gone — go back to the list it left */
     onRecordGone: () => void
   }
+
+/** URL segment → which agency-internal record kind its panels are about. The
+ * one place the translation is written down, so the form, the confirm and the
+ * writer all agree. */
+const INTERNAL_PANELS: Record<string, InternalKind | undefined> = {
+  marketing: "marketing",
+  brand: "brand",
+  delivery: "delivery",
+  purposes: "purposes",
+}
+
+/** …and the permission module each kind gates on. Two of them share `delivery`,
+ * which is the point of that module: one right, two nouns. */
+const INTERNAL_MODULE: Record<string, string> = {
+  marketing: "marketing",
+  brand: "brand_assets",
+  delivery: "delivery",
+  purposes: "delivery",
+}
+
+/** What to call one in a sentence a person reads before archiving it. */
+const INTERNAL_NOUN: Record<string, string> = {
+  marketing: "post",
+  brand: "brand asset",
+  delivery: "programme",
+  purposes: "meeting purpose",
+}
+
+/** A loaded record → the flat string map the form prefills from. Every value is
+ * stringified and every null becomes "", because a form field holds a string and
+ * `null` in one renders as the word "null". */
+function prefill(row: Record<string, unknown>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(row).map(([k, v]) => [k, v === null || v === undefined ? "" : String(v)])
+  )
+}
 
 export function WritePanels({
   query,
@@ -69,9 +144,91 @@ export function WritePanels({
   createHelp,
   createAccount,
   createKnowledge,
+  saveInternalRecord,
+  setInternalActive,
+  marketingChannelOptions,
+  marketingStatusOptions,
+  brandCategoryOptions,
+  departmentOptions,
+  marketingQ,
+  brandQ,
+  programmesQ,
+  purposesQ,
   closePanel,
   onRecordGone,
 }: WritePanelsProps) {
+  const [archiving, setArchiving] = React.useState(false)
+
+  // WHICH agency-internal form the URL is asking for, and everything it needs to
+  // open prefilled. Resolved once, here, because "is this panel mine?" and "what
+  // does it show?" are the same question asked of four segments — answering it
+  // per-dialog is how a create panel and an edit panel end up offering different
+  // fields for one record kind.
+  const internal = React.useMemo(() => {
+    const kind = INTERNAL_PANELS[query.module ?? ""]
+    const spec = kind
+      ? {
+          marketing: {
+            fields: marketingFields(marketingChannelOptions, marketingStatusOptions),
+            title: "Marketing post",
+            subtitle: "Something we published about ourselves. Ours alone — no client ever sees it.",
+            submitLabel: "Record it",
+            rows: marketingQ.data,
+          },
+          brand: {
+            fields: brandAssetFields(brandCategoryOptions),
+            title: "Brand asset",
+            subtitle: "A piece of our own brand material — a logo, a deck, a template.",
+            submitLabel: "Add it",
+            rows: brandQ.data,
+          },
+          delivery: {
+            fields: programmeFields(),
+            title: "Delivery programme",
+            subtitle: "A way we run an engagement, start to finish.",
+            submitLabel: "Add it",
+            rows: programmesQ.data,
+          },
+          purposes: {
+            fields: purposeFields(departmentOptions),
+            title: "Meeting purpose",
+            subtitle: "Why we meet, and the department it belongs to.",
+            submitLabel: "Add it",
+            rows: purposesQ.data,
+          },
+        }[kind]
+      : null
+    const editing = query.panel === "edit" && !!query.id
+    const row = editing ? (spec?.rows as { id: string }[] | undefined)?.find((r) => r.id === query.id) : undefined
+    return {
+      kind,
+      open:
+        !!kind &&
+        (query.panel === "add" || editing) &&
+        can(INTERNAL_MODULE[kind], editing ? "edit" : "create"),
+      fields: spec?.fields ?? [],
+      title: spec?.title ?? "",
+      subtitle: spec?.subtitle ?? "",
+      submitLabel: spec?.submitLabel ?? "Save",
+      // The dialog's own draft rule (R7) is keyed per record, so an edit prefills
+      // from the loaded row and a create starts blank.
+      initial: row ? (prefill(row) as Record<string, string>) : undefined,
+    }
+  }, [
+    query.module, query.panel, query.id, can,
+    marketingChannelOptions, marketingStatusOptions, brandCategoryOptions, departmentOptions,
+    marketingQ.data, brandQ.data, programmesQ.data, purposesQ.data,
+  ])
+
+  const internalArchive = React.useMemo(() => {
+    const kind = INTERNAL_PANELS[(query.confirm ?? "").replace(/\.archive$/, "")]
+    return {
+      kind,
+      open: !!kind && query.confirm === `${kind}.archive` && !!query.id && can(INTERNAL_MODULE[kind], "delete"),
+      title: `Archive this ${INTERNAL_NOUN[kind ?? "marketing"]}?`,
+    }
+  }, [query.confirm, query.id, can])
+
   // The change-role target (for the picker), from the URL id.
   const changeTarget =
     query.panel === "edit" && query.module === "members" && query.id
@@ -166,6 +323,66 @@ export function WritePanels({
         team={active.ctx?.team ?? null}
         onSaved={active.refresh}
       />
+
+      {/* THE AGENCY'S OWN HOUSEKEEPING — one dialog, four record kinds, opened
+          either as `?panel=add&module=<segment>` or `?panel=edit&module=<segment>&id`.
+          Every one is gated by the right its action needs, so a deep link can
+          never reach a form the screen itself would have hidden. */}
+      <InternalRecordDialog
+        open={internal.open}
+        onOpenChange={(o) => !o && closePanel()}
+        draftKey={
+          teamId && internal.kind ? `${internal.kind}:${query.id ?? "new"}:${teamId}` : undefined
+        }
+        fields={internal.fields}
+        title={internal.title}
+        subtitle={internal.subtitle}
+        submitLabel={query.id ? "Save changes" : internal.submitLabel}
+        initial={internal.initial}
+        onSubmit={(values) =>
+          saveInternalRecord(internal.kind as InternalKind, values, query.id || undefined)
+        }
+      />
+
+      {/* Archive one of them (?confirm=<segment>.archive&id) — gated by delete.
+          Its own AlertDialog rather than ConfirmAction's, which is built around
+          the two member/invite cases and their wording. */}
+      <AlertDialog
+        open={internalArchive.open}
+        onOpenChange={(o) => !archiving && !o && closePanel()}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{internalArchive.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              It stops showing as live and nothing is deleted — its history stays, and you can put
+              it back at any time.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={archiving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                setArchiving(true)
+                void setInternalActive(internalArchive.kind as InternalKind, query.id ?? "", false)
+                  .then(onRecordGone)
+                  .catch((err: unknown) => {
+                    if (!(err instanceof ApiFailure)) reportError("deep-link:archive", err)
+                    toast.error(
+                      err instanceof ApiFailure ? err.message : "Something went wrong. Try again."
+                    )
+                  })
+                  .finally(() => setArchiving(false))
+              }}
+              disabled={archiving}
+            >
+              {archiving ? <Spinner /> : null}
+              Archive
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Destructive confirms (?confirm=members.remove | invites.revoke) — both
        * need team_members:delete, gated so a deep link can't reach them. */}

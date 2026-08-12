@@ -126,6 +126,133 @@ describe("team schema", () => {
       // no client login passes one of its doors at all.
       "processes",
       "commercials",
+      // THE AGENCY'S OWN HOUSEKEEPING — the four modules carrying the seven
+      // legacy tables that describe how the agency runs ITSELF rather than what
+      // it does for a client. None of them is customer material, so unlike
+      // `processes` every door on all four REFUSES a client login rather than
+      // fencing one (the refusal-symmetry suite holds both halves of each).
+      //
+      // Two of the seven legacy tables are deliberately not here: `departments`
+      // and `channels` are bare labels, and the base already has one home for a
+      // team's editable vocabulary. A module built to hold a word is ceremony.
+      "marketing",
+      "brand_assets",
+      "delivery",
+      "staff_profiles",
     ])
+  })
+})
+
+// THE SIXTEEN UNGROUPED LEGACY VALUES, AND THE OWNER'S RULING ABOUT THEM.
+//
+// Sixteen of the legacy app's 154 dropdown values carried no group at all: ten
+// country names, five company-size bands and one stray hyphen. The reconciliation
+// recommended making them two FIELDS on the account; the owner overruled it and
+// asked for two GROUPS, and the reason holds up — a country typed free into an
+// address is a country spelled five ways by five people, which is the exact
+// failure the dropdown module exists to prevent.
+//
+// A group is not a row: the table holds (type, value) pairs, so a group EXISTS
+// only once it has a value. That is why this is testable at all, and why it has
+// to be: "we created two groups" is a claim about DATA, and the way a claim about
+// data gets quietly undone is somebody tidying a seed list.
+describe("the two dropdown groups the legacy migration lands in", () => {
+  const groups = new Set(DEFAULT_SELECTABLE.map((v) => v.type))
+
+  it("a new team starts with both groups, so the picker is never empty", () => {
+    expect(groups, "the owner ruled for a Country GROUP, not a field on the account").toContain("Country")
+    expect(groups, "the owner ruled for a Company size GROUP, not a field on the account").toContain(
+      "Company size"
+    )
+  })
+
+  it("the size bands are the five the legacy data has", () => {
+    const bands = DEFAULT_SELECTABLE.filter((v) => v.type === "Company size")
+    expect(bands.length, "five bands, as the legacy data has").toBe(5)
+  })
+
+  it("the stray hyphen is NOT carried across — it is a typo, not a value", () => {
+    // The sixteenth ungrouped value. Importing it would put a dash in a picker
+    // somebody then chooses by accident, and a record whose country is "-" is
+    // worse than one with no country at all, because it looks answered.
+    const junk = DEFAULT_SELECTABLE.filter((v) => /^[-–—\s]*$/.test(v.value))
+    expect(junk, `a blank or dash value is not a value: ${JSON.stringify(junk)}`).toEqual([])
+  })
+
+  it("an EXISTING team gets the same two groups, and gets them idempotently", () => {
+    const sql = TEAM_MIGRATIONS.find((m) => m.version === "0014_agency_internal")?.sql ?? ""
+    expect(sql, "the agency-internal migration has moved or been renamed").not.toBe("")
+    expect(sql, "existing teams need the Country group too").toContain("'Country'")
+    expect(sql, "existing teams need the Company size group too").toContain("'Company size'")
+    // Idempotent: the migration runner applies a version once, but a team that
+    // already types its own country values must not end up with duplicates when
+    // the legacy import arrives on top.
+    expect(sql, "the value seed must not duplicate a group a team already has").toContain(
+      "WHERE NOT EXISTS"
+    )
+  })
+})
+
+// THE SEVEN LEGACY TABLES, AND WHERE EACH ONE LANDED.
+//
+// Six tables and two vocabulary groups carry all seven. This locks the SHAPE of
+// that answer, because the shape is the decision: a table that quietly became a
+// dropdown value, or a dropdown value that quietly became a table, is the
+// migration answering a question the owner already answered.
+describe("the agency-internal migration", () => {
+  const sql = TEAM_MIGRATIONS.find((m) => m.version === "0014_agency_internal")?.sql ?? ""
+
+  it("creates the six tables the four modules own", () => {
+    for (const table of [
+      "marketing_posts",
+      "brand_assets",
+      "programs",
+      "meeting_purposes",
+      "staff_profiles",
+      "staff_certificates",
+    ])
+      expect(sql, `${table} must be created`).toContain(`CREATE TABLE ${table} (`)
+  })
+
+  it("gives every one of them the deactivate-not-delete column, and no DELETE", () => {
+    // ARCHITECTURE §4: the row is retired, never removed. Six tables, six audit
+    // blocks — a table that shipped without one would be the only place in the
+    // app where history can be destroyed.
+    expect((sql.match(/deactivated_at TEXT/g) ?? []).length).toBe(6)
+    expect(sql, "there is no delete in this model").not.toMatch(/\bDELETE\b/)
+  })
+
+  it("holds ONE live profile per person, in the database rather than in a handler", () => {
+    // CONCURRENCY rule 2: two tabs saving a colleague's profile at the same
+    // instant must settle into one row, not two. A read-then-write in the
+    // handler cannot promise that; a partial unique index can.
+    expect(sql).toContain("CREATE UNIQUE INDEX idx_staff_profiles_user")
+    expect(sql, "partial, so a retired profile can be replaced").toContain(
+      "ON staff_profiles (user_id) WHERE deactivated_at IS NULL"
+    )
+  })
+
+  it("hands the four new modules to the locked Admin role and to nobody else", () => {
+    // Same shape as 0007 and 0013, for the same reason: a migration must never
+    // hand out sight of the agency's own material that nobody granted. The
+    // rights come from `r.is_default`, which is 1 for the locked Admin role and
+    // 0 for every role somebody built by hand.
+    const backfill = sql.slice(sql.indexOf("INSERT INTO role_permissions"))
+    for (const m of ["marketing", "brand_assets", "delivery", "staff_profiles"])
+      expect(backfill, `${m} must reach existing teams`).toContain(`'${m}'`)
+    expect(backfill, "every other role must gain nothing").toContain("r.is_default")
+    expect(backfill, "and it must not re-grant what a team already has").toContain("WHERE NOT EXISTS")
+  })
+
+  it("carries NO account column — there is nothing here for a fence to fence", () => {
+    // The structural half of the promise the doors make in words. Every table in
+    // the process-map build carries `account_id` because its rows belong to a
+    // customer; not one of these does, because they belong to the agency. A
+    // column that isn't there cannot be joined to an account-fenced read by
+    // somebody who assumed it meant the same thing here.
+    const tables = sql.slice(sql.indexOf("CREATE TABLE marketing_posts"), sql.indexOf("INSERT INTO role_permissions"))
+    expect(tables, "an agency-internal table with an account column is a category error").not.toContain(
+      "account_id"
+    )
   })
 })

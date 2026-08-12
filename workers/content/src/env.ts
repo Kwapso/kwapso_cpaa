@@ -12,6 +12,14 @@ export type Env = {
   LEARNING_MEDIA: R2Bucket
   /** Ticket media (screen recordings, attachments), served by the gateway. */
   HELP_MEDIA: R2Bucket
+  /** The agency's OWN files — brand assets, staff photos, certificate PDFs —
+   * served by the gateway at /media/internal/. ONE bucket for the four internal
+   * modules rather than four: they hold the same kind of object for the same
+   * audience, and a bucket per module would be four more things to create on a
+   * fresh account (BOOTSTRAP.md) for no isolation anybody can point at. The
+   * per-team prefix inside it is what keeps teams apart, exactly as it does in
+   * the learning and ticket buckets. */
+  INTERNAL_MEDIA: R2Bucket
 
   /** Cloudflare account id (plain var) — for reaching per-team databases. */
   CF_ACCOUNT_ID: string

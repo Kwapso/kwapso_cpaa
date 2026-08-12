@@ -18,11 +18,110 @@ import * as React from "react"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 
 import { content as contentApi, tenancy } from "@/lib/api"
-import { accountsKey, knowledgeKey, listFetch } from "@/lib/live-resources"
+import {
+  accountsKey,
+  brandAssetsKey,
+  knowledgeKey,
+  listFetch,
+  marketingKey,
+  programmesKey,
+  purposesKey,
+} from "@/lib/live-resources"
 import { invalidate, primeCache } from "@shared/web/store"
 import type { AccountFormValues } from "@/components/account-form-dialog"
 import type { LearningFormValues } from "@/components/learning-form-dialog"
 import type { KnowledgeFormValues } from "@/components/knowledge-form-dialog"
+
+/** The four agency-internal record kinds, keyed by their URL segment (which is
+ * what the host has in hand when a panel opens). */
+export type InternalKind = "marketing" | "brand" | "delivery" | "purposes"
+
+/** Per kind: which door writes it, which cache holds it, which table its history
+ * is under, and what to say when one is created. A table rather than a switch
+ * with four near-identical arms — the arms would differ only in those four
+ * values, and a switch hides that they are the only difference. */
+const INTERNAL_WRITERS: Record<
+  InternalKind,
+  {
+    table: string
+    created: string
+    key: (teamId: string) => string
+    save: (v: Record<string, string>, id?: string) => Promise<unknown[]>
+    setActive: (id: string, active: boolean) => Promise<unknown[]>
+  }
+> = {
+  marketing: {
+    table: "marketing_posts",
+    created: "Post recorded.",
+    key: marketingKey,
+    save: async (v, id) => {
+      const body = {
+        title: v.title,
+        channel: v.channel || undefined,
+        status: v.status || undefined,
+        summary: v.summary || undefined,
+        body: v.body || undefined,
+        link: v.link || undefined,
+        publishedOn: v.publishedOn || undefined,
+      }
+      const r = id
+        ? await contentApi.updateMarketingPost({ id, ...body })
+        : await contentApi.createMarketingPost(body)
+      return r.posts
+    },
+    setActive: (id, active) => contentApi.setMarketingPostActive(id, active).then((r) => r.posts),
+  },
+  brand: {
+    table: "brand_assets",
+    created: "Added to the brand library.",
+    key: brandAssetsKey,
+    save: async (v, id) => {
+      const body = {
+        name: v.name,
+        category: v.category || undefined,
+        description: v.description || undefined,
+        fileUrl: v.fileUrl || undefined,
+      }
+      const r = id ? await contentApi.updateBrandAsset({ id, ...body }) : await contentApi.createBrandAsset(body)
+      return r.assets
+    },
+    setActive: (id, active) => contentApi.setBrandAssetActive(id, active).then((r) => r.assets),
+  },
+  delivery: {
+    table: "programs",
+    created: "Programme added.",
+    key: programmesKey,
+    save: async (v, id) => {
+      const body = {
+        name: v.name,
+        description: v.description || undefined,
+        // The one numeric field in the four: the form hands back a string, and
+        // an empty one means "leave it at the default" rather than zero.
+        sequence: v.sequence ? Number(v.sequence) : undefined,
+      }
+      const r = id ? await contentApi.updateProgramme({ id, ...body }) : await contentApi.createProgramme(body)
+      return r.programs
+    },
+    setActive: (id, active) => contentApi.setProgrammeActive(id, active).then((r) => r.programs),
+  },
+  purposes: {
+    table: "meeting_purposes",
+    created: "Meeting purpose added.",
+    key: purposesKey,
+    save: async (v, id) => {
+      const body = {
+        name: v.name,
+        department: v.department || undefined,
+        description: v.description || undefined,
+      }
+      const r = id
+        ? await contentApi.updateMeetingPurpose({ id, ...body })
+        : await contentApi.createMeetingPurpose(body)
+      return r.purposes
+    },
+    setActive: (id, active) => contentApi.setMeetingPurposeActive(id, active).then((r) => r.purposes),
+  },
+}
 
 export function useScreenActions(teamId: string | null) {
   // The named-action dispatcher — the flat `{key: string}` payloads the engine emits.
@@ -144,5 +243,46 @@ export function useScreenActions(teamId: string | null) {
     [teamId]
   )
 
-  return { runAction, createLearning, createHelp, createAccount, createKnowledge }
+  // THE AGENCY'S OWN HOUSEKEEPING — one writer for the four record kinds, because
+  // they are one shape: a create or an edit against a CAPPED list, whose door
+  // hands back the whole (small) collection, so the actor's cache is primed
+  // straight from the response and everyone else gets the row-level ping. No
+  // re-pull, unlike accounts and knowledge above — those page, and a page-one
+  // refetch is the honest way to find a new row in a list you only hold part of.
+  const saveInternalRecord = React.useCallback(
+    async (kind: InternalKind, values: Record<string, string>, id?: string) => {
+      if (!teamId) return
+      const spec = INTERNAL_WRITERS[kind]
+      const next = await spec.save(values, id)
+      primeCache(spec.key(teamId), next)
+      // The record's own history gained a row; its Activity tab reads that key.
+      if (id) invalidate(`activity:record:${spec.table}:${id}`)
+      toast.success(id ? "Saved." : spec.created)
+    },
+    [teamId]
+  )
+
+  /** Archive or restore one of those records. Separate from the save above
+   * because it is the DELETE right rather than the edit one, and because it is
+   * the half a confirm panel stands in front of. */
+  const setInternalActive = React.useCallback(
+    async (kind: InternalKind, id: string, active: boolean) => {
+      if (!teamId) return
+      const spec = INTERNAL_WRITERS[kind]
+      primeCache(spec.key(teamId), await spec.setActive(id, active))
+      invalidate(`activity:record:${spec.table}:${id}`)
+      toast.success(active ? "Restored." : "Archived.")
+    },
+    [teamId]
+  )
+
+  return {
+    runAction,
+    createLearning,
+    createHelp,
+    createAccount,
+    createKnowledge,
+    saveInternalRecord,
+    setInternalActive,
+  }
 }
