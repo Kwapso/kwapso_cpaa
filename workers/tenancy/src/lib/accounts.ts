@@ -302,6 +302,37 @@ export async function getAccountRow(
   return accountOrThrow(cfg, guard, scope, id)
 }
 
+/** MAY THIS ACCOUNT SEE WHAT THEY BOUGHT? — the per-account price switch, read
+ * as a BOOLEAN and nothing else.
+ *
+ * The owner's ruling is two sentences: value for everyone, prices only for the
+ * accounts he switches on. So the value door needs this one bit — and `toAccount`
+ * deliberately withholds `commercialsVisible` from a client login (it is the
+ * agency's own setting ABOUT them, not a setting for them to read), which is
+ * exactly right for the row and useless for the decision.
+ *
+ * A boolean, from inside the fence, is the whole answer. It lives HERE because
+ * this file is the only one in the worker that writes SQL against `accounts`,
+ * and that boundary is what makes "was this query fenced?" a question with one
+ * place to look. Outside the fence it is `false`, never a 404: a value screen
+ * asking about an account the caller cannot see should show no prices, not an
+ * error page that confirms the account exists. */
+export async function pricesVisibleFor(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  accountId: string
+): Promise<boolean> {
+  const fence = accountScopeClause(scope, "id")
+  const rows = await d1Query<{ commercials_visible: number }>(
+    cfg,
+    guard.databaseId,
+    `SELECT commercials_visible FROM accounts${where([fence.sql, "id = ?"])} LIMIT 1`,
+    [...fence.params, accountId]
+  )
+  return rows[0]?.commercials_visible === 1
+}
+
 /** Create an account. A portal caller may only add people INSIDE their own
  * account set (a main stakeholder adding a colleague); staff may create a root. */
 export async function createAccount(

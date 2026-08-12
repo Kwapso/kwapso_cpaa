@@ -136,6 +136,9 @@ Today it covers:
   `list_imports`, `get_import`, `get_ai_allowance`, `list_ai_usage`,
   `list_agent_threads`, `get_agent_thread`, `ask_knowledge`, `list_knowledge_sources`,
   `get_knowledge_status`. Each list tool that sits on a door with an
+  `list_agent_threads`, `get_agent_thread`, `list_apps`, `list_processes`,
+  `get_process`, `list_process_comments`, `read_value`, `list_account_rates`,
+  `list_internal_rates`, `read_margin`. Each list tool that sits on a door with an
   `?id=` filter EXPOSES + FORWARDS it (R19 parity) — pass `id` to fetch one record
   instead of pulling the whole collection (`list_help_tickets` also takes `scope`
   and `view`, the latter choosing the everyday list or the archive drawer;
@@ -221,6 +224,22 @@ Today it covers:
     `set_account_active`, `link_contact`, `set_contact_link_active`
   - portal access — `grant_portal_access`, `set_portal_access_active`
   - dropdown values — `create_dropdown_value`, `update_dropdown_value`, `set_dropdown_value_active`
+  - process maps — `create_app`, `update_app`, `set_app_active`, `create_process`,
+    `update_process`, `set_process_active`, `add_process_step`, `update_process_step`,
+    `remove_process_step`, `cut_process_version`, `comment_on_process` (all need
+    `processes:*`). `read_value` beside them is the savings drilled App → Process →
+    Step, with the caption that says what the numbers are made of — the times are
+    estimates the agency and the client agreed, the subtraction is arithmetic. A step
+    that got SLOWER is included and counted; nothing filters one out.
+  - rates and margin — `create_account_rate`, `update_account_rate`,
+    `set_account_rate_active` (what a client is charged) and `create_internal_rate`,
+    `update_internal_rate`, `set_internal_rate_active` (what our own hour costs us),
+    all needing `commercials:*`. **`read_margin` and `list_internal_rates` answer with
+    the agency's own figures**: a token acts as its owner, and no client login can hold
+    a token or be acted for at all, but if you are building a client-facing integration
+    on somebody's staff token, these two are the calls not to relay. Law R23 makes the
+    same statement about the app's own client portal structurally — the file those
+    figures live in cannot be reached from any door the portal opens.
   - learning — `create_learning`, `update_learning`, `set_learning_active`
   - tickets — `create_help_ticket`, `update_help_ticket`, `set_help_status`,
     `rank_help_ticket`, `archive_help_ticket`, `reply_help_ticket`,

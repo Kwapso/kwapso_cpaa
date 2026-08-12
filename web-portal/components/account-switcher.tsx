@@ -108,6 +108,12 @@ export function AccountSwitcher({
       invalidate(cacheKeys.ticketsCursor)
       invalidate(cacheKeys.company(currentAccountId))
       invalidate(cacheKeys.company(accountId))
+      // THE VALUE, for the same reason as the tickets and for one more: the
+      // figure on that screen is hours saved for the company they were standing
+      // in, and it is the number they are most likely to read out to somebody.
+      // Left cached, the header would name one company over another company's
+      // savings — the one-at-a-time confusion, wearing its most quotable form.
+      invalidate(cacheKeys.value)
       // Dropping a cache marks it stale; this re-reads it. The shell holds the
       // context inside its session read, so the header, this menu's tick and
       // every screen below repaint from one call.

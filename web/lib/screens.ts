@@ -77,6 +77,10 @@ export const MODULE_PERMISSION: Record<string, string> = {
   // ON the same screens, never a screen of its own — handing out a login is a
   // bigger decision than editing a phone number).
   accounts: "accounts",
+  // Process maps: the segment IS the module. `commercials` is a second gate ON
+  // the same screens (the money panels on an account), never a screen of its own
+  // — what an account is charged is a bigger decision than how long a step takes.
+  processes: "processes",
 }
 
 /* --------------------------------- team --------------------------------- */
@@ -357,6 +361,27 @@ export const knowledgeListRecipe: ScreenRecipe = {
       { field: "kind", label: "Kind", control: "select" },
       { field: "filed", label: "Filed under", control: "select" },
       { field: "state", label: "Status", control: "select" },
+/* ------------------------------ process maps ------------------------------ */
+
+/** Process maps list — every way of working we have mapped, with the app it sits
+ * in and how much of it there is. PAGED (R14): every app of every client grows
+ * maps and none is ever deleted, because the savings computed from a baseline
+ * have to stay checkable years later — so the frame's own "Showing X of Y" stays
+ * off and the exact total is badged once, above. */
+export const processesListRecipe: ScreenRecipe = {
+  type: "list",
+  display: "list",
+  surface: "none",
+  binding: { module: "processes" },
+  gate: { module: "processes", right: "read" },
+  fields: [field("name", "Process"), field("detail", "Details")],
+  actions: [],
+  collection: listCollection(
+    "No process maps yet.",
+    "Search process maps…",
+    [
+      { field: "app", label: "App", control: "select" },
+      { field: "archived", label: "Archived", control: "select" },
     ],
     { paged: true }
   ),
@@ -386,6 +411,11 @@ export const BASE_RECIPES: Record<string, ScreenRecipe> = {
   // controls that take it away from the assistant or give it back, which no
   // engine block draws (see knowledge-detail.tsx).
   "knowledge.list": knowledgeListRecipe,
+  // Process maps DETAIL has no recipe either — its steps carry an arithmetic no
+  // engine block draws (a baseline, a latest, and the subtraction between them),
+  // and its versions and conversation are collections with their own actions
+  // (see process-detail.tsx).
+  "processes.list": processesListRecipe,
 }
 
 /** A structural guard for a parsed override. The config store treats a recipe as

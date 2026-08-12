@@ -157,6 +157,48 @@ export function traceFor(
     case "bulk_set_learning_active":
       return { path: seg(teamId, "learning"), highlight: "main" }
 
+    /* ----------------------------- process maps ----------------------------- */
+    // An APP has no screen of its own — it is the heading a map sits under, and
+    // the filter above the list — so every app write lands on the maps page,
+    // where the new or changed app shows on the rows beneath it.
+    case "create_app":
+    case "update_app":
+    case "set_app_active":
+      return { path: seg(teamId, "processes"), highlight: "main" }
+    // Create → the maps list, where the new map appears live. Everything else →
+    // that map's own detail, because its steps, its versions and its
+    // conversation are all on one screen, so a change is visible wherever it
+    // landed. A step and a comment carry the PROCESS id rather than their own,
+    // which is what lets both land on the map that now reads differently.
+    case "create_process":
+      return { path: seg(teamId, "processes"), highlight: "main" }
+    case "update_process":
+    case "set_process_active":
+      return { path: `${seg(teamId, "processes")}/${str(input, "id")}`, highlight: "main" }
+    case "add_process_step":
+    case "cut_process_version":
+    case "comment_on_process":
+      return { path: `${seg(teamId, "processes")}/${str(input, "processId")}`, highlight: "main" }
+    // A step write names the STEP, not its map, so there is no map id to land
+    // on — the list is where the changed step's saving shows up either way.
+    case "update_process_step":
+    case "remove_process_step":
+      return { path: seg(teamId, "processes"), highlight: "main" }
+
+    /* -------------------------------- the money ----------------------------- */
+    // Both rate cards are read on the account they belong to; the internal one is
+    // team-wide, so it lands on the team area where it is managed. Neither has a
+    // per-row URL — a card is a handful of lines read whole.
+    case "create_account_rate":
+      return { path: `${seg(teamId, "accounts")}/${str(input, "accountId")}`, highlight: "main" }
+    case "update_account_rate":
+    case "set_account_rate_active":
+      return { path: seg(teamId, "accounts"), highlight: "main" }
+    case "create_internal_rate":
+    case "update_internal_rate":
+    case "set_internal_rate_active":
+      return { path: `/t/${teamId}`, highlight: "main" }
+
     /* --------------------------------- team -------------------------------- */
     // Rename the team → the team Overview (the bare /t/<team> path), where the new
     // name now shows. (Not the edit dialog — the rename is already saved.)

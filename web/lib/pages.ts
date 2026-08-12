@@ -42,6 +42,7 @@ export type TeamSection = {
     | "learning"
     | "tickets"
     | "knowledge"
+    | "processes"
     | "import"
   title: string
   module: string
@@ -91,6 +92,12 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // the day's work, not an admin setting. Gated by its own module, so a role
   // without it never sees the destination at all.
   { key: "knowledge", title: "Knowledge base", module: "knowledge", segment: "knowledge", placement: "sidebar", countCacheKey: "knowledge" },
+  // Process maps — App → Process → Step, and the value drilled through them. A
+  // first-class SIDEBAR page for the same reason Accounts is one: it is the day's
+  // work with a client, not an admin setting. Its count is the exact server total
+  // of the PROCESSES (the collection the screen leads with and the one that
+  // grows), keyed off the same `processes:<teamId>` cache the list reads.
+  { key: "processes", title: "Process maps", module: "processes", segment: "processes", placement: "sidebar", countCacheKey: "processes" },
   // Import has NO read-right of its own — it's gated per-target (create on
   // member_roles or learning). Reached CONTEXTUALLY from an "Import CSV" button on
   // those pages (which land on /t/<team>/import/<tableKey>), never a tab.
@@ -117,6 +124,14 @@ export const CONCEPT_ICON = {
   learning: "graduation-cap",
   knowledge: "library-big",
   tickets: "life-buoy",
+  // The map and the numbers drilled through it: a process is a route someone
+  // follows, a step is one stop on it, a version is a point in its history, and
+  // value is the time it gives back.
+  processes: "route",
+  steps: "list-checks",
+  versions: "git-branch",
+  value: "piggy-bank",
+  comments: "message-square",
   import: "upload",
   activity: "history",
 } as const

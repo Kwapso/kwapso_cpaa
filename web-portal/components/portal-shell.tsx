@@ -24,7 +24,7 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { ModeToggle } from "@kwapso/ui/registry/primitives/mode-toggle/mode-toggle"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
-import { Building2, House, LifeBuoy, LogOut } from "lucide-react"
+import { Building2, House, LifeBuoy, LogOut, PiggyBank } from "lucide-react"
 
 import { brand } from "@shared/brand"
 import { useRealtime } from "@shared/web/realtime"
@@ -38,11 +38,14 @@ import { NeedsName } from "@/components/needs-name"
 import { NoAccess } from "@/components/no-access"
 import { AccountSwitcher } from "@/components/account-switcher"
 
-/** The three places. A client can hold three in their head; a fourth would be a
- * thing to wonder about. */
+/** The four places. Three was the rule — a client can hold three in their head —
+ * and Value earns the fourth, because it is the one screen that answers the
+ * question the whole engagement is judged on. It sits before "My company" for
+ * the same reason: what the work is worth is read far more often than an address. */
 const DESTINATIONS = [
   { href: "/home", label: "Home", icon: House },
   { href: "/tickets", label: "Tickets", icon: LifeBuoy },
+  { href: "/value", label: "Value", icon: PiggyBank },
   { href: "/company", label: "My company", icon: Building2 },
 ] as const
 

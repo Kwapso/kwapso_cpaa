@@ -110,6 +110,55 @@ export const listFetch = {
       primeCache(cursorKey(helpKey(teamId, "mine")), r.nextCursor)
       return r.tickets
     }),
+  // R14: process maps are PAGED — every app of every client grows them, and none
+  // is ever deleted (the savings computed from a baseline have to stay checkable
+  // years later). Page one lands in the cache, its next cursor in the sidecar
+  // <LoadMore> reads.
+  processes: (teamId: string) =>
+    tenancy.processes().then((r) => {
+      primeCache(totalKey("processes", teamId), r.total)
+      primeCache(cursorKey(processesKey(teamId)), r.nextCursor)
+      return r.processes
+    }),
+}
+
+/** The process-map list's cache key (the paged maps list). */
+export function processesKey(teamId: string): string {
+  return `processes:${teamId}`
+}
+
+/** One map's own caches: the opened record (its versions, its current steps and
+ * its exact comment total) and the conversation on it. Keyed by the PROCESS, so
+ * moving between maps never clobbers the one you came from. */
+export function processKey(processId: string): string {
+  return `process:${processId}`
+}
+export function processCommentsKey(processId: string): string {
+  return `process-comments:${processId}`
+}
+/** The savings drill-down, per team — the one number a client is most likely to
+ * ask about, so it re-reads whenever any step under it moves. */
+export function valueKey(teamId: string): string {
+  return `value:${teamId}`
+}
+/** The systems we've built (bounded, team-wide) — a filter and a heading on the
+ * maps screen, and the names inside the value drill-down. */
+export function appsKey(teamId: string): string {
+  return `apps:${teamId}`
+}
+/** One account's rate card, and the margin computed on it. Both keyed by the
+ * ACCOUNT: a card is read on its account's screen, and a margin is about one
+ * account. */
+export function ratesKey(accountId: string): string {
+  return `rates:${accountId}`
+}
+export function marginKey(accountId: string): string {
+  return `margin:${accountId}`
+}
+/** The agency's own cost card — team-wide, because an internal rate is a fact
+ * about us and not about any client. */
+export function internalRatesKey(teamId: string): string {
+  return `internal-rates:${teamId}`
 }
 
 /** The accounts list's cache key (the paged customers list). */
@@ -252,6 +301,40 @@ export const TEAM_RESOURCES: Record<
     // it can't be row-patched from here — drop it and it reloads page one.
     deps: (t, id) => [`activity:record:help:${id}`, `help-stakeholders:${id}`, `help-mine:${t}`],
   },
+  // PROCESS MAPS — row-level live. A step edited on somebody else's screen
+  // patches just that map in the cached list; the deps carry the parts of the
+  // record that move with it: the opened map, its conversation, its history, and
+  // the SAVINGS, because a duration changing is precisely when a value figure
+  // stops being true.
+  processes: {
+    key: (t) => processesKey(t),
+    idField: "id",
+    fetchOne: (id) => tenancy.processRow(id),
+    fetchList: (t) => listFetch.processes(t),
+    deps: (t, id) => [processKey(id), processCommentsKey(id), `activity:record:processes:${id}`, valueKey(t)],
+  },
+  // A comment carries the PROCESS id — a conversation is only ever read on its
+  // own map, so that is the one row a listener can act on. It refreshes the
+  // value too: a staff explanation attached to a step is what the client's side
+  // shows beside a step that got slower.
+  process_comments: {
+    key: (t) => processesKey(t),
+    idField: "id",
+    fetchOne: (id) => tenancy.processRow(id),
+    fetchList: (t) => listFetch.processes(t),
+    deps: (t, id) => [processKey(id), processCommentsKey(id), valueKey(t)],
+  },
+  // A rate card ping carries the ACCOUNT it sits on — a card is only ever read on
+  // its account's own screen, so the account is the row a listener can act on.
+  // The same shape `account_links` and `portal_users` already have, and for the
+  // same reason: neither has a list of its own.
+  account_rates: {
+    key: (t) => accountsKey(t),
+    idField: "id",
+    fetchOne: (id) => tenancy.accountRow(id),
+    fetchList: (t) => listFetch.accounts(t),
+    deps: (_t, id) => [ratesKey(id), marginKey(id), accountKey(id)],
+  },
 }
 
 /** Coarse listeners for resources with no row-shaped cache: the ping just drops
@@ -261,4 +344,13 @@ export const SIMPLE_INVALIDATIONS: Record<string, (teamId: string) => string[]> 
   team: (t) => [`team-meta:${t}`],
   // Per-team screen-recipe overrides (was a deaf publisher before R15).
   screens: (t) => [`screens:${t}`],
+  // An app has no list of its own — it is read on the maps screen (as a filter
+  // and a heading) and inside the value drill-down, so a ping drops both.
+  apps: (t) => [appsKey(t), valueKey(t)],
+  // The agency's own cost card is TEAM-wide (an internal rate belongs to the
+  // agency, not to any account), so a coarse drop is the whole of it. The MARGIN
+  // caches it feeds are keyed per account and cannot be enumerated from here —
+  // the margin panel closes that itself by re-reading when the rate card it also
+  // shows changes underneath it (see margin-panel.tsx).
+  internal_rates: (t) => [internalRatesKey(t)],
 }

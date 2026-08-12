@@ -58,5 +58,24 @@ export const GLOSSARY = {
   activity: { term: "Activity", def: "A history of what changed on a record, and who changed it." },
   overview: { term: "Overview", def: "The key facts about a record at a glance." },
   status: { term: "Status", def: "Where a record sits in its lifecycle — a ticket runs new to resolved; an account is a prospect, a client, or a past client." },
+
+  // PROCESS MAPS, VERSIONS AND THE MONEY (SCOPE ch.02 — ported, never invented).
+  // The chain is App → Process → Step, and it is what every savings figure is
+  // drilled through. `app` is the one word this build shares with the work-engine
+  // lane (.plans/BUILD-1 §9 ports it too); the definition below is that lane's,
+  // word for word, so a merge keeps one line rather than choosing between two.
+  app: { term: "App", def: "A system we build for an account — the thing with its own address. One goal can need two." },
+  process: { term: "Process", def: "A way of working inside an app — the steps someone takes to get one job done." },
+  step: { term: "Step", def: "One part of a process. It carries how long it takes and how often it runs." },
+  processVersion: { term: "Version", def: "A process as it was at one moment. Version 1 is how they worked before us; each later one is what we changed it to." },
+  baseline: { term: "Baseline", def: "Version 1 of a process — how the work was done before we touched anything. Every saving is measured from it." },
+  savings: { term: "Saving", def: "Time a step no longer takes: the baseline minus the latest version, times how often it runs." },
+  regression: { term: "Regression", def: "A step that now takes longer than the baseline. We show it, and we say why." },
+  agreedEstimate: { term: "Agreed estimate", def: "A time we agreed with you rather than measured. The estimates are agreed; the subtraction is arithmetic." },
+  rateCard: { term: "Rate card", def: "What an account is charged per hour, by kind of work." },
+  internalRate: { term: "Internal rate", def: "What an hour of our own work costs us. Ours alone — it never leaves the agency." },
+  margin: { term: "Margin", def: "What is left of revenue after our own time and tool costs. Ours alone — never shown to a client." },
+  toolCost: { term: "Tool cost", def: "What an app costs us to keep running each month — hosting and the services behind it." },
+  priceVisibility: { term: "Price visibility", def: "The switch on an account that decides whether they see what they bought. Value is shown either way." },
 } as const satisfies Record<string, GlossaryEntry>
 

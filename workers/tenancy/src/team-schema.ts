@@ -576,6 +576,44 @@ CREATE TABLE knowledge_sources (
   content_hash TEXT,
   indexed_at TEXT,
   chunk_count INTEGER NOT NULL DEFAULT 0,
+    // PROCESS MAPS, THEIR VERSIONS, AND THE MONEY (SCOPE ch.02 + .plans/BUILD-3).
+    //
+    // The number 0012 leaves 0011 to the work-engine lane, which is building
+    // alongside this one and has already taken it (`0011_ticket_work_engine`).
+    // The runner applies this array in order and records each `version` string,
+    // so a gap is a key that never existed, not a missing step — and when the two
+    // lanes merge the order is already right.
+    //
+    // WHAT THIS BUILD OWNS, and what it borrows: it owns the chain App → Process
+    // → Step, the versions cut over it, the comments a client leaves on a map,
+    // and the two rate cards. It borrows exactly two facts from the work engine —
+    // a story's `step` (which step a piece of work changed) and a sprint's
+    // `sold_price` (what was sold) — and it never writes either.
+    version: "0013_process_maps_and_money",
+    sql: `
+-- AN APP is the built system: the thing with its own address and its own stage
+-- (SCOPE ch.02). Not the goal — a client wanting dispatch fixed, served by a
+-- driver app and a back-office screen, is TWO rows here.
+--
+-- \`account_id\` is whose system it is, and it is written once at creation and
+-- never edited: every process, version, step and comment beneath it carries the
+-- same account so the fence rides one clause with no join (the shape
+-- \`help.account_id\` already has). There is deliberately no "move this app to
+-- another account" door — moving one would silently re-publish a whole map, its
+-- savings and its conversation into somebody else's portal. NULL is the agency's
+-- own system, which belongs to no client and so appears in no portal.
+--
+-- \`tool_cost_cents_per_month\` is what this app costs US to keep running
+-- (hosting, the services behind it). It is a column rather than a table because
+-- a cost line with no history is one number about one app, and margin is the
+-- only thing that reads it — internal, always.
+CREATE TABLE apps (
+  id TEXT PRIMARY KEY,
+  account_id TEXT REFERENCES accounts (id),
+  name TEXT NOT NULL,
+  url TEXT,
+  stage TEXT,
+  tool_cost_cents_per_month INTEGER NOT NULL DEFAULT 0 CHECK (tool_cost_cents_per_month >= 0),
   created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
   updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
   deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
@@ -649,6 +687,164 @@ SELECT lower(hex(randomblob(16))), r.id, 'knowledge', r.is_default, r.is_default
   FROM member_roles r
  WHERE NOT EXISTS (
    SELECT 1 FROM role_permissions p WHERE p.role_id = r.id AND p.module = 'knowledge'
+CREATE INDEX idx_apps_account ON apps (account_id);
+
+-- A PROCESS is a way of working inside an app. It is the thing that is VERSIONED
+-- — v1 is the pre-kwapso baseline, and every later version is what we changed it
+-- to — so the process row itself carries no durations at all. They live on the
+-- steps of each version, which is what makes "where does 208 hours come from?"
+-- answerable rather than assertable.
+CREATE TABLE processes (
+  id TEXT PRIMARY KEY,
+  app_id TEXT NOT NULL REFERENCES apps (id),
+  account_id TEXT REFERENCES accounts (id),
+  name TEXT NOT NULL,
+  description TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+CREATE INDEX idx_processes_app ON processes (app_id);
+CREATE INDEX idx_processes_account ON processes (account_id);
+
+-- A VERSION is the process as it stood at one moment. Version 1 is the BASELINE
+-- (how they worked before us) and is created with the process itself, because a
+-- process with no baseline can never produce a saving and would quietly report
+-- zero forever.
+--
+-- \`cut_from_sprint_id\` is the work engine's sprint whose completion cut this
+-- version; NULL is the manual button. The partial unique index below is R17 for
+-- a write that is an INSERT rather than an UPDATE: a sprint that completes twice
+-- (a double click, a retried job, a replayed hook) cannot cut two versions,
+-- because the second INSERT is refused by the index rather than by a check
+-- somebody could race past.
+CREATE TABLE process_versions (
+  id TEXT PRIMARY KEY,
+  process_id TEXT NOT NULL REFERENCES processes (id),
+  account_id TEXT REFERENCES accounts (id),
+  version_no INTEGER NOT NULL CHECK (version_no >= 1),
+  label TEXT,
+  cut_from_sprint_id TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT
+);
+CREATE UNIQUE INDEX idx_process_versions_no ON process_versions (process_id, version_no);
+CREATE UNIQUE INDEX idx_process_versions_sprint
+  ON process_versions (process_id, cut_from_sprint_id) WHERE cut_from_sprint_id IS NOT NULL;
+
+-- A STEP is one part of a process, in ONE version. Two identifiers, and the
+-- difference between them is the whole savings calculation:
+--   • \`id\`       — this row, in this version.
+--   • \`step_key\` — THE SAME STEP, across every version. Minted when the step
+--                  first appears and copied forward by the cut, so "the baseline
+--                  duration" and "the latest duration" are two rows that can be
+--                  subtracted rather than two names that have to be matched.
+--
+-- \`removed_at\` is how a step that STOPPED HAPPENING stays honest. Deleting the
+-- row would drop it out of the join and report no saving at all for the work we
+-- removed entirely — the largest saving there is. So the cut carries it forward
+-- with its frequency intact and its duration at zero, and the plain sentence
+-- from SCOPE still holds: the baseline minus the latest, times how often it runs.
+CREATE TABLE process_steps (
+  id TEXT PRIMARY KEY,
+  process_id TEXT NOT NULL REFERENCES processes (id),
+  version_id TEXT NOT NULL REFERENCES process_versions (id),
+  account_id TEXT REFERENCES accounts (id),
+  step_key TEXT NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  position INTEGER NOT NULL DEFAULT 0,
+  seconds_per_run INTEGER NOT NULL DEFAULT 0 CHECK (seconds_per_run >= 0),
+  runs_per_month INTEGER NOT NULL DEFAULT 0 CHECK (runs_per_month >= 0),
+  removed_at TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT
+);
+-- One row per step per version: the cut copies forward, it never doubles up.
+CREATE UNIQUE INDEX idx_process_steps_version_key ON process_steps (version_id, step_key);
+CREATE INDEX idx_process_steps_process ON process_steps (process_id, step_key);
+
+-- A CLIENT MAY COMMENT ON A PROCESS MAP (SCOPE ch.06 — one of the six things a
+-- contact can do). A comment is a CONVERSATION, never an edit: it changes no
+-- duration and cuts no version.
+--
+-- \`explains_step_key\` is the other half of the regression rule. Internal
+-- dashboards ALWAYS show a step that got slower, because that is information;
+-- the portal shows one only when a staff member has attached the explanation,
+-- and this is that attachment. It is a comment, deliberately — an explanation
+-- the client can reply to, rather than a field they can only read.
+CREATE TABLE process_comments (
+  id TEXT PRIMARY KEY,
+  process_id TEXT NOT NULL REFERENCES processes (id),
+  account_id TEXT REFERENCES accounts (id),
+  body TEXT NOT NULL,
+  explains_step_key TEXT,
+  is_staff INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT
+);
+CREATE INDEX idx_process_comments_process ON process_comments (process_id, created_at);
+
+-- ── THE TWO RATE CARDS, AND WHY THEY ARE TWO TABLES ──────────────────────────
+--
+-- One is what an ACCOUNT IS CHARGED. The other is what an hour of our own work
+-- COSTS US. They are the same shape — a label and a number per hour — which is
+-- exactly the danger: one table with a \`kind\` column would put both numbers a
+-- single wrong WHERE clause apart, and the wrong one of them is the one figure
+-- SCOPE says a client must never see under any flag, ever.
+--
+-- Two tables cannot be confused by a forgotten predicate. A door that reads
+-- \`account_rates\` cannot accidentally return an internal rate, because the
+-- internal rate is not in the table it named. The same reasoning splits the code
+-- (lib/rates.ts vs lib/internal-money.ts) and is the law R23 checks.
+CREATE TABLE account_rates (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL REFERENCES accounts (id),
+  label TEXT NOT NULL,
+  cents_per_hour INTEGER NOT NULL CHECK (cents_per_hour >= 0),
+  currency TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+-- Race guard: two people naming the same kind of work on one account at once.
+CREATE UNIQUE INDEX idx_account_rates_label
+  ON account_rates (account_id, label) WHERE deactivated_at IS NULL;
+
+-- WHAT AN HOUR COSTS US. No account column, on purpose: an internal rate is a
+-- fact about the agency, not about a client — and a table with an account on it
+-- is a table somebody eventually joins to an account-fenced read.
+-- \`is_default\` is the rate margin applies to an hour of logged time while the
+-- work log does not yet say WHICH kind of work it was. It is one column rather
+-- than a guess: a margin that silently blended every rate on the card would be a
+-- number nobody could check, which is the one thing this build exists to avoid.
+CREATE TABLE internal_rates (
+  id TEXT PRIMARY KEY,
+  label TEXT NOT NULL,
+  cents_per_hour INTEGER NOT NULL CHECK (cents_per_hour >= 0),
+  currency TEXT,
+  is_default INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+CREATE UNIQUE INDEX idx_internal_rates_label
+  ON internal_rates (label) WHERE deactivated_at IS NULL;
+-- At most ONE default, enforced by the database rather than by whoever writes the
+-- next screen: two defaults would make the margin depend on row order.
+CREATE UNIQUE INDEX idx_internal_rates_default
+  ON internal_rates (is_default) WHERE is_default = 1 AND deactivated_at IS NULL;
+
+-- Existing teams: the locked Admin role gains both new modules in full (it is
+-- DEFINED as full access and cannot be edited afterwards to grant them). Every
+-- other role gains nothing — a migration must never hand out sight of an
+-- agency's margin, or of a client's world, that nobody granted. Same shape as
+-- 0007, for the same reason. New teams don't reach this: their seed already
+-- writes the rows.
+INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+SELECT lower(hex(randomblob(16))), r.id, m.module, r.is_default, r.is_default, r.is_default, r.is_default
+  FROM member_roles r
+  CROSS JOIN (SELECT 'processes' AS module UNION ALL SELECT 'commercials') m
+ WHERE NOT EXISTS (
+   SELECT 1 FROM role_permissions p WHERE p.role_id = r.id AND p.module = m.module
  );
 `,
   },

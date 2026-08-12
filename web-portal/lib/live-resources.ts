@@ -28,6 +28,8 @@ export const cacheKeys = {
   ticketsCursor: "portal:tickets:cursor",
   thread: (ticketId: string) => `portal:thread:${ticketId}`,
   threadTotal: (ticketId: string) => `portal:thread:${ticketId}:total`,
+  value: "portal:value",
+  processComments: (processId: string) => `portal:process-comments:${processId}`,
 }
 
 /** resource → the portal caches a ping on it invalidates. A resource the portal
@@ -42,6 +44,11 @@ export const PORTAL_LISTENERS: Record<string, (currentAccountId: string | null) 
   accounts: (a) => (a ? [cacheKeys.company(a)] : []),
   account_links: (a) => (a ? [cacheKeys.company(a)] : []),
   portal_users: (a) => (a ? [cacheKeys.company(a), cacheKeys.context] : []),
+  // A comment on one of their process maps — theirs or ours. The whole value
+  // read is dropped rather than the one conversation, because the comment that
+  // just landed may be the explanation for a step that got slower, and that
+  // changes what the value screen says beside it.
+  process_comments: () => [cacheKeys.value],
 }
 
 /** Apply one live ping. Unknown resources are ignored — the team channel carries

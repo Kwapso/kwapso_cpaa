@@ -318,6 +318,7 @@ function teamTabStrip(
     module === "learning" ||
     module === "tickets" ||
     module === "knowledge" ||
+    module === "processes" ||
     module === "import"
       ? module
       : "overview"

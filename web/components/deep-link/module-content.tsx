@@ -29,6 +29,7 @@ import { RoleDetailScreen } from "@/components/role-detail"
 import { LearningDetailScreen } from "@/components/learning-detail"
 import { KnowledgeDetailScreen } from "@/components/knowledge-detail"
 import { HelpDetailScreen } from "@/components/help-detail"
+import { ProcessDetailScreen } from "@/components/process-detail"
 import { ImportScreen } from "@/components/import-screen"
 import { SelectableScreen } from "@/components/selectable-screen"
 import { NoAccess, NotFound, LoadError } from "@/components/deep-link/screen-bits"
@@ -247,6 +248,9 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     }
     if (module === "tickets") {
       return <HelpDetailScreen teamId={teamId as string} helpId={recordId} myUserId={myUserId} />
+    }
+    if (module === "processes") {
+      return <ProcessDetailScreen teamId={teamId as string} processId={recordId} />
     }
     return <NotFound />
 }

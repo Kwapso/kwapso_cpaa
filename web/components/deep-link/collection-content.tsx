@@ -22,6 +22,7 @@ import {
 } from "@kwapso/ui/registry/collections/screen-renderer/screen-renderer"
 
 import { LearningProgressScreen } from "@/components/learning-progress"
+import { ProcessesScreen } from "@/components/processes-screen"
 import { NotFound, LoadError, SectionWithCreate, CollectionCard } from "@/components/deep-link/screen-bits"
 import { CollectionHeading } from "@/components/collection-heading"
 import { LoadMore } from "@/components/load-more"
@@ -198,6 +199,22 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
           />
         </div>
       </CountedAbove>
+    )
+  }
+  if (module === "processes") {
+    // The whole screen is host-composed: the VALUE drill-down sits above the
+    // list, and a map cannot be created without the apps it might belong to. Its
+    // own file, so this switch stays a switch.
+    return (
+      <ProcessesScreen
+        teamId={teamId as string}
+        recipe={recipe}
+        rights={rights}
+        total={totals.processes}
+        canCreate={can("processes", "create")}
+        onAction={onAction}
+        onIntent={onIntent}
+      />
     )
   }
   if (module === "accounts") {
