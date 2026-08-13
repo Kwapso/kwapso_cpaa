@@ -9,10 +9,43 @@
  * on a fresh deploy, short enough that a wedged host fails the run instead of the day. */
 export const REQUEST_TIMEOUT_MS = 30_000
 
-/** The one bare `fetch` in the scripts, with the timeout already on it. A caller can
- * still pass its own `signal` (the spread wins) — nothing here does. */
-export function timedFetch(url, opts = {}) {
-  return fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS), ...opts })
+/** How many times a request that never got an ANSWER is tried again, and how long
+ * the pauses between attempts are. Short, and it doubles: a slow moment is over
+ * in a second or two, and anything longer is not a slow moment.
+ *
+ * WHY THIS EXISTS. `timedFetch` throws on the timeout, nothing caught it, and a
+ * single 30-second stall killed a twenty-minute seed twice in a row — once at
+ * the tickets, once at the contact links, both of them requests that would have
+ * succeeded on the next try. A run that dies on one slow socket is a run nobody
+ * can finish against a cold worker.
+ *
+ * RETRIED: a timeout, a dropped connection, a DNS blip — the cases where NO
+ * answer came back, so trying again cannot do the write twice. NOT retried: any
+ * HTTP status at all. A 500 is an answer, a 400 is an answer, and re-sending a
+ * POST that may already have been applied is how a seed writes a row twice. */
+const RETRIES = 3
+const RETRY_PAUSE_MS = 400
+
+/** The one bare `fetch` in the scripts, with the timeout already on it — and a
+ * bounded retry for the case where nothing came back at all. A caller can still
+ * pass its own `signal` (the spread wins) — nothing here does. */
+export async function timedFetch(url, opts = {}) {
+  let last
+  for (let attempt = 0; attempt <= RETRIES; attempt++) {
+    try {
+      return await fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS), ...opts })
+    } catch (e) {
+      // A caller-supplied signal aborting is the caller deciding to stop; that is
+      // not a blip and must not be retried.
+      if (opts.signal?.aborted) throw e
+      last = e
+      if (attempt === RETRIES) break
+      const pause = RETRY_PAUSE_MS * 2 ** attempt
+      console.log(`  … no answer from ${new URL(url).pathname} — trying again in ${pause}ms`)
+      await new Promise((r) => setTimeout(r, pause))
+    }
+  }
+  throw last
 }
 
 /** A JSON caller bound to one base URL — `api(path, opts, cookie)`, exactly as the

@@ -44,6 +44,7 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 
 import { SAVINGS_CAPTION, savedHours, type StepSaving } from "@shared/workers/savings"
 import type { ProcessComment } from "@shared/types"
+import { moneyText } from "@shared/web/money"
 import { invalidate, useCached } from "@shared/web/store"
 import { ApiFailure, value as valueApi, type PortalValue } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
@@ -60,11 +61,16 @@ function minutesText(seconds: number): string {
   return `${Math.round(seconds / 60).toLocaleString()} min`
 }
 
-/** Money, as the client's own currency writes it. Cents in, one line out. */
-function moneyText(cents: number, currency: string | null): string {
-  const amount = (cents / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })
-  return currency ? `${amount} ${currency}` : amount
-}
+// Money comes from `shared/web/money.ts`, imported at the top of this file — not
+// written again here, which is what it was.
+//
+// The local copy left `minimumFractionDigits` off, so this screen rendered a
+// round rate as "12.5" where the agency's own rate card, reading the SAME cents,
+// rendered "12.50". A client and the person who set their price were looking at
+// two spellings of one number. That is the exact divergence the shared file was
+// written to stop, and its header says so — a formatter knows no table, no door
+// and no audience, so it is safe on both sides of the R24 fence and there is no
+// reason for a second one to exist.
 
 /** One step, and the whole sum behind it. This line is the answer to the third
  * click — deliberately the arithmetic rather than its result. */

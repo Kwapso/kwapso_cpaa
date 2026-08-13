@@ -30,6 +30,7 @@ import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import { cursorKey, todosKey, totalKey } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
 import type { AppRow, ProcessSummary, Sprint, Story, Todo } from "@shared/types"
+import { formatDate } from "@shared/web/format"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
 
 /** The four states a story moves through, in the words a person reads. The
@@ -93,7 +94,7 @@ export function storyLine(s: Story): string {
     [
       STORY_STATUS_LABEL[s.status],
       s.assigneeName ?? "unassigned",
-      s.dueOn ? `due ${s.dueOn}` : null,
+      s.dueOn ? `due ${formatDate(s.dueOn)}` : null,
       s.sprintName,
       s.ticketRef,
     ]
@@ -198,7 +199,12 @@ export function sprintLine(s: Sprint): string {
       s.sprintType,
       s.accountName,
       s.appName,
-      s.startsOn && s.endsOn ? `${s.startsOn} → ${s.endsOn}` : (s.startsOn ?? s.endsOn),
+      // Dates through the ONE formatter (shared/web/format.ts), never raw. A row
+      // reading "2026-02-23T00:00:00.000Z → 2026-03-20T00:00:00.000Z" is a
+      // timestamp somebody has to decode, on a list built for a manager to scan.
+      s.startsOn && s.endsOn
+        ? `${formatDate(s.startsOn)} → ${formatDate(s.endsOn)}`
+        : (formatDate(s.startsOn) || formatDate(s.endsOn) || null),
       s.storyCount > 0 ? `${done} of ${s.storyCount} done` : "no work in it yet",
     ]
       .filter(Boolean)
@@ -460,7 +466,7 @@ export function TodosPanel({
                 <p className="text-muted-foreground truncate text-xs">
                   {[
                     t.accountName,
-                    t.dueOn ? `due ${t.dueOn.slice(0, 10)}` : "no date",
+                    t.dueOn ? `due ${formatDate(t.dueOn)}` : "no date",
                     t.fileName,
                   ]
                     .filter(Boolean)

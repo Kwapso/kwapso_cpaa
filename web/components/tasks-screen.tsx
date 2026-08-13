@@ -32,6 +32,7 @@ import { content as contentApi } from "@/lib/api"
 import { listFetch, tasksKey, todosKey } from "@/lib/live-resources"
 import { withDataDrivenCollection } from "@/lib/screens"
 import type { Task } from "@shared/types"
+import { formatDate } from "@shared/web/format"
 import { invalidate, useCached } from "@shared/web/store"
 
 /** One task, as a row: who has it and when it is due. A task that names a client
@@ -45,7 +46,7 @@ function shapeTasks(tasks: Task[]) {
         [
           t.status === "done" ? "Done" : "Open",
           t.assigneeName ?? "nobody yet",
-          t.dueOn ? `due ${t.dueOn.slice(0, 10)}` : null,
+          t.dueOn ? `due ${formatDate(t.dueOn)}` : null,
         ]
           .filter(Boolean)
           .join(" · ") || "—",

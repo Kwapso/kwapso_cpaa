@@ -15,6 +15,8 @@
 // with it. The cap itself stays in the route: it is the guard that applies the
 // moment TEAM_CREATION_CLOSED is ever flipped back.)
 
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { TEAM_CREATION_CLOSED } from "@shared/product"
@@ -106,5 +108,40 @@ describe("one team: creation is closed on every surface", () => {
     )
     expect(res.status).toBe(200)
     expect(created, "a fresh environment must still be standable").toEqual(["Seeded"])
+  })
+
+  // THE OTHER HALF OF THE SENTENCE AT THE TOP OF THIS FILE, which was missing for
+  // as long as the door was open: the ops door being held open is worth nothing
+  // if the ship gate doesn't walk through it.
+  //
+  // `npm run deploy:staging` ends in `smoke:staging`, and the smoke used to reach
+  // for a team through the USER door — the one closed three tests above. On a
+  // freshly reset environment bootstrap correctly answers "no teams", every
+  // assertion after it fails, and the gate that is supposed to catch a broken
+  // deploy is itself the thing that's broken. It read as a product bug for a day.
+  //
+  // Source-scan rather than a network call: the invariant is that the smoke is
+  // WRITTEN to enter the way an operator does, and that has to be checkable
+  // without staging being up.
+  it("the ship gate can stand up its own team, or it cannot gate a fresh environment", () => {
+    const smoke = readFileSync(join(__dirname, "..", "..", "..", "scripts", "smoke-staging.mjs"), "utf8")
+    expect(
+      smoke.includes("/api/tenancy/admin/create-team"),
+      "smoke-staging.mjs has no way to a team except the door TEAM_CREATION_CLOSED shuts — " +
+        "on a reset environment the whole run fails at bootstrap and reports a fault that isn't one"
+    ).toBe(true)
+    expect(
+      smoke.includes("ADMIN_KEY"),
+      "the ops door needs the deployment's ADMIN_KEY — the smoke must read it from its environment"
+    ).toBe(true)
+    // And it must be a FALLBACK, not the normal path: creating unconditionally
+    // would mint a second team on every run, which is the litter the top of
+    // smoke-staging.mjs promises not to leave.
+    const bootFirst = smoke.indexOf("/api/tenancy/bootstrap")
+    const opsDoor = smoke.indexOf("/api/tenancy/admin/create-team")
+    expect(
+      bootFirst >= 0 && bootFirst < opsDoor,
+      "the smoke must ASK for a team before making one, or every run leaves a new team behind"
+    ).toBe(true)
   })
 })

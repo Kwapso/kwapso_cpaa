@@ -80,8 +80,42 @@ const profile = await api(
 )
 ok("profile saved", profile.body?.user?.onboardingComplete === true)
 
-// 5 · Bootstrap: first run births a team database; later runs return it.
-const boot = await api("/api/tenancy/bootstrap", { method: "POST" }, cookie)
+// 5 · The team. Bootstrap is asked FIRST and asked again LAST, and the ops door
+// sits between them only when the first answer was "none".
+//
+// WHY THE OPS DOOR IS IN A SMOKE TEST AT ALL. Team creation through the user
+// door is closed product-wide — kwapso is one agency, one team, invitation only
+// (TEAM_CREATION_CLOSED, shared/product.ts) — so on a freshly reset environment
+// bootstrap CORRECTLY returns an empty list, and every assertion after it fails
+// for a reason that is not a fault. That is not a hole to route around: it is
+// the product, and the smoke has to enter the way an operator does. The ops door
+// (x-admin-key, never public, refused on the user surface) is the seam the
+// product leaves open for exactly this, and it is the same door a real reset is
+// recovered through — so the smoke now exercises the recovery path as well.
+//
+// Idempotent by construction: the admin call happens ONLY when the caller has no
+// team, so the second run finds the first run's team and skips it entirely. No
+// litter, and the "later runs prove idempotency" promise at the top of this file
+// still holds.
+let boot = await api("/api/tenancy/bootstrap", { method: "POST" }, cookie)
+if (!boot.body?.teams?.length) {
+  const ADMIN_KEY = process.env.ADMIN_KEY ?? ""
+  if (!ADMIN_KEY) {
+    console.log(
+      "FAIL the smoke account has no team, and team creation is closed to users by design. " +
+        "Export ADMIN_KEY so the smoke can stand one up through the ops door."
+    )
+    process.exit(1)
+  }
+  const made = await api("/api/tenancy/admin/create-team", {
+    method: "POST",
+    headers: { "x-admin-key": ADMIN_KEY },
+    body: JSON.stringify({ name: "Smoke team", email: EMAIL }),
+  })
+  ok("team stood up through the ops door", made.res.ok && made.body?.ok === true, JSON.stringify(made.body))
+  if (!made.res.ok) process.exit(1)
+  boot = await api("/api/tenancy/bootstrap", { method: "POST" }, cookie)
+}
 const team = boot.body?.teams?.[0]
 ok("team exists + database ready", team?.dbStatus === "ready", JSON.stringify(boot.body))
 ok("current team set", typeof boot.body?.currentTeamId === "string")

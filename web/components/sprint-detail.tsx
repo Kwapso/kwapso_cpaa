@@ -37,6 +37,7 @@ import { StoriesPanel, sliceKey } from "@/components/work-panels"
 import { ApiFailure, content as contentApi } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
 import { formatCount } from "@shared/web/format-count"
+import { formatDate } from "@shared/web/format"
 import { listFetch, sprintsKey, totalKey } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
 import { CONCEPT_ICON } from "@/lib/pages"
@@ -108,7 +109,13 @@ export function SprintDetailScreen({
     { label: "Client", value: sprint.accountName || "Ours — no client" },
     { label: "App", value: sprint.appName || "—" },
     { label: "What it's for", value: sprint.goal || "—" },
-    { label: "Runs", value: sprint.startsOn && sprint.endsOn ? `${sprint.startsOn} → ${sprint.endsOn}` : (sprint.startsOn ?? sprint.endsOn ?? "—") },
+    {
+      label: "Runs",
+      value:
+        sprint.startsOn && sprint.endsOn
+          ? `${formatDate(sprint.startsOn)} → ${formatDate(sprint.endsOn)}`
+          : (formatDate(sprint.startsOn) || formatDate(sprint.endsOn) || "—"),
+    },
     { label: "Price sold", value: priceSold(sprint.soldPriceCents, sprint.currency) },
     {
       label: "Work inside it",
