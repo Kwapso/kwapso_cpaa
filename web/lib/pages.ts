@@ -130,10 +130,36 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // SCOPE ch.03). A first-class SIDEBAR page: it's the day's work, not an admin
   // setting. Its count is an exact server total (R16) keyed off the same
   // `accounts:<teamId>` cache the list reads, so the badge and the rows agree.
-  { key: "accounts", title: "Accounts", module: "accounts", segment: "accounts", placement: "sidebar", countCacheKey: "accounts", group: "daily" },
-  // Learning + Tickets are first-class SIDEBAR pages (not buried tabs) —
-  // team-scoped, each gated by its own read right.
   //
+  // ══ THE SIDEBAR ORDER IS THIS LIST'S ORDER ═══════════════════════════════
+  // The shell composes Home, then these in the order they appear here, then
+  // Settings — and THEN partitions by `group`, drawing the divider between the
+  // two halves. So a page's place on the rail is two facts and no third: where
+  // its line sits in this list, and which group it declares. Moving a page is
+  // moving its line.
+  //
+  // The owner's sequence, fixed 13 Aug 2026:
+  //   daily       Home · Accounts · Knowledge base · Tickets · Stories · Tasks
+  //   occasional  Meetings · Apps · Process maps · Sprints · Marketing ·
+  //               Brand library · Delivery method · Learning · Settings
+  //
+  // Two pages changed halves with it. KNOWLEDGE BASE moved up into the daily
+  // set — it stopped being a library somebody consults and became the thing the
+  // team asks first, which is a different habit and belongs above the fold.
+  // MEETINGS moved down out of it: the diary is read when there is a meeting,
+  // not every morning. LEARNING moved to the end of the occasional half, next
+  // to Settings, which is where a how-to library is looked for.
+  //
+  // Accounts — the companies and people the team works with (the customer spine,
+  // SCOPE ch.03). A first-class SIDEBAR page: it's the day's work, not an admin
+  // setting. Its count is an exact server total (R16) keyed off the same
+  // `accounts:<teamId>` cache the list reads, so the badge and the rows agree.
+  { key: "accounts", title: "Accounts", module: "accounts", segment: "accounts", placement: "sidebar", countCacheKey: "accounts", group: "daily" },
+  // The knowledge base — what the assistant is allowed to read, and the one
+  // screen where a person can see it, add to it, correct it and take something
+  // out. Gated by its own module, so a role without it never sees the
+  // destination at all.
+  { key: "knowledge", title: "Knowledge base", module: "knowledge", segment: "knowledge", placement: "sidebar", countCacheKey: "knowledge", group: "daily" },
   // Tickets is the one place in this table where the URL segment is NOT the
   // permission module. The section, the page and the address bar say `tickets`,
   // because that is the word for the thing (glossary, SCOPE ch.02). The right the
@@ -141,24 +167,7 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // permission sheet, in every team database, and renaming it would be a data
   // migration that could only ever take somebody's access away. `MODULE_PERMISSION`
   // in lib/screens.ts is the one seam that translates between the two.
-  //
-  // Learning STAYS VISIBLE — the owner was asked whether it could fold away and
-  // said no. It is occasional rather than daily: nobody reads the how-to library
-  // every morning, but the day they need it they need to be able to find it.
-  { key: "learning", title: "Learning", module: "learning", segment: "learning", placement: "sidebar", countCacheKey: "learning", group: "occasional" },
   { key: "tickets", title: "Tickets", module: "help", segment: "tickets", placement: "sidebar", countCacheKey: "help", group: "daily" },
-  // The knowledge base — what the assistant is allowed to read, and the one
-  // screen where a person can see it, add to it, correct it and take something
-  // out. A first-class SIDEBAR page for the same reason Learning is one: it is
-  // the day's work, not an admin setting. Gated by its own module, so a role
-  // without it never sees the destination at all.
-  { key: "knowledge", title: "Knowledge base", module: "knowledge", segment: "knowledge", placement: "sidebar", countCacheKey: "knowledge", group: "occasional" },
-  // Process maps — App → Process → Step, and the value drilled through them. A
-  // first-class SIDEBAR page for the same reason Accounts is one: it is the day's
-  // work with a client, not an admin setting. Its count is the exact server total
-  // of the PROCESSES (the collection the screen leads with and the one that
-  // grows), keyed off the same `processes:<teamId>` cache the list reads.
-  { key: "processes", title: "Process maps", module: "processes", segment: "processes", placement: "sidebar", countCacheKey: "processes", group: "occasional" },
   // ── THE WORK ENGINE, AS FOUR DESTINATIONS ────────────────────────────────
   // Apps → Sprints → Stories, plus our own admin beside them. Each is a section
   // AND a tab on the record above it, because the owner's comprehension answer
@@ -175,15 +184,21 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // database is behind it — there is no such string here, the module is `work`
   // either way).
   //
-  // Stories is daily. Sprints and apps are not: a sprint is a contract and an
-  // app is an inventory, and neither is a thing somebody opens before lunch.
+  // Stories and Tasks are daily. Sprints and apps are not: a sprint is a
+  // contract and an app is an inventory, and neither is opened before lunch.
   { key: "stories", title: "Stories", module: "work", segment: "stories", placement: "sidebar", countCacheKey: "stories", group: "daily" },
   { key: "tasks", title: "Tasks", module: "work", segment: "tasks", placement: "sidebar", countCacheKey: "tasks", group: "daily" },
-  { key: "meetings", title: "Meetings", module: "meetings", segment: "meetings", placement: "sidebar", countCacheKey: "meetings", group: "daily" },
+  // ── and below the divider ────────────────────────────────────────────────
+  { key: "meetings", title: "Meetings", module: "meetings", segment: "meetings", placement: "sidebar", countCacheKey: "meetings", group: "occasional" },
   // Apps gate on `processes`, not `work`: an app is the thing a process map
   // hangs off, and the module that owns the App → Process → Step chain is the
   // one whose right a person needs to see any of it.
   { key: "apps", title: "Apps", module: "processes", segment: "apps", placement: "sidebar", countCacheKey: "apps", group: "occasional" },
+  // Process maps — App → Process → Step, and the value drilled through them. Its
+  // count is the exact server total of the PROCESSES (the collection the screen
+  // leads with and the one that grows), keyed off the same `processes:<teamId>`
+  // cache the list reads.
+  { key: "processes", title: "Process maps", module: "processes", segment: "processes", placement: "sidebar", countCacheKey: "processes", group: "occasional" },
   { key: "sprints", title: "Sprints", module: "work", segment: "sprints", placement: "sidebar", countCacheKey: "sprints", group: "occasional" },
   // THE AGENCY'S OWN HOUSEKEEPING — three sidebar pages, each gated by its own
   // read right so a role without it never sees the destination at all. Their
@@ -197,6 +212,10 @@ export const TEAM_SECTIONS: TeamSection[] = [
   { key: "marketing", title: "Marketing", module: "marketing", segment: "marketing", placement: "sidebar", countCacheKey: "marketing", group: "occasional" },
   { key: "brand", title: "Brand library", module: "brand_assets", segment: "brand", placement: "sidebar", countCacheKey: "brand_assets", group: "occasional" },
   { key: "delivery", title: "Delivery method", module: "delivery", segment: "delivery", placement: "sidebar", countCacheKey: "programmes", group: "occasional" },
+  // Learning STAYS VISIBLE — the owner was asked whether it could fold away and
+  // said no. Last of the occasional half, beside Settings: nobody reads the
+  // how-to library every morning, but the day they need it they must find it.
+  { key: "learning", title: "Learning", module: "learning", segment: "learning", placement: "sidebar", countCacheKey: "learning", group: "occasional" },
   // Meeting purposes: the SAME module, its own segment, reached CONTEXTUALLY
   // from a button on the Delivery method screen. It is not a second sidebar page
   // because it is not a second destination — it is the other half of one, and a

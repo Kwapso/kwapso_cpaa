@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
-import { TEAM_SECTIONS, bottomNavItems } from "@/lib/pages"
+import { NAV, TEAM_SECTIONS, bottomNavItems } from "@/lib/pages"
 import { MODULE_PERMISSION } from "@/lib/screens"
 import { TEAM_MODULES } from "@shared/team-modules"
 
@@ -32,6 +32,60 @@ describe("bottomNavItems — Home, Learning, Tickets, Settings", () => {
   it("caps the bar at 5 destinations", () => {
     const many = [...composed, { slug: "a" }, { slug: "b" }]
     expect(bottomNavItems(many)).toHaveLength(5)
+  })
+})
+
+// THE RAIL'S ORDER IS THE OWNER'S, AND IT IS NOT A COMMENT.
+//
+// It was written down in a comment in pages.ts and nowhere else, which means any
+// change — a new page appended, a group flipped, a line moved while editing
+// something nearby — would have reordered his sidebar with a green build.
+//
+// This composes the rail the way app-shell.tsx does (Home first, the sidebar
+// sections in registry order, Settings last, then partitioned by group with the
+// divider between the halves) and asserts the sequence he fixed. It reads the
+// registry rather than the shell's JSX, so it stays true if the shell is
+// rewritten — but the composition is duplicated here, and that is the one thing
+// to keep honest: if app-shell's `inOrder` changes shape, change it here too.
+describe("the sidebar sequence the owner fixed", () => {
+  const composeLikeTheShell = () => {
+    const universal = NAV.filter((i) => !i.need)
+    const sidebar = TEAM_SECTIONS.filter((s) => s.placement === "sidebar").map((s) => ({
+      slug: s.key,
+      group: s.group ?? ("occasional" as const),
+    }))
+    const inOrder = [
+      ...universal.filter((i) => i.slug === "home"),
+      ...sidebar,
+      ...universal.filter((i) => i.slug !== "home"),
+    ]
+    return (["daily", "occasional"] as const).map((g) => inOrder.filter((i) => i.group === g).map((i) => i.slug))
+  }
+
+  it("puts the six daily destinations above the divider, in his order", () => {
+    expect(composeLikeTheShell()[0]).toEqual(["home", "accounts", "knowledge", "tickets", "stories", "tasks"])
+  })
+
+  it("puts the nine occasional ones below it, in his order", () => {
+    expect(composeLikeTheShell()[1]).toEqual([
+      "meetings",
+      "apps",
+      "processes",
+      "sprints",
+      "marketing",
+      "brand",
+      "delivery",
+      "learning",
+      "settings",
+    ])
+  })
+
+  it("lists every sidebar page exactly once, so nothing was lost in the reorder", () => {
+    const rail = composeLikeTheShell().flat()
+    const sidebarKeys = TEAM_SECTIONS.filter((s) => s.placement === "sidebar").map((s) => s.key)
+    for (const key of sidebarKeys)
+      expect(rail, `the "${key}" section is in the registry but not on the rail`).toContain(key)
+    expect(new Set(rail).size, "a destination appears twice on the rail").toBe(rail.length)
   })
 })
 
