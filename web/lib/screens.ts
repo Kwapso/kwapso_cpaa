@@ -98,6 +98,10 @@ export const MODULE_PERMISSION: Record<string, string> = {
   sprints: "work",
   tasks: "work",
   apps: "processes",
+  // MEETINGS is its own module, so the segment IS the module — and it is its own
+  // module because the thing being permissioned is the NOTES. The taxonomy of
+  // why we meet lives under `delivery`; what was said in the room does not.
+  meetings: "meetings",
   // THE AGENCY'S OWN HOUSEKEEPING. Two of these are the second and third places
   // in the app where the URL segment is NOT the permission module, and for the
   // same reason Tickets is the first: the address bar says the word a person
@@ -399,6 +403,26 @@ export const knowledgeListRecipe: ScreenRecipe = {
     ],
     { paged: true }
   ),
+}
+
+/** THE DIARY — every conversation we have had or are about to have, newest
+ * first. PAGED (R14): a meeting is an event, so the rows accumulate with
+ * ordinary use and are never curated away — a cancelled call in March is still
+ * the answer to "didn't we speak in March?". Glide's own two years are 350
+ * rows before this app has held a conversation of its own. */
+export const meetingsListRecipe: ScreenRecipe = {
+  type: "list",
+  display: "list",
+  surface: "none",
+  binding: { module: "meetings" },
+  gate: { module: "meetings", right: "read" },
+  fields: [field("name", "Meeting"), field("detail", "Details")],
+  actions: [],
+  collection: listCollection("Nothing in the diary yet.", "Search meetings…", [
+    { field: "client", label: "Client", control: "select" },
+    { field: "purpose", label: "Why we met", control: "select" },
+    { field: "state", label: "Status", control: "select" },
+  ], { paged: true }),
 }
 
 /* ------------------------------ process maps ------------------------------ */
@@ -772,6 +796,11 @@ export const BASE_RECIPES: Record<string, ScreenRecipe> = {
   "apps.list": appsListRecipe,
   "tasks.list": tasksListRecipe,
   "tasks.detail": taskDetailRecipe,
+  // The diary. Its DETAIL has no recipe: two of its three tabs are prose
+  // somebody wrote (the agenda, and the notes afterwards) and its header carries
+  // the one button in this module that reaches outside the app — see
+  // meeting-detail.tsx.
+  "meetings.list": meetingsListRecipe,
   // The agency's own housekeeping — the only four DETAILS in the app that are
   // pure recipes (see the note above them for why they can be).
   "marketing.list": marketingListRecipe,

@@ -27,6 +27,7 @@ import { AppsScreen } from "@/components/apps-screen"
 import { SprintsScreen } from "@/components/sprints-screen"
 import { StoriesScreen } from "@/components/stories-screen"
 import { TasksScreen } from "@/components/tasks-screen"
+import { MeetingsScreen } from "@/components/meetings-screen"
 import { TriageStrip } from "@/components/triage-strip"
 import {
   BrandLibraryScreen,
@@ -287,6 +288,19 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         canCreate={can("work", "create")}
         canRaiseTodo={can("todos", "create")}
         canCancelTodo={can("todos", "delete")}
+        onAction={onAction}
+        onIntent={onIntent}
+      />
+    )
+  }
+  if (module === "meetings") {
+    return (
+      <MeetingsScreen
+        teamId={teamId as string}
+        recipe={recipe}
+        rights={rights}
+        total={totals.meetings}
+        canCreate={can("meetings", "create")}
         onAction={onAction}
         onIntent={onIntent}
       />

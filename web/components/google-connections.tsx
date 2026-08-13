@@ -19,6 +19,7 @@ import * as React from "react"
 import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
+import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import {
   AlertDialog,
@@ -30,12 +31,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@kwapso/ui/registry/primitives/alert-dialog/alert-dialog"
-import { Ban, Plus, Power } from "lucide-react"
+import { Ban, Plus, Power, RefreshCw } from "lucide-react"
 
-import { GOOGLE_SERVICES, type GoogleConnection, type GoogleService, type GoogleSource } from "@shared/types"
-import { ApiFailure, content } from "@/lib/api"
+import {
+  GOOGLE_SERVICES,
+  type Account,
+  type GoogleConnection,
+  type GoogleService,
+  type GoogleSource,
+} from "@shared/types"
+import { ApiFailure, content, tenancy } from "@/lib/api"
 import { formatActivityWhen } from "@shared/web/format"
 import { googleKey } from "@/lib/live-resources"
+import { usePermissions } from "@/lib/perms"
 import { primeCache, useCached } from "@shared/web/store"
 import { GoogleSourceDialog } from "@/components/google-source-dialog"
 
@@ -52,15 +60,30 @@ const SERVICE_COPY: Record<GoogleService, { label: string; scope: string }> = {
 /** Which services are shared through NAMED folders or spaces. */
 const NAMED: GoogleService[] = ["drive", "chat"]
 
+/** How many bounded ticks one press of "bring it in" will run. Each one files up
+ * to INGEST_SOURCES_PER_TICK sources, so this is a first pass over a few hundred
+ * items — and a ceiling, because a loop that keeps going until an external system
+ * says stop is a loop whose length somebody else decides. What is left is picked
+ * up by the next press, from the cursor. */
+const MAX_SYNC_PASSES = 12
+
 export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) {
   const key = googleKey(teamId ?? "none")
   const q = useCached<{ connections: GoogleConnection[]; sources: GoogleSource[]; ready: boolean }>(
     key,
     () => content.googleConnections()
   )
+  // The clients a folder or a space can be filed under. Read on the same key the
+  // accounts screen uses, so opening Settings after the accounts list costs
+  // nothing — and only when there is a team to read them for.
+  const accountsQ = useCached<Account[]>(teamId ? `accounts:${teamId}` : null, () =>
+    tenancy.accounts().then((r) => r.accounts)
+  )
   const [busy, setBusy] = React.useState(false)
+  const [syncing, setSyncing] = React.useState(false)
   const [disconnecting, setDisconnecting] = React.useState<GoogleService | null>(null)
   const [sharing, setSharing] = React.useState<"drive" | "chat" | null>(null)
+  const { can } = usePermissions(teamId)
 
   // THE OTHER HALF OF THE ROUND-TRIP. Google sends the browser back to the
   // callback, which parks the authorization code in an HttpOnly cookie and
@@ -93,6 +116,52 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
 
   async function refresh() {
     primeCache(key, await content.googleConnections())
+  }
+
+  /** BRING MY GOOGLE MATERIAL INTO THE KNOWLEDGE BASE.
+   *
+   * The one sweep in the product that CANNOT run itself, and therefore the one
+   * that has to have a button. Everything it reads comes through this person's
+   * own token, so it has to run as them — and a cron has no caller to be. So the
+   * control lives here, on the card that owns the connection, rather than on the
+   * knowledge base's own screen where it would look like the fifteen-minute
+   * sweep and quietly be a different thing.
+   *
+   * It loops until the sweep says it has caught up, because a tick is bounded
+   * (25 sources) and a first run over a full folder is more than one tick.
+   * Bounded here too: a runaway loop against somebody's Drive is a worse failure
+   * than an incomplete first pass, and the next press carries on from the cursor.
+   */
+  async function syncGoogle() {
+    if (syncing) return
+    setSyncing(true)
+    let indexed = 0
+    try {
+      for (let pass = 0; pass < MAX_SYNC_PASSES; pass++) {
+        const r = await content.syncGoogleKnowledge()
+        indexed += r.results.reduce((n, k) => n + k.indexed, 0)
+        // A KIND THAT FAILED CARRIES ITS OWN SENTENCE (R12 records it on the
+        // row; the door hands it back per kind), and that sentence is the one
+        // worth showing — "connect it again in Settings" is actionable where a
+        // generic "couldn't read your Google material" is not. Found by pressing
+        // the button against a dead token and reading what came back.
+        const failed = r.results.find((k) => k.error)
+        if (failed?.error) {
+          toast.error(failed.error)
+          return
+        }
+        if (r.caughtUp) break
+      }
+      toast.success(
+        indexed > 0
+          ? `Brought in ${indexed} ${indexed === 1 ? "thing" : "things"} the assistant can now answer from.`
+          : "Everything of yours is already up to date."
+      )
+    } catch (err) {
+      toast.error(err instanceof ApiFailure ? err.message : "Couldn't read your Google material just now.")
+    } finally {
+      setSyncing(false)
+    }
   }
 
   async function disconnect() {
@@ -230,6 +299,15 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                           <Badge variant="outline" className="text-[10px]">
                             {s.shelf === "team" ? "The team can read it" : "Just you"}
                           </Badge>
+                          {/* AND WHOSE MATERIAL IT IS. The second decision made
+                           * at the moment of sharing, shown on the row for the
+                           * same reason the first one is: six months later,
+                           * "which client does the assistant think this is
+                           * about?" is a question somebody has to be able to
+                           * answer by looking. */}
+                          <Badge variant="outline" className="text-[10px]">
+                            {s.accountName ? `Filed under ${s.accountName}` : "Ours"}
+                          </Badge>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -263,12 +341,47 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
         </div>
       )}
 
+      {/* THE ONE SWEEP THAT CANNOT RUN ITSELF. Offered only when there is a live
+       * connection to read through and the caller may add to the knowledge base
+       * — the door demands both rights anyway, and a button that always refuses
+       * is worse than no button.
+       *
+       * `ready` is in the condition for a reason found by looking at the screen:
+       * without it, an environment whose OAuth app is not configured showed
+       * "Google connections aren't set up here" and a button offering to read
+       * through one, three lines apart. It is not merely untidy — reading needs a
+       * LIVE access token, and refreshing an expired one needs the OAuth app, so
+       * on a not-ready environment the button works until the first token expires
+       * and then fails with a message about something the person cannot fix. */}
+      {q.data?.ready && connections.length > 0 && can("knowledge", "create") && can("google", "read") && (
+        <div className="flex flex-col gap-1.5 rounded-xl border p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-sm font-medium">Let the assistant read what you have shared</span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={syncing || busy}
+              onClick={syncGoogle}
+              className="gap-1.5"
+            >
+              {syncing ? <Spinner /> : <RefreshCw className="size-3.5" aria-hidden />}
+              {syncing ? "Reading…" : "Bring it in"}
+            </Button>
+          </div>
+          <p className="text-muted-foreground text-xs">
+            Reads through YOUR connection only, so it has to be you who asks. Anything you shared with just
+            yourself stays answerable to you alone.
+          </p>
+        </div>
+      )}
+
       {sharing && (
         <GoogleSourceDialog
           open
           onOpenChange={(o) => !o && setSharing(null)}
           service={sharing}
           draftKey={`google-source:${sharing}`}
+          accountOptions={(accountsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
           onSubmit={async (values) => {
             await content.googleAddSource({ service: sharing, ...values })
             await refresh()

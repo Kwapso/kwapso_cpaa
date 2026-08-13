@@ -992,6 +992,46 @@ export type Task = {
   createdAt: string
   createdByName: string | null
 }
+
+/** The two states a meeting has. Cancelling is not a third one — it is the
+ * module's `delete`, and the row survives it. */
+export const MEETING_STATUSES = ["scheduled", "held"] as const
+export type MeetingStatus = (typeof MEETING_STATUSES)[number]
+
+/** A CONVERSATION WE HAD, or are about to have — the record Glide never kept.
+ * Its 350 meetings were folded into work logs, which kept the hours and lost the
+ * agenda; these two fields are why this is a record of its own. */
+export type Meeting = {
+  id: string
+  /** the short code a client quotes, when the meeting names one (BERG-M0007). */
+  ref: string | null
+  title: string
+  /** which client it is with. Null = an internal meeting of our own. */
+  accountId: string | null
+  accountName: string | null
+  /** why we meet, out of the settled taxonomy under Delivery method. */
+  purposeId: string | null
+  purposeName: string | null
+  /** what we mean to talk about, and what was decided. The two fields no other
+   * record in the app has anywhere to put. */
+  agenda: string | null
+  notes: string | null
+  location: string | null
+  startsAt: string
+  endsAt: string | null
+  status: MeetingStatus
+  heldAt: string | null
+  /** set once the meeting has been pushed to the caller's Google Calendar, so
+   * pressing the button twice cannot make a second entry. */
+  googleEventId: string | null
+  googleEventUrl: string | null
+  active: boolean
+  createdAt: string
+  creatorName: string | null
+  updatedAt: string | null
+  editorName: string | null
+}
+
 /* ─────────────────────── THE AGENCY'S OWN HOUSEKEEPING ──────────────────────
  * Four modules carrying the seven legacy tables that describe how the agency
  * runs ITSELF. Every one of these shapes has the same three closing fields —
@@ -1160,6 +1200,13 @@ export type GoogleSource = {
   externalId: string
   name: string
   shelf: GoogleShelf
+  /** WHICH CLIENT this folder or space is about — the compartment everything
+   * inside it is filed under when the knowledge base reads it. Null means the
+   * agency's own, exactly as it does on a knowledge source. Asked at the moment
+   * of naming, beside the shelf: both questions are about where the material
+   * ends up, and neither can be inferred from the material itself. */
+  accountId: string | null
+  accountName: string | null
   active: boolean
   createdAt: string
   creatorName: string | null
@@ -1184,4 +1231,10 @@ export type GoogleItem = {
    * back and ask. A `private` item may only ever be shown to its owner. */
   shelf: GoogleShelf
   ownerUserId: string
+  /** WHOSE MATERIAL IT IS — the client's, or nobody's. Carried on the item for
+   * the same reason the shelf is: the thing that knows which account a mail or a
+   * folder belongs to is the read that fetched it (the contact it was with, the
+   * folder it came out of), and asking again downstream would be guessing at
+   * text instead of reading a decision. Null = the agency's own compartment. */
+  accountId: string | null
 }

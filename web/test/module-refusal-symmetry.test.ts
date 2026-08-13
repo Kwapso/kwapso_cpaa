@@ -156,6 +156,14 @@ describe("a module refuses a client login on both halves, or on neither", () => 
     // no read half for this test to compare a write half against. What guards
     // them is that every door demanding one ALSO demands `google:edit`, and this
     // set already holds `google`.
+    //
+    // `meetings` joined the day the diary shipped, and it is the member whose
+    // exclusion would have been most tempting after `work`: a meeting is WITH a
+    // client, so a fence looks plausible. It is refused instead, because of what
+    // the row SAYS rather than who was in the room — the notes are our own record
+    // of a conversation, written for us and often about the client rather than
+    // for them, and a fence that showed a contact their own meetings would show
+    // them those notes.
     ).toEqual([
       "agent",
       "brand_assets",
@@ -165,6 +173,7 @@ describe("a module refuses a client login on both halves, or on neither", () => 
       "knowledge",
       "learning",
       "marketing",
+      "meetings",
       "selectable_data",
       "staff_profiles",
       "work",

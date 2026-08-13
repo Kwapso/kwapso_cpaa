@@ -38,6 +38,7 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
 
 import worker from "../src/index"
 import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
+import { INGEST_KINDS } from "../src/lib/knowledge-ingest"
 import { tokenise } from "../src/lib/knowledge-text"
 import type { KnowledgeAnswer } from "@shared/types"
 
@@ -203,11 +204,40 @@ describe.skipIf(!present)("the backfill, over the agency's own history", () => {
     // Counted off the DATABASE rather than off what the loader thinks it wrote:
     // the shared fixture ships accounts of its own, and an expectation built
     // from the loader's own tally would have quietly excused them.
-    const mirrorable =
-      one("SELECT COUNT(*) AS n FROM accounts WHERE deactivated_at IS NULL").n +
-      one("SELECT COUNT(*) AS n FROM learning WHERE deactivated_at IS NULL").n +
-      one("SELECT COUNT(*) AS n FROM help WHERE archived_at IS NULL").n
+    // AN ARCHIVED TICKET IS MIRRORED, NOT SKIPPED, and that is the point rather
+    // than an off-by-one. A row that leaves the part of the app its kind mirrors
+    // is written as a source and DEACTIVATED — the difference between "the
+    // assistant stops quoting it" and "the assistant quotes it forever because
+    // the sweep never visits it again". So the expectation counts every ticket,
+    // and the assertion below proves the archived ones arrived switched off.
+    //
+    // DERIVED FROM THE KINDS, not from a list written here. The sweep grew three
+    // more of them the day apps, stories and sprints started carrying summaries,
+    // and an expectation naming three tables would have gone on passing while
+    // silently describing a smaller app. Each kind names its own table.
+    const mirrorable = INGEST_KINDS.reduce((n: number, k: { table: string }) => {
+      const t = k.table
+      const live =
+        t === "help"
+          ? "SELECT COUNT(*) AS n FROM help"
+          : `SELECT COUNT(*) AS n FROM ${t} WHERE deactivated_at IS NULL`
+      try {
+        return n + one(live).n
+      } catch {
+        // the fixture does not ship this table — nothing to mirror from it
+        return n
+      }
+    }, 0)
     expect(stats.sources).toBe(mirrorable)
+    const archived = one("SELECT COUNT(*) AS n FROM help WHERE archived_at IS NOT NULL").n
+    if (archived > 0)
+      expect(
+        one(
+          `SELECT COUNT(*) AS n FROM knowledge_sources s JOIN help h ON h.id = s.origin_row_id
+            WHERE s.origin_table = 'help' AND h.archived_at IS NOT NULL AND s.deactivated_at IS NULL`
+        ).n,
+        "an archived ticket must arrive switched off — a live source the sweep will never revisit is quoted forever"
+      ).toBe(0)
     const dupes = one(
       `SELECT COUNT(*) AS n FROM (SELECT origin_table, origin_row_id FROM knowledge_sources
         WHERE origin_row_id IS NOT NULL GROUP BY 1, 2 HAVING COUNT(*) > 1)`

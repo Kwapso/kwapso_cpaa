@@ -1,0 +1,267 @@
+"use client"
+
+// MEETING FORM — arrange a conversation, or write it up afterwards.
+//
+// THE TWO LONG FIELDS ARE THE POINT. Everything above them (who with, when, why,
+// where) is the kind of thing every diary holds; the agenda and the notes are
+// what the previous system had nowhere to put, so it folded 350 meetings into
+// work logs and kept only the hours. The form asks for them in the order they
+// happen: the agenda before, the notes after.
+//
+// ITS DRAFT MATTERS more than most (R7). An agenda is typed while somebody is
+// still on the phone agreeing it, and notes are typed in the ten minutes before
+// the next call — both are moments where a mis-tap costs a conversation rather
+// than a field. FormShell (R4) + a per-session draft.
+
+import * as React from "react"
+
+import { Button } from "@kwapso/ui/registry/primitives/button/button"
+import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
+import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Input } from "@kwapso/ui/registry/primitives/input/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@kwapso/ui/registry/primitives/select/select"
+import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
+import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
+import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+import { defaultFieldConfig } from "@kwapso/ui/lib/config"
+
+import { ApiFailure } from "@/lib/api"
+import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
+import { useFormDraft } from "@shared/web/use-form-draft"
+
+/** Radix Select can't hold an empty value, so "nobody in particular" needs a
+ * sentinel — the same one the knowledge form uses for the agency's own material. */
+const NONE = "__none__"
+
+const titleField = { ...defaultFieldConfig, label: "What it is about", required: true }
+const whenField = { ...defaultFieldConfig, label: "When", required: true }
+const untilField = { ...defaultFieldConfig, label: "Until", required: false }
+const clientField = { ...defaultFieldConfig, label: "Who it is with", required: false }
+const purposeField = { ...defaultFieldConfig, label: "Why we are meeting", required: false }
+const whereField = { ...defaultFieldConfig, label: "Where", required: false }
+const agendaField = { ...defaultFieldConfig, label: "Agenda", required: false }
+const notesField = { ...defaultFieldConfig, label: "Notes", required: false }
+
+export type MeetingFormValues = {
+  title: string
+  startsAt: string
+  endsAt: string
+  accountId: string
+  purposeId: string
+  location: string
+  agenda: string
+  notes: string
+}
+
+/** A stored moment (ISO, UTC) → what `<input type="datetime-local">` wants, in the
+ * reader's OWN timezone. Doing it by hand rather than with `toISOString().slice`
+ * is the difference between "10:00" and "09:00" for anybody outside UTC — a
+ * meeting shown an hour out is a meeting somebody misses. */
+export function toLocalInput(iso: string | null | undefined): string {
+  if (!iso) return ""
+  const at = new Date(iso)
+  if (Number.isNaN(at.getTime())) return ""
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}T${pad(at.getHours())}:${pad(at.getMinutes())}`
+}
+
+/** …and back. The browser hands back a LOCAL wall-clock string with no zone on
+ * it, so `new Date(...)` reading it as local is exactly right — and the door
+ * stores the instant. */
+function toMoment(local: string): string {
+  if (!local) return ""
+  const at = new Date(local)
+  return Number.isNaN(at.getTime()) ? "" : at.toISOString()
+}
+
+export function MeetingFormDialog({
+  open,
+  onOpenChange,
+  onSubmit,
+  accountOptions,
+  purposeOptions,
+  initial,
+  draftKey,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSubmit: (values: MeetingFormValues) => Promise<void>
+  /** the clients this caller may file a meeting under — already fenced by their
+   * own read of the accounts door. */
+  accountOptions: { id: string; name: string }[]
+  /** why we meet, out of the settled taxonomy under Delivery method. */
+  purposeOptions: { id: string; name: string }[]
+  /** Present = EDIT mode (prefilled). */
+  initial?: Partial<MeetingFormValues>
+  draftKey?: string
+}) {
+  const isEdit = !!initial
+  const [values, setValues, clearDraft] = useFormDraft(
+    draftKey,
+    {
+      title: initial?.title ?? "",
+      startsAt: initial?.startsAt ?? "",
+      endsAt: initial?.endsAt ?? "",
+      accountId: initial?.accountId || NONE,
+      purposeId: initial?.purposeId || NONE,
+      location: initial?.location ?? "",
+      agenda: initial?.agenda ?? "",
+      notes: initial?.notes ?? "",
+    },
+    open
+  )
+  const [busy, setBusy] = React.useState(false)
+  const ready = values.title.trim() !== "" && values.startsAt !== ""
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!ready) return
+    setBusy(true)
+    try {
+      await onSubmit({
+        title: values.title.trim(),
+        startsAt: toMoment(values.startsAt),
+        endsAt: toMoment(values.endsAt),
+        accountId: values.accountId === NONE ? "" : values.accountId,
+        purposeId: values.purposeId === NONE ? "" : values.purposeId,
+        location: values.location.trim(),
+        agenda: values.agenda.trim(),
+        notes: values.notes.trim(),
+      })
+      clearDraft()
+      onOpenChange(false)
+    } catch (err) {
+      toast.error(
+        err instanceof ApiFailure ? err.message : isEdit ? "Couldn't save the meeting." : "Couldn't arrange that."
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <FormShellDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      busy={busy}
+      clearDraft={clearDraft}
+      onSubmit={submit}
+      title={<DialogTitle>{isEdit ? "Edit this meeting" : "New meeting"}</DialogTitle>}
+      subtitle={
+        <DialogDescription>
+          {isEdit
+            ? "Write up what was decided while it is still fresh — the notes are the part worth keeping."
+            : "A conversation, with what you mean to cover. You can add it to your own calendar afterwards."}
+        </DialogDescription>
+      }
+      footer={
+        <Button type="submit" disabled={busy || !ready}>
+          {busy ? <Spinner /> : null}
+          {busy ? "Saving…" : isEdit ? "Save changes" : "Put it in the diary"}
+        </Button>
+      }
+    >
+      <Field config={titleField} htmlFor="meeting-title" className={fieldSpacing}>
+        <Input
+          id="meeting-title"
+          value={values.title}
+          onChange={(e) => setValues((s) => ({ ...s, title: e.target.value }))}
+          placeholder="e.g. Quarterly review with Bergman"
+          disabled={busy}
+          autoFocus
+        />
+      </Field>
+      <Field config={whenField} htmlFor="meeting-when" className={fieldSpacing}>
+        <Input
+          id="meeting-when"
+          type="datetime-local"
+          value={values.startsAt}
+          onChange={(e) => setValues((s) => ({ ...s, startsAt: e.target.value }))}
+          disabled={busy}
+        />
+      </Field>
+      <Field config={untilField} htmlFor="meeting-until" className={fieldSpacing}>
+        <Input
+          id="meeting-until"
+          type="datetime-local"
+          value={values.endsAt}
+          onChange={(e) => setValues((s) => ({ ...s, endsAt: e.target.value }))}
+          disabled={busy}
+        />
+      </Field>
+      <Field config={clientField} htmlFor="meeting-client" className={fieldSpacing}>
+        <Select
+          value={values.accountId}
+          onValueChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
+          disabled={busy}
+        >
+          <SelectTrigger id="meeting-client">
+            <SelectValue placeholder="Nobody — it is ours" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NONE}>Nobody — it is ours</SelectItem>
+            {accountOptions.map((a) => (
+              <SelectItem key={a.id} value={a.id}>
+                {a.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+      <Field config={purposeField} htmlFor="meeting-purpose" className={fieldSpacing}>
+        <Select
+          value={values.purposeId}
+          onValueChange={(v) => setValues((s) => ({ ...s, purposeId: v }))}
+          disabled={busy}
+        >
+          <SelectTrigger id="meeting-purpose">
+            <SelectValue placeholder="Not said" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NONE}>Not said</SelectItem>
+            {purposeOptions.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+      <Field config={whereField} htmlFor="meeting-where" className={fieldSpacing}>
+        <Input
+          id="meeting-where"
+          value={values.location}
+          onChange={(e) => setValues((s) => ({ ...s, location: e.target.value }))}
+          placeholder="e.g. Their office, or a video call"
+          disabled={busy}
+        />
+      </Field>
+      <Field config={agendaField} htmlFor="meeting-agenda" className={fieldSpacing}>
+        <Textarea
+          id="meeting-agenda"
+          value={values.agenda}
+          onChange={(e) => setValues((s) => ({ ...s, agenda: e.target.value }))}
+          placeholder="What we mean to cover."
+          disabled={busy}
+          rows={3}
+        />
+      </Field>
+      <Field config={notesField} htmlFor="meeting-notes" className={fieldSpacing}>
+        <Textarea
+          id="meeting-notes"
+          value={values.notes}
+          onChange={(e) => setValues((s) => ({ ...s, notes: e.target.value }))}
+          placeholder="What was said and decided."
+          disabled={busy}
+          rows={4}
+        />
+      </Field>
+    </FormShellDialog>
+  )
+}

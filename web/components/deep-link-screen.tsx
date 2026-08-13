@@ -106,6 +106,7 @@ export function DeepLinkScreen() {
     sprintsQ,
     appsQ,
     tasksQ,
+    meetingsQ,
     marketingChannelOptions,
     marketingStatusOptions,
     brandCategoryOptions,
@@ -280,6 +281,7 @@ export function DeepLinkScreen() {
     sprints: totals.sprints,
     apps: totals.apps,
     tasks: totals.tasks,
+    meetings: totals.meetings,
     marketing: totals.marketing,
     brand_assets: totals.brand_assets,
     programmes: totals.programmes,
@@ -304,6 +306,7 @@ export function DeepLinkScreen() {
       sprints: sprintsQ.data,
       stories: storiesQ.data,
       tasks: tasksQ.data,
+      meetings: meetingsQ.data,
     },
   })
 
@@ -336,7 +339,7 @@ export function DeepLinkScreen() {
             noAccess, enabled, perms, can, module, recordId, teamId, canImport, go,
             overridesQ, metaQ, membersQ, rolesQ, roles, invitesQ, learningQ, helpQ, accountsQ, knowledgeQ, totals,
             marketingQ, brandQ, programmesQ, purposesQ, internalActivity,
-            storiesQ, sprintsQ, appsQ, tasksQ,
+            storiesQ, sprintsQ, appsQ, tasksQ, meetingsQ,
             activityQ, activityTotal, activityKey, activityScope, inviteAuditQ, teamName, active,
             rights, onAction, onIntent,
             sectionPath, helpScope, setHelpScope, myUserId, query, helpMineQ, helpArchivedQ,
@@ -402,6 +405,7 @@ function teamTabStrip(
     module === "sprints" ||
     module === "apps" ||
     module === "tasks" ||
+    module === "meetings" ||
     module === "marketing" ||
     module === "brand" ||
     module === "delivery" ||

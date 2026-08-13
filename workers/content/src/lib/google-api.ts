@@ -114,6 +114,12 @@ export async function driveList(
     url.searchParams.set("q", clauses.join(" and "))
     url.searchParams.set("pageSize", String(GOOGLE_PAGE_SIZE))
     url.searchParams.set("fields", "files(id,name,mimeType,modifiedTime,webViewLink)")
+    // ONE PAGE, so WHICH page matters. Newest-changed first is what a person
+    // scanning a folder wants, and it is what makes the knowledge sweep's window
+    // the RIGHT fifty files rather than an arbitrary fifty: a document edited
+    // this morning must not be invisible because the folder also holds two
+    // hundred that have not moved since 2023.
+    url.searchParams.set("orderBy", "modifiedTime desc")
     // Shared drives are ordinary folders to a person, so a folder somebody named
     // out of one must behave like any other.
     url.searchParams.set("supportsAllDrives", "true")
@@ -434,6 +440,12 @@ export type CalendarEvent = {
   start: string
   end: string
   url: string | null
+  /** Everybody invited, lower-cased. Carried because it is the ONE thing on an
+   * event that says whose material it is: an entry with a known contact on it is
+   * that client's, and an entry with nobody but us on it is ours. Without it the
+   * knowledge base would have to guess a client out of a meeting's title, which
+   * is the guess the compartment idea exists to avoid. */
+  attendees: string[]
 }
 
 export async function calendarList(
@@ -485,8 +497,18 @@ function toEvent(raw: unknown): CalendarEvent {
     start: str(start.dateTime) || str(start.date),
     end: str(end.dateTime) || str(end.date),
     url: str(e.htmlLink) || null,
+    // Bounded like every other list here: an event with two hundred guests is
+    // one somebody was BCC'd on, and reading all of them would make the cost of
+    // one calendar read a number a stranger sets.
+    attendees: (Array.isArray(e.attendees) ? e.attendees : [])
+      .slice(0, EVENT_ATTENDEE_CAP)
+      .map((a) => str((a as Record<string, unknown>).email).toLowerCase())
+      .filter(Boolean),
   }
 }
+
+/** Guests read off one event. R14's spirit on the other axis — see toEvent. */
+const EVENT_ATTENDEE_CAP = 50
 
 // ── GOOGLE CHAT ──────────────────────────────────────────────────────────────
 

@@ -241,6 +241,22 @@ export function traceFor(
       return { path: seg(teamId, "tasks"), highlight: "main" }
     case "set_task_done":
       return { path: `${seg(teamId, "tasks")}/${str(input, "id")}`, highlight: "main" }
+    // MEETINGS. A create lands on the diary, an edit on the meeting itself —
+    // and so does the calendar push, because the thing that changed HERE is the
+    // meeting's own "it is in your calendar" line. The entry it made is in
+    // Google, which is not a screen this app can ring.
+    case "create_meeting":
+      return { path: seg(teamId, "meetings"), highlight: "main" }
+    case "update_meeting":
+    case "set_meeting_held":
+    case "set_meeting_active":
+      return { path: `${seg(teamId, "meetings")}/${str(input, "id")}`, highlight: "main" }
+    case "add_meeting_to_calendar":
+      return { path: `${seg(teamId, "meetings")}/${str(input, "meetingId")}`, highlight: "main" }
+    // Bringing somebody's own Google material in lands on the knowledge base,
+    // where the sources it just filed are listed and the sync state is read.
+    case "sync_google_knowledge":
+      return { path: seg(teamId, "knowledge"), highlight: "main" }
     // The rota and the unread backlog are both read on the Tickets screen — the
     // triage strip sits above the list, which is where "what is waiting" belongs.
     case "set_triage_duty":

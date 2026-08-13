@@ -156,6 +156,8 @@ type SourceRow = {
   external_id: string
   name: string
   shelf: string
+  account_id: string | null
+  account_name: string | null
   deactivated_at: string | null
   created_at: string
   creator_name: string | null
@@ -163,7 +165,8 @@ type SourceRow = {
   editor_name: string | null
 }
 
-const SOURCE_COLUMNS = `id, connection_id, user_id, service, external_id, name, shelf,
+const SOURCE_COLUMNS = `id, connection_id, user_id, service, external_id, name, shelf, account_id,
+                        (SELECT a.name FROM accounts a WHERE a.id = google_sources.account_id) AS account_name,
                         deactivated_at, created_at, creator_name, updated_at, editor_name`
 
 function toSource(r: SourceRow): GoogleSource {
@@ -175,6 +178,8 @@ function toSource(r: SourceRow): GoogleSource {
     externalId: r.external_id,
     name: r.name,
     shelf: r.shelf as GoogleShelf,
+    accountId: r.account_id,
+    accountName: r.account_name,
     active: r.deactivated_at === null,
     createdAt: r.created_at,
     creatorName: r.creator_name,
@@ -354,7 +359,17 @@ export async function addNamedSource(
   cfg: D1Rest,
   guard: MemberGuard,
   actor: Actor,
-  input: { service: GoogleNamedService; externalId: string; name: string; shelf: GoogleShelf }
+  input: {
+    service: GoogleNamedService
+    externalId: string
+    name: string
+    shelf: GoogleShelf
+    /** which client this folder or space is about — null for the agency's own.
+     * It is the COMPARTMENT everything inside it is filed under when the
+     * knowledge base reads it, which is why the screen asks for it here rather
+     * than guessing from the contents later. */
+    accountId?: string | null
+  }
 ): Promise<string> {
   const connection = await activeConnection(cfg, guard, input.service)
   if (!connection)
@@ -384,15 +399,29 @@ export async function addNamedSource(
   )
   if (existing[0]) return existing[0].id
 
+  // A folder filed under a client has to name one this team really has, for the
+  // reason lib/knowledge.ts gives about a source: a compartment built from an id
+  // nobody owns is a slice of the knowledge base nothing can ever reach again.
+  if (input.accountId) {
+    const rows = await d1Query<{ id: string }>(
+      cfg,
+      guard.databaseId,
+      // R14: one row by primary key.
+      "SELECT id FROM accounts WHERE id = ? LIMIT 1",
+      [input.accountId]
+    )
+    if (!rows[0]) throw new GuardError(404, "not_found", "That account doesn't exist.")
+  }
+
   const id = ulid()
   const now = new Date().toISOString()
   await d1ExecScript(
     cfg,
     guard.databaseId,
-    `INSERT INTO google_sources (id, connection_id, user_id, service, external_id, name, shelf,
+    `INSERT INTO google_sources (id, connection_id, user_id, service, external_id, name, shelf, account_id,
         created_at, creator_id, creator_email, creator_name)
      VALUES (${sqlString(id)}, ${sqlString(connection.id)}, ${sqlString(guard.userId)}, ${sqlString(input.service)},
-        ${sqlString(input.externalId)}, ${sqlString(input.name)}, ${sqlString(input.shelf)},
+        ${sqlString(input.externalId)}, ${sqlString(input.name)}, ${sqlString(input.shelf)}, ${sqlString(input.accountId ?? null)},
         ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
   )
   await logActivity(cfg, guard.databaseId, actor, {

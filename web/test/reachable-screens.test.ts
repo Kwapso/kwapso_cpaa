@@ -171,6 +171,11 @@ describe("the screens are reachable", () => {
      * Between them these two holes hid BOTH rate cards' create doors — delete the
      * "New rate" button and this check said fine. */
     const WRITES = /\bpost\(|method:\s*"(?:POST|PUT|PATCH|DELETE)"/
+    /** Does this function body call THIS door — the whole path, and as a write?
+     * Two holes lived here. A path was matched as a PREFIX, so
+     * `/api/content/knowledge/sync-google` counted as a call to
+     * `/api/content/knowledge/sync`; and a path is not a door — the same string
+     * is a GET and a POST, so the reading twin vouched for the writing one. */
     const reaches = (path: string, body: string) =>
       new RegExp(`${path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=["\`?]|\\$\\{)`).test(body) &&
       WRITES.test(body)
@@ -220,7 +225,17 @@ describe("the screens are reachable", () => {
         // Which api method posts to this door, and is that method called from a
         // screen? Either hop missing is the same failure with two faces: no
         // plumbing, or plumbing nobody can reach.
+        // A WHOLE PATH, not a prefix of one. `body.includes(path)` counted
+        // `/api/content/knowledge/sync-google` as a call to
+        // `/api/content/knowledge/sync`, so wiring a button to the LONGER door
+        // silently marked the shorter one as pressed — and this suite's own
+        // ratchet then demanded the deletion of a true NO_CONTROL line. A door
+        // path ends where the URL literal does: a closing quote or backtick, or
+        // the `?` that starts a query string.
+        // Through the one matcher above, which knows both holes: a whole path,
+        // and only a body that actually WRITES.
         const callers = [...bodyOf].filter(([, body]) => reaches(path, body)).map(([name]) => name)
+
         if (!callers.some((name) => new RegExp(`\\.${name}\\s*\\(`).test(screens)))
           unpressed.push(`${method} ${path}`)
       }

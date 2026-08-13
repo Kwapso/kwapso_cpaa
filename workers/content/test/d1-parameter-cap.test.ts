@@ -57,6 +57,11 @@ describe("no statement can bind more parameters than D1 accepts", () => {
       // BASE-IMPROVEMENTS.md.
       unique: "user ids to notify — bounded by team size, which is not a hard bound",
       ids: "the same, one frame earlier in notify.ts — same bound, same admission",
+      // PROVEN, like the two at the top rather than the two admitted above it:
+      // the sync-state read names INGEST_KINDS (three, fixed in code) plus the
+      // caller's own Google state keys (GOOGLE_SERVICES, four, fixed in code).
+      // Seven, and neither list can grow without an edit to a `const` array.
+      keys: "the ingest state keys — INGEST_KINDS (3) plus one per GOOGLE_SERVICE (4), both fixed at author time",
       FLIPPABLE:
         "a module-level constant: the ticket statuses a Ready flip may move from. " +
         "Five strings, fixed at author time — the one list here that is provably small.",

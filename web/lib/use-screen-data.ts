@@ -21,6 +21,7 @@ import {
   helpKey,
   knowledgeKey,
   listFetch,
+  meetingsKey,
   marketingKey,
   programmesKey,
   purposesKey,
@@ -137,6 +138,13 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
   const tasksQ = useCached(enabled && module === "tasks" ? tasksKey(teamId as string) : null, () =>
     listFetch.tasks(teamId as string)
   )
+  // THE DIARY. Loaded only on its own section, cache-first + row-level live. R14:
+  // PAGED like tickets and sources — page one lands here and its next cursor in
+  // the sidecar <LoadMore> reads. The RECORD screen reads through this same key
+  // and falls back to a by-id read when the loaded prefix doesn't reach it.
+  const meetingsQ = useCached(enabled && module === "meetings" ? meetingsKey(teamId as string) : null, () =>
+    listFetch.meetings(teamId as string)
+  )
   // ── THE AGENCY'S OWN HOUSEKEEPING ────────────────────────────────────────
   // Four capped collections, each loaded only on its own module (cache-first +
   // row-level live). The Delivery method screen shows BOTH of its collections at
@@ -190,6 +198,7 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
     sprints: useCachedValue<number>(enabled ? totalKey("sprints", teamId as string) : null),
     apps: useCachedValue<number>(enabled ? totalKey("apps", teamId as string) : null),
     tasks: useCachedValue<number>(enabled ? totalKey("tasks", teamId as string) : null),
+    meetings: useCachedValue<number>(enabled ? totalKey("meetings", teamId as string) : null),
     // The agency's own housekeeping — the exact server totals the sidebar badges
     // and the collection headings show, primed by the fetchers above.
     marketing: useCachedValue<number>(enabled ? totalKey("marketing", teamId as string) : null),
@@ -286,6 +295,7 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
     sprintsQ,
     appsQ,
     tasksQ,
+    meetingsQ,
     membersQ,
     rolesQ,
     invitesQ,
