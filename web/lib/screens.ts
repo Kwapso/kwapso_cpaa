@@ -78,9 +78,16 @@ export const MODULE_PERMISSION: Record<string, string> = {
   // bigger decision than editing a phone number).
   accounts: "accounts",
   // Process maps: the segment IS the module. `commercials` is a second gate ON
-  // the same screens (the money panels on an account), never a screen of its own
-  // — what an account is charged is a bigger decision than how long a step takes.
+  // these screens as well (the rate card on an account), because what a client is
+  // charged is a bigger decision than how long a step takes.
   processes: "processes",
+  // …and `commercials` has ONE screen of its own: our own cost card. Both halves
+  // of the money gate on this single module, and they are reached in two
+  // different places on purpose — an ACCOUNT's rate card is a tab on that
+  // account's record (the question is always about one client), and OUR OWN cost
+  // card is this team-wide tab, which no client login can reach at any hostname
+  // (R23 · SCOPE, and workers/tenancy/src/lib/internal-money.ts says why).
+  "internal-rates": "commercials",
   // THE WORK ENGINE, as four segments over two modules. Stories, sprints and
   // tasks all gate on `work` — they are one permission and three nouns, exactly
   // as the delivery method is one permission and two. Apps gate on `processes`

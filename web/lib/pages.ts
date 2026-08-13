@@ -54,6 +54,13 @@ export type TeamSection = {
     | "roles"
     | "invites"
     | "dropdowns"
+    // WHAT OUR OWN HOUR COSTS US — the agency's own cost card, as a tab on the
+    // team area beside the other admin sections. A TAB rather than a sidebar
+    // page because it is one small settled list somebody sets and leaves, not a
+    // destination anybody opens in a working day. Its twin — what an ACCOUNT is
+    // charged — is deliberately NOT here: that card lives on the account's own
+    // record, because the question is always about one client (R23 · SCOPE).
+    | "internal-rates"
     | "accounts"
     | "learning"
     | "tickets"
@@ -109,6 +116,12 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // Dropdown values ("selectable data") — managed on the team page, a tab beside
   // the other admin sections. Gated by the selectable_data module.
   { key: "dropdowns", title: "Dropdown values", module: "selectable_data", segment: "dropdowns", placement: "tab", countCacheKey: "selectable" },
+  // Internal rates — gated on `commercials`, so a role without that read right
+  // never sees the tab at all. The segment says `internal-rates` in full rather
+  // than `rates`: an ambiguous URL is how somebody eventually wires the wrong
+  // card to it, and the two cards are the one pair in this app where mixing them
+  // up is a rule broken rather than a bug (R23).
+  { key: "internal-rates", title: "Internal rates", module: "commercials", segment: "internal-rates", placement: "tab", countCacheKey: "internal_rates" },
   // Accounts — the companies and people the team works with (the customer spine,
   // SCOPE ch.03). A first-class SIDEBAR page: it's the day's work, not an admin
   // setting. Its count is an exact server total (R16) keyed off the same
@@ -203,6 +216,10 @@ export const CONCEPT_ICON = {
   roles: "shield-half",
   invites: "mail",
   dropdowns: "list",
+  // The money, both halves. ONE icon, because a rate is a rate wherever it is
+  // read — the audiences differ, the concept does not (UI-CONVENTIONS §4: a
+  // concept gets one icon, reused at page, tab and button level).
+  "internal-rates": "banknote",
   // The customer spine's own vocabulary: an account, the people on it, and a login.
   accounts: "building-2",
   contacts: "contact",

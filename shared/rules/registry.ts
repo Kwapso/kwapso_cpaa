@@ -846,4 +846,14 @@ export const FORM_DIALOGS = [
   // a half-typed answer to "who may read this" must not be lost to a mis-tap and
   // re-guessed.
   "google-source-dialog",
+  // THE MONEY. One rate form serving both cards — what an account is charged and
+  // what our own hour costs us — because it is a label and a number and knows
+  // nothing else: no door, no table, no audience. The two CARDS are two files
+  // calling two door sets, which is where R23's separation actually lives (see
+  // the header of rate-form-dialog.tsx for what would make sharing it wrong).
+  "rate-form-dialog",
+  // Writing a reply into somebody's own Gmail. It gets the draft rule for the
+  // plainest reason of all: what is typed into it is a letter to a client, and
+  // pressing its second button sends that letter out of the building.
+  "mail-reply-dialog",
 ] as const

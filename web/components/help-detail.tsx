@@ -26,9 +26,10 @@ import {
   type TicketMember,
   type TicketStatus,
 } from "@kwapso/ui/registry/collections/ticket-thread/ticket-thread"
-import { ArchiveRestore, ArrowDown, ArrowUp, Archive, Hammer, Languages, Pencil, Send } from "lucide-react"
+import { ArchiveRestore, ArrowDown, ArrowUp, Archive, Hammer, Languages, Mail, Pencil, Send } from "lucide-react"
 
 import type {
+  Account,
   HelpMessage,
   HelpStakeholder,
   HelpTicket,
@@ -46,13 +47,14 @@ import { formatCount } from "@shared/web/format-count"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
 import { HelpFormDialog } from "@/components/help-form-dialog"
 import { LoadMore } from "@/components/load-more"
+import { MailReplyDialog } from "@/components/mail-reply-dialog"
 import { HelpStakeholders } from "@/components/help-stakeholders"
 import { HelpStatusStepper, type HelpStatusValue } from "@/components/help-status-stepper"
 import { ResolveDialog, type ResolveFormValues } from "@/components/resolve-dialog"
 import { StoryFormDialog } from "@/components/story-form-dialog"
 import { createStoryFrom, useStoryFormOptions } from "@/components/stories-screen"
 import { StoriesPanel, sliceKey } from "@/components/work-panels"
-import { totalKey } from "@/lib/live-resources"
+import { accountsKey, totalKey } from "@/lib/live-resources"
 import { CONCEPT_ICON } from "@/lib/pages"
 
 // LIBRARY ⇄ SERVER status. These were one-to-one until the work engine gave the
@@ -133,6 +135,12 @@ export function HelpDetailScreen({
   // may read and answer requests is not necessarily a person who may put things
   // on the team's backlog, and all three routes to a story respect that.
   const canWriteWork = can("work", "create")
+  // REPLYING FROM YOUR OWN MAILBOX. `google:edit` is "you may use your own
+  // connection"; the send half needs the owner's second switch as well, and the
+  // dialog asks for it separately — writing a draft changes nothing outside the
+  // building, sending it does.
+  const canMail = can("google", "edit")
+  const canSendMail = can("google_mail", "create")
 
   const [tab, setTab] = React.useState("conversation")
   const [editing, setEditing] = React.useState(false)
@@ -150,9 +158,16 @@ export function HelpDetailScreen({
   // it. Held in state rather than the URL because it is a suggestion, not a
   // destination: dismissing it should not be a page in the back history.
   const [promptStory, setPromptStory] = React.useState(false)
+  const [mailing, setMailing] = React.useState(false)
   const [ranking, setRanking] = React.useState(false)
   const options = useStoryFormOptions(teamId)
   const host = { base: basePath.replace(/\/tickets$/, "") }
+  // WHO TO WRITE TO, when we already know. A cache READ, never a fetch: if the
+  // accounts list is warm (you came through it, or the assistant loaded it) the
+  // client's address fills itself in; if it is cold, or their account sits past
+  // page one, the box is simply empty and a person types it. Costing every
+  // ticket screen a round-trip to save one line of typing is the wrong trade.
+  const accounts = useCachedValue<Account[]>(accountsKey(teamId))
 
   // Land on the newest reply, and follow the one you just sent — the same
   // behaviour the client gets on their side of this same conversation, from the
@@ -424,6 +439,23 @@ export function HelpDetailScreen({
               Answer
             </Button>
           )}
+          {/* REPLY BY EMAIL — the owner's own sentence, as a control: write it
+              into your Gmail drafts and click through to it there, or send it
+              from here. It is beside Answer rather than replacing it, because
+              they are different acts: Answer resolves the request and emails the
+              resolution; this is one letter to one person, out of your own
+              mailbox, leaving the ticket exactly where it is. */}
+          {canMail && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setMailing(true)}
+              className="shrink-0 gap-1.5"
+            >
+              <Mail className="size-3.5" />
+              Reply by email
+            </Button>
+          )}
           {/* MAKE IT A STORY — the first of the three ways (the owner asked for
               all three): a button on the ticket. It opens the story form with
               THIS request already filled in, so the link cannot be mistyped. */}
@@ -631,6 +663,22 @@ export function HelpDetailScreen({
           invalidate(`help:${teamId}`)
           setPromptStory(false)
         }}
+      />
+
+      {/* The subject carries the reference number the client quotes, when the
+          ticket has one — it is the whole reason that number exists. The body
+          starts from our own working text if there is any, because the alternative
+          is somebody retyping what the app already wrote down. */}
+      <MailReplyDialog
+        open={mailing}
+        onOpenChange={setMailing}
+        draftKey={`help:mail:${helpId}`}
+        defaultTo={
+          (accounts ?? []).find((a) => a.id === ticket.accountId)?.email ?? ""
+        }
+        defaultSubject={ticket.ref ? `${ticket.ref} · ${ticket.description}` : ticket.description}
+        defaultBody={ticket.draftResolution ?? ""}
+        canSend={canSendMail}
       />
 
       <HelpFormDialog

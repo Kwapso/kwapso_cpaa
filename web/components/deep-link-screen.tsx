@@ -271,6 +271,7 @@ export function DeepLinkScreen() {
     member_roles: totals.member_roles,
     invites: totals.invites,
     selectable: totals.selectable,
+    internal_rates: totals.internal_rates,
     learning: totals.learning,
     help: totals.help,
     accounts: totals.accounts,
@@ -391,6 +392,7 @@ function teamTabStrip(
     module === "roles" ||
     module === "invites" ||
     module === "dropdowns" ||
+    module === "internal-rates" ||
     module === "accounts" ||
     module === "learning" ||
     module === "tickets" ||

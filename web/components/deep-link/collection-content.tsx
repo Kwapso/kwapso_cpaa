@@ -245,6 +245,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         rights={rights}
         total={totals.stories}
         canCreate={can("work", "create")}
+        canEditTime={can("work", "edit")}
         onAction={onAction}
         onIntent={onIntent}
       />

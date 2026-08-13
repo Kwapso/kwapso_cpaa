@@ -24,7 +24,8 @@ import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
-import { ApiFailure } from "@/lib/api"
+import { ApiFailure, content } from "@/lib/api"
+import { FilePicker } from "@/components/file-picker"
 import { useFormDraft } from "@shared/web/use-form-draft"
 
 export type CertificateValues = {
@@ -119,7 +120,22 @@ export function CertificateFormDialog({
       {input("issuer", "Who issued it?", "text", "e.g. Cloudflare")}
       {input("issuedOn", "Granted on", "date")}
       {input("expiresOn", "Lapses on", "date")}
-      {input("fileUrl", "The certificate itself", "text", "A link, or the URL of a file you uploaded")}
+      {/* THE PIECE OF PAPER. A certificate recorded without it is somebody's
+          word for it — and until now that was the only thing this form could
+          hold, because the upload door had no control anywhere. */}
+      <Field
+        config={{ ...defaultFieldConfig, label: "The certificate itself", required: false }}
+        htmlFor="cert-file"
+        className={fieldSpacing}
+      >
+        <FilePicker
+          id="cert-file"
+          value={values.fileUrl}
+          onChange={(url) => setValues((v) => ({ ...v, fileUrl: url }))}
+          upload={(dataUrl) => content.uploadStaffFile(dataUrl).then((r) => r.url)}
+          disabled={busy}
+        />
+      </Field>
     </FormShellDialog>
   )
 }

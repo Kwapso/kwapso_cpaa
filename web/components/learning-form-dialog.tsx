@@ -27,11 +27,12 @@ import {
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
-import { Paperclip, X } from "lucide-react"
+import { X } from "lucide-react"
 
 import { ApiFailure, content } from "@/lib/api"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
+import { FilePicker } from "@/components/file-picker"
 import { ManageDropdownsLink } from "@/components/manage-dropdowns-link"
 
 const titleField = { ...defaultFieldConfig, label: "Title", required: true }
@@ -55,18 +56,6 @@ function acceptFor(t: string): string {
   if (v.includes("image")) return "image/*"
   if (v.includes("audio")) return "audio/*"
   return "*/*"
-}
-
-const MAX_UPLOAD_BYTES = 25 * 1024 * 1024 // 25 MB client cap
-
-// Read a File to a raw base64 data URL (no canvas re-encode — lossless).
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = () => reject(reader.error ?? new Error("read failed"))
-    reader.readAsDataURL(file)
-  })
 }
 
 /** What the form prefills from / submits — the editable surface of a Learning. */
@@ -115,39 +104,8 @@ export function LearningFormDialog({
   // `seed` re-keys the uncontrolled rich-text editor so it remounts with the draft.
   const [values, setValues, clearDraft, seed] = useFormDraft(draftKey, initialValues, open)
   const [busy, setBusy] = React.useState(false)
-  const [uploading, setUploading] = React.useState(false)
-  // The chosen file's name, for the "uploaded" chip (contentLink holds the URL).
-  const [fileName, setFileName] = React.useState("")
-  const fileInputRef = React.useRef<HTMLInputElement>(null)
-
   // This content type is an uploaded file, so swap the link Input for the picker.
   const wantsFile = values.contentType !== NONE && isFileType(values.contentType)
-
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    e.target.value = "" // let the same file be re-picked after a remove
-    if (!file) return
-    if (file.size > MAX_UPLOAD_BYTES) {
-      toast.error("That file is over 25 MB — please pick a smaller one.")
-      return
-    }
-    setUploading(true)
-    try {
-      const dataUrl = await readFileAsDataUrl(file)
-      const { url } = await content.uploadLearningFile(dataUrl, file.name)
-      setValues((v) => ({ ...v, contentLink: url }))
-      setFileName(file.name)
-    } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't upload that file.")
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  function removeFile() {
-    setValues((v) => ({ ...v, contentLink: "" }))
-    setFileName("")
-  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -275,48 +233,19 @@ export function LearningFormDialog({
 
       {wantsFile ? (
         // File-type content: upload the file itself (stored on R2, served from
-        // /media) instead of pasting an external link.
+        // /media) instead of pasting an external link — through the one upload
+        // control every form in the app now shares (components/file-picker).
         <Field config={fileField} htmlFor="learning-file" className={fieldSpacing}>
-          {values.contentLink ? (
-            <div className="flex items-center gap-2 rounded-lg border bg-card p-2 text-sm">
-              <Paperclip className="text-muted-foreground size-4 shrink-0" />
-              <span className="min-w-0 flex-1 truncate">{fileName || "Uploaded file"}</span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={removeFile}
-                disabled={busy || uploading}
-                className="text-muted-foreground h-auto shrink-0 px-2 py-1"
-              >
-                Remove
-              </Button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <input
-                ref={fileInputRef}
-                id="learning-file"
-                type="file"
-                accept={acceptFor(values.contentType)}
-                onChange={(e) => void handleFile(e)}
-                disabled={busy || uploading}
-                className="hidden"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={busy || uploading}
-                className="gap-1.5"
-              >
-                {uploading ? <Spinner /> : <Paperclip className="size-3.5" />}
-                {uploading ? "Uploading…" : "Choose a file"}
-              </Button>
-              <span className="text-muted-foreground text-xs">Up to 25 MB.</span>
-            </div>
-          )}
+          <FilePicker
+            id="learning-file"
+            value={values.contentLink}
+            onChange={(url) => setValues((v) => ({ ...v, contentLink: url }))}
+            upload={(dataUrl, name) =>
+              content.uploadLearningFile(dataUrl, name).then((r) => r.url)
+            }
+            accept={acceptFor(values.contentType)}
+            disabled={busy}
+          />
         </Field>
       ) : (
         <Field config={linkField} htmlFor="learning-link" className={fieldSpacing}>
