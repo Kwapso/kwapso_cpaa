@@ -34,6 +34,7 @@ import { AppDetailScreen } from "@/components/app-detail"
 import { SprintDetailScreen } from "@/components/sprint-detail"
 import { StoryDetailScreen } from "@/components/story-detail"
 import { ImportScreen } from "@/components/import-screen"
+import { InternalRateCardScreen } from "@/components/internal-rate-card"
 import { StaffPanel } from "@/components/staff-panel"
 import { SelectableScreen } from "@/components/selectable-screen"
 import { NoAccess, NotFound, LoadError } from "@/components/deep-link/screen-bits"
@@ -193,6 +194,13 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     const permKey = module ? MODULE_PERMISSION[module] : undefined
     if (!permKey) return <NotFound />
     if (!can(permKey, "read")) return <NoAccess />
+
+    // WHAT OUR OWN HOUR COSTS US. A team-wide screen with no record level: the
+    // card IS the collection, so it is handled here rather than falling through
+    // to the list/detail split below. Its twin — what an ACCOUNT is charged —
+    // is a tab on the account's own record and a different file entirely, which
+    // is the shape Law R23 is about (internal-rate-card.tsx says why).
+    if (module === "internal-rates") return <InternalRateCardScreen teamId={teamId as string} />
 
     // Team overview ----------------------------------------------------------
     if (module === "team") {

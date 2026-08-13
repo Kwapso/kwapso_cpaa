@@ -149,6 +149,31 @@ describe("the screens are reachable", () => {
     // to the next declaration rather than to the end of the line.
     const methods = [...apiSrc.matchAll(/^ {2}(\w+):\s*[(<]/gm)]
     expect(methods.length, "the api-method scan found almost nothing").toBeGreaterThan(40)
+    /** WHICH METHOD POSTS TO THIS DOOR — and the two ways that question used to be
+     * answered wrongly, both found by sabotaging a control and watching this check
+     * stay green.
+     *
+     *   • A PATH ENDS WHERE ITS STRING DOES. A plain `includes` is a prefix test,
+     *     so `/api/tenancy/rates` matched `/api/tenancy/rates/update` too, and the
+     *     stem door read as pressed the moment any sibling was.
+     *   • A PATH IS NOT A DOOR. `/api/tenancy/rates` is TWO doors — a GET that
+     *     reads the card and a POST that adds to it — and the reading method is
+     *     called from a screen on every card that renders. So the write door read
+     *     as pressed by the read door's own caller.
+     *
+     * What separates them is that the body SAYS it is a write — in either of the
+     * two ways this api layer writes one: the shared `post()` helper
+     * (shared/web/api.ts), or the inline `{ method: "POST", … }` the older tenancy
+     * methods still use. Both are here because both are real; matching only the
+     * helper called sixteen live doors unreachable, which is the same kind of
+     * wrong answer in the other direction.
+     *
+     * Between them these two holes hid BOTH rate cards' create doors — delete the
+     * "New rate" button and this check said fine. */
+    const WRITES = /\bpost\(|method:\s*"(?:POST|PUT|PATCH|DELETE)"/
+    const reaches = (path: string, body: string) =>
+      new RegExp(`${path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=["\`?]|\\$\\{)`).test(body) &&
+      WRITES.test(body)
     const bodyOf = new Map<string, string>()
     methods.forEach((m, i) => {
       const from = m.index as number
@@ -195,7 +220,7 @@ describe("the screens are reachable", () => {
         // Which api method posts to this door, and is that method called from a
         // screen? Either hop missing is the same failure with two faces: no
         // plumbing, or plumbing nobody can reach.
-        const callers = [...bodyOf].filter(([, body]) => body.includes(path)).map(([name]) => name)
+        const callers = [...bodyOf].filter(([, body]) => reaches(path, body)).map(([name]) => name)
         if (!callers.some((name) => new RegExp(`\\.${name}\\s*\\(`).test(screens)))
           unpressed.push(`${method} ${path}`)
       }
@@ -257,28 +282,10 @@ const NO_CONTROL: Record<string, string> = {
     "FOR A MACHINE. Posting into a named space is an act the assistant performs on request; a person is already in the space. The owner asked for read AND post, and the post half is the assistant's.",
 
   /* ── a gap, owned by another lane ──────────────────────────────────────── */
-  "POST /api/content/google/gmail/draft":
-    "A GAP, and a named one. The owner asked for exactly this in words: 'a clear link or a very nice UI when the agent is done, so that I can just click inside of the kwapso app and it takes me to my Gmail.' The draft is written and its Gmail link is returned; nothing on any screen yet shows it to a person. The GOOGLE lane owns it.",
-  "POST /api/content/google/gmail/send":
-    "A GAP, the other half of the same sentence: 'Or I can just say send it from kwapso and it sends it.' The door demands the two act permissions of a person exactly as of the assistant, so the control is safe to draw — it just is not drawn. The GOOGLE lane owns it.",
-
-
-  "POST /api/content/work-logs/update":
-    "A GAP (the time lane). Correcting a row of time — its duration, its kind of work, whether it is billable — has a door and no control: the time panel lists the week and cannot fix a line in it, so a mistyped hour can only be repaired by the assistant.",
-  "POST /api/content/brand-assets/upload":
-    "A GAP (the housekeeping lane). The brand library holds the material everything else is made with, and its form has no file field — an asset can be described here and only uploaded through the machine surface.",
-  "POST /api/content/staff/profiles/active":
-    "A GAP (the staff lane). A profile can be written and edited on the member's page and never retired, so a colleague who leaves keeps a live profile.",
-  "POST /api/content/staff/upload":
-    "A GAP (the staff lane). The same form's file half — a certificate can be recorded without the piece of paper behind it.",
-  "POST /api/tenancy/rates":
-    "A GAP (the money lane). The ACCOUNT rate card — what a client is charged per hour, by kind of work — has three doors, a live-sync listener, a cache key and no screen at all. Nobody at the agency can see or set a price without asking the assistant.",
-  "POST /api/tenancy/rates/update": "A GAP (the money lane) — see POST /api/tenancy/rates above.",
-  "POST /api/tenancy/rates/active": "A GAP (the money lane) — see POST /api/tenancy/rates above.",
-  "POST /api/tenancy/internal-rates":
-    "A GAP (the money lane). The agency's OWN cost card, which the margin is computed from. It is the half of the money that R24 keeps out of the portal, and it has no screen on our side either — so the figure every margin depends on can only be set by a machine.",
-  "POST /api/tenancy/internal-rates/update":
-    "A GAP (the money lane) — see POST /api/tenancy/internal-rates above.",
-  "POST /api/tenancy/internal-rates/active":
-    "A GAP (the money lane) — see POST /api/tenancy/internal-rates above.",
+  // EMPTY, and that is the point of the two headings staying here. Twelve doors
+  // sat under this one — both rate cards, the two halves of the Gmail sentence
+  // the owner asked for in words, a correction to a row of time, two uploads and
+  // a profile nobody could retire — and each of them now has something a person
+  // can press. What is left above is not a backlog: every line up there says a
+  // MACHINE is the caller, which is a decision rather than a gap.
 }

@@ -17,7 +17,7 @@ import * as React from "react"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { AlarmClockOff, CircleStop, Clock, Play, Plus, Trash2 } from "lucide-react"
+import { AlarmClockOff, CircleStop, Clock, Pencil, Play, Plus, Trash2 } from "lucide-react"
 
 import { LoadMore } from "@/components/load-more"
 import { clockFrom } from "@/components/timer-bar"
@@ -42,7 +42,17 @@ function line(l: WorkLog): string {
     .join(" · ")
 }
 
-export function TimePanel({ teamId, canCreate }: { teamId: string; canCreate: boolean }) {
+export function TimePanel({
+  teamId,
+  canCreate,
+  canEdit,
+}: {
+  teamId: string
+  canCreate: boolean
+  /** `work:edit` — a step above logging your own, because correcting a row of
+   * time changes a number somebody else may already have read. */
+  canEdit: boolean
+}) {
   const logsQ = useCached<WorkLog[]>(workLogsKey(teamId), () => listFetch.workLogs(teamId))
   const timersQ = useCached<RunningTimer[]>(runningTimersKey(teamId), () =>
     contentApi.runningTimers().then((r) => r.timers)
@@ -51,6 +61,10 @@ export function TimePanel({ teamId, canCreate }: { teamId: string; canCreate: bo
   // never the loaded page's length, which on a paged list is just "50" for ever.
   const totalSeconds = useCachedValue<number>(totalKey("work-seconds", teamId))
   const [addOpen, setAddOpen] = React.useState(false)
+  // THE ROW BEING CORRECTED. Held rather than routed through the URL because a
+  // correction is a thing you do to a line you are looking at — Back should
+  // close the form, not walk you through every line you opened.
+  const [editing, setEditing] = React.useState<WorkLog | null>(null)
   // THE ONE CLICK. The caller's own open work, with a Start beside each — the
   // acceptance bar BUILD-1 §5 sets, and the reason this strip exists rather than
   // a "log time" form being the only way in. Their OWN, because a list of
@@ -85,10 +99,29 @@ export function TimePanel({ teamId, canCreate }: { teamId: string; canCreate: bo
       startedAt: values.startedAt,
       endedAt: values.endedAt,
       note: values.note || undefined,
+      kind: values.kind || undefined,
       billable: values.billable,
     })
     refresh()
     toast.success("Time logged.")
+  }
+
+  /** CORRECT A ROW. Every figure this app shows about how long something took is
+   * a sum of these lines, so a mistyped hour is a wrong number on somebody's
+   * screen until somebody fixes it. The door keeps the trail (who corrected
+   * what, and when), which is why nothing here is a silent overwrite. */
+  async function correct(values: TimeFormValues) {
+    if (!editing) return
+    await contentApi.updateWorkLog({
+      id: editing.id,
+      startedAt: values.startedAt,
+      endedAt: values.endedAt,
+      note: values.note,
+      kind: values.kind,
+      billable: values.billable,
+    })
+    refresh()
+    toast.success("Time corrected.")
   }
 
   async function answerRunaway(id: string, answer: "keep" | "discard") {
@@ -175,14 +208,29 @@ export function TimePanel({ teamId, canCreate }: { teamId: string; canCreate: bo
       ) : (
         <ul className="divide-border divide-y rounded-md border">
           {logs.map((l) => (
-            <li key={l.id} className="flex items-center justify-between gap-3 px-3 py-2">
-              <div className="min-w-0">
+            <li key={l.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+              <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{l.targetLabel ?? "—"}</p>
                 <p className="text-muted-foreground truncate text-xs">{line(l)}</p>
               </div>
               <span className="shrink-0 text-sm tabular-nums">
                 {l.endedAt ? clockFrom(l.seconds) : "running"}
               </span>
+              {/* FIX A LINE. Only on time that has FINISHED: a running timer is
+                  corrected by stopping it, and a start time you can edit while
+                  the clock is still counting is two people writing the same
+                  number. */}
+              {canEdit && l.endedAt && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setEditing(l)}
+                  className="shrink-0 gap-1.5"
+                >
+                  <Pencil className="size-3.5" />
+                  Edit
+                </Button>
+              )}
             </li>
           ))}
         </ul>
@@ -203,6 +251,13 @@ export function TimePanel({ teamId, canCreate }: { teamId: string; canCreate: bo
         onOpenChange={setAddOpen}
         draftKey={`work-log:add:${teamId}`}
         onSubmit={logManually}
+      />
+      <TimeFormDialog
+        open={!!editing}
+        onOpenChange={(o) => !o && setEditing(null)}
+        draftKey={editing ? `work-log:edit:${editing.id}` : undefined}
+        initial={editing}
+        onSubmit={correct}
       />
     </section>
   )

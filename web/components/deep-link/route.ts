@@ -13,6 +13,9 @@ export type SectionKey =
   | "roles"
   | "invites"
   | "dropdowns"
+  // The agency's own cost card (see TEAM_SECTIONS for why it is a tab, and why
+  // the account's card is not beside it).
+  | "internal-rates"
   | "accounts"
   | "learning"
   | "tickets"

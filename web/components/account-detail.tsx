@@ -48,6 +48,7 @@ import { Pencil, Power } from "lucide-react"
 
 import type { Account, AccountDetail } from "@shared/types"
 import { AccountFormDialog, type AccountFormValues } from "@/components/account-form-dialog"
+import { AccountRateCard } from "@/components/account-rate-card"
 import {
   ChildrenPanel,
   ContactsPanel,
@@ -117,11 +118,18 @@ export function AccountDetailScreen({
   const canSeeWork = can("work", "read")
   const canSeeTodos = can("todos", "read")
   const canCancelTodo = can("todos", "delete")
+  // WHAT THIS CLIENT IS CHARGED. A second module on the same record, like the
+  // logins above: reading a phone number and seeing a price are different sized
+  // decisions, so `commercials` is its own gate and the tab simply is not there
+  // for a role without it. (The agency's OWN cost card is a different screen in
+  // a different file — R23; see internal-rate-card.tsx.)
+  const canSeeRates = can("commercials", "read")
   // R16: the exact totals those tabs badge, each primed by the panel's own fetch
   // over the same filter its rows came from.
   const appsTotal = useCachedValue<number>(totalKey("apps-account", accountId))
   const sprintsTotal = useCachedValue<number>(totalKey("sprints-account", accountId))
   const todosTotal = useCachedValue<number>(totalKey("todos-account", accountId))
+  const ratesTotal = useCachedValue<number>(totalKey("account-rates", accountId))
 
   const [tab, setTab] = React.useState("overview")
   const [editOpen, setEditOpen] = React.useState(false)
@@ -314,6 +322,19 @@ export function AccountDetailScreen({
             },
           ]
         : []),
+      ...(canSeeRates
+        ? [
+            {
+              value: "rates",
+              label: "Rates",
+              icon: CONCEPT_ICON["internal-rates"],
+              // R8/R16: the tab reveals a collection, so it carries that
+              // collection's exact server total through the one seam.
+              badge: formatCount(ratesTotal),
+              badgeVariant: "" as const,
+            },
+          ]
+        : []),
       ...(canSeeLogins
         ? [
             {
@@ -500,6 +521,21 @@ export function AccountDetailScreen({
             )
           if (t.value === "todos")
             return <TodosPanel teamId={teamId} accountId={accountId} canCancel={canCancelTodo} />
+
+          // WHAT WE CHARGE THEM. The door answers about ONE account, so the rows
+          // and the badge above are the same narrowed question — never a page of
+          // every account's prices filtered in the browser.
+          if (t.value === "rates")
+            return (
+              <AccountRateCard
+                accountId={accountId}
+                accountName={account.name}
+                canCreate={can("commercials", "create")}
+                canEdit={can("commercials", "edit")}
+                canRetire={can("commercials", "delete")}
+                actions={actions}
+              />
+            )
 
           // Portal access — the login switch. Only rendered for someone who may
           // see logins at all (the tab itself is hidden otherwise).

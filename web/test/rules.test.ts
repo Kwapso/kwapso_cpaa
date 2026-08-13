@@ -981,6 +981,65 @@ describe("RULES — the laws of the base", () => {
       leaks,
       `the client portal names the agency's own cost figures (R23): ${leaks.join(", ")}`
     ).toEqual([])
+
+    // ── 4. …AND OUR OWN TWO RATE CARDS STAY TWO SCREENS ───────────────────────
+    //
+    // The three clauses above all watch the CLIENT's app. This one watches ours,
+    // and it closes the way this law would most plausibly be undone next: not by
+    // a leak, but by somebody noticing that "what an account is charged" and
+    // "what our own hour costs" are the same list with different numbers, and
+    // merging the two screens into one component with an `internal` flag on it.
+    //
+    // That is precisely the shape the law exists to forbid. lib/rates.ts says it
+    // about the worker in its own header — "keeping them in one file behind a
+    // flag would put the figure SCOPE says a client must NEVER see one forgotten
+    // predicate away from the one they may" — and the split held on the server
+    // for as long as neither half had a screen. Both have one now, so the same
+    // sentence has to hold on this side of the wire.
+    //
+    // BOTH DOOR SETS ARE DERIVED, symmetrically: the internal ones from the
+    // handlers that call into internal-money.ts (above), the account ones from
+    // the handlers that call into lib/rates.ts beside it. Then the api layer's
+    // own method bodies say which method posts to which, and the components say
+    // which methods they call. Nothing here is a list somebody maintains.
+    const ratesSrc = stripComments(read(join(ROOT, "workers", "tenancy", "src", "lib", "rates.ts")))
+    const accountExports = [...ratesSrc.matchAll(/export\s+(?:async\s+)?function\s+(\w+)/g)].map((m) => m[1])
+    expect(accountExports.length, "the account-rates scan found no exports — it has gone blind").toBeGreaterThan(2)
+    const accountDoors = routes
+      .filter(([, , handler]) => {
+        const body = stripComments(routeFns.get(handler) ?? "")
+        return accountExports.some((fn) => new RegExp(`(?<![\\w.])${fn}\\s*\\(`).test(body))
+      })
+      .map(([, door]) => door.split(" ")[1])
+    expect(accountDoors.length, "no account-rate door was derived — the walk has gone blind").toBeGreaterThan(2)
+
+    // Which api method posts to which side. Same two-hop read the doors-have-
+    // controls check makes, for the same reason: a screen calls a METHOD, and
+    // the path only exists in that method's body.
+    const apiSrc = read(join(WEB, "lib", "api", "tenancy.ts"))
+    const apiMethods = [...apiSrc.matchAll(/^ {2}(\w+):\s*[(<]/gm)]
+    expect(apiMethods.length, "the tenancy api-method scan found almost nothing").toBeGreaterThan(20)
+    const sideOf = (paths: string[]) =>
+      apiMethods
+        .filter((m, i) => {
+          const body = apiSrc.slice(m.index as number, (apiMethods[i + 1]?.index as number) ?? apiSrc.length)
+          return paths.some((p) => body.includes(`"${p}"`) || body.includes(`\`${p}`))
+        })
+        .map((m) => m[1])
+    const internalMethods = sideOf(internalDoors.map((d) => d.door.split(" ")[1]))
+    const accountMethods = sideOf(accountDoors)
+    expect(internalMethods.length, "no api method reaches the internal doors — the map has gone blind").toBeGreaterThan(2)
+    expect(accountMethods.length, "no api method reaches the account doors — the map has gone blind").toBeGreaterThan(2)
+
+    const bothSides = componentFiles().filter((f) => {
+      const src = stripComments(read(f))
+      const calls = (names: string[]) => names.some((n) => new RegExp(`\\.${n}\\s*\\(`).test(src))
+      return calls(internalMethods) && calls(accountMethods)
+    })
+    expect(
+      bothSides,
+      `one screen reads BOTH rate cards (R23). What we charge a client and what our own hour costs are two audiences: keep them in two components, so the separation is an import somebody cannot forget rather than a condition somebody can invert — ${bothSides.join(", ")}`
+    ).toEqual([])
   })
 
   // R24 — A SAVINGS FIGURE NEVER RENDERS WITHOUT SAYING WHAT IT IS MADE OF.

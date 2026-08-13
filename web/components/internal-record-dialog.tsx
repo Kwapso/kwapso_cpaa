@@ -29,7 +29,8 @@ import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
-import { ApiFailure } from "@/lib/api"
+import { ApiFailure, content } from "@/lib/api"
+import { FilePicker } from "@/components/file-picker"
 import { useFormDraft } from "@shared/web/use-form-draft"
 
 /** One field on the form. `kind` decides the control; `options` turns a text
@@ -38,10 +39,15 @@ import { useFormDraft } from "@shared/web/use-form-draft"
 export type InternalField = {
   key: string
   label: string
-  kind: "text" | "prose" | "date" | "number"
+  kind: "text" | "prose" | "date" | "number" | "file"
   placeholder?: string
   options?: string[]
   required?: boolean
+  /** `kind: "file"` only — post the bytes and answer with the URL to store. It
+   * lives on the FIELD rather than on the dialog because each upload door is
+   * gated on the module that owns the thing being uploaded, and this one form
+   * serves four modules. */
+  upload?: (dataUrl: string, fileName: string) => Promise<string>
 }
 
 export type InternalRecordValues = Record<string, string>
@@ -122,7 +128,15 @@ export function InternalRecordDialog({
             htmlFor={id}
             className={fieldSpacing}
           >
-            {f.kind === "prose" ? (
+            {f.kind === "file" && f.upload ? (
+              <FilePicker
+                id={id}
+                value={values[f.key] ?? ""}
+                onChange={(url) => setValues((v) => ({ ...v, [f.key]: url }))}
+                upload={f.upload}
+                disabled={busy}
+              />
+            ) : f.kind === "prose" ? (
               <Textarea
                 id={id}
                 value={values[f.key] ?? ""}
@@ -177,7 +191,18 @@ export const marketingFields = (channels: string[], statuses: string[]): Interna
 export const brandAssetFields = (categories: string[]): InternalField[] => [
   { key: "name", label: "Name", kind: "text", required: true, placeholder: "Primary logo (dark)" },
   { key: "category", label: "Category", kind: "text", options: categories, placeholder: "Logos, decks, templates…" },
-  { key: "fileUrl", label: "File", kind: "text", placeholder: "https://… or an uploaded file's link" },
+  // THE MATERIAL ITSELF. The brand library holds what everything else is made
+  // with, and this field used to ask for a link to somewhere else — the upload
+  // door existed and nothing on any screen called it, so a logo could be
+  // described here and only ever kept elsewhere. It is the one field on the four
+  // internal forms that is a file, which is why `kind: "file"` carries its own
+  // door rather than the dialog knowing about any.
+  {
+    key: "fileUrl",
+    label: "File",
+    kind: "file",
+    upload: (dataUrl) => content.uploadBrandAssetFile(dataUrl).then((r) => r.url),
+  },
   { key: "description", label: "Description", kind: "prose", placeholder: "When to use it, and when not to." },
 ]
 

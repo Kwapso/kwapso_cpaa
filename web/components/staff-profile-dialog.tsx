@@ -28,7 +28,8 @@ import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
-import { ApiFailure } from "@/lib/api"
+import { ApiFailure, content } from "@/lib/api"
+import { FilePicker } from "@/components/file-picker"
 import { useFormDraft } from "@shared/web/use-form-draft"
 
 export type StaffProfileValues = {
@@ -108,6 +109,8 @@ export function StaffProfileDialog({
     </Field>
   )
 
+  const photoField = { ...defaultFieldConfig, label: "Photo", required: false }
+
   const prose = (key: keyof StaffProfileValues, label: string, placeholder: string) => (
     <Field config={{ ...defaultFieldConfig, label }} htmlFor={`staff-${key}`} className={fieldSpacing}>
       <Textarea
@@ -148,7 +151,20 @@ export function StaffProfileDialog({
       {prose("weaknesses", "What they find hard", "Written kindly — this is here to help people work together.")}
       {text("roleModels", "Who they look up to", "People, or ways of working")}
       {prose("about", "Anything else", "The rest of the picture.")}
-      {text("photoUrl", "Photo", "A link, or the URL of a file you uploaded")}
+      {/* THE PHOTO ITSELF. This field used to ask for "a link, or the URL of a
+          file you uploaded" — with nowhere in the app to upload one, so the
+          only honest answer was a link to somewhere else. The door has always
+          been there; this is the control for it. */}
+      <Field config={photoField} htmlFor="staff-photo" className={fieldSpacing}>
+        <FilePicker
+          id="staff-photo"
+          value={values.photoUrl}
+          onChange={(url) => set("photoUrl")(url)}
+          upload={(dataUrl) => content.uploadStaffFile(dataUrl).then((r) => r.url)}
+          accept="image/*"
+          disabled={busy}
+        />
+      </Field>
     </FormShellDialog>
   )
 }

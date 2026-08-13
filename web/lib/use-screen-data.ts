@@ -197,6 +197,11 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
     programmes: useCachedValue<number>(enabled ? totalKey("programmes", teamId as string) : null),
     purposes: useCachedValue<number>(enabled ? totalKey("purposes", teamId as string) : null),
     staff_certificates: useCachedValue<number>(enabled ? totalKey("staff_certificates", teamId as string) : null),
+    // Our own cost card. Like the staff certificates above, its rows are read by
+    // the screen that shows them (internal-rate-card.tsx) rather than here — one
+    // small settled list nothing else needs — so this is a cache READ that badges
+    // the team tab once that screen has primed it.
+    internal_rates: useCachedValue<number>(enabled ? totalKey("internal_rates", teamId as string) : null),
   }
   const selectableValues = formSelectableQ.data ?? []
   // The list now includes DEACTIVATED values (so the manager can reactivate them),

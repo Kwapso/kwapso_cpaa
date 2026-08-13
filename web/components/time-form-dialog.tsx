@@ -9,6 +9,14 @@
 // box would be one field fewer and would produce a number nobody can check
 // afterwards — "was that Tuesday morning or Tuesday afternoon?" has an answer
 // here and none there.
+//
+// AND IT CORRECTS ONE TOO (`initial`). Every number this app can show about how
+// long something took is a sum of these rows, so a mistyped hour is a wrong
+// figure on somebody's screen until it is fixed — and until now it could only be
+// fixed by asking the assistant. The one thing the correction cannot change is
+// WHAT the time was against: the door does not move a row between a story and a
+// ticket, so the form shows it as a fact rather than offering a picker that
+// would silently do nothing.
 
 import * as React from "react"
 
@@ -27,7 +35,7 @@ import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { Switch } from "@kwapso/ui/registry/primitives/switch/switch"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { Plus } from "lucide-react"
+import { Pencil, Plus } from "lucide-react"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
@@ -36,7 +44,7 @@ import { useActiveTeam } from "@/lib/use-active-team"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useCached } from "@shared/web/store"
-import type { HelpTicket, Story } from "@shared/types"
+import type { HelpTicket, Story, WorkLog } from "@shared/types"
 
 export type TimeFormValues = {
   targetTable: string
@@ -44,12 +52,18 @@ export type TimeFormValues = {
   startedAt: string
   endedAt: string
   note: string
+  /** the kind of work, so a margin can group by it. Free text on purpose: the
+   * kinds an agency bills are its own vocabulary, and a picker fed from the
+   * internal rate card would show what our hours cost to anybody who may log
+   * time — a different permission entirely. */
+  kind: string
   billable: boolean
 }
 
 const workField = { ...defaultFieldConfig, label: "What you worked on", required: true }
 const startField = { ...defaultFieldConfig, label: "Started", required: true }
 const endField = { ...defaultFieldConfig, label: "Finished", required: true }
+const kindField = { ...defaultFieldConfig, label: "Kind of work", required: false }
 const noteField = { ...defaultFieldConfig, label: "Note", required: false }
 const billableField = {
   ...defaultFieldConfig,
@@ -67,27 +81,53 @@ function toInstant(local: string): string {
   return Number.isFinite(ms) ? new Date(ms).toISOString() : ""
 }
 
+/** …and back again, to prefill a correction. The same rule in reverse: a stored
+ * instant is shown in the zone the person is sitting in, because that is the
+ * clock they read it off in the first place. Built from the local parts rather
+ * than `toISOString().slice(…)`, which would silently show UTC. */
+function toLocalInput(iso: string | null): string {
+  if (!iso) return ""
+  const ms = Date.parse(iso)
+  if (!Number.isFinite(ms)) return ""
+  const d = new Date(ms)
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 export function TimeFormDialog({
   open,
   onOpenChange,
   draftKey,
+  initial,
   onSubmit,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   draftKey?: string
+  /** present = CORRECT this row (prefilled, target fixed); absent = log new time */
+  initial?: WorkLog | null
   onSubmit: (values: TimeFormValues) => Promise<void>
 }) {
+  const isEdit = !!initial
   const teamId = useActiveTeam().ctx?.team?.id ?? null
-  const storiesQ = useCached<Story[]>(teamId ? storiesKey(teamId) : null, () =>
+  // A correction needs neither list: what it is against cannot move, so the two
+  // pickers would be two requests to fill a control nobody can use.
+  const storiesQ = useCached<Story[]>(teamId && !isEdit ? storiesKey(teamId) : null, () =>
     listFetch.stories(teamId as string)
   )
-  const ticketsQ = useCached<HelpTicket[]>(teamId ? helpKey(teamId, "all") : null, () =>
+  const ticketsQ = useCached<HelpTicket[]>(teamId && !isEdit ? helpKey(teamId, "all") : null, () =>
     listFetch.help(teamId as string)
   )
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
-    { target: "", startedAt: "", endedAt: "", note: "", billable: true },
+    {
+      target: initial ? `${initial.targetTable}:${initial.targetId}` : "",
+      startedAt: toLocalInput(initial?.startedAt ?? null),
+      endedAt: toLocalInput(initial?.endedAt ?? null),
+      note: initial?.note ?? "",
+      kind: initial?.kind ?? "",
+      billable: initial ? initial.billable : true,
+    },
     open
   )
   const [busy, setBusy] = React.useState(false)
@@ -120,12 +160,19 @@ export function TimeFormDialog({
         startedAt: toInstant(values.startedAt),
         endedAt: toInstant(values.endedAt),
         note: values.note.trim(),
+        kind: values.kind.trim(),
         billable: values.billable,
       })
       clearDraft()
       onOpenChange(false)
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't log that time.")
+      toast.error(
+        err instanceof ApiFailure
+          ? err.message
+          : isEdit
+            ? "Couldn't save that correction."
+            : "Couldn't log that time."
+      )
     } finally {
       setBusy(false)
     }
@@ -138,36 +185,47 @@ export function TimeFormDialog({
       busy={busy}
       clearDraft={clearDraft}
       onSubmit={submit}
-      title={<DialogTitle>Log time</DialogTitle>}
+      title={<DialogTitle>{isEdit ? "Correct this time" : "Log time"}</DialogTitle>}
       subtitle={
         <DialogDescription>
-          For work already finished. Say when it started and when it stopped — we work out the rest.
+          {isEdit
+            ? "Fix what was written down. The change is kept in the record's history, with your name on it."
+            : "For work already finished. Say when it started and when it stopped — we work out the rest."}
         </DialogDescription>
       }
       footer={
         <Button type="submit" disabled={busy || !ready} className="gap-1.5">
-          {busy ? <Spinner /> : <Plus className="size-4" />}
-          {busy ? "Saving…" : "Log it"}
+          {busy ? <Spinner /> : isEdit ? <Pencil className="size-4" /> : <Plus className="size-4" />}
+          {busy ? "Saving…" : isEdit ? "Save the correction" : "Log it"}
         </Button>
       }
     >
       <Field config={workField} htmlFor="time-target" className={fieldSpacing}>
-        <Select
-          value={values.target}
-          onValueChange={(v) => setValues((s) => ({ ...s, target: v }))}
-          disabled={busy}
-        >
-          <SelectTrigger id="time-target">
-            <SelectValue placeholder="Pick a story or a ticket" />
-          </SelectTrigger>
-          <SelectContent>
-            {options.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {isEdit ? (
+          // A FACT, NOT A CONTROL. The door corrects a row; it never moves one
+          // from a story to a ticket, so offering the picker here would be
+          // offering a change the server would quietly drop.
+          <p id="time-target" className="text-muted-foreground border-border/60 rounded-md border px-3 py-2 text-sm">
+            {initial?.targetLabel ?? "—"}
+          </p>
+        ) : (
+          <Select
+            value={values.target}
+            onValueChange={(v) => setValues((s) => ({ ...s, target: v }))}
+            disabled={busy}
+          >
+            <SelectTrigger id="time-target">
+              <SelectValue placeholder="Pick a story or a ticket" />
+            </SelectTrigger>
+            <SelectContent>
+              {options.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </Field>
       <Field config={startField} htmlFor="time-start" className={fieldSpacing}>
         <Input
@@ -184,6 +242,15 @@ export function TimeFormDialog({
           type="datetime-local"
           value={values.endedAt}
           onChange={(e) => setValues((s) => ({ ...s, endedAt: e.target.value }))}
+          disabled={busy}
+        />
+      </Field>
+      <Field config={kindField} htmlFor="time-kind" className={fieldSpacing}>
+        <Input
+          id="time-kind"
+          value={values.kind}
+          onChange={(e) => setValues((s) => ({ ...s, kind: e.target.value }))}
+          placeholder="Development, design, project management…"
           disabled={busy}
         />
       </Field>

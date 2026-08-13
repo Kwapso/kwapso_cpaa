@@ -43,16 +43,17 @@ import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import type { Sprint } from "@shared/types"
+import { moneyText } from "@shared/web/money"
 import { invalidate, useCached, useCachedValue } from "@shared/web/store"
 
-/** Whole cents → what a person would say. Local rather than a shared seam: this
- * is the ONLY price on the agency's own side of the fence that renders anywhere
- * (the two rate cards have their own panels, and the margin is R23's business),
- * so a seam here would be a seam with one caller. */
+/** Whole cents → what a person would say. The FORMATTING is the shared seam
+ * (shared/web/money.ts) now that the two rate cards render prices of their own;
+ * what stays here is the only part that is about a sprint — that a sprint with
+ * no price of its own was sold inside something else, which is a sentence rather
+ * than a zero. */
 function priceSold(cents: number, currency: string | null): string {
   if (!cents) return "Not sold separately"
-  const amount = (cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  return currency ? `${amount} ${currency}` : amount
+  return moneyText(cents, currency)
 }
 
 export function SprintDetailScreen({
