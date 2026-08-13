@@ -505,25 +505,46 @@ turn is persisted here, so the conversation is replayable and auditable. The
 agent acts AS the signed-in user through the same gated endpoints the UI uses, so
 these rows are a record of intent, never a separate set of powers.
 
-### knowledge_sources + knowledge_chunks + knowledge_terms + knowledge_ingest — KEEP (BUILT 2026-08-11, team migration `0012_knowledge`) — THE KNOWLEDGE BASE
+### knowledge_sources + knowledge_chunks + knowledge_terms + knowledge_ingest — KEEP (BUILT 2026-08-11, team migrations `0012_knowledge` + `0020_knowledge_vectors`) — THE KNOWLEDGE BASE
 One knowledge base, many **compartments**, chosen for the reader rather than by
 them. Four tables, one per job:
 
 - **`knowledge_sources`** — one row per piece of material the assistant may read.
   Two families in one table, because a person edits them in one list: a `note`
   somebody typed here (the body IS the truth) and a MIRROR of a row we already
-  own — `ticket` / `article` / `account` — where the row is the truth and the
-  15-minute sweep keeps the body in step. `compartment` is the design in one
+  own — `ticket` / `article` / `account` / `app` / `story` / `sprint` — where the
+  row is the truth and the sweep keeps the body in step. `compartment` is the design in one
   column (`agency`, or `account:<id>`), DERIVED on write and correctable by hand,
   never free-typed. `owner_user_id` is the second fence: NULL = the team's, a
   value = one person's (what THEY can see, through their own connection).
-  `content_hash` + `indexed_at` are what let the sweep skip an unchanged row
-  before it costs a model call. Deactivating means "stop reading this": the row
-  survives, its chunks do not, and the sweep will not put it back.
+  `content_hash` + `indexed_chunks` are what let the sweep skip a row that is
+  both unchanged AND finished, before it costs a model call — the hash says WHICH
+  text is being indexed and is stamped at the start of a rebuild, so a source
+  whose text changed halfway through starts again rather than finishing a
+  document that no longer exists. `summary` is what the record is ABOUT, derived
+  from the row itself and never generated (knowledge-summary.ts says why in
+  four reasons); it is what a LIST carries instead of the material, because a
+  source can be a 300-page contract and a page of fifty of them would be tens of
+  megabytes on the way to a screen showing titles. `app_id` / `ticket_id` /
+  `sprint_id` / `record_date` are the rest of the notebook a question is routed
+  by. `body_bytes` is how much material there really is, so a screen can say
+  "the first part of 412 KB" rather than presenting an excerpt as the whole
+  thing. `index_error` is why a source could not be indexed whole, in words —
+  nothing here is ever silently trimmed. Deactivating means "stop reading this":
+  the row survives, its chunks and its vectors do not, and the sweep will not put
+  it back — and a row that leaves the app (an archived ticket, a switched-off
+  app) deactivates itself the same way, because the readers now RETURN those rows
+  marked `retired` rather than filtering them out, which is what stopped an
+  archived ticket answering questions forever.
 - **`knowledge_chunks`** — a readable piece of a source: what retrieval scores
-  and what an answer cites. `embedding` is the quantised vector (384 dimensions →
-  512 characters); NULL means "not embedded yet", which retrieval survives by
-  falling back to the lexical score alone.
+  and what an answer cites. Its id is DERIVED (`<sourceId>:<seq>`, zero-padded),
+  which is what lets a vector be overwritten or deleted without a lookup table
+  and lets a source that got shorter lose only its tail. `embedding` is the
+  quantised vector (1024 dimensions → ~1,368 characters); it is no longer what
+  the search reads — Vectorize is — and it is kept for two jobs the index cannot
+  do: rebuilding the index without paying to re-embed everything, and answering
+  at all when no index is bound. NULL means "not embedded yet", which retrieval
+  survives by falling back to the word index alone.
 - **`knowledge_terms`** — the inverted index, as an ORDINARY indexed table rather
   than an FTS5 virtual one. Deliberate, and the reason is the DELETE: a re-index
   removes a source's postings, and on FTS5 that is a scan of every posting in the
@@ -534,12 +555,20 @@ them. Four tables, one per job:
   cursor is what makes ingestion resumable — a tick that dies halfway costs the
   next one nothing but the rows it has not reached.
 
-**Why the vectors live here and not in Vectorize** — the whole argument is at the
-top of `workers/content/src/lib/knowledge.ts`, but the short of it: every vector
-must belong to exactly one team, and a per-team database makes that STRUCTURAL
-(a caller's guard resolves one database id and the SQL cannot name another) where
-an account-wide index with a team id in its metadata makes it a filter somebody
-wrote correctly today.
+**Where the search lives, and why the tenancy argument survived the move.** The
+SEARCH is Cloudflare Vectorize — one account-wide index, with every team in its
+own NAMESPACE and every chunk carrying the labels a question is routed by. The
+original decision kept vectors here precisely because a per-team database makes
+tenancy structural where "one index with a team id in the metadata" makes it a
+filter somebody wrote correctly today. That objection is answered rather than
+dropped, and both halves are Law R26: a namespace is a PARTITION Vectorize
+applies before the search, not a filter; and nothing readable ever comes out of
+the index — it is asked for ids and scores alone, and every passage in every
+answer is read back out of THIS database, under the caller's own owner clause,
+with excluded sources gone. The vector store narrows; the database decides. The
+full argument, and what would change our mind, is at the top of
+`workers/content/src/lib/knowledge-vectors.ts`; the numbers that forced the move
+are in `.plans/BUILD-4-knowledge-retrieval.md`.
 
 ---
 ### apps + processes + process_versions + process_steps + process_comments — KEEP (BUILT 2026-08-11, team migration `0013_process_maps_and_money`) — THE PROCESS MAP
@@ -823,8 +852,10 @@ Google surface; every handler opens with `refusePortalCaller` and both tables ar
   2026-06-23)**: importable_databases, agent_usage, agent_credits, mcp_tokens (GLOBAL core
   0008/0009/0010); learning, learning_progress, help, help_threads,
   data_import_sessions, agent_threads, agent_messages (per-team `0004_modules`).
-  **Knowledge base (BUILT 2026-08-11)**: knowledge_sources, knowledge_chunks,
-  knowledge_terms, knowledge_ingest (per-team `0012_knowledge`).
+  **Knowledge base (BUILT 2026-08-11, retrieval rebuilt 2026-08-12)**:
+  knowledge_sources, knowledge_chunks, knowledge_terms, knowledge_ingest
+  (per-team `0012_knowledge` + `0020_knowledge_vectors`). The search itself lives
+  in Vectorize — see R26 and BOOTSTRAP.md §3b.
   **Since:** agent_usage_log (GLOBAL core `0011`, BUILT 2026-07-01), error_logs
   (GLOBAL core `0012`, the central error store, BUILT 2026-07-03),
   data_import_batches (per-team `0006_import_batches`, the agentic multi-file

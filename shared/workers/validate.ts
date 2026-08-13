@@ -16,6 +16,22 @@ export const TEXT_LIMITS = {
   message: 10_000, // agent chat turns
 } as const
 
+/** A WHOLE DOCUMENT, in BYTES rather than characters — the one cap in this file
+ * that is not a character count, because the thing it is protecting is not one.
+ *
+ * A source in the knowledge base can be a contract, a transcript, a book. The
+ * ceiling on it is D1's: a single row (and any one string in it) may be
+ * 2,000,000 bytes. Cap the CHARACTERS at, say, a million and a German document
+ * full of umlauts is 1.1 MB while a Chinese one is 3 MB — the same "limit"
+ * refusing one person's file and corrupting another's. So the number is bytes,
+ * measured as the database will measure them, with 500 KB left over for the rest
+ * of the row.
+ *
+ * 1.5 MB is roughly six hundred pages of prose — twice the three-hundred-page
+ * contract this was sized for. Above it the upload is REFUSED, in words, saying
+ * how big it was and what to do; nothing is ever silently trimmed. */
+export const DOCUMENT_LIMIT_BYTES = 1_500_000
+
 const NUL = String.fromCharCode(0)
 const stripNul = (s: string) => s.split(NUL).join("")
 
@@ -82,6 +98,40 @@ export function requireMoment(value: unknown, field: string): string {
   if (!Number.isFinite(ms)) throw new GuardError(400, "invalid_input", `${field} isn't a date and time.`)
   return new Date(ms).toISOString()
 }
+
+/** A DOCUMENT at the boundary — the same type-check and NUL-strip as
+ * `optionalText`, but capped in BYTES and sized for whole documents rather than
+ * for a paragraph.
+ *
+ * It is a separate function rather than `optionalText(value, field, 1_500_000)`
+ * for two reasons that both bite. The character cap would be the wrong ceiling
+ * (see DOCUMENT_LIMIT_BYTES). And a call site asking for a million characters of
+ * "text" reads like a typo, so the next person tightens it — and tightening a
+ * ceiling silently starts refusing files that used to go in.
+ *
+ * The refusal SAYS THE TWO NUMBERS. A ceiling nobody can see is indistinguishable
+ * from a bug, and this one will be met by a person holding a file they cannot
+ * split without being told how much to cut. */
+export function optionalDocument(
+  value: unknown,
+  field: string,
+  maxBytes: number = DOCUMENT_LIMIT_BYTES
+): string | undefined {
+  if (value === undefined || value === null) return undefined
+  if (typeof value !== "string") throw new GuardError(400, "invalid_input", `${field} must be text.`)
+  const clean = stripNul(value).trim()
+  if (!clean) return undefined
+  const bytes = new TextEncoder().encode(clean).length
+  if (bytes > maxBytes)
+    throw new GuardError(
+      400,
+      "too_large",
+      `${field} is ${mb(bytes)} of text and the most we can take in one piece is ${mb(maxBytes)}. Nothing was saved — split it and add the parts separately, and every part will be searchable.`
+    )
+  return clean
+}
+
+const mb = (bytes: number) => `${(bytes / 1_000_000).toFixed(1)} MB`
 
 /** The optional half: absent or blank → undefined; anything present must be a
  * real moment. */

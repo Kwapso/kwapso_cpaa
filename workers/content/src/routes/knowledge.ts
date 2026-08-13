@@ -29,7 +29,7 @@ import {
   updateSource,
   type SourceInput,
 } from "../lib/knowledge"
-import { listIngestState, sweepAll } from "../lib/knowledge-ingest"
+import { catchUp, listIngestState, sweepAll } from "../lib/knowledge-ingest"
 import type { Env } from "../env"
 
 /** GET /api/content/knowledge — the sources, newest first (?id → just that one).
@@ -89,6 +89,12 @@ export async function getKnowledgeAsk(request: Request, env: Env): Promise<Respo
   // default — and it is still capped, because a query string is an input.
   const question = queryText(url.searchParams.get("q"), "Question", TEXT_LIMITS.message)
   if (!question) return fail(400, "invalid_input", "A question is required.")
+  // BEFORE IT ANSWERS, IT CATCHES UP. A ticket whose status changed a minute ago
+  // must not be answered from a quarter-hour-old memory of it, and the owner's
+  // ruling was explicit: nothing to press, nothing to wait for. Bounded and
+  // best-effort — see catchUp(); a question is still answerable when it cannot
+  // run, just as current as the last sweep.
+  await catchUp(env, cfg, guard)
   const limit = Number(queryText(url.searchParams.get("limit"), "Limit"))
   return json(
     await retrieve(env, cfg, guard, {

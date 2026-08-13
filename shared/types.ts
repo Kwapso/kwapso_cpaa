@@ -601,14 +601,36 @@ export type KnowledgeSource = {
   originRowId: string | null
   compartment: string
   accountId: string | null
+  /** the built system, the ticket and the sprint this is about — the rest of the
+   * "notebook" a question is routed by. Null where it does not apply. */
+  appId: string | null
+  ticketId: string | null
+  sprintId: string | null
+  /** when the material is FROM, which is not when it was indexed */
+  recordDate: string | null
   title: string
+  /** what this record is ABOUT, in a sentence or two — derived from the record
+   * itself, never generated. What a list shows, and what the router searches. */
+  summary: string | null
+  /** the material. On a LIST this is always null (a page of 300-page contracts
+   * is not a list); on a detail it is as much as a screen shows. */
   body: string | null
+  /** how much material there really is. With `bodyTruncated` it is what lets a
+   * screen say "the first part of 412 KB" instead of showing an excerpt as if it
+   * were the document. */
+  bodyBytes: number
+  bodyTruncated: boolean
   sourceUrl: string | null
   /** "team" = anyone who may read the knowledge base; "private" = only its owner */
   visibility: "team" | "private"
   ownerUserId: string | null
   indexedAt: string | null
   chunkCount: number
+  /** how far through this source the indexer has got. Below `chunkCount` means
+   * a large document is still going in — it is searchable as far as it got. */
+  indexedChunks: number
+  /** why it could not be indexed whole, in words, or null */
+  indexError: string | null
   active: boolean
   createdAt: string
   creatorName: string | null
@@ -637,6 +659,12 @@ export type KnowledgeCitation = {
   title: string
   kind: string
   url: string | null
+  /** WHAT THE LIVE ROW SAYS RIGHT NOW, read at the moment of answering rather
+   * than taken from the index — so a ticket that was "in progress" when it was
+   * indexed and is "done" now cannot be quoted as in progress. Null for a source
+   * that mirrors nothing (a note somebody typed IS the truth). */
+  liveStatus: string | null
+  checkedAt: string | null
 }
 
 /** What the knowledge base answers with. It never writes prose — the assistant
@@ -652,6 +680,10 @@ export type KnowledgeAnswer = {
   compartments: string[]
   /** WHY those compartments, in a sentence a person can disagree with */
   reason: string
+  /** what the record summaries say this question is ABOUT. Evidence for the
+   * reader; deliberately NOT an input to the ranking — see §3 of
+   * workers/content/src/lib/knowledge.ts. */
+  records: { sourceId: string; title: string }[]
   passages: KnowledgePassage[]
   citations: KnowledgeCitation[]
   /** how many chunks the search considered (the bounded candidate set) */

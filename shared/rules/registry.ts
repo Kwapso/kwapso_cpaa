@@ -195,6 +195,13 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "savings-caption",
     status: "enforced",
   },
+  {
+    id: "R26",
+    dimension: "arch",
+    law: "THE VECTOR INDEX NARROWS; THE TEAM'S DATABASE DECIDES. The knowledge base searches one account-wide Vectorize index, so two properties that used to be free have to be bought back explicitly. First, tenancy is a PARTITION and not a filter: every call into the store passes `namespace: guard.teamId`, built in one function (namespaceFor) from the caller's own guard and never from a request — Vectorize applies a namespace before the search, so a query cannot see another tenant's vectors even if every metadata filter were wrong. Second, and this is the clause that makes the first one survivable: nothing readable ever comes out of the index. It is asked for ids and scores alone (`returnValues: false`, `returnMetadata: \"none\"`, and a hit type with no text field), and every passage in every answer is then read back out of the TEAM'S OWN DATABASE under the caller's own owner clause with excluded sources gone. A mislabelled or stale vector can therefore cost a relevant passage; it cannot produce one the caller was never allowed to read. The check reads knowledge-vectors.ts and knowledge.ts off disk AND runs the doors against an index deliberately planted with lying vectors — one claiming the team shelf for a private source, one left behind by a source somebody excluded, one belonging to another team — and asserts none of them reaches an answer.",
+    checkId: "vector-fence",
+    status: "enforced",
+  },
 ]
 
 /** R13 — reviewed exemptions: modules that are deliberately NOT import targets,

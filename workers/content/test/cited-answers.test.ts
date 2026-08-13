@@ -44,6 +44,7 @@ describe("R23 — the answer seam decides `found` and `citations` together", () 
       question: "what did we agree about the rollout?",
       compartments: [],
       reason: "The question named no client, so I searched the whole knowledge base.",
+      records: [],
       passages: [],
       candidates: 0,
     })
@@ -61,6 +62,7 @@ describe("R23 — the answer seam decides `found` and `citations` together", () 
       question: "what did we agree?",
       compartments: ["account:A1", "agency"],
       reason: "The question names Bergman S.A., so I searched Bergman S.A.'s material and the agency's own.",
+      records: [{ sourceId: "S1", title: "Bergman rollout note" }],
       passages: [passage("S1", "Bergman rollout note", 0), passage("S1", "Bergman rollout note", 1), passage("S2", "Process: rollouts")],
       candidates: 12,
     })
@@ -84,6 +86,7 @@ describe("R23 — the answer seam decides `found` and `citations` together", () 
       question: "anything?",
       compartments: [],
       reason: "…",
+      records: [],
       passages: [],
       candidates: 200,
     })

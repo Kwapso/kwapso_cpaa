@@ -10,7 +10,6 @@ import { describe, expect, it } from "vitest"
 
 import {
   CHUNK_TARGET_CHARS,
-  MAX_CHUNKS_PER_SOURCE,
   chunkText,
   contentHash,
   decodeEmbedding,
@@ -20,6 +19,7 @@ import {
   similarity,
   tokenise,
 } from "../src/lib/knowledge-text"
+import { MAX_CHUNKS_PER_SOURCE } from "../src/lib/knowledge"
 
 describe("chunkText", () => {
   it("returns nothing for empty text (never one empty chunk)", () => {
@@ -50,9 +50,23 @@ describe("chunkText", () => {
     expect(chunks.length).toBe(3)
   })
 
-  it("stops at the per-source ceiling rather than indexing a whole book", () => {
-    const chunks = chunkText("Sentence number one here. ".repeat(20_000))
-    expect(chunks.length).toBe(MAX_CHUNKS_PER_SOURCE)
+  it("chunks a whole book rather than stopping at a ceiling", () => {
+    // IT USED TO STOP AT 200 — about eight pages — and say nothing. A 300-page
+    // contract went in as its first eight pages, and "the whole document is in
+    // there" was indistinguishable from "the beginning of it is". The refusal
+    // now lives at the door, in bytes, before anything is saved; this function
+    // reports what the text really is.
+    const book = "Sentence number one here. ".repeat(20_000)
+    const chunks = chunkText(book)
+    expect(chunks.length).toBeGreaterThan(500)
+    // Nothing is lost between the pieces: every sentence of the book is in one.
+    expect(chunks.join(" ").length).toBeGreaterThan(book.length * 0.99)
+    // The backstop is still a number, and it is DERIVED from the door's ceiling
+    // rather than chosen beside it — 1.5 MB of text cannot make more than this.
+    // It lives in knowledge.ts, beside the validator it comes from: this file
+    // deliberately imports NOTHING, so that the benchmark can load it into plain
+    // Node and measure the shipped chunker rather than a copy of it.
+    expect(MAX_CHUNKS_PER_SOURCE).toBeGreaterThan(1_500)
   })
 
   it("strips a NUL byte, which SQLite refuses and no request boundary can catch here", () => {

@@ -1,9 +1,12 @@
 // THE PURE HALF OF THE KNOWLEDGE BASE — turning a piece of material into the
 // things retrieval actually scores: chunks, terms, and a vector. No database, no
-// network, no env; every function here is deterministic, which is what makes the
-// retrieval quality measurable rather than an impression (see
-// scripts/knowledge-backfill.mjs, which runs these against the agency's own
-// history and prints the numbers).
+// network, no env — AND NO IMPORTS AT ALL, which is a property worth keeping
+// rather than an accident: `scripts/knowledge-retrieval-bench.mjs` imports this
+// file straight into plain Node so that the "before" arm of every measurement is
+// really the shipped code. One `@shared/…` import here and that stops working,
+// which is exactly how it was found. The one constant that wanted to live here
+// and could not — the derived chunk ceiling — is in knowledge.ts beside the
+// validator it is derived from.
 //
 // Two sections, in the order the pipeline uses them:
 //   1. TEXT   — hash (has this changed?), chunk (what does a citation point at?),
@@ -18,12 +21,6 @@
  * being cut out of its source. */
 export const CHUNK_TARGET_CHARS = 900
 
-/** Chunks one source may hold. A ceiling, said out loud: a 400-page transcript
- * is a real thing to be handed, and without this one source could own the whole
- * index — and cost one embedding call per chunk while doing it. Past this the
- * source is indexed as far as the cap and `chunkText` says so by returning fewer
- * chunks than the text deserved; `indexSource` records the truncation on the row. */
-export const MAX_CHUNKS_PER_SOURCE = 200
 
 /** Distinct terms one chunk contributes to the inverted index. The tail of a
  * long chunk is mostly names and numbers that match nothing; the head is what
@@ -93,7 +90,11 @@ export function plainText(input: string): string {
  * table — a hard cut, so one unbroken 50,000-character line still gets indexed
  * instead of becoming one chunk nothing can cite precisely.
  *
- * Bounded by MAX_CHUNKS_PER_SOURCE. Returns [] for empty text, never [""]. */
+ * IT NO LONGER TRUNCATES. It returns every piece the text really has, and the
+ * caller decides what to do about a text that is too big — because a function
+ * that quietly returned the first two hundred pieces made "the whole document
+ * went in" impossible to tell from "the first eight pages went in", at the one
+ * place nobody was looking. Returns [] for empty text, never [""]. */
 export function chunkText(input: string): string[] {
   const text = plainText(input)
   if (!text) return []
@@ -111,7 +112,6 @@ export function chunkText(input: string): string[] {
     for (const sentence of paragraph.split(/(?<=[.!?])\s+/)) {
       for (const piece of hardCut(sentence)) {
         if (current && current.length + piece.length + 1 > CHUNK_TARGET_CHARS) flush()
-        if (chunks.length >= MAX_CHUNKS_PER_SOURCE) return chunks
         current = current ? `${current} ${piece}` : piece
       }
     }
@@ -120,7 +120,7 @@ export function chunkText(input: string): string[] {
     if (current.length >= CHUNK_TARGET_CHARS * 0.6) flush()
   }
   flush()
-  return chunks.slice(0, MAX_CHUNKS_PER_SOURCE)
+  return chunks
 }
 
 /** A run of text with no sentence boundary in it, cut into target-sized pieces. */

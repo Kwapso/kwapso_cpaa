@@ -1497,6 +1497,78 @@ SELECT lower(hex(randomblob(16))), r.id, m.module, r.is_default, r.is_default, r
  );
 `,
   },
+  {
+    // THE KNOWLEDGE BASE MOVES ITS SEARCH TO VECTORIZE, and grows the two things
+    // 0012 could not give it: a record's own SUMMARY (so the router knows what
+    // each record is ABOUT before it searches anything), and a size ceiling that
+    // is a product decision rather than an accident of a validator.
+    //
+    // 0012's own note said the vectors lived here because a per-team database
+    // makes tenancy structural. That argument is answered, not abandoned — see
+    // the header of workers/content/src/lib/knowledge-vectors.ts: the namespace
+    // is the partition, and the passages an answer is built from are still read
+    // out of THIS database under the caller's own fence. What changed is that the
+    // SEARCH no longer has to fit in a SQL statement.
+    version: "0020_knowledge_vectors",
+    sql: `
+-- WHAT A RECORD IS ABOUT, in a sentence or two. Written by the sweep from the
+-- row itself (never by a model — see knowledge-summary.ts), embedded, and
+-- searched FIRST: the router reads the summaries to decide which records to look
+-- inside, which is the difference between routing and guessing. It is also what
+-- a list screen shows instead of dragging a 300-page body over the wire.
+ALTER TABLE knowledge_sources ADD COLUMN summary TEXT;
+ALTER TABLE knowledge_sources ADD COLUMN summary_embedding TEXT;
+
+-- THE LABELS THE ROUTER NARROWS BY. \`account_id\` and \`compartment\` were
+-- already here; these are the rest of the notebook the owner asked for, each one
+-- a metadata index on the vector as well as a column here.
+ALTER TABLE knowledge_sources ADD COLUMN app_id TEXT;
+ALTER TABLE knowledge_sources ADD COLUMN ticket_id TEXT;
+ALTER TABLE knowledge_sources ADD COLUMN sprint_id TEXT;
+-- WHEN THE MATERIAL IS FROM, which is not when we indexed it: a transcript of
+-- Tuesday's call filed on Friday is Tuesday's. Kept as an ISO string here (it is
+-- read by people) and as whole seconds on the vector (it is filtered by ranges).
+ALTER TABLE knowledge_sources ADD COLUMN record_date TEXT;
+
+-- STAGED INGEST — how far through a source the indexer got, and why it stopped.
+-- A 300-page contract cannot be embedded inside one request: the work is done in
+-- slices and this is the resume point, so a source that is half-indexed is
+-- FINISHED by the next slice rather than started again. \`indexed_chunks\` = 0
+-- with a chunk_count above it is the readable form of "still going".
+ALTER TABLE knowledge_sources ADD COLUMN indexed_chunks INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE knowledge_sources ADD COLUMN index_error TEXT;
+-- The size of the material, in bytes, so a screen can say what it is holding and
+-- the ceiling can be explained rather than just enforced.
+ALTER TABLE knowledge_sources ADD COLUMN body_bytes INTEGER NOT NULL DEFAULT 0;
+
+CREATE INDEX idx_knowledge_sources_pending ON knowledge_sources (indexed_chunks, id) WHERE deactivated_at IS NULL;
+
+-- NO "WHAT CHANGED" TABLE, DELIBERATELY — the sweep's own cursor already IS one.
+--
+-- The obvious build for "instant re-index" is a dirty queue every write marks.
+-- It was rejected: it is an invariant fifty call sites have to remember, across
+-- three workers, and the one that forgets is silent. The cursor cannot be
+-- forgotten. Each kind is read in \`COALESCE(updated_at, created_at)\` order, so
+-- a row that changes sorts AFTER the cursor by construction — whoever changed
+-- it, through whichever door, including an import and the agent. What made it
+-- feel periodic was only WHEN it ran. So now it runs on a write, on a read, and
+-- on the cron (see knowledge-ingest.ts), and the cron's job shrinks to the one
+-- thing an event cannot do: notice what nobody was there to tell us about.
+
+-- THE OLD INDEX IS DISCARDED, DELIBERATELY AND ONCE.
+--
+-- Chunk ids are now DERIVED (\`<sourceId>:<seq>\`) so that a vector can be
+-- overwritten and deleted without a lookup table, and the old rows carry random
+-- ids that no vector will ever match. Blanking the content hash is what makes
+-- the base rebuild itself: every source now looks changed, so the next drain and
+-- the next sweep re-chunk, re-embed and re-upsert it. Nothing is lost — a
+-- mirrored source's truth is the row it mirrors and a typed note's is its own
+-- body, both of which are untouched here.
+DELETE FROM knowledge_terms;
+DELETE FROM knowledge_chunks;
+UPDATE knowledge_sources SET content_hash = NULL, indexed_at = NULL, chunk_count = 0, indexed_chunks = 0;
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

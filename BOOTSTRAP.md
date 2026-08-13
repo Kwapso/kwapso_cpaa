@@ -145,6 +145,48 @@ ARCHITECTURE.md `/media/*` note before storing anything sensitive.
 
 ---
 
+## 3b · The knowledge base's vector index
+
+ONE index for the account. Every team is a NAMESPACE inside it — Vectorize applies
+a namespace before the search, so a query cannot reach another team's vectors
+(Law R26; the full argument is at the top of
+`workers/content/src/lib/knowledge-vectors.ts`).
+
+**The metadata indexes must exist BEFORE anything is ingested.** Vectorize does
+not index metadata retrospectively: "vectors upserted before a metadata index was
+created won't have their metadata contained in that index". Create the index,
+then all nine, then deploy content — in that order. Getting it wrong is not an
+error, it is a knowledge base whose compartments silently do not narrow.
+
+```bash
+# 1024 dimensions because the embedding model is @cf/baai/bge-m3 (multilingual —
+# half the agency's tickets are in German). Change the model and this changes.
+npx wrangler vectorize create kwapso-knowledge --dimensions=1024 --metric=cosine
+npx wrangler vectorize create kwapso-knowledge-staging --dimensions=1024 --metric=cosine
+
+for INDEX in kwapso-knowledge kwapso-knowledge-staging; do
+  # The nine labels the router narrows by — the list is METADATA_INDEXES in
+  # workers/content/src/lib/knowledge-vectors.ts, and the tenth slot of ten is
+  # deliberately left free.
+  npx wrangler vectorize create-metadata-index $INDEX --property-name=level      --type=string
+  npx wrangler vectorize create-metadata-index $INDEX --property-name=compartment --type=string
+  npx wrangler vectorize create-metadata-index $INDEX --property-name=owner      --type=string
+  npx wrangler vectorize create-metadata-index $INDEX --property-name=kind       --type=string
+  npx wrangler vectorize create-metadata-index $INDEX --property-name=account    --type=string
+  npx wrangler vectorize create-metadata-index $INDEX --property-name=app        --type=string
+  npx wrangler vectorize create-metadata-index $INDEX --property-name=ticket     --type=string
+  npx wrangler vectorize create-metadata-index $INDEX --property-name=sprint     --type=string
+  npx wrangler vectorize create-metadata-index $INDEX --property-name=date       --type=number
+done
+```
+
+The binding is `KNOWLEDGE_INDEX` on the content worker and it is OPTIONAL: without
+it the knowledge base answers from its word index alone rather than refusing every
+question. That is a real degradation and a visible one (`reason` on every answer
+says what it searched), not a silent one.
+
+---
+
 ## 4 · Secrets + vars (per env, never in git)
 
 **Secrets** (set with `wrangler secret put <NAME>` in the worker's directory; add
@@ -341,7 +383,8 @@ transient auth error; just retry.)
 ```
 prereqs → npm install → wrangler login → npm run check
   → d1 create (core, both envs) → migrations apply (core 0001–00NN)
-  → r2 bucket create (media × 3 × 2 envs)
+  → r2 bucket create (media × 4 × 2 envs)
+  → vectorize create + 9 metadata indexes × 2 envs (BEFORE any ingest)
   → secret put (RESEND, CF_D1_TOKEN, ADMIN_KEY, INTERNAL_KEY, [ANTHROPIC], [TEST_LOGIN_KEY on non-prod auth]) + set vars (PUBLIC_APP_URL, AGENT_*)
   → npm run deploy:staging  (builds web/ + web-portal/, then
                              realtime→auth→tenancy→content→data-ops→mcp→gateway→portal-gateway) → smoke

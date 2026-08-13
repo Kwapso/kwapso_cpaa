@@ -686,8 +686,12 @@ describe("RULES — the laws of the base", () => {
           // so a character cap would be the wrong refusal) — locked by
           // workers/content/test/upload-parse.test.ts. `parseDataUrl` beside it
           // does NOT qualify: it declares `dataUrl: string`, which is a claim.
+          // `optionalDocument` is the seam's WHOLE-DOCUMENT half and lives in the
+          // same file: same type-check and NUL-strip, capped in bytes because the
+          // thing it guards is a database row's byte ceiling, not a paragraph —
+          // locked by workers/content/test/validate.test.ts with the rest.
           const checked =
-            /(?<![\w$.])(?:requireText|optionalText|queryText|requireIdList|requireMoment|optionalMoment|parseUploadDataUrl|Array\.isArray|Number|includes)\($/.test(
+            /(?<![\w$.])(?:requireText|optionalText|optionalDocument|queryText|requireIdList|requireMoment|optionalMoment|parseUploadDataUrl|Array\.isArray|Number|includes)\($/.test(
               before
             ) ||
             /(?<![\w$.])typeof\s*$/.test(before) ||
@@ -1105,6 +1109,7 @@ describe("RULES — the laws of the base", () => {
       "cited-answers", // R23: workers/content/test/cited-answers.test.ts
       "internal-money-never-in-portal", // R23: the import-graph scan above
       "savings-caption", // R24: the derived-screens scan above
+      "vector-fence", // R26: workers/content/test/vector-fence.test.ts
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")
