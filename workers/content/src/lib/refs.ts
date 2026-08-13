@@ -19,7 +19,7 @@ import type { MemberGuard } from "@shared/workers/gating"
  * Named here rather than passed as a free string so a typo cannot mint a second
  * counter beside the real one — `BERG-t0001` and `BERG-T0001` would be two
  * sequences, both plausible, and nobody would notice for months. */
-export const REF_KINDS = { ticket: "T", story: "S", task: "K", todo: "D", sprint: "SPR" } as const
+export const REF_KINDS = { ticket: "T", story: "S", task: "K", todo: "D", sprint: "SPR", meeting: "M" } as const
 export type RefKind = (typeof REF_KINDS)[keyof typeof REF_KINDS]
 
 /** Allocate the next reference for one account, race-safely.

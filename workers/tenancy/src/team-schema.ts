@@ -1497,6 +1497,99 @@ SELECT lower(hex(randomblob(16))), r.id, m.module, r.is_default, r.is_default, r
  );
 `,
   },
+  {
+    version: "0020_meetings",
+    sql: `
+-- MEETINGS — the section the owner asked for, and the one noun the legacy import
+-- had nowhere to put.
+--
+-- Glide held 350 of them and the reconciliation folded every one into a WORK LOG,
+-- because a work log was the only row that carried a date, a duration and a
+-- client. That kept the hours and threw away the meeting: what was on the agenda,
+-- what was decided, and who it was with. A work log answers "how long did that
+-- take"; it has no field that can answer "what did we agree in March".
+--
+-- So this is a record of its own, and the two things on it that nothing else in
+-- the app holds are \`agenda\` and \`notes\`. Time still goes on a work log — a
+-- meeting is not a timesheet — and the two are joined by nothing on purpose: a
+-- meeting that ran long is two facts, not one.
+--
+-- WHY IT IS ITS OWN MODULE and not four more rights on \`delivery\`:
+-- \`meeting_purposes\` is a TAXONOMY of why we meet (a settled list somebody
+-- curates once a year). A meeting is a record that accumulates forever. Sharing
+-- one permission row would mean granting the right to read every note ever taken
+-- in order to let somebody see the list of purposes.
+--
+-- \`purpose_id\` points at that taxonomy, so "why did we meet" is a dropdown value
+-- rather than a fifth spelling typed into a title.
+--
+-- \`status\` is two words, not five: a meeting is scheduled, or it has been held.
+-- Cancelling is \`deactivated_at\` like every other retirement in the base — the
+-- row survives, so a client asking "didn't we have a call in March?" is answerable
+-- either way.
+--
+-- \`google_event_id\` is what makes the calendar push idempotent. Pressing "put it
+-- in my calendar" twice must not make two entries, and the row is the only place
+-- that memory can live (SCOPE ch.03: Google being an hour behind breaks nothing —
+-- Google holding two copies of one meeting is not the same kind of harmless).
+CREATE TABLE meetings (
+  id TEXT PRIMARY KEY,
+  ref TEXT,
+  account_id TEXT REFERENCES accounts(id),
+  purpose_id TEXT REFERENCES meeting_purposes(id),
+  title TEXT NOT NULL,
+  agenda TEXT,
+  notes TEXT,
+  location TEXT,
+  starts_at TEXT NOT NULL,
+  ends_at TEXT,
+  status TEXT NOT NULL DEFAULT 'scheduled',
+  held_at TEXT,
+  google_event_id TEXT,
+  google_event_url TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+-- The list's own sort (newest first, id breaking ties) — the keyset the paged
+-- read walks, so page two is an index seek rather than an offset scan.
+CREATE INDEX idx_meetings_when ON meetings (starts_at DESC, id DESC);
+CREATE INDEX idx_meetings_account ON meetings (account_id);
+-- ONE meeting per calendar entry, on the database rather than in a handler: two
+-- tabs pressing "add to my calendar" at the same instant would otherwise write
+-- two ids over each other and leave an orphan event nothing in kwapso names
+-- (CONCURRENCY rule 2). Partial, so the overwhelming majority of rows — which
+-- have no event at all — are not competing for one NULL.
+CREATE UNIQUE INDEX idx_meetings_event ON meetings (google_event_id) WHERE google_event_id IS NOT NULL;
+
+-- WHICH CLIENT A NAMED FOLDER OR SPACE IS ABOUT. Nullable, and null means the
+-- agency's own — the same sentence \`knowledge_sources.account_id\` already
+-- speaks, which is what lets a Drive folder and a typed note land in the same
+-- compartment by the same rule.
+--
+-- ASKED, NOT GUESSED. The alternative was to read the folder's contents and
+-- match a client's name in them, and that is the failure the compartment idea
+-- exists to prevent: a document filed under the wrong client is worse than one
+-- filed under nobody, because the assistant will quote it confidently at the
+-- wrong person. The person naming the folder knows whose it is; the screen asks
+-- them, beside the question about who may read it.
+ALTER TABLE google_sources ADD COLUMN account_id TEXT;
+CREATE INDEX idx_google_sources_account ON google_sources (account_id);
+
+-- Existing teams: the locked Admin role gains the new module in full (it is
+-- DEFINED as full access and cannot be edited afterwards to grant it). Every
+-- other role gains nothing — including the Client role an owner may have made,
+-- which must never hold this one: a meeting's notes are our own record of a
+-- conversation, and no client login reaches any door on it. Same shape as 0007,
+-- 0013, 0018 and 0019.
+INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+SELECT lower(hex(randomblob(16))), r.id, 'meetings', r.is_default, r.is_default, r.is_default, r.is_default
+  FROM member_roles r
+ WHERE NOT EXISTS (
+   SELECT 1 FROM role_permissions p WHERE p.role_id = r.id AND p.module = 'meetings'
+ );
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

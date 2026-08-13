@@ -195,7 +195,15 @@ describe("the screens are reachable", () => {
         // Which api method posts to this door, and is that method called from a
         // screen? Either hop missing is the same failure with two faces: no
         // plumbing, or plumbing nobody can reach.
-        const callers = [...bodyOf].filter(([, body]) => body.includes(path)).map(([name]) => name)
+        // A WHOLE PATH, not a prefix of one. `body.includes(path)` counted
+        // `/api/content/knowledge/sync-google` as a call to
+        // `/api/content/knowledge/sync`, so wiring a button to the LONGER door
+        // silently marked the shorter one as pressed — and this suite's own
+        // ratchet then demanded the deletion of a true NO_CONTROL line. A door
+        // path ends where the URL literal does: a closing quote or backtick, or
+        // the `?` that starts a query string.
+        const whole = new RegExp(`${path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=["'\`?])`)
+        const callers = [...bodyOf].filter(([, body]) => whole.test(body)).map(([name]) => name)
         if (!callers.some((name) => new RegExp(`\\.${name}\\s*\\(`).test(screens)))
           unpressed.push(`${method} ${path}`)
       }

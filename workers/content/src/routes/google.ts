@@ -75,6 +75,7 @@ import {
   knownContactQuery,
 } from "../lib/google-api"
 import { knownContactEmails } from "../lib/google-read"
+import { claimCalendarEvent, getMeeting } from "../lib/meetings"
 import { getSprint } from "../lib/stories"
 import type { Env } from "../env"
 
@@ -254,6 +255,7 @@ export async function postGoogleSource(request: Request, env: Env): Promise<Resp
     externalId?: unknown
     name?: unknown
     shelf?: unknown
+    accountId?: unknown
   }>(request, env, "google", "create")
   await refusePortalCaller(cfg, guard)
   const id = await addNamedSource(cfg, guard, actor, {
@@ -263,6 +265,10 @@ export async function postGoogleSource(request: Request, env: Env): Promise<Resp
     externalId: requireText(body.externalId, "Folder or space", TEXT_LIMITS.short),
     name: requireText(body.name, "Name", TEXT_LIMITS.short),
     shelf: asShelf(optionalText(body.shelf, "Shelf", TEXT_LIMITS.short)),
+    // WHOSE MATERIAL IS IN IT — asked here, in the same breath as who may read
+    // it, because both are decisions about where the contents end up and neither
+    // can be read back off the contents. Left off = the agency's own.
+    accountId: optionalText(body.accountId, "Client", TEXT_LIMITS.short) ?? null,
   })
   await publishChange(env, guard.teamId, "google", id)
   return json({ sources: await listNamedSources(cfg, guard) })
@@ -510,12 +516,11 @@ export async function postGoogleEvent(request: Request, env: Env): Promise<Respo
  * spanning them — a sprint does not begin at 09:00, and inventing a time would
  * be inventing a fact.
  *
- * THE SECOND ONE IS NOT BUILT, and it is not built because it has nothing to
- * push: "meetings booked in kwapso appearing in Calendar" needs a MEETING, and
- * the app has no meetings table — only `meeting_purposes`, which is a taxonomy
- * of WHY we meet, with no date, no attendee and no duration on it. When a
- * meetings module lands, it becomes a second door beside this one and reuses
- * everything below the first line.
+ * THE SECOND ONE IS THE DOOR BELOW — `…/calendar/meeting`. It was unbuildable
+ * while the app had no meetings table (only `meeting_purposes`, a taxonomy of
+ * WHY we meet with no date, no attendee and no duration on it); now that a
+ * meeting is a row, it is a second door beside this one reusing everything under
+ * the first line.
  *
  * THREE GATES: `work:read` (you may not push a sprint you cannot see),
  * `google:edit`, and the events switch. */
@@ -552,6 +557,79 @@ export async function postGoogleSprintEvent(request: Request, env: Env): Promise
   await publishChange(env, guard.teamId, "google", connectionId)
   return json({ event })
 }
+
+/**
+ * POST /api/content/google/calendar/meeting — a meeting booked in kwapso, in my
+ * calendar. The second half of the sentence the owner said out loud, and the one
+ * that had nothing to push until meetings became a record.
+ *
+ * IT IS TIMED, WHERE A SPRINT IS ALL-DAY, and the difference is not cosmetic: a
+ * sprint is a block of sold work that does not begin at 09:00, and a meeting is
+ * a thing two people sit down for at a stated hour. A meeting with no end runs
+ * the default hour — an entry Google would refuse without an end, and inventing
+ * "all day" for a call would be inventing a fact of a different kind.
+ *
+ * PRESSING IT TWICE MAKES ONE ENTRY. The event id is CLAIMED on the row under
+ * the `google_event_id IS NULL` predicate, so a second press is answered with
+ * the entry that already exists rather than putting a second copy of the same
+ * meeting in somebody's diary. That is the same shape R17 asks of a status move,
+ * applied to a write that lands in a system we do not own — where a duplicate is
+ * not a stale screen but a real appointment somebody has to delete.
+ *
+ * THREE GATES, exactly as the sprint door has: `meetings:read` (you may not push
+ * a meeting you cannot see), `google:edit`, and the events switch.
+ */
+export async function postGoogleMeetingEvent(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{ meetingId?: unknown }>(
+    request,
+    env,
+    "meetings",
+    "read"
+  )
+  await refusePortalCaller(cfg, guard)
+  await requireRight(cfg, guard, "google", "edit")
+  await requireRight(cfg, guard, "google_events", "create")
+  const meeting = await getMeeting(cfg, guard, requireText(body.meetingId, "Meeting", TEXT_LIMITS.short))
+  if (!meeting) return fail(404, "meeting_not_found", "That meeting doesn't exist.")
+  if (!meeting.active)
+    return fail(409, "meeting_cancelled", "That meeting is cancelled — put it back in the diary first.")
+  // Already there: answer with what exists. Not an error — somebody pressing a
+  // button twice means it once.
+  if (meeting.googleEventId)
+    return json({
+      event: { id: meeting.googleEventId, url: meeting.googleEventUrl },
+      alreadyThere: true,
+    })
+
+  const { token, connectionId } = await accessTokenFor(env, cfg, guard, "calendar")
+  const event = await calendarCreate(token, {
+    summary: `${meeting.ref ? `${meeting.ref} · ` : ""}${meeting.title}`,
+    // What it is for, who it is with, and what we mean to cover — the agenda is
+    // the reason somebody opens a calendar entry the morning of the meeting.
+    description: [meeting.purposeName, meeting.accountName, meeting.location, meeting.agenda]
+      .filter(Boolean)
+      .join("\n"),
+    start: meeting.startsAt,
+    end: meeting.endsAt ?? new Date(Date.parse(meeting.startsAt) + DEFAULT_MEETING_MS).toISOString(),
+  })
+  const claimed = await claimCalendarEvent(cfg, guard, meeting.id, { id: event.id, url: event.url })
+  await recordGoogleAct(cfg, guard, actor, {
+    connectionId,
+    type: "Meeting added to calendar",
+    description: `kwapso put the "${meeting.title}" meeting in ${actor.name}'s calendar`,
+  })
+  // Two rows moved (the meeting, and the connection's last-used stamp), so both
+  // screens hear about it.
+  await publishChange(env, guard.teamId, "meetings", meeting.id, "edit", meeting.accountId ?? undefined)
+  await publishChange(env, guard.teamId, "google", connectionId)
+  return json({ event, alreadyThere: !claimed })
+}
+
+/** How long a meeting runs when nobody said. An hour is what a diary assumes and
+ * what a person will correct if it is wrong; the alternative — refusing to push
+ * a meeting whose end nobody decided — would make the button useless for exactly
+ * the meetings people arrange in a hurry. */
+const DEFAULT_MEETING_MS = 60 * 60 * 1000
 
 /** YYYY-MM-DD, one day later — see the exclusive-end note above. */
 function dayAfter(date: string): string {

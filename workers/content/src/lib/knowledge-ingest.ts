@@ -41,13 +41,24 @@ export const INGEST_SOURCES_PER_TICK = 25
 const REPLIES_PER_TICKET = Math.min(50, THREAD_HARD_CAP)
 
 /** A row on its way to becoming a source. `sortAt` is the cursor's value. */
-type IngestRow = {
+export type IngestRow = {
   originRowId: string
   sortAt: string
   title: string
   body: string
   accountId: string | null
   sourceUrl: string | null
+  /** WHO THIS MAY EVER ANSWER FOR. Null = the team's, which is what every row
+   * this app owns is: a ticket, an article and an account belong to everybody
+   * who may read the module. A person's id means the material arrived through
+   * ONE PERSON'S OWN SIGHT of it (their Drive, their mailbox) and is readable
+   * only in THEIR answers — the personal fence lib/knowledge.ts applies to every
+   * read, including the search.
+   *
+   * It is on the ROW rather than on the kind because a single Google kind
+   * carries both: a folder somebody filed as team material and one they kept to
+   * themselves come back from the same read, and the shelf is on each item. */
+  ownerUserId: string | null
 }
 
 /** One kind of in-app material: where it lives, and how a row of it reads.
@@ -57,13 +68,37 @@ type IngestRow = {
  * purpose: a list function answers what a SCREEN needs (fenced, shaped, capped
  * at a page), and this needs whole rows in a stable total order — asking a
  * screen's reader for that would bend it out of shape for a job it is not for. */
-type IngestKind = {
+export type IngestKind = {
   kind: string
+  /** WHERE THIS KIND KEEPS ITS PLACE, when that is not simply its name.
+   *
+   * The three kinds below sweep a TABLE, and a table has one position however
+   * many people are looking at it. A Google kind sweeps ONE PERSON'S sight of an
+   * external system, so Ana's Drive and Ben's Drive are two sweeps with two
+   * positions and two error records — the same kind, twice. Defaulting to `kind`
+   * is what keeps that invisible to everything that does not need to know. */
+  stateKey?: string
   /** which table a source of this kind mirrors — also its `origin_table` */
   table: string
   /** plain words for the activity trail and the failure message */
   label: string
   read: (cfg: D1Rest, guard: MemberGuard, after: Cursor | null, limit: number) => Promise<IngestRow[]>
+  /** MIRRORS A WINDOW, NOT A TABLE. The three kinds above walk a table that has
+   * a first row and a last one, so a cursor that reaches the end has finished.
+   * A Google kind reads what one API call HANDS BACK — the fifty most recently
+   * changed files in a folder, the newest messages in a space — and that window
+   * slides: a document edited today enters it, one nobody has touched since 2023
+   * leaves it. A cursor over a sliding window would stop at the newest thing it
+   * ever saw and never look behind itself again, so a windowed kind REWINDS the
+   * moment it catches up and walks the window again — in the same tick, so that
+   * a change with no new timestamp on it (a folder re-shelved) lands on the very
+   * next press rather than the one after. See sweepKind.
+   *
+   * That is only affordable because of the hash: a re-walk over unchanged
+   * material is one cheap upsert per item, no chunking, no embedding call. It is
+   * the same trade the sweep already makes everywhere else, said once more for a
+   * source whose order we do not control. */
+  windowed?: boolean
 }
 
 type Cursor = { at: string; id: string }
@@ -130,6 +165,8 @@ export const INGEST_KINDS: IngestKind[] = [
           .filter(Boolean)
           .join("\n\n"),
         accountId: r.account_id,
+        // A ticket belongs to the team that raised and answered it.
+        ownerUserId: null,
         sourceUrl: null,
       }))
     },
@@ -168,6 +205,8 @@ export const INGEST_KINDS: IngestKind[] = [
           .join("\n\n"),
         // The agency's own how-to library belongs to nobody's client.
         accountId: null,
+        // …and to nobody in particular either: an article is written FOR the team.
+        ownerUserId: null,
         sourceUrl: r.content_link,
       }))
     },
@@ -218,6 +257,8 @@ export const INGEST_KINDS: IngestKind[] = [
         // An account IS its own compartment — everything about a client is filed
         // under that client.
         accountId: r.id,
+        // The customer spine is the team's, like every other row this app owns.
+        ownerUserId: null,
         sourceUrl: null,
       }))
     },
@@ -263,16 +304,38 @@ export async function sweepKind(
   kind: IngestKind,
   limit = INGEST_SOURCES_PER_TICK
 ): Promise<SweepResult> {
+  const stateKey = kind.stateKey ?? kind.kind
   const state = await d1Query<{ cursor: string | null }>(
     cfg,
     guard.databaseId,
+    // R14: one row by primary key.
     "SELECT cursor FROM knowledge_ingest WHERE kind = ? LIMIT 1",
-    [kind.kind]
+    [stateKey]
   )
   const cursor = parseCursor(state[0]?.cursor ?? null)
-  const rows = await kind.read(cfg, guard, cursor, limit)
+  let rows = await kind.read(cfg, guard, cursor, limit)
   let indexed = 0
   let last: Cursor | null = cursor
+
+  // A WINDOWED KIND THAT HAS CAUGHT UP REWINDS, AND RE-WALKS IN THE SAME TICK.
+  //
+  // It read nothing past its cursor, which for a sliding window means "nothing
+  // NEWER" rather than "nothing left" — so the position is dropped and the
+  // window is walked again from the start, now.
+  //
+  // Doing it in the same tick rather than leaving it for the next one is the
+  // difference between a shelf move landing on the next press and landing on the
+  // one after: a person who moves a folder to the team's shelf and asks kwapso to
+  // bring it in has changed nothing about the FILE, so there is nothing newer for
+  // a cursor to find, and a tick that only rewound would file nothing at all.
+  //
+  // Cheap by construction: everything it re-meets is hash-skipped (no chunking,
+  // no embedding, one upsert), and it costs at most ONE extra listing per kind
+  // per tick. Bounded, once — not a loop.
+  if (kind.windowed && rows.length === 0 && cursor) {
+    last = null
+    rows = await kind.read(cfg, guard, null, limit)
+  }
 
   for (const row of rows) {
     const compartment = row.accountId ? accountCompartment(row.accountId) : AGENCY_COMPARTMENT
@@ -286,11 +349,15 @@ export async function sweepKind(
       cfg,
       guard.databaseId,
       `INSERT INTO knowledge_sources
-         (id, kind, origin_table, origin_row_id, compartment, account_id, title, body, source_url, created_at, creator_name)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'kwapso')
+         (id, kind, origin_table, origin_row_id, compartment, account_id, owner_user_id, title, body, source_url, created_at, creator_name)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'kwapso')
        ON CONFLICT (origin_table, origin_row_id) WHERE origin_row_id IS NOT NULL
        DO UPDATE SET title = excluded.title, body = excluded.body, source_url = excluded.source_url,
-                     compartment = excluded.compartment, account_id = excluded.account_id, updated_at = ?
+                     compartment = excluded.compartment, account_id = excluded.account_id,
+                     owner_user_id = excluded.owner_user_id,
+                     content_hash = CASE WHEN knowledge_sources.owner_user_id IS excluded.owner_user_id
+                                         THEN knowledge_sources.content_hash ELSE NULL END,
+                     updated_at = ?
        RETURNING id, content_hash, deactivated_at`,
       [
         ulid(),
@@ -299,6 +366,13 @@ export async function sweepKind(
         row.originRowId,
         compartment,
         row.accountId,
+        // THE PERSONAL FENCE TRAVELS ON THE UPSERT, and it is in the SET list on
+        // purpose: somebody who moves a folder from their own shelf to the
+        // team's has changed who this material may answer for, and a source that
+        // kept the old owner would go on being invisible to the colleague it was
+        // just shared with. It travels the other way too — team back to private
+        // — which is the direction that matters.
+        row.ownerUserId,
         row.title,
         row.body,
         row.sourceUrl,
@@ -311,18 +385,26 @@ export async function sweepKind(
     if (!source || source.deactivated_at !== null) continue
     // THE SKIP THAT PAYS FOR THE SWEEP: unchanged text is not re-chunked, so it
     // costs no embedding call and no writes.
+    //
+    // A SHELF MOVE IS A CHANGE EVEN WHEN THE TEXT IS IDENTICAL, and the statement
+    // above is where that is decided: the fence is stamped on every CHUNK and
+    // every TERM row (the search reads it there, never through a join), so a
+    // folder moved from private to the team's would go on being invisible to the
+    // colleague it was just shared with — and, far worse, one moved the other way
+    // would go on answering their questions. The upsert clears the hash when the
+    // owner moved, which lands here as "changed" and re-chunks with the new fence.
     if (source.content_hash === hash) continue
     await indexSource(env, cfg, guard, source.id)
     indexed++
   }
 
   const caughtUp = rows.length < limit
-  await recordRun(cfg, guard, kind.kind, {
+  await recordRun(cfg, guard, stateKey, {
     cursor: last ? `${last.at}|${last.id}` : null,
     indexed,
     error: null,
   })
-  return { kind: kind.kind, read: rows.length, indexed, caughtUp }
+  return { kind: stateKey, read: rows.length, indexed, caughtUp }
 }
 
 /** Stamp what a tick did on the kind's own row — including, and especially, what
@@ -351,26 +433,57 @@ async function recordRun(
   )
 }
 
-/** One tick over every kind. A kind that throws is RECORDED and the rest of the
- * sweep still runs — one bad table must not stop the others from catching up,
- * and a failure that stopped everything silently is the shape R12 exists for. */
+/** One tick over a LIST of kinds. A kind that throws is RECORDED and the rest of
+ * the sweep still runs — one bad table must not stop the others from catching
+ * up, and a failure that stopped everything silently is the shape R12 exists for.
+ *
+ * The list is a parameter, and that is the whole of the separation between the
+ * sweep the CRON runs and the one a PERSON runs: same engine, same resumability,
+ * same failure record, two sets of kinds. See sweepAll below for why the second
+ * set cannot be reached from a schedule. */
+export async function sweepKinds(
+  env: Env,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  kinds: IngestKind[],
+  limit = INGEST_SOURCES_PER_TICK
+): Promise<SweepResult[]> {
+  const results: SweepResult[] = []
+  for (const kind of kinds) {
+    const stateKey = kind.stateKey ?? kind.kind
+    try {
+      results.push(await sweepKind(env, cfg, guard, kind, limit))
+    } catch (e) {
+      const error = e instanceof Error ? e.message : String(e)
+      await recordRun(cfg, guard, stateKey, { cursor: null, indexed: 0, error })
+      results.push({ kind: stateKey, read: 0, indexed: 0, caughtUp: false, error })
+    }
+  }
+  return results
+}
+
+/**
+ * One tick over every kind THIS APP OWNS THE ROWS OF — what the 15-minute cron
+ * sweeps, and what a person pressing "bring it up to date" sweeps.
+ *
+ * IT IS `INGEST_KINDS` AND NOTHING ELSE, and that is a boundary rather than a
+ * default. The Google kinds live in a second list (lib/knowledge-google.ts) that
+ * this function does not import and cannot name, because everything in it is
+ * read with ONE PERSON'S OWN TOKEN: a sweep of somebody's mailbox has to run as
+ * that person or not at all. The cron has no caller and builds a guard whose
+ * user id no row can hold — so if the two lists were one, that guard would
+ * resolve no connection and the sweep would quietly do nothing, which is the
+ * right failure but an invisible one. Two lists make it a fact of the code
+ * instead: there is no argument the scheduled handler could pass that would
+ * reach a personal kind.
+ */
 export async function sweepAll(
   env: Env,
   cfg: D1Rest,
   guard: MemberGuard,
   limit = INGEST_SOURCES_PER_TICK
 ): Promise<SweepResult[]> {
-  const results: SweepResult[] = []
-  for (const kind of INGEST_KINDS) {
-    try {
-      results.push(await sweepKind(env, cfg, guard, kind, limit))
-    } catch (e) {
-      const error = e instanceof Error ? e.message : String(e)
-      await recordRun(cfg, guard, kind.kind, { cursor: null, indexed: 0, error })
-      results.push({ kind: kind.kind, read: 0, indexed: 0, caughtUp: false, error })
-    }
-  }
-  return results
+  return sweepKinds(env, cfg, guard, INGEST_KINDS, limit)
 }
 
 /** What the sweep has done so far, per kind — the screen's "is it in step?" row
@@ -385,7 +498,21 @@ export type IngestState = {
   sourcesIndexed: number
 }
 
-export async function listIngestState(cfg: D1Rest, guard: MemberGuard): Promise<IngestState[]> {
+export async function listIngestState(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  /** the caller's own personal state keys (their Google kinds), so the screen
+   * shows how far THEIR material has got and never a colleague's. Empty when the
+   * caller has no Google right — the sync screen then reads exactly as it did
+   * before this lane existed. */
+  personalKeys: string[] = []
+): Promise<IngestState[]> {
+  // NAMED, NOT SCANNED. The table now holds a row per person per Google kind, so
+  // "everything in it" would be one member's screen showing every colleague's
+  // sweep. The keys are code-known — the shared kinds plus the caller's own — so
+  // the read asks for exactly the rows it may show, and R14's cap is the length
+  // of a list this statement is carrying anyway.
+  const keys = [...INGEST_KINDS.map((k) => k.stateKey ?? k.kind), ...personalKeys]
   const rows = await d1Query<{
     kind: string
     cursor: string | null
@@ -397,10 +524,11 @@ export async function listIngestState(cfg: D1Rest, guard: MemberGuard): Promise<
   }>(
     cfg,
     guard.databaseId,
-    // R14 hard cap: one row per KIND, and the kinds are a fixed list in code —
-    // the cap is here because the law is the law, not because this can grow.
+    // R14 hard cap: one row per named key, and the names are a fixed list in code.
     `SELECT kind, cursor, last_run_at, last_ok_at, last_error, runs, sources_indexed
-       FROM knowledge_ingest ORDER BY kind LIMIT ${INGEST_KINDS.length + 10}`
+       FROM knowledge_ingest WHERE kind IN (${keys.map(() => "?").join(", ")})
+      ORDER BY kind LIMIT ${keys.length}`,
+    keys
   )
   return rows.map((r) => ({
     kind: r.kind,

@@ -17,6 +17,7 @@ import type {
   KnowledgeSource,
   Learning,
   MarketingPost,
+  Meeting,
   MeetingPurpose,
   Task,
   Program,
@@ -195,6 +196,36 @@ export function shapeKnowledgeList(
       kind: KNOWLEDGE_KIND[s.kind] ?? s.kind,
       filed: knowledgeFiledUnder(s, accountNames),
       state: s.active ? "In use" : "Not in use",
+    })),
+  }
+}
+
+/* -------------------------------- meetings -------------------------------- */
+
+/** One meeting, as a row: when it was, who it was with and why. The date leads
+ * because a diary is scanned by date — the title is what you read once you have
+ * found the day. */
+export function shapeMeetingsList(meetings: Meeting[]): ScreenData {
+  return {
+    rows: meetings.map((m) => ({
+      id: m.id,
+      // A CANCELLED meeting stays in the list (deactivate-not-delete) and says
+      // so — "didn't we have a call in March?" is answered either way, and the
+      // answer "yes, and we called it off" is a different one from silence.
+      name: m.active ? m.title : `${m.title} (cancelled)`,
+      detail:
+        [
+          formatDate(m.startsAt),
+          m.accountName ?? "ours",
+          m.purposeName,
+          !m.active ? "cancelled" : m.status === "held" ? "held" : null,
+        ]
+          .filter(Boolean)
+          .join(" · ") || "—",
+      // Facet columns (read by the filter engine, not the renderer).
+      client: m.accountName ?? "Ours",
+      purpose: m.purposeName ?? "Not said",
+      state: !m.active ? "Cancelled" : m.status === "held" ? "Held" : "Scheduled",
     })),
   }
 }

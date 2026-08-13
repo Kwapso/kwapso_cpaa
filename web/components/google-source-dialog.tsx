@@ -12,6 +12,16 @@
 // form that shares the thing, it defaults to `private`, and each choice is
 // spelled out in a sentence rather than a word.
 //
+// THE THIRD FIELD IS THE SAME ARGUMENT, ONE STEP ALONG: whose material is in it.
+// A folder's contents become knowledge-base sources, and every source is filed in
+// a COMPARTMENT — one client's, or the agency's own. That could have been guessed
+// by matching client names inside the documents; guessing it is precisely the
+// failure the compartment idea exists to prevent, because a document filed under
+// the wrong client is worse than one filed under nobody: the assistant will quote
+// it confidently at the wrong person. The person naming the folder knows. So the
+// form asks, here, beside the question about who may read it — the two decisions
+// that cannot be read back off the contents afterwards.
+//
 // Through the shared FormShell (Law R4) with a per-session draft (Law R7) — a
 // half-answered "who may read this" must not be lost to a mis-tap and guessed
 // at the second time.
@@ -22,6 +32,13 @@ import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@kwapso/ui/registry/primitives/select/select"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Plus, Search } from "lucide-react"
@@ -32,11 +49,22 @@ import { ApiFailure, content } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
 
-export type GoogleSourceValues = { externalId: string; name: string; shelf: GoogleShelf }
+export type GoogleSourceValues = {
+  externalId: string
+  name: string
+  shelf: GoogleShelf
+  /** which client's compartment its contents are filed under; "" = the agency's own. */
+  accountId: string
+}
+
+/** Radix Select can't hold an empty value, so "the agency's own" uses a sentinel
+ * — the same one the knowledge form uses for exactly the same decision. */
+const AGENCY = "__agency__"
 
 const searchField = { ...defaultFieldConfig, label: "Find it", required: false }
 const chosenField = { ...defaultFieldConfig, label: "What you're sharing", required: true }
 const shelfField = { ...defaultFieldConfig, label: "Who will be able to read it", required: true }
+const filedField = { ...defaultFieldConfig, label: "Whose material is in it", required: false }
 
 /** The two shelves, in the words a person needs rather than the words the column
  * uses. "Just me" is first and is the default, because the safe answer should be
@@ -59,17 +87,21 @@ export function GoogleSourceDialog({
   onOpenChange,
   service,
   draftKey,
+  accountOptions,
   onSubmit,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   service: "drive" | "chat"
   draftKey?: string
+  /** the clients this person may file it under — already fenced by their own
+   * read of the accounts door. */
+  accountOptions: { id: string; name: string }[]
   onSubmit: (values: GoogleSourceValues) => Promise<void>
 }) {
   const [values, setValues, clearDraft] = useFormDraft<GoogleSourceValues & { search: string }>(
     draftKey,
-    { externalId: "", name: "", shelf: "private", search: "" },
+    { externalId: "", name: "", shelf: "private", accountId: AGENCY, search: "" },
     open
   )
   const [busy, setBusy] = React.useState(false)
@@ -100,6 +132,7 @@ export function GoogleSourceDialog({
         externalId: values.externalId.trim(),
         name: values.name.trim(),
         shelf: values.shelf,
+        accountId: values.accountId === AGENCY ? "" : values.accountId,
       })
       clearDraft()
       setOptions(null)
@@ -201,6 +234,31 @@ export function GoogleSourceDialog({
             </button>
           ))}
         </div>
+      </Field>
+
+      {/* WHOSE MATERIAL, asked rather than guessed — see the note at the top. */}
+      <Field config={filedField} htmlFor="google-source-client" className={fieldSpacing}>
+        <Select
+          value={values.accountId}
+          onValueChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
+          disabled={busy}
+        >
+          <SelectTrigger id="google-source-client">
+            <SelectValue placeholder="Ours — not a client's" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={AGENCY}>Ours — not a client's</SelectItem>
+            {accountOptions.map((a) => (
+              <SelectItem key={a.id} value={a.id}>
+                {a.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-muted-foreground mt-1.5 text-xs">
+          Questions about that client are answered from what is in here. Leave it as ours if the {noun} is
+          not about one.
+        </p>
       </Field>
     </FormShellDialog>
   )

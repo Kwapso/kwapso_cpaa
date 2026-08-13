@@ -15,6 +15,7 @@
 
 import { fail, json, pagedJson } from "@shared/workers/http"
 import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { hasRight, requireRight } from "@shared/workers/gating"
 import { publishChange } from "@shared/workers/realtime"
 import { refusePortalCaller } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
@@ -30,6 +31,7 @@ import {
   type SourceInput,
 } from "../lib/knowledge"
 import { listIngestState, sweepAll } from "../lib/knowledge-ingest"
+import { googleStateKeys, sweepGoogle } from "../lib/knowledge-google"
 import type { Env } from "../env"
 
 /** GET /api/content/knowledge — the sources, newest first (?id → just that one).
@@ -105,7 +107,47 @@ export async function getKnowledgeAsk(request: Request, env: Env): Promise<Respo
 export async function getKnowledgeSync(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "knowledge", "read")
   await refusePortalCaller(cfg, guard)
-  return json({ ingest: await listIngestState(cfg, guard) })
+  // THE CALLER'S OWN Google rows ride along — and only theirs. The state table
+  // holds a row per person per service now (a sweep of somebody's mailbox is
+  // that person's sweep), so a screen showing "everything in the table" would be
+  // one member reading how far every colleague's Drive has got. `hasRight`
+  // rather than `requireRight`: somebody without the Google switch still gets a
+  // perfectly good answer about the tickets, articles and accounts.
+  const mine = (await hasRight(cfg, guard, "google", "read")) ? googleStateKeys(guard.userId) : []
+  return json({ ingest: await listIngestState(cfg, guard, mine) })
+}
+
+/**
+ * POST /api/content/knowledge/sync-google — bring MY OWN Google material into
+ * step: the folders and spaces I named, the mail with a known contact, my diary.
+ *
+ * A SECOND DOOR RATHER THAN A FLAG ON THE FIRST, for two reasons that point the
+ * same way. It needs a right the other one does not (`google:read` — reading
+ * somebody's mailbox is not the same permission as filing a note), and it is the
+ * only sweep in the product that acts as a PERSON rather than on a team's rows:
+ * every byte it reads comes through the caller's own token, and there is no
+ * caller on a cron. Bolting it onto the shared door would have made "who is this
+ * running as?" a question with two answers depending on a flag.
+ *
+ * WHAT AN OWNER STILL HAS TO DO: nothing here works until somebody has stood at
+ * Google's own consent screen in a browser and said yes (Settings → connect).
+ * Until then this door answers honestly with an empty list of kinds — the person
+ * has connected nothing, so there is nothing of theirs to sweep.
+ *
+ * A coarse ping, not a row-level one: a slice touches many sources and no one
+ * row is the change — the same shape the shared sync door already has.
+ */
+export async function postKnowledgeSyncGoogle(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "knowledge", "create")
+  await refusePortalCaller(cfg, guard)
+  await requireRight(cfg, guard, "google", "read")
+  const results = await sweepGoogle(env, cfg, guard)
+  if (results.some((r) => r.indexed > 0)) await publishChange(env, guard.teamId, "knowledge")
+  return json({
+    results,
+    caughtUp: results.every((r) => r.caughtUp && !r.error),
+    total: await countSources(cfg, guard),
+  })
 }
 
 /** POST /api/content/knowledge — add a source the assistant may read. */

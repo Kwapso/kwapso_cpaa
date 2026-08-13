@@ -23,6 +23,7 @@ export type SectionKey =
   | "sprints"
   | "stories"
   | "tasks"
+  | "meetings"
   // The agency's own housekeeping (staff profiles has no section — the owner's
   // ruling puts a profile on the member's own page, not on a page of its own).
   | "marketing"
@@ -56,7 +57,7 @@ export const TOP_LEVEL_MODULES = [
   // away the warm in-memory cache the whole caching model is built on. The four
   // work-engine destinations join it here on the way in rather than after the
   // same bug is noticed again.
-  "knowledge", "apps", "sprints", "stories", "tasks",
+  "knowledge", "apps", "sprints", "stories", "tasks", "meetings",
   // The agency's own housekeeping — clean top-level URLs, like every other
   // sidebar page (`purposes` rides along because it has records of its own).
   "marketing", "brand", "delivery", "purposes",

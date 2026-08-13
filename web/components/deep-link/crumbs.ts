@@ -22,6 +22,7 @@ import type {
   Learning,
   Sprint,
   Story,
+  Meeting,
   Task,
   TeamMember,
   TeamRole,
@@ -40,6 +41,7 @@ export type CrumbRecords = {
   sprints: Sprint[] | undefined
   stories: Story[] | undefined
   tasks: Task[] | undefined
+  meetings: Meeting[] | undefined
 }
 
 /** The record's own name for the last crumb — read from the list already in cache
@@ -70,6 +72,10 @@ function recordLabel(module: string | null, recordId: string | null, records: Cr
   if (module === "tasks") {
     const task = records.tasks?.find((t) => t.id === recordId)
     return task ? (task.ref ?? task.title) : "Task"
+  }
+  if (module === "meetings") {
+    const meeting = records.meetings?.find((m) => m.id === recordId)
+    return meeting ? (meeting.ref ?? meeting.title) : "Meeting"
   }
   if (module === "tickets") return "Ticket"
   return ""

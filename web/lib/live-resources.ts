@@ -167,6 +167,15 @@ export const listFetch = {
       primeCache(totalKey("tasks", teamId), r.total)
       return r.tasks
     }),
+  // R14: meetings are PAGED — an event is never curated away, so the door answers
+  // with a cursor rather than a ceiling. Page one lands in the cache, its next
+  // cursor in the sidecar <LoadMore> reads, exactly like tickets and sources.
+  meetings: (teamId: string) =>
+    contentApi.meetings().then((r) => {
+      primeCache(totalKey("meetings", teamId), r.total)
+      primeCache(cursorKey(meetingsKey(teamId)), r.nextCursor)
+      return r.meetings
+    }),
   // Sprints are BOUNDED, not paged (a block of sold work grows at the speed of
   // contracts), so there is no cursor sidecar to prime — just the exact total.
   sprints: (teamId: string) =>
@@ -246,6 +255,11 @@ export function todosKey(teamId: string): string {
 }
 export function tasksKey(teamId: string): string {
   return `tasks:${teamId}`
+}
+
+/** The diary's cache key (the paged meetings list). */
+export function meetingsKey(teamId: string): string {
+  return `meetings:${teamId}`
 }
 
 /** The triage strip: whose week it is, and the requests nobody has read. One
@@ -543,6 +557,17 @@ export const TEAM_RESOURCES: Record<
     fetchOne: (id) => contentApi.taskOne(id),
     fetchList: (t) => listFetch.tasks(t),
     deps: (_t, id) => [`activity:record:tasks:${id}`],
+  },
+  // MEETINGS — row-level live. A paged list's rows live in a cache key with its
+  // cursor in a sidecar, so the same registry keeps it live (R15's own words).
+  // The calendar push moves this row too, which is why "it is in your diary"
+  // appears without a reload on the screen that asked for it.
+  meetings: {
+    key: (t) => meetingsKey(t),
+    idField: "id",
+    fetchOne: (id) => contentApi.meetingOne(id),
+    fetchList: (t) => listFetch.meetings(t),
+    deps: (_t, id) => [`activity:record:meetings:${id}`],
   },
   // A rate card ping carries the ACCOUNT it sits on — a card is only ever read on
   // its account's own screen, so the account is the row a listener can act on.

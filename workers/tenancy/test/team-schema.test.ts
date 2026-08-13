@@ -135,6 +135,7 @@ describe("team schema", () => {
       // complete it themselves. That is why it is not four more rights on
       // `work`, which no client holds at all.
       "todos",
+      "meetings",
       // THE AGENCY'S OWN HOUSEKEEPING — the four modules carrying the seven
       // legacy tables that describe how the agency runs ITSELF rather than what
       // it does for a client. None of them is customer material, so unlike

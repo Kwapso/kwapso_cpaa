@@ -70,6 +70,10 @@ export type TeamSection = {
     | "sprints"
     | "stories"
     | "tasks"
+    // MEETINGS — a section of its own, which is what the owner asked for. It sits
+    // in `daily` beside Stories and Tasks: a diary is something somebody opens
+    // before their first call, not an inventory they consult twice a year.
+    | "meetings"
     // The agency's own housekeeping. Four sidebar pages rather than admin tabs:
     // a marketing calendar and a brand library are somebody's actual work, not a
     // setting. Staff profiles has NO section of its own — the owner's ruling is
@@ -162,6 +166,7 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // app is an inventory, and neither is a thing somebody opens before lunch.
   { key: "stories", title: "Stories", module: "work", segment: "stories", placement: "sidebar", countCacheKey: "stories", group: "daily" },
   { key: "tasks", title: "Tasks", module: "work", segment: "tasks", placement: "sidebar", countCacheKey: "tasks", group: "daily" },
+  { key: "meetings", title: "Meetings", module: "meetings", segment: "meetings", placement: "sidebar", countCacheKey: "meetings", group: "daily" },
   // Apps gate on `processes`, not `work`: an app is the thing a process map
   // hangs off, and the module that owns the App → Process → Step chain is the
   // one whose right a person needs to see any of it.
@@ -226,6 +231,9 @@ export const CONCEPT_ICON = {
   sprints: "calendar-range",
   apps: "app-window",
   tasks: "list-todo",
+  // A meeting is two people and an hour — the icon says the hour, because that
+  // is what distinguishes it from every other list in the rail.
+  meetings: "calendar-clock",
   todos: "inbox",
   timer: "timer",
   import: "upload",

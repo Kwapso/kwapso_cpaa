@@ -383,6 +383,61 @@ export const TARGETS: Record<string, TargetDef> = {
       sequence: r.sequence ? Number(r.sequence) : undefined,
     }),
   },
+  // THE 350 MEETINGS GLIDE HELD, and the reason this target exists at all. The
+  // legacy reconciliation folded every one of them into a WORK LOG, because a
+  // work log was the only row that carried a date, a duration and a client —
+  // which kept the hours and threw away the agenda and what was decided. Now
+  // that a meeting is a record, the history can come back in as itself.
+  //
+  // NO PURPOSE COLUMN, deliberately, and the same sentence the stories target
+  // makes about an assignee: a meeting purpose is a RECORD here and a word in a
+  // spreadsheet, and a wrong fuzzy match files a conversation under the wrong
+  // reason for ever. The client IS resolvable, because an account has a name a
+  // file can carry and the reference resolves it to the real row or rejects the
+  // line — no guess in either direction.
+  meetings: {
+    tableKey: "meetings",
+    module: "meetings",
+    displayName: "Meetings",
+    description:
+      "Bring the diary in in bulk — one row per conversation, with what was on the agenda and what was decided. The reason we met is set afterwards on the meeting itself, because a meeting purpose is a record here and only a word in a file.",
+    columns: [
+      { key: "title", label: "Title", required: true },
+      { key: "startsAt", label: "When", required: true },
+      { key: "endsAt", label: "Until", required: false },
+      { key: "account", label: "Client", required: false },
+      { key: "location", label: "Where", required: false },
+      { key: "agenda", label: "Agenda", required: false },
+      { key: "notes", label: "Notes", required: false },
+    ],
+    endpoint: { binding: "CONTENT", path: "/api/content/meetings" },
+    naturalKey: "title",
+    sample: {
+      title: "Quarterly review with Bergman",
+      startsAt: "2026-09-14T10:00:00Z",
+      endsAt: "2026-09-14T11:00:00Z",
+      account: "Bergman Logistik",
+      location: "Their office",
+      agenda: "What shipped last quarter, what is next, and the dispatch screen complaints.",
+      notes: "Agreed to move the driver app forward and park the reporting work.",
+    },
+    references: [
+      // The client is resolved to a REAL account id, and a name that matches
+      // nothing REJECTS the line rather than importing a meeting filed under
+      // nobody: a note about Bergman sitting in the agency's own compartment is
+      // an answer the assistant will give to the wrong person.
+      { column: "account", target: "accounts", by: "name", mode: "id", onMissing: "reject" },
+    ],
+    buildBody: (r, refs) => ({
+      title: r.title,
+      startsAt: r.startsAt,
+      endsAt: r.endsAt || undefined,
+      accountId: refs?.account || undefined,
+      location: r.location || undefined,
+      agenda: r.agenda || undefined,
+      notes: r.notes || undefined,
+    }),
+  },
   meeting_purposes: {
     tableKey: "meeting_purposes",
     module: "delivery",

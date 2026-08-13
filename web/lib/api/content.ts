@@ -31,6 +31,7 @@ import type {
   Todo,
   WorkLog,
   MarketingPost,
+  Meeting,
   MeetingPurpose,
   Program,
   StaffCertificate,
@@ -359,6 +360,43 @@ export const content = {
       caughtUp: boolean
       total: number
     }>("/api/content/knowledge/sync", post({})),
+  /** The PERSONAL half of the sweep: my own Drive folders, spaces, mail and
+   * diary, read through MY connection. Empty results mean I have connected
+   * nothing yet — the consent screen is a browser round-trip nobody can do for
+   * me. */
+  syncGoogleKnowledge: () =>
+    api<{
+      results: { kind: string; read: number; indexed: number; caughtUp: boolean; error?: string }[]
+      caughtUp: boolean
+      total: number
+    }>("/api/content/knowledge/sync-google", post({})),
+
+  /* -------------------------------- meetings -------------------------------- */
+  /** R14: a PAGE of meetings (a GROWING collection — an event is never curated
+   * away) — hand `nextCursor` back for the next one. `total` is the exact server
+   * count the heading shows. `view` is 'upcoming' by default. */
+  meetings: (cursor?: string | null, view?: "upcoming" | "all") =>
+    api<PagedResponse<{ meetings: Meeting[] }>>(
+      `/api/content/meetings?view=${enc(view ?? "all")}${cursor ? `&cursor=${enc(cursor)}` : ""}`
+    ),
+  meetingOne: (id: string) =>
+    api<{ meetings: Meeting[] }>(`/api/content/meetings?id=${enc(id)}`).then((r) => r.meetings[0] ?? null),
+  createMeeting: (input: {
+    title: string
+    startsAt: string
+    endsAt?: string | null
+    accountId?: string | null
+    purposeId?: string | null
+    agenda?: string | null
+    notes?: string | null
+    location?: string | null
+  }) => api<{ meeting: Meeting | null; total: number }>("/api/content/meetings", post(input)),
+  updateMeeting: (input: { id: string } & Partial<Meeting>) =>
+    api<{ meeting: Meeting | null; total: number }>("/api/content/meetings/update", post(input)),
+  setMeetingHeld: (id: string, held: boolean) =>
+    api<{ meeting: Meeting | null; total: number }>("/api/content/meetings/held", post({ id, held })),
+  setMeetingActive: (id: string, active: boolean) =>
+    api<{ meeting: Meeting | null; total: number }>("/api/content/meetings/active", post({ id, active })),
 
   /* ------------------- the agency's own housekeeping ------------------------
    * Four modules, all CAPPED rather than paged (R14) — authored libraries and
@@ -471,12 +509,15 @@ export const content = {
     api<{ options: { externalId: string; name: string }[] }>(
       `/api/content/google/pick?service=${enc(service)}${q ? `&q=${enc(q)}` : ""}`
     ),
-  /** Share one — and say, in the same call, who may read it. */
+  /** Share one — and say, in the same call, who may read it AND whose material
+   * it is. Both questions are about where the contents end up, and neither can
+   * be read back off the contents afterwards. */
   googleAddSource: (input: {
     service: "drive" | "chat"
     externalId: string
     name: string
     shelf: GoogleShelf
+    accountId?: string | null
   }) => api<{ sources: GoogleSource[] }>("/api/content/google/sources", post(input)),
   googleSetSourceActive: (id: string, active: boolean) =>
     api<{ sources: GoogleSource[] }>("/api/content/google/sources/active", post({ id, active })),
@@ -522,6 +563,14 @@ export const content = {
    * record to push today. */
   googleSprintToCalendar: (sprintId: string) =>
     api<{ event: CalendarEntry }>("/api/content/google/calendar/sprint", post({ sprintId })),
+  /** The other half: a meeting booked here, in my own calendar. `alreadyThere`
+   * is how the screen says "it is already in your diary" instead of quietly
+   * making a second entry. */
+  googleMeetingToCalendar: (meetingId: string) =>
+    api<{ event: { id: string; url: string | null }; alreadyThere: boolean }>(
+      "/api/content/google/calendar/meeting",
+      post({ meetingId })
+    ),
 
   googleChat: (sourceId: string) =>
     api<{ messages: ChatLine[]; space: string }>(

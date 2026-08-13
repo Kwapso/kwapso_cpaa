@@ -498,6 +498,14 @@ export const PORTAL_ACTIVITY_FENCE: Record<string, { fence: "account" | null; wh
   staff_profiles: { fence: null, why: "what a colleague is like and what they are bad at. The sharpest case of agency-only material in the app, and its HISTORY names both the subject and the person who wrote it down" },
   staff_certificates: { fence: null, why: "what our people are qualified in, and when a qualification was corrected — the agency's own credential register" },
 
+  // MEETINGS. `null`, and it is the same sentence the module's doors already
+  // speak: every meetings handler opens with refusePortalCaller, because the
+  // NOTES are our record of a conversation — written for us, often ABOUT the
+  // client rather than for them ("they are unhappy with the dispatch screen and
+  // hinted at the renewal"). A history feed would say who wrote them and when
+  // they were changed, which is a sharper disclosure than the meeting itself.
+  meetings: { fence: null, why: "a meeting's history names the staff who arranged it and rewrote its notes — and the notes are the agency's own record of a conversation, often about the client rather than for them. A client login reaches no door on this module at all (every handler opens with refusePortalCaller), so silence here is the door's own sentence repeated where the feed can hear it" },
+
   // GOOGLE. `null` twice, and neither is a hard call: a client login cannot
   // reach a single door on this module (every handler opens with
   // refusePortalCaller — the clients get no assistant and no Google surface at
@@ -574,6 +582,10 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
   // so both gate on `work`, the module a client login never holds.
   stories: "work",
   sprints: "work",
+  // A meeting gates on its OWN module — see shared/team-modules.ts for why the
+  // notes are the thing being permissioned, and why `delivery` (the taxonomy of
+  // why we meet) is not the same question.
+  meetings: "meetings",
   // THE AGENCY'S OWN HOUSEKEEPING. Six tables, four modules — grouped the way a
   // reader meets them: two tables gate on `delivery` because a programme and a
   // meeting purpose are one taxonomy, and two on `staff_profiles` because a
@@ -672,6 +684,15 @@ export const GROWING_COLLECTIONS: Record<
     webKey: "workLogsKey(",
     why: "the fastest-growing row in the work engine — 2,940 arrived from two years of the previous system and the rate only goes up, because every piece of work produces several. A ceiling here would eventually be a refusal to show somebody their own week",
   },
+  meetings: {
+    lib: "workers/content/src/lib/meetings.ts",
+    fn: "listMeetings",
+    routes: "workers/content/src/routes/meetings.ts",
+    rowsKey: "meetings",
+    listRecipe: "meetings.list",
+    webKey: "meetingsKey(",
+    why: "an EVENT, which is the shape this law names first: a meeting happens, is written up and is never curated away, because a cancelled call in March is still the answer to 'didn't we speak in March?'. Glide's own two years are 350 rows before this app has held a single conversation of its own, and the oldest is the one somebody digs for",
+  },
   stories: {
     lib: "workers/content/src/lib/stories.ts",
     fn: "listStories",
@@ -730,6 +751,11 @@ export const RECORD_DETAIL_COMPONENTS = [
   "role-detail",
   "account-detail",
   "knowledge-detail",
+  // A meeting's detail is a component rather than a recipe because two of its
+  // three tabs are PROSE somebody wrote (the agenda, and the notes afterwards)
+  // and its header carries the one button that reaches outside this app — "put
+  // it in my calendar". No engine block draws either.
+  "meeting-detail",
 ] as const
 
 /** R2 — reviewed bypasses. Each MUST get tabs over time; the reason is mandatory.
@@ -787,6 +813,10 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
   // description block like the housekeeping four above it.
   "tasks.detail.overview":
     "one task's status, who has it, when it is due and the note under it — one record, not a collection. Its sibling Activity tab carries the exact server total like every other record in the app.",
+  "meeting-detail.overview":
+    "one meeting's client, purpose, when and where, and its audit block — one record, not a collection. Its sibling Activity tab carries the exact server total like every other record in the app.",
+  "meeting-detail.notes":
+    "the agenda we set and the notes we took — the two pieces of prose this module exists to keep. One record's body, not a collection.",
   "knowledge-detail.overview":
     "one source's kind, compartment, who may read it, how many pieces it was cut into and when it was last indexed — one record, not a collection.",
 }
@@ -846,4 +876,8 @@ export const FORM_DIALOGS = [
   // a half-typed answer to "who may read this" must not be lost to a mis-tap and
   // re-guessed.
   "google-source-dialog",
+  // Arranging a meeting. Its draft matters for the same reason the time form's
+  // does: the agenda is typed while somebody is still on the phone agreeing it,
+  // and a mis-tap that loses it loses a conversation rather than a field.
+  "meeting-form-dialog",
 ] as const

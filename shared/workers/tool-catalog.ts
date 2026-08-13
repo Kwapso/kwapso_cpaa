@@ -1037,6 +1037,128 @@ export const SHARED_TOOLS: SharedTool[] = [
       summarize: (i, names) => `Put ${memberLabel(i, names)} on triage duty`,
     },
   },
+  /* --------------------------------- meetings -------------------------------- */
+  // THE CONVERSATIONS WE HAVE, and the two fields no other record can hold: what
+  // we meant to cover, and what was decided. The assistant's most useful act here
+  // is the one a person hates doing — writing the notes up straight after, out
+  // loud, before the next call starts.
+  {
+    name: "list_meetings",
+    summary:
+      "List MEETINGS — conversations we have had or are about to have, newest first, with the agenda and the notes on each. `view` is 'upcoming' by default (what is still to come); pass 'all' for the whole diary including cancelled ones. `accountId` narrows to one client, `purposeId` to one reason we meet, `status` to 'scheduled' or 'held', and `q` searches the title, the agenda and the notes. Pass `id` for one meeting. Returns ONE page plus the exact `total`, `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one). A meeting is NOT a work log: it says what was agreed, never how long it took.",
+    binding: "CONTENT", method: "GET", path: "/api/content/meetings",
+    schema: obj({ id: S, accountId: S, purposeId: S, status: S, view: S, q: S, cursor: S }),
+    buildQuery: (i) => {
+      const q: string[] = []
+      for (const k of ["id", "accountId", "purposeId", "status", "view", "q", "cursor"])
+        if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
+      return q.length ? `?${q.join("&")}` : ""
+    },
+    agent: {
+      write: false,
+      summarize: (i) => (str(i, "id") ? "Look up one meeting" : "List the meetings"),
+    },
+  },
+  {
+    name: "create_meeting",
+    summary:
+      "Put a meeting in the diary. `title` and `startsAt` are required; `startsAt` and `endsAt` are moments (a date AND a time — a meeting happens at an hour). `accountId` says which client it is with and is left off for an internal one; `purposeId` is why we meet, out of the meeting purposes list. `agenda` is what we mean to cover. Putting it in somebody's Google Calendar is a separate step — add_meeting_to_calendar.",
+    binding: "CONTENT", method: "POST", path: "/api/content/meetings",
+    schema: obj(
+      { title: S, startsAt: S, endsAt: S, accountId: S, purposeId: S, agenda: S, notes: S, location: S },
+      ["title", "startsAt"]
+    ),
+    buildBody: (i) => ({
+      title: str(i, "title"),
+      startsAt: str(i, "startsAt"),
+      endsAt: opt(i, "endsAt"),
+      accountId: opt(i, "accountId"),
+      purposeId: opt(i, "purposeId"),
+      agenda: opt(i, "agenda"),
+      notes: opt(i, "notes"),
+      location: opt(i, "location"),
+    }),
+    agent: {
+      write: true,
+      confirm: false,
+      summarize: (i) => `Arrange a meeting: "${str(i, "title").slice(0, 50)}"`,
+    },
+  },
+  {
+    name: "update_meeting",
+    summary:
+      "Correct a meeting, or write its notes up afterwards, by id. EVERY field is replaced by what you send — read the meeting first and pass back what you are not changing, or you will blank it. `notes` is the one people actually use this for: what was said and decided, written straight after.",
+    binding: "CONTENT", method: "POST", path: "/api/content/meetings/update",
+    schema: obj(
+      { id: S, title: S, startsAt: S, endsAt: S, accountId: S, purposeId: S, agenda: S, notes: S, location: S },
+      ["id", "title", "startsAt"]
+    ),
+    buildBody: (i) => ({
+      id: str(i, "id"),
+      title: str(i, "title"),
+      startsAt: str(i, "startsAt"),
+      endsAt: opt(i, "endsAt"),
+      accountId: opt(i, "accountId"),
+      purposeId: opt(i, "purposeId"),
+      agenda: opt(i, "agenda"),
+      notes: opt(i, "notes"),
+      location: opt(i, "location"),
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Update meeting ${str(i, "id")}` },
+  },
+  {
+    name: "set_meeting_held",
+    summary:
+      "Mark a meeting as held, or put it back in the diary (`held`: true / false), by id. Marking a held meeting held changes nothing.",
+    binding: "CONTENT", method: "POST", path: "/api/content/meetings/held",
+    schema: obj({ id: S, held: B }, ["id", "held"]),
+    buildBody: (i) => ({ id: str(i, "id"), held: i.held === true }),
+    agent: {
+      write: true,
+      confirm: false,
+      summarize: (i) => `${i.held === true ? "Mark held" : "Reopen"} meeting ${str(i, "id")}`,
+    },
+  },
+  {
+    name: "set_meeting_active",
+    summary:
+      "Cancel a meeting (`active`: false) or put it back (true), by id. Nothing is deleted — the record and its notes survive, because 'didn't we speak in March?' has to stay answerable.",
+    binding: "CONTENT", method: "POST", path: "/api/content/meetings/active",
+    schema: obj({ id: S, active: B }, ["id", "active"]),
+    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
+    agent: {
+      write: true,
+      // Cancelling is this module's delete, so it pauses for a yes/no exactly as
+      // the other three (de)activate toggles do; putting one back does not.
+      confirm: (i) => i.active === false,
+      summarize: (i) => `${i.active === false ? "Cancel" : "Reinstate"} meeting ${str(i, "id")}`,
+    },
+  },
+  {
+    name: "add_meeting_to_calendar",
+    summary:
+      "Put a meeting that is already in kwapso into YOUR OWN Google Calendar, by id. Needs a connected Calendar account and the 'Calendar on your behalf' right. Pressing it twice makes ONE entry — the second call answers with the one that already exists.",
+    binding: "CONTENT", method: "POST", path: "/api/content/google/calendar/meeting",
+    schema: obj({ meetingId: S }, ["meetingId"]),
+    buildBody: (i) => ({ meetingId: str(i, "meetingId") }),
+    agent: {
+      write: true,
+      // An event is a suggestion in a diary its owner can delete in one click —
+      // the same reasoning that leaves create_calendar_event unconfirmed while
+      // every mail tool asks (routes/google.ts states the owner's ruling).
+      confirm: false,
+      summarize: (i) => `Add meeting ${str(i, "meetingId")} to your calendar`,
+    },
+  },
+  {
+    name: "sync_google_knowledge",
+    summary:
+      "Bring MY OWN Google material into the knowledge base: the Drive folders and Chat spaces I named, mail to or from a known contact, and my calendar. Reads through MY connection only — never a colleague's — and files each item under the client it belongs to, keeping anything on my private shelf answerable to me alone. Safe to repeat: material that has not changed costs nothing. Answers with a line per service and `caughtUp`, which is false when there is more to bring in on the next call.",
+    binding: "CONTENT", method: "POST", path: "/api/content/knowledge/sync-google",
+    schema: obj({}),
+    buildBody: () => ({}),
+    agent: { write: true, confirm: false, summarize: () => "Bring your Google material up to date" },
+  },
   /* ---------------------------- to-dos and tasks ---------------------------- */
   // The two nouns that are the same shape and opposite audiences, and the model
   // needs to be told which is which more than a person does — a person reads two
@@ -2041,6 +2163,19 @@ export const TOOL_GATES: Record<string, string> = {
   cancel_todo: "todos:delete",
   create_task: "work:create",
   set_task_done: "work:edit",
+  // MEETINGS gate on their own module. `set_meeting_active` is a `delete`
+  // because cancelling IS this module's delete; the row survives it.
+  create_meeting: "meetings:create",
+  update_meeting: "meetings:edit",
+  set_meeting_held: "meetings:edit",
+  set_meeting_active: "meetings:delete",
+  // The two doors that reach OUTSIDE this app. Each is listed at the gate the
+  // door opens with — the FIRST one, which is the one a role has to hold before
+  // any of the others are even asked about. Pushing a meeting to a calendar also
+  // demands `google:edit` and the events switch at the door itself; reading
+  // somebody's Google into the knowledge base also demands `google:read`.
+  add_meeting_to_calendar: "meetings:read",
+  sync_google_knowledge: "knowledge:create",
   // The rota is about TICKETS, so it gates with them. `help:edit` is a right the
   // seeded Client role does not hold — and the door refuses a portal caller
   // anyway, because an unread backlog is our failure and not an SLA.

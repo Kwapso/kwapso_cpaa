@@ -21,6 +21,10 @@ export const TEAM_MODULES = [
   "commercials",
   "work",
   "todos",
+  // MEETINGS — its own switch, because a meeting's NOTES are the thing being
+  // permissioned. The taxonomy of why we meet lives under `delivery`; what was
+  // said in the room is a different question to ask a role about.
+  "meetings",
   // THE AGENCY'S OWN HOUSEKEEPING — four modules carrying the seven Glide tables
   // that describe how the agency runs ITSELF rather than what it does for a
   // client. None of them is customer material, so every door on all four refuses
@@ -100,6 +104,13 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   // (SCOPE ch.06, one of the six things a contact can do), so an owner grants
   // `todos: read + edit` to their Client role and grants nothing else.
   todos: "To-dos",
+  // MEETINGS. A record of a conversation — when it was, why we met, what was on
+  // the agenda and what was decided. AGENCY material: the notes are ours, taken
+  // for us, and often about the client rather than for them, so every door on it
+  // refuses a client login the way the work engine's do. Its `delete` is the
+  // cancel — the row survives, because "didn't we have a call in March?" has to
+  // stay answerable after somebody tidies up.
+  meetings: "Meetings",
 
   // ── THE AGENCY'S OWN HOUSEKEEPING ──────────────────────────────────────────
   // Four modules, seven legacy tables, and one sentence that decides all of it:

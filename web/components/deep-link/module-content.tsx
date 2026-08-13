@@ -33,6 +33,7 @@ import { ProcessDetailScreen } from "@/components/process-detail"
 import { AppDetailScreen } from "@/components/app-detail"
 import { SprintDetailScreen } from "@/components/sprint-detail"
 import { StoryDetailScreen } from "@/components/story-detail"
+import { MeetingDetailScreen } from "@/components/meeting-detail"
 import { ImportScreen } from "@/components/import-screen"
 import { StaffPanel } from "@/components/staff-panel"
 import { SelectableScreen } from "@/components/selectable-screen"
@@ -73,7 +74,7 @@ export type ModuleContentCtx = Pick<
   ScreenData,
   | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "learningQ" | "helpQ" | "helpMineQ" | "helpArchivedQ" | "accountsQ" | "knowledgeQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "inviteAuditQ"
   | "marketingQ" | "brandQ" | "programmesQ" | "purposesQ" | "internalActivity"
-  | "storiesQ" | "sprintsQ" | "appsQ" | "tasksQ"
+  | "storiesQ" | "sprintsQ" | "appsQ" | "tasksQ" | "meetingsQ"
 > & {
   noAccess: boolean
   enabled: boolean
@@ -340,6 +341,12 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       return (
         <StoryDetailScreen teamId={teamId as string} storyId={recordId} basePath={sectionPath} />
       )
+    }
+    // ONE MEETING — a component rather than a recipe, because two of its three
+    // tabs are prose somebody wrote and its header carries the button that
+    // reaches outside this app.
+    if (module === "meetings") {
+      return <MeetingDetailScreen teamId={teamId as string} meetingId={recordId} />
     }
     if (module === "tasks") {
       const base = resolveRecipe("tasks.detail", overridesQ.data)

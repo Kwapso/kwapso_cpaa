@@ -66,6 +66,12 @@
 //   POST /api/content/knowledge/update    -> correct a source
 //   POST /api/content/knowledge/active    -> take a source away from the assistant / give it back
 //   POST /api/content/knowledge/sync      -> bring the base into step, one bounded slice
+//   POST /api/content/knowledge/sync-google -> …and MY OWN Google material, as me
+//   GET  /api/content/meetings            -> the diary (?id → one; account/purpose/status/view/q filters)
+//   POST /api/content/meetings            -> put a meeting in the diary
+//   POST /api/content/meetings/update     -> correct it / write the notes up
+//   POST /api/content/meetings/held       -> it happened / it hasn't yet
+//   POST /api/content/meetings/active     -> cancel it / put it back
 //   GET  /api/content/marketing           -> the agency's own posts (?id → one)
 //   POST /api/content/marketing[/update|/active] -> write / edit / archive a post
 //   GET  /api/content/brand-assets        -> the brand library (?id → one)
@@ -144,9 +150,17 @@ import {
   getKnowledgeSync,
   postCreateKnowledge,
   postKnowledgeSync,
+  postKnowledgeSyncGoogle,
   postSetKnowledgeActive,
   postUpdateKnowledge,
 } from "./routes/knowledge"
+import {
+  getMeetings,
+  postCreateMeeting,
+  postMeetingHeld,
+  postSetMeetingActive,
+  postUpdateMeeting,
+} from "./routes/meetings"
 import {
   getMarketing,
   getMarketingExport,
@@ -206,6 +220,7 @@ import {
   postGoogleSource,
   postGoogleSourceActive,
   postGoogleSprintEvent,
+  postGoogleMeetingEvent,
 } from "./routes/google"
 import { sweepAll } from "./lib/knowledge-ingest"
 import { sendTriageDigest, teamMemberNames } from "./lib/notify"
@@ -311,6 +326,20 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // A slice of the sweep, by hand — it writes source rows, so it publishes (a
   // coarse ping: a slice touches many rows and no one row is the change).
   "POST /api/content/knowledge/sync": { handler: postKnowledgeSync, kind: "mutation" },
+  // THE PERSONAL HALF. Same engine, different kinds — and a different actor: every
+  // byte it reads comes through the CALLER's own Google token, which is why it is
+  // a door and never a cron (lib/knowledge-google.ts's header says why at length).
+  "POST /api/content/knowledge/sync-google": { handler: postKnowledgeSyncGoogle, kind: "mutation" },
+
+  // ── MEETINGS ───────────────────────────────────────────────────────────────
+  // The conversations we have, with the agenda and the notes kept. Every door
+  // refuses a client login (R21): a meeting's notes are OUR record, written for
+  // us and often about the client rather than for them.
+  "GET /api/content/meetings": { handler: getMeetings, kind: "read" },
+  "POST /api/content/meetings": { handler: postCreateMeeting, kind: "mutation" },
+  "POST /api/content/meetings/update": { handler: postUpdateMeeting, kind: "mutation" },
+  "POST /api/content/meetings/held": { handler: postMeetingHeld, kind: "mutation" },
+  "POST /api/content/meetings/active": { handler: postSetMeetingActive, kind: "mutation" },
 
   // ── THE AGENCY'S OWN HOUSEKEEPING ──────────────────────────────────────────
   // Four modules, six tables, and one thing every door below has in common: it
@@ -385,10 +414,13 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/content/google/gmail/send": { handler: postGoogleMailSend, kind: "mutation" },
   "GET /api/content/google/calendar/events": { handler: getGoogleEvents, kind: "read" },
   "POST /api/content/google/calendar/events": { handler: postGoogleEvent, kind: "mutation" },
-  // FROM kwapso TO Google: a sprint's dates as a calendar entry. The other half
-  // the owner named — meetings booked in kwapso — has no record to push yet (see
-  // the handler); it is a second door beside this one the day a meeting is a row.
+  // FROM kwapso TO Google: a sprint's dates as a calendar entry, and the meeting
+  // door beside it — the two halves of "what we book here shows up there".
   "POST /api/content/google/calendar/sprint": { handler: postGoogleSprintEvent, kind: "mutation" },
+  // …and the second half of that sentence, now that a meeting is a row. It moves
+  // the MEETING (it remembers the entry it became) as well as the connection, so
+  // it publishes twice — once for each screen that just went stale.
+  "POST /api/content/google/calendar/meeting": { handler: postGoogleMeetingEvent, kind: "mutation" },
   "GET /api/content/google/chat/messages": { handler: getGoogleChat, kind: "read" },
   "POST /api/content/google/chat/messages": { handler: postGoogleChat, kind: "mutation" },
 }

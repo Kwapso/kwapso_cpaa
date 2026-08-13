@@ -116,7 +116,21 @@ import {
 /** The kinds of material a source can be. `note` is typed by a person; the rest
  * MIRROR a row the app already owns and are kept in step by the sweep. Data, not
  * a code path — a new kind is a line here plus a reader in knowledge-ingest.ts. */
-export const KNOWLEDGE_KINDS = ["note", "ticket", "article", "account"] as const
+export const KNOWLEDGE_KINDS = [
+  "note",
+  "ticket",
+  "article",
+  "account",
+  // The four that arrive through somebody's own Google connection. Named for
+  // what a person would call the thing rather than for the service it came out
+  // of — somebody filtering the knowledge base is looking for "an email", and
+  // would have to translate "gmail" back into one. Built in
+  // lib/knowledge-google.ts, which is where the readers beside them live.
+  "document",
+  "email",
+  "event",
+  "message",
+] as const
 export type KnowledgeKind = (typeof KNOWLEDGE_KINDS)[number]
 
 /** The agency's own compartment — everything not owned by one client. */
