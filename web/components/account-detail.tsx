@@ -49,6 +49,7 @@ import { Pencil, Power } from "lucide-react"
 import type { Account, AccountDetail } from "@shared/types"
 import { AccountFormDialog, type AccountFormValues } from "@/components/account-form-dialog"
 import { AccountRateCard } from "@/components/account-rate-card"
+import { MarginPanel } from "@/components/margin-panel"
 import {
   ChildrenPanel,
   ContactsPanel,
@@ -525,16 +526,30 @@ export function AccountDetailScreen({
           // WHAT WE CHARGE THEM. The door answers about ONE account, so the rows
           // and the badge above are the same narrowed question — never a page of
           // every account's prices filtered in the browser.
+          //
+          // AND WHAT WE KEEP, under it. The margin door has computed revenue
+          // minus our time minus tool costs since the money went in, and until
+          // now nothing rendered it — an answer with no question attached. It
+          // belongs here rather than on a page of its own: "what do we charge
+          // them" and "what does that leave us" are one thought.
+          //
+          // Both are inside `commercials: read`, which is the same gate the two
+          // doors open with — and the margin door additionally refuses a portal
+          // caller outright, so this tab cannot leak our own cost even to a
+          // client who reached the agency origin (R24).
           if (t.value === "rates")
             return (
-              <AccountRateCard
-                accountId={accountId}
-                accountName={account.name}
-                canCreate={can("commercials", "create")}
-                canEdit={can("commercials", "edit")}
-                canRetire={can("commercials", "delete")}
-                actions={actions}
-              />
+              <div className="flex flex-col gap-6">
+                <AccountRateCard
+                  accountId={accountId}
+                  accountName={account.name}
+                  canCreate={can("commercials", "create")}
+                  canEdit={can("commercials", "edit")}
+                  canRetire={can("commercials", "delete")}
+                  actions={actions}
+                />
+                <MarginPanel accountId={accountId} accountName={account.name} />
+              </div>
             )
 
           // Portal access — the login switch. Only rendered for someone who may

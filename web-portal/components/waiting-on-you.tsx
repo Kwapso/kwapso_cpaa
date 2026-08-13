@@ -20,6 +20,7 @@ import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Check, Paperclip } from "lucide-react"
 
+import { formatDate } from "@shared/web/format"
 import { invalidate, useCached } from "@shared/web/store"
 import { ApiFailure, delivery } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
@@ -74,7 +75,7 @@ export function WaitingOnYou() {
               <p className="font-medium">{t.title}</p>
               {t.detail && <p className="text-muted-foreground text-sm">{t.detail}</p>}
               <p className="text-muted-foreground text-sm">
-                {t.dueOn ? `By ${t.dueOn.slice(0, 10)}` : "No date on it"}
+                {t.dueOn ? `By ${formatDate(t.dueOn)}` : "No date on it"}
                 {t.ref ? ` · ${t.ref}` : ""}
               </p>
             </div>

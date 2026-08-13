@@ -36,6 +36,7 @@ import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import { appsKey, helpKey, listFetch, sprintsKey, storiesKey } from "@/lib/live-resources"
 import { withDataDrivenCollection } from "@/lib/screens"
 import type { AppRow, HelpTicket, Sprint, Story, TeamMember } from "@shared/types"
+import { formatDate } from "@shared/web/format"
 import { invalidate, useCached } from "@shared/web/store"
 
 /** One story, as a row. The summary line is a stand-up sentence: where it is,
@@ -49,7 +50,7 @@ function shapeStories(stories: Story[], appNames: Map<string, string>) {
         [
           STORY_STATUS_LABEL[s.status],
           s.assigneeName ?? "unassigned",
-          s.dueOn ? `due ${s.dueOn}` : null,
+          s.dueOn ? `due ${formatDate(s.dueOn)}` : null,
           s.sprintName,
           s.ticketRef,
         ]

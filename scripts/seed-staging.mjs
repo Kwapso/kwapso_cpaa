@@ -102,7 +102,19 @@ if (!existsSync(SOURCE)) {
 const history = JSON.parse(readFileSync(SOURCE, "utf8"))
 
 const TEAM_NAME = "Kwapso"
-const OWNER_EMAIL = process.env.SEED_OWNER_EMAIL ?? "alaap@swiftstruck.com"
+
+/** THE OWNER'S ADDRESS IS A KWAPSO ONE, and it is not a preference.
+ *
+ * kwapso is its own company; Swift Struck is the studio that built the base it
+ * runs on. Seeding under a swiftstruck.com address put the whole history in a
+ * team the owner's real login could not reach, and left him staring at an empty
+ * app under a team of the same name. Every address this script derives — both
+ * client-portal testers are plus-addresses of this one — follows from here, so
+ * this line is the only one that has to be right.
+ *
+ * `ownInbox` derives its allow-list from this too, which is what stops the seed
+ * ever emailing a real client. */
+const OWNER_EMAIL = process.env.SEED_OWNER_EMAIL ?? "alaap@kwapso.com"
 const OWNER_NAME = { firstName: "Alaap", lastName: "Kanchwala" }
 
 // ── how much, and why that much ──────────────────────────────────────────────
@@ -130,6 +142,48 @@ const REPLIES_PER_REQUEST = 6
 /** Articles. 223 in the history, most of them a title and a hashtag list; the 40
  * newest with a body are what makes the learning screen look written-in. */
 const ARTICLE_LIMIT = 40
+
+// ── the work engine's own cuts ───────────────────────────────────────────────
+//
+// Every write below is one HTTP round trip, so the whole history — 28 apps, 106
+// sprints, 912 stories, 3,675 tasks, 1,297 logs, 350 meetings — is about
+// six thousand round trips and the better part of an hour. That is the wrong
+// default for a seed somebody runs after a deploy.
+//
+// So the default is a CUT, sized to make every screen read as used rather than
+// complete, and `--full` lifts every cap for the run that is actually the
+// migration. The caps are stated here rather than buried at each call site,
+// and each one says what it is buying.
+
+const full = process.argv.includes("--full")
+const cut = (n) => (full ? Infinity : n)
+
+/** Sprints carry the money, and 106 is already inside R14's 1,000-row cap — so
+ * the whole set goes in either way. Nothing is bought by cutting it. */
+const SPRINT_LIMIT = cut(106)
+
+/** Stories. 912 in the history; 320 here, spread across the apps rather than
+ * taken newest-first, so every app's board has something on it instead of three
+ * apps holding everything. */
+const STORY_LIMIT = cut(320)
+
+/** Our own admin. 3,675 in the history and the most repetitive rows in it — the
+ * 250 most recent are what makes the list look like a real week's work.
+ *
+ * THE ONE CAP `--full` DOES NOT LIFT, and the reason is a real finding rather
+ * than caution. The tasks list is a CAPPED read (LIST_HARD_CAP, 1,000) and not a
+ * paged one, so writing all 3,675 would put 2,675 rows in the database that no
+ * screen can reach — a seed that makes the app look complete while hiding two
+ * thirds of what it just wrote. Either tasks earn keyset paging like stories and
+ * meetings did, or this stays capped; until then, honest beats full. */
+const TASK_LIMIT = full ? 900 : 250
+
+/** Logged time. 1,297 recoverable logs; the 400 most recent are enough for the
+ * time screens and a margin with real hours behind it. */
+const WORK_LOG_LIMIT = cut(400)
+
+/** The diary. 350 meetings; the 150 most recent cover the last few months. */
+const MEETING_LIMIT = cut(150)
 
 // ── the client logins ────────────────────────────────────────────────────────
 //
@@ -383,6 +437,34 @@ const people = history.accounts
 const peopleGlideIds = new Set(people.map((p) => p.glideId))
 const links = history.accountLinks.filter((l) => companyByGlideId.has(l.accountGlideId) && peopleGlideIds.has(l.personGlideId))
 
+/** THE SAME ROUND-ROBIN, ONE NOUN OVER. A story belongs to an app, and taking
+ * the newest 320 hands the whole budget to the two apps that were busiest last
+ * month while eighteen boards stay empty. So one story is taken from each app in
+ * turn until the cut is spent, newest first inside each app — which is what
+ * makes every app's board worth opening. Memoised because the status pass reads
+ * the same list a second time and must get the same rows. */
+let storyCut = null
+function pickStories() {
+  if (storyCut) return storyCut
+  const queues = new Map()
+  for (const s of [...history.stories].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))) {
+    const key = s.appGlideId ?? "(none)"
+    if (!queues.has(key)) queues.set(key, [])
+    queues.get(key).push(s)
+  }
+  const out = []
+  const lists = [...queues.values()]
+  for (let round = 0; out.length < STORY_LIMIT; round++) {
+    const before = out.length
+    for (const list of lists) {
+      if (round < list.length && out.length < STORY_LIMIT) out.push(list[round])
+    }
+    if (out.length === before) break // every queue is spent
+  }
+  storyCut = out
+  return out
+}
+
 /** Round-robin by company, so the cut leaves every company with work on it
  * instead of handing the whole budget to the busiest one — and inside each
  * company, the requests somebody actually ANSWERED come first. A screen full of
@@ -426,6 +508,58 @@ const articles = history.learning
   .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
   .slice(0, ARTICLE_LIMIT)
 
+// ── would any of this be refused? ask BEFORE writing a single row ────────────
+//
+// A 519-character story title stopped a run three hundred rows in, with a clean
+// 400 from a door that was right to refuse it. The rows already written were
+// fine and the run still had to start again — and the failure was knowable from
+// the file before anything was sent.
+//
+// So the payload is checked against the doors' own ceiling first. It is a
+// PRE-FLIGHT, not a fix: the transform is where a value is reshaped to fit
+// (`fitTitle`), and this exists to make sure that stays true. If it ever fires,
+// the answer is a change in glide-transform.mjs, never a longer limit here.
+{
+  // The doors' own ceilings (TEXT_LIMITS in shared/workers/validate.ts). Repeated
+  // here because a .mjs script cannot import a .ts constant — so the comment names
+  // the authority, which is the most a script can do about it.
+  const SHORT = 200 // titles, names, labels
+  const LONG = 20_000 // details, notes, descriptions
+  const tooLong = []
+  for (const [what, rows, field, max] of [
+    ["apps", history.apps, "name", SHORT],
+    ["apps", history.apps, "description", LONG],
+    ["sprints", history.sprints, "name", SHORT],
+    ["stories", history.stories, "title", SHORT],
+    ["stories", history.stories, "detail", LONG],
+    ["tasks", history.tasks, "title", SHORT],
+    ["tasks", history.tasks, "detail", LONG],
+    ["meetings", history.meetings, "title", SHORT],
+    ["meetings", history.meetings, "location", SHORT],
+    ["meetings", history.meetings, "notes", LONG],
+    ["meeting purposes", history.meetingPurposes, "name", SHORT],
+  ]) {
+    for (const r of rows ?? []) {
+      if (typeof r[field] === "string" && r[field].length > max)
+        tooLong.push(`${what}.${field}: ${r[field].length} chars (max ${max}) — "${r[field].slice(0, 50)}…"`)
+    }
+  }
+  // The same idea for the other value a door refuses outright: a duration that
+  // floors to zero whole seconds. Caught here rather than 900 logs into the run.
+  for (const l of history.workLogs ?? []) {
+    if (Math.floor((new Date(l.endedAt) - new Date(l.startedAt)) / 1000) < 1)
+      tooLong.push(`work log: under a second — ${l.startedAt} → ${l.endedAt}`)
+  }
+  if (tooLong.length) {
+    console.error(
+      `\nStopped before writing anything: ${tooLong.length} value(s) are longer than the door accepts.\n` +
+        `Shape them in scripts/glide-transform.mjs (fitTitle / fitLong) rather than raising a limit here:\n  ` +
+        tooLong.slice(0, 10).join("\n  ")
+    )
+    process.exit(1)
+  }
+}
+
 if (dryRun) {
   const byCompany = {}
   for (const r of requests) byCompany[companyByGlideId.get(r.accountGlideId)?.name ?? "(no company)"] = (byCompany[companyByGlideId.get(r.accountGlideId)?.name ?? "(no company)"] ?? 0) + 1
@@ -441,7 +575,19 @@ if (dryRun) {
   console.log(`  ${String(requests.filter((r) => r.resolved).length).padStart(4)} of those requests then moved to resolved`)
   console.log(`\n  requests per company: ${Object.entries(byCompany).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(", ")}`)
   console.log(`  languages: ${requests.filter((r) => r.language === "de").length} German only, ${requests.filter((r) => r.language === "both").length} both, ${requests.filter((r) => r.language === "en").length} English only`)
+  const n = (x) => String(x).padStart(4)
+  const of = (kept, total) => `${n(kept)} of ${total}`
+  console.log(`\n  the work engine${full ? " (--full: every row, no cut)" : ""}:`)
+  console.log(`  ${n(history.apps.length)} apps`)
+  console.log(`  ${of(Math.min(history.sprints.length, SPRINT_LIMIT), history.sprints.length)} sprints`)
+  console.log(`  ${of(pickStories().length, history.stories.length)} stories, spread across ${new Set(pickStories().map((s) => s.appGlideId)).size} apps`)
+  console.log(`  ${of(Math.min(history.tasks.length, TASK_LIMIT), history.tasks.length)} pieces of our own admin`)
+  console.log(`  ${of(Math.min(history.workLogs.length, WORK_LOG_LIMIT), history.workLogs.length)} work logs — the only rows that keep their REAL dates`)
+  console.log(`  ${n(history.meetingPurposes.length)} meeting purposes`)
+  console.log(`  ${of(Math.min(history.meetings.length, MEETING_LIMIT), history.meetings.length)} meetings`)
   console.log(`\n  every row will be stamped created_at = now; the real dates stay in ${SOURCE}.`)
+  console.log(`  the exception is logged time: its start and finish ARE the record, so those are real.`)
+  if (!full) console.log(`  add --full to write the whole history instead of this cut.`)
   process.exit(0)
 }
 
@@ -804,7 +950,21 @@ for (const t of PORTAL_TESTERS) {
   }
   // Onboarding accepts every pending invite — the same door a real person walks
   // through after clicking the link in their email.
-  must(await post("/api/tenancy/bootstrap", {}, session.cookie), `${t.name} joining the team`)
+  //
+  // A CLIENT LOGIN JOINS AND IS THEN REFUSED, IN THAT ORDER, AND BOTH HALVES ARE
+  // RIGHT. `bootstrap` accepts the pending invites FIRST and only then decides
+  // whether to describe the team to the caller — and it will not describe the
+  // agency to a client login (R21). So a client gets a 403 carrying `client_login`
+  // from a call that has already made them a member. Reading that 403 as a failure
+  // stopped this whole seed dead, after the join had succeeded.
+  //
+  // So the refusal is the expected answer here, and anything OTHER than that one
+  // code is still fatal. Nothing is taken on trust either way — the membership
+  // read three lines down is what decides whether the join actually happened,
+  // and it was already there.
+  const bootstrapped = await post("/api/tenancy/bootstrap", {}, session.cookie)
+  if (!bootstrapped.ok && bootstrapped.body?.error !== "client_login")
+    must(bootstrapped, `${t.name} joining the team`)
   const joined = must(await api("/api/tenancy/members", {}, staff.cookie), "re-reading members").members ?? []
   if (!joined.some((m) => m.email?.toLowerCase() === t.email)) {
     console.error(`\nStopped: ${t.name} didn't join the team — their invite may already be spent.`)
@@ -855,6 +1015,11 @@ for (const t of PORTAL_TESTERS) {
     )
   }
 }
+
+/** Glide request id → the real ticket id, for the work logs below: time was
+ * logged against requests as well as against stories and tasks, and a log whose
+ * request never got seeded has nothing to attach to. */
+const ticketIdFor = new Map()
 
 const all = [...requests, { ...OURS, accountGlideId: null, replies: [], resolved: false }]
 for (const r of all) {
@@ -916,6 +1081,8 @@ for (const r of all) {
     say("created", "a request", "help requests")
   }
 
+  if (r.glideId) ticketIdFor.set(r.glideId, ticket.id)
+
   // The conversation, in the order it happened.
   const wanted = (r.replies ?? []).slice(0, REPLIES_PER_REQUEST)
   if (wanted.length) {
@@ -938,6 +1105,467 @@ for (const r of all) {
   if (r.resolved && ticket.status !== "resolved") {
     must(await post("/api/content/help/status", { id: ticket.id, status: "resolved" }, staff.cookie), "resolving a request")
     say("updated", "a request resolved", "help requests")
+  }
+}
+
+// ── 7b · the work engine: what we built, sold, did and spent time on ─────────
+//
+// THE ORDER IS THE DEPENDENCY, and it is not negotiable: an app before the
+// sprints under it, a sprint before the stories in it, a task before the time
+// logged against it. Each step below builds a glide-id → real-id map that the
+// next one reads, exactly as the accounts step does for the tickets.
+//
+// Everything is matched on a natural key first and skipped when it is already
+// there, so a second run creates nothing — the same claim the sections above
+// make, and the same way of making it.
+
+step("Apps")
+const appIdFor = new Map()
+{
+  const already = new Map(
+    (must(await api("/api/tenancy/apps", {}, staff.cookie), "reading the apps").apps ?? []).map((a) => [a.name, a])
+  )
+  for (const a of history.apps) {
+    const hit = already.get(a.name)
+    if (hit) {
+      appIdFor.set(a.glideId, hit.id)
+      say("reused", a.name, "apps")
+      continue
+    }
+    must(
+      await post(
+        "/api/tenancy/apps",
+        {
+          name: a.name,
+          accountId: a.accountGlideId ? idFor.get(a.accountGlideId) : undefined,
+          url: a.url ?? undefined,
+          stage: a.stage ?? undefined,
+          description: a.description ?? undefined,
+        },
+        staff.cookie
+      ),
+      `recording the app ${a.name}`
+    )
+    say("created", a.name, "apps")
+  }
+  // Read back once rather than per-write: the create door answers with the row,
+  // but re-reading the whole (bounded, 28-row) set is one round trip and cannot
+  // drift from what the server actually holds.
+  for (const row of must(await api("/api/tenancy/apps", {}, staff.cookie), "re-reading the apps").apps ?? []) {
+    const src = history.apps.find((a) => a.name === row.name)
+    if (src) appIdFor.set(src.glideId, row.id)
+  }
+}
+
+step("Sprints")
+const sprintIdFor = new Map()
+{
+  // A sprint's name repeats across apps ("Refinement · Aug 2026" is a name two
+  // apps can both have), so the natural key is the name AND the app — matching
+  // on the name alone would fold twenty real sprints into one.
+  const key = (name, appId) => `${appId ?? "-"}::${name}`
+  const already = new Map(
+    (must(await api("/api/content/sprints", {}, staff.cookie), "reading the sprints").sprints ?? []).map((s) => [
+      key(s.name, s.appId),
+      s,
+    ])
+  )
+  for (const s of history.sprints.slice(0, SPRINT_LIMIT)) {
+    const appId = appIdFor.get(s.appGlideId) ?? null
+    const hit = already.get(key(s.name, appId))
+    if (hit) {
+      sprintIdFor.set(s.glideId, hit.id)
+      say("reused", s.name, "sprints")
+      continue
+    }
+    must(
+      await post(
+        "/api/content/sprints",
+        {
+          name: s.name,
+          sprintType: s.sprintType ?? undefined,
+          appId: appId ?? undefined,
+          accountId: s.accountGlideId ? idFor.get(s.accountGlideId) : undefined,
+          startsOn: s.startsOn ?? undefined,
+          endsOn: s.endsOn ?? undefined,
+        },
+        staff.cookie
+      ),
+      `starting the sprint ${s.name}`
+    )
+    say("created", s.name, "sprints")
+  }
+  const written = must(await api("/api/content/sprints", {}, staff.cookie), "re-reading the sprints").sprints ?? []
+  const rowFor = new Map(written.map((row) => [key(row.name, row.appId), row]))
+  for (const s of history.sprints) {
+    const row = rowFor.get(key(s.name, appIdFor.get(s.appGlideId) ?? null))
+    if (row) sprintIdFor.set(s.glideId, row.id)
+  }
+
+  // FINISHED SPRINTS ARE FINISHED AFTERWARDS, never on the way in — the create
+  // door starts one, and completing it is its own door because completing a
+  // sprint CUTS A VERSION of every process map under it. A sprint that arrived
+  // already complete would have skipped that, and the savings figures would be
+  // measured from a baseline nobody cut.
+  for (const s of history.sprints.slice(0, SPRINT_LIMIT)) {
+    if (!s.complete) continue
+    const row = rowFor.get(key(s.name, appIdFor.get(s.appGlideId) ?? null))
+    if (!row || row.completedAt) continue
+    must(await post("/api/content/sprints/complete", { id: row.id, complete: true }, staff.cookie), "finishing a sprint")
+    say("updated", `${s.name} finished`, "sprints")
+  }
+}
+
+step("Stories")
+const storyIdFor = new Map()
+{
+  const already = new Map(
+    (await allPages("/api/content/stories?view=all", "stories", staff.cookie)).map((s) => [s.title, s])
+  )
+  for (const s of pickStories()) {
+    const hit = already.get(s.title)
+    if (hit) {
+      storyIdFor.set(s.glideId, hit.id)
+      // BACKFILL, for the same reason the tickets step backfills its account:
+      // idempotence means converging on the right row, not never touching one.
+      // An earlier run wrote these before the create call carried
+      // `changesNoStep`, so they cannot be finished — the door refuses, for ever,
+      // and the run dies on the status pass below. Skipping a known-wrong row is
+      // not idempotent, it is stuck.
+      if (!hit.changesNoStep && !hit.stepKey) {
+        // THE WHOLE ROW, not just the field being changed. This door REPLACES
+        // what it is given — a body carrying only the tick would silently clear
+        // the story's sprint, its app and its client, because absent reads as
+        // "set it to nothing". Sending the same fields the create sent keeps the
+        // update to the one thing it is for.
+        must(
+          await post(
+            "/api/content/stories/update",
+            {
+              id: hit.id,
+              title: s.title,
+              detail: s.detail ?? undefined,
+              appId: s.appGlideId ? appIdFor.get(s.appGlideId) : undefined,
+              sprintId: s.sprintGlideId ? sprintIdFor.get(s.sprintGlideId) : undefined,
+              accountId: s.accountGlideId ? idFor.get(s.accountGlideId) : undefined,
+              changesNoStep: true,
+            },
+            staff.cookie
+          ),
+          "recording that an imported story changed no process step"
+        )
+        say("updated", s.title, "stories")
+      } else say("reused", s.title, "stories")
+      continue
+    }
+    must(
+      await post(
+        "/api/content/stories",
+        {
+          title: s.title,
+          detail: s.detail ?? undefined,
+          appId: s.appGlideId ? appIdFor.get(s.appGlideId) : undefined,
+          sprintId: s.sprintGlideId ? sprintIdFor.get(s.sprintGlideId) : undefined,
+          accountId: s.accountGlideId ? idFor.get(s.accountGlideId) : undefined,
+          // "IT CHANGED NO STEP" — a statement of fact about the old app, not a
+          // way round the rule that refuses it.
+          //
+          // A story cannot be finished without naming the process step it changed
+          // or ticking that it changed none (BUILD-1 §2), and `refuseUnstepped`
+          // warns in as many words against defaulting the tick, because that
+          // "would fill the savings maths with quiet zeroes". That warning is
+          // about a story somebody is writing TODAY, where the answer exists and
+          // nobody typed it.
+          //
+          // This is the other case. Glide had no process maps at all — there were
+          // no steps in the old system for a story to have changed — so "none" is
+          // the true and only answer, and it puts no zero into any savings figure
+          // that was not already zero. The alternative is 200 finished pieces of
+          // work sitting in the backlog for ever, which is a lie the screen tells
+          // every day rather than one this comment tells once.
+          changesNoStep: true,
+        },
+        staff.cookie
+      ),
+      `writing down the story ${s.title.slice(0, 40)}`
+    )
+    say("created", s.title, "stories")
+  }
+  const written = new Map(
+    (await allPages("/api/content/stories?view=all", "stories", staff.cookie)).map((s) => [s.title, s])
+  )
+  for (const s of history.stories) {
+    const row = written.get(s.title)
+    if (row) storyIdFor.set(s.glideId, row.id)
+  }
+
+  // MOVED AFTER THEY EXIST, not on the way in — the create door writes a story
+  // open, and the status door is what moves it. That is the same "raised, then
+  // answered, then closed" shape the tickets step uses, and for the same reason:
+  // a row that arrives already finished has no trail behind it.
+  for (const s of pickStories()) {
+    if (s.status === "open") continue
+    const id = storyIdFor.get(s.glideId)
+    const row = written.get(s.title)
+    if (!id || row?.status === s.status) continue
+    must(await post("/api/content/stories/status", { id, status: s.status }, staff.cookie), "moving a story along")
+    say("updated", s.title, "stories")
+  }
+}
+
+step("Our own admin")
+const taskIdFor = new Map()
+{
+  const already = new Map(
+    (must(await api("/api/content/tasks", {}, staff.cookie), "reading the admin list").tasks ?? []).map((t) => [t.title, t])
+  )
+  for (const t of history.tasks.slice(-TASK_LIMIT)) {
+    const hit = already.get(t.title)
+    if (hit) {
+      taskIdFor.set(t.glideId, hit.id)
+      say("reused", t.title, "tasks")
+      continue
+    }
+    must(
+      await post(
+        "/api/content/tasks",
+        {
+          title: t.title,
+          detail: t.detail ?? undefined,
+          dueOn: t.dueOn ?? undefined,
+          accountId: t.accountGlideId ? idFor.get(t.accountGlideId) : undefined,
+        },
+        staff.cookie
+      ),
+      `writing down the task ${t.title.slice(0, 40)}`
+    )
+    say("created", t.title, "tasks")
+  }
+  const written = new Map(
+    (must(await api("/api/content/tasks", {}, staff.cookie), "re-reading the admin list").tasks ?? []).map((t) => [t.title, t])
+  )
+  for (const t of history.tasks) {
+    const row = written.get(t.title)
+    if (row) taskIdFor.set(t.glideId, row.id)
+  }
+  for (const t of history.tasks.slice(-TASK_LIMIT)) {
+    const row = written.get(t.title)
+    // `status`, not a `done` boolean — the row says "open" or "done". Reading a
+    // field the row hasn't got makes every already-ticked task look untouched,
+    // and the run reports work it did not do.
+    if (!t.done || !row || row.status === "done") continue
+    must(await post("/api/content/tasks/done", { id: row.id, done: true }, staff.cookie), "ticking a task off")
+    say("updated", t.title, "tasks")
+  }
+}
+
+step("Logged time")
+{
+  // THE ONE SECTION THAT CARRIES ITS REAL DATES. Every other row in this seed
+  // arrives stamped today, because no door accepts a created date — but a work
+  // log's start and finish ARE the record, so two years of real times land here
+  // exactly as they happened. It is the only place in the app where the history
+  // is genuinely the history.
+  const target = (l) =>
+    l.targetKind === "stories"
+      ? storyIdFor.get(l.targetGlideId)
+      : l.targetKind === "tasks"
+        ? taskIdFor.get(l.targetGlideId)
+        : ticketIdFor.get(l.targetGlideId)
+  const already = new Set(
+    (await allPages("/api/content/work-logs", "logs", staff.cookie)).map((l) => `${l.targetId}@${l.startedAt}`)
+  )
+  let skipped = 0
+  for (const l of history.workLogs.slice(-WORK_LOG_LIMIT)) {
+    const targetId = target(l)
+    if (!targetId) {
+      // Its story, task or request was outside this seed's cut. Counted rather
+      // than silently dropped — the seed is a SAMPLE, and a sample that hides
+      // what it left out is a sample nobody can size.
+      skipped++
+      continue
+    }
+    if (already.has(`${targetId}@${l.startedAt}`)) {
+      say("reused", "a log", "work logs")
+      continue
+    }
+    must(
+      await post(
+        "/api/content/work-logs",
+        {
+          targetTable: l.targetKind,
+          targetId,
+          startedAt: l.startedAt,
+          endedAt: l.endedAt,
+          note: l.staffName ? `Logged by ${l.staffName} in the old app` : undefined,
+        },
+        staff.cookie
+      ),
+      "logging time"
+    )
+    say("created", "a log", "work logs")
+  }
+  if (skipped) console.log(`  (${skipped} logs skipped — what they were against is outside this seed's cut)`)
+}
+
+// ── 7c · the money, and the arithmetic checked out loud ──────────────────────
+//
+// THE ONE THING THE HISTORY COULD NOT SUPPLY. Glide's sprint has six columns and
+// none of them is a price; there was no rate card in the old app at all. So the
+// money side has real HOURS behind it and no real RATES — which would leave
+// every money screen empty and untestable, on the one part of the app where
+// "it computes the right number" is the whole feature.
+//
+// So the rate cards are seeded with PLACEHOLDER figures, and the word is in the
+// label rather than in a comment nobody reading the screen will see. Two things
+// make that safe: this is staging, and price visibility is OFF unless somebody
+// switches it on per account (`commercials_visible`), so no client login can see
+// them even if one were pointed at this environment.
+//
+// The point is not the numbers. It is that the subtraction is then CHECKED —
+// hours × rate, minus tools, equals the margin the door reports — so a change
+// that quietly breaks the arithmetic fails here rather than on an invoice.
+
+step("Rate cards")
+const PLACEHOLDER_INTERNAL = { label: "Our time (placeholder rate)", centsPerHour: 4500, isDefault: true }
+const PLACEHOLDER_CHARGED = [
+  { label: "Implementation (placeholder rate)", centsPerHour: 11000 },
+  { label: "Enhancement (placeholder rate)", centsPerHour: 9500 },
+]
+{
+  const mine = must(await api("/api/tenancy/internal-rates", {}, staff.cookie), "reading our own cost card")
+    .internalRates ?? []
+  if (!mine.some((r) => r.label === PLACEHOLDER_INTERNAL.label)) {
+    must(await post("/api/tenancy/internal-rates", PLACEHOLDER_INTERNAL, staff.cookie), "setting what our hour costs")
+    say("created", PLACEHOLDER_INTERNAL.label, "internal rates")
+  } else say("reused", PLACEHOLDER_INTERNAL.label, "internal rates")
+
+  // Charged rates go on ONE company — the one the portal tester stands in — so
+  // there is a populated rate card to look at without pricing twenty clients
+  // with numbers nobody agreed.
+  const priced = idFor.get(companies.find((c) => c.name === PORTAL_TESTERS[0].companies[0])?.glideId)
+  if (priced) {
+    const card = must(
+      await api(`/api/tenancy/rates?accountId=${encodeURIComponent(priced)}`, {}, staff.cookie),
+      "reading the account's rate card"
+    ).rates ?? []
+    for (const r of PLACEHOLDER_CHARGED) {
+      if (card.some((x) => x.label === r.label)) {
+        say("reused", r.label, "account rates")
+        continue
+      }
+      must(await post("/api/tenancy/rates", { accountId: priced, ...r }, staff.cookie), `pricing ${r.label}`)
+      say("created", r.label, "account rates")
+    }
+  }
+}
+
+step("Checking the margin adds up")
+{
+  // ASK ABOUT A COMPANY THAT ACTUALLY HAS HOURS ON IT. The rate card above went
+  // on the portal tester's company so the portal has prices to show, but which
+  // companies ended up with logged time depends on where this run's cut of the
+  // history landed. Asserting arithmetic against a company with no time is a row
+  // of green ticks about nothing — so the busiest one is found first, from the
+  // logs themselves.
+  const logs = await allPages("/api/content/work-logs", "logs", staff.cookie)
+  const seconds = new Map()
+  for (const l of logs) {
+    if (!l.accountId) continue
+    seconds.set(l.accountId, (seconds.get(l.accountId) ?? 0) + (l.seconds ?? 0))
+  }
+  const busiest = [...seconds].sort((x, y) => y[1] - x[1])[0]?.[0]
+  const priced = busiest ?? idFor.get(companies.find((c) => c.name === PORTAL_TESTERS[0].companies[0])?.glideId)
+  const m = must(
+    await api(`/api/tenancy/margin?accountId=${encodeURIComponent(priced)}`, {}, staff.cookie),
+    "reading the margin"
+  )
+  // Every line the door built the answer from, re-added here. If these agree,
+  // the number on the screen is the number the data says.
+  const linesAddUp = (m.lines ?? []).reduce((n, l) => n + l.costCents, 0)
+  check("the time lines add up to the time cost", linesAddUp === m.timeCostCents, `${linesAddUp} vs ${m.timeCostCents}`)
+  check(
+    "and the margin is revenue minus time minus tools",
+    m.marginCents === m.revenueCents - m.timeCostCents - m.toolCostCents,
+    JSON.stringify(m).slice(0, 220)
+  )
+  // Each line is hours × that line's rate, rounded once. A line whose cost does
+  // not follow from its own two numbers is the failure this is here to catch.
+  for (const l of m.lines ?? []) {
+    const expected = Math.round((l.seconds / 3600) * l.centsPerHour)
+    check(
+      `“${l.label}” costs its own hours × its own rate`,
+      l.costCents === expected,
+      `${l.costCents} vs ${expected} (${l.seconds}s at ${l.centsPerHour}/h)`
+    )
+  }
+  check(
+    "there is logged time behind the figure, so the checks above mean something",
+    (m.lines ?? []).some((l) => l.seconds > 0),
+    "no time logged against this company — the arithmetic checks pass trivially"
+  )
+  const named = companies.find((c) => idFor.get(c.glideId) === priced)?.name ?? priced
+  console.log(
+    `  margin on ${named}: sold ${m.revenueCents}c − time ${m.timeCostCents}c − tools ${m.toolCostCents}c = ${m.marginCents}c` +
+      (m.marginPercent === null ? " (no revenue to be a percentage of — Glide never priced a sprint)" : ` (${m.marginPercent}%)`)
+  )
+  if (!m.loggedTimeAvailable) console.log("  (the work engine's tables are not in this database — time is not counted)")
+}
+
+step("Why we meet")
+const purposeIdFor = new Map()
+{
+  const already = new Map(
+    (must(await api("/api/content/delivery/purposes", {}, staff.cookie), "reading the purposes").purposes ?? []).map(
+      (p) => [p.name, p]
+    )
+  )
+  for (const p of history.meetingPurposes) {
+    const hit = already.get(p.name)
+    if (hit) {
+      purposeIdFor.set(p.glideId, hit.id)
+      say("reused", p.name, "meeting purposes")
+      continue
+    }
+    must(await post("/api/content/delivery/purposes", { name: p.name }, staff.cookie), `adding the purpose ${p.name}`)
+    say("created", p.name, "meeting purposes")
+  }
+  for (const row of must(await api("/api/content/delivery/purposes", {}, staff.cookie), "re-reading the purposes")
+    .purposes ?? []) {
+    const src = history.meetingPurposes.find((p) => p.name === row.name)
+    if (src) purposeIdFor.set(src.glideId, row.id)
+  }
+}
+
+step("The diary")
+{
+  // Title alone is not a key — "Weekly" happened 40 times. The moment is what
+  // makes a meeting that meeting.
+  const already = new Set(
+    (await allPages("/api/content/meetings", "meetings", staff.cookie)).map((m) => `${m.title}@${m.startsAt}`)
+  )
+  for (const m of history.meetings.slice(-MEETING_LIMIT)) {
+    if (already.has(`${m.title}@${m.startsAt}`)) {
+      say("reused", m.title, "meetings")
+      continue
+    }
+    must(
+      await post(
+        "/api/content/meetings",
+        {
+          title: m.title,
+          startsAt: m.startsAt,
+          endsAt: m.endsAt ?? undefined,
+          accountId: m.accountGlideId ? idFor.get(m.accountGlideId) : undefined,
+          purposeId: m.purposeGlideId ? purposeIdFor.get(m.purposeGlideId) : undefined,
+          location: m.location ?? undefined,
+          notes: m.notes ?? undefined,
+        },
+        staff.cookie
+      ),
+      `putting ${m.title} in the diary`
+    )
+    say("created", m.title, "meetings")
   }
 }
 
@@ -1076,6 +1704,93 @@ check(
 check("a contact of one company stands in one", (bStanding.accounts ?? []).length === 1, JSON.stringify(bStanding).slice(0, 200))
 check("neither client login is treated as staff", aStanding.kind === "portal" && bStanding.kind === "portal")
 if (aSecond) check("the second company is one they can stand in", (aStanding.accounts ?? []).some((x) => x.id === aSecond))
+
+// ── 8b · the fence around the WORK, and around the money ─────────────────────
+//
+// Everything above was written before the work engine had any rows in it, so it
+// asks about companies, contacts and requests — and every check passed while the
+// sprints, the stories, the logged time and the margin were all empty. An empty
+// table cannot leak, which means those checks were green about nothing.
+//
+// Now there is real work under real companies, so the questions can actually be
+// asked: does a client see another client's sprint, and can any client reach
+// what our own hour costs.
+
+step("Checking the fence around the work and the money")
+
+// THE POSITIVE HALF FIRST, as above: a door that answers nobody would pass every
+// refusal below and mean nothing.
+const aDelivery = must(await api("/api/content/portal/delivery", {}, a.cookie), "reading the client's own delivery")
+const aBlocks = aDelivery.sprints ?? []
+const bDelivery = must(await api("/api/content/portal/delivery", {}, b.cookie), "reading the other client's delivery")
+const bBlocks = bDelivery.sprints ?? []
+check(
+  `${testerA.companies[0]} sees the work sold to them (${aBlocks.length} blocks)`,
+  aBlocks.length > 0,
+  "no blocks at all — either nothing was sold to this company, or the door is refusing its own client"
+)
+// COMPARE A FIELD THAT EXISTS, AND PROVE IT EXISTS FIRST.
+//
+// The first version of this compared `x.id` and reported a cross-client leak
+// that was not there. A portal sprint deliberately carries no id — the door
+// selects ref, name, type, dates and counts and nothing else — so every row on
+// both sides had `id === undefined`, `undefined` matched `undefined`, and the
+// check failed on 10 of the client's OWN sprints.
+//
+// That is the usual trivial-check trap inverted: a negative check that FAILS for
+// free is as useless as one that passes for free, and it is more expensive,
+// because somebody spends an hour on a leak that does not exist. So the key is
+// asserted before it is trusted.
+const KEY = "ref"
+check(
+  "a delivery block carries something unique to compare",
+  aBlocks.every((x) => typeof x[KEY] === "string" && x[KEY]) &&
+    bBlocks.every((x) => typeof x[KEY] === "string" && x[KEY]),
+  `rows look like ${JSON.stringify(Object.keys(aBlocks[0] ?? {}))} — pick a key that is actually on them`
+)
+const aBlockKeys = new Set(aBlocks.map((x) => x[KEY]))
+const shared = bBlocks.filter((x) => aBlockKeys.has(x[KEY]))
+check(
+  "and none of the other client's",
+  shared.length === 0,
+  `${shared.length} blocks appear in BOTH clients' delivery: ${shared.map((x) => x[KEY]).slice(0, 5).join(", ")}`
+)
+
+// THE DOORS A CLIENT MUST NOT REACH AT ALL. These are agency-side reads of the
+// agency's own working material; the portal gateway forwards none of them, and
+// each one refuses a client login at the door as well (R21) — which is the half
+// this checks, because the same person is served at the agency hostname too.
+for (const [what, path] of [
+  ["the backlog", "/api/content/stories"],
+  ["the sprint list", "/api/content/sprints"],
+  ["everybody's logged time", "/api/content/work-logs"],
+  ["our own internal admin", "/api/content/tasks"],
+  ["the diary", "/api/content/meetings"],
+  ["what our own hour costs us", "/api/tenancy/internal-rates"],
+  ["what this account leaves us", `/api/tenancy/margin?accountId=${aHome}`],
+]) {
+  const res = await api(path, {}, a.cookie)
+  check(
+    `a client login cannot read ${what}`,
+    res.status === 403 || res.status === 404,
+    `got ${res.status} — ${JSON.stringify(res.body).slice(0, 140)}`
+  )
+}
+
+// AND THE SAME DOORS ANSWER US, so the refusals above are about WHO is asking
+// rather than about a door that is broken for everybody.
+for (const [what, path] of [
+  ["the backlog", "/api/content/stories?view=all"],
+  ["the sprint list", "/api/content/sprints"],
+  ["logged time", "/api/content/work-logs"],
+  ["our own admin", "/api/content/tasks"],
+  ["the diary", "/api/content/meetings"],
+  ["our internal rate card", "/api/tenancy/internal-rates"],
+  ["the margin on a client", `/api/tenancy/margin?accountId=${aHome}`],
+]) {
+  const res = await api(path, {}, staff.cookie)
+  check(`but we can read ${what}`, res.status === 200, `got ${res.status}`)
+}
 
 // ── 9 · what happened, and where to look ─────────────────────────────────────
 

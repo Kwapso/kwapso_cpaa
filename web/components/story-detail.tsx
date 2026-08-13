@@ -40,6 +40,7 @@ import { StoryStatusStepper } from "@/components/story-status-stepper"
 import { ApiFailure, content as contentApi } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
 import { formatCount } from "@shared/web/format-count"
+import { formatDate } from "@shared/web/format"
 import { cursorKey, runningTimersKey, storiesKey, totalKey } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
 import { CONCEPT_ICON } from "@/lib/pages"
@@ -161,7 +162,7 @@ export function StoryDetailScreen({
     { label: "Status", value: STORY_STATUS_LABEL[story.status] },
     { label: "Reference", value: story.ref || "—" },
     { label: "Who's doing it", value: story.assigneeName || "Nobody yet" },
-    { label: "Due", value: story.dueOn || "—" },
+    { label: "Due", value: formatDate(story.dueOn) || "—" },
     { label: "Detail", value: story.detail || "—" },
     { label: "What we'll tell them", value: story.closingNote || "—" },
     ...auditItems({

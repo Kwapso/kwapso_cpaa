@@ -133,25 +133,128 @@ const DROPDOWN_HOMES = {
  * rather than guessed into the wrong one. */
 const ACCOUNT_STATUS = { Active: "client", Archived: "past client" }
 
-/** Tables with nowhere to land today. The note names what each is waiting for —
- * the work engine, mostly. Counted, never dropped. */
+// ── the work engine's own columns ────────────────────────────────────────────
+//
+// Everything below was DERIVED, not read off a sample row: each foreign key was
+// tested by matching its values against every table's row ids across all rows,
+// and each label by counting its distinct values. The percentages in the
+// comments are the actual match rates, so a future reader can re-run the check
+// and get the same answer.
+
+const APP = {
+  name: "0Q1H5", // 100% filled, 27 distinct of 28 — the app's name
+  customer: "KH2hM", // → customers, 100%
+  url: "umEGb",
+  logo: "SgGGr",
+  description: "spLTj",
+  stage: "SiMwZ", // the plain word; npNd5 is the same value as a choices row id
+  background: "W7X7K",
+  problem: "fcAIk",
+  solution: "mmseq",
+  createdAt: "gE94D",
+  updatedAt: "l3V8c",
+}
+
+// A SPRINT IN GLIDE HAS NO NAME. Six columns, and not one of them is a title:
+// its identity was its app plus its dates plus its type. So the name is BUILT
+// from those three below — nothing invented, every part a real cell.
+const SPRINT = {
+  app: "qw1XE", // → apps, 100%
+  type: "df1gP", // → choices, group "Sprints/Type": Enhancement / Implementation / Refinement / Validation / Training / Diagnostic
+  startsOn: "ZozVJ",
+  endsOn: "dwXf6",
+  complete: "ZC4kS", // boolean, 88% filled
+  calendarEvent: "jAzSF",
+}
+
+const BACKLOG = {
+  title: "4BT9p", // 100% filled, 877 distinct
+  detail: "cEbJi",
+  app: "0e3PW", // → apps, 100%
+  module: "I9cTu", // → modules, 98%
+  sprint: "nnB3a", // → sprints, 100% (80% of rows sit in one)
+  ticket: "XlC6H", // → tickets, 100% (21% of rows came from a request)
+  type: "Whnhv", // the plain word — Feature / Change / Fix / Enhancement. Z8ZNT is the same as a choices id but misses the 50 Enhancements.
+  createdAt: "qFgjq",
+  touchedAt: "y1dsl", // ≥ createdAt on 839 of 840 rows that carry both
+}
+
+const WORKLOG = {
+  app: "Name", // → apps, 85%
+  task: "mF1k6", // → tasks, 40% — the rest point at rows this export doesn't carry
+  story: "h6gti", // → backlog, 100% (6% of rows)
+  ticket: "aqC3w", // → tickets, 99% (7% of rows)
+  user: "HdahH", // → users, 100%
+  userName: "rwE0f",
+  startedAt: "ioE4t",
+  endedAt: "dm68v",
+  hours: "49gqX", // decimal hours — the arithmetic is checked against the two dates below
+}
+
+const MEETING = {
+  title: "s5Yxt", // 100% filled, 303 distinct
+  purpose: "m7SxK", // → purposes, 100%
+  department: "3ns3L", // → departments, 99%
+  customer: "FrRxr", // → customers, 96% (40% of rows name one)
+  app: "JjvEu", // → apps, 98% (35% of rows)
+  attendees: "HDgRF", // → users, comma separated
+  attendeeNames: "BXK88",
+  externalName: "UO6LS",
+  startsAt: "9YgkK",
+  endsAt: "zxtbf",
+  mode: "wINP3", // In person (190) / Google Meet (153)
+  notes: "aek4K",
+  calendarEvent: "bwESR",
+  createdAt: "ZxRSG",
+}
+
+const TASK = {
+  title: "Name", // 100% filled
+  customer: "0rqK3", // → customers, 99%
+  app: "V6b5u", // → apps, 86%
+  ticket: "Dbaar", // → tickets, 100% (1% of rows)
+  department: "DE2iq", // → departments, 95%
+  owner: "w1KAK", // → users, 100%
+  ownerName: "r3JOD",
+  kind: "IWdse", // Production (2728) / Admin / Marketing / Support / Business / Sales / System
+  dueOn: "5YbMo",
+  createdAt: "uUgnV",
+  // DONE IS TWO COLUMNS THAT AGREE, AND A THIRD THAT DOES NOT. `0cee6` and
+  // `OLMHD` are both true on ~37% of rows and move together; `pQsN5` is true on
+  // 96%, which is a visibility flag rather than a completion one. Either of the
+  // agreeing pair is read as done, and the pair is named here so the reading is
+  // checkable rather than a claim.
+  done: "0cee6",
+  doneMirror: "OLMHD",
+}
+
+// `B0cSY` is the same column id the choices table uses for its value — Glide
+// reuses ids across tables, and a name read off the sample row ("Name") is empty
+// here, which is why all 27 rows were rejected the first time this ran.
+const PURPOSE = { name: "B0cSY", audience: "ggozi", department: "KiDbx" }
+
+/** Glide's app stage → the word this app uses. Anything unmapped is carried
+ * through as-is: `stage` is free text here, so an unfamiliar word is
+ * information, not an error. (Glide's own spelling of "Maintenance" is wrong;
+ * it is corrected on the way in because it is a label people read.) */
+const APP_STAGE = { Mainteinance: "Maintenance" }
+
+/** Tables with nowhere to land today. The note names what each is waiting for.
+ * Counted, never dropped.
+ *
+ * TEN OF THESE MOVED OUT on 13 Aug 2026, when the work engine shipped: apps,
+ * sprints, backlog, worklog, meetings, tasks and purposes are mapped below, and
+ * what is left here is what genuinely still has no home. */
 const DEFERRED_NOTES = {
-  apps: "The work engine's missing noun — a customer's app is the unit of work everything else hangs off.",
-  modules: "A feature inside an app; belongs with apps in the work engine.",
-  backlog: "Stories (SCOPE's word). Waiting on the work engine's story board.",
-  tasks: "To-dos (SCOPE ch.07). Links to tickets, apps and departments at once — the owner's open decision 2.",
-  worklog: "Logged time — 2,187 hours of it. Waiting on the work engine's time record.",
-  sprints: "Sprints, under an app. Work engine.",
-  meetings: "SCOPE ch.13 logs a meeting as work. Work engine.",
-  deliverables: "A delivered artefact under an app. Work engine.",
-  assets: "Per-module assets, carrying the savings maths already computed. Work engine.",
+  modules: "A feature inside an app. The base has no module noun — an app's stories carry the module NAME in their detail instead, which is where staff already look for it.",
+  deliverables: "A delivered artefact under an app. Eight rows; no record for them yet.",
+  assets: "Per-module assets carrying savings maths already computed. The process map holds that arithmetic now, but from steps rather than assets — importing them would need the steps they measure, which Glide never had.",
   milestones: "Empty in Glide (0 rows) — nothing to carry, listed so the zero is on the record.",
-  certificates: "Staff certifications — a team page, not a system record (owner decision 4).",
+  certificates: "Staff certifications. They hang off a MEMBER, and a Glide user is only a member here once they have signed in — so these wait for the people, not for a module.",
   program: "The delivery method behind meetings. Agency-internal; no module planned.",
-  purposes: "Meeting purposes, under departments. Agency-internal; no module planned.",
   departments: "Agency-internal grouping. The base has roles, not departments — no home, and no plan for one.",
-  channels: "Marketing channels behind the content pipeline. Agency-internal.",
-  branding: "A 74-row brand asset library. Agency-internal; the rescued files are in glide/files/.",
+  channels: "Marketing channels behind the content pipeline. They already appear as learning CATEGORIES (the article's channel becomes its category), so the table itself carries nothing extra.",
+  branding: "A 74-row brand asset library. The brand module holds these now, but each row is a FILE — importing them means moving bytes into R2, which is scripts/glide-to-r2.mjs's job and not this transform's.",
   roles: "NOT roles — one row PER PERSON (see CORRECTIONS). The base's permission matrix is the spine; carrying this would be a second, weaker one.",
 }
 
@@ -188,13 +291,80 @@ for (const t of ["customers", "contacts", "tickets", "apps", "modules", "sprints
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-const text = (v) => (typeof v === "string" ? v.trim() : typeof v === "number" ? String(v) : "")
+/** ONE NAME IN THE WHOLE EXPORT WAS TYPED IN ALREADY BROKEN, and this undoes it.
+ *
+ * "Marie-Christine GrÃ¼ner-Mirli" should read "Grüner-Mirli". Somebody pasted a
+ * mis-decoded string into Glide years ago and Glide stored exactly what it was
+ * given. The count says this is not our pipeline: 27,880 accented characters
+ * across the 32 tables are correct and there are TWO mojibake sequences, both of
+ * them the same row seen through the agency and portal copies.
+ *
+ * REPAIRING IT IS NOT INVENTING IT — rule 1 of this file stands. The characters
+ * `Ã¼` ARE the bytes of `ü`, read as Latin-1 by mistake; turning them back is
+ * decoding, not translating. What makes it safe is the ROUND TRIP: the repair is
+ * kept only if re-encoding the result reproduces the original exactly. A name
+ * that merely happens to contain `Ã` fails that test and is left alone.
+ */
+function unmojibake(s) {
+  if (!/[ÃÂâ][-¿€-™]/.test(s)) return s
+  try {
+    const bytes = Uint8Array.from([...s].map((c) => c.charCodeAt(0)))
+    if (bytes.some((b) => b > 0xff)) return s
+    const fixed = new TextDecoder("utf-8", { fatal: true }).decode(bytes)
+    // Only if it goes back exactly the way it came.
+    const round = [...new TextEncoder().encode(fixed)].map((b) => String.fromCharCode(b)).join("")
+    return round === s ? fixed : s
+  } catch {
+    return s
+  }
+}
+
+const text = (v) =>
+  typeof v === "string" ? unmojibake(v.trim()) : typeof v === "number" ? String(v) : ""
 const truthy = (v) => v === true || v === "true"
 const iso = (v) => {
   const d = new Date(text(v))
   return Number.isNaN(d.getTime()) ? null : d.toISOString()
 }
 const lower = (v) => text(v).toLowerCase()
+
+/** A TITLE THIS APP CAN HOLD, AND THE WHOLE THING KEPT ANYWAY.
+ *
+ * `TEXT_LIMITS.short` is 200 characters and the doors enforce it, because a
+ * title is a line on a list and a paragraph in that column is a list nobody can
+ * scan. Glide had no such rule: four backlog items and three tasks carry a whole
+ * sentence — the longest is 519 characters — where a title belongs, and the seed
+ * stopped dead on the first one with a clean 400.
+ *
+ * The refusal is right and the fix is not to raise the limit. It is to give the
+ * row a title that fits and put the FULL original at the top of the detail, so
+ * the words are all still there and the list is still readable. Cut at a word
+ * boundary, with an ellipsis, so a truncated title looks truncated rather than
+ * looking like somebody typed half a sentence.
+ */
+const TITLE_MAX = 200
+function fitTitle(raw) {
+  const t = text(raw).replace(/\s+/g, " ").trim()
+  if (t.length <= TITLE_MAX) return { title: t, full: null }
+  const cut = t.slice(0, TITLE_MAX - 1)
+  const lastSpace = cut.lastIndexOf(" ")
+  return { title: `${(lastSpace > TITLE_MAX * 0.6 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`, full: t }
+}
+
+/** THE SAME PROBLEM ONE SIZE UP. `TEXT_LIMITS.long` is 20,000 characters and one
+ * meeting's notes run past it — somebody wrote a document into the notes box.
+ *
+ * There is nowhere to move the overflow to (this IS the long field), so this one
+ * genuinely truncates — and says so in the text, where the reader is, rather than
+ * leaving them to wonder why a sentence stops. The full note is still in
+ * glide/normalised.json, and the marker names it. */
+const LONG_MAX = 20_000
+function fitLong(raw) {
+  const t = text(raw)
+  if (t.length <= LONG_MAX) return t || null
+  const keep = LONG_MAX - 120
+  return `${t.slice(0, keep).trimEnd()}\n\n[This note ran to ${t.length.toLocaleString()} characters and was cut to fit. The whole of it is in the Glide export.]`
+}
 
 /** Is this actually an address? Eight contacts carry "-" where an email should
  * be, and eight different people all matching on "-" is how a de-duplication
@@ -534,6 +704,326 @@ for (const r of src.content) {
   cnt.mapped()
 }
 
+// ── apps → the systems we've built ───────────────────────────────────────────
+//
+// THE UNIT OF WORK, and the reason this whole block exists. RECONCILIATION's
+// surprise was that everything in Glide hangs off an APP rather than off a
+// customer — sprints, stories, logged time and half the meetings all name one.
+// So apps are mapped first and everything below resolves through them; a row
+// whose app is missing is rejected rather than orphaned, because a story with no
+// app is a story nobody can find again.
+
+const appCnt = counter("apps", src.apps.length)
+const apps = []
+const appByGlideId = new Map()
+
+for (const r of src.apps) {
+  const name = text(r[APP.name])
+  if (!name) {
+    appCnt.rejected("no name — an app with no name cannot be found or filtered on")
+    continue
+  }
+  const customer = text(r[APP.customer])
+  if (customer && !companyByGlideId.has(customer)) {
+    appCnt.rejected("names a company that is not in the customers table")
+    continue
+  }
+  const stageRaw = text(r[APP.stage]) || choiceValue(r["npNd5"]) || ""
+  const app = {
+    glideId: r.$rowID,
+    name,
+    accountGlideId: customer || null,
+    url: text(r[APP.url]) || null,
+    stage: stageRaw ? (APP_STAGE[stageRaw] ?? stageRaw) : null,
+    // The three long-form fields Glide kept about WHY the app exists. Joined
+    // into one description because our app record has one, and labelled so the
+    // joins are readable rather than three paragraphs run together.
+    description:
+      [
+        text(r[APP.description]),
+        text(r[APP.background]) && `Background\n${text(r[APP.background])}`,
+        text(r[APP.problem]) && `The problem\n${text(r[APP.problem])}`,
+        text(r[APP.solution]) && `The solution\n${text(r[APP.solution])}`,
+      ]
+        .filter(Boolean)
+        .join("\n\n") || null,
+    createdAt: iso(r[APP.createdAt]),
+    unhoused: { logoUrl: text(r[APP.logo]) || null },
+  }
+  apps.push(app)
+  appByGlideId.set(r.$rowID, app)
+  appCnt.mapped()
+}
+
+// ── sprints → sprints ────────────────────────────────────────────────────────
+//
+// A NAME HAD TO BE BUILT, and this is the one place in this file where a value
+// is composed rather than copied. Glide's sprint carries six columns and not one
+// of them is a title — its identity on screen was the app it sat under plus its
+// dates. So the name is `<type> · <month>`, both parts real cells, and the app
+// and the exact dates ride alongside as their own fields. Nothing is invented:
+// a sprint with no type and no start is rejected rather than named "Sprint".
+
+const sprCnt = counter("sprints", src.sprints.length)
+const sprints = []
+const sprintByGlideId = new Map()
+
+const MONTH = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+const monthOf = (isoDate) => {
+  if (!isoDate) return null
+  const d = new Date(isoDate)
+  return `${MONTH[d.getUTCMonth()]} ${d.getUTCFullYear()}`
+}
+
+for (const r of src.sprints) {
+  const app = appByGlideId.get(text(r[SPRINT.app]))
+  if (!app) {
+    sprCnt.rejected("names an app that is not in the apps table")
+    continue
+  }
+  const type = choiceValue(r[SPRINT.type])
+  const startsOn = iso(r[SPRINT.startsOn])
+  if (!type && !startsOn) {
+    sprCnt.rejected("no type and no start date — nothing real to name it after")
+    continue
+  }
+  const sprint = {
+    glideId: r.$rowID,
+    name: [type ?? "Sprint", monthOf(startsOn)].filter(Boolean).join(" · "),
+    sprintType: type,
+    appGlideId: app.glideId,
+    accountGlideId: app.accountGlideId,
+    startsOn,
+    endsOn: iso(r[SPRINT.endsOn]),
+    complete: truthy(r[SPRINT.complete]),
+  }
+  sprints.push(sprint)
+  sprintByGlideId.set(r.$rowID, sprint)
+  sprCnt.mapped()
+}
+
+// ── backlog → stories ────────────────────────────────────────────────────────
+//
+// THE STATUS IS DERIVED FROM THE SPRINT, and that decision is worth stating
+// because the alternative was guessing. Glide's backlog has no four-state
+// column: it has two opaque booleans, and cross-tabulating them against the
+// sprints proved neither is a status — one is true on every row in a finished
+// sprint AND on ninety rows in no sprint at all, the other on a third of
+// everything. What IS certain is `sprints.ZC4kS`, a plain boolean on a row with
+// dates. So:
+//
+//     in a finished sprint  → done
+//     in a running sprint   → in progress
+//     in no sprint          → open
+//
+// One sentence, every part of it checkable, and it puts 675 stories in the right
+// column instead of putting 913 in a column chosen by a coin.
+
+const bckCnt = counter("backlog", src.backlog.length)
+const stories = []
+
+for (const r of src.backlog) {
+  const { title, full } = fitTitle(r[BACKLOG.title])
+  if (!title) {
+    bckCnt.rejected("no title — a story with no title is a row nobody can act on")
+    continue
+  }
+  const app = appByGlideId.get(text(r[BACKLOG.app]))
+  const sprint = sprintByGlideId.get(text(r[BACKLOG.sprint]))
+  const status = sprint ? (sprint.complete ? "done" : "in_progress") : "open"
+  const moduleName = text(r["1sEcm"])
+  stories.push({
+    glideId: r.$rowID,
+    title,
+    // The module name goes in the DETAIL rather than being dropped: the base has
+    // no module noun (see DEFERRED_NOTES), and "which part of the app is this
+    // about" is the first thing anybody asks about a story. A title that had to
+    // be shortened leads the detail with its full original, first — nothing is
+    // lost, and the long version is one line below the short one.
+    detail:
+      [full, text(r[BACKLOG.detail]), moduleName && `Part of the app: ${moduleName}`]
+        .filter(Boolean)
+        .join("\n\n") || null,
+    appGlideId: app?.glideId ?? null,
+    sprintGlideId: sprint?.glideId ?? null,
+    ticketGlideId: text(r[BACKLOG.ticket]) || null,
+    accountGlideId: app?.accountGlideId ?? null,
+    status,
+    storyType: text(r[BACKLOG.type]) || null,
+    createdAt: iso(r[BACKLOG.createdAt]),
+  })
+  bckCnt.mapped()
+}
+
+// ── tasks → our own admin ────────────────────────────────────────────────────
+//
+// THESE ARE TASKS, NOT TO-DOS, and getting that backwards would have sent 3,677
+// emails. In this app a TO-DO is something we ask a CLIENT for and completing it
+// mails them; a TASK is a piece of our own admin nobody outside sees. Glide's
+// 3,677 "tasks" are assigned to our own staff — they are the second thing, and
+// they go through the tasks door, which writes a row and tells nobody.
+//
+// They are mapped BEFORE the work logs because a log can be time spent on a
+// task, and a target that was never imported is a log with nothing to hang on.
+
+const tskCnt = counter("tasks", src.tasks.length)
+const tasks = []
+const taskByGlideId = new Map()
+for (const r of src.tasks) {
+  const { title, full } = fitTitle(r[TASK.title])
+  if (!title) {
+    tskCnt.rejected("no title — nothing to put on a list")
+    continue
+  }
+  const customer = text(r[TASK.customer])
+  const app = appByGlideId.get(text(r[TASK.app]))
+  const kind = text(r[TASK.kind])
+  const task = {
+    glideId: r.$rowID,
+    title,
+    // Glide's department word (Production, Admin, Marketing…) is the only thing
+    // that says what KIND of admin this was, and there is no column for it here,
+    // so it rides in the detail where a person will actually read it — under the
+    // full original title, on the three rows whose title had to be shortened.
+    detail: [full, kind && `Area: ${kind}`, app && `App: ${app.name}`].filter(Boolean).join("\n") || null,
+    accountGlideId: companyByGlideId.has(customer) ? customer : (app?.accountGlideId ?? null),
+    dueOn: iso(r[TASK.dueOn]),
+    done: truthy(r[TASK.done]) || truthy(r[TASK.doneMirror]),
+    ownerName: text(r[TASK.ownerName]) || null,
+    createdAt: iso(r[TASK.createdAt]),
+  }
+  tasks.push(task)
+  taskByGlideId.set(r.$rowID, task)
+  tskCnt.mapped()
+}
+tasks.sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)))
+
+// ── worklog → logged time ────────────────────────────────────────────────────
+//
+// THE ONE TABLE WHOSE REAL DATES SURVIVE THE FRONT DOOR. Everything else in this
+// migration arrives stamped today, because no door accepts a created date — but
+// the log-time door takes `startedAt` and `endedAt` as the RECORD ITSELF, so two
+// years and 2,187 hours land with their true times on them.
+//
+// Glide's own decimal hours (49gqX) are kept as `statedHours` and checked
+// against the two timestamps rather than trusted: where they disagree by more
+// than a minute the row says so, so a bad clock in the old app is visible here
+// instead of becoming a wrong number on a margin.
+
+const wlCnt = counter("worklog", src.worklog.length)
+const workLogs = []
+const storyByGlideId = new Map(stories.map((s) => [s.glideId, s]))
+
+for (const r of src.worklog) {
+  const startedAt = iso(r[WORKLOG.startedAt])
+  const endedAt = iso(r[WORKLOG.endedAt])
+  if (!startedAt || !endedAt) {
+    wlCnt.rejected("no start or no finish — a duration needs both ends")
+    continue
+  }
+  // THE DOOR'S OWN ARITHMETIC, not an approximation of it. `secondsBetween`
+  // FLOORS to whole seconds and `logTime` refuses a zero — so a timer somebody
+  // started and stopped by accident (one row, 556 milliseconds) passes a
+  // "finished after it started" test and is then refused on the wire. Matching
+  // the floor here means the file cannot contain a row the app will not take.
+  const wholeSeconds = Math.floor((new Date(endedAt) - new Date(startedAt)) / 1000)
+  if (wholeSeconds < 1) {
+    wlCnt.rejected("no time at all — under a second between the start and the finish")
+    continue
+  }
+  // WHAT THE TIME IS AGAINST, and the list is not ours to choose: time is logged
+  // against a story, a request or a task and nothing else (WORK_LOG_TARGETS in
+  // workers/content/src/lib/work-logs.ts). An APP is not a target — deliberately,
+  // because "eight hours on DigiDock" is not an answer anybody can cost. So a log
+  // that only names an app is rejected here rather than bent into a shape the
+  // door would refuse anyway.
+  //
+  // Most specific first: a log naming a story is about that story; the request
+  // beats the task for the same reason.
+  const story = storyByGlideId.get(text(r[WORKLOG.story]))
+  const ticketId = text(r[WORKLOG.ticket])
+  const task = taskByGlideId.get(text(r[WORKLOG.task]))
+  const target = story
+    ? { targetKind: "stories", targetGlideId: story.glideId }
+    : ticketId
+      ? { targetKind: "help", targetGlideId: ticketId }
+      : task
+        ? { targetKind: "tasks", targetGlideId: task.glideId }
+        : null
+  if (!target) {
+    // NOT "it only named an app" — that case turns out not to exist. Every one
+    // of these names a TASK that is not in the export: 1,567 rows pointing at
+    // 1,567 distinct ids that match no row in any of the 32 tables. They are
+    // tasks somebody deleted in Glide, and deleting the task took the time with
+    // it. 1,069 of the 2,187 hours are on the other side of that deletion and
+    // there is no honest way back — see CORRECTIONS.
+    wlCnt.rejected("its task was deleted in Glide — the parent row is in no exported table")
+    continue
+  }
+  const measured = (new Date(endedAt) - new Date(startedAt)) / 3_600_000
+  const stated = typeof r[WORKLOG.hours] === "number" ? r[WORKLOG.hours] : null
+  workLogs.push({
+    glideId: r.$rowID,
+    ...target,
+    startedAt,
+    endedAt,
+    staffName: text(r[WORKLOG.userName]) || null,
+    statedHours: stated,
+    // Only present when the old app's own figure disagrees with its own clocks.
+    clockDisagreement: stated !== null && Math.abs(stated - measured) > 1 / 60 ? { stated, measured } : null,
+  })
+  wlCnt.mapped()
+}
+
+// ── purposes + meetings → the diary ──────────────────────────────────────────
+
+const purCnt = counter("purposes", src.purposes.length)
+const meetingPurposes = []
+const purposeByGlideId = new Map()
+for (const r of src.purposes) {
+  const name = text(r[PURPOSE.name])
+  if (!name) {
+    purCnt.rejected("no name")
+    continue
+  }
+  const purpose = { glideId: r.$rowID, name }
+  meetingPurposes.push(purpose)
+  purposeByGlideId.set(r.$rowID, purpose)
+  purCnt.mapped()
+}
+
+const mtgCnt = counter("meetings", src.meetings.length)
+const meetings = []
+for (const r of src.meetings) {
+  const title = text(r[MEETING.title])
+  const startsAt = iso(r[MEETING.startsAt])
+  if (!title || !startsAt) {
+    mtgCnt.rejected(title ? "no start time — a meeting is a moment before it is anything else" : "no title")
+    continue
+  }
+  const customer = text(r[MEETING.customer])
+  const app = appByGlideId.get(text(r[MEETING.app]))
+  meetings.push({
+    glideId: r.$rowID,
+    title,
+    accountGlideId: companyByGlideId.has(customer) ? customer : (app?.accountGlideId ?? null),
+    purposeGlideId: purposeByGlideId.has(text(r[MEETING.purpose])) ? text(r[MEETING.purpose]) : null,
+    startsAt,
+    endsAt: iso(r[MEETING.endsAt]),
+    // Glide's "In person" / "Google Meet" is the nearest thing it had to a
+    // location, and it is what people actually needed to know.
+    location: text(r[MEETING.mode]) || null,
+    notes: fitLong(r[MEETING.notes]),
+    attendeeNames: text(r[MEETING.attendeeNames])
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+    unhoused: { externalAttendee: text(r[MEETING.externalName]) || null, calendarEventId: text(r[MEETING.calendarEvent]) || null },
+  })
+  mtgCnt.mapped()
+}
+meetings.sort((a, b) => String(a.startsAt).localeCompare(String(b.startsAt)))
+
 // ── everything with no home today ────────────────────────────────────────────
 
 const deferred = {}
@@ -556,6 +1046,12 @@ const CORRECTIONS = [
   "the ONE duplicate person is Dennis Franken, exactly as RECONCILIATION says — but eight OTHER contacts carry \"-\" in the email column, and de-duplicating on the raw value merges eight different people into one. 104 rows are 103 people, not the 96 the 'unique emails' count suggests: that count treated the placeholder as an address.",
   "788 requests exist only in German, not the ~754 RECONCILIATION estimates — the estimate counted titles, and some rows carry a German body under an English title.",
   "the customers table has no created date the migration can trust: VnwNS is filled on 11 of 20 rows and x0Sgb on 19, and neither is labelled. Ticket dates (72pZY, 1,816 of 1,820 filled, Jun 2024 → Aug 2026) are the only history dense enough to rely on.",
+  "HALF THE LOGGED TIME IS ALREADY GONE, and it went before this migration started. 1,567 of the 2,940 work logs name a parent task that is in NO exported table — 1,567 rows, 1,567 distinct ids, zero matches across all 32 tables. Glide deleted the task and left the time pointing at nothing. That is 1,069 of the 2,187 hours; 1,118 hours survive on 1,297 logs. RECONCILIATION quotes 2,187 hours as the history — the recoverable figure is a little over half of it, and no amount of mapping changes that.",
+  "no work log names ONLY an app. The app column (Name) is filled on 89% of rows, which reads like the primary link, but every row that has one also has a story, a request or a task — so the app column is a convenience copy, not the parent. Nothing was lost by refusing to log time against an app.",
+  "sprints have no name in Glide. Six columns, and none of them a title: a sprint was identified on screen by its app plus its dates. The name is composed here from its type and its start month, which is why every sprint in the new app reads like 'Enhancement · Jul 2026'.",
+  "the backlog has no status column either. Two opaque booleans (1lNG7, buR6D) look like candidates and neither is: one is true on every row in a finished sprint AND on 90 rows in no sprint, the other on a third of everything. The sprint's own completion flag is the only reliable signal, so the story's state is derived from it.",
+  "meeting purposes store their name in B0cSY, the same column id the choices table uses for its value — Glide reuses ids across tables. Reading the sample row's 'Name' column gives an empty string on all 27 rows.",
+  "ONE name in the export was already broken before we touched it: 'Marie-Christine GrÃ¼ner-Mirli'. It is not an encoding fault in this pipeline and the counting proves it — 27,880 accented characters across the 32 tables are correct and there are exactly two mojibake sequences, both the same contact row seen through the agency and portal copies. Somebody pasted a mis-decoded string into Glide years ago. `unmojibake` turns it back, and only when re-encoding the result reproduces the original byte for byte, so a name that merely contains 'Ã' is never touched.",
 ]
 
 // ── write, and report ────────────────────────────────────────────────────────
@@ -571,6 +1067,16 @@ const out = {
   selectableData,
   learning,
   helpRequests,
+  // The work engine's half, in the order the seed has to write it: an app before
+  // its sprints, a sprint before its stories, a story before the time logged
+  // against it.
+  apps,
+  sprints,
+  stories,
+  workLogs,
+  meetingPurposes,
+  meetings,
+  tasks,
   deferred,
   summary: tally,
 }
