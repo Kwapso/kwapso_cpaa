@@ -24,6 +24,8 @@ import { describe, expect, it } from "vitest"
 import { readdirSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
 
+import { sourceFiles } from "@shared/rules/source-scan"
+
 const ROOT = join(__dirname, "..", "..")
 const read = (p: string) => readFileSync(p, "utf8")
 const BACKUP = read(join(ROOT, "scripts", "backup.mjs"))
@@ -38,25 +40,26 @@ const WORKERS = readdirSync(join(ROOT, "workers")).filter((d) => {
 })
 
 /** Every `.ts` under a worker's src/, and the shared worker code with it — the
- * two places an R2 write can live. */
+ * two places an R2 write can live.
+ *
+ * Through `sourceFiles`, not a walk of its own: this file is a law like any
+ * other, and the law about laws (web/test/source-scan.test.ts) says every one of
+ * them reads source through the ONE walker. Eight hand-rolled copies is how a
+ * scan ends up filtering differently from the scan beside it and reporting
+ * success for a directory it never entered. The roster read above is the
+ * sanctioned exception — listing the workers is a different question from
+ * reading them — and it is named in that suite's DIRECT_READDIR with a reason. */
 function workerSources(): { path: string; source: string }[] {
-  const out: { path: string; source: string }[] = []
-  const walk = (dir: string) => {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const path = join(dir, entry.name)
-      if (entry.isDirectory()) walk(path)
-      else if (entry.name.endsWith(".ts")) out.push({ path, source: readFileSync(path, "utf8") })
-    }
-  }
-  for (const w of WORKERS) {
+  const roots = WORKERS.map((w) => join(ROOT, "workers", w, "src")).filter((d) => {
     try {
-      if (statSync(join(ROOT, "workers", w, "src")).isDirectory()) walk(join(ROOT, "workers", w, "src"))
+      return statSync(d).isDirectory()
     } catch {
-      /* a worker with no src/ is not a worker with a hidden R2 write */
+      // a worker with no src/ is not a worker with a hidden R2 write
+      return false
     }
-  }
-  walk(join(ROOT, "shared", "workers"))
-  return out
+  })
+  roots.push(join(ROOT, "shared", "workers"))
+  return sourceFiles(roots, { extensions: [".ts"] }).map((f) => ({ path: f.path, source: f.source }))
 }
 
 /** Which BINDINGS are R2 buckets, per worker — off each worker's `r2_buckets`,

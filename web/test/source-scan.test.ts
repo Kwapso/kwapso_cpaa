@@ -151,6 +151,8 @@ const DIRECT_READDIR: Record<string, string> = {
     "roster read, and it defines a worker as a directory with a src/index.ts — which is the question this suite asks",
   "workers/gateway/test/public-surface.test.ts":
     "roster read, and it defines a worker as a directory with a wrangler.jsonc — which is the question this suite asks",
+  "web/test/backup-covers-r2.test.ts":
+    "roster read: the workers with a wrangler.jsonc, to build the src/ roots it then hands to sourceFiles and to find each one's r2_buckets",
 }
 
 describe("no law walks a directory tree by hand", () => {
