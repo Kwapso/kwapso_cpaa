@@ -390,7 +390,8 @@ on top follows [CACHING.md](CACHING.md).
 ## 7 · Scale — the accepted ceiling (LOCKED 2026-08-14)
 
 The base scored **78 / 100** on the twelve-dimension scaling audit of 14 Aug 2026,
-after twelve repairs took it from 53. **78 is accepted, not a backlog.** This section
+after twelve repairs took it from 53 — **79** once the growth alarms were wired to a
+person later the same day. **That score is accepted, not a backlog.** This section
 exists so the next audit reads it and stops, rather than re-deriving the same
 conclusion and proposing the same work.
 
