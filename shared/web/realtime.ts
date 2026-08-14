@@ -97,18 +97,39 @@ export function useRealtime(
   teamId: string | null,
   onEvent: (event: RealtimeEvent) => void,
   onReconnect?: () => void,
-  fenceId?: string | null
+  fenceId?: string | null,
+  /** WHICH RESOURCES THIS APP ACTUALLY HANDLES. Omit and the socket hears
+   * everything, which is what it did before subscriptions existed.
+   *
+   * Derive it from the listener registry rather than typing a list: a resource
+   * this app handles but forgot to subscribe to is a screen that silently stops
+   * going live, which is the worst failure shape the live layer has — nothing is
+   * broken on screen, the data is simply stale. Deriving it means the two cannot
+   * drift, the same argument R15 makes about the registry itself. */
+  subscribe?: readonly string[]
 ): void {
-  useLiveChannel(teamChannelQuery(teamId, fenceId), onEvent, onReconnect)
+  useLiveChannel(teamChannelQuery(teamId, fenceId, subscribe), onEvent, onReconnect)
 }
 
 /** The team channel's URL query: which team, plus where the caller is standing
  * when that is a thing about them. Pulled out of the hook so the rule it encodes
  * — a fence that MOVES is a different socket — can be asserted directly instead
  * of inferred from a rendered component. */
-export function teamChannelQuery(teamId: string | null, fenceId?: string | null): string | null {
+export function teamChannelQuery(
+  teamId: string | null,
+  fenceId?: string | null,
+  subscribe?: readonly string[]
+): string | null {
   if (!teamId) return null
-  return `team=${encodeURIComponent(teamId)}${fenceId ? `&fence=${encodeURIComponent(fenceId)}` : ""}`
+  // SORTED, so the query string — and therefore the socket's identity — does not
+  // change when a registry's key order does. Without it, an unrelated edit to the
+  // listener map would churn every open socket on the next deploy.
+  const subs = subscribe?.length ? [...new Set(subscribe)].sort().join(",") : null
+  return (
+    `team=${encodeURIComponent(teamId)}` +
+    (fenceId ? `&fence=${encodeURIComponent(fenceId)}` : "") +
+    (subs ? `&sub=${encodeURIComponent(subs)}` : "")
+  )
 }
 
 /** Subscribe to YOUR OWN identity channel (account events + sign-out), open for

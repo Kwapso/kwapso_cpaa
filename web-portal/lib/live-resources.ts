@@ -61,6 +61,19 @@ export const PORTAL_LISTENERS: Record<string, (currentAccountId: string | null) 
   process_comments: () => [cacheKeys.value],
 }
 
+/** WHAT THIS APP ASKS THE CHANNEL FOR — derived from the listener map, never typed.
+ *
+ * The comment below has always said the interesting part: the team channel carries
+ * every module the agency uses and most of them are none of the portal's business.
+ * Until now the portal RECEIVED all of them and threw most away — work paid for
+ * inside a single-threaded Durable Object, per socket, per ping, on behalf of a
+ * listener that was never going to use it. Nine resources instead of everything.
+ *
+ * Derived so it cannot drift: adding a line to PORTAL_LISTENERS subscribes to it in
+ * the same edit. A resource this app handles but forgot to ask for would be a screen
+ * that silently stops going live — the failure shape with no symptom. */
+export const PORTAL_SUBSCRIPTIONS = Object.keys(PORTAL_LISTENERS)
+
 /** Apply one live ping. Unknown resources are ignored — the team channel carries
  * every module the agency uses, and most of them are none of the portal's
  * business. */

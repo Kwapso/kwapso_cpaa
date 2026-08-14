@@ -32,7 +32,7 @@ import { clearAllFormDrafts } from "@shared/web/use-form-draft"
 import { clearCache } from "@shared/web/store"
 import { reportError } from "@shared/web/log"
 import { auth } from "@/lib/api"
-import { applyLivePing, replayAfterReconnect } from "@/lib/live-resources"
+import { applyLivePing, PORTAL_SUBSCRIPTIONS, replayAfterReconnect } from "@/lib/live-resources"
 import { usePortalSession, type PortalSession } from "@/lib/session"
 import { NeedsName } from "@/components/needs-name"
 import { NoAccess } from "@/components/no-access"
@@ -79,7 +79,10 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
     session.state === "ready" ? session.teamId : null,
     React.useCallback((e) => applyLivePing(e.resource, accountId), [accountId]),
     React.useCallback(() => replayAfterReconnect(accountId), [accountId]),
-    accountId
+    accountId,
+    // ONLY WHAT THIS APP HANDLES. `applyLivePing` already ignored everything else;
+    // this stops the channel spending a send on it in the first place.
+    PORTAL_SUBSCRIPTIONS
   )
 
   if (session.state === "loading" || session.state === "signed-out")

@@ -19,6 +19,7 @@
 import { describe, expect, it, vi } from "vitest"
 
 import type { ScopeStamp } from "@shared/workers/account-scope"
+import { REALTIME_SHARDS, teamShardName } from "@shared/workers/realtime"
 import { TEXT_LIMITS } from "@shared/workers/validate"
 import worker, { LISTENER_MAX_AGE_MS, TeamChannel } from "../src/index"
 
@@ -67,6 +68,15 @@ function socket(options: { breaks?: "send" | "read" | "close" } = {}): FakeSocke
 function listener(scope: ScopeStamp = null, ageMs = 0): FakeSocket {
   const ws = socket()
   ws.serializeAttachment({ scope, at: Date.now() - ageMs })
+  return ws
+}
+
+/** A socket that has DECLARED a subscription — the resources its screens read.
+ * Separate from `listener()` because the two answer different questions and the
+ * suite below has to be able to say which one it is testing. */
+function subscriber(subs: string[] | undefined, scope: ScopeStamp = null): FakeSocket {
+  const ws = socket()
+  ws.serializeAttachment({ scope, at: Date.now(), ...(subs ? { subs } : {}) })
   return ws
 }
 
@@ -395,14 +405,64 @@ describe("/publish — the one door that reaches every team's channel", () => {
       body: JSON.stringify(body),
     })
 
-  it("broadcasts to the named channel when the key is right", async () => {
+  it("FANS a team ping out to every shard — one publisher call, N objects", async () => {
+    // THE PUBLISHER'S CONTRACT IS UNCHANGED and that is the point of doing the
+    // split here: a hundred-odd `publishChange` call sites still name `team:<id>`,
+    // and this door is the one place that knows a team's channel is more than one
+    // object. A fan-out written at the publisher would have been a hundred chances
+    // to write it differently.
     const { env: e, broadcasts } = env()
     const res = await worker.fetch(post({ channel: "team:T1", event: { resource: "members" } }, "shhh"), e)
 
     expect(res.status).toBe(200)
+    expect(broadcasts.map((b) => b.channel).sort()).toEqual(
+      Array.from({ length: REALTIME_SHARDS }, (_, i) => teamShardName("T1", i)).sort()
+    )
+    for (const b of broadcasts) expect(b.message).toBe(JSON.stringify({ resource: "members" }))
+    expect(
+      broadcasts.map((b) => b.channel),
+      "and never the un-sharded name — a listener is on a shard, so a ping there reaches nobody"
+    ).not.toContain("team:T1")
+  })
+
+  it("does NOT split a user channel — one person's devices are a handful", async () => {
+    // Splitting the most frequent ping in the product to buy headroom nobody needs
+    // would multiply its cost for nothing.
+    const { env: e, broadcasts } = env()
+    await worker.fetch(post({ channel: "user:U1", event: { resource: "profile" } }, "shhh"), e)
     expect(broadcasts).toEqual([
-      { channel: "team:T1", message: JSON.stringify({ resource: "members" }) },
+      { channel: "user:U1", message: JSON.stringify({ resource: "profile" }) },
     ])
+  })
+
+  it("passes an explicitly-named shard straight through", async () => {
+    // A caller who was specific is not second-guessed — the door only expands a
+    // BARE team name. This is what keeps a one-shard broadcast reachable for tests
+    // and for any future caller that wants exactly one object.
+    const { env: e, broadcasts } = env()
+    await worker.fetch(post({ channel: "team:T1#2", event: { resource: "members" } }, "shhh"), e)
+    expect(broadcasts.map((b) => b.channel)).toEqual(["team:T1#2"])
+  })
+
+  it("one dead shard does not cost the others their ping", async () => {
+    // Best-effort by contract: the write this ping describes has already
+    // committed, so a shard that throws must be logged and stepped over, never
+    // raced (Promise.all would have hidden three successes behind one failure).
+    const broadcasts: { channel: string; message: string }[] = []
+    const e = {
+      INTERNAL_KEY: "shhh",
+      CHANNELS: {
+        getByName: (channel: string) => ({
+          broadcast: (message: string) => {
+            if (channel.endsWith("#1")) throw new Error("shard down")
+            broadcasts.push({ channel, message })
+          },
+        }),
+      },
+    } as never
+    const res = await worker.fetch(post({ channel: "team:T1", event: { resource: "members" } }, "shhh"), e)
+    expect(res.status, "a dead shard is not a failed publish").toBe(200)
+    expect(broadcasts.length).toBe(REALTIME_SHARDS - 1)
   })
 
   it("refuses a wrong key, and broadcasts nothing", async () => {
@@ -505,5 +565,142 @@ describe("the hibernation handlers", () => {
   it("an error on a socket does not take the channel down", async () => {
     const { channel: ch } = channel([])
     await expect(ch.webSocketError()).resolves.toBeUndefined()
+  })
+})
+
+// A SUBSCRIPTION IS WHAT A LISTENER ASKED FOR; A FENCE IS WHAT IT MAY HAVE.
+//
+// Every socket used to receive every ping its fence allowed, so somebody looking
+// at one screen was woken by every other module in the team — and that cost is
+// paid inside a single-threaded object, per socket, per ping. Narrowing it is one
+// half of moving the ceiling (the other is the shard split above).
+//
+// The two filters fail in OPPOSITE directions on purpose, and that is most of what
+// this suite is about: a fence that cannot be checked sends nothing, and a
+// subscription that cannot be read sends everything. Getting those the wrong way
+// round would either break a screen or leak an id.
+describe("subscription scoping — what a listener asked to hear", () => {
+  const ping = (resource: string) => JSON.stringify({ resource })
+
+  it("sends a resource a socket subscribed to", () => {
+    const ws = subscriber(["help", "todos"])
+    const { channel: ch } = channel([ws])
+    ch.broadcast(ping("help"))
+    expect(ws.sent).toEqual([ping("help")])
+  })
+
+  it("SKIPS a resource nobody on that socket is looking at", () => {
+    const ws = subscriber(["help"])
+    const { channel: ch } = channel([ws])
+    ch.broadcast(ping("member_roles"))
+    expect(ws.sent, "the whole point: one screen open, one module's pings").toEqual([])
+    expect(ws.closed, "and skipping is not closing — the socket stays live").toBe(0)
+  })
+
+  it("a socket with NO subscription still hears everything", () => {
+    // FAIL OPEN. This is the shape every client had before subscriptions existed,
+    // and the shape an older build still sends. Over-serving costs bandwidth;
+    // under-serving costs a screen its correctness.
+    const ws = subscriber(undefined)
+    const { channel: ch } = channel([ws])
+    ch.broadcast(ping("anything-at-all"))
+    expect(ws.sent).toEqual([ping("anything-at-all")])
+  })
+
+  it("an unparsable event reaches a subscriber rather than being filtered out", () => {
+    // No resource to match against. The fence's answer to that is silence; the
+    // subscription's answer must be the opposite, or a malformed ping would go to
+    // un-narrowed sockets only and quietly skip every narrowed one.
+    const ws = subscriber(["help"])
+    const { channel: ch } = channel([ws])
+    ch.broadcast("not json")
+    expect(ws.sent).toEqual(["not json"])
+  })
+
+  it("the subscription NARROWS a fence, it never widens one", () => {
+    // A client login subscribed to a resource its fence does not allow must still
+    // hear nothing. The two filters are ANDed, and the fence is the one that
+    // decides — asserted because the cheap filter runs FIRST, and a reader could
+    // reasonably wonder whether running first also means winning.
+    const fenced = subscriber(["accounts"], { accountIds: ["A_MINE"] })
+    const { channel: ch } = channel([fenced])
+    ch.broadcast(JSON.stringify({ resource: "accounts", id: "A_SOMEONE_ELSE" }))
+    expect(fenced.sent, "subscribing to a resource is not permission to see a row").toEqual([])
+  })
+
+  it("both filters together: subscribed AND inside the fence", () => {
+    const fenced = subscriber(["accounts"], { accountIds: ["A_MINE"] })
+    const { channel: ch } = channel([fenced])
+    ch.broadcast(JSON.stringify({ resource: "accounts", id: "A_MINE" }))
+    expect(fenced.sent.length).toBe(1)
+  })
+
+  it("one socket's narrow subscription does not silence another's", () => {
+    const narrow = subscriber(["help"])
+    const wide = subscriber(undefined)
+    const { channel: ch } = channel([narrow, wide])
+    ch.broadcast(ping("member_roles"))
+    expect(narrow.sent).toEqual([])
+    expect(wide.sent.length, "a per-socket filter must stay per-socket").toBe(1)
+  })
+
+  it("an EXPIRED socket is closed whatever it subscribed to", () => {
+    // The deadline is checked before either filter, so a subscription cannot be
+    // used to keep a stale authorization quietly alive.
+    const stale = subscriber(["help"])
+    stale.serializeAttachment({ scope: null, at: Date.now() - LISTENER_MAX_AGE_MS - 1, subs: ["help"] })
+    const { channel: ch } = channel([stale])
+    ch.broadcast(ping("help"))
+    expect(stale.sent).toEqual([])
+    expect(stale.closed).toBe(1)
+  })
+})
+
+describe("the upgrade carries the subscription onto the socket", () => {
+  /** The two Workers globals `fetch()` needs — the same stubs the stamping suite
+   * above builds, for the same reason (a 101 is legal in the runtime and illegal
+   * in Node's Response). */
+  async function join(headers: Record<string, string> = {}) {
+    const pair = { 0: socket(), 1: socket() }
+    vi.stubGlobal("WebSocketPair", class { constructor() { return pair } })
+    vi.stubGlobal(
+      "Response",
+      class {
+        constructor(
+          readonly body: unknown,
+          readonly init: { status?: number; webSocket?: unknown } = {}
+        ) {}
+      }
+    )
+    try {
+      const { channel: ch, accepted } = channel([])
+      await ch.fetch(new Request("https://do/", { headers }))
+      return accepted[0].attachment as { subs?: string[]; at?: number; scope?: unknown }
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  }
+
+  it("attaches what the door declared, beside the fence and the issue time", async () => {
+    const held = await join({ "x-listener-subs": "help, todos ,help" })
+    expect(held.subs, "trimmed, de-duplicated, in order").toEqual(["help", "todos"])
+    expect(typeof held.at, "and the deadline still rides along").toBe("number")
+  })
+
+  it("OMITS the key entirely when nothing was declared", async () => {
+    // Not `subs: null`, not `subs: []`. One absent key, one meaning — so a socket
+    // from before subscriptions and a socket that declared nothing are the same
+    // object, and the fail-open branch has one shape to check rather than three.
+    const held = await join()
+    expect(Object.hasOwn(held, "subs")).toBe(false)
+  })
+
+  it("ignores a declaration too large to be a screen's needs", async () => {
+    // A subscription is walked per message, so an unbounded list turns the
+    // optimisation into the cost. Past the ceiling the listener is un-narrowed,
+    // never refused — the fail-open direction, again.
+    const huge = Array.from({ length: 200 }, (_, i) => `r${i}`).join(",")
+    const held = await join({ "x-listener-subs": huge })
+    expect(Object.hasOwn(held, "subs")).toBe(false)
   })
 })

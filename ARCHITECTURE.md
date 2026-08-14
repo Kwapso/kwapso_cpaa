@@ -100,6 +100,12 @@ hibernating. Exactly like OOP: one `class` (code), millions of objects (runtime)
 Both scale by key to very large numbers; they're orthogonal. Client read-caching
 on top follows [CACHING.md](CACHING.md).
 
+> **That paragraph is about the NUMBER of instances, and it is only half the
+> story.** Instances scale by key without limit; what does *not* scale without
+> limit is **one instance's fan-out** — a channel broadcasts to its sockets
+> serially, and a team is one channel. The measured ceiling and the decision to
+> accept it are in **§7** below. Read that before proposing a fan-out change.
+
 ### The actions today (each becomes an MCP-catalogued tool)
 
 > **UPDATED 2026-08-12 — read this table as the base's SHAPE, not as its census.**
@@ -380,3 +386,102 @@ on top follows [CACHING.md](CACHING.md).
   (known gaps: 6-digit code input, step wizard). Never one-off components here.
 - Anti-bloat is law: one master copy of every rule/doc/component; reuse over
   recode; keep every piece small enough for an agent to reason about.
+
+## 7 · Scale — the live layer's ceiling, and where it now sits (LOCKED 2026-08-14)
+
+**History, because this decision was made twice.** The twelve-dimension scaling audit
+of 14 Aug 2026 scored the base 78/100 (79 once the growth alarms were delivered), and
+its largest single gap — the whole of dimension 9 — *was* the decision recorded in §2:
+one `TeamChannel` per team, broadcasting serially. That ceiling was first **accepted**,
+on the grounds that it sat about seventy-five times above what this deployment peaks
+at. The owner then chose to raise it instead. Both were reasonable; this section records
+where it ended up and what is still true.
+
+**The change (14 Aug 2026).** A team's channel is now **split across
+`REALTIME_SHARDS` (4) objects**, and listeners **declare what they want to hear**.
+
+- **The split lives in the realtime worker's `/publish` door**, not at the publishers.
+  A publisher still makes one call naming `team:<id>`; the door fans it out to
+  `team:<id>#0…3`. All hundred-odd `publishChange` call sites are untouched, which is
+  the point — a fan-out written at the publisher would have been a hundred chances to
+  write it differently. Listeners join the shard of `shardFor(userId)`, so one person's
+  devices land together and a reconnect returns to the same object.
+- **Subscriptions narrow the sends.** The socket URL carries `?sub=`, the DO keeps it
+  on the attachment beside the fence, and a broadcast skips a socket that did not ask
+  for that resource. The client portal now asks for **nine** resources instead of
+  everything, derived from `PORTAL_LISTENERS` so the two cannot drift.
+- **The two filters fail in OPPOSITE directions, on purpose.** The fence decides what a
+  listener MAY hear: resolved from their session, never read off the URL, fails
+  **closed**. The subscription decides what it WANTS to hear: declared by the client,
+  fails **open**. That is why one is safe to take from a request and the other is not,
+  and why a client on an older build — sending no subscription — is over-served rather
+  than silently starved.
+- **The agency app is deliberately NOT narrowed.** Its shell refreshes the team
+  activity feed on *any* resource, so a derived subscription would have made that feed
+  stale for every resource outside the two listener maps. A narrowing that cannot be
+  proved complete is a screen that goes quietly out of date, which is the failure shape
+  with no symptom. It stays un-narrowed until the feed listens for something narrower.
+
+**WHERE THE CEILING NOW SITS — and the arithmetic, because the honest answer is not
+"solved".** Wall-clock per broadcast falls by the shard count, so the per-object
+listener ceiling goes from ~3,000–5,000 to roughly **12,000–20,000 per team**. But the
+work is `publishes/second × sockets × per-socket cost`, and sharding divides only by N:
+
+| shards | sockets/shard at 25,000 | CPU-seconds per second, per shard |
+|---|---|---|
+| 1 | 25,000 | ~130 — over by 130× |
+| **4 (today)** | **6,250** | **~33 — over by 33×** |
+| 8 | 3,125 | ~16 |
+| 128 | 195 | ~1 — and now the *publish* side is the bottleneck, at ~22,000 object calls/second |
+
+So at a base yardstick of 250,000 people in ONE tenant (~174 publishes/second),
+**sharding alone does not get there and cannot**: it would take ~128 shards, at which
+point every ping costs 128 object calls and the cost has simply moved. Reaching that
+scale needs a different shape — routing a ping only to shards holding interested
+listeners, instead of broadcasting every ping to every shard. That is not built and is
+not planned; it is the thing to design if a tenant ever approaches the yardstick.
+
+**What it means for kwapso: comfortably solved, with four times the margin it had.**
+The estate ([glide/RECONCILIATION.md](glide/RECONCILIATION.md) §3, confirmed with the
+owner 14 Aug 2026) is 20 client companies, 104 contacts, 6 staff — about 125 rows in
+`accounts`. Realistic peak is ~40 concurrent sockets; every human it works with, at
+once, on three devices each, is ~350. Against 12,000–20,000 that is 300× and ~40×.
+
+**The signal to revisit — specific, and observable today.** Nothing measures concurrent
+sockets, so do not go looking for that metric. These three are real:
+
+1. **The roster, which is countable.** `team_members` + `portal_users` on one team
+   passing **~12,000 rows** (was ~3,000 before the split). Concurrency is a fraction of
+   the roster. Today it is about 110.
+2. **Cloudflare's Durable Object metrics** (dashboard → Workers → Durable Objects →
+   `TeamChannel`): any single instance sustaining **>200 requests/second**.
+3. **A change of shape, which arrives with no number moving:** the base hosting a second
+   agency of its own, or client contacts being expected to keep the portal open all day
+   rather than visiting it. Either turns "occasional visitors" into "concurrent
+   sessions", which is what the numbers above rest on.
+
+**When one fires, in order:** raise `REALTIME_SHARDS` (one line, and the client and the
+fan-out read the same constant so they cannot disagree); then narrow the agency's
+subscription, which needs the activity feed to listen for something narrower than
+"anything"; then, and only at genuine yardstick scale, route pings to interested shards
+rather than to all of them.
+
+**THIS IS ABOUT THIS DEPLOYMENT, NOT ABOUT THE BASE.** Brimba is reusable and the audit
+scored it against a base's yardstick. A fork whose one tenant is a company rather than
+an agency meets the arithmetic in that table for real — see
+[BASE-MANUAL.md](BASE-MANUAL.md) §5. A fork's first architectural question is whether
+its largest tenant is a few hundred people or a few hundred thousand.
+
+**Other dimensions still held down, with the trigger that reopens each:**
+
+| accepted | why it stays | the trigger |
+|---|---|---|
+| Base64 uploads through the worker (not presigned direct-to-R2) | changes the client contract *and* the capability-URL model SCOPE ch.06 records | a file cap above ~25 MB, or the 128 MB isolate budget being hit in practice |
+| The module mover is one non-resumable request | safe and no longer quadratic since 2026-08-14; it fails loudly rather than corrupting | a team database actually crossing 8 GB |
+| No cross-shard merge (`d1QueryAcross` refuses a paged or counted read across shards) | nothing paged is on the split path, and refusing beats answering wrongly | the first time a PAGED module has to be split |
+| The crons rotate their team window rather than queueing | rotation makes a late team late, not skipped | more than ~600 teams |
+| R16's exact `COUNT(*)` on every feed page | it is a **Law** (RULES.md) — changing it means rule, registry and check together | an activity table past ~5M rows in one team |
+| Per-caller rate limiting on ordinary doors | not the config change it looks like: neither gateway decodes a session, so neither can key a limiter on a user; per-IP puts one office behind one bucket | any abuse, or a paid tier where a caller's cost is somebody else's bill |
+
+The growth alarms **are** delivered (`ALERT_TO` on tenancy, one mail per tick, once per
+new alarm) — [OPERATIONS.md](OPERATIONS.md) § *Growth watch*.

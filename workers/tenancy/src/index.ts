@@ -87,7 +87,7 @@ import { recordWorkerError } from "@shared/workers/error-log"
 import { requestId } from "@shared/workers/trace"
 import { sweepCoreRetention } from "@shared/workers/retention"
 import { GuardError } from "./lib/permissions"
-import { checkDatabaseSizes } from "./lib/sharding"
+import { alertNewAlarms, checkDatabaseSizes } from "./lib/sharding"
 import { d1Config } from "./lib/teams"
 import type { Env } from "./env"
 import {
@@ -310,6 +310,11 @@ export default {
       const message = e instanceof Error ? e.message : ""
       if (message.startsWith("cloud_key_missing:"))
         return fail(503, "cloud_key_missing", `${brand.name}'s cloud key isn't set up yet — team creation is paused.`)
+      // Set, but no longer ours — see d1-rest.ts. 503 because it is temporary and
+      // ours to fix, and NOT a 500, because the browser reads a 500 as "something
+      // is wrong with you" and a 503 as "something is wrong with us".
+      if (message.startsWith("cloud_key_rejected:"))
+        return fail(503, "cloud_key_rejected", `${brand.name} can't reach its databases right now. You're still signed in — this is our end, and we're on it.`)
       return fail(500, "internal", "Something went wrong on our side. Try again.")
     }
   },
@@ -365,6 +370,19 @@ export default {
             `size check stopped at its ${result.alerted.length}-alarm ceiling — more team databases are over the threshold and were NOT alarmed tonight. Tomorrow's run continues from where this one stopped.`
           )
         )
+      // TELL A HUMAN. Its OWN try, inside this one, for the reason the two outer
+      // blocks exist: the alarm row is the record and it is already written, so a
+      // failed send must not turn a successful size check into a failed cron. But
+      // it is RECORDED, because a database crossing 80% that nobody was told about
+      // is precisely the silence R12 and ARCHITECTURE §7 both exist to prevent.
+      try {
+        const sent = await alertNewAlarms(env, result.alerted)
+        if (sent.mailed)
+          console.log(`size alarm emailed to ${sent.mailed}/${sent.recipients} recipient(s)`)
+      } catch (e) {
+        console.error("size alarm could not be delivered:", e)
+        await recordWorkerError(env.DB, "tenancy", "cron/size-alert", e)
+      }
     } catch (e) {
       // LAW R12: unattended work has no user watching, so a swallowed failure would be
       // invisible — record it to the error store, not just the console.

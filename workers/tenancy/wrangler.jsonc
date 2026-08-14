@@ -27,7 +27,14 @@
     "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7",
     // The public web origin the SPA is served on — used for links in outbound
     // emails (invite CTA). NOT request-derived, so agent-sent invites are correct.
-    "PUBLIC_APP_URL": "https://agency.kwapso.app"
+    "PUBLIC_APP_URL": "https://agency.kwapso.app",
+    // WHO HEARS THE NIGHTLY GROWTH ALARM. Comma-separated; both of the owner's
+    // addresses, chosen 14 Aug 2026. It is a VAR rather than a secret because an
+    // address is not a credential, and it belongs in git for the reason
+    // ARCHITECTURE §7 gives: an alarm nobody receives is a table, and the thing
+    // that turns it back into a table is somebody forgetting to set this.
+    // Unset is not a crash — the cron records that nobody was told (R12).
+    "ALERT_TO": "alaap@swiftstruck.com,alaap@kwapso.com"
   },
   // Nightly 80%-size alarms (03:10 UTC) — the locked sharding machinery.
   "triggers": { "crons": ["10 3 * * *"] },
@@ -53,7 +60,11 @@
       "vars": {
         "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7",
         // The public staging web origin — used for invite-email links.
-        "PUBLIC_APP_URL": "https://agency-staging.kwapso.app"
+        "PUBLIC_APP_URL": "https://agency-staging.kwapso.app",
+        // Staging alarms go to the same place. Deliberately not silenced: staging
+        // is where a broken alarm path is supposed to be discovered, and an
+        // environment that never mails is one nobody notices is unwired.
+        "ALERT_TO": "alaap@swiftstruck.com,alaap@kwapso.com"
       },
       "triggers": { "crons": ["10 3 * * *"] }
     }

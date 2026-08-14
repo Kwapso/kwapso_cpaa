@@ -11,6 +11,12 @@ import { useRouter } from "next/navigation"
 
 import type { ActiveContext, SessionUser } from "@shared/types"
 
+// From the shared module, NOT from "@/lib/api" which re-exports it: the hook's
+// own test suite mocks "@/lib/api" with a factory that returns only { auth,
+// tenancy }, so an ApiFailure imported from there is `undefined` under test and
+// `e instanceof undefined` throws — turning the branch below into the very
+// bounce it exists to prevent, in exactly the tests meant to prove it doesn't.
+import { ApiFailure } from "@shared/web/api"
 import { clearCache } from "@shared/web/store"
 
 import { auth, tenancy } from "@/lib/api"
@@ -104,9 +110,33 @@ export function useActiveTeam(): ActiveTeam {
         setUser(next.user)
         setCtx(next.ctx)
         setLoading(false)
-      } catch {
-        setSessionCache(null)
-        router.replace("/login")
+      } catch (e) {
+        // AN OUTAGE IS NOT A SIGN-OUT, and this bare catch used to treat them as
+        // the same thing. 401 means this person really is signed out. Anything
+        // else — a 500 or 503 from the API, a dropped network — means the app is
+        // unwell while the person is perfectly signed in, and clearing the
+        // session sends them to a door that CANNOT help: the auth worker reaches
+        // the core database through its own native binding, so it stays healthy,
+        // and they sign in successfully, land back here, hit the same failure,
+        // and bounce again. A closed loop that reads as "my account is broken".
+        //
+        // Earned 2026-08-14: a rotated Cloudflare token made /api/tenancy/active
+        // return 500, and three people were locked out of a working app — one of
+        // them mid-form, which is why it looked like submitting the form had done
+        // it. Nothing was wrong with any of their accounts.
+        if (e instanceof ApiFailure && e.status === 401) {
+          setSessionCache(null)
+          router.replace("/login")
+          return
+        }
+        if (!alive) return
+        // KEEP THE CACHE. CACHING.md is cache-first, so a screen that already
+        // painted keeps working and only writes fail — which is the honest state
+        // of the world during a data-door outage. Dropping it here is what turned
+        // "briefly unwell" into "destroyed". With nothing cached there is nothing
+        // truthful to paint, so stay in the skeleton rather than show a hollow
+        // shell — the same reasoning the subscription effect above spells out.
+        if (sessionCache) setLoading(false)
       }
     }
     // Cached → show instantly + revalidate quietly; else load (skeleton shows).
