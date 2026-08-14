@@ -100,6 +100,12 @@ hibernating. Exactly like OOP: one `class` (code), millions of objects (runtime)
 Both scale by key to very large numbers; they're orthogonal. Client read-caching
 on top follows [CACHING.md](CACHING.md).
 
+> **That paragraph is about the NUMBER of instances, and it is only half the
+> story.** Instances scale by key without limit; what does *not* scale without
+> limit is **one instance's fan-out** — a channel broadcasts to its sockets
+> serially, and a team is one channel. The measured ceiling and the decision to
+> accept it are in **§7** below. Read that before proposing a fan-out change.
+
 ### The actions today (each becomes an MCP-catalogued tool)
 
 > **UPDATED 2026-08-12 — read this table as the base's SHAPE, not as its census.**
@@ -380,3 +386,104 @@ on top follows [CACHING.md](CACHING.md).
   (known gaps: 6-digit code input, step wizard). Never one-off components here.
 - Anti-bloat is law: one master copy of every rule/doc/component; reuse over
   recode; keep every piece small enough for an agent to reason about.
+
+## 7 · Scale — the accepted ceiling (LOCKED 2026-08-14)
+
+The base scored **78 / 100** on the twelve-dimension scaling audit of 14 Aug 2026,
+after twelve repairs took it from 53. **78 is accepted, not a backlog.** This section
+exists so the next audit reads it and stops, rather than re-deriving the same
+conclusion and proposing the same work.
+
+> **It is deliberately self-sufficient.** `scaling-review.md` holds the full workings,
+> and — like every audit report in this repo — it is **git-ignored**, a local artifact
+> rather than tracked canon. So everything load-bearing is written out here: a stranger
+> with a fresh clone gets the decision, the numbers and the plan without it.
+
+**The limiting decision, and it is one of ours.** One `TeamChannel` instance per
+team (§2 above, LOCKED 2026-06-15), and every mutation publishes to it (R1). A
+broadcast is a serial loop over that channel's sockets — the object is
+single-threaded, so publishes queue behind each other. Nothing about it is
+accidental; it is what makes the live layer serverless with no server to run, and
+it is the same decision that makes an idle team cost nothing.
+
+**The ceiling it imposes: roughly 3,000–5,000 concurrent sockets on ONE team
+channel.** Per socket a broadcast deserializes the fence attachment and tests it
+(~20–50 µs), so 3,000 sockets is 60–250 ms of single-threaded work per ping, and
+25,000 is over a second. Cloudflare's published soft ceiling for one instance is
+~1,000 requests/second, and each publish is one request. Above the range the
+symptom is not an error — pings arrive late, then later, and the app quietly
+becomes one you reload.
+
+**The load it actually carries.** kwapso is one agency. Its legacy estate
+([glide/RECONCILIATION.md](glide/RECONCILIATION.md) §3) is **20 client companies,
+104 contacts, 6 staff** — about 125 rows in `accounts` all told, confirmed with the
+owner on 14 Aug 2026. Sockets come from staff on the agency app and from client
+contacts on the portal; both join `team:<teamId>`.
+
+| | sockets | against a 3,000-socket ceiling |
+|---|---|---|
+| realistic peak — staff on two devices, a tenth of contacts signed in | **~40** | **75× headroom** |
+| every human kwapso works with, at once, on three devices each | **~350** | **~9× headroom** |
+
+The second row will not happen — clients visit the portal, they do not sit in it
+all day — and it still clears the ceiling by most of an order of magnitude. Fixing
+the fan-out would buy about **+630 weighted points of a scoring rubric and nothing
+a person using this app could perceive.**
+
+**THIS IS A JUDGEMENT ABOUT THIS DEPLOYMENT, NOT ABOUT THE BASE.** Brimba is a
+reusable base and the audit scored it against a base's yardstick: any single tenant
+reaching 250,000 people. That yardstick is *not* reachable on this topology, and a
+fork whose one tenant is a company rather than an agency **will** hit the ceiling —
+see [BASE-MANUAL.md](BASE-MANUAL.md) §5. Accepting the ceiling here does not accept
+it there. A fork's first architectural question is whether its largest tenant is a
+few hundred people or a few hundred thousand.
+
+**The signal to revisit — specific, and observable today.** Nothing measures
+concurrent sockets, so do not go looking for that metric. These three are real:
+
+1. **The roster, which is countable.** `team_members` + `portal_users` on one team
+   passing **~3,000 rows**. Concurrency is a fraction of the roster, so at that
+   size even a pessimistic half-are-online lands on the ceiling. Today it is about
+   110.
+2. **Cloudflare's own Durable Object metrics** (dashboard → Workers → Durable
+   Objects → `TeamChannel`): one instance sustaining **>200 requests/second**, a
+   fifth of the published soft ceiling.
+3. **A change of shape, which arrives with no number moving:** the base hosting a
+   second agency of its own, or client contacts being expected to keep the portal
+   open all day rather than visiting it. Either turns "occasional visitors" into
+   "concurrent sessions", which is the assumption the whole table above rests on.
+
+**When one fires, the work is three parts, cheapest first — do not redesign it.**
+
+1. **Scope the broadcast by subscription.** The client declares which resources its
+   mounted screens actually read; the channel filters on that before it sends. Today
+   every socket receives every team ping (subject only to the account fence), so this
+   cuts per-message work by roughly the ratio of resources to open screens. It is the
+   cheapest half and it needs no new objects.
+2. **Shard the channel.** `team:<id>:<bucket>` across N instances; the publisher writes
+   to all N, each holds ~1/N of the sockets. Broadcast cost per object falls by N,
+   publish cost rises by N. The client computes its bucket from its own session id, so
+   the API shape does not change.
+3. **Coalesce pings** under rapid change — a short window per resource, so a bulk write
+   emits one ping rather than one per row.
+
+The socket URL is versioned, so an old client keeps the old shape and rollback is doing
+nothing.
+
+**The other held-down dimensions are accepted on the same reasoning**, and are listed
+here rather than delegated so this section stays complete on its own:
+
+| accepted | why it stays | the trigger that would reopen it |
+|---|---|---|
+| Base64 uploads through the worker (not presigned direct-to-R2) | changes the client contract *and* the capability-URL model SCOPE ch.06 records | a file cap above ~25 MB, or the isolate's 128 MB budget being hit in practice |
+| The module mover is one non-resumable request | safe and no longer quadratic since the 2026-08-14 repairs; it fails loudly rather than corrupting | a team database actually crossing 8 GB — then it needs a job table and a cursor |
+| No cross-shard merge (`d1QueryAcross` refuses a paged or counted read across shards) | nothing paged is on the split path, and refusing beats answering wrongly | the first time a PAGED module has to be split |
+| The crons rotate their team window rather than queueing | rotation makes a late team late, not skipped | more than ~600 teams, where the *daily* digest becomes every-third-day |
+| R16's exact `COUNT(*)` on every feed page | it is a **Law** (RULES.md) — changing it means changing the rule, the registry and the check together | an activity table past ~5M rows in one team |
+
+**Two things are genuinely open, and neither is locked:** **delivering** the growth
+alarms to a human (the sender exists; the recipient has to be named, and cannot be
+derived — the core database belongs to no team), and per-caller rate limiting on
+ordinary doors (not the config change it looks like: neither gateway resolves a session,
+so neither can key a limiter on a user; zone-level WAF rules are the config-level half).
+Both are in [OPERATIONS.md](OPERATIONS.md) § *Growth watch*.
