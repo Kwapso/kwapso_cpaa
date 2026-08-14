@@ -20,7 +20,7 @@ import { describe, expect, it, vi } from "vitest"
 
 import type { ScopeStamp } from "@shared/workers/account-scope"
 import { TEXT_LIMITS } from "@shared/workers/validate"
-import worker, { TeamChannel } from "../src/index"
+import worker, { LISTENER_MAX_AGE_MS, TeamChannel } from "../src/index"
 
 /** One hibernatable socket, as the runtime hands it back from getWebSockets(). */
 type FakeSocket = {
@@ -59,6 +59,23 @@ function socket(options: { breaks?: "send" | "read" | "close" } = {}): FakeSocke
   return ws
 }
 
+/** A socket as `fetch()` leaves it: a fence (null = staff) and the moment the
+ * gate resolved it. `ageMs` ages the authorization — that is the whole subject
+ * of the deadline suite at the bottom of this file. Every fixture below goes
+ * through here, because a socket with no issue time is not a state the DO can
+ * hand out any more: it is the pre-deadline shape, and it is closed on sight. */
+function listener(scope: ScopeStamp = null, ageMs = 0): FakeSocket {
+  const ws = socket()
+  ws.serializeAttachment({ scope, at: Date.now() - ageMs })
+  return ws
+}
+
+/** The FENCE a socket is carrying, without the issue time beside it — so the
+ * assertions below say the same thing they always said about the stamp. */
+function fenceOf(attachment: unknown): unknown {
+  return (attachment as { scope?: unknown } | undefined)?.scope
+}
+
 /** A channel holding the given sockets, plus whatever fetch() accepts later. */
 function channel(sockets: FakeSocket[] = []) {
   const accepted: FakeSocket[] = []
@@ -80,9 +97,9 @@ const CLIENT: ScopeStamp = { accountIds: ["BERGMAN", "BERGMAN_SUB"] }
 
 describe("broadcast: the fan-out is per socket, and total", () => {
   it("reaches every listener on the channel", () => {
-    const a = socket()
-    const b = socket()
-    const c = socket()
+    const a = listener()
+    const b = listener()
+    const c = listener()
     const { channel: ch } = channel([a, b, c])
 
     ch.broadcast(JSON.stringify({ resource: "members", id: "M1" }))
@@ -93,11 +110,9 @@ describe("broadcast: the fan-out is per socket, and total", () => {
   it("applies each socket's OWN fence — one call, different subsets", () => {
     // The whole reason the stamp rides the socket instead of the channel: one
     // team channel carries staff and client logins at the same time.
-    const staff = socket()
-    const bergman = socket()
-    bergman.serializeAttachment(CLIENT)
-    const delaval = socket()
-    delaval.serializeAttachment({ accountIds: ["DELAVAL"] })
+    const staff = listener()
+    const bergman = listener(CLIENT)
+    const delaval = listener({ accountIds: ["DELAVAL"] })
     const { channel: ch } = channel([staff, bergman, delaval])
 
     ch.broadcast(JSON.stringify({ resource: "accounts", id: "BERGMAN_SUB" }))
@@ -112,9 +127,10 @@ describe("broadcast: the fan-out is per socket, and total", () => {
     // that line and the send. If the loop let the throw escape, one closing tab
     // would stop the ping for every listener listed after it — a whole team's
     // screens quietly stale, with nothing in any log.
-    const before = socket()
+    const before = listener()
     const dead = socket({ breaks: "send" })
-    const after = socket()
+    dead.serializeAttachment({ scope: null, at: Date.now() })
+    const after = listener()
     const { channel: ch } = channel([before, dead, after])
 
     ch.broadcast(JSON.stringify({ resource: "members", id: "M1" }))
@@ -127,7 +143,7 @@ describe("broadcast: the fan-out is per socket, and total", () => {
   it("a socket whose fence cannot be read is skipped, not trusted", () => {
     // Fail-closed, and it must not take the broadcast down with it.
     const broken = socket({ breaks: "read" })
-    const fine = socket()
+    const fine = listener()
     const { channel: ch } = channel([broken, fine])
 
     ch.broadcast(JSON.stringify({ resource: "accounts", id: "BERGMAN" }))
@@ -139,9 +155,8 @@ describe("broadcast: the fan-out is per socket, and total", () => {
   it("an unparsable event reaches staff and no fenced listener", () => {
     // The comment in the source says exactly this, and it is the fail-closed
     // direction: a ping nobody can check is a ping nobody fenced.
-    const staff = socket()
-    const client = socket()
-    client.serializeAttachment(CLIENT)
+    const staff = listener()
+    const client = listener(CLIENT)
     const { channel: ch } = channel([staff, client])
 
     ch.broadcast("not json at all")
@@ -153,7 +168,7 @@ describe("broadcast: the fan-out is per socket, and total", () => {
   it("sends the message through untouched — the DO stores and rewrites nothing", () => {
     // It holds NO application data (ARCHITECTURE.md); the databases stay the
     // source of truth. The relay must not become a place state can hide.
-    const ws = socket()
+    const ws = listener()
     const { channel: ch } = channel([ws])
     const message = JSON.stringify({ resource: "help", id: "H1", scope: "BERGMAN" })
 
@@ -207,11 +222,11 @@ describe("fetch: joining the channel stamps the socket", () => {
     expect(accepted, "the server half must be handed to the runtime").toHaveLength(1)
   })
 
-  it("a staff listener is stamped with NOTHING, and hears the whole team", async () => {
+  it("a staff listener is stamped with NO FENCE, and hears the whole team", async () => {
     const { accepted, channel: ch } = channel([])
     await withWorkerGlobals(() => ch.fetch(new Request("https://do/")))
 
-    expect(accepted[0].attachment, "no header = no stamp = staff").toBeUndefined()
+    expect(fenceOf(accepted[0].attachment), "no header = no fence = staff").toBeNull()
     ch.broadcast(JSON.stringify({ resource: "members", id: "M1" }))
     expect(accepted[0].sent).toHaveLength(1)
   })
@@ -224,7 +239,7 @@ describe("fetch: joining the channel stamps the socket", () => {
       )
     )
 
-    expect(accepted[0].attachment).toEqual(CLIENT)
+    expect(fenceOf(accepted[0].attachment)).toEqual(CLIENT)
     // And it is really in force: a row outside the fence is silence.
     ch.broadcast(JSON.stringify({ resource: "accounts", id: "DELAVAL" }))
     expect(accepted[0].sent).toHaveLength(0)
@@ -240,9 +255,111 @@ describe("fetch: joining the channel stamps the socket", () => {
       ch.fetch(new Request("https://do/", { headers: { "x-listener-scope": "{not json" } }))
     )
 
-    expect(accepted[0].attachment).toEqual({ accountIds: [] })
+    expect(fenceOf(accepted[0].attachment)).toEqual({ accountIds: [] })
     ch.broadcast(JSON.stringify({ resource: "accounts", id: "BERGMAN" }))
     expect(accepted[0].sent, "a fence with no accounts hears nothing at all").toHaveLength(0)
+  })
+
+  it("EVERY socket is stamped with the moment it was authorized — staff too", async () => {
+    // The issue time is what gives the authorization a deadline, so a socket
+    // without one is a socket that never expires. Staff are the case worth
+    // pinning: they carry no fence, and it would be easy to read "no fence" as
+    // "nothing to attach" and hand them the immortal socket back.
+    const before = Date.now()
+    const { accepted, channel: ch } = channel([])
+    await withWorkerGlobals(() => ch.fetch(new Request("https://do/")))
+
+    const at = (accepted[0].attachment as { at?: unknown }).at
+    expect(typeof at, "a staff socket carries an issue time").toBe("number")
+    expect(at as number).toBeGreaterThanOrEqual(before)
+  })
+})
+
+// AN AUTHORIZATION HAS A DEADLINE.
+//
+// The gate runs once, at the handshake. A hibernatable socket outlives the
+// object that accepted it, so "once" used to mean for ever: somebody removed
+// from the team, or a client login whose portal access was revoked, kept hearing
+// that team's pings — resource, row id, account — until they chose to close the
+// tab. Signing out did not end it either. No row DATA travels on a ping, but
+// this file's own fence exists because row ids are not nothing.
+//
+// So the broadcast closes an over-age socket instead of sending to it, and the
+// client's own reconnect walks back through the gate. These are the tests that
+// stop the deadline being quietly widened, dropped, or applied after the fence
+// instead of before it.
+describe("broadcast: the deadline on a live socket", () => {
+  const ping = JSON.stringify({ resource: "members", id: "M1" })
+
+  it("a socket inside its deadline still hears — the rule is a deadline, not a kill switch", () => {
+    const fresh = listener(null, LISTENER_MAX_AGE_MS - 1000)
+    const { channel: ch } = channel([fresh])
+
+    ch.broadcast(ping)
+
+    expect(fresh.sent, "one second inside the window is inside the window").toHaveLength(1)
+    expect(fresh.closed).toBe(0)
+  })
+
+  it("a socket past its deadline is CLOSED, and hears nothing on the way out", () => {
+    const stale = listener(null, LISTENER_MAX_AGE_MS + 1000)
+    const { channel: ch } = channel([stale])
+
+    ch.broadcast(ping)
+
+    expect(stale.sent, "the ping it aged out on must not be the one it receives").toHaveLength(0)
+    expect(stale.closed, "closed, so the client reconnects through the gate").toBe(1)
+  })
+
+  it("the deadline is checked BEFORE the fence — an expired client login is closed, not merely filtered", () => {
+    // Order matters. Filtering first would leave a revoked login holding an open
+    // socket for ever, silently, and it would come back to life the moment
+    // somebody touched a row that was inside its stale fence.
+    const stale = listener(CLIENT, LISTENER_MAX_AGE_MS + 1)
+    const { channel: ch } = channel([stale])
+
+    ch.broadcast(JSON.stringify({ resource: "accounts", id: "BERGMAN" }))
+
+    expect(stale.sent).toHaveLength(0)
+    expect(stale.closed, "a row inside the OLD fence is still an expired authorization").toBe(1)
+  })
+
+  it("a socket carrying no issue time is closed, not trusted", () => {
+    // The shape a socket accepted by an older build has — and the shape anything
+    // that skipped fetch() has. Fail-closed, in the same direction as an
+    // unreadable stamp: we cannot prove when this was authorized, so we don't.
+    const old = socket()
+    old.serializeAttachment({ accountIds: [] }) // the pre-deadline attachment
+    const none = socket() // never stamped at all
+    const { channel: ch } = channel([old, none])
+
+    ch.broadcast(ping)
+
+    expect(old.sent).toHaveLength(0)
+    expect(old.closed).toBe(1)
+    expect(none.sent).toHaveLength(0)
+    expect(none.closed).toBe(1)
+  })
+
+  it("one expired socket does not stop the ping reaching the live ones after it", () => {
+    // The same invariant the dead-socket test defends, said about the new branch:
+    // the fan-out is per socket and total, and closing one must not cost the rest.
+    const stale = listener(null, LISTENER_MAX_AGE_MS * 2)
+    const live = listener()
+    const { channel: ch } = channel([stale, live])
+
+    ch.broadcast(ping)
+
+    expect(stale.sent).toHaveLength(0)
+    expect(live.sent, "the listener AFTER the expired one still gets the ping").toHaveLength(1)
+  })
+
+  it("the window is bounded in minutes, not days — a deadline nobody reaches is not one", () => {
+    // A guard on the constant itself. The whole finding was an authorization that
+    // stood for ever; widening this to a session's lifetime would restore it
+    // while leaving every test above green.
+    expect(LISTENER_MAX_AGE_MS).toBeGreaterThanOrEqual(60_000)
+    expect(LISTENER_MAX_AGE_MS).toBeLessThanOrEqual(60 * 60 * 1000)
   })
 })
 

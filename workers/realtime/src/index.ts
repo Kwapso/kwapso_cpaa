@@ -20,7 +20,7 @@ import { accountScope, mayHearChange, scopeStamp, type ScopeStamp } from "@share
 import { d1ConfigFrom, GuardError, requireMember } from "@shared/workers/gating"
 import { fail, json } from "@shared/workers/http"
 import { recordWorkerError } from "@shared/workers/error-log"
-import { requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 
 export type Env = {
   /** The per-team live channels (one Durable Object instance per team). */
@@ -43,34 +43,90 @@ export type Env = {
  * request. Set by this worker only — the DO is reachable only from here. */
 const SCOPE_HEADER = "x-listener-scope"
 
+/**
+ * HOW LONG ONE AUTHORIZATION MAY STAND — the deadline on a live socket.
+ *
+ * The gate in `handle()` runs ONCE, at the handshake: signed in, an ACTIVE
+ * member of this team, and — for a client login — the fence they stand behind.
+ * The answer is serialized onto the socket so that no later ping costs a
+ * database read. What nothing ever re-asked was whether the answer was still
+ * true.
+ *
+ * A hibernatable socket outlives the object that accepted it, and a browser tab
+ * is patient, so "once" meant FOREVER. A member removed from the team, and a
+ * client login whose portal access was revoked, kept hearing that team's change
+ * pings — resource, row id and account, in real time — for as long as they left
+ * the connection open. Signing out does not end it either: destroySession
+ * clears a cookie and a row and touches no socket, and publishSignOut is wired
+ * to the email-change flow on the `user:` channel alone.
+ *
+ * What that leaks is ids, not rows: the payload carries no content, and every
+ * door refuses them the moment they try to read one. This codebase has already
+ * ruled on whether that is nothing — it is not. `mayHearChange` exists because
+ * "row ids are not secret: the live channel broadcasts them"
+ * (shared/workers/account-scope.ts), and a fence that is correct at the
+ * handshake and unexamined for ever after is the same sentence said about time
+ * instead of about accounts.
+ *
+ * So an authorization EXPIRES, and the expiry is enforced where the decision is
+ * spent: `broadcast` closes an over-age socket instead of sending to it. That
+ * shape is deliberate on both counts. It needs no alarm and no list of "things
+ * that ought to disconnect somebody" — a list is a thing the next module can be
+ * missing from, which is the failure this file's own fence was written to
+ * avoid. And it runs exactly when it matters: a channel with nothing to say has
+ * nothing to leak, and the first ping after the deadline is the one that does
+ * not go out.
+ *
+ * The client does the rest unaided. shared/web/realtime.ts reconnects with
+ * backoff and calls `onReconnect`, so the socket comes back re-gated and the
+ * screen resyncs whatever it missed — and a caller who is no longer a member
+ * simply gets the 403 the API has been giving them all along. Fifteen minutes
+ * is chosen against that cost: one extra handshake per listener per quarter of
+ * an hour, against a stale-authorization window that used to have no end.
+ */
+export const LISTENER_MAX_AGE_MS = 15 * 60 * 1000
+
+/** What a socket carries across hibernation: the fence resolved at the
+ * handshake (`null` = staff, who hear the whole team) and WHEN it was resolved.
+ * Every socket carries both halves, staff included — the issue time is what
+ * makes the decision expire, so a socket without one is a socket with no
+ * deadline, which is the hole above. */
+type Listener = { scope: ScopeStamp; at: number }
+
 /** One team's live channel: holds its members' sockets, relays change pings. */
 export class TeamChannel extends DurableObject<Env> {
   /** A browser joins. Accept the socket via the Hibernation API so the runtime
    *  keeps it (even after this object sleeps) and we don't pay while idle.
-   *  The listener's FENCE (if any) is serialized onto the socket, so it survives
-   *  hibernation and every later broadcast can honour it without a DB read. */
+   *  The listener's FENCE (if any) and the moment it was resolved are serialized
+   *  onto the socket, so both survive hibernation and every later broadcast can
+   *  honour them without a DB read. */
   async fetch(request: Request): Promise<Response> {
     const pair = new WebSocketPair()
     const [client, server] = Object.values(pair)
     this.ctx.acceptWebSocket(server)
     const stamp = request.headers.get(SCOPE_HEADER)
+    let scope: ScopeStamp = null
     if (stamp) {
       try {
-        server.serializeAttachment(JSON.parse(stamp) as ScopeStamp)
+        scope = JSON.parse(stamp) as ScopeStamp
       } catch {
         // Unreadable stamp = we can't prove what they may hear. Attach the empty
         // fence rather than none: none means STAFF, and a wrong guess that way
         // would broadcast the agency's world to a client login.
-        server.serializeAttachment({ accountIds: [] })
+        scope = { accountIds: [] }
       }
     }
+    server.serializeAttachment({ scope, at: Date.now() } satisfies Listener)
     return new Response(null, { status: 101, webSocket: client })
   }
 
   /** Fan a tiny message out to everyone on this channel who may hear it. A ping
    * carries a ROW ID — and, for a resource a client login is meant to hear, the
    * ACCOUNT that row belongs to — so "may hear" is the account fence, not just
-   * membership. See mayHearChange (shared/workers/account-scope.ts). */
+   * membership. See mayHearChange (shared/workers/account-scope.ts).
+   *
+   * And "may hear" is also a question about TIME: an authorization has a
+   * deadline (LISTENER_MAX_AGE_MS), and this is where it is spent. */
   broadcast(message: string): void {
     let event: { resource?: string; id?: string; scope?: string } | null = null
     try {
@@ -79,10 +135,20 @@ export class TeamChannel extends DurableObject<Env> {
       // Unparsable event: staff still get it (this worker wrote it), fenced
       // listeners don't — a ping nobody can check is a ping nobody fenced.
     }
+    const now = Date.now()
     for (const ws of this.ctx.getWebSockets()) {
       try {
-        const stamp = ws.deserializeAttachment() as ScopeStamp
-        if (stamp && !(event && mayHearChange(stamp, event))) continue
+        const listener = ws.deserializeAttachment() as Listener | null
+        // THE DEADLINE, CHECKED BEFORE THE FENCE. Out of time — or carrying no
+        // issue time at all, which is a socket from before this rule and gets
+        // the same answer — means close, never send: the client reconnects
+        // through the gate and comes back with a fence somebody has just
+        // re-proved. Fail-closed in the same direction as everything else here.
+        if (!listener || typeof listener.at !== "number" || now - listener.at > LISTENER_MAX_AGE_MS) {
+          ws.close(1000, "reauthorize")
+          continue
+        }
+        if (listener.scope && !(event && mayHearChange(listener.scope, event))) continue
         ws.send(message)
       } catch {
         // Dead socket — the runtime drops it on close; nothing to do here.
@@ -192,7 +258,17 @@ async function handle(request: Request, env: Env): Promise<Response> {
       const user = await whoAmI(request, env)
       if (!user) return fail(401, "signed_out", "Not signed in.")
 
-      const userId = url.searchParams.get("user")
+      // R20's QUERY half. These two were the only request inputs in the whole
+      // worker fleet read raw, and both name something: `?user=` picks a Durable
+      // Object, `?team=` is bound into a membership read and then picks one too.
+      // Neither is exploitable as written — the first is compared to the
+      // session's own id before it is used, and the second reaches getByName
+      // only after requireMember has proved it is a real team this caller
+      // belongs to — but that is a fact about today's two lines, not a property
+      // of the door. `/publish`, sixty lines above, caps its channel name for
+      // exactly this reason, in exactly these words: an unbounded string here is
+      // an unbounded object name. The seam is what keeps the next edit honest.
+      const userId = queryText(url.searchParams.get("user"), "User", TEXT_LIMITS.short)
       if (userId) {
         // Identity channel: you may only join your OWN.
         if (userId !== user.id)
@@ -200,7 +276,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
         return env.CHANNELS.getByName(`user:${userId}`).fetch(request)
       }
 
-      const teamId = url.searchParams.get("team")
+      const teamId = queryText(url.searchParams.get("team"), "Team", TEXT_LIMITS.short)
       if (teamId) {
         // Team channel: must be an active member of THIS team — the same
         // team_members + teams join the API gates on (requireMember), which also
