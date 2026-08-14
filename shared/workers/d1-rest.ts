@@ -60,6 +60,20 @@ async function cf<T>(
     if (!res.ok || !data.success) {
       // 4xx = our request is wrong — retrying won't help, fail loudly.
       const msg = data.errors?.map((e) => e.message).join("; ") || res.statusText
+      // A REFUSED KEY IS NOT A MALFORMED REQUEST, and until 2026-08-14 it read
+      // as one. Every secret in this codebase is guarded by a PRESENCE check
+      // (`cloud_key_missing`, gating.ts) and none by a VALIDITY one — so "not
+      // set" produced a named 503 that says what to do, and "set but rotated
+      // away" fell through to the generic `internal` 500 that says nothing.
+      // The day the owner rotated the Cloudflare token, that difference cost an
+      // afternoon: 150 identical 500s, every signed-in person bounced to a
+      // sign-in door that was itself perfectly healthy, and nothing anywhere
+      // naming the one fact that mattered. 401/403 is the cloud telling us our
+      // key is no longer ours; say so, and let the central catches answer 503.
+      if (res.status === 401 || res.status === 403)
+        throw new Error(
+          `cloud_key_rejected: the Cloudflare D1 token was refused (${msg}) — it has probably been rotated. Re-set CF_D1_TOKEN on tenancy, content, data-ops and realtime, in both environments.`
+        )
       throw new Error(`Cloudflare D1 API failed: ${msg}`)
     }
     return data.result

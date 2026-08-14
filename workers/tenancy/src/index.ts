@@ -310,6 +310,11 @@ export default {
       const message = e instanceof Error ? e.message : ""
       if (message.startsWith("cloud_key_missing:"))
         return fail(503, "cloud_key_missing", `${brand.name}'s cloud key isn't set up yet — team creation is paused.`)
+      // Set, but no longer ours — see d1-rest.ts. 503 because it is temporary and
+      // ours to fix, and NOT a 500, because the browser reads a 500 as "something
+      // is wrong with you" and a 503 as "something is wrong with us".
+      if (message.startsWith("cloud_key_rejected:"))
+        return fail(503, "cloud_key_rejected", `${brand.name} can't reach its databases right now. You're still signed in — this is our end, and we're on it.`)
       return fail(500, "internal", "Something went wrong on our side. Try again.")
     }
   },
