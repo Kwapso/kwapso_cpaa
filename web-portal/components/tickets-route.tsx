@@ -17,7 +17,7 @@ import { TicketsScreen } from "@/components/tickets-screen"
 import { TicketScreen } from "@/components/ticket-screen"
 
 /** "/tickets/01J…" → "01J…" ; "/tickets" (or "/tickets/") → null. */
-export function ticketIdFromPath(pathname: string): string | null {
+function ticketIdFromPath(pathname: string): string | null {
   const rest = pathname.replace(/^\/tickets\/?/, "").split("/").filter(Boolean)
   return rest[0] ?? null
 }

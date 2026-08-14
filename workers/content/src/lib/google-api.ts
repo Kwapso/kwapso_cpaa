@@ -30,7 +30,7 @@ import { GOOGLE_TIMEOUT_MS } from "./google-oauth"
 /** Rows one Google list call will ask for. Google's own maximums are far higher;
  * this is what a screen and a model turn can actually use, and asking for more
  * would be paying for material nobody reads. */
-export const GOOGLE_PAGE_SIZE = 50
+const GOOGLE_PAGE_SIZE = 50
 
 /** Known contacts one Gmail query may name. A Gmail search string has a real
  * length limit, and an agency with 2,000 contacts would otherwise build a query
@@ -177,7 +177,7 @@ function escapeDriveLiteral(value: string): string {
 /** How many characters of one file we will read back. A Drive folder can hold a
  * 400-page document; a bounded read is what keeps one file from being a worker's
  * whole memory budget. */
-export const DRIVE_TEXT_CAP = 100_000
+const DRIVE_TEXT_CAP = 100_000
 
 /** One file's readable text. A Google Doc/Sheet/Slide is EXPORTED as plain text
  * (its bytes are not a document); anything else is downloaded as-is, and a

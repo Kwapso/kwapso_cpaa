@@ -17,7 +17,7 @@ import {
 import { ulid } from "@shared/workers/id"
 import type { Learning, LearningProgressEntry } from "@shared/types"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
-import { optionalText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { intOr, optionalText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { EXPORT_HARD_CAP, LIST_HARD_CAP } from "@shared/workers/limits"
 import { ownedMediaKey, reclaimMedia } from "@shared/workers/image"
 import { ensureSelectableValue } from "./vocabulary"
@@ -25,14 +25,6 @@ import type { Env } from "../env"
 
 /** The dropdown `type` a learning item's category is stored under. */
 const CATEGORY_TYPE = "Learning category"
-
-/** Coerce an untrusted JSON value to a SAFE integer literal before it's
- * interpolated into SQL. The route types `sequence` as number but doesn't
- * validate at runtime, so a string could otherwise slip in raw — coerce it. */
-function intOr(v: unknown, fallback: number): number {
-  const n = Number(v)
-  return Number.isFinite(n) ? Math.trunc(n) : fallback
-}
 
 /** Allow only safe link schemes (http/https/mailto). A `javascript:` / `data:` /
  * `vbscript:` content_link is a stored-XSS payload the moment a reader clicks it, so

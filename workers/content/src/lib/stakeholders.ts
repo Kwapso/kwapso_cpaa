@@ -16,6 +16,7 @@ import type { HelpStakeholder } from "@shared/types"
 import { getTicket } from "./help"
 import type { Env } from "../env"
 import { idBatches, THREAD_HARD_CAP } from "@shared/workers/limits" // R14 hard cap
+import { parseStringArray } from "@shared/workers/validate"
 
 /** The four origins a stakeholder can have — drives the chip label in the UI. */
 export type StakeholderOrigin = "raiser" | "admin" | "mentioned" | "added"
@@ -27,17 +28,6 @@ const ORIGIN_RANK: Record<StakeholderOrigin, number> = {
   admin: 1,
   mentioned: 2,
   added: 3,
-}
-
-/** Parse a help_threads.tagged_user_ids JSON cell safely (untrusted → string[]). */
-function parseTagged(json: string | null): string[] {
-  if (!json) return []
-  try {
-    const v = JSON.parse(json)
-    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []
-  } catch {
-    return []
-  }
 }
 
 /** The team's locked Admin role id (member_roles WHERE is_default = 1, TEAM DB). */
@@ -162,7 +152,7 @@ export async function listStakeholders(
   // stakeholder-shaped half of the thread leak.
   if (!ticket) return []
   if (ticket.raiserId) claim(ticket.raiserId, "raiser")
-  for (const r of replyRows) for (const id of parseTagged(r.tagged_user_ids)) claim(id, "mentioned")
+  for (const r of replyRows) for (const id of parseStringArray(r.tagged_user_ids)) claim(id, "mentioned")
   for (const r of addedRows) claim(r.user_id, "added")
 
   // 4b. current team admins (TEAM DB role id → GLOBAL holders) — AND ONLY FOR A

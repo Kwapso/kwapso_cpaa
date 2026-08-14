@@ -174,7 +174,7 @@ export const KNOWLEDGE_KIND: Record<string, string> = {
  * the account, the agency's own shows the agency. The id is deliberately NOT
  * printed — a ULID in a filter dropdown is noise; the account's own name is what
  * somebody is scanning for, and the detail screen names it in full. */
-export function knowledgeFiledUnder(source: KnowledgeSource, accountNames?: Map<string, string>): string {
+function knowledgeFiledUnder(source: KnowledgeSource, accountNames?: Map<string, string>): string {
   if (!source.accountId) return "The agency"
   return accountNames?.get(source.accountId) ?? "A client"
 }

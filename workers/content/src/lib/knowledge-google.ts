@@ -77,7 +77,7 @@ export const GOOGLE_SOURCE_KINDS = GOOGLE_SERVICES.map((s) => KIND_OF[s])
 /** The state key one person's sweep of one service keeps its place under. The
  * ONE place the string is built, so the sweeper, the screen and the door can
  * never spell it differently. */
-export function googleStateKey(service: GoogleService, userId: string): string {
+function googleStateKey(service: GoogleService, userId: string): string {
   return `${KIND_OF[service]}:${userId}`
 }
 

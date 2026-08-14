@@ -142,3 +142,39 @@ export function optionalMoment(value: unknown, field: string): string | undefine
   if (!Number.isFinite(ms)) throw new GuardError(400, "invalid_input", `${field} isn't a date and time.`)
   return new Date(ms).toISOString()
 }
+
+/** An untrusted JSON value → a SAFE integer, before it is interpolated into SQL.
+ *
+ * A route can TYPE a field as a number without checking it at runtime, and
+ * `sequence` is the field that keeps proving it: it arrives declared as a number
+ * and is not one until something says so. `Number.isFinite` refuses NaN and both
+ * infinities; `Math.trunc` refuses a float where a row order is expected.
+ *
+ * It lives in the seam rather than beside a module because it was written twice —
+ * Learning and Delivery each carried a copy, and Delivery's comment said so
+ * ("the same guard Learning carries, and for the same reason"). A guard that has
+ * to be remembered twice is a guard the third module ships without. */
+export function intOr(value: unknown, fallback: number): number {
+  const n = Number(value)
+  return Number.isFinite(n) ? Math.trunc(n) : fallback
+}
+
+/** A stored JSON array cell → a string array, or an empty one.
+ *
+ * The column is written by this app, which is exactly why it is parsed
+ * defensively: a half-written cell, a migration, or a hand-edit in the console
+ * would otherwise throw inside a read and turn a list into a 500. Anything that
+ * is not an array of strings is nothing at all, never a partial answer.
+ *
+ * `help_threads.tagged_user_ids` is the cell that earned it, and it was parsed by
+ * two files a directory apart — the ticket thread and the stakeholder set — with
+ * identical bodies and two different comments describing them. */
+export function parseStringArray(json: string | null): string[] {
+  if (!json) return []
+  try {
+    const v = JSON.parse(json)
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []
+  } catch {
+    return []
+  }
+}

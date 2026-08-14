@@ -14,10 +14,6 @@ import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import {
-  ActivityFeed,
-  defaultActivityFeedConfig,
-} from "@kwapso/ui/registry/collections/activity-feed/activity-feed"
-import {
   TicketThread,
   type TicketMember,
   type TicketStatus,
@@ -42,7 +38,6 @@ import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/s
 import { formatCount } from "@shared/web/format-count"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
 import { HelpFormDialog } from "@/components/help-form-dialog"
-import { LoadMore } from "@/components/load-more"
 import { MailReplyDialog } from "@/components/mail-reply-dialog"
 import { HelpStakeholders } from "@/components/help-stakeholders"
 import { HelpStatusStepper, type HelpStatusValue } from "@/components/help-status-stepper"
@@ -51,6 +46,7 @@ import { StoryFormDialog } from "@/components/story-form-dialog"
 import { createStoryFrom, useStoryFormOptions } from "@/components/stories-screen"
 import { StoriesPanel, sliceKey } from "@/components/work-panels"
 import { OverviewList } from "@/components/overview-list"
+import { ActivityPanel } from "@/components/activity-panel"
 import { accountsKey, totalKey } from "@/lib/live-resources"
 import { CONCEPT_ICON } from "@/lib/pages"
 
@@ -567,24 +563,7 @@ export function HelpDetailScreen({
           if (t.value === "overview")
             return <OverviewList items={overviewItems} />
           if (t.value === "activity")
-            return (
-              // R14: the badge above counts the WHOLE history, so the feed under
-              // it must be able to reach all of it — page one, then Load more.
-              <div className="flex flex-col gap-4">
-                <ActivityFeed
-                  config={{
-                    ...defaultActivityFeedConfig,
-                    emptyText: "No activity yet.",
-                  }}
-                  items={activity.items}
-                />
-                <LoadMore
-                  listKey={activity.listKey}
-                  fetchPage={activity.fetchPage}
-                  label="Load more activity"
-                />
-              </div>
-            )
+            return <ActivityPanel activity={activity} />
           // THE SECOND WAY IN — a tab on the ticket where MORE work can be
           // added. One story may answer many tickets and one ticket may need
           // many stories, so this is a collection with its own create action.

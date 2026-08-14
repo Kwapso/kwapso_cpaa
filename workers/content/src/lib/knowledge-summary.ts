@@ -42,7 +42,7 @@
  * cheap read and one embedding each is a rounding error. A summary that grew
  * into a second copy of the body would make the router's search as expensive as
  * the search it exists to narrow. */
-export const SUMMARY_MAX_CHARS = 480
+const SUMMARY_MAX_CHARS = 480
 
 /** The facts a record hands over to be summarised. Deliberately flat and
  * deliberately strings: every value here is a column, so a caller cannot pass

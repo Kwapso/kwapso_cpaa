@@ -22,7 +22,7 @@ import * as React from "react"
  * app's voice (warm, plain, sentence case) rather than the worker's code. An
  * unrecognised reason falls back to the general one — a new failure code must
  * never render a blank or a raw string at a person. */
-export const GOOGLE_SIGN_IN_ERRORS: Record<string, string> = {
+const GOOGLE_SIGN_IN_ERRORS: Record<string, string> = {
   google_not_ready: "Google sign-in isn't switched on yet. Use your email and a code instead.",
   google_failed: "That didn't work. Try again, or use your email and a code.",
   // Never "your account is switched off": at the portal an account is a COMPANY,

@@ -63,19 +63,43 @@ describe("RULES — the laws of the base", () => {
   // R2 — every record-detail screen exposes Overview + Activity tabs. The
   // engine-recipe details (team/members/invites) carry them as recipe data; the
   // bespoke ones must render them themselves.
-  it("record-detail-tabs: bespoke record details render tabs + an Activity feed", () => {
+  // The Activity tab is now ONE component (components/activity-panel.tsx), so
+  // this check follows it there. It reads the same way round: each detail must
+  // render the panel, and the panel must be a feed you can page. Before, the two
+  // strings were looked for in every detail — which is why the block they name
+  // was written out ten times, comment and all, to keep the check happy.
+  //
+  // The strength is unchanged and the blind spot is smaller: the pairing of feed
+  // and pager now has ONE place it can be got wrong, and the assertion below
+  // stands on that place rather than on ten copies of it.
+  it("record-detail-tabs: bespoke record details render tabs + a pageable Activity panel", () => {
+    // R2 meets R14: the feed is a PAGE of a growing collection under a badge
+    // counting ALL of it — the gap that let a record with 143 events truthfully
+    // badge 143 over its newest 50, forever.
+    const panel = read(join(WEB, "components", "activity-panel.tsx"))
+    expect(panel, "the Activity panel must render the library ActivityFeed").toContain("ActivityFeed")
+    expect(panel, "the Activity panel must carry a <LoadMore> — its badge counts rows it can't reach (R14)").toContain(
+      "<LoadMore"
+    )
+
     for (const c of RECORD_DETAIL_COMPONENTS) {
       const src = read(join(WEB, "components", `${c}.tsx`))
       expect(src, `${c} must use library TabsView`).toContain("TabsView")
-      expect(src, `${c} must render an ActivityFeed (the Activity tab)`).toContain("ActivityFeed")
-      // R2 meets R14: that feed is a PAGE of a growing collection under a badge
-      // counting ALL of it. The generic check below proves SOMETHING in web can
-      // reach page two; this proves THIS detail can — the gap that let a record
-      // with 143 events truthfully badge 143 over its newest 50, forever.
-      expect(src, `${c}'s Activity feed must carry a <LoadMore> — its badge counts rows it can't reach (R14)`).toContain(
-        "<LoadMore"
-      )
+      expect(src, `${c} must render the Activity tab through <ActivityPanel>`).toContain("<ActivityPanel")
     }
+  })
+
+  // …and nothing goes back to hand-rolling one. A detail that renders its own
+  // ActivityFeed is a second copy of the pairing above, and the copy is exactly
+  // what shipped a feed under an unreachable badge the first time.
+  it("record-detail-tabs: no record detail hand-rolls its own Activity feed", () => {
+    const offenders = componentFiles()
+      .filter((f) => /-detail\.tsx$/.test(f))
+      .filter((f) => read(f).includes("<ActivityFeed"))
+    expect(
+      offenders,
+      `render the Activity tab through <ActivityPanel> instead of a local ActivityFeed: ${offenders.join(", ")}`
+    ).toEqual([])
   })
 
   // R3 — collection tab strips use TabsView; no hand-rolled <Button> toggles

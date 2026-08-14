@@ -936,7 +936,7 @@ export function indexableText(source: {
  * than on books. The argument for the prefix is strongest exactly where this
  * corpus is weakest — three hundred tickets that all say "we tried again and it
  * still failed" — and the harness takes any corpus. */
-export function embeddableText(_source: unknown, chunk: string): string {
+function embeddableText(_source: unknown, chunk: string): string {
   return chunk
 }
 
@@ -1173,7 +1173,7 @@ export type CompartmentChoice = {
   records: { sourceId: string; title: string }[]
 }
 
-export async function deriveCompartment(
+async function deriveCompartment(
   cfg: D1Rest,
   guard: MemberGuard,
   input: { question: string; accountId?: string | null }

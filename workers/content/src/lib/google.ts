@@ -132,7 +132,7 @@ export async function listConnections(
 }
 
 /** The caller's live connection for one service, or null. */
-export async function activeConnection(
+async function activeConnection(
   cfg: D1Rest,
   guard: MemberGuard,
   service: GoogleService
@@ -595,6 +595,6 @@ export async function recordGoogleAct(
 }
 
 /** The word a person reads for each service. */
-export function serviceLabel(service: GoogleService): string {
+function serviceLabel(service: GoogleService): string {
   return { drive: "Drive", gmail: "Gmail", calendar: "Calendar", chat: "Google Chat" }[service]
 }

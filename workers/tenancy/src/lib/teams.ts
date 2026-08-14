@@ -44,7 +44,7 @@ export async function applyMigration(
 }
 
 /** Apply every team-schema migration a fresh database needs. */
-export async function applyTeamSchema(
+async function applyTeamSchema(
   cfg: D1Rest,
   databaseId: string
 ): Promise<string> {

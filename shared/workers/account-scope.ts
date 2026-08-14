@@ -283,7 +283,7 @@ export function accountScopeClause(
 }
 
 /** Is this account inside the caller's fence? */
-export function inAccountScope(scope: AccountScope, accountId: string | null | undefined): boolean {
+function inAccountScope(scope: AccountScope, accountId: string | null | undefined): boolean {
   if (scope.kind === "staff") return true
   return !!accountId && scope.accountIds.includes(accountId)
 }

@@ -89,7 +89,7 @@ export function sliceKey(kind: string, ownerId: string): string {
 /** One story, in one line: where it is, who has it, when it is due, and which
  * request it answers. The same sentence the backlog row says, because it is the
  * same record — a person reading it on a sprint should not have to re-learn it. */
-export function storyLine(s: Story): string {
+function storyLine(s: Story): string {
   return (
     [
       STORY_STATUS_LABEL[s.status],
@@ -281,7 +281,7 @@ export function SprintsPanel({
 /* --------------------------------- the apps -------------------------------- */
 
 /** An app, in one line: whose it is, where it is up to, and its address. */
-export function appLine(a: AppRow, accountName?: string | null): string {
+function appLine(a: AppRow, accountName?: string | null): string {
   return [accountName ?? "the agency's own", a.stage, a.url].filter(Boolean).join(" · ") || "—"
 }
 

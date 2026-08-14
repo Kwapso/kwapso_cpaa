@@ -126,7 +126,7 @@ export const MODULE_PERMISSION: Record<string, string> = {
 
 /** Team overview — the team's metadata (Overview) + its activity feed, the
  * landing screen at /t/<teamId>. Edit team is gated by teams:edit. */
-export const teamDetailRecipe: ScreenRecipe = {
+const teamDetailRecipe: ScreenRecipe = {
   type: "detail",
   binding: { module: "team" },
   gate: { module: "teams", right: "read" },
@@ -170,7 +170,7 @@ export const teamDetailRecipe: ScreenRecipe = {
 /** Members list — clean rows (name + a role · joined summary line), tap a row to
  * open the member's detail. Mutating actions live on the detail (so the list
  * stays clean and we never show a self/last-admin action that would be refused). */
-export const membersListRecipe: ScreenRecipe = {
+const membersListRecipe: ScreenRecipe = {
   type: "list",
   display: "list",
   surface: "none",
@@ -185,7 +185,7 @@ export const membersListRecipe: ScreenRecipe = {
 
 /** Member detail (Overview + Activity). Actions change-role + remove are gated by
  * team_members edit/delete; the host hides them on your own row. */
-export const memberDetailRecipe: ScreenRecipe = {
+const memberDetailRecipe: ScreenRecipe = {
   type: "detail",
   binding: { module: "members" },
   gate: { module: "team_members", right: "read" },
@@ -235,7 +235,7 @@ export const memberDetailRecipe: ScreenRecipe = {
 
 /** Roles list — clean rows (title + a members/description summary line). Tapping
  * a role opens its detail (the permission grid + edit/deactivate live there). */
-export const rolesListRecipe: ScreenRecipe = {
+const rolesListRecipe: ScreenRecipe = {
   type: "list",
   display: "list",
   surface: "none",
@@ -252,7 +252,7 @@ export const rolesListRecipe: ScreenRecipe = {
 
 /** Invites list — clean rows (email + a role · status line). Tapping an invite
  * opens its detail, where Revoke lives (pending only). */
-export const invitesListRecipe: ScreenRecipe = {
+const invitesListRecipe: ScreenRecipe = {
   type: "list",
   display: "list",
   surface: "none",
@@ -267,7 +267,7 @@ export const invitesListRecipe: ScreenRecipe = {
 
 /** Invite detail — who/what/when, plus Revoke (gated team_members:delete; the
  * host shows it only while the invite is still pending). */
-export const inviteDetailRecipe: ScreenRecipe = {
+const inviteDetailRecipe: ScreenRecipe = {
   type: "detail",
   binding: { module: "invites" },
   gate: { module: "team_members", right: "read" },
@@ -314,7 +314,7 @@ export const inviteDetailRecipe: ScreenRecipe = {
 /** Learning list — clean rows (title + a category / description summary line).
  * Tapping a row opens the article (its body + the done toggle + edit/deactivate
  * live there). "New article" is host-rendered above, gated by learning:create. */
-export const learningListRecipe: ScreenRecipe = {
+const learningListRecipe: ScreenRecipe = {
   type: "list",
   display: "list",
   surface: "none",
@@ -334,7 +334,7 @@ export const learningListRecipe: ScreenRecipe = {
  * The My/All scope is a host-owned toggle (the server filters by raiser); tapping
  * a row opens the ticket thread. "Raise ticket" is host-rendered above, gated by
  * the help:create right (the module key behind the Tickets section). */
-export const ticketsListRecipe: ScreenRecipe = {
+const ticketsListRecipe: ScreenRecipe = {
   type: "list",
   display: "list",
   surface: "none",
@@ -357,7 +357,7 @@ export const ticketsListRecipe: ScreenRecipe = {
  * loud: what it is, its reference, where it stands, and the account it sits
  * under. PAGED (R14) — the list grows with ordinary use, so the frame's own
  * "Showing X of Y" stays off and the exact total is badged once, above. */
-export const accountsListRecipe: ScreenRecipe = {
+const accountsListRecipe: ScreenRecipe = {
   type: "list",
   display: "list",
   surface: "none",
@@ -385,7 +385,7 @@ export const accountsListRecipe: ScreenRecipe = {
  * know that?" and "whose is it?"). PAGED (R14) — the sweep only ever adds — so
  * the frame's own "Showing X of Y" stays off and the exact total is badged once,
  * above. */
-export const knowledgeListRecipe: ScreenRecipe = {
+const knowledgeListRecipe: ScreenRecipe = {
   type: "list",
   display: "list",
   surface: "none",
@@ -410,7 +410,7 @@ export const knowledgeListRecipe: ScreenRecipe = {
  * ordinary use and are never curated away — a cancelled call in March is still
  * the answer to "didn't we speak in March?". Glide's own two years are 350
  * rows before this app has held a conversation of its own. */
-export const meetingsListRecipe: ScreenRecipe = {
+const meetingsListRecipe: ScreenRecipe = {
   type: "list",
   display: "list",
   surface: "none",
@@ -432,7 +432,7 @@ export const meetingsListRecipe: ScreenRecipe = {
  * maps and none is ever deleted, because the savings computed from a baseline
  * have to stay checkable years later — so the frame's own "Showing X of Y" stays
  * off and the exact total is badged once, above. */
-export const processesListRecipe: ScreenRecipe = {
+const processesListRecipe: ScreenRecipe = {
   type: "list",
   display: "list",
   surface: "none",
@@ -458,7 +458,7 @@ export const processesListRecipe: ScreenRecipe = {
  * who has it, when it is due, and which request it answers. PAGED (R14): the
  * backlog only grows and a done story is never deleted, so the frame's own
  * "Showing X of Y" stays off and the exact total is badged once, above. */
-export const storiesListRecipe: ScreenRecipe = {
+const storiesListRecipe: ScreenRecipe = {
   type: "list",
   display: "list",
   surface: "none",
@@ -483,7 +483,7 @@ export const storiesListRecipe: ScreenRecipe = {
  * what somebody would say about one out loud: whose it is, which system, when it
  * runs, and how much of it is finished. BOUNDED, not paged (R14): a sprint is a
  * contract, so this collection grows at the speed of signatures. */
-export const sprintsListRecipe: ScreenRecipe = {
+const sprintsListRecipe: ScreenRecipe = {
   type: "list",
   display: "list",
   surface: "none",
@@ -502,7 +502,7 @@ export const sprintsListRecipe: ScreenRecipe = {
  * one account (the owner's ruling: "an app belongs to ONE account, always").
  * BOUNDED: an agency has tens of these, not thousands — the collection that
  * grows underneath is the process maps. */
-export const appsListRecipe: ScreenRecipe = {
+const appsListRecipe: ScreenRecipe = {
   type: "list",
   display: "list",
   surface: "none",
@@ -520,7 +520,7 @@ export const appsListRecipe: ScreenRecipe = {
 /** OUR OWN ADMIN. A task is never a client's — the summary line says who has it
  * and when it is due, and nothing about a customer unless the task itself names
  * one. BOUNDED (R14): admin is finished and ticked off as fast as it arrives. */
-export const tasksListRecipe: ScreenRecipe = {
+const tasksListRecipe: ScreenRecipe = {
   type: "list",
   display: "list",
   surface: "none",
@@ -537,7 +537,7 @@ export const tasksListRecipe: ScreenRecipe = {
 /** One task, as a record: its own fields and its history. A recipe rather than a
  * component for the same reason the four housekeeping details are — there is no
  * control on it the engine has no block for. */
-export const taskDetailRecipe: ScreenRecipe = {
+const taskDetailRecipe: ScreenRecipe = {
   type: "detail",
   binding: { module: "tasks" },
   gate: { module: "work", right: "read" },
@@ -629,7 +629,7 @@ function internalDetailActions(module: string, prefix: string, archiveLabel: str
 /** Marketing list — what the agency published, newest first. A row's summary
  * line says where it went and when, because those are the two questions somebody
  * scanning a marketing calendar is actually asking. */
-export const marketingListRecipe: ScreenRecipe = {
+const marketingListRecipe: ScreenRecipe = {
   type: "list",
   display: "list",
   surface: "none",
@@ -644,7 +644,7 @@ export const marketingListRecipe: ScreenRecipe = {
   ]),
 }
 
-export const marketingDetailRecipe: ScreenRecipe = {
+const marketingDetailRecipe: ScreenRecipe = {
   type: "detail",
   binding: { module: "marketing" },
   gate: { module: "marketing", right: "read" },
@@ -664,7 +664,7 @@ export const marketingDetailRecipe: ScreenRecipe = {
 }
 
 /** Brand library list — the material everything else is made with. */
-export const brandListRecipe: ScreenRecipe = {
+const brandListRecipe: ScreenRecipe = {
   type: "list",
   display: "list",
   surface: "none",
@@ -678,7 +678,7 @@ export const brandListRecipe: ScreenRecipe = {
   ]),
 }
 
-export const brandDetailRecipe: ScreenRecipe = {
+const brandDetailRecipe: ScreenRecipe = {
   type: "detail",
   binding: { module: "brand" },
   gate: { module: "brand_assets", right: "read" },
@@ -696,7 +696,7 @@ export const brandDetailRecipe: ScreenRecipe = {
 }
 
 /** Delivery programmes list — the screen the Delivery method section leads with. */
-export const programmesListRecipe: ScreenRecipe = {
+const programmesListRecipe: ScreenRecipe = {
   type: "list",
   display: "list",
   surface: "none",
@@ -709,7 +709,7 @@ export const programmesListRecipe: ScreenRecipe = {
   ]),
 }
 
-export const programmesDetailRecipe: ScreenRecipe = {
+const programmesDetailRecipe: ScreenRecipe = {
   type: "detail",
   binding: { module: "delivery" },
   gate: { module: "delivery", right: "read" },
@@ -726,7 +726,7 @@ export const programmesDetailRecipe: ScreenRecipe = {
 }
 
 /** Meeting purposes — the second collection on the Delivery method screen. */
-export const purposesListRecipe: ScreenRecipe = {
+const purposesListRecipe: ScreenRecipe = {
   type: "list",
   display: "list",
   surface: "none",
@@ -740,7 +740,7 @@ export const purposesListRecipe: ScreenRecipe = {
   ]),
 }
 
-export const purposesDetailRecipe: ScreenRecipe = {
+const purposesDetailRecipe: ScreenRecipe = {
   type: "detail",
   binding: { module: "purposes" },
   gate: { module: "delivery", right: "read" },

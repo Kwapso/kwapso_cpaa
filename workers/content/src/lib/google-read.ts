@@ -81,7 +81,7 @@ export async function knownContactEmails(cfg: D1Rest, guard: MemberGuard): Promi
  * under Marta would put it in a slice no question about Bergman ever searches.
  * A contact with no parent IS a client in their own right, so they are their own
  * compartment. */
-export async function knownContacts(
+async function knownContacts(
   cfg: D1Rest,
   guard: MemberGuard
 ): Promise<{ email: string; accountId: string }[]> {

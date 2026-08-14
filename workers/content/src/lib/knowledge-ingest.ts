@@ -571,7 +571,7 @@ function parseCursor(raw: string | null): Cursor | null {
  * A source somebody EXCLUDED stays excluded: the upsert leaves `deactivated_at`
  * alone and `indexSource` refuses to index a deactivated row, so a sweep can
  * never quietly hand back material a person deliberately took away. */
-export async function sweepKind(
+async function sweepKind(
   env: Env,
   cfg: D1Rest,
   guard: MemberGuard,

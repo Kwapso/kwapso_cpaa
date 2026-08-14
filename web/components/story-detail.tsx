@@ -22,10 +22,6 @@ import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
-import {
-  ActivityFeed,
-  defaultActivityFeedConfig,
-} from "@kwapso/ui/registry/collections/activity-feed/activity-feed"
 import { ArrowDown, ArrowUp, Pencil, Play } from "lucide-react"
 
 import { LoadMore } from "@/components/load-more"
@@ -34,6 +30,7 @@ import { useStoryFormOptions } from "@/components/stories-screen"
 import { STORY_STATUS_LABEL, sliceKey } from "@/components/work-panels"
 import { StoryStatusStepper } from "@/components/story-status-stepper"
 import { OverviewList } from "@/components/overview-list"
+import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, content as contentApi } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
 import { formatCount } from "@shared/web/format-count"
@@ -373,17 +370,7 @@ export function StoryDetailScreen({
               </div>
             )
           if (t.value === "activity")
-            return (
-              // R14: the badge above counts the WHOLE history, so the feed under
-              // it must be able to reach all of it — page one, then Load more.
-              <div className="flex flex-col gap-4">
-                <ActivityFeed
-                  config={{ ...defaultActivityFeedConfig, emptyText: "No activity yet." }}
-                  items={activity.items}
-                />
-                <LoadMore listKey={activity.listKey} fetchPage={activity.fetchPage} label="Load more activity" />
-              </div>
-            )
+            return <ActivityPanel activity={activity} />
           return <OverviewList items={overviewItems} />
         }}
       />
