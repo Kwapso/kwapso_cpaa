@@ -115,7 +115,7 @@ export async function listApps(
       // WHAT AN APP COSTS US is an internal number and never crosses to a client.
       // It is withheld HERE, on the row, rather than at the three call sites — a
       // redaction you have to remember is one somebody forgets (the same argument
-      // toAccount makes one table over, and the reason R23 exists).
+      // toAccount makes one table over, and the reason R24 exists).
       toolCostCentsPerMonth: scope.kind === "portal" ? null : r.tool_cost_cents_per_month,
       active: r.deactivated_at == null,
       createdAt: r.created_at,

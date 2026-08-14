@@ -331,7 +331,7 @@ export const PORTAL_VISIBLE_READS: Record<string, { fence: string | null; why: s
   },
   "workers/tenancy/src/lib/rates.ts": {
     fence: "accountScopeClause",
-    why: "what an account is CHARGED per hour. The rate-card DOOR refuses a client login outright — it answers with every account's card, the retired lines and the audit block naming who set the price — but the value door reads this file to PROJECT the live lines for one account, and only when that account's price visibility is switched on. So the same fence the accounts list carries rides these statements too: a client login can only ever be shown their own company's rates. What our own hour COSTS us is a different table in a different file, and no client-reachable path touches it (R23).",
+    why: "what an account is CHARGED per hour. The rate-card DOOR refuses a client login outright — it answers with every account's card, the retired lines and the audit block naming who set the price — but the value door reads this file to PROJECT the live lines for one account, and only when that account's price visibility is switched on. So the same fence the accounts list carries rides these statements too: a client login can only ever be shown their own company's rates. What our own hour COSTS us is a different table in a different file, and no client-reachable path touches it (R24).",
   },
   "workers/tenancy/src/lib/work-engine.ts": {
     fence: null,
@@ -474,7 +474,7 @@ export const PORTAL_ACTIVITY_FENCE: Record<string, { fence: "account" | null; wh
   process_steps: { fence: null, why: "a step's history is our record of changing THEIR agreed number; the current number, and the saving from it, is what the portal shows" },
   process_comments: { fence: null, why: "the conversation itself is fenced and readable; its history would name the staff author of every line, which the ticket thread already withholds" },
   account_rates: { fence: null, why: "who set a client's price, and what it was before — the agency's own commercial record, even about their own rate" },
-  internal_rates: { fence: null, why: "what our own hour costs. The one figure SCOPE says a client must never see under any flag, ever — its history least of all (R23)" },
+  internal_rates: { fence: null, why: "what our own hour costs. The one figure SCOPE says a client must never see under any flag, ever — its history least of all (R24)" },
 
   // THE WORK ENGINE. Not "a client may not see enough of this" — a client may
   // not see ANY of it, and the rows themselves are already refused at every door
@@ -891,7 +891,7 @@ export const FORM_DIALOGS = [
   // THE MONEY. One rate form serving both cards — what an account is charged and
   // what our own hour costs us — because it is a label and a number and knows
   // nothing else: no door, no table, no audience. The two CARDS are two files
-  // calling two door sets, which is where R23's separation actually lives (see
+  // calling two door sets, which is where R24's separation actually lives (see
   // the header of rate-form-dialog.tsx for what would make sharing it wrong).
   "rate-form-dialog",
   // Writing a reply into somebody's own Gmail. It gets the draft rule for the

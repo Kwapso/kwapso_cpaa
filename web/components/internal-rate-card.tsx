@@ -5,7 +5,7 @@
 // THIS FILE IS THE AGENCY'S SIDE OF THE FENCE, AND IT HAS NO CLIENT-FACING TWIN.
 // SCOPE's ruling is absolute: an internal rate and the margin computed from it
 // never render in the portal — "not behind a permission, not behind a feature
-// toggle, not for an admin viewing the portal" — and Law R23 makes that a fact
+// toggle, not for an admin viewing the portal" — and Law R24 makes that a fact
 // about the import graph rather than a promise: the doors below all refuse a
 // portal caller AT THE DOOR, the portal gateway does not forward them, and the
 // build goes red if anything under web-portal/ so much as names them.

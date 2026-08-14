@@ -86,7 +86,7 @@ export const MODULE_PERMISSION: Record<string, string> = {
   // different places on purpose — an ACCOUNT's rate card is a tab on that
   // account's record (the question is always about one client), and OUR OWN cost
   // card is this team-wide tab, which no client login can reach at any hostname
-  // (R23 · SCOPE, and workers/tenancy/src/lib/internal-money.ts says why).
+  // (R24 · SCOPE, and workers/tenancy/src/lib/internal-money.ts says why).
   "internal-rates": "commercials",
   // THE WORK ENGINE, as four segments over two modules. Stories, sprints and
   // tasks all gate on `work` — they are one permission and three nouns, exactly

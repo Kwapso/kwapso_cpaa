@@ -252,7 +252,7 @@ const CLIENT_ROLE = {
   //
   // `commercials` is DELIBERATELY ABSENT, and it is the only module on this list
   // that could not be here even as a worst case. Every one of its doors refuses a
-  // client login anyway (R23 + the refusal-symmetry suite), so granting it would
+  // client login anyway (R24 + the refusal-symmetry suite), so granting it would
   // test one more refusal — but the seed is also a working example an owner
   // copies, and a Client role with a tick beside "Rates & margin" is a screenshot
   // nobody should ever be able to take.

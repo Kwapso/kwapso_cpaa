@@ -141,7 +141,7 @@ export const PORTAL_DOORS: Record<string, Upstream> = {
   // client reads their value and talks about it, they do not browse the agency's
   // map inventory. Every money door is absent, `/api/tenancy/margin` and
   // `/api/tenancy/internal-rates` most of all: those are the agency's own books,
-  // refused at the door as well as unnamed here, and R23 fails the build if a
+  // refused at the door as well as unnamed here, and R24 fails the build if a
   // line for one of them ever appears in this table.
   "GET /api/tenancy/value": "TENANCY",
   "GET /api/tenancy/processes/comments": "TENANCY",

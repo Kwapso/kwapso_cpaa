@@ -397,7 +397,7 @@ export const tenancy = {
     api<{ id: string }>("/api/tenancy/processes/comments", post(input)),
 
   /** THE VALUE: savings drilled App → Process → Step, with the caption that says
-   * what the numbers are made of (R24). */
+   * what the numbers are made of (R25). */
   value: (opts: { accountId?: string; appId?: string } = {}) => {
     const p = new URLSearchParams()
     if (opts.accountId) p.set("accountId", opts.accountId)
@@ -419,7 +419,7 @@ export const tenancy = {
     api<{ ok: true }>("/api/tenancy/rates/active", post({ id, active })),
 
   /** What an hour of OUR work costs US. A separate door from the rate card above,
-   * on a separate table, in a separate file behind it — R23. */
+   * on a separate table, in a separate file behind it — R24. */
   internalRates: () =>
     api<{ internalRates: InternalRate[]; total: number }>("/api/tenancy/internal-rates"),
   createInternalRate: (input: Record<string, unknown>) =>
@@ -430,13 +430,13 @@ export const tenancy = {
     api<{ ok: true }>("/api/tenancy/internal-rates/active", post({ id, active })),
 
   /** Revenue − our own time − tool costs, with every line it was built from. The
-   * one figure a client never sees, under any flag, ever (R23). */
+   * one figure a client never sees, under any flag, ever (R24). */
   margin: (accountId: string) => api<MarginView>(`/api/tenancy/margin?accountId=${enc(accountId)}`),
 }
 
 /** What the margin door hands back. Declared HERE rather than imported from the
  * worker: the shape is the wire contract, and the worker's own file is the one
- * thing the portal may never reach (R23), so the browser client must not be the
+ * thing the portal may never reach (R24), so the browser client must not be the
  * thing that imports it. */
 export type MarginView = {
   revenueCents: number

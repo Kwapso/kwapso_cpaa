@@ -177,7 +177,7 @@ describe("the drill-down: App → Process → Step, and the parts add up", () =>
     expect(invoice?.savedSecondsPerMonth).toBe(38_400 + 36_000 - 6000)
   })
 
-  // R24 — the caption travels WITH the number, from the one place it is written.
+  // R25 — the caption travels WITH the number, from the one place it is written.
   it("every view carries the caption that makes it honest", () => {
     expect(view.caption).toBe(SAVINGS_CAPTION)
     expect(SAVINGS_CAPTION).toContain("estimates")

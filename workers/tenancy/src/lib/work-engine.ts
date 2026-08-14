@@ -79,7 +79,7 @@ async function borrowedSchema(cfg: D1Rest, guard: MemberGuard): Promise<{ ready:
  * here — this file reads two aggregate sums and returns no rows, so there is
  * nothing here for a fence to protect, and there must be nothing: a SUM is not a
  * disclosure, and the only door that reaches it is refused to client logins
- * outright (lib/internal-money.ts, R23). */
+ * outright (lib/internal-money.ts, R24). */
 export async function workEngineFacts(
   cfg: D1Rest,
   guard: MemberGuard,

@@ -9,7 +9,7 @@
 //
 // THREE THINGS ARE DELIBERATE HERE.
 //
-// 1. THE CAPTION SHIPS WITH THE NUMBER (R24), word for word, from the one
+// 1. THE CAPTION SHIPS WITH THE NUMBER (R25), word for word, from the one
 //    constant beside the arithmetic. The times are estimates we agreed with
 //    them; the subtraction is arithmetic. A client who understands that trusts
 //    the figure. One who believes we held a stopwatch stops trusting every other
@@ -27,7 +27,7 @@
 //    at the door: when it is off, the `prices` key is not in the response at
 //    all. This screen has no flag of its own to get wrong — it renders what it
 //    was given. And what it can never be given, under any setting, is the
-//    agency's own margin or internal rates (R23).
+//    agency's own margin or internal rates (R24).
 
 import * as React from "react"
 
@@ -142,7 +142,7 @@ export function ValueScreen({ ready }: { ready: PortalReady }) {
         <p className="text-3xl font-semibold tracking-tight">
           {hoursText(data.savedSecondsPerMonth)}
         </p>
-        {/* R24 — the sentence that makes the number honest, from the one place it
+        {/* R25 — the sentence that makes the number honest, from the one place it
             is written. Never assembled here. */}
         <p className="text-muted-foreground mt-3 text-sm">{data.caption ?? SAVINGS_CAPTION}</p>
       </section>

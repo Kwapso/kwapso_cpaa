@@ -78,7 +78,7 @@ export const portal = {
  * price visibility on for — what it cost. `prices` is ABSENT when the switch is
  * off: the door does not send it, so no screen can render it, and there is no
  * flag on this side to get wrong. The one figure that is never here under any
- * setting is the agency's own margin (R23). */
+ * setting is the agency's own margin (R24). */
 export type PortalValue = SavingsView & {
   prices?: {
     rates: { label: string; centsPerHour: number; currency: string | null }[]

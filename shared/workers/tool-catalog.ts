@@ -1714,7 +1714,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   // BOTH rate cards and the margin. Every door below refuses a client login, and
   // the internal two are the figures SCOPE says a client must never see under any
   // flag, ever — a machine caller reaches them only as a staff member whose role
-  // holds `commercials`, which no client role does (R23).
+  // holds `commercials`, which no client role does (R24).
   {
     name: "list_account_rates",
     summary:
@@ -2212,7 +2212,7 @@ export const TOOL_GATES: Record<string, string> = {
   comment_on_process: "processes:create",
   // The money. Both rate cards live under one module because they are one
   // decision-maker's job — and they live in two TABLES and two FILES because they
-  // are two audiences (R23).
+  // are two audiences (R24).
   create_account_rate: "commercials:create",
   update_account_rate: "commercials:edit",
   set_account_rate_active: "commercials:delete",

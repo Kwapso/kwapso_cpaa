@@ -8,7 +8,7 @@
 // a flag would put the figure SCOPE says a client must NEVER see one forgotten
 // predicate away from the one they may.
 //
-// A file cannot be forgotten the way a WHERE clause can. Law R23 walks the portal
+// A file cannot be forgotten the way a WHERE clause can. Law R24 walks the portal
 // gateway's own door table through to the code behind it and fails the build if
 // any of it reaches the internal file — so "internal rates and margin never
 // render in the portal" is a fact about the import graph, not a condition

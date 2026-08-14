@@ -200,7 +200,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     // card IS the collection, so it is handled here rather than falling through
     // to the list/detail split below. Its twin — what an ACCOUNT is charged —
     // is a tab on the account's own record and a different file entirely, which
-    // is the shape Law R23 is about (internal-rate-card.tsx says why).
+    // is the shape Law R24 is about (internal-rate-card.tsx says why).
     if (module === "internal-rates") return <InternalRateCardScreen teamId={teamId as string} />
 
     // Team overview ----------------------------------------------------------

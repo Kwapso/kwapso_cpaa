@@ -22,7 +22,7 @@
 /** The caption every screen showing a savings figure renders, word for word.
  *
  * It lives here, beside the arithmetic it describes, because the two are one
- * feature: the number is only honest while the sentence is next to it. Law R24
+ * feature: the number is only honest while the sentence is next to it. Law R25
  * fails the build if a screen renders the figure without it. */
 export const SAVINGS_CAPTION =
   "The times in these steps are estimates we agreed with you. The subtraction is arithmetic."

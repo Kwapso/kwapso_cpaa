@@ -2,7 +2,7 @@
 //
 // SCOPE's ruling has no exceptions clause: internal rates and margin never render
 // in the portal, under any flag, ever — "not behind a permission, not behind a
-// feature toggle, not for an admin viewing the portal". R23 proves the STRUCTURE
+// feature toggle, not for an admin viewing the portal". R24 proves the STRUCTURE
 // (nothing a client can reach imports the file the figures live in). This suite
 // proves the BEHAVIOUR, by driving the shipped worker with every combination of
 // the two switches that could plausibly be argued to open the door:

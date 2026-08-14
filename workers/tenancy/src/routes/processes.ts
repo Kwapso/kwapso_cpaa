@@ -376,7 +376,7 @@ export async function postProcessComment(request: Request, env: Env): Promise<Re
  *     account decides, and it decides HERE: when it is off, the `prices` key is
  *     ABSENT from the response, not present-and-empty and not present-and-hidden.
  *     A screen cannot render a field it never received, which is the same reason
- *     the margin lives in a file the portal cannot import (R23).
+ *     the margin lives in a file the portal cannot import (R24).
  *
  * What "prices" means is deliberately narrow: the rate card they agreed, and the
  * total of what has been sold to them. It is never a margin, never an internal

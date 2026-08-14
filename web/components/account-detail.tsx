@@ -123,7 +123,7 @@ export function AccountDetailScreen({
   // logins above: reading a phone number and seeing a price are different sized
   // decisions, so `commercials` is its own gate and the tab simply is not there
   // for a role without it. (The agency's OWN cost card is a different screen in
-  // a different file — R23; see internal-rate-card.tsx.)
+  // a different file — R24; see internal-rate-card.tsx.)
   const canSeeRates = can("commercials", "read")
   // R16: the exact totals those tabs badge, each primed by the panel's own fetch
   // over the same filter its rows came from.

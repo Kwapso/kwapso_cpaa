@@ -271,7 +271,7 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // included, because a client is shown what they bought through the value door's
   // projection, never by knocking on the card itself. `margin` is the figure SCOPE
   // says a client must never see under any flag: it is refused here, absent from
-  // the portal gateway's table, and unreachable from portal code by R23.
+  // the portal gateway's table, and unreachable from portal code by R24.
   "GET /api/tenancy/rates": { handler: getAccountRates, kind: "read" },
   "POST /api/tenancy/rates": { handler: postCreateAccountRate, kind: "mutation" },
   "POST /api/tenancy/rates/update": { handler: postUpdateAccountRate, kind: "mutation" },

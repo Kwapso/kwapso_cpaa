@@ -10,7 +10,7 @@
 // question it and nobody can answer, every other number in the app loses its
 // credit too.
 //
-// R24: the caption ships WITH the number, from the one constant beside the
+// R25: the caption ships WITH the number, from the one constant beside the
 // arithmetic (shared/workers/savings.ts). It is not decoration around the
 // feature — it is half of it. The times are estimates we agreed; the subtraction
 // is arithmetic. A client who understands that trusts the figure; one who thinks
@@ -106,7 +106,7 @@ export function ValuePanel({ view }: { view: SavingsView | undefined }) {
         <p className="text-2xl font-semibold tracking-tight">
           {hoursText(view.savedSecondsPerMonth)}
         </p>
-        {/* R24 — the sentence that makes the number honest, from the one place it
+        {/* R25 — the sentence that makes the number honest, from the one place it
             is written. Never assembled here. */}
         <p className="text-muted-foreground mt-2 text-xs">{view.caption ?? SAVINGS_CAPTION}</p>
         {unexplained > 0 && (

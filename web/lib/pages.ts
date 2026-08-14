@@ -59,7 +59,7 @@ export type TeamSection = {
     // page because it is one small settled list somebody sets and leaves, not a
     // destination anybody opens in a working day. Its twin — what an ACCOUNT is
     // charged — is deliberately NOT here: that card lives on the account's own
-    // record, because the question is always about one client (R23 · SCOPE).
+    // record, because the question is always about one client (R24 · SCOPE).
     | "internal-rates"
     | "accounts"
     | "learning"
@@ -124,7 +124,7 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // never sees the tab at all. The segment says `internal-rates` in full rather
   // than `rates`: an ambiguous URL is how somebody eventually wires the wrong
   // card to it, and the two cards are the one pair in this app where mixing them
-  // up is a rule broken rather than a bug (R23).
+  // up is a rule broken rather than a bug (R24).
   { key: "internal-rates", title: "Internal rates", module: "commercials", segment: "internal-rates", placement: "tab", countCacheKey: "internal_rates" },
   // Accounts — the companies and people the team works with (the customer spine,
   // SCOPE ch.03). A first-class SIDEBAR page: it's the day's work, not an admin

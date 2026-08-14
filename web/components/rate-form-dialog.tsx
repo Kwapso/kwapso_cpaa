@@ -3,7 +3,7 @@
 // ONE FORM FOR A RATE — a kind of work, what it costs an hour, in what currency.
 //
 // IT IS SHARED BY BOTH RATE CARDS, AND THAT IS SAFE PRECISELY BECAUSE IT KNOWS
-// NOTHING. Law R23 keeps the agency's own cost away from a client login
+// NOTHING. Law R24 keeps the agency's own cost away from a client login
 // STRUCTURALLY — by which files can reach `internal-money.ts` — and this file
 // reaches nothing: no door, no table, no cache key. It takes three strings and
 // hands them back. The two CARDS are two files calling two different door sets

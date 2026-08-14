@@ -7,7 +7,7 @@
 //
 // PURE, AND ABOUT NOTHING. It takes a number and a currency word; it knows no
 // table, no door and no audience. That is what makes it safe to share across the
-// R23 fence: the law that keeps our own cost away from a client login is about
+// R24 fence: the law that keeps our own cost away from a client login is about
 // which files reach `internal-money.ts`, and a function that formats an integer
 // reaches nothing. What it must never grow is a rate, a default, or a subtraction
 // — the moment it knows what the number MEANS, it stops being a formatter.

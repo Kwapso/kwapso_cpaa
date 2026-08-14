@@ -9,7 +9,7 @@
 //
 // THE OTHER CARD IS A DIFFERENT FILE, AND THAT IS THE LAW. What we charge a
 // client and what our own hour costs us are the same shape and opposite
-// audiences (SCOPE · R23): this one MAY be shown to a client through the
+// audiences (SCOPE · R24): this one MAY be shown to a client through the
 // portal's own value door when their price visibility is on; the internal one
 // never leaves the agency, under any flag, ever. Two numbers with opposite
 // audiences do not share a file, a door, a table or a screen — see

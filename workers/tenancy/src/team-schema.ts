@@ -820,7 +820,7 @@ CREATE INDEX idx_process_comments_process ON process_comments (process_id, creat
 -- Two tables cannot be confused by a forgotten predicate. A door that reads
 -- \`account_rates\` cannot accidentally return an internal rate, because the
 -- internal rate is not in the table it named. The same reasoning splits the code
--- (lib/rates.ts vs lib/internal-money.ts) and is the law R23 checks.
+-- (lib/rates.ts vs lib/internal-money.ts) and is the law R24 checks.
 CREATE TABLE account_rates (
   id TEXT PRIMARY KEY,
   account_id TEXT NOT NULL REFERENCES accounts (id),

@@ -8,7 +8,7 @@
 // somebody can invert later.
 //
 // A condition can be inverted. A permission can be granted. An import cannot be
-// forgotten: Law R23 walks the portal gateway's own door table through to the
+// forgotten: Law R24 walks the portal gateway's own door table through to the
 // handlers behind it and the lib files those handlers call, and turns the build
 // red if any of them reaches this file or names the table it reads. So the
 // sentence "a margin cannot render in the portal" is a fact about the import

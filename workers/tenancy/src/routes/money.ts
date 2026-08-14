@@ -3,7 +3,7 @@
 // EVERY DOOR IN THIS FILE REFUSES A CLIENT LOGIN. Not most of them, not the
 // internal ones: every one. That is why the file exists as its own file, beside
 // routes/processes.ts rather than inside it — a reader can check the rule by
-// counting `refusePortalCaller` against the number of handlers, and Law R23
+// counting `refusePortalCaller` against the number of handlers, and Law R24
 // checks the harder half (that nothing the portal gateway opens can reach the
 // internal figures at all).
 //
@@ -158,7 +158,7 @@ export async function postInternalRateActive(request: Request, env: Env): Promis
  * THE ONE FIGURE SCOPE SAYS A CLIENT MUST NEVER SEE, under any flag, ever. Three
  * things hold that: this door refuses a portal caller; the portal gateway does
  * not name it, so it is a 404 at the client hostname before a worker is reached;
- * and R23 fails the build if any portal-reachable code path ever imports the
+ * and R24 fails the build if any portal-reachable code path ever imports the
  * file behind it. Three, because the owner's ruling was "structurally true rather
  * than a condition someone can invert later". */
 export async function getMargin(request: Request, env: Env): Promise<Response> {

@@ -929,7 +929,7 @@ describe("RULES — the laws of the base", () => {
     ).toEqual([])
   })
 
-  // R23 — AN INTERNAL NUMBER CANNOT REACH THE CLIENT'S SIDE.
+  // R24 — AN INTERNAL NUMBER CANNOT REACH THE CLIENT'S SIDE.
   //
   // SCOPE's ruling is one of the few in this codebase with no exceptions clause
   // at all: internal rates and margin never render in the portal under any flag,
@@ -986,7 +986,7 @@ describe("RULES — the laws of the base", () => {
     const published = internalDoors.filter((d) => portalDoors.has(d.door))
     expect(
       published.map((d) => d.door),
-      "the portal gateway opens a door that reads the agency's own cost — SCOPE says a client never sees this, under any flag (R23)"
+      "the portal gateway opens a door that reads the agency's own cost — SCOPE says a client never sees this, under any flag (R24)"
     ).toEqual([])
 
     // ── 2. every one of them refuses a client login at the door ───────────────
@@ -998,7 +998,7 @@ describe("RULES — the laws of the base", () => {
     )
     expect(
       unrefused.map((d) => `${d.door} (${d.handler})`),
-      "a door that reads the agency's own cost must refuse a portal caller AT THE DOOR (R23 · R21)"
+      "a door that reads the agency's own cost must refuse a portal caller AT THE DOOR (R24 · R21)"
     ).toEqual([])
 
     // ── 3. the client's own front end names none of it ────────────────────────
@@ -1038,7 +1038,7 @@ describe("RULES — the laws of the base", () => {
     }
     expect(
       leaks,
-      `the client portal names the agency's own cost figures (R23): ${leaks.join(", ")}`
+      `the client portal names the agency's own cost figures (R24): ${leaks.join(", ")}`
     ).toEqual([])
 
     // ── 4. …AND OUR OWN TWO RATE CARDS STAY TWO SCREENS ───────────────────────
@@ -1097,11 +1097,11 @@ describe("RULES — the laws of the base", () => {
     })
     expect(
       bothSides,
-      `one screen reads BOTH rate cards (R23). What we charge a client and what our own hour costs are two audiences: keep them in two components, so the separation is an import somebody cannot forget rather than a condition somebody can invert — ${bothSides.join(", ")}`
+      `one screen reads BOTH rate cards (R24). What we charge a client and what our own hour costs are two audiences: keep them in two components, so the separation is an import somebody cannot forget rather than a condition somebody can invert — ${bothSides.join(", ")}`
     ).toEqual([])
   })
 
-  // R24 — A SAVINGS FIGURE NEVER RENDERS WITHOUT SAYING WHAT IT IS MADE OF.
+  // R25 — A SAVINGS FIGURE NEVER RENDERS WITHOUT SAYING WHAT IT IS MADE OF.
   //
   // "The numbers stop being believable" is one of the three things the owner
   // named as what would make him abandon this and go back to a spreadsheet. A
@@ -1132,7 +1132,7 @@ describe("RULES — the laws of the base", () => {
     const silent = showsSaving.filter((f) => !f.source.includes("SAVINGS_CAPTION"))
     expect(
       silent.map((f) => f.rel),
-      `these screens show a saving without the sentence that makes it honest — render SAVINGS_CAPTION beside it (R24): ${silent.map((f) => f.rel).join(", ")}`
+      `these screens show a saving without the sentence that makes it honest — render SAVINGS_CAPTION beside it (R25): ${silent.map((f) => f.rel).join(", ")}`
     ).toEqual([])
   })
 
@@ -1162,8 +1162,8 @@ describe("RULES — the laws of the base", () => {
       "client-reachable-doors", // R21: the client-reach scan above
       "agent-body-parity", // R22: the request BODY half, beside R19 in the mcp suite
       "cited-answers", // R23: workers/content/test/cited-answers.test.ts
-      "internal-money-never-in-portal", // R23: the import-graph scan above
-      "savings-caption", // R24: the derived-screens scan above
+      "internal-money-never-in-portal", // R24: the import-graph scan above
+      "savings-caption", // R25: the derived-screens scan above
       "vector-fence", // R26: workers/content/test/vector-fence.test.ts
     ])
     for (const r of RULES_REGISTRY) {

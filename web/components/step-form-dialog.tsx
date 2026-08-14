@@ -11,7 +11,7 @@
 //
 // The form says plainly what the number IS: an estimate the two of you agreed,
 // not a measurement. That is the same sentence the client reads under the
-// savings figure (R24), and it belongs on the form that produces it — a person
+// savings figure (R25), and it belongs on the form that produces it — a person
 // typing "40" should know it will be quoted back to a client.
 //
 // FormShell (R4) + a per-session draft (R7), like every other write.
