@@ -1,0 +1,33 @@
+# Who owns what. GitHub reads this to request reviews automatically; a human
+# reads it to know who to ask.
+#
+# HONEST STATE: one person owns everything. This file does not change that — it
+# records it, so a stranger can see at a glance that there is no second reviewer
+# to fall back on. INVENTORY.md § "What has no backup" prices that risk.
+# Adding a second owner here is a real mitigation and costs one line.
+
+*                       @alaap-kwapso
+
+# The law-book and the rules registry travel together — a law without its check
+# is forbidden by `registry-integrity`, so these three change as one.
+/RULES.md               @alaap-kwapso
+/shared/rules/          @alaap-kwapso
+/CLAUDE.md              @alaap-kwapso
+
+# The two public doors. Every other worker is private by config; a change here
+# can put a new address on the internet.
+/workers/gateway/         @alaap-kwapso
+/workers/portal-gateway/  @alaap-kwapso
+
+# The agency's own money. Nothing a client login can reach may import this.
+/workers/tenancy/src/lib/internal-money.ts  @alaap-kwapso
+
+# Standing the base up, taking a change back out, and what is not in the repo.
+/BOOTSTRAP.md           @alaap-kwapso
+/RUNBOOK.md             @alaap-kwapso
+/INVENTORY.md           @alaap-kwapso
+/OPERATIONS.md          @alaap-kwapso
+
+# Real customer data lives behind these — the catalogue is tracked, the data
+# never is.
+/glide/                 @alaap-kwapso

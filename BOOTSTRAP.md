@@ -24,25 +24,68 @@ end with a live base you can sign into and build on.
 
 ## 0 · Prerequisites (once per machine)
 
-- **Node 20+** and **npm**.
-- **A Cloudflare account on the Workers Paid plan** (Durable Objects need Paid).
-- **Wrangler** (comes via `npx wrangler` — no global install needed).
-- **A domain** on Cloudflare if you want custom URLs; otherwise the free
-  `*.workers.dev` subdomains are fine (that's what the defaults use).
-- **A [Resend](https://resend.com) account** for sending login-code + notification
+**Software, on your machine:**
+
+- **Node 22** — pinned in `.nvmrc` and in `package.json` `engines`; this is the
+  version CI runs. Node 20 works today but is not what anything is tested on.
+- **npm 10+** (ships with Node 22). The repo is an npm **workspace** — install
+  from the root, never inside a worker directory.
+- **Wrangler** — comes via `npx wrangler`, pinned at `^4.0.0` in the root
+  `package.json`. No global install needed.
+- **`git`**, and read access to `github.com/Kwapso/kwapso_cpaa` (private). The UI
+  library `github.com/Kwapso/kwapso_ui` is public, so `npm install` needs no
+  extra credential.
+
+**Accounts, before you can deploy anything.** INVENTORY.md is the full list with
+who issues each credential; these are the ones that block this runbook:
+
+- **A Cloudflare account on the Workers Paid plan** — Durable Objects require
+  Paid. Everything else here lives inside it: the workers, both D1 tiers, the R2
+  buckets and the Vectorize index.
+- **A [Resend](https://resend.com) account** for login-code and notification
   emails (or another provider — see OPERATIONS.md; auth is the only sender).
+  **Without it nobody can sign in**, because codes appear only in an inbox.
+- **A Google Cloud project** if you want either Google feature. It needs **two
+  separate OAuth clients** — a basic-scope one for the sign-in button, and a
+  sensitive-scope one for per-person Drive/Gmail/Calendar/Chat connections, which
+  goes through Google's verification and therefore takes calendar time. Neither is
+  required for a working base; INVENTORY.md § 3 has both, and mixing them up is a
+  named hazard.
+- **A domain** on Cloudflare if you want custom URLs; otherwise the free
+  `*.workers.dev` subdomains are fine (that's what the defaults use). Where the
+  domain is *registered* is not something this repo can tell you — INVENTORY.md
+  § 2.
 - *(Optional)* an **Anthropic API key** if you want the AI agent's brain to be
   Claude rather than the keyless Cloudflare Workers AI fallback.
 
 ```bash
 git clone <this-repo> brimba && cd brimba
-npm install            # also pulls @kwapso/ui from GitHub
+npm install            # also pulls @kwapso/ui from GitHub (a public repo)
+npm run check          # sanity: lint + TypeScript across every workspace + the full test suite
 npx wrangler login     # authenticate wrangler to your Cloudflare account
-npm run check          # sanity: TypeScript across every workspace + the full test suite must be green
+npx wrangler whoami    # CHECK IT. See the warning below before you go further
 ```
 
 `npm run check` green on a clean clone proves the code is intact before you touch
-any cloud resource.
+any cloud resource. **What green looks like: exit code 0**, ten workspaces, every
+suite passing — roughly 149 test files and 1,600-odd tests at the time of writing,
+but check the exit code, not the count, because the suite grows. Nothing in this
+step contacts Cloudflare, so it works before you have an account at all — which
+makes it the one step you can use to prove the code arrived intact.
+
+**One suite will report itself skipped, and on your machine that is correct.**
+`workers/content/test/knowledge-backfill.test.ts` measures retrieval over the
+agency's real Glide history, which is git-ignored customer data and is in no clone
+(INVENTORY.md § 6) — so the content worker ends `32 passed | 1 skipped`. Don't go
+looking for the missing file. A skip in any *other* suite is a real one.
+
+> **WHICH ACCOUNT AM I ABOUT TO BUILD IN?** `wrangler` acts on whatever account
+> the machine is logged into, and **no worker in this repo pins `account_id`**.
+> If your login points somewhere else, every command below silently builds in the
+> wrong place — and on the machine this base was written on, the default login
+> was a different client's account. Run `npx wrangler whoami` and read it. This is
+> the same hazard `scripts/reset-all.mjs` refuses to start without checking, and
+> RUNBOOK.md § 0 covers it for every later operation.
 
 ---
 
@@ -64,6 +107,47 @@ route may reach `/internal/*`, the agent, or the act-as-user surface).
 | `mcp` | no | the external machine surface: personal access tokens → team-pinned sessions → the MCP tool catalog at `/mcp` (routed only via the agency gateway) |
 | `gateway` | **YES** | the AGENCY front desk: serves `web/out` + routes `/api/*` (incl. `/mcp` + `/api/mcp/*`) by PREFIX + serves `/media/*` |
 | `portal-gateway` | **YES** | the CLIENT portal's front desk: serves `web-portal/out` + forwards a NAMED, CLOSED allow-list of `/api` doors (never a prefix fan-out) + serves `/media/*`. Binds only auth/tenancy/content/realtime, so data-ops and mcp are unreachable from the client internet by construction |
+
+### The shape, drawn
+
+```
+        agency staff                                   a client's contact
+              │                                                │
+              ▼                                                ▼
+   ┌──────────────────────┐                       ┌──────────────────────────┐
+   │  gateway   (PUBLIC)  │                       │ portal-gateway  (PUBLIC) │
+   │  serves web/out      │                       │ serves web-portal/out    │
+   │  routes /api/* by    │                       │ forwards a NAMED, CLOSED │
+   │  PREFIX              │                       │ allow-list of doors      │
+   └───────┬──────────────┘                       └────────┬─────────────────┘
+           │  service bindings (no public URL beyond here) │
+   ┌───────┴──────────┬──────────┬───────────┬─────────────┴──┐
+   ▼                  ▼          ▼           ▼                ▼
+ auth             tenancy     content    data-ops           mcp
+ login,           teams,      learning,  CSV import,   tokens → team-pinned
+ sessions,        roles,      tickets,   the AI agent  sessions → MCP tools
+ the sender       the money   the work                 (bound only to the
+                              engine, KB               agency gateway)
+   │                  │          │           │                │
+   └──────────────────┴────┬─────┴───────────┴────────────────┘
+                           ▼
+                        realtime  ── TeamChannel (Durable Object)
+                        fans out {resource, id, op} pings; holds no data
+
+  DATA                                        FILES            SEARCH
+  ────                                        ─────            ──────
+  kwapso-core  (one, global)                  4 R2 buckets     1 Vectorize index
+    identity, teams, billing                  per-team key       every team is a
+    native env.DB binding                     prefixes inside    NAMESPACE inside
+  one D1 per TEAM (created at runtime)                           it
+    all content, reached over the
+    D1 REST API with CF_D1_TOKEN
+```
+
+The portal gateway binds only auth, tenancy, content and realtime — **not**
+data-ops and **not** mcp. That is why import, the assistant and the machine
+surface are unreachable from the client internet by construction rather than by a
+condition somebody could invert.
 
 **Deploy order is `realtime → auth → tenancy → content → data-ops → mcp → gateway →
 portal-gateway`** and it matters: realtime is FIRST because every other worker
@@ -98,7 +182,8 @@ quota tables. Create it for each environment and apply the core migrations in
 npx wrangler d1 create kwapso-core-staging
 npx wrangler d1 create kwapso-core
 
-# Apply every core migration (0001…0016) to each env. Any core-bound worker can run it;
+# Apply EVERY core migration to each env — the command applies whatever is in
+# db/core/, so it needs no number from you. Any core-bound worker can run it;
 # auth is the canonical one. Run WITHOUT --env for production.
 cd workers/auth
 npx wrangler d1 migrations apply kwapso-core-staging --env staging --remote
@@ -106,26 +191,33 @@ npx wrangler d1 migrations apply kwapso-core --remote
 cd ../..
 ```
 
-The current core migrations are `0001`–`0016` (0013 = `mcp_tokens` + `sessions.team_pin` — the MCP front desk; 0015 = the login-code send throttle's ledger; 0016 = access-token expiry) (users, teams, team_members, the
-email-change security records, account activity, the import catalog, and the three
-agent quota tables `agent_usage` / `agent_credits` / `agent_usage_log`, plus the
-central error log `error_logs`). DATA-MODEL.md
-lists every table. **Migrations are additive — never edit an applied one.**
+**`db/core/` on disk is the live list — count it there, never here.** As of this
+writing it holds `0001`–`0019`: users, teams, team_members, the email-change
+security records, account activity, the import catalog, the three agent quota
+tables (`agent_usage` / `agent_credits` / `agent_usage_log`), the central error log
+`error_logs`, the MCP front desk (`mcp_tokens` + `sessions.team_pin` + token
+expiry), and the sign-in send throttle's ledger and indexes. DATA-MODEL.md lists
+every table and OPERATIONS.md says what breaks without each of the recent ones.
+**Migrations are additive — never edit an applied one.** A bad migration is rolled
+*forward* with a new one, never edited or removed; RUNBOOK.md § 1 says why.
 
 > **Per-team databases are NOT created here.** Each team's database is created at
-> runtime when the team is created (`applyTeamSchema` runs the `TEAM_MIGRATIONS` from
-> `workers/tenancy/src/team-schema.ts` — `0001_team_base` … `0008_portal_current_account`
-> today, eight of them; that file is the live list, this number is a copy of it). You
-> only apply *team-schema* migrations to *existing* teams later, via the migrate-teams
-> robot (§7). The last two are the customer spine (`0007`) and the client-portal
-> switcher's pointer (`0008`) — see DATA-MODEL.md for what each one adds and what
-> breaks without it.
+> runtime when the team is created — `applyTeamSchema` runs the `TEAM_MIGRATIONS`
+> array in `workers/tenancy/src/team-schema.ts`, which starts at `0001_team_base`
+> and today runs to `0021_meetings`. **That file is the live list; any count
+> written here is a copy that will go stale, so open it.** You only apply
+> *team-schema* migrations to *existing* teams later, via the migrate-teams robot
+> (§7) — new teams always get all of them. DATA-MODEL.md says what each adds and
+> what breaks without it; the customer spine (`0007_customer_spine`) and the
+> portal's account pointer (`0008_portal_current_account`) are the two the whole
+> client portal stands on.
 
 ---
 
 ## 3 · R2 buckets (uploaded files)
 
-One bucket per media concern, per env. Create all six before deploying content/gateway:
+Four buckets, each with a staging twin — **eight in total**. Create them all
+before deploying content/gateway:
 
 ```bash
 npx wrangler r2 bucket create kwapso-media                    # profile photos + team logos (gateway MEDIA)
@@ -205,11 +297,13 @@ says what it searched), not a silent one.
 
 **Vars** (plain config in `wrangler.jsonc`, not secret):
 
-- **`CF_ACCOUNT_ID`** on `tenancy` + `content` + `data-ops` — **your Cloudflare account
-  id.** Load-bearing: it builds the per-team D1 REST URL (`/accounts/<id>/d1/…`), so a
-  wrong value fails EVERY per-team DB operation (team creation, all content/import/agent
-  writes). The checked-in value is the original author's account — **overwrite it** in
-  both the top-level and `env.staging` vars blocks of those three workers.
+- **`CF_ACCOUNT_ID`** on **five workers** — `tenancy`, `content`, `data-ops`,
+  `realtime` and `mcp`. **Your Cloudflare account id.** Load-bearing: it builds the
+  per-team D1 REST URL (`/accounts/<id>/d1/…`), so a wrong value fails EVERY
+  per-team DB operation (team creation, every content/import/agent write, and the
+  live channel's fence). The checked-in value is the original author's account —
+  **overwrite it** in both the top-level and `env.staging` vars blocks of all five.
+  Grep for it rather than trusting this list: `grep -rn CF_ACCOUNT_ID workers/*/wrangler.jsonc`.
 - `tenancy` → `PUBLIC_APP_URL` = the environment's absolute origin (e.g.
   `https://agency-staging.kwapso.app`). Outbound email links use it;
   leave it unset and agent-sent invite links point at the internal binding host.
@@ -219,6 +313,25 @@ says what it searched), not a silent one.
   `low`), `AGENT_FREE_DAILY` (**the app's own daily allowance** — how many free assistant
   actions a team gets each day; code default 25, but the checked-in wrangler var sets
   **50** in both environments, so 50 is what a team really gets), `WORKERS_AI_MODEL` (the keyless fallback).
+- `content` → `KNOWLEDGE_EMBED_MODEL` (the embedding model, `@cf/baai/bge-m3` —
+  **it must agree with the dimension count you created the Vectorize index with in
+  §3b**, so changing one means recreating the other) and `KNOWLEDGE_MIN_SCORE` (the
+  similarity floor below which a passage is not offered as an answer). Both have
+  code defaults and neither needs setting to get a working base.
+- `tenancy` → `MAX_TEAMS_PER_USER` (default 5, counting teams the account
+  *created* — deactivated ones still count, because their database still exists).
+  `0` means zero, not "fall back to the default"; every numeric var behaves that
+  way.
+- `auth` → `ENVIRONMENT`. Ships as `production` in the top-level block, which is
+  what makes the test-login door refuse outright there. Do not set it to anything
+  else in production.
+
+**The scripts in `scripts/` read their own set of variables** — the reset, the
+smokes, the seeds and the Glide pull. They are not worker config and are not set
+with `wrangler secret`; they are exported in your shell. `.env.example` in the
+repo root names every one of them, and INVENTORY.md § 4 says who issues each.
+`node scripts/reset-all.mjs` in particular will refuse to start until
+`CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` are exported.
 
 ---
 
@@ -395,3 +508,27 @@ prereqs → npm install → wrangler login → npm run check
 If you can run this list, you can rebuild Brimba from nothing. To then *build a new
 product on it*, read **BASE-MANUAL.md → "Fork the base for a new product"** and
 **BUILD-A-MODULE.md**.
+
+---
+
+## What this runbook cannot give you
+
+Everything above is inside the repository. These are not, and no document can
+make them so — they are the things you have to be *given*:
+
+| What | Where it is written down |
+|---|---|
+| The Cloudflare account login (the account **id** is in the repo; the credential is not) | INVENTORY.md § 1 |
+| The Google Cloud project and its two OAuth clients | INVENTORY.md § 3 |
+| Who registered `kwapso.app`, and who holds that login | INVENTORY.md § 2 — **not currently recorded anywhere** |
+| Every secret's value (the *names* are all here and in `.dev.vars.example`) | INVENTORY.md § 4 |
+| `~/.config/kwapso/keys.env`, which eight files tell you to source | INVENTORY.md § 4 — it lived on one machine; recreate it |
+| The legacy Glide rows and files (git-ignored on purpose — customer data) | INVENTORY.md § 6, glide/README.md |
+
+The D1 database ids and the Cloudflare account id **are** checked in, in the
+`wrangler.jsonc` files — which is why §2 and §4 tell you to overwrite them rather
+than to go and find them.
+
+**Once it is running**, RUNBOOK.md is the other half of this file: rolling a
+change back out, getting data back with D1 Time Travel, and what to check when
+something breaks at two in the morning.

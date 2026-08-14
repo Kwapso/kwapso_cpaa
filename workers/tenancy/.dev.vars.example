@@ -1,0 +1,11 @@
+# Local-dev settings for the tenancy worker. Copy to `.dev.vars` (gitignored).
+# INVENTORY.md § 4 says who issues each of these.
+
+# The scoped D1 REST token (Cloudflare → API Tokens → Account · D1 · Edit) that
+# reaches per-team databases. Team creation and every per-team write needs it.
+CF_D1_TOKEN=
+# Shared with auth, content, mcp and BOTH gateways — the value must be identical
+# everywhere. The internal doors fail closed on a mismatch.
+INTERNAL_KEY=
+# Guards the maintenance endpoints (migrate-teams, db-sizes).
+ADMIN_KEY=

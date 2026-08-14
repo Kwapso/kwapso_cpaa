@@ -2,6 +2,11 @@
   "name": "kwapso",
   "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22",
+    "npm": ">=10"
+  },
   "description": "kwapso — the agency app + the client portal by Swift Struck. web/ = the agency screens, web-portal/ = the client screens, workers/ = the brains (two gateways over one shared set), shared/ = types all sides agree on.",
   "workspaces": [
     "web",

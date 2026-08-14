@@ -5,6 +5,12 @@ out/
 
 # Local secrets + OS noise
 .env*
+# ...except the TEMPLATE. `.env*` correctly keeps every real value out of git, and
+# for a while it kept the list of WHICH values exist out too — which is the half
+# that cannot be reissued from a provider's dashboard. `.env.example` holds names
+# and comments, never a value; the negation is anchored to that one filename so
+# nothing else can slip back in behind it.
+!.env.example
 .DS_Store
 *.log
 *.tsbuildinfo
@@ -24,6 +30,8 @@ out/
 /lean-mean-report.md
 /interface-lessness-report.html
 /interface-lessness-report.md
+/ocean-review.html
+/ocean-review.md
 
 # Per-workstream working notes — local to whoever is building, never forked
 # into a new app (the new-app skill clones this repo).

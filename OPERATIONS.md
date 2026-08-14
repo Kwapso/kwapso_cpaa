@@ -2,6 +2,17 @@
 
 How this project ships. /ship-staging and /ship-production read the config below.
 
+**Its two companions.** [RUNBOOK.md](RUNBOOK.md) is the other direction — rolling
+a deploy back out, restoring data with D1 Time Travel, and what to check when it
+breaks at two in the morning. [INVENTORY.md](INVENTORY.md) is everything the app
+needs that is not in this repository: the accounts, the domains, the two Google
+OAuth clients, every credential by name, the cron jobs, and what has no backup.
+BOOTSTRAP.md stands the whole thing up from zero.
+
+> **Before any command on this page: `npx wrangler whoami`.** No worker pins
+> `account_id`, so wrangler acts on whatever account the machine is logged into.
+> RUNBOOK.md § 0 explains why this is the first thing, not a footnote.
+
 ## Deploy config
 
 - platform: cloudflare-workers (TWO gateway workers — one per front door — each serving its own static export + routing /api)

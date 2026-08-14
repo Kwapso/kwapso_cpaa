@@ -101,6 +101,15 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
    workers, the live layer, and the Durable Object code-vs-runtime model). Read
    before building anything; do not relitigate without the user.
 2. **[OPERATIONS.md](OPERATIONS.md)** — how it builds and ships.
+   **[RUNBOOK.md](RUNBOOK.md)** is the other direction: rolling a change back out
+   (with the named triggers that say when to roll back rather than fix forward),
+   getting data back with D1 Time Travel, and what to check when it breaks at two
+   in the morning. **[INVENTORY.md](INVENTORY.md)** is everything the app needs
+   that is *not* in this repository — the accounts, the domains, the two Google
+   OAuth clients, every credential by name, the cron jobs, and an honest list of
+   what has no backup. **[CHANGELOG.md](CHANGELOG.md)** is the eras this project
+   moved through, reconstructed from git history so a newcomer can read how it got
+   here without reading 350 commits.
 3. **[CACHING.md](CACHING.md)** — the system-wide caching + loading/feedback
    ruleset (cache-first, row-level live-sync — patch the changed row, never
    refetch the list — examples). Follow it for every screen/module.
@@ -206,8 +215,13 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
 
 ## Develop
 
+**You need:** **Node 22** (pinned in `.nvmrc` and `package.json` `engines` — it is
+what CI runs), npm 10+, and git. Nothing else, and no cloud account: the commands
+below run entirely on your machine. Deploying is a different list — BOOTSTRAP.md
+§ 0 has it, and INVENTORY.md names every account and credential involved.
+
 ```bash
-npm install        # also pulls the UI library from GitHub
+npm install        # also pulls the UI library from GitHub (a public repo)
 npm run dev        # the agency app on http://localhost:3000
 npm run dev:portal # the client portal on http://localhost:3001
 npm run lint       # the fast half of the gate — oxlint over every workspace (~15ms)
@@ -218,5 +232,34 @@ npm run check      # THE GATE — lint, then types across every workspace, then 
 ends and all eight workers, then runs every test, including the law checks that read the
 source off disk — a plain `npx tsc --noEmit` proves far less.
 
+**What green looks like:** **exit code 0**, ten workspaces, every suite passing.
+For scale, that is roughly 149 test files and 1,600-odd tests; don't compare
+against those figures, compare against exit 0, because the suite grows every week.
+
+**Exactly one suite skips itself, and that is correct**:
+`workers/content/test/knowledge-backfill.test.ts` measures the knowledge base over
+the agency's real Glide history, and that data is git-ignored customer material
+(INVENTORY.md § 6). It is absent from every clone, so on your machine this run
+ends `32 passed | 1 skipped` in the content worker. **That skip is green.** A skip
+anywhere else is not — investigate it. The exact count for the commit you are
+standing on:
+
+```bash
+npm run check 2>&1 | grep -E "Test Files|Tests "
+```
+
+Set a worker up for local dev by copying its `.dev.vars.example` to `.dev.vars`
+(gitignored) — every worker that takes a secret has one, and each names what
+breaks when a value is missing.
+
 Ship by saying **"ship to staging"** / **"ship to production"** — the skills
-read OPERATIONS.md and handle GitHub + Cloudflare.
+read OPERATIONS.md and handle GitHub + Cloudflare. To take a change back out
+again, or to work out what is wrong while it is live, read
+[RUNBOOK.md](RUNBOOK.md).
+
+## Licence
+
+Proprietary and confidential — copyright © 2026 Swift Struck, all rights
+reserved. See [LICENSE](LICENSE). Access to this repository does not grant a
+licence to use, copy or redistribute it. Third-party dependencies keep their own
+licences, which are acknowledged in the same file.

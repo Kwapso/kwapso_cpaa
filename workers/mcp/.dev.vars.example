@@ -1,0 +1,7 @@
+# Local-dev settings for the mcp worker. Copy to `.dev.vars` (gitignored).
+# INVENTORY.md § 4 says who issues each of these.
+
+# The mcp worker mints team-pinned sessions through auth's /internal/mcp-session.
+# Omit this and the whole external machine surface cannot authenticate. Must match
+# auth / tenancy / content / both gateways exactly.
+INTERNAL_KEY=
