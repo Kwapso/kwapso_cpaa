@@ -48,3 +48,36 @@ export function formatRelative(iso?: string | null): string {
   if (days < 7) return `${days}d ago`
   return formatDate(iso)
 }
+
+// ── the datetime-local pair ───────────────────────────────────────────────────
+// `<input type="datetime-local">` speaks LOCAL WALL-CLOCK with no offset on it,
+// and the doors store instants. These two are that boundary, in both directions.
+//
+// They live here rather than beside a form because the reasoning is subtle and
+// was already written out twice, in two spellings, under two names: a meeting
+// form and a work-log form each carried a `toLocalInput` plus an inverse called
+// `toMoment` in one file and `toInstant` in the other. Two implementations of one
+// rule is how "10:00" and "09:00" end up on two screens showing the same row.
+
+/** A stored moment (ISO, UTC) → what `<input type="datetime-local">` wants, in
+ * the READER'S own timezone. Built from the local parts rather than
+ * `toISOString().slice(…)`, which would silently show UTC — the difference
+ * between "10:00" and "09:00" for anybody outside it, and a meeting shown an
+ * hour out is a meeting somebody misses. */
+export function toLocalInput(iso: string | null | undefined): string {
+  if (!iso) return ""
+  const ms = Date.parse(iso)
+  if (!Number.isFinite(ms)) return ""
+  const at = new Date(ms)
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}T${pad(at.getHours())}:${pad(at.getMinutes())}`
+}
+
+/** …and back. The browser hands back "2026-08-12T09:00" with no zone, so reading
+ * it as LOCAL is exactly right: it is the zone the person was sitting in, which
+ * is the zone they meant. The door stores the instant. */
+export function toMoment(local: string): string {
+  if (!local) return ""
+  const ms = Date.parse(local)
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : ""
+}

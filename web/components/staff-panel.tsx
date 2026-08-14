@@ -22,14 +22,11 @@ import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Card, CardContent } from "@kwapso/ui/registry/primitives/card/card"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import {
-  DescriptionList,
-  defaultDescriptionListConfig,
-} from "@kwapso/ui/registry/collections/description-list/description-list"
 import { Pencil, Plus, Power } from "lucide-react"
 
 import { CertificateFormDialog, type CertificateValues } from "@/components/certificate-form-dialog"
 import { StaffProfileDialog, type StaffProfileValues } from "@/components/staff-profile-dialog"
+import { OverviewList } from "@/components/overview-list"
 import { ApiFailure, content } from "@/lib/api"
 import { staffCertificatesKey, staffProfilesKey, totalKey } from "@/lib/live-resources"
 import { usePermissions } from "@/lib/perms"
@@ -191,10 +188,7 @@ export function StaffPanel({
       <Card>
         <CardContent className="p-4">
           {profileItems.length > 0 ? (
-            <DescriptionList
-              config={{ ...defaultDescriptionListConfig, columns: 1 }}
-              items={profileItems}
-            />
+            <OverviewList items={profileItems} />
           ) : (
             <p className="text-muted-foreground text-sm">
               Nothing written about {memberName} yet. The team can read what goes here; no client

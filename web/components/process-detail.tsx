@@ -35,21 +35,14 @@ import {
   AlertDialogTitle,
 } from "@kwapso/ui/registry/primitives/alert-dialog/alert-dialog"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
-import {
-  DescriptionList,
-  defaultDescriptionListConfig,
-} from "@kwapso/ui/registry/collections/description-list/description-list"
-import {
-  ActivityFeed,
-  defaultActivityFeedConfig,
-} from "@kwapso/ui/registry/collections/activity-feed/activity-feed"
 import { Comments } from "@kwapso/ui/registry/collections/comments/comments"
 import { GitBranch, Pencil, Plus, Power } from "lucide-react"
 
 import type { ProcessComment, ProcessDetail, ProcessStep } from "@shared/types"
-import { LoadMore } from "@/components/load-more"
 import { ProcessFormDialog, type ProcessFormValues } from "@/components/process-form-dialog"
 import { StepFormDialog, type StepFormValues } from "@/components/step-form-dialog"
+import { OverviewList } from "@/components/overview-list"
+import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
 import { formatCount } from "@shared/web/format-count"
@@ -325,12 +318,7 @@ export function ProcessDetailScreen({
         onValueChange={setTab}
         renderPanel={(t) => {
           if (t.value === "overview")
-            return (
-              <DescriptionList
-                config={{ ...defaultDescriptionListConfig, columns: 1 }}
-                items={overviewItems}
-              />
-            )
+            return <OverviewList items={overviewItems} />
 
           if (t.value === "steps")
             return (
@@ -477,21 +465,7 @@ export function ProcessDetailScreen({
               />
             )
 
-          return (
-            // R14: the badge above counts the WHOLE history, so the feed under it
-            // must be able to reach all of it — page one, then Load more.
-            <div className="flex flex-col gap-4">
-              <ActivityFeed
-                config={{ ...defaultActivityFeedConfig, emptyText: "No activity yet." }}
-                items={activity.items}
-              />
-              <LoadMore
-                listKey={activity.listKey}
-                fetchPage={activity.fetchPage}
-                label="Load more activity"
-              />
-            </div>
-          )
+          return <ActivityPanel activity={activity} />
         }}
       />
 

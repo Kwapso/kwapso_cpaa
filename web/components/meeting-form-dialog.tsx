@@ -33,6 +33,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
+import { toMoment } from "@shared/web/format"
 import { useFormDraft } from "@shared/web/use-form-draft"
 
 /** Radix Select can't hold an empty value, so "nobody in particular" needs a
@@ -57,27 +58,6 @@ export type MeetingFormValues = {
   location: string
   agenda: string
   notes: string
-}
-
-/** A stored moment (ISO, UTC) → what `<input type="datetime-local">` wants, in the
- * reader's OWN timezone. Doing it by hand rather than with `toISOString().slice`
- * is the difference between "10:00" and "09:00" for anybody outside UTC — a
- * meeting shown an hour out is a meeting somebody misses. */
-export function toLocalInput(iso: string | null | undefined): string {
-  if (!iso) return ""
-  const at = new Date(iso)
-  if (Number.isNaN(at.getTime())) return ""
-  const pad = (n: number) => String(n).padStart(2, "0")
-  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}T${pad(at.getHours())}:${pad(at.getMinutes())}`
-}
-
-/** …and back. The browser hands back a LOCAL wall-clock string with no zone on
- * it, so `new Date(...)` reading it as local is exactly right — and the door
- * stores the instant. */
-function toMoment(local: string): string {
-  if (!local) return ""
-  const at = new Date(local)
-  return Number.isNaN(at.getTime()) ? "" : at.toISOString()
 }
 
 export function MeetingFormDialog({

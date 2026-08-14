@@ -70,15 +70,15 @@ import type { Env } from "../env"
 /** Vectors sent in one upsert. Vectorize takes 1,000 per call from a Worker;
  * this is smaller on purpose — a batch is also the unit of RETRY, and re-sending
  * 200 vectors after a blip costs a fifth of re-sending a thousand. */
-export const UPSERT_BATCH = 200
+const UPSERT_BATCH = 200
 
 /** Ids removed in one delete call. Same ceiling, same reasoning. */
-export const DELETE_BATCH = 200
+const DELETE_BATCH = 200
 
 /** Nearest neighbours one search asks for. Vectorize allows 100 when neither
  * values nor metadata come back — which is exactly the shape this seam uses, so
  * the ceiling costs nothing. */
-export const VECTOR_TOP_K = 100
+const VECTOR_TOP_K = 100
 
 /** The sentinel an unindexed field carries. Vectorize has no "IS NULL": a vector
  * with no `ticket` key simply is not matched by `{ticket: {$ne: "x"}}` either,

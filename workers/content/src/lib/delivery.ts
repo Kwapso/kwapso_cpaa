@@ -19,7 +19,7 @@ import { describeChanges, logActivity, type Actor } from "@shared/workers/activi
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
-import { optionalText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { intOr, optionalText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { EXPORT_HARD_CAP, LIST_HARD_CAP } from "@shared/workers/limits"
 import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
 import type { MeetingPurpose, Program } from "@shared/types"
@@ -54,14 +54,6 @@ function toProgram(r: ProgramRow): Program {
     updatedAt: r.updated_at,
     editorName: r.editor_name,
   }
-}
-
-/** Coerce an untrusted JSON value to a SAFE integer before it is interpolated
- * into SQL — `sequence` arrives typed as a number and is not one until checked.
- * (The same guard Learning carries, and for the same reason.) */
-function intOr(v: unknown, fallback: number): number {
-  const n = Number(v)
-  return Number.isFinite(n) ? Math.trunc(n) : fallback
 }
 
 /** Every programme (active + retired), in display order. */

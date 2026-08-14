@@ -42,6 +42,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { Paperclip, Upload } from "lucide-react"
 
 import { ApiFailure } from "@/lib/api"
+import { readFileAsDataUrl } from "@shared/web/file"
 import { useFormDraft } from "@shared/web/use-form-draft"
 
 /** The client-side cap, matching the door's `KNOWLEDGE_FILE_MAX_BYTES`. It is
@@ -58,17 +59,6 @@ const visibilityField = { ...defaultFieldConfig, label: "Who can use it", requir
 /** Radix Select can't hold an empty value, so "the agency's own" uses a sentinel
  * — the same one the typed-note form uses, for the same reason. */
 const AGENCY = "__agency__"
-
-/** Read a File to a raw base64 data URL. No re-encode of any kind: whatever was
- * dropped is what gets stored, byte for byte. */
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = () => reject(reader.error ?? new Error("read failed"))
-    reader.readAsDataURL(file)
-  })
-}
 
 export function KnowledgeUploadDialog({
   open,

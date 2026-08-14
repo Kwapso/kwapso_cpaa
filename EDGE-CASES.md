@@ -614,6 +614,7 @@ last) fails, and deploying a worker before its migration 500s at runtime.
 | Guard an invariant with a pre-write `COUNT` only | TOCTOU race | Re-check in the `UPDATE … WHERE`; count is just the friendly error |
 | Assume hot reads route through sharding | They query `guard.databaseId` directly | Fine today; revisit any batched script if a module is split |
 | Deploy auth-first / worker-before-migration | Binder-before-target 500s; missing table | realtime-FIRST; migrations to both DBs first |
+| Split `lib/accounts.ts` because it is "1,136 lines" | 369 of those are comments, and a law pins every spine statement to that one file | Measure CODE lines; check what pins the file before proposing a split (§ *A long file that a law is holding open*) |
 
 ## The catalogue is data; the code is truth (R13)
 **The trap.** An import TargetDef lives in code, but a target only becomes one the
@@ -657,3 +658,29 @@ return — and the mounted root `ErrorBoundary` (`web/app/layout.tsx`) contains 
 that still slips through as a readable card, never a blank page. (The scanner
 walks past the parameter list to find the real function body, and catches
 `React.`-namespaced hooks too — both learned from its own sabotage test.)
+
+## A long file that a law is holding open
+**The trap.** Three files look like the obvious targets for a "split the god-file"
+refactor — `workers/tenancy/src/lib/accounts.ts`, `workers/content/src/lib/knowledge.ts`
+and `workers/tenancy/src/lib/processes.ts`. Two of them are long **on purpose**,
+and the first is long *by law*: `test/account-leak.test.ts` walks every file under
+`lib/` and `routes/` and fails the build if a statement against `accounts`,
+`account_links` or `portal_users` appears anywhere except `lib/accounts.ts`. Move
+one `SELECT` into a sibling and the message is immediate — *"spine SQL outside the
+one fenced file"*. That is the R21 fence's whole structural argument: a file cannot
+be forgotten the way a WHERE clause can.
+
+`knowledge.ts` is the same shape from the other end. It is not an unsplit
+god-file — it is what is LEFT after five splits (`knowledge-ingest`, `-vectors`,
+`-summary`, `-text`, `-google` are already siblings), and what remains is pinned:
+R23's `cited-answers.test.ts` reads `lib/knowledge.ts` for the one answer builder
+and forbids any door assembling that shape by hand, and R26's vector fence reads
+it too. `processes.ts` carries the same `AccountScope` fence as the spine, with the
+burglar suite trying every door's handle.
+
+**The rule.** Measure a file by its CODE lines, not its total — the comments here
+are the documentation, and by real code these are 767, 1,009 and 921 lines, not
+1,136 / 1,683 / 1,142. Then check what pins it before proposing a split: a law that
+names a path is a decision, not an oversight. If a split is genuinely wanted, the
+law moves first — the check, the registry entry and RULES.md together — and that is
+a deliberate change with the owner in the room, never a tidy-up.

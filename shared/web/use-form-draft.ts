@@ -37,7 +37,7 @@ function write<T>(id: string, value: T): void {
 }
 
 /** Drop a single saved draft. */
-export function clearFormDraft(id: string): void {
+function clearFormDraft(id: string): void {
   try {
     sessionStorage.removeItem(storageKey(id))
   } catch {

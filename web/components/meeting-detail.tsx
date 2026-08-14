@@ -22,25 +22,18 @@ import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
-import {
-  DescriptionList,
-  defaultDescriptionListConfig,
-} from "@kwapso/ui/registry/collections/description-list/description-list"
-import {
-  ActivityFeed,
-  defaultActivityFeedConfig,
-} from "@kwapso/ui/registry/collections/activity-feed/activity-feed"
 import { CalendarPlus, CheckCheck, Pencil, Power } from "lucide-react"
 
 import type { Account, Meeting, MeetingPurpose } from "@shared/types"
-import { LoadMore } from "@/components/load-more"
-import { MeetingFormDialog, toLocalInput, type MeetingFormValues } from "@/components/meeting-form-dialog"
+import { MeetingFormDialog, type MeetingFormValues } from "@/components/meeting-form-dialog"
+import { OverviewList } from "@/components/overview-list"
+import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, content, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
 import { listFetch, meetingsKey } from "@/lib/live-resources"
 import { usePermissions } from "@/lib/perms"
 import { formatCount } from "@shared/web/format-count"
-import { formatDateTime } from "@shared/web/format"
+import { formatDateTime, toLocalInput } from "@shared/web/format"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
 
@@ -268,24 +261,9 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
         onValueChange={setTab}
         renderPanel={(t) => {
           if (t.value === "overview")
-            return (
-              <DescriptionList
-                config={{ ...defaultDescriptionListConfig, columns: 1 }}
-                items={overviewItems}
-              />
-            )
+            return <OverviewList items={overviewItems} />
           if (t.value === "activity")
-            return (
-              // R14: the badge above counts the WHOLE history, so the feed under
-              // it must be able to reach all of it — page one, then Load more.
-              <div className="flex flex-col gap-4">
-                <ActivityFeed
-                  config={{ ...defaultActivityFeedConfig, emptyText: "No activity yet." }}
-                  items={activity.items}
-                />
-                <LoadMore listKey={activity.listKey} fetchPage={activity.fetchPage} label="Load more activity" />
-              </div>
-            )
+            return <ActivityPanel activity={activity} />
           return (
             <div className="flex flex-col gap-6">
               <section className="flex flex-col gap-2">

@@ -197,7 +197,7 @@ export async function getMeeting(
 }
 
 /** The same read, throwing the clean 404 every write opens with. */
-export async function meetingOrThrow(
+async function meetingOrThrow(
   cfg: D1Rest,
   guard: MemberGuard,
   id: string

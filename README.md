@@ -51,6 +51,24 @@ and screens are written) → the reference docs below as you need them →
 [EDGE-CASES.md](EDGE-CASES.md) before touching anything subtle →
 [OPERATIONS.md](OPERATIONS.md) to ship.
 
+**Already here, and just need to make ONE change?** That order is the whole tour.
+This is the short way in — the minimum that keeps a change in-rule, by the kind of
+change it is. CLAUDE.md is on every row because the Laws are, and the planning
+ritual in it names the rest:
+
+| You are changing… | Read these, then build |
+|---|---|
+| a screen or a form | [CLAUDE.md](CLAUDE.md) → [UI-CONVENTIONS.md](UI-CONVENTIONS.md) → [CACHING.md](CACHING.md) |
+| a worker route | [CLAUDE.md](CLAUDE.md) → [CONVENTIONS.md](CONVENTIONS.md) → [DATA-MODEL.md](DATA-MODEL.md) |
+| a whole new module | [BUILD-A-MODULE.md](BUILD-A-MODULE.md) (it lists its own prerequisites) |
+| anything the agent or MCP can reach | [CLAUDE.md](CLAUDE.md) → [MCP.md](MCP.md) → [AGENTIC-IMPORT.md](AGENTIC-IMPORT.md) |
+| a table, a column, or a migration | [DATA-MODEL.md](DATA-MODEL.md) → [OPERATIONS.md](OPERATIONS.md) |
+| a Law, or anything a Law names | [RULES.md](RULES.md) + `shared/rules/registry.ts` + its check — all three, or the build fails |
+
+Whatever the row, [EDGE-CASES.md](EDGE-CASES.md) is the one to open when something
+behaves oddly rather than wrongly — it is where the non-obvious traps are written
+down, and most of them cost somebody a day before they got there.
+
 **Rebuilding the whole base from nothing?** Follow
 **[BOOTSTRAP.md](BOOTSTRAP.md)** — the day-zero, command-by-command runbook that takes
 a fresh Cloudflare account to a live staging + production Brimba. It is the concrete

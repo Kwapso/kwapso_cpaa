@@ -22,7 +22,7 @@ import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d
 import { ulid } from "@shared/workers/id"
 import { HELP_STATUSES, type HelpMessage, type HelpStatus, type HelpTicket } from "@shared/types"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
-import { optionalText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { optionalText, parseStringArray, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { BULK_IDS_LIMIT, THREAD_HARD_CAP } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { rankAtTop, rankBetween } from "@shared/workers/rank"
@@ -161,23 +161,12 @@ type ReplyRow = {
   created_at: string
 }
 
-/** Parse the tagged_user_ids JSON safely (untrusted text → string[] or []). */
-function parseTagged(json: string | null): string[] {
-  if (!json) return []
-  try {
-    const v = JSON.parse(json)
-    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []
-  } catch {
-    return []
-  }
-}
-
 function toMessage(r: ReplyRow): HelpMessage {
   return {
     id: r.id,
     ticketId: r.help_id,
     body: r.message_body,
-    taggedUserIds: parseTagged(r.tagged_user_ids),
+    taggedUserIds: parseStringArray(r.tagged_user_ids),
     isAgent: r.is_agent === 1,
     authorId: r.creator_id,
     authorName: r.creator_name,

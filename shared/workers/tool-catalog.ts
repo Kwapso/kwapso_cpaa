@@ -85,7 +85,7 @@ export const roleLabel = (input: Record<string, unknown>, names?: Record<string,
   return title ? `the ${title} role` : `role ${id}`
 }
 /** A member reference for a summary: the resolved name/email, else "member <id>". */
-export const memberLabel = (input: Record<string, unknown>, names?: Record<string, string>): string => {
+const memberLabel = (input: Record<string, unknown>, names?: Record<string, string>): string => {
   const id = str(input, "userId")
   return names?.[id] ?? `member ${id}`
 }
@@ -99,7 +99,7 @@ export const memberLabel = (input: Record<string, unknown>, names?: Record<strin
  * approve an address it won't show them. `resolveNames` (workers/data-ops) fills
  * `names` with name AND email for exactly this reason. Falling back to the raw id
  * is honest about knowing less, rather than inventing a name. */
-export const accountLabel = (
+const accountLabel = (
   input: Record<string, unknown>,
   key: string,
   names?: Record<string, string>
@@ -2257,7 +2257,7 @@ export const GATELESS_WRITES: Record<string, string> = {
  * `portal_users` because a portal grant is the same order of decision: it hands
  * a person outside the team sight of a customer's whole world. One half of
  * "access"; the other half is the ACCOUNT FENCE below. */
-export const PRIVILEGE_MODULES = ["member_roles", "team_members", "portal_users"]
+const PRIVILEGE_MODULES = ["member_roles", "team_members", "portal_users"]
 
 /** A path or a field name, as a bag of lowercase words. */
 const words = (s: string): Set<string> => new Set(s.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean))

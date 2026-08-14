@@ -28,7 +28,7 @@ import { ulid } from "./id"
 /** The one header name. Chosen over `traceparent` because we are not emitting
  * W3C trace context — there are no spans, no sampling, no collector. A single
  * flat id is what the error store can actually join on. */
-export const TRACE_HEADER = "x-request-id"
+const TRACE_HEADER = "x-request-id"
 
 /** Long enough for a ULID (26) or a UUID (36), short enough that it can't be
  * used to smuggle a paragraph into a log line or a column. */

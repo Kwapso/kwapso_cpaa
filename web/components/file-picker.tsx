@@ -29,21 +29,13 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Paperclip } from "lucide-react"
 
 import { ApiFailure } from "@/lib/api"
+// No canvas re-encode: a certificate is a document, and a PDF put through an
+// image pipeline is not a PDF. The seam says so once, for both front doors.
+import { readFileAsDataUrl } from "@shared/web/file"
 
 /** The client-side cap. The doors have their own — this one exists so a person
  * who picked a 400 MB video is told before they spend two minutes uploading it. */
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024
-
-/** Read a File to a raw base64 data URL. No canvas re-encode: a certificate is a
- * document, and a PDF put through an image pipeline is not a PDF. */
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = () => reject(reader.error ?? new Error("read failed"))
-    reader.readAsDataURL(file)
-  })
-}
 
 export function FilePicker({
   id,

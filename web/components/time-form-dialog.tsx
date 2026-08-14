@@ -42,6 +42,7 @@ import { ApiFailure } from "@/lib/api"
 import { helpKey, listFetch, storiesKey } from "@/lib/live-resources"
 import { useActiveTeam } from "@/lib/use-active-team"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
+import { toLocalInput, toMoment } from "@shared/web/format"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useCached } from "@shared/web/store"
 import type { HelpTicket, Story, WorkLog } from "@shared/types"
@@ -70,28 +71,6 @@ const billableField = {
   label: "Billable",
   required: false,
   hint: "On unless you say otherwise.",
-}
-
-/** `<input type="datetime-local">` hands back "2026-08-12T09:00" in the browser's
- * own zone with no offset. Turning it into a real instant is the browser's job,
- * not the server's — `new Date(local)` reads it in the zone the person is sitting
- * in, which is the zone they meant. */
-function toInstant(local: string): string {
-  const ms = Date.parse(local)
-  return Number.isFinite(ms) ? new Date(ms).toISOString() : ""
-}
-
-/** …and back again, to prefill a correction. The same rule in reverse: a stored
- * instant is shown in the zone the person is sitting in, because that is the
- * clock they read it off in the first place. Built from the local parts rather
- * than `toISOString().slice(…)`, which would silently show UTC. */
-function toLocalInput(iso: string | null): string {
-  if (!iso) return ""
-  const ms = Date.parse(iso)
-  if (!Number.isFinite(ms)) return ""
-  const d = new Date(ms)
-  const pad = (n: number) => String(n).padStart(2, "0")
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 export function TimeFormDialog({
@@ -157,8 +136,8 @@ export function TimeFormDialog({
       await onSubmit({
         targetTable,
         targetId,
-        startedAt: toInstant(values.startedAt),
-        endedAt: toInstant(values.endedAt),
+        startedAt: toMoment(values.startedAt),
+        endedAt: toMoment(values.endedAt),
         note: values.note.trim(),
         kind: values.kind.trim(),
         billable: values.billable,

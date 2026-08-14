@@ -2,7 +2,7 @@
 
 // Learning detail — one article as a tabbed record: Article / Overview / Activity
 // (the standard every record gets). Article = the prose (library ArticleBody) + your
-// own Done toggle + Deactivate/Activate. Overview = audit metadata (DescriptionList).
+// own Done toggle + Deactivate/Activate. Overview = audit metadata (OverviewList).
 // Activity = the article's history via the GENERIC record-activity feed. Edit gated
 // by learning:edit; deactivate by learning:delete. Host-composed, like role/ticket.
 
@@ -16,23 +16,16 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { ProgressToggle } from "@kwapso/ui/registry/primitives/progress-toggle/progress-toggle"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import { WebEmbed } from "@kwapso/ui/registry/primitives/web-embed/web-embed"
-import {
-  DescriptionList,
-  defaultDescriptionListConfig,
-} from "@kwapso/ui/registry/collections/description-list/description-list"
-import {
-  ActivityFeed,
-  defaultActivityFeedConfig,
-} from "@kwapso/ui/registry/collections/activity-feed/activity-feed"
 import { Pencil, Power } from "lucide-react"
 
 import type { Learning, SelectableValue } from "@shared/types"
 import { LearningFormDialog, type LearningFormValues } from "@/components/learning-form-dialog"
-import { LoadMore } from "@/components/load-more"
 import { ApiFailure, content, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
 import { formatCount } from "@shared/web/format-count"
 import { RichText } from "@/components/rich-text"
+import { OverviewList } from "@/components/overview-list"
+import { ActivityPanel } from "@/components/activity-panel"
 import { safeHref, safeSrc } from "@/lib/rich-text"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
@@ -48,7 +41,7 @@ import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
 // carry `javascript:`/`data:`. Every URL therefore reaches its `src` through the
 // safeSrc seam (http/https or app-relative only); a framed `javascript:` URL would
 // otherwise run with THIS origin's cookies. An unsafe link renders no player at all.
-export function LearningMedia({ url, contentType }: { url: string; contentType: string }) {
+function LearningMedia({ url, contentType }: { url: string; contentType: string }) {
   const src = safeSrc(url)
   if (!src) return null
   const type = contentType.toLowerCase()
@@ -232,28 +225,9 @@ export function LearningDetailScreen({ teamId, learningId }: { teamId: string; l
         onValueChange={setTab}
         renderPanel={(t) => {
           if (t.value === "overview")
-            return (
-              <DescriptionList
-                config={{ ...defaultDescriptionListConfig, columns: 1 }}
-                items={overviewItems}
-              />
-            )
+            return <OverviewList items={overviewItems} />
           if (t.value === "activity")
-            return (
-              // R14: the badge above counts the WHOLE history, so the feed under
-              // it must be able to reach all of it — page one, then Load more.
-              <div className="flex flex-col gap-4">
-                <ActivityFeed
-                  config={{ ...defaultActivityFeedConfig, emptyText: "No activity yet." }}
-                  items={activity.items}
-                />
-                <LoadMore
-                  listKey={activity.listKey}
-                  fetchPage={activity.fetchPage}
-                  label="Load more activity"
-                />
-              </div>
-            )
+            return <ActivityPanel activity={activity} />
           return (
             <div className="flex flex-col gap-6">
               <div className="flex flex-col gap-3">

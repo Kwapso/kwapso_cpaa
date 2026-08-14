@@ -67,7 +67,7 @@ export const GOOGLE_TIMEOUT_MS = 15_000
  * `openid email` rides every one so we can label the connection. It costs
  * nothing at the consent screen — the person is choosing an account there anyway.
  */
-export const GOOGLE_SCOPES: Record<GoogleService, string[]> = {
+const GOOGLE_SCOPES: Record<GoogleService, string[]> = {
   drive: [
     "openid",
     "email",
@@ -120,7 +120,7 @@ export function connectCredentials(env: ConnectEnv): ConnectCredentials | null {
  * rather than from the request, which removes the open-redirect question instead
  * of answering it.
  */
-export function connectRedirectUri(env: ConnectEnv): string {
+function connectRedirectUri(env: ConnectEnv): string {
   const origin = (env.PUBLIC_APP_URL ?? "").replace(/\/+$/, "")
   if (!origin)
     throw new GuardError(

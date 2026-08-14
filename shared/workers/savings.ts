@@ -124,7 +124,7 @@ export function stepSaving(figures: StepFigures): StepSaving {
 }
 
 /** Roll one process up from its steps. */
-export function processSaving(
+function processSaving(
   process: { processId: string; name: string },
   steps: StepFigures[]
 ): ProcessSaving {
