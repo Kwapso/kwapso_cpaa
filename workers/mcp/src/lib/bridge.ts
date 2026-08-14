@@ -43,10 +43,30 @@ const CACHE_MS = 60 * 1000
 
 const cache = new Map<string, { cookie: string; expires: number }>()
 
+/** WHAT AN EXPIRED ENTRY IS: a live session cookie for somebody the cache has
+ * stopped answering for. Nothing used to remove one. `dropCachedSession` clears
+ * a REVOKED token's entry and a fresh mint OVERWRITES its own, so an entry only
+ * ever left this map if its own token came back — which means an isolate serving
+ * many tokens accumulated one credential per token it had ever seen, past the
+ * minute it was useful, for as long as the isolate lived. Small, but it is an
+ * unbounded structure holding credentials, and both halves of that sentence are
+ * the kind this codebase does not leave standing.
+ *
+ * Swept on the way past rather than on a timer: this function is the only thing
+ * that writes to the map, so it is the only moment the map can grow, and a
+ * linear pass over a map bounded by one isolate's live tokens costs nothing
+ * beside the network call it precedes. */
+function evictExpired(now: number): void {
+  for (const [id, entry] of cache) if (entry.expires <= now) cache.delete(id)
+}
+
 /** The Cookie header for acting AS this token's owner IN the token's team. */
 export async function sessionCookieFor(env: Env, token: McpTokenRow): Promise<string> {
   const hit = cache.get(token.id)
   if (hit && hit.expires > Date.now()) return hit.cookie
+  // A miss means we are about to write, so this is the moment to drop what the
+  // map is holding on to and no longer answering with.
+  evictExpired(Date.now())
 
   const res = await env.AUTH.fetch("https://internal/internal/mcp-session", {
     method: "POST",

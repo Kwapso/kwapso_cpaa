@@ -726,6 +726,61 @@ describe("RULES — the laws of the base", () => {
       expect(why.length, `${k} is an exception to R20 — that needs a real reason`).toBeGreaterThan(20)
   })
 
+  // R20, THE OTHER HALF OF THE REQUEST. CLAUDE.md has always said the query half
+  // is "locked separately by workers/content/test/validate.test.ts" — and that
+  // file locks what `queryText` DOES, which is a different sentence from "every
+  // door uses it". The body half got a call-site census the day its prose was
+  // found to be prose; the query half kept the prose. This is its census, and it
+  // is the same rule read positionally: a query parameter may reach code only
+  // from INSIDE something that is checking it.
+  //
+  // It found the two that were left: workers/realtime's `?user=` and `?team=`,
+  // the only raw request inputs in the fleet — each of which NAMES a Durable
+  // Object, sixty lines below a `/publish` door that caps its channel name for
+  // exactly that reason. Neither was exploitable as written; both were one edit
+  // away from being a fact about today's code instead of a property of the door.
+  it("validated-bodies: no query parameter reaches code unchecked either", () => {
+    /** The identifier opening the innermost call that encloses `i` — so a
+     * parameter is judged by where it SITS, exactly as a body field is. Stops at
+     * a statement boundary: a validator three statements back is not this one. */
+    const enclosingCall = (src: string, i: number): string => {
+      let depth = 0
+      for (let j = i - 1; j >= 0; j--) {
+        const ch = src[j]
+        if (ch === ")") depth++
+        else if (ch === "(") {
+          if (depth === 0) return /([A-Za-z_$][\w$]*)\s*$/.exec(src.slice(Math.max(0, j - 40), j))?.[1] ?? ""
+          depth--
+        } else if (ch === ";" || ch === "{" || ch === "}") return ""
+      }
+      return ""
+    }
+    // The seam, plus the two runtime coercions the body half already accepts in
+    // the same position (`Number(` / `parseInt(`), plus this repo's own named
+    // parsers that take the raw value and refuse it (requireWeek).
+    const CHECKERS = new Set([
+      "queryText", "requireText", "optionalText", "requireIdList", "requireMoment",
+      "optionalMoment", "Number", "parseInt", "requireWeek",
+    ])
+    const offenders: string[] = []
+    let params = 0
+    for (const [path, raw] of workerSources()) {
+      const src = stripComments(raw)
+      for (const m of src.matchAll(/\.searchParams\.get\s*\(\s*"([^"]*)"/g)) {
+        params++
+        if (!CHECKERS.has(enclosingCall(src, m.index as number)))
+          offenders.push(`${path.replace(/^\//, "")}::?${m[1]}`)
+      }
+    }
+    // Tripwire: a census that finds no parameters reports "all clear" exactly
+    // like a passing one — the failure mode the retired R15 clause died of.
+    expect(params, "the query-boundary scan found no parameters — it has gone blind").toBeGreaterThan(60)
+    expect(
+      offenders,
+      `a query parameter is trusted without a runtime check (R20) — put it through queryText from shared/workers/validate.ts: ${offenders.join(", ")}`
+    ).toEqual([])
+  })
+
   // Every enforced law in the registry maps to one of the checks above (or a
   // R21 — A DOOR ON THE AGENCY'S OWN MATERIAL REFUSES A CLIENT LOGIN.
   //

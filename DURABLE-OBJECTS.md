@@ -69,16 +69,25 @@ export class TeamChannel extends DurableObject<Env> {
     const [client, server] = Object.values(pair)
     this.ctx.acceptWebSocket(server)
     const stamp = request.headers.get("x-listener-scope")
-    if (stamp) server.serializeAttachment(JSON.parse(stamp))
+    // The fence (null = staff) AND the moment it was resolved. Both, on every
+    // socket — see "An authorization has a deadline" below.
+    server.serializeAttachment({ scope: stamp ? JSON.parse(stamp) : null, at: Date.now() })
     return new Response(null, { status: 101, webSocket: client })
   }
 
-  // Fan a tiny message out to everyone on this channel WHO MAY HEAR IT.
+  // Fan a tiny message out to everyone on this channel WHO MAY HEAR IT — and
+  // who still may, which is a question about time as well as about accounts.
   broadcast(message: string): void {
     const event = JSON.parse(message)
+    const now = Date.now()
     for (const ws of this.ctx.getWebSockets()) {
-      const stamp = ws.deserializeAttachment()          // null = staff
-      if (stamp && !mayHearChange(stamp, event)) continue
+      const listener = ws.deserializeAttachment()       // { scope, at }
+      // Out of time (or from before the rule) → close, never send.
+      if (!listener || typeof listener.at !== "number" || now - listener.at > LISTENER_MAX_AGE_MS) {
+        try { ws.close(1000, "reauthorize") } catch {}
+        continue
+      }
+      if (listener.scope && !mayHearChange(listener.scope, event)) continue
       try { ws.send(message) } catch { /* dead socket — runtime drops it */ }
     }
   }
@@ -172,6 +181,48 @@ that forgets the stamp makes a screen stale; a fence that guessed would make it
 a disclosure, so the unstamped case is silence. That is the fail-closed
 direction, kept: the door opened for exactly the resource that needed it, rather
 than having been open to everything all along.
+
+### An authorization has a deadline
+
+The gate above runs **once**, at the handshake: signed in, an active member of
+*this* team, and — for a client login — the fence they stand behind. The answer
+is stamped onto the socket so no later ping costs a database read. Nothing ever
+re-asked whether the answer was still true.
+
+A hibernatable socket outlives the object that accepted it, and a browser tab is
+patient, so "once" meant **for ever**. A member removed from the team, and a
+client login whose portal access was revoked, kept hearing that team's pings —
+resource, row id and account, live — for as long as they left the connection
+open. Signing out did not end it either: `destroySession` clears a cookie and a
+row and touches no socket, and `publishSignOut` is wired to the email-change
+flow on the `user:` channel alone. No row *data* travels on a ping and every
+door refuses an ex-member the moment they try to read one — but this file has
+already ruled that row ids are not nothing, which is why `mayHearChange` exists
+at all. A fence that is correct at the handshake and unexamined afterwards is
+the same sentence said about time instead of about accounts.
+
+So an authorization **expires** (`LISTENER_MAX_AGE_MS`, 15 minutes), and the
+expiry is spent where the decision is: `broadcast` closes an over-age socket
+instead of sending to it. Both halves of that shape are deliberate.
+
+- **No alarm, and no list.** Nothing has to enumerate "the things that ought to
+  disconnect somebody" — a list is a thing the next module can be missing from,
+  which is the failure the fence itself was written to avoid.
+- **It runs exactly when it matters.** A channel with nothing to say has nothing
+  to leak; the first ping after the deadline is the one that does not go out.
+- **The client does the rest unaided.** `shared/web/realtime.ts` reconnects with
+  backoff and calls `onReconnect`, so the socket comes back re-gated and the
+  screen resyncs what it missed. Somebody who is no longer a member simply gets
+  the 403 the API has been giving them all along.
+- **Fail-closed, like everything else here.** A socket carrying no issue time —
+  one accepted by an older build, or by anything that skipped `fetch()` — is
+  closed rather than trusted, and the deadline is checked **before** the fence,
+  so a revoked login is disconnected rather than merely filtered.
+
+`workers/realtime/test/team-channel.test.ts` pins both sides of the window, the
+order of the two checks, the no-issue-time case, and the constant's own
+magnitude — a deadline widened to a session's lifetime would restore the hole
+while leaving every other test green.
 
 Two consequences worth knowing:
 
