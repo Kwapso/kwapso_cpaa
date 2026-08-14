@@ -18,6 +18,7 @@ import { DurableObject } from "cloudflare:workers"
 import type { SessionUser } from "@shared/types"
 import { accountScope, mayHearChange, scopeStamp, type ScopeStamp } from "@shared/workers/account-scope"
 import { AUTH_UNAVAILABLE_MS, d1ConfigFrom, GuardError, requireMember } from "@shared/workers/gating"
+import { REALTIME_SHARDS, shardFor, teamShardName } from "@shared/workers/realtime"
 import { fail, json } from "@shared/workers/http"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { requestId, traceHeaders } from "@shared/workers/trace"
@@ -43,6 +44,37 @@ export type Env = {
 /** The listener's fence, handed from the gate to the channel on the upgrade
  * request. Set by this worker only — the DO is reachable only from here. */
 const SCOPE_HEADER = "x-listener-scope"
+
+/** The listener's SUBSCRIPTION — the resources its mounted screens actually read.
+ *
+ * Carried like the fence, and it answers a DIFFERENT question. The fence decides
+ * what a listener MAY hear: resolved from their session, never read off the URL,
+ * and it fails CLOSED. This decides what it WANTS to hear: declared by the client,
+ * and it fails OPEN. A client that lies about its subscription only makes its own
+ * screens stale, which is why one of the two is safe to take from a request.
+ *
+ * WHAT IT BUYS. Every socket used to receive every ping its fence allowed, so a
+ * person looking at one screen was woken by every other module in the team. The
+ * cost of that is paid inside a single-threaded object, per socket, per ping — the
+ * ceiling this whole channel is bounded by. Narrowing it is the other half of the
+ * split below: sharding divides the sockets per object, this divides the sends per
+ * socket. */
+const SUBS_HEADER = "x-listener-subs"
+
+/** Resources one socket may name. A subscription is a list the object walks for
+ * every message, so an unbounded one turns the optimisation into the cost. Far
+ * above any real screen's needs; a client past it is un-narrowed rather than
+ * refused, which is the same fail-open direction as everything else here. */
+const MAX_SUBS = 64
+
+/** Read a declared subscription off the upgrade. `null` means "everything" — a
+ * missing, empty, malformed or oversized declaration all land there, because
+ * over-serving a listener is harmless and under-serving one is a stale screen. */
+function readSubs(raw: string | null): string[] | null {
+  if (!raw) return null
+  const list = [...new Set(raw.split(",").map((r) => r.trim()).filter(Boolean))]
+  return list.length && list.length <= MAX_SUBS ? list : null
+}
 
 /**
  * HOW LONG ONE AUTHORIZATION MAY STAND — the deadline on a live socket.
@@ -92,7 +124,7 @@ export const LISTENER_MAX_AGE_MS = 15 * 60 * 1000
  * Every socket carries both halves, staff included — the issue time is what
  * makes the decision expire, so a socket without one is a socket with no
  * deadline, which is the hole above. */
-type Listener = { scope: ScopeStamp; at: number }
+type Listener = { scope: ScopeStamp; at: number; subs?: string[] }
 
 /** One team's live channel: holds its members' sockets, relays change pings. */
 export class TeamChannel extends DurableObject<Env> {
@@ -117,7 +149,11 @@ export class TeamChannel extends DurableObject<Env> {
         scope = { accountIds: [] }
       }
     }
-    server.serializeAttachment({ scope, at: Date.now() } satisfies Listener)
+    // `subs` is OMITTED rather than set to null when there is none, so a socket
+    // from before subscriptions existed and a socket that declared nothing are the
+    // same object — one absent key, one meaning: send me everything.
+    const subs = readSubs(request.headers.get(SUBS_HEADER))
+    server.serializeAttachment({ scope, at: Date.now(), ...(subs ? { subs } : {}) } satisfies Listener)
     return new Response(null, { status: 101, webSocket: client })
   }
 
@@ -149,6 +185,11 @@ export class TeamChannel extends DurableObject<Env> {
           ws.close(1000, "reauthorize")
           continue
         }
+        // THE SUBSCRIPTION, BEFORE THE FENCE, and the order is not arbitrary: this
+        // filter can only ever REMOVE a send and is wrong at worst by being
+        // generous, so it is cheap to run first and costs nothing if it is skipped.
+        // The fence below is the one that has to be right.
+        if (listener.subs && event?.resource && !listener.subs.includes(event.resource)) continue
         if (listener.scope && !(event && mayHearChange(listener.scope, event))) continue
         ws.send(message)
       } catch {
@@ -178,11 +219,18 @@ export class TeamChannel extends DurableObject<Env> {
  * here from their session, so an inbound `x-listener-scope` is either overwritten
  * or deleted. (It could only ever narrow what its sender hears, but a security
  * header that a request can carry is a habit worth not forming.) */
-function stamped(request: Request, stamp: ScopeStamp): Request {
-  if (!stamp && !request.headers.has(SCOPE_HEADER)) return request
+function stamped(request: Request, stamp: ScopeStamp, subs: string | null): Request {
   const headers = new Headers(request.headers)
   if (stamp) headers.set(SCOPE_HEADER, JSON.stringify(stamp))
   else headers.delete(SCOPE_HEADER)
+  // THE SUBSCRIPTION IS COPIED FROM THE QUERY STRING, NOT TRUSTED FROM A HEADER.
+  // Same hygiene as the fence for a different reason: the fence must not be
+  // caller-settable because it decides what may be SEEN, and this must not be
+  // caller-settable *as a header* because a request that can set an internal
+  // header is a shape worth never allowing — even where the value is harmless.
+  // So the door reads `?sub=` and writes the header itself; an inbound one dies.
+  if (subs) headers.set(SUBS_HEADER, subs)
+  else headers.delete(SUBS_HEADER)
   return new Request(request, { headers })
 }
 
@@ -263,7 +311,44 @@ async function handle(request: Request, env: Env): Promise<Response> {
       const channel = requireText(body.channel, "Channel", TEXT_LIMITS.short)
       if (body.event === undefined)
         return fail(400, "invalid_input", "channel and event are required.")
-      await env.CHANNELS.getByName(channel).broadcast(JSON.stringify(body.event))
+      // THE FAN-OUT LIVES HERE, and that is the whole reason a team's channel could
+      // be split at all. A publisher names `team:<id>` — one call, exactly as it
+      // always did — and this door spreads it over the shards. Written at the
+      // publisher instead, it would have been a hundred call sites and a hundred
+      // chances to write it differently; written here it is one loop that every
+      // publisher inherits.
+      //
+      // A `user:` channel is NOT split: it holds one person's devices, which is a
+      // handful, and splitting it would multiply the publish cost of the most
+      // frequent ping in the product to buy headroom nobody needs.
+      const payload = JSON.stringify(body.event)
+      const teamId = channel.startsWith("team:") ? channel.slice("team:".length) : null
+      if (teamId && !teamId.includes("#")) {
+        // Concurrently, and settled rather than raced: one slow shard must not
+        // hold the write that triggered this, and one dead shard must not cost the
+        // other three their ping. The publish is best-effort by contract
+        // (shared/workers/realtime.ts), so a rejection here is logged, not thrown.
+        const results = await Promise.allSettled(
+          // `async` on the arrow, deliberately: `allSettled` only settles what is
+          // already a promise, so a SYNCHRONOUS throw — from `getByName`, or from a
+          // stub that does not return one — escapes the whole thing and 500s a
+          // best-effort publish. An async arrow turns any throw into a rejection,
+          // which is the only shape this loop is allowed to see.
+          Array.from({ length: REALTIME_SHARDS }, async (_, shard) =>
+            env.CHANNELS.getByName(teamShardName(teamId, shard)).broadcast(payload)
+          )
+        )
+        const failed = results.filter((r) => r.status === "rejected").length
+        if (failed)
+          console.error(
+            `realtime: ${failed}/${REALTIME_SHARDS} shard(s) of team:${teamId} did not receive a ping`
+          )
+      } else {
+        // A `user:` channel, or a shard named explicitly (tests, and a future
+        // caller that wants one shard). Named channels are passed through
+        // untouched — the door does not second-guess a caller who was specific.
+        await env.CHANNELS.getByName(channel).broadcast(payload)
+      }
       return json({ ok: true })
     }
 
@@ -338,7 +423,21 @@ async function handle(request: Request, env: Env): Promise<Response> {
           await recordWorkerError(env.DB, "realtime", "GET /?team= (fence lookup)", e)
           return fail(503, "live_unavailable", "The live connection isn't available right now.")
         }
-        return env.CHANNELS.getByName(`team:${teamId}`).fetch(stamped(request, stamp))
+        // WHICH SHARD THEY JOIN — from their USER id, so all of one person's
+        // devices land on the same object and a reconnect returns to it. Not from
+        // the socket, not random: a listener who moved shard on every reconnect
+        // would spread one person over four objects for no benefit, and every
+        // shard would hold a slice of everybody.
+        //
+        // It is not a security decision and nothing here needs it to be: the
+        // shards are identical, and what a listener may hear rides the socket as
+        // the fence rather than being a property of which object holds it. A
+        // caller who forced themselves onto another shard would be handed exactly
+        // the same fence and exactly the same pings.
+        const shard = teamShardName(teamId, shardFor(user.id))
+        return env.CHANNELS.getByName(shard).fetch(
+          stamped(request, stamp, queryText(url.searchParams.get("sub"), "Subscription") ?? null)
+        )
       }
 
       return fail(400, "invalid_input", "team or user is required.")

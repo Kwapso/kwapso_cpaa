@@ -17,6 +17,57 @@
 
 import type { Fetcher } from "@cloudflare/workers-types"
 
+/** HOW MANY OBJECTS ONE TEAM'S CHANNEL IS SPREAD ACROSS.
+ *
+ * A Durable Object is single-threaded and a broadcast is a serial loop over its
+ * sockets, so ONE object per team made the team's socket count the ceiling: at a
+ * few thousand listeners a ping costs hundreds of milliseconds of one object's
+ * only thread, and every later publish queues behind it. Cloudflare's soft
+ * ceiling for one instance is ~1,000 requests/second and each publish is one
+ * request, so the publish rate reached it before the loop did.
+ *
+ * Splitting the channel divides the sockets — and therefore the per-ping work AND
+ * the per-object request rate — by this number. It is the one change that moves
+ * the ceiling rather than shaving the constant in front of it.
+ *
+ * THE COST IS PAID BY THE PUBLISHER, and it is paid INSIDE the realtime worker
+ * rather than here: a publisher still makes ONE call naming `team:<id>`, and
+ * realtime fans that out to the shards. Every one of the hundred-odd
+ * `publishChange` call sites is therefore untouched, which is the whole reason the
+ * split is shaped this way — a fan-out written at the publisher would have been a
+ * hundred chances to write it differently.
+ *
+ * WHY FOUR. Each shard is a real object with real per-request overhead, so this
+ * trades publish work for broadcast headroom and the trade only pays while the
+ * broadcast is the expensive side. Four takes the ceiling from ~3–5k concurrent
+ * listeners per team to ~12–20k, which clears the yardstick's 25,000 peak only
+ * once combined with subscription scoping below — and it keeps a quiet team's
+ * publish cost to four hibernating objects instead of one, which is nearly free
+ * (an idle object is evicted). Raising it is a one-line change; the number is here
+ * rather than inline so the client and the fan-out can never disagree about it. */
+export const REALTIME_SHARDS = 4
+
+/** WHICH shard a listener joins — stable per person, so their own devices land
+ * together and a reconnect returns to the same object.
+ *
+ * A cheap non-cryptographic hash: this decides load distribution, not
+ * authorization, and a listener who forced themselves onto another shard would
+ * gain nothing (the shards are identical and the account fence rides the socket,
+ * not the shard). It must be IDENTICAL on the client and in the worker, which is
+ * why it lives in the seam both import rather than being written twice. */
+export function shardFor(key: string, shards = REALTIME_SHARDS): number {
+  let h = 0
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) | 0
+  return Math.abs(h) % shards
+}
+
+/** The DO name for one shard of a team's channel. `#` because a Durable Object
+ * name is an opaque string and `#` appears in no team id (a ULID is base32), so
+ * the two halves can never be confused for one another. */
+export function teamShardName(teamId: string, shard: number): string {
+  return `team:${teamId}#${shard}`
+}
+
 /** What a publisher needs: the binding, and the shared internal key the realtime
  * worker checks. Taking the whole env (rather than just the binding) is what
  * lets the key travel with the call — a publisher that forgets it is a type
