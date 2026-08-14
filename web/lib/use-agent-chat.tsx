@@ -420,15 +420,22 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
   // The proposed actions as RunSteps (pending until the user decides).
   const confirmSteps: RunStep[] = pending ? confirmStepsFrom(pending.calls) : []
 
+  // An UNCAPPED environment counts but never refuses, so the countdown would be
+  // both wrong and alarming ("0 left today" on a door that keeps opening). It
+  // reports what was used instead — the number that is still true.
   const quotaLabel = quota
-    ? quota.blocked
-      ? "You're out of assistant credits for today"
-      : `${quota.remaining} left today${quota.creditBalance > 0 ? ` · ${quota.creditBalance} credits` : ""}`
+    ? quota.unlimited
+      ? `No daily limit here · ${quota.freeUsedToday} used today`
+      : quota.blocked
+        ? "You're out of assistant credits for today"
+        : `${quota.remaining} left today${quota.creditBalance > 0 ? ` · ${quota.creditBalance} credits` : ""}`
     : ""
 
   // The usage view's header line: free left today + purchased balance.
   const usageSummary = quota
-    ? `${quota.freeRemaining} of ${quota.freeDaily} free left today · balance ${quota.creditBalance}`
+    ? quota.unlimited
+      ? `${quota.freeUsedToday} used today · no daily limit in this environment · balance ${quota.creditBalance}`
+      : `${quota.freeRemaining} of ${quota.freeDaily} free left today · balance ${quota.creditBalance}`
     : ""
 
   return {

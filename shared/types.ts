@@ -361,6 +361,18 @@ export type AgentQuota = {
   creditBalance: number
   remaining: number
   blocked: boolean
+  /** TESTING ENVIRONMENTS ONLY — the daily allowance is not enforced here, so a
+   * turn is never refused for running out. The counters beside this stay TRUE:
+   * `freeUsedToday`, the credit balance and the usage log all keep recording, so
+   * what a team costs is still answerable. Only the REFUSAL is off.
+   *
+   * A boolean beside the number rather than a very large `freeDaily`, for the
+   * reason the whole codebase prefers `hasMore` / `complete` / `totalCapped`: a
+   * sentinel value has to be recognised to be understood, and anything that
+   * doesn't recognise it renders "999,975 of 1,000,000 free left today" to a
+   * person. A flag is either read or ignored, and ignoring it is safe here —
+   * `blocked` is already false. */
+  unlimited: boolean
 }
 
 /** One row of the agent usage log — a plain trail of what the AI did, one per turn.

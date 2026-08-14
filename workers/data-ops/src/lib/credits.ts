@@ -14,6 +14,29 @@ import type { Env } from "../env"
 /** Free AI requests per team per day before credits are spent. */
 export const FREE_DAILY = 25
 
+/** TESTING ENVIRONMENTS ONLY. When `AGENT_NO_DAILY_CAP` is on, the allowance is
+ * not ENFORCED — a turn is never refused for running out — but everything that
+ * MEASURES keeps running: `agent_usage` still increments, credits are still
+ * spent and refunded, and the usage log still fills. So "what did testing cost"
+ * stays answerable; only the door that says no is propped open.
+ *
+ * It is a separate var rather than `AGENT_FREE_DAILY: "999999"` because the cap
+ * is a number a PERSON reads on screen ("25 left today"), and a sentinel large
+ * enough to be unreachable is also large enough to be nonsense in a sentence.
+ *
+ * Never set on production — `workers/data-ops/test/credits-invariant.test.ts`
+ * fails the build if the production vars block carries it. */
+function noDailyCap(env: Env): boolean {
+  return env.AGENT_NO_DAILY_CAP === "true"
+}
+
+/** The cap the SQL enforces. Unlimited raises it out of reach rather than
+ * branching the statement, so the claim stays ONE atomic INSERT…ON CONFLICT and
+ * the race-safety argument below is the same argument in both modes. */
+function capFor(env: Env): number {
+  return noDailyCap(env) ? Number.MAX_SAFE_INTEGER : numberVar(env.AGENT_FREE_DAILY, FREE_DAILY)
+}
+
 /** Today's metering window, 'YYYY-MM-DD' (the free counter resets daily). */
 function today(): string {
   return new Date().toISOString().slice(0, 10)
@@ -29,6 +52,10 @@ export async function getQuota(env: Env, teamId: string): Promise<AgentQuota> {
   const credit = await env.DB.prepare("SELECT balance FROM agent_credits WHERE team_id = ?")
     .bind(teamId)
     .first<{ balance: number }>()
+  const unlimited = noDailyCap(env)
+  // The number a person READS is always the configured allowance, never the
+  // unreachable sentinel capFor hands the SQL — so an uncapped environment shows
+  // "3 used today", not "8 of 9007199254740991 free left".
   const cap = numberVar(env.AGENT_FREE_DAILY, FREE_DAILY)
   const freeUsedToday = usage?.used ?? 0
   const creditBalance = credit?.balance ?? 0
@@ -39,7 +66,9 @@ export async function getQuota(env: Env, teamId: string): Promise<AgentQuota> {
     freeRemaining,
     creditBalance,
     remaining: freeRemaining + creditBalance,
-    blocked: freeRemaining + creditBalance <= 0,
+    // Uncapped is never blocked, whatever the counters say — that IS the switch.
+    blocked: !unlimited && freeRemaining + creditBalance <= 0,
+    unlimited,
   }
 }
 
@@ -60,7 +89,7 @@ export type ConsumeResult = {
 export async function consumeAiUnit(env: Env, teamId: string): Promise<ConsumeResult> {
   const now = new Date().toISOString()
   const period = today()
-  const cap = numberVar(env.AGENT_FREE_DAILY, FREE_DAILY)
+  const cap = capFor(env)
   // ONE statement checks the cap AND consumes the slot: the row is created at
   // used = 1, or incremented only while it is still under the cap. Zero rows
   // changed = the free allowance is spent, and we fall through to paid credits.

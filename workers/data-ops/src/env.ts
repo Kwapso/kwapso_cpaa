@@ -38,6 +38,9 @@ export type Env = {
   /** Daily free agent turns per team; defaults to FREE_DAILY. Set very high to
    *  effectively remove the cap. */
   AGENT_FREE_DAILY?: string
+  /** "true" in TESTING environments only — stops the daily allowance REFUSING a
+   * turn, while every counter beside it keeps recording. Never on production. */
+  AGENT_NO_DAILY_CAP?: string
   /** The Workers AI model id for the cheap/fallback path. */
   WORKERS_AI_MODEL?: string
   // Secret (wrangler secret put): when set, the agentic path upgrades to Claude;

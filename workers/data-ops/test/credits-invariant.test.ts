@@ -73,3 +73,70 @@ describe("credit meter money-safety (source invariants)", () => {
     ).toBeGreaterThanOrEqual(2)
   })
 })
+
+// THE UNCAPPED TESTING ENVIRONMENT — off on production, and still MEASURING.
+//
+// The owner asked for no daily limit while his team tests. The danger in that
+// sentence is not the limit, it is the two things that could quietly go with it:
+// the switch escaping to production, and "no limit" being read as "no counting",
+// which would make what testing cost unanswerable after the fact.
+//
+// Both are read off disk — the source for the behaviour, the wrangler config for
+// where it is on — because a var set in the wrong block is exactly the kind of
+// mistake that ships silently and bills someone.
+describe("the no-daily-cap switch", () => {
+  const CFG = readFileSync(join(__dirname, "../wrangler.jsonc"), "utf8")
+  const parsed = JSON.parse(
+    CFG.replace(/(?<![:"])\/\/[^\n]*/g, "")
+  ) as { vars?: Record<string, string>; env?: Record<string, { vars?: Record<string, string> }> }
+
+  it("is OFF in the production vars block", () => {
+    expect(
+      parsed.vars?.AGENT_NO_DAILY_CAP,
+      "AGENT_NO_DAILY_CAP must never be set on production — it removes the spend ceiling"
+    ).toBeUndefined()
+  })
+
+  it("is ON in staging, which is the environment that asked for it", () => {
+    expect(parsed.env?.staging?.vars?.AGENT_NO_DAILY_CAP).toBe("true")
+  })
+
+  it("only ever turns on for the exact string 'true'", () => {
+    // A truthy check would make AGENT_NO_DAILY_CAP="false" remove the cap, which
+    // is the opposite of what anybody typing that means.
+    expect(CODE).toMatch(/env\.AGENT_NO_DAILY_CAP\s*===\s*"true"/)
+  })
+
+  it("still COUNTS every unit — no limit is not no meter", () => {
+    // The claim must remain the same single INSERT…ON CONFLICT that increments
+    // agent_usage. If unlimited ever short-circuits before it, usage stops being
+    // recorded and "what did testing cost" becomes unanswerable.
+    const insertAt = CODE.indexOf("INSERT INTO agent_usage (")
+    expect(insertAt, "the usage claim must still exist").toBeGreaterThan(-1)
+    expect(CODE.slice(insertAt, insertAt + 300)).toMatch(/used\s*=\s*used\s*\+\s*1/)
+    // …and nothing may return out of consumeAiUnit before reaching it.
+    const consumeAt = CODE.indexOf("export async function consumeAiUnit")
+    expect(
+      CODE.slice(consumeAt, insertAt),
+      "consumeAiUnit must reach the usage claim in every mode — an early return here stops the meter"
+    ).not.toMatch(/\breturn\b/)
+  })
+
+  it("raises the ceiling instead of branching the claim", () => {
+    // One atomic statement in both modes, so the race-safety argument is the same
+    // argument twice rather than two arguments to keep in step.
+    expect(CODE).toMatch(/Number\.MAX_SAFE_INTEGER/)
+    // `agent_usage (` with the paren: `agent_usage_log` is the SEPARATE table the
+    // per-command "why" trail writes to, and a prefix match counts it as a second
+    // claim. It is also the proof that measuring survives — the log still fills.
+    expect(
+      (CODE.match(/INSERT INTO agent_usage \(/g) ?? []).length,
+      "there must be exactly one usage claim"
+    ).toBe(1)
+    expect(CODE, "the usage log must still be written").toMatch(/INSERT INTO agent_usage_log \(/)
+  })
+
+  it("never reports blocked while uncapped", () => {
+    expect(CODE).toMatch(/blocked:\s*!unlimited\s*&&/)
+  })
+})

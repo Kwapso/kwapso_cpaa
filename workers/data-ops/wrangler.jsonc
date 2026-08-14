@@ -63,6 +63,7 @@
         "AGENT_MODEL": "claude-sonnet-5",
         "AGENT_EFFORT": "low",
         "AGENT_FREE_DAILY": "50",
+        "AGENT_NO_DAILY_CAP": "true",
         "WORKERS_AI_MODEL": "@cf/meta/llama-4-scout-17b-16e-instruct"
       }
     }

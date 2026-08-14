@@ -76,6 +76,7 @@ const QUOTA: AgentQuota = {
   creditBalance: 0,
   remaining: 24,
   blocked: false,
+  unlimited: false,
 }
 
 /** A ReadableStream of one or more UTF-8 chunks — mimics the fetch Response body the
