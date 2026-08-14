@@ -1,8 +1,11 @@
 // shared/web/splash.ts — THE OPENING FRAME, ON EVERY FRONT DOOR.
 //
-// The first three-and-a-half seconds of a cold start belong to the brand: the
-// kwapso mark assembles, locks, spins up until the rim smears, and bursts. Then
-// the app is there. It is a loading screen in the honest sense — a cold start on
+// The first three-and-three-quarter seconds of a cold start belong to the brand:
+// the kwapso mark assembles, locks, spins up until the rim smears, and then comes
+// apart — the C and the two eyes leaving on their own release tangents — and the
+// app arrives THROUGH that, not after it. The last three quarters of a second are
+// a cross-dissolve: the pieces fly outward across the screen you were waiting for.
+// It is a loading screen in the honest sense — a cold start on
 // a phone really does spend that long fetching a chunk graph — so the animation
 // is not decoration laid over a fast thing; it is what a person looks at instead
 // of a white rectangle.
@@ -55,17 +58,34 @@ import { brand } from "../brand"
 
 /* ------------------------------- the timing ------------------------------- */
 
-/** How long the mark itself is on screen, in milliseconds. The five beats of the
- * original animation — assemble, lock, spin-up, static, burst — are laid out
- * across this span as percentage stops in `ks-splash-spin` below. */
-export const SPLASH_MARK_MS = 3400
+/** How long the mark runs, start to finish. The five beats of the original
+ * animation — assemble, lock, spin-up, static, burst — are laid out across this
+ * span as percentage stops in `ks-splash-spin` below, and the whole of it plays:
+ * the screen is never taken away mid-beat. */
+export const SPLASH_MARK_MS = 3800
 
-/** The fade that carries the overlay off after the mark has burst. */
-export const SPLASH_FADE_MS = 300
+/** How long the app takes to arrive. */
+export const SPLASH_REVEAL_MS = 750
+
+/** WHEN the app starts arriving — and the number that carries the owner's
+ * direction, so it is derived rather than typed:
+ *
+ *   "we enter the app just as the last part of the animation of the logo
+ *    breaking apart happens, like in the last 0.75 seconds remaining"
+ *
+ * So the reveal does not WAIT for the burst, it RIDES it. The overlay begins
+ * dissolving exactly as the mark starts to come apart, and for three quarters of
+ * a second the pieces are flying outward across the app rather than across a
+ * black rectangle. Subtraction, not a constant: change either number above and
+ * the overlap stays true by construction — which is the whole reason
+ * web/test/splash.test.ts can assert the instruction instead of the arithmetic. */
+export const SPLASH_REVEAL_AT_MS = SPLASH_MARK_MS - SPLASH_REVEAL_MS
 
 /** Total time from first paint to an app you can touch. The owner asked for
- * "three to four seconds"; this is 3.7, and a tap cuts it short at any point. */
-export const SPLASH_TOTAL_MS = SPLASH_MARK_MS + SPLASH_FADE_MS
+ * "three to four seconds"; this is 3.8 — and because the reveal overlaps the
+ * burst rather than following it, the animation got LONGER while the wait got
+ * shorter by only a tenth. A tap cuts it short at any point. */
+export const SPLASH_TOTAL_MS = SPLASH_MARK_MS
 
 /* ------------------------------- the source ------------------------------- */
 
@@ -146,31 +166,55 @@ const FIELD = "#08090b"
  * the whole thing is under a kilobyte because it ships in the head of every
  * exported page.
  *
+ * `ease-in` on the reveal, not `linear`, and the reason is contrast rather than
+ * taste. A straight cross-fade puts the onyx field at half strength halfway
+ * through the burst — and in LIGHT mode the screen underneath is a pale mango
+ * wash, so a mango mark at half opacity over it simply vanishes. Frozen at that
+ * frame the pieces were not there at all. Ease-in holds the field near full for
+ * most of the reveal and drops it in the last quarter, so the burst plays out
+ * against something it can be seen against and the app still arrives during it.
+ * Dark mode never showed this; the check that found it was looking at the wrong
+ * mode by luck.
+ *
  * The group's timing function is `linear` and the acceleration is spelled out in
  * where the percentage stops fall — that is how you hand-author a spin that
- * builds torque rather than easing politely in and out of one. */
+ * builds torque rather than easing politely in and out of one.
+ *
+ * `ks-splash-fly-1/2/3` are the burst, and they are three keyframe sets rather
+ * than one because each arc leaves in a DIFFERENT direction — outward along the
+ * radius it sits on. They translate inside the group, so the group's rotation
+ * carries them: the pieces leave on tangents that keep turning, which is what
+ * makes it read as a thing coming apart rather than a thing zooming. Each holds
+ * still until 80%, the same instant the overlay begins to dissolve. Every arc
+ * therefore runs TWO animations at once (draw, then fly), which is why the
+ * -2/-3 rules re-state `animation-name` alongside their delay: a single
+ * `animation-delay` value applies to every animation in the list, and staggering
+ * the draw would otherwise stagger the burst off the end of the screen. */
 export function splashStyle(): string {
-  return `#ks-splash{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:${FIELD};animation:ks-splash-out ${SPLASH_FADE_MS}ms ease ${SPLASH_MARK_MS}ms both}
+  return `#ks-splash{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:${FIELD};animation:ks-splash-out ${SPLASH_REVEAL_MS}ms ease-in ${SPLASH_REVEAL_AT_MS}ms both}
 @keyframes ks-splash-out{from{opacity:1}to{opacity:0;visibility:hidden}}
 #ks-splash svg,#ks-splash video,#ks-splash img{width:min(42vmin,240px);height:auto;overflow:visible;display:block}
 #ks-splash .ks-mark{transform-origin:200px 200px;animation:ks-splash-spin ${SPLASH_MARK_MS}ms linear both}
-#ks-splash .ks-arc{stroke-dasharray:1;stroke-dashoffset:1;animation:ks-splash-draw 760ms cubic-bezier(.22,1,.36,1) both}
-#ks-splash .ks-arc-2{animation-delay:200ms}
-#ks-splash .ks-arc-3{animation-delay:330ms}
+#ks-splash .ks-arc{stroke-dasharray:1;stroke-dashoffset:1;animation:ks-splash-draw 760ms cubic-bezier(.22,1,.36,1) both,ks-splash-fly-1 ${SPLASH_MARK_MS}ms cubic-bezier(.3,0,.7,1) both}
+#ks-splash .ks-arc-2{animation-name:ks-splash-draw,ks-splash-fly-2;animation-delay:200ms,0ms}
+#ks-splash .ks-arc-3{animation-name:ks-splash-draw,ks-splash-fly-3;animation-delay:330ms,0ms}
 @keyframes ks-splash-draw{to{stroke-dashoffset:0}}
+@keyframes ks-splash-fly-1{0%,80%{transform:translate(0,0)}100%{transform:translate(-178px,74px)}}
+@keyframes ks-splash-fly-2{0%,80%{transform:translate(0,0)}100%{transform:translate(112px,-160px)}}
+@keyframes ks-splash-fly-3{0%,80%{transform:translate(0,0)}100%{transform:translate(190px,-44px)}}
 @keyframes ks-splash-spin{
 0%{transform:rotate(-20deg) scale(.76);filter:blur(0)}
-24%{transform:rotate(3deg) scale(1.07)}
-29%{transform:rotate(0deg) scale(1)}
-40%{transform:rotate(7deg) scale(1)}
-47%{transform:rotate(64deg) scale(1)}
-54%{transform:rotate(210deg) scale(1)}
-61%{transform:rotate(480deg) scale(1);filter:blur(0)}
-68%{transform:rotate(930deg) scale(1)}
-74%{transform:rotate(1530deg) scale(1.01);filter:blur(1.4px)}
-82%{transform:rotate(2310deg) scale(1.02)}
-90%{transform:rotate(3150deg) scale(1.03);filter:blur(2.4px);opacity:1}
-100%{transform:rotate(4050deg) scale(1.85);filter:blur(0);opacity:0}}
+21%{transform:rotate(3deg) scale(1.07)}
+26%{transform:rotate(0deg) scale(1)}
+35%{transform:rotate(7deg) scale(1)}
+42%{transform:rotate(64deg) scale(1)}
+49%{transform:rotate(215deg) scale(1)}
+57%{transform:rotate(520deg) scale(1);filter:blur(0)}
+65%{transform:rotate(1010deg) scale(1)}
+72%{transform:rotate(1650deg) scale(1.01);filter:blur(1.4px)}
+80%{transform:rotate(2500deg) scale(1.03);filter:blur(2.4px);opacity:1}
+88%{transform:rotate(3180deg) scale(1.12);filter:blur(1.6px);opacity:.9}
+100%{transform:rotate(4060deg) scale(1.34);filter:blur(0);opacity:0}}
 @media (prefers-reduced-motion:reduce){#ks-splash{animation-delay:520ms}#ks-splash .ks-mark{animation:none;transform:none}#ks-splash .ks-arc{animation:none;stroke-dashoffset:0}}`
 }
 

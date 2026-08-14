@@ -30,8 +30,9 @@ import { describe, expect, it } from "vitest"
 import { stripComments } from "@shared/rules/source-scan"
 import {
   assertSameOrigin,
-  SPLASH_FADE_MS,
   SPLASH_MARK_MS,
+  SPLASH_REVEAL_AT_MS,
+  SPLASH_REVEAL_MS,
   SPLASH_TOTAL_MS,
   splashInner,
   splashScript,
@@ -90,11 +91,66 @@ describe("it leaves on its own, with no JavaScript at all", () => {
     ).toMatch(rule)
   })
 
-  it("starts that exit after the mark has finished, not during it", () => {
+  it("starts the reveal at the moment the constants say it does", () => {
     const delay = /animation:\s*ks-splash-out\s+(\d+)ms\s+\S+\s+(\d+)ms/.exec(css)
     expect(delay, "the exit animation's shorthand no longer parses — this scan is reading the wrong shape").toBeTruthy()
-    expect(Number(delay![1])).toBe(SPLASH_FADE_MS)
-    expect(Number(delay![2])).toBe(SPLASH_MARK_MS)
+    expect(Number(delay![1])).toBe(SPLASH_REVEAL_MS)
+    expect(Number(delay![2])).toBe(SPLASH_REVEAL_AT_MS)
+  })
+})
+
+// THE OWNER'S DIRECTION, AS A TEST RATHER THAN A COMMENT.
+//
+//   "can we ensure that the loading screen … stays long enough for one complete
+//    loop of the animation, or maybe we enter the app just as the last part of
+//    the animation of the logo breaking apart happens, like in the last 0.75
+//    seconds remaining?"
+//
+// Both halves of that sentence are invariants, and neither is safe as prose. The
+// first — the animation is never cut off — dies quietly the moment somebody
+// shortens the overlay to make the app feel faster, and the only symptom is a
+// logo that stops mid-spin. The second is arithmetic between three constants,
+// and arithmetic between constants is exactly what drifts when one of them is
+// tuned by feel. So they are asserted from the shipped CSS, not from the numbers.
+describe("the app arrives THROUGH the burst, not after it", () => {
+  const css = splashStyle()
+
+  it("never takes the screen away before the mark has finished", () => {
+    const end = SPLASH_REVEAL_AT_MS + SPLASH_REVEAL_MS
+    expect(
+      end,
+      `the overlay is gone at ${end}ms but the mark runs to ${SPLASH_MARK_MS}ms — the animation would be cut off mid-beat`
+    ).toBeGreaterThanOrEqual(SPLASH_MARK_MS)
+  })
+
+  it("begins the reveal three quarters of a second before the end", () => {
+    const overlap = SPLASH_MARK_MS - SPLASH_REVEAL_AT_MS
+    expect(overlap, "the reveal no longer overlaps the burst — the app would appear against a finished screen").toBe(
+      SPLASH_REVEAL_MS
+    )
+    expect(overlap).toBeGreaterThanOrEqual(600)
+    expect(overlap).toBeLessThanOrEqual(900)
+  })
+
+  // The pieces have to be MOVING while the app comes up, or the cross-dissolve
+  // is just a fade. Each arc leaves in its own direction; a burst that starts
+  // before the reveal (or after it) reads as two events instead of one.
+  it("starts the arcs flying at the same instant the overlay starts dissolving", () => {
+    const flights = [...css.matchAll(/@keyframes ks-splash-fly-\d\{0%,(\d+)%\{transform:translate\(0,0\)\}/g)]
+    expect(flights.length, "the per-arc burst keyframes are gone — the mark would scale instead of come apart").toBe(3)
+    for (const f of flights) {
+      const startsAt = (Number(f[1]) / 100) * SPLASH_MARK_MS
+      expect(
+        Math.abs(startsAt - SPLASH_REVEAL_AT_MS),
+        `an arc starts leaving at ${Math.round(startsAt)}ms but the reveal starts at ${SPLASH_REVEAL_AT_MS}ms`
+      ).toBeLessThanOrEqual(120)
+    }
+  })
+
+  it("sends each arc somewhere different", () => {
+    const ends = [...css.matchAll(/100%\{transform:translate\((-?\d+)px,(-?\d+)px\)\}/g)].map((m) => `${m[1]},${m[2]}`)
+    expect(ends.length).toBe(3)
+    expect(new Set(ends).size, "two arcs leave on the same tangent — that reads as sliding, not bursting").toBe(3)
   })
 
   it("honours prefers-reduced-motion by standing still and leaving early", () => {
