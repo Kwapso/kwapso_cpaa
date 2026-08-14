@@ -28,7 +28,7 @@ shared notes). Substitute your real name everywhere you see `notes` / `note`.
 | Layer | File(s) | What you add |
 |---|---|---|
 | 1. Table + migration | `workers/tenancy/src/team-schema.ts` | a `CREATE TABLE`, appended as a new `TEAM_MIGRATIONS` entry |
-| 2. Register + permissions | same file — `TEAM_MODULES`, `MODULE_LABELS`, `buildTeamSeed` | one module key, one label, seed rows for the two default roles |
+| 2. Register + permissions | `shared/team-modules.ts` — `TEAM_MODULES` + `MODULE_LABELS` (**not** `team-schema.ts`, which only re-exports them; the list moved to `shared/` the moment data-ops needed it too) — then `buildTeamSeed` back in `team-schema.ts` | one module key, one label, seed rows for the two default roles |
 | 3. Worker handler | `workers/content/src/{routes,lib}/notes.ts` + `index.ts` `ROUTES` | gated CRUD → validate → audit → activity → `publishChange` |
 | 4. Web client + screen | `web/lib/api.ts`, `web/lib/screens.ts`, `web/lib/pages.ts`, `web/components/deep-link/shape.ts`, `deep-link-screen.tsx` | api wrapper, a list recipe, a nav section, a shaper, wiring |
 | 5. Record detail | `web/components/note-detail.tsx` | Overview + Activity tabs (Law R2) — the filename MUST equal the string you register in `RECORD_DETAIL_COMPONENTS` (the R2 check reads `web/components/<that-string>.tsx` off disk) |
@@ -118,16 +118,27 @@ the whole story — no per-table binding, no wrangler migration file.
 ## Layer 2 — register the module + its permissions
 
 **Permissions are the spine.** A module the matrix doesn't know about can't be
-gated, so the server would refuse every request. Registering is three edits, all in
-`team-schema.ts`, all beside each other.
+gated, so the server would refuse every request. Registering is three edits across
+**two** files: the module key and its label live in `shared/team-modules.ts`, the
+seed loop in `workers/tenancy/src/team-schema.ts`.
+
+> **Why two files, and why it is worth knowing.** The list used to sit in
+> `team-schema.ts` and moved to `shared/` the moment data-ops needed the same list
+> to build the import/export matrix — one list, two consumers, so neither can drift.
+> `team-schema.ts` re-exports it, so old imports still resolve and the move is
+> invisible at every call site. That is exactly what makes it easy to edit the wrong
+> file: the re-export line is the one you land on when you grep.
 
 ### 2a. Add the module key
 
 ```ts
-// TEAM_MODULES (team-schema.ts) — one row per module
+// TEAM_MODULES (shared/team-modules.ts) — one row per module
 export const TEAM_MODULES = [
   "teams", "team_members", "member_roles", "learning", "help",
   "selectable_data", "screens", "agent",
+  // …plus the modules the product has grown since — the customer spine, the
+  // knowledge base, the work engine, the agency's own housekeeping, the three
+  // Google switches. Read the real list in the file; it only ever gets longer.
   "notes",                       // ← new
 ] as const
 ```
@@ -553,9 +564,9 @@ LAYER 1 — table + migration  (workers/tenancy/src/team-schema.ts)
 [ ] Deactivate-not-delete: a deactivated_at column, NO DELETE anywhere
 [ ] Indexes for the columns you filter/join on
 
-LAYER 2 — register + permissions  (same file)
-[ ] Add the module key to TEAM_MODULES
-[ ] Add its label to MODULE_LABELS (TS forces this)
+LAYER 2 — register + permissions  (shared/team-modules.ts, then team-schema.ts)
+[ ] Add the module key to TEAM_MODULES          (shared/team-modules.ts)
+[ ] Add its label to MODULE_LABELS (TS forces this) (same file)
 [ ] buildTeamSeed already seeds it (Admin 1111 / Viewer 1000) — only touch for a special Viewer default
 
 LAYER 3 — worker handler  (workers/content/src/{lib,routes}/<module>.ts + index.ts)

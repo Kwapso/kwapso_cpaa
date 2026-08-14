@@ -5,6 +5,36 @@ re-read 2026-06-13, mapped to Brimba's design. Marks what we KEEP (real
 persisted data), what we DROP (Glide UI/computed artifacts), our additions, and
 OPEN questions. This is the canonical data-model reference — keep it accurate.
 
+## What's in here
+
+Nine and a half thousand words is too many to scroll, so: the two tiers, in order.
+
+**Preamble** — [Glide patterns that are NOT persisted data](#glide-patterns-that-are-not-persisted-data-dropped-everywhere) · [The audit block](#the-audit-block-standard-every-table)
+
+**GLOBAL core** (`kwapso-core`, reached by `env.DB`) — identity and billing across teams:
+`users` · `teams` · `team_members` · `email_change_logs` · `account_activity` ·
+`importable_databases` · `agent_usage` · `agent_credits` · `agent_usage_log` ·
+`mcp_tokens` · `error_logs` · `selectable_data_types` (the one still to build) ·
+*Retention in core* — the only place rows are really deleted.
+
+**[PER-TEAM](#per-team-each-lives-in-that-teams-own-database)** (one D1 database per team, reached over the REST door) — everything a team owns:
+
+| Subsystem | Tables |
+|---|---|
+| Permissions + vocabulary | `member_roles` + `role_permissions` · `selectable_data` |
+| Content | `learning` + `learning_progress` · `help` + `help_threads` (**Tickets**) · `ref_counters` |
+| History + invites | `activity` · `invite_logs` |
+| Import | `data_import_sessions` · `data_import_batches` |
+| The assistant | `agent_threads` + `agent_messages` |
+| The customer spine | `accounts` + `account_links` + `portal_users` (+ `current_account_id`) |
+| The knowledge base | `knowledge_sources` + `_chunks` + `_terms` + `_ingest` (+ Vectorize) |
+| Process maps + the money | `apps` + `processes` + `process_versions` + `process_steps` + `process_comments` · `account_rates` + `internal_rates` |
+| The work engine | `stories` + `sprints` · `work_logs` + `work_prefs` · `todos` + `tasks` · `triage_duty` · `meetings` |
+| The agency's own housekeeping | `marketing_posts` · `brand_assets` · `programs` · `meeting_purposes` · `staff_profiles` · `staff_certificates` |
+| One person's own Google | `google_connections` + `google_sources` |
+
+**Closing** — [Status: what's built vs. to build](#status-whats-built-vs-to-build) · *Resolutions (2026-06-13), cross-cutting model LOCKED*
+
 ## Glide patterns that are NOT persisted data (dropped everywhere)
 
 Glide columns are a mix of stored data and live "computed columns." These
@@ -251,9 +281,13 @@ watches **every** database in the account, core included — it used to filter
 ### member_roles + role_permissions — KEEP (built; we split Glide's WIDE → TALL)
 Glide `Member roles` was WIDE: `Identity/Title`, `Description`, `Is default`,
 then **24 boolean columns** = 6 modules × {read,create,edit,delete}. Modules:
-**Teams, Team members, Member roles, Learning, Help, Selectable data** — exactly
-our `TEAM_MODULES` (the module a person now reads as **Tickets** is still keyed
-`help`, because that string sits in every role's permission sheet). We store the 24 booleans as a TALL `role_permissions` sheet
+**Teams, Team members, Member roles, Learning, Help, Selectable data** — the six
+our `TEAM_MODULES` (`shared/team-modules.ts`) STARTED as, and still carries
+unchanged (the module a person now reads as **Tickets** is still keyed `help`,
+because that string sits in every role's permission sheet). The list has grown well
+past those six since — the customer spine, the knowledge base, the work engine, the
+agency's own housekeeping and the three Google switches all added rows, never
+columns, which is the whole point of the tall sheet. Read the list in that file. We store the 24 booleans as a TALL `role_permissions` sheet
 (role × module × 4 bits) so a new module = new rows, not new columns. `is_default`
 flags the seeded Admin (locked) + Viewer. Roles are **edit-live + deactivate-only,
 never delete** (holders keep the role). Q4 RESOLVED (see Resolutions): Admin
@@ -570,6 +604,28 @@ full argument, and what would change our mind, is at the top of
 `workers/content/src/lib/knowledge-vectors.ts`; the numbers that forced the move
 are in `.plans/BUILD-4-knowledge-retrieval.md`.
 
+**The edge the move creates: a reset does NOT empty the index.**
+`scripts/reset-all.mjs` deletes every team database and blanks the core — the two
+things it can reach. Vectorize is a third store outside both, so after a reset the
+account-wide index still holds the vectors of teams that no longer exist, and a
+deleted team's namespace is still there with rows in it. **This is harmless to
+READS, and R26 is exactly why**: nothing readable comes out of the index (ids and
+scores only), so a stranded vector can at worst score a chunk id that the team
+database no longer has a row for, and the passage read-back returns nothing. It
+cannot produce text, and it cannot cross a namespace. What it does cost is
+**storage you are paying for and a count that no longer means anything** — so treat
+it as housekeeping, not as a leak:
+
+- After a reset you intend to keep clean, delete and recreate the index rather than
+  trying to prune it: `npx wrangler vectorize delete kwapso-knowledge-staging`, then
+  re-run BOOTSTRAP §3b **including all nine metadata indexes** (they do not survive
+  the delete, and Vectorize will not index metadata retrospectively).
+- A team deleted on its own leaves its namespace behind. There is no per-namespace
+  delete today; the next full index rebuild is when it goes.
+- Nothing here is on a cron. It is deliberate: an automatic vector sweep keyed on
+  "teams that no longer exist" would be a destructive job reading a table a reset
+  has just emptied, which is the worst possible moment to trust it.
+
 ---
 ### apps + processes + process_versions + process_steps + process_comments — KEEP (BUILT 2026-08-11, team migration `0013_process_maps_and_money`) — THE PROCESS MAP
 
@@ -618,7 +674,10 @@ the wrong one of them is the one figure SCOPE says a client must never see under
 any flag, ever. A door that reads `account_rates` cannot return an internal rate,
 because the internal rate is not in the table it named. The same split runs
 through the code (`lib/rates.ts` vs `lib/internal-money.ts`) and is what **Law
-R23** checks: no door the client portal opens can reach the internal file.
+R24** checks: no door the client portal opens can reach the internal file. (R24,
+not R23 — R23 is the knowledge base's citation law. This sentence named the wrong
+one, which pointed anybody tracing the guarantee at a law that has nothing to do
+with it.)
 
 `internal_rates.is_default` (at most one, by partial unique index) is the rate a
 margin applies to logged time whose kind of work is not yet named. Tool costs are
@@ -710,6 +769,35 @@ person is on triage duty, and it is visible whose week it is" (.plans/BUILD-1 §
 has no answer if two rows claim a week, and a check in code is a check two
 simultaneous writers race past. A row per week rather than a flag on a member,
 because "whose week was it when this was missed?" has to survive.
+
+### meetings — KEEP (BUILT, per-team, team migration `0021_meetings`) — WHAT WAS AGREED IN THE ROOM
+
+The one noun the legacy import had nowhere to put. Glide held 350 meetings and the
+reconciliation folded every one into a **work log**, because a work log was the only
+row carrying a date, a duration and a client. That kept the hours and threw the
+meeting away: a work log answers *"how long did that take"* and has no field that
+can answer *"what did we agree in March"*.
+
+- **`agenda` and `notes` are the two things nothing else in the app holds**, and
+  they are why this is a record rather than a column on something else.
+- **Time still goes on a work log**, and the two are joined by nothing on purpose —
+  a meeting is not a timesheet, and a meeting that ran long is two facts, not one.
+- **`purpose_id`** points at the `meeting_purposes` taxonomy (§ *the agency's own
+  housekeeping*), so "why did we meet" is a dropdown value rather than a fifth
+  spelling typed into a title.
+- **`status` is two words, not five** — scheduled, or held. Cancelling is
+  `deactivated_at` like every other retirement here, so a client asking "didn't we
+  have a call in March?" is answerable either way.
+- **`google_event_id` is what makes the calendar push idempotent.** Pressing "put
+  it in my calendar" twice must not make two entries, and the row is the only place
+  that memory can live (SCOPE ch.03: Google being an hour behind breaks nothing;
+  Google holding two copies of one meeting is not the same kind of harmless).
+
+**Why it is its own permission module and not four more rights on `delivery`.**
+`meeting_purposes` is a TAXONOMY of why we meet — a settled list somebody curates
+once a year. A meeting is a record that accumulates forever. Sharing one permission
+row would mean granting the right to read every note ever taken in order to let
+somebody see the list of purposes.
 ### marketing_posts + brand_assets + programs + meeting_purposes + staff_profiles + staff_certificates — KEEP (BUILT 2026-08-12, team migration `0018_agency_internal`) — THE AGENCY'S OWN HOUSEKEEPING
 
 Six tables, four permission modules, and the seven agency-internal tables of the
@@ -865,13 +953,22 @@ Google surface; every handler opens with `refusePortalCaller` and both tables ar
   BUILT 2026-08-10; see below). **The work engine (BUILT 2026-08-11):**
   `help.account_id` (`0009_help_account`), the Tickets rename's data half
   (`0010_ticket_vocabulary`), and the ticket's work-engine columns + `ref_counters`
-  (`0011_ticket_work_engine`).
+  (`0011_ticket_work_engine`). **And since (all per-team):** process maps + the two
+  rate cards (`0013_process_maps_and_money`), stories + sprints
+  (`0014_stories_and_sprints`), work logs (`0015_work_logs`), to-dos + tasks
+  (`0016_todos_and_tasks`), triage duty (`0017_triage_duty`), the agency's own
+  housekeeping (`0018_agency_internal`), Google connections
+  (`0019_google_connections`), the knowledge base's vector columns
+  (`0020_knowledge_vectors`) and meetings (`0021_meetings`).
 - **The per-team migration list is `TEAM_MIGRATIONS` in
-  `workers/tenancy/src/team-schema.ts`** — eleven today, `0001_team_base` through
-  `0011_ticket_work_engine`. A new team's database runs all of them at
-  creation; existing teams get the gap rolled to them by `POST
-  /api/tenancy/admin/migrate-teams`. That file is the source; any list written
-  down elsewhere (here, OPERATIONS, BOOTSTRAP) is a copy of it.
+  `workers/tenancy/src/team-schema.ts`** — **twenty-one today, `0001_team_base`
+  through `0021_meetings`** (this line said "eleven, through
+  `0011_ticket_work_engine`" while the sections above it documented `0012` to
+  `0020`; a count in prose beside the list it counts is a copy that only ever
+  drifts one way). A new team's database runs all of them at creation; existing
+  teams get the gap rolled to them by `POST /api/tenancy/admin/migrate-teams`.
+  **That file is the source; any list written down elsewhere — here, OPERATIONS,
+  BOOTSTRAP, EDGE-CASES — is a copy of it, and the copy is the one to distrust.**
 - **To build (tables)**: selectable_data_types (the only remaining one) — the
   global authoritative dropdown-GROUP list.
 
