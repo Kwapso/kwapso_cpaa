@@ -173,3 +173,22 @@ export function savingsView(
 export function savedHours(seconds: number): number {
   return Math.round((seconds / 3600) * 10) / 10
 }
+
+/** Hours, said the way a person says them — the SPELLING of the figure above,
+ * kept beside the rounding rather than at each screen.
+ *
+ * It lives here for the reason `shared/web/money.ts` exists: both front doors
+ * show this number, and the two copies that used to render it had already
+ * drifted in their wording ("1 hours" was one keystroke away in each). A
+ * formatter knows no table, no door and no audience, so it is safe on both
+ * sides of the fence — and the rounding it spells happens ONCE, in savedHours,
+ * so the steps inside an app always add up to the app's own figure. */
+export function hoursText(seconds: number): string {
+  const hours = savedHours(Math.abs(seconds))
+  return `${hours.toLocaleString()} ${hours === 1 ? "hour" : "hours"}`
+}
+
+/** Minutes, for a step's own before/after — nobody describes one step in hours. */
+export function minutesText(seconds: number): string {
+  return `${Math.round(seconds / 60).toLocaleString()} min`
+}

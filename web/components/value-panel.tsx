@@ -33,21 +33,17 @@ import {
 import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 
-import { SAVINGS_CAPTION, savedHours, type SavingsView, type StepSaving } from "@shared/workers/savings"
-
-/** Hours, said the way a person says them. The rounding happens ONCE, in
- * savedHours, so the steps inside an app always add up to the app's own figure. */
-export function hoursText(seconds: number): string {
-  const hours = savedHours(Math.abs(seconds))
-  const unit = hours === 1 ? "hour" : "hours"
-  return `${hours.toLocaleString()} ${unit}`
-}
-
-/** Minutes, for a step's own before/after — nobody describes one step in hours. */
-function minutesText(seconds: number): string {
-  const minutes = Math.round(seconds / 60)
-  return `${minutes.toLocaleString()} min`
-}
+// Hours and minutes come from `shared/workers/savings.ts`, beside the rounding
+// they spell — not written again here, which is what they were. Both front doors
+// render this number, and a second copy of a formatter is the drift the money
+// seam already had to be written to stop.
+import {
+  SAVINGS_CAPTION,
+  hoursText,
+  minutesText,
+  type SavingsView,
+  type StepSaving,
+} from "@shared/workers/savings"
 
 /** ONE step's arithmetic, said out loud. This line is the answer to the third
  * click, and it is deliberately the whole sum rather than its result. */
