@@ -481,9 +481,13 @@ here rather than delegated so this section stays complete on its own:
 | The crons rotate their team window rather than queueing | rotation makes a late team late, not skipped | more than ~600 teams, where the *daily* digest becomes every-third-day |
 | R16's exact `COUNT(*)` on every feed page | it is a **Law** (RULES.md) — changing it means changing the rule, the registry and the check together | an activity table past ~5M rows in one team |
 
-**Two things are genuinely open, and neither is locked:** **delivering** the growth
-alarms to a human (the sender exists; the recipient has to be named, and cannot be
-derived — the core database belongs to no team), and per-caller rate limiting on
-ordinary doors (not the config change it looks like: neither gateway resolves a session,
-so neither can key a limiter on a user; zone-level WAF rules are the config-level half).
-Both are in [OPERATIONS.md](OPERATIONS.md) § *Growth watch*.
+**One thing is genuinely open, and it is not locked:** per-caller rate limiting on
+ordinary doors. It is not the config change it looks like — neither gateway resolves a
+session, so neither can key a limiter on a user without a lookup on every request, and
+per-IP puts a dozen staff behind one office NAT into one bucket. The config-level version
+is zone-level WAF rules, which are dashboard state rather than repo state.
+
+**The growth alarms ARE now delivered** (14 Aug 2026): `ALERT_TO` on the tenancy worker,
+one mail per tick listing every database that crossed 80% and how long each has left,
+once per NEW alarm rather than nightly while one is open. Both are in
+[OPERATIONS.md](OPERATIONS.md) § *Growth watch*.

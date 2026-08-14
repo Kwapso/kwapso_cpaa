@@ -326,8 +326,30 @@ where it cannot be answered honestly — a database's first night, or one that i
 growing — because a very large number would read as a measurement. Bounded at
 `CRON_GROWTH_CAP` (200) readings a night, biggest first.
 
-What is still open: nobody is DELIVERED any of this. Read it deliberately, or wire
-`db_alerts` + `filling` to an email or a page — see `scaling-review.md`, dimension 4.
+**AND IT IS DELIVERED** (decided with the owner 14 Aug 2026). The nightly cron emails
+`ALERT_TO` on the tenancy worker — `alaap@swiftstruck.com,alaap@kwapso.com`, staging and
+production both — with one mail per TICK listing every database that crossed 80% and how
+many days each has left at its current rate.
+
+- **Once per NEW alarm**, not nightly while one is open. That is not a filter in the
+  sender: `checkDatabaseSizes` already skips a database that has an open `db_alerts`
+  row, so "new tonight" is the set it hands over. A standing problem stops mailing,
+  because a nightly repeat is the mail people learn to filter and the one thing that
+  must stay unfiltered is "something changed".
+- **The trend rides inside the alarm**, not as a mail of its own. No mail while nothing
+  is alarming.
+- **A failed send is recorded, never swallowed** — `cron/size-alert` in `error_logs`
+  (R12). The alarm ROW is the record and is already written; the mail is the
+  notification, so a bad send must not fail the size check, and must not be quiet either.
+- **`ALERT_TO` unset is itself recorded.** An environment with no recipient is a
+  configuration state, but "a database crossed 80% and nobody was told" is exactly the
+  silence this closes — so the cron records it rather than shrugging.
+
+What is still open: per-caller rate limiting on ordinary doors. On re-examination it is
+**not** the config-level change it looked like — neither gateway decodes a session, so
+neither can key a limiter on a user without a lookup on every request, and per-IP puts
+the whole office behind one bucket. The config-level version is zone-level WAF rules in
+the Cloudflare dashboard. See `scaling-review.md` §6.7.
 
 ## Local dev
 

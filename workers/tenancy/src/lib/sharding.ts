@@ -20,7 +20,9 @@ import {
   type D1Rest,
 } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
+import { brand } from "@shared/brand"
 import { CRON_ALERT_CAP, CRON_GROWTH_CAP, RETENTION_DELETE_CAP } from "@shared/workers/limits"
+import { sendBrandedEmail } from "@shared/workers/notify"
 import type { Env } from "../env"
 
 /** D1's hard per-database ceiling (Cloudflare's published D1 limits, checked
@@ -161,6 +163,100 @@ async function recordGrowth(
     }
   }
   return written
+}
+
+/** TELL A HUMAN — once per NEW alarm, with the trend inside it.
+ *
+ * The alarm row and the console line were the whole of it: `db_alerts` is readable
+ * through an owner-gated route nobody polls, so "we have alarms" meant "we have a
+ * table". ARCHITECTURE §7 records that as the gap; this closes it.
+ *
+ * ONCE PER NEW ALARM, and that is not a cadence this function implements — it is
+ * the one `checkDatabaseSizes` already had. It skips a database that has an OPEN
+ * alert, so `alerted` is exactly the set that crossed the line TONIGHT. A database
+ * sitting at 85% for a month is not re-sent, which is the owner's choice (14 Aug
+ * 2026): a nightly repeat of a standing problem is the mail people start filtering,
+ * and the thing you want unfiltered is the one that says something CHANGED.
+ *
+ * ONE MAIL FOR THE WHOLE TICK, not one per database. Up to CRON_ALERT_CAP (50) can
+ * alarm on the same night — a bad night for the estate is exactly when 50 separate
+ * emails is the wrong answer.
+ *
+ * THE TREND RIDES ALONG (the owner's other choice): 80% is a position, and what a
+ * person needs is how long they have. `daysUntilFull` is read for the alarming
+ * databases only, and says so plainly when it cannot answer.
+ *
+ * FAILS SOFT, AND LOUDLY. The alarm ROW is the record and it is already written;
+ * this is the notification. But a notification that silently fails is a database
+ * nobody was told about, so the caller records it (R12) rather than shrugging. */
+export async function alertNewAlarms(
+  env: Env,
+  alerted: string[]
+): Promise<{ mailed: number; recipients: number }> {
+  if (!alerted.length) return { mailed: 0, recipients: 0 }
+  const to = (env.ALERT_TO ?? "")
+    .split(",")
+    .map((a) => a.trim())
+    .filter(Boolean)
+  if (!to.length) {
+    // NOT a crash, and not silence either. An environment with no recipient is a
+    // configuration state, but "a database crossed 80% and nobody was told" is
+    // exactly what §7 says must never be quiet.
+    throw new Error(
+      `${alerted.length} database(s) crossed the size threshold and ALERT_TO is not set, so nobody was emailed: ${alerted.join(", ")}. Set ALERT_TO on the tenancy worker.`
+    )
+  }
+
+  // The trend for the alarming databases only. `alerted` is bounded by
+  // CRON_ALERT_CAP (50), which is under D1_MAX_BOUND_PARAMS (100) — the one thing
+  // to check before binding a list in this repo, and it holds with room to spare.
+  const marks = alerted.map(() => "?").join(", ")
+  const trend = await env.DB.prepare(
+    `SELECT database_name, size_bytes, at, prev_size_bytes, prev_at
+       FROM db_growth WHERE database_name IN (${marks})`
+  )
+    .bind(...alerted)
+    .all<{
+      database_name: string
+      size_bytes: number
+      at: string
+      prev_size_bytes: number | null
+      prev_at: string | null
+    }>()
+  const byName = new Map((trend.results ?? []).map((r) => [r.database_name, r]))
+
+  const lines = alerted.map((name) => {
+    const row = byName.get(name)
+    const days = row ? daysUntilFull(row) : null
+    const gb = row ? (row.size_bytes / (1024 * 1024 * 1024)).toFixed(1) : "?"
+    // "Not answerable" is said in words rather than as a number, for the same
+    // reason daysUntilFull returns null: a made-up figure reads as a measurement.
+    const when =
+      days === null
+        ? "no growth reading yet, or it is not growing"
+        : days < 1
+          ? "FULL WITHIN A DAY at the current rate"
+          : `about ${Math.round(days)} day${Math.round(days) === 1 ? "" : "s"} left at the current rate`
+    return `${name} — ${gb} GB of 10 GB, ${when}.`
+  })
+
+  let mailed = 0
+  for (const address of to) {
+    const ok = await sendBrandedEmail(env, address, `${brand.name}: a database is filling up`, {
+      heading: alerted.length === 1 ? "A database crossed 80%" : `${alerted.length} databases crossed 80%`,
+      intro: lines.join("\n"),
+      // The action, not just the fact — the same rule the console line has always
+      // followed. OPERATIONS.md § Growth watch is the runbook it points at.
+      footnote:
+        "Run the module mover for the biggest module in that team's database (OPERATIONS.md, Growth watch). There is about 2 GB of headroom left above the alarm line.",
+    })
+    if (ok) mailed++
+  }
+  if (!mailed)
+    throw new Error(
+      `the size alarm could not be emailed to any of ${to.length} recipient(s): ${alerted.join(", ")}`
+    )
+  return { mailed, recipients: to.length }
 }
 
 /** DAYS UNTIL A DATABASE IS FULL, from the two readings above — the sentence a

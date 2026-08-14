@@ -14,6 +14,10 @@ export type Env = {
   /** The public WEB origin the SPA is served on (the gateway's public URL),
    *  used for links in outbound emails. Set per env in wrangler vars. */
   PUBLIC_APP_URL?: string
+  /** Comma-separated addresses that receive the nightly growth alarm. Optional:
+   *  unset means nobody is mailed, and the cron RECORDS that rather than going
+   *  quiet (ARCHITECTURE §7 — an alarm nobody receives is just a table). */
+  ALERT_TO?: string
 
   // Secrets (wrangler secret put):
   /** API token scoped to Account → D1 → Edit. Without it, team databases

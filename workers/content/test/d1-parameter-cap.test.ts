@@ -39,7 +39,7 @@ import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
 import { sourceFiles } from "@shared/rules/source-scan"
-import { D1_MAX_BOUND_PARAMS, PORTAL_ROOTS_CAP } from "@shared/workers/limits"
+import { CRON_ALERT_CAP, D1_MAX_BOUND_PARAMS, PORTAL_ROOTS_CAP } from "@shared/workers/limits"
 
 const SRC = join(__dirname, "..", "src")
 const REPO = join(__dirname, "..", "..", "..")
@@ -112,6 +112,14 @@ describe("no statement can bind more parameters than D1 accepts", () => {
         "one slice of idBatches — bounded BY D1_MAX_BOUND_PARAMS itself, which is the point of it",
       "tenancy/src/routes/accounts.ts: batch":
         "the same: a slice of idBatches, bounded by the cap it exists to respect",
+      // PROVEN, and by the caller's own ceiling rather than by a claim: the size
+      // alarm reads the growth trend for the databases that crossed 80% TONIGHT,
+      // and `checkDatabaseSizes` stops writing alarms at CRON_ALERT_CAP (50). The
+      // relationship is asserted directly in
+      // `workers/tenancy/test/size-alert-delivery.test.ts`, so the day somebody
+      // raises the alarm ceiling past D1's, that suite goes red too.
+      "tenancy/src/lib/sharding.ts: alerted":
+        `the databases that alarmed tonight, capped at CRON_ALERT_CAP (${CRON_ALERT_CAP})`,
       "tenancy/src/lib/accounts.ts: scope.roots":
         `the portal switcher's companies, capped at PORTAL_ROOTS_CAP (${PORTAL_ROOTS_CAP}) by ROOTS_SQL`,
       "tenancy/src/lib/activity-read.ts: allowedTables":
@@ -152,6 +160,10 @@ describe("no statement can bind more parameters than D1 accepts", () => {
     expect(
       PORTAL_ROOTS_CAP,
       "PORTAL_ROOTS_CAP must stay under D1's parameter cap — the switcher binds one per root"
+    ).toBeLessThan(D1_MAX_BOUND_PARAMS)
+    expect(
+      CRON_ALERT_CAP,
+      "CRON_ALERT_CAP must stay under D1's parameter cap — the size alarm binds one per alarming database"
     ).toBeLessThan(D1_MAX_BOUND_PARAMS)
   })
 })
