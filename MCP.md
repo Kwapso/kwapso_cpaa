@@ -642,6 +642,34 @@ of that allowance; `get_import` re-reads the same plan for free. A client that d
    admin tier). So give a machine token that right only when the integration genuinely
    manages roles; a read/import/export integration never needs it.
 
+### An open question, decided — the calendar tool on this surface
+
+`add_meeting_to_calendar` is on the machine catalogue. `google_sprint_to_calendar`
+is not — it is the in-app assistant's only. The two do the same kind of act,
+open with the same three gates, and were written the same day, and nothing
+recorded which placement was intended. That asymmetry was raised with the owner
+on 2026-08-14.
+
+**The decision is to leave both where they are, for now, and the reason is a
+measurement rather than a preference.** Nothing can reach that tool today: the
+team holds **zero** Google connections (verification is still with Google) and
+**zero** live machine tokens, and the tool additionally needs a connected
+Calendar account and the "Calendar on your behalf" right. So the exposure is not
+small, it is nil — while taking the tool off this surface is genuinely not a
+small change. There is no opt-out in the catalogue: every `SHARED_TOOLS` entry
+becomes an MCP tool (`workers/mcp/src/lib/tools.ts`, `MCP_TOOLS`), so removing
+one means a new field on the shared type, a filter, and amendments to the R9,
+R19 and R22 parity checks plus the tool census in this file. That is four laws
+moved to close a door nobody is standing at, on the surface that is hardest to
+test.
+
+**Revisit the day Google verification lands** — before the first person connects
+a Calendar, not after. The question to answer then is the one the owner should
+answer with the facts in front of him: *should an outside developer holding a
+personal access token be able to write into a colleague's calendar?* If the
+answer is no, the work above is what it costs, and it is much cheaper to do
+while the answer is still hypothetical than once integrations depend on it.
+
 ---
 
 ## 6 · For maintainers (where it lives)
