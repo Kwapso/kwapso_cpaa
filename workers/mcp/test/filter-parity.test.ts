@@ -470,3 +470,68 @@ describe("agent-body-parity (R22): a write tool offers its door's whole contract
     }
   }
 })
+
+// R19/R22's THIRD half: the census is also a PUBLISHED DOCUMENT.
+//
+// MCP.md is what an outside developer reads and what the owner reasons about the
+// blast radius of a leaked token with. Both halves above prove the CODE agrees
+// with itself; neither ever asked whether the sentence describing it was still
+// true. It wasn't, and the drift was not subtle:
+//
+//   • 46 of 156 tools — the entire work engine (stories, sprints, to-dos, tasks,
+//     timers), meetings, and every housekeeping module — were never named. A
+//     third of the machine surface was invisible to the only document that
+//     describes it, so a developer building against MCP.md would have concluded
+//     the capability did not exist and asked for it to be built.
+//   • The census sentence still read "87 doors, 66 with a tool, 21 with a written
+//     reason" while the app had grown to 208 / 173 / 35.
+//   • One of the two paragraphs listing the narrowed body fields said "two" while
+//     NARROWED_BODY_FIELDS above named four.
+//
+// A hand-maintained list beside a generated one is not documentation, it is a
+// second source of truth — so it gets the same treatment every other deny-list in
+// the base gets: derived from the code, red when it disagrees.
+describe("the published catalogue (MCP.md) says what the code does", () => {
+  const DOC = readFileSync(join(ROOT, "MCP.md"), "utf8")
+  // Backticked identifiers: tool names are snake_case, body fields camelCase.
+  const namedInDoc = new Set([...DOC.matchAll(/`([a-zA-Z][a-zA-Z0-9_]+)`/g)].map((m) => m[1]))
+
+  it("names every tool on this surface", () => {
+    const missing = MCP_TOOLS.map((t) => t.name).filter((n) => !namedInDoc.has(n))
+    expect(
+      missing,
+      `these tools are callable over MCP but MCP.md never names them, so the only document describing this surface is missing ${missing.length} of ${MCP_TOOLS.length} capabilities. Add them to §3 "The tools":\n  ${missing.join("\n  ")}`
+    ).toEqual([])
+  })
+
+  it("names every door whose write tool offers a narrowed contract", () => {
+    // The R22 block above lets a narrowing stand on a reason written HERE. That
+    // reason is for a maintainer; MCP.md is where the CALLER finds out their tool
+    // takes less than the door does. Both, or neither.
+    for (const k of Object.keys(NARROWED_BODY_FIELDS)) {
+      const [doorKey, field] = k.split("::")
+      const tool = writeToolsOn(WRITES.find((d) => key(d) === doorKey)!)[0]
+      expect(
+        namedInDoc.has(field),
+        `${tool?.name ?? doorKey} does not offer "${field}" and MCP.md never says so — a caller learns their contract is narrower than the screen's by having a field ignored. Add it to §3 item 7.`
+      ).toBe(true)
+    }
+  })
+
+  it("states the current census, not last quarter's", () => {
+    const withTool = DOORS.filter((d) => toolsOn(d).length).length
+    const reasoned = DOORS.filter((d) => key(d) in TOOLLESS_DOORS).length
+    const onMcp = DOORS.filter((d) => MCP_TOOLS.some((t) => t.path === d.path && t.method === d.method))
+      .length
+    for (const [n, what] of [
+      [DOORS.length, "doors in the census"],
+      [withTool, "doors with a tool on some machine surface"],
+      [reasoned, "doors with a written reason"],
+      [onMcp, "doors reachable from THIS surface"],
+    ] as const)
+      expect(
+        DOC.includes(String(n)),
+        `MCP.md should state ${n} ${what} and doesn't — the census sentence in §3 has gone stale. It last read 87 / 66 / 21 while the real numbers were ${DOORS.length} / ${withTool} / ${reasoned}.`
+      ).toBe(true)
+  })
+})
