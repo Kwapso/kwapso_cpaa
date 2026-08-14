@@ -121,10 +121,48 @@ export async function d1Query<Row = Record<string, unknown>>(
   return result[0]?.results ?? []
 }
 
+/** Statement shapes a CONCATENATION of per-shard answers cannot honestly give.
+ *
+ * The three below are wrong in the same way and it is worth naming precisely,
+ * because each looks like it works when there is only one database — which is
+ * every environment until the mover runs:
+ *
+ *   • `LIMIT n` — each shard returns up to n, so the caller gets up to n × shards
+ *     rows, and they are the top n OF EACH shard rather than the top n overall.
+ *     A keyset page built on that has the wrong rows in it AND takes its
+ *     `nextCursor` from the last row of a concatenation, which is a position in no
+ *     shard's ordering. Page two then repeats and skips, silently.
+ *   • `ORDER BY` — sorted within each shard, unsorted between them. A merge sort
+ *     across the results is the fix, and it has to know the sort key, which this
+ *     seam does not.
+ *   • `COUNT(` and the other aggregates — one row per shard. Every caller in the
+ *     base reads `rows[0].n`, so a split module would report the FIRST shard's
+ *     count as the whole total: R16's exact count, quietly wrong.
+ *
+ * FAIL LOUD RATHER THAN ANSWER WRONG. Nothing paged is routed through
+ * `queryModule` today, so this refuses nothing that currently runs — it is a
+ * tripwire for the day somebody points a paged or counted read at the split path
+ * and gets a plausible answer. Making it CORRECT (a per-shard cursor token and a
+ * merge, an aggregate that folds) is a real piece of work with a decision in it;
+ * the one thing that must not happen in the meantime is a wrong number nobody
+ * questions. Single-database reads — every read today — are untouched.
+ */
+const UNMERGEABLE: { pattern: RegExp; what: string }[] = [
+  { pattern: /\bLIMIT\b/i, what: "a LIMIT (each shard returns its own n, so the page is wrong)" },
+  { pattern: /\bORDER\s+BY\b/i, what: "an ORDER BY (sorted per shard, unsorted between them)" },
+  {
+    pattern: /\b(COUNT|SUM|AVG|MIN|MAX|GROUP_CONCAT)\s*\(/i,
+    what: "an aggregate (one row per shard, and every caller reads the first)",
+  },
+]
+
 /**
  * Merged reads (the "splitter" read path): run the same query against several
  * databases — e.g. a module split across shards — and return all rows as one
  * list. Pair with resolveModuleDatabases() in the tenancy sharding lib.
+ *
+ * ONE database is a plain read and anything goes. TWO OR MORE is a concatenation,
+ * and a concatenation cannot page, sort or count — see UNMERGEABLE above.
  */
 export async function d1QueryAcross<Row = Record<string, unknown>>(
   cfg: D1Rest,
@@ -132,6 +170,14 @@ export async function d1QueryAcross<Row = Record<string, unknown>>(
   sql: string,
   params: (string | number | null)[] = []
 ): Promise<Row[]> {
+  if (databaseIds.length > 1)
+    for (const { pattern, what } of UNMERGEABLE)
+      if (pattern.test(sql))
+        throw new Error(
+          `d1QueryAcross: this statement carries ${what}, and it is being run across ` +
+            `${databaseIds.length} databases. A concatenation of per-shard answers would be ` +
+            `plausible and wrong. Read one database, or give this path a real merge.`
+        )
   // allSettled, not all: gather every shard's outcome so a failure names WHICH shard(s)
   // failed (Promise.all throws the first raw error and hides the rest). It still fails
   // LOUD on any error — a sharded read that silently dropped a shard's rows would be

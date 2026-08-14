@@ -190,6 +190,14 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
     files are the evidence for "we decided this, and here is who said so". They are a
     RECORD, never a spec — where a form answer and SCOPE.html disagree, SCOPE wins,
     and where SCOPE is silent, base law applies. They hold no customer data.
+27. **[scaling-review.md](scaling-review.md)** — the scaling audit (14 Aug 2026, branch
+    `audit/scaling`): the twelve-dimension score, the platform limits looked up live,
+    **what breaks first and at what size** (the live layer, at roughly 3,000–5,000
+    concurrent sockets in one tenant), the twelve repairs that landed, and — the part
+    to read before proposing work — the eleven items judged too risky to change, each
+    written up as a plan with its tier. A REPORT, not a rule source: where it and
+    RULES.md disagree, RULES.md wins. `scaling-review.html` is the same thing as a
+    visual scorecard.
 
 ### Where the code lives
 

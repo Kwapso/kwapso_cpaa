@@ -1,0 +1,754 @@
+<title>Ceiling Report</title>
+<style>
+  /* ── tokens ─────────────────────────────────────────────────────────────────
+     Light is the base. Dark is redefined twice: once for prefers-color-scheme
+     (guarded so an explicit light choice beats a dark OS) and once for the
+     data-theme stamp, so the toggle wins in both directions. Nothing below this
+     block declares a colour outside a token. */
+  :root {
+    --ground: #f6f5f1;
+    --surface: #fffefb;
+    --surface-2: #efedE7;
+    --ink: #14181f;
+    --ink-2: #4b5361;
+    --ink-3: #7c8593;
+    --rule: #ded9cf;
+    --rule-firm: #c2bcaf;
+    --accent: #2b5f8a;
+    --accent-soft: #dbe6ef;
+    --good: #35714f;
+    --warn: #9a6a12;
+    --crit: #a1382b;
+    --good-soft: #d9e8de;
+    --warn-soft: #f2e6c9;
+    --crit-soft: #f2dcd7;
+    --shadow: 0 1px 2px rgba(20, 24, 31, .06), 0 8px 24px -16px rgba(20, 24, 31, .18);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #101317;
+      --surface: #171b21;
+      --surface-2: #1f242c;
+      --ink: #eceae4;
+      --ink-2: #a9b1bd;
+      --ink-3: #77808d;
+      --rule: #2a3038;
+      --rule-firm: #3d454f;
+      --accent: #7fb3d9;
+      --accent-soft: #1d2a36;
+      --good: #7fc39b;
+      --warn: #dab465;
+      --crit: #e08575;
+      --good-soft: #1a2a22;
+      --warn-soft: #2c2618;
+      --crit-soft: #2e1e1b;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -16px rgba(0, 0, 0, .7);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #101317;
+    --surface: #171b21;
+    --surface-2: #1f242c;
+    --ink: #eceae4;
+    --ink-2: #a9b1bd;
+    --ink-3: #77808d;
+    --rule: #2a3038;
+    --rule-firm: #3d454f;
+    --accent: #7fb3d9;
+    --accent-soft: #1d2a36;
+    --good: #7fc39b;
+    --warn: #dab465;
+    --crit: #e08575;
+    --good-soft: #1a2a22;
+    --warn-soft: #2c2618;
+    --crit-soft: #2e1e1b;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -16px rgba(0, 0, 0, .7);
+  }
+
+  /* ── type ──────────────────────────────────────────────────────────────────
+     Three roles. A tight system sans carries structure; a serif carries the
+     prose, which makes this read as an audit rather than a marketing page; a
+     mono carries every number, tabular so columns line up. */
+  :root {
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --serif: ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font: 400 16px/1.62 var(--serif);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: clamp(28px, 5vw, 68px) clamp(18px, 4vw, 44px) 96px; }
+
+  /* ── masthead ─────────────────────────────────────────────────────────── */
+  .eyebrow {
+    font: 600 11px/1 var(--sans);
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  h1 {
+    font: 700 clamp(30px, 5vw, 50px)/1.04 var(--sans);
+    letter-spacing: -.025em;
+    text-wrap: balance;
+    margin: 14px 0 0;
+  }
+  .standfirst {
+    max-width: 62ch;
+    font-size: 1.0625rem;
+    color: var(--ink-2);
+    margin: 16px 0 0;
+  }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 6px 22px;
+    margin-top: 22px; padding-top: 18px;
+    border-top: 1px solid var(--rule);
+    font: 500 12.5px/1.5 var(--mono);
+    color: var(--ink-3);
+  }
+  .meta b { color: var(--ink-2); font-weight: 600; }
+
+  /* ── the headline number ──────────────────────────────────────────────── */
+  .verdict {
+    display: grid;
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+    gap: clamp(20px, 4vw, 44px);
+    align-items: center;
+    margin: 40px 0 0;
+    padding: clamp(22px, 3vw, 32px);
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    box-shadow: var(--shadow);
+  }
+  @media (max-width: 720px) { .verdict { grid-template-columns: 1fr; } }
+  .move { display: flex; align-items: baseline; gap: 14px; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .move .from { font-size: clamp(30px, 6vw, 44px); font-weight: 500; color: var(--ink-3); }
+  .move .arrow { color: var(--rule-firm); font-size: 22px; }
+  .move .to { font-size: clamp(48px, 10vw, 78px); font-weight: 600; letter-spacing: -.04em; line-height: .9; color: var(--accent); }
+  .move .of { font-size: 15px; color: var(--ink-3); }
+  .verdict p { margin: 0; font-size: .96rem; color: var(--ink-2); }
+  .verdict p + p { margin-top: 10px; }
+  .verdict strong { color: var(--ink); }
+
+  /* ── sections ─────────────────────────────────────────────────────────── */
+  section { margin-top: clamp(48px, 7vw, 84px); }
+  h2 {
+    font: 650 12px/1 var(--sans);
+    letter-spacing: .15em; text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 0 0 6px;
+  }
+  h2 + .lede { font: 600 clamp(20px, 3vw, 27px)/1.24 var(--sans); letter-spacing: -.02em; margin: 0 0 8px; text-wrap: balance; }
+  .note { max-width: 68ch; color: var(--ink-2); font-size: .96rem; margin: 0 0 26px; }
+  .note code, code { font: 500 .88em var(--mono); background: var(--surface-2); padding: .1em .34em; border-radius: 2px; }
+
+  /* ── scorecard ────────────────────────────────────────────────────────── */
+  .card { background: var(--surface); border: 1px solid var(--rule); border-radius: 3px; box-shadow: var(--shadow); overflow: hidden; }
+  .row {
+    display: grid;
+    grid-template-columns: 2.1fr 3.4fr 4.6rem 4.6rem 2.6rem;
+    gap: 16px;
+    align-items: center;
+    padding: 13px clamp(14px, 2.4vw, 22px);
+    border-top: 1px solid var(--rule);
+  }
+  .row:first-child { border-top: 0; }
+  .row.head {
+    background: var(--surface-2);
+    font: 600 10.5px/1 var(--sans);
+    letter-spacing: .12em; text-transform: uppercase;
+    color: var(--ink-3);
+    padding-top: 10px; padding-bottom: 10px;
+  }
+  .dim { font: 500 14.5px/1.3 var(--sans); }
+  .dim .w { display: block; font: 500 11px/1.4 var(--mono); color: var(--ink-3); margin-top: 2px; }
+  /* One track, two bars: the AFTER bar sits behind, the BEFORE bar in front,
+     so the gain reads as the exposed extension rather than as a subtraction. */
+  .track { position: relative; height: 22px; background: var(--surface-2); border-radius: 2px; overflow: hidden; }
+  .bar { position: absolute; inset: 0 auto 0 0; border-radius: 2px; }
+  .bar.after { opacity: .95; }
+  .bar.before { background: var(--rule-firm); opacity: .9; }
+  .bar.after.b-good { background: var(--good); }
+  .bar.after.b-warn { background: var(--warn); }
+  .bar.after.b-crit { background: var(--crit); }
+  .num { font: 500 15px/1 var(--mono); font-variant-numeric: tabular-nums; text-align: right; color: var(--ink-2); }
+  .num.now { font-weight: 600; font-size: 17px; color: var(--ink); }
+  .delta { font: 500 12.5px/1 var(--mono); text-align: right; }
+  .delta.up { color: var(--good); }
+  .delta.flat { color: var(--ink-3); }
+  .tag { display: inline-block; font: 600 9.5px/1 var(--sans); letter-spacing: .1em; text-transform: uppercase; padding: 4px 6px; border-radius: 2px; margin-left: 6px; vertical-align: 1px; }
+  .tag.na { background: var(--surface-2); color: var(--ink-3); }
+  @media (max-width: 760px) {
+    .row { grid-template-columns: 1fr 3.6rem 3.6rem 2.4rem; }
+    .row .track { grid-column: 1 / -1; order: 9; }
+    .row.head .track { display: none; }
+  }
+  .sums {
+    display: flex; flex-wrap: wrap; gap: 10px 28px;
+    margin-top: 16px;
+    font: 500 12.5px/1.7 var(--mono);
+    color: var(--ink-3);
+  }
+  .sums b { color: var(--ink-2); font-weight: 600; }
+
+  /* ── ceiling ladder ───────────────────────────────────────────────────── */
+  .ladders { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(16px, 3vw, 28px); }
+  @media (max-width: 780px) { .ladders { grid-template-columns: 1fr; } }
+  .ladder { background: var(--surface); border: 1px solid var(--rule); border-radius: 3px; padding: clamp(16px, 2.4vw, 24px); box-shadow: var(--shadow); }
+  .ladder h3 { font: 650 11px/1 var(--sans); letter-spacing: .13em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 4px; }
+  .ladder .axis { font: 500 12px/1.5 var(--mono); color: var(--ink-2); margin: 0 0 18px; }
+  .rungs { list-style: none; margin: 0; padding: 0 0 0 22px; position: relative; }
+  /* The scale itself — one hairline, so the rungs read as positions on a climb. */
+  .rungs::before { content: ""; position: absolute; left: 4px; top: 6px; bottom: 6px; width: 2px; background: linear-gradient(var(--good), var(--warn) 55%, var(--crit)); border-radius: 2px; }
+  .rungs li { position: relative; padding: 0 0 16px; }
+  .rungs li:last-child { padding-bottom: 0; }
+  .rungs li::before {
+    content: ""; position: absolute; left: -22px; top: 7px;
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--ground); border: 2px solid var(--rule-firm);
+  }
+  .rungs li.s-good::before { border-color: var(--good); background: var(--good); }
+  .rungs li.s-warn::before { border-color: var(--warn); background: var(--warn); }
+  .rungs li.s-crit::before { border-color: var(--crit); background: var(--crit); }
+  .rungs .at { font: 600 12.5px/1.4 var(--mono); font-variant-numeric: tabular-nums; color: var(--ink); }
+  .rungs .what { display: block; font-size: .92rem; color: var(--ink-2); margin-top: 1px; }
+  .rungs .owns { font: 600 10px/1 var(--sans); letter-spacing: .09em; text-transform: uppercase; color: var(--ink-3); }
+
+  /* ── lists of work ────────────────────────────────────────────────────── */
+  .items { display: grid; gap: 10px; }
+  .item {
+    display: grid;
+    grid-template-columns: 1.6rem minmax(0, 1fr) auto;
+    gap: 14px; align-items: start;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--rule-firm);
+    border-radius: 2px;
+    padding: 14px 16px;
+  }
+  .item.fixed { border-left-color: var(--good); }
+  .item.open { border-left-color: var(--warn); }
+  .item.locked { border-left-color: var(--crit); }
+  .item .n { font: 600 12px/1.5 var(--mono); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .item h4 { font: 600 14.5px/1.35 var(--sans); margin: 0 0 4px; }
+  .item p { margin: 0; font-size: .93rem; color: var(--ink-2); }
+  .chip { font: 600 9.5px/1 var(--sans); letter-spacing: .1em; text-transform: uppercase; padding: 5px 7px; border-radius: 2px; white-space: nowrap; }
+  .chip.a { background: var(--good-soft); color: var(--good); }
+  .chip.b { background: var(--warn-soft); color: var(--warn); }
+  .chip.c { background: var(--crit-soft); color: var(--crit); }
+
+  /* ── the arithmetic table ─────────────────────────────────────────────── */
+  .scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 3px; box-shadow: var(--shadow); }
+  table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: .93rem; }
+  th, td { text-align: left; padding: 11px 16px; border-top: 1px solid var(--rule); }
+  thead th { border-top: 0; background: var(--surface-2); font: 600 10.5px/1 var(--sans); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+  td.n, th.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  tfoot td { font-weight: 600; background: var(--surface-2); }
+
+  footer { margin-top: clamp(48px, 7vw, 80px); padding-top: 20px; border-top: 1px solid var(--rule); font: 500 12.5px/1.8 var(--mono); color: var(--ink-3); }
+  footer b { color: var(--ink-2); }
+</style>
+
+<div class="wrap">
+
+  <p class="eyebrow">Scaling review &middot; Brimba / kwapso</p>
+  <h1>What breaks first, and at what size</h1>
+  <p class="standfirst">
+    Twelve dimensions, scored against one concrete target: any single tenant reaching
+    250,000 people, and dozens of such tenants on one app. Every number here is
+    recomputable from <code>scaling-review.md</code> and the rubric it cites.
+  </p>
+  <div class="meta">
+    <span><b>Branch</b> audit/scaling</span>
+    <span><b>Date</b> 14 Aug 2026</span>
+    <span><b>Platform</b> Workers &middot; D1-per-team &middot; R2 &middot; 1 DO class &middot; Vectorize</span>
+    <span><b>Gate</b> npm run check &rarr; exit 0, 1,686 tests</span>
+  </div>
+
+  <div class="verdict">
+    <div class="move">
+      <span class="from">53</span>
+      <span class="arrow">&rarr;</span>
+      <span class="to">78</span>
+      <span class="of">/ 100</span>
+    </div>
+    <div>
+      <p>
+        <strong>The target was 94, and it was not reached.</strong> Not for want of
+        repairs &mdash; twelve landed, and four dimensions moved by 25 points or more.
+        Every point still on the table sits behind a locked architectural decision, a
+        Law of the Base, or a change to an endpoint's observable contract.
+      </p>
+      <p>
+        The arithmetic for that claim is at the bottom: the eight available gains sum
+        to about +17, so 94 requires <em>all</em> of them, and no subset reaches it
+        without at least one Tier&nbsp;C change or one Law amendment.
+      </p>
+    </div>
+  </div>
+
+  <!-- ── scorecard ──────────────────────────────────────────────────────── -->
+  <section>
+    <h2>Scorecard</h2>
+    <p class="lede">Before, after, and what moved</p>
+    <p class="note">
+      The pale bar is where each dimension started; the coloured bar is where it is now.
+      Colour is banded against the 94 target: green at or above it, amber within 15
+      below, red beyond. <code>dimension = clamp(0,100, 100 &times; coverage &minus; penalty)</code>,
+      penalties being blocker&nbsp;25, major&nbsp;12, minor&nbsp;4.
+    </p>
+
+    <div class="card">
+      <div class="row head">
+        <span>Dimension</span><span class="track"></span><span class="num">Before</span><span class="num">After</span><span class="delta">&Delta;</span>
+      </div>
+
+      <div class="row">
+        <span class="dim">Data partitioning &amp; sharding<span class="w">weight 12 &middot; 4/4 &minus; 24</span></span>
+        <span class="track"><i class="bar after b-crit" style="width:76%"></i><i class="bar before" style="width:63%"></i></span>
+        <span class="num">63</span><span class="num now">76</span><span class="delta up">+13</span>
+      </div>
+
+      <div class="row">
+        <span class="dim">Query shape &amp; indexing<span class="w">weight 13 &middot; 3/3 &minus; 12</span></span>
+        <span class="track"><i class="bar after b-warn" style="width:88%"></i><i class="bar before" style="width:19%"></i></span>
+        <span class="num">19</span><span class="num now">88</span><span class="delta up">+69</span>
+      </div>
+
+      <div class="row">
+        <span class="dim">Endpoint contract stability<span class="w">weight 7 &middot; 4/4 &minus; 12</span></span>
+        <span class="track"><i class="bar after b-warn" style="width:88%"></i><i class="bar before" style="width:88%"></i></span>
+        <span class="num">88</span><span class="num now">88</span><span class="delta flat">&mdash;</span>
+      </div>
+
+      <div class="row">
+        <span class="dim">Growth triggers &amp; headroom<span class="w">weight 8 &middot; 4/4 &minus; 16</span></span>
+        <span class="track"><i class="bar after b-warn" style="width:84%"></i><i class="bar before" style="width:59%"></i></span>
+        <span class="num">59</span><span class="num now">84</span><span class="delta up">+25</span>
+      </div>
+
+      <div class="row">
+        <span class="dim">Client data volume &amp; lazy loading<span class="w">weight 9 &middot; 3/4 &minus; 0</span></span>
+        <span class="track"><i class="bar after b-crit" style="width:75%"></i><i class="bar before" style="width:63%"></i></span>
+        <span class="num">63</span><span class="num now">75</span><span class="delta up">+12</span>
+      </div>
+
+      <div class="row">
+        <span class="dim">Client cache freshness &amp; bounds<span class="w">weight 9 &middot; 5/5 &minus; 0</span></span>
+        <span class="track"><i class="bar after b-good" style="width:100%"></i><i class="bar before" style="width:35%"></i></span>
+        <span class="num">35</span><span class="num now">100</span><span class="delta up">+65</span>
+      </div>
+
+      <div class="row">
+        <span class="dim">Surge self-protection<span class="w">weight 6 &middot; 4/5 &minus; 12</span></span>
+        <span class="track"><i class="bar after b-crit" style="width:68%"></i><i class="bar before" style="width:36%"></i></span>
+        <span class="num">36</span><span class="num now">68</span><span class="delta up">+32</span>
+      </div>
+
+      <div class="row">
+        <span class="dim">Sequential, atomic &amp; contended ops<span class="w">weight 11 &middot; 4/4 &minus; 0</span></span>
+        <span class="track"><i class="bar after b-good" style="width:100%"></i><i class="bar before" style="width:100%"></i></span>
+        <span class="num">100</span><span class="num now">100</span><span class="delta flat">&mdash;</span>
+      </div>
+
+      <div class="row">
+        <span class="dim">Write fan-out &amp; realtime<span class="w">weight 7 &middot; 1/3 &minus; 37, clamped</span></span>
+        <span class="track"><i class="bar after b-crit" style="width:1.5%"></i><i class="bar before" style="width:1.5%"></i></span>
+        <span class="num">0</span><span class="num now">0</span><span class="delta flat">&mdash;</span>
+      </div>
+
+      <div class="row">
+        <span class="dim">Bulk paths, migrations &amp; lifecycle<span class="w">weight 5 &middot; 3/3 &minus; 8</span></span>
+        <span class="track"><i class="bar after b-good" style="width:92%"></i><i class="bar before" style="width:43%"></i></span>
+        <span class="num">43</span><span class="num now">92</span><span class="delta up">+49</span>
+      </div>
+
+      <div class="row">
+        <span class="dim">Elastic response time<span class="w">weight 5 &middot; 2/2 &minus; 0<span class="tag na">4 signals n/a</span></span></span>
+        <span class="track"><i class="bar after b-good" style="width:100%"></i><i class="bar before" style="width:100%"></i></span>
+        <span class="num">100</span><span class="num now">100</span><span class="delta flat">&mdash;</span>
+      </div>
+
+      <div class="row">
+        <span class="dim">File &amp; object storage<span class="w">weight 8 &middot; 6/9 &minus; 16</span></span>
+        <span class="track"><i class="bar after b-crit" style="width:51%"></i><i class="bar before" style="width:36%"></i></span>
+        <span class="num">36</span><span class="num now">51</span><span class="delta up">+15</span>
+      </div>
+    </div>
+
+    <div class="sums">
+      <span><b>Before</b> 5292 / 100 = 53</span>
+      <span><b>After</b> 7795 / 100 = 78</span>
+      <span><b>N/A on isolates</b> warm capacity, autoscaling config, connection pooling, per-instance setup reuse</span>
+    </div>
+  </section>
+
+  <!-- ── ceiling ladder ─────────────────────────────────────────────────── -->
+  <section>
+    <h2>The ceiling ladder</h2>
+    <p class="lede">Two climbs, because the target is two-level</p>
+    <p class="note">
+      Sharding by tenant answers the left column and nothing at all for the right one.
+      Both had to be answered separately, and they fail in different places: across
+      tenants it is the shared database and the crons that serve them; inside one
+      tenant it is the live layer, by about a factor of a hundred.
+    </p>
+
+    <div class="ladders">
+      <div class="ladder">
+        <h3>Inside one tenant</h3>
+        <p class="axis">today &rarr; 250,000 people, 25,000 sockets</p>
+        <ul class="rungs">
+          <li class="s-good">
+            <span class="at">~500 sockets</span>
+            <span class="what">Nothing. Comfortable.</span>
+          </li>
+          <li class="s-warn">
+            <span class="at">~3,000 sockets</span>
+            <span class="what">Broadcast latency becomes visible &mdash; pings arrive seconds late. <span class="owns">dim 9</span></span>
+          </li>
+          <li class="s-crit">
+            <span class="at">~10,000 sockets</span>
+            <span class="what">The Durable Object cannot keep up with the publish rate; live sync silently degrades to &ldquo;reload to see it&rdquo;. <span class="owns">dim 9</span></span>
+          </li>
+          <li class="s-crit">
+            <span class="at">~25,000 sockets</span>
+            <span class="what">Past one object's soft request ceiling. <strong>The target is not reachable without a topology change.</strong> <span class="owns">dim 9</span></span>
+          </li>
+          <li class="s-warn">
+            <span class="at">~5M activity rows</span>
+            <span class="what">R16's exact <code>COUNT(*)</code> on every feed page becomes the slowest query in the app &mdash; an index scan now, not a table scan. <span class="owns">dim 2</span></span>
+          </li>
+          <li class="s-warn">
+            <span class="at">~8 GB in a team DB</span>
+            <span class="what">The alarm fires; the mover is the only answer, and it is one long non-resumable request. <span class="owns">dim 1, 4</span></span>
+          </li>
+          <li class="s-warn">
+            <span class="at">25 MB attachment</span>
+            <span class="what">Already at the edge of a 128 MB isolate, on the request path. <span class="owns">dim 12</span></span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="ladder">
+        <h3>Across tenants</h3>
+        <p class="axis">today &rarr; dozens of large tenants + a long tail</p>
+        <ul class="rungs">
+          <li class="s-good">
+            <span class="at">any unswept estate</span>
+            <span class="what">Now catches up over a few nights instead of never. <span class="owns">dim 10 &mdash; repaired</span></span>
+          </li>
+          <li class="s-warn">
+            <span class="at">~200 teams</span>
+            <span class="what">The crons start lapping; the <em>daily</em> digest becomes every-N-days. Was: every team past the 200th got nothing at all. <span class="owns">dim 10</span></span>
+          </li>
+          <li class="s-crit">
+            <span class="at">~1,000 teams</span>
+            <span class="what">The digest is a weekly at best. Wants a work queue, not a bigger cap. <span class="owns">dim 10</span></span>
+          </li>
+          <li class="s-crit">
+            <span class="at">~8 GB in core</span>
+            <span class="what">No shard path for the shared database &mdash; the one ceiling in the system with no relief valve at all. <span class="owns">dim 1</span></span>
+          </li>
+          <li class="s-warn">
+            <span class="at">~10,000 databases</span>
+            <span class="what">The nightly size scan goes blind, and says so in a log. The platform allows 50,000. <span class="owns">dim 4</span></span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── repairs ────────────────────────────────────────────────────────── -->
+  <section>
+    <h2>Applied</h2>
+    <p class="lede">Twelve repairs, all in the working tree</p>
+    <p class="note">
+      Nothing deployed, nothing pushed. Six new test suites and four rewritten ones lock
+      each change; the parameter-cap guard was widened from one worker to the whole repo.
+    </p>
+
+    <div class="items">
+      <div class="item fixed">
+        <span class="n">01</span>
+        <div>
+          <h4>Four statements bound more parameters than D1 accepts</h4>
+          <p>
+            The account fence bound one per account in reach (cap 500) and carried the set
+            <em>three times</em> in one statement &mdash; so a client at a company with 34
+            businesses under it could not read its own activity feed, and one with 101 could
+            not read anything. Local SQLite allows 999, so every suite passed.
+          </p>
+        </div>
+        <span class="chip a">Tier A</span>
+      </div>
+
+      <div class="item fixed">
+        <span class="n">02</span>
+        <div>
+          <h4>The activity feed had no index for its own paging</h4>
+          <p>
+            The fastest-growing table in a team database, paging by keyset since R14, with its
+            only index leading on <code>related_table</code>. The record scope was indexed; the
+            feed everybody opens was not. Also: <code>sessions</code> had no index on the
+            predicate its nightly sweep selects on.
+          </p>
+        </div>
+        <span class="chip a">Tier A</span>
+      </div>
+
+      <div class="item fixed">
+        <span class="n">03</span>
+        <div>
+          <h4>Both crons starved every tenant past the 200th</h4>
+          <p>
+            Each read <code>ORDER BY id LIMIT 200</code> and each said the rest &ldquo;wait for
+            the next tick&rdquo;. The window never moved. Team ids are ULIDs, so the starved
+            ones were the newest tenants &mdash; never late, simply never.
+          </p>
+        </div>
+        <span class="chip a">Tier A</span>
+      </div>
+
+      <div class="item fixed">
+        <span class="n">04</span>
+        <div>
+          <h4>The one relief valve could not survive the size it exists for</h4>
+          <p>
+            The mover copied with <code>OFFSET</code> (quadratic, and its window shifted under
+            concurrent writes) and emptied the source with one unbounded <code>DELETE</code> that
+            D1 refuses past 30 s &mdash; <em>after</em> the routing flip, leaving every merged
+            read double-counting with nothing saying so.
+          </p>
+        </div>
+        <span class="chip a">Tier A</span>
+      </div>
+
+      <div class="item fixed">
+        <span class="n">05</span>
+        <div>
+          <h4>Retention removed 5,000 rows a night against hundreds of thousands</h4>
+          <p>
+            The cap bounds a <em>statement</em>, which is what times out; nothing bounded the
+            <em>night</em>. Now 40 bounded passes per table, stopping when one comes back short.
+            <code>error_logs</code> joins the sweep at the 90 days its own migration has claimed
+            since the day it was written.
+          </p>
+        </div>
+        <span class="chip a">Tier A</span>
+      </div>
+
+      <div class="item fixed">
+        <span class="n">06</span>
+        <div>
+          <h4>The morning digest could not finish</h4>
+          <p>
+            <code>Promise.all</code> over 500 members &times; 200 teams in one cron. A Worker has
+            <strong>six</strong> simultaneous outgoing connections, so 494 queued behind six:
+            ~17 s per team, ~56 minutes against a 15-minute limit. It died partway, daily.
+          </p>
+        </div>
+        <span class="chip a">Tier A</span>
+      </div>
+
+      <div class="item fixed">
+        <span class="n">07</span>
+        <div>
+          <h4>The client cache was unbounded, unexpiring and never cleared</h4>
+          <p>
+            A plain <code>Map</code> that only grew. CACHING.md claimed it was cleared on
+            sign-out and team switch; nothing cleared it. Now three ceilings, LRU eviction that
+            never takes a key somebody is looking at, and one <code>clearCache()</code> replacing
+            a hand-kept list of nine keys at the portal's company switch.
+          </p>
+        </div>
+        <span class="chip a">Tier A</span>
+      </div>
+
+      <div class="item fixed">
+        <span class="n">08</span>
+        <div>
+          <h4>Six more: <code>loadMore</code>, merged reads, media ranges, growth</h4>
+          <p>
+            A ceiling on accumulated pages on both front ends; a tripwire on
+            <code>d1QueryAcross</code> for the three shapes a concatenation cannot answer;
+            <code>Accept-Ranges</code> and 206 on <code>/media/*</code> so a 25 MB video is
+            seekable; and a <code>db_growth</code> table so &ldquo;how long have I got&rdquo; is
+            answerable at all &mdash; 80% of a cap being a position, not a warning.
+          </p>
+        </div>
+        <span class="chip a">Tier A</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── not changed ────────────────────────────────────────────────────── -->
+  <section>
+    <h2>Judged too risky to change</h2>
+    <p class="lede">Each one written up as a plan, not left as a discovery</p>
+
+    <div class="items">
+      <div class="item locked">
+        <span class="n">&#9651;</span>
+        <div>
+          <h4>The realtime fan-out topology &mdash; and the whole first ceiling</h4>
+          <p>
+            One Durable Object per team, broadcasting serially, unscoped by subscription. Both
+            of dimension 9's findings live here. Fixing it changes DO topology, which
+            ARCHITECTURE.md locks. The plan: shard the channel across N objects, scope by
+            subscription, coalesce under rapid change &mdash; the socket URL is versioned, so
+            rollback is an old client keeping the old shape.
+          </p>
+        </div>
+        <span class="chip c">Tier C</span>
+      </div>
+
+      <div class="item locked">
+        <span class="n">&#9651;</span>
+        <div>
+          <h4>Presigned direct-to-R2 uploads</h4>
+          <p>
+            Every upload is a base64 data URL through the worker: a 25 MB attachment allocates
+            well over 100 MB in a 128 MB isolate, on the request path. The fix changes both the
+            client contract and the security model of a bucket whose keys <em>are</em> its
+            credentials &mdash; SCOPE ch.06's recorded decision.
+          </p>
+        </div>
+        <span class="chip c">Tier C</span>
+      </div>
+
+      <div class="item locked">
+        <span class="n">&#9651;</span>
+        <div>
+          <h4>R16's exact <code>COUNT(*)</code> &mdash; a Law of the Base</h4>
+          <p>
+            O(n) per feed page on a tens-of-millions-row table, and the largest remaining query
+            cost in the app. A cached or approximate count needs RULES.md, the registry and the
+            check changed together. The new composite index makes it an index-only scan: a large
+            constant-factor win, not a complexity one.
+          </p>
+        </div>
+        <span class="chip c">Tier C</span>
+      </div>
+
+      <div class="item open">
+        <span class="n">&#9651;</span>
+        <div>
+          <h4>Delivering the alarms</h4>
+          <p>
+            <code>db_alerts</code> and the new <code>filling</code> list land in a table and a
+            <code>console.error</code>, behind an owner-gated route nobody polls. Until it is
+            wired to an email or a page, &ldquo;we have alarms&rdquo; means &ldquo;we have a
+            table&rdquo;. Who gets paged is the owner's call; the sender already exists.
+          </p>
+        </div>
+        <span class="chip b">Tier B</span>
+      </div>
+
+      <div class="item open">
+        <span class="n">&#9651;</span>
+        <div>
+          <h4>Per-caller rate limiting on ordinary doors</h4>
+          <p>
+            Auth, the agent, the error log and account activity are all throttled. Ordinary reads
+            are not &mdash; a member can hammer the activity feed, whose exact count is O(rows),
+            as fast as they like. Needs wrangler config on eight workers, new 429 paths, and a
+            decision about the limits.
+          </p>
+        </div>
+        <span class="chip b">Tier B</span>
+      </div>
+
+      <div class="item open">
+        <span class="n">&#9651;</span>
+        <div>
+          <h4>A retention window for the audit tables</h4>
+          <p>
+            <code>account_activity</code>, the per-team feed and the usage ledgers grow for ever
+            in the shared database. <code>retention.ts</code> is explicit that it never takes
+            &ldquo;anything anyone might have to answer for later&rdquo;. How long a record
+            somebody may be asked about is kept is a business decision, not an index's.
+          </p>
+        </div>
+        <span class="chip b">Owner</span>
+      </div>
+
+      <div class="item open">
+        <span class="n">&#9651;</span>
+        <div>
+          <h4>List virtualisation</h4>
+          <p>
+            Dimension 5's one missing signal. Collections come from <code>@kwapso/ui</code>,
+            which is out of bounds from this repo. The new 1,000-row page ceiling bounds the
+            damage; real virtualisation is a library change to surface upstream.
+          </p>
+        </div>
+        <span class="chip b">Library</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── the arithmetic ─────────────────────────────────────────────────── -->
+  <section>
+    <h2>Why 94 was not reachable</h2>
+    <p class="lede">Every available point, and what blocks it</p>
+    <p class="note">
+      The gap is +16 total, or +1,600 weighted. Below is every place they could come
+      from. The eight sum to about +1,713 &mdash; so 94 requires essentially all of
+      them, and no subset reaches it without at least one Tier&nbsp;C architectural
+      change or one Law amendment.
+    </p>
+
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Dimension</th><th class="n">Now</th><th class="n">Ceiling</th>
+            <th class="n">Weighted gain</th><th>Blocked by</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>9 &middot; Write fan-out</td><td class="n">0</td><td class="n">~90</td><td class="n">+630</td><td>Tier C &mdash; DO topology, locked in ARCHITECTURE.md</td></tr>
+          <tr><td>12 &middot; File &amp; object storage</td><td class="n">51</td><td class="n">~90</td><td class="n">+312</td><td>Tier C &mdash; presigned uploads change the client contract</td></tr>
+          <tr><td>1 &middot; Partitioning</td><td class="n">76</td><td class="n">~90</td><td class="n">+168</td><td>Tier C &mdash; core database split, resumable mover</td></tr>
+          <tr><td>2 &middot; Query shape</td><td class="n">88</td><td class="n">100</td><td class="n">+156</td><td>A Law &mdash; R16's exact count</td></tr>
+          <tr><td>5 &middot; Client data volume</td><td class="n">75</td><td class="n">~90</td><td class="n">+135</td><td><code>@kwapso/ui</code> &mdash; out of bounds from here</td></tr>
+          <tr><td>7 &middot; Surge</td><td class="n">68</td><td class="n">~90</td><td class="n">+132</td><td>Tier B &mdash; rate-limiting bindings on 8 workers</td></tr>
+          <tr><td>4 &middot; Headroom</td><td class="n">84</td><td class="n">~96</td><td class="n">+96</td><td>Tier B &mdash; alarm delivery: who gets paged</td></tr>
+          <tr><td>3 &middot; Contract stability</td><td class="n">88</td><td class="n">100</td><td class="n">+84</td><td>Tier C &mdash; a real cross-shard merge</td></tr>
+        </tbody>
+        <tfoot>
+          <tr><td>All eight</td><td class="n">78</td><td class="n">~95</td><td class="n">+1,713</td><td>Four of them are Tier C</td></tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <p class="note" style="margin-top:22px">
+      Cheapest genuine route, by impact &divide; effort: <strong>scope and shard the
+      broadcast</strong> (+630, and it removes the app's first ceiling), then
+      <strong>rate limiting</strong> (+132, mostly config), then <strong>alarm
+      delivery</strong> (+96, the sender exists), then <strong>presigned uploads</strong>
+      (+312). Those four alone reach about 89.
+    </p>
+  </section>
+
+  <footer>
+    <p>
+      <b>Caveat that qualifies every number above:</b> nothing in this codebase measures
+      p95 latency per endpoint. Every performance claim is derived from code shape, row
+      counts and platform limits looked up live on 14 Aug 2026 &mdash; not from observation.
+    </p>
+    <p>
+      31 files changed, 6 new test suites, 2 core migrations + 1 team migration to apply
+      before deploy. Full detail in <b>scaling-review.md</b>.
+      <code>@kwapso/ui</code>, <code>glide/</code> and <code>.session-notes/</code> untouched.
+    </p>
+  </footer>
+
+</div>

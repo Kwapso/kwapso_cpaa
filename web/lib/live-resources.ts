@@ -27,18 +27,40 @@ export function cursorKey(listKey: string): string {
   return `cursor:${listKey}`
 }
 
+/** How many rows one paged list may hold in the browser at once.
+ *
+ * `loadMore` APPENDS, which is what makes "load more" feel like one list — and
+ * with nothing stopping it, a growing collection (the activity feed, tickets) had
+ * no ceiling at all on the client side: page after page went into one array, in
+ * memory and in the DOM, for as long as the tab stayed open. R14 caps what one
+ * REQUEST returns; nothing capped what a session ACCUMULATED, and the two are
+ * different numbers.
+ *
+ * Twenty pages of PAGE_SIZE (50). Nobody reads a thousand rows looking for
+ * something — they search, or they filter — and past this the honest answer is to
+ * say so rather than to keep growing a list the browser will choke on. It is also
+ * comfortably inside the row budget the cache itself now enforces
+ * (MAX_CACHED_ROWS in shared/web/store.ts), so one list can never spend the whole
+ * tab's allowance and evict every other screen. */
+export const CLIENT_PAGE_ROWS_CAP = 1000
+
 /** Fetch the NEXT page of a paged collection and APPEND it to the loaded prefix —
  * never a refetch of what's already on screen. Returns false when there was
- * nothing more to load (so the caller can stop asking). The cursor is opaque: it
- * only ever travels cache → door → cache. */
+ * nothing more to load, or when the loaded list has reached
+ * CLIENT_PAGE_ROWS_CAP (so the caller can stop asking, and say why). The cursor
+ * is opaque: it only ever travels cache → door → cache. */
 export async function loadMore<T>(
   listKey: string,
   fetchPage: (cursor: string) => Promise<{ rows: T[]; nextCursor: string | null }>
 ): Promise<boolean> {
   const cursor = readCache<string | null>(cursorKey(listKey))
   if (!cursor) return false
+  const loaded = readCache<T[]>(listKey) ?? []
+  // The ceiling is checked BEFORE the fetch — a page nobody may keep is a request
+  // nobody should make.
+  if (loaded.length >= CLIENT_PAGE_ROWS_CAP) return false
   const next = await fetchPage(cursor)
-  primeCache(listKey, [...(readCache<T[]>(listKey) ?? []), ...next.rows])
+  primeCache(listKey, [...loaded, ...next.rows])
   primeCache(cursorKey(listKey), next.nextCursor)
   return true
 }

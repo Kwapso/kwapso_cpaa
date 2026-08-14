@@ -65,10 +65,62 @@ export function refuseForeignOrigin(request: Request): Response | null {
   return fail(403, "foreign_origin", "That request didn't come from this site.")
 }
 
+/** WHAT A RANGE IS, as R2 spells it: a UNION of three shapes, not one object with
+ * three optional fields. "From here to the end", "this many bytes from here" and
+ * "the last n bytes" are three different asks, and a single all-optional object
+ * would also describe nonsense (a length with no offset and a suffix at once).
+ * Writing the union is what lets `byteRange` return only the askable shapes — and
+ * it is the shape the real binding hands BACK, so the response can describe what
+ * was actually sent.
+ *
+ * `options?: unknown` on the bucket below is the other half of the same note:
+ * `R2Bucket.get` is overloaded and one of its overloads requires `onlyIf`, so a
+ * structural slice that names the options shape is checked against THAT overload
+ * and the real binding stops being assignable. The option object is built one line
+ * from where it is passed and fully typed there; what this door needs from the
+ * bucket is the key and the answer. */
+type MediaRange = { offset: number; length?: number } | { length: number } | { suffix: number }
+
 /** What an R2 object body looks like to us — just enough to serve it, so this
- * module needs no R2 types beyond what it actually touches. */
-type MediaObject = { body: ReadableStream | null; httpMetadata?: { contentType?: string } }
-type MediaBucket = { get(key: string): Promise<MediaObject | null> }
+ * module needs no R2 types beyond what it actually touches.
+ *
+ * `size` and `range` are what a RANGE read needs: the total length for the
+ * `Content-Range` header, and which slice R2 actually returned (it may narrow a
+ * request, and the header must describe what was sent, not what was asked for). */
+type MediaObject = {
+  // OPTIONAL, and the reason is R2's own types: one `get` overload can answer an
+  // `R2Object` (metadata, no body) as well as an `R2ObjectBody`, so a slice that
+  // REQUIRES `body` is not something the real binding satisfies. The serve path
+  // treats a missing body as an empty one, which is what a 200 with no content is.
+  body?: ReadableStream | null
+  size?: number
+  range?: MediaRange
+  httpMetadata?: { contentType?: string }
+}
+/** The one method this door touches, still — now with the range option it needs. */
+type MediaBucket = {
+  get(key: string, options?: unknown): Promise<MediaObject | null>
+}
+
+/** The `Range:` header, as the one form that matters here — a single byte range.
+ *
+ * Multi-range requests are legal HTTP and no browser media player sends them, so
+ * anything that is not one plain `bytes=a-b`, `bytes=a-` or `bytes=-n` is treated
+ * as no range at all: the whole object comes back with a 200, which is exactly
+ * what a client that could not be understood should receive. */
+function byteRange(header: string | null): MediaRange | null {
+  const m = header && /^bytes=(\d*)-(\d*)$/.exec(header.trim())
+  if (!m) return null
+  const [, rawStart, rawEnd] = m
+  if (rawStart === "" && rawEnd === "") return null
+  // `bytes=-500` is "the last 500 bytes", which R2 calls a suffix.
+  if (rawStart === "") return { suffix: Number(rawEnd) }
+  const offset = Number(rawStart)
+  if (rawEnd === "") return { offset }
+  const end = Number(rawEnd)
+  if (end < offset) return null // a nonsense range is not a range
+  return { offset, length: end - offset + 1 }
+}
 
 /** Headers for an R2 media object served on an app origin. These responses are
  * WORKER-built, so the app's public/_headers does not apply to them — the
@@ -82,6 +134,11 @@ export function mediaHeaders(object: MediaObject): HeadersInit {
     "Content-Security-Policy": "default-src 'none'; sandbox",
     "X-Content-Type-Options": "nosniff",
     "Cache-Control": "public, max-age=31536000, immutable",
+    // WHAT MAKES A RANGE REQUEST POSSIBLE AT ALL. Without this a browser does not
+    // ask, and a media player that cannot ask cannot seek: an attachment may be a
+    // 25 MB video, and dragging its scrub bar re-downloaded the whole file from
+    // the start — a resumable, seekable object served as if it were a small image.
+    "Accept-Ranges": "bytes",
   }
 }
 
@@ -109,12 +166,35 @@ export function mediaHeaders(object: MediaObject): HeadersInit {
 export async function serveMedia(
   bucket: MediaBucket,
   pathname: string,
-  prefix: string
+  prefix: string,
+  /** The caller's `Range:` header, when there is one. Optional so the two
+   * gateways' existing whole-object calls keep working unchanged. */
+  rangeHeader?: string | null
 ): Promise<Response> {
   const key = safeMediaKey(pathname.slice(prefix.length))
-  const object = key && (await bucket.get(key))
+  if (!key) return new Response("Not found", { status: 404 })
+  const range = byteRange(rangeHeader ?? null)
+  const object = await bucket.get(key, range ? { range } : undefined)
   if (!object) return new Response("Not found", { status: 404 })
-  return new Response(object.body, { headers: mediaHeaders(object) })
+  const headers = new Headers(mediaHeaders(object))
+  // A PARTIAL ANSWER MUST SAY SO, and say exactly which bytes it is. A 200 with a
+  // slice of the file in it is the worst possible reply: the player believes it
+  // has the whole thing. R2 may also narrow what it returns, so the header
+  // describes `object.range` — what was SENT — never what was asked for.
+  if (range && object.range && object.size !== undefined) {
+    // Read off the union R2 handed back, in the same three shapes it accepts. A
+    // suffix answer ("the last n bytes") has no offset of its own — it is the one
+    // whose start has to be computed from the total.
+    const sent = object.range
+    const offset =
+      "suffix" in sent ? Math.max(0, object.size - sent.suffix) : "offset" in sent ? sent.offset : 0
+    const length =
+      "suffix" in sent ? Math.min(sent.suffix, object.size) : (sent.length ?? object.size - offset)
+    headers.set("Content-Range", `bytes ${offset}-${offset + length - 1}/${object.size}`)
+    headers.set("Content-Length", String(length))
+    return new Response(object.body ?? null, { status: 206, headers })
+  }
+  return new Response(object.body ?? null, { headers })
 }
 
 /**

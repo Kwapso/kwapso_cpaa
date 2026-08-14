@@ -20,6 +20,14 @@ vi.mock("@shared/workers/d1-rest", () => ({
     bindings.push(params)
     return sql.includes("COUNT(*)") ? [{ n: 0 }] : []
   }),
+  // THE REAL ONE, deliberately. The fence renders its account ids as literals
+  // rather than binding them (D1 refuses a statement past 100 bound parameters,
+  // and the activity clause carries the set three times) — so a stubbed
+  // `sqlString` would let this suite pass over SQL that no longer escapes
+  // anything. The assertions below read the clause as text; they must read the
+  // text the door actually sends.
+  sqlString: (value: unknown) =>
+    value === null || value === undefined ? "NULL" : `'${String(value).replaceAll("'", "''")}'`,
 }))
 
 const { getActivity } = await import("../src/lib/activity-read")
@@ -138,7 +146,12 @@ describe("a client login's record reads are fenced on every table (the help leak
       expect(q).toContain("related_table = 'accounts'")
       expect(q, "a closed answer would lock the client out of their own history").not.toContain("0 = 1")
     }
+    // The ROW ID is still bound (it arrives from the caller); the fence's own
+    // account ids are literals in the clause above. Both halves are asserted, so
+    // neither can quietly change into the other.
     for (const params of bindings) expect(params).toContain("A_MINE")
+    for (const q of queries)
+      expect(q, "the fence's ids are literals, not bound parameters").toContain("'A_MINE'")
   })
 
   it("STAFF are not fenced (a fence that refuses everybody is a broken door)", async () => {

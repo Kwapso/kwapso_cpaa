@@ -1025,9 +1025,16 @@ async function rowInFenceOrThrow(
 
 /** WHERE this client login may stand, with names — the switcher's whole payload,
  * and the ONLY place the roots become readable text. Not a growing collection: a
- * person belongs to a handful of companies, and the guard corridor has already
- * bounded the set. LIMIT LIST_HARD_CAP anyway (R14), because "it can't get big"
- * is exactly the sentence every unbounded read was born from. */
+ * person belongs to a handful of companies. LIMIT LIST_HARD_CAP anyway (R14),
+ * because "it can't get big" is exactly the sentence every unbounded read was
+ * born from.
+ *
+ * ONE BOUND PARAMETER PER ROOT, and that is only safe because the corridor now
+ * caps the set: `ROOTS_SQL` had no LIMIT, so "the guard corridor has already
+ * bounded the set" — which this comment used to claim — was not true, and past
+ * ~99 links the statement carried more parameters than D1 accepts.
+ * PORTAL_ROOTS_CAP (50) is what makes the claim true, and it is the number
+ * `d1-parameter-cap.test.ts` vouches for this list by. */
 export async function portalStandings(
   cfg: D1Rest,
   guard: MemberGuard,

@@ -227,16 +227,67 @@ takes:
 | `login_codes` | older than `AUTH_RETENTION_HOURS` (24h) | a code lives ten minutes; the per-address cap looks back one hour |
 | `login_sends` | older than `AUTH_RETENTION_HOURS` | the send budget's whole window is one hour |
 | `sessions` | already past their own `expires_at` | that cookie is already dead — every read re-checks expiry |
+| `error_logs` | older than `ERROR_LOG_RETENTION_DAYS` (90) | diagnostics, not a record — and 90 days is the window `db/core/0012` has claimed since the table was created |
 
 Sessions are judged by **expiry, not age**: `expires_at` slides forward while a
 session is in use, so an age-based sweep would sign out every long-lived user.
 
 Nothing anyone might have to answer for is touched: activity, account activity,
-`error_logs`, `agent_usage_log`, invite audits and every audit block stay. Each
-delete is bounded (`RETENTION_DELETE_CAP` rows per table per night, via an inner
-`SELECT … LIMIT`) — an estate swept for the first time catches up over a few
-nights instead of timing out every night and deleting nothing. A run that hits
-its ceiling is recorded to `error_logs`, not merely logged (R12).
+`agent_usage_log`, invite audits and every audit block stay. `error_logs` is the
+one that moved, and only because it was already documented as a 90-day history
+with nothing enforcing it — a rate ceiling (`db/core/0019`) bounds how fast a
+store fills, never how full it gets. **A retention window for `account_activity`
+or the usage ledgers is an owner's decision, not an index's**, and it is still
+open (scaling review 2026-08-14).
+
+**A statement is bounded; a NIGHT is bounded separately** (scaling review
+2026-08-14). Each delete takes at most `RETENTION_DELETE_CAP` rows — that is the
+cap on what can time out — and the tick runs that statement up to
+`RETENTION_PASSES_PER_TICK` (40) times per table, stopping the moment one comes
+back short. Only the first of those existed, and the difference was the finding:
+5,000 rows a night against a shared database taking sign-ins from every tenant is
+not retention, and at the yardstick (a quarter of a million people in one tenant,
+plus everyone else) the tables grew monotonically while a green nightly job
+reported success. 40 × 5,000 = 200,000 rows per table per night, no statement any
+larger than the one that already worked. A run that hits the PASS ceiling is
+recorded to `error_logs`, not merely logged (R12).
+
+### db_growth — KEEP (BUILT 2026-08-14, GLOBAL — `db/core/0022`) — HOW LONG HAVE I GOT
+Purpose: the half of the growth watch the size alarm never had. `db_alerts` says a
+database has crossed 80% of D1's 10 GB cap, and 80% is a POSITION, not a warning —
+two databases at 8.1 GB raise the identical alarm and are in completely different
+trouble, one having sat there a year and the other having crossed 6 GB last week.
+The mover takes a while and needs a person, so the question that follows every alarm
+is "how long have I got", and nothing recorded the two readings a rate needs.
+
+**One row per database, not one per night.** A sample table is the obvious shape and
+the wrong one: an estate near the platform's 50,000-database limit would add 50,000
+rows a night to the very database this mechanism keeps small — a growth watch that is
+itself the growth. Each row holds tonight's `size_bytes`/`at` and the previous
+reading (`prev_size_bytes`/`prev_at`), and the nightly upsert shifts current into
+previous **inside one statement** (`excluded` vs the bare columns), so there is no
+read-then-write pair to race.
+
+**The interval is stored, not assumed.** A rate computed against a presumed 24 hours
+is quietly wrong exactly when the cron has been late, skipped or re-fired — which is
+when you are most likely reading it. `daysUntilFull()` (one exported function, beside
+the rows it reads) is headroom-from-the-CAP ÷ (Δsize ÷ Δtime), and it returns **null**
+rather than a number whenever it cannot answer honestly: one reading only, no elapsed
+time, or a database that held still or shrank. "Not growing" and "growing slowly" are
+different answers and only one of them is a number.
+
+Bounded at `CRON_GROWTH_CAP` (200) readings a night, taking the LARGEST databases —
+a trend only matters where there is a ceiling to reach. Written on quiet nights too
+(a trend you start measuring at 80% is a trend you measured too late), and wrapped so
+a failed reading can never cost somebody the alarm that a database is nearly full.
+Read through the owner-gated `GET /api/tenancy/admin/db-sizes` as `filling`, soonest
+first. Locked by `workers/tenancy/test/db-growth.test.ts`.
+
+**Every sweep predicate has an index behind it** (`db/core/0015`, `0017`, `0021`).
+`sessions` did not: the only index on it led with `user_id`, so the sweep meant to
+keep the shared database under D1's 10 GB cap was full-scanning the largest table in
+it, every night, to find 5,000 rows — a sweep whose predicate scans is the timeout
+this whole mechanism exists to avoid, wearing a `LIMIT`.
 
 The other half of the same problem is RATE, and a sweep does not solve it: every
 repeatable core write now carries a per-caller ceiling that rides its INSERT
@@ -362,7 +413,21 @@ without opening every team DB.
 Purpose: the human-readable change feed. Glide referenced the subject row via
 **one relation column per table** (`Invite logs/Teams/Member roles/Team members/
 Data import sessions Row ID`). Brimba uses a generic `(related_table,
-related_row_id)` pair instead → scales to any module without new columns. Per the
+related_row_id)` pair instead → scales to any module without new columns.
+
+**Indexes (team migration `0023_activity_feed_index`, scaling review 2026-08-14).**
+This is the fastest-growing table in a team database by construction: R1 makes every
+mutation publish and this feed records a row for each, so at the yardstick it is the
+tens-of-millions one. It pages by keyset (R14) on `ORDER BY created_at DESC, id DESC`
+— and from `0001` until now its only index led with `related_table`. So the RECORD
+scope was indexed and the TEAM scope, the feed everybody opens, was not: every page
+scanned and sorted the whole table to hand back fifty rows, and page two paid it
+again. `idx_activity_feed (created_at DESC, id DESC)` serves the unfiltered page;
+`idx_activity_table_feed (related_table, created_at DESC, id DESC)` serves R18's
+`related_table IN (…)` page and lets the R16 `COUNT(*)` beside it read an index
+rather than the widest table in the database. (`meetings` has carried exactly this
+index for exactly this reason since `0021`.) The count is still O(rows-it-counts) —
+that is R16's price, and it is named in `scaling-review.md`. Per the
 Q3 resolution below — **log EVERYTHING** (creations, edits, activations/
 deactivations, milestones), superseding the earlier "edits/deactivations only" —
 the SAME rows are surfaced four ways by the read path
@@ -844,7 +909,7 @@ Google surface; every handler opens with `refusePortalCaller` and both tables ar
 
 - **Built**: users, teams, team_members, invite_index, member_roles,
   role_permissions, selectable_data, activity (table only), team_module_databases,
-  db_alerts, login_codes (+ `sent_ip` / `sends`, 0015 — the send throttle's own
+  db_alerts, db_growth (GLOBAL core `0022` — see below), login_codes (+ `sent_ip` / `sends`, 0015 — the send throttle's own
   ledger: WHO asked for each code and how many emails that row has caused, so a
   rotation is counted like a mint), sessions (+ `team_pin`, 0013), account_activity, email_change_logs +
   email_change_codes (the hashed-OTP split; BUILT 2026-06-17), invite_logs

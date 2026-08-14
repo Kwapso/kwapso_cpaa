@@ -15,7 +15,7 @@ import { GuardError, hasRight, type MemberGuard } from "@shared/workers/gating"
 import type { HelpStakeholder } from "@shared/types"
 import { getTicket } from "./help"
 import type { Env } from "../env"
-import { THREAD_HARD_CAP } from "@shared/workers/limits" // R14 hard cap
+import { idBatches, THREAD_HARD_CAP } from "@shared/workers/limits" // R14 hard cap
 
 /** The four origins a stakeholder can have — drives the chip label in the UI. */
 export type StakeholderOrigin = "raiser" | "admin" | "mentioned" | "added"
@@ -71,27 +71,33 @@ async function lookupUsers(
   const out = new Map<string, { name: string | null; email: string; imageUrl: string | null }>()
   const unique = [...new Set(ids)].filter(Boolean)
   if (!unique.length) return out
-  const placeholders = unique.map(() => "?").join(", ")
-  const { results } = await env.DB.prepare(
-    `SELECT u.id, u.email, u.first_name, u.last_name, u.image_url
-       FROM users u
-       JOIN team_members tm ON tm.user_id = u.id
-      WHERE tm.team_id = ? AND tm.deactivated_at IS NULL AND u.id IN (${placeholders}) LIMIT ${THREAD_HARD_CAP}`
-  )
-    .bind(teamId, ...unique)
-    .all<{
-      id: string
-      email: string
-      first_name: string | null
-      last_name: string | null
-      image_url: string | null
-    }>()
-  for (const r of results ?? []) {
-    out.set(r.id, {
-      name: [r.first_name, r.last_name].filter(Boolean).join(" ") || null,
-      email: r.email,
-      imageUrl: r.image_url,
-    })
+  // BATCHED under D1's bound-parameter ceiling. The id list arriving here is
+  // bounded by THREAD_HARD_CAP (500) — a real bound, and five times more than one
+  // statement may carry, so a ticket watched by more than ~99 people answered 500
+  // rather than slowly. `reserved` is 1 for the team id bound alongside them.
+  for (const batch of idBatches(unique, 1)) {
+    const { results } = await env.DB.prepare(
+      `SELECT u.id, u.email, u.first_name, u.last_name, u.image_url
+         FROM users u
+         JOIN team_members tm ON tm.user_id = u.id
+        WHERE tm.team_id = ? AND tm.deactivated_at IS NULL
+          AND u.id IN (${batch.map(() => "?").join(", ")}) LIMIT ${THREAD_HARD_CAP}`
+    )
+      .bind(teamId, ...batch)
+      .all<{
+        id: string
+        email: string
+        first_name: string | null
+        last_name: string | null
+        image_url: string | null
+      }>()
+    for (const r of results ?? []) {
+      out.set(r.id, {
+        name: [r.first_name, r.last_name].filter(Boolean).join(" ") || null,
+        email: r.email,
+        imageUrl: r.image_url,
+      })
+    }
   }
   return out
 }

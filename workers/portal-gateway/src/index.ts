@@ -203,7 +203,9 @@ async function handle(request: Request, env: Env): Promise<Response> {
     // decision, same boundary validation, same headers as the agency door — one
     // function, so it cannot be otherwise.
     if (pathname.startsWith("/media/") && request.method === "GET")
-      return serveMedia(env.MEDIA, pathname, "/media/")
+      // A RANGE, IF THEY ASKED FOR ONE — the same seekable, resumable serving the
+      // agency door gives, because it is the same function.
+      return serveMedia(env.MEDIA, pathname, "/media/", request.headers.get("Range"))
 
     // The tickets tree: /tickets/<ticketId> is ONE client-resolved screen. The
     // static export emits a single shell, so serve it for any /tickets/* depth

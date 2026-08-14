@@ -1662,6 +1662,37 @@ SELECT lower(hex(randomblob(16))), r.id, 'meetings', r.is_default, r.is_default,
  );
 `,
   },
+  {
+    // THE FEED GETS THE INDEX ITS OWN PAGING ASKS FOR.
+    //
+    // `activity` is the fastest-growing table in a team's database by
+    // construction: R1 makes every mutation publish and R18's feed records one
+    // row for each, so at the yardstick this table is the tens-of-millions one.
+    // It has paged by keyset since R14 — `ORDER BY created_at DESC, id DESC`,
+    // with `created_at < ? OR (created_at = ? AND id < ?)` as the cursor — and
+    // the only index on it since 0001 leads with `related_table`.
+    //
+    // So the record scope (`related_table = ? AND related_row_id = ?`) was
+    // indexed and the TEAM scope, which is the feed everybody opens, was not:
+    // every page did a full scan and a sort of the whole table to hand back
+    // fifty rows, and page two paid it again. `meetings` already carries exactly
+    // this index for exactly this reason ("the keyset the paged read walks, so
+    // page two is an index seek rather than an offset scan") — the feed that
+    // grows fastest was the one missing it.
+    //
+    // TWO INDEXES, because the feed has two shapes and they are not the same
+    // seek. The plain one serves an unfiltered page; the composite one serves
+    // R18's `related_table IN (…)` page AND lets the R16 COUNT(*) beside it read
+    // an index rather than the table. Neither makes that COUNT cheaper than
+    // O(rows-it-counts) — that is R16's price and it is named in the scaling
+    // report — but an index-only scan over one narrow column is a different
+    // order of cost from a scan of the widest table in the database.
+    version: "0023_activity_feed_index",
+    sql: `
+CREATE INDEX IF NOT EXISTS idx_activity_feed ON activity (created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_activity_table_feed ON activity (related_table, created_at DESC, id DESC);
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

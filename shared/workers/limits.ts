@@ -15,6 +15,54 @@ export const EXPORT_HARD_CAP = 10_000
  * messages, a per-member progress matrix). */
 export const THREAD_HARD_CAP = 500
 
+// ── the platform's own ceiling on one statement ───────────────────────────────
+// The caps above are OURS: numbers we chose. This one is D1's, and it is the
+// reason a read can be perfectly bounded by the caps above and still fail.
+
+/** Bound parameters D1 accepts in ONE statement (checked against Cloudflare's
+ * published D1 limits, 14 Aug 2026). Named here rather than repeated at each
+ * door because it is the ceiling the caps above have to fit UNDER: a read capped
+ * at LIST_HARD_CAP that then looks its 1,000 ids up with `IN (?, ?, …)` is a
+ * bounded read that D1 refuses outright.
+ *
+ * WHY IT KEPT BEING MISSED: every suite in this repo runs its SQL against local
+ * SQLite, whose limit is 999 — a harness ten times MORE permissive than the thing
+ * it stands in for, so a statement binding 500 values passes every test and 500s
+ * in production. It has, twice (`workers/content/test/d1-parameter-cap.test.ts`
+ * records the first). */
+export const D1_MAX_BOUND_PARAMS = 100
+
+/** Slice an id list into batches that fit under D1's ceiling, so a lookup over
+ * more ids than one statement may carry becomes several statements instead of an
+ * error. `reserved` is how many parameters the statement binds BESIDE the ids
+ * (a team id, a status) — counted, not guessed, because the ceiling is on the
+ * whole statement.
+ *
+ * The alternative — interpolating the ids through `sqlString` — is what the fence
+ * does (shared/workers/account-scope.ts), and it is right there because the SQL
+ * is assembled as text anyway. On the core database the house style is a bound
+ * `env.DB.prepare(...).bind(...)`, and batching keeps it that way rather than
+ * teaching a second habit. */
+export function idBatches(ids: string[], reserved = 0): string[][] {
+  const size = Math.max(1, D1_MAX_BOUND_PARAMS - reserved)
+  const out: string[][] = []
+  for (let i = 0; i < ids.length; i += size) out.push(ids.slice(i, i + size))
+  return out
+}
+
+/** Companies one client login may STAND IN (the portal switcher's list).
+ *
+ * Different from SCOPE_HARD_CAP, which bounds how far the fence REACHES DOWN from
+ * whichever one they are standing in. This bounds how many they can choose
+ * between, and it exists for two reasons: the roots read had no LIMIT at all
+ * (R14), and the switcher's own lookup binds one parameter per root — so an
+ * uncapped set was both an unbounded read and a statement D1 would refuse. Far
+ * above "a person belongs to a handful of companies", and under
+ * D1_MAX_BOUND_PARAMS with room for the rest of the statement. Past it the set is
+ * short in the SAFE direction, like every other fence ceiling: fewer companies,
+ * never someone else's. */
+export const PORTAL_ROOTS_CAP = 50
+
 // ── bounds on the work a single request or tick may do ───────────────────────
 // R14 caps the ROWS a read returns. These cap the WORK a path does: how many
 // pages it will pull, how many round-trips it will fan out, how deep it will
@@ -40,6 +88,19 @@ export const CRON_TEAM_CAP = 200
  * plus an insert — so the tick's write work is bounded and the rest waits for
  * tomorrow's run, which re-finds them (the check is idempotent per database). */
 export const CRON_ALERT_CAP = 50
+
+/** Databases one nightly tick records a GROWTH reading for (`db_growth`).
+ *
+ * Bounded for the same reason CRON_ALERT_CAP is: the scan is one listing, but each
+ * reading is a write, and an estate near the platform's 50,000-database limit would
+ * turn a growth watch into the thing that grows. The tick takes the LARGEST this
+ * many, because a trend only matters where there is a ceiling to reach — a 4 MB
+ * database filling twice as fast as another 4 MB database is not news.
+ *
+ * Sized above CRON_TEAM_CAP so the watch is never narrower than the estate the
+ * crons work through, and well under the alarm ceiling's cost per row (an upsert,
+ * no read). */
+export const CRON_GROWTH_CAP = 200
 
 /** Pending invitations one sign-in sweep will accept in a single pass. Each one is
  * three core-DB writes plus two live pings, and the list is keyed on an EMAIL
@@ -118,6 +179,41 @@ export const ACCOUNT_ACTIVITY_PER_HOUR = 60
  * night, deleting nothing at all. Bounded work catches up over a few nights and
  * always finishes. */
 export const RETENTION_DELETE_CAP = 5_000
+
+/** How many BOUNDED deletes one table gets per nightly tick.
+ *
+ * The cap above bounds one STATEMENT, which is the right unit — a statement is
+ * what times out. It is not the right unit for the NIGHT, and the difference is
+ * the whole finding: at 5,000 rows a night one table can absorb 5,000 sign-ins a
+ * day, and the yardstick this base is built for is a quarter of a million people
+ * in ONE tenant, plus every other tenant on the same shared core database. A
+ * sweep that removes 5,000 while the day adds 300,000 is not retention, it is
+ * arithmetic pointing one way.
+ *
+ * So the tick runs the same bounded statement up to this many times, stopping
+ * early the moment one comes back short (nothing left to take). 40 × 5,000 =
+ * 200,000 rows per table per night, per statement none of which is any bigger
+ * than the one that already worked — and the loop is what makes "catching up
+ * takes a few nights and always finishes" true instead of aspirational. Sized to
+ * stay far inside a cron's 15 minutes: forty statements against an indexed
+ * predicate is seconds, not minutes. */
+export const RETENTION_PASSES_PER_TICK = 40
+
+/** How long the central error log keeps a row.
+ *
+ * db/core/0012 has described `error_logs` as a "90-day-ish owned history" since
+ * the day it was created, and nothing ever deleted a row — so the ninety days
+ * was a sentence in a comment rather than a property of the table, and the store
+ * that exists to tell you what broke was itself unbounded on the one database
+ * every tenant shares. 0019 added a per-caller RATE ceiling, which is a different
+ * promise: a rate bounds how fast it fills, a sweep bounds how full it gets.
+ *
+ * NOT the audit tables. `account_activity`, the team activity feed and the usage
+ * ledgers stay forever on purpose (retention.ts: "anything anyone might have to
+ * answer for later"). This one is diagnostics, its own comment already named the
+ * window, and implementing a documented window is not the same decision as
+ * choosing a new one. */
+export const ERROR_LOG_RETENTION_DAYS = 90
 
 /** How long a spent or expired sign-in artefact is kept before the sweep takes
  * it. Everything that reads these tables looks back ONE hour (the send budget,

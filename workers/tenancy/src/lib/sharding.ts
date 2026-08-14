@@ -20,12 +20,25 @@ import {
   type D1Rest,
 } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
-import { CRON_ALERT_CAP } from "@shared/workers/limits"
+import { CRON_ALERT_CAP, CRON_GROWTH_CAP, RETENTION_DELETE_CAP } from "@shared/workers/limits"
 import type { Env } from "../env"
+
+/** D1's hard per-database ceiling (Cloudflare's published D1 limits, checked
+ * 14 Aug 2026). Named rather than left implicit inside the 80% below, because the
+ * growth arithmetic needs the ceiling itself: "how long have I got" is headroom
+ * divided by a rate, and headroom is measured from HERE, not from the alarm. */
+export const D1_MAX_DATABASE_BYTES = 10 * 1024 * 1024 * 1024
 
 /** 80% of D1's 10GB per-database cap. */
 export const ALERT_THRESHOLD_BYTES = 8 * 1024 * 1024 * 1024
 const COPY_BATCH = 250
+
+/** Bounded DELETEs the mover will run to empty ONE moved table in the old home.
+ * 200 × RETENTION_DELETE_CAP = a million rows, which is comfortably more than any
+ * single table in a database that has only just crossed 8 GB. It is a ceiling on a
+ * loop, not a budget: past it the mover REFUSES rather than leaving a half-emptied
+ * source behind a flipped route (see the drain step). */
+const MOVE_DRAIN_PASSES = 200
 
 /** Nightly: size EVERY database in the account, alarm on anything ≥ the threshold.
  *
@@ -51,10 +64,13 @@ const COPY_BATCH = 250
 export async function checkDatabaseSizes(
   env: Env,
   cfg: D1Rest
-): Promise<{ checked: number; alerted: string[]; capped: boolean }> {
+): Promise<{ checked: number; alerted: string[]; capped: boolean; sampled: number }> {
   const databases = await d1ListDatabases(cfg)
   const alerted: string[] = []
   let capped = false
+  // The trend first, because it is what turns a POSITION into a WARNING — and
+  // because it must be recorded even on a night when nothing alarms.
+  const sampled = await recordGrowth(env, databases)
 
   for (const db of databases) {
     if ((db.file_size ?? 0) < ALERT_THRESHOLD_BYTES) continue
@@ -91,7 +107,85 @@ export async function checkDatabaseSizes(
     )
     alerted.push(db.name)
   }
-  return { checked: databases.length, alerted, capped }
+  return { checked: databases.length, alerted, capped, sampled }
+}
+
+/** TONIGHT'S SIZE, BESIDE LAST NIGHT'S — so "how long have I got" is answerable.
+ *
+ * 80% of a cap is a POSITION, not a warning. Two databases at 8.1 GB raise the
+ * identical alarm and are in completely different trouble: one has been there a
+ * year, the other crossed 6 GB last week. The mover takes a while and needs a
+ * person, so the question that matters is always the rate — and nothing recorded
+ * enough to compute one. This is the missing half of the growth watch, not a new
+ * alarm: it writes on every night, alarming or not, because a trend you only start
+ * measuring once you are already at 80% is a trend you measured too late.
+ *
+ * ONE UPSERT PER DATABASE, current shifted into previous. A sample-per-night table
+ * would make the growth watch the thing that grows (see db/core/0022).
+ *
+ * BOUNDED (CRON_GROWTH_CAP) and biased to the LARGEST, because a trend only matters
+ * where there is a ceiling to reach. Never throws: a growth reading is the least
+ * important thing this cron does, and it runs BEFORE the alarms — a failure here
+ * must not cost somebody the alert that a database is nearly full. */
+async function recordGrowth(
+  env: Env,
+  databases: { uuid: string; name: string; file_size: number | null }[]
+): Promise<number> {
+  const biggest = [...databases]
+    .sort((a, b) => (b.file_size ?? 0) - (a.file_size ?? 0))
+    .slice(0, CRON_GROWTH_CAP)
+  const now = new Date().toISOString()
+  let written = 0
+  for (const db of biggest) {
+    try {
+      // The shift happens INSIDE the statement (`excluded` is the incoming row, the
+      // bare columns are the stored one), so there is no read-then-write pair to
+      // race — the same shape CONCURRENCY.md asks for everywhere else. A re-fired
+      // tick therefore moves a real reading into `prev`, which is why `prev_at` is
+      // stored rather than assumed to be 24 hours ago.
+      await env.DB.prepare(
+        `INSERT INTO db_growth (database_id, database_name, size_bytes, at, prev_size_bytes, prev_at)
+         VALUES (?, ?, ?, ?, NULL, NULL)
+         ON CONFLICT(database_id) DO UPDATE SET
+           database_name   = excluded.database_name,
+           prev_size_bytes = db_growth.size_bytes,
+           prev_at         = db_growth.at,
+           size_bytes      = excluded.size_bytes,
+           at              = excluded.at`
+      )
+        .bind(db.uuid, db.name, db.file_size ?? 0, now)
+        .run()
+      written++
+    } catch (e) {
+      console.error(`db growth reading failed for ${db.name}:`, e)
+    }
+  }
+  return written
+}
+
+/** DAYS UNTIL A DATABASE IS FULL, from the two readings above — the sentence a
+ * person actually needs, computed rather than eyeballed.
+ *
+ * `null` when it cannot be answered honestly: no previous reading (a database's
+ * first night), no elapsed time between them, or a database that SHRANK or held
+ * still. "Not growing" and "growing slowly" are different answers and only one of
+ * them is a number; inventing a very large one would read as a measurement.
+ *
+ * Exported for the admin read and its own test — the arithmetic lives beside the
+ * rows it reads, so nobody has to re-derive it at a call site. */
+export function daysUntilFull(row: {
+  size_bytes: number
+  at: string
+  prev_size_bytes: number | null
+  prev_at: string | null
+}): number | null {
+  if (row.prev_size_bytes === null || row.prev_at === null) return null
+  const grew = row.size_bytes - row.prev_size_bytes
+  if (grew <= 0) return null
+  const days = (new Date(row.at).getTime() - new Date(row.prev_at).getTime()) / 86_400_000
+  if (!(days > 0)) return null
+  const headroom = D1_MAX_DATABASE_BYTES - row.size_bytes
+  return Math.max(0, headroom / (grew / days))
 }
 
 /**
@@ -190,11 +284,25 @@ export async function moveModuleToOwnDatabase(
 
     // 2 · Copy rows in batches (values inlined — the script API has no params;
     //     team tables hold text/numbers only, no blobs).
-    for (let offset = 0; ; offset += COPY_BATCH) {
+    //
+    //     BY KEY, NOT BY OFFSET. This walked `LIMIT 250 OFFSET n`, and offset
+    //     paging is wrong here twice over: SQLite reaches offset 4,000,000 by
+    //     reading and discarding four million rows, so copying a big table costs
+    //     O(n²) reads — and this is the tool you reach for precisely BECAUSE the
+    //     table is big. Worse, the window shifts under a concurrent insert or
+    //     delete, so rows could be copied twice or skipped, which step 3 would
+    //     then report as a count mismatch after the whole copy had run.
+    //
+    //     Every team table has `id TEXT PRIMARY KEY`, so "everything after the
+    //     last id I copied" is an index seek — constant cost per batch, and stable
+    //     under writes. Exactly the reasoning shared/workers/paging.ts states for
+    //     screens; the mover is the one place it mattered most and did not have it.
+    let after = ""
+    for (;;) {
       const rows = await d1Query<Record<string, string | number | null>>(
         cfg,
         team.database_id,
-        `SELECT * FROM ${table} LIMIT ${COPY_BATCH} OFFSET ${offset}`
+        `SELECT * FROM ${table} WHERE id > ${sqlValue(after)} ORDER BY id LIMIT ${COPY_BATCH}`
       )
       if (rows.length === 0) break
       const cols = Object.keys(rows[0])
@@ -207,6 +315,7 @@ export async function moveModuleToOwnDatabase(
         `INSERT INTO ${table} (${cols.join(", ")}) VALUES\n${values};`
       )
       movedRows += rows.length
+      after = String(rows[rows.length - 1].id)
       if (rows.length < COPY_BATCH) break
     }
 
@@ -224,8 +333,45 @@ export async function moveModuleToOwnDatabase(
   )
     .bind(ulid(), teamId, module, newDbId, new Date().toISOString())
     .run()
+  // THE OLD HOME IS EMPTIED IN BOUNDED BITES, and it MUST empty, because routing
+  // has already flipped: `resolveModuleDatabases` now returns both databases and
+  // every read is a MERGED read over them. A row left behind here is a row
+  // returned twice — a doubled list, a doubled count, doubled money.
+  //
+  // `DELETE FROM <table>;` was one statement over a table this function only runs
+  // on when it has grown too big for its database. D1 refuses a statement past 30
+  // seconds, so on a multi-million-row table that DELETE was the one step
+  // guaranteed to fail — and it failed AFTER the routing flip had committed,
+  // leaving exactly the doubled state above with nothing to say so. The same
+  // sentence shared/workers/retention.ts already had to learn: "a DELETE is
+  // exactly as unbounded as a SELECT".
+  //
+  // So it is chunked, and it is VERIFIED. Not draining is not a warning here; it
+  // is a state a person has to fix before the module is read again, and the only
+  // honest thing to do is say which table and stop.
   for (const table of tables) {
-    await d1ExecScript(cfg, team.database_id, `DELETE FROM ${table};`)
+    let left = 0
+    for (let pass = 0; ; pass++) {
+      await d1ExecScript(
+        cfg,
+        team.database_id,
+        `DELETE FROM ${table} WHERE id IN (SELECT id FROM ${table} LIMIT ${RETENTION_DELETE_CAP});`
+      )
+      const [remaining] = await d1Query<{ n: number }>(
+        cfg,
+        team.database_id,
+        `SELECT COUNT(*) AS n FROM ${table}`
+      )
+      left = remaining?.n ?? 0
+      if (left === 0) break
+      if (pass >= MOVE_DRAIN_PASSES)
+        throw new Error(
+          `move_drain_incomplete: ${table} still holds ${left} rows in the OLD database after ` +
+            `${MOVE_DRAIN_PASSES} passes. Routing is already pointing at ${newDbId}, so reads are ` +
+            `MERGED and these rows are duplicates — empty ${table} in ${team.database_id} before ` +
+            `the module is read again.`
+        )
+    }
   }
 
   await env.DB.prepare(

@@ -42,9 +42,8 @@ import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Check, ChevronsUpDown } from "lucide-react"
 
-import { invalidate } from "@shared/web/store"
+import { clearCache } from "@shared/web/store"
 import { ApiFailure, portal } from "@/lib/api"
-import { cacheKeys } from "@/lib/live-resources"
 
 export function AccountSwitcher({
   accounts,
@@ -95,35 +94,23 @@ export function AccountSwitcher({
     setPending(accountId)
     try {
       await portal.switchAccount(accountId)
-      // Everything on screen belonged to the company they just left. CONTEXT
-      // FIRST — it holds which company they are standing in and its name, so
-      // leaving it cached switches the server and not the screen: the header,
-      // this menu's tick and the company page all keep naming the old company
-      // while the tickets underneath belong to the new one. That is worse than
-      // not switching at all.
-      invalidate(cacheKeys.context)
-      invalidate(cacheKeys.session)
-      invalidate(cacheKeys.tickets)
-      invalidate(cacheKeys.ticketsTotal)
-      invalidate(cacheKeys.ticketsCursor)
-      invalidate(cacheKeys.company(currentAccountId))
-      invalidate(cacheKeys.company(accountId))
-      // THE VALUE, for the same reason as the tickets and for one more: the
-      // figure on that screen is hours saved for the company they were standing
-      // in, and it is the number they are most likely to read out to somebody.
-      // Left cached, the header would name one company over another company's
-      // savings — the one-at-a-time confusion, wearing its most quotable form.
-      invalidate(cacheKeys.value)
-      // WHAT WE ARE WAITING ON, AND WHAT THEY BOUGHT — both are lists of one
-      // company's rows, and both would otherwise be the previous company's under
-      // the new company's name. The to-do list is the worse of the two: it is a
-      // list somebody ACTS on, so a stale one is not a wrong screen, it is a
-      // person sending us another client's logo.
-      invalidate(cacheKeys.todos)
-      invalidate(cacheKeys.delivery)
-      // Dropping a cache marks it stale; this re-reads it. The shell holds the
-      // context inside its session read, so the header, this menu's tick and
-      // every screen below repaint from one call.
+      // EVERYTHING on screen belonged to the company they just left, so the
+      // whole cache goes — not a list of keys.
+      //
+      // This used to name them one by one (context, session, tickets and their
+      // total and cursor, both companies, the value, the to-dos, the delivery
+      // list), and each line arrived the same way: somebody noticed a screen
+      // still showing the previous company's rows under the new company's name.
+      // That is the shape R21 has already been bitten by twice — a hand-kept
+      // list of what a client can reach, which is correct until the next screen
+      // is added and then silently isn't. A switch is a change of WHO IS ASKING;
+      // the honest answer is that nothing cached survives it.
+      //
+      // AND IT HAPPENS BEFORE THE RE-READ BELOW. The context cache holds which
+      // company they are standing in and its name, so a repaint that ran while it
+      // was still cached would name the old company over the new one's rows —
+      // worse than not switching at all.
+      clearCache()
       onSwitched()
     } catch (e) {
       // The move didn't happen, so stop saying it is happening — the effect

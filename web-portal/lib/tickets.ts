@@ -19,6 +19,14 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { support } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 
+/** Rows this list may hold in the browser at once — the agency app's
+ * CLIENT_PAGE_ROWS_CAP, restated for the portal's own hook (the two front ends
+ * share no lib). The reason is the same: `loadMore` appends, and without a
+ * ceiling the array and the DOM under it grow for as long as the tab is open. The
+ * comment above promises a client "can reach the oldest one" and that stays
+ * true — through search and filters, not through a thousand appended rows. */
+const CLIENT_PAGE_ROWS_CAP = 1000
+
 /** Page one, primed with its exact total and the cursor page two starts at. */
 async function firstPage(): Promise<HelpTicket[]> {
   const page = await support.tickets()
@@ -36,6 +44,10 @@ export function useTickets() {
   const loadMore = React.useCallback(async () => {
     const next = readCache<string | null>(cacheKeys.ticketsCursor)
     if (!next) return
+    // Checked BEFORE the fetch — a page nobody may keep is a request nobody
+    // should make. `hasMore` below stands down at the same number, so the button
+    // goes away rather than becoming a no-op.
+    if ((readCache<HelpTicket[]>(cacheKeys.tickets) ?? []).length >= CLIENT_PAGE_ROWS_CAP) return
     setLoadingMore(true)
     try {
       const page = await support.tickets(next)
@@ -60,8 +72,9 @@ export function useTickets() {
     loading,
     error,
     refresh,
-    /** null cursor = that was the last page. */
-    hasMore: !!cursor,
+    /** null cursor = that was the last page; the row ceiling is the other way a
+     * list stops offering more (see CLIENT_PAGE_ROWS_CAP). */
+    hasMore: !!cursor && (data?.length ?? 0) < CLIENT_PAGE_ROWS_CAP,
     loadingMore,
     loadMore,
   }

@@ -11,11 +11,103 @@
 
 import * as React from "react"
 
-const cache = new Map<string, unknown>()
+// ── THE CACHE IS BOUNDED, AND IT HAS A MAXIMUM AGE ───────────────────────────
+// This was a plain `Map` that only ever grew. Nothing evicted, nothing expired,
+// and nothing cleared it when the person or the team changed — so the power user
+// CACHING.md is written for, one tab open for a working day, accumulated every
+// list they had ever opened (up to LIST_HARD_CAP rows each) plus every page
+// `loadMore` had ever appended, for as long as the tab lived. On a big tenant
+// that is a browser that gets slower all morning and dies after lunch, and no
+// screen was doing anything wrong to cause it.
+//
+// Three bounds, because there are three ways this fills up:
+//   • KEYS    — how many collections are remembered at once,
+//   • ROWS    — the number that actually costs memory (a key holding 5,000
+//               appended rows is worth 100 holding fifty),
+//   • AGE     — the ceiling on staleness that does not depend on a live ping
+//               arriving. Realtime patches the rows it knows about; a screen
+//               left open through a deploy, a permission change or a dropped
+//               socket needs a floor under freshness that is ours, not the
+//               socket's.
+//
+// EVICTION NEVER TAKES A KEY SOMEBODY IS LOOKING AT. A subscribed key is on
+// screen, and dropping it would blank a list to make room for one nobody is
+// reading. So the sweep skips subscribed keys and takes the least recently used
+// of the rest — which is exactly right, because the unsubscribed ones are the
+// ones the day's navigation left behind.
+
+/** Collections remembered at once. Generous for real navigation (a day of
+ * screens is tens of keys, not hundreds) and a wall for accumulation. */
+const MAX_CACHED_KEYS = 120
+
+/** Rows held across every cached array, together. The number that actually
+ * bounds memory: one paged feed scrolled all day can hold more rows on its own
+ * than forty ordinary lists put together. */
+const MAX_CACHED_ROWS = 20_000
+
+/** How long a cached value may be painted without a refetch, live pings or not.
+ * Ten minutes: long enough that ordinary back-and-forth navigation is still
+ * instant, short enough that nothing a socket missed survives a coffee break. */
+const MAX_CACHE_AGE_MS = 10 * 60 * 1000
+
+type Entry = { value: unknown; at: number }
+
+const cache = new Map<string, Entry>()
 const subscribers = new Map<string, Set<() => void>>()
 
 function notify(key: string) {
   subscribers.get(key)?.forEach((fn) => fn())
+}
+
+/** Is anything on screen reading this key? */
+function watched(key: string): boolean {
+  return (subscribers.get(key)?.size ?? 0) > 0
+}
+
+/** Rows an entry costs. Non-array values (a total, a cursor, one record) count
+ * as one — they are not what fills a tab up. */
+function rowCost(value: unknown): number {
+  return Array.isArray(value) ? value.length : 1
+}
+
+/** Bring both ceilings back under the line, oldest-touched first, never taking a
+ * key a screen is subscribed to. Runs after every write — the cost is one pass
+ * over at most MAX_CACHED_KEYS entries, and only when a bound is actually
+ * crossed. */
+function evict(): void {
+  let rows = 0
+  for (const entry of cache.values()) rows += rowCost(entry.value)
+  if (cache.size <= MAX_CACHED_KEYS && rows <= MAX_CACHED_ROWS) return
+  // Map iterates in insertion order and every write re-inserts, so this walks
+  // least-recently-written first. Deleting the CURRENT entry mid-iteration is
+  // defined behaviour for a Map iterator, so no copy is needed.
+  for (const [key, entry] of cache.entries()) {
+    if (cache.size <= MAX_CACHED_KEYS && rows <= MAX_CACHED_ROWS) break
+    if (watched(key)) continue
+    cache.delete(key)
+    rows -= rowCost(entry.value)
+  }
+}
+
+/** Write an entry, stamp it, and re-insert it so it counts as most recently
+ * used. THE one place `cache` is written, so the bounds cannot be bypassed by a
+ * future helper that forgets them. */
+function store(key: string, value: unknown): void {
+  cache.delete(key)
+  cache.set(key, { value, at: Date.now() })
+  evict()
+}
+
+/** The cached value, or undefined if there is none OR it is past
+ * MAX_CACHE_AGE_MS. An expired entry is dropped rather than returned, so the
+ * caller's own miss path (a real fetch) takes over — there is no second code
+ * path for "stale", which is how a maximum age stays one rule. */
+function fresh(key: string): Entry | undefined {
+  const entry = cache.get(key)
+  if (!entry) return undefined
+  if (Date.now() - entry.at <= MAX_CACHE_AGE_MS) return entry
+  cache.delete(key)
+  return undefined
 }
 
 /** Drop a cached entry and tell anyone showing it to refetch (live refresh). */
@@ -24,17 +116,34 @@ export function invalidate(key: string): void {
   notify(key)
 }
 
+/** FORGET EVERYTHING — sign-out, and switching to another team.
+ *
+ * Both change WHO IS ASKING, and a cache keyed by resource + team id still holds
+ * rows the next identity may not read. The tab used to keep them: a signed-out
+ * page could paint a member list from memory, and the caches of a team you no
+ * longer belong to sat there until the tab closed. Rows a caller may no longer
+ * see are not a memory problem, they are a disclosure — so this is called at the
+ * identity boundary rather than left to eviction.
+ *
+ * Subscribers are notified so anything mounted refetches through the
+ * permission-checked door and finds out honestly what it may still have. */
+export function clearCache(): void {
+  const keys = [...cache.keys()]
+  cache.clear()
+  for (const key of keys) notify(key)
+}
+
 /** Seed/replace a cached entry — e.g. after a mutation returns fresh data, so
  * the screen updates instantly without a round-trip. */
 export function primeCache(key: string, value: unknown): void {
-  cache.set(key, value)
+  store(key, value)
   notify(key)
 }
 
 /** Peek at a cached value without subscribing (e.g. the live handler bumping a
  * primed `total:` sidecar by ±1 on an add/remove ping). */
 export function readCache<T>(key: string): T | undefined {
-  return cache.get(key) as T | undefined
+  return fresh(key)?.value as T | undefined
 }
 
 /** Subscribe to a cached value WITHOUT a fetcher — for sidecar keys someone else
@@ -54,7 +163,7 @@ export function useCachedValue<T>(key: string | null): T | undefined {
   )
   return React.useSyncExternalStore(
     subscribe,
-    () => (key ? (cache.get(key) as T | undefined) : undefined),
+    () => (key ? (fresh(key)?.value as T | undefined) : undefined),
     () => undefined
   )
 }
@@ -66,12 +175,12 @@ export function useCachedValue<T>(key: string | null): T | undefined {
  * screen's own useCached will fetch normally). Pure seeding: no cache-first paint
  * or row-level live-sync behaviour changes, it just fills a cold key earlier. */
 export function primeCacheIfCold<T>(key: string, fetcher: () => Promise<T>): void {
-  if (cache.has(key)) return
+  if (fresh(key)) return
   void fetcher()
     .then((value) => {
       // Re-check: a real fetch (useCached) or live patch may have landed while we
       // were in flight — don't clobber it with our (now possibly stale) result.
-      if (!cache.has(key)) primeCache(key, value)
+      if (!fresh(key)) primeCache(key, value)
     })
     .catch(() => {
       /* a prewarm miss is silent — the screen fetches on mount as usual */
@@ -91,11 +200,11 @@ export async function patchRow(
   id: string,
   fetchOne: () => Promise<Record<string, unknown> | null>
 ): Promise<void> {
-  const cur = cache.get(key) as Record<string, unknown>[] | undefined
-  if (cur === undefined) return // not loaded — nothing visible to patch
+  const cur = fresh(key)?.value as Record<string, unknown>[] | undefined
+  if (cur === undefined) return // not loaded (or expired) — nothing visible to patch
   try {
     const row = await fetchOne()
-    const latest = cache.get(key) as Record<string, unknown>[] | undefined
+    const latest = fresh(key)?.value as Record<string, unknown>[] | undefined
     if (latest === undefined) return
     let next: Record<string, unknown>[]
     if (row == null) {
@@ -104,7 +213,7 @@ export async function patchRow(
       const idx = latest.findIndex((r) => r[idField] === id)
       next = idx >= 0 ? latest.map((r, i) => (i === idx ? row : r)) : [row, ...latest]
     }
-    cache.set(key, next)
+    store(key, next)
     notify(key)
   } catch (e) {
     console.error("patchRow failed; invalidating", key, e)
@@ -131,17 +240,17 @@ export async function reconcile(
   idField: string,
   fetchList: () => Promise<Record<string, unknown>[]>
 ): Promise<void> {
-  if (cache.get(key) === undefined) return // not loaded — nothing visible to catch up
+  if (fresh(key) === undefined) return // not loaded (or expired) — nothing to catch up
   try {
     const rows = await fetchList()
-    const prev = cache.get(key) as Record<string, unknown>[] | undefined
+    const prev = fresh(key)?.value as Record<string, unknown>[] | undefined
     if (prev === undefined) return
     const prevById = new Map(prev.map((r) => [r[idField], r]))
     const next = rows.map((row) => {
       const old = prevById.get(row[idField])
       return old && shallowEqualRow(old, row) ? old : row // reuse identity if unchanged
     })
-    cache.set(key, next)
+    store(key, next)
     notify(key)
   } catch (e) {
     console.error("reconcile failed; invalidating", key, e)
@@ -154,9 +263,9 @@ export function useCached<T>(
   fetcher: () => Promise<T>
 ): { data: T | undefined; loading: boolean; error: unknown; refresh: () => void } {
   const [data, setData] = React.useState<T | undefined>(
-    key ? (cache.get(key) as T | undefined) : undefined
+    key ? (fresh(key)?.value as T | undefined) : undefined
   )
-  const [loading, setLoading] = React.useState<boolean>(key ? !cache.has(key) : false)
+  const [loading, setLoading] = React.useState<boolean>(key ? !fresh(key) : false)
   const [error, setError] = React.useState<unknown>(null)
 
   const fetcherRef = React.useRef(fetcher)
@@ -167,7 +276,7 @@ export function useCached<T>(
     if (!key) return
     try {
       const value = await fetcherRef.current()
-      cache.set(key, value)
+      store(key, value)
       if (!aliveRef.current) return
       setData(value)
       setError(null)
@@ -187,9 +296,10 @@ export function useCached<T>(
   // (an `invalidate` cleared the key) falls through to a real refetch.
   const sync = React.useCallback(() => {
     if (!key) return
-    if (cache.has(key)) {
+    const entry = fresh(key)
+    if (entry) {
       if (aliveRef.current) {
-        setData(cache.get(key) as T)
+        setData(entry.value as T)
         setLoading(false)
       }
     } else {
@@ -200,9 +310,10 @@ export function useCached<T>(
   React.useEffect(() => {
     aliveRef.current = true
     if (!key) return
-    if (cache.has(key)) {
-      // Cached → show instantly, revalidate quietly.
-      setData(cache.get(key) as T)
+    const entry = fresh(key)
+    if (entry) {
+      // Cached and inside MAX_CACHE_AGE_MS → show instantly, revalidate quietly.
+      setData(entry.value as T)
       setLoading(false)
     } else {
       setData(undefined)

@@ -22,10 +22,9 @@ import { LogOut } from "lucide-react"
 
 import { brand } from "@shared/brand"
 import { clearAllFormDrafts } from "@shared/web/use-form-draft"
-import { invalidate } from "@shared/web/store"
+import { clearCache } from "@shared/web/store"
 import { reportError } from "@shared/web/log"
 import { auth } from "@/lib/api"
-import { cacheKeys } from "@/lib/live-resources"
 
 export function NoAccess({ email }: { email: string }) {
   async function signOut() {
@@ -43,7 +42,7 @@ export function NoAccess({ email }: { email: string }) {
       return
     }
     clearAllFormDrafts()
-    invalidate(cacheKeys.session)
+    clearCache() // signing out forgets the rows too, not just the session key
     location.assign("/login")
   }
 

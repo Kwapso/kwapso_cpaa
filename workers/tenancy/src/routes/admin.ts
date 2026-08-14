@@ -4,8 +4,9 @@
 
 import { fail, json } from "@shared/workers/http"
 import { d1Query } from "@shared/workers/d1-rest"
-import { checkDatabaseSizes, moveModuleToOwnDatabase } from "../lib/sharding"
+import { checkDatabaseSizes, daysUntilFull, moveModuleToOwnDatabase } from "../lib/sharding"
 import { applyMigration, createTeam, d1Config } from "../lib/teams"
+import { CRON_GROWTH_CAP } from "@shared/workers/limits"
 import { requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { adminGuard } from "../context"
 import { TEAM_MIGRATIONS } from "../team-schema"
@@ -48,7 +49,11 @@ export async function migrateTeams(request: Request, env: Env): Promise<Response
   return json({ ok: true, teamsChecked: teams.results?.length ?? 0, teamsMigrated: migrated })
 }
 
-/** On-demand version of the nightly size check (plus the alarm list). */
+/** On-demand version of the nightly size check — the alarms, AND the trend.
+ *
+ * The alarm list answers "which databases are nearly full". `filling` answers the
+ * question that follows it and used to have no answer anywhere: how long have I
+ * got. 80% of a cap is a position, not a warning — see `recordGrowth`. */
 export async function dbSizes(request: Request, env: Env): Promise<Response> {
   const denied = adminGuard(request, env)
   if (denied) return denied
@@ -57,7 +62,32 @@ export async function dbSizes(request: Request, env: Env): Promise<Response> {
   const open = await env.DB.prepare(
     "SELECT database_name, size_bytes, created_at FROM db_alerts WHERE resolved_at IS NULL"
   ).all()
-  return json({ ...result, openAlerts: open.results ?? [] })
+  // Bounded (R14), and by the thing that makes a row worth reading: the fastest
+  // fillers first, so the answer is a shortlist rather than the whole estate.
+  // CRON_GROWTH_CAP is what the nightly tick writes, so the read can never ask for
+  // more rows than exist.
+  const growth = await env.DB.prepare(
+    `SELECT database_name, size_bytes, at, prev_size_bytes, prev_at FROM db_growth
+      ORDER BY size_bytes DESC LIMIT ${CRON_GROWTH_CAP}`
+  ).all<{
+    database_name: string
+    size_bytes: number
+    at: string
+    prev_size_bytes: number | null
+    prev_at: string | null
+  }>()
+  const filling = (growth.results ?? [])
+    .map((r) => ({
+      name: r.database_name,
+      sizeBytes: r.size_bytes,
+      // null = not answerable yet (one reading, or it is not growing). Reported as
+      // null rather than as a very large number, which would read as a measurement.
+      daysUntilFull: daysUntilFull(r),
+    }))
+    // The soonest first — the shortlist's whole purpose. Un-answerable rows go last
+    // rather than being dropped: "we have no trend for this one yet" is information.
+    .sort((a, b) => (a.daysUntilFull ?? Infinity) - (b.daysUntilFull ?? Infinity))
+  return json({ ...result, openAlerts: open.results ?? [], filling })
 }
 
 /** The mover: POST { teamId, module, tables: [...] } with x-admin-key. */

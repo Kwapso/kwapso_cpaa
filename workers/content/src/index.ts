@@ -234,6 +234,70 @@ import { publishChange } from "@shared/workers/realtime"
  * drift into a cron that fires and does nothing. */
 const DIGEST_CRON = "0 7 * * *"
 
+/** How often each tick fires, in milliseconds — the rotation's step size (see
+ * teamSlice). Beside the expressions above rather than derived from them, because
+ * parsing a cron string to get a period is a lot of machinery to answer a
+ * question two constants already answer. */
+const SWEEP_EVERY_MS = 15 * 60 * 1000
+const DIGEST_EVERY_MS = 24 * 60 * 60 * 1000
+
+/** THE TEAMS THIS TICK WORKS ON — a ROTATING window, not the first page.
+ *
+ * Both crons used to read `ORDER BY id LIMIT CRON_TEAM_CAP` and both said, in a
+ * comment, that "the remaining teams wait for the next tick". They did not. The
+ * order never changed and neither did the window, so the same 200 teams were
+ * swept and mailed every time and every team past the 200th was skipped —
+ * forever, not late. Team ids are ULIDs, so "the first 200 by id" is "the 200
+ * oldest": the newest tenants were the ones getting nothing, silently, which is
+ * the worst possible direction for it to fail in.
+ *
+ * The fix keeps every property the cap was bought for — bounded work per tick,
+ * nothing to remember between ticks — and adds the one it was missing: the window
+ * MOVES. `scheduledTime` divided by the tick's own period is a counter that
+ * advances once per fire, and modulo the number of windows it walks the whole
+ * estate and comes back round. No cursor table, no migration, no state to get
+ * out of step, and it is deterministic — a re-run of the same tick does the same
+ * teams.
+ *
+ * OFFSET, DELIBERATELY. Keyset paging is the house rule for anything a person
+ * scrolls (shared/workers/paging.ts), and it is the wrong tool here: this needs
+ * "the Nth window of the whole estate", which is what an offset IS. `teams` is
+ * one row per tenant — thousands, not millions — and this runs twice a day and
+ * every fifteen minutes on a table that size. If it ever became the expensive
+ * part of a tick, the estate would be big enough to deserve a real work queue,
+ * which is the Tier-C answer the scaling review names.
+ *
+ * A LATE TEAM IS THE COST, and it is named honestly: with more than
+ * CRON_TEAM_CAP teams the sweep's lap takes ceil(total/cap) ticks (fifteen
+ * minutes each) and the digest's lap takes that many DAYS. Fifteen minutes late
+ * is what the sweep was designed for. Days late is not a daily digest, and the
+ * tick says so out loud rather than looking healthy. */
+export async function teamSlice(
+  env: Env,
+  scheduledTime: number,
+  everyMs: number,
+  job: string
+): Promise<{ id: string; database_id: string }[]> {
+  const READY = `db_status = 'ready' AND deactivated_at IS NULL`
+  const counted = await env.DB.prepare(`SELECT COUNT(*) AS n FROM teams WHERE ${READY}`).first<{
+    n: number
+  }>()
+  const total = counted?.n ?? 0
+  if (total === 0) return []
+  const windows = Math.ceil(total / CRON_TEAM_CAP)
+  const window = windows <= 1 ? 0 : Math.floor(scheduledTime / everyMs) % windows
+  if (windows > 1)
+    console.warn(
+      `${job}: ${total} teams needs ${windows} ticks per lap — this tick takes window ${window + 1}/${windows}. ` +
+        `A team is now visited once every ${windows} ticks; past a few windows this wants a work queue, not a bigger cap.`
+    )
+  const rows = await env.DB.prepare(
+    `SELECT id, database_id FROM teams WHERE ${READY}
+      ORDER BY id LIMIT ${CRON_TEAM_CAP} OFFSET ${window * CRON_TEAM_CAP}`
+  ).all<{ id: string; database_id: string }>()
+  return rows.results ?? []
+}
+
 /**
  * THE LIVE-SYNC SEAM (locked, CACHING.md "Every mutation publishes"). Every
  * route is classified so a new one CAN'T be added without consciously deciding
@@ -472,19 +536,14 @@ export default {
     // EXPRESSION rather than on a clock reading is what keeps that honest: "is it
     // about 7am?" is a question with a different answer in every timezone and a
     // wrong one whenever a tick is late.
-    if (controller.cron === DIGEST_CRON) return morningDigest(env)
+    if (controller.cron === DIGEST_CRON) return morningDigest(env, controller.scheduledTime)
     let teams: { id: string; database_id: string }[] = []
     try {
-      const rows = await env.DB.prepare(
-        // Bounded like every other read (R14). A cron that would run for an hour
-        // is a cron that gets killed halfway with nothing recorded; past this
-        // ceiling the remaining teams wait for the next tick, which is 15
-        // minutes away and starts from each kind's own cursor.
-        `SELECT id, database_id FROM teams
-          WHERE db_status = 'ready' AND deactivated_at IS NULL
-          ORDER BY id LIMIT ${CRON_TEAM_CAP}`
-      ).all<{ id: string; database_id: string }>()
-      teams = rows.results ?? []
+      // Bounded like every other read (R14), and ROTATING — see teamSlice. A cron
+      // that would run for an hour is a cron that gets killed halfway with nothing
+      // recorded; past the ceiling the remaining teams wait for a LATER tick, and
+      // each one resumes from its own kind's cursor when its window comes round.
+      teams = await teamSlice(env, controller.scheduledTime, SWEEP_EVERY_MS, "knowledge sweep")
     } catch (e) {
       console.error("knowledge sweep: could not list teams:", e)
       await recordWorkerError(env.DB, "content", "cron/knowledge-sweep", e)
@@ -541,17 +600,14 @@ export default {
  *
  * R12: every failure is recorded, per team, and the loop goes on to the next one.
  * Unattended work has nobody watching. */
-async function morningDigest(env: Env): Promise<void> {
+async function morningDigest(env: Env, scheduledTime: number): Promise<void> {
   let teams: { id: string; database_id: string }[] = []
   try {
-    const rows = await env.DB.prepare(
-      // Bounded like every other read (R14) — past this ceiling the rest wait for
-      // tomorrow, which for a daily nudge is the right kind of late.
-      `SELECT id, database_id FROM teams
-        WHERE db_status = 'ready' AND deactivated_at IS NULL
-        ORDER BY id LIMIT ${CRON_TEAM_CAP}`
-    ).all<{ id: string; database_id: string }>()
-    teams = rows.results ?? []
+    // Bounded like every other read (R14), and ROTATING — see teamSlice. It used
+    // to say "past this ceiling the rest wait for tomorrow", and tomorrow read the
+    // same first 200 teams: every tenant past the 200th oldest never received a
+    // digest at all.
+    teams = await teamSlice(env, scheduledTime, DIGEST_EVERY_MS, "morning digest")
   } catch (e) {
     console.error("morning digest: could not list teams:", e)
     await recordWorkerError(env.DB, "content", "cron/morning-digest", e)
