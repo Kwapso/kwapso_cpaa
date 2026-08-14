@@ -123,33 +123,18 @@ links safe, and what a new module plugs into on day one.
 
 ### teamContext → requireRight
 
-The shared gating seam is `shared/workers/gating.ts`. Every team-scoped handler
-opens the same way:
+The shared gating seam is `shared/workers/gating.ts`, and every team-scoped
+handler opens the same two lines: `teamContext` resolves *who is calling, which
+team they are standing in, and which database that is*, then `requireRight` asks
+whether their role holds the one right this door needs. Both throw a `GuardError`
+that the central catch maps to a clean status.
 
-```ts
-export async function getLearning(request: Request, env: Env): Promise<Response> {
-  const { cfg, guard } = await teamContext(request, env)   // who + which team + which DB
-  await requireRight(cfg, guard, "learning", "read")        // does their role hold this right?
-  const items = await listLearning(cfg, guard)
-  return json({ learning: items })
-}
-```
-
-`teamContext` does four things, in order, throwing a `GuardError` (mapped
-centrally to a clean HTTP status) at the first failure:
-
-1. `whoAmI(request, env)` — asks the **auth** worker who the caller is (401 if
-   signed out). Nobody parses cookies but auth.
-2. Reads the caller's **active team** (`user.currentTeamId`) — one team session at
-   a time (409 if none).
-3. `d1ConfigFrom(env)` — the D1 REST config for reaching that team's DB.
-4. `requireMember` — confirms the caller is an **active** member of that team, and
-   returns the `guard` carrying their `roleId` and the team's `databaseId` (403
-   `not_member` otherwise).
-
-Then `requireRight(cfg, guard, module, right)` reads the role's **tall permission
-sheet** (`role_permissions`: `role_id × module × {read,create,edit,delete}`) in
-that team's DB and throws 403 `forbidden` if the bit isn't set.
+**The step-by-step — what `teamContext` checks and in what order, the shape of
+the `guard` it returns, and the exact codes each failure produces — is in
+[CONVENTIONS.md §4](CONVENTIONS.md), beside the handler shape it opens.** That is
+where you are standing when you need it, and one mechanism described in two
+documents is a mechanism the two can disagree about. This section is the half
+CONVENTIONS does not carry: *why the spine is shaped this way at all.*
 
 **Why a tall sheet.** Permissions are `role | module | read/create/edit/delete`
 rows, not columns. A new module is *new rows*, never a schema change

@@ -16,7 +16,9 @@
 
 import { GuardError } from "@shared/workers/gating"
 import { forwardToDoor } from "@shared/workers/http"
-import { checkArgTypes, N, obj, S, SHARED_TOOLS, TOOL_GATES, type SharedTool } from "@shared/workers/tool-catalog"
+import { checkArgTypes, N, obj, S } from "@shared/workers/tool-args"
+import { SHARED_TOOLS, type SharedTool } from "@shared/workers/tool-catalog"
+import { TOOL_GATES } from "@shared/workers/tool-gates"
 import type { Env } from "../env"
 
 export type McpTool = {

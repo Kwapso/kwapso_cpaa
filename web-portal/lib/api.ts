@@ -8,7 +8,12 @@
 // conversation about opening a door — not an import away.
 //
 // It is NOT web/lib/api.ts with a filter. The agency client carries ~90 calls
-// across roles, invites, imports and the assistant; the portal has fourteen.
+// across roles, invites, imports and the assistant; this list is a fraction of
+// it. The COUNT is deliberately not written down here: it was "fourteen" for
+// long enough to become wrong, in this comment and in ARCHITECTURE.md at the
+// same time, because a number in prose is a number nothing checks. The door
+// table in workers/portal-gateway/src/index.ts is the truth, and the fence
+// suite walks this file against it.
 
 import type {
   AccountDetail,

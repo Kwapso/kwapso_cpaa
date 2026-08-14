@@ -124,7 +124,7 @@ SELECT id FROM reach LIMIT ${SCOPE_HARD_CAP}`
  *
  * `[]` means the WHOLE ROW is an input; a list names the ONLY columns that are.
  *
- * WHO READS THIS. `shared/workers/tool-catalog.ts` — to decide which machine-
+ * WHO READS THIS. `shared/workers/tool-gates.ts` — to decide which machine-
  * surface writes must stop for a confirm panel. A write that changes one of
  * these changes WHO CAN SEE WHOSE, which is the same order of decision as a
  * permission grant, and the model reaches it while reading team text an attacker
@@ -168,7 +168,7 @@ export const FENCE_INPUTS: Record<string, string[]> = {
  * one and never will be, so filing it there would have bought a confirm panel by
  * making a true list untrue, and the next reader would have deleted it as stale.
  *
- * WHO READS THIS. `shared/workers/tool-catalog.ts`, beside the other two.
+ * WHO READS THIS. `shared/workers/tool-gates.ts`, beside the other two.
  * `workers/tenancy/test/grant-identity.test.ts` proves the door really resolves
  * a person this way, so the day it stops, the line goes red instead of quietly
  * guarding nothing. */
@@ -192,7 +192,7 @@ export const FENCE_IDENTITY_INPUTS: Record<string, string[]> = {
  * naming a client on an agency ticket publishes that conversation into their
  * portal in one call.
  *
- * WHO READS THIS. `shared/workers/tool-catalog.ts`, beside FENCE_INPUTS, to
+ * WHO READS THIS. `shared/workers/tool-gates.ts`, beside FENCE_INPUTS, to
  * decide which machine-surface writes must stop for a confirm panel. It is
  * declared HERE rather than there for the same reason FENCE_INPUTS is: the list
  * has to sit next to the clause it describes, or the next module to grow a

@@ -35,51 +35,51 @@ Do not relitigate any "LOCKED" item without the user.
 ## 2 · The machine — workers (LOCKED)
 
 Domain workers, each small enough for an AI agent to hold fully in its head.
-**UPDATED 2026-08-10:** **8 are built & on disk** — the six shared brains (auth,
-tenancy, realtime, content, data-ops, mcp) under **TWO front doors**: `gateway`
-(the agency app, `web/`) and `portal-gateway` (the client portal, `web-portal/`).
-Neither door owns data; both forward to the same gated routes, so the portal and
-the agency app are two views of the same rows rather than two systems.
-**UPDATED 2026-07-07:** auth, tenancy, realtime,
-gateway, **content**, **data-ops**, and **mcp** (the external machine surface:
-personal access tokens → a team-pinned session bridge → the opt-in tool catalog;
-routed through the gateway at `/mcp` + `/api/mcp/*`). (The planned `workers/config` recipe store was folded into
-**tenancy**, not built separately.) `npm run check` type-checks both front ends
-(`web` + `web-portal`) and all eight workers, then runs the full
+**8 are built & on disk** — the six shared brains (auth, tenancy, realtime,
+content, data-ops, mcp) under **TWO front doors**: `gateway` (the agency app,
+`web/`) and `portal-gateway` (the client portal, `web-portal/`). `npm run check`
+type-checks both front ends and all eight workers, then runs the full
 unit/integration suite across every workspace.
 
-| Worker | Owns |
-|---|---|
-| **auth** | Sign-in — a 6-digit email code via Resend, **or Google** (UNPARKED 2026-08-11; see §5), sessions, email-change flow (code to the NEW email). No Clerk, no auth vendor |
-| **tenancy** | teams, team members, Member roles (module key `member_roles`) + permissions, invites; the per-team screen-recipe config store (`GET/POST /api/tenancy/config/screens`); and — **UPDATED 2026-08-12** — three subsystems that shipped into this worker because they hang off the same tenant spine: **the customer spine** (`accounts` + `account_links` + `portal_users`, and the one guard corridor `shared/workers/account-scope.ts` that decides a client login's account set — DATA-MODEL § *THE CUSTOMER SPINE*), **process maps** (App → Process → Step + the versions cut over them, and the savings computed from them — R25), and **the money** (the two rate cards and the margin: `account_rates` is what a client is charged, `internal_rates` is what our own hour costs us, and they are two tables in two files because **R24** forbids the second ever reaching the portal). Routes under `/api/tenancy/*`; the live list is the `ROUTES` table in `workers/tenancy/src/index.ts` |
-| **content** *(BUILT 2026-06-23; `kwapso-content`)* | Also **GOOGLE CONNECTIONS** (BUILT 2026-08-12; §5): per-person Drive / Gmail / Calendar / Chat, the second OAuth app, tokens encrypted at rest, and the neutral read seam (`lib/google-read.ts`) the knowledge-base lane plugs into. **Learning** (how-to articles, in-app body, manual sequence, pick-or-create category → `selectable_data`, per-user `mark done` progress, deactivate-not-delete) + **Tickets** (account-fenced tickets + threaded replies, fixed status lifecycle `open/in_progress/resolved/reopened`, raiser-can-reopen, @mention + reply email notify, source screen/record capture). There is ONE ticket module and no help section — the permission key, the tables and the path are still `help` on purpose (DATA-MODEL.md § *help + help_threads* says why). **UPDATED 2026-08-12 — three more subsystems live here:** (a) **the WORK ENGINE** — stories, sprints, work logs, to-dos, tasks, triage duty and meetings: what an account ASKS for is a ticket, what we DO about it is a story, and a timer is just a work log with no end yet (DATA-MODEL § *stories + sprints*, § *work_logs + work_prefs*, § *todos + tasks*, § *triage_duty*); (b) **the KNOWLEDGE BASE** — `knowledge_sources` / `_chunks` / `_terms` / `_ingest`, searched through one account-wide Vectorize index partitioned by team namespace, every passage read back out of the team's own database (**R23** citations, **R26** the vector fence); (c) **the agency's own housekeeping** — marketing posts, brand assets, delivery programmes + meeting purposes, staff profiles + certificates, none of which carries an `account_id` and every door of which opens with `refusePortalCaller` (**R21**). Routes under `/api/content/*`; the live list is the `ROUTES` table in `workers/content/src/index.ts`. Binds AUTH (whoami) + REALTIME (live pings) + the core DB (gating) + four R2 buckets (`LEARNING_MEDIA`, `HELP_MEDIA`, `MEDIA`, `INTERNAL_MEDIA`) + the `KNOWLEDGE_INDEX` Vectorize binding + Workers AI (`AI`, for embeddings). **It is the second worker with a cron** (`*/15 * * * *` the knowledge sweep, `0 7 * * *` the morning digest) — both record their failures to the error store (**R12**). Gated by the `learning` / `help` / `knowledge` / `work` / `todos` / `meetings` / `marketing` / `brand_assets` / `delivery` / `staff_profiles` / `google*` permission modules; not public (`workers_dev:false`) |
-| **data-ops** *(BUILT 2026-06-23; `kwapso-data-ops`)* | **(a) CSV import** — the 3-stage session (file → mapping → confirm) against the GLOBAL owner-maintained `importable_databases` catalog, **INSERT-ONLY**, gated by the **target's `create` right** (no key of its own), writing **act-as-user** through the gated create endpoints (three targets today: `selectable_data` + `member_roles` + `learning`), PLUS the agentic multi-file **batch** import (AGENTIC-IMPORT.md — analyze → plan → ordered run with foreign-key resolution). **(b) the AI agent** — a swappable model seam, an opt-in tool catalog, an act-as-user executor, the confirm rule, identity-act blocks, fenced tool results, a step cap, saved per-team threads (audit), and a credit-based quota (the quota tables + rules live in DATA-MODEL.md `agent_usage`/`agent_credits` + EDGE-CASES.md §8). Routes under `/api/data-ops/*`. Binds AUTH/REALTIME/CONTENT/TENANCY + Workers AI (`AI`) + the core DB; not public (`workers_dev:false`) |
-| **realtime** | the live "switchboard" (LOCKED 2026-06-13; ROW-LEVEL 2026-06-22): one **TeamChannel Durable Object** per channel holds its open WebSockets (hibernatable → idle channels cost ~nothing) and fans out tiny **row-level** change pings `{resource, id, op}` so screens patch just the changed row — no refetch. Holds NO app data — the databases stay the source of truth. **Two channel scopes**, both gated like the API: `team:<id>` (every active member; gated by active membership of THAT team) and `user:<id>` (one person's devices — identity/membership events + a forced sign-out; gated to your OWN id, open even when teamless). Channels are created on-demand by name, unlimited, reusable as-is. Workers publish via `publishChange` / `publishUserChange` / `publishSignOut`; the client re-pulls the one changed row through the normal permission-checked endpoint. The ping carries no row CONTENT (just `{resource,id,op}`), and the socket is gated at connect, so a listener never receives data it couldn't already fetch. |
-| **gateway / MCP** | the AGENCY front desk — one of the two public doors: serves the web screens (and marks `/_next/static/**` immutable so repeat loads don't re-validate), routes `/api/*` to the workers (incl. `/api/content/*`, `/api/data-ops/*`, and the `/api/realtime` WebSocket), and serves uploaded media from R2. Routes `/mcp` + `/api/mcp/*` to the mcp worker (the ONE master MCP catalog — BUILT, below). UI and agents call the SAME doors |
-| **portal-gateway** *(BUILT 2026-08-10; `kwapso-portal`)* | the CLIENT portal's front door — the second of the two doors SCOPE ch.04 locks ("two front doors, one building": the portal and the agency app are different permission-gated views of the same rows, never copies, never synced). Serves `web-portal/out` and forwards `/api` — but by an **allow-list keyed `METHOD /path`**, not by prefix. That is the one structural difference from the agency gateway and the whole point of a second door: a prefix fan-out here would publish every tenancy route, data-ops and `/mcp` to the client internet, each defended only by a role check. Instead the surface is fourteen named doors — plus `POST /api/log/client`, the client error beacon, which is handled BEFORE the allow-list because it is the door's own crash pipe rather than a forward (it verifies the session before it writes anything, ERROR-HANDLING.md) — and everything else is 404. The worker binds only AUTH/TENANCY/CONTENT/REALTIME so it *cannot* reach data-ops or mcp at all. Hostnames `client.kwapso.app` / `staging-client.kwapso.app` (**never** `portal.kwapso.app` — that is the owner's live Glide portal). Guarded by `workers/portal-gateway/test/portal-door.test.ts` (every agency door not named must 404, derived off the agency's own API client) and `web-portal/test/portal-fence.test.ts` (every READ it names is walked to the lib function behind it, which must carry the account fence) |
-| **mcp** *(BUILT 2026-07-07; `kwapso-mcp`)* | the external machine surface: personal access tokens (hashed, shown-once, revocable, pinned to ONE team; core `mcp_tokens`, mig 0013) verified on EVERY request and bridged (auth `/internal/mcp-session`, INTERNAL_KEY) to a short-lived session PINNED to the token's team (`sessions.team_pin` — /me answers with the pinned team, so the whole gating chain re-checks live membership + role per call and the token can never act outside its team). Exposes the OPT-IN tool catalog over JSON-RPC at `/mcp` (Bearer auth): reads, full-field CSV exports, deterministic create/edit/deactivate writes (roles, members, invites, dropdowns, learning, tickets — each re-checking requireRight + the locked guards + audit + publishChange at the door), the agentic import (start/add/plan/run — plan METERED on the team's AI quota), and the assistant itself (agent_chat/agent_confirm). Every tool is a thin forward to an existing gated door; `catalog.test.ts` machine-checks each forwarded path against the target worker's own ROUTES + that every declared exportPath is a tool. Token management (create show-once / list / revoke) is session-gated under `/api/mcp/tokens` with a Settings card. Not public (`workers_dev:false`) — only the AGENCY gateway routes to it; the portal gateway does not bind it at all, so the machine surface is off the client internet. **Developer guide: MCP.md** (how an outside tool connects + the cost model) |
+**ONE ROSTER, AND IT IS NOT HERE.** What each worker owns — and, more usefully,
+*why each one is its own worker* — is a table in
+**[BASE-MANUAL.md §1](BASE-MANUAL.md)**. What each one BINDS, when its crons run
+and which hostname it answers on is in **[OPERATIONS.md](OPERATIONS.md)**. This
+section used to carry a third copy of both, and it is how the sentence below it
+came to describe a fourteen-door allow-list that had grown to twenty-four: a
+roster written in three places is a roster only one of which gets corrected.
 
+What is LOCKED here is the shape, not the inventory:
+
+| The decision | Why it is locked |
+|---|---|
+| **Split by DOMAIN, not by convenience** — each worker small enough for an agent to hold fully in its head | The unit of understanding is the unit of deployment. A worker you cannot read in one sitting is one nobody changes safely. |
+| **Exactly TWO public doors** — `gateway` (agency, `web/`) and `portal-gateway` (client, `web-portal/`) | A third public address would be a third route onto `/internal/*`, the agent and the act-as-user surface. Everything else sets `workers_dev:false` **and** `preview_urls:false`. |
+| **Neither door owns data** — both forward to the same gated routes | It is what makes the portal and the agency app two VIEWS of the same rows (SCOPE ch.04 "two front doors, one building") rather than two systems that drift. |
+| **The agency door routes by PREFIX; the portal door by a NAMED allow-list** | The one structural difference between them, and the whole point of a second door: a prefix fan-out on a client-facing origin would publish every tenancy route, data-ops and `/mcp` to the client internet, each defended only by a role check. The allow-list is the door table in `workers/portal-gateway/src/index.ts` — the count lives there, never in prose. |
+| **The planned `workers/config` recipe store was folded into `tenancy`** | It was one table and two routes hanging off the tenant spine. A worker for that would have been a deployment boundary bought with nothing. |
+
+Both gateways are guarded by tests that derive their surface from code rather
+than a list: `workers/portal-gateway/test/portal-door.test.ts` (every agency door
+the portal does not name must 404) and `web-portal/test/portal-fence.test.ts`
+(every read it does name is walked through to the lib function behind it, which
+must carry the account fence).
 
 ### Durable Objects — code vs runtime, and how they scale (LOCKED 2026-06-15)
 
-The confusion to retire: **a worker count and a Durable-Object count are different things.**
+**The decision: a worker count and a Durable-Object count are different things,
+and the runtime one is the only one that grows with teams.** Deployed code does
+not scale with the tenant list; addressed instances do, without limit, and idle
+ones hibernate for ~nothing.
 
-- A **Worker** is deployed *code*. We have **8 built today** (auth, tenancy,
-  realtime, content, data-ops, mcp, gateway, portal-gateway — UPDATED
-  2026-08-10). This number does **not** grow with teams.
-- A **Durable Object class** is also code — a class *inside* a worker (e.g.
-  `TeamChannel` in the realtime worker). We have very few (the 500-classes cap is
-  irrelevant).
-- A **Durable Object instance** is a *runtime* entity addressed by name
-  (`team:<id>` or `user:<id>`). Instances are **unlimited** and created on demand
-  — addressing one by name conjures it; idle ones hibernate (≈ free). **An
-  instance is not a worker.**
+The distinction itself — worker vs DO *class* vs DO *instance*, with the counts
+and what each one costs — is explained once, in a table, in
+**[DURABLE-OBJECTS.md §1](DURABLE-OBJECTS.md)**. It is not repeated here: this
+section is the ruling, that document is the mechanism, and two step-by-step
+accounts of one model are two accounts that can disagree.
 
-So 10,000 teams + their members = still 8 workers + one `TeamChannel` class, but
-that many *instances* (one per team **and** one per signed-in user), almost all
-hibernating. Exactly like OOP: one `class` (code), millions of objects (runtime).
-
-**What gets a DO instance — and what does NOT:**
+What this section locks is the part that is a DECISION rather than a fact of the
+platform — **what gets a DO instance, and what does NOT:**
 - **Live channels — one instance per team AND one per user** (`TeamChannel`,
   addressed `team:<id>` or `user:<id>`). A team change pings that team's channel
   (every active member); an identity / cross-team-membership / sign-out event pings

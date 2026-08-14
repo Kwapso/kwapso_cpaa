@@ -31,7 +31,8 @@ import { describe, expect, it } from "vitest"
 
 import { stripComments } from "@shared/rules/source-scan"
 import { FENCED_ROW_OWNERS } from "@shared/workers/account-scope"
-import { isPrivilegeWrite, SHARED_TOOLS } from "@shared/workers/tool-catalog"
+import { SHARED_TOOLS } from "@shared/workers/tool-catalog"
+import { isPrivilegeWrite } from "@shared/workers/tool-gates"
 
 const helpSrc = stripComments(readFileSync(join(__dirname, "..", "src", "lib", "help.ts"), "utf8"))
 

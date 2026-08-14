@@ -69,6 +69,32 @@ Whatever the row, [EDGE-CASES.md](EDGE-CASES.md) is the one to open when somethi
 behaves oddly rather than wrongly — it is where the non-obvious traps are written
 down, and most of them cost somebody a day before they got there.
 
+### One topic, one owner
+
+Several documents legitimately touch the same subject at different **altitudes** —
+ARCHITECTURE rules on it, BASE-MANUAL explains why it is that way, CONVENTIONS
+tells you how to write it, and the data layer is a good example of all three
+getting along. What is *not* legitimate is two documents describing the same
+MECHANISM step by step, because then they can disagree and nothing says which is
+right. This table names the owner for the topics where that has actually happened:
+
+| Topic | Owner — the mechanism lives here | Everyone else |
+|---|---|---|
+| Which workers exist, what each owns and why | [BASE-MANUAL.md §1](BASE-MANUAL.md) | ARCHITECTURE §2 keeps the *decision* (split by domain, exactly two public doors); OPERATIONS keeps the bindings, crons and hostnames |
+| `teamContext` → `requireRight`, step by step | [CONVENTIONS.md §4](CONVENTIONS.md) | BASE-MANUAL §2 keeps *why* the spine is shaped that way (the tall sheet, the module list) |
+| Worker vs DO class vs DO instance | [DURABLE-OBJECTS.md §1](DURABLE-OBJECTS.md) | ARCHITECTURE §2 keeps the ruling on what gets an instance |
+| Every table and column | [DATA-MODEL.md](DATA-MODEL.md) | everyone links to it; nobody re-lists columns |
+| The Laws themselves | [RULES.md](RULES.md) + `shared/rules/registry.ts` | CLAUDE.md summarises them; BASE-MANUAL §4 explains the safety net |
+
+**And a number in prose is a number nothing checks.** ARCHITECTURE described the
+portal's allow-list as "fourteen named doors" long after it had grown to
+twenty-four, and the same stale figure sat in `web-portal/lib/api.ts` — two copies,
+neither of which anybody thought to correct. Where a count is derivable, point at
+the thing that holds it (`PORTAL_DOORS` in the portal gateway) instead of writing
+it down. The counts that *are* written down — the worker roster, the `R1–Rn` range
+— are the ones `web/test/doc-claims.test.ts` checks against the code, which is why
+they may be written down at all.
+
 **Rebuilding the whole base from nothing?** Follow
 **[BOOTSTRAP.md](BOOTSTRAP.md)** — the day-zero, command-by-command runbook that takes
 a fresh Cloudflare account to a live staging + production Brimba. It is the concrete

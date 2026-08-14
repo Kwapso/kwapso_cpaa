@@ -27,7 +27,8 @@ import { describe, expect, it } from "vitest"
 import { indexFunctions } from "@shared/rules/seam-scan"
 import { stripComments } from "@shared/rules/source-scan"
 import { FENCE_INPUTS } from "@shared/workers/account-scope"
-import { isPrivilegeWrite, SHARED_TOOLS } from "@shared/workers/tool-catalog"
+import { SHARED_TOOLS } from "@shared/workers/tool-catalog"
+import { isPrivilegeWrite } from "@shared/workers/tool-gates"
 import { ROUTES } from "../src/index"
 
 const SHARED = join(__dirname, "..", "..", "..", "shared", "workers")
