@@ -44,19 +44,30 @@ export type ChangeEvent = {
 }
 
 async function publish(env: RealtimeEnv, channel: string, event: ChangeEvent): Promise<void> {
+  // THE PING MUST NOT OUTLIVE THE WRITE IT DESCRIBES. This hop is already
+  // best-effort — the catch below is the whole degradation story, and a live
+  // layer that is down costs a screen its instant refresh and nothing else. But
+  // a HUNG realtime is worse than a dead one: without a ceiling the publish keeps
+  // the mutation's request open, so an unwell live layer turns every successful
+  // write into a slow one. Two seconds is a fan-out to a Durable Object in the
+  // same colo; anything slower has already failed.
+  // (Cast: see whoAmI in gating.ts — shared/ compiles in the web workspaces too.)
+  const init = {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      // /publish can broadcast to ANY channel, so it is an internal door and
+      // is keyed like every other one. Network isolation (workers_dev:false,
+      // and the gateway never routing it) was its only protection before —
+      // one config regression away from an open broadcast door.
+      "x-internal-key": env.INTERNAL_KEY ?? "",
+    },
+    body: JSON.stringify({ channel, event }),
+    signal: AbortSignal.timeout(2_000),
+  } as unknown as Parameters<typeof env.REALTIME.fetch>[1]
+
   try {
-    await env.REALTIME.fetch("https://realtime/publish", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        // /publish can broadcast to ANY channel, so it is an internal door and
-        // is keyed like every other one. Network isolation (workers_dev:false,
-        // and the gateway never routing it) was its only protection before —
-        // one config regression away from an open broadcast door.
-        "x-internal-key": env.INTERNAL_KEY ?? "",
-      },
-      body: JSON.stringify({ channel, event }),
-    })
+    await env.REALTIME.fetch("https://realtime/publish", init)
   } catch (e) {
     console.error("realtime publish failed:", e)
   }

@@ -16,6 +16,7 @@ import { fail, json } from "@shared/workers/http"
 import { GuardError } from "@shared/workers/gating"
 import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { logError, recordWorkerError } from "@shared/workers/error-log"
+import { requestId } from "@shared/workers/trace"
 import type { Env } from "./env"
 import { sha256Hex } from "./lib/crypto"
 import { isValidEmail, normalizeEmail, sendEmail, sendLoginCode } from "./lib/email"
@@ -115,7 +116,7 @@ export default {
       console.error("auth worker error:", e)
       // Record the crash in the central error log (core DB) — best-effort,
       // never blocks the response. Clean GuardError refusals never reach here.
-      await recordWorkerError(env.DB, "auth", `${request.method} ${new URL(request.url).pathname}`, e)
+      await recordWorkerError(env.DB, "auth", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request))
       return fail(500, "internal", "Something went wrong on our side. Try again.")
     }
   },
@@ -188,6 +189,7 @@ async function internalLogError(request: Request, env: Env): Promise<Response> {
     stack?: unknown
     url?: unknown
     userId?: unknown
+    requestId?: unknown
   }
   // Type-checked field by field rather than put through requireText, because
   // this door DROPS rubbish instead of refusing it (R20 is satisfied by an
@@ -209,6 +211,12 @@ async function internalLogError(request: Request, env: Env): Promise<Response> {
       // browser's body; a caller who reached this door already holds INTERNAL_KEY
       // and could write anything, so there is nothing further to prove here.
       userId: typeof b.userId === "string" ? b.userId : undefined,
+      // The thread back to the click. Like `userId`, it arrives from the DOOR
+      // (off the `x-request-id` header it stamped) and never from the browser's
+      // body — a beacon that could name its own request id could staple a
+      // client crash onto somebody else's trace. Type-checked here, capped in
+      // logError. See shared/workers/trace.ts.
+      requestId: typeof b.requestId === "string" ? b.requestId : undefined,
     })
   return new Response(null, { status: 204 })
 }

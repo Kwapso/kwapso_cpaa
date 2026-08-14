@@ -39,6 +39,7 @@ import {
   serveMedia,
 } from "@shared/workers/front-door"
 import { fail } from "@shared/workers/http"
+import { requestId, stampTrace } from "@shared/workers/trace"
 
 /** The workers a portal door may be forwarded to. */
 type Upstream = "AUTH" | "TENANCY" | "CONTENT" | "REALTIME"
@@ -165,10 +166,15 @@ type Env = {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    // The client door names its requests too, from the same seam and for the
+    // same reason as the agency door — a client's failing click crosses just as
+    // many workers, and "which hop broke" is the same question. The label on the
+    // `error_logs` row differs; the thread joining the rows does not.
+    const traced = stampTrace(request, requestId(request))
     try {
-      return await handle(request, env)
+      return await handle(traced, env)
     } catch (e) {
-      return recordGatewayCrash(request, env.AUTH, "portal-gateway", env.INTERNAL_KEY, e)
+      return recordGatewayCrash(traced, env.AUTH, "portal-gateway", env.INTERNAL_KEY, e)
     }
   },
 } satisfies ExportedHandler<Env>

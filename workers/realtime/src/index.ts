@@ -17,9 +17,10 @@ import { DurableObject } from "cloudflare:workers"
 
 import type { SessionUser } from "@shared/types"
 import { accountScope, mayHearChange, scopeStamp, type ScopeStamp } from "@shared/workers/account-scope"
-import { d1ConfigFrom, GuardError, requireMember } from "@shared/workers/gating"
+import { AUTH_UNAVAILABLE_MS, d1ConfigFrom, GuardError, requireMember } from "@shared/workers/gating"
 import { fail, json } from "@shared/workers/http"
 import { recordWorkerError } from "@shared/workers/error-log"
+import { requestId, traceHeaders } from "@shared/workers/trace"
 import { requireText, TEXT_LIMITS } from "@shared/workers/validate"
 
 export type Env = {
@@ -121,9 +122,25 @@ function stamped(request: Request, stamp: ScopeStamp): Request {
 
 /** Ask the auth worker (one session system, one master) who this is. */
 async function whoAmI(request: Request, env: Env): Promise<SessionUser | null> {
-  const res = await env.AUTH.fetch("https://auth/api/auth/me", {
-    headers: { Cookie: request.headers.get("Cookie") ?? "" },
-  })
+  // The same shape as the shared seam's whoAmI, and for the same reasons: a
+  // ceiling on the hop, and an auth OUTAGE told apart from a signed-out caller.
+  // Returning null on an outage would refuse the socket with "Not signed in.",
+  // which sends a signed-in person to the login screen because a different
+  // worker was ill. AUTH_UNAVAILABLE_MS / the 503 both live in gating.ts.
+  let res: Response
+  try {
+    res = await env.AUTH.fetch("https://auth/api/auth/me", {
+      headers: { Cookie: request.headers.get("Cookie") ?? "", ...traceHeaders(requestId(request)) },
+      signal: AbortSignal.timeout(AUTH_UNAVAILABLE_MS),
+      // (one constant, one meaning — imported from the gating seam)
+    })
+  } catch {
+    throw new GuardError(
+      503,
+      "auth_unavailable",
+      "We can't check who you are right now. Try again in a moment."
+    )
+  }
   if (!res.ok) return null
   return ((await res.json()) as { user: SessionUser }).user
 }
@@ -141,7 +158,13 @@ export default {
       // Never a bare 1101. Realtime binds the core database, so a crash here is
       // recorded like every other worker's (ERROR-HANDLING.md) instead of
       // vanishing into Cloudflare's exception counter.
-      await recordWorkerError(env.DB, "realtime", new URL(request.url).pathname, e).catch(() => null)
+      await recordWorkerError(
+        env.DB,
+        "realtime",
+        new URL(request.url).pathname,
+        e,
+        requestId(request)
+      ).catch(() => null)
       return fail(500, "server_error", "Something went wrong.")
     }
   },

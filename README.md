@@ -72,6 +72,8 @@ concrete + checkable:
 - **UI conventions** — [UI-CONVENTIONS.md](UI-CONVENTIONS.md): library-is-lego, recipe vs bespoke, the enforced UI Laws, the action-icon mapping, the *action-button rows never clip* responsive rule, the voice.
 - **Import + export rules** — [AGENTIC-IMPORT.md](AGENTIC-IMPORT.md): audit parity, export-needs-read/import-needs-create, one-confirm, insert-only, and every import place offers a sample file (test-enforced).
 - **Error rules** — [ERROR-HANDLING.md](ERROR-HANDLING.md): never swallow; one client seam; every worker records to the central store.
+- **The bad day** — [RESILIENCE.md](RESILIENCE.md): auth named as the single point of failure and what falls over with it, which worker owns a table a pair of them write, and how the rows come back (backup, restore, and what is deliberately not backed up).
+- **The last architecture audit** — [architecture-review.md](architecture-review.md): the 2026-08-14 score (69 → 93) against the eight robustness criteria, with the arithmetic, the confirmed findings and what was deliberately left as a recommendation.
 - **The single vocabulary** — `shared/glossary.ts` (Law R6, machine-checked): one word per concept, used in all UI copy.
 
 - **The docs themselves are checked too** — `web/test/doc-claims.test.ts` derives the worker roster from `workers/` on disk, reads each `wrangler.jsonc` to see which are public, and reads the Laws' range off `shared/rules/registry.ts`, then fails if any doc (the root canon, the fork skills, or a `.plans/` build plan) states a worker count, a public-door count or a `R1–Rn` range that disagrees. Add a worker or a Law, and every stale sentence goes red the same day.

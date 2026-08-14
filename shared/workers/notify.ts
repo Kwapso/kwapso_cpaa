@@ -28,11 +28,21 @@ export async function sendBrandedEmail(
 ): Promise<boolean> {
   const { html, text } = brandedEmail({ ...content, origin: origin ?? env.PUBLIC_APP_URL })
   try {
-    const res = await env.AUTH.fetch("https://auth/internal/send-email", {
+    // A CEILING ON A BEST-EFFORT HOP. This call is already allowed to fail — the
+    // state change committed before it and is the authority (ARCHITECTURE §5,
+    // member-notification emails) — but "allowed to fail" and "allowed to hang"
+    // are different permissions. Without this, an auth worker stuck behind a slow
+    // Resend holds the role-change request open long after the role changed.
+    // Longer than the identity ceiling because there is a real third party at the
+    // other end of it.
+    // (Cast: see whoAmI in gating.ts — shared/ compiles in the web workspaces too.)
+    const init = {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-internal-key": env.INTERNAL_KEY ?? "" },
       body: JSON.stringify({ to, subject, html, text }),
-    })
+      signal: AbortSignal.timeout(15_000),
+    } as unknown as Parameters<typeof env.AUTH.fetch>[1]
+    const res = await env.AUTH.fetch("https://auth/internal/send-email", init)
     if (!res.ok) console.error("email send failed:", subject, res.status)
     return res.ok
   } catch (e) {

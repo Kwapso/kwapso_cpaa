@@ -37,7 +37,10 @@ export async function getErrors(request: Request, env: Env): Promise<Response> {
   const limit = Math.min(Math.max(1, Math.trunc(Number(url.searchParams.get("limit")) || 100)), 200)
   const where = status === "all" ? "" : "WHERE status = ?"
   const stmt = env.DB.prepare(
-    `SELECT id, at, source, place, message, stack, team_id, user_id, url, status, resolved_at, resolution_note
+    // `request_id` is what turns eight separate rows back into one failing
+    // click (shared/workers/trace.ts). Reading the store without it means the
+    // id is written and never seen, which is the same as not having it.
+    `SELECT id, at, source, place, message, stack, team_id, user_id, url, request_id, status, resolved_at, resolution_note
      FROM error_logs ${where} ORDER BY at DESC LIMIT ${limit}`
   )
   const rows = await (status === "all" ? stmt : stmt.bind(status)).all()

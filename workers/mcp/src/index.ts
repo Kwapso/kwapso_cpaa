@@ -27,6 +27,7 @@ import { fail, json } from "@shared/workers/http"
 import { GuardError, whoAmI } from "@shared/workers/gating"
 import { requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { recordWorkerError } from "@shared/workers/error-log"
+import { requestId } from "@shared/workers/trace"
 import type { Env } from "./env"
 import { createToken, listTokens, revokeToken, verifyToken } from "./lib/tokens"
 import { dropCachedSession, sessionCookieFor } from "./lib/bridge"
@@ -188,7 +189,7 @@ export default {
     } catch (e) {
       if (e instanceof GuardError) return fail(e.status, e.code, e.message)
       console.error("mcp worker error:", e)
-      await recordWorkerError(env.DB, "mcp", `${request.method} ${pathname}`, e)
+      await recordWorkerError(env.DB, "mcp", `${request.method} ${pathname}`, e, requestId(request))
       return fail(500, "internal", "Something went wrong on our side. Try again.")
     }
   },

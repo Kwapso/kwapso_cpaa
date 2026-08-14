@@ -22,6 +22,7 @@ import { appendMessage, consumePendingProposal, createThread, getPendingProposal
 import { addBatchFile, createBatch, getBatchView, planBatch } from "./import-batch"
 import { GuardError } from "@shared/workers/gating"
 import { recordWorkerError } from "@shared/workers/error-log"
+import { requestId, traceHeaders } from "@shared/workers/trace"
 
 const MAX_STEPS = 12
 
@@ -229,7 +230,14 @@ export async function resolveNames(
   const wantRoles = calls.some((c) => typeof c.input.roleId === "string")
   const cookie = request.headers.get("Cookie") ?? ""
   const get = async (path: string): Promise<unknown> => {
-    const res = await env.TENANCY.fetch(`https://internal${path}`, { headers: { Cookie: cookie } })
+    const res = await env.TENANCY.fetch(`https://internal${path}`, {
+      headers: { Cookie: cookie, ...traceHeaders(requestId(request)) },
+      // This is a COSMETIC read — it turns ids into names in the confirm panel,
+      // and the caller below already treats a null as "no name available". So a
+      // slow tenancy must cost the panel its names, never the agent turn its
+      // answer. Short on purpose, for the same reason.
+      signal: AbortSignal.timeout(3_000),
+    })
     return res.ok ? await res.json() : null
   }
   try {
