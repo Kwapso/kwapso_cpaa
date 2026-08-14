@@ -531,6 +531,37 @@ paths already route through it. They don't.
   When you wire a module onto the split path, audit its batched scripts: any
   script touching two tables that could land in different shards must be
   reworked into merged reads + per-DB writes.
+- **AND A CONCATENATION CANNOT PAGE, SORT OR COUNT** (scaling review 2026-08-14).
+  `d1QueryAcross` runs one statement against every shard and concatenates the rows.
+  That is right for "give me the rows" and quietly wrong for three shapes, each of
+  which *looks* correct while there is only one database — which is every
+  environment until the mover runs:
+  - `LIMIT n` → each shard returns up to n, so you get the top n **of each shard**,
+    up to n × shards rows. A keyset page built on that has the wrong rows in it and
+    takes its `nextCursor` from the last row of a concatenation, which is a position
+    in no shard's ordering: page two repeats and skips, silently.
+  - `ORDER BY` → sorted within each shard, unsorted between them. The fix is a merge
+    sort, which needs the sort key — something the seam cannot know.
+  - `COUNT(…)` and friends → one row per shard, and every caller here reads
+    `rows[0].n`. R16's *exact* count would report the first shard's total as the whole.
+
+  `d1QueryAcross` now **throws** on all three when handed more than one database, so
+  the day somebody points a paged or counted read at the split path they get a
+  refusal instead of a plausible number. Making it correct — a cursor token encoding
+  a position per shard, plus folding aggregates — is real work with a decision in it,
+  and it is the prerequisite for wiring any PAGED module onto the split path. One
+  database is untouched: every read today takes that branch.
+  Locked by `workers/tenancy/test/merged-read-guard.test.ts`.
+- **The mover has to survive the size it exists for.** It is what an 80% alarm tells
+  you to run, so it only ever sees a table too big for its database — and two of its
+  steps could not survive that. The copy paged with `LIMIT/OFFSET` (quadratic reads,
+  and a window that shifts under a concurrent write); the emptying was one
+  `DELETE FROM <table>;`, which D1 refuses past 30 seconds — **after** the routing
+  flip has committed, so a timeout left both databases holding the rows and every
+  merged read double-counting, with nothing saying so. It now copies by primary key
+  and empties in `RETENTION_DELETE_CAP`-sized bites, counting what is left and
+  **refusing by name** if the source did not drain.
+  Locked by `workers/tenancy/test/mover-drain.test.ts`.
 
 ---
 

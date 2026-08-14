@@ -1,0 +1,41 @@
+-- THE NIGHTLY SWEEP STOPS READING THE WHOLE TABLE TO FIND ITS 5,000 ROWS.
+--
+-- shared/workers/retention.ts takes a bounded slice of a few tables a night,
+-- each chosen by an inner SELECT with its own LIMIT. Two of those predicates had
+-- an index behind them from the day they were written (`idx_login_codes_recent`,
+-- `idx_login_sends_time`, both on `created_at`). The third did not: `sessions` is
+-- swept on `expires_at < ?` and the only index on the table is
+-- `idx_sessions_user (user_id)`.
+--
+-- WHY THAT IS THE ONE THAT MATTERED. `sessions` is the biggest and fastest-
+-- growing table in the SHARED core database — one row per sign-in, from every
+-- person in every team, sliding its own expiry forward while it is used. So the
+-- sweep that exists to keep that database under D1's 10 GB cap was doing a full
+-- scan of the largest thing in it, every night, to find the oldest 5,000 rows.
+-- Past a few million sessions that scan runs into D1's 30-second statement
+-- ceiling, the DELETE moves nothing, and the table the sweep was written to
+-- bound grows without limit — the exact failure the sweep's own header warns
+-- about ("time out, delete nothing — and do the same again tomorrow, forever"),
+-- reached through a missing index rather than a missing LIMIT.
+--
+-- An index on the sweep's own predicate turns that scan into a range seek over
+-- exactly the rows it is about to delete. It costs one index on a table whose
+-- writes are already one-per-sign-in.
+CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions (expires_at);
+
+-- THE ERROR LOG'S OWN RETENTION, for the same reason one line up.
+--
+-- `error_logs` has been documented as a "90-day-ish owned history" since
+-- db/core/0012, and rate-limited per bucket since 0019 — and neither of those is
+-- retention. A ceiling bounds the RATE; only a sweep bounds the TOTAL, and
+-- nothing had ever deleted a row, so the 90 days was a sentence in a comment
+-- rather than a property of the table. The sweep that now enforces it
+-- (ERROR_LOG_RETENTION_DAYS, shared/workers/limits.ts) reads `at < ?`, and the
+-- two existing indexes lead with `status` and with the COALESCE bucket — neither
+-- can serve an age predicate.
+--
+-- NOT the audit tables. `account_activity`, `activity` and the usage ledgers stay
+-- untouched on purpose: retention.ts is explicit that it never takes "anything
+-- anyone might have to answer for later", and a retention window for a record
+-- somebody may be asked about is an owner's decision, not an index's.
+CREATE INDEX IF NOT EXISTS idx_error_logs_at ON error_logs (at);

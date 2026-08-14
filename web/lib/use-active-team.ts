@@ -11,6 +11,8 @@ import { useRouter } from "next/navigation"
 
 import type { ActiveContext, SessionUser } from "@shared/types"
 
+import { clearCache } from "@shared/web/store"
+
 import { auth, tenancy } from "@/lib/api"
 
 export type ActiveTeam = {
@@ -31,6 +33,12 @@ type Session = { user: SessionUser; ctx: ActiveContext }
 let sessionCache: Session | null = null
 const sessionSubs = new Set<() => void>()
 function setSessionCache(next: Session | null): void {
+  // SIGNING OUT FORGETS THE DATA, not just the session. `null` here is the
+  // sign-out / auth-failure path, and the row cache is keyed by resource + team —
+  // so without this the tab kept every list the previous person had opened, and a
+  // signed-out page could paint a member list out of memory. Cheap, and the only
+  // moment we know for certain that nothing in the cache is ours to show.
+  if (next === null) clearCache()
   sessionCache = next
   for (const fn of sessionSubs) fn()
 }
@@ -115,6 +123,12 @@ export function useActiveTeam(): ActiveTeam {
 
   const switchTeam = React.useCallback(async (teamId: string) => {
     const nextCtx = await tenancy.switchTeam(teamId)
+    // A TEAM SWITCH IS A DIFFERENT WORLD. Cache keys carry the team id, so the old
+    // team's rows were never going to be MIS-shown — but they were kept, for as
+    // long as the tab lived, and somebody who works across five teams in a morning
+    // was carrying all five. Dropped on the switch, which is the moment they stop
+    // being anything anyone is looking at.
+    clearCache()
     if (sessionCache) setSessionCache({ ...sessionCache, ctx: nextCtx })
     setCtx(nextCtx)
   }, [])

@@ -34,51 +34,54 @@ function standBody() {
 }
 
 describe("switching company drops what the old company filled", () => {
-  it("invalidates the context — which company they stand in, and its name", () => {
-    expect(standBody()).toContain("cacheKeys.context")
+  // IT USED TO BE A LIST, AND THE LIST WAS THE BUG WAITING TO HAPPEN.
+  //
+  // `stand()` named nine cache keys one at a time, and every one of them had been
+  // added the same way: somebody noticed a screen still showing the previous
+  // company's rows under the new company's name. This suite existed to catch the
+  // tenth — by re-deriving `cacheKeys` from live-resources.ts and failing on any
+  // entry the switcher did not mention.
+  //
+  // That is the shape R21 has now been bitten by twice: a hand-kept list of what a
+  // client can reach, correct until the next screen is added. A switch is a change
+  // of WHO IS ASKING, and the honest answer is that NOTHING cached survives it — so
+  // the switcher clears the whole cache and there is no list to keep in step. The
+  // few keys that were "kept on purpose" (a ticket's thread, a process's comments)
+  // were only ever kept because their ids meant the new company would not ask for
+  // them; dropping them costs one refetch if somebody switches back.
+  //
+  // Still read off the source, for the reason the header gives: the bug is an
+  // omission, and a render test would pass just as happily on a switcher that
+  // dropped nothing at all.
+  it("clears the whole cache — not a list of keys somebody has to remember", () => {
+    const body = standBody()
+    expect(body, "a switch must forget what the old company filled").toContain("clearCache()")
+    expect(
+      body,
+      "and it must not go back to naming keys one by one — the next screen added is the one that gets forgotten"
+    ).not.toMatch(/cacheKeys\./)
   })
 
-  it("invalidates the ticket list, its total and its cursor", () => {
+  it("clears BEFORE it re-reads, or the header names one company over another's rows", () => {
+    // `onSwitched()` is the context re-read that repaints the header, this menu's
+    // tick and every screen below. Clearing after it would leave the repaint
+    // reading the cache it was about to drop.
     const body = standBody()
-    for (const key of ["cacheKeys.tickets", "cacheKeys.ticketsTotal", "cacheKeys.ticketsCursor"]) {
-      expect(body, `a switch must drop ${key}`).toContain(key)
+    const cleared = body.indexOf("clearCache()")
+    const reread = body.indexOf("onSwitched()")
+    expect(cleared, "the clear must be there at all").toBeGreaterThan(-1)
+    expect(reread, "the re-read must be there at all").toBeGreaterThan(-1)
+    expect(cleared, "clear, then re-read").toBeLessThan(reread)
+  })
+
+  it("nothing else in the portal hand-lists caches across an identity change", () => {
+    // The same sentence, at the other two identity boundaries: signing out, and
+    // the no-access dead end. Both used to drop only the session key, so a
+    // signed-out tab still held every list the previous person had opened.
+    for (const file of ["../components/portal-shell.tsx", "../components/no-access.tsx"]) {
+      const text = readFileSync(resolve(__dirname, file), "utf8")
+      expect(text, `${file} must forget the rows, not just the session`).toContain("clearCache()")
     }
-  })
-
-  it("drops BOTH companies' records — the one being left and the one being entered", () => {
-    const body = standBody()
-    // Only dropping the one being left leaves a stale record for a company they
-    // switch back to later.
-    expect(body).toContain("cacheKeys.company(currentAccountId)")
-    expect(body).toContain("cacheKeys.company(accountId)")
-  })
-
-  it("every cache the portal keeps is either dropped here or deliberately kept", () => {
-    // A new cache key added later is the way this regresses: someone adds
-    // `portal:invoices`, never thinks about the switcher, and a client sees
-    // another company's invoices under their own name. This test fails when a
-    // key is added without a decision.
-    const file = readFileSync(resolve(__dirname, "../lib/live-resources.ts"), "utf8")
-    // Only the cacheKeys object. The same file also declares PORTAL_LISTENERS,
-    // whose entries are RESOURCE names (help, accounts, …) at the same
-    // indentation — reading those as cache keys makes this test fail for a
-    // reason that has nothing to do with the switcher.
-    const from = file.indexOf("export const cacheKeys")
-    expect(from, "cacheKeys must be declared in live-resources").toBeGreaterThan(-1)
-    const block = file.slice(from, file.indexOf("\n}", from))
-    const declared = [...block.matchAll(/^\s{2}(\w+):/gm)].map((m) => m[1])
-    expect(declared.length, "cacheKeys must be readable from live-resources").toBeGreaterThan(4)
-
-    const body = standBody()
-    // `thread` and `threadTotal` are per-ticket, and `processComments` is
-    // per-process — all three are keyed by an id the new company's screens will
-    // never ask for, so they age out rather than being enumerated. (The VALUE
-    // read is not one of them: it is keyed by nothing but the caller, so the new
-    // company would read the old company's savings straight out of the cache.)
-    // Everything else must be named.
-    const keptOnPurpose = new Set(["thread", "threadTotal", "processComments"])
-    const missed = declared.filter((k) => !keptOnPurpose.has(k) && !body.includes(`cacheKeys.${k}`))
-    expect(missed, `these caches survive a company switch with nobody deciding they should: ${missed.join(", ")}`).toEqual([])
   })
 })
 

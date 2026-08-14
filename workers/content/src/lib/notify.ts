@@ -62,6 +62,53 @@ async function portalUserIds(cfg: D1Rest, guard: MemberGuard, ids: string[]): Pr
   return new Set(rows.map((r) => r.user_id))
 }
 
+/** How many sends run at once, and how many one call will run at all.
+ *
+ * WHY A CONCURRENCY BOUND AT ALL, when `Promise.all` looks like it already
+ * parallelises: a Worker may have only SIX outgoing connections waiting for
+ * response headers at a time (Cloudflare Workers limits, checked 14 Aug 2026), so
+ * `Promise.all` over 500 sends does not run 500 in parallel — it queues 494 of
+ * them behind six, inside one invocation, and the invocation is what runs out
+ * first. A cron gets 15 minutes of wall clock. Five hundred sends at a couple of
+ * hundred milliseconds each, six at a time, is most of that for ONE team, and the
+ * digest loops over a whole window of them.
+ *
+ * So the fan-out is bounded twice: SEND_CONCURRENCY matches the platform's own
+ * ceiling (asking for more parallelism than the runtime will give buys nothing but
+ * a longer queue), and SEND_FAN_CAP is the ceiling on ONE call's recipients — past
+ * it the send stops and says so, rather than turning a nudge into the reason the
+ * whole tick died with nothing recorded. */
+const SEND_CONCURRENCY = 6
+const SEND_FAN_CAP = 100
+
+/** Send to many people with a bounded number in flight. Every failure is already
+ * each caller's own `.catch` — this only decides HOW MANY are in the air, so a
+ * best-effort notice stays best-effort and never becomes the thing that spends an
+ * invocation's whole budget.
+ *
+ * Over SEND_FAN_CAP the extra recipients are DROPPED and NAMED. Silently sending
+ * to the first hundred would be the shape this base refuses everywhere else (a
+ * short answer that looks complete); a digest is a nudge, and the honest failure
+ * for a nudge nobody can deliver at that size is a loud line in the log plus a
+ * decision for a person to make. */
+async function sendToMany(
+  who: string,
+  people: { email: string }[],
+  // `unknown`, not `void`: every caller's body is `send(...).catch(console.error)`,
+  // whose value is whatever the catch returned. What comes back is discarded —
+  // saying so here is what keeps the call sites free of a `void` nobody reads.
+  one: (person: { email: string }) => Promise<unknown>
+): Promise<void> {
+  const list = people.slice(0, SEND_FAN_CAP)
+  if (people.length > list.length)
+    console.error(
+      `${who}: ${people.length} recipients is past the ${SEND_FAN_CAP} one send may fan out to — ` +
+        `${people.length - list.length} were NOT emailed. This wants a queue, not a bigger number.`
+    )
+  for (let i = 0; i < list.length; i += SEND_CONCURRENCY)
+    await Promise.all(list.slice(i, i + SEND_CONCURRENCY).map(one))
+}
+
 /** A short, safe preview of the reply text for the email body. */
 function snippet(body: string): string {
   const clean = body.trim().replace(/\s+/g, " ")
@@ -234,14 +281,12 @@ export async function notifyTodoRaised(
     // NO STAFF NAME ANYWHERE IN IT. SCOPE ch.06 — the portal never says which
     // staff member is doing the work — and an email is a surface that leaves the
     // building, which is exactly where that promise is easiest to drop.
-    await Promise.all(
-      people.map((p) =>
-        send(env, p.email, `${brand.name}: we need something from you`, {
-          heading: "One thing from you",
-          intro: `${todo.title}${todo.due_on ? ` — by ${todo.due_on.slice(0, 10)}` : ""}.`,
-          footnote: `Open ${todo.ref ? `${todo.ref} ` : ""}in your ${name} portal to mark it done, and send the file with it if there is one.`,
-        }).catch((e) => console.error("to-do notice failed:", e))
-      )
+    await sendToMany("to-do notice", people, (p) =>
+      send(env, p.email, `${brand.name}: we need something from you`, {
+        heading: "One thing from you",
+        intro: `${todo.title}${todo.due_on ? ` — by ${todo.due_on.slice(0, 10)}` : ""}.`,
+        footnote: `Open ${todo.ref ? `${todo.ref} ` : ""}in your ${name} portal to mark it done, and send the file with it if there is one.`,
+      }).catch((e) => console.error("to-do notice failed:", e))
     )
   } catch (e) {
     console.error("to-do notify failed:", e)
@@ -311,16 +356,14 @@ export async function sendTriageDigest(
       lines.push(
         `No time was logged last week by: ${digest.missingTime.join(", ")}.`
       )
-    await Promise.all(
-      to.map((p) =>
-        send(env, p.email, `${team}: this morning`, {
+    await sendToMany("triage digest", to, (p) =>
+      send(env, p.email, `${team}: this morning`, {
           heading: digest.onDutyName ? `${digest.onDutyName} is on triage this week` : "Nobody is on triage this week",
           intro: lines.join(" "),
           footnote: digest.onDutyName
             ? "Open Tickets to read them."
-            : "Put somebody on triage duty in Tickets — a backlog with no owner is the one nobody clears.",
-        }).catch((e) => console.error("triage digest failed:", e))
-      )
+          : "Put somebody on triage duty in Tickets — a backlog with no owner is the one nobody clears.",
+      }).catch((e) => console.error("triage digest failed:", e))
     )
   } catch (e) {
     console.error("triage digest failed:", e)
@@ -361,17 +404,15 @@ export async function notifyTicketResolved(
     if (!people.length) return
     const name = await teamName(env, guard.teamId)
     const asked = snippet(ticket.description)
-    await Promise.all(
-      people.map((p) =>
-        send(env, p.email, `${name}: ${ticket.ref ? `${ticket.ref} — ` : ""}answered`, {
-          heading: "We've come back to you",
-          // The ANSWER in full, and what they asked in one line above it, because
-          // a resolution arriving with no reminder of the question is a paragraph
-          // people have to go and look something up to understand.
-          intro: `You asked: "${asked}"\n\n${resolution}`,
-          footnote: "Open the ticket if you want to reply — the whole conversation is there.",
-        }).catch((e) => console.error("resolution notice failed:", e))
-      )
+    await sendToMany("resolution notice", people, (p) =>
+      send(env, p.email, `${name}: ${ticket.ref ? `${ticket.ref} — ` : ""}answered`, {
+        heading: "We've come back to you",
+        // The ANSWER in full, and what they asked in one line above it, because
+        // a resolution arriving with no reminder of the question is a paragraph
+        // people have to go and look something up to understand.
+        intro: `You asked: "${asked}"\n\n${resolution}`,
+        footnote: "Open the ticket if you want to reply — the whole conversation is there.",
+      }).catch((e) => console.error("resolution notice failed:", e))
     )
   } catch (e) {
     console.error("resolution notify failed:", e)

@@ -34,8 +34,9 @@
 // safe: the row that proves you are a client outlives your login.
 
 import { PORTAL_ACTIVITY_FENCE } from "../rules/registry"
-import { d1Query, type D1Rest } from "./d1-rest"
+import { d1Query, sqlString, type D1Rest } from "./d1-rest"
 import { GuardError, type MemberGuard } from "./gating"
+import { PORTAL_ROOTS_CAP } from "./limits"
 
 /** The caller's stamp. `accountIds` is the closed set a portal caller may touch
  * RIGHT NOW: the company they are standing in, everything nested under it, and
@@ -65,17 +66,48 @@ export type AccountScope =
  * in the SAFE direction (it stops early, granting less). */
 const SCOPE_HARD_CAP = 500
 
+/** The fence's ids, as a LITERAL id list rather than a bound-parameter list.
+ *
+ * D1 REFUSES A STATEMENT CARRYING MORE THAN 100 BOUND PARAMETERS, and the fence
+ * was the one place in the base that could hand it more. `accountScopeClause`
+ * bound one parameter per account in reach (up to SCOPE_HARD_CAP, 500) and
+ * `accountActivityClause` bound the same set THREE times in one statement — so a
+ * client login standing at a company with 34 businesses nested under it stopped
+ * being able to read its own activity feed, and one with 101 stopped being able
+ * to read anything at all. Not a slow path: a 500 on every fenced door, and the
+ * local-SQLite harness (limit 999) could never see it. Exactly the failure
+ * `workers/content/test/d1-parameter-cap.test.ts` was written for, in a file that
+ * suite did not walk.
+ *
+ * Interpolation is the same answer that suite prescribes for the same shape:
+ * these ids are SERVER-OWNED — they come out of the team's own `accounts`,
+ * `account_links` and `portal_users` rows via `accountScope()`, never off a
+ * request — and they go through `sqlString` like every other server-owned value
+ * the script door carries (CONVENTIONS). Values off a request stay bound.
+ *
+ * An EMPTY list is never rendered: both callers answer `0 = 1` before reaching
+ * here, because `IN ()` is not valid SQL. */
+function idList(accountIds: string[]): string {
+  return accountIds.map((id) => sqlString(id)).join(", ")
+}
+
 /** The companies this person belongs to: the one their own row hangs under, plus
  * every one they're actively linked to. Two `?` for the same person id
  * (positional binding — the D1 REST door and node:sqlite both take an ordered
- * array, so no named parameters here). */
+ * array, so no named parameters here).
+ *
+ * BOUNDED (R14, PORTAL_ROOTS_CAP). This was the one read in the guard corridor
+ * with no ceiling on it: anybody may be linked to any number of companies, and
+ * every root then became a bound parameter in the switcher's own lookup. `ORDER
+ * BY id` already made the set stable across requests, which is what makes a LIMIT
+ * safe to add — the same fifty every time, not a different fifty per refresh. */
 const ROOTS_SQL = `
 SELECT parent_account_id AS id FROM accounts
  WHERE id = ? AND parent_account_id IS NOT NULL
 UNION
 SELECT l.account_id FROM account_links l
  WHERE l.person_account_id = ? AND l.deactivated_at IS NULL
-ORDER BY id`
+ORDER BY id LIMIT ${PORTAL_ROOTS_CAP}`
 
 /** From the company they're standing in, everything nested beneath it. */
 const REACH_SQL = `
@@ -244,10 +276,10 @@ export function accountScopeClause(
 ): { sql: string; params: string[] } {
   if (scope.kind === "staff") return { sql: "", params: [] }
   if (scope.accountIds.length === 0) return { sql: "0 = 1", params: [] }
-  return {
-    sql: `${column} IN (${scope.accountIds.map(() => "?").join(", ")})`,
-    params: [...scope.accountIds],
-  }
+  // The ids are interpolated, not bound — see idList. `params` stays in the
+  // return shape (always empty now) so every call site keeps spreading it and
+  // nothing has to know which half of the clause carries values.
+  return { sql: `${column} IN (${idList(scope.accountIds)})`, params: [] }
 }
 
 /** Is this account inside the caller's fence? */
@@ -396,13 +428,16 @@ export function mayHearChange(
 export function accountActivityClause(scope: AccountScope): { sql: string; params: string[] } {
   if (scope.kind === "staff") return { sql: "", params: [] }
   if (scope.accountIds.length === 0) return { sql: "0 = 1", params: [] }
-  const marks = scope.accountIds.map(() => "?").join(", ")
+  // THREE copies of the same set in ONE statement — which is why this clause hit
+  // D1's parameter ceiling at 34 accounts rather than 101, and why the ids are
+  // interpolated (idList) instead of bound.
+  const ids = idList(scope.accountIds)
   return {
     sql:
-      `((related_table = 'accounts' AND related_row_id IN (${marks}))` +
-      ` OR (related_table = 'account_links' AND related_row_id IN (SELECT id FROM account_links WHERE account_id IN (${marks})))` +
-      ` OR (related_table = 'portal_users' AND related_row_id IN (SELECT id FROM portal_users WHERE account_id IN (${marks}))))`,
-    params: [...scope.accountIds, ...scope.accountIds, ...scope.accountIds],
+      `((related_table = 'accounts' AND related_row_id IN (${ids}))` +
+      ` OR (related_table = 'account_links' AND related_row_id IN (SELECT id FROM account_links WHERE account_id IN (${ids})))` +
+      ` OR (related_table = 'portal_users' AND related_row_id IN (SELECT id FROM portal_users WHERE account_id IN (${ids}))))`,
+    params: [],
   }
 }
 

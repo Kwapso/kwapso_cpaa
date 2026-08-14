@@ -12,7 +12,7 @@
 import * as React from "react"
 
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { cursorKey, loadMore } from "@/lib/live-resources"
+import { CLIENT_PAGE_ROWS_CAP, cursorKey, loadMore } from "@/lib/live-resources"
 import { useCachedValue } from "@shared/web/store"
 
 export function LoadMore<T>({
@@ -27,8 +27,22 @@ export function LoadMore<T>({
   label?: string
 }) {
   const cursor = useCachedValue<string | null>(cursorKey(listKey))
+  // The list itself, only to know HOW MUCH of it is loaded. `useCachedValue`
+  // rather than a fetcher: the list has one owner and this is not it.
+  const loaded = useCachedValue<T[]>(listKey)
   const [busy, setBusy] = React.useState(false)
   if (!cursor) return null
+  // AT THE CEILING, SAY SO — don't offer a button that no longer does anything.
+  // `loadMore` refuses past CLIENT_PAGE_ROWS_CAP (a browser holding a thousand
+  // rows of one list is already past useful), and a disabled "Load more" would
+  // read as a bug. There IS more; this is the wrong tool for reaching it.
+  if ((loaded?.length ?? 0) >= CLIENT_PAGE_ROWS_CAP)
+    return (
+      <p className="text-muted-foreground text-center text-sm">
+        That&apos;s the first {CLIENT_PAGE_ROWS_CAP.toLocaleString()} — search or filter to find
+        what you&apos;re after.
+      </p>
+    )
   return (
     <div className="flex justify-center">
       <Button

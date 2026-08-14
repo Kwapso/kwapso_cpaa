@@ -80,6 +80,12 @@ async function handle(request: Request, env: Env): Promise<Response> {
       return fail(404, "not_found", "No such API.")
     }
 
+    // A RANGE, IF THEY ASKED FOR ONE. Read once for all three buckets below: an
+    // attachment may be a 25 MB video, and without this a player's seek re-fetched
+    // the whole object from byte zero. serveMedia decides what a range means; this
+    // only hands it the header.
+    const range = request.headers.get("Range")
+
     // ── Uploaded media: a CAPABILITY URL, on purpose ───────────────────────
     // No session, no membership check — a recorded, deliberate decision whose
     // reasoning (and the fork warning that goes with it) lives on serveMedia in
@@ -89,7 +95,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
     // live in their own per-team bucket. Same serving shape as /media/* below;
     // just a different bucket, matched first since it's a more specific prefix.
     if (pathname.startsWith("/media/learning/") && request.method === "GET")
-      return serveMedia(env.LEARNING_MEDIA, pathname, "/media/learning/")
+      return serveMedia(env.LEARNING_MEDIA, pathname, "/media/learning/", range)
 
     // The agency's own files — brand assets, staff photos, certificate PDFs.
     // Its own bucket, matched before the generic prefix for the same reason
@@ -101,12 +107,12 @@ async function handle(request: Request, env: Env): Promise<Response> {
     // nowhere to be redeemed — which is the same shape as the API refusal one
     // layer up, said in routing instead of in a gate.
     if (pathname.startsWith("/media/internal/") && request.method === "GET")
-      return serveMedia(env.INTERNAL_MEDIA, pathname, "/media/internal/")
+      return serveMedia(env.INTERNAL_MEDIA, pathname, "/media/internal/", range)
 
     // Uploaded files (profile photos, team logos). URLs carry ?v= for cache
     // busting, so the file itself can be cached hard.
     if (pathname.startsWith("/media/") && request.method === "GET")
-      return serveMedia(env.MEDIA, pathname, "/media/")
+      return serveMedia(env.MEDIA, pathname, "/media/", range)
 
     // Deep-link tree: /t/<teamId>/<module>/<id>/… is ONE client-resolved screen.
     // Static export emits a single shell (t.html), so serve it for ANY /t/* depth

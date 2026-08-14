@@ -13,7 +13,7 @@
 
 import { fail, json, pagedJson } from "@shared/workers/http"
 import { csvResponse, exportTooLarge, toCsv } from "@shared/workers/csv"
-import { EXPORT_HARD_CAP } from "@shared/workers/limits"
+import { EXPORT_HARD_CAP, idBatches } from "@shared/workers/limits"
 import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { gated, gatedBody, openTeam } from "@shared/workers/route"
@@ -450,10 +450,20 @@ export async function postSwitchPortalAccount(request: Request, env: Env): Promi
  * already returned, and no others. */
 async function withEmails(env: Env, rows: PortalUser[]): Promise<PortalUser[]> {
   if (!rows.length) return rows
-  const marks = rows.map(() => "?").join(", ")
-  const found = await env.DB.prepare(`SELECT id, email FROM users WHERE id IN (${marks})`)
-    .bind(...rows.map((r) => r.userId))
-    .all<{ id: string; email: string }>()
-  const byId = new Map((found.results ?? []).map((u) => [u.id, u.email]))
+  // BATCHED, because the list feeding this is capped at LIST_HARD_CAP (1,000) and
+  // D1 refuses a statement carrying more than D1_MAX_BOUND_PARAMS (100) of them.
+  // A bounded read that then binds one parameter per row is still a statement the
+  // platform will not run — so the client-login list for a company with more than
+  // a hundred people answered 500, on a path every suite here passes because
+  // local SQLite allows 999. See idBatches (shared/workers/limits.ts).
+  const byId = new Map<string, string>()
+  for (const batch of idBatches(rows.map((r) => r.userId))) {
+    const found = await env.DB.prepare(
+      `SELECT id, email FROM users WHERE id IN (${batch.map(() => "?").join(", ")})`
+    )
+      .bind(...batch)
+      .all<{ id: string; email: string }>()
+    for (const u of found.results ?? []) byId.set(u.id, u.email)
+  }
   return rows.map((r) => ({ ...r, email: byId.get(r.userId) ?? null }))
 }

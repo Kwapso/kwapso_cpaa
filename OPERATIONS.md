@@ -254,6 +254,36 @@ both owner-only:
 - CI runs the same on every push (.github/workflows/ci.yml)
 - deploy:staging ends with scripts/smoke-staging.mjs — the LIVE login→team journey must pass or the deploy is considered failed
 
+## Growth watch — the alarms, and what to do when one fires (scaling review 2026-08-14)
+
+The nightly size check (`checkDatabaseSizes`, cron `10 3 * * *` on tenancy) sizes
+**every** database in the account and writes a `db_alerts` row at 80% of D1's 10 GB
+cap. Nothing DELIVERS that alarm: it lands in a table and a `console.error`, readable
+through the owner-gated admin route, and nobody is polling either. **Until it is
+wired to an email or a page, "we have alarms" means "we have a table" — check it
+deliberately.** Recorded here rather than fixed because who gets paged, and how, is
+an owner's decision.
+
+| watch | where it comes from | the number | what to do when it trips |
+|---|---|---|---|
+| a database at 80% of 10 GB | `db_alerts` (nightly) | `ALERT_THRESHOLD_BYTES` | run the module mover for that team's biggest module; ~2 GB of headroom left |
+| the size scan going blind | a `console.error` from `d1ListDatabases` | `D1_LIST_PAGE_CAP × 100` = 10,000 databases | the platform allows 50,000 — raise the page cap before the estate passes 10,000, or the scan silently stops covering the rest |
+| a cron lapping | a `console.warn` from `teamSlice` naming `window N/M` | `CRON_TEAM_CAP` = 200 teams | past one window a team is visited every M ticks: 15 min × M for the sweep, **M DAYS** for the morning digest. Two or three windows is late; more than that wants a work queue, not a bigger cap |
+| a retention sweep not catching up | `error_logs`, recorded not just logged (R12) | `RETENTION_DELETE_CAP × RETENTION_PASSES_PER_TICK` = 200,000 rows/table/night | the shared core database is taking rows faster than a night can clear them — raise the passes, or shorten the window |
+| the mover failing to drain | a thrown `move_drain_incomplete` naming the table | `MOVE_DRAIN_PASSES` | **urgent**: routing has already flipped, so reads are merged and those rows are duplicates. Empty the named table in the OLD database before the module is read again |
+
+**And the trend, beside the position.** `GET /api/tenancy/admin/db-sizes` now also
+returns `filling`: every watched database with its size and `daysUntilFull`, soonest
+first. It comes from `db_growth` (one row per database, tonight's reading beside last
+night's — `db/core/0022`), so the answer to "how long have I got" is computed from two
+real measurements rather than eyeballed off an alarm. `daysUntilFull` is **null**
+where it cannot be answered honestly — a database's first night, or one that is not
+growing — because a very large number would read as a measurement. Bounded at
+`CRON_GROWTH_CAP` (200) readings a night, biggest first.
+
+What is still open: nobody is DELIVERED any of this. Read it deliberately, or wire
+`db_alerts` + `filling` to an email or a page — see `scaling-review.md`, dimension 4.
+
 ## Local dev
 
 - `npm run dev:auth` (auth worker on :8787, local DB; first time: apply migrations with `--local`)

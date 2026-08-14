@@ -29,10 +29,10 @@ import { Building2, House, LifeBuoy, LogOut, PiggyBank } from "lucide-react"
 import { brand } from "@shared/brand"
 import { useRealtime } from "@shared/web/realtime"
 import { clearAllFormDrafts } from "@shared/web/use-form-draft"
-import { invalidate } from "@shared/web/store"
+import { clearCache } from "@shared/web/store"
 import { reportError } from "@shared/web/log"
 import { auth } from "@/lib/api"
-import { applyLivePing, cacheKeys, replayAfterReconnect } from "@/lib/live-resources"
+import { applyLivePing, replayAfterReconnect } from "@/lib/live-resources"
 import { usePortalSession, type PortalSession } from "@/lib/session"
 import { NeedsName } from "@/components/needs-name"
 import { NoAccess } from "@/components/no-access"
@@ -120,7 +120,10 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
       return
     }
     clearAllFormDrafts() // one person's half-typed ticket is never the next one's
-    invalidate(cacheKeys.session)
+    // The whole cache, not just the session key: every list in it is one
+    // company's rows, and none of them is the next person's to see. Same
+    // sentence the drafts line above already makes.
+    clearCache()
     router.replace("/login")
   }
 

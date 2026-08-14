@@ -130,12 +130,42 @@ The re-pull then goes through the normal **permission-checked endpoint**, so a
 cache can never hold data the viewer isn't allowed to see. (A viewer with no
 rights simply gets nothing back.)
 
-### 9 · Lifetime: in-memory per session
-The cache lives in module memory, cleared on sign-out / team switch (different
-keys). Cross-reload persistence of FETCHED data stays off on purpose — the live
-channel keeps it correct while the tab is open. (Unsaved FORM INPUT is different:
-it DOES persist to `sessionStorage` so a half-filled form survives navigation —
-see §11.)
+### 9 · Lifetime: in-memory per session, and **BOUNDED** (scaling review 2026-08-14)
+The cache lives in module memory. Cross-reload persistence of FETCHED data stays
+off on purpose — the live channel keeps it correct while the tab is open. (Unsaved
+FORM INPUT is different: it DOES persist to `sessionStorage` so a half-filled form
+survives navigation — see §11.)
+
+**It has three ceilings and an eviction rule.** This section used to say the cache
+was "cleared on sign-out / team switch (different keys)", and neither half was true:
+nothing cleared it, and *different keys* is not *dropped keys*. It was a plain `Map`
+that only ever grew — no size bound, no maximum age, nothing removed at the identity
+boundary. The user this whole document is written for keeps one tab open for a
+working day, so a morning of navigation accumulated every list ever opened (up to
+`LIST_HARD_CAP` rows each) plus every page `<LoadMore>` had ever appended, and a
+signed-out tab could still paint a member list out of memory.
+
+| bound | value | why this one |
+|---|---|---|
+| `MAX_CACHED_KEYS` | 120 | how many collections are remembered at once — tens is a real day's navigation, hundreds is accumulation |
+| `MAX_CACHED_ROWS` | 20,000 | the number that actually costs memory: one paged feed scrolled all day can hold more rows than forty ordinary lists |
+| `MAX_CACHE_AGE_MS` | 10 min | a floor under freshness that does **not** depend on a ping arriving. The socket *will* drop in an eight-hour session (§6 catches up when it notices; this catches what it never noticed) |
+
+- **Eviction never takes a subscribed key.** A key with a mounted reader is on
+  screen, and dropping it to make room for one nobody is reading would blank a live
+  list. The sweep skips subscribed keys and takes the least-recently-written of the
+  rest — which is exactly the set a day's navigation left behind.
+- **`clearCache()` at the identity boundary.** Sign-out, team switch (agency) and
+  company switch (portal) all drop everything and notify, so a mounted screen
+  re-reads through the permission-checked door. The portal's company switch used to
+  name nine cache keys one at a time — each added after somebody spotted a stale
+  screen — which is the hand-kept-list shape R21 has been bitten by twice. A switch
+  changes *who is asking*; nothing cached survives it.
+- **A read does not refresh age.** The clock starts at the WRITE, or a screen
+  polling its own cache would keep stale rows alive for ever.
+
+Locked by `web/test/cache-bounds.test.ts` and
+`web-portal/test/switcher-invalidation.test.ts`.
 
 ### 10 · Edge / server
 - Content-hashed assets (`/_next/static/**`) → cached **forever, immutable**
@@ -210,6 +240,15 @@ last page, `undefined` = nothing loaded yet).
 - **The cursor is opaque.** It travels cache → door → cache and is never built,
   parsed, or stored anywhere else. A malformed one is a clean 400, so a stale
   link fails loudly instead of quietly re-serving page one forever.
+- **The PREFIX has a ceiling of its own: `CLIENT_PAGE_ROWS_CAP` (1,000).** R14 caps
+  what one request returns; nothing capped what a session ACCUMULATED, and appending
+  is the whole point of `<LoadMore>` — so a scrolled feed grew in memory and in the
+  DOM for as long as the tab lived. At the ceiling the button is replaced by a
+  sentence ("that's the first 1,000 — search or filter"), because a disabled
+  Load-more reads as a bug and there IS more; this is the wrong tool for reaching
+  it. Both front ends carry the number (`web/lib/live-resources.ts`,
+  `web-portal/lib/tickets.ts` — the two share no lib). It sits inside
+  `MAX_CACHED_ROWS` on purpose, so one list can never spend the whole tab's budget.
 
 ## Checklist for a new screen / module
 1. Read with `useCached("<resource>:<scopeId>", fetcher)`.

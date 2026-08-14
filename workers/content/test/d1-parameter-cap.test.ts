@@ -15,17 +15,43 @@
 // something larger than D1's cap. Server-owned ids go through `sqlString` like
 // every other server-owned value (CONVENTIONS); values off a request stay bound,
 // and stay under the cap.
+//
+// IT USED TO WALK ONE WORKER, AND THAT WAS THE HOLE. `SRC` was
+// `workers/content/src` — the worker the first bug happened in — so the check
+// read like a repo-wide law and was actually one directory. Four statements
+// outside it had the same shape and worse bounds, and the scaling review found
+// them under a green build:
+//   • the ACCOUNT FENCE (shared/workers/account-scope.ts) bound one parameter per
+//     account in reach — SCOPE_HARD_CAP is 500 — and `accountActivityClause`
+//     bound the same set THREE times in one statement, so a client login standing
+//     at a company with 34 businesses under it could not read its own activity
+//     feed, and one with 101 could not read anything at all;
+//   • the portal switcher bound one per root off a read that had no LIMIT;
+//   • `withEmails` bound one per row of a list capped at LIST_HARD_CAP (1,000);
+//   • the ticket-stakeholder lookup bound one per watcher, capped at 500.
+// So the scan now walks EVERY worker's src plus shared/, and the vouching list
+// below is keyed by file as well as by variable — a bound is only a bound if you
+// can name it, and "the same variable name is fine somewhere else" is how a list
+// of exceptions stops meaning anything.
 
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
 import { sourceFiles } from "@shared/rules/source-scan"
+import { D1_MAX_BOUND_PARAMS, PORTAL_ROOTS_CAP } from "@shared/workers/limits"
 
 const SRC = join(__dirname, "..", "src")
+const REPO = join(__dirname, "..", "..", "..")
 
-/** D1's hard ceiling on bound parameters in one statement. */
-const D1_PARAM_CAP = 100
+/** Every directory a statement can be written in: the six brains, the two
+ * gateways, and the shared seams they all call. */
+const SCANNED = [
+  join(REPO, "shared"),
+  ...["auth", "content", "data-ops", "gateway", "mcp", "portal-gateway", "realtime", "tenancy"].map(
+    (w) => join(REPO, "workers", w, "src")
+  ),
+]
 
 describe("no statement can bind more parameters than D1 accepts", () => {
   it("the knowledge candidate fetch interpolates its ids, it does not bind them", () => {
@@ -40,50 +66,92 @@ describe("no statement can bind more parameters than D1 accepts", () => {
     expect(line, "and it must not generate a placeholder per candidate").not.toContain('map(() => "?")')
   })
 
+  it("the account fence interpolates its ids — it is the widest list in the base", () => {
+    const src = readFileSync(join(REPO, "shared", "workers", "account-scope.ts"), "utf8")
+    expect(
+      src,
+      "accountScopeClause and accountActivityClause must render their account ids through " +
+        "sqlString (idList). Binding them is bounded only by SCOPE_HARD_CAP (500), and the " +
+        "activity clause carries the set three times — so it fails at 34 accounts, on every " +
+        "fenced read a client login makes."
+    ).not.toContain('map(() => "?")')
+    expect(src, "and the ids must go through the one escaping seam").toContain("sqlString(id)")
+  })
+
   it("every per-element placeholder list is one that provably cannot reach the cap", () => {
     // A `xs.map(() => "?")` is safe only while `xs` cannot outgrow D1's limit.
-    // Rather than guess from the file's constants — which flags the safe lists
-    // alongside the dangerous one — this names each surviving list and why it is
-    // small. A new one turns the build red until somebody says which it is.
+    // Rather than guess from each file's constants — which flags the safe lists
+    // alongside the dangerous ones — this names each surviving list, WHERE it is,
+    // and why it is small. A new one turns the build red until somebody says
+    // which it is.
     const KNOWN_SMALL: Record<string, string> = {
-      terms: "a question's search terms, capped at MAX_QUESTION_TERMS (24)",
-      compartments: "the compartments searched — the agency's plus at most one client",
-      // NOT proven, ADMITTED. notify.ts and stakeholders.ts bind one parameter
-      // per user id against the global core DB, bounded only by how many people
-      // are on a team or watching one ticket. Small today (single figures) and
-      // the same failure mode as the one above: past a hundred, the notify and
-      // stakeholder reads start throwing "too many SQL variables". Recorded here
-      // rather than quietly passing, because the shape is the bug — see
-      // BASE-IMPROVEMENTS.md.
-      unique: "user ids to notify — bounded by team size, which is not a hard bound",
-      ids: "the same, one frame earlier in notify.ts — same bound, same admission",
-      // PROVEN, like the two at the top rather than the two admitted above it:
-      // the sync-state read names INGEST_KINDS (three, fixed in code) plus the
-      // caller's own Google state keys (GOOGLE_SERVICES, four, fixed in code).
-      // Seven, and neither list can grow without an edit to a `const` array.
-      keys: "the ingest state keys — INGEST_KINDS (3) plus one per GOOGLE_SERVICE (4), both fixed at author time",
-      FLIPPABLE:
+      "content/src/lib/knowledge.ts: terms":
+        "a question's search terms, capped at MAX_QUESTION_TERMS (24)",
+      "content/src/lib/knowledge.ts: compartments":
+        "the compartments searched — the agency's plus at most one client",
+      // NOT proven, ADMITTED — and now with the number that makes it survivable.
+      // notify.ts binds one parameter per user id against the global core DB.
+      // `lookupUsers` is fed a ticket's raiser plus its @mentions, and mentions
+      // are capped at MENTIONS_LIMIT (50), so the list is ≤51. `accountInboxes`
+      // reads its grants under `LIMIT 100`, which is the cap exactly and no
+      // headroom — recorded here rather than quietly passing, because a cap that
+      // equals the ceiling is one edit from crossing it.
+      "content/src/lib/notify.ts: unique":
+        "a ticket's raiser plus its mentions — MENTIONS_LIMIT (50) bounds the list at 51",
+      "content/src/lib/notify.ts: ids":
+        "the account's portal grants, bounded by the read's own LIMIT 100 — exactly at the cap",
+      // PROVEN: the sync-state read names INGEST_KINDS (three, fixed in code)
+      // plus the caller's own Google state keys (GOOGLE_SERVICES, four, fixed in
+      // code). Seven, and neither list can grow without an edit to a `const`.
+      "content/src/lib/knowledge-ingest.ts: keys":
+        "the ingest state keys — INGEST_KINDS (3) plus one per GOOGLE_SERVICE (4), both fixed at author time",
+      "content/src/lib/ready-flip.ts: FLIPPABLE":
         "a module-level constant: the ticket statuses a Ready flip may move from. " +
-        "Five strings, fixed at author time — the one list here that is provably small.",
+        "Five strings, fixed at author time.",
+      "content/src/lib/stakeholders.ts: batch":
+        "one slice of idBatches — bounded BY D1_MAX_BOUND_PARAMS itself, which is the point of it",
+      "tenancy/src/routes/accounts.ts: batch":
+        "the same: a slice of idBatches, bounded by the cap it exists to respect",
+      "tenancy/src/lib/accounts.ts: scope.roots":
+        `the portal switcher's companies, capped at PORTAL_ROOTS_CAP (${PORTAL_ROOTS_CAP}) by ROOTS_SQL`,
+      "tenancy/src/lib/activity-read.ts: allowedTables":
+        "the modules a caller may read — one per TEAM_MODULES entry, fixed at author time",
+      "tenancy/src/lib/work-engine.ts: BORROWED":
+        "a module-level constant: the tables the work engine borrows. Fixed at author time.",
+      // A column list, not an id list: bounded by the table's own shape, and D1
+      // caps a table at 100 columns anyway — so the schema cannot make this fail
+      // without failing first for a different reason.
+      "tenancy/src/lib/accounts.ts: cols": "one placeholder per COLUMN — D1 caps a table at 100 of them",
+      "tenancy/src/lib/processes.ts: cols": "the same: one per column, and a table may not have 101",
     }
     const found: string[] = []
-    for (const file of sourceFiles(SRC, { extensions: [".ts"] })) {
-      for (const m of file.source.matchAll(/(\w+)\.map\(\(\) => "\?"\)/g))
-        found.push(`${file.rel}: ${m[1]}`)
-    }
-    const unexplained = found.filter((f) => !KNOWN_SMALL[f.split(": ")[1]])
+    for (const dir of SCANNED)
+      for (const file of sourceFiles(dir, { extensions: [".ts"] }))
+        for (const m of file.source.matchAll(/([\w.]+)\.map\(\(\) => "\?"\)/g)) {
+          // `file.rel` is relative to each scanned root, so re-key it on the
+          // worker (or shared/) it came from — two workers may hold the same
+          // relative path and must not vouch for each other's lists.
+          const root = dir.slice(REPO.length + 1).replace(/^workers\//, "")
+          found.push(`${root}/${file.rel}: ${m[1]}`)
+        }
+    const unexplained = found.filter((f) => !KNOWN_SMALL[f])
     expect(
       unexplained,
       `a statement generates one bound placeholder per element of a list this suite cannot vouch ` +
-        `for. D1 refuses past ${D1_PARAM_CAP} parameters. Either prove the list is small and add it ` +
-        `to KNOWN_SMALL with its bound, or interpolate server-owned values through sqlString:\n` +
+        `for. D1 refuses past ${D1_MAX_BOUND_PARAMS} parameters. Either prove the list is small and ` +
+        `add it to KNOWN_SMALL with its bound, interpolate server-owned values through sqlString, or ` +
+        `batch it with idBatches:\n` +
         unexplained.join("\n")
     ).toEqual([])
 
-    // And the caps that make those two safe must stay under the limit.
+    // And the caps that make those safe must stay under the limit.
     const src = readFileSync(join(SRC, "lib", "knowledge.ts"), "utf8")
     const maxTerms = Number(/const MAX_QUESTION_TERMS = (\d+)/.exec(src)?.[1] ?? "0")
     expect(maxTerms, "MAX_QUESTION_TERMS must stay under D1's parameter cap").toBeGreaterThan(0)
-    expect(maxTerms).toBeLessThan(D1_PARAM_CAP)
+    expect(maxTerms).toBeLessThan(D1_MAX_BOUND_PARAMS)
+    expect(
+      PORTAL_ROOTS_CAP,
+      "PORTAL_ROOTS_CAP must stay under D1's parameter cap — the switcher binds one per root"
+    ).toBeLessThan(D1_MAX_BOUND_PARAMS)
   })
 })

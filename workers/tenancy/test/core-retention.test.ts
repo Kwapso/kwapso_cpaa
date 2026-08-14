@@ -17,7 +17,12 @@ import { join } from "node:path"
 import { DatabaseSync, type SqlValue } from "node:sqlite"
 import { describe, expect, it } from "vitest"
 
-import { AUTH_RETENTION_HOURS, RETENTION_DELETE_CAP } from "../../../shared/workers/limits"
+import {
+  AUTH_RETENTION_HOURS,
+  ERROR_LOG_RETENTION_DAYS,
+  RETENTION_DELETE_CAP,
+  RETENTION_PASSES_PER_TICK,
+} from "../../../shared/workers/limits"
 import { sweepCoreRetention } from "../../../shared/workers/retention"
 
 const CORE = join(__dirname, "..", "..", "..", "db", "core")
@@ -33,6 +38,10 @@ function coreDb() {
   db.exec(/CREATE TABLE login_codes[\s\S]*?\);/.exec(auth)![0])
   db.exec(/CREATE TABLE sessions[\s\S]*?\);/.exec(auth)![0])
   db.exec(migration("0017_login_send_ledger.sql"))
+  // The sweep takes `error_logs` too now, so the harness has to carry it — a
+  // missing table would be swallowed by the per-table catch and the assertions
+  // about it would pass against nothing.
+  db.exec(/CREATE TABLE error_logs[\s\S]*?\);/.exec(migration("0012_error_logs.sql"))![0])
   const now = new Date().toISOString()
   db.prepare("INSERT INTO users (id, email, created_at, updated_at) VALUES ('U1','u@example.com',?,?)").run(now, now)
   return db
@@ -75,9 +84,13 @@ function harness() {
         "INSERT INTO sessions (id, user_id, token_hash, created_at, expires_at, last_seen_at) VALUES (?,?,?,?,?,?)"
       )
       .run(`x${seq++}`, "U1", `t${seq}`, ago(1), expiresAt, ago(1))
+  const errorLog = (at: string) =>
+    db
+      .prepare("INSERT INTO error_logs (id, at, source, place, message) VALUES (?,?,?,?,?)")
+      .run(`e${seq++}`, at, "content", "GET /x", "boom")
   const count = (table: string) =>
     (db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n
-  return { db, code, send, session, count, sweep: () => sweepCoreRetention(binding(db)) }
+  return { db, code, send, session, errorLog, count, sweep: () => sweepCoreRetention(binding(db)) }
 }
 
 describe("the sweep takes what is spent and leaves what is live", () => {
@@ -131,17 +144,63 @@ describe("the sweep takes what is spent and leaves what is live", () => {
 })
 
 describe("the sweep does bounded work, and says when it did not finish", () => {
-  it("stops at the per-table ceiling and names the table", async () => {
+  it("keeps going past ONE statement's ceiling — a night is not a statement", async () => {
+    // THE CAP BOUNDS A STATEMENT, NOT A NIGHT. This suite used to assert the
+    // opposite ("at most the ceiling in one night"), and that was the finding: at
+    // 5,000 rows a night against a database taking sign-ins from every tenant, a
+    // quarter-million-person tenant adds more before lunch than a night could
+    // remove, and the table grows for ever while the cron reports success.
     const h = harness()
     for (let i = 0; i < RETENTION_DELETE_CAP + 25; i++) h.code(ago(AUTH_RETENTION_HOURS + 1))
 
     const report = await h.sweep()
 
-    expect(report.deleted.login_codes, "at most the ceiling in one night").toBe(RETENTION_DELETE_CAP)
-    expect(h.count("login_codes"), "the rest wait for tomorrow").toBe(25)
-    // A full sweep is not a finished one. Without this, a table that never
+    expect(report.deleted.login_codes, "the whole backlog, over several statements").toBe(
+      RETENTION_DELETE_CAP + 25
+    )
+    expect(h.count("login_codes"), "nothing spent is left behind").toBe(0)
+    expect(report.capped, "and it finished, so it does not claim otherwise").toEqual([])
+  })
+
+  it("stops at the PASS ceiling and names the table", async () => {
+    // Bounded work is still bounded: the tick runs at most
+    // RETENTION_PASSES_PER_TICK statements per table. Proving that with real rows
+    // would mean inserting 200,001 of them, so the ceiling is proved on the
+    // arithmetic and the loop's own shape instead — and the un-finished flag is
+    // proved below on a stub that never runs short.
+    let calls = 0
+    const alwaysFull = {
+      prepare: () => ({
+        bind: () => ({
+          async run() {
+            calls++
+            return { meta: { changes: RETENTION_DELETE_CAP } }
+          },
+        }),
+      }),
+    }
+    const report = await sweepCoreRetention(alwaysFull)
+
+    const tables = Object.keys(report.deleted).length
+    expect(calls, "at most the pass ceiling, per table").toBe(RETENTION_PASSES_PER_TICK * tables)
+    // A full last pass is not a finished sweep. Without this, a table that never
     // catches up is indistinguishable from one with nothing left to take.
     expect(report.capped, "and the run says it has not caught up").toContain("login_codes")
+    expect(report.deleted.login_codes).toBe(RETENTION_DELETE_CAP * RETENTION_PASSES_PER_TICK)
+  })
+
+  it("takes error logs past their documented window, and leaves recent ones", async () => {
+    // db/core/0012 has called this a "90-day-ish owned history" since the day the
+    // table was created, and nothing had ever deleted a row: a rate ceiling (0019)
+    // bounds how fast it fills, not how full it gets.
+    const h = harness()
+    h.errorLog(ago(24 * (ERROR_LOG_RETENTION_DAYS + 1)))
+    h.errorLog(ago(24 * 3)) // last week's crash is still what somebody is reading
+
+    const report = await h.sweep()
+
+    expect(report.deleted.error_logs).toBe(1)
+    expect(h.count("error_logs"), "recent diagnostics survive").toBe(1)
   })
 
   it("a run with room to spare does not claim it was capped", async () => {
