@@ -5,6 +5,7 @@ import { Toaster } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { ThemeProvider } from "@kwapso/ui/registry/tokens/theme-provider"
 import { BrandTheme } from "@shared/web/brand-theme"
 import { appMetadata, appViewport } from "@shared/web/pwa"
+import { SplashScreen } from "@shared/web/splash-screen"
 import { AgentHost } from "@/components/agent-host"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { ErrorReporter } from "@/components/error-reporter"
@@ -30,6 +31,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={inter.variable} suppressHydrationWarning>
       <body className="min-h-[100svh] antialiased">
+        {/* FIRST IN THE BODY, and that is the point: the parser paints it before
+         * it has read the rest of the document, let alone fetched the bundle. It
+         * clears itself after ~3.7s (or on a tap) — shared/web/splash.ts. */}
+        <SplashScreen />
         <BrandTheme />
         {/* defaultTheme="system" = follow the device's day/night setting; a
          * ModeToggle (in the app bar + on the auth screens) lets people

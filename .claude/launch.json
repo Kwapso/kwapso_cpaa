@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--workspace=web"],
       "port": 3000
+    },
+    {
+      "name": "kwapso-portal",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:portal"],
+      "port": 3001
     }
   ]
 }
