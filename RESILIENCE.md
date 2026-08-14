@@ -95,7 +95,7 @@ down is a split the next person will not preserve.
 |---|---|---|
 | `kwapso-core` (D1) | users, teams, team_members, invites, mcp_tokens, error_logs | dump + Time Travel |
 | one D1 **per team** | that team's everything: roles, permissions, learning, tickets, work engine, knowledge, activity | dump + Time Travel, **per team** |
-| R2 buckets (4) | uploaded media, learning attachments, ticket attachments, the agency's own files | **not backed up** — see below |
+| R2 buckets (4) | uploaded media, learning attachments, ticket attachments, the agency's own files | object-by-object dump — **no Time Travel**, so the last run is the only copy |
 | Vectorize index | knowledge embeddings | **derived** — rebuilt from the team databases |
 | Durable Objects | open WebSockets | **nothing to recover** — holds no app data (ARCHITECTURE §2) |
 
@@ -140,12 +140,21 @@ resolves.
 
 ### What is NOT backed up, and what that costs
 
-- **R2 buckets.** Profile photos, team logos, learning media, ticket
-  attachments, the agency's internal files. Losing a bucket loses those files
-  permanently; the rows that reference them survive and the images 404. R2 has
-  no equivalent of Time Travel. **This is the real gap in the recovery story** —
-  closing it means either bucket-to-bucket replication or adding R2 to
-  `backup.mjs`.
+- ~~**R2 buckets.**~~ **Now covered** — `scripts/backup.mjs` copies every object
+  in every bucket this environment owns, alongside the database dumps. R2 still
+  has no equivalent of Time Travel, so the backup is the only copy: a bucket
+  deleted between two runs is gone for the window between them.
+
+  Two properties worth knowing before you trust it. The **bucket is the
+  inventory**, not the database — every object is copied whether or not a row
+  names it, because a key nobody references is usually an upload whose form was
+  abandoned, and guessing from six upload routes' columns was how the first
+  attempt would have quietly missed files. The databases are the **cross-check**:
+  a row naming a key the bucket does not hold is reported as a failure, and that
+  file was already lost before the backup ran. And a bucket the account holds
+  that no config covers **fails the run** rather than being skipped, because a
+  backup that reports success while incomplete is worse than none.
+  `web/test/backup-covers-r2.test.ts` derives both halves from the source.
 - **Secrets.** `RESEND_API_KEY`, `GOOGLE_CLIENT_*`, `GOOGLE_CONNECT_*`,
   `GOOGLE_TOKEN_KEY`, `CF_D1_TOKEN`, `INTERNAL_KEY`. Re-set from the owner's
   password manager per [OPERATIONS.md](OPERATIONS.md). **`GOOGLE_TOKEN_KEY` is
