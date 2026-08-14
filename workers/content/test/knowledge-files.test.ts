@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from "vitest"
 
 import { DOCUMENT_LIMIT_BYTES } from "@shared/workers/validate"
 import { GuardError } from "@shared/workers/gating"
+import { indexableText } from "../src/lib/knowledge"
 import {
   capToRow,
   extractFile,
@@ -190,5 +191,28 @@ describe("extractFile: the file is kept, the words are only claimed when they ex
         fileName: "nothing.pdf",
       })
     ).rejects.toBeInstanceOf(GuardError)
+  })
+})
+
+// AN UNREADABLE FILE INDEXES TO NOTHING — the clause the first real upload
+// earned. A .pptx came back "stored, not searchable" in words and `chunkCount:
+// 1` in the same row, because the indexer falls back to the TITLE when there is
+// no body. One searchable piece containing nothing but the file's own name is
+// the exact state this feature promises never to reach: the screen derives
+// "stored, not searchable" from that count, and the assistant could have cited a
+// deck it had not read a word of.
+describe("indexableText: a title is not material", () => {
+  it("indexes a typed note on its title even with no body — unchanged", () => {
+    expect(indexableText({ title: "Dispatch rollout", body: null })).toBe("Dispatch rollout")
+  })
+
+  it("indexes a FILE we could not read to nothing at all", () => {
+    expect(indexableText({ title: "Quarterly deck", body: null, file_url: "/media/internal/x/y" })).toBe("")
+  })
+
+  it("indexes a file we COULD read on its title and its words, like anything else", () => {
+    expect(
+      indexableText({ title: "Runbook", body: "the window is four hours", file_url: "/media/internal/x/y" })
+    ).toContain("four hours")
   })
 })

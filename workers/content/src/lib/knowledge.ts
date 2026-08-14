@@ -898,8 +898,24 @@ async function clearIndex(
 /** The text a source is indexed FROM: its title and its body, together. The
  * title is indexed with the body deliberately — a note called "Bergman dispatch
  * rollout" whose body never repeats the name would otherwise be unfindable by
- * the words a person would actually use. */
-export function indexableText(source: { title: string; body: string | null }): string {
+ * the words a person would actually use.
+ *
+ * WITH ONE EXCEPTION, AND IT IS THE WHOLE OF THE UPLOAD PROMISE. A FILE we could
+ * not read has no body, and indexing it on its TITLE alone would produce a
+ * source with one searchable piece containing nothing but its own name — which
+ * is precisely the state this feature is built never to reach. A real upload
+ * proved it rather than a test: a .pptx came back "stored, not searchable" in
+ * words and `chunkCount: 1` in the same row, so the screen that derives "stored,
+ * not searchable" from the count would have called it searchable, and the
+ * assistant could have cited a deck it had not read a word of. A title is not
+ * material. An unreadable file indexes to nothing, and the number on the row
+ * says so. */
+export function indexableText(source: {
+  title: string
+  body: string | null
+  file_url?: string | null
+}): string {
+  if (source.file_url && !source.body) return ""
   return [source.title, source.body ?? ""].join("\n\n").trim()
 }
 
@@ -983,7 +999,11 @@ export async function indexSource(
   const rows = await d1Query<SourceRow & { content_hash: string | null }>(
     cfg,
     guard.databaseId,
-    `SELECT id, kind, title, summary, body, compartment, account_id, app_id, ticket_id, sprint_id, record_date,
+    // `file_url` rides along because `indexableText` needs it: a file with no
+    // body indexes to nothing, and the difference between "no body" and "a file
+    // with no body" is the difference between a note somebody left blank and a
+    // document we could not read.
+    `SELECT id, kind, title, summary, body, file_url, compartment, account_id, app_id, ticket_id, sprint_id, record_date,
             owner_user_id, content_hash, chunk_count, indexed_chunks, deactivated_at, created_at
        FROM knowledge_sources WHERE id = ? LIMIT 1`,
     [sourceId]

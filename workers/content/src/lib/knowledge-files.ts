@@ -243,13 +243,27 @@ export async function extractFile(
 
   try {
     const converted = await withTimeout(
-      env.AI.toMarkdown({
-        name: file.fileName,
-        // The type the browser declared, handed on so the converter can pick a
-        // reader. It is not trusted anywhere else — the stored object is
-        // labelled application/octet-stream regardless (shared/workers/image.ts).
-        blob: new Blob([file.bytes as unknown as ArrayBuffer], { type: file.contentType }),
-      }),
+      env.AI.toMarkdown(
+        {
+          name: file.fileName,
+          // The type the browser declared, handed on so the converter can pick a
+          // reader. It is not trusted anywhere else — the stored object is
+          // labelled application/octet-stream regardless (shared/workers/image.ts).
+          blob: new Blob([file.bytes as unknown as ArrayBuffer], { type: file.contentType }),
+        },
+        // NO PDF METADATA, and this is a MEASURED decision rather than a
+        // preference. The converter's default prepends the file's producer,
+        // creation date, PDF version and half a dozen `IsSomethingPresent=false`
+        // lines to the markdown. On the first real document put through this
+        // door — a one-page runbook — that preamble was 80% of the 834 bytes
+        // extracted, and it was what came back as the PASSAGE when the runbook
+        // was asked about: an answer quoting "PDFFormatVersion=1.3" at somebody
+        // who asked about a dispatch window. It also poisons the embedding,
+        // because every PDF in the base then shares four hundred identical
+        // characters and therefore resembles every other PDF more than it
+        // resembles any question.
+        { conversionOptions: { pdf: { metadata: false } } }
+      ),
       CONVERT_TIMEOUT_MS
     )
     if (converted.format === "error")
