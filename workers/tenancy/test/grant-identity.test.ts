@@ -32,7 +32,8 @@ import { describe, expect, it } from "vitest"
 
 import { stripComments } from "@shared/rules/source-scan"
 import { FENCE_IDENTITY_INPUTS } from "@shared/workers/account-scope"
-import { isPrivilegeWrite, SHARED_TOOLS } from "@shared/workers/tool-catalog"
+import { SHARED_TOOLS } from "@shared/workers/tool-catalog"
+import { isPrivilegeWrite } from "@shared/workers/tool-gates"
 import { TEAM_MIGRATIONS } from "../src/team-schema"
 
 const accountsSrc = stripComments(

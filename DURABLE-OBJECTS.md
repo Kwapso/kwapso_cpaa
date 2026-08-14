@@ -18,9 +18,10 @@ write path.
 
 ## 1 · Two different things called "Durable Object"
 
-The confusion to retire first (ARCHITECTURE.md §2): **a worker count and a
-Durable-Object count are different things**, and a DO *class* and a DO *instance*
-are different again.
+The confusion to retire first: **a worker count and a Durable-Object count are
+different things**, and a DO *class* and a DO *instance* are different again.
+This table is where that distinction is kept — ARCHITECTURE §2 rules on what gets
+an instance and points here for what an instance IS.
 
 | Thing | What it is | How many | Grows with teams? |
 |---|---|---|---|

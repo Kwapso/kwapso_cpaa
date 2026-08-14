@@ -25,16 +25,9 @@ import { GuardError, requireRight, teamContext } from "@shared/workers/gating"
 import { forwardToDoor } from "@shared/workers/http"
 import { BULK_IDS_LIMIT } from "@shared/workers/limits"
 import { publishChange } from "@shared/workers/realtime"
-import { B,
-  checkArgTypes,
-  isPrivilegeWrite,
-  obj,
-  roleLabel,
-  S,
-  SHARED_TOOLS,
-  str,
-  type SharedTool,
-} from "@shared/workers/tool-catalog"
+import { B, checkArgTypes, obj, S, str } from "@shared/workers/tool-args"
+import { roleLabel, SHARED_TOOLS, type SharedTool } from "@shared/workers/tool-catalog"
+import { isPrivilegeWrite } from "@shared/workers/tool-gates"
 import { confirmBatch, getBatchView, planModules } from "./import-batch"
 import type { Env } from "../env"
 import type { ToolSpec } from "./model"

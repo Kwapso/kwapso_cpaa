@@ -44,7 +44,10 @@ the concrete form of the planning ritual's step 4 (CLAUDE.md).
   buildBody · summary, plus the agent's `write`/`confirm`/`summarize`) — the agent
   (`toAgentTool`) and MCP (`toMcpTool`) both pick it up, so they can't drift. A tool for
   only ONE surface stays in that surface's file (the agent's bulk/SELF tools; the MCP's
-  exports/import/agent-bridge). The agent's confirm is `true` — or an input-aware
+  exports/import/agent-bridge). A WRITE also needs its `module:right` in `TOOL_GATES` —
+  `shared/workers/tool-gates.ts`, which owns who-may-call-it and what-must-be-confirmed
+  while the catalog owns the declarations; `workers/mcp/test/catalog.test.ts` fails the
+  build if a write resolves to neither a gate nor a reason. The agent's confirm is `true` — or an input-aware
   predicate — if the act is DESTRUCTIVE, a PRIVILEGE GRANT, or bulk (other constructive writes run free, EDGE-CASES
   §5). Both forward through the SAME gated door — never a second, ungated path.
 - **A new invariant → a machine-checked Law if it can be source-scanned; else a

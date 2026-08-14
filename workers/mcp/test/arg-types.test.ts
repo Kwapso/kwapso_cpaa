@@ -12,7 +12,7 @@
 
 import { describe, expect, it } from "vitest"
 
-import { checkArgTypes, obj, S, B, N, str } from "@shared/workers/tool-catalog"
+import { checkArgTypes, obj, S, B, N, str } from "@shared/workers/tool-args"
 import { GuardError } from "@shared/workers/gating"
 import { MCP_TOOLS } from "../src/lib/tools"
 
