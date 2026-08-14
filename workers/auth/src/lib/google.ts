@@ -177,11 +177,6 @@ export async function googleSigningKeys(now: number = Date.now()): Promise<Jwk[]
   return keyCache.keys
 }
 
-/** Test seam: forget the cached keys. Never called by the worker. */
-export function forgetGoogleKeys(): void {
-  keyCache = null
-}
-
 /**
  * VERIFY GOOGLE'S ASSERTION. Signature first, then every claim that decides
  * whether this token is about US, about NOW, and about a REAL address:

@@ -829,11 +829,6 @@ export type InternalRate = {
 export const STORY_STATUSES = ["open", "in_progress", "in_review", "done"] as const
 export type StoryStatus = (typeof STORY_STATUSES)[number]
 
-/** The states a story is NOT yet finished in. Derived from the one list above
- * rather than retyped, so a fifth state cannot be added and silently left out of
- * the question the Ready flip asks ("is anything still open on this ticket?"). */
-export const OPEN_STORY_STATUSES = STORY_STATUSES.filter((s) => s !== "done")
-
 /** ONE PIECE OF WORK WE DO. The only place an assignee and a due date live — a
  * ticket deliberately has neither and derives its picture from these. */
 export type Story = {

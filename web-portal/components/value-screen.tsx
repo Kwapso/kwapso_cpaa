@@ -42,7 +42,7 @@ import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { Comments } from "@kwapso/ui/registry/collections/comments/comments"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 
-import { SAVINGS_CAPTION, savedHours, type StepSaving } from "@shared/workers/savings"
+import { SAVINGS_CAPTION, hoursText, minutesText, type StepSaving } from "@shared/workers/savings"
 import type { ProcessComment } from "@shared/types"
 import { moneyText } from "@shared/web/money"
 import { invalidate, useCached } from "@shared/web/store"
@@ -50,22 +50,12 @@ import { ApiFailure, value as valueApi, type PortalValue } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 import type { PortalReady } from "@/components/portal-shell"
 
-/** Hours, said the way a person says them. The rounding happens ONCE (savedHours)
- * so the steps inside a process always add up to the figure above them. */
-function hoursText(seconds: number): string {
-  const hours = savedHours(Math.abs(seconds))
-  return `${hours.toLocaleString()} ${hours === 1 ? "hour" : "hours"}`
-}
-
-function minutesText(seconds: number): string {
-  return `${Math.round(seconds / 60).toLocaleString()} min`
-}
-
-// Money comes from `shared/web/money.ts`, imported at the top of this file — not
-// written again here, which is what it was.
+// Money comes from `shared/web/money.ts`, and hours and minutes from
+// `shared/workers/savings.ts` beside the rounding they spell — imported at the
+// top of this file, not written again here, which is what they were.
 //
-// The local copy left `minimumFractionDigits` off, so this screen rendered a
-// round rate as "12.5" where the agency's own rate card, reading the SAME cents,
+// The local money copy left `minimumFractionDigits` off, so this screen rendered
+// a round rate as "12.5" where the agency's own rate card, reading the SAME cents,
 // rendered "12.50". A client and the person who set their price were looking at
 // two spellings of one number. That is the exact divergence the shared file was
 // written to stop, and its header says so — a formatter knows no table, no door
