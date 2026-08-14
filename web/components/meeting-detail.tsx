@@ -23,10 +23,6 @@ import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import {
-  DescriptionList,
-  defaultDescriptionListConfig,
-} from "@kwapso/ui/registry/collections/description-list/description-list"
-import {
   ActivityFeed,
   defaultActivityFeedConfig,
 } from "@kwapso/ui/registry/collections/activity-feed/activity-feed"
@@ -35,6 +31,7 @@ import { CalendarPlus, CheckCheck, Pencil, Power } from "lucide-react"
 import type { Account, Meeting, MeetingPurpose } from "@shared/types"
 import { LoadMore } from "@/components/load-more"
 import { MeetingFormDialog, toLocalInput, type MeetingFormValues } from "@/components/meeting-form-dialog"
+import { OverviewList } from "@/components/overview-list"
 import { ApiFailure, content, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
 import { listFetch, meetingsKey } from "@/lib/live-resources"
@@ -268,12 +265,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
         onValueChange={setTab}
         renderPanel={(t) => {
           if (t.value === "overview")
-            return (
-              <DescriptionList
-                config={{ ...defaultDescriptionListConfig, columns: 1 }}
-                items={overviewItems}
-              />
-            )
+            return <OverviewList items={overviewItems} />
           if (t.value === "activity")
             return (
               // R14: the badge above counts the WHOLE history, so the feed under

@@ -36,10 +36,6 @@ import {
 } from "@kwapso/ui/registry/primitives/alert-dialog/alert-dialog"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import {
-  DescriptionList,
-  defaultDescriptionListConfig,
-} from "@kwapso/ui/registry/collections/description-list/description-list"
-import {
   ActivityFeed,
   defaultActivityFeedConfig,
 } from "@kwapso/ui/registry/collections/activity-feed/activity-feed"
@@ -50,6 +46,7 @@ import type { ProcessComment, ProcessDetail, ProcessStep } from "@shared/types"
 import { LoadMore } from "@/components/load-more"
 import { ProcessFormDialog, type ProcessFormValues } from "@/components/process-form-dialog"
 import { StepFormDialog, type StepFormValues } from "@/components/step-form-dialog"
+import { OverviewList } from "@/components/overview-list"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
 import { formatCount } from "@shared/web/format-count"
@@ -325,12 +322,7 @@ export function ProcessDetailScreen({
         onValueChange={setTab}
         renderPanel={(t) => {
           if (t.value === "overview")
-            return (
-              <DescriptionList
-                config={{ ...defaultDescriptionListConfig, columns: 1 }}
-                items={overviewItems}
-              />
-            )
+            return <OverviewList items={overviewItems} />
 
           if (t.value === "steps")
             return (

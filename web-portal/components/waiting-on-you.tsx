@@ -20,6 +20,7 @@ import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Check, Paperclip } from "lucide-react"
 
+import { readFileAsDataUrl } from "@shared/web/file"
 import { formatDate } from "@shared/web/format"
 import { invalidate, useCached } from "@shared/web/store"
 import { ApiFailure, delivery } from "@/lib/api"
@@ -29,15 +30,6 @@ import type { Todo } from "@shared/types"
 /** What a browser will turn into a data URL for us. Generous for a logo or a
  * signed PDF; the door caps it again at 10 MB, which is the cap that counts. */
 const MAX_FILE_BYTES = 10 * 1024 * 1024
-
-function readAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result))
-    reader.onerror = () => reject(new Error("Couldn't read that file."))
-    reader.readAsDataURL(file)
-  })
-}
 
 export function WaitingOnYou() {
   const todosQ = useCached<Todo[]>(cacheKeys.todos, () => delivery.todos().then((r) => r.todos))
@@ -54,7 +46,7 @@ export function WaitingOnYou() {
         toast.error("That file is too big — 10 MB is the most we can take.")
         return
       }
-      const attachment = file ? { dataUrl: await readAsDataUrl(file), name: file.name } : undefined
+      const attachment = file ? { dataUrl: await readFileAsDataUrl(file), name: file.name } : undefined
       await delivery.completeTodo(id, attachment)
       invalidate(cacheKeys.todos)
       toast.success("Thank you — that's off your list.")

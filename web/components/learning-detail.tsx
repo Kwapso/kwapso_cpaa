@@ -2,7 +2,7 @@
 
 // Learning detail — one article as a tabbed record: Article / Overview / Activity
 // (the standard every record gets). Article = the prose (library ArticleBody) + your
-// own Done toggle + Deactivate/Activate. Overview = audit metadata (DescriptionList).
+// own Done toggle + Deactivate/Activate. Overview = audit metadata (OverviewList).
 // Activity = the article's history via the GENERIC record-activity feed. Edit gated
 // by learning:edit; deactivate by learning:delete. Host-composed, like role/ticket.
 
@@ -17,10 +17,6 @@ import { ProgressToggle } from "@kwapso/ui/registry/primitives/progress-toggle/p
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import { WebEmbed } from "@kwapso/ui/registry/primitives/web-embed/web-embed"
 import {
-  DescriptionList,
-  defaultDescriptionListConfig,
-} from "@kwapso/ui/registry/collections/description-list/description-list"
-import {
   ActivityFeed,
   defaultActivityFeedConfig,
 } from "@kwapso/ui/registry/collections/activity-feed/activity-feed"
@@ -33,6 +29,7 @@ import { ApiFailure, content, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
 import { formatCount } from "@shared/web/format-count"
 import { RichText } from "@/components/rich-text"
+import { OverviewList } from "@/components/overview-list"
 import { safeHref, safeSrc } from "@/lib/rich-text"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
@@ -232,12 +229,7 @@ export function LearningDetailScreen({ teamId, learningId }: { teamId: string; l
         onValueChange={setTab}
         renderPanel={(t) => {
           if (t.value === "overview")
-            return (
-              <DescriptionList
-                config={{ ...defaultDescriptionListConfig, columns: 1 }}
-                items={overviewItems}
-              />
-            )
+            return <OverviewList items={overviewItems} />
           if (t.value === "activity")
             return (
               // R14: the badge above counts the WHOLE history, so the feed under

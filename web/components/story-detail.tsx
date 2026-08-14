@@ -23,10 +23,6 @@ import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import {
-  DescriptionList,
-  defaultDescriptionListConfig,
-} from "@kwapso/ui/registry/collections/description-list/description-list"
-import {
   ActivityFeed,
   defaultActivityFeedConfig,
 } from "@kwapso/ui/registry/collections/activity-feed/activity-feed"
@@ -37,6 +33,7 @@ import { StoryFormDialog, type StoryFormValues } from "@/components/story-form-d
 import { useStoryFormOptions } from "@/components/stories-screen"
 import { STORY_STATUS_LABEL, sliceKey } from "@/components/work-panels"
 import { StoryStatusStepper } from "@/components/story-status-stepper"
+import { OverviewList } from "@/components/overview-list"
 import { ApiFailure, content as contentApi } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
 import { formatCount } from "@shared/web/format-count"
@@ -387,12 +384,7 @@ export function StoryDetailScreen({
                 <LoadMore listKey={activity.listKey} fetchPage={activity.fetchPage} label="Load more activity" />
               </div>
             )
-          return (
-            <DescriptionList
-              config={{ ...defaultDescriptionListConfig, columns: 1 }}
-              items={overviewItems}
-            />
-          )
+          return <OverviewList items={overviewItems} />
         }}
       />
 
