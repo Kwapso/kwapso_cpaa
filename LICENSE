@@ -1,0 +1,49 @@
+Copyright (c) 2026 Swift Struck. All rights reserved.
+
+PROPRIETARY AND CONFIDENTIAL
+
+This software and its accompanying documentation ("the Software") are the
+confidential and proprietary property of Swift Struck. The Software is licensed,
+not sold.
+
+No permission is granted to any person to use, copy, modify, merge, publish,
+distribute, sublicense, or sell copies of the Software, or to prepare derivative
+works of it, except under a separate written agreement signed by Swift Struck.
+
+Access to this repository does not grant any licence. If you can read this file
+because you were given access to the repository, you may use the Software only
+for the purpose for which that access was granted, and you may not redistribute
+it.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+Contact: alaap@swiftstruck.com
+
+
+----------------------------------------------------------------------------
+THIRD-PARTY COMPONENTS
+
+The Software depends on open-source components installed from npm, each governed
+by its own licence. Those licences are not superseded by the terms above and
+their obligations continue to apply. The authoritative list for any given build
+is package-lock.json; to print the current set:
+
+    npx license-checker --summary
+
+The principal direct dependencies and their licences at the time of writing:
+
+    next            MIT      Vercel, Inc.
+    react           MIT      Meta Platforms, Inc. and affiliates
+    wrangler        MIT OR Apache-2.0   Cloudflare, Inc.
+    oxlint          MIT      Boshen and oxc contributors
+    vitest          MIT      Vitest contributors
+    @kwapso/ui      proprietary — Swift Struck (github.com/Kwapso/kwapso_ui)
+
+Nothing in the dependency tree is licensed under the GPL or another copyleft
+licence that would place obligations on this Software's own distribution terms.
+Re-check this statement whenever a dependency is added.

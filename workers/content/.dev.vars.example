@@ -1,0 +1,21 @@
+# Local-dev settings for the content worker. Copy to `.dev.vars` (gitignored).
+# INVENTORY.md § 4 says who issues each of these.
+
+CF_D1_TOKEN=
+# Must match auth / tenancy / mcp / both gateways exactly.
+INTERNAL_KEY=
+
+# Per-person Google connections (Drive, Gmail, Calendar, Chat). These come from
+# the `kwapso sync` OAuth client — NEVER the `kwapso-signin` client, whose whole
+# point is that it asks for nothing frightening. All three or none: with any one
+# missing the Connect button is not offered, which is deliberate. A half-configured
+# environment must never walk somebody through a consent screen and then be unable
+# to keep what they granted.
+GOOGLE_CONNECT_CLIENT_ID=
+GOOGLE_CONNECT_CLIENT_SECRET=
+# 32 random bytes, base64 — `openssl rand -base64 32`. The key the stored refresh
+# and access tokens are encrypted under. Rotating it invalidates every stored
+# connection (one click each to reconnect; no data is lost).
+GOOGLE_TOKEN_KEY=
+
+INSECURE_COOKIE=1

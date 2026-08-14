@@ -1,0 +1,7 @@
+# Local-dev settings for the agency gateway. Copy to `.dev.vars` (gitignored).
+
+# The gateway holds no database and sends no email, but it still needs the shared
+# key: it forwards client error beacons to auth's /internal/log-error. Without it
+# a crash in somebody's browser never reaches error_logs. Must match auth /
+# tenancy / content / mcp / the portal gateway exactly.
+INTERNAL_KEY=

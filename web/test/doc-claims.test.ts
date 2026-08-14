@@ -121,8 +121,14 @@ const SUBSET_CLAIMS: { doc: string; phrase: string; why: string }[] = [
   },
   {
     doc: "BOOTSTRAP.md",
-    phrase: "three workers",
-    why: "the workers carrying CF_ACCOUNT_ID (tenancy, content, data-ops) — the per-team D1 REST callers.",
+    phrase: "five workers",
+    why:
+      "the workers carrying CF_ACCOUNT_ID — tenancy, content, data-ops, AND realtime + mcp. " +
+      "This entry read 'three workers' until an audit checked it against the configs: realtime " +
+      "took the var when the live channel learned to fence a joining socket, and mcp has always " +
+      "carried it. A reviewed subset claim is only as good as its last review, and this one had " +
+      "quietly become the wrong number in the one file that tells a stranger which configs to " +
+      "overwrite — leaving the original author's account id on two workers of a fork.",
   },
   {
     doc: "BASE-MANUAL.md",

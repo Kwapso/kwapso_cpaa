@@ -1,0 +1,9 @@
+# Local-dev settings for the realtime worker. Copy to `.dev.vars` (gitignored).
+# INVENTORY.md § 4 says who issues each of these.
+
+# The live-channel fence. A joining socket resolves the caller's account scope
+# through the same guard corridor the API uses, so a client-portal login hears
+# only its own world. With no token the team channel refuses EVERY socket — the
+# fail-closed direction, but it costs live sync until this is set.
+CF_D1_TOKEN=
+INTERNAL_KEY=

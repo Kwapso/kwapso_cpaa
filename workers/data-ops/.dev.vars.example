@@ -1,0 +1,10 @@
+# Local-dev settings for the data-ops worker. Copy to `.dev.vars` (gitignored).
+# INVENTORY.md § 4 says who issues each of these.
+
+CF_D1_TOKEN=
+# Guards the owner-only endpoints (seed-targets, the error log, grant-credits).
+ADMIN_KEY=
+# OPTIONAL. Set it and the assistant's brain is Claude; leave it blank and it
+# falls back to Cloudflare Workers AI. BOTH do full tool use — the key changes
+# which model thinks, never whether the assistant can act.
+ANTHROPIC_API_KEY=

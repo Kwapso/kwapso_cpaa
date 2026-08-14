@@ -5,6 +5,12 @@ out/
 
 # Local secrets + OS noise
 .env*
+# ...except the TEMPLATE. `.env*` correctly keeps every real value out of git, and
+# for a while it kept the list of WHICH values exist out too — which is the half
+# that cannot be reissued from a provider's dashboard. `.env.example` holds names
+# and comments, never a value; the negation is anchored to that one filename so
+# nothing else can slip back in behind it.
+!.env.example
 .DS_Store
 *.log
 *.tsbuildinfo
@@ -26,6 +32,20 @@ out/
 /interface-lessness-report.md
 /story-review.html
 /story-review.md
+/ocean-review.html
+/ocean-review.md
+/architecture-review.html
+/architecture-review.md
+/scaling-review.html
+/scaling-review.md
+
+# WHERE scripts/backup.mjs PUTS THE BACKUPS, and the one line standing between a
+# routine `git add -A` and every client's database in the repository. The script
+# defaults to ./backups and the runbooks tell you to run it from the repo root,
+# so without this the dumps land INSIDE the working tree — real customer rows,
+# staged by the next commit that adds everything. The architecture review flagged
+# it as the gap it would not close in a contended file; this is the file.
+/backups/
 
 # Per-workstream working notes — local to whoever is building, never forked
 # into a new app (the new-app skill clones this repo).

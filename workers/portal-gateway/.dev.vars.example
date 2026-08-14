@@ -1,0 +1,7 @@
+# Local-dev settings for the client portal's gateway. Copy to `.dev.vars`
+# (gitignored).
+
+# Same beacon door, same seam as the agency gateway — without it a crash on a
+# client's phone is console-only. Must match auth / tenancy / content / mcp / the
+# agency gateway exactly.
+INTERNAL_KEY=
