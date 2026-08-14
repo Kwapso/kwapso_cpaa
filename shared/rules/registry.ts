@@ -76,7 +76,7 @@ export const RULES_REGISTRY: Rule[] = [
   {
     id: "R9",
     dimension: "arch",
-    law: "The agent knows what the app can do — its system prompt carries a capability brief GENERATED from the import/export catalog (+ the glossary), so the UI and the agent can never disagree about a capability. And it knows what the app REFUSES: a vocabulary-gated write states its call ORDER (create the dropdown value first, write the rows second, one turn) on BOTH surfaces the model reads — the tool's own description and the system rule wall. Earned by: a perfectly-planned single call refused by the vocabulary gate, ending a turn having changed nothing.",
+    law: "The agent knows what the app can do — its system prompt carries a capability brief GENERATED from the import/export catalog (+ the glossary), so the UI and the agent can never disagree about a capability. And it knows what the app REFUSES: a vocabulary-gated write states its call ORDER (create the dropdown value first, write the rows second, one turn) on BOTH surfaces the model reads — the tool's own description and the system rule wall. It also knows what the app can DRAW: the visual blocks it may emit are generated from ONE catalogue (shared/agent-blocks.ts), so the prompt can never advertise a shape the renderer refuses or hide one it draws, and every example in the prompt is proved by RUNNING the parser over it. Earned by: a perfectly-planned single call refused by the vocabulary gate, ending a turn having changed nothing.",
     checkId: "agent-app-parity",
     status: "enforced",
   },
