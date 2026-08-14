@@ -129,18 +129,32 @@ agent_confirm, plan_import) use the team's AI quota.
 Confirm the live list with `tools/list` (it's generated, so it's always current).
 Today it covers:
 
-- **Read:** `whoami`, `my_permissions`, `get_team`, `list_members`, `list_roles`,
-  `list_invites`, `list_dropdown_values`, `list_learning`, `list_learning_progress`,
-  `list_help_tickets`, `get_help_thread`, `list_help_stakeholders`, `list_accounts`,
-  `get_account`, `list_portal_access`, `list_import_targets`, `get_import_sample`,
-  `list_imports`, `get_import`, `get_ai_allowance`, `list_ai_usage`,
-  `list_agent_threads`, `get_agent_thread`, `ask_knowledge`, `list_knowledge_sources`,
-  `get_knowledge_status`. Each list tool that sits on a door with an
-  `list_agent_threads`, `get_agent_thread`, `list_apps`, `list_processes`,
-  `get_process`, `list_process_comments`, `read_value`, `list_account_rates`,
-  `list_internal_rates`, `read_margin`, `list_marketing_posts`, `list_brand_assets`,
-  `list_programmes`, `list_meeting_purposes`, `list_staff_profiles`,
-  `list_staff_certificates`. Each list tool that sits on a door with an
+- **Read** — 57 tools, grouped the way the app groups them:
+  - identity and rights — `whoami`, `my_permissions`, `get_team`
+  - people and access — `list_members`, `list_roles`, `list_invites`,
+    `list_portal_access`
+  - customers — `list_accounts`, `get_account`
+  - vocabulary — `list_dropdown_values`
+  - learning — `list_learning`, `list_learning_progress`
+  - tickets — `list_help_tickets`, `get_help_thread`, `list_help_stakeholders`
+  - the work engine — `list_stories`, `list_sprints`, `list_todos`, `list_tasks`,
+    `get_triage`, `list_work_logs`, `list_running_timers`
+  - meetings — `list_meetings`
+  - process maps and the money — `list_apps`, `list_processes`, `get_process`,
+    `list_process_comments`, `read_value`, `list_account_rates`,
+    `list_internal_rates`, `read_margin`
+  - the knowledge base — `ask_knowledge`, `list_knowledge_sources`,
+    `get_knowledge_status`
+  - the agency's own housekeeping — `list_marketing_posts`, `list_brand_assets`,
+    `list_programmes`, `list_meeting_purposes`, `list_staff_profiles`,
+    `list_staff_certificates`
+  - importing — `list_import_targets`, `get_import_sample`, `list_imports`,
+    `get_import`
+  - the AI allowance and saved conversations — `get_ai_allowance`, `list_ai_usage`,
+    `list_agent_threads`, `get_agent_thread`
+  - the nine CSV exports, listed under **Export** below.
+
+  Each list tool that sits on a door with an
   `?id=` filter EXPOSES + FORWARDS it (R19 parity) — pass `id` to fetch one record
   instead of pulling the whole collection (`list_help_tickets` also takes `scope`
   and `view`, the latter choosing the everyday list or the archive drawer;
@@ -162,10 +176,17 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth —
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **87 doors, 66 with a tool, 21 with a written reason** — the reasons
-  being the team-pin doors (§3.2 below), the client-portal standing doors (§3.3), the
-  sign-in and personal-identity doors on auth, the screen-recipe store, the media
-  upload, one invite's audit trail and the cross-module activity feed.
+  red build. Today: **208 doors, 173 with a tool, 35 with a written reason** — the
+  reasons being the team-pin doors (§3.2 below), the client-portal standing doors
+  (§3.3), the sign-in and personal-identity doors on auth, the screen-recipe store,
+  the three media uploads, the seven Google doors that are a person's own decision,
+  the timesheet correction, one invite's audit trail and the cross-module activity
+  feed. Of the 173, **156 are on THIS surface** and 17 are the in-app assistant's
+  alone — the thirteen Google tools, the three confirm-panel bulk writes and the role
+  permission matrix read, each reasoned in §3. Those three numbers are asserted
+  against the live census in `workers/mcp/test/filter-parity.test.ts`, so this
+  sentence cannot quietly go stale again — it did, at 87 / 66 / 21, while the app
+  grew to two and a half times the size.
 
   **One asymmetry worth stating plainly.** The in-app assistant now stops for a yes/no
   panel before every write that decides who-can-do-what — derived from the gate map,
@@ -259,8 +280,8 @@ Today it covers:
     figures live in cannot be reached from any door the portal opens.
   - learning — `create_learning`, `update_learning`, `set_learning_active`
   - tickets — `create_help_ticket`, `update_help_ticket`, `set_help_status`,
-    `rank_help_ticket`, `archive_help_ticket`, `reply_help_ticket`,
-    `add_help_stakeholder`. (The module is Tickets; the tool NAMES carry the old
+    `resolve_help_ticket`, `rank_help_ticket`, `archive_help_ticket`,
+    `reply_help_ticket`, `add_help_stakeholder`. (The module is Tickets; the tool NAMES carry the old
     `help` spelling because they are a published contract outside developers
     already call by name, so the rename of the section a person reads
     deliberately stopped at them — DATA-MODEL.md says why it never moves.)
@@ -268,13 +289,48 @@ Today it covers:
     priority, and there is no priority field to set. `archive_help_ticket` puts a
     ticket away without deleting anything; read them back with
     `list_help_tickets` and `view: 'archived'`.
+  - the work engine, stories and sprints — `create_story`, `update_story`,
+    `set_story_status`, `rank_story` (`work:create` / `work:edit`), `create_sprint`
+    and `complete_sprint`. Priority here is the ORDER, exactly as it is on a ticket:
+    `rank_story` moves a story, there is no priority field. No client login holds
+    `work:*` and the doors refuse a portal caller outright, so unlike the ticket
+    doors the question "what if a contact reaches this?" has a one-word answer.
+  - to-dos and tasks — `raise_todo`, `complete_todo`, `cancel_todo`
+    (`todos:create` / `:edit` / `:delete` — what we need FROM a client), and
+    `create_task`, `set_task_done` (`work:create` / `work:edit` — what we owe
+    ourselves).
+  - time — `start_timer`, `stop_timer`, `log_time`, `resolve_runaway_timer`,
+    `set_timer_auto_stop`, all on `work:create`. Logging your OWN hours is a create,
+    not an edit: a person who may do the work may say how long it took them.
+    CORRECTING a row that already exists is `work:edit` and has deliberately no tool
+    at all — see the exclusions below.
+  - the triage rota — `set_triage_duty` (`help:edit`), beside the `get_triage` read.
+  - meetings — `create_meeting`, `update_meeting`, `set_meeting_held`,
+    `set_meeting_active` (`meetings:create` / `:edit` / `:edit` / `:delete`;
+    cancelling IS this module's delete and the row survives it), and
+    `add_meeting_to_calendar`, which opens on `meetings:read` and then demands
+    `google:edit` and the events switch at the door itself.
+  - the agency's own housekeeping — `create_marketing_post`, `update_marketing_post`,
+    `set_marketing_post_active` (`marketing:*`); `create_brand_asset`,
+    `update_brand_asset`, `set_brand_asset_active` (`brand_assets:*`);
+    `create_programme`, `update_programme`, `set_programme_active` and
+    `create_meeting_purpose`, `update_meeting_purpose`, `set_meeting_purpose_active`
+    (both `delivery:*`); `save_staff_profile`, `set_staff_profile_active`,
+    `create_staff_certificate`, `update_staff_certificate`,
+    `set_staff_certificate_active` (`staff_profiles:*`).
   - the knowledge base — `add_knowledge_source`, `update_knowledge_source`,
-    `set_knowledge_source_active`, `sync_knowledge`. The same three acts a person
-    has on the Knowledge base screen, gated by the same `knowledge:create` /
-    `:edit` / `:delete` rights — so a token whose role cannot take a source away
-    cannot ask the assistant to take one away either. `sync_knowledge` brings the
-    base into step with the app's own rows one bounded slice at a time (call it
-    while `caughtUp` is false); the 15-minute sweep does the same unattended.
+    `set_knowledge_source_active`, `sync_knowledge`, `sync_google_knowledge`. The
+    same acts a person has on the Knowledge base screen, gated by the same
+    `knowledge:create` / `:edit` / `:delete` rights — so a token whose role cannot
+    take a source away cannot ask the assistant to take one away either.
+    `sync_knowledge` brings the base into step with the app's own rows one bounded
+    slice at a time (call it while `caughtUp` is false); the 15-minute sweep does the
+    same unattended. `sync_google_knowledge` does the same for the Google material
+    the CALLER has already connected — their own Drive folders, the mail with a
+    known contact, their diary — acting as that person and gated `knowledge:create`
+    **and** `google:read`. Read the Google paragraph below before you use it: it and
+    `add_meeting_to_calendar` are the two tools on this surface that touch Google,
+    and the posture around them is under review.
 
   **`ask_knowledge` never writes prose.** It answers with the passages it found and
   the SOURCES they came from, plus the compartment it searched and the sentence
@@ -340,14 +396,24 @@ Today it covers:
    what one call here is built to carry. A machine writes the article and references
    media it already has a URL for.
 
-7. **Two BODY FIELDS, on doors that are otherwise fully here.** A tool may offer a
-   narrower contract than its door accepts — but only in writing, and only for a
-   reason. Both of these are the same reason as item 6: **bytes, not prose.**
+7. **Four BODY FIELDS, across three doors that are otherwise fully here.** A tool
+   may offer a narrower contract than its door accepts — but only in writing, and
+   only for a reason. All of them are the same reason as item 6: **bytes, not
+   prose.**
    - **`update_team` takes `name`, not `logoDataUrl`.** A logo is a base64 image data
      URL up to 2.5 MB — around 3.4 million characters of *argument* on a surface whose
      whole *answer* is capped at 400,000. Renaming is unaffected: the door treats an
      absent logo as "leave it as it is", so a machine rename can never blank a logo it
      cannot send. Set the logo in the app, on the Team screen.
+   - **`complete_todo` takes `id`, not `fileDataUrl` or `fileName`.** A to-do's
+     attachment is a base64 data URL up to 10 MB — around 14 million characters of
+     argument on that same 400,000-character surface. And the file is the CLIENT's:
+     "send us the signed contract" is answered by the person who has it, from their
+     own portal. Marking the to-do done from a machine is a legitimate act — the
+     thing arrived by email and somebody is tidying up — so `id` is exposed and
+     forwarded and the capability is whole. `fileName` is read only inside the
+     `if (body.fileDataUrl …)` branch, so offering it alone would be a field that
+     changes nothing, which is worse than an absent one.
    - **`agent_chat` takes `message`, not `files`.** Attaching up to 8 CSVs of 5 MB each
      is up to 40 MB on the same surface — and the capability is already here in a
      better machine shape: `start_import` → `add_import_file` → `plan_import` →
@@ -381,15 +447,41 @@ There is deliberately **no confirm step on the direct write tools** — calling
 genuinely uncertain, natural-language actions through `agent_chat` instead: it proposes,
 you approve with `agent_confirm`.
 
-**Google is not on this surface, and that is on purpose.** A person's Drive,
-Gmail, Calendar and Chat connections are reachable by the **in-app assistant**
-(thirteen tools, act-as-user, capped by the same role) and by nothing else: the
-MCP catalogue exposes none of them. A personal access token is a secret pasted
-into somebody's CI config, and the blast radius of a leaked one must not include
-a colleague's mailbox. If you need Google material through a machine, ask the
-assistant for it — `agent_chat` reaches those tools under the same rights, with
-the same confirm rules (mail always asks), and spends the team's AI allowance
-while doing so.
+**Google is almost entirely off this surface, and that is on purpose — but read
+the exception.** The thirteen tools that BROWSE a person's Drive, Gmail, Calendar
+and Chat (`google_drive_files`, `google_mail_search`, `google_send_mail`,
+`google_chat_post` and the rest) belong to the **in-app assistant** and to nothing
+else: no MCP tool forwards to any of those doors. A personal access token is a
+secret pasted into somebody's CI config, and the blast radius of a leaked one
+must not include a mailbox. If you need Google material browsed through a
+machine, ask the assistant — `agent_chat` reaches those tools under the same
+rights, with the same confirm rules (mail always asks), and spends the team's AI
+allowance while doing so.
+
+**Two tools DO cross that line, and the sentence above used to deny it.** They
+are gated exactly as their doors are and neither reaches anybody else's account,
+but both belong in front of you rather than in a catalogue you skim:
+
+- **`add_meeting_to_calendar`** forwards to `POST /api/content/google/calendar/meeting`
+  — a real Google door. It writes one entry, for a meeting already booked in
+  kwapso, into the CALLER's own calendar, behind `meetings:read` + `google:edit` +
+  the events switch, refusing a portal caller, and claiming the event id under a
+  `google_event_id IS NULL` predicate so pressing it twice makes one entry. Its
+  identical twin `google_sprint_to_calendar` — the same act for a sprint, the same
+  three gates — is assistant-only. **One of those two placements is wrong and it is
+  the owner's call which:** either a sprint should be pushable from a machine too,
+  or a meeting should not be.
+- **`sync_google_knowledge`** does not browse Google, but it does READ it: gated
+  `knowledge:create` **and** `google:read`, it sweeps the caller's own connected
+  Drive folders, the mail with a known contact and their diary into the knowledge
+  base — from which `ask_knowledge`, also on this surface, hands the passages back.
+  A leaked token therefore reaches its OWN owner's Google material by that route,
+  which is narrower than the browse tools (nobody else's account, no send, no
+  delete) but is not nothing, and is not what "the MCP catalogue exposes none of
+  them" led a reader to expect.
+
+Both are recorded here rather than quietly removed because taking a capability off
+a published surface breaks somebody's script, and that is a decision with an owner.
 
 Three Google doors have no tool on **either** surface, for a reason that is not
 about caution: connecting an account is a person standing at Google's own consent
