@@ -37,6 +37,7 @@ import {
 } from "@/components/internal-screens"
 import { NotFound, LoadError, SectionWithCreate, CollectionCard } from "@/components/deep-link/screen-bits"
 import { CollectionHeading } from "@/components/collection-heading"
+import { KnowledgeAsk } from "@/components/knowledge-ask"
 import { LoadMore } from "@/components/load-more"
 import { content as contentApi, tenancy } from "@/lib/api"
 import { accountsKey, helpKey, knowledgeKey, type HelpScope } from "@/lib/live-resources"
@@ -444,10 +445,25 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     return (
       <div className="flex flex-col gap-4">
         <CollectionHeading sectionKey="knowledge" total={totals.knowledge} />
+        {/* ASK IT, HERE. The list answers "what does it know?"; this answers
+            "what does it know about X?", which is the question somebody actually
+            came with. It sits ABOVE the list because a page whose first control
+            is a question box is a page people ask questions on. It spends no
+            assistant allowance and says so — see knowledge-ask.tsx. */}
+        <KnowledgeAsk onOpenSource={(id) => go(`${sectionPath}/${id}`)} />
         <SectionWithCreate
           show={can("knowledge", "create")}
           label="Add a source"
           icon="plus"
+          // The third way in, beside the other two. It sits in the SECONDARY
+          // slot — the same place "Import CSV" sits on the accounts screen —
+          // because it is the same kind of affordance: another road to the same
+          // record, for material that already exists somewhere else.
+          secondary={{
+            show: can("knowledge", "create"),
+            label: "Upload a file",
+            onClick: () => go(sectionPath, { panel: "add", module: "knowledge-file" }),
+          }}
           onCreate={() => go(sectionPath, { panel: "add", module: "knowledge" })}
         >
           <ScreenRenderer recipe={knowledgeRecipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />

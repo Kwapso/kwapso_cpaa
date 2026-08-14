@@ -153,6 +153,11 @@ import {
  * a code path — a new kind is a line here plus a reader in knowledge-ingest.ts. */
 export const KNOWLEDGE_KINDS = [
   "note",
+  // A file somebody uploaded. The FILE is the truth and the body is a READING of
+  // it, which is why it is its own kind rather than a note with a link on it: a
+  // reader who disagrees with an answer needs to be able to tell the difference
+  // between words a colleague typed and words a converter produced.
+  "file",
   "ticket",
   "article",
   "account",
@@ -308,6 +313,11 @@ type SourceRow = {
   body: string | null
   body_bytes: number
   source_url: string | null
+  file_url: string | null
+  file_name: string | null
+  file_type: string | null
+  file_bytes: number
+  file_note: string | null
   owner_user_id: string | null
   indexed_at: string | null
   chunk_count: number
@@ -327,7 +337,8 @@ type SourceRow = {
  * screen that shows titles. The summary is what a list is for; the body is what
  * a detail is for. */
 const LIST_COLS = `id, kind, origin_table, origin_row_id, compartment, account_id, app_id, ticket_id, sprint_id,
-  record_date, title, summary, NULL AS body, body_bytes, source_url, owner_user_id, indexed_at,
+  record_date, title, summary, NULL AS body, body_bytes, source_url,
+  file_url, file_name, file_type, file_bytes, file_note, owner_user_id, indexed_at,
   chunk_count, indexed_chunks, index_error,
   created_at, creator_name, editor_name, updated_at, deactivated_at`
 
@@ -365,6 +376,11 @@ function toSource(r: SourceRow): KnowledgeSource {
     // fact that stops an excerpt from being mistaken for the document.
     bodyTruncated: shown !== null && r.body_bytes > shown.length,
     sourceUrl: r.source_url,
+    fileUrl: r.file_url,
+    fileName: r.file_name,
+    fileType: r.file_type,
+    fileBytes: r.file_bytes,
+    fileNote: r.file_note,
     // The FIELD a person edits is "who may this be read by", so the wire says
     // that rather than making every reader remember what a null id means.
     visibility: r.owner_user_id ? "private" : "team",
@@ -599,10 +615,98 @@ function byteLength(text: string | null): number {
   return text ? new TextEncoder().encode(text).length : 0
 }
 
+/** WRITE A SOURCE FROM AN UPLOADED FILE, and index whatever words came out of
+ * it — the third way into the knowledge base.
+ *
+ * It is a sibling of `createSource` rather than a flag on it, because the two
+ * differ in the one thing that matters here: what the TRUTH is. A note's truth
+ * is its body, so an edit rewrites it. A file's truth is the file, so the body
+ * is a READING that must always be traceable back to the thing it was read from
+ * — which is why `fileUrl` is written in the same statement as the words, and
+ * why `fileNote` is not optional in this function's shape.
+ *
+ * `extract.text` null is a first-class outcome, not a failure: the row is
+ * written, the source is listed, `indexSource` finds no text and indexes nothing
+ * — so `chunkCount` stays 0 and every screen reading it says "stored, not
+ * searchable" without anybody having to remember to. The one thing that cannot
+ * happen is a row that looks indexed and is not.
+ *
+ * THE BODY GOES IN AS A BOUND PARAMETER, for the reason `createSource` gives:
+ * D1 refuses a statement over 100 KB and the material here can be a megabyte. */
+export async function createFileSource(
+  env: Env,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor,
+  input: {
+    title: string
+    accountId: string | null
+    privateToMe: boolean
+    file: { url: string; name: string; type: string; bytes: number }
+    extract: { text: string | null; note: string | null }
+  }
+): Promise<string> {
+  const account = input.accountId ? await requireAccount(cfg, guard, input.accountId) : null
+  const id = ulid()
+  const now = new Date().toISOString()
+  const compartment = account ? accountCompartment(account.id) : AGENCY_COMPARTMENT
+  const summary = buildSummary({
+    noun: "file",
+    title: input.title,
+    accountName: account?.name ?? null,
+    // A file we could not read still gets a summary, and the note IS the honest
+    // one: "we keep presentations but can't read their words" is a true sentence
+    // about this record, and the router prefers records it can describe.
+    detail: input.extract.text ?? input.extract.note ?? "",
+  })
+  await d1Query(
+    cfg,
+    guard.databaseId,
+    `INSERT INTO knowledge_sources (id, kind, compartment, account_id, title, summary, body, body_bytes,
+       file_url, file_name, file_type, file_bytes, file_note,
+       owner_user_id, record_date, created_at, creator_id, creator_email, creator_name)
+     VALUES (?, 'file', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      compartment,
+      input.accountId,
+      input.title,
+      summary,
+      input.extract.text,
+      byteLength(input.extract.text),
+      input.file.url,
+      input.file.name,
+      input.file.type,
+      input.file.bytes,
+      input.extract.note,
+      input.privateToMe ? guard.userId : null,
+      now,
+      now,
+      actor.id,
+      actor.email,
+      actor.name,
+    ]
+  )
+  await indexSource(env, cfg, guard, id)
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: "Knowledge source added",
+    // The history says which of the two happened, because "we have that file"
+    // and "the assistant can answer from that file" are different promises and
+    // somebody will one day need to know which one was made.
+    description: `${actor.name} uploaded "${input.file.name}" to the knowledge base${
+      input.extract.text ? "" : " — kept, but not searchable"
+    }`,
+    relatedTable: "knowledge_sources",
+    relatedRowId: id,
+  })
+  return id
+}
+
 /** Correct a source. A MIRRORED source's body belongs to the row it mirrors, so
  * only its filing (which client, who may read it) is editable here — the sweep
  * would overwrite anything else on its next tick, which would be a worse lie
- * than refusing. A typed note is editable in full. */
+ * than refusing. An UPLOADED FILE's body belongs to the file, so everything but
+ * the words is editable, including its name. A typed note is editable in full. */
 export async function updateSource(
   env: Env,
   cfg: D1Rest,
@@ -614,7 +718,24 @@ export async function updateSource(
   const before = await sourceOrThrow(cfg, guard, id)
   const v = readInput(input)
   const account = v.accountId ? await requireAccount(cfg, guard, v.accountId) : null
+  // WHOSE WORDS ARE THESE? Two families answer "not this form's": a MIRRORED
+  // source, whose row the sweep would overwrite an edit from; and an UPLOADED
+  // FILE, whose truth is the file — its body is a READING of it, and a form is
+  // not where a reading is corrected.
+  //
+  // For the file the argument is sharper than "the sweep would undo it", and it
+  // is a real trap rather than a principle: a detail screen is handed only as
+  // much body as a person can read (DETAIL_COLS caps it), so a form prefilled
+  // from that and saved back would write the EXCERPT over the document — a
+  // 300-page contract silently becoming its first eight pages, with the file
+  // still sitting there looking untouched. Filing and visibility stay editable,
+  // which is everything a person actually wants to change about a file.
   const mirrored = before.originRowId !== null
+  const fileBacked = before.fileUrl !== null
+  // The TITLE is a different question from the WORDS, and a file answers the two
+  // differently: its words belong to it, but nothing owns what we call it — so a
+  // file source can be renamed and a mirrored one cannot (the sweep would put
+  // the row's own name straight back).
   const title = mirrored ? before.title : v.title
   // A mirrored source's body is never read back here (the list does not carry it
   // and the detail carries only as much as a screen shows), so an edit leaves
@@ -629,6 +750,16 @@ export async function updateSource(
       `UPDATE knowledge_sources SET account_id = ?, compartment = ?, owner_user_id = ?, updated_at = ?,
          editor_id = ?, editor_email = ?, editor_name = ? WHERE id = ?`,
       [v.accountId, compartment, owner, now, actor.id, actor.email, actor.name, id]
+    )
+  } else if (fileBacked) {
+    // Everything but the words. The body and its summary are left exactly as the
+    // reading produced them, for the reason above.
+    await d1Query(
+      cfg,
+      guard.databaseId,
+      `UPDATE knowledge_sources SET title = ?, source_url = ?, account_id = ?, compartment = ?,
+         owner_user_id = ?, updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ? WHERE id = ?`,
+      [title, v.sourceUrl, v.accountId, compartment, owner, now, actor.id, actor.email, actor.name, id]
     )
   } else {
     await d1Query(
@@ -662,7 +793,12 @@ export async function updateSource(
     { label: "Title", from: before.title, to: title },
     { label: "Filed under", from: before.compartment, to: compartment },
     { label: "Visible to", from: before.visibility, to: owner ? "private" : "team" },
-    { label: "Body", from: before.body, to: mirrored ? before.body : v.body, hideValues: true },
+    {
+      label: "Body",
+      from: before.body,
+      to: mirrored || fileBacked ? before.body : v.body,
+      hideValues: true,
+    },
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Knowledge source edited",
@@ -762,8 +898,24 @@ async function clearIndex(
 /** The text a source is indexed FROM: its title and its body, together. The
  * title is indexed with the body deliberately — a note called "Bergman dispatch
  * rollout" whose body never repeats the name would otherwise be unfindable by
- * the words a person would actually use. */
-export function indexableText(source: { title: string; body: string | null }): string {
+ * the words a person would actually use.
+ *
+ * WITH ONE EXCEPTION, AND IT IS THE WHOLE OF THE UPLOAD PROMISE. A FILE we could
+ * not read has no body, and indexing it on its TITLE alone would produce a
+ * source with one searchable piece containing nothing but its own name — which
+ * is precisely the state this feature is built never to reach. A real upload
+ * proved it rather than a test: a .pptx came back "stored, not searchable" in
+ * words and `chunkCount: 1` in the same row, so the screen that derives "stored,
+ * not searchable" from the count would have called it searchable, and the
+ * assistant could have cited a deck it had not read a word of. A title is not
+ * material. An unreadable file indexes to nothing, and the number on the row
+ * says so. */
+export function indexableText(source: {
+  title: string
+  body: string | null
+  file_url?: string | null
+}): string {
+  if (source.file_url && !source.body) return ""
   return [source.title, source.body ?? ""].join("\n\n").trim()
 }
 
@@ -847,7 +999,11 @@ export async function indexSource(
   const rows = await d1Query<SourceRow & { content_hash: string | null }>(
     cfg,
     guard.databaseId,
-    `SELECT id, kind, title, summary, body, compartment, account_id, app_id, ticket_id, sprint_id, record_date,
+    // `file_url` rides along because `indexableText` needs it: a file with no
+    // body indexes to nothing, and the difference between "no body" and "a file
+    // with no body" is the difference between a note somebody left blank and a
+    // document we could not read.
+    `SELECT id, kind, title, summary, body, file_url, compartment, account_id, app_id, ticket_id, sprint_id, record_date,
             owner_user_id, content_hash, chunk_count, indexed_chunks, deactivated_at, created_at
        FROM knowledge_sources WHERE id = ? LIMIT 1`,
     [sourceId]

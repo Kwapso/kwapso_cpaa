@@ -570,15 +570,16 @@ turn is persisted here, so the conversation is replayable and auditable. The
 agent acts AS the signed-in user through the same gated endpoints the UI uses, so
 these rows are a record of intent, never a separate set of powers.
 
-### knowledge_sources + knowledge_chunks + knowledge_terms + knowledge_ingest — KEEP (BUILT 2026-08-11, team migrations `0012_knowledge` + `0020_knowledge_vectors`) — THE KNOWLEDGE BASE
+### knowledge_sources + knowledge_chunks + knowledge_terms + knowledge_ingest — KEEP (BUILT 2026-08-11, team migrations `0012_knowledge` + `0020_knowledge_vectors` + `0022_knowledge_files`) — THE KNOWLEDGE BASE
 One knowledge base, many **compartments**, chosen for the reader rather than by
 them. Four tables, one per job:
 
 - **`knowledge_sources`** — one row per piece of material the assistant may read.
-  Two families in one table, because a person edits them in one list: a `note`
-  somebody typed here (the body IS the truth) and a MIRROR of a row we already
-  own — `ticket` / `article` / `account` / `app` / `story` / `sprint` — where the
-  row is the truth and the sweep keeps the body in step. `compartment` is the design in one
+  Three families in one table, because a person edits them in one list: a `note`
+  somebody typed here (the body IS the truth), a `file` somebody uploaded (THE
+  FILE is the truth and the body is a READING of it), and a MIRROR of a row we
+  already own — `ticket` / `article` / `account` / `app` / `story` / `sprint` —
+  where the row is the truth and the sweep keeps the body in step. `compartment` is the design in one
   column (`agency`, or `account:<id>`), DERIVED on write and correctable by hand,
   never free-typed. `owner_user_id` is the second fence: NULL = the team's, a
   value = one person's (what THEY can see, through their own connection).

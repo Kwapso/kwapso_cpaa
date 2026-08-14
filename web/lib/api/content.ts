@@ -338,6 +338,21 @@ export const content = {
     accountId?: string | null
     visibility?: string
   }) => api<{ source: KnowledgeSource | null; total: number }>("/api/content/knowledge", post(input)),
+  /** Hand the knowledge base a FILE. One call, one record: the bytes and the row
+   * are written together, so closing the tab halfway can never leave a stored
+   * file nothing points at. The answer is the source itself — read `fileNote` to
+   * find out whether its words are searchable or whether it is only kept. */
+  uploadKnowledgeFile: (input: {
+    fileName: string
+    fileDataUrl: string
+    title?: string
+    accountId?: string | null
+    visibility?: string
+  }) =>
+    api<{ source: KnowledgeSource | null; total: number }>(
+      "/api/content/knowledge/upload",
+      post(input)
+    ),
   updateKnowledge: (input: {
     id: string
     title: string

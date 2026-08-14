@@ -31,7 +31,7 @@ import {
   ActivityFeed,
   defaultActivityFeedConfig,
 } from "@kwapso/ui/registry/collections/activity-feed/activity-feed"
-import { Pencil, Power } from "lucide-react"
+import { Paperclip, Pencil, Power } from "lucide-react"
 
 import type { Account, KnowledgeSource } from "@shared/types"
 import { KnowledgeFormDialog, type KnowledgeFormValues } from "@/components/knowledge-form-dialog"
@@ -137,6 +137,12 @@ export function KnowledgeDetailScreen({
   if (!item) return <p className="text-muted-foreground text-sm">That source doesn&apos;t exist.</p>
 
   const mirrored = item.originRowId !== null
+  // A FILE's words belong to the file, exactly as a mirrored source's belong to
+  // its row — so the form's two text fields go read-only for both. Kept as a
+  // second name rather than folded into `mirrored`, because the SENTENCE each
+  // one shows is different: one is kept in step with a record, the other was
+  // read out of a document you can open.
+  const textOwnedElsewhere = mirrored || item.fileUrl !== null
   const filedUnder = item.accountId ? (accountNames.get(item.accountId) ?? "A client") : "The agency"
   const overviewItems = [
     { label: "Kind", value: KNOWLEDGE_KIND[item.kind] ?? item.kind },
@@ -148,9 +154,25 @@ export function KnowledgeDetailScreen({
     {
       label: "Searchable pieces",
       // An indexed source with no pieces is a real state (its text was empty),
-      // and saying "0" is the honest reading of it.
-      value: item.indexedAt ? String(item.chunkCount) : "Not indexed yet",
+      // and saying "0" is the honest reading of it. For an UPLOADED file that is
+      // also the commonest honest state — a deck or an archive is kept and not
+      // read — so it is said in words rather than as a zero somebody has to
+      // interpret.
+      value: item.fileUrl && !item.chunkCount
+        ? "None — stored, not searchable"
+        : item.indexedAt
+          ? String(item.chunkCount)
+          : "Not indexed yet",
     },
+    ...(item.fileUrl
+      ? [
+          { label: "File", value: item.fileName ?? "Uploaded file" },
+          {
+            label: "Size",
+            value: `${Math.max(1, Math.round(item.fileBytes / 1000)).toLocaleString()} KB`,
+          },
+        ]
+      : []),
     { label: "Last indexed", value: item.indexedAt ? formatDateTime(item.indexedAt) : "—" },
     ...auditItems({
       createdByName: item.creatorName,
@@ -244,6 +266,34 @@ export function KnowledgeDetailScreen({
                   Kept in step with the record it came from — its words change when that record does.
                 </p>
               )}
+              {/* THE FILE THIS WAS READ FROM, and — when there was nothing to
+                  read — the sentence saying so. It goes ABOVE the words rather
+                  than below them, because it is the thing that tells a reader
+                  what they are looking at: words a colleague typed, or words a
+                  converter produced from a document they can open and check. */}
+              {item.fileUrl && (
+                <div className="flex flex-col gap-2">
+                  <a
+                    // Through the seam like every other URL on a screen, even
+                    // though this one is a path THIS app minted (/media/internal/…)
+                    // rather than anything a person typed. A URL nobody validated
+                    // because "it can't be dangerous" is how the next one gets in.
+                    href={safeHref(item.fileUrl)}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="bg-card flex w-fit max-w-full items-center gap-2 rounded-lg border p-2 text-sm"
+                  >
+                    <Paperclip className="text-muted-foreground size-4 shrink-0" />
+                    <span className="min-w-0 truncate">{item.fileName ?? "Open the file"}</span>
+                  </a>
+                  {item.fileNote && (
+                    // Never hidden, never softened. A file we could not read is
+                    // kept on purpose, and the one thing that must not happen is
+                    // a reader assuming the assistant can answer from it.
+                    <p className="text-muted-foreground text-sm">{item.fileNote}</p>
+                  )}
+                </div>
+              )}
               {item.bodyTruncated ? (
                 <p className="text-muted-foreground text-sm">
                   Showing the first part of {Math.round(item.bodyBytes / 1000).toLocaleString()} KB of
@@ -309,7 +359,13 @@ export function KnowledgeDetailScreen({
         onOpenChange={setEditingOpen}
         draftKey={`knowledge:edit:${sourceId}`}
         accountOptions={(accountsQ.data ?? []).map((a) => ({ id: a.id, name: a.name }))}
-        textOwnedElsewhere={mirrored}
+        textOwnedElsewhere={textOwnedElsewhere}
+        titleOwnedElsewhere={mirrored}
+        textOwnedNote={
+          item.fileUrl
+            ? "These words were read out of the file, so they are corrected by adding the file again rather than typed over here. You can still rename it, change where it is filed and who can use it."
+            : undefined
+        }
         initial={{
           title: item.title,
           body: item.body ?? "",

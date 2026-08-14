@@ -66,6 +66,8 @@ export function KnowledgeFormDialog({
   initial,
   draftKey,
   textOwnedElsewhere,
+  textOwnedNote,
+  titleOwnedElsewhere,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -76,8 +78,21 @@ export function KnowledgeFormDialog({
   initial?: Partial<KnowledgeFormValues>
   /** stable id for per-session draft persistence (CACHING.md §11); omit to disable */
   draftKey?: string
-  /** true when the sweep owns this source's words (a mirrored ticket/article/account) */
+  /** true when this source's words belong to something else — a mirrored row the
+   * sweep keeps in step, or an uploaded file the words were read out of */
   textOwnedElsewhere?: boolean
+  /** WHY they are read-only, in the sentence that fits. Two different things own
+   * words here and they need two different explanations: a mirrored source is
+   * kept in step with a record, an uploaded file IS the record. One boolean with
+   * one sentence would have told half the people the wrong thing. */
+  textOwnedNote?: string
+  /** true when even the NAME belongs elsewhere. Separate from the words on
+   * purpose: a mirrored source is called what its row is called, and the sweep
+   * would put that name straight back — but nothing owns what we call an
+   * uploaded file, so a file source can be renamed while its words stay
+   * read-only. Defaults to `textOwnedElsewhere`, which is what a mirrored source
+   * has always meant. */
+  titleOwnedElsewhere?: boolean
 }) {
   const isEdit = !!initial
   const [values, setValues, clearDraft] = useFormDraft(
@@ -130,7 +145,8 @@ export function KnowledgeFormDialog({
       subtitle={
         <DialogDescription>
           {textOwnedElsewhere
-            ? "This one is kept in step with the record it came from, so its words are edited there. You can still change where it is filed and who can use it."
+            ? (textOwnedNote ??
+              "This one is kept in step with the record it came from, so its words are edited there. You can still change where it is filed and who can use it.")
             : "Anything you put here is something the assistant may use to answer questions — and it will name this source when it does."}
         </DialogDescription>
       }
@@ -147,7 +163,7 @@ export function KnowledgeFormDialog({
           value={values.title}
           onChange={(e) => setValues((v) => ({ ...v, title: e.target.value }))}
           placeholder="e.g. How we handle a Bergman dispatch outage"
-          disabled={busy || textOwnedElsewhere}
+          disabled={busy || (titleOwnedElsewhere ?? textOwnedElsewhere)}
           autoFocus
         />
       </Field>

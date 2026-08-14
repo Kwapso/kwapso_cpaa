@@ -14,13 +14,16 @@
 // has been made twice in this codebase and caught twice.
 
 import { fail, json, pagedJson } from "@shared/workers/http"
-import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { hasRight, requireRight } from "@shared/workers/gating"
 import { publishChange } from "@shared/workers/realtime"
 import { refusePortalCaller } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
+import { ANY_FILE_TYPE, mediaKey, NEUTRALISED_CONTENT_TYPE, parseUploadDataUrl } from "@shared/workers/image"
+import { KNOWLEDGE_FILE_MAX_BYTES, KNOWLEDGE_UPLOAD_MAX_BYTES } from "@shared/workers/limits"
 import {
   countSources,
+  createFileSource,
   createSource,
   getSource,
   KNOWLEDGE_KINDS,
@@ -30,6 +33,7 @@ import {
   updateSource,
   type SourceInput,
 } from "../lib/knowledge"
+import { extractFile } from "../lib/knowledge-files"
 import { catchUp, listIngestState, sweepAll } from "../lib/knowledge-ingest"
 import { googleStateKeys, sweepGoogle } from "../lib/knowledge-google"
 import type { Env } from "../env"
@@ -166,6 +170,110 @@ export async function postCreateKnowledge(request: Request, env: Env): Promise<R
   await publishChange(env, guard.teamId, "knowledge", id, "add")
   return json({ source: await getSource(cfg, guard, id), total: await countSources(cfg, guard) })
 }
+
+/** POST /api/content/knowledge/upload — hand the knowledge base a FILE.
+ *
+ * ONE DOOR, ONE RECORD. It is deliberately not the learning module's shape (an
+ * upload door that answers with a URL, and a second call that writes the row):
+ * there, the file is an illustration inside something a person is already
+ * writing, and the two halves are genuinely two acts. Here the file IS the
+ * record, so splitting it would mean a stored object with no row pointing at it
+ * every time somebody closed the tab between the two calls — an orphan in a
+ * bucket, invisible to every screen and every sweep.
+ *
+ * A SEPARATE DOOR FROM `POST /api/content/knowledge`, though, and that is also
+ * on purpose. Bolting `fileDataUrl` onto the typed-note door would put a
+ * megabyte-shaped field on a door the ASSISTANT sits on — and R22 would then
+ * quite rightly require `add_knowledge_source` to expose and forward it, which
+ * is a contract no language model can honour (it cannot emit a base64 PDF). A
+ * door a machine cannot use should not pretend to be one a machine can use.
+ * There is no MCP tool on this one, and that is the whole reason.
+ *
+ * THE ENVELOPE IS CHECKED BEFORE THE BODY IS READ. `gatedBody` calls
+ * `request.json()`, which is the expensive step — so the declared length is
+ * refused first, exactly as the agent chat door learned to (limits.ts). Past the
+ * envelope, `parseUploadDataUrl` caps the FILE itself before it decodes a byte.
+ *
+ * WHAT HAPPENS TO A FILE WE CANNOT READ: it is stored and listed anyway, and it
+ * says so. See lib/knowledge-files.ts — that decision has a page of its own.
+ *
+ * R21 at the door, like every other handler here. */
+export async function postUploadKnowledgeFile(request: Request, env: Env): Promise<Response> {
+  const declared = Number(request.headers.get("content-length") ?? 0)
+  if (declared > KNOWLEDGE_UPLOAD_MAX_BYTES)
+    return fail(
+      413,
+      "too_large",
+      `That upload is too big — the most we can take in one file is ${mb(KNOWLEDGE_FILE_MAX_BYTES)}. Nothing was saved.`
+    )
+  const { actor, cfg, guard, body } = await gatedBody<{
+    title?: unknown
+    fileName?: unknown
+    fileDataUrl?: unknown
+    accountId?: unknown
+    visibility?: unknown
+  }>(request, env, "knowledge", "create")
+  await refusePortalCaller(cfg, guard)
+
+  const fileName = requireText(body.fileName, "File name", TEXT_LIMITS.short)
+  // The title defaults to the file's own name, because a person who dragged a
+  // contract onto the screen has already named it once.
+  const title = optionalText(body.title, "Title", TEXT_LIMITS.short) ?? fileName
+  const parsed = parseUploadDataUrl(body.fileDataUrl, KNOWLEDGE_FILE_MAX_BYTES, ANY_FILE_TYPE)
+  if (!parsed)
+    return fail(
+      400,
+      "too_large",
+      `We couldn't read that as a file, or it is over ${mb(KNOWLEDGE_FILE_MAX_BYTES)}. Nothing was saved.`
+    )
+
+  // READ IT FIRST, STORE IT SECOND, WRITE THE ROW LAST. The order is the one that
+  // fails least badly: a conversion that dies leaves nothing behind at all, and a
+  // row is only ever written once there is a file for it to point at. The one
+  // orphan this can still leave — bytes in R2 with no row, because the INSERT
+  // failed — costs storage and nothing else, which is the same bargain every
+  // other upload door in the base makes (see reclaimMedia's header).
+  const extract = await extractFile(env, {
+    bytes: parsed.bytes,
+    contentType: parsed.contentType,
+    fileName,
+  })
+  // The agency's OWN bucket, and the reasoning is R21's rather than R2's: the
+  // knowledge base holds internal material, and `/media/internal/` is served by
+  // the AGENCY gateway alone — the portal has no such path, so a capability URL
+  // that leaked into a client's hands has nowhere to be redeemed. The shared
+  // MEDIA bucket, which both front doors serve, would have been exactly the
+  // wrong shelf. A bucket of its own was considered and rejected: INTERNAL_MEDIA
+  // already exists to hold "the agency's own files, for the agency's own eyes",
+  // its own header argues against one bucket per module, and a new one would be
+  // a step in BOOTSTRAP.md that a rebuild from zero can silently skip.
+  const key = mediaKey(guard.teamId)
+  await env.INTERNAL_MEDIA.put(key, parsed.bytes as unknown as ArrayBuffer, {
+    // NEVER the declared type. The object is served back on the app's own origin,
+    // so a stored `text/html` would be stored XSS — and the structural answer is
+    // to write the bytes with no renderable label at all rather than to keep a
+    // list of types somebody has to maintain (shared/workers/image.ts).
+    httpMetadata: { contentType: NEUTRALISED_CONTENT_TYPE },
+  })
+
+  const id = await createFileSource(env, cfg, guard, actor, {
+    title,
+    accountId: optionalText(body.accountId, "Account", TEXT_LIMITS.short) ?? null,
+    privateToMe: body.visibility === "private",
+    file: {
+      url: `/media/internal/${key}`,
+      name: fileName,
+      type: parsed.contentType,
+      bytes: parsed.bytes.length,
+    },
+    extract,
+  })
+  // Row-level (R1): carry the new source's id so open lists patch just that row.
+  await publishChange(env, guard.teamId, "knowledge", id, "add")
+  return json({ source: await getSource(cfg, guard, id), total: await countSources(cfg, guard) })
+}
+
+const mb = (bytes: number) => `${Math.round(bytes / 1_000_000)} MB`
 
 /** POST /api/content/knowledge/update — correct a source. */
 export async function postUpdateKnowledge(request: Request, env: Env): Promise<Response> {

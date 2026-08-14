@@ -18,13 +18,19 @@ export type Env = {
    * uploads it from the portal and we read it in the agency app, so a bucket only
    * one door can serve would be a file one of the two sides cannot open. */
   MEDIA: R2Bucket
-  /** The agency's OWN files — brand assets, staff photos, certificate PDFs —
-   * served by the gateway at /media/internal/. ONE bucket for the four internal
-   * modules rather than four: they hold the same kind of object for the same
-   * audience, and a bucket per module would be four more things to create on a
-   * fresh account (BOOTSTRAP.md) for no isolation anybody can point at. The
-   * per-team prefix inside it is what keeps teams apart, exactly as it does in
-   * the learning and ticket buckets. */
+  /** The agency's OWN files — brand assets, staff photos, certificate PDFs, and
+   * the documents uploaded into the knowledge base — served by the gateway at
+   * /media/internal/. ONE bucket for the internal modules rather than one each:
+   * they hold the same kind of object for the same audience, and a bucket per
+   * module would be more things to create on a fresh account (BOOTSTRAP.md) for
+   * no isolation anybody can point at. The per-team prefix inside it is what
+   * keeps teams apart, exactly as it does in the learning and ticket buckets.
+   *
+   * FOR THE KNOWLEDGE BASE THE CHOICE IS R21's, not R2's: the material there is
+   * the agency's own, and `/media/internal/` is served by the AGENCY gateway
+   * alone — the portal has no such path — so a capability URL that reached a
+   * client has nowhere to be redeemed. The shared MEDIA bucket, which both front
+   * doors serve, would have been exactly the wrong shelf for it. */
   INTERNAL_MEDIA: R2Bucket
 
   /** Cloudflare account id (plain var) — for reaching per-team databases. */

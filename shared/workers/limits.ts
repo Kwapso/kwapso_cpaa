@@ -129,6 +129,33 @@ export const AGENT_FILE_MAX_BYTES = 5_000_000
 /** Files one agent chat message may attach. */
 export const AGENT_MAX_FILES = 8
 
+// ── a file dropped into the knowledge base ───────────────────────────────────
+// TWO NUMBERS, AND THEY ARE A PAIR — the same shape as the agent-chat ceiling
+// above, and for the same reason it was written: a per-file cap enforced AFTER
+// `request.json()` describes what may be stored while the parse describes what
+// may be SENT, and the parse is the expensive step. So the door checks the
+// envelope against `Content-Length` before it reads a byte, and the file cap
+// afterwards, once there is a file to measure.
+
+/** Bytes one uploaded file may carry into the knowledge base.
+ *
+ * 25 MB is the number the product already teaches: it is the learning-attachment
+ * cap, so the sentence a person meets when they pick something enormous is the
+ * one they have already met once. It is a ceiling on the FILE, not on the
+ * material — a 25 MB scanned PDF may convert to a few hundred kilobytes of text,
+ * and a 3 MB spreadsheet may convert to more than the row can hold. The text has
+ * its own, separate ceiling (`DOCUMENT_LIMIT_BYTES` in validate.ts), because the
+ * two are ceilings on different things: this one is what we will accept and
+ * store, that one is what one database row can hold. */
+export const KNOWLEDGE_FILE_MAX_BYTES = 25 * 1024 * 1024
+
+/** Bytes one upload REQUEST may declare. A base64 data URL is ~4/3 of the file
+ * it carries, so the envelope is the file cap times four thirds plus room for
+ * the title, the filing and the JSON around them. Checked against
+ * `Content-Length` BEFORE the body is parsed — a cap is only a cap if it is
+ * checked before the expensive step. */
+export const KNOWLEDGE_UPLOAD_MAX_BYTES = Math.ceil(KNOWLEDGE_FILE_MAX_BYTES * (4 / 3)) + 64 * 1024
+
 /** How far up the account tree the loop guard will walk. The tree is self-nesting,
  * so the ancestor walk is the only unbounded recursion in the base. Past this depth
  * the guard cannot PROVE a move is ring-free, so it refuses — fails closed, never

@@ -840,6 +840,11 @@ export const FORM_DIALOGS = [
   "contact-link-dialog",
   "portal-access-dialog",
   "knowledge-form-dialog",
+  // The third way into the knowledge base. Its draft is the interesting one:
+  // what it persists is the TITLE and the FILING, never the file — a File cannot
+  // go into session storage, and a form that pretended otherwise would silently
+  // save a source with nothing behind it.
+  "knowledge-upload-dialog",
   // Process maps and the numbers under them. The step form is the one that
   // matters most here: it collects the two figures every savings number in the
   // app is a subtraction between, so a draft lost to a mis-tap is an agreed
