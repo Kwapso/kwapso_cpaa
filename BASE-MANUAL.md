@@ -30,9 +30,9 @@ service-binding calls (never a public hop).
 | Worker | Cloudflare name | Owns | Why it's its own worker |
 |---|---|---|---|
 | **auth** | `kwapso-auth` | Sign-in — a 6-digit email code via Resend or Google (no Clerk), sessions, the email-change flow, profile, `/api/auth/me`, and `/internal/send-email` | Identity is the one thing every other worker trusts. It's the single session authority: everyone else asks it "who is this?" (`whoAmI`) rather than parsing cookies themselves. |
-| **tenancy** | `kwapso-tenancy` | Teams, members, Member roles (`member_roles`) + the permission sheet, invites, per-team dropdown values, the screen-recipe config store, and the team-DB migration/sharding admin endpoints | This is the multi-tenancy engine — it owns the global "who's in which team, in which role" catalog and the per-team database lifecycle. The permission seam that every module gates against lives here. |
+| **tenancy** | `kwapso-tenancy` | Teams, members, Member roles (`member_roles`) + the permission sheet, invites, per-team dropdown values, the screen-recipe config store, the team-DB migration/sharding admin endpoints — **and the three subsystems that hang off the same spine:** the **customer spine** (accounts, contact links, portal logins + the one account-fence corridor), **process maps** (App → Process → Step and the savings cut from them), and **the money** (the two rate cards + margin, split across two files because R24 forbids the internal one reaching the portal) | This is the multi-tenancy engine — it owns the global "who's in which team, in which role" catalog and the per-team database lifecycle. The permission seam that every module gates against lives here, and so does the *second* fence the product needs: which **accounts** a caller may see. Both are decisions about who may read what, so they belong to one worker. |
 | **realtime** | `kwapso-realtime` | The live switchboard — one `TeamChannel` Durable Object per channel, fanning out row-level `{resource,id,op}` change pings over WebSockets | Live-sync is a cross-cutting concern with a stateful runtime (open sockets). It holds **no app data** — the databases stay the source of truth — so it can be a thin, hibernatable coordinator instead of a second copy of everything. |
-| **content** | `kwapso-content` | **Learning** (how-to articles + per-user "done" progress) and **Tickets** (tickets + threaded replies — one module, no help section; the key, tables and path stay `help`, DATA-MODEL.md says why) | These are the base's two real content modules. They're grouped because they share the same shape (team-DB CRUD gated on a permission module, deactivate-not-delete, R2 media) and neither is big enough to deserve its own worker. |
+| **content** | `kwapso-content` | **Learning** (how-to articles + per-user "done" progress), **Tickets** (tickets + threaded replies — one module, no help section; the key, tables and path stay `help`, DATA-MODEL.md says why), **the work engine** (stories, sprints, work logs, to-dos, tasks, triage duty, meetings), **the knowledge base** (sources → chunks → terms → the Vectorize index, plus the 15-minute sweep and the 07:00 digest), **the per-person Google connections**, and **the agency's own housekeeping** (marketing, brand assets, delivery, staff profiles) | Everything a team AUTHORS lives here. They're grouped because they share one shape — team-DB CRUD gated on a permission module, deactivate-not-delete, an audit block, R2 media — and none is big enough to deserve its own worker. It is the only domain worker besides tenancy with a cron, and both of its crons record failures to the error store (R12). |
 | **data-ops** | `kwapso-data-ops` | **CSV import** (the 3-stage single-target session + the agentic multi-file batch import, AGENTIC-IMPORT.md) and **the AI agent** | Both are "operations over the other modules' data" rather than modules of their own. Import writes act-as-user through a target's create endpoint; the agent acts-as-user through every gated endpoint. Neither owns a table of user content — they orchestrate. |
 | **mcp** | `kwapso-mcp` | The external machine surface: personal access tokens → a team-pinned session bridge → an opt-in tool catalogue for outside machines | It proves the point of the door design: it slots onto the same gated endpoints the agent already uses, so it added zero new trust surface beyond the token itself. How an outside tool connects + the cost model: **MCP.md**. |
 | **gateway** | `kwapso` / `kwapso-staging` | The AGENCY public door: serves `web/out`, serves uploaded media from R2, and routes `/api/*` to the right worker by PREFIX | One of the two workers with a public URL. |
@@ -154,11 +154,20 @@ that team's DB and throws 403 `forbidden` if the bit isn't set.
 **Why a tall sheet.** Permissions are `role | module | read/create/edit/delete`
 rows, not columns. A new module is *new rows*, never a schema change
 (DATA-MODEL.md — Glide's 24-boolean WIDE table became this TALL one). Members
-point at one role; editing a role applies instantly to every holder. The seeded
-modules today are in `TEAM_MODULES` (`workers/tenancy/src/team-schema.ts`):
-`teams`, `team_members`, `member_roles`, `learning`, `help`, `selectable_data`,
-`screens`, `agent`. Every team is born with an **Admin** (locked, full rights) and
-a **Viewer** (read-only) role.
+point at one role; editing a role applies instantly to every holder.
+
+**The module list lives in `shared/team-modules.ts`** (`TEAM_MODULES`), which
+`workers/tenancy/src/team-schema.ts` re-exports — it moved to `shared/` the moment
+data-ops needed the same list to build the import/export matrix, and the comment at
+the top of that file says so: *"adding a module here is the ONLY way it appears in
+either."* Read it there; any list written down elsewhere (including the next
+sentence) is a copy. It began as the six Glide modules plus `screens` and `agent`,
+and has grown with the product — today it also carries the customer spine
+(`accounts`, `portal_users`), the knowledge base (`knowledge`), the work engine
+(`processes`, `commercials`, `work`, `todos`, `meetings`), the agency's own
+housekeeping (`marketing`, `brand_assets`, `delivery`, `staff_profiles`) and the
+three Google switches (`google`, `google_mail`, `google_events`). Every team is born
+with an **Admin** (locked, full rights) and a **Viewer** (read-only) role.
 
 ### The locked security rules the gate enforces
 
@@ -257,8 +266,9 @@ extend the base safely.
 
 To add, say, a `products` module, you touch these seams and nothing else:
 
-1. **Permissions.** Add `"products"` to `TEAM_MODULES`, give it a `MODULE_LABELS`
-   entry (the compiler forces you to — `MODULE_LABELS` is `Record<TEAM_MODULES,…>`),
+1. **Permissions.** Add `"products"` to `TEAM_MODULES` (`shared/team-modules.ts`),
+   give it a `MODULE_LABELS` entry in the same file (the compiler forces you to —
+   `MODULE_LABELS` is `Record<TEAM_MODULES,…>`),
    and a team-DB migration for its table(s). Every role's matrix now has a
    `products` row; `requireRight(cfg, guard, "products", "create")` just works.
 2. **Live-sync.** Every mutation route calls `publishChange(env.REALTIME,
@@ -301,7 +311,7 @@ the machine-checked Laws (§4) turn a careless change red before it ships.
 | `activity-read.ts` / `activity.ts` (the one activity path) | Every module's history feed | `generic-activity-path` (R5) — no per-module read SQL allowed |
 | The screen engine / recipe shape | Every screen | `record-detail-tabs` (R2), `no-handrolled-toggles` (R3), `forms-use-formshell` (R4), `tab-counts-derived` (R8) |
 | `shared/glossary.ts` (a term's wording) | All UI copy + the agent's system prompt | `glossary-wellformed` (R6) |
-| `TEAM_MODULES` / `MODULE_LABELS` | The permission matrix, seeds, the Roles screen | `team-schema.test.ts` asserts the module list + seed row counts; `MODULE_LABELS` won't compile without a label |
+| `TEAM_MODULES` / `MODULE_LABELS` (`shared/team-modules.ts`) | The permission matrix, seeds, the Roles screen — **and** data-ops's import/export matrix, which reads the same list | `team-schema.test.ts` asserts the module list + seed row counts; `MODULE_LABELS` won't compile without a label |
 
 ### How to change foundational code safely
 
@@ -367,8 +377,17 @@ check without its Law.** To add one, do all three steps (registry row + test +
 RULES.md row) or the build fails — which is precisely the property that keeps an
 agreed rule from silently slipping over time.
 
-A natural next Law, once the tool catalogue stabilises, is `R9 (ai): every agent
-tool maps to a gated route` — the invariant §2 relies on, made machine-checked.
+**That invariant is no longer a "next Law" — it landed, and the id it was pencilled
+in under went to something else.** This paragraph used to propose `R9 (ai): every
+agent tool maps to a gated route`. R9 is now *agent/MCP capability parity* (the
+system prompt's brief is GENERATED from the catalogs, so the UI and the agent can
+never disagree), and the "every tool maps to a gated route" invariant §2 relies on
+is machine-checked from three directions instead: **R10** (`gating-seam`, with the
+mcp surface carrying its own suite), `workers/mcp/test/catalog.test.ts` (every
+forwarded path checked against the target worker's own `ROUTES`), and **R19**/**R22**
+(the tool exposes and forwards every filter and every body field its door accepts).
+Read RULES.md for the current set; a number written here would be the fourth copy
+the registry exists to prevent.
 
 ---
 

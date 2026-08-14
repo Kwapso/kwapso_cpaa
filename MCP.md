@@ -240,9 +240,11 @@ Today it covers:
 
   **An export is ONE WHOLE DOCUMENT — never a page, and never a short file.** That is
   the deliberate answer to "why doesn't an export take a cursor?", and it is R14's own
-  answer: three of these four sit on **bounded** collections (a team's roles, its
-  how-to articles, its dropdown vocabulary are curated by hand and stop growing), and
-  the law says in as many words that a bounded collection doesn't need a cursor to be
+  answer: all but one of these sit on **bounded** collections (a team's roles, its
+  how-to articles, its dropdown vocabulary, its programmes, its meeting purposes, its
+  brand assets, its staff certificates and what it has published about itself are all
+  curated by hand and stop growing), and the law says in as many words that a bounded
+  collection doesn't need a cursor to be
   honest. **Accounts is the one that grows** — every company and every person an agency
   works with — so `export_accounts_csv` narrows by the same three filters as
   `list_accounts` (`q`, `type`, `parentId`), and past what one file can carry the door
@@ -275,9 +277,10 @@ Today it covers:
     all needing `commercials:*`. **`read_margin` and `list_internal_rates` answer with
     the agency's own figures**: a token acts as its owner, and no client login can hold
     a token or be acted for at all, but if you are building a client-facing integration
-    on somebody's staff token, these two are the calls not to relay. Law R23 makes the
-    same statement about the app's own client portal structurally — the file those
-    figures live in cannot be reached from any door the portal opens.
+    on somebody's staff token, these two are the calls not to relay. Law **R24** makes
+    the same statement about the app's own client portal structurally — the file those
+    figures live in cannot be reached from any door the portal opens. (R24, not R23 —
+    R23 is the knowledge base's citation law.)
   - learning — `create_learning`, `update_learning`, `set_learning_active`
   - tickets — `create_help_ticket`, `update_help_ticket`, `set_help_status`,
     `resolve_help_ticket`, `rank_help_ticket`, `archive_help_ticket`,

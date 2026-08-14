@@ -15,6 +15,45 @@ The whole layer is tiny and dependency-free:
   `publishChange` (team channel), `publishUserChange` (one user's devices),
   `publishSignOut` (forced sign-out).
 
+### The publish contract — what the three functions promise
+
+`publishChange` is named in ten documents and is the thing Law R1 is about, so its
+contract belongs in one place rather than being inferred from ten call sites. **This
+is that place.**
+
+```ts
+publishChange(env.REALTIME, teamId, resource, id, op)   // → the TEAM channel
+publishUserChange(env.REALTIME, userId, resource)       // → one person's devices
+publishSignOut(env.REALTIME, userId)                    // → forced sign-out
+```
+
+| Argument | What it must be |
+|---|---|
+| `resource` | the STRING the client registry keys on — a `TEAM_RESOURCES` entry, a `SIMPLE_INVALIDATIONS` entry, or a reasoned `DEAF_EXEMPT` line (Law **R15**: a publisher with no listener is a screen that stales). Conventionally the table name (`member_roles`, `help`, `learning`). |
+| `id` | the affected ROW's id, so the client can patch just that row (rule 3). **The one deliberate exception is a bulk write**, which publishes ONE id-less ping on the target table and lets the client reconcile the list — one ping, never one per row. |
+| `op` | `add` · `edit` · `remove`. It drives the count sidecar (`add`/`remove` bump `total` by ±1) and nothing else — the client re-pulls the row through the gated endpoint either way, so a wrong `op` costs an off-by-one badge until the next reconcile, never wrong data. |
+
+Four promises the callers rely on and must not break:
+
+1. **It carries no row CONTENT** — ever (rule 8). The ping says *that* something
+   changed, never *what*. This is what lets the socket be safe for every member of a
+   team regardless of their module rights.
+2. **It is fire-and-forget and MUST NOT be able to fail the write.** A realtime
+   hiccup is a stale screen for one revalidation cycle; a realtime hiccup that rolled
+   back a committed write would be a data-loss bug caused by a cache layer. Same
+   best-effort contract as activity writes and notification emails
+   (ERROR-HANDLING.md).
+3. **It goes AFTER the write commits**, not beside it. A ping the client acts on
+   before the row exists re-pulls the old row and patches the stale value in — which
+   looks exactly like the write silently failing.
+4. **Zero rows moved means no ping** (Law **R17**). An idempotent transition that
+   changed nothing publishes nothing and writes no activity row, so a double-click
+   is one event in the history and one ping on the wire.
+
+The seam test (`workers/*/test/publish-seam.test.ts`) reads handler source off disk
+and turns the build red if a route classified `mutation` contains none of the three
+calls — so the contract above is what you are agreeing to when you classify a route.
+
 ## The rules
 
 ### 1 · Cache-first reads (stale-while-revalidate)

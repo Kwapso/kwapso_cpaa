@@ -98,34 +98,53 @@ quota tables. Create it for each environment and apply the core migrations in
 npx wrangler d1 create kwapso-core-staging
 npx wrangler d1 create kwapso-core
 
-# Apply every core migration (0001…0016) to each env. Any core-bound worker can run it;
-# auth is the canonical one. Run WITHOUT --env for production.
+# Apply EVERY core migration to each env — the command applies whatever is pending,
+# so it stays right as db/core/ grows. Any core-bound worker can run it; auth is the
+# canonical one. Run WITHOUT --env for production.
 cd workers/auth
 npx wrangler d1 migrations apply kwapso-core-staging --env staging --remote
 npx wrangler d1 migrations apply kwapso-core --remote
 cd ../..
 ```
 
-The current core migrations are `0001`–`0016` (0013 = `mcp_tokens` + `sessions.team_pin` — the MCP front desk; 0015 = the login-code send throttle's ledger; 0016 = access-token expiry) (users, teams, team_members, the
-email-change security records, account activity, the import catalog, and the three
-agent quota tables `agent_usage` / `agent_credits` / `agent_usage_log`, plus the
-central error log `error_logs`). DATA-MODEL.md
-lists every table. **Migrations are additive — never edit an applied one.**
+The current core migrations are **`0001`–`0019`** — users, teams, team_members, the
+email-change security records, account activity, the import catalog, the three agent
+quota tables (`agent_usage` / `agent_credits` / `agent_usage_log`), the central error
+log (`error_logs`), and the access + throttle hardening: `0013` = `mcp_tokens` +
+`sessions.team_pin` (the MCP front desk), `0015` = the login-code send throttle's
+ledger, `0016` = access-token expiry, `0017` = `login_sends` (the send budget's own
+table), `0018` = the email-change throttle's target index, `0019` =
+`idx_error_logs_bucket_at` (the index behind the error store's hourly per-caller
+ceiling). **The last three matter on a fresh stand-up**: without `0015` or `0017`
+every sign-in code request 500s on a missing column or table, which is the first
+thing you will try to do in §7. OPERATIONS.md § *migrations* has the full note on
+each; DATA-MODEL.md lists every table. **This number is a copy of `db/core/` — count
+the directory if it disagrees; it said `0001`–`0016` for three migrations after that
+stopped being true.** Migrations are additive — never edit an applied one.
 
 > **Per-team databases are NOT created here.** Each team's database is created at
 > runtime when the team is created (`applyTeamSchema` runs the `TEAM_MIGRATIONS` from
-> `workers/tenancy/src/team-schema.ts` — `0001_team_base` … `0008_portal_current_account`
-> today, eight of them; that file is the live list, this number is a copy of it). You
-> only apply *team-schema* migrations to *existing* teams later, via the migrate-teams
-> robot (§7). The last two are the customer spine (`0007`) and the client-portal
-> switcher's pointer (`0008`) — see DATA-MODEL.md for what each one adds and what
-> breaks without it.
+> `workers/tenancy/src/team-schema.ts` — `0001_team_base` … `0021_meetings` today,
+> twenty-one of them; **that file is the live list and this number is a copy of it**,
+> which said "eight" for thirteen migrations after that stopped being true — count
+> the array if the two disagree). A fresh team runs all of them, so nothing here is
+> a step you can miss; you only apply *team-schema* migrations to *existing* teams
+> later, via the migrate-teams robot (§7). The ones a rebuilder most needs to know
+> exist are the customer spine (`0007_customer_spine`) and the portal switcher's
+> pointer (`0008_portal_current_account`) — without either, every account and portal
+> route hits a missing column or table — and the nine that carry the product's later
+> shape: the knowledge base (`0012`, `0020`), process maps + the money (`0013`),
+> stories + sprints (`0014`), work logs (`0015`), to-dos + tasks (`0016`), triage
+> duty (`0017`), the agency's own housekeeping (`0018`), Google connections (`0019`)
+> and meetings (`0021`). DATA-MODEL.md says what each adds and what breaks without it.
 
 ---
 
 ## 3 · R2 buckets (uploaded files)
 
-One bucket per media concern, per env. Create all six before deploying content/gateway:
+One bucket per media concern, per env — **four names × two environments = eight
+buckets.** Create all eight before deploying content/gateway (this line said "six"
+while listing eight; §10's teardown and OPERATIONS.md both say eight):
 
 ```bash
 npx wrangler r2 bucket create kwapso-media                    # profile photos + team logos (gateway MEDIA)
@@ -185,6 +204,32 @@ it the knowledge base answers from its word index alone rather than refusing eve
 question. That is a real degradation and a visible one (`reason` on every answer
 says what it searched), not a silent one.
 
+**If you got the order wrong — the recovery, because the warning above needs one.**
+"Vectors upserted before a metadata index was created won't have their metadata
+contained in that index" is not repairable in place: there is no re-index command,
+and adding the metadata index afterwards leaves every existing vector invisible to
+it. So the fix is to start the index again, and it is cheap because **nothing is
+lost** — the quantised embedding of every chunk is still in the team's own
+`knowledge_chunks.embedding` column, kept for exactly this (DATA-MODEL § *the
+knowledge base*), so a rebuild costs no re-embedding.
+
+```bash
+npx wrangler vectorize delete kwapso-knowledge-staging
+```
+
+Then re-run the whole of §3b for that environment — the create, **and all nine
+metadata indexes** (they do not survive the delete) — and re-ingest with `POST
+/api/content/knowledge/sync` (or just wait: the content worker's 15-minute sweep
+does it unattended, one bounded slice at a time, resuming from the cursor in
+`knowledge_ingest`).
+
+**How to tell whether you got it right**, before an agency's worth of material is in
+there: ingest one source, ask a question whose answer lives in a *different*
+compartment, and check that it is NOT returned. Every answer carries the compartment
+it searched and the reasoning that chose it (R23), so the failure mode this warning
+is about — compartments that silently do not narrow — is one read away, not a thing
+you discover months later.
+
 ---
 
 ## 4 · Secrets + vars (per env, never in git)
@@ -201,15 +246,24 @@ says what it searched), not a silent one.
 | `ADMIN_KEY` | tenancy, data-ops | guards the maintenance endpoints (migrate-teams, db-sizes, grant credits). Set it in both environments. |
 | `TEST_LOGIN_KEY` | auth (**NON-PRODUCTION ONLY**) | the test-login door's own secret — its holder can sign in as ANY account on that environment. Deliberately a different name from `ADMIN_KEY` so the maintenance-key rollout can never arm it, and the door refuses outright when the worker's `ENVIRONMENT` var is `production`. |
 | `INTERNAL_KEY` | auth, tenancy, content, gateway, mcp | shared secret gating auth's `/internal/*` doors. tenancy + content call `/internal/send-email`; the **gateway** forwards client error beacons to `/internal/log-error` (a DIFFERENT reason — the gateway sends no email but still needs the key, or web errors never reach `error_logs`). The **mcp** worker uses it to mint team-pinned sessions (`/internal/mcp-session`). MUST match across all five. |
+| `GOOGLE_CONNECT_CLIENT_ID` + `GOOGLE_CONNECT_CLIENT_SECRET` + `GOOGLE_TOKEN_KEY` | content | *optional, but all-or-nothing* — the per-person Google **connections** (Drive / Gmail / Calendar / Chat). A DIFFERENT OAuth client from the sign-in one above (`kwapso sync`, the one carrying the sensitive scopes); `GOOGLE_TOKEN_KEY` is 32 random bytes base64 (`openssl rand -base64 32`) and is what the stored refresh tokens are encrypted under, so a dump of the table without it is a list of email addresses. With any one of the three missing, the Connect button is not offered and the rest of the product is untouched — deliberate, so a half-configured environment never walks somebody through a consent screen and then fails to keep what they granted. Redirect URIs, scopes and the rotation consequence: OPERATIONS.md § *Google connections*. |
 | `ANTHROPIC_API_KEY` | data-ops | *optional* — when set, the agent's brain is Claude; unset falls back to Workers AI. Both do full tool use. |
 
 **Vars** (plain config in `wrangler.jsonc`, not secret):
 
-- **`CF_ACCOUNT_ID`** on `tenancy` + `content` + `data-ops` — **your Cloudflare account
-  id.** Load-bearing: it builds the per-team D1 REST URL (`/accounts/<id>/d1/…`), so a
-  wrong value fails EVERY per-team DB operation (team creation, all content/import/agent
-  writes). The checked-in value is the original author's account — **overwrite it** in
-  both the top-level and `env.staging` vars blocks of those three workers.
+- **`CF_ACCOUNT_ID`** on `tenancy`, `content`, `data-ops`, **`realtime` and `mcp`** —
+  **your Cloudflare account id.** Load-bearing: it builds the per-team D1 REST URL
+  (`/accounts/<id>/d1/…`), so a wrong value fails EVERY per-team DB operation (team
+  creation, all content/import/agent writes). The checked-in value is the original
+  author's account — **overwrite it** in both the top-level and `env.staging` vars
+  blocks of each. **This list named only the first three until 12 Aug 2026**, which
+  is the dangerous half of the §2 warning repeated one level down: `realtime` reads
+  the account id to fence a joining socket through the same guard corridor the API
+  uses (OPERATIONS.md § secrets), and `mcp` carries it beside its core-DB binding. A
+  fork that overwrites three and leaves two pointing at somebody else's account gets
+  the same silent failure §2 describes — and on an account that already hosts the
+  original base, the same cross-tenant reach. Grep it before you deploy:
+  `grep -rn CF_ACCOUNT_ID workers/*/wrangler.jsonc` should return only your id.
 - `tenancy` → `PUBLIC_APP_URL` = the environment's absolute origin (e.g.
   `https://agency-staging.kwapso.app`). Outbound email links use it;
   leave it unset and agent-sent invite links point at the internal binding host.

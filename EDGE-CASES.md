@@ -62,16 +62,21 @@ it moved, offer a **gentle "reload" toast**, never a surprise reload mid-task.
 Don't mistake this for cache-busting: it heals an *already-stale* tab; it does
 not make cross-route navigation soft.
 
-**The AI co-pilot must survive this reload — it's mounted at the ROOT, and its
-open state persists.** The assistant panel is the one surface that spans *all*
-screens, so it lives in a single root-mounted host (`web/components/agent-host.tsx`,
-rendered once in `app/layout.tsx`), **not** inside any per-route `AppShell`. That
-survives *soft* navigation. But crossing into `/t` from a top-level route is a
-*hard reload* (above), which wipes all in-memory state — so the panel's open flag
-is **mirrored to `sessionStorage`** (`web/lib/agent-open.ts`): on the post-reload
-load the host reopens the panel and `useAgentChat` resumes the saved thread, so the
-conversation survives even though the live stream was cut. Two consequences to
-respect:
+**The AI co-pilot is mounted at the ROOT, and its open state persists.** The
+assistant panel is the one surface that spans *all* screens, so it lives in a single
+root-mounted host (`web/components/agent-host.tsx`, rendered once in
+`app/layout.tsx`), **not** inside any per-route `AppShell`. Root-mounting is what
+carries it across *soft* navigation, which since the one-shell re-architecture is
+**all** in-app navigation — crossing into `/t` from a top-level route no longer
+reloads anything. (This paragraph used to open "must survive this reload" and assert
+that the crossing *was* a hard reload, citing the section above it — which by then
+said the opposite, as do the two bullets below. The `sessionStorage` mirror it
+described is still there and still earns its place; what changed is *why*.) The
+panel's open flag is **mirrored to `sessionStorage`** (`web/lib/agent-open.ts`) for
+the two events that genuinely still wipe in-memory state — a real page refresh (F5)
+and a `version-watch` chunk reload — after which the host reopens the panel and
+`useAgentChat` resumes the saved thread, so the conversation survives even though
+the live stream was cut. Two consequences to respect:
 - **The screen-trace always soft-drives (one shell), never `router.push`es.** The
   engine (`web/lib/screen-trace.tsx`) hands its target to the shell, which `go()`s
   there via the History API from any screen — no reload. (Before the one-shell
@@ -583,9 +588,12 @@ last) fails, and deploying a worker before its migration 500s at runtime.
 - **Apply new migrations to BOTH databases before deploying the workers that
   need them.** Core migrations (e.g. `0008 importable_databases`, `0009
   agent_usage`, `0010 agent_credits`) go to `kwapso-core` **and**
-  `kwapso-core-staging`; the team-schema migrations (`0004_modules` through
-  `0008_portal_current_account`) roll to **every** team DB via `POST
-  /api/tenancy/admin/migrate-teams` (x-admin-key).
+  `kwapso-core-staging`; the team-schema migrations — the whole
+  `TEAM_MIGRATIONS` array in `workers/tenancy/src/team-schema.ts`, `0001_team_base`
+  through `0021_meetings` today — roll to **every** team DB via `POST
+  /api/tenancy/admin/migrate-teams` (x-admin-key). Read the range off that array
+  rather than out of any doc: this line named `0004`–`0008` for thirteen migrations
+  after that stopped being true.
   Deploy the worker before the migration and its first query hits a missing
   table. Production is owner-gated: migrations first, then the realtime-first
   deploy.
