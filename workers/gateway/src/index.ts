@@ -15,6 +15,7 @@ import {
   serveMedia,
 } from "@shared/workers/front-door"
 import { fail } from "@shared/workers/http"
+import { requestId, stampTrace } from "@shared/workers/trace"
 
 type Env = {
   ASSETS: Fetcher
@@ -34,10 +35,16 @@ type Env = {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    // THE NAME IS GIVEN HERE, at the door, once — this is the only place on the
+    // agency side that knows a request has begun. Everything below forwards it,
+    // and every worker behind it re-reads the same id instead of minting its
+    // own, so one failing click is one query in `error_logs` rather than eight
+    // rows nobody can line up. See shared/workers/trace.ts.
+    const traced = stampTrace(request, requestId(request))
     try {
-      return await handle(request, env)
+      return await handle(traced, env)
     } catch (e) {
-      return recordGatewayCrash(request, env.AUTH, "gateway", env.INTERNAL_KEY, e)
+      return recordGatewayCrash(traced, env.AUTH, "gateway", env.INTERNAL_KEY, e)
     }
   },
 } satisfies ExportedHandler<Env>

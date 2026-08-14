@@ -41,6 +41,7 @@ function coreDb() {
   const db = new DatabaseSync(":memory:")
   db.exec(migration("0012_error_logs.sql"))
   db.exec(migration("0019_error_log_bound.sql"))
+  db.exec(migration("0020_error_request_id.sql"))
   return db
 }
 

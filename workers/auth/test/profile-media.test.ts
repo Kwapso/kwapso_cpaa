@@ -37,7 +37,7 @@ function fresh(opts: { deleteFails?: boolean } = {}) {
     CREATE TABLE team_members (id TEXT PRIMARY KEY, team_id TEXT, user_id TEXT, deactivated_at TEXT);
     CREATE TABLE account_activity (id TEXT PRIMARY KEY, user_id TEXT, type TEXT, description TEXT, created_at TEXT);
     CREATE TABLE error_logs (id TEXT PRIMARY KEY, at TEXT, source TEXT, place TEXT, message TEXT,
-      stack TEXT, team_id TEXT, user_id TEXT, url TEXT, status TEXT DEFAULT 'open',
+      stack TEXT, team_id TEXT, user_id TEXT, url TEXT, request_id TEXT, status TEXT DEFAULT 'open',
       resolved_at TEXT, resolution_note TEXT);
     INSERT INTO users (id, email, onboarding_completed_at, created_at, updated_at)
       VALUES ('U1', 'me@example.com', '2026-01-01', '2026-01-01', '2026-01-01');

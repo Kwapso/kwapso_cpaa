@@ -84,6 +84,7 @@
 import { brand } from "@shared/brand"
 import { fail, json } from "@shared/workers/http"
 import { recordWorkerError } from "@shared/workers/error-log"
+import { requestId } from "@shared/workers/trace"
 import { sweepCoreRetention } from "@shared/workers/retention"
 import { GuardError } from "./lib/permissions"
 import { checkDatabaseSizes } from "./lib/sharding"
@@ -305,7 +306,7 @@ export default {
       console.error("tenancy worker error:", e)
       // Record the crash in the central error log (core DB) — best-effort,
       // never blocks the response. Clean GuardError refusals never reach here.
-      await recordWorkerError(env.DB, "tenancy", `${request.method} ${new URL(request.url).pathname}`, e)
+      await recordWorkerError(env.DB, "tenancy", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request))
       const message = e instanceof Error ? e.message : ""
       if (message.startsWith("cloud_key_missing:"))
         return fail(503, "cloud_key_missing", `${brand.name}'s cloud key isn't set up yet — team creation is paused.`)

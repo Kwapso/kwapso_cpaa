@@ -9,6 +9,7 @@ import type { Fetcher, D1Database } from "@cloudflare/workers-types"
 import type { SessionUser } from "../types"
 import { d1Query, type D1Rest } from "./d1-rest"
 import { fail } from "./http"
+import { requestId, traceHeaders } from "./trace"
 
 /** The slice of a worker Env the gating needs. Every domain worker's Env
  * structurally satisfies this (the AUTH binding + the core DB + the Cloudflare
@@ -54,13 +55,61 @@ export function d1ConfigFrom(env: GatingEnv): D1Rest {
   return { accountId: env.CF_ACCOUNT_ID, apiToken: env.CF_D1_TOKEN }
 }
 
-/** Ask the auth worker (one session system, one master) who this request is. */
+/** How long a worker waits for auth to say who somebody is before it gives up.
+ *
+ * This is a same-colo service-binding call that normally answers in single-digit
+ * milliseconds, so five seconds is not a tuning knob — it is a CEILING. R11
+ * exempts service bindings from the timeout law because Cloudflare bounds them,
+ * and that is true of the socket; it is not true of the worker on the other end,
+ * which can be redeploying, throwing, or stuck on its own D1 call. Without a
+ * ceiling, an unwell auth holds every gated request in five other workers open
+ * for as long as it likes, and the queue behind them is the outage. */
+export const AUTH_UNAVAILABLE_MS = 5_000
+
+/** Ask the auth worker (one session system, one master) who this request is.
+ *
+ * THE HIGHEST-TRAFFIC CROSS-SERVICE CALL IN THE SYSTEM — every gated route in
+ * five workers opens with it, which makes auth the component with the largest
+ * blast radius (RESILIENCE.md). Two things follow from that, and they are the
+ * whole reason this function is not a one-liner:
+ *
+ *   • A CEILING (above), so a slow auth degrades this request instead of the
+ *     worker.
+ *   • "AUTH IS DOWN" IS NOT "YOU ARE SIGNED OUT". `null` means the session was
+ *     not recognised, and callers turn that into a 401 that signs somebody out
+ *     of the app. An outage that returned `null` would therefore log every
+ *     signed-in person out of a healthy app because a different worker was ill —
+ *     and they would each try to sign in again, against the worker that is
+ *     already struggling. So an outage throws a 503 instead: every worker maps
+ *     GuardError first, the caller keeps their session, and the error store gets
+ *     a row that says `auth_unavailable` rather than a generic 500.
+ *
+ * There is deliberately NO fallback answer here — no cached identity, no
+ * "assume signed in". Guessing on the identity read is guessing on the gate. */
 export async function whoAmI(request: Request, env: GatingEnv): Promise<SessionUser | null> {
-  const res = await env.AUTH.fetch("https://auth/api/auth/me", {
-    headers: { Cookie: request.headers.get("Cookie") ?? "" },
-  })
-  if (!res.ok) return null
-  return ((await res.json()) as { user: SessionUser }).user
+  // The init is assembled apart and cast once. `shared/` is compiled by the two
+  // WEB workspaces as well as the workers, and there the ambient `AbortSignal`
+  // is the DOM one while the binding wants Cloudflare's — structurally the same
+  // object, two declarations. Same reason `forwardToDoor` types its fetcher
+  // structurally rather than as a `Fetcher`.
+  const init = {
+    headers: { Cookie: request.headers.get("Cookie") ?? "", ...traceHeaders(requestId(request)) },
+    signal: AbortSignal.timeout(AUTH_UNAVAILABLE_MS),
+  } as unknown as Parameters<typeof env.AUTH.fetch>[1]
+
+  try {
+    const res = await env.AUTH.fetch("https://auth/api/auth/me", init)
+    if (!res.ok) return null
+    return ((await res.json()) as { user: SessionUser }).user
+  } catch {
+    // Includes an unreadable body: auth answering nonsense is auth being
+    // unwell, and it must not read to the caller as "you are signed out".
+    throw new GuardError(
+      503,
+      "auth_unavailable",
+      "We can't check who you are right now. Try again in a moment."
+    )
+  }
 }
 
 export function toActor(user: SessionUser): Actor {

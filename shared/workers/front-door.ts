@@ -11,6 +11,7 @@
 
 import { fail } from "./http"
 import { safeMediaKey } from "./image"
+import { requestId } from "./trace"
 
 /** Anything with `.fetch()` — a service binding, in worker terms. */
 type Upstream = { fetch(url: string, init?: RequestInit): Promise<Response> }
@@ -191,6 +192,10 @@ export async function recordClientError(
             stack: b.stack,
             url: b.url,
             userId: typeof who === "string" ? who : undefined,
+            // Off the HEADER this door stamped, never off the beacon's body:
+            // a browser that could name its own request id could staple its
+            // crash onto somebody else's trace. Same rule as userId, one line up.
+            requestId: requestId(request),
           }),
         })
         .catch(() => null) // recording must never break the beacon
@@ -230,6 +235,10 @@ export async function recordGatewayCrash(
         place,
         message: e instanceof Error ? e.message : String(e),
         stack: e instanceof Error ? e.stack : undefined,
+        // The door that MINTS the id has to record it on its own crash too, or
+        // the one row that names where a request entered the system is the one
+        // row the trace can't find.
+        requestId: requestId(request),
       }),
     })
     .catch(() => null)

@@ -6,7 +6,7 @@
 // cached per isolate (~10 min) to avoid a session INSERT per call; the token
 // itself is re-verified on EVERY request, so revocation bites immediately.
 
-import { GuardError } from "@shared/workers/gating"
+import { AUTH_UNAVAILABLE_MS, GuardError } from "@shared/workers/gating"
 import type { Env } from "../env"
 import { requireStaff } from "./staff"
 import type { McpTokenRow } from "./tokens"
@@ -68,14 +68,32 @@ export async function sessionCookieFor(env: Env, token: McpTokenRow): Promise<st
   // map is holding on to and no longer answering with.
   evictExpired(Date.now())
 
-  const res = await env.AUTH.fetch("https://internal/internal/mcp-session", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-internal-key": env.INTERNAL_KEY ?? "",
-    },
-    body: JSON.stringify({ userId: token.user_id, teamId: token.team_id }),
-  })
+  let res: Response
+  try {
+    res = await env.AUTH.fetch("https://internal/internal/mcp-session", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-internal-key": env.INTERNAL_KEY ?? "",
+      },
+      body: JSON.stringify({ userId: token.user_id, teamId: token.team_id }),
+      // The same ceiling the gating seam puts on the identity read, because this
+      // IS the identity read for the machine surface — and an outside tool
+      // holding a request open is exactly the caller least likely to give up on
+      // its own. AUTH_UNAVAILABLE_MS, so the two never drift apart.
+      signal: AbortSignal.timeout(AUTH_UNAVAILABLE_MS),
+    })
+  } catch {
+    // A CEILING HIT IS NOT A BAD TOKEN. Falling through to the 502 below would
+    // be roughly right, but the code matters here: an outside tool that reads
+    // `bridge_failed` may well delete a token it thinks has gone stale, when
+    // nothing was ever wrong with it. Same code the human doors give.
+    throw new GuardError(
+      503,
+      "auth_unavailable",
+      "We can't act for this token right now. Try again in a moment."
+    )
+  }
   if (!res.ok) {
     // auth's clean reason (e.g. no longer an active member) passes straight out.
     const body = (await res.json().catch(() => null)) as { message?: string } | null

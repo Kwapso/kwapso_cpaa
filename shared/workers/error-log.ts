@@ -25,6 +25,11 @@ export type ErrorReport = {
   teamId?: string
   userId?: string
   url?: string
+  /** The id the public door minted for this request, carried on every internal
+   * hop (shared/workers/trace.ts). Optional because a cron tick is not a
+   * request and has no id to carry — and inventing one there would suggest a
+   * click that never happened. */
+  requestId?: string
 }
 
 /** How many rows one BUCKET may write to the store in a trailing hour.
@@ -54,8 +59,8 @@ export async function logError(db: CoreDb, r: ErrorReport): Promise<void> {
     // failed insert already was.
     await db
       .prepare(
-        `INSERT INTO error_logs (id, at, source, place, message, stack, team_id, user_id, url)
-         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+        `INSERT INTO error_logs (id, at, source, place, message, stack, team_id, user_id, url, request_id)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
           WHERE (SELECT COUNT(*) FROM error_logs
                   WHERE COALESCE(user_id, source) = ? AND at > ?) < ?`
       )
@@ -69,6 +74,9 @@ export async function logError(db: CoreDb, r: ErrorReport): Promise<void> {
         r.teamId ?? null,
         r.userId ?? null,
         r.url ? String(r.url).slice(0, 300) : null,
+        // Capped like every other caller-influenced field: the id may have come
+        // from an outside tool's own header (trace.ts keeps a sane one).
+        r.requestId ? String(r.requestId).slice(0, 64) : null,
         // The bucket, matching the row this statement would write — and matching
         // idx_error_logs_bucket_at (core 0019), so the count is an index seek and
         // not a scan of the one table built to grow.
@@ -83,13 +91,19 @@ export async function logError(db: CoreDb, r: ErrorReport): Promise<void> {
 }
 
 /** The central-catch one-liner: console (for live tails) + the table (for history).
- * `e` is whatever was thrown; `place` is "<METHOD> <pathname>". */
+ * `e` is whatever was thrown; `place` is "<METHOD> <pathname>".
+ *
+ * `requestId` is what makes the console line and the row FILTERABLE together —
+ * pass the id off the request (`requestId(request)`) so this worker's row joins
+ * the rows every other worker wrote for the same click. A cron tick has none,
+ * and passes nothing. */
 export async function recordWorkerError(
   db: CoreDb,
   source: string,
   place: string,
-  e: unknown
+  e: unknown,
+  requestId?: string
 ): Promise<void> {
   const err = e instanceof Error ? e : new Error(String(e))
-  await logError(db, { source, place, message: err.message, stack: err.stack })
+  await logError(db, { source, place, message: err.message, stack: err.stack, requestId })
 }
