@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest"
 
-import { parseUploadDataUrl } from "@shared/workers/image"
+import { ANY_FILE_TYPE, parseUploadDataUrl } from "@shared/workers/image"
 
 const b64 = (s: string) => btoa(s)
 
@@ -48,5 +48,40 @@ describe("parseUploadDataUrl", () => {
     const big = b64("a".repeat(2000))
     expect(parseUploadDataUrl(`data:image/png;base64,${big}`, 100)).toBeNull()
     expect(parseUploadDataUrl(`data:image/png;base64,${big}`, 5000)).not.toBeNull()
+  })
+})
+
+// THE WIDER TYPE RULE, and the two things that must stay true about it. The
+// knowledge base takes any file from a person's desktop, so it passes
+// `ANY_FILE_TYPE` — and that is only safe because it stores every byte with no
+// renderable label (see NEUTRALISED_CONTENT_TYPE). What is locked here is that
+// the widening is OPT-IN, and that it widens the TYPE and nothing else.
+describe("parseUploadDataUrl: the opt-in type rule", () => {
+  it("defaults to the inline-safe list, so no existing door widened", () => {
+    expect(parseUploadDataUrl(`data:text/html;base64,${b64("<b>x</b>")}`, 9999)).toBeNull()
+    expect(
+      parseUploadDataUrl(
+        `data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,${b64("PK")}`,
+        9999
+      )
+    ).toBeNull()
+  })
+
+  it("takes any well-formed type when a door asks for one", () => {
+    expect(
+      parseUploadDataUrl(`data:application/zip;base64,${b64("PK")}`, 9999, ANY_FILE_TYPE)?.contentType
+    ).toBe("application/zip")
+    expect(
+      parseUploadDataUrl(`data:text/html;base64,${b64("<b>x</b>")}`, 9999, ANY_FILE_TYPE)?.contentType
+    ).toBe("text/html")
+  })
+
+  it("still refuses a malformed data URL and an over-cap payload — the SHAPE rule never moved", () => {
+    expect(parseUploadDataUrl("data:;base64,xxxx", 9999, ANY_FILE_TYPE)).toBeNull()
+    expect(parseUploadDataUrl("not a data url", 9999, ANY_FILE_TYPE)).toBeNull()
+    expect(parseUploadDataUrl(123, 9999, ANY_FILE_TYPE)).toBeNull()
+    expect(
+      parseUploadDataUrl(`data:application/zip;base64,${b64("x".repeat(500))}`, 100, ANY_FILE_TYPE)
+    ).toBeNull()
   })
 })

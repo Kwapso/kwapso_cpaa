@@ -134,7 +134,7 @@ npx wrangler r2 bucket create kwapso-learning-media           # learning attachm
 npx wrangler r2 bucket create kwapso-learning-media-staging
 npx wrangler r2 bucket create kwapso-help-media               # ticket attachments — name follows the table (content HELP_MEDIA)
 npx wrangler r2 bucket create kwapso-help-media-staging
-npx wrangler r2 bucket create kwapso-internal-media            # the agency's OWN files: brand assets, staff photos, certificate PDFs (content INTERNAL_MEDIA)
+npx wrangler r2 bucket create kwapso-internal-media            # the agency's OWN files: brand assets, staff photos, certificate PDFs, knowledge-base uploads (content INTERNAL_MEDIA)
 npx wrangler r2 bucket create kwapso-internal-media-staging
 ```
 

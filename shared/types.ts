@@ -621,6 +621,23 @@ export type KnowledgeSource = {
   bodyBytes: number
   bodyTruncated: boolean
   sourceUrl: string | null
+  /** THE FILE THIS SOURCE WAS READ FROM, when it was one (kind 'file').
+   *
+   * `fileUrl` is a capability URL into the agency's own media (/media/internal/,
+   * served by the agency door and no other). `fileType` is the type the browser
+   * declared — a LABEL for a screen, never handed to a renderer; the object
+   * itself is stored with no renderable type at all.
+   *
+   * `fileNote` is the honest half, and the one a screen must never hide: why
+   * this file's words are missing, or why there are fewer of them than the file
+   * holds. `fileUrl` set with a null `body` and this note is the whole of
+   * "stored, not searchable" — a state the product allows on purpose, because
+   * the alternative was refusing half of what somebody has on their desktop. */
+  fileUrl: string | null
+  fileName: string | null
+  fileType: string | null
+  fileBytes: number
+  fileNote: string | null
   /** "team" = anyone who may read the knowledge base; "private" = only its owner */
   visibility: "team" | "private"
   ownerUserId: string | null

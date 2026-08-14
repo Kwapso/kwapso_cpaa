@@ -158,19 +158,60 @@ export function parseDataUrl(
 const INLINE_SAFE_UPLOAD =
   /^(image\/(png|jpe?g|webp|gif|avif)|video\/(mp4|webm|ogg)|audio\/(mpeg|mp4|webm|ogg)|application\/pdf)$/
 
+/** ANY well-formed mime — for a door that STORES the bytes without ever letting
+ * the browser render them as their declared type.
+ *
+ * The knowledge base is the one place in the product where "any type of file
+ * that is sitting on my desktop" is the requirement, and an allow-list is the
+ * wrong answer to it: half the things a person would drop on that screen (a
+ * deck, an archive, a design file, a saved web page) are not media, and refusing
+ * them is refusing the feature. So the boundary moves from WHICH TYPES to HOW
+ * THEY ARE STORED — see `NEUTRALISED_CONTENT_TYPE` below. Nothing else in this
+ * repo may pass this: a door that serves a file back under its declared type is
+ * exactly what `INLINE_SAFE_UPLOAD` exists for, and that stays the default.
+ *
+ * The shape rule is unchanged, so a malformed data URL is still refused — this
+ * widens the TYPE, never the parse. */
+export const ANY_FILE_TYPE = /^[\w.+-]+\/[\w.+-]+$/
+
+/** WHAT AN "ANY TYPE" UPLOAD IS WRITTEN INTO R2 AS, always — never the type the
+ * caller declared.
+ *
+ * `INLINE_SAFE_UPLOAD` is a CONDITION: it holds while the list is right and
+ * while every door that reads it wants the same list. This is the structural
+ * form of the same protection, and it is why the knowledge door can take an HTML
+ * file without taking on stored XSS: the bytes are labelled
+ * `application/octet-stream` at rest, so `mediaHeaders` cannot serve them as
+ * `text/html` — the label the browser would have to trust was never written
+ * down. A condition can be inverted; a byte that was never labelled cannot be
+ * re-labelled by forgetting a check. (The declared type is still kept, on the
+ * row, so a screen can say "PowerPoint presentation" — it is a LABEL there, not
+ * an instruction to a renderer.) */
+export const NEUTRALISED_CONTENT_TYPE = "application/octet-stream"
+
 /** General data-URL parser for learning attachments: base64-decodes, enforces a
  * caller-supplied byte cap, and — critically — accepts ONLY an inline-safe media mime
  * (`INLINE_SAFE_UPLOAD`; never text/html or svg). Returns null if the input isn't a
  * well-formed base64 data URL, the mime isn't allow-listed, or the decoded payload is
- * over `maxBytes`. (parseDataUrl above is the tighter images-only sibling.) */
+ * over `maxBytes`. (parseDataUrl above is the tighter images-only sibling.)
+ *
+ * `allow` is the type rule, and it DEFAULTS to the inline-safe list so that every
+ * existing caller keeps exactly the boundary it had. A caller passing something
+ * wider is asserting that it never serves the file back under its declared type
+ * — today that is one door (the knowledge base's), and it stores every byte as
+ * `NEUTRALISED_CONTENT_TYPE`. It is a parameter rather than a second function so
+ * that R20's scan still sees ONE binary validator at the boundary: a door that
+ * needs a different type rule states it at the call, in the checking position,
+ * where the next reader is already looking. */
 export function parseUploadDataUrl(
   dataUrl: unknown,
-  maxBytes: number
+  maxBytes: number,
+  allow: RegExp = INLINE_SAFE_UPLOAD
 ): { contentType: string; bytes: Uint8Array } | null {
   if (typeof dataUrl !== "string") return null
   const match = /^data:([\w.+-]+\/[\w.+-]+);base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl)
   if (!match) return null
-  if (!INLINE_SAFE_UPLOAD.test(match[1])) return null // reject script-capable types (XSS)
+  if (!allow.test(match[1])) return null // reject script-capable types (XSS)
   // The cap BEFORE the decode, for the same reason as parseDataUrl: `atob` on an
   // unmeasured payload allocates whatever the caller sent, and only then is it
   // refused for being too big.

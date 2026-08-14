@@ -255,6 +255,35 @@ export function useScreenActions(teamId: string | null) {
     [teamId]
   )
 
+  // Upload a FILE as a source. Same cache move as the typed note above (page one
+  // is re-pulled, because the list pages), and one thing it does not share: the
+  // toast is DERIVED FROM THE ANSWER rather than assumed. A file we could not
+  // read is stored and listed on purpose, and telling somebody "the assistant
+  // can now use it" when it cannot is the exact lie this feature is built not to
+  // tell — so the door's own sentence is what gets shown.
+  const uploadKnowledgeFile = React.useCallback(
+    async (values: {
+      fileName: string
+      fileDataUrl: string
+      title: string
+      accountId: string
+      visibility: "team" | "private"
+    }) => {
+      if (!teamId) return
+      const { source } = await contentApi.uploadKnowledgeFile({
+        fileName: values.fileName,
+        fileDataUrl: values.fileDataUrl,
+        title: values.title || undefined,
+        accountId: values.accountId || null,
+        visibility: values.visibility,
+      })
+      primeCache(knowledgeKey(teamId), await listFetch.knowledge(teamId))
+      if (source?.fileNote) toast.warning(source.fileNote)
+      else toast.success(`The assistant can now use "${source?.title ?? values.fileName}".`)
+    },
+    [teamId]
+  )
+
   // THE AGENCY'S OWN HOUSEKEEPING — one writer for the four record kinds, because
   // they are one shape: a create or an edit against a CAPPED list, whose door
   // hands back the whole (small) collection, so the actor's cache is primed
@@ -294,6 +323,7 @@ export function useScreenActions(teamId: string | null) {
     createHelp,
     createAccount,
     createKnowledge,
+    uploadKnowledgeFile,
     saveInternalRecord,
     setInternalActive,
   }

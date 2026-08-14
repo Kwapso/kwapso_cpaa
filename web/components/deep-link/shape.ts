@@ -164,6 +164,7 @@ export function shapeLearningList(items: Learning[]): ScreenData {
  * saying which row it mirrors is the honest answer to "why does it know that?". */
 export const KNOWLEDGE_KIND: Record<string, string> = {
   note: "Note",
+  file: "From a file",
   ticket: "From a ticket",
   article: "From an article",
   account: "From an account",

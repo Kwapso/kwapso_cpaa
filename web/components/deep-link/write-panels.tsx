@@ -14,6 +14,7 @@ import { type ScreenQuery } from "@kwapso/ui/lib/recipe"
 import { AccountFormDialog } from "@/components/account-form-dialog"
 import { LearningFormDialog } from "@/components/learning-form-dialog"
 import { KnowledgeFormDialog } from "@/components/knowledge-form-dialog"
+import { KnowledgeUploadDialog } from "@/components/knowledge-upload-dialog"
 import { HelpFormDialog } from "@/components/help-form-dialog"
 import { RolePickerDialog } from "@/components/role-picker-dialog"
 import { RoleFormDialog } from "@/components/role-form-dialog"
@@ -77,6 +78,7 @@ export type WritePanelsProps = Pick<
     | "createHelp"
     | "createAccount"
     | "createKnowledge"
+    | "uploadKnowledgeFile"
     | "saveInternalRecord"
     | "setInternalActive"
   > & {
@@ -144,6 +146,7 @@ export function WritePanels({
   createHelp,
   createAccount,
   createKnowledge,
+  uploadKnowledgeFile,
   saveInternalRecord,
   setInternalActive,
   marketingChannelOptions,
@@ -313,6 +316,20 @@ export function WritePanels({
         draftKey={teamId ? `knowledge:new:${teamId}` : undefined}
         accountOptions={(accountsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
         onSubmit={createKnowledge}
+      />
+
+      {/* Upload a FILE into the knowledge base (?panel=upload&module=knowledge)
+          — gated by the same create right, because it makes the same kind of
+          record by another road. Its own panel name rather than a flag on the
+          one above: the two forms ask different first questions ("what should
+          the assistant know?" versus "which file?"), and a deep link should be
+          able to say which one it means. */}
+      <KnowledgeUploadDialog
+        open={query.panel === "add" && query.module === "knowledge-file" && can("knowledge", "create")}
+        onOpenChange={(o) => !o && closePanel()}
+        draftKey={teamId ? `knowledge:upload:${teamId}` : undefined}
+        accountOptions={(accountsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
+        onSubmit={uploadKnowledgeFile}
       />
 
       {/* Edit the team (?panel=edit&module=team) — gated by teams:edit. */}

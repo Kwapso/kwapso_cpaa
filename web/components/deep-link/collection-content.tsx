@@ -448,6 +448,15 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
           show={can("knowledge", "create")}
           label="Add a source"
           icon="plus"
+          // The third way in, beside the other two. It sits in the SECONDARY
+          // slot — the same place "Import CSV" sits on the accounts screen —
+          // because it is the same kind of affordance: another road to the same
+          // record, for material that already exists somewhere else.
+          secondary={{
+            show: can("knowledge", "create"),
+            label: "Upload a file",
+            onClick: () => go(sectionPath, { panel: "add", module: "knowledge-file" }),
+          }}
           onCreate={() => go(sectionPath, { panel: "add", module: "knowledge" })}
         >
           <ScreenRenderer recipe={knowledgeRecipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />

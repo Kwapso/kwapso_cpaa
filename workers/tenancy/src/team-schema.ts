@@ -1662,6 +1662,43 @@ SELECT lower(hex(randomblob(16))), r.id, 'meetings', r.is_default, r.is_default,
  );
 `,
   },
+  {
+    version: "0022_knowledge_files",
+    sql: `
+-- A FILE IS THE THIRD WAY INTO THE KNOWLEDGE BASE, and it is a fourth family in
+-- a table that already holds three:
+--   • TYPED here (kind 'note') — the body is the truth;
+--   • MIRRORED from a row we own — the row is the truth, the sweep keeps up;
+--   • ARRIVED through somebody's Google connection — their shelf, their answers;
+--   • UPLOADED (kind 'file') — THE FILE is the truth, and the body is a READING
+--     of it. That last sentence is why these columns exist rather than the
+--     upload being a note with a link glued to it: the words in \`body\` were
+--     produced by a converter, and a reader who disagrees with an answer has to
+--     be able to open the thing the words came from and check.
+--
+-- \`file_url\` is a capability URL into the agency's OWN media bucket
+-- (/media/internal/ — served by the agency gateway and by no other door), for
+-- the reason SCOPE ch.06 records about every other upload in the product.
+--
+-- \`file_type\` is the type the browser DECLARED. It is a LABEL and nothing else:
+-- the object itself is stored as application/octet-stream, so this string is
+-- never handed to a renderer (shared/workers/image.ts says why at length).
+--
+-- \`file_note\` is the honest half. Some files cannot be read — a deck, an
+-- archive, a design file — and the ruling was that those are still STORED and
+-- still LISTED rather than refused, because "any type of file" was the ask and
+-- refusing half of them is not that. What must never happen is pretending one
+-- was indexed, so the reason lives on the row, in words, and every screen that
+-- shows the source shows it. It is a separate column from \`index_error\` on
+-- purpose: that one belongs to the INDEXER and is rewritten on every pass, and a
+-- fact about the file would be wiped by the next re-index of the text.
+ALTER TABLE knowledge_sources ADD COLUMN file_url TEXT;
+ALTER TABLE knowledge_sources ADD COLUMN file_name TEXT;
+ALTER TABLE knowledge_sources ADD COLUMN file_type TEXT;
+ALTER TABLE knowledge_sources ADD COLUMN file_bytes INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE knowledge_sources ADD COLUMN file_note TEXT;
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

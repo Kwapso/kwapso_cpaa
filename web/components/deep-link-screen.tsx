@@ -162,6 +162,7 @@ export function DeepLinkScreen() {
     createHelp,
     createAccount,
     createKnowledge,
+    uploadKnowledgeFile,
     saveInternalRecord,
     setInternalActive,
   } = useScreenActions(teamId)
@@ -371,6 +372,7 @@ export function DeepLinkScreen() {
         createHelp={createHelp}
         createAccount={createAccount}
         createKnowledge={createKnowledge}
+        uploadKnowledgeFile={uploadKnowledgeFile}
         saveInternalRecord={saveInternalRecord}
         setInternalActive={setInternalActive}
         closePanel={closePanel}
