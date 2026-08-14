@@ -5,6 +5,8 @@
 // this test goes red: the agent can never again tell a user a capability doesn't
 // exist while the UI shows it (the "no bulk import for dropdown values" bug class).
 
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
 import { GLOSSARY } from "@shared/glossary"
@@ -12,6 +14,16 @@ import { capabilityBrief } from "../src/lib/app-brief"
 import { DROPDOWN_ORDER_RULE, KNOWLEDGE_CITATION_RULE, SYSTEM } from "../src/lib/agent"
 import { TARGETS } from "../src/lib/targets"
 import { sharedByName } from "@shared/workers/tool-catalog"
+import {
+  AGENT_BLOCKS,
+  BLOCK_FENCE_PREFIX,
+  BLOCK_KINDS,
+  BLOCK_LIMITS,
+  blockBrief,
+  parseAgentBlock,
+} from "@shared/agent-blocks"
+
+const ROOT = join(__dirname, "..", "..", "..")
 
 describe("agent-app parity (Law R9): the agent knows what the app can do", () => {
   it("the system prompt carries the generated capability brief", () => {
@@ -104,5 +116,62 @@ describe("agent-app parity (Law R9): the agent knows what the app can do", () =>
     // And it must name the tool the model has to reach for — a rule about
     // citations that never says how to get one is a rule about nothing.
     expect(KNOWLEDGE_CITATION_RULE).toContain("ask_knowledge")
+  })
+
+  /* ------------------------- R9, the DRAWING half ------------------------- */
+  //
+  // The assistant can now emit VISUAL BLOCKS — a fenced block the app renders as a
+  // real component instead of a paragraph of figures. That is a capability, so it
+  // is held to R9's own sentence: the prompt is GENERATED from the catalogue, so it
+  // can never advertise a shape the renderer cannot draw, or hide one it can.
+  //
+  // Three surfaces have to agree and none of them is hand-listed here: the
+  // CATALOGUE (shared/agent-blocks.ts), the PROMPT (scraped back out of the
+  // generated brief, so a kind that never made it into the text is caught), and the
+  // RENDERER (read off disk in web/, because the model's promise is only worth what
+  // the browser actually paints).
+
+  it("the system prompt carries the generated visual-block brief", () => {
+    expect(SYSTEM).toContain(blockBrief())
+  })
+
+  it("the prompt advertises EXACTLY the kinds the catalogue declares", () => {
+    // Derived from the brief's own fences — the same thing the model reads and the
+    // same pattern the renderer matches on the way back in.
+    const advertised = [
+      ...blockBrief().matchAll(new RegExp("```" + BLOCK_FENCE_PREFIX + "([a-z]+)", "g")),
+    ].map((m) => m[1])
+    expect(new Set(advertised), "a kind is advertised that the catalogue doesn't declare, or vice versa").toEqual(
+      new Set(BLOCK_KINDS)
+    )
+    // The cap the parser REFUSES on has to be the cap the prompt states, or the
+    // model is told one number and judged by another.
+    expect(blockBrief(), "the brief must state the row cap the parser enforces").toContain(
+      String(BLOCK_LIMITS.rows)
+    )
+  })
+
+  // Proved by RUNNING the parser, never by reading the shape — the lesson R22 paid
+  // for. An example that drifted from its own validator would otherwise teach the
+  // model, in the prompt, to emit exactly the thing the app refuses to draw.
+  it("every example in the prompt actually parses", () => {
+    for (const b of Object.values(AGENT_BLOCKS)) {
+      const parsed = parseAgentBlock(b.kind, b.example)
+      expect(parsed, `the ${b.kind} example the prompt teaches must parse`).not.toBeNull()
+      expect(parsed!.kind).toBe(b.kind)
+    }
+  })
+
+  it("the renderer draws exactly those kinds — read off disk, not asserted from here", () => {
+    const src = readFileSync(join(ROOT, "web", "components", "agent-blocks.tsx"), "utf8")
+    // The renderer map is one object literal keyed by kind (its TYPE is a mapped
+    // type over AgentBlockKind, so tsc refuses a missing or extra key too — this
+    // reads the same fact off the file so R9's own check states it).
+    const map = /const BLOCK_RENDERERS[\s\S]*?=\s*\{([\s\S]*?)\n\}/.exec(src)
+    expect(map, "web/components/agent-blocks.tsx must export one BLOCK_RENDERERS map").not.toBeNull()
+    const drawn = [...map![1].matchAll(/^\s{2}([a-z]+):/gm)].map((m) => m[1])
+    expect(new Set(drawn), "the prompt offers a block the renderer cannot draw, or hides one it can").toEqual(
+      new Set(BLOCK_KINDS)
+    )
   })
 })

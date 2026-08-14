@@ -11,6 +11,7 @@
 import type { AgentQuota, ChatOutcome, PendingCall, StreamEvent } from "@shared/types"
 import { pendingCall } from "@shared/workers/confirm-payload"
 import { capabilityBrief } from "./app-brief"
+import { blockBrief } from "@shared/agent-blocks"
 import { GLOSSARY } from "@shared/glossary"
 import { consumeAiUnit, foldUsageIntoLatest, getQuota, logUsage, refundAiUnits, type ConsumeResult, type UsageSource } from "./credits"
 import type { Actor, MemberGuard } from "@shared/workers/gating"
@@ -82,6 +83,12 @@ export const SYSTEM = [
   // agent-app parity). The agent knows exactly what the app around it offers,
   // from the same code truth the screens render, so the two can never disagree.
   "\n" + capabilityBrief(),
+  // The VISUAL BLOCK brief — R9's drawing half, GENERATED from the same catalogue
+  // the renderer reads (shared/agent-blocks.ts). The prompt cannot advertise a
+  // shape the app refuses to draw, or hide one it draws, because both halves come
+  // out of one file — and agent-parity.test.ts runs the parser over every example
+  // in here, so the prompt can only teach a format the app actually accepts.
+  "\n" + blockBrief(),
 ].join(" ")
 
 function deriveTitle(message: string): string {
