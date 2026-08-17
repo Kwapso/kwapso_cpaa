@@ -683,6 +683,7 @@ export function AccountDetailScreen({
       <AppFormDialog
         open={appOpen}
         onOpenChange={setAppOpen}
+        teamId={teamId}
         accounts={[{ id: accountId, name: account.name }]}
         draftKey={`app:add:${accountId}`}
         onSubmit={async (v) => {

@@ -9,7 +9,7 @@ export type NavItem = {
   slug: string
   path: string
   title: string
-  icon: "home" | "settings"
+  icon: "home" | "settings" | "kwapso"
   need?: { module: string; right: "read" }
   /** Which half of the rail it sits in — see NavGroup below. */
   group: NavGroup
@@ -31,6 +31,21 @@ export type NavGroup = "daily" | "occasional"
 
 export const NAV: NavItem[] = [
   { slug: "home", path: "/home", title: "Home", icon: "home", group: "daily" },
+  // THE AGENCY ITSELF, as a destination (CHECKLIST 10.1, 17 Aug 2026). Who we
+  // are: the material we make our own work with, the people who make it, and the
+  // details that go on a contract. "As a business owner you use this all the
+  // time" is the whole case for it being a page rather than a corner of
+  // Settings — Settings is where you change how the app behaves, and none of
+  // this is a setting.
+  //
+  // A NAV ENTRY RATHER THAN A TEAM SECTION, deliberately. It is gated by no
+  // module of its own: every person in the team may look up the company's phone
+  // number. What is INSIDE it is gated panel by panel — the brand library on
+  // `brand_assets:read`, the people on `team_members:read`, and editing the
+  // legal details on `teams:edit` — so a role sees exactly the parts it holds
+  // and the page never becomes a permission of its own that somebody has to
+  // remember to grant.
+  { slug: "kwapso", path: "/kwapso", title: "Kwapso", icon: "kwapso", group: "occasional" },
   { slug: "settings", path: "/settings", title: "Settings", icon: "settings", group: "occasional" },
 ]
 
@@ -230,7 +245,13 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // right so a role without it never sees the destination at all. Its count is
   // an exact server total (R16) keyed off the same cache the list reads, so the
   // badge and the rows can never disagree.
-  { key: "brand", title: "Brand library", module: "brand_assets", segment: "brand", placement: "sidebar", countCacheKey: "brand_assets", group: "occasional" },
+  // BRAND LIBRARY — CONTEXTUAL since 17 Aug 2026 (CHECKLIST 10.2). Nothing
+  // under it changed: the screen, the records and `/brand/<id>` are all still
+  // here. What went is the line on the rail, because the brand library is one of
+  // the three things the Kwapso page is FOR, and a rail that lists both the
+  // section and the page it lives on reads as two ideas. It keeps its count key:
+  // the heading on the screen still badges the exact server total.
+  { key: "brand", title: "Brand library", module: "brand_assets", segment: "brand", placement: "contextual", countCacheKey: "brand_assets" },
   // Meeting purposes: its own segment, reached CONTEXTUALLY from a button on the
   // Meetings screen. It is not a sidebar page because it is not a destination —
   // it is the taxonomy behind one, and a nav rail that lists a page and the
@@ -249,6 +270,9 @@ export const TEAM_SECTIONS: TeamSection[] = [
 export const CONCEPT_ICON = {
   home: "home",
   settings: "settings",
+  // The agency itself — a building would be the team, so this is the badge on
+  // the door: who we are, said once.
+  kwapso: "badge-check",
   team: "building",
   overview: "layout-dashboard",
   members: "users",

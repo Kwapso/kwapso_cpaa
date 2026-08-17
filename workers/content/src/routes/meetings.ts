@@ -38,6 +38,7 @@ import type { Env } from "../env"
 function filterFrom(url: URL): MeetingFilter {
   return {
     accountId: queryText(url.searchParams.get("accountId"), "Client") ?? undefined,
+    appId: queryText(url.searchParams.get("appId"), "App") ?? undefined,
     purposeId: queryText(url.searchParams.get("purposeId"), "Purpose") ?? undefined,
     status: queryText(url.searchParams.get("status"), "Status") ?? undefined,
     view: queryText(url.searchParams.get("view"), "View") ?? undefined,

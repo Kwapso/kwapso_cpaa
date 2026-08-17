@@ -166,7 +166,18 @@ export async function updateTeamDetails(
   env: Env,
   teamId: string,
   name: string,
-  logoDataUrl?: string
+  logoDataUrl?: string,
+  /** THE AGENCY'S OWN DETAILS (db/core/0025). All four optional and each one
+   * PATCHED rather than replaced: `undefined` means "the caller said nothing
+   * about this", which is what lets the team-edit dialog save a rename without
+   * erasing an address it never showed. A caller that means "clear it" sends an
+   * empty string, which lands as null. */
+  legal?: {
+    legalName?: string | null
+    legalAddress?: string | null
+    legalNumbers?: string | null
+    phone?: string | null
+  }
 ): Promise<void> {
   const clean = name.trim()
   if (!clean) throw new GuardError(400, "invalid_input", "A team needs a name.")
@@ -194,13 +205,29 @@ export async function updateTeamDetails(
   }
 
   const now = new Date().toISOString()
+  // COALESCE(?, column) is the patch: a bound null leaves the column alone, and
+  // an empty string clears it. Written as SQL rather than as four branches
+  // because sixteen combinations of "was it sent?" is how one of these fields
+  // eventually gets wiped by a form that was not asking about it.
+  const legalSet = `legal_name = COALESCE(?, legal_name),
+                    legal_address = COALESCE(?, legal_address),
+                    legal_numbers = COALESCE(?, legal_numbers),
+                    phone = COALESCE(?, phone)`
+  const legalParams = [
+    legal?.legalName ?? null,
+    legal?.legalAddress ?? null,
+    legal?.legalNumbers ?? null,
+    legal?.phone ?? null,
+  ]
   if (logoUrl !== undefined) {
-    await env.DB.prepare("UPDATE teams SET name = ?, logo_url = ?, updated_at = ? WHERE id = ?")
-      .bind(clean, logoUrl, now, teamId)
+    await env.DB.prepare(
+      `UPDATE teams SET name = ?, logo_url = ?, ${legalSet}, updated_at = ? WHERE id = ?`
+    )
+      .bind(clean, logoUrl, ...legalParams, now, teamId)
       .run()
   } else {
-    await env.DB.prepare("UPDATE teams SET name = ?, updated_at = ? WHERE id = ?")
-      .bind(clean, now, teamId)
+    await env.DB.prepare(`UPDATE teams SET name = ?, ${legalSet}, updated_at = ? WHERE id = ?`)
+      .bind(clean, ...legalParams, now, teamId)
       .run()
   }
 
@@ -493,7 +520,12 @@ export async function listMyTeams(
   userId: string
 ): Promise<TeamSummary[]> {
   const rows = await env.DB.prepare(
-    `SELECT t.id, t.name, t.logo_url, t.db_status, tm.role_id
+    // THE FOUR LEGAL FIELDS RIDE THIS READ rather than earning a door of their
+    // own. They are four short columns on a row this query already opens, they
+    // are read on one screen, and a second endpoint would be a round trip plus a
+    // cache key plus a listener for a company's phone number.
+    `SELECT t.id, t.name, t.logo_url, t.db_status, tm.role_id,
+            t.legal_name, t.legal_address, t.legal_numbers, t.phone
      FROM team_members tm
      JOIN teams t ON t.id = tm.team_id AND t.deactivated_at IS NULL
      WHERE tm.user_id = ? AND tm.deactivated_at IS NULL
@@ -506,6 +538,10 @@ export async function listMyTeams(
       logo_url: string | null
       db_status: string
       role_id: string
+      legal_name: string | null
+      legal_address: string | null
+      legal_numbers: string | null
+      phone: string | null
     }>()
 
   return (rows.results ?? []).map((r) => ({
@@ -514,6 +550,10 @@ export async function listMyTeams(
     logoUrl: r.logo_url,
     roleId: r.role_id,
     dbStatus: r.db_status,
+    legalName: r.legal_name,
+    legalAddress: r.legal_address,
+    legalNumbers: r.legal_numbers,
+    phone: r.phone,
   }))
 }
 

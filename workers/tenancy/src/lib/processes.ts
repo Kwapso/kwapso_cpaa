@@ -88,6 +88,10 @@ export async function listApps(
       url: string | null
       stage: string | null
       tool_cost_cents_per_month: number
+      about: string | null
+      client_context: string | null
+      solution: string | null
+      key_actors: string | null
       deactivated_at: string | null
       created_at: string
       creator_name: string | null
@@ -97,7 +101,13 @@ export async function listApps(
       cfg,
       guard.databaseId,
       // R14 hard cap — an app list is bounded by how many systems exist.
-      `SELECT id, account_id, name, url, stage, tool_cost_cents_per_month, deactivated_at,
+      //
+      // THE FOUR CONTEXT FIELDS RIDE THE LIST, and that is a decision rather than
+      // laziness: the apps set is bounded and read whole, the detail screen reads
+      // the record out of the same cache the list filled, and a second door for
+      // four columns would be a round trip that buys a page nothing.
+      `SELECT id, account_id, name, url, stage, tool_cost_cents_per_month,
+              about, client_context, solution, key_actors, deactivated_at,
               created_at, creator_name, updated_at, editor_name
          FROM apps${sql} ORDER BY (deactivated_at IS NULL) DESC, name ASC LIMIT ${LIST_HARD_CAP}`,
       params
@@ -118,6 +128,14 @@ export async function listApps(
       // redaction you have to remember is one somebody forgets (the same argument
       // toAccount makes one table over, and the reason R24 exists).
       toolCostCentsPerMonth: scope.kind === "portal" ? null : r.tool_cost_cents_per_month,
+      // The four context fields go to a client login as well. They are the
+      // agency's description of the client's OWN system and the situation it was
+      // built into — the same material the portal's value screen already names
+      // the app on. Nothing here is a number about us.
+      about: r.about,
+      clientContext: r.client_context,
+      solution: r.solution,
+      keyActors: r.key_actors,
       active: r.deactivated_at == null,
       createdAt: r.created_at,
       createdByName: scope.kind === "portal" ? null : r.creator_name,
@@ -133,7 +151,17 @@ export async function createApp(
   guard: MemberGuard,
   scope: AccountScope,
   actor: Actor,
-  input: { name: string; accountId?: string; url?: string; stage?: string; toolCostCentsPerMonth?: number }
+  input: {
+    name: string
+    accountId?: string
+    url?: string
+    stage?: string
+    toolCostCentsPerMonth?: number
+    about?: string
+    clientContext?: string
+    solution?: string
+    keyActors?: string
+  }
 ): Promise<string> {
   if (input.accountId) requireAccountInScope(scope, input.accountId)
   const id = ulid()
@@ -144,6 +172,10 @@ export async function createApp(
     url: input.url ?? null,
     stage: input.stage ?? null,
     tool_cost_cents_per_month: input.toolCostCentsPerMonth ?? 0,
+    about: input.about ?? null,
+    client_context: input.clientContext ?? null,
+    solution: input.solution ?? null,
+    key_actors: input.keyActors ?? null,
     created_at: new Date().toISOString(),
     creator_id: actor.id,
     creator_email: actor.email,
@@ -166,31 +198,60 @@ export async function updateApp(
   scope: AccountScope,
   actor: Actor,
   id: string,
-  input: { name: string; url?: string | null; stage?: string | null; toolCostCentsPerMonth?: number }
+  input: {
+    name: string
+    url?: string | null
+    stage?: string | null
+    toolCostCentsPerMonth?: number
+    about?: string | null
+    clientContext?: string | null
+    solution?: string | null
+    keyActors?: string | null
+  }
 ): Promise<void> {
   const before = await appOrThrow(cfg, guard, scope, id)
   const fence = accountScopeClause(scope, "account_id")
   const audit = editedBy(actor, new Date().toISOString())
+  // Absent means "say nothing", the patch rule this door already keeps for the
+  // address and the stage — an edit that erased what it was not asked about is
+  // the mistake the accounts door made once and nothing here repeats.
+  const keep = <T,>(sent: T | undefined, existing: T): T => (sent === undefined ? existing : sent)
   const changed = await d1Query<{ id: string }>(
     cfg,
     guard.databaseId,
-    `UPDATE apps SET name = ?, url = ?, stage = ?, tool_cost_cents_per_month = ?, ${audit.sql}
+    `UPDATE apps SET name = ?, url = ?, stage = ?, tool_cost_cents_per_month = ?,
+            about = ?, client_context = ?, solution = ?, key_actors = ?, ${audit.sql}
      ${where([fence.sql, "id = ?"])} RETURNING id`,
     [
       input.name,
-      input.url === undefined ? before.url : input.url,
-      input.stage === undefined ? before.stage : input.stage,
-      input.toolCostCentsPerMonth === undefined ? before.toolCost : input.toolCostCentsPerMonth,
+      keep(input.url, before.url),
+      keep(input.stage, before.stage),
+      keep(input.toolCostCentsPerMonth, before.toolCost),
+      keep(input.about, before.about),
+      keep(input.clientContext, before.clientContext),
+      keep(input.solution, before.solution),
+      keep(input.keyActors, before.keyActors),
       ...audit.params,
       ...fence.params,
       id,
     ]
   )
   if (!changed[0]) throw new GuardError(404, "not_found", "That app doesn't exist.")
+  // The four context fields are reported as CHANGED and never quoted: they are
+  // paragraphs, and an activity line that pastes one is a feed nobody can read.
   const changes = describeChanges([
     { label: "Name", from: before.name, to: input.name },
-    { label: "Address", from: before.url, to: input.url === undefined ? before.url : input.url },
-    { label: "Stage", from: before.stage, to: input.stage === undefined ? before.stage : input.stage },
+    { label: "Address", from: before.url, to: keep(input.url, before.url) },
+    { label: "Stage", from: before.stage, to: keep(input.stage, before.stage) },
+    { label: "About", from: before.about, to: keep(input.about, before.about), hideValues: true },
+    {
+      label: "Client context",
+      from: before.clientContext,
+      to: keep(input.clientContext, before.clientContext),
+      hideValues: true,
+    },
+    { label: "Solution", from: before.solution, to: keep(input.solution, before.solution), hideValues: true },
+    { label: "Key actors", from: before.keyActors, to: keep(input.keyActors, before.keyActors), hideValues: true },
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "App edited",
@@ -1138,7 +1199,18 @@ async function appOrThrow(
   guard: MemberGuard,
   scope: AccountScope,
   id: string
-): Promise<{ id: string; accountId: string | null; name: string; url: string | null; stage: string | null; toolCost: number }> {
+): Promise<{
+  id: string
+  accountId: string | null
+  name: string
+  url: string | null
+  stage: string | null
+  toolCost: number
+  about: string | null
+  clientContext: string | null
+  solution: string | null
+  keyActors: string | null
+}> {
   const fence = accountScopeClause(scope, "account_id")
   const rows = await d1Query<{
     id: string
@@ -1147,10 +1219,15 @@ async function appOrThrow(
     url: string | null
     stage: string | null
     tool_cost_cents_per_month: number
+    about: string | null
+    client_context: string | null
+    solution: string | null
+    key_actors: string | null
   }>(
     cfg,
     guard.databaseId,
-    `SELECT id, account_id, name, url, stage, tool_cost_cents_per_month
+    `SELECT id, account_id, name, url, stage, tool_cost_cents_per_month,
+            about, client_context, solution, key_actors
        FROM apps${where([fence.sql, "id = ?"])} LIMIT 1`,
     [...fence.params, id]
   )
@@ -1162,6 +1239,10 @@ async function appOrThrow(
     url: rows[0].url,
     stage: rows[0].stage,
     toolCost: rows[0].tool_cost_cents_per_month,
+    about: rows[0].about,
+    clientContext: rows[0].client_context,
+    solution: rows[0].solution,
+    keyActors: rows[0].key_actors,
   }
 }
 

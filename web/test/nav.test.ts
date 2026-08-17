@@ -81,16 +81,19 @@ describe("the sidebar sequence the owner fixed", () => {
   })
 
   it("puts the occasional ones below it, in his order", () => {
-    // FIVE, not nine, since 17 Aug 2026. Marketing and Learning were purged, the
-    // Delivery method page went with its programmes folded onto the sprint type,
-    // and Process maps became contextual — a map is read inside the app it
-    // belongs to. None of the four lost a screen; three lost a module and one
-    // lost only its line on the rail.
+    // FIVE, and the fifth changed on 17 Aug 2026. Marketing and Learning were
+    // purged, the Delivery method page went with its programmes folded onto the
+    // sprint type, and Process maps became contextual — a map is read inside the
+    // app it belongs to. Then BRAND LIBRARY became contextual too and KWAPSO
+    // took its place: the library is one of the three things the Kwapso page is
+    // for, and a rail that lists both the section and the page it lives on reads
+    // as two ideas. None of the five lost a screen; three lost a module and two
+    // lost only their line on the rail.
     expect(composeLikeTheShell()[1]).toEqual([
       "meetings",
       "apps",
       "sprints",
-      "brand",
+      "kwapso",
       "settings",
     ])
   })

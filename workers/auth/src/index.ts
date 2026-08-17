@@ -42,8 +42,9 @@ import {
   verifyGoogleIdToken,
 } from "./lib/google"
 import { listAccountActivity } from "./lib/account-activity"
-import { setLanguage, updateProfile, type ProfileInput } from "./lib/profile"
+import { setLanguage, setScale, updateProfile, type ProfileInput } from "./lib/profile"
 import { isLanguage } from "@shared/i18n"
+import { isScale } from "@shared/scale"
 import {
   findOrCreateUserByEmail,
   toSessionUser,
@@ -86,6 +87,8 @@ export default {
           return await profile(request, env)
         case "POST /api/auth/language":
           return await language(request, env)
+        case "POST /api/auth/scale":
+          return await scale(request, env)
         case "POST /api/auth/logout":
           return await logout(request, env)
         case "GET /api/auth/health":
@@ -514,6 +517,28 @@ async function language(request: Request, env: Env): Promise<Response> {
     return fail(400, "bad_language", "That is not a language kwapso speaks.")
 
   return json(await setLanguage(env, user, chosen))
+}
+
+/** HOW BIG THIS PERSON WANTS THE APP. The same door as `language`, one field
+ * along, and deliberately its twin rather than a second preferences endpoint
+ * with a shape of its own: both are one word about one reader, both are read off
+ * `SessionUser` by both front doors, and both must survive a device change.
+ *
+ * R20, positionally: `body.scale` sits as `requireText`'s first argument and
+ * then as `isScale`'s only argument, and `isScale` is a real check against
+ * SCALE_STEPS rather than a truthiness guard. An unknown step is a clean 400
+ * here, never a value that lands on a user row and leaves somebody reading the
+ * fallback size for ever with no way to explain why. The body is read field by
+ * field and never destructured. */
+async function scale(request: Request, env: Env): Promise<Response> {
+  const user = await getSessionUser(env, request)
+  if (!user) return fail(401, "signed_out", "Not signed in.")
+
+  const body = (await request.json().catch(() => ({}))) as { scale?: unknown }
+  const chosen = requireText(body.scale, "Size", 16)
+  if (!isScale(chosen)) return fail(400, "bad_scale", "That is not a size kwapso offers.")
+
+  return json(await setScale(env, user, chosen))
 }
 
 async function logout(request: Request, env: Env): Promise<Response> {

@@ -22,7 +22,12 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import { CheckCheck, Pencil, RotateCcw } from "lucide-react"
 
-import { SprintFormDialog, sprintTypeLabel, useSprintTypes } from "@/components/sprint-form-dialog"
+import {
+  SprintFormDialog,
+  sprintTypeLabel,
+  sprintTypeName,
+  useSprintTypes,
+} from "@/components/sprint-form-dialog"
 import { StoryFormDialog } from "@/components/story-form-dialog"
 import { createStoryFrom, useStoryFormOptions } from "@/components/stories-screen"
 import { StoriesPanel, sliceKey } from "@/components/work-panels"
@@ -108,6 +113,14 @@ export function SprintDetailScreen({
     : kindOption
       ? `${sprintTypeLabel(kindOption, lang)}${kindOption.standardDays === null ? "" : `, normally ${kindOption.standardDays} days`}`
       : sprint.sprintType
+  // THE KIND, SAID TWICE AND ON PURPOSE — as a mark in the leading slot beside
+  // the title, and as the WORD on the eyebrow directly above it. That pairing is
+  // what makes a mark legal rather than decoration (UI-CONVENTIONS §5): it sits
+  // where an icon sits, it is `aria-hidden`, and the word is never further away
+  // than the line above. A sprint nobody typed a kind on still gets an eyebrow —
+  // "Sprint" is what it is — and simply carries no mark.
+  const kindWord = kindOption ? sprintTypeName(kindOption, lang) : sprint.sprintType || t("Sprint")
+  const kindMark = kindOption?.mark ?? null
 
   const done = sprint.storyCount - sprint.openStoryCount
   const overviewItems = [
@@ -168,38 +181,51 @@ export function SprintDetailScreen({
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight">
-            <span className="truncate">{sprint.name}</span>
-            {sprint.completedAt && (
-              <Badge variant="secondary" className="text-[10px]">
-                {t("Complete")}
-              </Badge>
-            )}
-          </h1>
-          {/* THE CROSS-LINKS UP THE TREE — the app it covers and the client who
-              bought it, both one tap away. */}
-          <p className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-            {sprint.ref && <span>{sprint.ref}</span>}
-            {sprint.appId && sprint.appName && (
-              <button
-                type="button"
-                onClick={() => softNavigate(`${host.base}/apps/${sprint.appId}`)}
-                className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
-              >
-                {t("On")} {sprint.appName}
-              </button>
-            )}
-            {sprint.accountId && sprint.accountName && (
-              <button
-                type="button"
-                onClick={() => softNavigate(`${host.base}/accounts/${sprint.accountId}`)}
-                className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
-              >
-                {t("For")} {sprint.accountName}
-              </button>
-            )}
-          </p>
+        <div className="flex min-w-0 items-start gap-3">
+          {kindMark && (
+            <span
+              aria-hidden
+              className="bg-muted grid size-11 shrink-0 place-items-center rounded-xl text-2xl leading-none"
+            >
+              {kindMark}
+            </span>
+          )}
+          <div className="min-w-0">
+            <p className="text-muted-foreground text-xs font-medium tracking-[0.5px] uppercase">
+              {kindWord}
+            </p>
+            <h1 className="flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight">
+              <span className="truncate">{sprint.name}</span>
+              {sprint.completedAt && (
+                <Badge variant="secondary" className="text-[10px]">
+                  {t("Complete")}
+                </Badge>
+              )}
+            </h1>
+            {/* THE CROSS-LINKS UP THE TREE — the app it covers and the client who
+                bought it, both one tap away. */}
+            <p className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+              {sprint.ref && <span>{sprint.ref}</span>}
+              {sprint.appId && sprint.appName && (
+                <button
+                  type="button"
+                  onClick={() => softNavigate(`${host.base}/apps/${sprint.appId}`)}
+                  className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
+                >
+                  {t("On")} {sprint.appName}
+                </button>
+              )}
+              {sprint.accountId && sprint.accountName && (
+                <button
+                  type="button"
+                  onClick={() => softNavigate(`${host.base}/accounts/${sprint.accountId}`)}
+                  className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
+                >
+                  {t("For")} {sprint.accountName}
+                </button>
+              )}
+            </p>
+          </div>
         </div>
         {/* ml-auto on the GROUP so a narrow phone reflows instead of clipping. */}
         <div className="flex flex-wrap gap-2 sm:ml-auto sm:shrink-0">
@@ -277,6 +303,8 @@ export function SprintDetailScreen({
           : {})}
         tickets={options.tickets}
         members={options.members}
+        processes={options.processes}
+        storyTypes={options.storyTypes}
         draftKey={`story:add:sprint:${sprintId}`}
         onSubmit={async (v) => {
           await createStoryFrom(teamId, { ...v, sprintId })

@@ -653,8 +653,12 @@ export const TEAM_RESOURCES: Record<
     fetchOne: (id) => contentApi.meetingOne(id),
     fetchList: (t) => listFetch.meetings(t),
     deps: (_t, id) => [`activity:record:meetings:${id}`],
-    // The per-account slices of the diary — a contact's Meetings tab.
-    slicePrefix: "meetings-account-of:",
+    // THE PER-OWNER SLICES OF THE DIARY — a contact's Meetings tab
+    // (`meetings-account-of:`) and an app's (`meetings-app-of:`). One prefix
+    // covers both because `sliceKey` spells every slice `<kind>-of:<id>` and
+    // both kinds start with the module's own name. It cannot reach the list key
+    // itself, which is `meetings:<teamId>` — a colon where this has a hyphen.
+    slicePrefix: "meetings-",
   },
   // A rate card ping carries the ACCOUNT it sits on — a card is only ever read on
   // its account's own screen, so the account is the row a listener can act on.

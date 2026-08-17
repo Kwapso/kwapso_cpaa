@@ -198,6 +198,7 @@ export function ProcessesScreen({
       <AppFormDialog
         open={appOpen}
         onOpenChange={setAppOpen}
+        teamId={teamId}
         accounts={(accountsQ.data ?? [])
           .filter((a) => a.active && a.accountType === "entity")
           .map((a) => ({ id: a.id, name: a.name }))}

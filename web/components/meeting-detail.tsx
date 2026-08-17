@@ -24,13 +24,13 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import { CalendarPlus, CheckCheck, Pencil, Power } from "lucide-react"
 
-import type { Account, Meeting, MeetingPurpose } from "@shared/types"
+import type { Account, AppRow, Meeting, MeetingPurpose } from "@shared/types"
 import { MeetingFormDialog, type MeetingFormValues } from "@/components/meeting-form-dialog"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, content, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
-import { listFetch, meetingsKey } from "@/lib/live-resources"
+import { appsKey, listFetch, meetingsKey } from "@/lib/live-resources"
 import { usePermissions } from "@/lib/perms"
 import { formatCount } from "@shared/web/format-count"
 import { formatDateTime, toLocalInput } from "@shared/web/format"
@@ -66,6 +66,10 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
   const accountsQ = useCached<Account[]>(canEdit ? `accounts:${teamId}` : null, () =>
     tenancy.accounts().then((r) => r.accounts)
   )
+  // WHICH SYSTEM A MEETING WAS ABOUT. Read on the same condition as the accounts
+  // above, and out of the SAME bounded cache the apps page holds — an agency has
+  // tens of apps, so the picker costs nothing anybody has not already paid.
+  const appsQ = useCached<AppRow[]>(canEdit ? appsKey(teamId) : null, () => listFetch.apps(teamId))
   const purposesQ = useCached<MeetingPurpose[]>(canEdit ? `purposes:${teamId}` : null, () =>
     listFetch.purposes(teamId)
   )
@@ -91,6 +95,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
       startsAt: values.startsAt,
       endsAt: values.endsAt || null,
       accountId: values.accountId || null,
+      appId: values.appId || null,
       purposeId: values.purposeId || null,
       location: values.location || null,
       agenda: values.agenda || null,
@@ -151,6 +156,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
 
   const overviewItems = [
     { label: t("Who it is with"), value: item.accountName ?? "Nobody — it is ours" },
+    { label: t("Which app"), value: item.appName ?? "—" },
     { label: t("Why we are meeting"), value: item.purposeName ?? "—" },
     { label: t("When"), value: formatDateTime(item.startsAt) },
     { label: t("Until"), value: item.endsAt ? formatDateTime(item.endsAt) : "—" },
@@ -296,8 +302,10 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
         onOpenChange={setEditing}
         draftKey={`meeting:edit:${meetingId}`}
         accountOptions={(accountsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
+        appOptions={(appsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
         purposeOptions={(purposesQ.data ?? []).filter((p) => p.active).map((p) => ({ id: p.id, name: p.name }))}
         initial={{
+          appId: item.appId ?? "",
           title: item.title,
           startsAt: toLocalInput(item.startsAt),
           endsAt: toLocalInput(item.endsAt),

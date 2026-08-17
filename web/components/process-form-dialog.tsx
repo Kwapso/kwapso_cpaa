@@ -55,6 +55,7 @@ export function ProcessFormDialog({
   open,
   onOpenChange,
   apps,
+  fixedApp,
   initial,
   draftKey,
   onSubmit,
@@ -63,6 +64,10 @@ export function ProcessFormDialog({
   onOpenChange: (open: boolean) => void
   /** The systems we've built — a process lives inside one. */
   apps: { id: string; name: string }[]
+  /** Opened FROM an app, so which app is a fact rather than a question
+   * (CHECKLIST 8.12). The picker disappears and a sentence takes its place —
+   * the same shape the sprint and story forms already use. */
+  fixedApp?: { id: string; name: string }
   /** Present = editing an existing map (the app and the baseline are settled). */
   initial?: { name: string; description: string }
   draftKey?: string
@@ -73,7 +78,7 @@ export function ProcessFormDialog({
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
     {
-      appId: "",
+      appId: fixedApp?.id ?? "",
       name: initial?.name ?? "",
       description: initial?.description ?? "",
       baselineLabel: "",
@@ -126,7 +131,12 @@ export function ProcessFormDialog({
         </Button>
       }
     >
-      {!editing && (
+      {!editing && fixedApp && (
+        <p className="text-muted-foreground text-sm">
+          {t("Inside")} <span className="text-foreground font-medium">{fixedApp.name}</span>
+        </p>
+      )}
+      {!editing && !fixedApp && (
         <Field config={appField} htmlFor="process-app" className={fieldSpacing}>
           <Select
             value={values.appId}

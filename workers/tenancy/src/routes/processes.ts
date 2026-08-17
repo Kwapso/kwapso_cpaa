@@ -114,6 +114,13 @@ export async function postCreateApp(request: Request, env: Env): Promise<Respons
       body.toolCostCentsPerMonth === undefined
         ? undefined
         : wholeNumber(Number(body.toolCostCentsPerMonth), "Monthly tool cost", MAX_TOOL_COST_CENTS),
+    // THE FOUR CONTEXT FIELDS — prose, so `TEXT_LIMITS.long`, and each one sits
+    // in a validator's first argument like every other body field on this door
+    // (R20 is positional: the scan has to SEE the check).
+    about: optionalText(body.about, "About", TEXT_LIMITS.long),
+    clientContext: optionalText(body.clientContext, "Client context", TEXT_LIMITS.long),
+    solution: optionalText(body.solution, "Solution", TEXT_LIMITS.long),
+    keyActors: optionalText(body.keyActors, "Key actors", TEXT_LIMITS.long),
   })
   await publishChange(env, guard.teamId, "apps", id, "add")
   return json({ id })
@@ -134,6 +141,14 @@ export async function postUpdateApp(request: Request, env: Env): Promise<Respons
       body.toolCostCentsPerMonth === undefined
         ? undefined
         : wholeNumber(Number(body.toolCostCentsPerMonth), "Monthly tool cost", MAX_TOOL_COST_CENTS),
+    about: "about" in body ? (optionalText(body.about, "About", TEXT_LIMITS.long) ?? null) : undefined,
+    clientContext:
+      "clientContext" in body
+        ? (optionalText(body.clientContext, "Client context", TEXT_LIMITS.long) ?? null)
+        : undefined,
+    solution: "solution" in body ? (optionalText(body.solution, "Solution", TEXT_LIMITS.long) ?? null) : undefined,
+    keyActors:
+      "keyActors" in body ? (optionalText(body.keyActors, "Key actors", TEXT_LIMITS.long) ?? null) : undefined,
   })
   await publishChange(env, guard.teamId, "apps", id)
   return json({ ok: true })

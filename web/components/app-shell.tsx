@@ -16,6 +16,7 @@ import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import {
   AppWindow,
+  BadgeCheck,
   Building2,
   CalendarClock,
   CalendarRange,
@@ -51,8 +52,9 @@ import { ProfileMenu } from "@/components/profile-menu"
 import { TeamSwitcher } from "@/components/team-switcher"
 import { TimerBar } from "@/components/timer-bar"
 import { LanguageProvider } from "@shared/web/language"
+import { applyScale } from "@shared/web/scale-section"
 
-const NAV_ICONS = { home: Home, settings: Settings } as const
+const NAV_ICONS = { home: Home, settings: Settings, kwapso: BadgeCheck } as const
 // The lucide component for each team SIDEBAR page in the rail — the same concept
 // icons the tabs use (CONCEPT_ICON, pages.ts), as components rather than names
 // because the rail renders them directly. Every sidebar section has a line here;
@@ -111,6 +113,18 @@ export function AppShell({
   // into a tab paints from cache, not a skeleton. Cold-guarded + failure-swallowed
   // (see the hook) — it only SEEDS cold keys, never touching a warm/live entry.
   useTeamPrewarm(teamId)
+
+  // HOW BIG THIS PERSON WANTS THE APP. One root font size on <html>, applied
+  // here rather than in the root layout for the same reason the language is:
+  // the root layout is a server component with no session, and the preference
+  // arrives on `active.user`. Every size token in the theme is in `rem`, so this
+  // one number moves text and spacing together (UI-RULEBOOK S4) — and because
+  // the viewport is locked against pinch-zoom (S5) it is the only way anybody
+  // can make this app bigger.
+  const userScale = active.user?.scale ?? null
+  React.useEffect(() => {
+    applyScale(userScale, "agency")
+  }, [userScale])
 
   // Desktop sidebar collapse (icon rail), remembered across sessions.
   const [collapsed, setCollapsed] = React.useState(false)

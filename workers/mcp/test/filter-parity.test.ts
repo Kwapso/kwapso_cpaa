@@ -158,6 +158,8 @@ const TOOLLESS_DOORS: Record<string, string> = {
     "the history of exactly those global identity changes (name, photo, email). It is the person's own account trail rather than the pinned team's work, and it reads a surface no tool here can write to.",
   "POST /api/auth/logout":
     "destroys the browser session behind a cookie. This surface mints its own short-lived, team-pinned session per call and lets it expire; the way to end a token's access is to revoke the token, on the Access tokens screen — which bites on the very next call.",
+  "POST /api/auth/scale":
+    "sets how big a PERSON wants their screens, across every team they belong to. The same sentence as the language door below it, and for the same two reasons: it is an identity act outside the one-team, role-capped envelope this surface promises, and there is nothing here for a machine to gain — a size is a fact about a pair of eyes, and no answer this surface gives changes with it. A tool would let a client silently resize what its owner reads.",
   "POST /api/auth/language":
     "sets the language a PERSON reads their screens in, across every team they belong to — so like the profile and the email change, it sits outside the one-team, role-capped envelope this surface promises. There is also nothing here for a machine to gain: the assistant already answers a token's calls in that person's own language, because it reads the same session row this door writes. A tool would let a client silently change what its owner sees in the app, and give it nothing it does not already have.",
 }

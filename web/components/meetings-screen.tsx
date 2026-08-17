@@ -36,9 +36,9 @@ import { PagedFind } from "@/components/paged-find"
 import { MeetingFormDialog, type MeetingFormValues } from "@/components/meeting-form-dialog"
 import { shapeMeetingsList } from "@/components/deep-link/shape"
 import { content as contentApi, tenancy } from "@/lib/api"
-import { listFetch, meetingsKey } from "@/lib/live-resources"
+import { appsKey, listFetch, meetingsKey } from "@/lib/live-resources"
 import { withDataDrivenCollection } from "@/lib/screens"
-import type { Account, Meeting, MeetingPurpose } from "@shared/types"
+import type { Account, AppRow, Meeting, MeetingPurpose } from "@shared/types"
 import { invalidate, useCached } from "@shared/web/store"
 import { formatCount } from "@shared/web/format-count"
 import { useT } from "@shared/web/language"
@@ -76,6 +76,10 @@ export function MeetingsScreen({
   const accountsQ = useCached<Account[]>(canCreate ? `accounts:${teamId}` : null, () =>
     tenancy.accounts().then((r) => r.accounts)
   )
+  // WHICH SYSTEM A MEETING WAS ABOUT. Same condition as the accounts above, and
+  // out of the SAME bounded cache the apps page holds — an agency has tens of
+  // apps, so the picker costs nothing anybody has not already paid.
+  const appsQ = useCached<AppRow[]>(canCreate ? appsKey(teamId) : null, () => listFetch.apps(teamId))
   // The purposes are read whenever this screen can offer them at all — the form
   // picker needs them, and so does the count on the link below.
   const purposesQ = useCached<MeetingPurpose[]>(canCreate || canReadPurposes ? `purposes:${teamId}` : null, () =>
@@ -89,6 +93,7 @@ export function MeetingsScreen({
       startsAt: values.startsAt,
       endsAt: values.endsAt || undefined,
       accountId: values.accountId || undefined,
+      appId: values.appId || undefined,
       purposeId: values.purposeId || undefined,
       location: values.location || undefined,
       agenda: values.agenda || undefined,
@@ -171,6 +176,7 @@ export function MeetingsScreen({
         onOpenChange={setOpen}
         draftKey={`meeting:add:${teamId}`}
         accountOptions={(accountsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
+        appOptions={(appsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
         purposeOptions={(purposesQ.data ?? []).filter((p) => p.active).map((p) => ({ id: p.id, name: p.name }))}
         onSubmit={add}
       />

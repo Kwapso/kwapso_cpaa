@@ -67,6 +67,33 @@ export async function setLanguage(
   return { user: toSessionUser(updated as UserRow) }
 }
 
+/** HOW BIG THIS PERSON WANTS THE APP. The twin of `setLanguage` above, and it
+ * keeps the same two promises: R17's predicate rides the UPDATE, so choosing the
+ * size you already read at moves zero rows and sends no ping; and the publish is
+ * the identity fan-out, so the person's OTHER devices re-pull `me` and re-render
+ * at the new size without a reload. Nobody else's screen changes, because nobody
+ * else reads it. `scale` is already proven to be one of SCALE_STEPS at the door
+ * (R20), so this writes it plainly. */
+export async function setScale(
+  env: Env,
+  user: UserRow,
+  scale: string
+): Promise<{ user: ReturnType<typeof toSessionUser> }> {
+  const result = await env.DB.prepare(
+    "UPDATE users SET scale = ?, updated_at = ? WHERE id = ? AND COALESCE(scale, '') <> ?"
+  )
+    .bind(scale, new Date().toISOString(), user.id, scale)
+    .run()
+
+  if (result.meta.changes > 0)
+    await publishUserChange(env, user.id, "profile", user.id, "edit")
+
+  const updated = await env.DB.prepare("SELECT * FROM users WHERE id = ?")
+    .bind(user.id)
+    .first<UserRow>()
+  return { user: toSessionUser(updated as UserRow) }
+}
+
 export async function updateProfile(
   env: Env,
   user: UserRow,

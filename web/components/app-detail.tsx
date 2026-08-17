@@ -25,11 +25,12 @@ import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs
 import { Pencil, Power } from "lucide-react"
 
 import { AppFormDialog, type AppFormValues } from "@/components/app-form-dialog"
+import { ProcessFormDialog } from "@/components/process-form-dialog"
 import { SprintFormDialog } from "@/components/sprint-form-dialog"
 import { StoryFormDialog } from "@/components/story-form-dialog"
 import { createSprintFrom } from "@/components/sprints-screen"
 import { createStoryFrom, useStoryFormOptions } from "@/components/stories-screen"
-import { ProcessesPanel, SprintsPanel, StoriesPanel, sliceKey } from "@/components/work-panels"
+import { AppMeetingsPanel, ProcessesPanel, SprintsPanel, StoriesPanel, sliceKey } from "@/components/work-panels"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, tenancy } from "@/lib/api"
@@ -37,6 +38,7 @@ import { auditItems } from "@/lib/audit-overview"
 import { formatCount } from "@shared/web/format-count"
 import { accountsKey, appsKey, listFetch, totalKey, valueKey } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
+import { appStageMark } from "@shared/app-stages"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useRecordActivity } from "@/lib/use-record-activity"
@@ -67,6 +69,7 @@ export function AppDetailScreen({
   const sprintsTotal = useCachedValue<number>(totalKey("sprints-app", appId))
   const storiesTotal = useCachedValue<number>(totalKey("stories-app", appId))
   const mapsTotal = useCachedValue<number>(totalKey("processes-app", appId))
+  const meetingsTotal = useCachedValue<number>(totalKey("meetings-app", appId))
 
   const { can } = usePermissions(teamId)
   const canEdit = can("processes", "edit")
@@ -76,6 +79,7 @@ export function AppDetailScreen({
   const [tab, setTab] = React.useState("overview")
   const [editOpen, setEditOpen] = React.useState(false)
   const [sprintOpen, setSprintOpen] = React.useState(false)
+  const [mapOpen, setMapOpen] = React.useState(false)
   const [storyOpen, setStoryOpen] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
   const options = useStoryFormOptions(teamId)
@@ -98,6 +102,10 @@ export function AppDetailScreen({
       url: values.url || null,
       stage: values.stage || null,
       toolCostCentsPerMonth: values.toolCostCentsPerMonth,
+      about: values.about || null,
+      clientContext: values.clientContext || null,
+      solution: values.solution || null,
+      keyActors: values.keyActors || null,
     })
     refresh()
     toast.success(t("App updated."))
@@ -124,9 +132,18 @@ export function AppDetailScreen({
   const account = app.accountId ? (accountsQ.data ?? []).find((a) => a.id === app.accountId) : null
   const accountName = account?.name ?? (app.accountId ? "A client" : null)
 
+  // THE CONTEXT AN APP CARRIES, above the housekeeping. The four prose fields
+  // are what somebody joining the account reads first and what the assistant
+  // answers "what is this system for?" out of, so they lead the Overview rather
+  // than trailing the address. A field nobody has filled in is dropped rather
+  // than shown empty (UI-RULEBOOK W2 — `hideEmpty` is the default).
   const overviewItems = [
     { label: t("Client"), value: accountName ?? "Ours — no client" },
-    { label: t("Stage"), value: app.stage || "—" },
+    { label: t("Stage"), value: app.stage ? `${appStageMark(app.stage)} ${app.stage}`.trim() : "—" },
+    { label: t("About"), value: app.about || "—" },
+    { label: t("Client context"), value: app.clientContext || "—" },
+    { label: t("Solution"), value: app.solution || "—" },
+    { label: t("Key actors"), value: app.keyActors || "—" },
     { label: t("Address"), value: app.url || "—" },
     ...auditItems({
       createdByName: app.createdByName ?? null,
@@ -161,6 +178,13 @@ export function AppDetailScreen({
         label: t("Process maps"),
         icon: CONCEPT_ICON.processes,
         badge: formatCount(mapsTotal),
+        badgeVariant: "" as const,
+      },
+      {
+        value: "meetings",
+        label: t("Meetings"),
+        icon: CONCEPT_ICON.meetings,
+        badge: formatCount(meetingsTotal),
         badgeVariant: "" as const,
       },
       {
@@ -258,7 +282,15 @@ export function AppDetailScreen({
                 emptyText="Nothing has been done on this app yet."
               />
             )
-          if (t.value === "maps") return <ProcessesPanel appId={appId} host={host} />
+          if (t.value === "maps")
+            return (
+              <ProcessesPanel
+                appId={appId}
+                host={host}
+                onNew={canEdit ? () => setMapOpen(true) : undefined}
+              />
+            )
+          if (t.value === "meetings") return <AppMeetingsPanel appId={appId} host={host} />
           if (t.value === "activity")
             return <ActivityPanel activity={activity} />
           return <OverviewList items={overviewItems} />
@@ -268,6 +300,7 @@ export function AppDetailScreen({
       <AppFormDialog
         open={editOpen}
         onOpenChange={setEditOpen}
+        teamId={teamId}
         accounts={(accountsQ.data ?? [])
           .filter((a) => a.active && a.accountType === "entity")
           .map((a) => ({ id: a.id, name: a.name }))}
@@ -280,9 +313,35 @@ export function AppDetailScreen({
           // absent: the field asks for an amount, and an amount nobody has given
           // is nothing rather than a blank the door would read as "leave it".
           toolCostCentsPerMonth: app.toolCostCentsPerMonth ?? 0,
+          about: app.about ?? "",
+          clientContext: app.clientContext ?? "",
+          solution: app.solution ?? "",
+          keyActors: app.keyActors ?? "",
         }}
         draftKey={`app:edit:${appId}`}
         onSubmit={save}
+      />
+
+      {/* A MAP IS DRAWN FROM THE APP IT BELONGS TO (8.12). Process maps stopped
+          being a nav destination on 17 Aug 2026, so this button is the way in —
+          without it the tab could only ever show maps somebody made elsewhere. */}
+      <ProcessFormDialog
+        open={mapOpen}
+        onOpenChange={setMapOpen}
+        apps={[{ id: appId, name: app.name }]}
+        fixedApp={{ id: appId, name: app.name }}
+        draftKey={`process:add:app:${appId}`}
+        onSubmit={async (v) => {
+          await tenancy.createProcess({
+            appId: v.appId,
+            name: v.name,
+            description: v.description || undefined,
+            baselineLabel: v.baselineLabel || undefined,
+          })
+          invalidate(sliceKey("processes-app", appId))
+          invalidate(valueKey(teamId))
+          toast.success(t("Process mapped."))
+        }}
       />
 
       {/* Both forms open with THIS app already chosen — you are standing on it,
@@ -306,6 +365,8 @@ export function AppDetailScreen({
         fixedApp={{ id: appId, name: app.name }}
         tickets={options.tickets}
         members={options.members}
+        processes={options.processes}
+        storyTypes={options.storyTypes}
         draftKey={`story:add:app:${appId}`}
         onSubmit={async (v) => {
           await createStoryFrom(teamId, v)

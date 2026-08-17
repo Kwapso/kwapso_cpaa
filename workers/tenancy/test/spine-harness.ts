@@ -103,7 +103,7 @@ export function buildSpineDb(): DatabaseSync {
   // The GLOBAL core tables the gating seam reads natively.
   db.exec(`
     CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT, first_name TEXT, last_name TEXT, current_team_id TEXT, updated_at TEXT, deactivated_at TEXT);
-    CREATE TABLE teams (id TEXT PRIMARY KEY, name TEXT, logo_url TEXT, database_id TEXT, db_status TEXT NOT NULL DEFAULT 'ready', created_at TEXT, creator_name TEXT, creator_email TEXT, updated_at TEXT, deactivated_at TEXT);
+    CREATE TABLE teams (id TEXT PRIMARY KEY, name TEXT, logo_url TEXT, database_id TEXT, db_status TEXT NOT NULL DEFAULT 'ready', created_at TEXT, creator_name TEXT, creator_email TEXT, updated_at TEXT, deactivated_at TEXT, legal_name TEXT, legal_address TEXT, legal_numbers TEXT, phone TEXT);
     CREATE TABLE team_members (id TEXT PRIMARY KEY, team_id TEXT, user_id TEXT, role_id TEXT, created_at TEXT, deactivated_at TEXT);
     INSERT INTO teams (id, name, database_id, created_at, creator_name, creator_email)
       VALUES ('${IDS.team}', 'Kwapso', 'db_team', '2026-01-01', 'Staff', 'staff@kwapso.app');

@@ -36,6 +36,8 @@ type MeetingRow = {
   title: string
   account_id: string | null
   account_name: string | null
+  app_id: string | null
+  app_name: string | null
   purpose_id: string | null
   purpose_name: string | null
   agenda: string | null
@@ -57,10 +59,11 @@ type MeetingRow = {
 /** The two names ride the read rather than a second lookup: a meeting is only
  * ever useful with the client and the purpose spelled out, and a list of fifty
  * would otherwise be a hundred round trips through the REST door. */
-const MEETING_COLS = `m.id, m.ref, m.title, m.account_id, m.purpose_id, m.agenda, m.notes, m.location,
+const MEETING_COLS = `m.id, m.ref, m.title, m.account_id, m.app_id, m.purpose_id, m.agenda, m.notes, m.location,
   m.starts_at, m.ends_at, m.status, m.held_at, m.google_event_id, m.google_event_url,
   m.created_at, m.creator_name, m.updated_at, m.editor_name, m.deactivated_at,
   (SELECT a.name FROM accounts a WHERE a.id = m.account_id) AS account_name,
+  (SELECT ap.name FROM apps ap WHERE ap.id = m.app_id) AS app_name,
   (SELECT p.name FROM meeting_purposes p WHERE p.id = m.purpose_id) AS purpose_name`
 
 /** The sort a meeting list is keyed by: when it is / was, newest first. A diary
@@ -75,6 +78,8 @@ function toMeeting(r: MeetingRow): Meeting {
     title: r.title,
     accountId: r.account_id,
     accountName: r.account_name,
+    appId: r.app_id,
+    appName: r.app_name,
     purposeId: r.purpose_id,
     purposeName: r.purpose_name,
     agenda: r.agenda,
@@ -102,6 +107,11 @@ function toMeeting(r: MeetingRow): Meeting {
  * fields at the door. */
 export type MeetingFilter = {
   accountId?: string
+  /** WHICH SYSTEM IT WAS ABOUT. The app record's own Meetings tab asks the
+   * SERVER by this rather than narrowing a loaded page in the browser — the
+   * diary is paged, and "this app's meetings among the newest fifty" is an
+   * answer that looks like an answer. */
+  appId?: string
   purposeId?: string
   status?: string
   /** 'upcoming' (the default view) hides what has already been held; 'all'
@@ -123,6 +133,10 @@ function whereFor(filter: MeetingFilter): { sql: string; params: (string | numbe
   if (filter.accountId) {
     where.push("m.account_id = ?")
     params.push(filter.accountId)
+  }
+  if (filter.appId) {
+    where.push("m.app_id = ?")
+    params.push(filter.appId)
   }
   if (filter.purposeId) {
     where.push("m.purpose_id = ?")
@@ -214,6 +228,7 @@ async function meetingOrThrow(
 export type MeetingInput = {
   title?: unknown
   accountId?: unknown
+  appId?: unknown
   purposeId?: unknown
   agenda?: unknown
   notes?: unknown
@@ -225,6 +240,7 @@ export type MeetingInput = {
 type ReadInput = {
   title: string
   accountId: string | null
+  appId: string | null
   purposeId: string | null
   agenda: string | null
   notes: string | null
@@ -248,6 +264,7 @@ function readInput(input: MeetingInput): ReadInput {
   return {
     title: requireText(input.title, "What it is about", TEXT_LIMITS.short),
     accountId: optionalText(input.accountId, "Client", TEXT_LIMITS.short) ?? null,
+    appId: optionalText(input.appId, "App", TEXT_LIMITS.short) ?? null,
     purposeId: optionalText(input.purposeId, "Why we are meeting", TEXT_LIMITS.short) ?? null,
     agenda: optionalText(input.agenda, "Agenda", TEXT_LIMITS.long) ?? null,
     notes: optionalText(input.notes, "Notes", TEXT_LIMITS.long) ?? null,
@@ -263,7 +280,7 @@ function readInput(input: MeetingInput): ReadInput {
 async function requireReferences(
   cfg: D1Rest,
   guard: MemberGuard,
-  v: { accountId: string | null; purposeId: string | null }
+  v: { accountId: string | null; appId: string | null; purposeId: string | null }
 ): Promise<void> {
   if (v.accountId) {
     const rows = await d1Query<{ id: string }>(
@@ -274,6 +291,16 @@ async function requireReferences(
       [v.accountId]
     )
     if (!rows[0]) throw new GuardError(400, "invalid_input", "That client isn't on your books any more.")
+  }
+  if (v.appId) {
+    const rows = await d1Query<{ id: string }>(
+      cfg,
+      guard.databaseId,
+      // R14: one row by primary key.
+      "SELECT id FROM apps WHERE id = ? AND deactivated_at IS NULL LIMIT 1",
+      [v.appId]
+    )
+    if (!rows[0]) throw new GuardError(400, "invalid_input", "That app isn't one of ours any more.")
   }
   if (v.purposeId) {
     const rows = await d1Query<{ id: string }>(
@@ -305,9 +332,9 @@ export async function createMeeting(
   await d1ExecScript(
     cfg,
     guard.databaseId,
-    `INSERT INTO meetings (id, ref, account_id, purpose_id, title, agenda, notes, location,
+    `INSERT INTO meetings (id, ref, account_id, app_id, purpose_id, title, agenda, notes, location,
         starts_at, ends_at, status, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(v.accountId)}, ${sqlString(v.purposeId)},
+VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(v.accountId)}, ${sqlString(v.appId)}, ${sqlString(v.purposeId)},
         ${sqlString(v.title)}, ${sqlString(v.agenda)}, ${sqlString(v.notes)}, ${sqlString(v.location)},
         ${sqlString(v.startsAt)}, ${sqlString(v.endsAt)}, 'scheduled',
         ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
@@ -336,12 +363,13 @@ export async function updateMeeting(
   await d1Query(
     cfg,
     guard.databaseId,
-    `UPDATE meetings SET title = ?, account_id = ?, purpose_id = ?, agenda = ?, notes = ?, location = ?,
+    `UPDATE meetings SET title = ?, account_id = ?, app_id = ?, purpose_id = ?, agenda = ?, notes = ?, location = ?,
         starts_at = ?, ends_at = ?, updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ?
       WHERE id = ?`,
     [
       v.title,
       v.accountId,
+      v.appId,
       v.purposeId,
       v.agenda,
       v.notes,

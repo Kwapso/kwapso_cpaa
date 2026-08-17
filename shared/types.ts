@@ -36,6 +36,13 @@ export type SessionUser = {
    * from a deliberate choice of English so that only the un-chosen could ever be
    * guessed at from a browser header. */
   language: string | null
+  /** HOW BIG THIS PERSON WANTS THE APP. One of SCALE_STEPS (shared/scale.ts).
+   * Null means never chosen, which reads as comfortable — kept distinct from a
+   * deliberate choice of comfortable for the same reason `language` is. It sits
+   * on the session rather than in one browser's storage so it follows the person
+   * between devices, and because the viewport is locked against pinch-zoom this
+   * is the only way anybody can make the app bigger (UI-RULEBOOK S4, S5). */
+  scale: string | null
 }
 
 /** One team as the tenancy worker lists them for the signed-in person. */
@@ -47,6 +54,16 @@ export type TeamSummary = {
   roleId: string
   /** creating | ready | failed — a team is usable once 'ready' */
   dbStatus: string
+  /** THE AGENCY'S OWN DETAILS (db/core/0025) — the four facts a business owner
+   * reaches for when an invoice, a contract or a client's supplier form asks.
+   * `legalName` is what goes on a contract, which is often not the short name in
+   * the rail; `legalNumbers` is one block of text on purpose, because which
+   * numbers a business carries is a fact about its country. All four null until
+   * somebody fills them in. */
+  legalName?: string | null
+  legalAddress?: string | null
+  legalNumbers?: string | null
+  phone?: string | null
 }
 
 /** One member of a team — membership (per-team) joined with identity (global,
@@ -772,6 +789,16 @@ export type AppRow = {
   /** what it costs US to run each month, in cents. `null` on the way OUT to a
    * client login — an internal number, withheld on the row (see listApps). */
   toolCostCentsPerMonth: number | null
+  // ── THE FOUR CONTEXT FIELDS ────────────────────────────────────────────────
+  // What the system is, the situation it was built into, what we did about it,
+  // and who actually uses it. Prose, all four — they are what somebody joining
+  // the account reads first, and what the assistant answers "what is this app
+  // for?" out of. They ride on the LIST row rather than a detail door because
+  // the apps set is bounded and read whole: the record is the list's own row.
+  about: string | null
+  clientContext: string | null
+  solution: string | null
+  keyActors: string | null
   active: boolean
   createdAt?: string | null
   createdByName?: string | null
@@ -1123,6 +1150,11 @@ export type Meeting = {
   /** which client it is with. Null = an internal meeting of our own. */
   accountId: string | null
   accountName: string | null
+  /** WHICH SYSTEM IT WAS ABOUT, and the app's name so a row can say it without a
+   * second lookup. Nullable: plenty of meetings are about the account rather
+   * than one of its systems, and the first kickoff call is one of them. */
+  appId: string | null
+  appName: string | null
   /** why we meet, out of the settled taxonomy under Delivery method. */
   purposeId: string | null
   purposeName: string | null

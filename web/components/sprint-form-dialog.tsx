@@ -108,12 +108,26 @@ export function useSprintTypes(teamId: string | null): SprintTypeOption[] {
     : FALLBACK_SPRINT_TYPES.map((value) => ({ value, mark: null, nameDe: null, standardDays: null }))
 }
 
-/** What a person reads for one type: its mark, then its name in their own
- * language where the agency wrote one down. The German label is a CURATED word
- * carried over from the delivery catalogue, not a translation seam — everything
- * the app itself says is translated at build time from the string catalogue. */
+/** JUST THE WORD — the type's name in the reader's own language, with no mark on
+ * the front of it. The German label is a CURATED word carried over from the
+ * delivery catalogue, not a translation seam: everything the app itself says is
+ * translated at build time from the string catalogue, and a team's own
+ * vocabulary is not the app talking.
+ *
+ * It is its own function because a TYPE MARK has to be `aria-hidden` and sit
+ * where an icon sits (UI-CONVENTIONS §5), which means the mark and the word are
+ * two elements on a row rather than one string. This is the half `sprintTypeLabel`
+ * puts second, so a screen that renders them apart and a picker that renders them
+ * together can never disagree about which word a German client reads. */
+export function sprintTypeName(option: SprintTypeOption, lang: string): string {
+  return lang === "de" && option.nameDe ? option.nameDe : option.value
+}
+
+/** What a person reads for one type in a single string: its mark, then its name.
+ * For a picker option and any other place a mark cannot have an element of its
+ * own. */
 export function sprintTypeLabel(option: SprintTypeOption, lang: string): string {
-  const name = lang === "de" && option.nameDe ? option.nameDe : option.value
+  const name = sprintTypeName(option, lang)
   return option.mark ? `${option.mark} ${name}` : name
 }
 

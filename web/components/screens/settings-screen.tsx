@@ -21,9 +21,18 @@
 // three are the same sentence said three ways — something outside this app has
 // been given a way in, and this is where you take it back.
 //
-// The team's own admin (members, roles, invites, dropdown values) stays where it
-// was: a tab strip on the TEAM. That is one level down, not a fourth thing here
-// — a team is a record, and its sections belong to it.
+// THE TEAM'S OWN ADMIN MOVED HERE ON 17 AUG 2026 (CHECKLIST 10.4 and 10.5), and
+// the reason is that its front door had quietly closed. Users, member roles,
+// invites and dropdown values are a tab strip on the TEAM, one level down at
+// /t/<teamId> — and the team switcher that used to be the way to that level was
+// hidden when the app became single-team. The screens were all still there and
+// there was no longer a link to any of them.
+//
+// So Settings now carries the list. The screens themselves did not move: each
+// row is a link to the page that already existed, gated by the same read right
+// the tab strip gates on, so a role that cannot see roles sees no row rather
+// than a row that refuses. Two places to reach one screen is fine; nowhere to
+// reach it is not.
 //
 // A content component rendered inside the one deep-link shell (the shell provides
 // the AppShell chrome).
@@ -44,14 +53,30 @@ import { GoogleConnectionsSection } from "@/components/google-connections"
 import { InvitationsPanel, useReceivedInvites } from "@/components/invitations"
 import { letterMark } from "@/lib/identity"
 import { softNavigate } from "@/lib/nav"
+import { TEAM_SECTIONS } from "@/lib/pages"
+import { usePermissions } from "@/lib/perms"
+import { auth } from "@/lib/api"
 import { TEAM_SCREENS_HIDDEN } from "@shared/product"
 import type { ActiveTeam } from "@/lib/use-active-team"
+import { ScaleSection } from "@shared/web/scale-section"
 import { useT } from "@shared/web/language"
 
 export function SettingsScreen({ active }: { active: ActiveTeam }) {
   const t = useT()
   const { ctx } = active
   const pendingInvites = useReceivedInvites().data ?? []
+  const teamId = ctx?.team?.id ?? null
+  const { can } = usePermissions(teamId)
+
+  // THE TEAM'S ADMIN SCREENS, DERIVED rather than hand-listed. A `placement:
+  // "tab"` section IS one of them by definition, so a section added to the
+  // registry appears here the day it is added and one removed disappears the
+  // same day — the failure this list exists to fix was a screen with no way in,
+  // and a hand-written list is exactly how that happens again. Overview is left
+  // out because it is the team record itself rather than a setting.
+  const adminSections = TEAM_SECTIONS.filter(
+    (s) => s.placement === "tab" && s.key !== "overview" && can(s.module, "read")
+  )
 
   async function openTeam(teamId: string) {
     if (teamId !== ctx?.team?.id) await active.switchTeam(teamId)
@@ -69,6 +94,34 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
         <section className="animate-rise flex flex-col gap-3">
           <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Invitations")}</h2>
           <InvitationsPanel active={active} />
+        </section>
+      )}
+
+      {/* HOW BIG THE APP IS (CHECKLIST 10.3). One root font size moves text and
+          spacing together, and because the viewport is locked against pinch to
+          zoom this is the only way anybody can make this app bigger. */}
+      <ScaleSection
+        value={active.user?.scale ?? null}
+        save={(scale) => auth.setScale(scale)}
+        className="animate-rise"
+      />
+
+      {/* THE TEAM'S OWN ADMIN — see the header for why these rows are here. */}
+      {teamId && adminSections.length > 0 && (
+        <section className="animate-rise flex flex-col gap-3">
+          <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+            {t("This team")}
+          </h2>
+          <List
+            surface="none"
+            className="rounded-xl border"
+            onItemClick={(item) => softNavigate(`/t/${teamId}/${item.id}`)}
+            items={adminSections.map((s) => ({
+              id: s.segment,
+              title: t(s.title),
+              trailing: <ChevronRight className="text-muted-foreground size-4" />,
+            }))}
+          />
         </section>
       )}
 

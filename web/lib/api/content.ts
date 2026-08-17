@@ -488,12 +488,16 @@ export const content = {
      * meeting somebody digs for is the OLD one. */
     q?: string,
     /** one client's diary — the door already parses it; this is the web half. */
-    accountId?: string
+    accountId?: string,
+    /** ONE SYSTEM'S diary, for the app record's own Meetings tab. Asked of the
+     * SERVER rather than filtered in the browser: the diary pages, so "this
+     * app's meetings among the newest fifty" is an answer that looks like one. */
+    appId?: string
   ) =>
     api<PagedResponse<{ meetings: Meeting[] }>>(
       `/api/content/meetings?view=${enc(view ?? "all")}${q ? `&q=${enc(q)}` : ""}${
         accountId ? `&accountId=${enc(accountId)}` : ""
-      }${cursor ? `&cursor=${enc(cursor)}` : ""}`
+      }${appId ? `&appId=${enc(appId)}` : ""}${cursor ? `&cursor=${enc(cursor)}` : ""}`
     ),
   meetingOne: (id: string) =>
     api<{ meetings: Meeting[] }>(`/api/content/meetings?id=${enc(id)}`).then((r) => r.meetings[0] ?? null),
@@ -502,6 +506,7 @@ export const content = {
     startsAt: string
     endsAt?: string | null
     accountId?: string | null
+    appId?: string | null
     purposeId?: string | null
     agenda?: string | null
     notes?: string | null

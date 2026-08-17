@@ -931,4 +931,12 @@ export const FORM_DIALOGS = [
   // does: the agenda is typed while somebody is still on the phone agreeing it,
   // and a mis-tap that loses it loses a conversation rather than a field.
   "meeting-form-dialog",
+  // The agency's own details, on the Kwapso page. A separate dialog from
+  // team-edit and the difference is the audience rather than the fields: one is
+  // what the app calls itself in the rail, the other is what the company is
+  // called on an invoice. Its draft earns its keep the way the staff profile's
+  // does — a registered address and a pair of tax numbers are copied out of
+  // somewhere else, and losing them to a mis-tap means going and finding them
+  // again.
+  "legal-details-dialog",
 ] as const

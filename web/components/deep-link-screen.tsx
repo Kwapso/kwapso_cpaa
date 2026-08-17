@@ -43,6 +43,7 @@ import { useTraceRing } from "@/components/deep-link/use-trace-ring"
 import { WritePanels } from "@/components/deep-link/write-panels"
 import { HomeScreen } from "@/components/screens/home-screen"
 import { ProfileScreen } from "@/components/screens/profile-screen"
+import { KwapsoScreen } from "@/components/screens/kwapso-screen"
 import { SettingsScreen } from "@/components/screens/settings-screen"
 import { InvitationsScreen } from "@/components/screens/invitations-screen"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
@@ -237,7 +238,9 @@ export function DeepLinkScreen() {
     const accountCrumbs: Crumb[] =
       module === "settings"
         ? [{ label: t("Settings") }]
-        : module === "invitations"
+        : module === "kwapso"
+          ? [{ label: t("Kwapso") }]
+          : module === "invitations"
           ? [{ label: t("Invitations") }]
           : module === "profile"
             ? [{ label: t("Your profile") }]
@@ -245,6 +248,7 @@ export function DeepLinkScreen() {
     return (
       <AppShell active={active} breadcrumbs={accountCrumbs} onNavigate={go} activePath={currentPath}>
         {module === "home" && <HomeScreen active={active} />}
+        {module === "kwapso" && <KwapsoScreen active={active} />}
         {module === "settings" && <SettingsScreen active={active} />}
         {module === "profile" && <ProfileScreen active={active} />}
         {module === "invitations" && <InvitationsScreen active={active} />}

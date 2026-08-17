@@ -68,11 +68,20 @@ export const tenancy = {
       body: JSON.stringify({ name }),
     }),
 
-  /** Edit the active team's name + optional logo (data URL). Needs teams:edit. */
-  updateTeam: (name: string, logoDataUrl?: string) =>
+  /** Edit the active team's name + optional logo (data URL) + the agency's own
+   * legal details. Needs teams:edit.
+   *
+   * `legal` is PATCHED, never replaced: a field this call leaves out keeps what
+   * it had, so the team-edit dialog can save a rename without erasing an address
+   * it was never showing. Sending an empty string is how a caller clears one. */
+  updateTeam: (
+    name: string,
+    logoDataUrl?: string,
+    legal?: { legalName?: string; legalAddress?: string; legalNumbers?: string; phone?: string }
+  ) =>
     api<{ ok: true }>("/api/tenancy/teams/update", {
       method: "POST",
-      body: JSON.stringify({ name, logoDataUrl }),
+      body: JSON.stringify({ name, logoDataUrl, ...legal }),
     }),
 
   /** Everyone on the active team (identity + role + the guard flags). */

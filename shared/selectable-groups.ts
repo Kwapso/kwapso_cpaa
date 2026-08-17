@@ -28,6 +28,13 @@ export const SELECTABLE_GROUPS = {
   country: "Country",
   /** HOW BIG AN ACCOUNT IS. The second ungrouped set — five size bands. */
   companySize: "Company size",
+  /** WHERE AN APP HAS GOT TO. It was a free-typed text field until 17 Aug 2026,
+   * which is how one inventory carried "live", "Live" and "in dev" for the same
+   * three apps. The eight names the agency already uses live in
+   * `shared/app-stages.ts` beside the mark and the active/inactive answer each
+   * one implies; the rows themselves are ordinary dropdown values, editable like
+   * every other vocabulary. */
+  appStage: "App stage",
 } as const
 
 export type SelectableGroup = (typeof SELECTABLE_GROUPS)[keyof typeof SELECTABLE_GROUPS]

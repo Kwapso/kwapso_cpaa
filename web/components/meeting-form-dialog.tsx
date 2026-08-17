@@ -45,6 +45,10 @@ const titleField = { ...defaultFieldConfig, label: "What it is about", required:
 const whenField = { ...defaultFieldConfig, label: "When", required: true }
 const untilField = { ...defaultFieldConfig, label: "Until", required: false }
 const clientField = { ...defaultFieldConfig, label: "Who it is with", required: false }
+// WHICH SYSTEM IT WAS ABOUT. Optional on purpose: plenty of meetings are about
+// the account rather than one of its systems, and the first kickoff call is one
+// of them. It is what fills the app record's own Meetings tab.
+const appField = { ...defaultFieldConfig, label: "Which app", required: false }
 const purposeField = { ...defaultFieldConfig, label: "Why we are meeting", required: false }
 const whereField = { ...defaultFieldConfig, label: "Where", required: false }
 const agendaField = { ...defaultFieldConfig, label: "Agenda", required: false }
@@ -55,6 +59,7 @@ export type MeetingFormValues = {
   startsAt: string
   endsAt: string
   accountId: string
+  appId: string
   purposeId: string
   location: string
   agenda: string
@@ -66,6 +71,7 @@ export function MeetingFormDialog({
   onOpenChange,
   onSubmit,
   accountOptions,
+  appOptions,
   purposeOptions,
   initial,
   draftKey,
@@ -76,6 +82,9 @@ export function MeetingFormDialog({
   /** the clients this caller may file a meeting under — already fenced by their
    * own read of the accounts door. */
   accountOptions: { id: string; name: string }[]
+  /** the systems a meeting can be filed against — the same bounded apps list
+   * every other form in the work engine picks from. */
+  appOptions: { id: string; name: string }[]
   /** why we meet, out of the settled taxonomy under Delivery method. */
   purposeOptions: { id: string; name: string }[]
   /** Present = EDIT mode (prefilled). */
@@ -91,6 +100,7 @@ export function MeetingFormDialog({
       startsAt: initial?.startsAt ?? "",
       endsAt: initial?.endsAt ?? "",
       accountId: initial?.accountId || NONE,
+      appId: initial?.appId || NONE,
       purposeId: initial?.purposeId || NONE,
       location: initial?.location ?? "",
       agenda: initial?.agenda ?? "",
@@ -111,6 +121,7 @@ export function MeetingFormDialog({
         startsAt: toMoment(values.startsAt),
         endsAt: toMoment(values.endsAt),
         accountId: values.accountId === NONE ? "" : values.accountId,
+        appId: values.appId === NONE ? "" : values.appId,
         purposeId: values.purposeId === NONE ? "" : values.purposeId,
         location: values.location.trim(),
         agenda: values.agenda.trim(),
@@ -189,6 +200,25 @@ export function MeetingFormDialog({
           <SelectContent>
             <SelectItem value={NONE}>{t("Nobody — it is ours")}</SelectItem>
             {accountOptions.map((a) => (
+              <SelectItem key={a.id} value={a.id}>
+                {a.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+      <Field config={appField} htmlFor="meeting-app" className={fieldSpacing}>
+        <Select
+          value={values.appId}
+          onValueChange={(v) => setValues((s) => ({ ...s, appId: v }))}
+          disabled={busy}
+        >
+          <SelectTrigger id="meeting-app">
+            <SelectValue placeholder={t("Not about one app")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NONE}>{t("Not about one app")}</SelectItem>
+            {appOptions.map((a) => (
               <SelectItem key={a.id} value={a.id}>
                 {a.name}
               </SelectItem>

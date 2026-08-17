@@ -62,11 +62,13 @@ export const TOP_LEVEL_MODULES = [
   // The agency's own housekeeping — clean top-level URLs, like every other
   // sidebar page (`purposes` rides along because it has records of its own).
   "brand", "purposes",
-  "home", "settings", "invitations", "profile",
+  // The agency itself (CHECKLIST 10.1) — an account-level screen like Settings,
+  // because it is about the team rather than a collection inside one.
+  "home", "kwapso", "settings", "invitations", "profile",
 ]
 
 /** The account-level screens the shell renders directly (not team-scoped module content). */
-export const ACCOUNT_MODULES = ["home", "settings", "invitations", "profile"]
+export const ACCOUNT_MODULES = ["home", "kwapso", "settings", "invitations", "profile"]
 
 export function parseRoute(pathname: string, search: string): Route {
   const segs = pathname.split("/").filter(Boolean) // ["t", teamId, module?, id?] OR [module, id?]

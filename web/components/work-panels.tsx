@@ -29,7 +29,7 @@ import { LoadMore } from "@/components/load-more"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import { cursorKey, todosKey, totalKey } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
-import type { AppRow, ProcessSummary, Sprint, Story, Todo } from "@shared/types"
+import type { AppRow, Meeting, ProcessSummary, Sprint, Story, Todo } from "@shared/types"
 import { formatDate } from "@shared/web/format"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
@@ -353,7 +353,18 @@ export function AppsPanel({
 /** THE PROCESS MAPS DRAWN INSIDE ONE APP. Paged (R14) like the maps list itself:
  * every app of every client grows them and none is ever deleted, because a
  * saving computed from a baseline has to stay checkable years later. */
-export function ProcessesPanel({ appId, host }: { appId: string; host: PanelHost }) {
+export function ProcessesPanel({
+  appId,
+  host,
+  onNew,
+}: {
+  appId: string
+  host: PanelHost
+  /** Map a process from inside the app it belongs to (CHECKLIST 8.12). Absent
+   * when the reader cannot create one, which is why it is a prop rather than a
+   * permission this panel re-derives. */
+  onNew?: () => void
+}) {
   const t = useT()
   const key = sliceKey("processes-app", appId)
   const q = useCached<ProcessSummary[]>(key, () =>
@@ -370,6 +381,14 @@ export function ProcessesPanel({ appId, host }: { appId: string; host: PanelHost
 
   return (
     <div className="flex flex-col gap-3">
+      {onNew && (
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button size="sm" onClick={onNew} className="gap-1.5">
+            <Plus className="size-4" />
+            {t("Map a process")}
+          </Button>
+        </div>
+      )}
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">
           {t("No process maps drawn inside this app yet.")}
@@ -402,6 +421,65 @@ export function ProcessesPanel({ appId, host }: { appId: string; host: PanelHost
           tenancy
             .processes({ appId, cursor: c })
             .then((r) => ({ rows: r.processes, nextCursor: r.nextCursor }))
+        }
+      />
+    </div>
+  )
+}
+
+/* ------------------------------- the diary -------------------------------- */
+
+/** THE MEETINGS ABOUT ONE APP. Asked of the SERVER by `appId`, never narrowed in
+ * the browser: the diary is paged, and "this app's meetings among the newest
+ * fifty" is an answer that looks like an answer. Paged (R14) for the same
+ * reason — a two-year system accumulates meetings and the oldest is the one
+ * somebody is digging for. `total` is the door's exact COUNT(*) over this same
+ * filter, parked in the sidecar the tab badge reads (R16). */
+export function AppMeetingsPanel({ appId, host }: { appId: string; host: PanelHost }) {
+  const t = useT()
+  const key = sliceKey("meetings-app", appId)
+  const q = useCached<Meeting[]>(key, () =>
+    contentApi.meetings(null, "all", undefined, undefined, appId).then((r) => {
+      primeCache(totalKey("meetings-app", appId), r.total)
+      primeCache(cursorKey(key), r.nextCursor)
+      return r.meetings
+    })
+  )
+
+  if (q.error) return <p className="text-destructive text-sm">{t("Couldn't load the meetings.")}</p>
+  if (q.data === undefined) return <Skeleton variant="list" lines={3} />
+  const rows = q.data
+
+  return (
+    <div className="flex flex-col gap-3">
+      {rows.length === 0 ? (
+        <p className="text-muted-foreground text-sm">{t("No meetings about this app yet.")}</p>
+      ) : (
+        <ul className="flex flex-col gap-1.5">
+          {rows.map((m) => (
+            <Row key={m.id} live={m.active}>
+              <div className="min-w-0 flex-1">
+                <OpenLink label={m.title} onOpen={() => softNavigate(`${host.base}/meetings/${m.id}`)} />
+                <p className="text-muted-foreground truncate text-xs">
+                  {[formatDate(m.startsAt), m.accountName].filter(Boolean).join(" · ")}
+                </p>
+              </div>
+              {m.status === "held" && (
+                <Badge variant="secondary" className="text-[10px]">
+                  {t("Held")}
+                </Badge>
+              )}
+            </Row>
+          ))}
+        </ul>
+      )}
+      <LoadMore
+        listKey={key}
+        label={t("Load more meetings")}
+        fetchPage={(c: string) =>
+          contentApi
+            .meetings(c, "all", undefined, undefined, appId)
+            .then((r) => ({ rows: r.meetings, nextCursor: r.nextCursor }))
         }
       />
     </div>

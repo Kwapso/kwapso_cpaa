@@ -281,11 +281,18 @@ export const SHARED_TOOLS: SharedTool[] = [
   // gate, same audit row.
   {
     name: "update_team",
-    summary: "Rename the team this caller is standing in. Its people, records and history are untouched.",
+    summary:
+      "Rename the team this caller is standing in, and set the agency's own details. Its people, records and history are untouched. `legalName` is what goes on a contract when it is not the short name in the rail, `legalAddress` is the registered address, `legalNumbers` is one block of text for whatever numbers the country asks for (a company number, a VAT number), and `phone` is the number somebody rings. Send only what you are changing: a field left out keeps its current value, and an empty string clears it.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/teams/update",
-    schema: obj({ name: S }, ["name"]),
-    buildBody: (i) => ({ name: str(i, "name") }),
-    agent: { write: true, confirm: false, summarize: (i) => `Rename the team to "${str(i, "name")}"` },
+    schema: obj({ name: S, legalName: S, legalAddress: S, legalNumbers: S, phone: S }, ["name"]),
+    buildBody: (i) => ({
+      name: str(i, "name"),
+      legalName: sent(i, "legalName"),
+      legalAddress: sent(i, "legalAddress"),
+      legalNumbers: sent(i, "legalNumbers"),
+      phone: sent(i, "phone"),
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Update the team "${str(i, "name")}"` },
   },
 
   /* -------------------------------- accounts ------------------------------- */
@@ -948,12 +955,12 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_meetings",
     summary:
-      "List MEETINGS — conversations we have had or are about to have, newest first, with the agenda and the notes on each. `view` is 'upcoming' by default (what is still to come); pass 'all' for the whole diary including cancelled ones. `accountId` narrows to one client, `purposeId` to one reason we meet, `status` to 'scheduled' or 'held', and `q` searches the title, the agenda and the notes. Pass `id` for one meeting. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one). A meeting is NOT a work log: it says what was agreed, never how long it took.",
+      "List MEETINGS — conversations we have had or are about to have, newest first, with the agenda and the notes on each. `view` is 'upcoming' by default (what is still to come); pass 'all' for the whole diary including cancelled ones. `accountId` narrows to one client, `appId` to one system, `purposeId` to one reason we meet, `status` to 'scheduled' or 'held', and `q` searches the title, the agenda and the notes. Pass `id` for one meeting. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one). A meeting is NOT a work log: it says what was agreed, never how long it took.",
     binding: "CONTENT", method: "GET", path: "/api/content/meetings",
-    schema: obj({ id: S, accountId: S, purposeId: S, status: S, view: S, q: S, cursor: S }),
+    schema: obj({ id: S, accountId: S, appId: S, purposeId: S, status: S, view: S, q: S, cursor: S }),
     buildQuery: (i) => {
       const q: string[] = []
-      for (const k of ["id", "accountId", "purposeId", "status", "view", "q", "cursor"])
+      for (const k of ["id", "accountId", "appId", "purposeId", "status", "view", "q", "cursor"])
         if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
       return q.length ? `?${q.join("&")}` : ""
     },
@@ -965,10 +972,10 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_meeting",
     summary:
-      "Put a meeting in the diary. `title` and `startsAt` are required; `startsAt` and `endsAt` are moments (a date AND a time — a meeting happens at an hour). `accountId` says which client it is with and is left off for an internal one; `purposeId` is why we meet, out of the meeting purposes list. `agenda` is what we mean to cover. Putting it in somebody's Google Calendar is a separate step — add_meeting_to_calendar.",
+      "Put a meeting in the diary. `title` and `startsAt` are required; `startsAt` and `endsAt` are moments (a date AND a time — a meeting happens at an hour). `accountId` says which client it is with and is left off for an internal one; `appId` says which of their systems it was about and is left off when it was about the account itself; `purposeId` is why we meet, out of the meeting purposes list. `agenda` is what we mean to cover. Putting it in somebody's Google Calendar is a separate step — add_meeting_to_calendar.",
     binding: "CONTENT", method: "POST", path: "/api/content/meetings",
     schema: obj(
-      { title: S, startsAt: S, endsAt: S, accountId: S, purposeId: S, agenda: S, notes: S, location: S },
+      { title: S, startsAt: S, endsAt: S, accountId: S, appId: S, purposeId: S, agenda: S, notes: S, location: S },
       ["title", "startsAt"]
     ),
     buildBody: (i) => ({
@@ -976,6 +983,7 @@ export const SHARED_TOOLS: SharedTool[] = [
       startsAt: str(i, "startsAt"),
       endsAt: opt(i, "endsAt"),
       accountId: opt(i, "accountId"),
+      appId: opt(i, "appId"),
       purposeId: opt(i, "purposeId"),
       agenda: opt(i, "agenda"),
       notes: opt(i, "notes"),
@@ -993,7 +1001,7 @@ export const SHARED_TOOLS: SharedTool[] = [
       "Correct a meeting, or write its notes up afterwards, by id. EVERY field is replaced by what you send — read the meeting first and pass back what you are not changing, or you will blank it. `notes` is the one people actually use this for: what was said and decided, written straight after.",
     binding: "CONTENT", method: "POST", path: "/api/content/meetings/update",
     schema: obj(
-      { id: S, title: S, startsAt: S, endsAt: S, accountId: S, purposeId: S, agenda: S, notes: S, location: S },
+      { id: S, title: S, startsAt: S, endsAt: S, accountId: S, appId: S, purposeId: S, agenda: S, notes: S, location: S },
       ["id", "title", "startsAt"]
     ),
     buildBody: (i) => ({
@@ -1002,6 +1010,7 @@ export const SHARED_TOOLS: SharedTool[] = [
       startsAt: str(i, "startsAt"),
       endsAt: opt(i, "endsAt"),
       accountId: opt(i, "accountId"),
+      appId: opt(i, "appId"),
       purposeId: opt(i, "purposeId"),
       agenda: opt(i, "agenda"),
       notes: opt(i, "notes"),
@@ -1426,30 +1435,44 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_app",
     summary:
-      "Record a system we have built. `accountId` is whose it is (leave it out for the agency's own). `toolCostCentsPerMonth` is what it costs US to keep running — an internal figure, never shown to a client.",
+      "Record a system we have built. `accountId` is whose it is (leave it out for the agency's own). `toolCostCentsPerMonth` is what it costs US to keep running — an internal figure, never shown to a client. `stage` is where it has got to, one of the team's App stage values. The four context fields are prose: `about` is what the system is, `clientContext` is the situation it was built into, `solution` is what we did about it, and `keyActors` is who actually uses it.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/apps",
-    schema: obj({ name: S, accountId: S, url: S, stage: S, toolCostCentsPerMonth: N }, ["name"]),
+    schema: obj(
+      { name: S, accountId: S, url: S, stage: S, toolCostCentsPerMonth: N, about: S, clientContext: S, solution: S, keyActors: S },
+      ["name"]
+    ),
     buildBody: (i) => ({
       name: str(i, "name"),
       accountId: opt(i, "accountId"),
       url: opt(i, "url"),
       stage: opt(i, "stage"),
       toolCostCentsPerMonth: typeof i.toolCostCentsPerMonth === "number" ? i.toolCostCentsPerMonth : undefined,
+      about: opt(i, "about"),
+      clientContext: opt(i, "clientContext"),
+      solution: opt(i, "solution"),
+      keyActors: opt(i, "keyActors"),
     }),
     agent: { write: true, confirm: false, summarize: (i) => `Record the app "${str(i, "name")}"` },
   },
   {
     name: "update_app",
     summary:
-      "Edit an app's own details (by id) — never which account it belongs to, which is set once when it is created. Send ONLY the fields you are changing; anything you leave out keeps its current value.",
+      "Edit an app's own details (by id) — never which account it belongs to, which is set once when it is created. Send ONLY the fields you are changing; anything you leave out keeps its current value. The four context fields (`about`, `clientContext`, `solution`, `keyActors`) are prose and are edited here like any other field.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/apps/update",
-    schema: obj({ id: S, name: S, url: S, stage: S, toolCostCentsPerMonth: N }, ["id", "name"]),
+    schema: obj(
+      { id: S, name: S, url: S, stage: S, toolCostCentsPerMonth: N, about: S, clientContext: S, solution: S, keyActors: S },
+      ["id", "name"]
+    ),
     buildBody: (i) => ({
       id: str(i, "id"),
       name: str(i, "name"),
       url: sent(i, "url"),
       stage: sent(i, "stage"),
       toolCostCentsPerMonth: typeof i.toolCostCentsPerMonth === "number" ? i.toolCostCentsPerMonth : undefined,
+      about: sent(i, "about"),
+      clientContext: sent(i, "clientContext"),
+      solution: sent(i, "solution"),
+      keyActors: sent(i, "keyActors"),
     }),
     agent: { write: true, confirm: false, summarize: (i) => `Edit the app "${str(i, "name")}"` },
   },

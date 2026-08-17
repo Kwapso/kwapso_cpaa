@@ -36,12 +36,18 @@ import {
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
+import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Pencil, Plus } from "lucide-react"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
+import { listFetch } from "@/lib/live-resources"
+import { APP_STAGES, appStageMark } from "@shared/app-stages"
+import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
+import type { SelectableValue } from "@shared/types"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
+import { useCached } from "@shared/web/store"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useT } from "@shared/web/language"
 
@@ -52,6 +58,13 @@ export type AppFormValues = {
   stage: string
   /** whole cents a month — converted from the amount the form asks for */
   toolCostCentsPerMonth: number
+  // THE FOUR CONTEXT FIELDS. They are on the form, not on a second "describe it"
+  // screen, because the moment somebody records an app is the moment they know
+  // the answers — a field asked for later is a field left empty.
+  about: string
+  clientContext: string
+  solution: string
+  keyActors: string
 }
 
 const nameField = { ...defaultFieldConfig, label: "What it's called", required: true }
@@ -61,7 +74,34 @@ const accountField = {
   required: false,
   hint: "Set once. Leave it blank for one of our own.",
 }
-const stageField = { ...defaultFieldConfig, label: "Stage", required: false }
+const stageField = { ...defaultFieldConfig, label: "Stage", required: false, hint: "Where it has got to." }
+const aboutField = { ...defaultFieldConfig, label: "About", required: false, hint: "What this system is, in a sentence or two." }
+const contextField = {
+  ...defaultFieldConfig,
+  label: "Client context",
+  required: false,
+  hint: "The situation it was built into.",
+}
+const solutionField = { ...defaultFieldConfig, label: "Solution", required: false, hint: "What we did about it." }
+const actorsField = {
+  ...defaultFieldConfig,
+  label: "Key actors",
+  required: false,
+  hint: "Who actually uses it, in their words.",
+}
+
+/** The team's App stage vocabulary, newest answer first: the rows somebody has
+ * curated on the Dropdown values screen, and the eight the agency already uses
+ * as the fallback while that read is in flight or a team has retired the lot.
+ * The mark rides the label, never the stored value — a stage is its WORD, and
+ * the pictograph is a mark in an icon slot (UI-CONVENTIONS §5). */
+export function useAppStages(teamId: string): { value: string; mark: string }[] {
+  const valuesQ = useCached<SelectableValue[]>(`selectable:${teamId}`, () => listFetch.selectable(teamId))
+  const rows = (valuesQ.data ?? [])
+    .filter((v) => v.active && v.type === SELECTABLE_GROUPS.appStage)
+    .map((v) => ({ value: v.value, mark: v.mark ?? appStageMark(v.value) }))
+  return rows.length > 0 ? rows : APP_STAGES.map((s) => ({ value: s.name, mark: s.mark }))
+}
 
 export function AppFormDialog({
   open,
@@ -70,6 +110,7 @@ export function AppFormDialog({
   initial,
   draftKey,
   onSubmit,
+  teamId,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -81,9 +122,12 @@ export function AppFormDialog({
   initial?: AppFormValues
   draftKey?: string
   onSubmit: (values: AppFormValues) => Promise<void>
+  /** the team, so the stage picker can read the team's own vocabulary */
+  teamId: string
 }) {
   const t = useT()
   const editing = initial !== undefined
+  const stages = useAppStages(teamId)
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
     initial
@@ -93,8 +137,22 @@ export function AppFormDialog({
           url: initial.url,
           stage: initial.stage,
           cost: initial.toolCostCentsPerMonth ? String(initial.toolCostCentsPerMonth / 100) : "",
+          about: initial.about,
+          clientContext: initial.clientContext,
+          solution: initial.solution,
+          keyActors: initial.keyActors,
         }
-      : { name: "", accountId: "", url: "", stage: "", cost: "" },
+      : {
+          name: "",
+          accountId: "",
+          url: "",
+          stage: "",
+          cost: "",
+          about: "",
+          clientContext: "",
+          solution: "",
+          keyActors: "",
+        },
     open
   )
   const [busy, setBusy] = React.useState(false)
@@ -117,6 +175,10 @@ export function AppFormDialog({
         stage: values.stage.trim(),
         toolCostCentsPerMonth:
           values.cost.trim() !== "" && Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 100) : 0,
+        about: values.about.trim(),
+        clientContext: values.clientContext.trim(),
+        solution: values.solution.trim(),
+        keyActors: values.keyActors.trim(),
       })
       clearDraft()
       onOpenChange(false)
@@ -179,12 +241,64 @@ export function AppFormDialog({
         </Select>
       </Field>
       )}
+      {/* STAGE IS A CHOICE, not a typed word. It was free text until 17 Aug 2026,
+          which is how one inventory came to carry "live", "Live" and "in dev" for
+          the same three systems. The mark rides the LABEL only. */}
       <Field config={stageField} htmlFor="app-stage" className={fieldSpacing}>
-        <Input
-          id="app-stage"
+        <Select
           value={values.stage}
-          onChange={(e) => setValues((s) => ({ ...s, stage: e.target.value }))}
-          placeholder={t("e.g. live")}
+          onValueChange={(v) => setValues((s) => ({ ...s, stage: v }))}
+          disabled={busy}
+        >
+          <SelectTrigger id="app-stage">
+            <SelectValue placeholder={t("Not said")} />
+          </SelectTrigger>
+          <SelectContent>
+            {stages.map((s) => (
+              <SelectItem key={s.value} value={s.value}>
+                {s.mark ? `${s.mark} ${t(s.value)}` : t(s.value)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+      <Field config={aboutField} htmlFor="app-about" className={fieldSpacing}>
+        <Textarea
+          id="app-about"
+          rows={3}
+          value={values.about}
+          onChange={(e) => setValues((s) => ({ ...s, about: e.target.value }))}
+          placeholder={t("What this system does, and for whom.")}
+          disabled={busy}
+        />
+      </Field>
+      <Field config={contextField} htmlFor="app-client-context" className={fieldSpacing}>
+        <Textarea
+          id="app-client-context"
+          rows={3}
+          value={values.clientContext}
+          onChange={(e) => setValues((s) => ({ ...s, clientContext: e.target.value }))}
+          placeholder={t("How they were working before, and what it was costing them.")}
+          disabled={busy}
+        />
+      </Field>
+      <Field config={solutionField} htmlFor="app-solution" className={fieldSpacing}>
+        <Textarea
+          id="app-solution"
+          rows={3}
+          value={values.solution}
+          onChange={(e) => setValues((s) => ({ ...s, solution: e.target.value }))}
+          placeholder={t("What we built, and the decisions behind it.")}
+          disabled={busy}
+        />
+      </Field>
+      <Field config={actorsField} htmlFor="app-key-actors" className={fieldSpacing}>
+        <Textarea
+          id="app-key-actors"
+          rows={2}
+          value={values.keyActors}
+          onChange={(e) => setValues((s) => ({ ...s, keyActors: e.target.value }))}
+          placeholder={t("e.g. the two dispatchers, and whoever is on the counter")}
           disabled={busy}
         />
       </Field>

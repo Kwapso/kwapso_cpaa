@@ -66,6 +66,15 @@ export const auth = {
       body: JSON.stringify({ language }),
     }),
 
+  /** How big this person wants the app. Its own door beside `setLanguage`, and
+   * for the same reason: a size change must not be refused because a name is
+   * missing, and must not post a name back. */
+  setScale: (scale: string) =>
+    api<{ user: SessionUser }>("/api/auth/scale", {
+      method: "POST",
+      body: JSON.stringify({ scale }),
+    }),
+
   /** Change email, step 1: send a 6-digit code to the NEW address (inbox only —
    * same law as login, the code never rides the response). */
   startEmailChange: (email: string) =>

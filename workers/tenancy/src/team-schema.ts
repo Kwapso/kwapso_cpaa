@@ -6,6 +6,7 @@
 import { sqlString } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { TASK_DEPARTMENTS } from "@shared/departments"
+import { APP_STAGES } from "@shared/app-stages"
 import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
 
 // The module list itself lives in shared/team-modules.ts — data-ops builds the
@@ -1978,6 +1979,54 @@ SELECT lower(hex(randomblob(16))), '${SELECTABLE_GROUPS.department}', '${d.name}
 ).join("\n")}
 `,
   },
+  {
+    // ── AN APP BECOMES A RECORD, not a name with a URL on it ──────────────────
+    //
+    // FOUR CONTEXT FIELDS, and they are the reason this migration exists. An app
+    // row carried a name, an address and a free-typed stage: enough to list one,
+    // nowhere near enough to brief anybody. The tester was emphatic that these
+    // earn their keep twice over, for onboarding a person and for the assistant
+    // answering a question about the system. They are long prose, so they are
+    // TEXT columns rather than a table — one app has exactly one answer to each,
+    // and a table would be four rows pretending to be a collection.
+    //
+    // \`key_actors\` is prose too, deliberately. "Who this is for" is a sentence
+    // about the CLIENT's world ("the two dispatchers, and whoever is on the
+    // counter"), not a list of our users — the people an app is about rarely
+    // hold a login here at all.
+    //
+    // STAGE STOPS BEING TYPED. The column does not change; what changes is that
+    // the eight names the agency already uses arrive as ordinary dropdown values
+    // with the mark it already recognises each one by, so the form offers them
+    // instead of asking somebody to remember whether they wrote "live" or "Live"
+    // last time. Pick-or-create like every other vocabulary this file seeds: a
+    // team that typed its own stage keeps it, and the eight sit beside it. The
+    // names, marks and order are read off the legacy data, not invented — see
+    // shared/app-stages.ts, which also carries the one thing a dropdown row
+    // cannot say: whether a stage means the app is still being worked on.
+    //
+    // WHICH APP A MEETING WAS ABOUT. Nullable: plenty of meetings are about the
+    // account rather than one of its systems, and NOT NULL here would make the
+    // diary refuse the first kickoff call.
+    version: "0029_app_record",
+    sql: `
+ALTER TABLE apps ADD COLUMN about TEXT;
+ALTER TABLE apps ADD COLUMN client_context TEXT;
+ALTER TABLE apps ADD COLUMN solution TEXT;
+ALTER TABLE apps ADD COLUMN key_actors TEXT;
+
+ALTER TABLE meetings ADD COLUMN app_id TEXT REFERENCES apps (id);
+CREATE INDEX idx_meetings_app ON meetings (app_id);
+
+-- ONE STATEMENT PER VALUE, generated from the shared list — D1's compound-SELECT
+-- ceiling is FIVE terms, which 0018 learned the hard way.
+${APP_STAGES.map(
+  (s) => `INSERT INTO selectable_data (id, type, value, mark, is_default, created_at, creator_id, creator_email, creator_name)
+SELECT lower(hex(randomblob(16))), ${sqlString(SELECTABLE_GROUPS.appStage)}, ${sqlString(s.name)}, ${sqlString(s.mark)}, 1, datetime('now'), NULL, NULL, 'System'
+ WHERE NOT EXISTS (SELECT 1 FROM selectable_data s WHERE s.type = ${sqlString(SELECTABLE_GROUPS.appStage)} AND s.value = ${sqlString(s.name)});`
+).join("\n")}
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }
@@ -2073,6 +2122,14 @@ export const DEFAULT_SELECTABLE: DefaultSelectable[] = [
   // dropdown row has nowhere to put them, and they live beside the rule each
   // department implies (shared/departments.ts).
   ...TASK_DEPARTMENTS.map((d) => ({ type: SELECTABLE_GROUPS.department, value: d.name })),
+  // WHERE AN APP HAS GOT TO — the eight stages the agency already uses, each
+  // with the mark it recognises the stage by. Same shape as the departments
+  // above and the sprint types before them: a newborn team and a team upgraded
+  // by migration 0029 offer the same eight words, and either can add a ninth on
+  // its own Dropdown values screen. The active/inactive answer each stage
+  // implies is not here, because a dropdown row has nowhere to put it — it
+  // lives beside the vocabulary in shared/app-stages.ts.
+  ...APP_STAGES.map((s) => ({ type: SELECTABLE_GROUPS.appStage, value: s.name, mark: s.mark })),
 ]
 
 /**

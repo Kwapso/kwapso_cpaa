@@ -13,6 +13,8 @@ export type UserRow = {
   current_team_id: string | null
   /** null until this person picks one; reads as English (shared/i18n.ts). */
   language: string | null
+  /** null until this person picks one; reads as comfortable (shared/scale.ts). */
+  scale: string | null
   created_at: string
   updated_at: string
   deactivated_at: string | null
@@ -35,6 +37,7 @@ export function toSessionUser(row: UserRow & { team_pin?: string | null }): Sess
     currentTeamId: row.current_team_id ?? null,
     pinnedTeamId: row.team_pin ?? null,
     language: row.language ?? null,
+    scale: row.scale ?? null,
   }
 }
 
@@ -73,8 +76,10 @@ export async function findOrCreateUserByEmail(
     image_url: null,
     onboarding_completed_at: null,
     current_team_id: null,
-    // Never chosen. Reads as English, and stays distinguishable from somebody
-    // who actively picked English (0024_user_language.sql).
+    // Never chosen, both of them. Language reads as English and size reads as
+    // comfortable, and each stays distinguishable from somebody who actively
+    // picked that answer (0024_user_language.sql, 0026_user_scale.sql).
+    scale: null,
     language: null,
     created_at: now,
     updated_at: now,
