@@ -323,8 +323,8 @@ export const SCREENLESS_WRITE_TOOLS: string[] = [
   "update_staff_certificate",
   "set_staff_certificate_active",
   "set_staff_profile_active",
-  // THE SIX GOOGLE WRITES. Every one of them changes something in GOOGLE — a
-  // file in a Drive folder, a draft in a mailbox, an event in a diary, a message
+  // EVERY GOOGLE WRITE. All of them change something in GOOGLE — a file in a
+  // Drive folder, a draft or a label in a mailbox, an event in a diary, a message
   // in a space — and kwapso has no screen showing any of those, deliberately: a
   // card that re-implemented Gmail beside Gmail would be the wrong kind of
   // ambitious, and driving somebody to a page that shows nothing they just did is
@@ -335,11 +335,23 @@ export const SCREENLESS_WRITE_TOOLS: string[] = [
   // Settings. That is not a trace target either: `/settings` is not under
   // `/t/<team>/`, and the check rightly insists a trace lands on the team host.
   // The mail tools carry the better answer anyway — the draft's own Gmail link,
-  // which the assistant is told to hand over every time.
+  // which the assistant is told to hand over every time; the Drive tools carry
+  // the file's own Drive link, and the calendar tools the entry's.
   "google_drive_upload",
+  "google_drive_update",
+  "google_drive_folder",
+  "google_mail_to_drive",
+  "google_drive_trash",
   "google_draft_reply",
   "google_send_mail",
+  "google_reply_mail",
+  "google_label_mail",
   "google_create_event",
   "google_sprint_to_calendar",
+  "google_update_event",
+  "google_event_guests",
+  "google_event_location",
+  "google_cancel_event",
   "google_chat_post",
+  "google_chat_delete",
 ]

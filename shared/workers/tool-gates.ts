@@ -171,23 +171,45 @@ export const TOOL_GATES: Record<string, string> = {
   // module means CONNECT AN ACCOUNT, which is the switch an owner grants
   // separately and which no tool here holds.
   //
-  // The two doors that reach OUTSIDE that world demand a second right on top,
-  // and this map names only ONE gate per tool — so it names the one an owner
-  // would look for. Both are recorded here so a reader does not have to open the
-  // handler to learn that the send switch exists:
+  // The doors that reach OUTSIDE that world demand a second right on top, and
+  // this map names only ONE gate per tool — so it names the one an owner would
+  // look for. Every one is recorded here so a reader does not have to open the
+  // handler to learn that the switches exist:
   //   google_send_mail          — also google_mail:create
+  //   google_reply_mail         — also google_mail:create (a reply IS a message)
   //   google_create_event       — also google_events:create
   //   google_sprint_to_calendar — also google_events:create (and work:read, to
   //                               read the sprint it is pushing)
+  //   google_update_event       — also google_events:create
+  //   google_event_guests       — also google_events:create
+  //   google_event_location     — also google_events:create
+  //   google_cancel_event       — also google_events:create
   // None of them is a PRIVILEGE write: they change what is in a person's own
   // Drive, mailbox or diary, never who may do what, and never who can see whose.
   // The confirm rule they DO get is the owner's own, written on each tool.
+  //
+  // TAKING SOMETHING BACK is `google:delete`, which is the same reading this
+  // module already applies to withdrawing a shared folder: the row survives (a
+  // binned file keeps its history for thirty days), what ends is kwapso's own
+  // handiwork. It is a separate right so an owner can grant an assistant that
+  // writes without granting one that un-writes.
   google_drive_upload: "google:edit",
+  google_drive_update: "google:edit",
+  google_drive_folder: "google:edit",
+  google_mail_to_drive: "google:edit",
+  google_drive_trash: "google:delete",
   google_draft_reply: "google:edit",
   google_send_mail: "google:edit",
+  google_reply_mail: "google:edit",
+  google_label_mail: "google:edit",
   google_create_event: "google:edit",
   google_sprint_to_calendar: "google:edit",
+  google_update_event: "google:edit",
+  google_event_guests: "google:edit",
+  google_event_location: "google:edit",
+  google_cancel_event: "google:edit",
   google_chat_post: "google:edit",
+  google_chat_delete: "google:delete",
 }
 
 /** Writes that genuinely have no single `module:right` to name, each with its reason.

@@ -213,20 +213,33 @@ import {
 import {
   getGoogleCallback,
   getGoogleChat,
+  getGoogleChatSpaces,
   getGoogleConnections,
   getGoogleDriveFile,
   getGoogleDriveFiles,
   getGoogleEvents,
+  getGoogleEventTranscript,
   getGoogleMail,
   getGoogleMailMessage,
   getGooglePick,
   getGoogleStart,
   postGoogleChat,
+  postGoogleChatDelete,
   postGoogleConnect,
   postGoogleDisconnect,
+  postGoogleDriveFolder,
+  postGoogleDriveSaveMail,
+  postGoogleDriveTrash,
+  postGoogleDriveUpdate,
   postGoogleDriveUpload,
   postGoogleEvent,
+  postGoogleEventCancel,
+  postGoogleEventGuests,
+  postGoogleEventLocation,
+  postGoogleEventUpdate,
   postGoogleMailDraft,
+  postGoogleMailLabel,
+  postGoogleMailReply,
   postGoogleMailSend,
   postGoogleSource,
   postGoogleSourceActive,
@@ -492,12 +505,37 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "GET /api/content/google/drive/files": { handler: getGoogleDriveFiles, kind: "read" },
   "GET /api/content/google/drive/file": { handler: getGoogleDriveFile, kind: "read" },
   "POST /api/content/google/drive/upload": { handler: postGoogleDriveUpload, kind: "mutation" },
+  // WRITING is not just putting a file in. Rewriting one, making a folder to put
+  // it in, filing a conversation as a document — and the bin, without which the
+  // other three are three ways to make a mess nobody can tidy.
+  "POST /api/content/google/drive/update": { handler: postGoogleDriveUpdate, kind: "mutation" },
+  "POST /api/content/google/drive/folder": { handler: postGoogleDriveFolder, kind: "mutation" },
+  "POST /api/content/google/drive/save-mail": { handler: postGoogleDriveSaveMail, kind: "mutation" },
+  "POST /api/content/google/drive/trash": { handler: postGoogleDriveTrash, kind: "mutation" },
   "GET /api/content/google/gmail/messages": { handler: getGoogleMail, kind: "read" },
   "GET /api/content/google/gmail/message": { handler: getGoogleMailMessage, kind: "read" },
   "POST /api/content/google/gmail/draft": { handler: postGoogleMailDraft, kind: "mutation" },
   "POST /api/content/google/gmail/send": { handler: postGoogleMailSend, kind: "mutation" },
+  // Answering INSIDE a conversation, and filing one under a label. The reply
+  // door demands the mail switch exactly as the send door does — it sends.
+  "POST /api/content/google/gmail/reply": { handler: postGoogleMailReply, kind: "mutation" },
+  "POST /api/content/google/gmail/label": { handler: postGoogleMailLabel, kind: "mutation" },
   "GET /api/content/google/calendar/events": { handler: getGoogleEvents, kind: "read" },
   "POST /api/content/google/calendar/events": { handler: postGoogleEvent, kind: "mutation" },
+  // The four questions a person asks about an entry that already exists — what it
+  // says and when, who is coming, where it is, and whether it is happening at all.
+  // Four doors because a person changes one at a time, and because only one of
+  // them puts something in a third party's inbox (routes/google.ts says more).
+  "POST /api/content/google/calendar/event/update": { handler: postGoogleEventUpdate, kind: "mutation" },
+  "POST /api/content/google/calendar/event/guests": { handler: postGoogleEventGuests, kind: "mutation" },
+  "POST /api/content/google/calendar/event/location": { handler: postGoogleEventLocation, kind: "mutation" },
+  "POST /api/content/google/calendar/event/cancel": { handler: postGoogleEventCancel, kind: "mutation" },
+  // What was SAID in the meeting, reached from the meeting — Meet files its
+  // transcript as an ordinary Doc, so until now you had to already know which one.
+  "GET /api/content/google/calendar/event/transcript": {
+    handler: getGoogleEventTranscript,
+    kind: "read",
+  },
   // FROM kwapso TO Google: a sprint's dates as a calendar entry, and the meeting
   // door beside it — the two halves of "what we book here shows up there".
   "POST /api/content/google/calendar/sprint": { handler: postGoogleSprintEvent, kind: "mutation" },
@@ -505,8 +543,14 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // the MEETING (it remembers the entry it became) as well as the connection, so
   // it publishes twice — once for each screen that just went stale.
   "POST /api/content/google/calendar/meeting": { handler: postGoogleMeetingEvent, kind: "mutation" },
+  // Which spaces are there at all — the question that had no answer while a space
+  // could only be read by naming one you already knew. Reading the LIST is not
+  // reading what is in them; the messages door still refuses an unnamed space.
+  "GET /api/content/google/chat/spaces": { handler: getGoogleChatSpaces, kind: "read" },
   "GET /api/content/google/chat/messages": { handler: getGoogleChat, kind: "read" },
   "POST /api/content/google/chat/messages": { handler: postGoogleChat, kind: "mutation" },
+  // …and taking one back, for the same reason the Drive bin exists.
+  "POST /api/content/google/chat/delete": { handler: postGoogleChatDelete, kind: "mutation" },
 }
 
 export default {

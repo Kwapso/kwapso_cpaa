@@ -88,9 +88,9 @@ const TOOLLESS_DOORS: Record<string, string> = {
   // THE FIRST THREE ARE A BROWSER ROUND-TRIP. Connecting is a person standing at
   // Google's own consent screen and saying yes; there is no version of that a
   // machine can perform, and the credential it produces travels in an HttpOnly
-  // cookie a machine never holds. The other thirteen Google doors DO have tools,
-  // so this is not a module that was skipped — it is the three steps of a human
-  // decision, left out on purpose.
+  // cookie a machine never holds. The other twenty-seven Google doors DO have
+  // tools, so this is not a module that was skipped — it is the three steps of a
+  // human decision, left out on purpose.
   "GET /api/content/google/start":
     "answers with a 302 to Google's own consent screen. A machine caller cannot consent on somebody's behalf — that is the entire point of a consent screen — and a tool here would hand back a redirect nobody can follow. Connecting is a person, at a browser, choosing which of their accounts kwapso may act as.",
   "GET /api/content/google/callback":

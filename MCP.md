@@ -178,7 +178,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth —
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **215 doors, 174 with a tool, 41 with a written reason** — the
+  red build. Today: **228 doors, 187 with a tool, 41 with a written reason** — the
   reasons being the team-pin doors (§3.2 below), the client-portal standing doors
   (§3.3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the FOUR upload pairs — three media doors and the knowledge base, each now a
@@ -187,8 +187,8 @@ Today it covers:
   called because a JSON-RPC request has no body to stream into. Same conclusion,
   two different reasons, both written down — the seven
   Google doors that are a person's own decision, the timesheet correction, one
-  invite's audit trail and the cross-module activity feed. Of the 174, **157 are on THIS surface** and 17 are the in-app assistant's
-  alone — the thirteen Google tools, the three confirm-panel bulk writes and the role
+  invite's audit trail and the cross-module activity feed. Of the 187, **157 are on THIS surface** and 30 are the in-app assistant's
+  alone — the twenty-six Google tools, the three confirm-panel bulk writes and the role
   permission matrix read, each reasoned in §3. Those three numbers are asserted
   against the live census in `workers/mcp/test/filter-parity.test.ts`, so this
   sentence cannot quietly go stale again — it did, at 87 / 66 / 21, while the app
@@ -464,10 +464,11 @@ genuinely uncertain, natural-language actions through `agent_chat` instead: it p
 you approve with `agent_confirm`.
 
 **Google is almost entirely off this surface, and that is on purpose — but read
-the exception.** The thirteen tools that BROWSE a person's Drive, Gmail, Calendar
-and Chat (`google_drive_files`, `google_mail_search`, `google_send_mail`,
-`google_chat_post` and the rest) belong to the **in-app assistant** and to nothing
-else: no MCP tool forwards to any of those doors. A personal access token is a
+the exception.** The twenty-six tools that BROWSE and CHANGE a person's Drive,
+Gmail, Calendar and Chat (`google_drive_files`, `google_mail_search`,
+`google_send_mail`, `google_chat_post` and the rest) belong to the **in-app
+assistant** and to nothing else: no MCP tool forwards to any of those doors. A
+personal access token is a
 secret pasted into somebody's CI config, and the blast radius of a leaked one
 must not include a mailbox. If you need Google material browsed through a
 machine, ask the assistant — `agent_chat` reaches those tools under the same
@@ -498,6 +499,19 @@ but both belong in front of you rather than in a catalogue you skim:
 
 Both are recorded here rather than quietly removed because taking a capability off
 a published surface breaks somebody's script, and that is a decision with an owner.
+
+**What the assistant can now do there, and what it still cannot.** The module used
+to be able to read all four services and write only three things — a file into a
+named folder, a draft, an event. It can now also rewrite a file, make a folder,
+file a message or a whole conversation into Drive as a readable document, reply
+inside a thread, put a Gmail label on a message or take it off, change an event's
+title, times, guests or location, call an event off, list every Chat space the
+person can see, and reach a meeting's transcript from the diary entry rather than
+by already knowing which document it is. Two of those tools exist only so the
+others are safe to have: `google_drive_trash` and `google_chat_delete` undo what
+kwapso itself wrote — the bin rather than a delete, and only a message this app
+sent. What it still cannot do is unchanged and is the point: connect an account,
+disconnect one, or widen what it is allowed to see.
 
 Three Google doors have no tool on **either** surface, for a reason that is not
 about caution: connecting an account is a person standing at Google's own consent

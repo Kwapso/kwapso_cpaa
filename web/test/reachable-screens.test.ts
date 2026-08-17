@@ -335,6 +335,42 @@ const NO_CONTROL: Record<string, string> = {
   "POST /api/content/google/chat/messages":
     "FOR A MACHINE. Posting into a named space is an act the assistant performs on request; a person is already in the space. The owner asked for read AND post, and the post half is the assistant's.",
 
+  // THE THIRTEEN THAT FINISH THAT SENTENCE, and they are one decision, not
+  // thirteen. Every door on this module acts INSIDE Google — a file in a Drive
+  // folder, a label in a mailbox, a guest on a diary entry — and kwapso
+  // deliberately has no screen for any of it. That is the same ruling the four
+  // lines above already stand on, and it is the reason the module exists: a
+  // person who wants to rename a file opens Drive, which is better at it than a
+  // card we could build beside it would ever be. What kwapso adds is the
+  // ASSISTANT doing it on request, and a history row on the connection so "what
+  // has kwapso done as me?" has an answer in Settings.
+  //
+  // Read the two `take it back` doors as part of the same decision rather than as
+  // an oversight: they exist so the assistant's own writes are undoable, and the
+  // person's undo is Drive's bin and Chat's own delete, which they already have.
+  "POST /api/content/google/drive/update":
+    "FOR A MACHINE. Rewriting a file is the assistant answering 'update the scope doc with what we agreed'. A person with the document open edits it in Google Docs, which is better at editing documents than anything we would put beside it.",
+  "POST /api/content/google/drive/folder":
+    "FOR A MACHINE. Making a folder inside a shared one is the assistant tidying as it files — 'put these under a Bergman folder'. A person makes a folder in Drive, in one click, where the folders are.",
+  "POST /api/content/google/drive/save-mail":
+    "FOR A MACHINE. 'Put that exchange in the client folder' is a sentence somebody says to an assistant; the person's own version is forwarding the thread, which Gmail already does. It is also the one door here that reads one service and writes another, which is exactly the kind of errand a machine is for.",
+  "POST /api/content/google/drive/trash":
+    "FOR A MACHINE, and specifically to undo a machine. It exists so the assistant can take back a file it wrote; a person uses Drive's own bin, which is the same act on the same file with a shorter path to it.",
+  "POST /api/content/google/gmail/reply":
+    "FOR A MACHINE. The person's control is the mail reply dialog, which DRAFTS — the owner's ruling that a drafted reply is the normal way to answer mail. This door sends inside the thread, which is the assistant's half of the same sentence and carries the same always-ask confirm.",
+  "POST /api/content/google/gmail/label":
+    "FOR A MACHINE. Filing a message under a label is the assistant tidying a mailbox on request. A person clicks the label button in Gmail, where the message already is.",
+  "POST /api/content/google/calendar/event/update":
+    "FOR A MACHINE, on the owner's calendar ruling: the assistant may change a diary entry without asking, because its owner can change it back in one click. A person edits the entry in Google Calendar.",
+  "POST /api/content/google/calendar/event/guests":
+    "FOR A MACHINE. 'Add Marta to Thursday's call' is an errand; the person's version is the guest field in Google Calendar. It is the one calendar write that asks first, because an invitation lands in somebody else's inbox and cannot be recalled.",
+  "POST /api/content/google/calendar/event/location":
+    "FOR A MACHINE. Where a meeting happens is one field, and the assistant sets it when a room changes. A person types it in Google Calendar — and the meeting record's own location field is the kwapso-side control this door exists to push.",
+  "POST /api/content/google/calendar/event/cancel":
+    "FOR A MACHINE. Calling a meeting off is the assistant answering 'cancel Thursday'; a person cancels it in Google Calendar, where the guests and the notification live.",
+  "POST /api/content/google/chat/delete":
+    "FOR A MACHINE, and specifically to undo a machine — the counterpart of the post door above. It takes back a message kwapso itself sent; a person deletes their own message in Chat.",
+
   /* ── a gap, owned by another lane ──────────────────────────────────────── */
   // EMPTY, and that is the point of the two headings staying here. Twelve doors
   // sat under this one — both rate cards, the two halves of the Gmail sentence

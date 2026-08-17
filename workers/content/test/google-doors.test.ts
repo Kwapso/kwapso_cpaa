@@ -76,13 +76,23 @@ describe("the owner's two switches are demanded where the act happens", () => {
   const ACTS: { switch: string; calls: RegExp; what: string }[] = [
     {
       switch: "google_mail",
-      calls: /\bgmailSend(Draft)?\s*\(/,
+      // `gmailReply` belongs here beside `gmailSend`: a reply is not a softer act
+      // than a message, it IS a message, in somebody's inbox, with our name on
+      // it. The day the reply door was written this pattern was one name short
+      // and would have let it ship without the owner's switch.
+      calls: /\bgmail(Send(Draft)?|Reply)\s*\(/,
       what: "sends mail out of somebody's mailbox",
     },
     {
       switch: "google_events",
-      calls: /\bcalendarCreate\s*\(/,
-      what: "puts an event in somebody's calendar",
+      // Every WRITE on a calendar, not only the one that creates. The owner's
+      // switch reads "kwapso may put an EVENT in your calendar", and the honest
+      // reading of it is "kwapso may touch my diary" — of which moving an
+      // appointment, uninviting somebody and calling the whole thing off are all
+      // sharper versions than adding one. Reads (`calendarList`, `calendarGet`)
+      // are deliberately absent: this is the writers' list.
+      calls: /\bcalendar(Create|Update|Guests|Cancel)\s*\(/,
+      what: "puts an event in somebody's calendar, or changes one",
     },
   ]
 
