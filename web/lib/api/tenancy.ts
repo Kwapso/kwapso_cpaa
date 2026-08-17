@@ -363,10 +363,16 @@ export const tenancy = {
       `/api/tenancy/processes${qs ? `?${qs}` : ""}`
     )
   },
-  /** One map opened: its versions, its current steps, and the exact comment total
-   * its tab badges. */
-  processDetail: (id: string) =>
-    api<ProcessDetail>(`/api/tenancy/processes/detail?id=${enc(id)}`),
+  /** One map opened: its versions, the steps of ONE of them, the exact totals its
+   * tabs badge, and the saving those steps add up to.
+   *
+   * `versionId` reads an OLDER version — its steps and times exactly as they
+   * were when it was cut. Omitted means the current one, which is what every
+   * caller before the version selector existed was asking for. */
+  processDetail: (id: string, versionId?: string) =>
+    api<ProcessDetail>(
+      `/api/tenancy/processes/detail?id=${enc(id)}${versionId ? `&versionId=${enc(versionId)}` : ""}`
+    ),
   /** ONE process row (the row-level live re-pull). A 404 means it's genuinely gone
    * — anything else propagates, so a network blip never drops a row off a list. */
   processRow: (id: string): Promise<ProcessSummary | null> =>

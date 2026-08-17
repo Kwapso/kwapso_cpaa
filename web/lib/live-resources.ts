@@ -359,6 +359,21 @@ export function processKey(processId: string): string {
 export function processCommentsKey(processId: string): string {
   return `process-comments:${processId}`
 }
+/** AN OLDER VERSION of a map, read on its own. The record cache above holds the
+ * CURRENT version — the one a live ping is about, and the one every other screen
+ * means when it says "the process" — so an older version gets a slice of its own
+ * rather than taking that key's place: selecting version 1 must not leave the
+ * next reader of `process:<id>` holding last year's steps.
+ *
+ * Older versions are frozen (the server refuses an edit to anything but the
+ * latest), so these slices go stale in exactly one way: a cut turns today's
+ * version into an old one. That is a `processes` ping, and PROCESS_VERSION_SLICES
+ * below is how it reaches every loaded slice — the ping names a map, not a
+ * version, which is the same shape the work-log/time slices have. */
+export function processVersionKey(processId: string, versionId: string): string {
+  return `${PROCESS_VERSION_SLICES}${processId}:${versionId}`
+}
+export const PROCESS_VERSION_SLICES = "process-version:"
 /** The savings drill-down, per team — the one number a client is most likely to
  * ask about, so it re-reads whenever any step under it moves. */
 export function valueKey(teamId: string): string {
@@ -548,6 +563,12 @@ export const TEAM_RESOURCES: Record<
     fetchOne: (id) => tenancy.processRow(id),
     fetchList: (t) => listFetch.processes(t),
     deps: (t, id) => [processKey(id), processCommentsKey(id), `activity:record:processes:${id}`, valueKey(t)],
+    // …and any OLDER version somebody has open. A cut is a `processes` ping, and
+    // it is the one event that changes what an old version IS — the version that
+    // was current a moment ago is now one of these. The ping names the map, not
+    // the version, so the honest answer is to drop the family and let whatever is
+    // on screen re-read (cache-first: a slice nobody is looking at costs nothing).
+    slicePrefix: PROCESS_VERSION_SLICES,
   },
   // A comment carries the PROCESS id — a conversation is only ever read on its
   // own map, so that is the one row a listener can act on. It refreshes the

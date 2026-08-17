@@ -336,23 +336,53 @@ export async function listProcesses(
   }
 }
 
-/** One process opened: its versions, the steps of its LATEST version, and the
- * exact counts its tabs are badged with (R16 — never `rows.length`, which is a
- * capped read's ceiling wearing a total's clothes). Outside the fence it is a
- * 404, identical to a made-up id. */
+/** One process opened: its versions, the steps of ONE of them, the exact counts
+ * its tabs are badged with (R16 — never `rows.length`, which is a capped read's
+ * ceiling wearing a total's clothes), and the subtraction the whole map exists
+ * to produce. Outside the fence it is a 404, identical to a made-up id.
+ *
+ * `versionId` IS THE ANSWER TO "I CAN'T SEE THE OLD VERSION" (tester L4, 17 Aug
+ * 2026). It defaults to the latest — the answer this door has always given — and
+ * naming an older one returns THAT version's steps, with their times as they
+ * were agreed. A version id belonging to another map is a 404 rather than an
+ * empty list: an empty list reads as "this version had no steps", which is a
+ * different and much worse sentence than "no such version".
+ *
+ * `saving` comes back through `listSavings` rather than being computed here, and
+ * that is the point of the round trip. It is the SAME statement and the SAME
+ * pure function the value screen and the client's portal read, so the figure on
+ * this screen cannot disagree with the one a client is looking at. A second
+ * implementation of the subtraction — even a correct-looking one — is exactly
+ * how "the numbers stop being believable" starts. `null` when the map is
+ * archived: an archived map is out of the value picture by construction (the
+ * savings read excludes it), and reporting a figure for it would contradict the
+ * value screen on the same page. */
 export async function getProcess(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
-  id: string
+  id: string,
+  opts: { versionId?: string } = {}
 ): Promise<ProcessDetail> {
   const summary = await processOrThrow(cfg, guard, scope, id)
-  const [versions, steps, commentsTotal] = await Promise.all([
+  const shown = await versionOrThrow(cfg, guard, scope, id, opts.versionId)
+  const [versions, steps, shownStepCount, commentsTotal, savings] = await Promise.all([
     listProcessVersions(cfg, guard, scope, id),
-    listProcessSteps(cfg, guard, scope, id),
+    listProcessSteps(cfg, guard, scope, id, shown.id),
+    countVersionSteps(cfg, guard, scope, shown.id),
     countProcessComments(cfg, guard, scope, id),
+    listSavings(cfg, guard, scope, { processId: id }),
   ])
-  return { process: summary, versions, steps, commentsTotal }
+  return {
+    process: summary,
+    versions,
+    steps,
+    shownVersionId: shown.id,
+    shownStepCount,
+    commentsTotal,
+    saving: savings.apps[0]?.processes[0] ?? null,
+    savingsCaption: savings.caption,
+  }
 }
 
 /** Every version of one process, newest first. BOUNDED: a version is cut once per
@@ -394,12 +424,28 @@ export async function listProcessVersions(
   }))
 }
 
-/** The steps of one process's LATEST version — what the work looks like today. */
+/** The steps of ONE version of a process — the latest by default (what the work
+ * looks like today), or a named older one (what it looked like when that version
+ * was cut).
+ *
+ * THE ORDER IS THE FEATURE, not a detail of the read. A reader who cannot tell
+ * what follows what cannot check the arithmetic underneath it, and the times on
+ * these steps are what a client's savings figure is a subtraction between.
+ *
+ * `position` decides; `created_at` then `id` settle a tie. Name was the old
+ * settler, and it sorted "Chase the paperwork" above "Collect the documents"
+ * whenever two positions matched — an alphabetical list wearing a sequence's
+ * clothes, which is worse than an arbitrary one because it looks deliberate.
+ * The id is there to make the order TOTAL rather than to say anything about
+ * time: it is unique, so two reads of the same rows always come back the same
+ * way round. (Within one millisecond the data holds no order to recover — a
+ * ULID's second half is random — and that is honest: nothing wrote one down.) */
 export async function listProcessSteps(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
-  processId: string
+  processId: string,
+  versionId?: string
 ): Promise<ProcessStep[]> {
   const fence = accountScopeClause(scope, "s.account_id")
   const rows = await d1Query<{
@@ -420,9 +466,15 @@ export async function listProcessSteps(
     `SELECT s.id, s.version_id, s.step_key, s.name, s.description, s.position,
             s.seconds_per_run, s.runs_per_month, s.removed_at
        FROM process_steps s
-      ${where([fence.sql, "s.process_id = ?", "s.version_id = (SELECT id FROM process_versions v WHERE v.process_id = ? ORDER BY v.version_no DESC LIMIT 1)"])}
-      ORDER BY s.position ASC, s.name ASC LIMIT ${LIST_HARD_CAP}`,
-    [...fence.params, processId, processId]
+      ${where([
+        fence.sql,
+        "s.process_id = ?",
+        versionId
+          ? "s.version_id = ?"
+          : "s.version_id = (SELECT id FROM process_versions v WHERE v.process_id = ? ORDER BY v.version_no DESC LIMIT 1)",
+      ])}
+      ORDER BY s.position ASC, s.created_at ASC, s.id ASC LIMIT ${LIST_HARD_CAP}`,
+    [...fence.params, processId, versionId ?? processId]
   )
   return rows.map((r) => ({
     id: r.id,
@@ -436,6 +488,34 @@ export async function listProcessSteps(
     runsPerMonth: r.runs_per_month,
     removed: r.removed_at != null,
   }))
+}
+
+/** R16 — the exact server total behind the Steps tab, for the version being
+ * SHOWN. It has to move with the version selector: a badge counting today's
+ * steps over a list showing version 1's is the quietly-wrong number R16 exists
+ * to prevent, and on this screen it would be quietly wrong about the arithmetic
+ * a client is reading.
+ *
+ * A PLAIN `COUNT(*)`, not the bounded seam in shared/workers/count.ts, and that
+ * is the seam's own instruction rather than a shortcut past it: it is scoped to
+ * GROWING_COLLECTIONS on purpose, because a bounded collection already has a
+ * ceiling and wrapping one "would be ceremony". The steps of ONE version of ONE
+ * map are bounded by what a person can read — the same reason `listProcessSteps`
+ * above takes a hard cap rather than a cursor. */
+export async function countVersionSteps(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  versionId: string
+): Promise<number> {
+  const fence = accountScopeClause(scope, "account_id")
+  const rows = await d1Query<{ n: number }>(
+    cfg,
+    guard.databaseId,
+    `SELECT COUNT(*) AS n FROM process_steps${where([fence.sql, "version_id = ?"])}`,
+    [...fence.params, versionId]
+  )
+  return rows[0]?.n ?? 0
 }
 
 /** Create a process AND its baseline. The two are one act, deliberately: a
@@ -553,7 +633,16 @@ export async function setProcessActive(
 // ── steps ────────────────────────────────────────────────────────────────────
 
 /** Add a step to a process's LATEST version. A new step gets a fresh `step_key`,
- * which is the identity every later version will carry it forward under. */
+ * which is the identity every later version will carry it forward under.
+ *
+ * WITH NO POSITION GIVEN IT GOES ON THE END, and that is a fix rather than a
+ * preference. The default was `0`, and `0` sorts FIRST — so every step added
+ * from the app landed above the whole map, and a reader watching a sequence
+ * build up saw it grow backwards. (The seeded maps set an explicit position and
+ * looked fine, which is why it survived: the only steps that misbehaved were the
+ * ones a person typed.) A tie is harmless — two concurrent adds may land on the
+ * same number and the read's `created_at` tie-break settles them — so this needs
+ * no lock; it is a display order, not an invariant. */
 export async function addStep(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -579,7 +668,7 @@ export async function addStep(
     step_key: ulid(),
     name: input.name,
     description: input.description ?? null,
-    position: input.position ?? 0,
+    position: input.position ?? (await nextPosition(cfg, guard, version.id)),
     seconds_per_run: input.secondsPerRun,
     runs_per_month: input.runsPerMonth,
     created_at: new Date().toISOString(),
@@ -660,7 +749,14 @@ export async function updateStep(
  * for it, silently.
  *
  * R17: `removed_at IS NULL` rides the UPDATE, so removing twice moves zero rows,
- * writes no second history line and publishes nothing. */
+ * writes no second history line and publishes nothing.
+ *
+ * AND ONLY IN THE NEWEST VERSION — the same predicate `updateStep` carries, added
+ * here on 17 Aug 2026 when the detail screen learned to show older versions. The
+ * hole was real and had simply been out of reach: this write sets a duration to
+ * ZERO, so against a baseline it would have manufactured the largest saving the
+ * app can report, on the exact figure a client is shown. Nothing but the absence
+ * of a button was stopping it, and a button is not a permission. */
 export async function removeStep(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -675,9 +771,29 @@ export async function removeStep(
     cfg,
     guard.databaseId,
     `UPDATE process_steps SET removed_at = ?, seconds_per_run = 0, ${editedBy(actor, now).sql}
-     ${where([fence.sql, "id = ?", "removed_at IS NULL"])} RETURNING process_id`,
+     ${where([
+       fence.sql,
+       "id = ?",
+       "removed_at IS NULL",
+       // …and only in the newest version. It rides the UPDATE rather than sitting
+       // in front of it because a version cut between a check and a write would
+       // leave the check true and the write wrong.
+       "version_id = (SELECT id FROM process_versions v WHERE v.process_id = process_steps.process_id ORDER BY v.version_no DESC LIMIT 1)",
+     ])} RETURNING process_id`,
     [now, ...editedBy(actor, now).params, ...fence.params, id]
   )
+  // ZERO ROWS MOVED HAS TWO CAUSES NOW, and they are not the same answer. Already
+  // removed is nothing wrong (R17: silence, no second history line, no ping).
+  // Belonging to a frozen version is a refusal, and it has to SAY so — a silent
+  // 200 would tell somebody the baseline had been edited when it had not. The
+  // read happens only on this path, so the ordinary write still costs one
+  // statement and the predicate above is still the thing that decided.
+  if (!changed[0] && !(await isInLatestVersion(cfg, guard, scope, id)))
+    throw new GuardError(
+      409,
+      "not_latest",
+      "That step belongs to an older version of the process. Only the current version can be changed."
+    )
   if (!changed[0]) return null
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Step removed",
@@ -891,7 +1007,7 @@ export async function listSavings(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
-  opts: { accountId?: string; appId?: string } = {}
+  opts: { accountId?: string; appId?: string; processId?: string } = {}
 ): Promise<SavingsView> {
   if (opts.accountId) requireAccountInScope(scope, opts.accountId)
   const fence = accountScopeClause(scope, "p.account_id")
@@ -899,6 +1015,14 @@ export async function listSavings(
     fence.sql,
     opts.accountId ? "p.account_id = ?" : undefined,
     opts.appId ? "p.app_id = ?" : undefined,
+    // ONE MAP'S OWN SUBTRACTION, for the map's own screen. It narrows the same
+    // statement rather than adding a second one, which is what makes the figure
+    // on a process's detail the same figure as on the value screen by
+    // construction instead of by inspection. Not a query parameter on the value
+    // door: nothing asks a machine for one map's saving, and a filter with no
+    // caller is a contract to keep for nothing (R19 measures the door's own
+    // parameters, so this stays honest by staying a lib option).
+    opts.processId ? "p.id = ?" : undefined,
     // An archived app or process is not part of today's picture.
     "p.deactivated_at IS NULL",
     "a.deactivated_at IS NULL",
@@ -906,6 +1030,7 @@ export async function listSavings(
   const params = [...fence.params]
   if (opts.accountId) params.push(opts.accountId)
   if (opts.appId) params.push(opts.appId)
+  if (opts.processId) params.push(opts.processId)
 
   // WHICH STEPS WE HAVE EXPLAINED — one bounded read, not one per step. A staff
   // comment naming a step IS the explanation (BUILD-3 §3), so this is the set of
@@ -1106,6 +1231,69 @@ async function latestVersionOrThrow(
   )
   if (!rows[0])
     throw new GuardError(409, "no_baseline", "That process has no version 1 yet — it can't be measured from.")
+  return { id: rows[0].id, versionNo: rows[0].version_no }
+}
+
+/** Is this step part of the version that can still be edited? Asked ONLY to tell
+ * two zero-row outcomes apart after a refused write — never to decide one, which
+ * is why it is not called before the UPDATE that carries the same predicate. */
+async function isInLatestVersion(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  stepId: string
+): Promise<boolean> {
+  const fence = accountScopeClause(scope, "account_id")
+  const rows = await d1Query<{ n: number }>(
+    cfg,
+    guard.databaseId,
+    `SELECT COUNT(*) AS n FROM process_steps${where([
+      fence.sql,
+      "id = ?",
+      "version_id = (SELECT id FROM process_versions v WHERE v.process_id = process_steps.process_id ORDER BY v.version_no DESC LIMIT 1)",
+    ])}`,
+    [...fence.params, stepId]
+  )
+  return (rows[0]?.n ?? 0) > 0
+}
+
+/** The next place on the end of a version's list of steps. No fence clause: the
+ * version id reaching here has already been resolved through one
+ * (`latestVersionOrThrow`), and this reads no row's contents — it asks for a
+ * number to sort by. */
+async function nextPosition(cfg: D1Rest, guard: MemberGuard, versionId: string): Promise<number> {
+  const rows = await d1Query<{ n: number | null }>(
+    cfg,
+    guard.databaseId,
+    "SELECT MAX(position) AS n FROM process_steps WHERE version_id = ?",
+    [versionId]
+  )
+  return (rows[0]?.n ?? 0) + 1
+}
+
+/** THE VERSION A READER ASKED FOR — the named one, or the latest when they named
+ * none.
+ *
+ * `process_id = ?` rides the WHERE beside the id, so a version id belonging to
+ * ANOTHER map is a 404 and not that map's steps. The account fence would already
+ * refuse another CLIENT's version; this is the clause that refuses another map
+ * of the same client's, which the fence cannot see the difference of. */
+async function versionOrThrow(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  processId: string,
+  versionId?: string
+): Promise<{ id: string; versionNo: number }> {
+  if (!versionId) return latestVersionOrThrow(cfg, guard, scope, processId)
+  const fence = accountScopeClause(scope, "account_id")
+  const rows = await d1Query<{ id: string; version_no: number }>(
+    cfg,
+    guard.databaseId,
+    `SELECT id, version_no FROM process_versions${where([fence.sql, "id = ?", "process_id = ?"])} LIMIT 1`,
+    [...fence.params, versionId, processId]
+  )
+  if (!rows[0]) throw new GuardError(404, "not_found", "That version doesn't exist.")
   return { id: rows[0].id, versionNo: rows[0].version_no }
 }
 

@@ -1,6 +1,13 @@
 // Shared contract between the workers (who produce these) and the web app
 // (who consumes them). ONE master copy — never redeclare these shapes.
 
+// The one import this file makes, and it is the reason the rule above holds: a
+// savings figure has a shape, and that shape lives beside the arithmetic that
+// produces it (shared/workers/savings.ts). Re-declaring `ProcessSaving` here to
+// keep the file import-free would be the exact duplication this file exists to
+// prevent — and the copy that drifts would be the one describing money.
+import type { ProcessSaving } from "./workers/savings"
+
 /** A signed-in person, as the auth worker returns them to the browser. */
 export type SessionUser = {
   id: string
@@ -789,13 +796,28 @@ export type ProcessStep = {
   removed: boolean
 }
 
-/** One process opened: its versions, its current steps, and the exact comment
- * total its tab is badged with (R16). */
+/** One process opened: its versions, the steps of ONE of them, the exact totals
+ * its tabs are badged with (R16), and the subtraction the map exists to produce.
+ *
+ * `steps` is the SHOWN version's, not always the current one's — `shownVersionId`
+ * says which, and it is the latest unless the reader asked for an older one. The
+ * two travel together deliberately: a list of steps with no version beside it is
+ * how a reader ends up checking today's times against last year's total. */
 export type ProcessDetail = {
   process: ProcessSummary
   versions: ProcessVersion[]
   steps: ProcessStep[]
+  /** which version `steps` belongs to (the latest, unless one was asked for) */
+  shownVersionId: string
+  /** the exact server count of that version's steps — what the Steps tab badges */
+  shownStepCount: number
   commentsTotal: number
+  /** baseline minus latest, step by step, through the ONE savings seam — so this
+   * screen's figure and the client's portal can never disagree. `null` for an
+   * archived map, which is out of the value picture by construction. */
+  saving: ProcessSaving | null
+  /** the sentence the figure above must be quoted with (R25), carried with it */
+  savingsCaption: string
 }
 
 /** A comment on a process map — a conversation, never an edit. */

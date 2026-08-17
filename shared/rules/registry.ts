@@ -770,6 +770,16 @@ export const RECORD_DETAIL_COMPONENTS = [
   // and its header carries the one button that reaches outside this app — "put
   // it in my calendar". No engine block draws either.
   "meeting-detail",
+  // A process map's detail is a component because its Steps tab draws an
+  // ARITHMETIC — a numbered sequence, each step's time, the version's total, and
+  // the subtraction between the baseline and today — over a collection the
+  // reader chooses the VERSION of. No engine block expresses either half.
+  //
+  // Listed here on 17 Aug 2026, after a tester could not tell what order the
+  // steps ran in and could not open an older version: the screen already had the
+  // tabs, but no law was walking it, so nothing would have caught the Steps badge
+  // counting today's steps over an older version's list.
+  "process-detail",
 ] as const
 
 /** R2 — reviewed bypasses. Each MUST get tabs over time; the reason is mandatory.
@@ -833,6 +843,8 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
     "the agenda we set and the notes we took — the two pieces of prose this module exists to keep. One record's body, not a collection.",
   "knowledge-detail.overview":
     "one source's kind, compartment, who may read it, how many pieces it was cut into and when it was last indexed — one record, not a collection.",
+  "process-detail.overview":
+    "the map's own description — including the caveat saying whether its times have been agreed yet — plus its app, its current version, its baseline and its audit block. One record, not a collection. Its four siblings each carry a server count, and the Steps badge counts the VERSION being shown rather than always the current one.",
 }
 
 /** R4 — the form dialogs that MUST use FormShell. */
