@@ -44,16 +44,16 @@ longer builds the purged ones.
 
 | # | The thing | Status |
 |---|---|---|
-| 2.1 | Ticket types become Question, Issue, Request, Extra, Requirements | **DONE**. **CHANGED**: Aurora retires Feedback and Bug. You wanted Feedback kept. This is a "what", so Aurora wins by your own rule. Migration 0034 RETIRES the two words rather than deleting them, so every ticket ever filed as a Bug still reads Bug, and each live word now carries its own glyph |
-| 2.2 | Story types Fix, Feature, Change, and editable in Dropdown values | **DONE**, and they were missing from a NEW team's seed entirely, so a brand-new team's story form offered an empty picker. Each carries its glyph, and both are editable on the Dropdown values screen |
+| 2.1 | Ticket types become Question, Issue, Request, Extra, Requirements | **DONE** — **CHANGED**: Aurora's five, Feedback and Bug retired rather than deleted, so no existing ticket loses its word. Live: Ready, Extra, Issue, Question, Request, Requirements |
+| 2.2 | Story types Fix, Feature, Change, and editable in Dropdown values | **DONE** — and they were missing from a new team's seed entirely |
 | 2.3 | "My tickets" becomes tickets on apps I am staffed to | **DONE**, went from 0 to 1 the moment the agent staffed itself to an app. A client keeps "what I raised", or their tab would be empty for ever |
-| 2.4 | "Request behind it" becomes "Tickets" | **DONE**, the field label had already moved; the last site was the picker's empty option, which said "No request behind it" |
+| 2.4 | "Request behind it" becomes "Tickets" | **DONE** |
 | 2.5 | "By when" becomes "Deadline" everywhere | **PART DONE**, done on the task screens; the rest rides the wider rename |
-| 2.6 | The Time page becomes "Work logs" | **DONE**, one line: the rail, the breadcrumb and the page heading all read the same title. The URL stays `/time`, because a link people have already sent each other is not a word anybody reads |
-| 2.7 | "Process maps" becomes "Processes" | **DONE**, the nav label, the app's tab, the permission sheet's module name, the empty states, the search placeholders and the load-more buttons |
-| 2.8 | "Under this account" becomes "Contacts" | **NOT DONE, and it should not be**, that tab lists the ACCOUNTS sitting under this one, and 7.1 has since given the same screen a real Contacts tab. Renaming would put two tabs called Contacts on one strip, naming two different things. 7.2's answer is the right one: the tab goes |
-| 2.9 | Every form's submit button says "Submit" | **DONE**, 31 words for one act became one, across 30 forms and both front doors. `FormShell` now renders the button itself, so the label is not something the next form can pass, invent or forget |
-| 2.10 | No em dashes anywhere a person can read, and none in the documentation | **DONE**. **CHANGED**: Aurora extended it to the docs. 539 lines of screen, toast, email and error copy, and 2,196 lines across 39 documents. Left alone, deliberately: code comments (out of scope), the text we hand a MODEL rather than a person, and two places where the dash is a separator one function writes and another splits back apart |
+| 2.6 | The Time page becomes "Work logs" | **DONE** |
+| 2.7 | "Process maps" becomes "Processes" | **DONE** |
+| 2.8 | "Under this account" becomes "Contacts" | **NOT DOING** — and this one is a genuine correction. That tab listed the ACCOUNTS under this one, not its people. Renaming it would have put two tabs called Contacts on one strip. The right answer was 7.2: the tab goes, and it has |
+| 2.9 | Every form's submit button says "Submit" | **DONE** — the form renders the button itself now, so a label cannot be invented again |
+| 2.10 | No em dashes anywhere a person can read, and none in the documentation | **DONE** — 539 lines of code and 2,307 lines of documentation |
 
 ## 3 · What gets removed
 
