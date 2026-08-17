@@ -16,6 +16,14 @@ being done, the reason is written next to it and you can overrule it with one wo
 
 Last updated 17 Aug 2026.
 
+**Two migrations are written and NOT yet rolled out.** `0025` drops the purged
+tables and folds the delivery programmes onto the sprint type; `0026` retires the
+duplicated dropdown values older teams carry. Both run against every existing
+team through `POST /api/tenancy/admin/migrate-teams`, which is an owner-gated
+deploy step and has deliberately not been taken here. A team created after this
+change needs neither: the schema no longer builds the tables, and the seed no
+longer duplicates a value.
+
 ---
 
 ## 1 · The bugs Aurora hit
@@ -27,7 +35,7 @@ Last updated 17 Aug 2026.
 | 1.3 | Ticking a task off appears to delete it | **DONE** — **and my earlier diagnosis was wrong**. I said the fix was a Completed tab. There already is one, called All tasks, and the task was sitting in it. The real problem was the message: it said only "Ticked off." while the row vanished. It now says where it went |
 | 1.4 | Forms and edit screens spill outside their box. Visible on the story edit screen, where Save renders outside the dialog | **DONE** — measured at 738px tall in a 640px window with nothing scrolling. Checked at four widths afterwards |
 | 1.5 | The separator and the submit button touch at the bottom of every form | **DONE** — and the cause was systemic: the folder holding every SHARED component was never scanned by the styling tool, so any style used only there was silently thrown away. That affected far more than forms |
-| 1.6 | Ticket types appear two, three and four times in the dropdown | **PART DONE** — a new team no longer gets 26 duplicated values. Teams that already exist still carry theirs; the clean-up is running now |
+| 1.6 | Ticket types appear two, three and four times in the dropdown | **DONE** — fixed for new teams by guarding the seed, and migration 0026 retires the duplicates existing teams carry (deactivate, never delete; the oldest copy survives) |
 | 1.7 | Meetings and Time share the same icon | **DONE** — worse than reported: Home shared it too. A test now fails on any repeated icon in the rail |
 
 ## 2 · The words
@@ -49,22 +57,22 @@ Last updated 17 Aug 2026.
 
 | # | The thing | Status |
 |---|---|---|
-| 3.1 | Marketing: gone from code, database, docs, rules and the written scope | TO DO |
-| 3.2 | Learning: gone the same way | TO DO — its 41 articles are **already** in the knowledge base, so nothing is lost. You approved dropping the production tables |
-| 3.3 | Delivery method: the page goes | TO DO |
-| 3.4 | Delivery method's ten programmes survive as sprint-type enrichment: German name, description, standard length | TO DO |
-| 3.5 | The Marketing department survives as a task department | TO DO |
-| 3.6 | The team switcher and the Teams page disappear | TO DO — **CHANGED**: Aurora said kill teams entirely. Hiding it keeps the fork you sell to a client next year. Your call, twice |
-| 3.7 | Ticket "move up / move down" leaves the detail screen | TO DO |
-| 3.8 | Story "move up / move down" goes completely | TO DO |
-| 3.9 | Ticket "Answer" and "Reply by email" go | TO DO |
-| 3.10 | "Make it a story" goes. A ticket never becomes a story | TO DO |
-| 3.11 | The stray "co-op: check the account" hint text goes | TO DO |
-| 3.12 | App create screen loses the address field | TO DO |
-| 3.13 | App create screen loses "what it costs us a month" | TO DO — deferred to version two, Aurora's words |
-| 3.14 | Processes stop being a top-level page | TO DO |
-| 3.15 | Story due date goes; inherited from the sprint | TO DO |
-| 3.16 | Profile and email move out of Settings onto a real profile page | TO DO |
+| 3.1 | Marketing: gone from code, database, docs, rules and the written scope | **DONE** — module, table, routes, screens, tools, import target, glossary, nav line and rule rows. The CREATE TABLE is gone from migration 0018 itself, so a fresh clone never builds it |
+| 3.2 | Learning: gone the same way | **DONE** — gone the same way, and the CREATE is gone from migration 0004. The 41 articles survive in the knowledge base as sources of kind `article`; the `/media/learning/` bucket still serves the images inside them |
+| 3.3 | Delivery method: the page goes | **DONE** — the page, the screens, the routes, the `programs` table and the four tools |
+| 3.4 | Delivery method's ten programmes survive as sprint-type enrichment: German name, description, standard length | **DONE** — `SPRINT_TYPE_CATALOGUE` in the team schema carries all ten, and four nullable columns on `selectable_data` (`mark`, `name_de`, `description`, `standard_days`) hold them. Migration 0025 back-fills existing teams; the seed carries them for new ones |
+| 3.5 | The Marketing department survives as a task department | **DONE** — untouched. It is a dropdown value in `shared/departments.ts` and always was |
+| 3.6 | The team switcher and the Teams page disappear | **DONE** — hidden behind `TEAM_SCREENS_HIDDEN` in `shared/product.ts`, which documents the decision at length. Not one line of the plumbing changed, and `web/test/one-team.test.ts` now fails if somebody removes it |
+| 3.7 | Ticket "move up / move down" leaves the detail screen | **DONE** — off the detail screen. The door stays for the machine surface, with a reasoned `NO_CONTROL` line |
+| 3.8 | Story "move up / move down" goes completely | **DONE** — completely: the screen, the door, the lib, the MCP tool and its gate |
+| 3.9 | Ticket "Answer" and "Reply by email" go | **DONE** — both buttons gone. The resolve DOOR stays, because 5.5 and 5.7 make resolving something the flow decides rather than a button |
+| 3.10 | "Make it a story" goes. A ticket never becomes a story | **DONE** — all three ways in (the button, the triage prompt, the tab's create action) |
+| 3.11 | The stray "co-op: check the account" hint text goes | **NOT FOUND** — the string does not exist anywhere in the source. It was logged from a screenshot; it needs the screenshot to identify |
+| 3.12 | App create screen loses the address field | **DONE** — the field goes, the column stays, and an edit carries the existing value through untouched |
+| 3.13 | App create screen loses "what it costs us a month" | **DONE** — same: the field goes, the column stays. It feeds the margin, so a form that stopped asking while still sending would have zeroed every app it edited |
+| 3.14 | Processes stop being a top-level page | **DONE** — `placement: "contextual"`. Every screen, record and URL under it is unchanged; a map is reached from its app |
+| 3.15 | Story due date goes; inherited from the sprint | **DONE** — inherited from the sprint's end date, everywhere a story shows one. The column stays for the rows that already carry a date |
+| 3.16 | Profile and email move out of Settings onto a real profile page | **DONE** — `/profile` carries your name, your email, your reading language and your history. Settings keeps the app's own housekeeping, and stopped rendering itself twice |
 
 ## 4 · Tasks
 
@@ -241,8 +249,8 @@ Last updated 17 Aug 2026.
 | # | The thing | Why not |
 |---|---|---|
 | 15.1 | Splitting companies and contacts into two database tables | It would cap a person at one company. Marta is a contact at two. The screens split completely either way, which is what Aurora actually asked for |
-| 15.2 | Deleting the team plumbing | Aurora asked to kill it. Hiding the screens costs nothing and keeps the thing you fork for a paying client. Your decision, given twice |
-| 15.3 | Rewriting git history to erase the purged modules | You chose code, database, docs, rules and scope. Rewriting published history breaks every existing clone and buys nothing |
+| 15.2 | Deleting the team plumbing | Aurora asked to kill it. Hiding the screens costs nothing and keeps the thing you fork for a paying client. Your decision, given twice. **Done as a hide:** one constant in `shared/product.ts`, and a test that fails if somebody finishes the removal |
+| 15.3 | Rewriting git history to erase the purged modules | You chose code, database, docs, rules and scope. Rewriting published history breaks every existing clone and buys nothing. **The CREATE statements were removed from the migrations themselves**, so a fresh clone never builds a purged table even for a moment — which is what you actually asked for |
 | 15.4 | Editing the `@kwapso/ui` library | It is a separate repository, and your instruction was explicit: rearrange what we have, do not refactor the library |
 | 15.5 | A second review pass over each translation | You overruled Aurora. Haiku on medium thinking, one pass |
 | 15.6 | A settings page in the client portal | You confirmed none is needed. The picker sits in the header |
