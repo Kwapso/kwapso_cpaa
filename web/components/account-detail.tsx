@@ -54,8 +54,9 @@ import {
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import { Pencil, Power } from "lucide-react"
 
-import type { Account, AccountDetail } from "@shared/types"
-import type { SavingsView } from "@shared/workers/savings"
+import type { Account, AccountDetail, AccountRate } from "@shared/types"
+import { SAVINGS_CAPTION, savedHours, type SavingsView } from "@shared/workers/savings"
+import { moneyText } from "@shared/web/money"
 import { AccountFormDialog, type AccountFormValues } from "@/components/account-form-dialog"
 import { AccountRateCard } from "@/components/account-rate-card"
 import { MarginPanel } from "@/components/margin-panel"
@@ -85,12 +86,13 @@ import {
   accountsKey,
   childrenKey,
   listFetch,
+  ratesKey,
   totalKey,
 } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
-import { invalidate, useCached, useCachedValue } from "@shared/web/store"
+import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import { useT } from "@shared/web/language"
 
@@ -156,6 +158,18 @@ export function AccountDetailScreen({
   // for a role without it. (The agency's OWN cost card is a different screen in
   // a different file — R24; see internal-rate-card.tsx.)
   const canSeeRates = can("commercials", "read")
+  // The client's own rate card — read only to turn the hours above into money,
+  // and only for a role that may see prices at all. It is the same cache the
+  // Rates tab fills, so opening that tab costs nothing afterwards.
+  const ratesQ = useCached<AccountRate[]>(
+    can("commercials", "read") ? ratesKey(accountId) : null,
+    () =>
+      tenancy.accountRates(accountId).then((r) => {
+        primeCache(totalKey("account-rates", accountId), r.total)
+        return r.rates
+      })
+  )
+
   // R16: the exact totals those tabs badge, each primed by the panel's own fetch
   // over the same filter its rows came from.
   const appsTotal = useCachedValue<number>(totalKey("apps-account", accountId))
@@ -275,6 +289,19 @@ export function AccountDetailScreen({
   // column is ordinary text a machine caller can write, so what reaches a `src`
   // is checked here rather than trusted because we happen to have written it.
   const cover = safeSrc(account.coverUrl)
+
+  // WHAT THE HOURS ARE WORTH, at this client's own agreed rate. `null` when
+  // there is no rate card yet (or the role may not see one), which is the honest
+  // answer: an hours figure without a price beside it is still true, and a price
+  // invented from a default rate is the kind of number that costs the whole
+  // screen its credit. The FIRST live rate is the client's headline rate — the
+  // rate card itself is the breakdown, one tab along.
+  const headlineRate = (ratesQ.data ?? []).find((r) => r.active) ?? null
+  const savedSeconds = valueQ.data?.savedSecondsPerMonth ?? 0
+  const moneyBack =
+    headlineRate && savedSeconds > 0
+      ? moneyText(Math.round(savedHours(savedSeconds) * headlineRate.centsPerHour), headlineRate.currency)
+      : null
 
   const where = [account.street, account.postalCode, account.city, account.country]
     .filter(Boolean)
@@ -523,6 +550,20 @@ export function AccountDetailScreen({
                       {t("Total impact")}
                     </p>
                     <ValuePanel view={valueQ.data} />
+                    {/* THE SAME HOURS, IN MONEY. Not a second calculation — it is
+                        the drill-down's own total multiplied by what this client
+                        agreed to pay for an hour of the work, which is why it is
+                        only shown when there IS a rate card to multiply by. The
+                        caption comes with it (R25) for exactly the reason it
+                        comes with the hours: a figure a client cannot account
+                        for is worse than no figure at all. */}
+                    {moneyBack && (
+                      <div className="rounded-lg border p-4">
+                        <p className="text-muted-foreground text-sm">{t("Money given back, every month")}</p>
+                        <p className="text-2xl font-semibold tracking-tight tabular-nums">{moneyBack}</p>
+                        <p className="text-muted-foreground mt-2 text-xs">{SAVINGS_CAPTION}</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
