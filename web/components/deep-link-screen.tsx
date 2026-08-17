@@ -247,9 +247,9 @@ export function DeepLinkScreen() {
   if (ACCOUNT_MODULES.includes(module ?? "")) {
     const accountCrumbs: Crumb[] =
       module === "settings"
-        ? [{ label: "Settings" }]
+        ? [{ label: t("Settings") }]
         : module === "invitations"
-          ? [{ label: "Invitations" }]
+          ? [{ label: t("Invitations") }]
           : []
     return (
       <AppShell active={active} breadcrumbs={accountCrumbs} onNavigate={go} activePath={currentPath}>

@@ -82,9 +82,9 @@ export function KnowledgeAsk({ onOpenSource }: { onOpenSource: (sourceId: string
         <Input
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Ask the knowledge base — e.g. what did we agree about Bergman's dispatch window?"
+          placeholder={t("Ask the knowledge base — e.g. what did we agree about Bergman's dispatch window?")}
           disabled={busy}
-          aria-label="Ask the knowledge base"
+          aria-label={t("Ask the knowledge base")}
         />
         <Button type="submit" disabled={busy || !question.trim()} className="shrink-0 gap-1.5">
           {busy ? <Spinner /> : <Search className="size-4" />}
@@ -95,9 +95,7 @@ export function KnowledgeAsk({ onOpenSource }: { onOpenSource: (sourceId: string
           the box rather than a tooltip because the whole point is that nobody
           should have to go looking for it. */}
       <p className="text-muted-foreground text-xs">
-        This looks through what the assistant can read and shows you the passages and their
-        sources. It doesn&apos;t use the team&apos;s assistant allowance — open the assistant if
-        you want the answer written out.
+        {t("This looks through what the assistant can read and shows you the passages and their sources. It doesn't use the team's assistant allowance — open the assistant if you want the answer written out.")}
       </p>
 
       {answer && (
@@ -160,7 +158,7 @@ export function KnowledgeAsk({ onOpenSource }: { onOpenSource: (sourceId: string
                   somebody straight to the origin row instead would skip the
                   screen that says WHY the assistant knows this. */}
               <div className="flex flex-col gap-2 border-t pt-3">
-                <p className="text-xs font-medium">Where this came from</p>
+                <p className="text-xs font-medium">{t("Where this came from")}</p>
                 <ul className="flex flex-col gap-1">
                   {answer.citations.map((c) => (
                     <li key={c.sourceId} className="text-sm">
@@ -178,7 +176,7 @@ export function KnowledgeAsk({ onOpenSource }: { onOpenSource: (sourceId: string
                       {c.liveStatus && (
                         <span className="text-muted-foreground text-xs">
                           {" "}
-                          — that record says &ldquo;{c.liveStatus}&rdquo; right now
+                          — that record says &ldquo;{c.liveStatus}{t("” right now")}
                         </span>
                       )}
                     </li>

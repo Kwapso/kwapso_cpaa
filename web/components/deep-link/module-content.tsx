@@ -246,7 +246,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
               every mutation writes a row — so it pages instead of stopping at 50. */}
           <LoadMore
             listKey={`activity:team:${teamId}`}
-            label="Load more activity"
+            label={t("Load more activity")}
             fetchPage={(c: string) =>
               tenancy.activity("team", undefined, c).then((r) => ({ rows: r.activity, nextCursor: r.nextCursor }))
             }
@@ -269,7 +269,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     const activityMore = (
       <LoadMore
         listKey={activityKey as string}
-        label="Load more activity"
+        label={t("Load more activity")}
         fetchPage={(c: string) =>
           tenancy
             .activity(activityScope ?? "team", recordId ?? undefined, c)
@@ -281,7 +281,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       if (membersQ.error) return <LoadError what="members" />
       if (membersQ.data === undefined) return <Skeleton variant="list" lines={4} />
       const member = membersQ.data.find((m) => m.userId === recordId) ?? null
-      if (!member) return <p className="text-muted-foreground text-sm">That member isn&apos;t on this team.</p>
+      if (!member) return <p className="text-muted-foreground text-sm">{t("That member isn't on this team.")}</p>
       const base = resolveRecipe("members.detail", overridesQ.data, t)
       if (!base) return <NotFound />
       // R8/R16: the Activity tab badges this member's exact history total.
@@ -305,7 +305,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       if (invitesQ.error) return <LoadError what="invites" />
       if (invitesQ.data === undefined) return <Skeleton variant="list" lines={4} />
       const invite = invitesQ.data.find((i) => i.id === recordId) ?? null
-      if (!invite) return <p className="text-muted-foreground text-sm">That invite no longer exists.</p>
+      if (!invite) return <p className="text-muted-foreground text-sm">{t("That invite no longer exists.")}</p>
       const base = resolveRecipe("invites.detail", overridesQ.data, t)
       if (!base) return <NotFound />
       // R8/R16: the Activity tab badges this invite's exact history total.

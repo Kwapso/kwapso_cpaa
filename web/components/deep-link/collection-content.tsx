@@ -137,16 +137,16 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     return (
       <SectionWithCreate
         show={can("member_roles", "create")}
-        label="New role"
+        label={t("New role")}
         icon="plus"
         secondary={{
           show: can("member_roles", "create"),
-          label: "Import CSV",
+          label: t("Import CSV"),
           onClick: () => go(`/t/${teamId}/import/member_roles`),
         }}
         download={{
           show: (data.rows?.length ?? 0) > 0, // export needs READ — implied by seeing this list
-          label: "Export CSV",
+          label: t("Export CSV"),
           href: "/api/tenancy/roles/export",
         }}
         onCreate={() => go(sectionPath, { panel: "add", module: "roles" })}
@@ -163,7 +163,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     return (
       <SectionWithCreate
         show={can("team_members", "create")}
-        label="Invite"
+        label={t("Invite")}
         icon="mail"
         onCreate={() => go(sectionPath, { panel: "add", module: "invites" })}
       >
@@ -179,16 +179,16 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     const articlesPanel = (
       <SectionWithCreate
         show={can("learning", "create")}
-        label="New article"
+        label={t("New article")}
         icon="plus"
         secondary={{
           show: can("learning", "create"),
-          label: "Import CSV",
+          label: t("Import CSV"),
           onClick: () => go(`/t/${teamId}/import/learning`),
         }}
         download={{
           show: (data.rows?.length ?? 0) > 0, // export needs READ — implied by seeing this list
-          label: "Export CSV",
+          label: t("Export CSV"),
           href: "/api/content/learning/export",
         }}
         onCreate={() => go(sectionPath, { panel: "add", module: "learning" })}
@@ -219,12 +219,12 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
       tabs: [
         {
           value: "articles",
-          label: "Articles",
+          label: t("Articles"),
           icon: "book-open",
           badge: learningBadge,
           badgeVariant: "" as const,
         },
-        { value: "progress", label: "Team progress", icon: "users", badge: "", badgeVariant: "" as const },
+        { value: "progress", label: t("Team progress"), icon: "users", badge: "", badgeVariant: "" as const },
       ],
     }
     // ARBITRATION (R16 iii): the counted strip is the heading's SIBLING here,
@@ -430,12 +430,12 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
             the filtering itself still happens over the whole collection. */}
         <PagedFind<Account>
           listKey={accountsKey(teamId as string)}
-          placeholder="Search accounts…"
+          placeholder={t("Search accounts…")}
           noun="accounts"
           facets={[
             {
               field: "type",
-              label: "Type",
+              label: t("Type"),
               control: "select",
               options: [
                 { value: "entity", label: ACCOUNT_TYPE.entity },
@@ -444,7 +444,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
             },
             {
               field: "status",
-              label: "Status",
+              label: t("Status"),
               control: "select",
               options: [...new Set(loaded.map((a) => a.status).filter((s): s is string => !!s))].map(
                 (s) => ({ value: s, label: accountStatus(s) })
@@ -452,11 +452,11 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
             },
             {
               field: "archived",
-              label: "Archived",
+              label: t("Archived"),
               control: "select",
               options: [
-                { value: "no", label: "No" },
-                { value: "yes", label: "Yes" },
+                { value: "no", label: t("No") },
+                { value: "yes", label: t("Yes") },
               ],
             },
           ]}
@@ -475,11 +475,11 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
               <>
                 <SectionWithCreate
                   show={can("accounts", "create")}
-                  label="New account"
+                  label={t("New account")}
                   icon="plus"
                   secondary={{
                     show: can("accounts", "create"),
-                    label: "Import CSV",
+                    label: t("Import CSV"),
                     onClick: () => go(`/t/${teamId}/import/accounts`),
                   }}
                   // Parity, in the direction nobody checks. `export_accounts_csv` has been
@@ -496,7 +496,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
                   // narrowing.
                   download={{
                     show: (data.rows?.length ?? 0) > 0,
-                    label: "Export CSV",
+                    label: t("Export CSV"),
                     href: `/api/tenancy/accounts/export${found.queryString}`,
                   }}
                   onCreate={() => go(sectionPath, { panel: "add", module: "accounts" })}
@@ -513,7 +513,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
                     pages, and so do the matches when a find is on. */}
                 <LoadMore
                   listKey={found.listKey ?? accountsKey(teamId as string)}
-                  label="Load more accounts"
+                  label={t("Load more accounts")}
                   fetchPage={found.fetchPage}
                 />
               </>
@@ -548,7 +548,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
             answered by the door — over every source, not the newest fifty. */}
         <PagedFind<KnowledgeSource>
           listKey={knowledgeKey(teamId as string)}
-          placeholder="Search the knowledge base…"
+          placeholder={t("Search the knowledge base…")}
           noun="sources"
           fetchPage={(query, cursor) =>
             contentApi
@@ -565,7 +565,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
               <>
                 <SectionWithCreate
                   show={can("knowledge", "create")}
-                  label="Add a source"
+                  label={t("Add a source")}
                   icon="plus"
                   // The third way in, beside the other two. It sits in the SECONDARY
                   // slot — the same place "Import CSV" sits on the accounts screen —
@@ -573,7 +573,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
                   // record, for material that already exists somewhere else.
                   secondary={{
                     show: can("knowledge", "create"),
-                    label: "Upload a file",
+                    label: t("Upload a file"),
                     onClick: () => go(sectionPath, { panel: "add", module: "knowledge-file" }),
                   }}
                   onCreate={() => go(sectionPath, { panel: "add", module: "knowledge" })}
@@ -590,7 +590,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
                     anybody writes — the list pages. */}
                 <LoadMore
                   listKey={found.listKey ?? knowledgeKey(teamId as string)}
-                  label="Load more sources"
+                  label={t("Load more sources")}
                   fetchPage={found.fetchPage}
                 />
               </>
@@ -625,7 +625,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
           archive. */}
       <PagedFind<HelpTicket>
         listKey={helpKey(teamId as string, helpScope)}
-        placeholder="Search tickets…"
+        placeholder={t("Search tickets…")}
         noun="tickets"
         fetchPage={(query, cursor) =>
           contentApi
@@ -647,7 +647,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
             <>
       <SectionWithCreate
         show={can("help", "create")}
-        label="Raise ticket"
+        label={t("Raise ticket")}
         icon="plus"
         onCreate={() => go(sectionPath, { panel: "add", module: "tickets" })}
         // The My/All raiser strip sits ABOVE the boxed list — it scopes which
@@ -660,14 +660,14 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
               tabs: [
                 {
                   value: "all",
-                  label: "All tickets",
+                  label: t("All tickets"),
                   icon: "inbox",
                   badge: helpBadge,
                   badgeVariant: "",
                 },
                 {
                   value: "mine",
-                  label: "My tickets",
+                  label: t("My tickets"),
                   icon: "user",
                   badge: formatCount(totals.helpMine),
                   badgeVariant: "",
@@ -677,7 +677,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
                 // moved the dead end one step along instead of ending it.
                 {
                   value: "archived",
-                  label: "Archived",
+                  label: t("Archived"),
                   icon: "archive",
                   badge: formatCount(totals.helpArchived),
                   badgeVariant: "",
@@ -693,7 +693,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
       </SectionWithCreate>
       <LoadMore
         listKey={found.listKey ?? helpKey(teamId as string, helpScope)}
-        label="Load more tickets"
+        label={t("Load more tickets")}
         fetchPage={found.fetchPage}
       />
             </>
