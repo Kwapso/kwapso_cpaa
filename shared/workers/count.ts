@@ -117,13 +117,58 @@ export async function countCollection(
   inner: string,
   params: (string | number | null)[] = []
 ): Promise<number> {
+  return reportedTotal(await countRaw(cfg, databaseId, inner, params))
+}
+
+/** THE SAME COUNT, ACROSS A SPLIT MODULE'S SHARDS — and the one aggregate that
+ * genuinely CAN be merged, which is why it lives here rather than being refused
+ * by `d1QueryAcross`.
+ *
+ * That refusal is right about aggregates in general: run `SELECT COUNT(*)` across
+ * three databases and you get three rows, and every caller in the base reads
+ * `rows[0].n`, so a split module would report the FIRST shard's count as the whole
+ * total — R16's number, quietly wrong. What makes THIS case different is that the
+ * fold is known: a row belongs to exactly one shard, so the total is the SUM of
+ * the per-shard counts, and there is nothing to sort or de-duplicate. A page
+ * cannot be merged that way (the rows must be ordered BETWEEN shards, and the
+ * cursor is a position in an ordering no single shard has), so paging stays
+ * refused. Counting was never the hard half; it was only ever grouped with it.
+ *
+ * IT SUMS BEFORE IT CLAMPS, which is what keeps it exact. Each shard counts to
+ * CAP + 1, so if the true total is under the ceiling no shard truncated and the
+ * sum is the exact number. If the sum lands over the ceiling — whether because one
+ * shard truncated or because several honest counts added up — it is clamped once,
+ * at the end, and reports as capped. Clamping each shard first would throw away
+ * the very information the sum needs.
+ *
+ * ONE DATABASE IS THE ORDINARY CASE and costs nothing extra: the loop runs once. */
+export async function countCollectionAcross(
+  cfg: D1Rest,
+  databaseIds: string[],
+  inner: string,
+  params: (string | number | null)[] = []
+): Promise<number> {
+  const counts = await Promise.all(
+    databaseIds.map((id) => countRaw(cfg, id, inner, params))
+  )
+  return reportedTotal(counts.reduce((a, b) => a + b, 0))
+}
+
+/** One shard's bounded count, UNCLAMPED — the number `countCollectionAcross` has
+ * to add up before it decides whether the total reached the ceiling. */
+async function countRaw(
+  cfg: D1Rest,
+  databaseId: string,
+  inner: string,
+  params: (string | number | null)[]
+): Promise<number> {
   const rows = await d1Query<{ n: number }>(
     cfg,
     databaseId,
     `SELECT COUNT(*) AS n FROM ${boundedInner(inner)}`,
     params
   )
-  return reportedTotal(rows[0]?.n ?? 0)
+  return rows[0]?.n ?? 0
 }
 
 /** The same bounded subquery, with more than one number computed over it.
