@@ -42,6 +42,29 @@ const COPY_BATCH = 250
  * source behind a flipped route (see the drain step). */
 const MOVE_DRAIN_PASSES = 200
 
+/** COPY BATCHES ONE CALL WILL RUN before it stops and asks to be called again.
+ *
+ * This is the number that turns the mover from one long request into a resumable
+ * job. 400 × COPY_BATCH = 100,000 rows per call: enough that a normal move
+ * finishes in one or two calls, small enough that a call comfortably completes
+ * inside a Worker's limits on the table this tool exists for. The work is bounded
+ * per CALL, not per move — the move itself is as big as it needs to be, and its
+ * progress is a row in `team_module_moves` rather than a place in a stack frame.
+ *
+ * A ceiling on a loop that used to have none is the same fix retention.ts and the
+ * drain below already had; the difference is that those two could finish their work
+ * in later ticks, and this one could not finish it at all. */
+const COPY_BATCHES_PER_CALL = 400
+
+/** How long a claim on a move is honoured before another call may take it over.
+ *
+ * A Worker that is killed cannot release its own claim, so a claim that could only
+ * be cleared by its holder would strand the move forever — which is the failure
+ * this whole table exists to end, reintroduced one layer up. Ten minutes is far
+ * longer than a bounded call takes and short enough that a person retrying after a
+ * crash is not left waiting. */
+const MOVE_CLAIM_STALE_MS = 10 * 60 * 1000
+
 /** Nightly: size EVERY database in the account, alarm on anything ≥ the threshold.
  *
  * IT USED TO WATCH ONLY `team-*`, AND THAT WAS THE HOLE. The prefix filter read
@@ -326,26 +349,146 @@ export async function queryModule<Row = Record<string, unknown>>(
   return d1QueryAcross<Row>(cfg, dbs, sql, params)
 }
 
+/** THE MOVE ROW — one per (team, module), the thing that makes a retry a
+ * continuation rather than a fresh start. See db/core/0023 for the full argument. */
+type MoveRow = {
+  id: string
+  database_id: string
+  source_database_id: string
+  tables_json: string
+  status: string
+  cursors_json: string
+  verified_json: string
+  drained_json: string
+  rows_copied: number
+  claimed_at: string | null
+}
+
+/** What one call to the mover accomplished. `done` false means exactly one thing:
+ * call it again. Nothing is wrong, and nothing needs deciding. */
+export type MoveProgress = {
+  databaseId: string
+  movedRows: number
+  done: boolean
+  status: string
+  /** What this call was working on when it ran out of budget — for a person or a
+   * script watching a big move go by. */
+  copying?: string
+}
+
+const parseList = (json: string): string[] => {
+  try {
+    const v = JSON.parse(json)
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []
+  } catch {
+    return []
+  }
+}
+const parseCursors = (json: string): Record<string, string> => {
+  try {
+    const v = JSON.parse(json)
+    return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, string>) : {}
+  } catch {
+    return {}
+  }
+}
+
+/** Write progress back. Every field the caller advanced, in ONE statement, so a
+ * call that dies between two writes cannot leave a cursor ahead of its own
+ * verification. */
+async function saveMove(
+  env: Env,
+  id: string,
+  patch: {
+    status?: string
+    cursors?: Record<string, string>
+    verified?: string[]
+    drained?: string[]
+    rowsCopied?: number
+    claimedAt?: string | null
+    lastError?: string | null
+  }
+): Promise<void> {
+  const sets: string[] = ["updated_at = ?"]
+  const params: (string | number | null)[] = [new Date().toISOString()]
+  /** One column, one value, in step — the pairing is the whole point of the helper. */
+  const set = (column: string, value: string | number | null): void => {
+    sets.push(`${column} = ?`)
+    params.push(value)
+  }
+  if (patch.status !== undefined) set("status", patch.status)
+  if (patch.cursors !== undefined) set("cursors_json", JSON.stringify(patch.cursors))
+  if (patch.verified !== undefined) set("verified_json", JSON.stringify(patch.verified))
+  if (patch.drained !== undefined) set("drained_json", JSON.stringify(patch.drained))
+  if (patch.rowsCopied !== undefined) set("rows_copied", patch.rowsCopied)
+  if (patch.claimedAt !== undefined) set("claimed_at", patch.claimedAt)
+  if (patch.lastError !== undefined) set("last_error", patch.lastError)
+  await env.DB.prepare(`UPDATE team_module_moves SET ${sets.join(", ")} WHERE id = ?`)
+    .bind(...params, id)
+    .run()
+}
+
 /**
- * THE MOVER: relocate a module's tables from a team's main database into a
- * brand-new dedicated database. Copies schema + indexes + rows (batched),
- * verifies counts, flips routing, then empties the old tables. Any open size
- * alarm for the source database is marked resolved.
+ * MOVE A MODULE'S TABLES INTO A DATABASE OF THEIR OWN — resumably.
+ *
+ * This is the one relief valve for a team database that has outgrown D1's 10 GB,
+ * and every individual step in it has been bounded for a while: the copy walks by
+ * key rather than by offset, the drain deletes in chunks, the verify runs before
+ * anything is destroyed. What was NOT bounded was the REQUEST. It is the tool you
+ * reach for precisely because a table has millions of rows, so the one thing it
+ * could be relied upon to do at that size was get killed halfway — and a killed
+ * call left a new database holding part of the data, no routing flip (that is last,
+ * deliberately, so the half-done state is the SAFE half), and nothing at all to say
+ * it had happened. The only available response was to run it again, which created a
+ * second database, orphaned the first, and started from row one.
+ *
+ * SO THE PROGRESS LIVES IN A ROW, NOT IN A STACK FRAME (`team_module_moves`, and
+ * db/core/0023 argues each column). Each call:
+ *
+ *   1. finds or opens the move row, CLAIMING it so two calls cannot copy the same
+ *      table into the same database;
+ *   2. does at most COPY_BATCHES_PER_CALL batches of copying, saving the per-table
+ *      cursor as it goes;
+ *   3. stops and answers `done: false` when the budget runs out — which means "call
+ *      me again", not "something went wrong";
+ *   4. verifies, flips routing, drains and finishes, each recorded, once all tables
+ *      are copied.
+ *
+ * THE COPY IS IDEMPOTENT, and that stopped being optional today. `INSERT OR IGNORE`
+ * rather than `INSERT`: every team table has `id TEXT PRIMARY KEY`, so re-inserting
+ * a batch already present is a no-op. It matters for two reasons that arrived from
+ * different directions. A resumed call re-copies from the last SAVED cursor, and the
+ * batch after that cursor may have landed before the save did. And as of 2026-08-17
+ * `d1-rest` retries a transient "internal error" that Cloudflare reports inside an
+ * HTTP 200 — so a batch INSERT can now genuinely run twice for one call, which under
+ * plain INSERT is 250 duplicate rows that the verify step would catch as a mismatch
+ * only after the whole table had been copied. A retry that can double a row is a
+ * retry that needs an idempotent write, and this one is now the only kind here.
+ *
+ * ROUTING IS STILL FLIPPED LAST, and the drain still refuses rather than leaving a
+ * half-emptied source behind a flipped route. Those two decisions are unchanged and
+ * are the reason an interrupted move is recoverable at all.
  */
 export async function moveModuleToOwnDatabase(
   env: Env,
   cfg: D1Rest,
   teamId: string,
   module: string,
-  tables: string[]
-): Promise<{ databaseId: string; movedRows: number }> {
-  const team = await env.DB.prepare(
-    "SELECT database_id FROM teams WHERE id = ? AND db_status = 'ready'"
-  )
-    .bind(teamId)
-    .first<{ database_id: string }>()
-  if (!team) throw new Error(`team_not_ready: ${teamId}`)
+  tables: string[],
+  /** How many copy batches THIS call may run. Defaults to COPY_BATCHES_PER_CALL.
+   *
+   * A parameter rather than only a constant for two reasons, and the second is why
+   * it is not just test scaffolding: a bounded job whose budget cannot be turned
+   * down is a job you cannot slow when it is competing with real traffic, and the
+   * person running a move on a busy morning is exactly the person who wants smaller
+   * bites. It also makes resumption provable without a hundred thousand fake rows. */
+  opts: { batchesPerCall?: number } = {}
+): Promise<MoveProgress> {
+  const now = new Date().toISOString()
 
+  // Already moved and finished? That is the old error, and it stays an error: the
+  // routing row is the fact, and a second move of a module that has one would put
+  // its rows in a third place.
   const existing = await env.DB.prepare(
     "SELECT id FROM team_module_databases WHERE team_id = ? AND module = ?"
   )
@@ -353,82 +496,166 @@ export async function moveModuleToOwnDatabase(
     .first<{ id: string }>()
   if (existing) throw new Error(`module_already_moved: ${module}`)
 
-  const newDbId = await d1CreateDatabase(
-    cfg,
-    `team-${teamId.toLowerCase()}-${module.replaceAll("_", "-")}`
+  // ── 1 · find or open the move, and CLAIM it ────────────────────────────────
+  let move = await env.DB.prepare(
+    "SELECT id, database_id, source_database_id, tables_json, status, cursors_json, verified_json, drained_json, rows_copied, claimed_at FROM team_module_moves WHERE team_id = ? AND module = ? AND status <> 'done'"
   )
+    .bind(teamId, module)
+    .first<MoveRow>()
 
-  let movedRows = 0
+  if (!move) {
+    const team = await env.DB.prepare(
+      "SELECT database_id FROM teams WHERE id = ? AND db_status = 'ready'"
+    )
+      .bind(teamId)
+      .first<{ database_id: string }>()
+    if (!team) throw new Error(`team_not_ready: ${teamId}`)
+
+    // The database is created FIRST and recorded IMMEDIATELY. The old code created
+    // it and remembered it only in a local variable, which is precisely how a
+    // killed call orphaned one.
+    const newDbId = await d1CreateDatabase(
+      cfg,
+      `team-${teamId.toLowerCase()}-${module.replaceAll("_", "-")}`
+    )
+    const id = ulid()
+    await env.DB.prepare(
+      `INSERT INTO team_module_moves
+         (id, team_id, module, database_id, source_database_id, tables_json, status, claimed_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'copying', ?, ?)`
+    )
+      .bind(id, teamId, module, newDbId, team.database_id, JSON.stringify(tables), now, now)
+      .run()
+    move = {
+      id,
+      database_id: newDbId,
+      source_database_id: team.database_id,
+      tables_json: JSON.stringify(tables),
+      status: "copying",
+      cursors_json: "{}",
+      verified_json: "[]",
+      drained_json: "[]",
+      rows_copied: 0,
+      claimed_at: now,
+    }
+  } else {
+    // THE CLAIM RIDES THE UPDATE (CONCURRENCY.md rule 1) — a read-then-write claim
+    // is a suggestion under load. Zero rows changed means somebody else holds it
+    // and their claim is still fresh.
+    const stale = new Date(Date.now() - MOVE_CLAIM_STALE_MS).toISOString()
+    const claimed = await env.DB.prepare(
+      "UPDATE team_module_moves SET claimed_at = ? WHERE id = ? AND (claimed_at IS NULL OR claimed_at < ?)"
+    )
+      .bind(now, move.id, stale)
+      .run()
+    if ((claimed.meta?.changes ?? 0) === 0)
+      throw new Error(
+        `move_in_progress: another call is moving ${module} for ${teamId} (claimed ${move.claimed_at}). ` +
+          `Wait for it to finish, or retry after ${Math.round(MOVE_CLAIM_STALE_MS / 60000)} minutes if it died.`
+      )
+    // The move's OWN table list wins over the caller's. A second call that named
+    // fewer tables would otherwise "finish" a move that had not moved everything.
+    const recorded = parseList(move.tables_json)
+    if (recorded.length) tables = recorded
+  }
+
+  const newDbId = move.database_id
+  const sourceDbId = move.source_database_id
+  const cursors = parseCursors(move.cursors_json)
+  const verified = parseList(move.verified_json)
+  const drained = parseList(move.drained_json)
+  let movedRows = move.rows_copied
+  let budget = Math.max(1, opts.batchesPerCall ?? COPY_BATCHES_PER_CALL)
+
+  // ── 2 · copy, bounded, saving the cursor as it goes ────────────────────────
   for (const table of tables) {
-    // 1 · Recreate the table + its indexes exactly as they exist today.
-    const ddl = await d1Query<{ sql: string }>(
-      cfg,
-      team.database_id,
-      "SELECT sql FROM sqlite_master WHERE name = ? AND type = 'table'",
-      [table]
-    )
-    if (!ddl[0]) throw new Error(`table_not_found: ${table}`)
-    await d1ExecScript(cfg, newDbId, ddl[0].sql)
+    if (verified.includes(table)) continue // done in an earlier call
 
-    const indexes = await d1Query<{ sql: string }>(
-      cfg,
-      team.database_id,
-      "SELECT sql FROM sqlite_master WHERE tbl_name = ? AND type = 'index' AND sql IS NOT NULL",
-      [table]
-    )
-    for (const idx of indexes) await d1ExecScript(cfg, newDbId, idx.sql)
+    // The schema is recreated only when this table has not been started. `IF NOT
+    // EXISTS` is not available for an arbitrary captured DDL string, so the cursor
+    // is what says whether to run it — another reason progress is per table.
+    if (cursors[table] === undefined) {
+      const ddl = await d1Query<{ sql: string }>(
+        cfg,
+        sourceDbId,
+        "SELECT sql FROM sqlite_master WHERE name = ? AND type = 'table'",
+        [table]
+      )
+      if (!ddl[0]) throw new Error(`table_not_found: ${table}`)
+      await d1ExecScript(cfg, newDbId, ddl[0].sql)
+      const indexes = await d1Query<{ sql: string }>(
+        cfg,
+        sourceDbId,
+        "SELECT sql FROM sqlite_master WHERE tbl_name = ? AND type = 'index' AND sql IS NOT NULL",
+        [table]
+      )
+      for (const idx of indexes) await d1ExecScript(cfg, newDbId, idx.sql)
+      cursors[table] = ""
+      await saveMove(env, move.id, { cursors })
+    }
 
-    // 2 · Copy rows in batches (values inlined — the script API has no params;
-    //     team tables hold text/numbers only, no blobs).
-    //
-    //     BY KEY, NOT BY OFFSET. This walked `LIMIT 250 OFFSET n`, and offset
-    //     paging is wrong here twice over: SQLite reaches offset 4,000,000 by
-    //     reading and discarding four million rows, so copying a big table costs
-    //     O(n²) reads — and this is the tool you reach for precisely BECAUSE the
-    //     table is big. Worse, the window shifts under a concurrent insert or
-    //     delete, so rows could be copied twice or skipped, which step 3 would
-    //     then report as a count mismatch after the whole copy had run.
-    //
-    //     Every team table has `id TEXT PRIMARY KEY`, so "everything after the
-    //     last id I copied" is an index seek — constant cost per batch, and stable
-    //     under writes. Exactly the reasoning shared/workers/paging.ts states for
-    //     screens; the mover is the one place it mattered most and did not have it.
-    let after = ""
     for (;;) {
+      if (budget <= 0) {
+        // OUT OF BUDGET, NOT OUT OF LUCK. Everything up to `cursors[table]` is in
+        // the new database and recorded; the next call starts there.
+        await saveMove(env, move.id, { cursors, rowsCopied: movedRows, claimedAt: null })
+        return {
+          databaseId: newDbId,
+          movedRows,
+          done: false,
+          status: "copying",
+          copying: table,
+        }
+      }
       const rows = await d1Query<Record<string, string | number | null>>(
         cfg,
-        team.database_id,
-        `SELECT * FROM ${table} WHERE id > ${sqlValue(after)} ORDER BY id LIMIT ${COPY_BATCH}`
+        sourceDbId,
+        `SELECT * FROM ${table} WHERE id > ${sqlValue(cursors[table])} ORDER BY id LIMIT ${COPY_BATCH}`
       )
+      budget--
       if (rows.length === 0) break
       const cols = Object.keys(rows[0])
-      const values = rows
-        .map((r) => `(${cols.map((c) => sqlValue(r[c])).join(", ")})`)
-        .join(",\n")
+      const values = rows.map((r) => `(${cols.map((c) => sqlValue(r[c])).join(", ")})`).join(",\n")
+      // OR IGNORE — see the header. A re-run batch is a no-op rather than 250
+      // duplicates, which is what makes both a resume and a transport-level retry
+      // safe here.
       await d1ExecScript(
         cfg,
         newDbId,
-        `INSERT INTO ${table} (${cols.join(", ")}) VALUES\n${values};`
+        `INSERT OR IGNORE INTO ${table} (${cols.join(", ")}) VALUES\n${values};`
       )
       movedRows += rows.length
-      after = String(rows[rows.length - 1].id)
+      cursors[table] = String(rows[rows.length - 1].id)
+      await saveMove(env, move.id, { cursors, rowsCopied: movedRows })
       if (rows.length < COPY_BATCH) break
     }
 
-    // 3 · Verify before touching the source.
-    const [src] = await d1Query<{ n: number }>(cfg, team.database_id, `SELECT COUNT(*) AS n FROM ${table}`)
+    // ── 3 · verify this table before anything is destroyed ───────────────────
+    const [src] = await d1Query<{ n: number }>(cfg, sourceDbId, `SELECT COUNT(*) AS n FROM ${table}`)
     const [dst] = await d1Query<{ n: number }>(cfg, newDbId, `SELECT COUNT(*) AS n FROM ${table}`)
-    if (src.n !== dst.n)
-      throw new Error(`copy_mismatch: ${table} src=${src.n} dst=${dst.n}`)
+    if (src.n !== dst.n) {
+      const err = `copy_mismatch: ${table} src=${src.n} dst=${dst.n}`
+      await saveMove(env, move.id, { lastError: err, claimedAt: null })
+      throw new Error(err)
+    }
+    verified.push(table)
+    await saveMove(env, move.id, { verified, cursors, rowsCopied: movedRows })
   }
 
-  // 4 · Flip routing, then empty the moved tables in the old home.
+  await saveMove(env, move.id, { status: "copied" })
+
+  // ── 4 · flip routing, then empty the old home ─────────────────────────────
+  // Unchanged in substance and still LAST: until this row exists nothing is routed
+  // anywhere, which is what makes every interrupted call above recoverable.
+  // Idempotent because a resumed call may already have written it.
   await env.DB.prepare(
-    `INSERT INTO team_module_databases (id, team_id, module, database_id, created_at)
+    `INSERT OR IGNORE INTO team_module_databases (id, team_id, module, database_id, created_at)
      VALUES (?, ?, ?, ?, ?)`
   )
     .bind(ulid(), teamId, module, newDbId, new Date().toISOString())
     .run()
+  await saveMove(env, move.id, { status: "routed" })
+
   // THE OLD HOME IS EMPTIED IN BOUNDED BITES, and it MUST empty, because routing
   // has already flipped: `resolveModuleDatabases` now returns both databases and
   // every read is a MERGED read over them. A row left behind here is a row
@@ -438,43 +665,48 @@ export async function moveModuleToOwnDatabase(
   // on when it has grown too big for its database. D1 refuses a statement past 30
   // seconds, so on a multi-million-row table that DELETE was the one step
   // guaranteed to fail — and it failed AFTER the routing flip had committed,
-  // leaving exactly the doubled state above with nothing to say so. The same
-  // sentence shared/workers/retention.ts already had to learn: "a DELETE is
-  // exactly as unbounded as a SELECT".
+  // leaving exactly the doubled state above with nothing to say so.
   //
   // So it is chunked, and it is VERIFIED. Not draining is not a warning here; it
   // is a state a person has to fix before the module is read again, and the only
-  // honest thing to do is say which table and stop.
+  // honest thing to do is say which table and stop. Per-table progress is recorded
+  // so a call killed mid-drain resumes instead of restarting the passes.
   for (const table of tables) {
+    if (drained.includes(table)) continue
     let left = 0
     for (let pass = 0; ; pass++) {
       await d1ExecScript(
         cfg,
-        team.database_id,
+        sourceDbId,
         `DELETE FROM ${table} WHERE id IN (SELECT id FROM ${table} LIMIT ${RETENTION_DELETE_CAP});`
       )
       const [remaining] = await d1Query<{ n: number }>(
         cfg,
-        team.database_id,
+        sourceDbId,
         `SELECT COUNT(*) AS n FROM ${table}`
       )
       left = remaining?.n ?? 0
       if (left === 0) break
-      if (pass >= MOVE_DRAIN_PASSES)
-        throw new Error(
+      if (pass >= MOVE_DRAIN_PASSES) {
+        const err =
           `move_drain_incomplete: ${table} still holds ${left} rows in the OLD database after ` +
-            `${MOVE_DRAIN_PASSES} passes. Routing is already pointing at ${newDbId}, so reads are ` +
-            `MERGED and these rows are duplicates — empty ${table} in ${team.database_id} before ` +
-            `the module is read again.`
-        )
+          `${MOVE_DRAIN_PASSES} passes. Routing is already pointing at ${newDbId}, so reads are ` +
+          `MERGED and these rows are duplicates — empty ${table} in ${sourceDbId} before ` +
+          `the module is read again.`
+        await saveMove(env, move.id, { lastError: err, claimedAt: null })
+        throw new Error(err)
+      }
     }
+    drained.push(table)
+    await saveMove(env, move.id, { drained })
   }
 
   await env.DB.prepare(
     "UPDATE db_alerts SET resolved_at = ? WHERE database_id = ? AND resolved_at IS NULL"
   )
-    .bind(new Date().toISOString(), team.database_id)
+    .bind(new Date().toISOString(), sourceDbId)
     .run()
 
-  return { databaseId: newDbId, movedRows }
+  await saveMove(env, move.id, { status: "done", claimedAt: null, lastError: null })
+  return { databaseId: newDbId, movedRows, done: true, status: "done" }
 }

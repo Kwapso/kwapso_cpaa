@@ -112,8 +112,18 @@ export async function moveModule(request: Request, env: Env): Promise<Response> 
   if (!IDENT.test(module) || tables.some((t) => typeof t !== "string" || !IDENT.test(t)))
     return fail(400, "invalid_input", "module and tables must be plain SQL identifiers (letters, digits, underscores).")
 
+  // BOUNDED PER CALL, RESUMABLE ACROSS CALLS (lib/sharding.ts). `done: false` is
+  // not a failure and not a partial success — it means the call spent its budget
+  // and the move's progress is recorded, so POST the same body again to continue.
+  // A big move is several calls; each one is safe to repeat.
   const result = await moveModuleToOwnDatabase(env, d1Config(env), teamId, module, tables)
-  return json({ ok: true, ...result })
+  return json({
+    ok: true,
+    ...result,
+    next: result.done
+      ? null
+      : "Not finished — call this door again with the same body to continue. Nothing is wrong.",
+  })
 }
 
 /**
