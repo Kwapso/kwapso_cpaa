@@ -177,14 +177,25 @@ export async function getProcesses(request: Request, env: Env): Promise<Response
   return pagedJson("processes", page)
 }
 
-/** GET /api/tenancy/processes/detail?id= — one map: its versions, its current
- * steps, and the exact comment total its tab is badged with. Fenced. */
+/** GET /api/tenancy/processes/detail?id=[&versionId=] — one map: its versions,
+ * the steps of ONE of them, the exact totals its tabs are badged with, and the
+ * subtraction between its baseline and today. Fenced.
+ *
+ * `versionId` is how an OLDER version is read. Absent means the latest, which is
+ * what this door has always answered — so every existing caller keeps the reply
+ * it had. A version belonging to another map is a 404, not an empty step list.
+ */
 export async function getProcessDetail(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "processes", "read")
   const scope = await accountScope(cfg, guard)
-  const id = queryText(new URL(request.url).searchParams.get("id"), "Id")
+  const url = new URL(request.url)
+  const id = queryText(url.searchParams.get("id"), "Id")
   if (!id) return fail(400, "invalid_input", "Which process?")
-  return json(await getProcess(cfg, guard, scope, id))
+  return json(
+    await getProcess(cfg, guard, scope, id, {
+      versionId: queryText(url.searchParams.get("versionId"), "Version"),
+    })
+  )
 }
 
 /** POST /api/tenancy/processes — map a way of working, and its baseline with it.

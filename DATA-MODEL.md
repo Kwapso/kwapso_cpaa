@@ -718,6 +718,16 @@ is carried forward with its frequency intact and its time at zero (`removed_at`)
 deleting the row would drop it out of the baseline join and report no saving at
 all for the work we removed entirely, which is the largest saving there is.
 
+**Only the NEWEST version's steps can be written.** A baseline that can be edited
+after the fact is a saving anybody can dial up, and every figure this app shows a
+client is a subtraction from one. The predicate rides both writes' `UPDATE`
+rather than sitting in front of them, so a version cut mid-request cannot leave a
+check true and the write wrong. `removeStep` did not carry it until 2026-08-17 —
+the write that sets a duration to ZERO, and so the one that would have
+manufactured the largest saving the app can report. Nothing but the absence of a
+screen had been keeping callers off it; the process detail's version selector is
+exactly the screen that would have arrived. A button is not a permission.
+
 Every table carries `account_id`, denormalised on purpose: the fence is then the
 same one clause the accounts list uses, with no join for the next reader to
 forget. An app's account is written once at creation and there is no move-app

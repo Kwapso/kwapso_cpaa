@@ -6,6 +6,33 @@
 // latest, and the subtraction between them — and Versions and the conversation
 // are collections with their own actions.
 //
+// WHAT A TESTER COULD NOT DO HERE, 17 Aug 2026, and what changed:
+//
+//   "Order is unclear."  The steps were a list of names with times under them
+//   and nothing saying what followed what — and every step added from the app
+//   went in at position 0, so a person building a map watched it grow BACKWARDS.
+//   They are now NUMBERED, in one explicit order, with each step's time beside
+//   its number and the total underneath. A sequence a reader cannot follow is
+//   not a process map; it is a set.
+//
+//   "I am missing to see the detail of the old version."  The Versions tab
+//   listed that versions existed. It could not open one — the door only ever
+//   returned the latest version's steps. A version is now SELECTED (the picker
+//   on the Steps tab, or Open on a version row) and read in full: its steps, its
+//   times, its order, its total, as they were agreed the day it was cut.
+//
+// WHY THAT MATTERS MORE THAN THE SCREEN'S SIZE SUGGESTS: these step times are
+// what the savings figure on the CLIENT'S OWN PORTAL is computed from (R25). The
+// subtraction is first version minus latest, so a reader who cannot inspect both
+// sides of it cannot check the number a client is being shown — including the
+// steps we REMOVED between the two, which is the largest saving there is and the
+// easiest to leave out of a screen.
+//
+// THE FIGURE IS NOT COMPUTED HERE. It arrives from the door, through the one
+// savings seam the value screen and the portal read, so the number on a map and
+// the number a client is looking at cannot drift apart. R25's caption ships with
+// it, word for word, from the same file as the arithmetic.
+//
 // THE ONE RULE THIS SCREEN ENFORCES IN ITS UI, because the server enforces it in
 // the statement: only the CURRENT version can be edited. A baseline you can edit
 // after the fact is a saving anybody can dial up, and every number this build
@@ -13,9 +40,10 @@
 // and nothing more, and the screen says why rather than just greying a button.
 //
 // Every count is an exact server COUNT(*) through the ONE formatCount seam (R16)
-// — never the length of a list the door capped. Nothing here deletes: a step
-// that stops happening keeps its row and its frequency at zero seconds, which is
-// what makes the saving for work we removed entirely come out right.
+// — never the length of a list the door capped, and the Steps badge counts the
+// version being SHOWN, not always today's. Nothing here deletes: a step that
+// stops happening keeps its row and its frequency at zero seconds, which is what
+// makes the saving for work we removed entirely come out right.
 
 import * as React from "react"
 
@@ -35,31 +63,54 @@ import {
   AlertDialogTitle,
 } from "@kwapso/ui/registry/primitives/alert-dialog/alert-dialog"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@kwapso/ui/registry/primitives/select/select"
 import { Comments } from "@kwapso/ui/registry/collections/comments/comments"
-import { GitBranch, Pencil, Plus, Power } from "lucide-react"
+import { GitBranch, ListOrdered, Pencil, Plus, Power } from "lucide-react"
 
-import type { ProcessComment, ProcessDetail, ProcessStep } from "@shared/types"
+import type { ProcessComment, ProcessDetail, ProcessStep, ProcessVersion } from "@shared/types"
+// The number and the words for it come from the file that computes it — never
+// spelled again here. `SAVINGS_CAPTION` is R25's sentence, rendered word for word
+// wherever a saving appears.
+import { SAVINGS_CAPTION, hoursText, minutesText } from "@shared/workers/savings"
 import { ProcessFormDialog, type ProcessFormValues } from "@/components/process-form-dialog"
 import { StepFormDialog, type StepFormValues } from "@/components/step-form-dialog"
+import { SavingStepLine } from "@/components/value-panel"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
 import { formatCount } from "@shared/web/format-count"
 import {
+  PROCESS_VERSION_SLICES,
   processCommentsKey,
   processKey,
+  processVersionKey,
   processesKey,
   valueKey,
 } from "@/lib/live-resources"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
-import { invalidate, useCached } from "@shared/web/store"
+import { invalidate, invalidatePrefix, useCached } from "@shared/web/store"
 import { useRecordActivity } from "@/lib/use-record-activity"
 
-/** A step's time, said the way a person says it. */
-function minutes(seconds: number): string {
-  return `${Math.round(seconds / 60).toLocaleString()} min`
+/** How a version is named out loud, everywhere on this screen: its number, then
+ * what somebody called it. Written once so the picker, the banner and the
+ * versions list cannot describe the same version three ways. */
+function versionLabel(v: ProcessVersion): string {
+  return `Version ${v.versionNo}${v.label ? ` — ${v.label}` : ""}${v.isBaseline ? " (baseline)" : ""}`
+}
+
+/** One step's whole monthly cost: how long it takes, times how often it happens.
+ * The number a reader adds up in their head as they go down the list — so the
+ * screen shows the same one rather than leaving them to multiply. */
+function stepSecondsPerMonth(step: ProcessStep): number {
+  return step.secondsPerRun * step.runsPerMonth
 }
 
 /** A confirm this screen asks before a red action. Nothing here deletes, so each
@@ -73,9 +124,26 @@ export function ProcessDetailScreen({
   teamId: string
   processId: string
 }) {
+  // WHICH VERSION IS BEING READ. `null` is "the current one", which is what the
+  // record cache holds and what every live ping is about — so the default costs
+  // no extra read and stays row-level live. Choosing an older one reads a slice
+  // of its own (see processVersionKey): an old version must not take the record
+  // cache's place, or the next screen to read `process:<id>` gets last year's
+  // steps under today's heading.
+  const [versionId, setVersionId] = React.useState<string | null>(null)
+
+  // The record's own facts — its versions, its saving, its comment total — always
+  // come from THIS read, whichever version is on screen. Only the steps and their
+  // badge move with the picker.
   const detailQ = useCached<ProcessDetail>(processKey(processId), () =>
     tenancy.processDetail(processId)
   )
+  const olderQ = useCached<ProcessDetail>(
+    versionId ? processVersionKey(processId, versionId) : null,
+    () => tenancy.processDetail(processId, versionId ?? undefined)
+  )
+  const shown = versionId ? olderQ : detailQ
+
   const commentsQ = useCached<{ comments: ProcessComment[]; total: number }>(
     processCommentsKey(processId),
     () => tenancy.processComments(processId)
@@ -105,6 +173,10 @@ export function ProcessDetailScreen({
     invalidate(processesKey(teamId))
     // A duration changing is exactly when a value figure stops being true.
     invalidate(valueKey(teamId))
+    // …and every older version we have loaded. Cutting a version is the write
+    // that turns today's steps into an old version's, so the slices have to go
+    // with it — the same family drop the live listener does for everyone else.
+    invalidatePrefix(PROCESS_VERSION_SLICES)
   }, [processId, teamId])
 
   const run = React.useCallback(
@@ -159,20 +231,31 @@ export function ProcessDetailScreen({
   if (detailQ.error) return <p className="text-destructive text-sm">Couldn&apos;t load the process.</p>
   if (detailQ.data === undefined) return <Skeleton variant="list" lines={5} />
 
-  const { process, versions, steps, commentsTotal } = detailQ.data
+  const { process, versions, commentsTotal, saving, savingsCaption } = detailQ.data
+  // Versions come back newest-first, so [0] is today's and the last is version 1.
   const current = versions[0] ?? null
+  const baseline = versions.find((v) => v.isBaseline) ?? null
   const currentLabel = current
     ? `version ${current.versionNo}${current.label ? ` — ${current.label}` : ""}`
     : "the current version"
 
+  // The steps on screen, and the version they belong to. While an older version
+  // is still loading, `shown.data` is undefined — the Steps tab paints a skeleton
+  // rather than the current version's steps under the old version's heading,
+  // which would be the wrong times beside the right title.
+  const shownSteps = shown.data?.steps
+  const shownVersion =
+    versions.find((v) => v.id === (versionId ?? shown.data?.shownVersionId)) ?? current
+  const isCurrent = !versionId || shownVersion?.id === current?.id
+  const shownStepCount = shown.data?.shownStepCount ?? process.stepCount
+  // The total under the numbered list: every step's time × how often it happens.
+  // A plain sum of what is on the screen above it, so a reader can check it.
+  const shownTotalSeconds = (shownSteps ?? []).reduce((n, s) => n + stepSecondsPerMonth(s), 0)
+
   const overviewItems = [
     { label: "App", value: process.appName },
-    { label: "What it is", value: process.description || "—" },
-    { label: "Current version", value: current ? `Version ${current.versionNo}` : "—" },
-    {
-      label: "Baseline",
-      value: versions.find((v) => v.isBaseline)?.label || "Version 1",
-    },
+    { label: "Current version", value: current ? versionLabel(current) : "—" },
+    { label: "Baseline", value: baseline ? versionLabel(baseline) : "Version 1" },
     ...auditItems({
       createdByName: null,
       createdAt: process.createdAt,
@@ -191,7 +274,10 @@ export function ProcessDetailScreen({
         value: "steps",
         label: "Steps",
         icon: CONCEPT_ICON.steps,
-        badge: formatCount(process.stepCount),
+        // R16: the exact server count of the version being SHOWN — it moves with
+        // the picker, because a badge counting today's steps over version 1's
+        // list is the quietly-wrong number the law was written for.
+        badge: formatCount(shownStepCount),
         badgeVariant: "" as const,
       },
       {
@@ -318,13 +404,57 @@ export function ProcessDetailScreen({
         onValueChange={setTab}
         renderPanel={(t) => {
           if (t.value === "overview")
-            return <OverviewList items={overviewItems} />
+            return (
+              <div className="flex flex-col gap-4">
+                {/* WHAT THIS MAP SAYS ABOUT ITSELF, in full and at the top. The
+                    description is where the caveat lives on every map seeded
+                    from the apps' own words — that the times are a first pass,
+                    not measured, and must be agreed before the saving is quoted.
+                    It used to be a value in a definition list, one line among
+                    eight; a caveat a reader has to go looking for is a caveat
+                    that is not doing its job, and a client is reading the number
+                    it qualifies. `whitespace-pre-line` keeps the blank line the
+                    caveat is written after. */}
+                {process.description && (
+                  <div className="bg-muted/40 rounded-lg border p-4">
+                    <p className="text-sm leading-relaxed whitespace-pre-line">
+                      {process.description}
+                    </p>
+                  </div>
+                )}
+                <OverviewList items={overviewItems} />
+              </div>
+            )
 
           if (t.value === "steps")
             return (
               <div className="flex flex-col gap-3">
-                {canCreate && (
-                  <div className="flex justify-end">
+                {/* WHICH VERSION AM I READING. A picker rather than a strip of
+                    buttons: R3 forbids a hand-rolled toggle, and a map cut once
+                    per completed sprint grows more versions than a strip can
+                    hold anyway. It is the first thing on the panel because
+                    everything under it means something different per version. */}
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground shrink-0 text-sm">Showing</span>
+                    <Select
+                      value={shownVersion?.id ?? ""}
+                      onValueChange={(v) => setVersionId(v === current?.id ? null : v)}
+                    >
+                      <SelectTrigger className="w-[19rem] max-w-full">
+                        <SelectValue placeholder="Pick a version" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {versions.map((v) => (
+                          <SelectItem key={v.id} value={v.id}>
+                            {versionLabel(v)}
+                            {v.id === current?.id ? " · current" : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {canCreate && isCurrent && (
                     <Button
                       size="sm"
                       onClick={() => {
@@ -336,37 +466,75 @@ export function ProcessDetailScreen({
                       <Plus className="size-3.5" />
                       Add step
                     </Button>
-                  </div>
+                  )}
+                </div>
+
+                {/* An older version is READ-ONLY, and the screen says why rather
+                    than greying a button and leaving a person to guess. The
+                    server refuses the write regardless — this is the sentence,
+                    not the lock. */}
+                {!isCurrent && (
+                  <p className="text-muted-foreground bg-muted/40 rounded-lg border p-3 text-xs">
+                    This is how the work was described when{" "}
+                    {shownVersion ? versionLabel(shownVersion).toLowerCase() : "this version"} was
+                    cut{shownVersion ? ` on ${new Date(shownVersion.createdAt).toLocaleDateString()}` : ""}.
+                    Older versions can be read but never edited — every saving is a subtraction from
+                    them, so they stay exactly as they were agreed.
+                  </p>
                 )}
-                {steps.length === 0 ? (
+
+                {shown.error ? (
+                  // A version that can't be read says so and offers the way back
+                  // — a skeleton that never resolves is the same screen as a hang.
+                  <div className="flex flex-col items-start gap-2">
+                    <p className="text-destructive text-sm">Couldn&apos;t load that version.</p>
+                    <Button variant="outline" size="sm" onClick={() => setVersionId(null)}>
+                      Show the current version
+                    </Button>
+                  </div>
+                ) : shownSteps === undefined ? (
+                  <Skeleton variant="list" lines={4} />
+                ) : shownSteps.length === 0 ? (
                   <p className="text-muted-foreground text-sm">
-                    No steps yet. Add the first one and say how long it takes and how often it
-                    happens — that is what a saving is measured from.
+                    {isCurrent
+                      ? "No steps yet. Add the first one and say how long it takes and how often it happens — that is what a saving is measured from."
+                      : "This version has no steps recorded."}
                   </p>
                 ) : (
                   <div className="rounded-lg border">
-                    {steps.map((step) => (
+                    {shownSteps.map((step, i) => (
                       <div
                         key={step.id}
                         className="flex flex-col gap-2 border-b p-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between"
                       >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">
-                            {step.name}
-                            {step.removed && (
-                              <Badge variant="secondary" className="ml-2 text-[10px]">
-                                no longer done
-                              </Badge>
+                        {/* THE NUMBER IS THE POINT. A step's place in the
+                            sequence is what a reader could not tell before, and
+                            it is what makes the times underneath checkable. */}
+                        <div className="flex min-w-0 gap-3">
+                          <span className="text-muted-foreground w-6 shrink-0 text-sm tabular-nums">
+                            {i + 1}.
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">
+                              {step.name}
+                              {step.removed && (
+                                <Badge variant="secondary" className="ml-2 text-[10px]">
+                                  no longer done
+                                </Badge>
+                              )}
+                            </p>
+                            <p className="text-muted-foreground text-xs">
+                              {minutesText(step.secondsPerRun)} each time ·{" "}
+                              {step.runsPerMonth.toLocaleString()}× a month ·{" "}
+                              {hoursText(stepSecondsPerMonth(step))} a month
+                            </p>
+                            {step.description && (
+                              <p className="text-muted-foreground mt-1 text-xs">{step.description}</p>
                             )}
-                          </p>
-                          <p className="text-muted-foreground text-xs">
-                            {minutes(step.secondsPerRun)} · {step.runsPerMonth.toLocaleString()}× a
-                            month
-                            {step.description ? ` · ${step.description}` : ""}
-                          </p>
+                          </div>
                         </div>
                         <div className="flex shrink-0 gap-2">
-                          {canEdit && !step.removed && (
+                          {canEdit && isCurrent && !step.removed && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -380,7 +548,7 @@ export function ProcessDetailScreen({
                               Edit
                             </Button>
                           )}
-                          {canArchive && !step.removed && (
+                          {canArchive && isCurrent && !step.removed && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -407,6 +575,52 @@ export function ProcessDetailScreen({
                         </div>
                       </div>
                     ))}
+                    {/* THE TOTAL AT THE END — the plain sum of the column above
+                        it, so a reader who adds the rows up gets this number.
+                        It is a WORKLOAD, not a saving: how much of somebody's
+                        month this way of working costs. The subtraction between
+                        two of these is the saving, and it is shown below with
+                        the sentence it has to be quoted with. */}
+                    <div className="bg-muted/40 flex items-baseline justify-between gap-3 border-t p-3">
+                      <span className="text-sm font-medium">
+                        Total, as {shownVersion ? versionLabel(shownVersion).toLowerCase() : "this version"}{" "}
+                        describes it
+                      </span>
+                      <span className="text-sm font-semibold tabular-nums">
+                        {hoursText(shownTotalSeconds)} a month
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* BOTH SIDES OF THE SUBTRACTION, on the screen that produced
+                    them. The rows come from the door through the ONE savings
+                    seam — the same statement and the same arithmetic the value
+                    screen and the client's own portal read — so this figure and
+                    the one a client is looking at cannot drift apart.
+                    Every step is here, including the ones we REMOVED between the
+                    two versions: dropping work entirely is the largest saving
+                    there is, and a comparison that showed only surviving steps
+                    would leave it out. */}
+                {saving && saving.steps.length > 0 && (
+                  <div className="rounded-lg border p-4">
+                    <p className="text-muted-foreground text-sm">
+                      Time given back, every month — {baseline ? versionLabel(baseline) : "the baseline"}{" "}
+                      minus {current ? versionLabel(current) : "today"}
+                    </p>
+                    <p className="text-2xl font-semibold tracking-tight">
+                      {hoursText(saving.savedSecondsPerMonth)}
+                    </p>
+                    {/* R25 — the sentence that makes the number honest, from the
+                        one place it is written. Never assembled here. */}
+                    <p className="text-muted-foreground mt-2 text-xs">
+                      {savingsCaption || SAVINGS_CAPTION}
+                    </p>
+                    <div className="mt-3">
+                      {saving.steps.map((s) => (
+                        <SavingStepLine key={s.stepKey} step={s} />
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -414,32 +628,59 @@ export function ProcessDetailScreen({
 
           if (t.value === "versions")
             return (
-              <div className="rounded-lg border">
-                {versions.map((v) => (
-                  <div key={v.id} className="flex items-baseline justify-between gap-3 border-b p-3 last:border-b-0">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
-                        Version {v.versionNo}
-                        {v.label ? ` — ${v.label}` : ""}
-                        {v.isBaseline && (
-                          <Badge variant="secondary" className="ml-2 text-[10px]">
-                            baseline
+              <div className="flex flex-col gap-3">
+                <p className="text-muted-foreground text-sm">
+                  Every version this way of working has been through. Open one to read its steps and
+                  the times they were agreed at — version 1 is how the work was done before us, and
+                  every saving is measured from it.
+                </p>
+                <div className="rounded-lg border">
+                  {versions.map((v) => (
+                    <div
+                      key={v.id}
+                      className="flex flex-col gap-2 border-b p-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">
+                          Version {v.versionNo}
+                          {v.label ? ` — ${v.label}` : ""}
+                          {v.isBaseline && (
+                            <Badge variant="secondary" className="ml-2 text-[10px]">
+                              baseline
+                            </Badge>
+                          )}
+                        </p>
+                        <p className="text-muted-foreground text-xs">
+                          {new Date(v.createdAt).toLocaleDateString()}
+                          {v.cutFromSprintId ? " · cut when a sprint completed" : ""}
+                          {v.createdByName ? ` · ${v.createdByName}` : ""}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {v.id === current?.id && (
+                          <Badge variant="outline" className="text-[10px]">
+                            current
                           </Badge>
                         )}
-                      </p>
-                      <p className="text-muted-foreground text-xs">
-                        {new Date(v.createdAt).toLocaleDateString()}
-                        {v.cutFromSprintId ? " · cut when a sprint completed" : ""}
-                        {v.createdByName ? ` · ${v.createdByName}` : ""}
-                      </p>
+                        {/* THE MISSING DOOR (tester L4). The list said a version
+                            existed; nothing opened it. This selects it and moves
+                            to the steps, which is where a version's detail is. */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5"
+                          onClick={() => {
+                            setVersionId(v.id === current?.id ? null : v.id)
+                            setTab("steps")
+                          }}
+                        >
+                          <ListOrdered className="size-3.5" />
+                          Open
+                        </Button>
+                      </div>
                     </div>
-                    {v.versionNo === current?.versionNo && (
-                      <Badge variant="outline" className="shrink-0 text-[10px]">
-                        current
-                      </Badge>
-                    )}
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )
 

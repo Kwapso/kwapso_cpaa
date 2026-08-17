@@ -46,8 +46,14 @@ import {
 } from "@shared/workers/savings"
 
 /** ONE step's arithmetic, said out loud. This line is the answer to the third
- * click, and it is deliberately the whole sum rather than its result. */
-function StepLine({ step }: { step: StepSaving }) {
+ * click, and it is deliberately the whole sum rather than its result.
+ *
+ * EXPORTED because a map's own detail screen answers the same question about the
+ * same rows, and the answer has to be phrased identically in both places: a
+ * client who reads "12 min before · 3 min now" on the value screen and a
+ * differently-worded version of the same sum on the map is being asked to check
+ * whether two sentences mean the same thing. One component, one wording. */
+export function SavingStepLine({ step }: { step: StepSaving }) {
   const gain = step.savedSecondsPerMonth >= 0
   return (
     <div className="flex flex-col gap-1 border-t py-3 first:border-t-0 sm:flex-row sm:items-baseline sm:justify-between">
@@ -145,7 +151,7 @@ export function ValuePanel({ view }: { view: SavingsView | undefined }) {
                     <AccordionContent>
                       <div className="pl-2">
                         {process.steps.map((step) => (
-                          <StepLine key={step.stepKey} step={step} />
+                          <SavingStepLine key={step.stepKey} step={step} />
                         ))}
                       </div>
                     </AccordionContent>

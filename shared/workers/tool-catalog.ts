@@ -1550,10 +1550,12 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "get_process",
     summary:
-      "One process map in full (by id): its versions newest-first, the steps of its CURRENT version with their times, and the exact number of comments on it. Version 1 is always the baseline — how the work was done before us — and every saving is measured from it.",
+      "One process map in full (by id): its versions newest-first, the steps of ONE version with their times and the order they happen in, the exact number of comments on it, and the saving it produces (baseline minus latest, step by step, with the caption that number must be quoted with). `versionId` reads an OLDER version — its steps exactly as they were agreed when it was cut; leave it off for the current one. Version 1 is always the baseline — how the work was done before us — and every saving is measured from it.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/processes/detail",
-    schema: obj({ id: S }, ["id"]),
-    buildQuery: (i) => `?id=${encodeURIComponent(str(i, "id"))}`,
+    schema: obj({ id: S, versionId: S }, ["id"]),
+    buildQuery: (i) =>
+      `?id=${encodeURIComponent(str(i, "id"))}` +
+      (opt(i, "versionId") ? `&versionId=${encodeURIComponent(str(i, "versionId"))}` : ""),
     agent: { write: false, summarize: (i) => `Look up process map ${str(i, "id")}` },
   },
   {
