@@ -117,22 +117,22 @@ Last updated 17 Aug 2026.
 
 | # | The thing | Status |
 |---|---|---|
-| 7.1 | Companies and contacts split into separate screens | TO DO — **CHANGED**: one table underneath, split screens on top. Two tables would cap a person at one company, and Marta is at two. Your call, twice |
+| 7.1 | Companies and contacts split into separate screens | **PART DONE** — the server splits them properly: a role without the contacts right gets companies only, and the rows, the count and the CSV all narrow together. The tab strip on the list is being added now |
 | 7.2 | The "Under this account" tab goes | TO DO |
-| 7.3 | Portal access stops being a tab and moves onto the contact | TO DO |
+| 7.3 | Portal access stops being a tab and moves onto the contact | **DONE** — proved on staging: the company screen no longer has a Portal access tab, the contact does |
 | 7.4 | Only a contact can hold a login | TO DO — **CHANGED**: Aurora's answer, over your "both levels" |
-| 7.5 | A contact's page is its own page: no sprints, no rates, no contacts of its own | TO DO |
-| 7.6 | Contacts get their own permission, off by default | TO DO |
-| 7.7 | The reference code | TO DO — **CHANGED**: the system generates it, Aurora's answer, so nobody types it and there is no conflict dialog |
-| 7.8 | Address splits into street, postal code, city, country, with country a dropdown | TO DO |
-| 7.9 | A language on the account | TO DO |
-| 7.10 | An industry field | TO DO |
-| 7.11 | A rich-text "about" field | TO DO |
-| 7.12 | A logo and a cover image | TO DO |
-| 7.13 | Front-end status: active client, past client, archived | TO DO |
-| 7.14 | The account shows the total impact: hours and money given back | TO DO |
+| 7.5 | A contact's page is its own page: no sprints, no rates, no contacts of its own | **DONE** — proved with Marta, who is a contact at two companies. That case is why it stayed one table |
+| 7.6 | Contacts get their own permission, off by default | **DONE** — proved with a real Developer role: 23 companies, zero people, and adding a contact refused with a plain sentence |
+| 7.7 | The reference code | **DONE** — **CHANGED**: the system generates it. Two companies both starting "Bergman" got BERG and BERG2, and the form has no Reference field at all |
+| 7.8 | Address splits into street, postal code, city, country, with country a dropdown | **DONE** |
+| 7.9 | A language on the account | **DONE** |
+| 7.10 | An industry field | **DONE** |
+| 7.11 | A rich-text "about" field | **DONE** |
+| 7.12 | A logo and a cover image | **DONE** — stored as files, not pasted into the row, which would have put 60KB on every list read |
+| 7.13 | Front-end status: active client, past client, archived | **DONE** |
+| 7.14 | The account shows the total impact: hours and money given back | **DONE** — 84 hours and 10,080 EUR a month on the test company, each followed by the caption explaining what the figure is made of |
 | 7.15 | A knowledge tab inside an account | TO DO |
-| 7.16 | The account type selector stays | **CHANGED** — Aurora wanted it gone. You overruled explicitly: client, company, individual. A sales lead is an individual with no parent, which satisfies her case too |
+| 7.16 | The account type selector stays | **DONE** — **CHANGED again, and it resolves your disagreement with Aurora cleanly.** The type is Company or Person. "Client" turned out to be a STATUS, not a type, so the status list is Active client / Past client / Archived. You get your sales lead as a Person with no company; Aurora gets an account that is always a company |
 
 ## 8 · Apps and processes
 
