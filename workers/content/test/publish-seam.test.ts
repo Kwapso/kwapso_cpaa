@@ -17,7 +17,14 @@ const HOUSEKEEPING = [
   // Stores an uploaded file in R2 but changes no record — there's no row to
   // patch, so nothing to broadcast (the create/edit that references the file
   // pings its own row).
+  //
+  // EACH OF THESE COMES IN A PAIR since 2026-08-17: the buffered door that took a
+  // base64 data URL, and the `-stream` door beside it that takes the file as the
+  // request body. Streaming changed how the bytes ARRIVE and nothing at all about
+  // what they change — still a file and still no row — so the reasoning above
+  // covers both halves, and the pair is listed rather than the rule loosened.
   "POST /api/content/learning/upload",
+  "POST /api/content/learning/upload-stream",
   // The caller's OWN timer preference (does starting one stop the others?). It
   // changes no record anybody else can see and no screen anybody else is looking
   // at, so there is nothing for a ping to patch.
@@ -27,7 +34,9 @@ const HOUSEKEEPING = [
   // a staff photo or a certificate PDF lands the same way. Neither writes a row
   // — the create/edit that references the URL pings its own.
   "POST /api/content/brand-assets/upload",
+  "POST /api/content/brand-assets/upload-stream",
   "POST /api/content/staff/upload",
+  "POST /api/content/staff/upload-stream",
 ]
 
 publishSeam({

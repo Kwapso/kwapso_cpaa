@@ -38,6 +38,29 @@ import type {
   StaffProfile,
 } from "@shared/types"
 import { api, enc, post } from "@shared/web/api"
+
+/** SEND A FILE AS THE BODY — the client half of the four streaming upload doors.
+ *
+ * The form fields in this app produce a base64 data URL (that is what a file input
+ * plus a downsize step hands back), and the browser was never the constrained end:
+ * the 25 MB ceiling was the WORKER's, three copies of the file in a 128 MB isolate.
+ * So the data URL stays on this side and turns back into bytes here, at the edge of
+ * the network call, so the request carries the file itself and the worker streams it
+ * to storage without ever holding it.
+ *
+ * One helper for all four doors. The old base64 doors are still live for tabs that
+ * were open before the deploy — they simply are not called from this build. */
+async function sendFile<T>(path: string, dataUrl: string): Promise<T> {
+  const blob = await (await fetch(dataUrl)).blob()
+  return api<T>(path, {
+    method: "POST",
+    // The file's own type — a LABEL the door holds to its allow-list before it
+    // stores anything under it.
+    headers: { "Content-Type": blob.type || "application/octet-stream" },
+    body: blob,
+  })
+}
+
 import type { PagedResponse } from "@shared/web/api"
 
 /** The facets the story list door parses — mirrored here so a caller cannot
@@ -127,13 +150,15 @@ export const content = {
     api<{ learning: Learning[] }>("/api/content/learning/update", post(input)),
   setLearningActive: (id: string, active: boolean) =>
     api<{ learning: Learning[] }>("/api/content/learning/active", post({ id, active })),
-  /** Upload a file for an article (gated by learning:create). Send the raw
-   * base64 data URL; get back the served /media URL + its content type. */
-  uploadLearningFile: (dataUrl: string, filename?: string) =>
-    api<{ url: string; contentType: string }>(
-      "/api/content/learning/upload",
-      post({ dataUrl, filename })
-    ),
+  /** Upload a file for an article (gated by learning:create). Streams the bytes
+   * as the request body; get back the served /media URL + its content type.
+   *
+   * `filename` is gone, not forgotten: the buffered door accepted it and never
+   * read it — the key is minted server-side from the team id and a ULID, and a
+   * learning URL is pasted into an article rather than downloaded by name. A
+   * parameter nothing reads is a contract nobody can rely on. */
+  uploadLearningFile: (dataUrl: string) =>
+    sendFile<{ url: string; contentType: string }>("/api/content/learning/upload-stream", dataUrl),
   markLearningDone: (id: string, done: boolean) =>
     api<{ ok: true }>("/api/content/learning/done", post({ id, done })),
   learningProgress: () =>
@@ -528,10 +553,10 @@ export const content = {
     api<{ assets: BrandAsset[]; total: number }>("/api/content/brand-assets/update", post(input)),
   setBrandAssetActive: (id: string, active: boolean) =>
     api<{ assets: BrandAsset[]; total: number }>("/api/content/brand-assets/active", post({ id, active })),
-  /** Upload the bytes behind an asset (gated brand_assets:create). Send the raw
-   * base64 data URL; get back the served /media/internal URL. */
+  /** Upload the bytes behind an asset (gated brand_assets:create). Streams the
+   * bytes as the request body; get back the served /media/internal URL. */
   uploadBrandAssetFile: (dataUrl: string) =>
-    api<{ url: string; contentType: string }>("/api/content/brand-assets/upload", post({ dataUrl })),
+    sendFile<{ url: string; contentType: string }>("/api/content/brand-assets/upload-stream", dataUrl),
 
   programmes: () => api<{ programs: Program[]; total: number }>("/api/content/delivery/programs"),
   programmeOne: (id: string) =>
@@ -562,8 +587,9 @@ export const content = {
     api<{ profiles: StaffProfile[]; total: number }>("/api/content/staff/profiles", post(input)),
   setStaffProfileActive: (id: string, active: boolean) =>
     api<{ profiles: StaffProfile[]; total: number }>("/api/content/staff/profiles/active", post({ id, active })),
+  /** A profile photo or a certificate, streamed as the request body. */
   uploadStaffFile: (dataUrl: string) =>
-    api<{ url: string; contentType: string }>("/api/content/staff/upload", post({ dataUrl })),
+    sendFile<{ url: string; contentType: string }>("/api/content/staff/upload-stream", dataUrl),
 
   /** `userId` narrows at the DOOR, not in the client: a member's page shows one
    * person's certificates, and filtering a capped list afterwards would disagree

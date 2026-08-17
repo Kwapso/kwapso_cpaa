@@ -183,16 +183,23 @@ describe("the screens are reachable", () => {
      *     called from a screen on every card that renders. So the write door read
      *     as pressed by the read door's own caller.
      *
-     * What separates them is that the body SAYS it is a write — in either of the
-     * two ways this api layer writes one: the shared `post()` helper
-     * (shared/web/api.ts), or the inline `{ method: "POST", … }` the older tenancy
-     * methods still use. Both are here because both are real; matching only the
-     * helper called sixteen live doors unreachable, which is the same kind of
-     * wrong answer in the other direction.
+     * What separates them is that the body SAYS it is a write — in any of the
+     * THREE ways this api layer writes one: the shared `post()` helper
+     * (shared/web/api.ts), the inline `{ method: "POST", … }` the older tenancy
+     * methods still use, or `sendFile()` — the upload helper that streams a file
+     * as the request body (web/lib/api/content.ts). All three are here because all
+     * three are real; matching only the first called sixteen live doors
+     * unreachable, which is the same kind of wrong answer in the other direction.
+     *
+     * `sendFile` earned its place the day the four streaming upload doors landed:
+     * it holds the `method: "POST"` itself, so the CALLER's body carries the path
+     * and no write marker, and all four streamed doors read as unpressed while
+     * being wired to real file pickers. A helper that hides the verb is exactly the
+     * shape this matcher has been wrong about twice.
      *
      * Between them these two holes hid BOTH rate cards' create doors — delete the
      * "New rate" button and this check said fine. */
-    const WRITES = /\bpost\(|method:\s*"(?:POST|PUT|PATCH|DELETE)"/
+    const WRITES = /\bpost\(|\bsendFile[<(]|method:\s*"(?:POST|PUT|PATCH|DELETE)"/
     /** Does this function body call THIS door — the whole path, and as a write?
      * Two holes lived here. A path was matched as a PREFIX, so
      * `/api/content/knowledge/sync-google` counted as a call to
@@ -296,6 +303,12 @@ describe("the screens are reachable", () => {
  * a screen that now exists. */
 const NO_CONTROL: Record<string, string> = {
   /* ── for a client that is already out there ───────────────────────────── */
+  "POST /api/content/learning/upload":
+    "FOR AN OLDER BUILD OF THIS APP. The buffered half of the learning-media upload pair — a base64 data URL in a JSON body — replaced on 17 Aug 2026 by /upload-stream, which hands the file to R2 as it arrives. No screen in THIS build calls it, and that is deliberate: a browser holds its own copy of the app for as long as the tab is open, so somebody who loaded a page before the deploy is still running the old JavaScript and still posting here. An upload contract is the one change where the server must be ready before the client and outlast it afterwards. All four of these lines go when no build in the wild uses them.",
+  "POST /api/content/brand-assets/upload":
+    "FOR AN OLDER BUILD OF THIS APP — the buffered half of the brand-asset upload pair, kept for tabs opened before the 17 Aug 2026 deploy for the reason written on the learning line above.",
+  "POST /api/content/staff/upload":
+    "FOR AN OLDER BUILD OF THIS APP — the buffered half of the staff-file upload pair, kept for tabs opened before the 17 Aug 2026 deploy for the reason written on the learning line above.",
   "POST /api/content/knowledge/upload":
     "FOR AN OLDER BUILD OF THIS APP. The buffered upload door — a base64 data URL in a JSON body — replaced on 17 Aug 2026 by /upload-stream, which takes the file as the request body and never materialises it. No screen in THIS build calls it, and that is the point rather than a gap: a browser holds its own copy of the app for as long as the tab is open, so a person who loaded the app before the deploy is still running the old JavaScript and still posting here. The door stays until no build in the wild uses it; deleting it then is a separate, boring change. An upload contract is the one kind of change where the server must be ready before the client is, and outlast it afterwards.",
 

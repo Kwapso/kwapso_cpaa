@@ -19,7 +19,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { KNOWLEDGE_EXTRACT_MAX_BYTES, KNOWLEDGE_STREAM_MAX_BYTES } from "@shared/workers/limits"
+import { KNOWLEDGE_EXTRACT_MAX_BYTES, STREAM_UPLOAD_MAX_BYTES } from "@shared/workers/limits"
 
 const ctx = vi.hoisted(() => ({
   guard: { teamId: "team01", databaseId: "db1", userId: "u1" },
@@ -114,7 +114,7 @@ describe("the streamed knowledge upload: the envelope, before anything expensive
   it("refuses a file past the ceiling WITHOUT touching the bucket", async () => {
     const b = bucket()
     const res = await postStreamKnowledgeFile(
-      upload("fileName=big.zip", { length: KNOWLEDGE_STREAM_MAX_BYTES + 1 }),
+      upload("fileName=big.zip", { length: STREAM_UPLOAD_MAX_BYTES + 1 }),
       envWith(b)
     )
     expect(res.status).toBe(413)

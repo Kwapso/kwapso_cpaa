@@ -240,9 +240,7 @@ export function LearningFormDialog({
             id="learning-file"
             value={values.contentLink}
             onChange={(url) => setValues((v) => ({ ...v, contentLink: url }))}
-            upload={(dataUrl, name) =>
-              content.uploadLearningFile(dataUrl, name).then((r) => r.url)
-            }
+            upload={(dataUrl) => content.uploadLearningFile(dataUrl).then((r) => r.url)}
             accept={acceptFor(values.contentType)}
             disabled={busy}
           />

@@ -174,12 +174,13 @@ export const KNOWLEDGE_FILE_MAX_BYTES = 25 * 1024 * 1024
 export const KNOWLEDGE_UPLOAD_MAX_BYTES = Math.ceil(KNOWLEDGE_FILE_MAX_BYTES * (4 / 3)) + 64 * 1024
 
 // ── the STREAMED upload, and why its ceiling is a different number ────────────
-// The cap above bounds a file that is BUFFERED: a base64 data URL inside a JSON
+// The caps above bound a file that is BUFFERED: a base64 data URL inside a JSON
 // body, which `request.json()` materialises whole before a single validation
 // runs. At 25 MB that is ~33 MB of base64, plus the decoded copy, plus the JSON
 // string around them — well over 100 MB of a 128 MB isolate, on the request path.
 // So 25 MB was never a judgement about files; it was the largest number that fits
-// in memory three times.
+// in memory three times. Every upload door in the base wore it for that reason and
+// explained it to people as if it described documents.
 //
 // The streamed door does not buffer. The body goes to R2 as it arrives
 // (`put(key, request.body)`), so the isolate holds a window rather than a file
@@ -196,10 +197,16 @@ export const KNOWLEDGE_UPLOAD_MAX_BYTES = Math.ceil(KNOWLEDGE_FILE_MAX_BYTES * (
 // So this sits deliberately UNDER the platform wall, with headroom for headers
 // and the query string: refused by us, with a sentence a person can act on,
 // rather than cut off mid-body by the edge with nothing useful to say.
+// ONE NUMBER FOR ALL FOUR STREAMING DOORS — the knowledge base, learning media,
+// staff files and brand assets. They differ in which bucket they write and in
+// whether the bytes are ever served back under their declared type; they do not
+// differ in what the platform will carry, and that is the only thing this number
+// is about. Four constants would be four chances to raise one and forget three.
+//
 // Decimal megabytes, not binary, because `mb()` renders the refusal by dividing
 // by 1,000,000 — so this way the number in the code and the number the person is
 // told are the same number. (90 MiB would be refused with the words "94 MB".)
-export const KNOWLEDGE_STREAM_MAX_BYTES = 90 * 1_000_000
+export const STREAM_UPLOAD_MAX_BYTES = 90 * 1_000_000
 
 /** How large a streamed file we will still READ (convert to text for the
  * assistant). Extraction needs the bytes in memory — that is what conversion IS —

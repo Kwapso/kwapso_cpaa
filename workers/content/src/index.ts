@@ -19,6 +19,7 @@
 //   POST /api/content/learning/bulk-active -> (de)activate MANY items at once → {updated,skipped}
 //   POST /api/content/learning/done       -> mark an item done / not-done (your own progress)
 //   POST /api/content/learning/upload      -> upload a local file (image/clip) to team R2 → URL
+//   POST /api/content/learning/upload-stream -> the same, file as the raw body
 //   GET  /api/content/learning/progress   -> curator dashboard (every member's done state)
 //   GET  /api/content/help                -> the team's tickets (?scope=mine|all, ?id → one)
 //   GET  /api/content/help/thread         -> one ticket's replies (?id=<ticketId>)
@@ -99,6 +100,7 @@ import {
   postLearningDone,
   postSetLearningActive,
   postUpdateLearning,
+  postStreamLearningFile,
   postUploadLearningFile,
   getLearningExport,
 } from "./routes/learning"
@@ -181,6 +183,7 @@ import {
   postCreateBrandAsset,
   postSetBrandAssetActive,
   postUpdateBrandAsset,
+  postStreamBrandAsset,
   postUploadBrandAsset,
 } from "./routes/brand-assets"
 import {
@@ -204,6 +207,7 @@ import {
   postSetStaffCertificateActive,
   postSetStaffProfileActive,
   postUpdateStaffCertificate,
+  postStreamStaffFile,
   postUploadStaffFile,
 } from "./routes/staff"
 import {
@@ -329,6 +333,7 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/content/learning/done": { handler: postLearningDone, kind: "mutation" },
   // Stores a file in R2 but changes NO record (no row to patch) → housekeeping.
   "POST /api/content/learning/upload": { handler: postUploadLearningFile, kind: "housekeeping" },
+  "POST /api/content/learning/upload-stream": { handler: postStreamLearningFile, kind: "housekeeping" },
   "GET /api/content/learning/progress": { handler: getLearningProgress, kind: "read" },
   "GET /api/content/help": { handler: getHelp, kind: "read" },
   "GET /api/content/help/thread": { handler: getHelpThread, kind: "read" },
@@ -435,6 +440,7 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // Stores a file in R2 but changes NO record (no row to patch) → housekeeping,
   // the same classification the learning upload carries.
   "POST /api/content/brand-assets/upload": { handler: postUploadBrandAsset, kind: "housekeeping" },
+  "POST /api/content/brand-assets/upload-stream": { handler: postStreamBrandAsset, kind: "housekeeping" },
   "GET /api/content/delivery/programs": { handler: getPrograms, kind: "read" },
   "GET /api/content/delivery/programs/export": { handler: getProgramsExport, kind: "read" },
   "POST /api/content/delivery/programs": { handler: postCreateProgram, kind: "mutation" },
@@ -450,6 +456,7 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/content/staff/profiles": { handler: postSaveStaffProfile, kind: "mutation" },
   "POST /api/content/staff/profiles/active": { handler: postSetStaffProfileActive, kind: "mutation" },
   "POST /api/content/staff/upload": { handler: postUploadStaffFile, kind: "housekeeping" },
+  "POST /api/content/staff/upload-stream": { handler: postStreamStaffFile, kind: "housekeeping" },
   "GET /api/content/staff/certificates": { handler: getStaffCertificates, kind: "read" },
   "GET /api/content/staff/certificates/export": { handler: getStaffCertificatesExport, kind: "read" },
   "POST /api/content/staff/certificates": { handler: postCreateStaffCertificate, kind: "mutation" },
