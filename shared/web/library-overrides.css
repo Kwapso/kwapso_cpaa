@@ -5,10 +5,33 @@
  * here, so the day the library adopts it as its default there is one line to
  * delete, not two to remember.
  *
- * Overlay readability (feedback 2026-06-30): the library's frosted `.glass` sits
- * at 72% surface opacity — too see-through to read dialog/sheet text against the
- * living background. Keep the frosted blur, make the surface mostly opaque. (A
- * library prompt tracks adopting this as the default; see UI-GAPS.md.) */
-.glass {
-  background-color: color-mix(in oklch, var(--card) 94%, transparent);
-}
+ * ── THERE ARE NO OVERRIDES RIGHT NOW, AND THAT IS THE POINT ────────────────
+ *
+ * This file held exactly one rule for six weeks:
+ *
+ *     .glass { background-color: color-mix(in oklch, var(--card) 94%, transparent) }
+ *
+ * It was written on 2026-06-30 because the library's `.glass` was frosted at 72%
+ * opacity and dialog text was hard to read against the moving background. That
+ * was true then. The library has since replaced `.glass` with a flat, FULLY
+ * OPAQUE paper surface, and its own comment quotes the brand book while doing
+ * it: "No frosted-glass cards, no translucent panels."
+ *
+ * So the override stopped fixing anything and started causing something. Six
+ * percent of translucency does not read as translucency — it reads as a COLOUR,
+ * because `web/app/globals.css` drifts three blurred mango pools behind the
+ * whole page on 47- and 61-second loops. `Card` carries `glass` in its base
+ * class, so every card, dialog, popover and menu in both apps was tinted by a
+ * slowly moving orange field underneath it.
+ *
+ * That is the "cards have this pink background, this is not a brand colour"
+ * report from 2026-08-17, and the "we don't need these animations" beside it.
+ * Neither was a theme problem: `--card` is #f7f2ea and `--background` is
+ * #fffef9, which match kwapso.com's own surfaces to within a unit. One stale
+ * line was painting over a palette that was already right.
+ *
+ * DELETED rather than re-tuned. Lowering it to 2% would have made the tint
+ * subtler and left the same bug for somebody to find again in November.
+ *
+ * BEFORE YOU ADD AN OVERRIDE HERE, check whether the library already does what
+ * you want. This one was fighting a fix that had already shipped. */

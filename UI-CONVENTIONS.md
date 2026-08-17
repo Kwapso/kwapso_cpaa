@@ -512,7 +512,26 @@ plain, sentence case, no jargon, no emoji**, and it uses the **glossary terms**.
 
 - **Sentence case** everywhere — titles, buttons, labels. "New article", not "New
   Article".
-- **No emoji.** Anywhere. (This is a hard design-language rule.)
+- **No emoji IN COPY.** Not in a sentence, a heading, a button, a label, a placeholder,
+  a toast or an email. That is the whole of the original rule and it still holds: emoji
+  in prose is what makes a business app read like a chat message.
+
+  **A TYPE MARK is not copy, and it is allowed** (see §4). It is the small pictograph
+  that sits in the leading slot of a row where a lucide icon would otherwise sit, marking
+  what KIND of record this is: a bug on a fix, a question mark on a question, a gem on an
+  implementation sprint. It qualifies only if all four are true — it occupies an icon
+  slot rather than appearing inside a sentence, it is `aria-hidden` so a screen reader
+  never announces it, it is always accompanied by the type WORD nearby, and it is set on
+  the Dropdown values screen rather than written into a component.
+
+  **Why the rule moved, on 17 Aug 2026.** The owner asked for these twice, in writing,
+  and Aurora asked for the same thing independently after counting how long it took her
+  to tell a question from an issue in a list of forty. The agency's own legacy data has
+  carried a glyph and a colour on every ticket type, story type and sprint type for
+  years. A rule that forbids the thing the business already does, in the words of the
+  people it is for, is a rule that has stopped describing reality — so it was changed
+  deliberately rather than worked around quietly. A colour alone was the alternative and
+  it loses to a pictograph at a glance, which was the entire request.
 - **Use the dictionary.** "Activate / deactivate", never "delete". "Access right", not
   "permission", in user-facing copy. "Ticket", "Conversation", "Stakeholder" as defined.
 - **Warm and concrete.** Real examples from the code:
