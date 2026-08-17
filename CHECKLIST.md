@@ -38,7 +38,7 @@ Last updated 17 Aug 2026.
 | 2.2 | Story types Fix, Feature, Change, and editable in Dropdown values | TO DO |
 | 2.3 | "My tickets" becomes tickets on apps I am staffed to | TO DO — **CHANGED**: you chose "stories assigned to me". A "what", so Aurora wins |
 | 2.4 | "Request behind it" becomes "Tickets" | TO DO |
-| 2.5 | "By when" becomes "Deadline" everywhere | TO DO |
+| 2.5 | "By when" becomes "Deadline" everywhere | **PART DONE** — done on the task screens; the rest rides the wider rename |
 | 2.6 | The Time page becomes "Work logs" | TO DO |
 | 2.7 | "Process maps" becomes "Processes" | TO DO |
 | 2.8 | "Under this account" becomes "Contacts" | TO DO |
@@ -70,15 +70,15 @@ Last updated 17 Aug 2026.
 
 | # | The thing | Status |
 |---|---|---|
-| 4.1 | "Today's tasks" progress bar pinned to the top of every tab | TO DO |
-| 4.2 | Tabs: Overdue, List, Calendar, Completed, Upcoming, All | TO DO |
-| 4.3 | Priority becomes important and urgent ticks, scored `(important x 2) + urgent + 1` | TO DO — the formula was read off your own screenshot |
-| 4.4 | An assignee selector that defaults to whoever is creating the task | TO DO |
-| 4.5 | A department selector: Admin, Business, Marketing, Production, Sales, each with its icon and brand colour | TO DO — all five came out of the legacy data with icons and hex colours already chosen |
-| 4.6 | Production makes a task name an app. Sales and Admin make it name a customer | TO DO |
-| 4.7 | An image or file on a task | TO DO |
-| 4.8 | Completed view columns: department, app, important, urgent, deadline, closed | TO DO |
-| 4.9 | Who can see everyone else's tasks | TO DO — **CHANGED**: a configurable permission, Aurora's answer, not "everyone" |
+| 4.1 | "Today's tasks" progress bar pinned to the top of every tab | **DONE** — reads 100 / 133 done on staging |
+| 4.2 | Tabs: Overdue, List, Calendar, Completed, Upcoming, All | **DONE** — Overdue 32, List 80, Calendar 138, Completed 172, Upcoming 2, All 251. The calendar is the library's, not a hand-built one |
+| 4.3 | Priority becomes important and urgent ticks, scored `(important x 2) + urgent + 1` | **DONE** — worked out on the fly rather than stored, so it can never go stale |
+| 4.4 | An assignee selector that defaults to whoever is creating the task | **DONE** — and it uncovered a real bug: the row had been storing the CREATOR's name as the assignee |
+| 4.5 | A department selector: Admin, Business, Marketing, Production, Sales, each with its icon and brand colour | **DONE** — seeded as editable dropdown values, so you can change them without a deploy |
+| 4.6 | Production makes a task name an app. Sales and Admin make it name a customer | **DONE** — the second field appears the moment you pick the department, and the server refuses it too, in words |
+| 4.7 | An image or file on a task | **DONE** |
+| 4.8 | Completed view columns: department, app, important, urgent, deadline, closed | **DONE** — exactly those six |
+| 4.9 | Who can see everyone else's tasks | TO DO — **CHANGED**: a configurable permission, Aurora's answer. Held back deliberately: the file listing every permission is being rewritten by the purge lane right now, and half-adding a switch nobody can configure is worse than waiting |
 
 ## 5 · Tickets
 
@@ -117,7 +117,7 @@ Last updated 17 Aug 2026.
 
 | # | The thing | Status |
 |---|---|---|
-| 7.1 | Companies and contacts split into separate screens | **PART DONE** — the server splits them properly: a role without the contacts right gets companies only, and the rows, the count and the CSV all narrow together. The tab strip on the list is being added now |
+| 7.1 | Companies and contacts split into separate screens | **DONE** — All 129, Companies 23, People 106, each an exact server count. A role without the contacts right sees no People tab at all |
 | 7.2 | The "Under this account" tab goes | TO DO |
 | 7.3 | Portal access stops being a tab and moves onto the contact | **DONE** — proved on staging: the company screen no longer has a Portal access tab, the contact does |
 | 7.4 | Only a contact can hold a login | TO DO — **CHANGED**: Aurora's answer, over your "both levels" |
