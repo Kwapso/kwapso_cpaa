@@ -22,10 +22,12 @@ the **smallest** one first and only climb when it genuinely can't hold the need.
 the concrete form of the planning ritual's step 4 (CLAUDE.md).
 
 - **A new capability → a route on an existing worker.** Almost never a new worker — the
-  seven are locked (ARCHITECTURE.md). A new module = new routes on the worker that owns
-  its domain (tenancy for team-scoped config, content for learning/ticket-shaped modules,
-  data-ops for import/agent). A new worker is an ARCHITECTURE decision (a genuinely new
-  bounded context with its own scaling/security boundary), not a build-time one.
+  roster is locked (ARCHITECTURE.md). A new module = new routes on the worker that owns
+  its domain (tenancy for team-scoped config and the customer spine, content for
+  record-shaped modules a person authors — tickets, the brand library, the knowledge
+  base — data-ops for import/agent). A new worker is an ARCHITECTURE decision (a
+  genuinely new bounded context with its own scaling/security boundary), not a
+  build-time one.
 - **New data → a column, then a table, then a database.** A column on an existing table
   if it belongs to that record; a new **per-team** table for a new module's records; a
   new **core** table only for global identity / billing / a cross-team index. Never a
@@ -74,10 +76,11 @@ type RouteKind = "read" | "mutation" | "housekeeping"
 type Handler = (request: Request, env: Env) => Promise<Response>
 
 export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
-  "GET  /api/content/learning":         { handler: getLearning,        kind: "read" },
-  "POST /api/content/learning":         { handler: postCreateLearning, kind: "mutation" },
-  "POST /api/content/learning/update":  { handler: postUpdateLearning, kind: "mutation" },
-  "POST /api/content/learning/upload":  { handler: postUploadLearningFile, kind: "housekeeping" },
+  "GET  /api/content/brand-assets":        { handler: getBrandAssets,       kind: "read" },
+  "POST /api/content/brand-assets":        { handler: postCreateBrandAsset, kind: "mutation" },
+  "POST /api/content/brand-assets/update": { handler: postUpdateBrandAsset, kind: "mutation" },
+  "POST /api/content/brand-assets/active": { handler: postSetBrandAssetActive, kind: "mutation" },
+  "POST /api/content/brand-assets/upload": { handler: postUploadBrandAsset, kind: "housekeeping" },
   // …
 }
 ```
@@ -161,10 +164,11 @@ export class GuardError extends Error {
 ```
 
 `status` is the HTTP status, `code` is a stable machine string the client can branch on
-(`not_member`, `forbidden`, `invalid_input`, `learning_not_found`, …), `message` is
+(`not_member`, `forbidden`, `invalid_input`, `brand_asset_not_found`, …), `message` is
 plain English safe to show the user. Throw it from anywhere in the call stack — gating,
-validation, or a lib CRUD function (`learningOrThrow` throws a `404 learning_not_found`)
-— and it surfaces as a clean response without a single hand-built error path in between.
+validation, or a lib CRUD function (`assetOrThrow` in `lib/brand-assets.ts` throws a
+`404 brand_asset_not_found`) — and it surfaces as a clean response without a single
+hand-built error path in between.
 
 ### Housekeeping beyond routes: `scheduled`
 
@@ -212,19 +216,23 @@ comment rather than shipping an empty stub.
 
 ## 2 · The handler body — the fixed opening
 
-Inside a route handler (see `workers/content/src/routes/learning.ts`) the steps run in
-a fixed order. Deviating is a smell; matching it is how the next reader knows what
+Inside a route handler (see `workers/content/src/routes/brand-assets.ts`) the steps run
+in a fixed order. Deviating is a smell; matching it is how the next reader knows what
 they're looking at before they read a line.
 
 ```ts
-export async function postCreateLearning(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard } = await teamContext(request, env)     // 1 · who + where
-  await requireRight(cfg, guard, "learning", "create")               // 2 · may they?
-  const body = (await request.json().catch(() => ({}))) as LearningInput  // 3 · read body
-  requireText(body.title, "Title", TEXT_LIMITS.short)                // 4 · validate at boundary
-  const id = await createLearning(cfg, guard, actor, body)           // 5 · CRUD via lib
-  await publishChange(env.REALTIME, guard.teamId, "learning", id, "add")  // 6 · publish live
-  return json({ learning: await listLearning(cfg, guard) })          // 7 · respond
+export async function postCreateBrandAsset(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<BrandAssetInput>(   // 1 · 2 · 3
+    request, env, "brand_assets", "create"
+  )
+  await refusePortalCaller(cfg, guard)                                    // 4 · whose world?
+  requireText(body.name, "Name", TEXT_LIMITS.short)                       // 5 · validate
+  const id = await createBrandAsset(cfg, guard, actor, body)              // 6 · CRUD via lib
+  await publishChange(env, guard.teamId, "brand_assets", id, "add")       // 7 · publish live
+  return json({                                                           // 8 · respond
+    assets: await listBrandAssets(cfg, guard),
+    total: await countBrandAssets(cfg, guard),                            // R16: the exact total
+  })
 }
 ```
 
@@ -235,23 +243,41 @@ export async function postCreateLearning(request: Request, env: Env): Promise<Re
    before any read or write. Security is never just hiding UI.
 3. **Read the body defensively** — `(await request.json().catch(() => ({}))) as T`. A
    malformed body becomes `{}`, never a throw; the `as T` is a *shape hint*, not a
-   promise the fields are valid — that's step 4's job.
-4. **Validate at the boundary** — `requireText` / `optionalText` (§5).
-5. **CRUD through the lib layer** — never inline SQL in a route (§3, §6).
-6. **Publish the live change** — one row-level ping per changed row (Law R1, §7).
-7. **Respond via `json`**.
+   promise the fields are valid — that's step 5's job.
 
-Reads collapse to steps 1–2 then the query and `json`:
+   Steps 1–3 are the same three lines in about fifty handlers, so they are collapsed
+   into one awaited call: **`gated(request, env, module, right)`** for a read and
+   **`gatedBody<B>(…)`** for a write (`shared/workers/route.ts`). It is deliberately
+   *not* a wrap-the-whole-handler decorator — handlers stay plain
+   `export async function`s, because the seam tests read each handler's source by name
+   straight off disk. A handler that gates unusually (two rights, a body-derived
+   module, an admin-key check) simply doesn't use these and writes the steps out.
+4. **Decide about a client login, at the door** (Law R21). A door on the agency's own
+   material calls `refusePortalCaller`; a door on shared material resolves the account
+   fence with `accountScope` instead. Neither is optional and neither happens later —
+   the whole point of R21 is that the decision is made where the request arrives.
+5. **Validate at the boundary** — `requireText` / `optionalText` / `queryText` (§5).
+6. **CRUD through the lib layer** — never inline SQL in a route (§3, §6).
+7. **Publish the live change** — one row-level ping per changed row (Law R1, §7).
+8. **Respond via `json`**, carrying the collection's exact server total (Law R16).
+
+Reads collapse to the gated opening, then the query and `json`:
 
 ```ts
-export async function getLearning(request: Request, env: Env): Promise<Response> {
-  const { cfg, guard } = await teamContext(request, env)
-  await requireRight(cfg, guard, "learning", "read")
-  const items = await listLearning(cfg, guard)
-  const id = new URL(request.url).searchParams.get("id") // ?id= → one item
-  return json({ learning: id ? items.filter((l) => l.id === id) : items })
+export async function getBrandAssets(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "brand_assets", "read")
+  await refusePortalCaller(cfg, guard)
+  const assets = await listBrandAssets(cfg, guard)
+  const id = queryText(new URL(request.url).searchParams.get("id"), "Id") // ?id= → one asset
+  return json({
+    assets: id ? assets.filter((a) => a.id === id) : assets,
+    total: await countBrandAssets(cfg, guard),
+  })
 }
 ```
+
+Note the query string goes through `queryText` rather than being read raw: R20 holds
+the query half to the same positional rule as the body half (§5).
 
 ---
 
@@ -263,7 +289,7 @@ database:
 | Database | How you reach it | Helper |
 |----------|------------------|--------|
 | **Global core** (`users`, `teams`, `team_members`, login codes, import registry) | the native `env.DB` binding | `env.DB.prepare(sql).bind(…).first()/.run()/.all()` |
-| **Per-team** (roles, learning, help, activity, selectable data, …) | the Cloudflare D1 **REST door** | `d1Query` / `d1ExecScript` in `shared/workers/d1-rest.ts` |
+| **Per-team** (roles, help, brand assets, activity, selectable data, …) | the Cloudflare D1 **REST door** | `d1Query` / `d1ExecScript` in `shared/workers/d1-rest.ts` |
 
 Per-team databases are created at *runtime*, so they can't be pre-wired bindings — the
 REST door (`d1-rest.ts`) is the *one file* every team-data touch goes through, which is
@@ -301,11 +327,11 @@ const recent = await env.DB.prepare(
   `sqlString` (or `sqlValue`)**, never a bare template literal.
 
   ```ts
-  // workers/content/src/lib/learning.ts — createLearning
+  // workers/content/src/lib/brand-assets.ts — createBrandAsset
   await d1ExecScript(cfg, guard.databaseId,
-    `INSERT INTO learning (id, content_title, content_body, created_at, creator_id, creator_email, creator_name)
-     VALUES (${sqlString(id)}, ${sqlString(title)}, ${sqlString(body)}, ${sqlString(now)},
-             ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`)
+    `INSERT INTO brand_assets (id, name, category, description, created_at, creator_id, creator_email, creator_name)
+     VALUES (${sqlString(id)}, ${sqlString(v.name)}, ${sqlString(v.category)}, ${sqlString(v.description)},
+             ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`)
   ```
 
 ### `sqlString` / `sqlValue` / `ulid` — the three primitives
@@ -326,13 +352,13 @@ const recent = await env.DB.prepare(
   bare, strings via `sqlString`, `null` → `NULL`).
 
 - **Numbers still need coercing.** A field the route *types* as a number but doesn't
-  validate at runtime is coerced with a small helper before it's interpolated — never
+  validate at runtime goes through the shared helper before it's interpolated — never
   trust the `as` cast:
 
   ```ts
-  // learning.ts — sequence is typed number but arrives untrusted
-  function intOr(v: unknown, fallback: number): number {
-    const n = Number(v); return Number.isFinite(n) ? Math.trunc(n) : fallback
+  // shared/workers/validate.ts — a rank, a sequence, a count: typed number, arrives untrusted
+  export function intOr(value: unknown, fallback: number): number {
+    const n = Number(value); return Number.isFinite(n) ? Math.trunc(n) : fallback
   }
   ```
 
@@ -387,10 +413,11 @@ export async function requireRight(cfg, guard, module, right): Promise<void> {
 Conventions that fall out of the spine:
 
 - **Deactivate maps to `delete`.** Retiring a record (§6) is gated by the `delete`
-  right — deactivate *is* our delete. See `postSetLearningActive` gating on
-  `"learning", "delete"`.
-- **Your own data uses `read`.** Recording your *own* progress (`postLearningDone`)
-  only needs `read` — any reader may mark their own item done.
+  right — deactivate *is* our delete. See `postSetBrandAssetActive` gating on
+  `"brand_assets", "delete"`.
+- **Your own data uses `read`.** Joining a conversation on a ticket (`postHelpReply`)
+  only needs `help:read` — any member who can see a ticket may reply to it, because
+  the thing being written is their own words, not the record.
 - **The AI agent is not special.** It acts **as the signed-in user through the same
   gated endpoints** and never exceeds their rights. There is no agent role, no bypass.
 - **Operator endpoints** (`/admin/*`, seeds, migrations) use `adminGuard` (the
@@ -434,12 +461,19 @@ requireText(body.title, "Title", TEXT_LIMITS.short)
 const category = optionalText(input.category, "Category", TEXT_LIMITS.short) ?? null
 ```
 
-For non-text values there's no shared helper by design — validate inline and specifically
-(`typeof body.active !== "boolean"` → `fail(400, "invalid_input", …)`; a list of ids via
-`requireIdList`). Content-shaped input gets a purpose-built scrubber (`safeLink` allows
-only `http`/`https`/`mailto`; `safeBody` strips scripts/handlers/dangerous schemes) —
-defence in depth beside the renderer's own allowlist. This behaviour is **locked** by
-`workers/content/test/validate.test.ts`: the 500s can't come back.
+The query string is held to the same rule: **`queryText(searchParams.get(…), field)`**,
+never a raw read. R20's census walks both halves, and "the helper's behaviour is locked"
+is a different sentence from "every door uses it".
+
+For other value shapes there's no one-size helper by design — validate inline and
+specifically (`typeof body.active !== "boolean"` → `fail(400, "invalid_input", …)`; a
+list of ids via `requireIdList`). Typed fields get a purpose-built door of their own:
+`safeExternalLink` allows only `http`/`https`/`mailto` (anything else is dropped —
+a `javascript:` URL on a record is a stored-XSS payload the moment somebody clicks it),
+and `optionalDate` refuses anything that isn't exactly a real calendar day rather than
+coercing it, because a value that is *nearly* a date sorts, renders and is wrong. Both
+live in `workers/content/src/lib/internal-fields.ts`. The core helpers' behaviour is
+**locked** by `workers/content/test/validate.test.ts`: the 500s can't come back.
 
 ---
 
@@ -459,15 +493,19 @@ show them greyed with an Activate button and the owner can bring one back. Only 
 form PICKERS filter to `active` (a retired value isn't offered as a new choice, but old
 rows that referenced it still read truthfully). Do **not** filter a management list to
 `WHERE deactivated_at IS NULL` — that hides the row *and* the way back (`listRoles`,
-`listLearning`, `listSelectable` all return inactive; only the pickers in
+`listBrandAssets`, `listSelectable` all return inactive; only the pickers in
 `use-screen-data.ts` drop it). Guarded for dropdown values by
 `workers/tenancy/test/selectable-reactivatable.test.ts`.
 
 ```ts
-// learning.ts — setLearningActive
-const sql = active
-  ? `UPDATE learning SET deactivated_at = NULL, deactivator_id = NULL, deactivator_email = NULL, deactivator_name = NULL, updated_at = ${sqlString(now)} WHERE id = ${sqlString(id)};`
-  : `UPDATE learning SET deactivated_at = ${sqlString(now)}, deactivator_id = ${sqlString(actor.id)}, deactivator_email = ${sqlString(actor.email)}, deactivator_name = ${sqlString(actor.name)}, updated_at = ${sqlString(now)} WHERE id = ${sqlString(id)};`
+// brand-assets.ts — setBrandAssetActive. The current-status predicate rides the
+// UPDATE and the row comes back, so a repeat moves zero rows (Law R17).
+const changed = await d1Query<{ id: string }>(cfg, guard.databaseId,
+  active
+    ? `UPDATE brand_assets SET deactivated_at = NULL, deactivator_id = NULL, deactivator_email = NULL, deactivator_name = NULL, updated_at = ? WHERE id = ? AND deactivated_at IS NOT NULL RETURNING id`
+    : `UPDATE brand_assets SET deactivated_at = ?, deactivator_id = ${sqlString(actor.id)}, deactivator_email = ${sqlString(actor.email)}, deactivator_name = ${sqlString(actor.name)}, updated_at = ? WHERE id = ? AND deactivated_at IS NULL RETURNING id`,
+  active ? [now, id] : [now, now, id])
+if (!changed[0]) return false            // nothing moved → no activity row, no ping
 ```
 
 `active === null` in the shaped type is derived from `deactivated_at === null` — the DB
@@ -494,11 +532,11 @@ contract** — it swallows and logs its own failures, so a logging hiccup can ne
 the action it describes. Callers just `await` it; no `.catch` needed.
 
 ```ts
-// learning.ts — after the INSERT
+// brand-assets.ts — after the INSERT
 await logActivity(cfg, guard.databaseId, actor, {
-  type: "Learning created",
-  description: `${actor.name} added the "${title}" learning item`,
-  relatedTable: "learning",
+  type: "Brand asset created",
+  description: `${actor.name} added "${v.name}" to the brand library`,
+  relatedTable: "brand_assets",
   relatedRowId: id,
 })
 ```
@@ -523,7 +561,9 @@ Two conventions matter:
 
 - **Row-level, never list-level.** Pass the changed row's `id` so clients patch that one
   row instead of refetching the list (CACHING.md). For a bulk action, publish **one ping
-  per changed row** — see `postBulkSetLearningActive` looping `for (const id of changed)`.
+  per changed row** — see `postBulkHelpStatus` (routes/help.ts) looping
+  `for (const row of changed)`. A CSV import is the one sanctioned exception, and it
+  publishes a single id-less ping on the target table rather than thousands.
 - **The payload carries no row data** — `{ resource, id, op }` only. The client re-pulls
   the row through the permission-checked endpoint, so a live ping can never leak data.
   `op` (`add | edit | remove | session`) is *advisory*; the client verifies by re-pull.
@@ -542,15 +582,16 @@ The line is simple: **if two workers would write it the same way, it lives in `s
   (`d1Query`/`d1ExecScript`/`sqlString`), `id.ts` (`ulid`), `activity.ts`
   (`logActivity`), `realtime.ts` (`publishChange`). Touch these carefully — a change
   ripples across all eight workers.
-- **`shared/types.ts`** is the contract the web `web/` client and the workers both agree
-  on (`SessionUser`, `Learning`, `ApiError`, …). Shape a DB row into a shared type at the
-  lib boundary (`toLearning`) so the wire type is stable even as columns change.
+- **`shared/types.ts`** is the contract the `web/` client and the workers both agree
+  on (`SessionUser`, `BrandAsset`, `ApiError`, …). Shape a DB row into a shared type at
+  the lib boundary (`toAsset`) so the wire type is stable even as columns change.
 - **`shared/rules/registry.ts`** and **`shared/glossary.ts`** / **`shared/brand.ts`** are
   the single sources of truth for the laws, the product vocabulary, and brand strings.
 - **A worker's own `src/`** holds only what's specific to it: its `env.ts` (the bindings
   it's given), its `index.ts` switchboard, its `routes/*` (thin handlers), and its
   `lib/*` (the module's real CRUD + rules). Route files stay thin; module logic lives in
-  `lib/`. `learning.ts` route → `learning.ts` lib is the pattern to copy.
+  `lib/`. `routes/brand-assets.ts` → `lib/brand-assets.ts` is the pattern to copy: one
+  name, two files, and you can guess which half a line belongs in.
 
 Each worker's `Env` (e.g. `workers/content/src/env.ts`) is written to **structurally
 satisfy** the shared `GatingEnv` (`AUTH` + `DB` + the Cloudflare D1 credentials), which
@@ -580,8 +621,8 @@ gets a one-line reason.
 line exists*:
 
 ```ts
-// Row-level: carry the new item's id so open learning lists patch just that row.
-await publishChange(env.REALTIME, guard.teamId, "learning", id, "add")
+// R17: a no-op repeat moves zero rows → no ping, no duplicate history.
+const changed = await setBrandAssetActive(cfg, guard, actor, id, body.active)
 
 // A missing item is skipped, not fatal — the rest of the batch still applies.
 if (e instanceof GuardError && e.status === 404) { skipped++; continue }
@@ -589,19 +630,21 @@ if (e instanceof GuardError && e.status === 404) { skipped++; continue }
 // ?v= busts caches; the file itself is served immutable by the gateway.
 ```
 
-**Guard the reader against a subtle danger.** From `learning.ts`, above `safeLink`:
+**Guard the reader against a subtle danger.** From `internal-fields.ts`, above
+`safeExternalLink`:
 
 ```ts
-// Allow only safe link schemes (http/https/mailto). A `javascript:` / `data:` /
-// `vbscript:` content_link is a stored-XSS payload the moment a reader clicks it, so
-// anything else is dropped (defence-in-depth beside the renderer's own check).
+// Allow only safe link schemes (http / https / mailto). A `javascript:` / `data:` /
+// `vbscript:` URL stored on a record is a stored-XSS payload the moment a reader
+// clicks it. Anything unrecognised is dropped rather than refused — a link is
+// optional, and losing a bad one costs nothing.
 ```
 
 **A `housekeeping` classification always carries its reason** inline in `ROUTES`:
 
 ```ts
 // Stores a file in R2 but changes NO record (no row to patch) → housekeeping.
-"POST /api/content/learning/upload": { handler: postUploadLearningFile, kind: "housekeeping" },
+"POST /api/content/brand-assets/upload": { handler: postUploadBrandAsset, kind: "housekeeping" },
 ```
 
 Anti-patterns: a comment that restates the code (`// increment i`), a stale comment that
@@ -614,19 +657,20 @@ simpler. If a comment is needed to explain *what* the code does, prefer clearer 
 
 Consistent, boring, predictable — the reader should be able to *guess* the name.
 
-- **Route handlers** read as `METHOD` + verb + noun: `getLearning`, `postCreateLearning`,
-  `postUpdateLearning`, `postSetLearningActive`, `postBulkSetLearningActive`.
-- **Lib CRUD** is the bare verb + noun: `listLearning`, `createLearning`,
-  `updateLearning`, `setLearningActive`, `setLearningDone`. Bulk siblings prefix `bulk`
-  (`bulkSetLearningActive`).
-- **Fetch-or-throw** helpers end in `OrThrow` (`learningOrThrow`) and throw a `404`
-  `GuardError`.
-- **Shaping functions** are `toX` (`toLearning`, `toActor`) — one DB row → one shared type.
-- **DB columns** are `snake_case` (`content_title`, `deactivated_at`, `creator_email`);
-  **TS fields** are `camelCase` (`title`, `active`, `creatorEmail`). The `toX` function is
-  the single translation point.
+- **Route handlers** read as `METHOD` + verb + noun: `getBrandAssets`,
+  `postCreateBrandAsset`, `postUpdateBrandAsset`, `postSetBrandAssetActive`,
+  `postUploadBrandAsset`.
+- **Lib CRUD** is the bare verb + noun: `listBrandAssets`, `countBrandAssets`,
+  `createBrandAsset`, `updateBrandAsset`, `setBrandAssetActive`. Bulk siblings prefix
+  `bulk` (`bulkSetStatus` in `lib/help.ts`).
+- **Fetch-or-throw** helpers end in `OrThrow` (`assetOrThrow`, `ticketOrThrow`,
+  `sourceOrThrow`) and throw a `404` `GuardError`.
+- **Shaping functions** are `toX` (`toAsset`, `toActor`) — one DB row → one shared type.
+- **DB columns** are `snake_case` (`file_url`, `deactivated_at`, `creator_email`);
+  **TS fields** are `camelCase` (`fileUrl`, `active`, `creatorName`). The `toX` function
+  is the single translation point.
 - **Error codes** are short `snake_case` strings, stable enough for the client to branch
-  on: `not_member`, `forbidden`, `invalid_input`, `no_team`, `learning_not_found`.
+  on: `not_member`, `forbidden`, `invalid_input`, `no_team`, `brand_asset_not_found`.
 - **`GuardError` messages** are warm, plain, sentence case, safe to show a user — they
   follow the same voice as UI copy (see the glossary in `shared/glossary.ts`): *"You're
   not a member of this team."*, not *"403 FORBIDDEN: membership assertion failed"*.
@@ -731,12 +775,13 @@ stay green.
 
 ## The short version
 
-Open with `teamContext` → gate with `requireRight` → read the body defensively and
-`requireText`/`optionalText` it → do CRUD in a `lib/` function through `d1Query` /
+Open with `gated` / `gatedBody` (`teamContext` → `requireRight` → the defensive body
+read) → decide about a client login at the door → `requireText`/`optionalText`/
+`queryText` every field → do CRUD in a `lib/` function through `d1Query` /
 `d1ExecScript` + `sqlString` + `ulid`, stamping the audit block and deactivating instead
-of deleting → `logActivity` → `publishChange` → `json`. Throw `GuardError` for every
-rule failure and let the one central catch format it. Comment the *why*. Add the least
-code that does the job, and keep `npm run check` green.
+of deleting → `logActivity` → `publishChange` → `json` with the exact total. Throw
+`GuardError` for every rule failure and let the one central catch format it. Comment
+the *why*. Add the least code that does the job, and keep `npm run check` green.
 
 ## Reading config, and writing a check that can fail
 
@@ -780,10 +825,13 @@ These three are machine-checked; write them the house way so the build stays gre
 
   But a cap is an honest *refusal* to answer, so a collection that GROWS with
   ordinary use must **page** instead. Growing collections are DATA
-  (`GROWING_COLLECTIONS` in `shared/rules/registry.ts`); today: support tickets
-  and the activity feed — both the team-wide one and one record's slice of it,
-  registered separately because "the server pages" and "the client can reach page
-  two" are different facts. Page by KEY, never by offset — `LIMIT ? OFFSET ?`
+  (`GROWING_COLLECTIONS` in `shared/rules/registry.ts`); today: tickets, the
+  knowledge base, accounts, process maps, work logs, meetings, stories, and the
+  activity feed — the team-wide one and one record's slice of it registered
+  separately, because "the server pages" and "the client can reach page two" are
+  different facts. Read the real list in the registry; each entry says in plain
+  words *why* that collection grows, and that sentence is the thing to argue with
+  before you add one. Page by KEY, never by offset — `LIMIT ? OFFSET ?`
   re-scans everything it skips and duplicates or drops rows when someone writes
   mid-scroll:
 
@@ -809,7 +857,7 @@ These three are machine-checked; write them the house way so the build stays gre
   the current-status predicate INLINE and reads the changed rows back:
 
   ```sql
-  UPDATE learning SET deactivated_at = ?, … WHERE id = ? AND deactivated_at IS NULL RETURNING id
+  UPDATE brand_assets SET deactivated_at = ?, … WHERE id = ? AND deactivated_at IS NULL RETURNING id
   ```
 
   Return the boolean; when zero rows moved write NO activity row and (in the

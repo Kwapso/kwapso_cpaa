@@ -22,16 +22,22 @@ contract belongs in one place rather than being inferred from ten call sites. **
 is that place.**
 
 ```ts
-publishChange(env.REALTIME, teamId, resource, id, op)   // → the TEAM channel
-publishUserChange(env.REALTIME, userId, resource)       // → one person's devices
-publishSignOut(env.REALTIME, userId)                    // → forced sign-out
+publishChange(env, teamId, resource, id, op, scope)  // → the TEAM channel
+publishUserChange(env, userId, resource)             // → one person's devices
+publishSignOut(env, userId)                          // → forced sign-out
 ```
+
+All three take the worker's **whole `env`**, not the `REALTIME` binding on its own
+(`RealtimeEnv = { REALTIME, INTERNAL_KEY? }`). That is deliberate: the shared internal
+key the realtime worker checks travels with the call, so a publisher that forgets it is
+a type error here rather than a silent 403 at runtime.
 
 | Argument | What it must be |
 |---|---|
-| `resource` | the STRING the client registry keys on — a `TEAM_RESOURCES` entry, a `SIMPLE_INVALIDATIONS` entry, or a reasoned `DEAF_EXEMPT` line (Law **R15**: a publisher with no listener is a screen that stales). Conventionally the table name (`member_roles`, `help`, `learning`). |
+| `resource` | the STRING the client registry keys on — a `TEAM_RESOURCES` entry, a `SIMPLE_INVALIDATIONS` entry, or a reasoned `DEAF_EXEMPT` line (Law **R15**: a publisher with no listener is a screen that stales). Conventionally the table name (`member_roles`, `help`, `brand_assets`). |
 | `id` | the affected ROW's id, so the client can patch just that row (rule 3). **The one deliberate exception is a bulk write**, which publishes ONE id-less ping on the target table and lets the client reconcile the list — one ping, never one per row. |
 | `op` | `add` · `edit` · `remove`. It drives the count sidecar (`add`/`remove` bump `total` by ±1) and nothing else — the client re-pulls the row through the gated endpoint either way, so a wrong `op` costs an off-by-one badge until the next reconcile, never wrong data. |
+| `scope` | the ACCOUNT the row belongs to, on `publishChange` only. Pass it for anything a client login is meant to hear: a portal socket is fenced by account and cannot check a row id, so a ping with no scope is one their side never receives. |
 
 Four promises the callers rely on and must not break:
 
@@ -93,7 +99,7 @@ app-shell so the R15 `live-collections` check imports it as data). Two channels:
 
 ```ts
 // worker, after a successful write — carry the affected row id:
-await publishChange(env.REALTIME, guard.teamId, "member_roles", roleId, "edit")
+await publishChange(env, guard.teamId, "member_roles", roleId, "edit")
 
 // client registry (app-shell.tsx) — one line per module, generic handler:
 member_roles: {
@@ -237,16 +243,16 @@ input lived only in component state. **Rule: every form dialog persists its draf
 
 The agent + modules build adds these resources; each follows the rules above.
 
-- **Learning, help, help_threads → ROW-LEVEL pings** (rule 3). Every CRUD write in
-  the content worker publishes `publishChange(env.REALTIME, teamId, "<resource>",
+- **help, help_threads, brand_assets → ROW-LEVEL pings** (rule 3). Every CRUD write in
+  the content worker publishes `publishChange(env, teamId, "<resource>",
   id, op)` carrying the affected row id, so open lists patch just that one row.
   (A reply both pings `help_threads` (add) and the parent `help` row (edit) so the
   ticket and its thread stay in sync.)
 - **Import → ONE coarse list-ping per table.** A bulk write is the explicit
   exception to row-level: `confirm` writes every mapped row INSERT-ONLY, then
   publishes a SINGLE id-less ping on the **target table** (e.g. `member_roles` or
-  `learning`) — one ping, not one per row — and the client refetches that one list
-  (rule 6's reconcile). One list-ping per imported table.
+  `brand_assets`) — one ping, not one per row — and the client refetches that one
+  list (rule 6's reconcile). One list-ping per imported table.
 - **agent_usage → a coarse list-ping** too: after an agent turn spends quota, the
   data-ops worker publishes an id-less `agent_usage` ping so the team's quota
   meter refreshes (no row content; just "the meter moved").
@@ -291,7 +297,7 @@ last page, `undefined` = nothing loaded yet).
 
 ## Checklist for a new screen / module
 1. Read with `useCached("<resource>:<scopeId>", fetcher)`.
-2. On every server write, `publishChange(env.REALTIME, teamId, "<resource>", id, op)`
+2. On every server write, `publishChange(env, teamId, "<resource>", id, op)`
    **with the affected row id** (classify the route `mutation` so the seam test passes).
 3. Add ONE `TEAM_RESOURCES` entry (key / idField / fetchOne / fetchList / deps) — the
    generic handler does row-level patch + reconnect catch-up; no bespoke code.
@@ -333,7 +339,8 @@ cache (rule 9) — defeating cache-first entirely and multiplying server calls (
 enforces "no spinner on navigation" from Loading rule 2 above).
 
 The **whole post-auth app** is ONE static shell (`deep-link-screen.tsx` resolves
-`/home`, `/settings`, `/invitations`, `/learning`, `/tickets`, and the `/t/**` tree
+`/home`, `/settings`, `/invitations`, every clean top-level page in
+`TOP_LEVEL_MODULES` (`/tickets`, `/accounts`, `/brand`, …), and the `/t/**` tree
 from the URL). Move between any of them with the **History API**
 (`window.history.pushState` / `replaceState`) — Next observes it, the route
 segment never changes, nothing reloads, the cache stays warm — then re-render from

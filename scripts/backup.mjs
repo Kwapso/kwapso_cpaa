@@ -44,6 +44,13 @@
 // is silent by construction, which is the exact failure this script's dump check
 // exists to refuse in the D1 half.
 //
+// That is also why a module going away does not take its bucket with it. The
+// learning library was purged on 17 Aug 2026 and nothing writes to
+// kwapso-learning-media any more — but the gateway still serves it, the images
+// inside those articles still have to load, and the objects are still the
+// clients' own files. A bucket is backed up because it EXISTS, not because some
+// row still names it.
+//
 // `wrangler` has no `r2 object list`, which is what makes the derived inventory
 // look inevitable. The R2 REST API does have one, and this repo already pages it
 // (scripts/glide-to-r2.mjs). So the bucket itself is the inventory: every object
@@ -53,7 +60,7 @@
 // key the bucket does not hold is a file that is ALREADY LOST, and a backup is
 // the moment that becomes visible, exactly as a team database missing from the
 // account is. That reconciliation is derived from the code: WHERE-THE-KEYS-LAND
-// below lists every column, traced from the seven `.put(` calls in the workers.
+// below lists every column, traced from the `.put(` calls in the workers.
 //
 // Which buckets are COVERED is derived from the wrangler configs, not typed from
 // memory — and then the account is listed and asked whether it holds a bucket
@@ -265,14 +272,11 @@ const isThisEnvironment = (name, environment) =>
 const ARCHIVE_BUCKET = { staging: "kwapso-glide-archive-staging", production: "kwapso-glide-archive" }
 
 /** WHERE THE KEYS LAND — every column in this codebase that holds an R2 object's
- * URL, traced from the seven places a worker writes one:
+ * URL, traced from the places a worker writes one:
  *
  *   auth/src/lib/profile.ts          MEDIA           → core users.image_url
  *   tenancy/src/lib/teams.ts         MEDIA           → core teams.logo_url
  *   content/routes/todos.ts          MEDIA           → team todos.file_url
- *   content/routes/learning.ts       LEARNING_MEDIA  → team learning.content_link
- *                                                      + content_body (pasted into
- *                                                        the article's HTML)
  *   content/routes/brand-assets.ts   INTERNAL_MEDIA  → team brand_assets.file_url
  *   content/routes/staff.ts          INTERNAL_MEDIA  → team staff_profiles.photo_url
  *                                                      + staff_certificates.file_url
@@ -280,9 +284,16 @@ const ARCHIVE_BUCKET = { staging: "kwapso-glide-archive-staging", production: "k
  *
  * The last three doors hand a URL back to a FORM and the row is written by a
  * different route, so the column was read off the write, not guessed from the
- * name. `content_body` is in the list because the learning upload door returns a
- * URL the editor pastes into the article — the same reason
- * content/src/lib/learning.ts scans that column when it reclaims.
+ * name.
+ *
+ * LEARNING_MEDIA USED TO HAVE TWO ROWS HERE — learning.content_link and
+ * learning.content_body — and they are gone because the TABLE is gone (the
+ * learning library was purged on 17 Aug 2026). Reconciling against a table that
+ * no longer exists does not report a missing file; it throws, and ends the
+ * backup where it should have reported one. The BUCKET is untouched: it is still
+ * bound and still served at /media/learning/, so it is enumerated and captured
+ * like every other one, which is the half that was always doing the work. There
+ * is simply no row left to cross-check it against.
  *
  * HELP_MEDIA is bound by the content worker and appears in NO row here, because
  * nothing writes it: the ticket-attachment hook is deferred (OPERATIONS.md §R2
@@ -294,8 +305,6 @@ const CORE_REFERENCES = [
 ]
 const TEAM_REFERENCES = [
   { table: "todos", column: "file_url" },
-  { table: "learning", column: "content_link" },
-  { table: "learning", column: "content_body" },
   { table: "brand_assets", column: "file_url" },
   { table: "staff_profiles", column: "photo_url" },
   { table: "staff_certificates", column: "file_url" },
@@ -307,9 +316,10 @@ const TEAM_REFERENCES = [
  * then internal, then the shared bucket. One function, so the backup cannot
  * disagree with the door about where a file lives.
  *
- * ROOT-RELATIVE ONLY, for the reason ownedLearningKeys gives at length:
- * `https://elsewhere.example/media/…` is a link on someone else's host, and
- * reading our own key out of it would let a pasted link invent a missing file.
+ * ROOT-RELATIVE ONLY, for the reason `ownedMediaKey` gives at length in
+ * shared/workers/image.ts: `https://elsewhere.example/media/…` is a link on
+ * someone else's host, and reading our own key out of it would let a pasted
+ * link invent a missing file.
  * brand_assets.file_url is documented as "either an object we host or a link
  * somewhere else", so this is what keeps a legacy Google link from being
  * reported as a lost object. */
@@ -338,8 +348,8 @@ const bucketFor = (binding, environment) =>
 /** Every root-relative /media/… reference inside a column value. The lookbehind
  * is what makes it a reference to OUR object rather than any string containing
  * our path, and the character class stops at the `?v=` cache-buster and at any
- * quote — the same expression content/src/lib/learning.ts scans article HTML
- * with, for the same reason. */
+ * quote — a reference is the path and nothing else, and everything after it
+ * belongs to whoever wrote the surrounding text. */
 const MEDIA_URL = /(?<![\w:.\-/])\/media\/[A-Za-z0-9/_%-]+/g
 
 /** THE KEY A BACKUP MAY WRITE TO DISK. R2 hands these back, not a caller, but a

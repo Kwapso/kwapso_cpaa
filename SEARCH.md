@@ -76,7 +76,7 @@ box off, and a `<PagedFind>` is wired to that collection's own cache key.
 
 ### Layer 3 — full-text "search anything" (FTS5)
 For record modules where Glide-style "match anything on the detail screen" is
-wanted (learning, tickets, imported datasets), each per-team database gets a
+wanted (tickets, imported datasets), each per-team database gets a
 **SQLite FTS5** virtual table mirroring the record table's text columns. The
 worker queries it with `MATCH` and returns ranked hits. This is what makes search
 span *all* of a record's fields, not just a column, at scale.
@@ -88,31 +88,35 @@ physics, same as every other per-team table ([ARCHITECTURE.md](ARCHITECTURE.md) 
 Pattern, added by the module's team-schema migration when that module is built:
 
 ```sql
--- one virtual table per searchable record table (e.g. learning)
-CREATE VIRTUAL TABLE learning_fts USING fts5(
-  title, description, category,          -- the text fields shown on the detail
-  content='learning', content_rowid='rowid'
+-- one virtual table per searchable record table (e.g. help, the tickets table)
+CREATE VIRTUAL TABLE help_fts USING fts5(
+  description, help_type, status,        -- the text fields shown on the detail
+  content='help', content_rowid='rowid'
 );
 -- triggers keep it in lock-step with the base table (no app code to forget)
-CREATE TRIGGER learning_ai AFTER INSERT ON learning BEGIN
-  INSERT INTO learning_fts(rowid, title, description, category)
-  VALUES (new.rowid, new.content_title, new.content_description, new.category);
+CREATE TRIGGER help_ai AFTER INSERT ON help BEGIN
+  INSERT INTO help_fts(rowid, description, help_type, status)
+  VALUES (new.rowid, new.description, new.help_type, new.status);
 END;
-CREATE TRIGGER learning_ad AFTER DELETE ON learning BEGIN
-  INSERT INTO learning_fts(learning_fts, rowid, title, description, category)
-  VALUES('delete', old.rowid, old.content_title, old.content_description, old.category);
+CREATE TRIGGER help_ad AFTER DELETE ON help BEGIN
+  INSERT INTO help_fts(help_fts, rowid, description, help_type, status)
+  VALUES('delete', old.rowid, old.description, old.help_type, old.status);
 END;
-CREATE TRIGGER learning_au AFTER UPDATE ON learning BEGIN
-  INSERT INTO learning_fts(learning_fts, rowid, ...) VALUES('delete', old.rowid, ...);
-  INSERT INTO learning_fts(rowid, ...) VALUES (new.rowid, ...);
+CREATE TRIGGER help_au AFTER UPDATE ON help BEGIN
+  INSERT INTO help_fts(help_fts, rowid, ...) VALUES('delete', old.rowid, ...);
+  INSERT INTO help_fts(rowid, ...) VALUES (new.rowid, ...);
 END;
 ```
 
-Query path (in the module's worker): `SELECT l.* FROM learning_fts f JOIN learning l
-ON l.rowid = f.rowid WHERE learning_fts MATCH ? ORDER BY rank LIMIT ? OFFSET ?` —
-then the **same permission gate** as every read runs first (a viewer with no
-right gets nothing back; FTS never bypasses [permissions](ARCHITECTURE.md) §3).
-Deactivated rows are filtered in the JOIN, never hard-deleted ([records rule](ARCHITECTURE.md) §4).
+Query path (in the module's worker): `SELECT h.* FROM help_fts f JOIN help h
+ON h.rowid = f.rowid WHERE help_fts MATCH ? ORDER BY rank LIMIT ?` — then the
+**same permission gate** as every read runs first (a viewer with no
+right gets nothing back; FTS never bypasses [permissions](ARCHITECTURE.md) §3),
+and the account fence narrows it further for a client login. Archived rows are
+filtered in the JOIN, never hard-deleted ([records rule](ARCHITECTURE.md) §4).
+Note the missing `OFFSET`: tickets are a `GROWING_COLLECTIONS` member, so an
+FTS read pages by key like every other read of them (Law **R14**) — the ranked
+hits are ordered and cursored, never skipped over.
 
 Rules for FTS5 here:
 - **One virtual table per searchable record table**, created by that module's
@@ -171,9 +175,10 @@ compartment model, the two fences); BOOTSTRAP.md §3b is how you stand the index
 
 - **Layer 1 + the library search/filter UI**: SHIPPED — the library search/filter
   bar landed and the app turned it on across the BOUNDED collections (members /
-  roles / invites / dropdowns / learning) via the recipes (`listCollection` +
-  `withDataDrivenCollection`, which hides search/filters when a list is empty or
-  a facet has no options). See UI-CONVENTIONS §6.
+  roles / invites / dropdown values / the brand library / meeting purposes) via
+  the recipes (`listCollection` + `withDataDrivenCollection`, which hides
+  search/filters when a list is empty or a facet has no options). See
+  UI-CONVENTIONS §6.
 - **Layer 2 (server-side query)**: SHIPPED 2026-08-17 for every PAGED collection —
   accounts, tickets, the knowledge base, the backlog, the diary and the process
   maps all search through their own door (`?q=`), and the accounts screen's three

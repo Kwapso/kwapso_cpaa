@@ -701,8 +701,8 @@ dark button the old app uses. Change `web/components/deep-link/screen-bits.tsx:9
 which is the single seam for every collection add button in the agency app, and
 `web-portal/components/tickets-screen.tsx:62`.
 
-The fourteen labels this deletes ("New task", "New story", "New meeting", "New role",
-"New article", "New account", "Invite", "Raise ticket", "Add a source", "Map a process",
+The thirteen labels this deletes ("New task", "New story", "New meeting", "New role",
+"New account", "Invite", "Raise ticket", "Add a source", "Map a process",
 "Start a sprint", "Record an app", "Upload a file", plus the portal's) become the
 `aria-label` and the tooltip. That also ends the two competing naming families
 ("New <noun>" and "<verb> a <noun>").
@@ -764,9 +764,9 @@ either way. (inferred: adopting the old app's numbered form; both satisfy R14.)
 
 ### F1: every submit button says "Submit"
 
-One word, every form, both front doors. This replaces 31 distinct labels currently in
+One word, every form, both front doors. This replaces 30 distinct labels currently in
 use, including "Save changes" (13 sites), "Add it" (7), "Save" (4), "Create role",
-"Create article", "Add value", "Add source", "Add file", "Add contact", "Add account",
+"Add value", "Add source", "Add file", "Add contact", "Add account",
 "Add step", "Record it", "Map it", "Start it", "Log it", "Put it in the diary",
 "Share it", "Send it", "Send it from kwapso", "Send and resolve", "Send invite",
 "Ask and email", "Raise ticket", "Give access", "Save profile", "Email me a code",

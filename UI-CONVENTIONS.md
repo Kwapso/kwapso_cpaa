@@ -114,9 +114,12 @@ export const BASE_RECIPES: Record<string, ScreenRecipe> = {
   "roles.list":     rolesListRecipe,
   "invites.list":   invitesListRecipe,
   "invites.detail": inviteDetailRecipe,
-  "learning.list":  learningListRecipe,
   "tickets.list":   ticketsListRecipe,
   "accounts.list":  accountsListRecipe,
+  "brand.list":     brandListRecipe,
+  "brand.detail":   brandDetailRecipe,
+  // …and one per screen the product has grown since. Read the real list in the
+  // file; a key is missing here only because this is an excerpt.
 }
 ```
 
@@ -157,60 +160,79 @@ permission grid is a bespoke `PermissionMatrix` with no screen-engine block, so
 // host composes it from the library PermissionMatrix (see role-detail.tsx).
 ```
 
-The current bespoke details are **`role-detail`**, **`learning-detail`**,
-**`help-detail`** and **`account-detail`** — each a full record screen (its own header,
-tabs, actions) wired by hand because it carries a control (permission matrix /
-rich-text article body + media / ticket thread + status stepper / the account's
-contacts, the accounts nested under it and its portal logins, each a collection with
-its own actions) the engine doesn't render.
+The current bespoke details are the names in `RECORD_DETAIL_COMPONENTS`
+(`shared/rules/registry.ts`) — **`role-detail`**, **`help-detail`**,
+**`account-detail`**, **`contact-detail`**, **`knowledge-detail`**,
+**`meeting-detail`** and **`process-detail`** — each a full record screen (its own
+header, tabs, actions) wired by hand because it carries a control the engine doesn't
+render: a permission matrix / a ticket thread + status stepper / the account's
+contacts, the accounts nested under it and its portal logins / a source's own words
+and the switches that take it away from the assistant / prose somebody wrote before
+and after a meeting / a numbered sequence of steps and the subtraction between two
+versions of it. Each of those is a collection or a control with actions of its own.
+
+The counter-example is worth naming, because it is the one that keeps this section
+honest: the **brand library**'s detail is a plain recipe (`brand.detail`), not a
+bespoke component. It shows a name, a category, a description, a file and an audit
+block — description-list rows and an activity feed — so there is nothing for a host
+to compose. Reach for bespoke when a control has no engine block, not when a screen
+feels important.
 
 The one bespoke **list** is **`selectable-screen.tsx`** (Dropdown values): it groups
 values by *type* — a shape the flat `list` recipe doesn't express. Because it's
 host-composed it doesn't get the recipe chrome for free, so it **assembles the same
 chrome from library primitives**: a search `Input` + a status `Select` (Active default ·
-Inactive · All), matching the recipe collections (roles/learning) so a deactivated value
-is hidden by default but reachable to reactivate; and a **"New value" button that opens a
-FormShell dialog** (`selectable-form-dialog.tsx`, registered in `FORM_DIALOGS`), never an
-inline add row. Two rules when you hand-compose a collection: **match the standard filter
-chrome** (search + status), and **every create goes through a FormShell dialog** (Law R4,
-separators before the submit) — don't invent a different one.
+Inactive · All), matching the recipe collections (roles, the brand library) so a
+deactivated value is hidden by default but reachable to reactivate; and a **"New value"
+button that opens a FormShell dialog** (`selectable-form-dialog.tsx`, registered in
+`FORM_DIALOGS`), never an inline add row. Two rules when you hand-compose a collection:
+**match the standard filter chrome** (search + status), and **every create goes through a
+FormShell dialog** (Law R4, separators before the submit) — don't invent a different one.
 
 ### The decision, in one table
 
 | The screen is…                                             | Build it as…                          | Example |
 |------------------------------------------------------------|---------------------------------------|---------|
 | A bounded list of shaped rows                              | a `list` recipe                        | `membersListRecipe` |
-| A detail whose tabs are description-lists + activity        | a `detail` recipe                      | `memberDetailRecipe`, `inviteDetailRecipe` |
-| A detail carrying a control the engine has no block for     | a host-composed component              | `role-detail`, `learning-detail`, `help-detail` |
+| A detail whose tabs are description-lists + activity        | a `detail` recipe                      | `memberDetailRecipe`, `inviteDetailRecipe`, `brandDetailRecipe` |
+| A detail carrying a control the engine has no block for     | a host-composed component              | `role-detail`, `help-detail`, `process-detail` |
 | A generic, app-agnostic control you keep re-needing         | **not here** — surface it to the library | — |
 
-The `deep-link-screen.tsx` resolver holds both worlds together: it renders a
+The resolver holds both worlds together: `deep-link-screen.tsx` hands the URL to
+`renderModuleContent` (`web/components/deep-link/module-content.tsx`), which renders a
 `<ScreenRenderer>` for recipe screens and delegates to `<RoleDetailScreen>` /
-`<LearningDetailScreen>` / `<HelpDetailScreen>` for the bespoke ones.
+`<HelpDetailScreen>` / `<ProcessDetailScreen>` for the bespoke ones.
 
 ### The screen engine's URL grammar
 
 One static shell (`deep-link-screen.tsx`) backs the whole `/t/*` tree.
 `/t/<teamId>/<module>/<id>` is resolved **client-side** (a static export can't
-prerender ids). Learning and Tickets also have clean top-level URLs (`/learning`,
-`/tickets`) that run against the active team. The friendly URL segment maps to the real
-permission module the server enforces:
+prerender ids). Most sidebar pages also have a clean top-level URL (`/tickets`,
+`/accounts`, `/brand`, …) that runs against the active team. The friendly URL segment
+maps to the real permission module the server enforces:
 
 ```ts
 // web/lib/screens.ts
 export const MODULE_PERMISSION: Record<string, string> = {
   team: "teams", members: "team_members", roles: "member_roles",
   invites: "team_members", dropdowns: "selectable_data",
-  learning: "learning", tickets: "help", accounts: "accounts",
+  tickets: "help", accounts: "accounts", knowledge: "knowledge",
+  brand: "brand_assets", purposes: "delivery",
+  // …one line per segment; read the real map in the file.
 }
 ```
 
-Learning, Tickets and **Accounts** each have a clean top-level URL too (`/learning`,
-`/tickets`, `/accounts`) — a sidebar page resolves the team from context, like `/home`.
-Tickets is the one page whose segment isn't its permission module: the address says
-`tickets`, the right the server checks is `help`. That is the only place the two
-names meet — DATA-MODEL.md § *help + help_threads* says why the key never moves.
-A new one needs three lines: `TOP_LEVEL_MODULES` (`deep-link/route.ts`), the
+Every page listed in `TOP_LEVEL_MODULES` (`deep-link/route.ts`) has a clean top-level
+URL — a sidebar page resolves the team from context, like `/home`. Three segments are
+the ones whose name isn't their permission module, and each of them is deliberate:
+the address says `tickets` while the right the server checks is `help`; `brand` reads
+better than `brand_assets` in an address; and `purposes` gates on `delivery`, the
+module key that survived when its programme half was folded onto the sprint type.
+Renaming a permission STRING already written into every role's sheet in every team
+database can only ever take somebody's access away — DATA-MODEL.md
+§ *help + help_threads* says it once, and the other two follow the same reasoning.
+`MODULE_PERMISSION` is the one place the two names meet.
+A new page needs three lines: `TOP_LEVEL_MODULES` (`deep-link/route.ts`), the
 gateway's top-level shell loop, and its own `web/app/<segment>/[[...rest]]/page.tsx`.
 
 Navigation *inside* `/t/*` uses the History API, never the framework router — a static
@@ -249,16 +271,18 @@ and the check verifies exactly that, reading the source for the two library name
 
 ```ts
 // web/test/rules.test.ts
-for (const c of RECORD_DETAIL_COMPONENTS) {          // ["help-detail", "learning-detail"]
+for (const c of RECORD_DETAIL_COMPONENTS) {          // ["help-detail", "role-detail", …]
   const src = read(join(WEB, "components", `${c}.tsx`))
   expect(src, `${c} must use library TabsView`).toContain("TabsView")
   expect(src, `${c} must render an ActivityFeed (the Activity tab)`).toContain("ActivityFeed")
 }
 ```
 
-`learning-detail.tsx` is the model: a `TabsView` whose panels are `Article` /
-`Overview` (a `DescriptionList` of `auditItems(...)`) / `Activity` (an `ActivityFeed`
-fed by the generic `tenancy.recordActivity("learning", id)` path).
+`knowledge-detail.tsx` is the shortest model to copy: a `TabsView` whose panels are
+`Source` (the words themselves) / `Overview` (a description list built from
+`auditItems(...)`) / `Activity` (an `ActivityFeed` fed by the generic
+`useRecordActivity("knowledge_sources", id)` path). The record's own tab carries no
+badge; Activity carries `formatCount(activity.total)`.
 
 **No exceptions today.** `role-detail` — the last one — grew its tabs on 2026-07-06
 (Permissions is its main tab, then Overview + Activity) and joined
@@ -279,10 +303,11 @@ const offenders = componentFiles().filter((f) => /variant=\{[^}]*===[^}]*\?/.tes
 expect(offenders, `use the library TabsView instead of hand-rolled toggles`).toEqual([])
 ```
 
-Real `TabsView` usage — the learning list's Articles / Team-progress strip and the
-Tickets list's All / My raiser strip in `deep-link-screen.tsx` — is `variant: "line"`
-config with `tabs`, `badge`, `badgeVariant`, and an `onValueChange` that drives the URL
-(`?tab=…`) so Back works.
+Real `TabsView` usage — the Tickets list's All tickets / My tickets / Archived strip
+and the Accounts list's companies-and-people strip, both in
+`deep-link/collection-content.tsx` — is `variant: "line"` config with `tabs`, `badge`,
+`badgeVariant`, and an `onValueChange` that drives the URL (`?tab=…`) so Back works and
+a link to one scope is a link somebody can send.
 
 ### R4 — every form goes through `FormShell`
 
@@ -292,9 +317,9 @@ library primitives. The check asserts each form dialog imports it:
 
 ```ts
 // web/test/rules.test.ts — FORM_DIALOGS is the enforced list
-for (const d of FORM_DIALOGS) {                       // help-form-dialog, learning-form-dialog,
-  const src = read(join(WEB, "components", `${d}.tsx`))//  role-form-dialog, invite-dialog, team-edit-dialog
-  expect(src, `${d} must use FormShell`).toContain("form-shell")
+for (const d of FORM_DIALOGS) {                       // help-form-dialog, role-form-dialog,
+  const src = read(join(WEB, "components", `${d}.tsx`))//  invite-dialog, team-edit-dialog,
+  expect(src, `${d} must use FormShell`).toContain("form-shell") //  internal-record-dialog, …
 }
 ```
 
@@ -319,16 +344,18 @@ expect(terms.has(entry.term), `duplicate term "${entry.term}"`).toBe(false)
 
 The canonical terms include: **Team**, **Member**, **Role**, **Access right**
 (not "permission" in copy), **Invite**, **Revoke**, **Activate / deactivate** (not
-"delete"), **Ticket**, **Conversation**, **Stakeholder**, **Learning**, **Article**,
-**Category**, **Done**, **Dropdown values**, **Import**, **Assistant**, **Activity**,
-**Overview**, **Status**. When writing UI copy, reach for this list first.
+"delete"), **Archive**, **Account**, **Contact**, **Ticket**, **Conversation**,
+**Stakeholder**, **Story**, **Sprint**, **Task**, **Brand asset**, **Knowledge base**,
+**Source**, **Citation**, **Dropdown values**, **Import**, **Export**, **Assistant**,
+**Activity**, **Overview**, **Status**. That is a sample, not the list — read
+`shared/glossary.ts`, and when writing UI copy reach for it first.
 
 ### R7 — forms persist their draft per session
 
 A half-filled form whose screen unmounts (you navigated away in the same tab) must come
 back filled. Every form dialog persists via **`useFormDraft`** (backed by
 `sessionStorage`, keyed by a stable `draftKey` the caller supplies, e.g.
-`learning:new:<teamId>` / `learning:edit:<recordId>`). Cleared on submit or explicit
+`help:new:<teamId>` / `help:edit:<recordId>`). Cleared on submit or explicit
 dismiss (Esc / backdrop / close); *preserved* on navigation. The check mirrors R4 —
 each `FORM_DIALOGS` entry must contain `useFormDraft`. See CACHING.md §11.
 
@@ -338,8 +365,8 @@ There are **two** tab strips in this app, and the law covers both: the **team se
 strip** (Overview · Members · Roles · Invites) and the tabs on **one record's own
 screen** (Overview · Activity, plus whatever that record adds). A tab that shows a
 collection carries that collection's count; a tab that shows the record itself
-(Overview, an article's prose, the permission grid) carries none — and says so once,
-with its reason, in **`RECORD_TAB_COUNT_EXCEPTIONS`**.
+(Overview, a source's own words, a meeting's agenda, the permission grid) carries none
+— and says so once, with its reason, in **`RECORD_TAB_COUNT_EXCEPTIONS`**.
 
 *(This half was learned the hard way: the check walked `TEAM_SECTIONS` only, so the
 team strip stayed honest while every record in the app shipped an Activity tab with
@@ -355,8 +382,8 @@ Any `placement: "tab"` section that leads with a collection must declare a
 // web/components/deep-link-screen.tsx
 for (const s of TEAM_SECTIONS) {
   if (!s.countCacheKey) continue
-  const rows = loadedByCacheKey[s.countCacheKey]
-  if (rows !== undefined) sectionCounts[s.key] = rows.length
+  const total = totalByCacheKey[s.countCacheKey]     // the door's exact COUNT(*), never rows.length
+  if (total !== undefined) sectionCounts[s.key] = total
 }
 ```
 
@@ -386,7 +413,8 @@ detail render (`module-content.tsx`), keyed by what `tabCountKey` names — so a
 supplies numbers without knowing tab keys, and the check asserts one `withTabCounts`
 per rendered detail recipe (a seam nothing calls is dead code wearing a law's clothes).
 
-**Bespoke details** (`role-detail`, `learning-detail`, `help-detail`) build their own
+**Bespoke details** (`role-detail`, `help-detail`, `knowledge-detail`, and the rest of
+`RECORD_DETAIL_COMPONENTS`) build their own
 tabs config, so the check reads the tabs **out of the source** and requires each one to
 carry a badge or be a reviewed exception. Their counts come from the one generic record
 read, **`useRecordActivity(table, id)`** (`web/lib/use-record-activity.ts`), which
@@ -429,11 +457,11 @@ add a concept to the vocabulary, never a one-off icon at a call site.
 
 | Action | Icon | Notes |
 |--------|------|-------|
-| Edit | `Pencil` | e.g. "Edit", "Edit details" — wired (`role-detail`, `learning-detail`, `help-detail`) |
+| Edit | `Pencil` | e.g. "Edit", "Edit details" — wired (`role-detail`, `help-detail`, `knowledge-detail`) |
 | Deactivate / switch off | `Power` | our deactivate-only model — never "delete" — wired |
 | Remove (from team) | `UserMinus` | the canonical icon for a remove action |
 | Revoke (an invite) | `Ban` | the canonical icon for a revoke action |
-| Create / add | `Plus` | "New role", "New article", "Raise ticket" — wired (`screen-bits`) |
+| Create / add | `Plus` | "New role", "New account", "Raise ticket", "Add a source" — wired (`screen-bits`) |
 | Import | `Upload` | "Import CSV" — wired (`screen-bits`) |
 | Export | `Download` | "Export CSV" — wired (`screen-bits`) |
 | Invite | `Mail` | the one create action with its own concept icon — wired |
@@ -475,7 +503,7 @@ text button, not yet an icon button); when they *do* carry an icon, use `UserMin
 `Ban` respectively. The mapping is the law regardless of whether a given action is wired
 with its icon yet — do not pick a different icon at a call site.
 
-Real usage (`role-detail.tsx`, `learning-detail.tsx`):
+Real usage (`role-detail.tsx`, `knowledge-detail.tsx`):
 
 ```tsx
 <Button variant="outline" size="sm" onClick={() => setEditingOpen(true)} className="shrink-0 gap-1.5">
@@ -510,8 +538,8 @@ Real usage (`role-detail.tsx`, `learning-detail.tsx`):
 Write for a **45–55-year-old manager who wants things simple**. The voice is **warm,
 plain, sentence case, no jargon, no emoji**, and it uses the **glossary terms**.
 
-- **Sentence case** everywhere — titles, buttons, labels. "New article", not "New
-  Article".
+- **Sentence case** everywhere — titles, buttons, labels. "New account", not "New
+  Account".
 - **No emoji IN COPY.** Not in a sentence, a heading, a button, a label, a placeholder,
   a toast or an email. That is the whole of the original rule and it still holds: emoji
   in prose is what makes a business app read like a chat message.
@@ -535,13 +563,16 @@ plain, sentence case, no jargon, no emoji**, and it uses the **glossary terms**.
 - **Use the dictionary.** "Activate / deactivate", never "delete". "Access right", not
   "permission", in user-facing copy. "Ticket", "Conversation", "Stakeholder" as defined.
 - **Warm and concrete.** Real examples from the code:
-  - Empty states: *"No members yet."*, *"No learning yet."*, *"No tickets yet."*
-  - Placeholders that teach: *"How to onboard a new client"*, *"Write the article —
-    bold, italic, highlight, and lists are supported."*
-  - Explain the *why*, briefly: *"The content is also what the assistant reads to help
-    your team."*
+  - Empty states: *"No members yet."*, *"No tickets yet."*, *"Nothing in the brand
+    library yet."*
+  - Placeholders that teach: *"Primary logo (dark)"*, *"When to use it, and when not
+    to."*, *"Why we meet, and who is in the room."*
+  - Explain the *why*, briefly: *"Anything you put here is something the assistant may
+    use to answer questions — and it will name this source when it does."*
   - Reassure on a scary action: *"Members who have it keep their access, but you can't
-    give it to anyone new. You can activate it again later."*
+    give it to anyone new. You can activate it again later."*, *"It stops showing as
+    live and nothing is deleted — its history stays, and you can put it back at any
+    time."*
 - **Say what a control does, not how it's implemented.** No worker names, no "D1", no
   "publishChange" in the UI. Ever.
 
@@ -580,8 +611,9 @@ const facets = collection.filterFacets.filter((f) =>
 So: **empty list → no search bar, no filters** (just the empty message).
 **Rows present → search on, and a filter facet appears only when its column has values.**
 `filterFacets` reference real columns on the *shaped* rows (e.g. members filter by
-`role`, roles by `state`, help by `status`); their options are auto-derived from the
-data. A cleared dropdown shows a clear-X (see the learning form's category/type selects).
+`role`, roles by `state`, help by `status`, the brand library by `category` and
+`state`); their options are auto-derived from the data, so a facet never offers a
+value no row carries.
 
 ### One-row headers
 
@@ -667,9 +699,11 @@ Every screen that shows a collection shows its count **exactly once**:
   a ceiling (that is how a 24,011-row catalogue once advertised "1000").
 - **The place** is a tab badge where the screen has a counted tab, else a
   `CollectionHeading` (`<h1>` + count chip, title from the module registry). A
-  count may NEVER hinge on an unrelated permission — Learning's count once vanished
-  for non-curators because it rode the curator-only tab strip; sidebar collections
-  now carry a heading.
+  count may NEVER hinge on an unrelated permission — the lesson was earned on the
+  Learning screen, whose count vanished for non-curators because it rode the
+  curator-only tab strip. Learning has since been removed from the app; the rule it
+  taught has not, and sidebar collections carry a heading so their count no longer
+  depends on a strip a reader may not be allowed to see.
 - **The arbitration** is the React context in `web/components/counted-tabs.tsx`
   (`CountedTabs` marks a badged tab's panel; `CountedAbove` marks a counted sibling
   strip). The `CollectionHeading` calls the hook ABOVE its early return and renders

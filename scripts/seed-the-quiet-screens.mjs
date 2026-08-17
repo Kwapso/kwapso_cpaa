@@ -1,14 +1,13 @@
-// THE SCREENS THE MIGRATION LEFT EMPTY — process maps, the delivery method and
-// the marketing pipeline — filled so the app reads like a working system.
+// THE SCREENS THE MIGRATION LEFT EMPTY — the brand library and the process maps
+// — filled so the app reads like a working system.
 //
 //   TEST_LOGIN_KEY=… node scripts/seed-the-quiet-screens.mjs staging
 //
 // WHERE EACH ONE'S CONTENT COMES FROM, because they are not the same and the
 // difference matters:
 //
-//   • DELIVERY METHOD and MARKETING are REAL — Glide's `program` and `content`
-//     tables, carried through glide/normalised.json like everything else. They
-//     were deferred in the first pass because no module held them; both do now.
+//   • THE BRAND LIBRARY IS REAL — Glide's `branding` table, read straight out of
+//     the rows this repo pulled, and still pointing at the files Glide hosts.
 //
 //   • PROCESS MAPS ARE NOT REAL, and this file says so out loud in the place a
 //     reader will see it. Glide never held a process map, so there is nothing to
@@ -24,6 +23,17 @@
 //     must be agreed with the client before anybody quotes them. The app's own
 //     caption already says the times are agreed estimates; this is the sentence
 //     that keeps that true while they are not yet agreed.
+//
+// TWO SCREENS THIS SCRIPT USED TO FILL AND DELIBERATELY NO LONGER DOES.
+// Marketing was purged outright on 17 Aug 2026, so there is no screen left to
+// fill. The delivery method went the same day, and that one is a fold rather
+// than a loss: its ten programmes were always the SPRINT TYPE under a second
+// name, so the enrichment that made them worth a table of their own — the mark,
+// the German name, the description, the standard length in days — now lives on
+// the sprint type's own row, seeded from SPRINT_TYPE_CATALOGUE and back-filled
+// by migration 0025_purge_learning_marketing_programmes. A fresh team already
+// has those rows before this script signs in; writing them again would be a
+// second hand on the same dial.
 //
 // STAGING ONLY by default, and production refuses the sign-in door anyway.
 
@@ -50,12 +60,11 @@ if (!TEST_LOGIN_KEY) {
   process.exit(1)
 }
 
-const SOURCE = resolve(ROOT, "glide/normalised.json")
-if (!existsSync(SOURCE)) {
-  console.error(`No ${SOURCE}. Run \`node scripts/glide-transform.mjs\` first.`)
-  process.exit(1)
-}
-const history = JSON.parse(readFileSync(SOURCE, "utf8"))
+// NO glide/normalised.json HERE ANY MORE. The two steps that read it were the
+// delivery method and marketing; what is left reads the pulled Glide rows
+// directly (the brand library) or is written in this file (the maps). So the
+// script no longer needs glide-transform.mjs to have run first, and it no longer
+// says it does.
 
 const api = makeApi(BASE)
 const post = (path, payload, cookie) =>
@@ -264,89 +273,7 @@ async function allPages(path, key, cookie) {
 console.log(`\nFilling the quiet screens on ${TARGETS[target].label} (${BASE})`)
 const cookie = await signIn(OWNER_EMAIL)
 
-// ── 1 · the delivery method — REAL, out of Glide's `program` table ────────────
-
-step("Delivery method")
-{
-  const PROGRAM = { name: "Name", german: "jncW0", description: "Ua5qn", sequence: "IlH09" }
-  const raw = existsSync(resolve(ROOT, "glide/data/agency.program.json"))
-    ? JSON.parse(readFileSync(resolve(ROOT, "glide/data/agency.program.json"), "utf8")).rows ?? []
-    : []
-  const existing = new Map(
-    (must(await api("/api/content/delivery/programs", {}, cookie), "reading the programmes").programs ?? []).map(
-      (p) => [p.name, p]
-    )
-  )
-  for (const r of raw) {
-    const name = String(r[PROGRAM.name] ?? "").trim()
-    if (!name) continue
-    if (existing.has(name)) {
-      say("reused", name)
-      continue
-    }
-    const german = String(r[PROGRAM.german] ?? "").trim()
-    const desc = String(r[PROGRAM.description] ?? "").trim()
-    must(
-      await post(
-        "/api/content/delivery/programs",
-        {
-          name,
-          description: [desc, german && `Known to German-speaking clients as “${german}”.`].filter(Boolean).join("\n\n") || undefined,
-          sequence: Number.isFinite(Number(r[PROGRAM.sequence])) ? Number(r[PROGRAM.sequence]) : undefined,
-        },
-        cookie
-      ),
-      `adding the programme ${name}`
-    )
-    say("created", name)
-  }
-}
-
-// ── 2 · marketing — REAL, the Glide content that never became an article ──────
-
-step("Marketing")
-{
-  const MARKETING_LIMIT = 60
-  const existing = new Set(
-    (must(await api("/api/content/marketing", {}, cookie), "reading the marketing list").posts ?? []).map((p) => p.title)
-  )
-  // The articles already in Learning are the ones WITH a body; what is left is
-  // the pipeline — ideas, drafts and posts that went out on a channel.
-  const inLearning = new Set(history.learning.filter((a) => a.body).slice(0, 40).map((a) => a.title))
-  const posts = history.learning
-    .filter((a) => !inLearning.has(a.title))
-    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
-    .slice(0, MARKETING_LIMIT)
-  let made = 0
-  for (const p of posts) {
-    if (existing.has(p.title)) continue
-    const res = await post(
-      "/api/content/marketing",
-      {
-        title: p.title,
-        channel: p.category ?? undefined,
-        status: p.publicationState ?? undefined,
-        summary: p.unhoused?.hashtags ?? undefined,
-        body: p.body ?? undefined,
-        link: p.contentLink ?? undefined,
-        // A DAY, not a moment. The door takes YYYY-MM-DD and refuses a full
-        // timestamp — which is right: a post goes out on a day, and storing the
-        // hour would invite a screen to show one that means nothing.
-        publishedOn: p.publishedAt ? String(p.publishedAt).slice(0, 10) : undefined,
-      },
-      cookie
-    )
-    if (!res.ok) {
-      console.log(`  FAILED   ${p.title.slice(0, 50)} — ${res.status} ${res.body?.message ?? ""}`)
-      failures++
-      continue
-    }
-    made++
-  }
-  say("created", `${made} posts (of ${history.learning.length} pieces of content in the history)`)
-}
-
-// ── 2b · the brand library — REAL rows, still pointing at their own files ─────
+// ── 1 · the brand library — REAL rows, still pointing at their own files ──────
 //
 // A brand asset is a name, a category and a FILE, and the file can be either
 // something we host or a link (see brand-assets.ts). Glide's 74 rows carry a
@@ -395,7 +322,7 @@ step("Brand library")
   say("created", `${made} assets${skipped ? ` (${skipped} skipped — no file on the row)` : ""}`)
 }
 
-// ── 3 · process maps — NOT real, and they say so ──────────────────────────────
+// ── 2 · process maps — NOT real, and they say so ──────────────────────────────
 
 step("Process maps")
 {
@@ -501,7 +428,7 @@ step("Process maps")
   }
 }
 
-// ── 4 · did it actually produce a saving? ─────────────────────────────────────
+// ── 3 · did it actually produce a saving? ─────────────────────────────────────
 
 step("Checking the savings add up")
 {
