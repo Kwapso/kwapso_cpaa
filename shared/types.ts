@@ -952,6 +952,12 @@ export type ProcessSummary = {
   accountId: string | null
   name: string
   description: string | null
+  /** WHO DOES THIS WORK — the role whose hours the saving is measured in
+   * (CHECKLIST 8.13). Free text against the team's own words: the person who
+   * does a client's invoicing is THEIR bookkeeper, not one of our logins. Null
+   * until somebody says, and an app's money figure then reports this process's
+   * hours with no price beside them rather than inventing one. */
+  roleName: string | null
   /** how many versions have been cut (1 = the baseline alone) */
   versionCount: number
   /** steps in the CURRENT version */

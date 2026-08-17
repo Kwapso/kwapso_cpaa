@@ -316,8 +316,15 @@ export async function postUpdateProcess(request: Request, env: Env): Promise<Res
       "description" in body
         ? (optionalText(body.description, "Description", TEXT_LIMITS.long) ?? null)
         : undefined,
+    // WHO DOES THIS WORK (8.13) — the role whose hours the saving is measured
+    // in. Absent means "say nothing", like every other field on this door.
+    roleName:
+      "roleName" in body ? (optionalText(body.roleName, "Who does it", TEXT_LIMITS.short) ?? null) : undefined,
   })
   await publishChange(env, guard.teamId, "processes", id)
+  // The app's money figure is computed from this process's role, so it moves
+  // when the role does — and it is keyed per app, which the process knows.
+  await publishChange(env, guard.teamId, "apps", id)
   return json({ ok: true })
 }
 

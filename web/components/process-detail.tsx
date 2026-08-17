@@ -204,6 +204,7 @@ export function ProcessDetailScreen({
       id: processId,
       name: values.name,
       description: values.description || null,
+      roleName: values.roleName || null,
     })
     refresh()
     toast.success(t("Process updated."))
@@ -716,7 +717,11 @@ export function ProcessDetailScreen({
         open={editOpen}
         onOpenChange={setEditOpen}
         apps={[]}
-        initial={{ name: process.name, description: process.description ?? "" }}
+        initial={{
+          name: process.name,
+          description: process.description ?? "",
+          roleName: process.roleName ?? "",
+        }}
         draftKey={`process:edit:${processId}`}
         onSubmit={saveProcess}
       />

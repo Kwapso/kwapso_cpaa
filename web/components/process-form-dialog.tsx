@@ -38,12 +38,22 @@ export type ProcessFormValues = {
   appId: string
   name: string
   description: string
+  /** WHO DOES THIS WORK (CHECKLIST 8.13) — the role whose hours the saving is
+   * measured in. Free text in the team's own words: the person who does a
+   * client's invoicing is THEIR bookkeeper, not one of our logins. */
+  roleName: string
   baselineLabel: string
 }
 
 const appField = { ...defaultFieldConfig, label: "App", required: true }
 const nameField = { ...defaultFieldConfig, label: "Process name", required: true }
 const descField = { ...defaultFieldConfig, label: "What it is", required: false }
+const roleField = {
+  ...defaultFieldConfig,
+  label: "Who does it",
+  required: false,
+  hint: "The role whose hours this takes. It is what prices the saving.",
+}
 const baselineField = {
   ...defaultFieldConfig,
   label: "Name for how it worked before",
@@ -69,7 +79,7 @@ export function ProcessFormDialog({
    * the same shape the sprint and story forms already use. */
   fixedApp?: { id: string; name: string }
   /** Present = editing an existing map (the app and the baseline are settled). */
-  initial?: { name: string; description: string }
+  initial?: { name: string; description: string; roleName: string }
   draftKey?: string
   onSubmit: (values: ProcessFormValues) => Promise<void>
 }) {
@@ -81,6 +91,7 @@ export function ProcessFormDialog({
       appId: fixedApp?.id ?? "",
       name: initial?.name ?? "",
       description: initial?.description ?? "",
+      roleName: initial?.roleName ?? "",
       baselineLabel: "",
     },
     open
@@ -98,6 +109,7 @@ export function ProcessFormDialog({
         appId: values.appId,
         name: values.name.trim(),
         description: values.description.trim(),
+        roleName: values.roleName.trim(),
         baselineLabel: values.baselineLabel.trim(),
       })
       clearDraft()
@@ -164,6 +176,20 @@ export function ProcessFormDialog({
           placeholder={t("e.g. Approving a supplier invoice")}
           disabled={busy}
           autoFocus
+        />
+      </Field>
+      {/* WHOSE HOURS THESE ARE (8.13). It is what turns the time this map gives
+          back into money: the saving is priced at the rate of the role that used
+          to spend it. Free text against the team's own words, and an unpriced
+          role is a legal answer — the hours still count and the money says it
+          could not be worked out, rather than being invented. */}
+      <Field config={roleField} htmlFor="process-role" className={fieldSpacing}>
+        <Input
+          id="process-role"
+          value={values.roleName}
+          onChange={(e) => setValues((s) => ({ ...s, roleName: e.target.value }))}
+          placeholder={t("e.g. Bookkeeper")}
+          disabled={busy}
         />
       </Field>
       <Field config={descField} htmlFor="process-description" className={fieldSpacing}>

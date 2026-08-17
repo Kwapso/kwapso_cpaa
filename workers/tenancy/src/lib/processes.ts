@@ -632,6 +632,7 @@ export async function listProcesses(
       account_id: string | null
       name: string
       description: string | null
+      role_name: string | null
       deactivated_at: string | null
       created_at: string
       version_count: number
@@ -639,7 +640,7 @@ export async function listProcesses(
     }>(
       cfg,
       guard.databaseId,
-      `SELECT p.id, p.app_id, a.name AS app_name, p.account_id, p.name, p.description,
+      `SELECT p.id, p.app_id, a.name AS app_name, p.account_id, p.name, p.description, p.role_name,
               p.deactivated_at, p.created_at,
               (SELECT COUNT(*) FROM process_versions v WHERE v.process_id = p.id) AS version_count,
               (SELECT COUNT(*) FROM process_steps s WHERE s.process_id = p.id
@@ -670,6 +671,7 @@ export async function listProcesses(
       accountId: r.account_id,
       name: r.name,
       description: r.description,
+      roleName: r.role_name,
       versionCount: r.version_count,
       stepCount: r.step_count,
       active: r.deactivated_at == null,
@@ -913,23 +915,30 @@ export async function updateProcess(
   scope: AccountScope,
   actor: Actor,
   id: string,
-  input: { name: string; description?: string | null }
+  input: { name: string; description?: string | null; roleName?: string | null }
 ): Promise<void> {
   const before = await processOrThrow(cfg, guard, scope, id)
   const fence = accountScopeClause(scope, "account_id")
   const audit = editedBy(actor, new Date().toISOString())
   const description = input.description === undefined ? before.description : input.description
+  // WHO DOES THIS WORK (CHECKLIST 8.13). Absent means "say nothing", the same
+  // patch rule every other field on this door keeps. The word itself is not
+  // checked against the rate card: naming a role nobody has priced is a legal,
+  // useful answer — the app's money figure reports its hours and says the
+  // process could not be priced, which is the honest half-answer.
+  const roleName = input.roleName === undefined ? before.roleName : input.roleName
   const changed = await d1Query<{ id: string }>(
     cfg,
     guard.databaseId,
-    `UPDATE processes SET name = ?, description = ?, ${audit.sql}
+    `UPDATE processes SET name = ?, description = ?, role_name = ?, ${audit.sql}
      ${where([fence.sql, "id = ?"])} RETURNING id`,
-    [input.name, description, ...audit.params, ...fence.params, id]
+    [input.name, description, roleName, ...audit.params, ...fence.params, id]
   )
   if (!changed[0]) throw new GuardError(404, "not_found", "That process doesn't exist.")
   const changes = describeChanges([
     { label: "Name", from: before.name, to: input.name },
     { label: "Description", from: before.description, to: description, hideValues: true },
+    { label: "Who does it", from: before.roleName, to: roleName },
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Process edited",
@@ -1543,6 +1552,7 @@ async function processOrThrow(
     account_id: string | null
     name: string
     description: string | null
+    role_name: string | null
     deactivated_at: string | null
     created_at: string
     version_count: number
@@ -1550,7 +1560,7 @@ async function processOrThrow(
   }>(
     cfg,
     guard.databaseId,
-    `SELECT p.id, p.app_id, a.name AS app_name, p.account_id, p.name, p.description,
+    `SELECT p.id, p.app_id, a.name AS app_name, p.account_id, p.name, p.description, p.role_name,
             p.deactivated_at, p.created_at,
             (SELECT COUNT(*) FROM process_versions v WHERE v.process_id = p.id) AS version_count,
             (SELECT COUNT(*) FROM process_steps s WHERE s.process_id = p.id
@@ -1568,6 +1578,7 @@ async function processOrThrow(
     accountId: r.account_id,
     name: r.name,
     description: r.description,
+    roleName: r.role_name,
     versionCount: r.version_count,
     stepCount: r.step_count,
     active: r.deactivated_at == null,

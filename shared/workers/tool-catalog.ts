@@ -1659,10 +1659,15 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_process",
     summary:
-      "Rename or re-describe a process map (by id). Send ONLY what you are changing; to empty the description, send it as an empty string.",
+      "Rename or re-describe a process map (by id), or say who does the work. Send ONLY what you are changing; to empty a field, send it as an empty string. `roleName` is WHOSE hours this process takes — the bookkeeper, the dispatcher, whoever actually does it — and it is what turns the hours this map gives back into money (see get_app_value). It is free text in the team's own words, and naming a role nobody has priced is fine: the hours still count and the money is reported as unpriced rather than invented.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/update",
-    schema: obj({ id: S, name: S, description: S }, ["id", "name"]),
-    buildBody: (i) => ({ id: str(i, "id"), name: str(i, "name"), description: sent(i, "description") }),
+    schema: obj({ id: S, name: S, description: S, roleName: S }, ["id", "name"]),
+    buildBody: (i) => ({
+      id: str(i, "id"),
+      name: str(i, "name"),
+      description: sent(i, "description"),
+      roleName: sent(i, "roleName"),
+    }),
     agent: { write: true, confirm: false, summarize: (i) => `Edit the process "${str(i, "name")}"` },
   },
   {
