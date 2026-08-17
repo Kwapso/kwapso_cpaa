@@ -286,6 +286,9 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         recipe={recipe}
         rights={rights}
         total={totals.tasks}
+        allTotal={totals.tasksAll}
+        view={ctx.taskView}
+        onViewChange={ctx.setTaskView}
         canCreate={can("work", "create")}
         canRaiseTodo={can("todos", "create")}
         canCancelTodo={can("todos", "delete")}

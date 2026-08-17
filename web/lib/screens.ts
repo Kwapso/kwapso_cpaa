@@ -923,3 +923,34 @@ export function withoutActions(recipe: ScreenRecipe, ids: string[]): ScreenRecip
   const drop = new Set(ids)
   return { ...recipe, actions: actions.filter((a: RecipeAction) => !drop.has(a.id)) }
 }
+
+/** Re-label (and optionally re-style) one action — for a TOGGLE, where the same
+ * door does two opposite things and the button has to say which one it will do
+ * NEXT (a fresh copy; the base recipe is never mutated).
+ *
+ * `RecipeAction.label` is a static string in the library, and the library is
+ * lego this repo does not edit — so a control whose wording depends on the
+ * record's state is the HOST's job, and this is the one seam for it.
+ *
+ * The task tick is why it exists. It read "Tick it off" whether or not the task
+ * was already done: the write toggled correctly underneath, so pressing the
+ * unchanged button a second time quietly REOPENED the thing you had just
+ * finished — the tester's "it marks as done, but the button to tick it off stays
+ * there". R17's shape (an idempotent transition) has a matching obligation on
+ * the screen: a control that offers the same move again is a control that reads
+ * as though nothing happened. */
+export function withActionLabel(
+  recipe: ScreenRecipe,
+  id: string,
+  label: string,
+  variant?: RecipeAction["variant"]
+): ScreenRecipe {
+  const actions = Array.isArray(recipe.actions) ? recipe.actions : []
+  if (actions.length === 0) return recipe
+  return {
+    ...recipe,
+    actions: actions.map((a: RecipeAction) =>
+      a.id === id ? { ...a, label, ...(variant ? { variant } : {}) } : a
+    ),
+  }
+}

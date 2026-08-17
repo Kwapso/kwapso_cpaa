@@ -184,9 +184,12 @@ export const listFetch = {
       primeCache(totalKey("todos", teamId), r.total)
       return r.todos
     }),
-  tasks: (teamId: string) =>
-    contentApi.tasks().then((r) => {
-      primeCache(totalKey("tasks", teamId), r.total)
+  // Both counts come back from either view's fetch (R16), because the badge on
+  // the strip's OTHER tab cannot be counted from the rows in front of you.
+  tasks: (teamId: string, view: TaskView = "open") =>
+    contentApi.tasks(view).then((r) => {
+      primeCache(totalKey("tasks", teamId), r.openTotal)
+      primeCache(totalKey("tasks-all", teamId), r.allTotal)
       return r.tasks
     }),
   // R14: meetings are PAGED — an event is never curated away, so the door answers
@@ -275,8 +278,13 @@ export function workLogsKey(teamId: string): string {
 export function todosKey(teamId: string): string {
   return `todos:${teamId}`
 }
-export function tasksKey(teamId: string): string {
-  return `tasks:${teamId}`
+/** Which pile of our own admin a screen is showing. A SERVER view, not a client
+ * filter: the list is capped (R14), so sieving the loaded rows for the done ones
+ * would show "the finished tasks among the newest N" under a badge counting all
+ * of them (R16) — the same reason the ticket strip is a server scope. */
+export type TaskView = "open" | "all"
+export function tasksKey(teamId: string, view: TaskView = "open"): string {
+  return view === "all" ? `tasks-all:${teamId}` : `tasks:${teamId}`
 }
 
 /** The diary's cache key (the paged meetings list). */
@@ -599,13 +607,16 @@ export const TEAM_RESOURCES: Record<
     fetchList: (t) => listFetch.todos(t),
     deps: (_t, id) => [`activity:record:todos:${id}`],
   },
-  // TASKS — our own admin, agency-side only.
+  // TASKS — our own admin, agency-side only. The row-level patch lands on the
+  // OPEN list; the All list is dropped instead, because a task that has just
+  // been ticked leaves one collection and stays in the other, and "patch the row
+  // in place" has no answer for a row that changed which list it belongs to.
   tasks: {
-    key: (t) => tasksKey(t),
+    key: (t) => tasksKey(t, "open"),
     idField: "id",
     fetchOne: (id) => contentApi.taskOne(id),
-    fetchList: (t) => listFetch.tasks(t),
-    deps: (_t, id) => [`activity:record:tasks:${id}`],
+    fetchList: (t) => listFetch.tasks(t, "open"),
+    deps: (t, id) => [tasksKey(t, "all"), `activity:record:tasks:${id}`],
   },
   // MEETINGS — row-level live. A paged list's rows live in a cache key with its
   // cursor in a sidecar, so the same registry keeps it live (R15's own words).

@@ -12,7 +12,7 @@
 // learning / tickets / team-meta load only on their own module.
 
 import { tenancy } from "@/lib/api"
-import type { HelpScope } from "@/lib/live-resources"
+import type { HelpScope, TaskView } from "@/lib/live-resources"
 import {
   accountsKey,
   appsKey,
@@ -43,6 +43,9 @@ export type ScreenDataInput = {
   recordId: string | null
   /** which ticket set the Tickets screen is showing — a SERVER scope (R14/R16). */
   helpScope?: HelpScope
+  /** which pile of our own admin the Tasks screen is showing — a SERVER view,
+   * for the same reason (R14/R16). */
+  taskView?: TaskView
 }
 
 /** Which TABLE a record under each agency-internal URL segment lives in — the
@@ -60,7 +63,14 @@ const INTERNAL_ACTIVITY_TABLE: Record<string, string> = {
   tasks: "tasks",
 }
 
-export function useScreenData({ teamId, enabled, module, recordId, helpScope = "all" }: ScreenDataInput) {
+export function useScreenData({
+  teamId,
+  enabled,
+  module,
+  recordId,
+  helpScope = "all",
+  taskView = "open",
+}: ScreenDataInput) {
   // Per-team screen-recipe overrides (config store) — load across the team area.
   const overridesQ = useCached(enabled ? `screens:${teamId}` : null, () =>
     tenancy.screenOverrides().then((r) => r.screens)
@@ -135,8 +145,25 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
   const appsQ = useCached(enabled && module === "apps" ? appsKey(teamId as string) : null, () =>
     listFetch.apps(teamId as string)
   )
-  const tasksQ = useCached(enabled && module === "tasks" ? tasksKey(teamId as string) : null, () =>
-    listFetch.tasks(teamId as string)
+  // OUR OWN ADMIN, in two SERVER views. Open is the everyday one and the only
+  // one the app could show for months — the door has parsed `?view=all` since it
+  // shipped and nothing ever sent it.
+  //
+  // The ALL list is also what the RECORD screen reads, and that is not an
+  // optimisation: ticking a task off the open list removes it from the open
+  // list, so a detail screen sourced from that collection would answer "that
+  // record no longer exists" the moment you used the button on it. It loads when
+  // the strip asks for it, or when a record is open — never both fetches just to
+  // show the open list.
+  const tasksOpenQ = useCached(
+    enabled && module === "tasks" ? tasksKey(teamId as string, "open") : null,
+    () => listFetch.tasks(teamId as string, "open")
+  )
+  const tasksAllQ = useCached(
+    enabled && module === "tasks" && (taskView === "all" || !!recordId)
+      ? tasksKey(teamId as string, "all")
+      : null,
+    () => listFetch.tasks(teamId as string, "all")
   )
   // THE DIARY. Loaded only on its own section, cache-first + row-level live. R14:
   // PAGED like tickets and sources — page one lands here and its next cursor in
@@ -198,6 +225,7 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
     sprints: useCachedValue<number>(enabled ? totalKey("sprints", teamId as string) : null),
     apps: useCachedValue<number>(enabled ? totalKey("apps", teamId as string) : null),
     tasks: useCachedValue<number>(enabled ? totalKey("tasks", teamId as string) : null),
+    tasksAll: useCachedValue<number>(enabled ? totalKey("tasks-all", teamId as string) : null),
     meetings: useCachedValue<number>(enabled ? totalKey("meetings", teamId as string) : null),
     // The agency's own housekeeping — the exact server totals the sidebar badges
     // and the collection headings show, primed by the fetchers above.
@@ -294,7 +322,8 @@ export function useScreenData({ teamId, enabled, module, recordId, helpScope = "
     storiesQ,
     sprintsQ,
     appsQ,
-    tasksQ,
+    tasksOpenQ,
+    tasksAllQ,
     meetingsQ,
     membersQ,
     rolesQ,

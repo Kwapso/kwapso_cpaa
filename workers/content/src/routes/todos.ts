@@ -167,17 +167,46 @@ export async function getPortalDelivery(request: Request, env: Env): Promise<Res
 
 /* ----------------------------------- tasks ---------------------------------- */
 
-/** GET /api/content/tasks — our own admin (work:read). Refused to a client login:
- * a task is the agency's, and its list is a list of what we are behind on. */
-export async function getTasks(request: Request, env: Env): Promise<Response> {
-  const { cfg, guard } = await gated(request, env, "work", "read")
-  await refusePortalCaller(cfg, guard)
-  const url = new URL(request.url)
-  const filter = {
+/** The filters this door parses — one place, so the list and its counts can never
+ * be asked different questions (R16) and the machine surface has one thing to
+ * mirror (R19). */
+function taskFilterFrom(url: URL): { view: "open" | "all"; assigneeId?: string } {
+  return {
     view: queryText(url.searchParams.get("view"), "View") === "all" ? ("all" as const) : ("open" as const),
     assigneeId: queryText(url.searchParams.get("assigneeId"), "Assignee"),
   }
-  return json({ tasks: await listTasks(cfg, guard, filter), total: await countTasks(cfg, guard, filter) })
+}
+
+/** Every task response carries BOTH view counts (R16).
+ *
+ * The screen has an open/all strip on it, and the badge on the view you are NOT
+ * looking at cannot be counted from the rows you ARE — the open list has no idea
+ * how many finished ones are behind it. `total` stays the count over what was
+ * listed, so the sidebar badge goes on meaning "what is still on our list". */
+async function taskPage(
+  cfg: Parameters<typeof listTasks>[0],
+  guard: Parameters<typeof listTasks>[1],
+  filter: { view: "open" | "all"; assigneeId?: string }
+): Promise<Response> {
+  const [tasks, openTotal, allTotal] = await Promise.all([
+    listTasks(cfg, guard, filter),
+    countTasks(cfg, guard, { ...filter, view: "open" }),
+    countTasks(cfg, guard, { ...filter, view: "all" }),
+  ])
+  return json({ tasks, total: filter.view === "all" ? allTotal : openTotal, openTotal, allTotal })
+}
+
+/** GET /api/content/tasks — our own admin (work:read). Refused to a client login:
+ * a task is the agency's, and its list is a list of what we are behind on.
+ *
+ * `?view=all` is how the finished ones are seen. It has been parsed here since
+ * the door shipped and nothing on any screen ever sent it, so the app had one
+ * view of a two-view collection and no way to say so — the tester's "cannot
+ * switch the view, I only see open ones". */
+export async function getTasks(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "work", "read")
+  await refusePortalCaller(cfg, guard)
+  return taskPage(cfg, guard, taskFilterFrom(new URL(request.url)))
 }
 
 /** POST /api/content/tasks — write down a piece of admin (work:create). */
@@ -198,8 +227,7 @@ export async function postCreateTask(request: Request, env: Env): Promise<Respon
     accountId: optionalText(body.accountId, "Client", TEXT_LIMITS.short),
   })
   await publishChange(env, guard.teamId, "tasks", id, "add", accountId ?? undefined)
-  const filter = { view: "open" as const }
-  return json({ tasks: await listTasks(cfg, guard, filter), total: await countTasks(cfg, guard, filter) })
+  return taskPage(cfg, guard, { view: "open" })
 }
 
 /** POST /api/content/tasks/done — tick it, or put it back (work:edit).
@@ -216,6 +244,5 @@ export async function postTaskDone(request: Request, env: Env): Promise<Response
   if (typeof body.done !== "boolean") return fail(400, "invalid_input", "done must be true or false.")
   const { moved, accountId } = await setTaskDone(cfg, guard, actor, id, body.done)
   if (moved) await publishChange(env, guard.teamId, "tasks", id, "edit", accountId ?? undefined)
-  const filter = { view: "open" as const }
-  return json({ tasks: await listTasks(cfg, guard, filter), total: await countTasks(cfg, guard, filter) })
+  return taskPage(cfg, guard, { view: "open" })
 }

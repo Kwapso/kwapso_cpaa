@@ -47,7 +47,7 @@ import { InvitationsScreen } from "@/components/screens/invitations-screen"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 
 import { ApiFailure } from "@/lib/api"
-import type { HelpScope } from "@/lib/live-resources"
+import type { HelpScope, TaskView } from "@/lib/live-resources"
 import { registerHostGo } from "@/lib/nav"
 import { usePermissions } from "@/lib/perms"
 import { useScreenData } from "@/lib/use-screen-data"
@@ -84,6 +84,11 @@ export function DeepLinkScreen() {
   // so it must be declared ABOVE the reads that key off it.
   const [helpScope, setHelpScope] = React.useState<HelpScope>("all")
 
+  // Which pile of our own admin the Tasks screen shows. A SERVER view for the
+  // same reason (the list is capped, so "the done ones" is a question for the
+  // door, not a sieve over the rows already loaded), so it is declared here too.
+  const [taskView, setTaskView] = React.useState<TaskView>("open")
+
   // Per-module data — cache-first + null-keyed (a screen fetches only the modules
   // it shows). Lifted into one hook so the host reads as "fetch, then render".
   const {
@@ -105,7 +110,8 @@ export function DeepLinkScreen() {
     storiesQ,
     sprintsQ,
     appsQ,
-    tasksQ,
+    tasksOpenQ,
+    tasksAllQ,
     meetingsQ,
     marketingChannelOptions,
     marketingStatusOptions,
@@ -121,7 +127,7 @@ export function DeepLinkScreen() {
     activityQ,
     activityTotal,
     inviteAuditQ,
-  } = useScreenData({ teamId, enabled, module, recordId, helpScope })
+  } = useScreenData({ teamId, enabled, module, recordId, helpScope, taskView })
 
   const roles = rolesQ.data ?? []
   const activeRoles = roles.filter((r) => r.active)
@@ -306,7 +312,9 @@ export function DeepLinkScreen() {
       apps: appsQ.data,
       sprints: sprintsQ.data,
       stories: storiesQ.data,
-      tasks: tasksQ.data,
+      // The ALL list, so a FINISHED task's breadcrumb still says its name rather
+      // than falling back to an id — it loads whenever a record is open.
+      tasks: tasksAllQ.data ?? tasksOpenQ.data,
       meetings: meetingsQ.data,
     },
   })
@@ -340,10 +348,11 @@ export function DeepLinkScreen() {
             noAccess, enabled, perms, can, module, recordId, teamId, canImport, go,
             overridesQ, metaQ, membersQ, rolesQ, roles, invitesQ, learningQ, helpQ, accountsQ, knowledgeQ, totals,
             marketingQ, brandQ, programmesQ, purposesQ, internalActivity,
-            storiesQ, sprintsQ, appsQ, tasksQ, meetingsQ,
+            storiesQ, sprintsQ, appsQ, tasksOpenQ, tasksAllQ, meetingsQ,
             activityQ, activityTotal, activityKey, activityScope, inviteAuditQ, teamName, active,
             rights, onAction, onIntent,
             sectionPath, helpScope, setHelpScope, myUserId, query, helpMineQ, helpArchivedQ,
+            taskView, setTaskView,
           })}
         </CountedTabs>
       </div>

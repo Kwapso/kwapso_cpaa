@@ -6,6 +6,7 @@ import {
   isScreenRecipe,
   resolveRecipe,
   tabCountKey,
+  withActionLabel,
   withoutActions,
   withTabCounts,
 } from "@/lib/screens"
@@ -86,6 +87,45 @@ describe("withoutActions", () => {
     withoutActions(base, ["members.changeRole", "members.remove"])
     expect(base.actions.length).toBe(originalLength)
     expect(base.actions.map((a) => a.id)).toContain("members.changeRole")
+  })
+})
+
+// A TOGGLE'S BUTTON SAYS WHAT IT WILL DO NEXT.
+//
+// The task tick read "Tick it off" whether or not the task was already done. The
+// write underneath toggled correctly, so pressing the unchanged button a second
+// time quietly REOPENED the thing you had just finished — the tester's "it marks
+// as done, but the button to tick it off stays there". R17 makes the transition
+// idempotent in the database; the screen owes it the matching sentence, because
+// a control still offering the same move is a control that reads as though
+// nothing happened.
+describe("withActionLabel", () => {
+  const taskDetail = BASE_RECIPES["tasks.detail"] as ScreenRecipe
+
+  it("re-labels (and re-styles) just the named action, on a fresh copy", () => {
+    expect(taskDetail.actions.find((a) => a.id === "tasks.done")?.label).toBe("Tick it off")
+
+    const next = withActionLabel(taskDetail, "tasks.done", "Put it back", "ghost")
+    expect(next).not.toBe(taskDetail)
+    const done = next.actions.find((a) => a.id === "tasks.done")
+    expect(done?.label).toBe("Put it back")
+    expect(done?.variant).toBe("ghost")
+    // …and the ACTION is unchanged: it is one door in two directions, and the
+    // host decides which way from the record, not from the label.
+    expect(done?.action).toBe("tasks.done")
+  })
+
+  it("leaves the base recipe alone, so the next record starts from the base", () => {
+    withActionLabel(taskDetail, "tasks.done", "Put it back", "ghost")
+    expect(taskDetail.actions.find((a) => a.id === "tasks.done")?.label).toBe("Tick it off")
+    expect(taskDetail.actions.find((a) => a.id === "tasks.done")?.variant).toBe("outline")
+  })
+
+  it("is a no-op for an id the recipe doesn't carry, and keeps the variant when none is given", () => {
+    const untouched = withActionLabel(taskDetail, "nope.missing", "Whatever")
+    expect(untouched.actions).toEqual(taskDetail.actions)
+    const kept = withActionLabel(taskDetail, "tasks.done", "Put it back")
+    expect(kept.actions.find((a) => a.id === "tasks.done")?.variant).toBe("outline")
   })
 })
 
