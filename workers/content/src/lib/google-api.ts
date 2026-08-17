@@ -190,17 +190,31 @@ export async function driveFileText(token: string, fileId: string): Promise<stri
   const mime = str(meta.mimeType)
   const isGoogleDoc = mime.startsWith("application/vnd.google-apps")
   const url = isGoogleDoc
-    ? `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/export?mimeType=text/plain`
+    ? `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/export?mimeType=text/plain&supportsAllDrives=true`
     : `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`
   const res = await fetch(url, {
     // R11.
     signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS),
     headers: { Authorization: `Bearer ${token}` },
   })
-  if (res.status === 401 || res.status === 403)
+  // A 401 IS about the grant: the token stopped being accepted between the
+  // metadata call above and this one, and the caller has to hear that rather
+  // than watch the rest of the folder quietly become empty strings.
+  if (res.status === 401)
     throw new GuardError(409, "google_access_lost", "Google wouldn't allow that any more — connect it again in Settings.")
-  // A file with no text representation (an image, a zip) is not an error: it is
-  // a file with nothing to read, and the caller gets an empty string.
+  // A 403 IS NOT, and this line used to treat them alike. The metadata call
+  // ahead of this one goes through googleFetch, which throws on 401/403 — so the
+  // token is already proven good ON THIS FILE, and a refusal here is about the
+  // FILE: downloading switched off by its owner, a Shared Drive retention rule,
+  // Google's abusive-file flag. It belongs with the image and the zip below — a
+  // file with nothing we can read — not with a broken connection.
+  //
+  // Why it matters more than one file's text: the caller in google-read.ts reads
+  // a whole named folder in an uncaught loop. On 2026-08-17 one such file made
+  // that sweep index NOTHING out of a live folder and record "connect it again
+  // in Settings" against a grant that was never broken, while Gmail, Calendar
+  // and Chat indexed 25, 25 and 2 the same minute. A dead token still stops the
+  // loop, which is right; one awkward file no longer does.
   if (!res.ok) return ""
   return (await res.text()).slice(0, DRIVE_TEXT_CAP)
 }
