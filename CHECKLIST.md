@@ -22,13 +22,13 @@ Last updated 17 Aug 2026.
 
 | # | The thing | Status |
 |---|---|---|
-| 1.1 | Sharing or deep-linking a ticket fails to load the page. Happens across the whole app | TO DO |
-| 1.2 | The start timer is broken on tickets, stories and tasks | TO DO |
-| 1.3 | Ticking a task off appears to delete it | **CHANGED** — the record is never deleted; it leaves the only list on screen and there is nowhere to find it. Fixed by adding the Completed tab (4.2) |
-| 1.4 | Forms and edit screens spill outside their box. Visible on the story edit screen, where Save renders outside the dialog | TO DO |
-| 1.5 | The separator and the submit button touch at the bottom of every form | TO DO |
-| 1.6 | Ticket types appear two, three and four times in the dropdown | TO DO — two vocabularies are live at once. Fixed by 2.1 |
-| 1.7 | Meetings and Time share the same icon | TO DO |
+| 1.1 | Sharing or deep-linking a ticket fails to load the page. Happens across the whole app | **DONE** — worse than reported: 13 of 15 sections 404'd, not just tickets. The gateway kept a list of which addresses it handles and it still named Learning and an old Help path while the app had grown to fifteen |
+| 1.2 | The start timer is broken on tickets, stories and tasks | **DONE** — the button never noticed a timer was already running, so the second press was refused; and tickets and tasks had no start button at all. One shared button now, on all three |
+| 1.3 | Ticking a task off appears to delete it | **DONE** — **and my earlier diagnosis was wrong**. I said the fix was a Completed tab. There already is one, called All tasks, and the task was sitting in it. The real problem was the message: it said only "Ticked off." while the row vanished. It now says where it went |
+| 1.4 | Forms and edit screens spill outside their box. Visible on the story edit screen, where Save renders outside the dialog | **DONE** — measured at 738px tall in a 640px window with nothing scrolling. Checked at four widths afterwards |
+| 1.5 | The separator and the submit button touch at the bottom of every form | **DONE** — and the cause was systemic: the folder holding every SHARED component was never scanned by the styling tool, so any style used only there was silently thrown away. That affected far more than forms |
+| 1.6 | Ticket types appear two, three and four times in the dropdown | **PART DONE** — a new team no longer gets 26 duplicated values. Teams that already exist still carry theirs; the clean-up is running now |
+| 1.7 | Meetings and Time share the same icon | **DONE** — worse than reported: Home shared it too. A test now fails on any repeated icon in the rail |
 
 ## 2 · The words
 
