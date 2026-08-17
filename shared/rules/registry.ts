@@ -209,6 +209,13 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "vector-fence",
     status: "enforced",
   },
+  {
+    id: "R27",
+    dimension: "ai",
+    law: "DESCRIBED CONTRACTS — every `backticked` identifier in a tool description names something real: an argument the tool's own schema declares; a query param or body field its door reads (the same census R19/R22 stand on); a field its response actually carries — the pagedJson contract and the door's own extras read out of the call itself, the handler's own json({...}) literals, the row fields the module's libs map off a database row, and R23's knowledgeAnswer seam; another tool's name on either machine surface; or a reasoned DESCRIPTION_VOCABULARY entry. The vocabulary is a deny-list in spirit: every entry carries a reason, an entry nothing uses turns the build red, and so does an entry a derived class already covers. Nothing hand-listed that can be derived: tools from the three catalogue files themselves, doors from each worker's own switchboard, reads from handler source, response keys from the seams and the module's own libs. Scope, stated honestly: the law checks IDENTIFIERS, not sentences — a false sentence built from real identifiers is R19/R22's to make pointless; what THIS law ends is a name that exists nowhere surviving review because only humans read prose, and humans assume a green build checked it. Earned by: 2026-08-16 — a session reverted a tool description to a false promise, added two parameters that do not exist and a fake filter claim, and npm run check passed, because every law on the machine surface read the wiring (schema, buildQuery, buildBody) and none read the words a developer actually reads.",
+    checkId: "described-contracts",
+    status: "enforced",
+  },
 ]
 
 /** R13 — reviewed exemptions: modules that are deliberately NOT import targets,

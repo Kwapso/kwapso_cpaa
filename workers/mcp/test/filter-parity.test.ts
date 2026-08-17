@@ -38,25 +38,17 @@
 // strings. So the denominator is now every non-admin door, filtered or not:
 // silence about a capability has to be written down before it is allowed.
 
-import { readFileSync, existsSync } from "node:fs"
+import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
-import { sourceFiles } from "@shared/rules/source-scan"
 import { SHARED_TOOLS } from "@shared/workers/tool-catalog"
 import { MCP_TOOLS } from "../src/lib/tools"
 import { TOOL_CATALOG } from "../../data-ops/src/lib/tools"
-
-const ROOT = join(__dirname, "..", "..", "..")
-
-/** The workers whose doors this law governs: every one that serves the app's own
- * `/api` surface to a signed-in caller. (realtime and the two gateways own no
- * doors of their own — they forward; mcp IS the surface being measured.) */
-const WORKERS = ["tenancy", "content", "data-ops", "auth"] as const
-type Worker = (typeof WORKERS)[number]
-
-type Door = { worker: Worker; method: "GET" | "POST"; path: string; handler: string }
-const key = (d: { method: string; path: string }) => `${d.method} ${d.path}`
+// The door census itself — workers, doors, and what each door's own source says
+// it reads — lives in door-census.ts, extracted the day R27 became its second
+// reader (a description may only name what the door really reads or returns).
+import { DOORS, doorBodyFields, doorParams, key, ROOT, WORKERS, type Door } from "./door-census"
 
 /** A door that deliberately has no tool on either machine surface. Each line is a
  * decision someone made, in writing — the alternative is a gap nobody ever sees,
@@ -191,90 +183,6 @@ const NARROWED_BODY_FIELDS: Record<string, string> = {
     "attaching up to 8 CSVs of 5 MB each is up to 40 MB of argument on the same 400,000-character surface — and the capability is already here in a better machine shape: start_import → add_import_file → plan_import → run_import is deterministic, resumable, and re-readable for free through get_import when a client drops a plan. Conversational file-drop is the shape a person supervises on a screen; a headless client should use the pipeline that reports per-row what it did.",
 }
 
-/** The route-handler source for a worker: its routes/ directory if it has one,
- * else its index.ts (auth keeps its handlers in the switchboard file). */
-function handlerSources(worker: Worker): string[] {
-  const dir = join(ROOT, "workers", worker, "src", "routes")
-  if (!existsSync(dir)) return [readFileSync(join(ROOT, "workers", worker, "src", "index.ts"), "utf8")]
-  return sourceFiles(dir, { extensions: [".ts"] }).map((f) => f.source)
-}
-
-const indexSource = (worker: Worker) =>
-  readFileSync(join(ROOT, "workers", worker, "src", "index.ts"), "utf8")
-
-/** Every door on a worker, read off its OWN switchboard — the declarative ROUTES
- * table (tenancy / content / data-ops) or auth's switch. Excluded, and only
- * these three: `/admin/` (owner maintenance behind `x-admin-key`, a header no
- * tool can send — locked separately in catalog.test.ts), the health probe, and
- * `/internal/*` (service bindings only, never routed publicly). */
-function doorsOf(worker: Worker): Door[] {
-  const src = indexSource(worker)
-  const out: Door[] = []
-  const add = (method: string, path: string, handler: string) => {
-    if (path.includes("/admin/") || path.endsWith("/health")) return
-    out.push({ worker, method: method as "GET" | "POST", path, handler })
-  }
-  for (const m of src.matchAll(/"(GET|POST) (\/api\/[^"]+)"\s*:\s*\{\s*handler:\s*(\w+)/g))
-    add(m[1], m[2], m[3])
-  for (const m of src.matchAll(/case "(GET|POST) (\/api\/[^"]+)":\s*\n\s*return await (\w+)\(/g))
-    add(m[1], m[2], m[3])
-  return out
-}
-
-/** One function's body: from its declaration to the next top-level `}` (or the
- * next export, whichever comes first) — never into the function that follows. */
-function fnBody(src: string, name: string): string {
-  const at = src.search(new RegExp(`function ${name}\\(`))
-  if (at === -1) return ""
-  const ends = [src.indexOf("\n}\n", at), src.indexOf("\nexport ", at + 1)].filter((i) => i !== -1)
-  return src.slice(at, ends.length ? Math.min(...ends) : undefined)
-}
-
-/** What a door READS — its own handler, PLUS any helper in the same file it
- * calls, one level deep.
- *
- * The one level is not a nicety, it is the law's blind spot closed. This scan
- * once read the handler alone, so the moment a door factored its parsing into a
- * `function accountQuery(url)` beside it — which is exactly what you do when two
- * doors must narrow by the same words — the door dropped out of the census
- * entirely and its tool's obligations silently became none. A law that stops
- * looking when you tidy up is a law that rewards tidying up.
- *
- * One level, and only helpers declared in the SAME source: a `createLearning`
- * imported from a lib declares its contract in a TYPE, which is not source a
- * scan can follow, and pretending otherwise would be worse than saying so. */
-function handlerBody(door: Door): string {
-  for (const src of handlerSources(door.worker)) {
-    const own = fnBody(src, door.handler)
-    if (!own) continue
-    const called = [...new Set([...own.matchAll(/\b([a-zA-Z_]\w*)\s*\(/g)].map((m) => m[1]))]
-    return [own, ...called.filter((n) => n !== door.handler).map((n) => fnBody(src, n))].join("\n")
-  }
-  return ""
-}
-
-/** The params a door's handler parses, derived from ITS OWN source: its
- * `searchParams.get` calls are the truth. */
-function doorParams(door: Door): string[] {
-  return [...handlerBody(door).matchAll(/searchParams\.get\("(\w+)"\)/g)].map((x) => x[1])
-}
-
-/** The BODY fields a door's handler reads, derived the same way: its `body.<field>`
- * reads are the truth. R20 is what makes this legible — a body may not be
- * destructured at the read, so every field a door takes off the wire appears
- * here, in one shape, whether it is validated with `requireText`, tested with
- * `typeof`, or checked with `Array.isArray`.
- *
- * SCOPE, stated honestly: this reads the HANDLER, exactly as the query half
- * does. A handler that hands the whole `body` object to a lib (createLearning,
- * createTicket) declares its contract in that lib's input TYPE, which is not
- * source a scan can follow — those tools were checked by hand and match. What
- * this catches is the case that actually bit: a field the DOOR names and the
- * TOOL doesn't. */
-function doorBodyFields(door: Door): string[] {
-  return [...new Set([...handlerBody(door).matchAll(/\bbody\.(\w+)\b/g)].map((x) => x[1]))]
-}
-
 /** Every tool on EITHER machine surface that forwards to a door — the shared
  * catalog, the MCP's own, and the agent's own. A capability reached from one
  * surface is not a gap; a capability reached from neither is. De-duplicated by
@@ -340,7 +248,6 @@ const readToolsOn = (door: Door): ToolView[] => (door.method === "GET" ? toolsOn
 const writeToolsOn = (door: Door): ToolView[] =>
   door.method === "POST" ? toolsOn(door).filter((t) => t.buildBody) : []
 
-const DOORS: Door[] = WORKERS.flatMap(doorsOf)
 const FILTERED = DOORS.filter((d) => doorParams(d).length > 0)
 const WRITES = DOORS.filter((d) => d.method === "POST" && doorBodyFields(d).length > 0)
 

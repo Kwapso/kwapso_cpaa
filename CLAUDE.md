@@ -55,6 +55,18 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
   `shared/workers/savings.ts`, word for word — the times are agreed estimates, the
   subtraction is arithmetic — and the screens are derived from the payload they read.
   (`savings-caption`)
+- **Described contracts (R27)** — every `backticked` identifier in a tool description
+  names something real: an argument the tool's own schema declares, a query param or
+  body field its door reads (the same door census R19/R22 stand on), a field its
+  response actually carries (the `pagedJson` contract + the door's own extras, the
+  handler's `json({…})` literals, the row fields the module's libs map off a database
+  row, R23's `knowledgeAnswer` seam), another tool's name, or a reasoned
+  `DESCRIPTION_VOCABULARY` entry — rot-checked, so an unused or derivable entry turns
+  the build red. R19/R22 prove the wiring and never the prose; on 2026-08-16 a
+  description with a false promise, two invented parameters and a fake filter passed
+  a green build, because the words a developer actually reads were the one unchecked
+  surface. Identifiers, not sentences — an invented NAME can no longer ship.
+  (`described-contracts`)
 
 A law cannot be added without its check (`registry-integrity`). When you add a rule, add it to RULES.md **and** the registry **and** a check — or the build fails.
 
@@ -63,7 +75,7 @@ A law cannot be added without its check (`registry-integrity`). When you add a r
 Answer these seven, in order, *before* you write code. It's the thinking that keeps a change in-rule and lean — the antidote to the failure mode that bit us (a change that looked fine but broke an unstated invariant, or rebuilt a seam that already existed).
 
 1. **Say it in one glossary sentence.** What changes, in [the glossary's](shared/glossary.ts) words — never a synonym. No word for it yet? That's a glossary decision first (Law R6).
-2. **Which Laws bite?** Walk R1–R26: it reads a request body → every field through the validation seam, positionally (R20); a client login could reach it at the agency origin → it decides about portal callers at the door (R21); it mutates → gate (R10) + publish (R1) + a reachable listener (R15); renders a form → FormShell (R4) + draft (R7); a collection → tabs (R2/R3/R8), a bounded read — or real keyset paging if it GROWS (R14) — and an exact, once-only count through the one seam (R16); a deactivate/reactivate or status move → the idempotent predicate + zero-row silence (R17); writes activity → its relatedTable resolves through the gate map (R18); a new module → an import TargetDef or a reasoned exemption (R13); touches the agent/MCP → capability parity (R9), every door filter exposed + forwarded (R19), every BODY field too (R22), and the confirm rule; calls an external service → a fetch timeout (R11); runs on a cron → record failures (R12); answers from the knowledge base → the one answer seam, citations and all (R23), and its search is namespaced and its words come from D1 (R26). Name them now, not in review.
+2. **Which Laws bite?** Walk R1–R27: it reads a request body → every field through the validation seam, positionally (R20); a client login could reach it at the agency origin → it decides about portal callers at the door (R21); it mutates → gate (R10) + publish (R1) + a reachable listener (R15); renders a form → FormShell (R4) + draft (R7); a collection → tabs (R2/R3/R8), a bounded read — or real keyset paging if it GROWS (R14) — and an exact, once-only count through the one seam (R16); a deactivate/reactivate or status move → the idempotent predicate + zero-row silence (R17); writes activity → its relatedTable resolves through the gate map (R18); a new module → an import TargetDef or a reasoned exemption (R13); touches the agent/MCP → capability parity (R9), every door filter exposed + forwarded (R19), every BODY field too (R22), a description whose every backticked identifier names something real (R27), and the confirm rule; calls an external service → a fetch timeout (R11); runs on a cron → record failures (R12); answers from the knowledge base → the one answer seam, citations and all (R23), and its search is namespaced and its words come from D1 (R26). Name them now, not in review.
 3. **Which seams do I reuse — not rebuild?** The data door (`shared/workers/d1-rest`), gating (`requireRight`), validation (`shared/workers/validate`), `publishChange`, `FormShell`, the recipe engine, the tool catalog. If you're writing what a seam already does, stop.
 4. **What's the smallest shape?** A route on an existing worker (not a new worker); a column (not a table); a recipe (not a bespoke screen); a flag (not a code path). "Too much code is a defect."
 5. **What could break?** Name the failure path *before* the happy path: tenant isolation, ≥1 admin, a unique pending invite, a never-negative balance, a concurrent write, a partial failure, a hung fetch. Validate at the boundary; make retryable writes idempotent.
