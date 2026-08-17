@@ -94,6 +94,12 @@ export function AppDetailScreen({
   // Who can be put on this app (8.10) — the team, from the cache the members
   // screen already fills.
   const members = useTeamMembers(teamId)
+  // The client's own people, by name — see the note beside `contactNames` below
+  // for why this is a second read rather than the accounts cache.
+  const clientId = appsQ.data?.find((a) => a.id === appId)?.accountId ?? null
+  const contactsQ = useCached(clientId ? `account-detail:${clientId}` : null, () =>
+    tenancy.accountDetail(clientId as string)
+  )
 
   const [tab, setTab] = React.useState("overview")
   const [editOpen, setEditOpen] = React.useState(false)
@@ -176,10 +182,19 @@ export function AppDetailScreen({
     )
 
   // The people on it, as NAMES. The row carries ids — a staff row points at a
-  // login in the core database and a stakeholder at an account row — and both
-  // caches are already open on this screen, so the names cost nothing.
+  // login in the core database and a stakeholder at an account row.
+  //
+  // THE STAFF NAMES come out of the members cache, which is bounded and read
+  // whole. THE CONTACT NAMES do not come out of the accounts cache, and that is
+  // the bug this comment exists to stop somebody re-introducing: accounts are a
+  // GROWING collection that PAGES, so a contact who is not in page one resolved
+  // to "Somebody". They come off the account's own detail door instead — the
+  // same read the form uses to offer them, so the name a person picked and the
+  // name they are shown are the one answer.
   const memberNames = new Map(members.map((m) => [m.id, m.name]))
-  const contactNames = new Map((accountsQ.data ?? []).map((a) => [a.id, a.name]))
+  const contactNames = new Map(
+    (contactsQ.data?.links ?? []).map((l) => [l.personAccountId, l.personName])
+  )
   const staffLine = app.staff.length
     ? app.staff
         .map((p) => `${memberNames.get(p.userId) ?? "Somebody"}${p.isLead ? " (team lead)" : ""}`)
