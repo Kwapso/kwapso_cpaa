@@ -42,7 +42,6 @@ function listCollection(
 ): CollectionConfig {
   return {
     ...defaultCollectionConfig,
-    searchable: true,
     searchPlaceholder,
     headerLayout: "inline",
     userFilter: filterFacets.length > 0,
@@ -53,6 +52,13 @@ function listCollection(
     // "Showing 50 of 50" beside a badge that correctly says 55. The count is
     // shown exactly once, above, through the formatCount seam.
     showCount: !opts.paged,
+    // …and its SEARCH BOX is wrong for the same reason, which took longer to
+    // notice because a search that finds nothing looks like an answer. The frame
+    // searches the array it holds — page one — so on a paged collection the box
+    // is answered by the DOOR instead, from the host's own find bar
+    // (components/paged-find.tsx · SEARCH.md layer 2). One box per screen, and
+    // it is the one that can see past the cursor.
+    searchable: !opts.paged,
   }
 }
 
@@ -365,16 +371,13 @@ const accountsListRecipe: ScreenRecipe = {
   gate: { module: "accounts", right: "read" },
   fields: [field("name", "Account"), field("detail", "Details")],
   actions: [],
-  collection: listCollection(
-    "No accounts yet.",
-    "Search accounts…",
-    [
-      { field: "type", label: "Type", control: "select" },
-      { field: "status", label: "Status", control: "select" },
-      { field: "archived", label: "Archived", control: "select" },
-    ],
-    { paged: true }
-  ),
+  // NO FACETS HERE, and that is the fix rather than a loss: type / status /
+  // archived are the door's OWN filters now, asked from the host's find bar
+  // (components/paged-find.tsx). In the frame they narrowed the loaded page —
+  // "companies among the newest fifty" — while the exact count above them never
+  // moved, which is what a manager reported as "filter by type, the count
+  // doesn't change". A filter a person can pick has to be one the server applies.
+  collection: listCollection("No accounts yet.", "Search accounts…", [], { paged: true }),
 }
 
 /* -------------------------------- knowledge ------------------------------- */
@@ -851,17 +854,30 @@ export function resolveRecipe(
 
 /** Tune a list recipe's collection chrome to the DATA it's about to show, so we
  * never render dead UI: no rows → hide search + filters entirely (the empty
- * state stands alone); rows present → keep search, and keep a facet only when at
- * least one of its rows carries a value (an all-empty facet is a useless
- * dropdown). A fresh copy — the base recipe is never mutated. */
+ * state stands alone); rows present → keep the recipe's own search setting, and
+ * keep a facet only when at least one of its rows carries a value (an all-empty
+ * facet is a useless dropdown). A fresh copy — the base recipe is never mutated.
+ *
+ * It RESPECTS `searchable` rather than turning it on: a paged collection's box
+ * belongs to the door (see `listCollection`), and this used to switch the
+ * frame's own one back on the moment a row existed — which is every time.
+ *
+ * `emptyText` is the one thing a caller may override, and there is exactly one
+ * caller: a screen mid-search, where "No accounts yet." is a sentence about the
+ * collection and not about the question that just came back empty. */
 export function withDataDrivenCollection(
   recipe: ScreenRecipe,
-  rows: Record<string, unknown>[]
+  rows: Record<string, unknown>[],
+  emptyText?: string
 ): ScreenRecipe {
   const collection = recipe.collection
   if (!collection) return recipe
+  const text = emptyText ?? collection.emptyText
   if (rows.length === 0) {
-    return { ...recipe, collection: { ...collection, searchable: false, userFilter: false } }
+    return {
+      ...recipe,
+      collection: { ...collection, emptyText: text, searchable: false, userFilter: false },
+    }
   }
   const facets = collection.filterFacets.filter((f) =>
     rows.some((row) => {
@@ -871,7 +887,13 @@ export function withDataDrivenCollection(
   )
   return {
     ...recipe,
-    collection: { ...collection, searchable: true, userFilter: facets.length > 0, filterFacets: facets },
+    collection: {
+      ...collection,
+      emptyText: text,
+      searchable: collection.searchable,
+      userFilter: facets.length > 0,
+      filterFacets: facets,
+    },
   }
 }
 

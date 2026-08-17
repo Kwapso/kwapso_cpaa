@@ -26,6 +26,7 @@ import type { ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
 import { CollectionHeading } from "@/components/collection-heading"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { LoadMore } from "@/components/load-more"
+import { PagedFind } from "@/components/paged-find"
 import { MeetingFormDialog, type MeetingFormValues } from "@/components/meeting-form-dialog"
 import { shapeMeetingsList } from "@/components/deep-link/shape"
 import { content as contentApi, tenancy } from "@/lib/api"
@@ -80,9 +81,7 @@ export function MeetingsScreen({
 
   if (meetingsQ.error) return <p className="text-destructive text-sm">Couldn&apos;t load the meetings.</p>
   if (meetingsQ.data === undefined) return <Skeleton variant="list" lines={4} />
-
-  const data = shapeMeetingsList(meetingsQ.data)
-  const listRecipe = withDataDrivenCollection(recipe, data.rows ?? [])
+  const loaded = meetingsQ.data
 
   return (
     <div className="flex flex-col gap-4">
@@ -90,25 +89,47 @@ export function MeetingsScreen({
           heading — and it is the door's exact COUNT(*). */}
       <CollectionHeading sectionKey="meetings" total={total} />
 
-      <SectionWithCreate show={canCreate} label="New meeting" icon="plus" onCreate={() => setOpen(true)}>
-        <ScreenRenderer
-          recipe={listRecipe}
-          data={data}
-          rights={rights}
-          onAction={onAction}
-          onIntent={onIntent}
-        />
-      </SectionWithCreate>
-
-      {/* R14: the heading counts the WHOLE diary, so the list under it has to be
-          able to reach all of it — page one, then Load more. */}
-      <LoadMore
+      {/* R14's other half: the diary pages, and the meeting somebody digs for is
+          the OLD one — so the search box is answered by the door, over the whole
+          diary rather than the page in the browser. */}
+      <PagedFind<Meeting>
         listKey={meetingsKey(teamId)}
-        fetchPage={(cursor) =>
-          contentApi.meetings(cursor).then((r) => ({ rows: r.meetings, nextCursor: r.nextCursor }))
+        placeholder="Search meetings…"
+        noun="meetings"
+        fetchPage={(query, cursor) =>
+          contentApi
+            .meetings(cursor, "all", query.q)
+            .then((r) => ({ rows: r.meetings, nextCursor: r.nextCursor, total: r.total }))
         }
-        label="Load more meetings"
-      />
+      >
+        {(found) => {
+          const rows = found.active ? found.rows : loaded
+          if (rows === null) return <Skeleton variant="list" lines={4} />
+          const data = shapeMeetingsList(rows)
+          const listRecipe = withDataDrivenCollection(recipe, data.rows ?? [], found.emptyText)
+          return (
+            <>
+              <SectionWithCreate show={canCreate} label="New meeting" icon="plus" onCreate={() => setOpen(true)}>
+                <ScreenRenderer
+                  recipe={listRecipe}
+                  data={data}
+                  rights={rights}
+                  onAction={onAction}
+                  onIntent={onIntent}
+                />
+              </SectionWithCreate>
+
+              {/* R14: the heading counts the WHOLE diary, so the list under it has to be
+                  able to reach all of it — page one, then Load more. */}
+              <LoadMore
+                listKey={found.listKey ?? meetingsKey(teamId)}
+                fetchPage={found.fetchPage}
+                label="Load more meetings"
+              />
+            </>
+          )
+        }}
+      </PagedFind>
 
       <MeetingFormDialog
         open={open}

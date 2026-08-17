@@ -28,6 +28,7 @@ import type { ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
 
 import { CollectionHeading } from "@/components/collection-heading"
 import { LoadMore } from "@/components/load-more"
+import { PagedFind } from "@/components/paged-find"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { StoryFormDialog, type StoryFormValues } from "@/components/story-form-dialog"
 import { TimePanel } from "@/components/time-panel"
@@ -147,8 +148,7 @@ export function StoriesScreen({
   if (storiesQ.error) return <p className="text-destructive text-sm">Couldn&apos;t load the work.</p>
   if (storiesQ.data === undefined) return <Skeleton variant="list" lines={4} />
 
-  const data = shapeStories(storiesQ.data, options.appNames)
-  const listRecipe = withDataDrivenCollection(recipe, data.rows)
+  const loaded = storiesQ.data
 
   return (
     <div className="flex flex-col gap-4">
@@ -157,29 +157,55 @@ export function StoriesScreen({
           length, which on a paged list is just "50" for ever. */}
       <CollectionHeading sectionKey="stories" total={total} />
 
-      <SectionWithCreate
-        show={canCreate}
-        label="New story"
-        icon="plus"
-        onCreate={() => setStoryOpen(true)}
-      >
-        <ScreenRenderer
-          recipe={listRecipe}
-          data={data}
-          rights={rights}
-          onAction={onAction}
-          onIntent={onIntent}
-        />
-      </SectionWithCreate>
-
-      {/* R14: the backlog only grows and a done story is never deleted, so it pages. */}
-      <LoadMore
+      {/* R14's other half: 3,677 stories arrived from the previous system on day
+          one, so a search box filtering the loaded page would answer "among the
+          newest fifty" — the same objection this file already makes about
+          narrowing the backlog by app in the browser. The door answers it. */}
+      <PagedFind<Story>
         listKey={storiesKey(teamId)}
-        label="Load more work"
-        fetchPage={(c: string) =>
-          contentApi.stories({ cursor: c }).then((r) => ({ rows: r.stories, nextCursor: r.nextCursor }))
+        placeholder="Search work…"
+        noun="stories"
+        fetchPage={(query, cursor) =>
+          contentApi
+            // `view: "all"` while searching: somebody looking for a story by name
+            // is as likely to want the finished one, and the everyday backlog
+            // hides those.
+            .stories({ filter: { q: query.q, view: "all" }, cursor })
+            .then((r) => ({ rows: r.stories, nextCursor: r.nextCursor, total: r.total }))
         }
-      />
+      >
+        {(found) => {
+          const rows = found.active ? found.rows : loaded
+          if (rows === null) return <Skeleton variant="list" lines={4} />
+          const data = shapeStories(rows, options.appNames)
+          const listRecipe = withDataDrivenCollection(recipe, data.rows, found.emptyText)
+          return (
+            <>
+              <SectionWithCreate
+                show={canCreate}
+                label="New story"
+                icon="plus"
+                onCreate={() => setStoryOpen(true)}
+              >
+                <ScreenRenderer
+                  recipe={listRecipe}
+                  data={data}
+                  rights={rights}
+                  onAction={onAction}
+                  onIntent={onIntent}
+                />
+              </SectionWithCreate>
+
+              {/* R14: the backlog only grows and a done story is never deleted, so it pages. */}
+              <LoadMore
+                listKey={found.listKey ?? storiesKey(teamId)}
+                label="Load more work"
+                fetchPage={found.fetchPage}
+              />
+            </>
+          )
+        }}
+      </PagedFind>
 
       {/* Time, under the work it is against. BUILD-1 §5: one click is the
           acceptance bar — the Start control is on the header bar once a timer is

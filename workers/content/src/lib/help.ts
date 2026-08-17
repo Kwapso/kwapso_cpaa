@@ -18,7 +18,7 @@
 
 import { accountScopeClause, type AccountScope } from "@shared/workers/account-scope"
 import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
-import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
+import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { HELP_STATUSES, type HelpMessage, type HelpStatus, type HelpTicket } from "@shared/types"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
@@ -289,19 +289,44 @@ function archiveClause(view: "live" | "archived"): string {
   return view === "archived" ? "archived_at IS NOT NULL" : "archived_at IS NULL"
 }
 
+/** WHAT THE SEARCH BOX ON THE TICKETS SCREEN ASKS THE SERVER. It rides the list
+ * AND the count, so the number beside the results counts the same question the
+ * rows answer.
+ *
+ * It searches the reference and the words a person would recognise a ticket by —
+ * the description they wrote and the title we made of it. ESCAPED for the same
+ * two reasons the accounts search is (`workers/tenancy/src/lib/accounts.ts`): a
+ * search box is not a pattern box, and an alternating `%a%a%…` needle is a
+ * handful of bytes that costs the worker exponential time over the whole table. */
+function searchClause(q: string | undefined): { sql: string; params: string[] } {
+  if (!q) return { sql: "", params: [] }
+  const needle = `%${likeLiteral(q.toLowerCase())}%`
+  return {
+    sql: `(LOWER(description) LIKE ? ESCAPE '\\' OR LOWER(ref) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(title_en, '')) LIKE ? ESCAPE '\\')`,
+    params: [needle, needle, needle],
+  }
+}
+
 export async function listTickets(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
   tab: "mine" | "all",
   view: "live" | "archived",
-  cursor: string | null
+  cursor: string | null,
+  q?: string
 ): Promise<Page<HelpTicket>> {
   const pos = decodeCursor(cursor)
   const after = keysetAfter(pos, TICKET_ORDER)
   const fence = ticketFence(guard, scope, tab)
-  const clauses = [archiveClause(view), ...(fence.sql ? [fence.sql] : []), ...(after.sql ? [after.sql] : [])]
-  const params = [...fence.params, ...after.params]
+  const find = searchClause(q)
+  const clauses = [
+    archiveClause(view),
+    ...(fence.sql ? [fence.sql] : []),
+    ...(find.sql ? [find.sql] : []),
+    ...(after.sql ? [after.sql] : []),
+  ]
+  const params = [...fence.params, ...find.params, ...after.params]
   const rows = await d1Query<TicketRow>(
     cfg,
     guard.databaseId,
@@ -322,7 +347,8 @@ export async function countTickets(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
-  view: "live" | "archived"
+  view: "live" | "archived",
+  q?: string
 ): Promise<{ total: number; mineTotal: number }> {
   // R16 says the count is exact; the fence says exact ABOUT WHAT THEY MAY SEE.
   // An unfenced total would tell a client how many tickets exist that it is
@@ -333,13 +359,18 @@ export async function countTickets(
   // and archived together would badge a number the list can never reach, which is
   // the R16 failure in its quietest form: both numbers true, neither about the
   // rows on screen.
+  // …and it counts the SAME SEARCH, when there is one: a filtered list showing an
+  // unfiltered total is the R16 failure the other way round.
   const fence = ticketFence(guard, scope, "all")
-  const where = [archiveClause(view), ...(fence.sql ? [fence.sql] : [])].join(" AND ")
+  const find = searchClause(q)
+  const where = [archiveClause(view), ...(fence.sql ? [fence.sql] : []), ...(find.sql ? [find.sql] : [])].join(
+    " AND "
+  )
   const rows = await d1Query<{ total: number; mine: number }>(
     cfg,
     guard.databaseId,
     `SELECT COUNT(*) AS total, SUM(CASE WHEN creator_id = ? THEN 1 ELSE 0 END) AS mine FROM help WHERE ${where}`,
-    [guard.userId, ...fence.params]
+    [guard.userId, ...fence.params, ...find.params]
   )
   return { total: rows[0]?.total ?? 0, mineTotal: rows[0]?.mine ?? 0 }
 }

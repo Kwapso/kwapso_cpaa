@@ -26,7 +26,7 @@
 // count is served by the ticket door (BUILD-1 §7).
 
 import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
-import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
+import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { optionalText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
@@ -139,6 +139,12 @@ export type StoryFilter = {
   assigneeId?: string
   /** "open" hides done stories — the everyday view of a backlog. */
   view?: "open" | "all"
+  /** THE SEARCH BOX, answered here rather than in the browser. The backlog pages
+   * (R14), so a search that filtered the loaded page would answer "among the
+   * newest fifty" while the badge above counted 3,677 — the same defect this
+   * file's own note above `appId` describes for the app's screen. It rides
+   * `storyWhere`, so the list and the count are asked the one question. */
+  q?: string
 }
 
 function storyWhere(filter: StoryFilter): { sql: string; params: string[] } {
@@ -164,6 +170,17 @@ function storyWhere(filter: StoryFilter): { sql: string; params: string[] } {
   if (filter.assigneeId) {
     parts.push("s.assignee_id = ?")
     params.push(filter.assigneeId)
+  }
+  if (filter.q) {
+    // The reference and the words somebody would recognise the work by. ESCAPED,
+    // because a search box is not a pattern box: `%` and `_` are LIKE's own
+    // wildcards, and an alternating `%a%a%…` needle is a handful of bytes that
+    // costs the worker exponential time over the whole table.
+    parts.push(
+      `(LOWER(s.title) LIKE ? ESCAPE '\\' OR LOWER(s.ref) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(s.detail, '')) LIKE ? ESCAPE '\\')`
+    )
+    const needle = `%${likeLiteral(filter.q.toLowerCase())}%`
+    params.push(needle, needle, needle)
   }
   return { sql: parts.length ? parts.join(" AND ") : "1 = 1", params }
 }

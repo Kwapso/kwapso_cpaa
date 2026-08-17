@@ -268,10 +268,23 @@ export const tenancy = {
   /** R14: a PAGE of accounts (a GROWING collection) — hand `cursor` back from the
    * previous response for the next one; `total` is the exact server count of what
    * this caller may see. `parentId` narrows to one account's children. */
-  accounts: (opts: { q?: string; type?: string; parentId?: string; cursor?: string | null } = {}) => {
+  accounts: (
+    opts: {
+      q?: string
+      type?: string
+      /** the team's own word for where an account stands, as stored */
+      status?: string
+      /** "yes" = only the put-away ones, "no" = only the live ones */
+      archived?: string
+      parentId?: string
+      cursor?: string | null
+    } = {}
+  ) => {
     const p = new URLSearchParams()
     if (opts.q) p.set("q", opts.q)
     if (opts.type) p.set("type", opts.type)
+    if (opts.status) p.set("status", opts.status)
+    if (opts.archived) p.set("archived", opts.archived)
     if (opts.parentId) p.set("parentId", opts.parentId)
     if (opts.cursor) p.set("cursor", opts.cursor)
     const qs = p.toString()

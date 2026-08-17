@@ -55,21 +55,19 @@ export async function getKnowledge(request: Request, env: Env): Promise<Response
     )
   }
   const kind = queryText(url.searchParams.get("kind"), "Kind")
+  const filter = {
+    // An unknown kind is dropped rather than refused: a filter is a narrowing,
+    // and narrowing by a word that is not a kind would answer "nothing" as if
+    // the base were empty.
+    kind: kind && (KNOWLEDGE_KINDS as readonly string[]).includes(kind) ? kind : undefined,
+    compartment: queryText(url.searchParams.get("compartment"), "Compartment"),
+    q: queryText(url.searchParams.get("q"), "Search"),
+  }
   const [page, total] = await Promise.all([
-    listSources(
-      cfg,
-      guard,
-      {
-        // An unknown kind is dropped rather than refused: a filter is a narrowing,
-        // and narrowing by a word that is not a kind would answer "nothing" as if
-        // the base were empty.
-        kind: kind && (KNOWLEDGE_KINDS as readonly string[]).includes(kind) ? kind : undefined,
-        compartment: queryText(url.searchParams.get("compartment"), "Compartment"),
-        q: queryText(url.searchParams.get("q"), "Search"),
-      },
-      queryText(url.searchParams.get("cursor"), "Cursor") ?? null
-    ),
-    countSources(cfg, guard),
+    listSources(cfg, guard, filter, queryText(url.searchParams.get("cursor"), "Cursor") ?? null),
+    // …over the SAME question the rows answered. Counting the whole base beside a
+    // searched page badges a number the list cannot reach.
+    countSources(cfg, guard, filter),
   ])
   // R16: the exact server total rides every list response (badges never use
   // rows.length — on a paged list that is just "50" forever).
