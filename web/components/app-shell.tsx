@@ -50,6 +50,7 @@ import { TEAM_CREATION_CLOSED } from "@shared/product"
 import { ProfileMenu } from "@/components/profile-menu"
 import { TeamSwitcher } from "@/components/team-switcher"
 import { TimerBar } from "@/components/timer-bar"
+import { LanguageProvider } from "@shared/web/language"
 
 const NAV_ICONS = { home: Home, settings: Settings } as const
 // The lucide component for each team SIDEBAR page in the rail — the same concept
@@ -278,6 +279,12 @@ export function AppShell({
   })
 
   return (
+    // THE LANGUAGE WRAPS THE WHOLE SHELL, so the nav, the breadcrumbs, every
+    // routed screen and every dialog opened from one all read the same `t`.
+    // Here rather than in the root layout because the root layout is a server
+    // component with no session: the preference arrives on `active.user`, which
+    // this shell already has in hand before it paints.
+    <LanguageProvider value={active.user?.language}>
     <div className="flex min-h-[100svh]">
       {/* Desktop sidebar (collapsible to an icon rail).
        *
@@ -408,6 +415,7 @@ export function AppShell({
        * (agent-host.tsx) so it survives navigation — it is intentionally not
        * rendered here. */}
     </div>
+    </LanguageProvider>
   )
 }
 

@@ -191,7 +191,10 @@ export async function postAgentChat(request: Request, env: Env): Promise<Respons
       return { name, csv: raw.csv }
     })
   }
-  const opts = { threadId, message, source: callerSurface(user), files }
+  // The caller's own language rides on the session `teamContext` already
+  // resolved, so the assistant answers in the language the person reads the
+  // rest of the app in without a second lookup or a client-supplied claim.
+  const opts = { threadId, message, source: callerSurface(user), files, language: user.language }
   if (wantsStream(request))
     return streamRun(env, (emit) => runChat(env, request, cfg, guard, actor, opts, emit))
   return json(await runChat(env, request, cfg, guard, actor, opts))
@@ -209,7 +212,7 @@ export async function postAgentConfirm(request: Request, env: Env): Promise<Resp
     return fail(400, "invalid_input", "threadId and approve are required.")
   // What runs comes from the server's stored proposal (in confirmAndRun), not the
   // client — any client-supplied `calls` are ignored, so nothing un-proposed executes.
-  const opts = { threadId, approve: body.approve, source: callerSurface(user) }
+  const opts = { threadId, approve: body.approve, source: callerSurface(user), language: user.language }
   if (wantsStream(request))
     return streamRun(env, (emit) => confirmAndRun(env, request, cfg, guard, actor, opts, emit))
   return json(await confirmAndRun(env, request, cfg, guard, actor, opts))

@@ -113,6 +113,8 @@ describe("the side never becomes a fingerprint", () => {
       onboardingComplete: true,
       currentTeamId: "team_1",
       pinnedTeamId: null,
+      // Never chose one, which is the common case and reads as English.
+      language: null,
     },
     teamId: "team_1",
     accounts: [{ id: "acc_1", name: "Northwind" }],

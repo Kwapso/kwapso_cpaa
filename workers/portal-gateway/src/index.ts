@@ -82,6 +82,12 @@ export const PORTAL_DOORS: Record<string, Upstream> = {
   "GET /api/auth/google/callback": "AUTH",
   "GET /api/auth/me": "AUTH",
   "POST /api/auth/profile": "AUTH",
+  // A contact choosing the language they read their own portal in. On the
+  // allow-list deliberately: SCOPE's point about the portal is that a client
+  // sees their world in their own words, and the door touches exactly one column
+  // on the caller's own user row. It reveals nothing about the agency and
+  // nothing about any other account.
+  "POST /api/auth/language": "AUTH",
   "POST /api/auth/logout": "AUTH",
 
   // ── the client's own world (every read fenced by the caller's account set) ──

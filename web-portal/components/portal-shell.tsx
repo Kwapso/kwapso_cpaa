@@ -31,6 +31,8 @@ import { useRealtime } from "@shared/web/realtime"
 import { clearAllFormDrafts } from "@shared/web/use-form-draft"
 import { clearCache } from "@shared/web/store"
 import { reportError } from "@shared/web/log"
+import { LanguageProvider } from "@shared/web/language"
+import { LanguageMenu } from "@shared/web/language-menu"
 import { auth } from "@/lib/api"
 import { applyLivePing, PORTAL_SUBSCRIPTIONS, replayAfterReconnect } from "@/lib/live-resources"
 import { usePortalSession, type PortalSession } from "@/lib/session"
@@ -131,6 +133,10 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
   }
 
   return (
+    // The whole portal reads one language: the header's own picker, the three
+    // screens, and every dialog opened from them. `session.user.language` is
+    // already resolved by the time this paints, so there is no flash of English.
+    <LanguageProvider value={session.user?.language}>
     <div className="flex min-h-[100svh] flex-col">
       <header className="bg-background/80 sticky top-0 z-30 border-b backdrop-blur">
         <div className="mx-auto flex w-full max-w-3xl items-center gap-2 px-5 py-3">
@@ -141,6 +147,11 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
             onSwitching={setSwitching}
           />
           <div className="flex-1" />
+          {/* Beside the light/dark toggle, not behind a fourth nav entry: the
+           * three destinations below are fixed by design, and a language is the
+           * same class of thing as a theme — a personal display preference,
+           * wanted from every screen, about nothing in the client's own data. */}
+          <LanguageMenu save={(lang) => auth.setLanguage(lang)} />
           <ModeToggle />
           <Button variant="ghost" size="icon" aria-label="Sign out" onClick={() => void signOut()}>
             <LogOut className="size-3.5" />
@@ -190,6 +201,7 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
         </div>
       </nav>
     </div>
+    </LanguageProvider>
   )
 }
 

@@ -11,6 +11,8 @@ export type UserRow = {
   image_url: string | null
   onboarding_completed_at: string | null
   current_team_id: string | null
+  /** null until this person picks one; reads as English (shared/i18n.ts). */
+  language: string | null
   created_at: string
   updated_at: string
   deactivated_at: string | null
@@ -32,6 +34,7 @@ export function toSessionUser(row: UserRow & { team_pin?: string | null }): Sess
     onboardingComplete: row.onboarding_completed_at !== null,
     currentTeamId: row.current_team_id ?? null,
     pinnedTeamId: row.team_pin ?? null,
+    language: row.language ?? null,
   }
 }
 
@@ -70,6 +73,9 @@ export async function findOrCreateUserByEmail(
     image_url: null,
     onboarding_completed_at: null,
     current_team_id: null,
+    // Never chosen. Reads as English, and stays distinguishable from somebody
+    // who actively picked English (0024_user_language.sql).
+    language: null,
     created_at: now,
     updated_at: now,
     deactivated_at: null,

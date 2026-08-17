@@ -27,6 +27,46 @@ export type ProfileInput = {
   imageDataUrl?: string
 }
 
+/** SET THE LANGUAGE THIS PERSON READS kwapso IN.
+ *
+ * Its own function, and its own door, rather than a fourth field on the profile
+ * form above. Two reasons, and both are about failure rather than tidiness:
+ *
+ *   • `updateProfile` REFUSES without a first and last name. A person choosing
+ *     Spanish has not asked to be told their name is missing, and a half-
+ *     onboarded person would be unable to change language at all.
+ *   • Riding on the profile form would mean the switcher posts the name back
+ *     alongside the language. With two tabs open that is a lost update: the tab
+ *     that switched language would quietly restore whatever name it loaded with.
+ *
+ * `language` is already proven to be one of LANGUAGES at the door (R20), so this
+ * writes it plainly. The publish is the same identity fan-out a name change
+ * makes: the person's OTHER devices re-pull `me` and re-render in the new
+ * language without a reload. Nobody else's screen changes, because nobody else
+ * reads it. */
+export async function setLanguage(
+  env: Env,
+  user: UserRow,
+  language: string
+): Promise<{ user: ReturnType<typeof toSessionUser> }> {
+  // R17: the current-language predicate rides the UPDATE. Choosing the language
+  // you already read in moves zero rows, so it writes no history and sends no
+  // ping — a switcher somebody clicks twice is silent the second time.
+  const result = await env.DB.prepare(
+    "UPDATE users SET language = ?, updated_at = ? WHERE id = ? AND COALESCE(language, '') <> ?"
+  )
+    .bind(language, new Date().toISOString(), user.id, language)
+    .run()
+
+  if (result.meta.changes > 0)
+    await publishUserChange(env, user.id, "profile", user.id, "edit")
+
+  const updated = await env.DB.prepare("SELECT * FROM users WHERE id = ?")
+    .bind(user.id)
+    .first<UserRow>()
+  return { user: toSessionUser(updated as UserRow) }
+}
+
 export async function updateProfile(
   env: Env,
   user: UserRow,

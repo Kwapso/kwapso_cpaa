@@ -392,6 +392,10 @@ export const PORTAL_VISIBLE_WRITES: Record<string, { fence: string | null; why: 
     fence: null,
     why: "writes the caller's own name and photo on the GLOBAL user row — their own record, reached through no id but their session's.",
   },
+  "POST /api/auth/language": {
+    fence: null,
+    why: "writes ONE column on the caller's own global user row — which language they read kwapso in — reached through no id but their session's, exactly as the profile door above. There is no account in the question at all: a language is a fact about a reader, not about a company, so there is no fence for it to resolve and nothing another account could learn from it. The value it accepts is one of four the code declares (shared/i18n.ts), so the body cannot carry a surprise either.",
+  },
   "POST /api/auth/logout": {
     fence: null,
     why: "ends the caller's own session; there is no record to be fenced from.",

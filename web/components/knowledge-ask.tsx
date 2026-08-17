@@ -49,6 +49,7 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { FileText, Search } from "lucide-react"
 
 import type { KnowledgeAnswer } from "@shared/types"
+import { useT } from "@shared/web/language"
 import { AgentMarkdown } from "@/components/agent-markdown"
 import { ApiFailure, content } from "@/lib/api"
 
@@ -59,6 +60,7 @@ export function KnowledgeAsk({ onOpenSource }: { onOpenSource: (sourceId: string
   // editing the box would silently re-label an answer that is still about the
   // old question.
   const [answer, setAnswer] = React.useState<KnowledgeAnswer | null>(null)
+  const t = useT()
 
   async function ask(e: React.FormEvent) {
     e.preventDefault()
@@ -107,9 +109,18 @@ export function KnowledgeAsk({ onOpenSource }: { onOpenSource: (sourceId: string
           <p className="text-muted-foreground text-xs">{answer.reason}</p>
 
           {!answer.found ? (
-            // The seam's own sentence, word for word. Not softened, not
-            // supplemented, and above all not replaced by a guess (R23).
-            <p className="text-sm">{answer.message}</p>
+            // R23's decision, unchanged: `found` is false, so nothing is shown
+            // that could be mistaken for an answer and nothing is guessed.
+            //
+            // But the seam's `message` is written for the ASSISTANT — "Say so
+            // plainly, do not answer from memory" is an instruction to a model,
+            // and it has been rendered to a person on this screen since the
+            // screen was built. Nobody noticed while it was English and everyone
+            // would notice in German. So the seam keeps its sentence for the
+            // model, and the human reading this gets a human one, in their own
+            // language. The FACT both report is identical and comes from the
+            // same `found`.
+            <p className="text-sm">{t("The knowledge base has nothing on this.")}</p>
           ) : (
             <>
               <div className="flex flex-col gap-4">

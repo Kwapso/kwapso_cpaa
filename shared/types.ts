@@ -26,6 +26,16 @@ export type SessionUser = {
    * with `/api/auth/me`, which is how a downstream worker can tell a token's call
    * from a person's without inventing a header a browser could also send. */
   pinnedTeamId: string | null
+  /** The language this person reads kwapso in, or null if they never chose.
+   *
+   * It rides on the session for the same reason `currentTeamId` does: every
+   * worker already resolves the caller through `whoAmI`, so a refusal message,
+   * an email and the assistant's prose can all be composed in the reader's own
+   * language without a single door looking it up — and none of them can disagree
+   * about it. Null means English (shared/i18n.ts `toLanguage`), kept distinct
+   * from a deliberate choice of English so that only the un-chosen could ever be
+   * guessed at from a browser header. */
+  language: string | null
 }
 
 /** One team as the tenancy worker lists them for the signed-in person. */

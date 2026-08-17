@@ -43,6 +43,7 @@ import { InvitationsPanel, useReceivedInvites } from "@/components/invitations"
 import { ProfileDialog } from "@/components/profile-dialog"
 import { auth } from "@/lib/api"
 import { formatDateTime } from "@shared/web/format"
+import { LanguageSection } from "@shared/web/language-section"
 import { personName, personInitials, letterMark } from "@/lib/identity"
 import { softNavigate } from "@/lib/nav"
 import { useCached } from "@shared/web/store"
@@ -119,6 +120,12 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
           ]}
         />
       </section>
+
+      {/* Above account activity, below the profile: language is a setting
+       * somebody changes once and then forgets, but they have to be able to FIND
+       * it while reading a language they do not understand — so it sits high,
+       * and its own control shows the four flags rather than hiding them. */}
+      <LanguageSection save={(lang) => auth.setLanguage(lang)} />
 
       <section className="animate-rise flex flex-col gap-3">
         <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Account activity</h2>

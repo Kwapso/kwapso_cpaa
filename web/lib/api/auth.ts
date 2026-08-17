@@ -15,6 +15,7 @@ import type {
   ActivityItem,
   SessionUser,
 } from "@shared/types"
+import type { Language } from "@shared/i18n"
 import { api } from "@shared/web/api"
 
 export const auth = {
@@ -54,6 +55,15 @@ export const auth = {
     api<{ user: SessionUser }>("/api/auth/profile", {
       method: "POST",
       body: JSON.stringify(input),
+    }),
+
+  /** The language this person reads kwapso in. Its own door rather than a field
+   * on updateProfile: a language change must not be refused because a name is
+   * missing, and must not post a name back (a lost update with two tabs open). */
+  setLanguage: (language: Language) =>
+    api<{ user: SessionUser }>("/api/auth/language", {
+      method: "POST",
+      body: JSON.stringify({ language }),
     }),
 
   /** Change email, step 1: send a 6-digit code to the NEW address (inbox only —

@@ -23,6 +23,7 @@ import type {
   SessionUser,
   Todo,
 } from "@shared/types"
+import type { Language } from "@shared/i18n"
 import type { SavingsView } from "@shared/workers/savings"
 // The plumbing — one fetch wrapper, one error class, one paged shape — is shared
 // with the agency app (shared/web/api.ts). Only the DOOR LIST below is the
@@ -55,6 +56,11 @@ export const auth = {
   /** First visit only: your name (and a photo if you'd like one). */
   updateProfile: (input: { firstName: string; lastName: string; imageDataUrl?: string }) =>
     api<{ user: SessionUser }>("/api/auth/profile", post(input)),
+  /** The language this contact reads their own portal in. On the gateway's
+   * allow-list: it touches one column on the caller's own user row and says
+   * nothing about the agency or about any other account. */
+  setLanguage: (language: Language) =>
+    api<{ user: SessionUser }>("/api/auth/language", post({ language })),
   logout: () => api<{ ok: true }>("/api/auth/logout", { method: "POST" }),
 }
 
