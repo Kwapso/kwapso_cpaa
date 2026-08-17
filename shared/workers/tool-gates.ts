@@ -166,6 +166,9 @@ export const TOOL_GATES: Record<string, string> = {
   set_account_rate_active: "commercials:delete",
   create_internal_rate: "commercials:create",
   update_internal_rate: "commercials:edit",
+  // One tool for add / re-price / retire, so one gate: setting a price IS an
+  // edit of the card whichever of the three it turns out to be.
+  set_role_rate: "commercials:edit",
   set_internal_rate_active: "commercials:delete",
   // GOOGLE. Every write through somebody's own connection is `google:edit` —
   // "change something in the world you connected" — because `create` on this

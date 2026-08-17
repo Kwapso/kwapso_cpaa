@@ -512,6 +512,7 @@ export const PORTAL_ACTIVITY_FENCE: Record<string, { fence: "account" | null; wh
   process_comments: { fence: null, why: "the conversation itself is fenced and readable; its history would name the staff author of every line, which the ticket thread already withholds" },
   account_rates: { fence: null, why: "who set a client's price, and what it was before — the agency's own commercial record, even about their own rate" },
   internal_rates: { fence: null, why: "what our own hour costs. The one figure SCOPE says a client must never see under any flag, ever — its history least of all (R24)" },
+  internal_role_rates: { fence: null, why: "what an hour of a ROLE is worth — the second internal rate card, and the number an app's money figure is computed from. The same ruling as the line above it, for the same reason: a client may not see what we think an hour of anybody's time costs, and a history line saying we re-priced it is the same disclosure spread over time (R24)" },
 
   // THE WORK ENGINE. Not "a client may not see enough of this" — a client may
   // not see ANY of it, and the rows themselves are already refused at every door
@@ -587,6 +588,10 @@ export const PORTAL_ACTIVITY_EXEMPT: Record<string, string> = {
  * table a worker writes that is neither here nor exempt turns the build red —
  * a table the feed cannot NAME is a table it cannot withhold. */
 export const ACTIVITY_GATE_MAP: Record<string, string> = {
+  // What an hour of a ROLE costs (8.13). The same module as the two rate cards
+  // it sits beside: `commercials` is the right that decides whether a person may
+  // see money at all, and a role's price is money about us.
+  internal_role_rates: "commercials",
   help: "help",
   selectable_data: "selectable_data",
   member_roles: "member_roles",
@@ -885,6 +890,8 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
     "one source's kind, compartment, who may read it, how many pieces it was cut into and when it was last indexed — one record, not a collection.",
   "app-detail.overview":
     "one system's own fields — whose it is, its stage, the four paragraphs of context, who is on it from both sides, and its address. One record, not a collection. Its five collection tabs (sprints, stories, process maps, meetings, tickets) and its activity tab each carry a server count.",
+  "app-detail.value":
+    "the hours this app gives back every month and what they are worth at the rate of the role that used to spend them (8.13). An arithmetic over the app's process maps, drilled process by process — the lines are the sum's own working, not a collection of records, and a badge over them would be counting the number of terms in an addition.",
   "app-detail.knowledge":
     "the knowledge base asked IN CONTEXT (8.9): a question box that already knows which system it is about, and the passages that answer it. Retrieval, not a collection — there is no set of rows to count, and a badge over it would be counting the whole base.",
   "process-detail.overview":

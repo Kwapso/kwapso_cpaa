@@ -431,6 +431,18 @@ export function marginKey(accountId: string): string {
 }
 /** The agency's own cost card — team-wide, because an internal rate is a fact
  * about us and not about any client. */
+/** What an hour of each ROLE costs (8.13) — one small settled list, team-wide,
+ * read whole on the internal rates screen. */
+export function roleRatesKey(teamId: string): string {
+  return `role-rates:${teamId}`
+}
+
+/** What ONE app has given back — hours and money. Its own key per app, because
+ * it is read on that app's record and nowhere else. */
+export function appMoneyKey(appId: string): string {
+  return `app-money:${appId}`
+}
+
 export function internalRatesKey(teamId: string): string {
   return `internal-rates:${teamId}`
 }
@@ -799,6 +811,12 @@ export const SIMPLE_INVALIDATIONS: Record<string, (teamId: string) => string[]> 
   // the margin panel closes that itself by re-reading when the rate card it also
   // shows changes underneath it (see margin-panel.tsx).
   internal_rates: (t) => [internalRatesKey(t)],
+  // The ROLE rate card, beside it and for the same reason: it is one small
+  // settled list read whole on one screen, so a coarse drop is the whole of the
+  // answer. The per-app money it feeds is keyed by app and cannot be enumerated
+  // from here — that panel re-reads when the card it is computed from changes,
+  // exactly as the margin panel does.
+  role_rates: (t) => [roleRatesKey(t)],
   // The rota has no list of its own: it is one line above the ticket list saying
   // whose week it is, read together with the backlog it is about. A ping drops
   // both, because the answer to "is anything sitting?" moves with the answer to

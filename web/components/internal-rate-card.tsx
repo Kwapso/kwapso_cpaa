@@ -29,6 +29,7 @@ import * as React from "react"
 
 import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
+import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
@@ -44,10 +45,10 @@ import {
 } from "@kwapso/ui/registry/primitives/alert-dialog/alert-dialog"
 import { Pencil, Plus, Power } from "lucide-react"
 
-import type { InternalRate } from "@shared/types"
+import type { InternalRate, RoleRate } from "@shared/types"
 import { RateFormDialog, type RateFormValues } from "@/components/rate-form-dialog"
 import { ApiFailure, tenancy } from "@/lib/api"
-import { internalRatesKey, totalKey } from "@/lib/live-resources"
+import { internalRatesKey, roleRatesKey, totalKey } from "@/lib/live-resources"
 import { usePermissions } from "@/lib/perms"
 import { rateText } from "@shared/web/money"
 import { primeCache, useCached } from "@shared/web/store"
@@ -289,6 +290,182 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* THE ROLE RATE CARD, on the same screen (8.13) — see its own header. */}
+      <RoleRateCard teamId={teamId} />
+    </div>
+  )
+}
+
+/* ------------------------- what a ROLE's hour is worth --------------------- */
+
+/** THE THIRD RATE CARD (CHECKLIST 8.13) — what an hour of a KIND OF PERSON is
+ * worth, which is what Aurora's savings model multiplies the hours saved by.
+ *
+ * It sits on this screen and not its own, beside the card it is a sibling of:
+ * both are INTERNAL and both are one small settled list. R24's fourth clause
+ * forbids one component from reading the internal card AND the account card,
+ * and it is right to — but two internal cards are one screen's worth of the
+ * agency's own housekeeping, and splitting them would have made "what do we pay
+ * for an hour?" two destinations.
+ *
+ * ONE FORM, ONE DOOR, ALL THREE MOVES. The ROLE is the key, so typing a role
+ * that already has a price re-prices it, a new one adds it, and Retire turns it
+ * off. There is no edit dialog because there is nothing to edit that is not the
+ * two fields already on the screen.
+ */
+export function RoleRateCard({ teamId }: { teamId: string }) {
+  const t = useT()
+  const ratesQ = useCached<RoleRate[]>(roleRatesKey(teamId), () =>
+    tenancy.roleRates().then((r) => {
+      // R16: the door's exact COUNT(*), primed by the fetch that loaded the rows.
+      primeCache(totalKey("role_rates", teamId), r.total)
+      return r.roleRates
+    })
+  )
+  const { can } = usePermissions(teamId)
+  const canEdit = can("commercials", "edit")
+
+  const [role, setRole] = React.useState("")
+  const [amount, setAmount] = React.useState("")
+  const [busy, setBusy] = React.useState(false)
+
+  const refresh = React.useCallback(async () => {
+    const r = await tenancy.roleRates()
+    primeCache(totalKey("role_rates", teamId), r.total)
+    primeCache(roleRatesKey(teamId), r.roleRates)
+  }, [teamId])
+
+  async function set(roleName: string, centsPerHour: number, active: boolean, done: string) {
+    setBusy(true)
+    try {
+      await tenancy.setRoleRate({ roleName, centsPerHour, active })
+      await refresh()
+      toast.success(done)
+      return true
+    } catch (err) {
+      toast.error(err instanceof ApiFailure ? err.message : "Couldn't save that rate.")
+      return false
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (ratesQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the role rates.")}</p>
+  if (ratesQ.data === undefined) return <Skeleton variant="list" lines={3} />
+  const rates = ratesQ.data
+  // Whole units in, whole cents out — the same conversion every price on this
+  // screen makes, so nothing can be a hundred times wrong in one place only.
+  const cents = Math.round(Number(amount.trim()) * 100)
+  const ready = role.trim() !== "" && Number.isFinite(cents) && cents >= 0
+
+  return (
+    <div className="flex flex-col gap-4 border-t pt-6">
+      <div className="min-w-0">
+        <h2 className="text-lg font-semibold tracking-tight">{t("Role rates")}</h2>
+        <p className="text-muted-foreground mt-1 text-sm">
+          {t("What an hour of each role is worth — the bookkeeper, the dispatcher, whoever actually does the work a process describes. This is what turns hours given back into money given back. Ours alone: it never appears in a client's portal.")}
+        </p>
+      </div>
+
+      {rates.length === 0 ? (
+        <p className="text-muted-foreground text-sm">
+          {t("No role rates yet. Until one is set, an app's hours are reported without a money figure beside them.")}
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-1.5">
+          {rates.map((r) => (
+            <li
+              key={r.id}
+              className={`border-border/60 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 ${
+                r.active ? "" : "opacity-60"
+              }`}
+            >
+              <span className="min-w-0 flex-1 truncate text-sm font-medium">{r.roleName}</span>
+              <span className="text-sm tabular-nums">{rateText(r.centsPerHour, null)}</span>
+              {!r.active && (
+                <Badge variant="outline" className="text-muted-foreground text-[10px]">
+                  {t("Retired")}
+                </Badge>
+              )}
+              {canEdit && (
+                <span className="ml-auto flex shrink-0 gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => {
+                      setRole(r.roleName)
+                      setAmount(String(r.centsPerHour / 100))
+                    }}
+                    className="gap-1.5"
+                  >
+                    <Pencil className="size-3.5" />
+                    {t("Edit")}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() =>
+                      void set(
+                        r.roleName,
+                        r.centsPerHour,
+                        !r.active,
+                        r.active ? "Rate retired." : "Rate restored."
+                      )
+                    }
+                    className={r.active ? "text-destructive hover:text-destructive gap-1.5" : "gap-1.5"}
+                  >
+                    <Power className="size-3.5" />
+                    {r.active ? t("Retire") : t("Restore")}
+                  </Button>
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {canEdit && (
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex min-w-40 flex-1 flex-col gap-1 text-sm">
+            {t("Role")}
+            <Input
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              placeholder={t("e.g. Bookkeeper")}
+              disabled={busy}
+            />
+          </label>
+          <label className="flex w-32 flex-col gap-1 text-sm">
+            {t("An hour")}
+            <Input
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              inputMode="decimal"
+              placeholder="45"
+              disabled={busy}
+            />
+          </label>
+          <Button
+            size="sm"
+            disabled={busy || !ready}
+            onClick={() =>
+              void set(role.trim(), cents, true, "Rate saved.").then((ok) => {
+                if (ok) {
+                  setRole("")
+                  setAmount("")
+                }
+              })
+            }
+            className="gap-1.5"
+          >
+            {busy ? <Spinner /> : <Plus className="size-4" />}
+            {t("Save")}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

@@ -55,6 +55,9 @@
 //   POST /api/tenancy/rates                -> add a rate
 //   POST /api/tenancy/rates/update         -> edit a rate
 //   POST /api/tenancy/rates/active         -> retire / restore a rate
+//   GET  /api/tenancy/role-rates           -> what an hour of each ROLE costs (internal)
+//   POST /api/tenancy/role-rates           -> set or retire a role's rate (internal)
+//   GET  /api/tenancy/app-money            -> one app's hours and what they're worth (internal)
 //   GET  /api/tenancy/internal-rates       -> what our own hour costs (internal)
 //   POST /api/tenancy/internal-rates       -> add an internal rate
 //   POST /api/tenancy/internal-rates/update-> edit an internal rate
@@ -164,7 +167,10 @@ import {
 import {
   getAccountRates,
   getInternalRates,
+  getAppMoney,
   getMargin,
+  getRoleRates,
+  postSetRoleRate,
   postAccountRateActive,
   postCreateAccountRate,
   postCreateInternalRate,
@@ -281,6 +287,12 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/tenancy/internal-rates/update": { handler: postUpdateInternalRate, kind: "mutation" },
   "POST /api/tenancy/internal-rates/active": { handler: postInternalRateActive, kind: "mutation" },
   "GET /api/tenancy/margin": { handler: getMargin, kind: "read" },
+  // WHAT A ROLE'S HOUR COSTS, and what one app gave back (CHECKLIST 8.13). Both
+  // internal: the money is computed from the role rate card, so neither is on
+  // the portal gateway's surface and both refuse a client login (R24).
+  "GET /api/tenancy/role-rates": { handler: getRoleRates, kind: "read" },
+  "POST /api/tenancy/role-rates": { handler: postSetRoleRate, kind: "mutation" },
+  "GET /api/tenancy/app-money": { handler: getAppMoney, kind: "read" },
   // admin/* are ops-only (roll migrations, relocate a module's DB) — they touch
   // no client-visible app row, so they broadcast nothing.
   "POST /api/tenancy/admin/migrate-teams": { handler: migrateTeams, kind: "housekeeping" },

@@ -27,10 +27,13 @@ import {
   updateAccountRate,
 } from "../lib/rates"
 import {
+  appMoneyBack,
   createInternalRate,
   listInternalRates,
+  listRoleRates,
   readMargin,
   setInternalRateActive,
+  setRoleRate,
   updateInternalRate,
 } from "../lib/internal-money"
 import type { Env } from "../env"
@@ -172,4 +175,63 @@ export async function getMargin(request: Request, env: Env): Promise<Response> {
   const accountId = queryText(new URL(request.url).searchParams.get("accountId"), "Account")
   if (!accountId) return fail(400, "invalid_input", "Which account?")
   return json(await readMargin(cfg, guard, accountId))
+}
+
+// ── what an hour of a ROLE costs, and what one app gave back ────────────────
+//
+// Three doors, and every one of them refuses a client login like the nine above.
+// R24 derives that obligation from the file they call into rather than from this
+// comment: `listRoleRates`, `setRoleRate` and `appMoneyBack` are exports of
+// lib/internal-money.ts, so the law walks these handlers and fails the build if
+// any of them forgets.
+
+/** GET /api/tenancy/role-rates — what an hour of each role costs (8.13). */
+export async function getRoleRates(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "commercials", "read")
+  await refusePortalCaller(cfg, guard)
+  const { rows, total } = await listRoleRates(cfg, guard)
+  return json({ roleRates: rows, total })
+}
+
+/** POST /api/tenancy/role-rates — set what a role's hour costs, or retire it.
+ *
+ * ONE door for add, re-price and retire, because the ROLE is the key and all
+ * three are the same sentence about it. See setRoleRate for why that is the lean
+ * shape rather than a shortcut. */
+export async function postSetRoleRate(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "commercials", "edit")
+  await refusePortalCaller(cfg, guard)
+  if (typeof body.active !== "boolean") return fail(400, "invalid_input", "Live rate, or retired?")
+  const { id, moved } = await setRoleRate(cfg, guard, actor, {
+    roleName: requireText(body.roleName, "Role", TEXT_LIMITS.short),
+    centsPerHour: centsPerHour(Number(body.centsPerHour)),
+    active: body.active,
+  })
+  // R17 — a re-save that changed nothing moves no row, so it rings no bell.
+  if (moved) await publishChange(env, guard.teamId, "role_rates", id)
+  return json({ id })
+}
+
+/** GET /api/tenancy/app-money?appId= — the hours one app gives back and what
+ * they are worth (8.13). INTERNAL: the money half is computed from the role rate
+ * card, so this door is agency-only and the portal gateway does not open it. The
+ * HOURS half a client may see — that is `GET /api/tenancy/value`, which is a
+ * different door answering a different question with no price in it. */
+export async function getAppMoney(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "commercials", "read")
+  const scope = await refusePortalCaller(cfg, guard)
+  const appId = requireText(queryText(new URL(request.url).searchParams.get("appId"), "App"), "App", TEXT_LIMITS.short)
+  const money = await appMoneyBack(cfg, guard, scope, appId)
+  // SPELLED OUT rather than spread, and that is R27 rather than fussiness: the
+  // contract a tool description promises is derived from the literal a door
+  // returns, so `return json(theObject)` is a door whose response nothing can
+  // read. Naming the six fields here is what makes the promise checkable.
+  return json({
+    appId: money.appId,
+    savedSecondsPerMonth: money.savedSecondsPerMonth,
+    moneyCentsPerMonth: money.moneyCentsPerMonth,
+    unpricedProcesses: money.unpricedProcesses,
+    lines: money.lines,
+    caption: money.caption,
+  })
 }

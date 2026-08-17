@@ -22,9 +22,11 @@ import { logActivity, describeChanges, type Actor } from "@shared/workers/activi
 import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { LIST_HARD_CAP } from "@shared/workers/limits"
-import type { InternalRate } from "@shared/types"
+import type { AppMoneyBack, InternalRate, RoleRate } from "@shared/types"
 import { GuardError, type MemberGuard } from "./permissions"
 import { workEngineFacts } from "./work-engine"
+import { listSavings } from "./processes"
+import type { AccountScope } from "@shared/workers/account-scope"
 
 /** One line of the margin's arithmetic: a kind of work, the time logged against
  * it, the rate applied, and what that came to. The drill-down for a number the
@@ -347,5 +349,225 @@ async function internalRateOrThrow(
     centsPerHour: rows[0].cents_per_hour,
     currency: rows[0].currency,
     isDefault: rows[0].is_default === 1,
+  }
+}
+
+/* ------------- what a ROLE's hour costs, and the app it pays for ----------- */
+//
+// AURORA'S MODEL FOR "HOURS AND MONEY GIVEN BACK, PER APP" (CHECKLIST 8.13),
+// settled over the owner's "client rate times hours saved". Her sentence: for
+// each process, record WHICH ROLE does it; store a rate per role; the figure is
+// the hours that role no longer spends, times its rate. Before minus after.
+//
+// IT IS A THIRD RATE CARD AND IT BELONGS IN THIS FILE, which is the whole of
+// R24's defence. `account_rates` is what a client is CHARGED and lives in
+// rates.ts behind the account fence; `internal_rates` is what a KIND OF WORK
+// costs us; this is what a ROLE's hour costs. All three are prices, only two of
+// them are ours, and the one thing that reliably keeps ours off the client's
+// side is that the file they live in is a file no portal-reachable path
+// imports. A condition can be inverted; an import cannot be forgotten.
+//
+// WHY THE ROLES ARE NOT `member_roles`. The person who does a client's invoicing
+// is THEIR bookkeeper, not one of our logins. So a role here is free text
+// against the team's own vocabulary, and the rate is what an hour of that
+// person's time is worth — which is exactly the number that makes "we gave four
+// hours a month back" into a figure somebody can put in a proposal.
+
+/** The team's role rate card. No account column and no fence, for the same
+ * reason the internal rate card has neither: it is a fact about the work, not
+ * about any one client. The doors in front of it refuse a portal caller. */
+export async function listRoleRates(
+  cfg: D1Rest,
+  guard: MemberGuard
+): Promise<{ rows: RoleRate[]; total: number }> {
+  const [rows, counted] = await Promise.all([
+    d1Query<{
+      id: string
+      role_name: string
+      cents_per_hour: number
+      deactivated_at: string | null
+      created_at: string
+      creator_name: string | null
+      updated_at: string | null
+      editor_name: string | null
+    }>(
+      cfg,
+      guard.databaseId,
+      // R14 hard cap — kinds of person, not hours.
+      `SELECT id, role_name, cents_per_hour, deactivated_at, created_at, creator_name,
+              updated_at, editor_name
+         FROM internal_role_rates ORDER BY (deactivated_at IS NULL) DESC, role_name ASC
+        LIMIT ${LIST_HARD_CAP}`,
+      []
+    ),
+    // R16 — the exact server total.
+    d1Query<{ n: number }>(cfg, guard.databaseId, "SELECT COUNT(*) AS n FROM internal_role_rates", []),
+  ])
+  return {
+    rows: rows.map((r) => ({
+      id: r.id,
+      roleName: r.role_name,
+      centsPerHour: r.cents_per_hour,
+      active: r.deactivated_at == null,
+      createdAt: r.created_at,
+      createdByName: r.creator_name,
+      updatedAt: r.updated_at,
+      editedByName: r.editor_name,
+    })),
+    total: counted[0]?.n ?? 0,
+  }
+}
+
+/** SET WHAT A ROLE'S HOUR COSTS — one door for all three moves, and that is the
+ * lean decision rather than an oversight. A rate card of `{role, price}` has no
+ * "edit" that is not "say what it is now": the ROLE is the key, so naming one
+ * that exists re-prices it, naming one that does not adds it, and `active:false`
+ * retires it. Three doors would have been three gates, three tools and three
+ * refusals for one sentence.
+ *
+ * Idempotent (R17): re-sending the same price moves the row to the state it is
+ * already in, and re-retiring a retired rate returns without a second history
+ * line. The current-state predicate rides the UPDATE rather than a read before
+ * it, so two people saving at once cannot both write. */
+export async function setRoleRate(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor,
+  input: { roleName: string; centsPerHour: number; active: boolean }
+): Promise<{ id: string; moved: boolean }> {
+  const now = new Date().toISOString()
+  const existing = await d1Query<{ id: string; cents_per_hour: number; deactivated_at: string | null }>(
+    cfg,
+    guard.databaseId,
+    // R14: the role IS the key, so at most one row can come back.
+    "SELECT id, cents_per_hour, deactivated_at FROM internal_role_rates WHERE role_name = ? LIMIT 1",
+    [input.roleName]
+  )
+  const before = existing[0]
+  if (!before) {
+    const id = ulid()
+    await d1Query(
+      cfg,
+      guard.databaseId,
+      `INSERT INTO internal_role_rates (id, role_name, cents_per_hour, created_at, creator_id,
+          creator_email, creator_name)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [id, input.roleName, input.centsPerHour, now, actor.id, actor.email, actor.name]
+    )
+    if (!input.active)
+      await d1Query(
+        cfg,
+        guard.databaseId,
+        `UPDATE internal_role_rates SET deactivated_at = ?, deactivator_id = ?, deactivator_email = ?,
+            deactivator_name = ? WHERE id = ? AND deactivated_at IS NULL`,
+        [now, actor.id, actor.email, actor.name, id]
+      )
+    await logActivity(cfg, guard.databaseId, actor, {
+      type: "Role rate set",
+      description: `${actor.name} priced an hour of ${input.roleName}`,
+      relatedTable: "internal_role_rates",
+      relatedRowId: id,
+    })
+    return { id, moved: true }
+  }
+  // R17 — nothing to say when nothing changed. Both facts in one predicate, so
+  // a re-save of an unchanged rate writes no row and rings no bell.
+  const unchanged = before.cents_per_hour === input.centsPerHour && (before.deactivated_at == null) === input.active
+  if (unchanged) return { id: before.id, moved: false }
+  await d1Query(
+    cfg,
+    guard.databaseId,
+    input.active
+      ? `UPDATE internal_role_rates SET cents_per_hour = ?, deactivated_at = NULL, deactivator_id = NULL,
+            deactivator_email = NULL, deactivator_name = NULL, updated_at = ?, editor_id = ?,
+            editor_email = ?, editor_name = ? WHERE id = ?`
+      : `UPDATE internal_role_rates SET cents_per_hour = ?, deactivated_at = ?, deactivator_id = ?,
+            deactivator_email = ?, deactivator_name = ?, updated_at = ?, editor_id = ?,
+            editor_email = ?, editor_name = ? WHERE id = ?`,
+    input.active
+      ? [input.centsPerHour, now, actor.id, actor.email, actor.name, before.id]
+      : [
+          input.centsPerHour,
+          now,
+          actor.id,
+          actor.email,
+          actor.name,
+          now,
+          actor.id,
+          actor.email,
+          actor.name,
+          before.id,
+        ]
+  )
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: input.active ? "Role rate set" : "Role rate retired",
+    description: `${actor.name} ${input.active ? "priced" : "retired the price of"} an hour of ${input.roleName}`,
+    relatedTable: "internal_role_rates",
+    relatedRowId: before.id,
+  })
+  return { id: before.id, moved: true }
+}
+
+/** WHAT ONE APP HAS GIVEN BACK — hours, and what those hours are worth (8.13).
+ *
+ * The hours are `listSavings`' own arithmetic, unchanged and un-recomputed: the
+ * baseline minus the latest, step by step, rolled up per process. This adds the
+ * one thing that file cannot know without importing a price — WHOSE hours they
+ * were, and what an hour of that person is worth.
+ *
+ * A PROCESS WITH NO ROLE, OR A ROLE WITH NO LIVE RATE, CONTRIBUTES ZERO MONEY
+ * AND ITS FULL HOURS. That asymmetry is deliberate and it is the honest one: the
+ * time saved is a measurement and it is true whether or not anybody has priced
+ * it, while the money is an inference that needs a number nobody has given yet.
+ * Inventing a default rate would produce a figure that looks the same as a real
+ * one, which is precisely the sort of number that costs a screen its credit.
+ *
+ * R25 rides the object: the caption comes from `listSavings` and is passed on
+ * word for word, because the money is made of the same estimates the hours are.
+ */
+export async function appMoneyBack(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  appId: string
+): Promise<AppMoneyBack> {
+  const [view, roles, rates] = await Promise.all([
+    listSavings(cfg, guard, scope, { appId }),
+    d1Query<{ id: string; role_name: string | null }>(
+      cfg,
+      guard.databaseId,
+      // R14 hard cap — the processes inside one app, which is a bounded set.
+      `SELECT id, role_name FROM processes WHERE app_id = ? AND deactivated_at IS NULL LIMIT ${LIST_HARD_CAP}`,
+      [appId]
+    ),
+    listRoleRates(cfg, guard),
+  ])
+  const roleOf = new Map(roles.map((r) => [r.id, r.role_name]))
+  const priceOf = new Map(rates.rows.filter((r) => r.active).map((r) => [r.roleName, r.centsPerHour]))
+  const app = view.apps[0]
+  const lines = (app?.processes ?? []).map((p) => {
+    const roleName = roleOf.get(p.processId) ?? null
+    const centsPerHour = roleName ? (priceOf.get(roleName) ?? null) : null
+    return {
+      processId: p.processId,
+      name: p.name,
+      roleName,
+      savedSecondsPerMonth: p.savedSecondsPerMonth,
+      centsPerHour,
+      // Rounded ONCE per line, so the lines always add up to the total shown —
+      // the same rule `margin` keeps one function up this file.
+      moneyCentsPerMonth:
+        centsPerHour == null ? null : Math.round((p.savedSecondsPerMonth / 3600) * centsPerHour),
+    }
+  })
+  return {
+    appId,
+    savedSecondsPerMonth: view.savedSecondsPerMonth,
+    moneyCentsPerMonth: lines.reduce((sum, l) => sum + (l.moneyCentsPerMonth ?? 0), 0),
+    /** how many of the lines could not be priced — the screen says so rather
+     * than quietly reporting a smaller number as if it were the whole. */
+    unpricedProcesses: lines.filter((l) => l.moneyCentsPerMonth == null).length,
+    lines,
+    caption: view.caption,
   }
 }

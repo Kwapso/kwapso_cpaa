@@ -157,13 +157,17 @@ export function traceFor(
       return { path: seg(teamId, "tickets"), highlight: "main" }
 
     /* ----------------------------- process maps ----------------------------- */
-    // An APP has no screen of its own — it is the heading a map sits under, and
-    // the filter above the list — so every app write lands on the maps page,
-    // where the new or changed app shows on the rows beneath it.
+    // AN APP HAS ITS OWN SCREEN NOW — it got one on 17 Aug 2026, the same day
+    // process maps stopped being a nav destination, so the old note here ("an
+    // app is the heading a map sits under") sent people to a page that no longer
+    // leads with what they had just changed. A create lands on the list, where
+    // the new tile appears live; an edit lands on the record, because its
+    // people, its context and its work are all on that one screen.
     case "create_app":
+      return { path: seg(teamId, "apps"), highlight: "main" }
     case "update_app":
     case "set_app_active":
-      return { path: seg(teamId, "processes"), highlight: "main" }
+      return { path: `${seg(teamId, "apps")}/${str(input, "id")}`, highlight: "main" }
     // Create → the maps list, where the new map appears live. Everything else →
     // that map's own detail, because its steps, its versions and its
     // conversation are all on one screen, so a change is visible wherever it
@@ -196,6 +200,9 @@ export function traceFor(
     case "create_internal_rate":
     case "update_internal_rate":
     case "set_internal_rate_active":
+    // A ROLE'S price sits on the same card, on the same settings screen, for the
+    // same reason: it is a handful of lines read whole, with no per-row URL.
+    case "set_role_rate":
       return { path: `/t/${teamId}`, highlight: "main" }
 
     /* ----------------------------- the work engine -------------------------- */

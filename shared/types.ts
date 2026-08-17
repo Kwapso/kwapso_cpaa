@@ -859,6 +859,52 @@ export type KnowledgeAnswer = {
 // us to run, what a margin is) is a separate type from anything the client side
 // can ask for — never an optional field on a shared one. See R24.
 
+/** WHAT AN HOUR OF A ROLE COSTS (CHECKLIST 8.13). The third rate card, and the
+ * second INTERNAL one: `AccountRate` is what a client is charged, `InternalRate`
+ * is what a kind of our own work costs us, and this is what an hour of a KIND OF
+ * PERSON is worth — the number Aurora's savings model multiplies hours by.
+ *
+ * Its own type rather than a flag on `InternalRate`, for the reason those two are
+ * already two types: one shape with a discriminator is one wrong filter away
+ * from showing a client a number about us. */
+export type RoleRate = {
+  id: string
+  /** the role, in the team's own words. Free text: the person who does a
+   * client's invoicing is THEIR bookkeeper, not one of our logins. */
+  roleName: string
+  centsPerHour: number
+  active: boolean
+  createdAt: string
+  createdByName: string | null
+  updatedAt: string | null
+  editedByName: string | null
+}
+
+/** WHAT ONE APP HAS GIVEN BACK — hours, and what those hours are worth (8.13).
+ * INTERNAL, always: it is computed from the role rate card, so no client-
+ * reachable path may read it (R24). */
+export type AppMoneyBack = {
+  appId: string
+  savedSecondsPerMonth: number
+  /** the sum of the priced lines only — see `unpricedProcesses`. */
+  moneyCentsPerMonth: number
+  /** how many processes could not be priced, because they name no role or the
+   * role has no live rate. Shown, never hidden: a total that silently left work
+   * out is the sort of number that costs the screen its credit. */
+  unpricedProcesses: number
+  lines: {
+    processId: string
+    name: string
+    roleName: string | null
+    savedSecondsPerMonth: number
+    centsPerHour: number | null
+    moneyCentsPerMonth: number | null
+  }[]
+  /** R25 — the sentence the figure may not be shown without, carried on the
+   * payload so the screen never assembles it. */
+  caption: string
+}
+
 /** An App: the built system, the thing with its own address (SCOPE ch.02). */
 export type AppRow = {
   id: string

@@ -39,6 +39,7 @@ import {
   sliceKey,
 } from "@/components/work-panels"
 import { KnowledgeAsk } from "@/components/knowledge-ask"
+import { AppMoneyPanel } from "@/components/app-money-panel"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, tenancy } from "@/lib/api"
@@ -85,6 +86,10 @@ export function AppDetailScreen({
   const canArchive = can("processes", "delete")
   const canWriteWork = can("work", "create")
   const canReadKnowledge = can("knowledge", "read")
+  // 8.13 — the money half of "what this app gave back" is an INTERNAL figure, so
+  // the tab is behind the right that decides whether a person may see money at
+  // all. The door refuses a client login besides (R24).
+  const canSeeMoney = can("commercials", "read")
   const canReadTickets = can("help", "read")
   // Who can be put on this app (8.10) — the team, from the cache the members
   // screen already fills.
@@ -259,6 +264,20 @@ export function AppDetailScreen({
             },
           ]
         : []),
+      // WHAT IT GIVES BACK (8.13) — hours, and what those hours are worth at the
+      // rate of the role that used to spend them. Not a collection and so not
+      // counted; see RECORD_TAB_COUNT_EXCEPTIONS.
+      ...(canSeeMoney
+        ? [
+            {
+              value: "value",
+              label: t("Value"),
+              icon: CONCEPT_ICON["internal-rates"],
+              badge: "",
+              badgeVariant: "" as const,
+            },
+          ]
+        : []),
       // THE KNOWLEDGE BASE, IN CONTEXT (8.9 + 12.1). Not a collection and so not
       // counted — see RECORD_TAB_COUNT_EXCEPTIONS. What it is instead is the
       // ordinary ask box with THIS record's own details already in the question,
@@ -380,6 +399,7 @@ export function AppDetailScreen({
             )
           if (t.value === "meetings") return <AppMeetingsPanel appId={appId} host={host} />
           if (t.value === "tickets") return <AppTicketsPanel appId={appId} host={host} />
+          if (t.value === "value") return <AppMoneyPanel appId={appId} />
           if (t.value === "knowledge")
             return (
               <KnowledgeAsk

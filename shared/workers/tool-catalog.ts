@@ -1861,6 +1861,41 @@ export const SHARED_TOOLS: SharedTool[] = [
     buildQuery: (i) => `?accountId=${encodeURIComponent(str(i, "accountId"))}`,
     agent: { write: false, summarize: (i) => `Work out the margin on ${accountLabel(i, "accountId")}` },
   },
+  {
+    name: "list_role_rates",
+    summary:
+      "What an hour of each ROLE is worth — the bookkeeper, the dispatcher, whoever actually does a process. INTERNAL: never quote one to a client. This is the third rate card and it answers a different question from the other two: `list_account_rates` is what a client is charged and `list_internal_rates` is what a kind of our own work costs us. Each row carries `roleName`, `centsPerHour` and whether it is still `active`.",
+    binding: "TENANCY", method: "GET", path: "/api/tenancy/role-rates",
+    schema: obj({}),
+    buildQuery: () => "",
+    agent: { write: false, summarize: () => "Read what an hour of each role is worth" },
+  },
+  {
+    name: "set_role_rate",
+    summary:
+      "Set what an hour of one role is worth, by name. The ROLE is the key, so this one tool adds, re-prices and retires: `roleName` names it, `centsPerHour` is WHOLE CENTS an hour (45 euros is 4500), and `active: false` retires it without deleting anything. Re-sending a price that has not changed moves nothing and writes no history. INTERNAL — this number feeds what an app is said to have given back, and it is never shown to a client.",
+    binding: "TENANCY", method: "POST", path: "/api/tenancy/role-rates",
+    schema: obj({ roleName: S, centsPerHour: N, active: B }, ["roleName", "centsPerHour", "active"]),
+    buildBody: (i) => ({
+      roleName: str(i, "roleName"),
+      centsPerHour: typeof i.centsPerHour === "number" ? i.centsPerHour : 0,
+      active: i.active !== false,
+    }),
+    agent: {
+      write: true,
+      confirm: false,
+      summarize: (i) => `Price an hour of ${str(i, "roleName")}`,
+    },
+  },
+  {
+    name: "get_app_value",
+    summary:
+      "What ONE app has given back every month: `savedSecondsPerMonth` (the hours), `moneyCentsPerMonth` (those hours at the rate of the role that used to spend them) and one line per process in `lines`, each naming its `roleName` and `centsPerHour`. `unpricedProcesses` counts the processes that could not be priced because they name no role or the role has no live rate — their HOURS are still in the total and their money is not, and saying so is the point. Always quote `caption` with the figure. INTERNAL: the money half comes from the role rate card, so never repeat it to a client — the hours half on its own is what the client's own value screen shows.",
+    binding: "TENANCY", method: "GET", path: "/api/tenancy/app-money",
+    schema: obj({ appId: S }, ["appId"]),
+    buildQuery: (i) => `?appId=${encodeURIComponent(str(i, "appId"))}`,
+    agent: { write: false, summarize: (i) => `Work out what app ${str(i, "appId")} gives back` },
+  },
 
   /* ------------------- the agency's own housekeeping ------------------------ */
   // Three modules the assistant reaches exactly as a person does — same doors,

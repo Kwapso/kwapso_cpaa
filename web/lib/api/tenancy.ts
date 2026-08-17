@@ -18,6 +18,7 @@ import type {
   AccountRate,
   ActiveContext,
   ActivityItem,
+  AppMoneyBack,
   AppRow,
   InternalRate,
   Invite,
@@ -28,6 +29,7 @@ import type {
   ProcessSummary,
   ReceivedInvite,
   RolePermissions,
+  RoleRate,
   SelectableValue,
   TeamMeta,
   TeamMember,
@@ -364,6 +366,15 @@ export const tenancy = {
     api<{ ok: true }>("/api/tenancy/apps/update", post(input)),
   setAppActive: (id: string, active: boolean) =>
     api<{ ok: true }>("/api/tenancy/apps/active", post({ id, active })),
+
+  /** WHAT AN HOUR OF EACH ROLE IS WORTH, and what one app gives back (8.13).
+   * INTERNAL, both of them: the money is computed from the role rate card, the
+   * doors refuse a client login, and the portal gateway opens neither (R24). */
+  roleRates: () => api<{ roleRates: RoleRate[]; total: number }>("/api/tenancy/role-rates"),
+  /** One door for add, re-price and retire — the role name is the key. */
+  setRoleRate: (input: { roleName: string; centsPerHour: number; active: boolean }) =>
+    api<{ id: string }>("/api/tenancy/role-rates", post(input)),
+  appMoney: (appId: string) => api<AppMoneyBack>(`/api/tenancy/app-money?appId=${enc(appId)}`),
 
   /** R14: a PAGE of process maps (a GROWING collection) — hand `cursor` back from
    * the previous response for the next one; `total` is the exact server count of

@@ -142,7 +142,7 @@ Today it covers:
   - meetings — `list_meetings`
   - process maps and the money — `list_apps`, `list_processes`, `get_process`,
     `list_process_comments`, `read_value`, `list_account_rates`,
-    `list_internal_rates`, `read_margin`
+    `list_internal_rates`, `read_margin`, `list_role_rates`, `get_app_value`
   - the knowledge base — `ask_knowledge`, `list_knowledge_sources`,
     `get_knowledge_status`
   - the agency's own housekeeping — `list_marketing_posts`, `list_brand_assets`,
@@ -178,7 +178,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth —
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **213 doors, 173 with a tool, 40 with a written reason** — the
+  red build. Today: **216 doors, 176 with a tool, 40 with a written reason** — the
   reasons being the team-pin doors (§3.2 below), the client-portal standing doors
   (§3.3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the THREE upload pairs — two media doors and the knowledge base, each a
@@ -187,7 +187,7 @@ Today it covers:
   called because a JSON-RPC request has no body to stream into. Same conclusion,
   two different reasons, both written down — the seven
   Google doors that are a person's own decision, the timesheet correction, one
-  invite's audit trail and the cross-module activity feed. Of the 173, **144 are on THIS surface** and 29 are the in-app assistant's
+  invite's audit trail and the cross-module activity feed. Of the 176, **147 are on THIS surface** and 29 are the in-app assistant's
   alone — the twenty-six Google tools, the two confirm-panel bulk writes and the role
   permission matrix read, each reasoned in §3. Those three numbers are asserted
   against the live census in `workers/mcp/test/filter-parity.test.ts`, so this
@@ -280,8 +280,10 @@ Today it covers:
     that got SLOWER is included and counted; nothing filters one out.
   - rates and margin — `create_account_rate`, `update_account_rate`,
     `set_account_rate_active` (what a client is charged) and `create_internal_rate`,
-    `update_internal_rate`, `set_internal_rate_active` (what our own hour costs us),
-    all needing `commercials:*`. **`read_margin` and `list_internal_rates` answer with
+    `update_internal_rate`, `set_internal_rate_active` (what our own hour costs us) and
+    `set_role_rate` (what an hour of a ROLE is worth — one tool for add, re-price and
+    retire, because the role name is the key), all needing `commercials:*`.
+    **`read_margin`, `list_internal_rates`, `list_role_rates` and `get_app_value` answer with
     the agency's own figures**: a token acts as its owner, and no client login can hold
     a token or be acted for at all, but if you are building a client-facing integration
     on somebody's staff token, these two are the calls not to relay. Law **R24** makes
