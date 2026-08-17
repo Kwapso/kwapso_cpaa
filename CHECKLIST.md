@@ -44,7 +44,7 @@ longer duplicates a value.
 |---|---|---|
 | 2.1 | Ticket types become Question, Issue, Request, Extra, Requirements | TO DO — **CHANGED**: Aurora retires Feedback and Bug. You wanted Feedback kept. This is a "what", so Aurora wins by your own rule |
 | 2.2 | Story types Fix, Feature, Change, and editable in Dropdown values | TO DO |
-| 2.3 | "My tickets" becomes tickets on apps I am staffed to | TO DO — **CHANGED**: you chose "stories assigned to me". A "what", so Aurora wins |
+| 2.3 | "My tickets" becomes tickets on apps I am staffed to | TO DO — **CHANGED**: tickets on apps I am staffed to. Genuinely blocked: nothing records who is staffed to an app yet. That is 8.10, and it unblocks this |
 | 2.4 | "Request behind it" becomes "Tickets" | TO DO |
 | 2.5 | "By when" becomes "Deadline" everywhere | **PART DONE** — done on the task screens; the rest rides the wider rename |
 | 2.6 | The Time page becomes "Work logs" | TO DO |
@@ -92,34 +92,34 @@ longer duplicates a value.
 
 | # | The thing | Status |
 |---|---|---|
-| 5.1 | Sub-tabs by type under All, My and Archived | TO DO |
-| 5.2 | The status becomes a label you cannot click | TO DO |
-| 5.3 | A new "Scheduled" state between Triage and In progress | TO DO |
-| 5.4 | In progress happens by itself when a timer starts on the ticket or a related story | TO DO |
-| 5.5 | Ready happens by itself when every related story closes | TO DO |
-| 5.6 | Resolve is refused until a resolution is written | TO DO |
-| 5.7 | Resolving emails the client automatically | TO DO — **CHANGED**: goes to the raiser AND the app's main stakeholder, Aurora's answer |
-| 5.8 | A ticket must name its app | TO DO |
-| 5.9 | A ticket must name the contact who raised it | TO DO |
-| 5.10 | Several files and several links on a ticket, from both front doors | TO DO |
-| 5.11 | A dedicated triage screen showing whose week it is | TO DO |
-| 5.12 | No automation ever unassigns the triage person | TO DO |
-| 5.13 | The main stakeholder validates tickets before triage | TO DO — **CHANGED**: only extras, requests and feedback wait. Questions and issues go straight in, Aurora's note |
+| 5.1 | Sub-tabs by type under All, My and Archived | **DONE** — the tabs come from your OWN ticket words, so retiring one retires its tab. Live: Ready 1, Extra 58, Issue 24, Question 17, Request 107 |
+| 5.2 | The status becomes a label you cannot click | **DONE** — clicked it on staging; nothing moved |
+| 5.3 | A new "Scheduled" state between Triage and In progress | **DONE** — happens by itself when stories exist and one is in a sprint |
+| 5.4 | In progress happens by itself when a timer starts on the ticket or a related story | **DONE** |
+| 5.5 | Ready happens by itself when every related story closes | **DONE** |
+| 5.6 | Resolve is refused until a resolution is written | **DONE** — refused on all three routes into it, not just the obvious one |
+| 5.7 | Resolving emails the client automatically | **DONE** — **and it fixed a real leak**: it used to mail EVERY login at the company. Now the raiser and the main stakeholder. No client email was sent while testing |
+| 5.8 | A ticket must name its app | **DONE** |
+| 5.9 | A ticket must name the contact who raised it | **DONE** — narrowed to that company's own people; the door refuses anyone else |
+| 5.10 | Several files and several links on a ticket, from both front doors | **DONE** — files and links, from both front doors |
+| 5.11 | A dedicated triage screen showing whose week it is | **DONE** — the DOOR decides whose week it is, so an empty list comes back to everyone else rather than the screen hiding it |
+| 5.12 | No automation ever unassigns the triage person | **DONE** — a check across all six workers fails if anything ever starts writing to the rota |
+| 5.13 | The main stakeholder validates tickets before triage | **DONE** — **CHANGED**: extras, requests and feedback wait. Questions and issues go straight in, Aurora's note |
 
 ## 6 · Stories
 
 | # | The thing | Status |
 |---|---|---|
-| 6.1 | The app selector moves to the top of the form, and the edit screen matches the form | TO DO |
-| 6.2 | A story type selector, required | TO DO |
-| 6.3 | The sprint list filters to that app and to current and future sprints, with an icon for active, done and upcoming | TO DO |
-| 6.4 | The ticket list filters to that app and to open tickets only | TO DO |
-| 6.5 | A story links to one or more processes | TO DO — **CHANGED**: an explicit "no process" option exists, Aurora's answer, rather than being impossible to save |
-| 6.6 | "Who's doing it" limits to staff on that app | TO DO |
-| 6.7 | The status becomes a label; a timer moves it, not the other way round | TO DO |
-| 6.8 | A work logs tab on the story, and everywhere else time is captured | TO DO |
-| 6.9 | Review is refused until the timers are stopped and an explanation is written | TO DO — **CHANGED**: the file is required only when there is something to show, Aurora's answer |
-| 6.10 | The reviewer gets one Done button | TO DO — **CHANGED**: the app's team lead presses it, Aurora's answer, not anyone with the right |
+| 6.1 | The app selector moves to the top of the form, and the edit screen matches the form | **DONE** — one dialog for both, so a field added shows up on both by construction rather than by memory |
+| 6.2 | A story type selector, required | **DONE** |
+| 6.3 | The sprint list filters to that app and to current and future sprints, with an icon for active, done and upcoming | **DONE** |
+| 6.4 | The ticket list filters to that app and to open tickets only | **DONE** |
+| 6.5 | A story links to one or more processes | **DONE** — **CHANGED**: an empty list is refused unless the "no process" tick is deliberately set, Aurora's answer |
+| 6.6 | "Who's doing it" limits to staff on that app | TO DO — blocked on 8.10 for the same reason as 2.3: nothing records app staffing yet |
+| 6.7 | The status becomes a label; a timer moves it, not the other way round | **DONE** — a timer moves the status now, not the reverse |
+| 6.8 | A work logs tab on the story, and everywhere else time is captured | **DONE** |
+| 6.9 | Review is refused until the timers are stopped and an explanation is written | **DONE** — **CHANGED**: timers stopped and an explanation written; the file only when there is something to show, Aurora's answer |
+| 6.10 | The reviewer gets one Done button | **PART DONE** — one button, one place. "Pressed by the app's team lead" waits on 8.10 |
 
 ## 7 · Companies and contacts
 
