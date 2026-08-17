@@ -4,11 +4,15 @@
 // The finding this locks: a client-portal contact IS an ordinary team member —
 // grant → invite → accept is the only way to make a working portal login. So
 // "are you signed in?" never told the two apart, and a client who signed in at
-// the AGENCY address could mint a token and call `list_learning` /
-// `export_learning_csv` with their Client role's rights: every internal how-to
-// article, in full, as a CSV. Nothing was bypassed. The gate ran and passed —
-// the reason those articles are safe is that the client's own gateway REFUSES
-// that door, and the machine surface had no door-level opinion at all.
+// the AGENCY address could mint a token and call the agency's own reads with
+// their Client role's rights: the whole of an internal module, in full, as a
+// CSV. Nothing was bypassed. The gate ran and PASSED — the reason that material
+// is safe is that the client's own gateway REFUSES those doors, and the machine
+// surface had no door-level opinion at all.
+//
+// (The module it was found on was Learning, which has since been purged. The
+// finding was never about articles: it was about a door with no fence, no
+// refusal, and a second front entrance nobody had asked the question at.)
 //
 // Driven through the worker's real handlers, with tenancy answering the way the
 // real door does: `{ kind: "staff" | "portal", accounts, currentAccountId }`.
