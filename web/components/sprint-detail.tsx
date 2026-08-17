@@ -22,7 +22,7 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import { CheckCheck, Pencil, RotateCcw } from "lucide-react"
 
-import { SprintFormDialog } from "@/components/sprint-form-dialog"
+import { SprintFormDialog, sprintTypeLabel, useSprintTypes } from "@/components/sprint-form-dialog"
 import { StoryFormDialog } from "@/components/story-form-dialog"
 import { createStoryFrom, useStoryFormOptions } from "@/components/stories-screen"
 import { StoriesPanel, sliceKey } from "@/components/work-panels"
@@ -40,7 +40,7 @@ import { useRecordActivity } from "@/lib/use-record-activity"
 import type { Sprint } from "@shared/types"
 import { moneyText } from "@shared/web/money"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
-import { useT } from "@shared/web/language"
+import { useLanguage } from "@shared/web/language"
 
 /** Whole cents → what a person would say. The FORMATTING is the shared seam
  * (shared/web/money.ts) now that the two rate cards render prices of their own;
@@ -62,12 +62,15 @@ export function SprintDetailScreen({
   /** the sprints list in the URL form we arrived through */
   basePath: string
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   // Sprints are bounded and read whole, so the record comes out of the same cache
   // the list holds — opening one costs no round-trip.
   const sprintsQ = useCached<Sprint[]>(sprintsKey(teamId), () => listFetch.sprints(teamId))
   const activity = useRecordActivity("sprints", sprintId)
   const storiesTotal = useCachedValue<number>(totalKey("stories-sprint", sprintId))
+  // The team's own sprint-type vocabulary, for the mark and the standard length
+  // the Kind row shows. Cache-first: the form beside it reads the same key.
+  const sprintTypes = useSprintTypes(teamId)
 
   const { can } = usePermissions(teamId)
   const canEdit = can("work", "edit")
@@ -99,10 +102,23 @@ export function SprintDetailScreen({
   const sprint = sprintsQ.data.find((s) => s.id === sprintId) ?? null
   if (!sprint) return <p className="text-muted-foreground text-sm">{t("That sprint no longer exists.")}</p>
 
+  const kindOption = sprintTypes.find((o) => o.value === sprint.sprintType)
+  const kindLine = !sprint.sprintType
+    ? "—"
+    : kindOption
+      ? `${sprintTypeLabel(kindOption, lang)}${kindOption.standardDays === null ? "" : `, normally ${kindOption.standardDays} days`}`
+      : sprint.sprintType
+
   const done = sprint.storyCount - sprint.openStoryCount
   const overviewItems = [
     { label: t("Reference"), value: sprint.ref || "—" },
-    { label: t("Kind"), value: sprint.sprintType || "—" },
+    // THE KIND, AND WHAT THE KIND CARRIES. A sprint type used to be a bare word;
+    // since team-schema 0025 it also holds the mark somebody recognises it by,
+    // the label a German client reads, and how long a block of this kind
+    // normally runs — the delivery catalogue's fields, on the thing they were
+    // always describing. The DATES are still the ones somebody agreed; this
+    // number is what to expect, said beside them.
+    { label: t("Kind"), value: kindLine },
     { label: t("Client"), value: sprint.accountName || "Ours — no client" },
     { label: t("App"), value: sprint.appName || "—" },
     { label: t("What it's for"), value: sprint.goal || "—" },

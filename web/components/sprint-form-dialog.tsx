@@ -40,14 +40,14 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Pencil, Plus } from "lucide-react"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
-import { ApiFailure } from "@/lib/api"
+import { ApiFailure, tenancy } from "@/lib/api"
 import { accountsKey, listFetch } from "@/lib/live-resources"
 import { useActiveTeam } from "@/lib/use-active-team"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useCached } from "@shared/web/store"
-import type { Account } from "@shared/types"
-import { useT } from "@shared/web/language"
+import type { Account, SelectableValue } from "@shared/types"
+import { useLanguage } from "@shared/web/language"
 
 export type SprintFormValues = {
   name: string
@@ -67,12 +67,55 @@ export type SprintFormValues = {
 /** "Nothing chosen" as a real Select value — an empty string is not selectable. */
 const NONE = "__none__"
 
-/** The three SCOPE names. A "blueprint" is a PRICED PLANNING sprint, not a fourth
- * type (.plans/BUILD-1 §3), so it is a price on a Planning row and not an option
- * here. The vocabulary is editable on the Dropdown values screen; these are the
- * ones every team starts with, which is what a form should offer before anybody
- * has been to that screen. */
-const SPRINT_TYPES = ["Planning", "Implementation", "Iteration"]
+/** The two SCOPE names the delivery catalogue has no word of its own for. A
+ * "blueprint" is a PRICED PLANNING sprint, not a type (.plans/BUILD-1 §3), so it
+ * is a price on a Planning row and not an option here. These are a FALLBACK and
+ * nothing more — what the picker offers before the team's own vocabulary has
+ * loaded, so an empty dropdown never greets somebody on a cold cache. */
+const FALLBACK_SPRINT_TYPES = ["Planning", "Iteration", "Implementation"]
+
+/** ONE SPRINT TYPE, as the app reads it — the word, the mark somebody
+ * recognises it by, the label a German client reads, and how long a block of
+ * this kind normally runs.
+ *
+ * All three extras arrived with team-schema 0025, when the Delivery method page
+ * was retired and its ten programmes were folded onto the sprint type they had
+ * always been a second name for. They are OPTIONAL because a team adds its own
+ * types on the Dropdown values screen and nobody should have to fill in four
+ * fields to name one. */
+export type SprintTypeOption = {
+  value: string
+  mark: string | null
+  nameDe: string | null
+  standardDays: number | null
+}
+
+/** THE TEAM'S OWN SPRINT TYPES, not a list in this file.
+ *
+ * The picker used to offer three hard-coded words, which meant the Dropdown
+ * values screen — the ONE place a type is added (the owner's and Aurora's shared
+ * answer) — could not actually add one. It reads the vocabulary now, active rows
+ * only, exactly as every other pick-or-create field in the app does. */
+export function useSprintTypes(teamId: string | null): SprintTypeOption[] {
+  const q = useCached<SelectableValue[]>(teamId ? `selectable:${teamId}` : null, () =>
+    tenancy.selectable().then((r) => r.values)
+  )
+  const rows = (q.data ?? [])
+    .filter((v) => v.active && v.type === "Sprint type")
+    .map((v) => ({ value: v.value, mark: v.mark, nameDe: v.nameDe, standardDays: v.standardDays }))
+  return rows.length
+    ? rows
+    : FALLBACK_SPRINT_TYPES.map((value) => ({ value, mark: null, nameDe: null, standardDays: null }))
+}
+
+/** What a person reads for one type: its mark, then its name in their own
+ * language where the agency wrote one down. The German label is a CURATED word
+ * carried over from the delivery catalogue, not a translation seam — everything
+ * the app itself says is translated at build time from the string catalogue. */
+export function sprintTypeLabel(option: SprintTypeOption, lang: string): string {
+  const name = lang === "de" && option.nameDe ? option.nameDe : option.value
+  return option.mark ? `${option.mark} ${name}` : name
+}
 
 const nameField = { ...defaultFieldConfig, label: "Sprint name", required: true }
 const typeField = { ...defaultFieldConfig, label: "Kind", required: false }
@@ -130,9 +173,10 @@ export function SprintFormDialog({
   draftKey?: string
   onSubmit: (values: SprintFormValues) => Promise<void>
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const isEdit = !!initial
   const teamId = useActiveTeam().ctx?.team?.id ?? null
+  const sprintTypes = useSprintTypes(teamId)
   // Page one of the accounts list is plenty for a picker, and it is the SAME
   // cache the accounts screen holds.
   const accountsQ = useCached<Account[]>(teamId ? accountsKey(teamId) : null, () =>
@@ -239,9 +283,10 @@ export function SprintFormDialog({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={NONE}>{t("Not said")}</SelectItem>
-            {SPRINT_TYPES.map((t) => (
-              <SelectItem key={t} value={t}>
-                {t}
+            {sprintTypes.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {sprintTypeLabel(option, lang)}
+                {option.standardDays === null ? "" : ` · ${option.standardDays} days`}
               </SelectItem>
             ))}
           </SelectContent>
