@@ -50,7 +50,7 @@ cross-cutting so every screen + future phase inherits them:
   ARCHITECTURE.md (workers table, LOCKED 2026-06-13).
   **UPDATED 2026-06-22, now ROW-LEVEL + two channels:** pings carry
   `{resource, id, op}`; the client re-pulls just the changed row and patches it
-  in place (never invalidate-the-whole-collection). Two channel scopes —
+  in place (never invalidate-the-whole-collection). Two channel scopes,
   `team:<id>` and the per-user `user:<id>` (identity/membership events + forced
   sign-out), published via `publishChange` / `publishUserChange` /
   `publishSignOut`. "Every mutation publishes" is now a guard-tested invariant.

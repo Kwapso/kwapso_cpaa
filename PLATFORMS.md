@@ -1,7 +1,7 @@
 # PLATFORMS.md, where the base can run (Cloudflare recommended; the top-10 mapped)
 
 Brimba is **built for Cloudflare** and the `new-app` skill stands it up there end to
-end (one prompt + a few credentials). But the base is deliberately built on **seams** —
+end (one prompt + a few credentials). But the base is deliberately built on **seams**,
 a small set of swappable interfaces where it touches the platform, so it can be
 *ported* to any major cloud. This doc is the honest, thorough map: what each pillar of
 the base needs, which service on each of the top-10 providers backs it, and how big a
@@ -83,7 +83,7 @@ rewrite. In rough effort order:
    prefixes; most targets speak the S3 API, so this is often a client swap only.
 4. **Re-home the compute.** The 8 workers are small HTTP handlers; map each to the
    platform's function/container unit (or collapse several into one service on
-   container platforms like Fly/Render/Cloud Run). Keep the **public-doors** rule —
+   container platforms like Fly/Render/Cloud Run). Keep the **public-doors** rule,
    only the two gateways (one per front end) are public; the other six are
    private/internal, which is what keeps `/internal/*`, the agent and the act-as-user
    surface unreachable from outside.

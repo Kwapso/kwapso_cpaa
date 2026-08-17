@@ -14,7 +14,7 @@ capped by your role**. Never more. There's no separate "API key with god powers.
    - Production: `https://agency.kwapso.app`
    - Staging: `https://agency-staging.kwapso.app`
    (If you're not on the team yet, ask the owner to invite you.)
-2. **Settings → Access tokens → New token.** Name it, then **copy the secret now** —
+2. **Settings → Access tokens → New token.** Name it, then **copy the secret now**,
    it's shown once and looks like `kwapso_mcp_…`. Treat it like a password.
 
 ## 2 · The endpoint
@@ -79,7 +79,7 @@ AI budget, reads/exports still work.
 
 - **Revoke any time** from the same screen, it stops the next call instantly.
 - **One team only.** The token is pinned to the team you made it in.
-- **Your live role is the cap.** Change the role and the token's power changes with it —
+- **Your live role is the cap.** Change the role and the token's power changes with it,
   you never touch the token.
 
 Full detail (tool list, security posture, cost table): [MCP.md](MCP.md).

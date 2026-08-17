@@ -81,9 +81,9 @@ upload N files ─▶ AGENT ANALYZES ─▶ PLAN (review) ─▶ one confirm ─
 
 The plan is not a hope, it is a **prediction the run is bound to**. One pure pass,
 `scanRows` (import-plan.ts), maps + normalizes every row and decides rejections
-(missing required value; an exact duplicate of an earlier row in the same file —
+(missing required value; an exact duplicate of an earlier row in the same file,
 same required values, is skipped, importing the first). `planStep` runs that scan
-at plan time and stores the predicted rejections (row + reason, capped at 200 —
+at plan time and stores the predicted rejections (row + reason, capped at 200,
 the count stays exact); `confirmBatch` runs the SAME scan at execution. Same
 checks, same wording, the review screen can never promise something the run
 won't do. The review shows per-step reasons, a bottom big-number strip (will
@@ -94,8 +94,8 @@ failures from the gated endpoint itself.
 
 ## 3 · The catalog + declaring a target (how an app plugs in)
 
-An importable target is one entry in `TARGETS` (`workers/data-ops/src/lib/targets.ts`)
-— that is the ONLY step. The catalog row in `importable_databases` self-heals against
+An importable target is one entry in `TARGETS` (`workers/data-ops/src/lib/targets.ts`),
+that is the ONLY step. The catalog row in `importable_databases` self-heals against
 the code on read (R13: `reconcileCatalog`, INSERT-only), so shipping the `TargetDef`
 ships the capability; seeding is now just a label refresh. A target declares:
 
@@ -253,7 +253,7 @@ or skip validation, same safety model as the chat agent.
 
 **Import history.** `GET /api/data-ops/import/batches`, the team's past import runs,
 newest first (who, when, files → tables, totals). TEAM-visible summaries (any
-signed-in member): the same altitude as the activity feed's "imported N rows" line —
+signed-in member): the same altitude as the activity feed's "imported N rows" line,
 row contents and rejection reasons stay on the creator-scoped batch. Shown as
 "Past imports" on the Import screen.
 

@@ -135,7 +135,7 @@ Each field in a screen recipe carries `searchable` / `filterable`; the collectio
 declares `searchPlaceholder`, `userFilter`, `filterFacets`, and a size hint that
 maps to a layer (`serverSide` off = Layer 1; on = Layer 2; a `fullText` flag =
 Layer 3). The engine wires `searchable` fields → the library `searchKeys`,
-`filterable` fields → filter facets, and chooses client vs server by the hint —
+`filterable` fields → filter facets, and chooses client vs server by the hint,
 so turning on search for a new screen is a recipe edit, not new plumbing.
 
 ## The fourth layer, the knowledge base (BUILT 2026-08-11, retrieval rebuilt 2026-08-12)
@@ -179,7 +179,7 @@ compartment model, the two fences); BOOTSTRAP.md §3b is how you stand the index
   the recipes (`listCollection` + `withDataDrivenCollection`, which hides
   search/filters when a list is empty or a facet has no options). See
   UI-CONVENTIONS §6.
-- **Layer 2 (server-side query)**: SHIPPED 2026-08-17 for every PAGED collection —
+- **Layer 2 (server-side query)**: SHIPPED 2026-08-17 for every PAGED collection,
   accounts, tickets, the knowledge base, the backlog, the diary and the process
   maps all search through their own door (`?q=`), and the accounts screen's three
   filters (type / status / archived) are door filters too, so the filtered count

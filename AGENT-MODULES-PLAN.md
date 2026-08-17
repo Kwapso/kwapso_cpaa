@@ -24,7 +24,7 @@ docs are being reconciled now. **Still remaining:** ~~the external `mcp` worker~
 
 > **HISTORICAL PLAN, where a detail below disagrees with the shipped truth, the
 > manual wins** (BASE-MANUAL.md + EDGE-CASES.md). Details superseded since this
-> was written: the confirm rule shipped NARROW (only the destructive acts —
+> was written: the confirm rule shipped NARROW (only the destructive acts,
 > remove member, revoke invite, plus the bulk tools confirm-with-count; not the
 > ">1 row OR delete-type OR dangerous table" heuristic in Phase 3A); Workers AI
 > does FULL tool calling (not "text-only answers"); the chat later gained SSE
@@ -65,8 +65,8 @@ docs are being reconciled now. **Still remaining:** ~~the external `mcp` worker~
 - **Help** (`workers/content`): ticket CRUD + threaded replies (@mention = notify) +
   fixed status lifecycle (open/in-progress/resolved/reopened; raiser reopens) + My/All
   tab queries + source screen/record capture. Email on reply/@mention. (The
-  `kwapso-help-media` R2 bucket is bound, but the **attachment hook is DEFERRED** —
-  see the remaining-work list.)
+  `kwapso-help-media` R2 bucket is bound, but the **attachment hook is DEFERRED**.
+  See the remaining-work list.)
 - **Import** (`workers/data-ops`): the 3-stage session against the global catalog;
   preview-then-write; one list-ping per table.
 - All gated, all publish live pings; reuse `lib/notify.ts`.

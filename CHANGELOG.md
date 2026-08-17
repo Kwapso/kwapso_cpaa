@@ -34,7 +34,7 @@ legacy rows are still in the Glide export. Marketing stays as a task
 **department**, which is a dropdown value and always was. Two team migrations did
 the work: `0025_purge_learning_marketing_programmes` and, alongside it,
 `0026_retire_duplicate_dropdown_values`, which deactivated the 26 duplicated
-dropdown values every team born before the seed was guarded had been carrying —
+dropdown values every team born before the seed was guarded had been carrying,
 the reason a tester saw each ticket type two, three and four times in every
 picker.
 

@@ -168,7 +168,7 @@ quota tables. Create it for each environment and apply the core migrations in
 > pinned to the account this base was built on. On YOUR account those are wrong, and
 > wrangler binds D1 by `database_id` when present, so a stale id silently binds to
 > nothing and **every per-team DB write fails**. WORSE, if you fork onto an account
-> that ALREADY hosts the original base, the stale id binds to the ORIGINAL core DB —
+> that ALREADY hosts the original base, the stale id binds to the ORIGINAL core DB,
 > a cross-tenant data leak. After creating each core DB below, paste its returned
 > `database_id` into the `d1_databases` block of **all SIX core-bound workers, auth,
 > tenancy, content, data-ops, realtime, AND mcp** (mcp binds the core DB for
@@ -334,7 +334,7 @@ you discover months later.
   `realtime` and `mcp`. **Your Cloudflare account id.** Load-bearing: it builds the
   per-team D1 REST URL (`/accounts/<id>/d1/…`), so a wrong value fails EVERY
   per-team DB operation (team creation, every content/import/agent write, and the
-  live channel's fence). The checked-in value is the original author's account —
+  live channel's fence). The checked-in value is the original author's account,
   **overwrite it** in both the top-level and `env.staging` vars blocks of all five.
   Grep for it rather than trusting this list: `grep -rn CF_ACCOUNT_ID workers/*/wrangler.jsonc`.
 - `tenancy` → `PUBLIC_APP_URL` = the environment's absolute origin (e.g.
@@ -346,7 +346,7 @@ you discover months later.
   `low`), `AGENT_FREE_DAILY` (**the app's own daily allowance**, how many free assistant
   actions a team gets each day; code default 25, but the checked-in wrangler var sets
   **50** in both environments, so 50 is what a team really gets), `WORKERS_AI_MODEL` (the keyless fallback).
-- `content` → `KNOWLEDGE_EMBED_MODEL` (the embedding model, `@cf/baai/bge-m3` —
+- `content` → `KNOWLEDGE_EMBED_MODEL` (the embedding model, `@cf/baai/bge-m3`,
   **it must agree with the dimension count you created the Vectorize index with in
   §3b**, so changing one means recreating the other) and `KNOWLEDGE_MIN_SCORE` (the
   similarity floor below which a passage is not offered as an answer). Both have

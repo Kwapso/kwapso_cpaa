@@ -37,7 +37,7 @@ trick as the swappable AI-import interface).
   console-only, the crash is seen by nobody.
 - **Workers** `console.error` in their `catch` blocks → observability, AND every
   core-bound worker's central catch calls `recordWorkerError(env.DB, …)`
-  (`shared/workers/error-log.ts`) so the crash lands in the store below —
+  (`shared/workers/error-log.ts`) so the crash lands in the store below,
   machine-checked by `workers/data-ops/test/error-seam.test.ts`, so a worker
   can't quietly stop recording. `GuardError`s map to clean 4xx and are NEVER
   logged (an expected refusal is not an error); unexpected errors become a
@@ -54,7 +54,7 @@ environment (staging and production errors never mix), cross-team by design
   `data-ops`, `mcp`, `realtime` (the six workers that bind the core DB and record
   their own crashes), `web` (a beacon from the agency screens), `portal` (a beacon
   from the client portal's screens) and `portal-gateway` (the portal door's own
-  crash, which it reports through auth because it binds no database of its own) —
+  crash, which it reports through auth because it binds no database of its own),
   `place` (the route `POST /api/…`, or the client's `where`),
   `message`, `stack` (capped), `team_id` / `user_id` / `url` when known, and the
   resolve-workflow fields: `status` (`open` → `resolved`), `resolved_at`,
@@ -71,7 +71,7 @@ environment (staging and production errors never mix), cross-team by design
   contract is that recording never breaks the request it is recording.
   **Why it exists:** `POST /api/log/client` forwards a browser's crash into the
   GLOBAL core DB. Every FIELD was capped; the row COUNT was not, so a signed-in
-  caller with a loop could grow the core database until it hit its size alarm —
+  caller with a loop could grow the core database until it hit its size alarm,
   the store that says what broke becoming the thing that broke. **Why a ceiling
   and not a dedup window:** the message is the caller's own body, so anything
   keyed on repeated CONTENT is defeated by putting a counter in the string; a
@@ -119,8 +119,8 @@ sibling of the pre-ship trio (`lean_mean_check` · `story_checks_out` ·
 - Our seam means adopting a service later is a one-file change, not a refactor.
 
 ## Rules for new code
-1. Every `catch` either handles the error meaningfully or calls the reporter —
-   never an empty `catch {}` that hides a failure (logging-only `catch` for
+1. Every `catch` either handles the error meaningfully or calls the reporter.
+   Never an empty `catch {}` that hides a failure (logging-only `catch` for
    best-effort side-effects like activity writes is fine, and is commented as such).
 2. **Member-notification emails (new 2026-06-21)** are best-effort, same pattern
    as activity writes. When a role changes, a member is removed, or a pending

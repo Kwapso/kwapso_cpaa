@@ -164,7 +164,7 @@ Today it covers:
 
   **`my_permissions` is the one to call first.** `whoami` says who the token is and
   which team it is pinned to; `my_permissions` says what that person may DO there,
-  module by module. Every door re-checks the same rights on every call regardless —
+  module by module. Every door re-checks the same rights on every call regardless,
   this is simply how a client can know before it asks, instead of learning from a 403.
 
   **R19 now starts at the DOORS, and at ALL of them.** The parity check used to walk
@@ -175,7 +175,7 @@ Today it covers:
   (what may I do here, how much of the app's own daily AI allowance is left, what may I
   import into, what did that import plan say).
 
-  So the census is now every non-admin door on tenancy, content, data-ops and auth —
+  So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
   red build. Today: **218 doors, 178 with a tool, 40 with a written reason**, the
@@ -389,7 +389,7 @@ Today it covers:
 
 **Intentionally NOT on the machine surface, reasoned exclusions, not gaps.**
 
-1. **The multi-row *mutation* tools** the in-app assistant uses —
+1. **The multi-row *mutation* tools** the in-app assistant uses,
    `bulk_set_help_status`, `bulk_set_learning_active`, and the set-shaped
    `set_help_status_by_filter`, are agent-only. They're built around the app's yes/no
    CONFIRM panel (a person approves the true count before a high-blast write runs); a
@@ -475,7 +475,7 @@ Today it covers:
 
    Two other narrowings **were** here and are now closed, because neither had a reason
    that survived being written down: `create_role` takes its `permissions` matrix (the
-   door demands `member_roles:edit` on top of `member_roles:create` when one arrives —
+   door demands `member_roles:edit` on top of `member_roles:create` when one arrives,
    its own double gate is the control, and the two-call path via `set_role_permissions`
    reached the same end state anyway), and `reply_help_ticket` takes `taggedUserIds` (a
    client login is refused mentions at the door and cannot hold a token at all, so every
@@ -597,7 +597,7 @@ developer. So two levers keep it under control:
    exports, and running a *pre-planned* import stay available. (`plan_import` is the one
    import step that uses AI, bounded by the quota like everything else.)
 
-So your instinct is right for the cheap tools ("they're just hitting our endpoints") —
+So your instinct is right for the cheap tools ("they're just hitting our endpoints"),
 and for the AI tools, the allowance + the role are how you keep the cost yours-but-bounded,
 or zero, by choice.
 
@@ -645,7 +645,7 @@ of that allowance; `get_import` re-reads the same plan for free. A client that d
   row, never by its absence.
   **How fresh is that answer?** The bridge mints one short-lived team-pinned session
   per token and re-uses it for **60 seconds**, so a burst of tool calls in one
-  conversation shares one session instead of writing a session row each time —
+  conversation shares one session instead of writing a session row each time,
   and nothing is cached until the staff check has passed. For that minute, then,
   a passed authorization decision stands without being re-asked, which is worth
   being precise about rather than waving at. The decision has **no transition to
@@ -670,7 +670,7 @@ of that allowance; `get_import` re-reads the same plan for free. A client that d
   team: not in the catalog, structurally unreachable. Every write route gates on a
   permission (machine-checked. Law R10), so a tool can't skip the gate.
 - **Writes are reversible + audited.** The write tools deactivate, never hard-delete;
-  every change stamps an audit block (who + when) and the locked guards fire even here —
+  every change stamps an audit block (who + when) and the locked guards fire even here,
   you can't remove yourself or the last admin.
 - **An assistant turn records that a MACHINE ran it.** `agent_chat` and `agent_confirm`
   reach the same handler the in-app assistant does, and that handler used to stamp every

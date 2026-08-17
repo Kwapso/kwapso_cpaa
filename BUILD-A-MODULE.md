@@ -238,7 +238,7 @@ brand-assets.ts) so a bad id is a clean 404, not a silent no-op, and keep the
 current-status predicate inside the `UPDATE` with `RETURNING id`, so a repeat moves
 zero rows and stays silent (Law R17, below).
 
-Return rows shaped into a **shared type** (`shared/types.ts`), not raw DB columns —
+Return rows shaped into a **shared type** (`shared/types.ts`), not raw DB columns,
 `toAsset` (brand-assets.ts) maps `file_url → fileUrl`, `deactivated_at === null
 → active`, etc. The client and the AI agent both consume the shared type. Add
 `export type Note = { … }` to `shared/types.ts` alongside `BrandAsset`.
@@ -285,7 +285,7 @@ worker who you are (401 if signed out), reads your active team (409 if none),
 confirms you're an **active member** of it (403 `not_member`, gating.ts), and
 hands back the guard carrying your `roleId` + the team's `databaseId`.
 `requireRight` (gating.ts) reads the tall sheet and throws `403 forbidden` if
-your role lacks that right on `"notes"`. The check is on the **real module key** —
+your role lacks that right on `"notes"`. The check is on the **real module key**,
 security is never just hiding UI, and the **AI agent goes through these same gated
 endpoints** as the signed-in user, so it can never exceed your rights.
 
@@ -306,7 +306,7 @@ response. You never build error responses by hand inside a handler.
 
 **Every mutation publishes a live change.** After a successful write, call
 `publishChange(env, guard.teamId, resource, id, op)`
-(`shared/workers/realtime.ts`). The payload carries only `{resource, id, op}` —
+(`shared/workers/realtime.ts`). The payload carries only `{resource, id, op}`.
 **never row data**, so every open screen re-pulls *just that one row* through the
 permission-checked endpoint (row-level live-sync; nothing can leak). `op` is
 advisory (`add` | `edit` | `remove`); the client re-pulls and decides keep-or-drop.
@@ -408,7 +408,7 @@ and the gateway's top-level shell loop (gateway index.ts).
 
 **Importable? Declare a target + a sample.** If your module accepts CSV import, add a `TargetDef` in `workers/data-ops/src/lib/targets.ts` (columns, the gated create endpoint, optional `references`, a `sample` example row, and `exportPath` if the module also has a CSV export door). See AGENTIC-IMPORT.md. The downloadable sample file is then automatic (tests enforce every target yields one AND that the sample itself imports cleanly), and, because the agent's capability brief is generated from the same catalog (Law R9), the assistant automatically knows your module can be imported/exported the moment you declare it. Nothing else to teach it.
 
-**Add your product words to the glossary (Law R6).** Any new term your UI shows —
+**Add your product words to the glossary (Law R6).** Any new term your UI shows,
 `invoices`, `purchase order`, `SKU`, goes in `shared/glossary.ts` (one term, one
 clear ≤140-char definition), and UI copy must use exactly that word, never a synonym.
 `web/test/rules.test.ts` checks the glossary is well-formed (`glossary-wellformed`).
@@ -679,7 +679,7 @@ AFTER SHIP
 - **A detail without Overview + Activity tabs.** Fails `record-detail-tabs` (R2).
 - **A per-module activity query.** Read history only via the generic `record` path (R5).
 - **A collection tab with a hand-listed count.** Declare a `countCacheKey` (R8).
-- **A record tab with no count.** Every tab that reveals a collection carries it —
+- **A record tab with no count.** Every tab that reveals a collection carries it,
   a record's Activity tab included (R8); an uncounted tab needs a reasoned
   `RECORD_TAB_COUNT_EXCEPTIONS` line.
 - **Refetching the whole list on a change.** Row-level live-sync only. (CACHING.md.)

@@ -288,7 +288,7 @@ recorded to `error_logs`, not merely logged (R12).
 
 ### db_growth. KEEP (BUILT 2026-08-14, GLOBAL, `db/core/0022`). HOW LONG HAVE I GOT
 Purpose: the half of the growth watch the size alarm never had. `db_alerts` says a
-database has crossed 80% of D1's 10 GB cap, and 80% is a POSITION, not a warning —
+database has crossed 80% of D1's 10 GB cap, and 80% is a POSITION, not a warning,
 two databases at 8.1 GB raise the identical alarm and are in completely different
 trouble, one having sat there a year and the other having crossed 6 GB last week.
 The mover takes a while and needs a person, so the question that follows every alarm
@@ -310,7 +310,7 @@ rather than a number whenever it cannot answer honestly: one reading only, no el
 time, or a database that held still or shrank. "Not growing" and "growing slowly" are
 different answers and only one of them is a number.
 
-Bounded at `CRON_GROWTH_CAP` (200) readings a night, taking the LARGEST databases —
+Bounded at `CRON_GROWTH_CAP` (200) readings a night, taking the LARGEST databases,
 a trend only matters where there is a ceiling to reach. Written on quiet nights too
 (a trend you start measuring at 80% is a trend you measured too late), and wrapped so
 a failed reading can never cost somebody the alarm that a database is nearly full.
@@ -494,18 +494,18 @@ related_row_id)` pair instead → scales to any module without new columns.
 **Indexes (team migration `0023_activity_feed_index`, scaling review 2026-08-14).**
 This is the fastest-growing table in a team database by construction: R1 makes every
 mutation publish and this feed records a row for each, so at the yardstick it is the
-tens-of-millions one. It pages by keyset (R14) on `ORDER BY created_at DESC, id DESC`
-— and from `0001` until now its only index led with `related_table`. So the RECORD
+tens-of-millions one. It pages by keyset (R14) on `ORDER BY created_at DESC, id DESC`,
+and from `0001` until now its only index led with `related_table`. So the RECORD
 scope was indexed and the TEAM scope, the feed everybody opens, was not: every page
 scanned and sorted the whole table to hand back fifty rows, and page two paid it
 again. `idx_activity_feed (created_at DESC, id DESC)` serves the unfiltered page;
 `idx_activity_table_feed (related_table, created_at DESC, id DESC)` serves R18's
 `related_table IN (…)` page and lets the R16 `COUNT(*)` beside it read an index
 rather than the widest table in the database. (`meetings` has carried exactly this
-index for exactly this reason since `0021`.) The count is still O(rows-it-counts) —
+index for exactly this reason since `0021`.) The count is still O(rows-it-counts),
 that is R16's price, and it is named in `scaling-review.md`. Per the
 Q3 resolution below, **log EVERYTHING** (creations, edits, activations/
-deactivations, milestones), superseding the earlier "edits/deactivations only" —
+deactivations, milestones), superseding the earlier "edits/deactivations only",
 the SAME rows are surfaced four ways by the read path
 (`?scope=team|user|role|invite`).
 
@@ -551,7 +551,7 @@ the move is ring-free, so it **refuses the move**, fails closed, never open. Far
 deeper than any real org chart, and a refusal you would only ever meet by building
 a chain nobody meant. **`SCOPE_HARD_CAP` (500, `shared/workers/account-scope.ts`)**
 bounds the other direction: the reach walk that decides which accounts a client may
-see stops at 500 rows. Past that the account set is wrong in the SAFE direction —
+see stops at 500 rows. Past that the account set is wrong in the SAFE direction,
 it stops early and grants LESS, never more. Both numbers are one-line changes, and
 both are deliberately generous rather than tuned.
 
@@ -580,8 +580,8 @@ freelancer can hold a login on their own parentless account.
 > door accepts it (`POST` accounts → `appRestriction`) and the read hands it back;
 > neither narrows anything. When the Apps module lands, enforcing it is the work. The audit block IS the grant
 record (creator_* = who granted, deactivator_* = who revoked), so there is no
-second `granted_by` column to keep in step. **Revoke deactivates, never deletes**
-— login dies, every record stays, and a partial unique index on `user_id` where
+second `granted_by` column to keep in step. **Revoke deactivates, never deletes**,
+login dies, every record stays, and a partial unique index on `user_id` where
 active means at most ONE live grant per person, which is what pins a caller to
 exactly one account set.
 
@@ -677,7 +677,7 @@ them. Four tables, one per job:
   `sprint_id` / `record_date` are the rest of the notebook a question is routed
   by. `body_bytes` is how much material there really is, so a screen can say
   "the first part of 412 KB" rather than presenting an excerpt as the whole
-  thing. `index_error` is why a source could not be indexed whole, in words —
+  thing. `index_error` is why a source could not be indexed whole, in words,
   nothing here is ever silently trimmed. Deactivating means "stop reading this":
   the row survives, its chunks and its vectors do not, and the sweep will not put
   it back, and a row that leaves the app (an archived ticket, a switched-off
@@ -762,7 +762,7 @@ same sprint rather than a check a retry could slip past.
 **`process_steps.step_key` is the identity that makes a saving a SUBTRACTION**
 rather than a name match: the row id belongs to one version, the key is the same
 step across all of them, and a cut copies it forward. A step that STOPS happening
-is carried forward with its frequency intact and its time at zero (`removed_at`) —
+is carried forward with its frequency intact and its time at zero (`removed_at`),
 deleting the row would drop it out of the baseline join and report no saving at
 all for the work we removed entirely, which is the largest saving there is.
 
@@ -770,7 +770,7 @@ all for the work we removed entirely, which is the largest saving there is.
 after the fact is a saving anybody can dial up, and every figure this app shows a
 client is a subtraction from one. The predicate rides both writes' `UPDATE`
 rather than sitting in front of them, so a version cut mid-request cannot leave a
-check true and the write wrong. `removeStep` did not carry it until 2026-08-17 —
+check true and the write wrong. `removeStep` did not carry it until 2026-08-17,
 the write that sets a duration to ZERO, and so the one that would have
 manufactured the largest saving the app can report. Nothing but the absence of a
 screen had been keeping callers off it; the process detail's version selector is
@@ -904,7 +904,7 @@ can answer *"what did we agree in March"*.
 
 - **`agenda` and `notes` are the two things nothing else in the app holds**, and
   they are why this is a record rather than a column on something else.
-- **Time still goes on a work log**, and the two are joined by nothing on purpose —
+- **Time still goes on a work log**, and the two are joined by nothing on purpose,
   a meeting is not a timesheet, and a meeting that ran long is two facts, not one.
 - **`purpose_id`** points at the `meeting_purposes` taxonomy (§ *the agency's own
   housekeeping*), so "why did we meet" is a dropdown value rather than a fifth
@@ -1044,7 +1044,7 @@ diary.
 **Permissions: three modules, because the owner named three switches.** `google`
 (read what you shared · **create = connect an account** and name a folder or
 space · edit = write back through it · delete = disconnect or stop sharing),
-plus `google_mail` and `google_events`, which exist to carry ONE right each —
+plus `google_mail` and `google_events`, which exist to carry ONE right each,
 may kwapso send mail as you, and may it put an event in your calendar. Separate
 from each other and from `agent`, so granting somebody the assistant does not
 grant the assistant their outbox. A module whose four rights are not all

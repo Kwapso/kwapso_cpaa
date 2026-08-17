@@ -2,7 +2,7 @@
 
 The house style of the Brimba server. This is the *how we write code here* companion
 to [ARCHITECTURE.md](ARCHITECTURE.md) (the locked decisions) and [RULES.md](RULES.md)
-(the machine-checked laws). Everything below is grounded in code that already exists —
+(the machine-checked laws). Everything below is grounded in code that already exists,
 where a rule has a canonical file, it's named. A new developer (or an AI agent like
 Claude Code) should be able to read this once and write a new worker route that looks
 like it was always here.
@@ -46,7 +46,7 @@ the concrete form of the planning ritual's step 4 (CLAUDE.md).
   buildBody · summary, plus the agent's `write`/`confirm`/`summarize`), the agent
   (`toAgentTool`) and MCP (`toMcpTool`) both pick it up, so they can't drift. A tool for
   only ONE surface stays in that surface's file (the agent's bulk/SELF tools; the MCP's
-  exports/import/agent-bridge). A WRITE also needs its `module:right` in `TOOL_GATES` —
+  exports/import/agent-bridge). A WRITE also needs its `module:right` in `TOOL_GATES`,
   `shared/workers/tool-gates.ts`, which owns who-may-call-it and what-must-be-confirmed
   while the catalog owns the declarations; `workers/mcp/test/catalog.test.ts` fails the
   build if a write resolves to neither a gate nor a reason. The agent's confirm is `true`, or an input-aware
@@ -254,7 +254,7 @@ export async function postCreateBrandAsset(request: Request, env: Env): Promise<
    module, an admin-key check) simply doesn't use these and writes the steps out.
 4. **Decide about a client login, at the door** (Law R21). A door on the agency's own
    material calls `refusePortalCaller`; a door on shared material resolves the account
-   fence with `accountScope` instead. Neither is optional and neither happens later —
+   fence with `accountScope` instead. Neither is optional and neither happens later,
    the whole point of R21 is that the decision is made where the request arrives.
 5. **Validate at the boundary**, `requireText` / `optionalText` / `queryText` (§5).
 6. **CRUD through the lib layer**. Never inline SQL in a route (§3, §6).
@@ -468,7 +468,7 @@ is a different sentence from "every door uses it".
 For other value shapes there's no one-size helper by design, validate inline and
 specifically (`typeof body.active !== "boolean"` → `fail(400, "invalid_input", …)`; a
 list of ids via `requireIdList`). Typed fields get a purpose-built door of their own:
-`safeExternalLink` allows only `http`/`https`/`mailto` (anything else is dropped —
+`safeExternalLink` allows only `http`/`https`/`mailto` (anything else is dropped,
 a `javascript:` URL on a record is a stored-XSS payload the moment somebody clicks it),
 and `optionalDate` refuses anything that isn't exactly a real calendar day rather than
 coercing it, because a value that is *nearly* a date sorts, renders and is wrong. Both
@@ -679,7 +679,7 @@ Consistent, boring, predictable, the reader should be able to *guess* the name.
 
 ## 11 · TypeScript config across workspaces
 
-The repo is an npm workspace (`web`, `workers/*`) with **one tsconfig per workspace** —
+The repo is an npm workspace (`web`, `workers/*`) with **one tsconfig per workspace**,
 there is no root `tsconfig.json`. The shared invariants (`workers/content/tsconfig.json`
 is representative):
 
@@ -723,7 +723,7 @@ between "I think it works" and "the laws still hold".
         && npm test"
 ```
 
-`check` = **lint the whole repo**, then **type-check every workspace** (both front ends —
+`check` = **lint the whole repo**, then **type-check every workspace** (both front ends,
 `web` and `web-portal`, and all eight workers, each against its own tsconfig), then
 **run the full test suite** (`npm test` fans out across nine workspaces: every worker
 that carries a suite, plus both front ends).
@@ -818,8 +818,8 @@ defect first.
 These three are machine-checked; write them the house way so the build stays green.
 
 - **Bounded reads, and PAGED growing ones (R14).** Every exported `list*`/`search*`
-  in a worker `lib/` carries a HARD CAP from `shared/workers/limits.ts` —
-  `LIST_HARD_CAP` (1000), `EXPORT_HARD_CAP` (10000), `THREAD_HARD_CAP` (500) —
+  in a worker `lib/` carries a HARD CAP from `shared/workers/limits.ts`.
+  `LIST_HARD_CAP` (1000), `EXPORT_HARD_CAP` (10000), `THREAD_HARD_CAP` (500),
   with a `// R14 hard cap` comment. Never an unbounded `SELECT`; one unbounded
   read stalls a worker at 100k rows.
 

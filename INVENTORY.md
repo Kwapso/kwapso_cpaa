@@ -104,7 +104,7 @@ fail closed on a mismatch, so a half-finished rotation is an outage, not a
 degradation.
 
 **Secrets are copies, not references.** Replacing a credential means pushing it to
-every worker in its row again, then testing on a path that really exercises it —
+every worker in its row again, then testing on a path that really exercises it,
 for `CF_D1_TOKEN`, that means a *fresh* signup, because the smoke suite reuses an
 existing team and will go green with a dead token.
 
@@ -167,8 +167,8 @@ source ~/.config/kwapso/keys.env && node scripts/glide-pull.mjs
 ```
 
 **This route has an expiry date.** It needs a live Glide account on the Business
-plan. `glide/files/`, roughly 79 MB of clients' own logos, photos, PDFs and video
-— was copied off Google's storage before the Glide account lapses, and once that
+plan. `glide/files/`, roughly 79 MB of clients' own logos, photos, PDFs and video,
+was copied off Google's storage before the Glide account lapses, and once that
 account is closed `scripts/glide-files.mjs` returns nothing. **Where that 79 MB is
 backed up is not recorded anywhere.** If it exists in only one place, it is one
 laptop away from gone.

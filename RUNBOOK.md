@@ -13,7 +13,7 @@ lost it, and working out what is wrong at two in the morning.
 ## 0 · Which Cloudflare account am I about to change?
 
 `wrangler` picks an account from whatever the machine is logged into. **No worker
-in this repo pins `account_id`**, so nothing in the code corrects a wrong login —
+in this repo pins `account_id`**, so nothing in the code corrects a wrong login,
 a deploy, a database delete or a secret push simply lands wherever the session
 points. On the machine this project was written on, the default login was a
 *different* client's account, and the only thing that ever prevented an accident
@@ -100,7 +100,7 @@ was skipped on purpose.
 - **Migrations.** Both core and team migrations are additive and are never edited
   once applied. Rolling code back to before a migration is safe (the extra column
   is simply unread); rolling the *database* back is section 2.
-- **Vars in `wrangler.jsonc`.** These ship with a version, so they do come back —
+- **Vars in `wrangler.jsonc`.** These ship with a version, so they do come back,
   which is worth remembering if you changed one deliberately.
 
 ---

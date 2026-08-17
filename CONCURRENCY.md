@@ -21,7 +21,7 @@ stock-on-hand, a uniqueness rule) must be made race-safe by ONE of:
 
 2. **A unique index**, for *uniqueness* invariants, let the database reject the
    duplicate. Use a partial index when only some rows are constrained.
-   - Example: at most one **pending** invite per (team, email) —
+   - Example: at most one **pending** invite per (team, email),
      `db/core/0006_invite_pending_unique.sql`; `createInvite` catches the
      violation and reports it kindly.
 

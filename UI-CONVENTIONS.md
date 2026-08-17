@@ -23,7 +23,7 @@ The one-line mental model:
 
 Brimba's primitives and collections come from **`@kwapso/ui`**, a **separate
 repo** (`github:Kwapso/kwapso_ui`), pinned in both
-`package.json` and `web/package.json`. Both front ends, `web/` and `web-portal/` —
+`package.json` and `web/package.json`. Both front ends, `web/` and `web-portal/`,
 import from that one package.
 
 **One name, said once:** the package is **`@kwapso/ui`**. That is what
@@ -152,7 +152,7 @@ blank a screen team-wide.
 When a screen needs a control the engine has no block for, the host composes it from
 library primitives itself. The canonical example is **`role-detail.tsx`**: a role's
 permission grid is a bespoke `PermissionMatrix` with no screen-engine block, so
-`screens.ts` deliberately has **no `roles.detail` recipe** —
+`screens.ts` deliberately has **no `roles.detail` recipe**,
 
 ```ts
 // web/lib/screens.ts (registry comment)
@@ -266,7 +266,7 @@ does show up in `rules.test.ts`: the app must read record activity through the o
 
 Every record you can open has, at minimum, an **Overview** tab (the key facts at a
 glance) and an **Activity** tab (what changed and who changed it). Recipe details get
-these as recipe data (see §2a). The **bespoke** details must render them themselves —
+these as recipe data (see §2a). The **bespoke** details must render them themselves,
 and the check verifies exactly that, reading the source for the two library names:
 
 ```ts
@@ -356,7 +356,7 @@ A half-filled form whose screen unmounts (you navigated away in the same tab) mu
 back filled. Every form dialog persists via **`useFormDraft`** (backed by
 `sessionStorage`, keyed by a stable `draftKey` the caller supplies, e.g.
 `help:new:<teamId>` / `help:edit:<recordId>`). Cleared on submit or explicit
-dismiss (Esc / backdrop / close); *preserved* on navigation. The check mirrors R4 —
+dismiss (Esc / backdrop / close); *preserved* on navigation. The check mirrors R4,
 each `FORM_DIALOGS` entry must contain `useFormDraft`. See CACHING.md §11.
 
 ### R8, every tab that reveals a collection carries its count
@@ -365,8 +365,8 @@ There are **two** tab strips in this app, and the law covers both: the **team se
 strip** (Overview · Members · Roles · Invites) and the tabs on **one record's own
 screen** (Overview · Activity, plus whatever that record adds). A tab that shows a
 collection carries that collection's count; a tab that shows the record itself
-(Overview, a source's own words, a meeting's agenda, the permission grid) carries none
-— and says so once, with its reason, in **`RECORD_TAB_COUNT_EXCEPTIONS`**.
+(Overview, a source's own words, a meeting's agenda, the permission grid) carries none,
+and says so once, with its reason, in **`RECORD_TAB_COUNT_EXCEPTIONS`**.
 
 *(This half was learned the hard way: the check walked `TEAM_SECTIONS` only, so the
 team strip stayed honest while every record in the app shipped an Activity tab with
@@ -452,8 +452,8 @@ to add a UI law is fixed: **RULES.md row ⇄ `registry.ts` entry ⇄ a real chec
 ## 4. The action-icon mapping
 
 Action buttons carry an icon (lucide), placed **before** the label, sized **`size-3.5`**
-on inline action buttons. Keep the icon-for-action mapping identical across the app —
-add a concept to the vocabulary, never a one-off icon at a call site.
+on inline action buttons. Keep the icon-for-action mapping identical across the app.
+Add a concept to the vocabulary, never a one-off icon at a call site.
 
 | Action | Icon | Notes |
 |--------|------|-------|
@@ -469,7 +469,7 @@ add a concept to the vocabulary, never a one-off icon at a call site.
 ### Action-button rows never clip (responsive rule)
 
 A horizontal group of action buttons (e.g. **Export CSV · Import CSV · New role**)
-must **wrap**, never clip, on a narrow screen. Use `flex flex-wrap` on the row —
+must **wrap**, never clip, on a narrow screen. Use `flex flex-wrap` on the row,
 `justify-end` alone (no wrap) pushes the overflow off the **left** edge, where the
 container hides it, so the leftmost button silently disappears on a phone (a real
 bug the owner hit). Every action-button row in the host uses `flex flex-wrap
@@ -494,7 +494,7 @@ controls that fit a laptop share a phone's width between them, and each ends up 
 narrow to read, a date field showing half a date, a select showing no placeholder at
 all. Nothing looks broken, so nobody reports it.
 
-Like its twin, this is a **documented convention, not a machine-checked Law** —
+Like its twin, this is a **documented convention, not a machine-checked Law**,
 responsive CSS is outside the rules-test scope, but it applies to every multi-control
 row in both front ends.
 

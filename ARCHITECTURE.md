@@ -205,7 +205,7 @@ on top follows [CACHING.md](CACHING.md).
 
 - **One team session at a time** (Glide-style team-hop button on every page).
 - **Every server request validates active-team membership + role rights.**
-  A deep link to another team's record gets blocked/booted server-side —
+  A deep link to another team's record gets blocked/booted server-side,
   security is never just hiding UI.
   - *The reviewed exception (FLAGGED 2026-07-02; the predictable-key half CLOSED
     2026-08-10):* `GET /media/*` is served by **both** public doors — the agency

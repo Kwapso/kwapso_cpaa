@@ -32,7 +32,7 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
 - **An answer from the knowledge base carries its sources (R23).** Retrieval never writes prose, it hands back the passages and the sources they came from, and the assistant composes the reply with those in front of it. `found`, `passages` and `citations` are ONE decision in ONE seam (`knowledgeAnswer`): no citation means no passage and a sentence the assistant must say instead of inventing one. No door assembles that response by hand, the same shape as R14's `pagedJson`. The compartment searched, and the REASONING that chose it, ride the same object. (`cited-answers`)
 
 - **An internal number cannot reach the client's side (R24).** What our own hour costs
-  (`internal_rates`) and the margin computed from it live in ONE file —
+  (`internal_rates`) and the margin computed from it live in ONE file,
   `workers/tenancy/src/lib/internal-money.ts`, and the check DERIVES the doors that call
   into it from that file's own exports: none of them is on the portal gateway's surface,
   every one opens with `refusePortalCaller`, and nothing in `web-portal/` names the

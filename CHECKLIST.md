@@ -44,16 +44,16 @@ longer builds the purged ones.
 
 | # | The thing | Status |
 |---|---|---|
-| 2.1 | Ticket types become Question, Issue, Request, Extra, Requirements | **DONE** — **CHANGED**: Aurora retires Feedback and Bug. You wanted Feedback kept. This is a "what", so Aurora wins by your own rule. Migration 0034 RETIRES the two words rather than deleting them, so every ticket ever filed as a Bug still reads Bug, and each live word now carries its own glyph |
-| 2.2 | Story types Fix, Feature, Change, and editable in Dropdown values | **DONE** — and they were missing from a NEW team's seed entirely, so a brand-new team's story form offered an empty picker. Each carries its glyph, and both are editable on the Dropdown values screen |
+| 2.1 | Ticket types become Question, Issue, Request, Extra, Requirements | **DONE**. **CHANGED**: Aurora retires Feedback and Bug. You wanted Feedback kept. This is a "what", so Aurora wins by your own rule. Migration 0034 RETIRES the two words rather than deleting them, so every ticket ever filed as a Bug still reads Bug, and each live word now carries its own glyph |
+| 2.2 | Story types Fix, Feature, Change, and editable in Dropdown values | **DONE**, and they were missing from a NEW team's seed entirely, so a brand-new team's story form offered an empty picker. Each carries its glyph, and both are editable on the Dropdown values screen |
 | 2.3 | "My tickets" becomes tickets on apps I am staffed to | **DONE**, went from 0 to 1 the moment the agent staffed itself to an app. A client keeps "what I raised", or their tab would be empty for ever |
-| 2.4 | "Request behind it" becomes "Tickets" | **DONE** — the field label had already moved; the last site was the picker's empty option, which said "No request behind it" |
+| 2.4 | "Request behind it" becomes "Tickets" | **DONE**, the field label had already moved; the last site was the picker's empty option, which said "No request behind it" |
 | 2.5 | "By when" becomes "Deadline" everywhere | **PART DONE**, done on the task screens; the rest rides the wider rename |
-| 2.6 | The Time page becomes "Work logs" | **DONE** — one line: the rail, the breadcrumb and the page heading all read the same title. The URL stays `/time`, because a link people have already sent each other is not a word anybody reads |
-| 2.7 | "Process maps" becomes "Processes" | **DONE** — the nav label, the app's tab, the permission sheet's module name, the empty states, the search placeholders and the load-more buttons |
-| 2.8 | "Under this account" becomes "Contacts" | **NOT DONE, and it should not be** — that tab lists the ACCOUNTS sitting under this one, and 7.1 has since given the same screen a real Contacts tab. Renaming would put two tabs called Contacts on one strip, naming two different things. 7.2's answer is the right one: the tab goes |
-| 2.9 | Every form's submit button says "Submit" | **DONE** — 31 words for one act became one, across 30 forms and both front doors. `FormShell` now renders the button itself, so the label is not something the next form can pass, invent or forget |
-| 2.10 | No em dashes anywhere a person can read, and none in the documentation | **DONE** — **CHANGED**: Aurora extended it to the docs. 539 lines of screen, toast, email and error copy, and 2,196 lines across 39 documents. Left alone, deliberately: code comments (out of scope), the text we hand a MODEL rather than a person, and two places where the dash is a separator one function writes and another splits back apart |
+| 2.6 | The Time page becomes "Work logs" | **DONE**, one line: the rail, the breadcrumb and the page heading all read the same title. The URL stays `/time`, because a link people have already sent each other is not a word anybody reads |
+| 2.7 | "Process maps" becomes "Processes" | **DONE**, the nav label, the app's tab, the permission sheet's module name, the empty states, the search placeholders and the load-more buttons |
+| 2.8 | "Under this account" becomes "Contacts" | **NOT DONE, and it should not be**, that tab lists the ACCOUNTS sitting under this one, and 7.1 has since given the same screen a real Contacts tab. Renaming would put two tabs called Contacts on one strip, naming two different things. 7.2's answer is the right one: the tab goes |
+| 2.9 | Every form's submit button says "Submit" | **DONE**, 31 words for one act became one, across 30 forms and both front doors. `FormShell` now renders the button itself, so the label is not something the next form can pass, invent or forget |
+| 2.10 | No em dashes anywhere a person can read, and none in the documentation | **DONE**. **CHANGED**: Aurora extended it to the docs. 539 lines of screen, toast, email and error copy, and 2,196 lines across 39 documents. Left alone, deliberately: code comments (out of scope), the text we hand a MODEL rather than a person, and two places where the dash is a separator one function writes and another splits back apart |
 
 ## 3 · What gets removed
 
@@ -88,7 +88,7 @@ longer builds the purged ones.
 | 4.6 | Production makes a task name an app. Sales and Admin make it name a customer | **DONE**, the second field appears the moment you pick the department, and the server refuses it too, in words |
 | 4.7 | An image or file on a task | **DONE** |
 | 4.8 | Completed view columns: department, app, important, urgent, deadline, closed | **DONE**, exactly those six |
-| 4.9 | Who can see everyone else's tasks | **DONE** — **CHANGED**: a real configurable permission, Aurora's answer. Proved with a real person: they saw 1 task against the admin's 79, and granting the right took them to 80 with no deploy |
+| 4.9 | Who can see everyone else's tasks | **DONE**. **CHANGED**: a real configurable permission, Aurora's answer. Proved with a real person: they saw 1 task against the admin's 79, and granting the right took them to 80 with no deploy |
 
 ## 5 · Tickets
 
@@ -128,9 +128,9 @@ longer builds the purged ones.
 | # | The thing | Status |
 |---|---|---|
 | 7.1 | Companies and contacts split into separate screens | **DONE**. All 129, Companies 23, People 106, each an exact server count. A role without the contacts right sees no People tab at all |
-| 7.2 | The "Under this account" tab goes | **DONE** — gone, along with the code behind it. The company strip is now Overview, Contacts, Apps, Sprints, To-dos, Rates, Knowledge, Activity |
+| 7.2 | The "Under this account" tab goes | **DONE**, gone, along with the code behind it. The company strip is now Overview, Contacts, Apps, Sprints, To-dos, Rates, Knowledge, Activity |
 | 7.3 | Portal access stops being a tab and moves onto the contact | **DONE**, proved on staging: the company screen no longer has a Portal access tab, the contact does |
-| 7.4 | Only a contact can hold a login | **DONE** — **CHANGED**: Aurora's answer. And it found a real rudeness: a company with an address used to be told "ask them to sign in once" for something the door was always going to refuse. Both cases now say "A login belongs to a person, not to a company" |
+| 7.4 | Only a contact can hold a login | **DONE**. **CHANGED**: Aurora's answer. And it found a real rudeness: a company with an address used to be told "ask them to sign in once" for something the door was always going to refuse. Both cases now say "A login belongs to a person, not to a company" |
 | 7.5 | A contact's page is its own page: no sprints, no rates, no contacts of its own | **DONE**, proved with Marta, who is a contact at two companies. That case is why it stayed one table |
 | 7.6 | Contacts get their own permission, off by default | **DONE**, proved with a real Developer role: 23 companies, zero people, and adding a contact refused with a plain sentence |
 | 7.7 | The reference code | **DONE**. **CHANGED**: the system generates it. Two companies both starting "Bergman" got BERG and BERG2, and the form has no Reference field at all |
@@ -141,7 +141,7 @@ longer builds the purged ones.
 | 7.12 | A logo and a cover image | **DONE**, stored as files, not pasted into the row, which would have put 60KB on every list read |
 | 7.13 | Front-end status: active client, past client, archived | **DONE** |
 | 7.14 | The account shows the total impact: hours and money given back | **DONE**, 84 hours and 10,080 EUR a month on the test company, each followed by the caption explaining what the figure is made of |
-| 7.15 | A knowledge tab inside an account | **DONE** — driven live on a real company: the question is rewritten with the company's own details and that rewriting is shown on screen |
+| 7.15 | A knowledge tab inside an account | **DONE**, driven live on a real company: the question is rewritten with the company's own details and that rewriting is shown on screen |
 | 7.16 | The account type selector stays | **DONE**. **CHANGED again, and it resolves your disagreement with Aurora cleanly.** The type is Company or Person. "Client" turned out to be a STATUS, not a type, so the status list is Active client / Past client / Archived. You get your sales lead as a Person with no company; Aurora gets an account that is always a company |
 
 ## 8 · Apps and processes
@@ -175,7 +175,7 @@ longer builds the purged ones.
 | 9.7 | Recurring calendar meetings appear | **DONE**, **17 real repeating meetings pulled from your calendar**, with the further-out ones read-only underneath. Pressing it again said "Nothing new to bring in" |
 | 9.8 | Sprints get a calendar view | **DONE**, a calendar view |
 | 9.9 | Sprints get an overview by type and status | **DONE**, grouped by running, coming up and wrapped, then by kind |
-| 9.10 | Sprint types get their icon and colour | **DONE**, each type carries its mark, with one gap: the flat All tab has none, because the list renderer has no icon slot and putting a glyph inside the title is the one shape the law refuses |
+| 9.10 | Sprint types get their icon and colour | **DONE**, each type carries its mark, with one gap that is now written down: the flat All tab has none, because the screen engine maps a row to a title and a subtitle and passes no icon slot, and putting a glyph inside the title is the one shape the law refuses. Left as it is rather than host-composing a second copy of that list; the one-line library change is UI-GAPS #16 |
 
 ## 10 · The Kwapso page and settings
 
@@ -191,15 +191,15 @@ longer builds the purged ones.
 
 | # | The thing | Status |
 |---|---|---|
-| 11.1 | Side padding drops to roughly a tenth; wide, with a cap on big screens | **DONE** — the 768px cap that governed every module screen is now 1600px, and the gutter is 40px on a desktop (the brand site's own number) instead of 138px. Checked at 375, 768 and 1440 |
-| 11.2 | At most two buttons on a title, the rest behind a three-dot menu | **DONE** — the menu did not exist anywhere in the app, so it was built once and used on all eight record screens. The ticket went from six controls to two |
-| 11.3 | A grey footer with created and last edited, moved off Overview | **DONE** — five rows in the middle of Overview became one grey strip at the foot of the record, on every detail screen |
+| 11.1 | Side padding drops to roughly a tenth; wide, with a cap on big screens | **DONE**, the 768px cap that governed every module screen is now 1600px, and the gutter is 40px on a desktop (the brand site's own number) instead of 138px. Checked at 375, 768 and 1440 |
+| 11.2 | At most two buttons on a title, the rest behind a three-dot menu | **DONE**, the menu did not exist anywhere in the app, so it was built once and used on all eight record screens. The ticket went from six controls to two |
+| 11.3 | A grey footer with created and last edited, moved off Overview | **DONE**, five rows in the middle of Overview became one grey strip at the foot of the record, on every detail screen |
 | 11.4 | Cards: off-white on white, no border, no animation, no pink | **DONE**, it was one stale line forcing cards 6% transparent over a moving orange background, not a colour choice |
-| 11.5 | Detail screens: ambient at the top only, clean below the tabs | **DONE** — the header band is the one region that lets the field through; from the tab strip down it is flat paper, full-bleed and at least a screen tall so the orange never reappears under a short record |
-| 11.6 | Sticky header and tabs with a reduced title and breadcrumbs | **DONE** — and it took two goes: the first build was correct and did nothing, because `overflow-x-hidden` on the page silently makes that element a scroll container and a sticky child then sticks to a box that never scrolls |
-| 11.7 | The add button is a plus icon with no text | **DONE** — thirteen labels became the button's accessible name and its tooltip. Import and Export keep their words: rare, consequential, and not guessable from a glyph |
-| 11.8 | An emoji per type on every collection, editable in Dropdown values | **PART DONE** — the law was **changed** on 17 Aug rather than worked around: it now says no emoji **in copy**, and defines a type mark that may sit where an icon sits. The glyphs are seeded on the ticket, story and sprint words, they are EDITABLE on the Dropdown values screen (a Mark field on the form, the glyph on every row), and they show in the header band of every record. They do NOT show in a collection ROW yet, and the reason is one line of library: the screen engine maps a row to a title and a subtitle and passes no icon slot, and putting a glyph inside the title is the one shape the law refuses. UI-GAPS #16 |
-| 11.9 | Less text in every collection row | **DONE** — a ticket row was a reference glued to a title over four facts; it is a title over two. Stories, accounts and meetings the same. The reference is not lost: it leads the eyebrow on the record's own screen, which is where somebody looks when a client says it out loud |
+| 11.5 | Detail screens: ambient at the top only, clean below the tabs | **DONE**, the header band is the one region that lets the field through; from the tab strip down it is flat paper, full-bleed and at least a screen tall so the orange never reappears under a short record |
+| 11.6 | Sticky header and tabs with a reduced title and breadcrumbs | **DONE**, and it took two goes: the first build was correct and did nothing, because `overflow-x-hidden` on the page silently makes that element a scroll container and a sticky child then sticks to a box that never scrolls |
+| 11.7 | The add button is a plus icon with no text | **DONE**, thirteen labels became the button's accessible name and its tooltip. Import and Export keep their words: rare, consequential, and not guessable from a glyph |
+| 11.8 | An emoji per type on every collection, editable in Dropdown values | **PART DONE**, the law was **changed** on 17 Aug rather than worked around: it now says no emoji **in copy**, and defines a type mark that may sit where an icon sits. The glyphs are seeded on the ticket, story and sprint words, they are EDITABLE on the Dropdown values screen (a Mark field on the form, the glyph on every row), and they show in the header band of every record. They do NOT show in a collection ROW yet, and the reason is one line of library: the screen engine maps a row to a title and a subtitle and passes no icon slot, and putting a glyph inside the title is the one shape the law refuses. UI-GAPS #16 |
+| 11.9 | Less text in every collection row | **DONE**, a ticket row was a reference glued to a title over four facts; it is a title over two. Stories, accounts and meetings the same. The reference is not lost: it leads the eyebrow on the record's own screen, which is where somebody looks when a client says it out loud |
 
 ## 12 · Knowledge base
 
@@ -207,7 +207,7 @@ longer builds the purged ones.
 |---|---|---|
 | 12.1 | Reachable from inside an account, app, ticket, story and task, with that record's context fed in | **DONE**, inside an app and inside an account |
 | 12.2 | Learning's articles ingested before Learning is destroyed | **DONE**, all 41 are already indexed. Measured, not assumed |
-| 12.3 | Control over who can see what inside it | **DONE** — a source is readable by the whole team, by the people staffed to one app, or by you alone. It rides the app's own staffing rather than inventing a second access list, so staffing somebody grants sight instantly with nothing re-indexed |
+| 12.3 | Control over who can see what inside it | **DONE**, a source is readable by the whole team, by the people staffed to one app, or by you alone. It rides the app's own staffing rather than inventing a second access list, so staffing somebody grants sight instantly with nothing re-indexed |
 
 ## 13 · Languages
 
@@ -227,7 +227,7 @@ longer builds the purged ones.
 | 13.12 | Top 25 languages | **DONE**, 29 languages, your four first, one exported list |
 | 13.13 | Haiku, one pass, no reviewer | **DONE**. **CHANGED**: Aurora wanted a second checking pass. You overruled |
 | 13.14 | The language is set per account, overridable per contact, and staff switch their own | **BUILDING**. **CHANGED**: Aurora wanted account-only. You overruled |
-| 13.15 | A rule that fails the build when a new string escapes the catalogue | **DONE** — R28 exists: the law, its registry row and its check. It re-runs the real extractor rather than describing it, names missing and orphaned strings separately, and **went red on its first run and caught two real ones** |
+| 13.15 | A rule that fails the build when a new string escapes the catalogue | **DONE**. R28 exists: the law, its registry row and its check. It re-runs the real extractor rather than describing it, names missing and orphaned strings separately, and **went red on its first run and caught two real ones** |
 
 ## 14 · Google
 
@@ -244,7 +244,7 @@ longer builds the purged ones.
 | 14.9 | Chat: list every space | **DONE**, 19 spaces found, 2 of them shared |
 | 14.10 | Transcripts: read one, and reach it from its event | **DONE**, reached from the diary entry, text read back |
 | 14.11 | Every door driven for real against your account, then cleaned up | **DONE**, 42 of 44 checks pass. Drive back to its original 8 files, zero sweep events in the calendar, zero sweep messages in either space |
-| 14.12 | Google comes into step when you open the app, not only on a button | **DONE** — fires once behind first paint, only for somebody holding both rights, silent on failure but recorded. Proved live: the browser's own catch-up fired, a stale call was skipped, and a deliberate press really swept |
+| 14.12 | Google comes into step when you open the app, not only on a button | **DONE**, fires once behind first paint, only for somebody holding both rights, silent on failure but recorded. Proved live: the browser's own catch-up fired, a stale call was skipped, and a deliberate press really swept |
 
 ## 15 · Things deliberately NOT being done
 

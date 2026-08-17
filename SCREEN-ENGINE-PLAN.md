@@ -171,7 +171,7 @@ Decided with the user; do not relitigate without them.
   recipe schema) and the `screen-renderer` collection live in `@kwapso/ui`
   (`lib/recipe.ts` + `registry/collections/screen-renderer`), so EVERY app on
   the base inherits them. The engine **renders** a recipe + speaks the URL
-  grammar; it does NOT fetch data, call APIs, store recipes, or own the router —
+  grammar; it does NOT fetch data, call APIs, store recipes, or own the router,
   those are the host app's job (a recipe store + the app's
   catch-all route + server-side permission checks). _UPDATED 2026-06-21: the
   recipe store is the **TENANCY worker** at `/api/tenancy/config/screens`, not a

@@ -70,7 +70,7 @@ findings survived; all nine are fixed below. 371 tests.
 # SECURITY ADVISORY, for apps forked from this base BEFORE 2026-08-04
 
 A base that fixes a vulnerability silently leaves its own children exposed. Every
-app forked before commit `5da1c76` carries the defects below in its own source —
+app forked before commit `5da1c76` carries the defects below in its own source,
 the fork copied the code, and no deploy of this repo reaches it. **Six of these
 have been independently confirmed live in a downstream product's production.**
 
@@ -91,17 +91,17 @@ model calls `set_role_permissions` / `set_member_role` / `create_role` /
 ```bash
 grep -A 12 -E 'name: "(create_role|update_role|set_role_active|set_role_permissions|set_member_role|invite_member)"' shared/workers/tool-catalog.ts | grep -c "confirm: false"
 ```
-Any count above `0` is vulnerable. (A plain `grep confirm: false` is NOT a test —
+Any count above `0` is vulnerable. (A plain `grep confirm: false` is NOT a test,
 most tools legitimately don't confirm; only the privilege ones must.)
 **Patch:** any tool whose `TOOL_GATES` entry starts `member_roles:` or
-`team_members:` must declare `confirm: true`. Derive it rather than listing names
-— copy `isPrivilegeWrite()` from `shared/workers/tool-catalog.ts` and the
+`team_members:` must declare `confirm: true`. Derive it rather than listing names,
+copy `isPrivilegeWrite()` from `shared/workers/tool-catalog.ts` and the
 `requiresConfirm` guard in `workers/data-ops/src/lib/tools.ts`.
 
 ## A2 · HIGH, the activity feed leaks every module's history
 **The attack:** any member with `team_members:read` requests
 `GET /api/tenancy/activity?scope=user` **with no `id`**. It matches no branch,
-the WHERE comes out empty, and the whole team's cross-module history returns —
+the WHERE comes out empty, and the whole team's cross-module history returns,
 including before→after values from modules that member cannot read.
 
 ```bash
@@ -131,9 +131,9 @@ database that also holds users, sessions and teams, toward D1's 10 GB cap.
 ```bash
 grep -n 'includes("session")' workers/gateway/src/index.ts
 ```
-**Patch:** any hit is vulnerable. Resolve the session first —
-`env.AUTH.fetch("https://internal/api/auth/me", { headers: { Cookie: cookie } })`
-— and drop the beacon when it isn't ok.
+**Patch:** any hit is vulnerable. Resolve the session first,
+`env.AUTH.fetch("https://internal/api/auth/me", { headers: { Cookie: cookie } })`,
+and drop the beacon when it isn't ok.
 
 ## A5 · MEDIUM, one mistyped directory arms sign-in-as-anyone
 **Why it matters:** if the test-login door is gated by `ADMIN_KEY`, it shares its
@@ -158,9 +158,9 @@ grep -c "agent_usage.used <" workers/data-ops/src/lib/credits.ts
 ```
 **Patch:** a count of `0` is vulnerable, the cap isn't in the write.
 (Don't grep for `SELECT used FROM agent_usage`: a legitimate read of the same
-row backs the quota display.) Put the cap in the write —
-`INSERT … ON CONFLICT … DO UPDATE SET used = used + 1 WHERE agent_usage.used < ?`
-— and proceed only when a row changed.
+row backs the quota display.) Put the cap in the write.
+`INSERT … ON CONFLICT … DO UPDATE SET used = used + 1 WHERE agent_usage.used < ?`,
+and proceed only when a row changed.
 
 ## A7 · MEDIUM, an uncapped database-creation door
 **The attack:** sign up, then POST `/api/tenancy/teams` in a loop. Every call
@@ -211,7 +211,7 @@ RETURNING id`), placed BELOW every validation, and release it on failure.
 ```bash
 grep -n "safeBody(input.body)" workers/content/src/lib/learning.ts
 ```
-**Patch:** any hit is vulnerable. Wrap with the boundary seam first —
+**Patch:** any hit is vulnerable. Wrap with the boundary seam first,
 `safeBody(optionalText(input.body, "Body", TEXT_LIMITS.long))`, and the same for
 `contentLink`.
 
@@ -275,7 +275,7 @@ The hardening round's own review found five loose ends. 354 tests (up from 342).
 
 ## Fixed (2026-08-04), the base hardening round (7 new laws + security/UI)
 
-Ported the twenty defects a downstream product (Acrymold) found under real load —
+Ported the twenty defects a downstream product (Acrymold) found under real load,
 each was a base defect. Seven became machine-checked Laws (R13–R19), each
 sabotage-proven; the rest are security/agent/UI fixes. 342 tests (up from 302).
 
@@ -440,8 +440,8 @@ the shared tool catalogue.
 
 **"Stories from a transcript"** cannot be finished by anyone yet: there is no
 `stories` table. The work engine's migration `0011_ticket_work_engine` landed the
-ticket's own columns; the story is still to come. The knowledge half of that flow
-— find the transcript, retrieve the app and process context, needs the Google
+ticket's own columns; the story is still to come. The knowledge half of that flow,
+find the transcript, retrieve the app and process context, needs the Google
 connector above.
 
 ---

@@ -1,6 +1,6 @@
 # Brimba
 
-**The multi-tenant SaaS base by Swift Struck.** Not an app for one industry —
+**The multi-tenant SaaS base by Swift Struck.** Not an app for one industry,
 the reusable foundation every future app (ERP, CRM, portal…) is built on: login
 (an email code or Google), teams, Member roles (module key `member_roles`), invites,
 tickets, dropdown management, CSV data import, and an in-app **AI
@@ -71,7 +71,7 @@ down, and most of them cost somebody a day before they got there.
 
 ### One topic, one owner
 
-Several documents legitimately touch the same subject at different **altitudes** —
+Several documents legitimately touch the same subject at different **altitudes**.
 ARCHITECTURE rules on it, BASE-MANUAL explains why it is that way, CONVENTIONS
 tells you how to write it, and the data layer is a good example of all three
 getting along. What is *not* legitimate is two documents describing the same
@@ -91,8 +91,8 @@ portal's allow-list as "fourteen named doors" long after it had grown to
 twenty-four, and the same stale figure sat in `web-portal/lib/api.ts`, two copies,
 neither of which anybody thought to correct. Where a count is derivable, point at
 the thing that holds it (`PORTAL_DOORS` in the portal gateway) instead of writing
-it down. The counts that *are* written down, the worker roster, the `R1–Rn` range
-— are the ones `web/test/doc-claims.test.ts` checks against the code, which is why
+it down. The counts that *are* written down, the worker roster, the `R1–Rn` range,
+are the ones `web/test/doc-claims.test.ts` checks against the code, which is why
 they may be written down at all.
 
 **Rebuilding the whole base from nothing?** Follow

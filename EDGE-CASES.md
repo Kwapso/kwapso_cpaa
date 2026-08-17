@@ -116,7 +116,7 @@ the live stream was cut. Two consequences to respect:
   `useAgentChat` resumes the saved thread.
 - **The session cache is reactive.** `useActiveTeam` holds the session in a
   pub-sub'd module cache, so a component mounted *before* login (the root host)
-  picks up the session the instant another instance logs in / creates a team —
+  picks up the session the instant another instance logs in / creates a team,
   without it, the launcher only appeared after a manual reload.
 
 ---
@@ -353,8 +353,8 @@ chat for a confirmed action, the app shows one yes/no panel, and a chat-level
 proposes a dangerous call, the **full proposal** (name + input) is stored
 server-side as `status:"proposed"` on the assistant message
 (`agent.ts`). `/confirm` executes the **server-recorded** proposal
-(`confirmAndRun` → `getPendingProposal`), ignoring any `calls` the client sends
-— so a client can't approve a call the model never proposed. After running, the
+(`confirmAndRun` → `getPendingProposal`), ignoring any `calls` the client sends,
+so a client can't approve a call the model never proposed. After running, the
 proposal is flipped `"proposed" → "done"` (`consumePendingProposal`) so a stray
 re-POST can't replay a remove/revoke.
 

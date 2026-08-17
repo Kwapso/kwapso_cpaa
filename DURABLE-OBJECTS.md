@@ -142,7 +142,7 @@ check, not a lock. `fetch` in `index.ts`:
 2. `?user=<id>`: you may join **only your own** identity channel
    (`userId !== user.id` → `403`). Open for every signed-in user, even before
    they join a team.
-3. `?team=<id>`: you must be an **active member of that team** —
+3. `?team=<id>`: you must be an **active member of that team**,
    `requireMember(env, user.id, teamId)` (`shared/workers/gating.ts`), the very
    function every API door gates on. Not a member → `403`.
 
@@ -192,7 +192,7 @@ re-asked whether the answer was still true.
 
 A hibernatable socket outlives the object that accepted it, and a browser tab is
 patient, so "once" meant **for ever**. A member removed from the team, and a
-client login whose portal access was revoked, kept hearing that team's pings —
+client login whose portal access was revoked, kept hearing that team's pings,
 resource, row id and account, live, for as long as they left the connection
 open. Signing out did not end it either: `destroySession` clears a cookie and a
 row and touches no socket, and `publishSignOut` is wired to the email-change
@@ -215,7 +215,7 @@ instead of sending to it. Both halves of that shape are deliberate.
   backoff and calls `onReconnect`, so the socket comes back re-gated and the
   screen resyncs what it missed. Somebody who is no longer a member simply gets
   the 403 the API has been giving them all along.
-- **Fail-closed, like everything else here.** A socket carrying no issue time —
+- **Fail-closed, like everything else here.** A socket carrying no issue time,
   one accepted by an older build, or by anything that skipped `fetch()`, is
   closed rather than trusted, and the deadline is checked **before** the fence,
   so a revoked login is disconnected rather than merely filtered.
@@ -228,7 +228,7 @@ while leaving every other test green.
 Two consequences worth knowing:
 
 - **It costs one read per connect.** The team channel needs `CF_D1_TOKEN` on the
-  realtime worker (OPERATIONS.md § Secrets). With no token, or a failed lookup —
+  realtime worker (OPERATIONS.md § Secrets). With no token, or a failed lookup,
   the team channel **refuses the socket** (`503`): we cannot tell staff from a
   client login, so nobody joins. The `user:<id>` channel is unaffected, so
   identity events and a forced sign-out still reach every device.
@@ -252,7 +252,7 @@ Two consequences worth knowing:
   **What is still bounded by socket lifetime:** a REVOKED grant. Withdrawing a
   portal login does not close the sockets that person already holds, so until the
   link drops (or their next session read moves them out of `ready`, which closes
-  it) they keep hearing account-owned pings for the world they have just left —
+  it) they keep hearing account-owned pings for the world they have just left,
   row ids only, and every door refuses them from the first request. Closing that
   properly needs a server-initiated close or a user-channel listener on the
   portal, which is an ARCHITECTURE decision, not a quiet patch.
@@ -432,7 +432,7 @@ for (const k of r.deps?.(teamId, id) ?? []) invalidate(k)
 - **`op` is advisory.** The client re-pulls and decides keep-or-drop, so `add`
   vs `edit` vs `remove` need not be exact (`ChangeEvent` docstring). The
   single-row read passes the **same server filter** as the list, so a row that
-  no longer belongs (a deactivated member) comes back `null` and is dropped —
+  no longer belongs (a deactivated member) comes back `null` and is dropped,
   one mechanism for add / edit / remove / soft-delete.
 - **Never trust the ping for data.** The re-pull goes through the
   permission-checked endpoint, so a cache can never hold something the viewer
@@ -442,8 +442,8 @@ for (const k of r.deps?.(teamId, id) ?? []) invalidate(k)
 - **A full-collection refetch happens only on first load and team switch.**
 
 The identity channel is handled by a parallel `useUserRealtime` block: a
-`session` event re-checks auth (`auth.me().catch(() => location.assign("/login"))`
-— the acting device keeps its still-valid session, only truly-dead ones bounce);
+`session` event re-checks auth (`auth.me().catch(() => location.assign("/login"))`,
+the acting device keeps its still-valid session, only truly-dead ones bounce);
 `profile` / `teams` call `active.refresh()`; `account_activity` invalidates the
 small own-account feed.
 
@@ -502,7 +502,7 @@ the second one sees `changes === 0`. `removeMember` uses the identical backstop.
 ### 2 · A unique index, for uniqueness invariants
 
 Let the database reject the duplicate; use a partial index when only some rows
-are constrained. Example: at most one **pending** invite per (team, email) —
+are constrained. Example: at most one **pending** invite per (team, email),
 `db/core/0006_invite_pending_unique.sql`; `createInvite` catches the violation
 and reports it kindly. No DO.
 
@@ -557,7 +557,7 @@ worker to the DO. A DO is single-threaded: a long-lived connection is fine
 (that's what Hibernation is for), but any *streaming* response is bounded by the
 isolate/request lifetime of the worker carrying it, not the DO's lifetime.
 Long-lived PUSH (hours-open, server-initiated) belongs on the hibernatable
-WebSocket path, never a held-open HTTP stream. The agent chat DOES stream —
+WebSocket path, never a held-open HTTP stream. The agent chat DOES stream,
 turn-length SSE straight from `data-ops` (seconds, one request's lifetime, the
 DO never involved; see EDGE-CASES §6), which is fine precisely because it ends
 with the turn; it is not a long-lived channel.

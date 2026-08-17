@@ -257,7 +257,7 @@ The agent + modules build adds these resources; each follows the rules above.
   data-ops worker publishes an id-less `agent_usage` ping so the team's quota
   meter refreshes (no row content; just "the meter moved").
 - **The agent chat / confirm endpoints are "housekeeping"** (rule 4): one person's
-  private conversation, so the CONVERSATION (thread + messages) publishes NOTHING —
+  private conversation, so the CONVERSATION (thread + messages) publishes NOTHING,
   the only broadcast a turn itself makes is the id-less `agent_usage` quota ping
   above. The TEAM-VISIBLE
   EFFECTS of an action the agent takes still publish normally, because the agent

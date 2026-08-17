@@ -84,7 +84,7 @@ DB, and the seed rows a newborn team starts with, is
 
 **Why this split.** Two invariants pull in opposite directions:
 
-- **Hard tenant isolation.** Another team's rows are never in the same database —
+- **Hard tenant isolation.** Another team's rows are never in the same database,
   isolation "by physics, not by query discipline" (ARCHITECTURE.md §1). A missing
   `WHERE team_id = ?` can't leak across tenants because the other tenant's rows
   aren't reachable from that connection at all. It also means a team's data can be
@@ -163,7 +163,7 @@ with an **Admin** (locked, full rights) and a **Viewer** (read-only) role.
 - **Block at every step.** UI overlays are permission-gated on open *and* every
   action re-checks `requireRight` on the server. The client guard is a courtesy;
   the server guard is the guarantee.
-- **Export needs READ; import needs CREATE.** Import has no permission of its own —
+- **Export needs READ; import needs CREATE.** Import has no permission of its own,
   it's gated on the *target's* `create` right.
 - **Deactivate, never delete.** Master records are retired (`deactivated_at` set),
   never hard-deleted, so history and access survive.
@@ -205,7 +205,7 @@ Four more structural guards layer on top (all in `agent.ts` / `tools.ts`):
   when it's **destructive**: the two removals (remove a member, revoke an invite)
   and the three **deactivations** (a role / article / dropdown value, *only* when
   switching OFF, an input-aware predicate), plus the high-blast **bulk / import**
-  tools (whose summary carries the row COUNT). Every **constructive** write —
+  tools (whose summary carries the row COUNT). Every **constructive** write,
   create, edit, invite, grant a role, set permissions, (re)activate, a single
   status change, runs straight away (the server still gates each call by the
   caller's rights, and every write is reversible + audited). `requiresConfirm`
@@ -252,7 +252,7 @@ extend the base safely.
 To add, say, a `products` module, you touch these seams and nothing else:
 
 1. **Permissions.** Add `"products"` to `TEAM_MODULES` (`shared/team-modules.ts`),
-   give it a `MODULE_LABELS` entry in the same file (the compiler forces you to —
+   give it a `MODULE_LABELS` entry in the same file (the compiler forces you to.
    `MODULE_LABELS` is `Record<TEAM_MODULES,…>`),
    and a team-DB migration for its table(s). Every role's matrix now has a
    `products` row; `requireRight(cfg, guard, "products", "create")` just works.
@@ -278,7 +278,7 @@ To add, say, a `products` module, you touch these seams and nothing else:
    clean 400, never a 500.
 7. **The agent (optional).** Add read/write tools to the catalogue in `tools.ts`,
    each pointing at your new gated endpoints. Because the executor forwards the
-   cookie, the agent automatically inherits your module's exact permission checks —
+   cookie, the agent automatically inherits your module's exact permission checks,
    you write no new authz for it.
 
 Notice what you *don't* touch: no new worker, no new database, no new auth, no new
@@ -286,7 +286,7 @@ live layer. That's the base working.
 
 ### What ripples when you change a foundational seam (base → module)
 
-The same seams, seen from the other side. Changing one is powerful *and* loud —
+The same seams, seen from the other side. Changing one is powerful *and* loud,
 the machine-checked Laws (§4) turn a careless change red before it ships.
 
 | Change this seam | …and it ripples to | What `npm run check` catches |
@@ -429,7 +429,7 @@ are not oversights; they are deliberate positions the base takes, which are righ
 for some products and wrong for others.
 
 1. **Uploaded files are capability URLs, not gated reads.** `/media/*`,
-   `/media/internal/*` and `/media/learning/*` (a read-only legacy prefix —
+   `/media/internal/*` and `/media/learning/*` (a read-only legacy prefix,
    nothing writes to that bucket since the Learning module was purged, and it
    stays so the images inside articles the knowledge base kept still load) serve
    any object whose key you know: every key is minted
@@ -491,7 +491,7 @@ bigger.
   or a role is **new rows, never a schema change**, so permissions scale to any number
   of modules and roles with zero migrations. Editing a role applies instantly to every
   holder (members point at a role id, not a copy of the rights). The one invariant to
-  respect as you grow: a team always keeps **≥1 admin** (enforced race-safely —
+  respect as you grow: a team always keeps **≥1 admin** (enforced race-safely.
   CONCURRENCY.md).
 
 - **Invites.** An invite is a global index row (`invite_index`) + a per-team audit log.
