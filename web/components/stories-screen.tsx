@@ -30,7 +30,7 @@ import { CollectionHeading } from "@/components/collection-heading"
 import { LoadMore } from "@/components/load-more"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { StoryFormDialog, type StoryFormValues } from "@/components/story-form-dialog"
-import { TimePanel } from "@/components/time-panel"
+import { StartTimerStrip } from "@/components/time-panel"
 import { STORY_STATUS_LABEL } from "@/components/work-panels"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import { appsKey, helpKey, listFetch, sprintsKey, storiesKey } from "@/lib/live-resources"
@@ -123,7 +123,6 @@ export function StoriesScreen({
   rights,
   total,
   canCreate,
-  canEditTime,
   onAction,
   onIntent,
 }: {
@@ -133,8 +132,6 @@ export function StoriesScreen({
   /** the exact server total (R16) — never the loaded page's length */
   total: number | undefined
   canCreate: boolean
-  /** `work:edit` — correcting a row of logged time, a step above logging one */
-  canEditTime: boolean
   onAction: (actionId: string, ctx: ScreenActionContext) => void
   onIntent: (intent: ScreenIntent) => void
 }) {
@@ -181,10 +178,12 @@ export function StoriesScreen({
         }
       />
 
-      {/* Time, under the work it is against. BUILD-1 §5: one click is the
-          acceptance bar — the Start control is on the header bar once a timer is
-          running, and this is where a person sees where their week went. */}
-      <TimePanel teamId={teamId} canCreate={canCreate} canEdit={canEditTime} />
+      {/* THE ONE CLICK, beside the work it is against (BUILD-1 §5) — and the
+          Monday morning question, which has to be answerable wherever you are.
+          The TIMESHEET is no longer here: a list of everything ever logged, at
+          the foot of the backlog, is where logged time went to hide. It has a
+          page of its own now (/time), which is the link in the rail above. */}
+      <StartTimerStrip teamId={teamId} canCreate={canCreate} />
 
       <StoryFormDialog
         open={storyOpen}

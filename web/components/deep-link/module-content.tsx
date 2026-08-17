@@ -76,7 +76,7 @@ export type ModuleContentCtx = Pick<
   ScreenData,
   | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "learningQ" | "helpQ" | "helpMineQ" | "helpArchivedQ" | "accountsQ" | "knowledgeQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "inviteAuditQ"
   | "marketingQ" | "brandQ" | "programmesQ" | "purposesQ" | "internalActivity"
-  | "storiesQ" | "sprintsQ" | "appsQ" | "tasksOpenQ" | "tasksAllQ" | "meetingsQ"
+  | "storiesQ" | "sprintsQ" | "appsQ" | "tasksOpenQ" | "tasksAllQ" | "workLogsQ" | "meetingsQ"
 > & {
   noAccess: boolean
   enabled: boolean

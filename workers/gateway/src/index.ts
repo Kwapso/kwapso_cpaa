@@ -137,6 +137,10 @@ async function handle(request: Request, env: Env): Promise<Response> {
       // out to a page of their own — the segment follows the heading, because a
       // URL that disagrees with the title on the page is a cost paid for ever.
       "stories", "sprints", "apps", "tasks",
+      // TIME — the destination a work log never had. No records of its own (a
+      // row of time is only ever read in a list of its neighbours), but it is
+      // forwarded like the rest so the shell survives a reload at any depth.
+      "time",
       // The diary. A sidebar page with records of its own, so it needs the shell
       // at every depth for the same reason the four above it do.
       "meetings",

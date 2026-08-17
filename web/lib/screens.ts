@@ -97,6 +97,11 @@ export const MODULE_PERMISSION: Record<string, string> = {
   stories: "work",
   sprints: "work",
   tasks: "work",
+  // …and TIME is the fourth noun on the same permission. A work log had no
+  // destination at all: the only list of one was a panel at the foot of the
+  // Stories page, under the backlog, which is why a tester with 115 logged
+  // entries reported that she could not find logged time.
+  time: "work",
   apps: "processes",
   // MEETINGS is its own module, so the segment IS the module — and it is its own
   // module because the thing being permissioned is the NOTES. The taxonomy of

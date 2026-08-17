@@ -27,6 +27,7 @@ import { AppsScreen } from "@/components/apps-screen"
 import { SprintsScreen } from "@/components/sprints-screen"
 import { StoriesScreen } from "@/components/stories-screen"
 import { TasksScreen } from "@/components/tasks-screen"
+import { TimeScreen } from "@/components/time-screen"
 import { MeetingsScreen } from "@/components/meetings-screen"
 import { TriageStrip } from "@/components/triage-strip"
 import {
@@ -247,7 +248,6 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         rights={rights}
         total={totals.stories}
         canCreate={can("work", "create")}
-        canEditTime={can("work", "edit")}
         onAction={onAction}
         onIntent={onIntent}
       />
@@ -294,6 +294,20 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         canCancelTodo={can("todos", "delete")}
         onAction={onAction}
         onIntent={onIntent}
+      />
+    )
+  }
+  // TIME — the destination a work log never had. No recipe: its rows are a list
+  // whose only control is a correction dialog, which is a screen the engine has
+  // no block for (the same reason the story detail is host-composed).
+  if (module === "time") {
+    if (ctx.workLogsQ.error) return <LoadError what="the time" />
+    return (
+      <TimeScreen
+        teamId={teamId as string}
+        total={totals.workLogs}
+        canCreate={can("work", "create")}
+        canEdit={can("work", "edit")}
       />
     )
   }

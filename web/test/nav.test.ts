@@ -62,8 +62,22 @@ describe("the sidebar sequence the owner fixed", () => {
     return (["daily", "occasional"] as const).map((g) => inOrder.filter((i) => i.group === g).map((i) => i.slug))
   }
 
-  it("puts the six daily destinations above the divider, in his order", () => {
-    expect(composeLikeTheShell()[0]).toEqual(["home", "accounts", "knowledge", "tickets", "stories", "tasks"])
+  // SEVEN since Time joined them. It is the fourth work-engine destination and
+  // it sits with the other two dailies — a timesheet is opened on the days you
+  // fill it in, which is most of them. It had no place on the rail at all
+  // before: the whole list of logged time was a panel at the foot of the Stories
+  // page, which is how a tester with 115 entries came to report that she could
+  // not find any of it.
+  it("puts the seven daily destinations above the divider, in his order", () => {
+    expect(composeLikeTheShell()[0]).toEqual([
+      "home",
+      "accounts",
+      "knowledge",
+      "tickets",
+      "stories",
+      "tasks",
+      "time",
+    ])
   })
 
   it("puts the nine occasional ones below it, in his order", () => {

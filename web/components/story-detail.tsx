@@ -204,7 +204,7 @@ export function StoryDetailScreen({
       {
         value: "time",
         label: "Time",
-        icon: CONCEPT_ICON.timer,
+        icon: CONCEPT_ICON.time,
         badge: formatCount(timeTotal),
         badgeVariant: "" as const,
       },

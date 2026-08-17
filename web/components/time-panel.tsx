@@ -1,15 +1,23 @@
 "use client"
 
-// TIME, on the Stories page — the week as it actually went, and the two ways of
-// adding to it.
+// TIME — the week as it actually went, and the two ways of adding to it.
 //
-// ONE CLICK IS THE ACCEPTANCE BAR (.plans/BUILD-1 §5). The Start button on each
-// backlog row is that click; this panel is the other half — what has already been
-// logged, and the manual entry that is "always available", because half of real
-// time is remembered rather than clocked.
+// TWO PIECES, because they belong in two places. `StartTimerStrip` is the one
+// click and the Monday-morning question, and it sits beside the WORK (the
+// Stories page): starting a timer is something you do while looking at what you
+// are about to do, and "you left this running since Friday" is something you
+// need answered wherever you happen to be. `TimePanel` is the TIMESHEET — what
+// has already been logged, the manual entry that is "always available" because
+// half of real time is remembered rather than clocked, and the correction — and
+// that belongs on a page of its own.
 //
-// The RUNAWAY prompt lives here too rather than in the header, deliberately: the
-// header's job is a glance, and "you left this running since Friday, what do you
+// It did not have one. The whole list lived under the backlog at the foot of the
+// Stories page, which is how a tester with 115 logged entries came to report
+// that she could not find logged time at all. See the `time` section in
+// lib/pages.ts.
+//
+// ONE CLICK IS THE ACCEPTANCE BAR (.plans/BUILD-1 §5). The RUNAWAY prompt is not
+// in the header for a reason: the header's job is a glance, and "what do you
 // want done about it?" is a question with three answers.
 
 import * as React from "react"
@@ -23,10 +31,17 @@ import { LoadMore } from "@/components/load-more"
 import { clockFrom } from "@/components/timer-bar"
 import { TimeFormDialog, type TimeFormValues } from "@/components/time-form-dialog"
 import { ApiFailure, content as contentApi } from "@/lib/api"
-import { listFetch, runningTimersKey, storiesKey, totalKey, workLogsKey } from "@/lib/live-resources"
+import {
+  TIME_SLICE_PREFIX,
+  listFetch,
+  runningTimersKey,
+  storiesKey,
+  totalKey,
+  workLogsKey,
+} from "@/lib/live-resources"
 import { useActiveTeam } from "@/lib/use-active-team"
 import type { RunningTimer, Story, WorkLog } from "@shared/types"
-import { invalidate, useCached, useCachedValue } from "@shared/web/store"
+import { invalidate, invalidatePrefix, useCached, useCachedValue } from "@shared/web/store"
 
 /** One row of time, in a sentence: what it was on, who, how long, and whether we
  * are charging for it. */
@@ -42,6 +57,125 @@ function line(l: WorkLog): string {
     .join(" · ")
 }
 
+/** Everything a row of time touches: the team's list and its totals, the header
+ * bar, the backlog (whose stories now have more hours against them), and the
+ * Time tab of whatever the row was logged against. One place, because three
+ * screens do this and a screen that forgets one of them is a stale screen. */
+function refreshTime(teamId: string): void {
+  invalidate(workLogsKey(teamId))
+  invalidate(runningTimersKey(teamId))
+  invalidate(storiesKey(teamId))
+  invalidatePrefix(TIME_SLICE_PREFIX)
+}
+
+/** THE ONE CLICK, and the Monday morning question — beside the WORK.
+ *
+ * The caller's OWN open stories, with a Start next to each: the acceptance bar
+ * BUILD-1 §5 sets, and the reason this exists rather than a "log time" form
+ * being the only way in. Their own, because a list of everybody's work would
+ * need reading before it could be clicked. */
+export function StartTimerStrip({ teamId, canCreate }: { teamId: string; canCreate: boolean }) {
+  const timersQ = useCached<RunningTimer[]>(runningTimersKey(teamId), () =>
+    contentApi.runningTimers().then((r) => r.timers)
+  )
+  const me = useActiveTeam().user?.id ?? null
+  const storiesQ = useCached<Story[]>(storiesKey(teamId), () => listFetch.stories(teamId))
+  const runningIds = new Set((timersQ.data ?? []).map((t) => `${t.targetTable}:${t.targetId}`))
+  const mine = (storiesQ.data ?? [])
+    .filter((s) => s.status !== "done" && s.assigneeId === me && !runningIds.has(`stories:${s.id}`))
+    .slice(0, 5)
+  const runaways = (timersQ.data ?? []).filter((t) => t.runaway)
+
+  async function start(storyId: string) {
+    try {
+      await contentApi.startTimer("stories", storyId)
+      refreshTime(teamId)
+      toast.success("Timer started.")
+    } catch (err) {
+      toast.error(err instanceof ApiFailure ? err.message : "Couldn't start that timer.")
+    }
+  }
+
+  async function answerRunaway(id: string, answer: "keep" | "discard") {
+    try {
+      await contentApi.resolveRunaway(id, answer)
+      refreshTime(teamId)
+      toast.success(answer === "discard" ? "Binned — nothing was counted." : "Stopped, kept in full.")
+    } catch (err) {
+      toast.error(err instanceof ApiFailure ? err.message : "Couldn't do that.")
+    }
+  }
+
+  if (mine.length === 0 && runaways.length === 0) return null
+
+  return (
+    <section className="flex flex-col gap-2">
+      {canCreate && mine.length > 0 && (
+        <ul className="flex flex-wrap gap-1.5">
+          {mine.map((s) => (
+            <li key={s.id}>
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => start(s.id)}>
+                <Play className="size-3.5" />
+                {s.title.length > 34 ? `${s.title.slice(0, 34)}…` : s.title}
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <RunawayPrompts runaways={runaways} onAnswer={answerRunaway} />
+    </section>
+  )
+}
+
+/** THE MONDAY MORNING PROMPT. Never automatic: a timer that stopped itself at
+ * some clever hour is a number a person did not choose. Two of the three answers
+ * are one tap here; "stop it at five o'clock" is the third, and it is the stop
+ * control on the header bar with a time. */
+function RunawayPrompts({
+  runaways,
+  onAnswer,
+}: {
+  runaways: RunningTimer[]
+  onAnswer: (id: string, answer: "keep" | "discard") => void
+}) {
+  return (
+    <>
+      {runaways.map((t) => (
+        <div
+          key={t.id}
+          className="border-destructive/40 flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
+        >
+          <span>
+            <AlarmClockOff className="mr-1.5 inline size-3.5" />A timer on{" "}
+            <strong>{t.targetLabel ?? "something"}</strong> has been running for{" "}
+            {clockFrom(t.elapsedSeconds)}.
+          </span>
+          <span className="flex gap-1.5">
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => onAnswer(t.id, "keep")}>
+              <CircleStop className="size-3.5" />
+              Keep it all
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => onAnswer(t.id, "discard")}
+            >
+              <Trash2 className="size-3.5" />
+              Bin it
+            </Button>
+          </span>
+        </div>
+      ))}
+    </>
+  )
+}
+
+/** THE TIMESHEET — what has already been logged, on the Time page.
+ *
+ * It renders no heading of its own: the page above it carries the section
+ * heading and the exact ROW count (R16), and the hours below are a second,
+ * different number that this panel says itself. Two numbers, said once each. */
 export function TimePanel({
   teamId,
   canCreate,
@@ -65,32 +199,6 @@ export function TimePanel({
   // correction is a thing you do to a line you are looking at — Back should
   // close the form, not walk you through every line you opened.
   const [editing, setEditing] = React.useState<WorkLog | null>(null)
-  // THE ONE CLICK. The caller's own open work, with a Start beside each — the
-  // acceptance bar BUILD-1 §5 sets, and the reason this strip exists rather than
-  // a "log time" form being the only way in. Their OWN, because a list of
-  // everybody's work would need reading before it could be clicked.
-  const me = useActiveTeam().user?.id ?? null
-  const storiesQ = useCached<Story[]>(storiesKey(teamId), () => listFetch.stories(teamId))
-  const runningIds = new Set((timersQ.data ?? []).map((t) => `${t.targetTable}:${t.targetId}`))
-  const mine = (storiesQ.data ?? [])
-    .filter((s) => s.status !== "done" && s.assigneeId === me && !runningIds.has(`stories:${s.id}`))
-    .slice(0, 5)
-
-  async function start(storyId: string) {
-    try {
-      await contentApi.startTimer("stories", storyId)
-      refresh()
-      toast.success("Timer started.")
-    } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't start that timer.")
-    }
-  }
-
-  const refresh = () => {
-    invalidate(workLogsKey(teamId))
-    invalidate(runningTimersKey(teamId))
-    invalidate(storiesKey(teamId))
-  }
 
   async function logManually(values: TimeFormValues) {
     await contentApi.logTime({
@@ -102,7 +210,7 @@ export function TimePanel({
       kind: values.kind || undefined,
       billable: values.billable,
     })
-    refresh()
+    refreshTime(teamId)
     toast.success("Time logged.")
   }
 
@@ -120,14 +228,14 @@ export function TimePanel({
       kind: values.kind,
       billable: values.billable,
     })
-    refresh()
+    refreshTime(teamId)
     toast.success("Time corrected.")
   }
 
   async function answerRunaway(id: string, answer: "keep" | "discard") {
     try {
       await contentApi.resolveRunaway(id, answer)
-      refresh()
+      refreshTime(teamId)
       toast.success(answer === "discard" ? "Binned — nothing was counted." : "Stopped, kept in full.")
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't do that.")
@@ -141,15 +249,12 @@ export function TimePanel({
   return (
     <section className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-muted-foreground flex items-center gap-1.5 text-sm font-medium">
+        {/* THE HOURS. Not the collection's count (the heading above says that) —
+            the number anybody reading a timesheet actually came for. */}
+        <p className="text-muted-foreground flex items-center gap-1.5 text-sm">
           <Clock className="size-3.5" />
-          Time
-          {totalSeconds ? (
-            <span className="bg-muted rounded-full px-2 py-0.5 text-xs tabular-nums">
-              {clockFrom(totalSeconds)}
-            </span>
-          ) : null}
-        </h2>
+          {totalSeconds ? `${clockFrom(totalSeconds)} logged` : "Nothing logged yet"}
+        </p>
         {canCreate && (
           <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setAddOpen(true)}>
             <Plus className="size-3.5" />
@@ -158,50 +263,7 @@ export function TimePanel({
         )}
       </div>
 
-      {mine.length > 0 && (
-        <ul className="flex flex-wrap gap-1.5">
-          {mine.map((s) => (
-            <li key={s.id}>
-              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => start(s.id)}>
-                <Play className="size-3.5" />
-                {s.title.length > 34 ? `${s.title.slice(0, 34)}…` : s.title}
-              </Button>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {/* THE MONDAY MORNING PROMPT. Never automatic: a timer that stopped itself
-          at some clever hour is a number a person did not choose. Two of the
-          three answers are one tap here; "stop it at five o'clock" is the third,
-          and it is the stop control on the header bar with a time. */}
-      {runaways.map((t) => (
-        <div
-          key={t.id}
-          className="border-destructive/40 flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
-        >
-          <span>
-            <AlarmClockOff className="mr-1.5 inline size-3.5" />
-            A timer on <strong>{t.targetLabel ?? "something"}</strong> has been running for{" "}
-            {clockFrom(t.elapsedSeconds)}.
-          </span>
-          <span className="flex gap-1.5">
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => answerRunaway(t.id, "keep")}>
-              <CircleStop className="size-3.5" />
-              Keep it all
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => answerRunaway(t.id, "discard")}
-            >
-              <Trash2 className="size-3.5" />
-              Bin it
-            </Button>
-          </span>
-        </div>
-      ))}
+      <RunawayPrompts runaways={runaways} onAnswer={answerRunaway} />
 
       {logs.length === 0 ? (
         <p className="text-muted-foreground text-sm">No time logged yet.</p>

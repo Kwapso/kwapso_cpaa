@@ -29,6 +29,7 @@ import {
   storiesKey,
   tasksKey,
   totalKey,
+  workLogsKey,
 } from "@/lib/live-resources"
 import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
 import { useRecordActivity } from "@/lib/use-record-activity"
@@ -165,6 +166,14 @@ export function useScreenData({
       : null,
     () => listFetch.tasks(teamId as string, "all")
   )
+  // TIME. Loaded only on its own section, like the four above it. R14: PAGED —
+  // 2,940 rows arrived from two years of the previous system and every piece of
+  // work produces several more, so page one lands here and its next cursor in
+  // the sidecar <LoadMore> reads.
+  const workLogsQ = useCached(
+    enabled && module === "time" ? workLogsKey(teamId as string) : null,
+    () => listFetch.workLogs(teamId as string)
+  )
   // THE DIARY. Loaded only on its own section, cache-first + row-level live. R14:
   // PAGED like tickets and sources — page one lands here and its next cursor in
   // the sidecar <LoadMore> reads. The RECORD screen reads through this same key
@@ -226,6 +235,10 @@ export function useScreenData({
     apps: useCachedValue<number>(enabled ? totalKey("apps", teamId as string) : null),
     tasks: useCachedValue<number>(enabled ? totalKey("tasks", teamId as string) : null),
     tasksAll: useCachedValue<number>(enabled ? totalKey("tasks-all", teamId as string) : null),
+    // The exact ROW count of the time list, which is what the sidebar badges and
+    // what the Time page's heading says. The HOURS are a different number and
+    // live in their own sidecar (`work-seconds`), read by the panel itself.
+    workLogs: useCachedValue<number>(enabled ? totalKey("work-logs", teamId as string) : null),
     meetings: useCachedValue<number>(enabled ? totalKey("meetings", teamId as string) : null),
     // The agency's own housekeeping — the exact server totals the sidebar badges
     // and the collection headings show, primed by the fetchers above.
@@ -324,6 +337,7 @@ export function useScreenData({
     appsQ,
     tasksOpenQ,
     tasksAllQ,
+    workLogsQ,
     meetingsQ,
     membersQ,
     rolesQ,
