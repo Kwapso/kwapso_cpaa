@@ -20,7 +20,12 @@ import { publishChange } from "@shared/workers/realtime"
 import { refusePortalCaller } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
 import { ANY_FILE_TYPE, mediaKey, NEUTRALISED_CONTENT_TYPE, parseUploadDataUrl } from "@shared/workers/image"
-import { KNOWLEDGE_FILE_MAX_BYTES, KNOWLEDGE_UPLOAD_MAX_BYTES } from "@shared/workers/limits"
+import {
+  KNOWLEDGE_EXTRACT_MAX_BYTES,
+  KNOWLEDGE_FILE_MAX_BYTES,
+  KNOWLEDGE_STREAM_MAX_BYTES,
+  KNOWLEDGE_UPLOAD_MAX_BYTES,
+} from "@shared/workers/limits"
 import {
   countSources,
   createFileSource,
@@ -33,7 +38,7 @@ import {
   updateSource,
   type SourceInput,
 } from "../lib/knowledge"
-import { extractFile } from "../lib/knowledge-files"
+import { extractFile, unreadableNote } from "../lib/knowledge-files"
 import { catchUp, listIngestState, sweepAll } from "../lib/knowledge-ingest"
 import { googleStateKeys, sweepGoogle } from "../lib/knowledge-google"
 import type { Env } from "../env"
@@ -269,6 +274,127 @@ export async function postUploadKnowledgeFile(request: Request, env: Env): Promi
     extract,
   })
   // Row-level (R1): carry the new source's id so open lists patch just that row.
+  await publishChange(env, guard.teamId, "knowledge", id, "add")
+  return json({ source: await getSource(cfg, guard, id), total: await countSources(cfg, guard) })
+}
+
+/** POST /api/content/knowledge/upload-stream — the SAME capability as the door
+ * above, with the file arriving as the request body instead of inside it.
+ *
+ * WHY A SECOND DOOR RATHER THAN A CHANGED ONE. The upload CONTRACT differs: the
+ * file is the body, so the metadata that used to sit beside it in the JSON moves
+ * to the query string. A client built against the old shape must keep working —
+ * it is deployed, and a browser holds its own copy of the app for as long as the
+ * tab is open — so the buffered door stays exactly as it was and this one sits
+ * beside it. Nothing is migrated; the new client simply picks the new door. When
+ * no build in the wild uses the old one, deleting it is a separate, boring change.
+ *
+ * WHAT IT ACTUALLY FIXES. The buffered door's 25 MB was never a judgement about
+ * files — it was the largest number that fits in a 128 MB isolate three times
+ * over: `request.json()` materialises the whole body, a base64 data URL is ~4/3
+ * of the file it carries, and the decode makes another copy. Here the body is
+ * handed to R2 as it arrives, so the isolate holds a window rather than a file.
+ * The ceiling moves from 25 MB to 90 MB, and what stops it there is the PLATFORM's
+ * own request-body limit rather than anything in this code (limits.ts says so, and
+ * says what the only door past it is).
+ *
+ * THE METADATA IS STILL VALIDATED AT THE BOUNDARY (R20), and the query string is
+ * held to exactly the same positional rule the body is: every `searchParams.get`
+ * sits inside a checker, never in a truthiness test and never behind a cast.
+ * Moving a field from a body to a query string must not be a way to leave the
+ * validation seam behind — that is precisely the substitution R20's query census
+ * exists to catch.
+ *
+ * THE KEY CARRIES NO CALLER INPUT AT ALL. `mediaKey(teamId)` is the team's id and
+ * a fresh ULID, so there is no path to contain, no dot-segment to reject and no
+ * escape to think about — the strongest form of the rule `safeObjectKey` states
+ * for the backup, arrived at by the key having no user-supplied segment rather
+ * than by filtering one. The declared FILE NAME is a label on the row; it never
+ * reaches the key.
+ *
+ * R21 at the door, like every other handler here. */
+export async function postStreamKnowledgeFile(request: Request, env: Env): Promise<Response> {
+  // The envelope first, before anything expensive — the same order the buffered
+  // door learned. A `Content-Length` past the ceiling is refused with a sentence
+  // rather than cut off mid-body by the edge with nothing useful to say.
+  const declared = Number(request.headers.get("content-length") ?? 0)
+  if (!Number.isFinite(declared) || declared <= 0)
+    return fail(411, "length_required", "That upload did not say how big it is, so we did not start it.")
+  if (declared > KNOWLEDGE_STREAM_MAX_BYTES)
+    return fail(
+      413,
+      "too_large",
+      `That upload is too big — the most we can take in one file is ${mb(KNOWLEDGE_STREAM_MAX_BYTES)}. Nothing was saved.`
+    )
+
+  const { actor, cfg, guard } = await gated(request, env, "knowledge", "create")
+  await refusePortalCaller(cfg, guard)
+
+  // The metadata rides the query string, and every field goes through the seam.
+  const url = new URL(request.url)
+  // EVERY ONE THROUGH `queryText`, including the two that look like they do not
+  // need it. The file name is REQUIRED, so the obvious spelling is `requireText`
+  // — but R20's query census reads the call a `searchParams.get` sits inside, and
+  // it is right to: a required-ness check is not a length check, and this door's
+  // whole point is that its metadata moved OUT of the validated body. The
+  // required-ness is a separate line below, where it reads as what it is.
+  const fileName = queryText(url.searchParams.get("fileName"), "File name", TEXT_LIMITS.short)
+  if (!fileName)
+    return fail(400, "invalid_input", "That upload did not say what the file is called. Nothing was saved.")
+  const title = queryText(url.searchParams.get("title"), "Title", TEXT_LIMITS.short) ?? fileName
+  const accountId = queryText(url.searchParams.get("accountId"), "Account", TEXT_LIMITS.short) ?? null
+  // …and the same for the one read only ever compared against a literal. A
+  // comparison bounds what the value MEANS, never what it COSTS to carry here.
+  const privateToMe =
+    queryText(url.searchParams.get("visibility"), "Visibility", TEXT_LIMITS.short) === "private"
+
+  // The declared type is checked for SHAPE, exactly as the buffered door checks
+  // it — and, exactly as there, it is never what the bytes are stored under.
+  const contentType = (request.headers.get("content-type") ?? "").split(";")[0].trim()
+  if (!ANY_FILE_TYPE.test(contentType))
+    return fail(400, "invalid_input", "That upload did not say what kind of file it is. Nothing was saved.")
+  if (!request.body)
+    return fail(400, "invalid_input", "That upload had no file in it. Nothing was saved.")
+
+  // STREAMED STRAIGHT THROUGH. This is the whole change: the bytes are never a
+  // value in this isolate. The bucket and the label are the buffered door's, for
+  // its reasons — INTERNAL_MEDIA because `/media/internal/` is served by the
+  // agency gateway alone, and NEUTRALISED_CONTENT_TYPE because an object served
+  // back on the app's own origin must not carry a renderable label.
+  const key = mediaKey(guard.teamId)
+  await env.INTERNAL_MEDIA.put(key, request.body, {
+    httpMetadata: { contentType: NEUTRALISED_CONTENT_TYPE },
+  })
+
+  // READING IT IS A SEPARATE QUESTION FROM STORING IT, and now they have separate
+  // ceilings. Conversion needs the bytes in memory — that is what conversion is —
+  // so a file past the extract ceiling is stored and listed and SAYS it was not
+  // read, which is the answer the knowledge base already gives for a file it
+  // cannot convert. Storing a 60 MB archive nobody can search beats refusing it:
+  // the alternative is that the material is not in the product at all.
+  let extract: { text: string | null; note: string | null }
+  if (declared > KNOWLEDGE_EXTRACT_MAX_BYTES) {
+    extract = { text: null, note: unreadableNote(fileName) }
+  } else {
+    // Read back ONCE, from the object we just wrote. One copy in memory, against
+    // the buffered door's three.
+    const stored = await env.INTERNAL_MEDIA.get(key)
+    extract = stored
+      ? await extractFile(env, {
+          bytes: new Uint8Array(await stored.arrayBuffer()),
+          contentType,
+          fileName,
+        })
+      : { text: null, note: unreadableNote(fileName) }
+  }
+
+  const id = await createFileSource(env, cfg, guard, actor, {
+    title,
+    accountId,
+    privateToMe,
+    file: { url: `/media/internal/${key}`, name: fileName, type: contentType, bytes: declared },
+    extract,
+  })
   await publishChange(env, guard.teamId, "knowledge", id, "add")
   return json({ source: await getSource(cfg, guard, id), total: await countSources(cfg, guard) })
 }

@@ -341,18 +341,47 @@ export const content = {
   /** Hand the knowledge base a FILE. One call, one record: the bytes and the row
    * are written together, so closing the tab halfway can never leave a stored
    * file nothing points at. The answer is the source itself — read `fileNote` to
-   * find out whether its words are searchable or whether it is only kept. */
-  uploadKnowledgeFile: (input: {
+   * find out whether its words are searchable or whether it is only kept.
+   *
+   * THE BYTES GO AS THE BODY, not inside it (`/upload-stream`). The old door
+   * (`/upload`) took a base64 data URL in a JSON envelope, which the worker had to
+   * materialise whole before it could validate anything — a 25 MB file became
+   * ~33 MB of base64, plus the decoded copy, plus the JSON around them, in a
+   * 128 MB isolate. That was the real ceiling, and it was the SERVER's.
+   *
+   * It stays a data URL on THIS side, because that is what the file field
+   * produces and the browser was never the constrained end. The conversion back
+   * to bytes happens here, at the edge of the network call, so the request
+   * carries the file itself and the worker streams it to storage without ever
+   * holding it. The metadata rides the query string for the same reason — there
+   * is no JSON body left to put it in.
+   *
+   * The old door is still there and still works. A browser holds its own copy of
+   * this app for as long as the tab is open, so a build shipped before today keeps
+   * uploading through the door it knows about. */
+  uploadKnowledgeFile: async (input: {
     fileName: string
     fileDataUrl: string
     title?: string
     accountId?: string | null
     visibility?: string
-  }) =>
-    api<{ source: KnowledgeSource | null; total: number }>(
-      "/api/content/knowledge/upload",
-      post(input)
-    ),
+  }) => {
+    const blob = await (await fetch(input.fileDataUrl)).blob()
+    const q = new URLSearchParams({ fileName: input.fileName })
+    if (input.title) q.set("title", input.title)
+    if (input.accountId) q.set("accountId", input.accountId)
+    if (input.visibility) q.set("visibility", input.visibility)
+    return api<{ source: KnowledgeSource | null; total: number }>(
+      `/api/content/knowledge/upload-stream?${q}`,
+      {
+        method: "POST",
+        // The file's own type, so the converter can pick a reader. It is a LABEL:
+        // the object is stored under a neutral type whatever this says.
+        headers: { "Content-Type": blob.type || "application/octet-stream" },
+        body: blob,
+      }
+    )
+  },
   updateKnowledge: (input: {
     id: string
     title: string
