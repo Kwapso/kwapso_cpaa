@@ -75,6 +75,7 @@ export type TeamSection = {
     // glossary uses for what is on it now that the sprints have moved out.
     | "apps"
     | "sprints"
+    | "time"
     | "stories"
     | "tasks"
     // MEETINGS — a section of its own, which is what the owner asked for. It sits
@@ -188,6 +189,21 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // contract and an app is an inventory, and neither is opened before lunch.
   { key: "stories", title: "Stories", module: "work", segment: "stories", placement: "sidebar", countCacheKey: "stories", group: "daily" },
   { key: "tasks", title: "Tasks", module: "work", segment: "tasks", placement: "sidebar", countCacheKey: "tasks", group: "daily" },
+  // TIME — the fourth daily destination, and the one that had none.
+  //
+  // A work log is the row every figure in this app is eventually built on, and
+  // there was nowhere to go and look at one: the whole list lived in a panel at
+  // the FOOT of the Stories page, under the backlog, and a story's own Time tab
+  // showed the handful logged against that story. Both are the right place for
+  // what they do — a start button belongs beside the work, and a story's hours
+  // belong on the story — and neither is a place a person goes to find "the time
+  // I logged". A tester with 115 entries reported she could not find any of it.
+  //
+  // "Time" rather than "Work logs": the glossary defines a work log as "one row
+  // of time", and the two screens that already show them are both headed Time.
+  // The count is the exact number of ROWS (R16), keyed off the same cache the
+  // list reads; the hours are a second, different number the screen says itself.
+  { key: "time", title: "Time", module: "work", segment: "time", placement: "sidebar", countCacheKey: "work-logs", group: "daily" },
   // ── and below the divider ────────────────────────────────────────────────
   { key: "meetings", title: "Meetings", module: "meetings", segment: "meetings", placement: "sidebar", countCacheKey: "meetings", group: "occasional" },
   // Apps gate on `processes`, not `work`: an app is the thing a process map
@@ -271,7 +287,12 @@ export const CONCEPT_ICON = {
   // is what distinguishes it from every other list in the rail.
   meetings: "calendar-clock",
   todos: "inbox",
-  timer: "timer",
+  // TIME — the section, the story tab and the running clock in the header are
+  // ONE concept wearing one icon (UI-CONVENTIONS §4), which is why this is `time`
+  // and not `timer`: the key has to match the section key the rail looks it up
+  // by, and a second entry for the same idea is how two icons for one concept
+  // start.
+  time: "timer",
   import: "upload",
   activity: "history",
   // The agency's own housekeeping: what we send out, the material we send it

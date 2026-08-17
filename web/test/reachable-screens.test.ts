@@ -38,7 +38,7 @@ import { describe, expect, it } from "vitest"
 import { sourceFiles } from "@shared/rules/source-scan"
 
 import { NAV, TEAM_SECTIONS } from "../lib/pages"
-import { MODULE_PERMISSION } from "../lib/screens"
+import { BASE_RECIPES, MODULE_PERMISSION } from "../lib/screens"
 import { TOP_LEVEL_MODULES } from "../components/deep-link/route"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -114,6 +114,28 @@ describe("the screens are reachable", () => {
       expect(
         new RegExp(`"${s.segment}"`).test(gateway),
         `the gateway does not forward /${s.segment}/* to its shell — a deep link to one of its records 404s on load`
+      ).toBe(true)
+
+      // (e) …and something actually RENDERS it. Four registries can all agree a
+      // section exists while the render switch has no branch for it, and then
+      // the rail links to a page that answers NotFound.
+      //
+      // It is a real failure, not a hypothetical one: the Time section shipped
+      // its registries in one commit and its screen in the same one, and for the
+      // length of that commit the branch sat BELOW `renderCollection`'s
+      // `<module>.list` recipe guard — which every other collection passes and a
+      // host-composed one cannot. Every test was green, because the four checks
+      // above are about registries and none of them opens the screen.
+      //
+      // A collection is drawn either by a branch in the switch or by a recipe;
+      // this asks for one of the two, which is the weakest claim that still
+      // catches a destination nothing draws.
+      const collections = read(join(WEB, "components", "deep-link", "collection-content.tsx"))
+      const hasBranch = new RegExp(`module === "${s.segment}"`).test(collections)
+      const hasRecipe = `${s.segment}.list` in BASE_RECIPES
+      expect(
+        hasBranch || hasRecipe,
+        `sidebar section "${s.key}" has no branch in renderCollection AND no "${s.segment}.list" recipe — the rail links to a page that renders NotFound`
       ).toBe(true)
     }
   })

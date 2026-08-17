@@ -41,7 +41,7 @@ import { SelectableScreen } from "@/components/selectable-screen"
 import { NoAccess, NotFound, LoadError } from "@/components/deep-link/screen-bits"
 import { LoadMore } from "@/components/load-more"
 import { tenancy } from "@/lib/api"
-import type { HelpScope } from "@/lib/live-resources"
+import type { HelpScope, TaskView } from "@/lib/live-resources"
 import {
   shapeBrandDetail,
   shapeInviteDetail,
@@ -59,6 +59,7 @@ import type { useActiveTeam } from "@/lib/use-active-team"
 import {
   MODULE_PERMISSION,
   resolveRecipe,
+  withActionLabel,
   withoutActions,
   withTabCounts,
 } from "@/lib/screens"
@@ -75,7 +76,7 @@ export type ModuleContentCtx = Pick<
   ScreenData,
   | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "learningQ" | "helpQ" | "helpMineQ" | "helpArchivedQ" | "accountsQ" | "knowledgeQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "inviteAuditQ"
   | "marketingQ" | "brandQ" | "programmesQ" | "purposesQ" | "internalActivity"
-  | "storiesQ" | "sprintsQ" | "appsQ" | "tasksQ" | "meetingsQ"
+  | "storiesQ" | "sprintsQ" | "appsQ" | "tasksOpenQ" | "tasksAllQ" | "workLogsQ" | "meetingsQ"
 > & {
   noAccess: boolean
   enabled: boolean
@@ -97,6 +98,8 @@ export type ModuleContentCtx = Pick<
   setHelpScope: (v: HelpScope) => void
   myUserId: string | null
   query: ScreenQuery
+  taskView: TaskView
+  setTaskView: (v: TaskView) => void
 }
 
 /** The row is whichever record kind a segment holds; each shaper takes its own
@@ -116,17 +119,29 @@ function internalDetail(
     what: string
     query: { data: { id: string }[] | undefined; error: unknown }
     shape: InternalShaper
+    /** Last word on the recipe, once the record is known — for the one thing a
+     * recipe cannot say on its own: an action whose label depends on the state
+     * of the record it acts on. A `RecipeAction.label` is a static string in the
+     * library (which is lego, and not edited from here), so a control that has
+     * to read "put it back" once it has been ticked is the host's job.
+     *
+     * It is handed the SHAPED record rather than the raw row on purpose: that is
+     * the object `onAction` reads to decide which way the toggle goes, and a
+     * label deciding from a different spelling of the same field is how a button
+     * ends up disagreeing with the write behind it. */
+    adapt?: (recipe: ScreenRecipe, record: Record<string, unknown>) => ScreenRecipe
   }
 ): React.ReactNode {
   if (spec.query.error) return <LoadError what={spec.what} />
   if (spec.query.data === undefined) return <Skeleton variant="list" lines={4} />
   const row = spec.query.data.find((r) => r.id === ctx.recordId) ?? null
   if (!row) return <p className="text-muted-foreground text-sm">That record no longer exists.</p>
+  const data = spec.shape(row, ctx.internalActivity.rows)
   return (
     <div className="flex flex-col gap-4">
       <ScreenRenderer
-        recipe={recipe}
-        data={spec.shape(row, ctx.internalActivity.rows)}
+        recipe={spec.adapt ? spec.adapt(recipe, data.record ?? {}) : recipe}
+        data={data}
         rights={ctx.rights}
         onAction={ctx.onAction}
         onIntent={ctx.onIntent}
@@ -362,8 +377,18 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       // R8/R16: the Activity tab badges this record's exact history total.
       return internalDetail(ctx, withTabCounts(base, { activity: ctx.internalActivity.total }), {
         what: "the tasks",
-        query: ctx.tasksQ,
+        // The ALL list, not the open one: ticking a task off removes it from the
+        // open collection, so a detail read out of that would answer "that record
+        // no longer exists" the instant you used the button on it.
+        query: ctx.tasksAllQ,
         shape: shapeTaskDetail as InternalShaper,
+        // THE TICK SAYS WHAT IT WILL DO NEXT. Same door, two directions — the
+        // host already toggles on the record's status, and the label has to
+        // agree with it or a finished task offers to be finished again.
+        adapt: (recipe, record) =>
+          record.status === "Done"
+            ? withActionLabel(recipe, "tasks.done", "Put it back", "ghost")
+            : recipe,
       })
     }
 

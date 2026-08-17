@@ -99,11 +99,19 @@ export async function postStartTimer(request: Request, env: Env): Promise<Respon
     requireText(body.targetTable, "What the time is against", TEXT_LIMITS.short),
     requireText(body.targetId, "What the time is against", TEXT_LIMITS.short)
   )
-  const { id, accountId } = await startTimer(cfg, guard, actor, {
+  const { id, accountId, stopped } = await startTimer(cfg, guard, actor, {
     ...target,
     note: optionalText(body.note, "Note", TEXT_LIMITS.long),
     kind: optionalText(body.kind, "Kind of work", TEXT_LIMITS.short),
   })
+  // R1: THE TIMERS AUTO-STOP CLOSED ARE MUTATIONS TOO. Starting one under the
+  // caller's own auto-stop-previous setting ENDS the others — a row of time
+  // acquires a finish and a duration — and only the new row was being announced.
+  // So every other screen (and every colleague's) went on showing those timers
+  // as running until something else happened to drop the cache. One publish per
+  // row moved, before the one for the row created.
+  for (const was of stopped)
+    await publishChange(env, guard.teamId, "work_logs", was.id, "edit", was.accountId ?? undefined)
   await publishChange(env, guard.teamId, "work_logs", id, "add", accountId ?? undefined)
   return json({ timers: await runningTimers(cfg, guard) })
 }

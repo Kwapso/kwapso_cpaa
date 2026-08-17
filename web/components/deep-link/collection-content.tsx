@@ -27,6 +27,7 @@ import { AppsScreen } from "@/components/apps-screen"
 import { SprintsScreen } from "@/components/sprints-screen"
 import { StoriesScreen } from "@/components/stories-screen"
 import { TasksScreen } from "@/components/tasks-screen"
+import { TimeScreen } from "@/components/time-screen"
 import { MeetingsScreen } from "@/components/meetings-screen"
 import { TriageStrip } from "@/components/triage-strip"
 import {
@@ -88,6 +89,27 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     setHelpScope,
     query,
   } = ctx
+
+  // TIME — the one collection with NO recipe, so it is answered before the
+  // recipe guard below rather than after it.
+  //
+  // Its rows are a list whose only controls are a correction dialog and a
+  // three-answer prompt, which is a screen the engine has no block for — the
+  // same reason the story detail is host-composed. Everything under this line
+  // has a `<module>.list` recipe and dies without one, so a host-only collection
+  // placed among them resolves to NotFound: the section is in every registry,
+  // the rail links to it, and the page 404s. (It did, for one commit.)
+  if (module === "time") {
+    if (ctx.workLogsQ.error) return <LoadError what="the time" />
+    return (
+      <TimeScreen
+        teamId={teamId as string}
+        total={totals.workLogs}
+        canCreate={can("work", "create")}
+        canEdit={can("work", "edit")}
+      />
+    )
+  }
 
   const recipe = resolveRecipe(`${module}.list`, overridesQ.data)
   if (!recipe) return <NotFound />
@@ -247,7 +269,6 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         rights={rights}
         total={totals.stories}
         canCreate={can("work", "create")}
-        canEditTime={can("work", "edit")}
         onAction={onAction}
         onIntent={onIntent}
       />
@@ -286,6 +307,9 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         recipe={recipe}
         rights={rights}
         total={totals.tasks}
+        allTotal={totals.tasksAll}
+        view={ctx.taskView}
+        onViewChange={ctx.setTaskView}
         canCreate={can("work", "create")}
         canRaiseTodo={can("todos", "create")}
         canCancelTodo={can("todos", "delete")}

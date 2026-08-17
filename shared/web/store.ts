@@ -116,6 +116,24 @@ export function invalidate(key: string): void {
   notify(key)
 }
 
+/** Drop every cached entry whose key starts with `prefix`, and tell anyone
+ * showing one to refetch.
+ *
+ * For a collection that is ALSO cached in RECORD-SCOPED slices — the time
+ * logged against one story, say — where the live ping cannot name which slice
+ * it belongs to. A work-log ping carries the work log's own id; the story it
+ * was logged against is on the ROW, which the listener has not read yet and
+ * may never read (patchRow does nothing when the team-wide list isn't loaded).
+ * So the honest answer is to drop every loaded slice and let the one on screen
+ * re-read — the same coarse honesty `help-mine` already gets, for the same
+ * reason. Cache-first, so a slice nobody is looking at costs nothing. */
+export function invalidatePrefix(prefix: string): void {
+  // Snapshot first: `invalidate` notifies, a subscriber may refetch, and a
+  // refetch stores — mutating the map that is being walked.
+  const keys = [...cache.keys()]
+  for (const key of keys) if (key.startsWith(prefix)) invalidate(key)
+}
+
 /** FORGET EVERYTHING — sign-out, and switching to another team.
  *
  * Both change WHO IS ASKING, and a cache keyed by resource + team id still holds

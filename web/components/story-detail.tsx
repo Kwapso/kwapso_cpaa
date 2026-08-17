@@ -27,7 +27,8 @@ import { ArrowDown, ArrowUp, Pencil, Play } from "lucide-react"
 import { LoadMore } from "@/components/load-more"
 import { StoryFormDialog, type StoryFormValues } from "@/components/story-form-dialog"
 import { useStoryFormOptions } from "@/components/stories-screen"
-import { STORY_STATUS_LABEL, sliceKey } from "@/components/work-panels"
+import { STORY_STATUS_LABEL } from "@/components/work-panels"
+import { TimeFormDialog, type TimeFormValues } from "@/components/time-form-dialog"
 import { StoryStatusStepper } from "@/components/story-status-stepper"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
@@ -35,7 +36,7 @@ import { ApiFailure, content as contentApi } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
-import { cursorKey, runningTimersKey, storiesKey, totalKey } from "@/lib/live-resources"
+import { cursorKey, recordTimeKey, runningTimersKey, storiesKey, totalKey } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
@@ -71,7 +72,10 @@ export function StoryDetailScreen({
     contentApi.stories().then((r) => r.stories)
   )
 
-  const timeKey = sliceKey("time-story", storyId)
+  // The time on THIS story. Keyed through recordTimeKey rather than the generic
+  // slice key, because that family is the one the live registry drops when any
+  // row of time moves (R15) — a stop pressed on the header bar has to land here.
+  const timeKey = recordTimeKey("stories", storyId)
   const logsQ = useCached<WorkLog[]>(timeKey, () =>
     contentApi.workLogs({ filter: { targetTable: "stories", targetId: storyId } }).then((r) => {
       primeCache(totalKey("time-story", storyId), r.total)
@@ -86,6 +90,11 @@ export function StoryDetailScreen({
 
   const [tab, setTab] = React.useState("overview")
   const [editOpen, setEditOpen] = React.useState(false)
+  // THE ROW OF TIME BEING CORRECTED. Held rather than routed through the URL,
+  // for the reason the Stories page's panel holds its own: a correction is a
+  // thing you do to a line you are looking at, and Back should close the form
+  // rather than walk you back through every line you opened.
+  const [editingLog, setEditingLog] = React.useState<WorkLog | null>(null)
   const [busy, setBusy] = React.useState(false)
   const options = useStoryFormOptions(teamId)
   const host = { base: basePath.replace(/\/stories$/, "") }
@@ -108,6 +117,25 @@ export function StoryDetailScreen({
     } finally {
       setBusy(false)
     }
+  }
+
+  /** CORRECT A ROW OF TIME, on the record it was logged against. The Time tab
+   * listed the hours and offered nothing to do about a wrong one — so a mistyped
+   * figure could only be fixed from the Stories page, if you knew it was there.
+   * The door keeps the trail (who corrected what, and when). */
+  async function correctTime(values: TimeFormValues) {
+    if (!editingLog) return
+    await contentApi.updateWorkLog({
+      id: editingLog.id,
+      startedAt: values.startedAt,
+      endedAt: values.endedAt,
+      note: values.note,
+      kind: values.kind,
+      billable: values.billable,
+    })
+    invalidate(timeKey)
+    invalidate(`activity:record:stories:${storyId}`)
+    toast.success("Time corrected.")
   }
 
   async function save(values: StoryFormValues) {
@@ -176,7 +204,7 @@ export function StoryDetailScreen({
       {
         value: "time",
         label: "Time",
-        icon: CONCEPT_ICON.timer,
+        icon: CONCEPT_ICON.time,
         badge: formatCount(timeTotal),
         badgeVariant: "" as const,
       },
@@ -352,6 +380,23 @@ export function StoryDetailScreen({
                             Discarded
                           </Badge>
                         )}
+                        {/* FIX A LINE. Only on time that has FINISHED and has
+                            not been binned: a running timer is corrected by
+                            stopping it (the control for that is on the header
+                            bar, on every screen), and a start time you can edit
+                            while the clock is still counting is two people
+                            writing the same number. */}
+                        {canEdit && l.endedAt && !l.discarded && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setEditingLog(l)}
+                            className="shrink-0 gap-1.5"
+                          >
+                            <Pencil className="size-3.5" />
+                            Edit
+                          </Button>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -393,6 +438,13 @@ export function StoryDetailScreen({
         }}
         draftKey={`story:edit:${storyId}`}
         onSubmit={save}
+      />
+      <TimeFormDialog
+        open={!!editingLog}
+        onOpenChange={(o) => !o && setEditingLog(null)}
+        draftKey={editingLog ? `work-log:edit:${editingLog.id}` : undefined}
+        initial={editingLog}
+        onSubmit={correctTime}
       />
     </div>
   )

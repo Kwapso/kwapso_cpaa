@@ -72,6 +72,15 @@ export type StoryWrite = {
 }
 
 /** The facets the work-log list door parses. */
+/** What every tasks door answers with: the rows for the view asked for, the
+ * count over that view, and BOTH view counts for the strip's two badges (R16). */
+export type TaskListResponse = {
+  tasks: Task[]
+  total: number
+  openTotal: number
+  allTotal: number
+}
+
 export type LogQuery = {
   scope?: "mine" | "all"
   targetTable?: string
@@ -249,14 +258,18 @@ export const content = {
       post({ id, fileDataUrl: file?.dataUrl, fileName: file?.name })
     ),
   cancelTodo: (id: string) => api<{ todos: Todo[]; total: number }>("/api/content/todos/cancel", post({ id })),
+  /** Our own admin. `openTotal` and `allTotal` are the two exact server counts
+   * the view strip badges (R16) — both come back whichever view was asked for,
+   * because the count on the tab you are not looking at cannot be derived from
+   * the rows on the one you are. `total` is the count over what was listed. */
   tasks: (view?: "open" | "all") =>
-    api<{ tasks: Task[]; total: number }>(`/api/content/tasks${view ? `?view=${view}` : ""}`),
+    api<TaskListResponse>(`/api/content/tasks${view ? `?view=${view}` : ""}`),
   taskOne: (id: string) =>
     api<{ tasks: Task[] }>("/api/content/tasks?view=all").then((r) => r.tasks.find((t) => t.id === id) ?? null),
   createTask: (input: { title: string; detail?: string; dueOn?: string; assigneeId?: string; accountId?: string }) =>
-    api<{ tasks: Task[]; total: number }>("/api/content/tasks", post(input)),
+    api<TaskListResponse>("/api/content/tasks", post(input)),
   setTaskDone: (id: string, done: boolean) =>
-    api<{ tasks: Task[]; total: number }>("/api/content/tasks/done", post({ id, done })),
+    api<TaskListResponse>("/api/content/tasks/done", post({ id, done })),
 
   /* ---------------------------------- time ---------------------------------- */
   /** R14: a PAGE of time. `total` is the row count and `totalSeconds` is the

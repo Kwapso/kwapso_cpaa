@@ -23,15 +23,19 @@ import {
 import type { ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
 import { Inbox } from "lucide-react"
 
+import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
+
 import { CollectionHeading } from "@/components/collection-heading"
+import { CountedAbove } from "@/components/counted-tabs"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { TaskFormDialog, type TaskFormValues } from "@/components/task-form-dialog"
 import { TodoFormDialog, type TodoFormValues } from "@/components/todo-form-dialog"
 import { TodosPanel } from "@/components/work-panels"
 import { content as contentApi } from "@/lib/api"
-import { listFetch, tasksKey, todosKey } from "@/lib/live-resources"
+import { listFetch, tasksKey, todosKey, type TaskView } from "@/lib/live-resources"
 import { withDataDrivenCollection } from "@/lib/screens"
 import type { Task } from "@shared/types"
+import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
 import { invalidate, useCached } from "@shared/web/store"
 
@@ -63,6 +67,9 @@ export function TasksScreen({
   rights,
   total,
   canCreate,
+  allTotal,
+  view,
+  onViewChange,
   canRaiseTodo,
   canCancelTodo,
   onAction,
@@ -73,13 +80,19 @@ export function TasksScreen({
   rights: ScreenRights
   /** the exact server total (R16) — never the loaded list's length */
   total: number | undefined
+  /** the same, for the whole pile including the finished ones */
+  allTotal: number | undefined
+  /** which pile is showing — a SERVER view, owned by the host so the reads can
+   * key off it (see useScreenData) */
+  view: TaskView
+  onViewChange: (v: TaskView) => void
   canCreate: boolean
   canRaiseTodo: boolean
   canCancelTodo: boolean
   onAction: (actionId: string, ctx: ScreenActionContext) => void
   onIntent: (intent: ScreenIntent) => void
 }) {
-  const tasksQ = useCached<Task[]>(tasksKey(teamId), () => listFetch.tasks(teamId))
+  const tasksQ = useCached<Task[]>(tasksKey(teamId, view), () => listFetch.tasks(teamId, view))
   const [taskOpen, setTaskOpen] = React.useState(false)
   const [todoOpen, setTodoOpen] = React.useState(false)
 
@@ -89,7 +102,9 @@ export function TasksScreen({
       detail: values.detail || undefined,
       dueOn: values.dueOn ? new Date(values.dueOn).toISOString() : undefined,
     })
-    invalidate(tasksKey(teamId))
+    // A new task belongs in BOTH piles, and only one of them is on screen.
+    invalidate(tasksKey(teamId, "open"))
+    invalidate(tasksKey(teamId, "all"))
     toast.success("Task added.")
   }
 
@@ -110,10 +125,16 @@ export function TasksScreen({
   const data = shapeTasks(tasksQ.data)
   const listRecipe = withDataDrivenCollection(recipe, data.rows)
 
+  // R16: the two badges are exact server counts, both primed by whichever view
+  // was fetched — the finished pile cannot be counted from the open rows.
+  const openBadge = formatCount(total)
+
   return (
+    <CountedAbove active={openBadge !== ""}>
     <div className="flex flex-col gap-4">
-      {/* R16: a sidebar page has no tab strip to badge, so the count lives in the
-          heading — and it is the door's exact COUNT(*). */}
+      {/* R16: the count lives in ONE place. The strip below badges both views, so
+          the heading stands down through the arbitration context rather than
+          saying the same number twice. */}
       <CollectionHeading sectionKey="tasks" total={total} />
 
       <SectionWithCreate
@@ -121,6 +142,36 @@ export function TasksScreen({
         label="New task"
         icon="plus"
         onCreate={() => setTaskOpen(true)}
+        // OPEN / ALL, above the boxed list — it scopes which tasks the card
+        // shows, so it is not part of that unit. It is a SERVER view: the door
+        // has parsed `?view=all` since it shipped and nothing ever sent it, so
+        // the app had two piles of admin and could only ever show one of them.
+        aboveCard={
+          <TabsView
+            config={{
+              ...defaultTabsConfig,
+              variant: "line",
+              tabs: [
+                {
+                  value: "open",
+                  label: "Still to do",
+                  icon: "inbox",
+                  badge: openBadge,
+                  badgeVariant: "",
+                },
+                {
+                  value: "all",
+                  label: "All tasks",
+                  icon: "list",
+                  badge: formatCount(allTotal),
+                  badgeVariant: "",
+                },
+              ],
+            }}
+            value={view}
+            onValueChange={(v) => onViewChange(v as TaskView)}
+          />
+        }
       >
         <ScreenRenderer
           recipe={listRecipe}
@@ -158,5 +209,6 @@ export function TasksScreen({
         onSubmit={raiseTodo}
       />
     </div>
+    </CountedAbove>
   )
 }

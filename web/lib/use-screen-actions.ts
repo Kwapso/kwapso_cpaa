@@ -27,6 +27,7 @@ import {
   programmesKey,
   purposesKey,
   tasksKey,
+  totalKey,
 } from "@/lib/live-resources"
 import { invalidate, primeCache } from "@shared/web/store"
 import type { AccountFormValues } from "@/components/account-form-dialog"
@@ -169,8 +170,18 @@ export function useScreenActions(teamId: string | null) {
         // confirm: nothing is lost either way, and a confirm on a tick is the
         // kind of ceremony that teaches people to click through dialogs.
         case "tasks.done": {
-          const { tasks } = await contentApi.setTaskDone(payload.id, payload.done === "true")
-          primeCache(tasksKey(teamId), tasks)
+          const { tasks, openTotal, allTotal } = await contentApi.setTaskDone(
+            payload.id,
+            payload.done === "true"
+          )
+          // The door answers with the OPEN list, which is the one the row just
+          // left (or rejoined) — so that one is primed and the ALL list, which
+          // this response is not, is dropped and re-read. R16: both badges come
+          // back from the same write, so neither goes stale behind the other.
+          primeCache(tasksKey(teamId, "open"), tasks)
+          primeCache(totalKey("tasks", teamId), openTotal)
+          primeCache(totalKey("tasks-all", teamId), allTotal)
+          invalidate(tasksKey(teamId, "all"))
           invalidate(`activity:record:tasks:${payload.id}`)
           toast.success(payload.done === "true" ? "Ticked off." : "Put back.")
           break

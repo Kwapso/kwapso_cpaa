@@ -184,9 +184,12 @@ export const listFetch = {
       primeCache(totalKey("todos", teamId), r.total)
       return r.todos
     }),
-  tasks: (teamId: string) =>
-    contentApi.tasks().then((r) => {
-      primeCache(totalKey("tasks", teamId), r.total)
+  // Both counts come back from either view's fetch (R16), because the badge on
+  // the strip's OTHER tab cannot be counted from the rows in front of you.
+  tasks: (teamId: string, view: TaskView = "open") =>
+    contentApi.tasks(view).then((r) => {
+      primeCache(totalKey("tasks", teamId), r.openTotal)
+      primeCache(totalKey("tasks-all", teamId), r.allTotal)
       return r.tasks
     }),
   // R14: meetings are PAGED — an event is never curated away, so the door answers
@@ -275,8 +278,13 @@ export function workLogsKey(teamId: string): string {
 export function todosKey(teamId: string): string {
   return `todos:${teamId}`
 }
-export function tasksKey(teamId: string): string {
-  return `tasks:${teamId}`
+/** Which pile of our own admin a screen is showing. A SERVER view, not a client
+ * filter: the list is capped (R14), so sieving the loaded rows for the done ones
+ * would show "the finished tasks among the newest N" under a badge counting all
+ * of them (R16) — the same reason the ticket strip is a server scope. */
+export type TaskView = "open" | "all"
+export function tasksKey(teamId: string, view: TaskView = "open"): string {
+  return view === "all" ? `tasks-all:${teamId}` : `tasks:${teamId}`
 }
 
 /** The diary's cache key (the paged meetings list). */
@@ -292,6 +300,24 @@ export function triageKey(teamId: string): string {
 
 export function runningTimersKey(teamId: string): string {
   return `running-timers:${teamId}`
+}
+
+/** THE TIME LOGGED AGAINST ONE RECORD — the Time tab on a story, and any record
+ * that grows one (a ticket and a task are the other two things time may sit
+ * against). Keyed by the record, because it is that record's own slice of a
+ * collection the whole team shares, read through the door's own target filter
+ * rather than sieved out of the team-wide page.
+ *
+ * They all share ONE PREFIX on purpose. A `work_logs` ping carries the work
+ * log's id and nothing else — the story it belongs to is on the row — so a
+ * listener cannot name the one slice that went stale. It drops the family and
+ * the slice on screen re-reads (see TEAM_RESOURCES.work_logs below). This is
+ * the bug the tester found: a timer stopped from the header stayed "running" on
+ * the story's Time tab for ever, because that key reached no listener at all —
+ * and a row that reads as running is a row the screen refuses to let you edit. */
+export const TIME_SLICE_PREFIX = "time-of:"
+export function recordTimeKey(targetTable: string, targetId: string): string {
+  return `${TIME_SLICE_PREFIX}${targetTable}:${targetId}`
 }
 /** The agency-internal collections' cache keys. Named functions rather than
  * inline templates for the same reason the accounts and ticket keys are: the
@@ -406,6 +432,12 @@ export const TEAM_RESOURCES: Record<
     fetchList: (teamId: string) => Promise<Record<string, unknown>[]>
     /** small dependent caches to coarse-invalidate (aggregations / feeds). */
     deps?: (teamId: string, id: string) => string[]
+    /** A cache-key PREFIX covering this collection's record-scoped slices, for
+     * the collections that have them. `deps` is given the ping's row id, which
+     * is enough to name a key derived from THAT row; it is not enough when the
+     * slice is keyed by a DIFFERENT record (the story a work log sits against).
+     * Everything under the prefix is dropped and re-read. */
+    slicePrefix?: string
     /** refresh the active-team context (e.g. the section member count). */
     refreshCtx?: boolean
   }
@@ -560,6 +592,9 @@ export const TEAM_RESOURCES: Record<
     fetchOne: (id) => contentApi.workLogOne(id),
     fetchList: (t) => listFetch.workLogs(t),
     deps: (t, id) => [runningTimersKey(t), storiesKey(t), `activity:record:work_logs:${id}`],
+    // …and the Time tab on whichever record this row was logged against, which
+    // the ping cannot name (recordTimeKey above says why it is a family drop).
+    slicePrefix: TIME_SLICE_PREFIX,
   },
   // TO-DOS — row-level live, and the one work-engine resource a CLIENT hears
   // about too (the portal has its own listener map). A contact completing one in
@@ -572,13 +607,16 @@ export const TEAM_RESOURCES: Record<
     fetchList: (t) => listFetch.todos(t),
     deps: (_t, id) => [`activity:record:todos:${id}`],
   },
-  // TASKS — our own admin, agency-side only.
+  // TASKS — our own admin, agency-side only. The row-level patch lands on the
+  // OPEN list; the All list is dropped instead, because a task that has just
+  // been ticked leaves one collection and stays in the other, and "patch the row
+  // in place" has no answer for a row that changed which list it belongs to.
   tasks: {
-    key: (t) => tasksKey(t),
+    key: (t) => tasksKey(t, "open"),
     idField: "id",
     fetchOne: (id) => contentApi.taskOne(id),
-    fetchList: (t) => listFetch.tasks(t),
-    deps: (_t, id) => [`activity:record:tasks:${id}`],
+    fetchList: (t) => listFetch.tasks(t, "open"),
+    deps: (t, id) => [tasksKey(t, "all"), `activity:record:tasks:${id}`],
   },
   // MEETINGS — row-level live. A paged list's rows live in a cache key with its
   // cursor in a sidecar, so the same registry keeps it live (R15's own words).

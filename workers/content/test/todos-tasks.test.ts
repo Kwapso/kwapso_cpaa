@@ -228,6 +228,41 @@ describe("a task is ours, and a client never learns one exists", () => {
     ).toBe(stamp)
   })
 
+  // THE FINISHED PILE IS REACHABLE, AND BOTH COUNTS COME BACK.
+  //
+  // `?view=all` has been parsed by this door since it shipped and nothing on any
+  // screen ever sent it, so the app had a two-view collection and could show one
+  // view of it — the tester's "cannot switch the view, I only see open ones".
+  // A door with a filter nobody sends is indistinguishable from a door without
+  // one, so the contract is pinned here: the view CHANGES the rows, and every
+  // answer carries both exact counts, because the badge on the tab you are not
+  // looking at cannot be counted from the rows on the one you are (R16).
+  it("shows the finished ones on ?view=all, and counts both piles either way", async () => {
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Still to do" })
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Already finished" })
+    const done = (
+      db().prepare(`SELECT id FROM tasks WHERE title = 'Already finished'`).get() as { id: string }
+    ).id
+    await call(IDS.staffUser, "POST /api/content/tasks/done", { id: done, done: true })
+
+    const open = (await (await call(IDS.staffUser, "GET /api/content/tasks")).json()) as {
+      tasks: { title: string }[]
+      total: number
+      openTotal: number
+      allTotal: number
+    }
+    expect(open.tasks.map((t) => t.title)).toEqual(["Still to do"])
+    // `total` stays the count over what was LISTED, so the sidebar badge goes on
+    // meaning "what is still on our list".
+    expect(open).toMatchObject({ total: 1, openTotal: 1, allTotal: 2 })
+
+    const all = (await (
+      await call(IDS.staffUser, "GET /api/content/tasks", undefined, "?view=all")
+    ).json()) as { tasks: { title: string }[]; total: number; openTotal: number; allTotal: number }
+    expect(all.tasks.map((t) => t.title).sort()).toEqual(["Already finished", "Still to do"])
+    expect(all).toMatchObject({ total: 2, openTotal: 1, allTotal: 2 })
+  })
+
   // THE LINE BETWEEN THE TWO NOUNS, proved rather than asserted. A client login
   // holding every right their role can hold reads their own to-dos and is
   // refused the task list outright — which is the whole reason these are two

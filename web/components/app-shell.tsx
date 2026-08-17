@@ -41,7 +41,7 @@ import { useRealtime, useUserRealtime } from "@shared/web/realtime"
 // the live-collections check imports, and the thread/help_threads + agent_usage
 // deaf-exemptions live beside them in the rules registry.
 import { SIMPLE_INVALIDATIONS, TEAM_RESOURCES, totalKey } from "@/lib/live-resources"
-import { invalidate, patchRow, primeCache, readCache, reconcile } from "@shared/web/store"
+import { invalidate, invalidatePrefix, patchRow, primeCache, readCache, reconcile } from "@shared/web/store"
 import { NAV, TEAM_SECTIONS, bottomNavItems, isNavActive, type Crumb, type NavGroup } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useTeamPrewarm } from "@/lib/use-team-prewarm"
@@ -197,6 +197,12 @@ export function AppShell({
       }
       const r = TEAM_RESOURCES[event.resource]
       if (!r) return
+      // The record-scoped slices of this collection, where it has them. Dropped
+      // BEFORE the row-level patch below and independently of it: patchRow does
+      // nothing when the team-wide list isn't loaded, and "the person is looking
+      // at one story's Time tab having never opened the Time page" is precisely
+      // the case that stayed stale (see recordTimeKey in lib/live-resources).
+      if (r.slicePrefix) invalidatePrefix(r.slicePrefix)
       // R16: an add/remove moves the collection's exact total by one — bump the
       // primed sidecar so badges stay honest between full refetches.
       if (event.op === "add" || event.op === "remove") {
@@ -229,8 +235,13 @@ export function AppShell({
       // the badges as they run. The small derived feeds/gates are cheap, so
       // coarse-invalidate them.
       if (!teamId) return
-      for (const r of Object.values(TEAM_RESOURCES))
+      for (const r of Object.values(TEAM_RESOURCES)) {
         void reconcile(r.key(teamId), r.idField, () => r.fetchList(teamId))
+        // A record-scoped slice has no list fetcher to reconcile against — it is
+        // the door answering a narrower question — so catching up on one is a
+        // drop and a re-read.
+        if (r.slicePrefix) invalidatePrefix(r.slicePrefix)
+      }
       invalidate(`activity:team:${teamId}`)
       invalidate(`my-perms:${teamId}`)
       void active.refresh()
