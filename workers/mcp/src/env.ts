@@ -1,3 +1,5 @@
+import type { RateLimiter } from "@shared/workers/rate-limit"
+
 export interface Env {
   /** the global core DB (native binding) — mcp_tokens live here */
   DB: D1Database
@@ -9,4 +11,8 @@ export interface Env {
   DATAOPS: Fetcher
   /** the worker-to-worker shared secret (the auth session-mint bridge) */
   INTERNAL_KEY?: string
+  /** Cloudflare's per-caller rate-limit binding. Optional — the seam fails open
+   * without it (shared/workers/rate-limit.ts), which is what lets the code deploy
+   * before the binding is configured. */
+  CALLER_LIMIT?: RateLimiter
 }

@@ -257,6 +257,40 @@ export const BULK_IDS_LIMIT = Math.floor((AGENT_MAX_TOKENS - AGENT_REPLY_ENVELOP
 // repeat at will against it carries a ceiling, and — CONCURRENCY.md — the ceiling
 // rides the INSERT rather than being read first.
 
+// ── what one CALLER may ask for, per worker, per minute ──────────────────────
+// The caps above bound one request's work. This one bounds how many requests one
+// person gets, which is the axis nothing covered: every read door in the app was
+// unthrottled, and a read of the activity feed or the accounts list is real work
+// on a database the whole team shares.
+
+/** Requests one CALLER may make to ONE worker in a minute (shared/workers/rate-limit.ts).
+ *
+ * CHOSEN FROM THIS APP'S REAL SHAPE, not from a round number. The estate is 20
+ * client companies, 104 contacts and 6 staff, and realistic peak concurrency is
+ * about 40 sockets (ARCHITECTURE.md §7). The heaviest honest moment a single person
+ * produces is a cold open of the app — priming the caches behind a screen is on the
+ * order of twenty requests — and then navigation, which is a handful per screen.
+ * Somebody working hard, clicking constantly, with a page refreshing behind them,
+ * is tens per minute. Not hundreds.
+ *
+ * So 600 is roughly ten times the busiest real person and about ten requests a
+ * second sustained: generous enough that no human and no ordinary screen can reach
+ * it — including a screen that is retrying because something is wrong, which is the
+ * case that must NOT be throttled, because that person is already having a bad time
+ * — and low enough that a loop hits a wall in the first second rather than after it
+ * has read a database ten thousand times.
+ *
+ * PER WORKER, because the binding is per worker: a person's budget on content and
+ * their budget on tenancy are separate, which is the honest shape — they are
+ * separate databases' worth of work, and a busy Tickets screen should not spend the
+ * allowance the Accounts screen needs.
+ *
+ * The period is 60 seconds because Cloudflare's rate-limiting binding allows 10 or
+ * 60 and nothing else; the number here and the `period` in each wrangler.jsonc are
+ * the same decision written in two places, which is why every one of them says
+ * this constant's name in a comment beside it. */
+export const CALLER_REQUESTS_PER_MINUTE = 600
+
 /** Account-activity rows one PERSON may write in an hour. Every identity edit
  * (name, photo, email) appends a row to the shared core database AND pings that
  * person's live channel, so a session alternating its own first name grows the one

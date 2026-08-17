@@ -25,6 +25,7 @@
 
 import { fail, json } from "@shared/workers/http"
 import { GuardError, whoAmI } from "@shared/workers/gating"
+import { callerHasBudget, TOO_FAST } from "@shared/workers/rate-limit"
 import { requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { requestId } from "@shared/workers/trace"
@@ -53,6 +54,15 @@ async function handleMcp(request: Request, env: Env): Promise<Response> {
   if (!bearer)
     return fail(401, "no_token", "Send a personal access token: Authorization: Bearer <token>.")
   const token = await verifyToken(env, bearer)
+
+  // THE MACHINE SURFACE'S OWN CEILING, spent per TOKEN OWNER and separately from
+  // their budget inside the app (rate-limit.ts). It sits here because this is where
+  // the caller becomes known, exactly as `teamContext` is that point for the app —
+  // and it is worth having on top of the per-worker budgets behind it, because one
+  // JSON-RPC call can become several forwarded door calls: refusing the loop at the
+  // front is cheaper than refusing each of its consequences.
+  if (!(await callerHasBudget(env, token.user_id, "machine")))
+    throw new GuardError(429, "too_many_requests", TOO_FAST)
 
   const rpc = (await request.json().catch(() => null)) as RpcRequest | null
   if (!rpc || rpc.jsonrpc !== "2.0" || typeof rpc.method !== "string")

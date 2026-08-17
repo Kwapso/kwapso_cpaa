@@ -27,6 +27,14 @@
     { "binding": "CONTENT", "service": "kwapso-content" },
     { "binding": "DATAOPS", "service": "kwapso-data-ops" }
   ],
+  // PER-CALLER RATE LIMIT on the machine surface (shared/workers/rate-limit.ts),
+  // keyed on the TOKEN'S OWNER. Its own namespace so a looping integration is
+  // refused at /mcp before it becomes several forwarded door calls. The ceiling is
+  // CALLER_REQUESTS_PER_MINUTE in shared/workers/limits.ts; the code fails open if
+  // this block is absent.
+  "ratelimits": [
+    { "name": "CALLER_LIMIT", "namespace_id": "1104", "simple": { "limit": 600, "period": 60 } }
+  ],
   "vars": { "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7" },
   "env": {
     "staging": {
@@ -47,6 +55,9 @@
         { "binding": "TENANCY", "service": "kwapso-tenancy-staging" },
         { "binding": "CONTENT", "service": "kwapso-content-staging" },
         { "binding": "DATAOPS", "service": "kwapso-data-ops-staging" }
+      ],
+      "ratelimits": [
+        { "name": "CALLER_LIMIT", "namespace_id": "1104", "simple": { "limit": 600, "period": 60 } }
       ],
       "vars": { "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7" }
     }
