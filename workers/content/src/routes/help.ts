@@ -125,6 +125,11 @@ function ticketFilterFrom(url: URL): TicketFilter {
     // a leak. It is what a client record's Tickets tab and a contact's own screen
     // ask, so the rows and the badge answer the same question (R16).
     accountId: queryText(url.searchParams.get("accountId"), "Client"),
+    // WHICH SYSTEM — the app record's Tickets tab (8.6). Same reasoning as the
+    // account narrowing above: a filter over the fence, asked of the SERVER
+    // because the list pages, so "this app's tickets among the newest fifty" is
+    // an answer that would look like an answer and not be one.
+    appId: queryText(url.searchParams.get("appId"), "App"),
     // The sub-tab strip's two halves. The type is the team's OWN vocabulary, so
     // it is not checked against a list here — an unknown word narrows to nothing,
     // which is the honest answer for a type nobody uses.

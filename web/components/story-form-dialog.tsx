@@ -126,6 +126,7 @@ export function StoryFormDialog({
   fixedTicket,
   tickets,
   members,
+  appStaff,
   processes,
   storyTypes,
   initial,
@@ -150,6 +151,13 @@ export function StoryFormDialog({
   /** OPEN tickets only (6.4), each tagged with the app it is about. */
   tickets: { id: string; label: string; appId: string | null }[]
   members: { id: string; name: string }[]
+  /** WHO IS ON EACH APP (CHECKLIST 6.6) — app id → the staff user ids on it. The
+   * assignee picker narrows to the chosen app's people, and the DOOR refuses
+   * anybody else, so this is the courtesy half of a rule that is enforced on the
+   * server. An app nobody has been staffed to narrows to nobody, so the picker
+   * falls back to the whole team rather than becoming unusable — the same
+   * fail-open the door takes, said in the same place. */
+  appStaff: Map<string, string[]>
   /** The team's process maps, each tagged with the app it sits inside (6.5). */
   processes: { id: string; name: string; appId: string | null }[]
   /** The team's own `Story type` dropdown values (6.2). */
@@ -186,6 +194,12 @@ export function StoryFormDialog({
   const sprintOptions = onThisApp(sprints)
   const ticketOptions = onThisApp(tickets)
   const processOptions = onThisApp(processes)
+  // WHO'S DOING IT, narrowed to the staff on the chosen app (CHECKLIST 6.6).
+  // FAIL-OPEN on an app nobody is staffed to, exactly as the door does: a rule
+  // that made the assignee un-pickable on precisely the apps nobody has been
+  // assigned to would stop the work being recorded at all.
+  const staffHere = appId ? (appStaff.get(appId) ?? []) : []
+  const assignable = staffHere.length ? members.filter((m) => staffHere.includes(m.id)) : members
   // A story is describable once it has a name, a kind, and an answer about which
   // maps it changes — the same three the door insists on, so the button is never
   // enabled into a refusal.
@@ -388,7 +402,7 @@ export function StoryFormDialog({
           "story-assignee",
           values.assigneeId,
           "Nobody yet",
-          members.map((m) => ({ id: m.id, label: m.name })),
+          assignable.map((m) => ({ id: m.id, label: m.name })),
           (v) => setValues((s) => ({ ...s, assigneeId: v }))
         )}
       </Field>

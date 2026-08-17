@@ -34,7 +34,7 @@ import type { ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
 import { CollectionHeading } from "@/components/collection-heading"
 import { CountedAbove } from "@/components/counted-tabs"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
-import { AppFormDialog, type AppFormValues } from "@/components/app-form-dialog"
+import { AppFormDialog, useTeamMembers, type AppFormValues } from "@/components/app-form-dialog"
 import { AppTiles } from "@/components/app-tiles"
 import { tenancy } from "@/lib/api"
 import { accountsKey, appsKey, listFetch, valueKey } from "@/lib/live-resources"
@@ -57,6 +57,13 @@ export async function createAppFrom(teamId: string, values: AppFormValues): Prom
     clientContext: values.clientContext || undefined,
     solution: values.solution || undefined,
     keyActors: values.keyActors || undefined,
+    // Who is on it, from the same submit (8.10 + 8.5). Sent even when empty, so
+    // recording an app with nobody on it is a deliberate answer rather than a
+    // field the door never heard about.
+    staffUserIds: values.staffUserIds,
+    leadUserId: values.leadUserId || undefined,
+    stakeholderContactIds: values.stakeholderContactIds,
+    mainStakeholderContactId: values.mainStakeholderContactId || undefined,
   })
   invalidate(appsKey(teamId))
   invalidate(valueKey(teamId))
@@ -115,6 +122,9 @@ export function AppsScreen({
   // The accounts an app can belong to — page one is plenty for a picker, and it
   // is the SAME cache the accounts screen holds.
   const accountsQ = useCached<Account[]>(accountsKey(teamId), () => listFetch.accounts(teamId))
+  // Who can be put on an app (8.10) — the team, from the cache four other
+  // screens already fill.
+  const members = useTeamMembers(teamId)
   const [addOpen, setAddOpen] = React.useState(false)
   const [tab, setTab] = React.useState("active")
   // The engine recipe and its rights are still the contract this screen is
@@ -179,6 +189,7 @@ export function AppsScreen({
           The collection that grows underneath is the process maps. */}
 
       <AppFormDialog
+        members={members}
         open={addOpen}
         onOpenChange={setAddOpen}
         teamId={teamId}

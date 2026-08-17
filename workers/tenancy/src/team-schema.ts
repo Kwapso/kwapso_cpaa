@@ -2142,6 +2142,101 @@ SELECT lower(hex(randomblob(16))), ${sqlString(SELECTABLE_GROUPS.appStage)}, ${s
 ).join("\n")}
 `,
   },
+  {
+    // WHO IS ON AN APP, AND WHO THE CLIENT'S PERSON IS (CHECKLIST 8.10 + 8.5).
+    //
+    // Two tables and not one, because the two questions are about two different
+    // populations that live in two different databases. STAFF are our own people
+    // — a `user_id` from the GLOBAL core's `team_members`, which is why there is
+    // no foreign key here and cannot be. STAKEHOLDERS are the client's people —
+    // an `accounts` row of type individual, in THIS database, which is why that
+    // one does carry its reference. A single table with a "kind" column would
+    // have had one pointer meaning two incompatible things, which is the shape
+    // that produces a join nobody can write.
+    //
+    // WHY THEY MATTER MORE THAN THEY LOOK. Three separate asks were blocked on
+    // the staff table alone: "my tickets" means tickets on the apps I am staffed
+    // to (2.3), a story's assignee narrows to that app's staff (6.6), and the
+    // Done button belongs to the app's team lead (6.10). None of them is a
+    // feature on its own — each is one clause once this row exists.
+    //
+    // ONE LEAD, ONE MAIN, ENFORCED BY THE INDEX RATHER THAN BY A CHECK. A
+    // partial unique index is the only version of "exactly one" that survives
+    // two people pressing save at the same moment (CONCURRENCY.md): a read-then-
+    // write check would let both through. The partial clause is what lets a
+    // RETIRED lead's row stay on the record — deactivate, never delete — without
+    // occupying the one live slot.
+    //
+    // THE MEMBERSHIP INDEX IS UNIQUE ACROSS BOTH STATES, deliberately: adding
+    // somebody who was taken off the app again re-activates the row they already
+    // have rather than inserting a second one, so the record keeps one history
+    // per person instead of a pile of tombstones.
+    version: "0030_app_staff_and_stakeholders",
+    sql: `
+CREATE TABLE app_staff (
+  id TEXT PRIMARY KEY,
+  app_id TEXT NOT NULL REFERENCES apps (id),
+  user_id TEXT NOT NULL,
+  is_lead INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+CREATE UNIQUE INDEX idx_app_staff_person ON app_staff (app_id, user_id);
+CREATE INDEX idx_app_staff_user ON app_staff (user_id);
+CREATE UNIQUE INDEX idx_app_staff_lead ON app_staff (app_id) WHERE is_lead = 1 AND deactivated_at IS NULL;
+
+CREATE TABLE app_stakeholders (
+  id TEXT PRIMARY KEY,
+  app_id TEXT NOT NULL REFERENCES apps (id),
+  contact_id TEXT NOT NULL REFERENCES accounts (id),
+  is_main INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+CREATE UNIQUE INDEX idx_app_stakeholders_person ON app_stakeholders (app_id, contact_id);
+CREATE UNIQUE INDEX idx_app_stakeholders_main ON app_stakeholders (app_id) WHERE is_main = 1 AND deactivated_at IS NULL;
+`,
+  },
+  {
+    // WHAT AN HOUR OF A ROLE COSTS US, AND WHICH ROLE DOES A PROCESS (8.13).
+    //
+    // Aurora's model for "hours and money given back", settled over the owner's:
+    // the money is the hours saved times THE RATE OF THE ROLE THAT DOES THE WORK,
+    // before minus after. The app had two rate cards and neither could answer it
+    // — `rates` is what an ACCOUNT is charged, `internal_rates` is what a KIND OF
+    // WORK costs us — so this is the third: a price per role.
+    //
+    // IT IS AN INTERNAL NUMBER AND R24 IS ABSOLUTE ABOUT IT. The table is read
+    // only from workers/tenancy/src/lib/internal-money.ts, every door that reads
+    // it refuses a portal caller, and nothing in web-portal/ may name it. The
+    // rule's own sentence is why it lives beside the internal rate card rather
+    // than beside the account one: a condition can be inverted, an import cannot
+    // be forgotten.
+    //
+    // \`role_name\` ON THE PROCESS, not on the step. The feedback's sentence is
+    // "for each process, record which role does it" — one process is one kind of
+    // work done by one kind of person, and a role per step would ask somebody to
+    // answer the same question eleven times to get one number. Free text against
+    // the team's own role vocabulary rather than a foreign key to `member_roles`:
+    // the person who does a client's invoicing is THEIR bookkeeper, not one of
+    // our logins, so the roles being priced are not roles anybody here holds.
+    version: "0031_role_rate_card",
+    sql: `
+CREATE TABLE internal_role_rates (
+  id TEXT PRIMARY KEY,
+  role_name TEXT NOT NULL,
+  cents_per_hour INTEGER NOT NULL DEFAULT 0 CHECK (cents_per_hour >= 0),
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+CREATE UNIQUE INDEX idx_internal_role_rates_role ON internal_role_rates (role_name) WHERE deactivated_at IS NULL;
+
+ALTER TABLE processes ADD COLUMN role_name TEXT;
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

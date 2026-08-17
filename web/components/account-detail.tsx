@@ -68,7 +68,8 @@ import {
 } from "@/components/account-detail-panels"
 import { ContactLinkDialog, type ContactLinkValues } from "@/components/contact-link-dialog"
 import { ContactDetailScreen } from "@/components/contact-detail"
-import { AppFormDialog } from "@/components/app-form-dialog"
+import { AppFormDialog, useTeamMembers } from "@/components/app-form-dialog"
+import { KnowledgeAsk } from "@/components/knowledge-ask"
 import { RichText } from "@/components/rich-text"
 import { safeSrc } from "@/lib/rich-text"
 import { ValuePanel } from "@/components/value-panel"
@@ -133,6 +134,9 @@ export function AccountDetailScreen({
   )
 
   const { can } = usePermissions(teamId)
+  // Who can be put on an app (8.10), for the record-an-app dialog below.
+  const members = useTeamMembers(teamId)
+  const canReadKnowledge = can("knowledge", "read")
   const canEdit = can("accounts", "edit")
   const canArchive = can("accounts", "delete")
   // THE ADDRESS BOOK IS ITS OWN GRANT. `contacts` rather than `accounts`: a
@@ -412,6 +416,21 @@ export function AccountDetailScreen({
             },
           ]
         : []),
+      // THE KNOWLEDGE BASE, IN CONTEXT (CHECKLIST 12.1). The same tab an app
+      // record carries, asking about this client instead — the compartment is
+      // named for it, so a question typed here can never be answered out of
+      // another client's material (R23's `reason` says which it searched).
+      ...(canReadKnowledge
+        ? [
+            {
+              value: "knowledge",
+              label: t("Knowledge"),
+              icon: CONCEPT_ICON.knowledge,
+              badge: "",
+              badgeVariant: "" as const,
+            },
+          ]
+        : []),
       // NO PORTAL TAB. Only a person can hold a login (the owner's ruling), so
       // the switch lives on the contact's own page — see contact-detail.tsx.
       {
@@ -614,6 +633,18 @@ export function AccountDetailScreen({
             )
           if (tabItem.value === "todos")
             return <TodosPanel teamId={teamId} accountId={accountId} canCancel={canCancelTodo} />
+          if (tabItem.value === "knowledge")
+            return (
+              <KnowledgeAsk
+                accountId={accountId}
+                context={[account.name, account.industry ? `(${account.industry})` : null]
+                  .filter(Boolean)
+                  .join(" ")}
+                onOpenSource={(sourceId) =>
+                  softNavigate(`${basePath.replace(/\/accounts$/, "")}/knowledge/${sourceId}`)
+                }
+              />
+            )
 
           // WHAT WE CHARGE THEM. The door answers about ONE account, so the rows
           // and the badge above are the same narrowed question — never a page of
@@ -681,6 +712,7 @@ export function AccountDetailScreen({
           move-app door, so being on the right record when you write it down is
           the whole safeguard. */}
       <AppFormDialog
+        members={members}
         open={appOpen}
         onOpenChange={setAppOpen}
         teamId={teamId}

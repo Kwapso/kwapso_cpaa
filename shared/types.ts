@@ -880,6 +880,17 @@ export type AppRow = {
   clientContext: string | null
   solution: string | null
   keyActors: string | null
+  /** WHETHER THIS READER MAY OPEN IT (8.11). Everyone sees an app in the
+   * overview; only the staff on it and an admin open its detail. False means the
+   * four context fields and the address above arrived NULL because the door
+   * withheld them, not because nobody has filled them in. */
+  canOpen: boolean
+  /** OUR people on this app, the lead first. Empty when `canOpen` is false. */
+  staff: { userId: string; isLead: boolean }[]
+  /** THE CLIENT's people on this app, the main one first. Each `contactId` is an
+   * `accounts` row of type individual — a contact is a person's own account row
+   * (there is no contacts table, and CHECKLIST 15.1 says why). */
+  stakeholders: { contactId: string; isMain: boolean }[]
   active: boolean
   createdAt?: string | null
   createdByName?: string | null

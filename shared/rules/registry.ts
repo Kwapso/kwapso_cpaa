@@ -811,6 +811,15 @@ export const RECORD_DETAIL_COMPONENTS = [
   // tabs, but no law was walking it, so nothing would have caught the Steps badge
   // counting today's steps over an older version's list.
   "process-detail",
+  // An APP's detail is a component because five of its seven tabs are the work
+  // hanging off the system — sprints, stories, maps, meetings, tickets — each a
+  // collection with its own actions that no engine block draws, and because the
+  // record is the first in this codebase with RECORD-LEVEL visibility: only the
+  // staff on it and an admin open it at all (CHECKLIST 8.11).
+  //
+  // Listed here on 17 Aug 2026, when it grew the people, the tickets tab and the
+  // knowledge tab. It had a detail screen for a day without a law walking it.
+  "app-detail",
 ] as const
 
 /** R2 — reviewed bypasses. Each MUST get tabs over time; the reason is mandatory.
@@ -850,6 +859,8 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
   "help-detail.overview": "one ticket's type, source and audit block — one record, not a collection.",
   "account-detail.overview":
     "one company's own fields — its reference, its industry, its postal address, its language, where it sits, the paragraph about it, and the hours its apps have given back. One record, not a collection. Every collection tab beside it — contacts, children, apps, sprints, to-dos, rates, activity — carries a server count.",
+  "account-detail.knowledge":
+    "the knowledge base asked IN CONTEXT (12.1): a question box that already knows which client it is about, and the passages that answer it. Retrieval, not a collection — there is no set of rows to count.",
   "contact-detail.overview":
     "one person's own fields (their company, how to reach them, where they are, their language, their reference) — one record, not a collection. Its five collection tabs — companies, to-dos, tickets, meetings, portal login, activity — each carry a server count.",
   "knowledge-detail.source":
@@ -872,6 +883,10 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
     "the agenda we set and the notes we took — the two pieces of prose this module exists to keep. One record's body, not a collection.",
   "knowledge-detail.overview":
     "one source's kind, compartment, who may read it, how many pieces it was cut into and when it was last indexed — one record, not a collection.",
+  "app-detail.overview":
+    "one system's own fields — whose it is, its stage, the four paragraphs of context, who is on it from both sides, and its address. One record, not a collection. Its five collection tabs (sprints, stories, process maps, meetings, tickets) and its activity tab each carry a server count.",
+  "app-detail.knowledge":
+    "the knowledge base asked IN CONTEXT (8.9): a question box that already knows which system it is about, and the passages that answer it. Retrieval, not a collection — there is no set of rows to count, and a badge over it would be counting the whole base.",
   "process-detail.overview":
     "the map's own description — including the caveat saying whether its times have been agreed yet — plus its app, its current version, its baseline and its audit block. One record, not a collection. Its four siblings each carry a server count, and the Steps badge counts the VERSION being shown rather than always the current one.",
 }

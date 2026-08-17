@@ -25,8 +25,11 @@ import { fail, json, pagedJson } from "@shared/workers/http"
 import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { gated, gatedBody } from "@shared/workers/route"
-import { accountScope, refusePortalCaller } from "@shared/workers/account-scope"
-import { pricesVisibleFor } from "../lib/accounts"
+import { accountScope, refusePortalCaller, type AccountScope } from "@shared/workers/account-scope"
+import type { Actor } from "@shared/workers/activity"
+import type { D1Rest } from "@shared/workers/d1-rest"
+import type { MemberGuard } from "@shared/workers/gating"
+import { getAccountRow, pricesVisibleFor } from "../lib/accounts"
 import { listAccountRates } from "../lib/rates"
 import { workEngineFacts } from "../lib/work-engine"
 import { GuardError } from "@shared/workers/gating"
@@ -44,6 +47,8 @@ import {
   listSavings,
   removeStep,
   setAppActive,
+  setAppStaff,
+  setAppStakeholders,
   setProcessActive,
   updateApp,
   updateProcess,
@@ -85,6 +90,16 @@ const MAX_RUNS_PER_MONTH = 100_000
 /** €10m a month on one app's hosting is a typo, not a tool cost. */
 const MAX_TOOL_COST_CENTS = 1_000_000_000
 
+/** How many people one app can carry on either side. R14 in its smallest form:
+ * an app with fifty people named on it is a paste, not a project.
+ *
+ * The number is not arbitrary — it is what keeps the write BELOW D1's ceiling.
+ * The staff and stakeholder writes bind one placeholder per named person plus
+ * nine audit values, and D1 refuses a statement past `D1_MAX_BOUND_PARAMS`
+ * (100). Fifty leaves headroom that a future audit column cannot eat.
+ * workers/content/test/d1-parameter-cap.test.ts holds this pairing. */
+const APP_PEOPLE_CAP = 50
+
 // ── apps ─────────────────────────────────────────────────────────────────────
 
 /** GET /api/tenancy/apps[?accountId=] — the systems we have built.
@@ -122,8 +137,70 @@ export async function postCreateApp(request: Request, env: Env): Promise<Respons
     solution: optionalText(body.solution, "Solution", TEXT_LIMITS.long),
     keyActors: optionalText(body.keyActors, "Key actors", TEXT_LIMITS.long),
   })
+  await savePeople(cfg, guard, scope, actor, id, body)
   await publishChange(env, guard.teamId, "apps", id, "add")
   return json({ id })
+}
+
+/** WHO IS ON AN APP, on the SAME door that records the app (8.10 + 8.5).
+ *
+ * A second door would have been the obvious shape and it is the wrong one: the
+ * form asks all of this in one dialog, so a second door means a second request
+ * that can fail on its own and leave an app recorded with nobody on it. Riding
+ * the create and the edit means one submit, one refusal, one line of history.
+ *
+ * Each list is only touched when the caller SENT it — a machine editing an app's
+ * stage must not silently empty its staff (the same patch rule the prose fields
+ * keep, said about a collection). */
+async function savePeople(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  actor: Actor,
+  appId: string,
+  body: Body
+): Promise<void> {
+  // R20 is positional and it asks about each FIELD, not each mention: the
+  // `Array.isArray` here is the check, and the same field read inside it is the
+  // value that check licensed.
+  if (Array.isArray(body.staffUserIds))
+    await setAppStaff(
+      cfg,
+      guard,
+      actor,
+      appId,
+      idList(body.staffUserIds, "Staff"),
+      optionalText(body.leadUserId, "Team lead", TEXT_LIMITS.short) ?? null
+    )
+  if (Array.isArray(body.stakeholderContactIds)) {
+    const contactIds = idList(body.stakeholderContactIds, "Stakeholders")
+    // EVERY STAKEHOLDER IS PROVED THROUGH THE SPINE'S OWN FENCED READER, one at
+    // a time, before a single row is written. `getAccountRow` is the only door
+    // in this worker onto `accounts`, and it refuses an id outside the caller's
+    // account scope — so naming somebody off another client's books is a 404
+    // rather than a stakeholder row pointing at a stranger.
+    for (const id of contactIds) await getAccountRow(cfg, guard, scope, id)
+    await setAppStakeholders(
+      cfg,
+      guard,
+      scope,
+      actor,
+      appId,
+      contactIds,
+      optionalText(body.mainStakeholderContactId, "Main stakeholder", TEXT_LIMITS.short) ?? null
+    )
+  }
+}
+
+/** An untrusted array of ids into a clean, de-duped, bounded list. EMPTY IS
+ * LEGAL here, unlike the batch endpoints' `requireIdList`: "nobody is on this
+ * app yet" is a real answer and the form has to be able to send it. Each id
+ * still goes through the text seam, so a number, an object or a megabyte is a
+ * clean 400 rather than a row. */
+function idList(value: unknown[], label: string): string[] {
+  if (value.length > APP_PEOPLE_CAP)
+    throw new GuardError(400, "invalid_input", `${label}: that is more people than an app can carry.`)
+  return [...new Set(value.map((v) => requireText(v, label, TEXT_LIMITS.short)))]
 }
 
 export async function postUpdateApp(request: Request, env: Env): Promise<Response> {
@@ -150,6 +227,7 @@ export async function postUpdateApp(request: Request, env: Env): Promise<Respons
     keyActors:
       "keyActors" in body ? (optionalText(body.keyActors, "Key actors", TEXT_LIMITS.long) ?? null) : undefined,
   })
+  await savePeople(cfg, guard, scope, actor, id, body)
   await publishChange(env, guard.teamId, "apps", id)
   return json({ ok: true })
 }

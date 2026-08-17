@@ -469,6 +469,81 @@ async function memberOrThrow(
   return { id: userId, name: rows[0]?.name ?? what }
 }
 
+/* ------------------- the app's own people decide two things ---------------- */
+
+/** WHO IS ON THIS APP, and which of them leads it. Read out of the tenancy
+ * build's `app_staff` table, which lives in the SAME team database — the two
+ * workers are two brains over one set of books, and a story asking "who is on
+ * the system this work is about?" is a read, not a reach.
+ *
+ * Returns an empty set for a story with no app, which is what makes both rules
+ * below fail OPEN in exactly the case where they have nothing to say. */
+async function appStaff(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  appId: string | null
+): Promise<{ userIds: Set<string>; leadUserId: string | null }> {
+  if (!appId) return { userIds: new Set(), leadUserId: null }
+  const rows = await d1Query<{ user_id: string; is_lead: number }>(
+    cfg,
+    guard.databaseId,
+    // R14 hard cap — one app's staff is bounded by the size of the team.
+    `SELECT user_id, is_lead FROM app_staff WHERE app_id = ? AND deactivated_at IS NULL LIMIT ${LIST_HARD_CAP}`,
+    [appId]
+  )
+  return {
+    userIds: new Set(rows.map((r) => r.user_id)),
+    leadUserId: rows.find((r) => r.is_lead === 1)?.user_id ?? null,
+  }
+}
+
+/** CHECKLIST 6.6: "who's doing it" limits to the staff on that app.
+ *
+ * At the DOOR and not only in the picker, because a narrowed dropdown is a
+ * suggestion and this is a rule. It is deliberately silent when the app has NO
+ * staff yet: an app nobody has been assigned to would otherwise refuse every
+ * assignee on it, which would make recording who is doing the work impossible
+ * on precisely the apps that most need it. Somebody being staffed is what turns
+ * the rule on. */
+async function refuseOffAppAssignee(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  appId: string | null,
+  assigneeId: string | null,
+  what: string
+): Promise<void> {
+  if (!assigneeId) return
+  const { userIds } = await appStaff(cfg, guard, appId)
+  if (userIds.size === 0 || userIds.has(assigneeId)) return
+  throw new GuardError(
+    400,
+    "not_on_app",
+    `${what} isn't on this app. Add them to the app's team first, then give them the work.`
+  )
+}
+
+/** CHECKLIST 6.10: the reviewer's one Done button belongs to the app's TEAM LEAD.
+ *
+ * Aurora's answer over the owner's "anyone with the right". Silent when the app
+ * has no lead — and that is not a loophole, it is the migration path: 3,677
+ * stories arrived from the previous system on apps nobody has staffed, and a
+ * rule that locked all of them behind a person who does not exist would have
+ * frozen the backlog on the day it shipped. Name a lead and the button becomes
+ * theirs. */
+async function refuseDoneByAnybodyElse(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  appId: string | null
+): Promise<void> {
+  const { leadUserId } = await appStaff(cfg, guard, appId)
+  if (!leadUserId || leadUserId === guard.userId) return
+  throw new GuardError(
+    403,
+    "not_team_lead",
+    "Only this app's team lead can mark the work done. Ask them to take a look."
+  )
+}
+
 /** The rank a new story takes: above every one already there. Read-then-write,
  * deliberately, and safe for the same reason a ticket's is — two stories written
  * in the same instant can land on the same rank, both are "newest", the `id DESC`
@@ -509,6 +584,8 @@ export async function createStory(
 
   const accountId = await resolveAccount(cfg, guard, named, ticketId, appId)
   const processIds = await resolveProcesses(cfg, guard, input.processIds, changesNoStep)
+  // 6.6 — the work goes to somebody who is on this app, or nowhere.
+  await refuseOffAppAssignee(cfg, guard, appId ?? null, assigneeId ?? null, "That person")
   const assignee = assigneeId ? await memberOrThrow(cfg, guard, assigneeId, "Assignee") : null
   const reviewer = reviewerId ? await memberOrThrow(cfg, guard, reviewerId, "Reviewer") : null
 
@@ -570,6 +647,10 @@ export async function updateStory(
   // and a client may already be quoting it.
   const accountId = (await resolveAccount(cfg, guard, named, ticketId, appId)) ?? before.account_id
   const processIds = await resolveProcesses(cfg, guard, input.processIds, changesNoStep)
+  // 6.6 — asked of the app this edit is LEAVING the story on, so moving work to
+  // another system and handing it to somebody who is not on that system is one
+  // refusal rather than two edits that each looked fine.
+  await refuseOffAppAssignee(cfg, guard, appId ?? before.app_id, assigneeId ?? null, "That person")
   const assignee = assigneeId ? await memberOrThrow(cfg, guard, assigneeId, "Assignee") : null
   const reviewer = reviewerId ? await memberOrThrow(cfg, guard, reviewerId, "Reviewer") : null
 
@@ -706,6 +787,8 @@ export async function setStoryStatus(
   review?: { note?: string | null; fileUrl?: string | null; fileName?: string | null }
 ): Promise<{ moved: boolean; story: Story; ticketId: string | null; accountId: string | null }> {
   const before = await storyOrThrow(cfg, guard, id)
+  // 6.10 — one Done button, and it belongs to the app's team lead.
+  if (status === "done") await refuseDoneByAnybodyElse(cfg, guard, before.app_id)
   if (status === "done") refuseUnstepped(before)
   const reviewNote = review?.note ?? null
   if (status === "in_review")

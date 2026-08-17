@@ -29,7 +29,7 @@ import { LoadMore } from "@/components/load-more"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import { cursorKey, todosKey, totalKey } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
-import type { AppRow, Meeting, ProcessSummary, Sprint, Story, Todo } from "@shared/types"
+import type { AppRow, HelpTicket, Meeting, ProcessSummary, Sprint, Story, Todo } from "@shared/types"
 import { formatDate } from "@shared/web/format"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
@@ -480,6 +480,61 @@ export function AppMeetingsPanel({ appId, host }: { appId: string; host: PanelHo
           contentApi
             .meetings(c, "all", undefined, undefined, appId)
             .then((r) => ({ rows: r.meetings, nextCursor: r.nextCursor }))
+        }
+      />
+    </div>
+  )
+}
+
+/** THE TICKETS ABOUT ONE APP (CHECKLIST 8.6). Asked of the SERVER by `appId`,
+ * exactly like the meetings above and for the same reason: the ticket list is a
+ * GROWING collection that pages, so "this app's tickets among the newest fifty"
+ * would be an answer that looks like an answer. `total` is the door's exact
+ * COUNT(*) over the same narrowing, parked where the tab badge reads it (R16). */
+export function AppTicketsPanel({ appId, host }: { appId: string; host: PanelHost }) {
+  const t = useT()
+  const key = sliceKey("tickets-app", appId)
+  const q = useCached<HelpTicket[]>(key, () =>
+    contentApi.help("all", null, "live", undefined, undefined, undefined, undefined, appId).then((r) => {
+      primeCache(totalKey("tickets-app", appId), r.total)
+      primeCache(cursorKey(key), r.nextCursor)
+      return r.tickets
+    })
+  )
+
+  if (q.error) return <p className="text-destructive text-sm">{t("Couldn't load the tickets.")}</p>
+  if (q.data === undefined) return <Skeleton variant="list" lines={3} />
+  const rows = q.data
+  // Tickets live at their own top-level URL, so the link is built off the host
+  // prefix rather than the section we are standing in.
+  return (
+    <div className="flex flex-col gap-3">
+      {rows.length === 0 ? (
+        <p className="text-muted-foreground text-sm">{t("Nothing has been raised about this app yet.")}</p>
+      ) : (
+        <ul className="flex flex-col gap-1.5">
+          {rows.map((ticket) => (
+            <Row key={ticket.id} live={!ticket.archivedAt}>
+              <div className="min-w-0 flex-1">
+                <OpenLink
+                  label={ticket.description}
+                  onOpen={() => softNavigate(`${host.base}/tickets/${ticket.id}`)}
+                />
+                <p className="text-muted-foreground truncate text-xs">
+                  {[ticket.ref, ticket.helpType, ticket.status].filter(Boolean).join(" · ")}
+                </p>
+              </div>
+            </Row>
+          ))}
+        </ul>
+      )}
+      <LoadMore
+        listKey={key}
+        label={t("Load more tickets")}
+        fetchPage={(c: string) =>
+          contentApi
+            .help("all", c, "live", undefined, undefined, undefined, undefined, appId)
+            .then((r) => ({ rows: r.tickets, nextCursor: r.nextCursor }))
         }
       />
     </div>

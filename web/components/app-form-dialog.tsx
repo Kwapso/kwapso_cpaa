@@ -25,6 +25,7 @@
 import * as React from "react"
 
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
+import { Checkbox } from "@kwapso/ui/registry/primitives/checkbox/checkbox"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
@@ -41,11 +42,11 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Pencil, Plus } from "lucide-react"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
-import { ApiFailure } from "@/lib/api"
+import { ApiFailure, tenancy } from "@/lib/api"
 import { listFetch } from "@/lib/live-resources"
 import { APP_STAGES, appStageMark } from "@shared/app-stages"
 import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
-import type { SelectableValue } from "@shared/types"
+import type { SelectableValue, TeamMember } from "@shared/types"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useCached } from "@shared/web/store"
 import { useFormDraft } from "@shared/web/use-form-draft"
@@ -65,6 +66,18 @@ export type AppFormValues = {
   clientContext: string
   solution: string
   keyActors: string
+  // ── WHO IS ON IT ───────────────────────────────────────────────────────────
+  // CHECKLIST 8.10 and 8.5, and they are asked HERE rather than on a second
+  // screen for the same reason the four context fields are: the moment somebody
+  // records an app is the moment they know who is on it. Three other asks were
+  // blocked on the answer — my tickets (2.3), who a story goes to (6.6), and
+  // who may press Done (6.10) — so a field deferred is three features deferred.
+  staffUserIds: string[]
+  /** one of `staffUserIds`, or empty. The door refuses a lead who is not on it. */
+  leadUserId: string
+  stakeholderContactIds: string[]
+  /** one of `stakeholderContactIds`, or empty. Who a resolved ticket is mailed to. */
+  mainStakeholderContactId: string
 }
 
 const nameField = { ...defaultFieldConfig, label: "What it's called", required: true }
@@ -89,6 +102,34 @@ const actorsField = {
   required: false,
   hint: "Who actually uses it, in their words.",
 }
+const staffField = {
+  ...defaultFieldConfig,
+  label: "Who is on it",
+  required: false,
+  hint: "Our people. Only they and an admin open this app's page.",
+}
+const leadField = {
+  ...defaultFieldConfig,
+  label: "Team lead",
+  required: false,
+  hint: "The one who marks work on this app done.",
+}
+const stakeholderField = {
+  ...defaultFieldConfig,
+  label: "Their people",
+  required: false,
+  hint: "The client's own contacts for this system.",
+}
+const mainStakeholderField = {
+  ...defaultFieldConfig,
+  label: "Main stakeholder",
+  required: false,
+  hint: "Who hears back when a ticket on this app is answered.",
+}
+
+/** The word for nobody. A Select cannot hold an empty string as a value, so the
+ * absence has to be spelled — the same sentinel the ticket form uses. */
+const NOBODY = "__none__"
 
 /** The team's App stage vocabulary, newest answer first: the rows somebody has
  * curated on the Dropdown values screen, and the eight the agency already uses
@@ -103,10 +144,25 @@ export function useAppStages(teamId: string): { value: string; mark: string }[] 
   return rows.length > 0 ? rows : APP_STAGES.map((s) => ({ value: s.name, mark: s.mark }))
 }
 
+/** THE TEAM, for the "who is on it" list (8.10). Its own hook beside the stage
+ * one so every screen that can record an app asks the same question of the same
+ * cache — the members list four other screens already hold, so opening the
+ * dialog costs a round trip only on a page that has never needed it. */
+export function useTeamMembers(teamId: string): { id: string; name: string }[] {
+  const membersQ = useCached<TeamMember[]>(`members:${teamId}`, () =>
+    tenancy.members().then((r) => r.members)
+  )
+  return (membersQ.data ?? []).map((m) => ({
+    id: m.userId,
+    name: [m.firstName, m.lastName].filter(Boolean).join(" ") || m.email,
+  }))
+}
+
 export function AppFormDialog({
   open,
   onOpenChange,
   accounts,
+  members,
   initial,
   draftKey,
   onSubmit,
@@ -115,6 +171,9 @@ export function AppFormDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
   accounts: { id: string; name: string }[]
+  /** the team, for the "who is on it" list (8.10). Every member is offerable —
+   * staffing is not a permission, it is a rota. */
+  members: { id: string; name: string }[]
   /** Present = editing an existing app. The ACCOUNT picker disappears in that
    * mode rather than being disabled: whose system it is was decided once, there
    * is no door to change it, and a greyed-out control that can never be used is
@@ -141,6 +200,10 @@ export function AppFormDialog({
           clientContext: initial.clientContext,
           solution: initial.solution,
           keyActors: initial.keyActors,
+          staffUserIds: initial.staffUserIds,
+          leadUserId: initial.leadUserId,
+          stakeholderContactIds: initial.stakeholderContactIds,
+          mainStakeholderContactId: initial.mainStakeholderContactId,
         }
       : {
           name: "",
@@ -152,11 +215,32 @@ export function AppFormDialog({
           clientContext: "",
           solution: "",
           keyActors: "",
+          staffUserIds: [] as string[],
+          leadUserId: "",
+          stakeholderContactIds: [] as string[],
+          mainStakeholderContactId: "",
         },
     open
   )
   const [busy, setBusy] = React.useState(false)
   const ready = values.name.trim() !== ""
+  // WHOSE PEOPLE THE STAKEHOLDER LIST IS — the account already on the app, or
+  // the one being chosen. Read through the same door the account screen reads,
+  // so "who is a contact here" has one answer in the app (the shape the ticket
+  // form already has for the same question).
+  const clientId = (editing ? initial.accountId : values.accountId) || null
+  const contactsQ = useCached(clientId ? `account-detail:${clientId}` : null, () =>
+    tenancy.accountDetail(clientId as string)
+  )
+  const contacts = (contactsQ.data?.links ?? [])
+    .filter((l) => l.active)
+    .map((l) => ({ id: l.personAccountId, name: l.personName }))
+  // A lead who has been unticked is no longer a lead — worked out on the fly so
+  // the form can never send the pair the door would refuse.
+  const lead = values.staffUserIds.includes(values.leadUserId) ? values.leadUserId : ""
+  const mainHolder = values.stakeholderContactIds.includes(values.mainStakeholderContactId)
+    ? values.mainStakeholderContactId
+    : ""
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -179,6 +263,10 @@ export function AppFormDialog({
         clientContext: values.clientContext.trim(),
         solution: values.solution.trim(),
         keyActors: values.keyActors.trim(),
+        staffUserIds: values.staffUserIds,
+        leadUserId: lead,
+        stakeholderContactIds: values.stakeholderContactIds,
+        mainStakeholderContactId: mainHolder,
       })
       clearDraft()
       onOpenChange(false)
@@ -302,6 +390,119 @@ export function AppFormDialog({
           disabled={busy}
         />
       </Field>
+      {/* WHO IS ON IT (8.10). A tick list rather than a multi-select control,
+          because the library ships no multi-select and the rulebook is explicit
+          that nothing here edits the library — the same shape the story form
+          already uses for the processes it touches. */}
+      <Field config={staffField} htmlFor="app-staff" className={fieldSpacing}>
+        <div className="flex flex-col gap-2" id="app-staff">
+          {members.length === 0 ? (
+            <p className="text-muted-foreground text-sm">{t("Nobody on the team yet.")}</p>
+          ) : (
+            members.map((m) => (
+              <label key={m.id} className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={values.staffUserIds.includes(m.id)}
+                  onCheckedChange={(c) =>
+                    setValues((s) => ({
+                      ...s,
+                      staffUserIds:
+                        c === true
+                          ? [...s.staffUserIds, m.id]
+                          : s.staffUserIds.filter((x) => x !== m.id),
+                    }))
+                  }
+                  disabled={busy}
+                />
+                {m.name}
+              </label>
+            ))
+          )}
+        </div>
+      </Field>
+      {/* THE LEAD IS CHOSEN FROM THE PEOPLE ALREADY TICKED, and the field is not
+          there until somebody is: a lead is one of the staff by definition, and
+          a picker with nothing in it is a question with no possible answer. */}
+      {values.staffUserIds.length > 0 && (
+        <Field config={leadField} htmlFor="app-lead" className={fieldSpacing}>
+          <Select
+            value={lead || NOBODY}
+            onValueChange={(v) => setValues((s) => ({ ...s, leadUserId: v === NOBODY ? "" : v }))}
+            disabled={busy}
+          >
+            <SelectTrigger id="app-lead">
+              <SelectValue placeholder={t("Nobody yet")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NOBODY}>{t("Nobody yet")}</SelectItem>
+              {members
+                .filter((m) => values.staffUserIds.includes(m.id))
+                .map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.name}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </Field>
+      )}
+      {/* THEIR PEOPLE (8.5), from the client's own contacts. Absent entirely on
+          one of our own systems, which has no client to have contacts at. */}
+      {clientId && (
+        <Field config={stakeholderField} htmlFor="app-stakeholders" className={fieldSpacing}>
+          <div className="flex flex-col gap-2" id="app-stakeholders">
+            {contacts.length === 0 ? (
+              <p className="text-muted-foreground text-sm">
+                {t("Nobody is on this client's books yet.")}
+              </p>
+            ) : (
+              contacts.map((c) => (
+                <label key={c.id} className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={values.stakeholderContactIds.includes(c.id)}
+                    onCheckedChange={(ch) =>
+                      setValues((s) => ({
+                        ...s,
+                        stakeholderContactIds:
+                          ch === true
+                            ? [...s.stakeholderContactIds, c.id]
+                            : s.stakeholderContactIds.filter((x) => x !== c.id),
+                      }))
+                    }
+                    disabled={busy}
+                  />
+                  {c.name}
+                </label>
+              ))
+            )}
+          </div>
+        </Field>
+      )}
+      {values.stakeholderContactIds.length > 0 && (
+        <Field config={mainStakeholderField} htmlFor="app-main-stakeholder" className={fieldSpacing}>
+          <Select
+            value={mainHolder || NOBODY}
+            onValueChange={(v) =>
+              setValues((s) => ({ ...s, mainStakeholderContactId: v === NOBODY ? "" : v }))
+            }
+            disabled={busy}
+          >
+            <SelectTrigger id="app-main-stakeholder">
+              <SelectValue placeholder={t("Not said")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NOBODY}>{t("Not said")}</SelectItem>
+              {contacts
+                .filter((c) => values.stakeholderContactIds.includes(c.id))
+                .map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </Field>
+      )}
     </FormShellDialog>
   )
 }

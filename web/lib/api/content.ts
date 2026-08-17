@@ -174,7 +174,11 @@ export const content = {
      * badge above it counted them all. `byType` / `byStatus` come back with every
      * page and are what the badges read. */
     helpType?: string,
-    status?: HelpTicket["status"]
+    status?: HelpTicket["status"],
+    /** ONE SYSTEM'S tickets — the app record's Tickets tab (CHECKLIST 8.6). The
+     * door narrows and counts the same narrowed question, so the tab badge and
+     * the rows under it are one answer (R16). */
+    appId?: string
   ) =>
     api<
       PagedResponse<{
@@ -186,9 +190,9 @@ export const content = {
     >(
       `/api/content/help?scope=${scope}&view=${view}${q ? `&q=${enc(q)}` : ""}${
         accountId ? `&accountId=${enc(accountId)}` : ""
-      }${helpType ? `&helpType=${enc(helpType)}` : ""}${status ? `&status=${enc(status)}` : ""}${
-        cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""
-      }`
+      }${appId ? `&appId=${enc(appId)}` : ""}${helpType ? `&helpType=${enc(helpType)}` : ""}${
+        status ? `&status=${enc(status)}` : ""
+      }${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`
     ),
   /** PUT IT AWAY, or take it back out. The door has answered this since archive
    * shipped; nothing on any screen called it, so a ticket could be archived by

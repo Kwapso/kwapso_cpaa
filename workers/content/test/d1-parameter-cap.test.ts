@@ -125,6 +125,12 @@ describe("no statement can bind more parameters than D1 accepts", () => {
       // lookup carries `LIMIT 100`, and the set is de-duped before it is bound.
       "content/src/lib/notify.ts: list":
         "the resolution's recipients — the raiser and the main stakeholder, from a read bounded at LIMIT 100",
+      // PROVEN by the cap the DOOR applies before the lib is ever called:
+      // routes/processes.ts refuses a staff or stakeholder list longer than
+      // APP_PEOPLE_CAP (50), and the write binds nine audit values beside it —
+      // fifty-nine, with headroom against D1's hundred.
+      "tenancy/src/lib/processes.ts: wanted":
+        "the people named on one app, capped at APP_PEOPLE_CAP (50) by the door before the lib sees it",
       "content/src/lib/stakeholders.ts: batch":
         "one slice of idBatches — bounded BY D1_MAX_BOUND_PARAMS itself, which is the point of it",
       "tenancy/src/routes/accounts.ts: batch":

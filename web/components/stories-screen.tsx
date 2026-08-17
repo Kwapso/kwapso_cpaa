@@ -126,6 +126,10 @@ export function useStoryFormOptions(teamId: string) {
       id: m.userId,
       name: [m.firstName, m.lastName].filter(Boolean).join(" ") || m.email,
     })),
+    // WHO IS ON EACH APP (CHECKLIST 6.6). The staff set rides the app row, so
+    // the picker narrows without a second read — and the DOOR enforces the same
+    // rule, so a narrowed list is a courtesy rather than the control.
+    appStaff: new Map((appsQ.data ?? []).map((a) => [a.id, a.staff.map((p) => p.userId)])),
   }
 }
 
@@ -268,6 +272,7 @@ export function StoriesScreen({
         apps={options.apps}
         tickets={options.tickets}
         members={options.members}
+        appStaff={options.appStaff}
         processes={options.processes}
         storyTypes={options.storyTypes}
         draftKey={`story:add:${teamId}`}

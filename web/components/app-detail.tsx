@@ -24,13 +24,21 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import { Pencil, Power } from "lucide-react"
 
-import { AppFormDialog, type AppFormValues } from "@/components/app-form-dialog"
+import { AppFormDialog, useTeamMembers, type AppFormValues } from "@/components/app-form-dialog"
 import { ProcessFormDialog } from "@/components/process-form-dialog"
 import { SprintFormDialog } from "@/components/sprint-form-dialog"
 import { StoryFormDialog } from "@/components/story-form-dialog"
 import { createSprintFrom } from "@/components/sprints-screen"
 import { createStoryFrom, useStoryFormOptions } from "@/components/stories-screen"
-import { AppMeetingsPanel, ProcessesPanel, SprintsPanel, StoriesPanel, sliceKey } from "@/components/work-panels"
+import {
+  AppMeetingsPanel,
+  AppTicketsPanel,
+  ProcessesPanel,
+  SprintsPanel,
+  StoriesPanel,
+  sliceKey,
+} from "@/components/work-panels"
+import { KnowledgeAsk } from "@/components/knowledge-ask"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, tenancy } from "@/lib/api"
@@ -70,11 +78,17 @@ export function AppDetailScreen({
   const storiesTotal = useCachedValue<number>(totalKey("stories-app", appId))
   const mapsTotal = useCachedValue<number>(totalKey("processes-app", appId))
   const meetingsTotal = useCachedValue<number>(totalKey("meetings-app", appId))
+  const ticketsTotal = useCachedValue<number>(totalKey("tickets-app", appId))
 
   const { can } = usePermissions(teamId)
   const canEdit = can("processes", "edit")
   const canArchive = can("processes", "delete")
   const canWriteWork = can("work", "create")
+  const canReadKnowledge = can("knowledge", "read")
+  const canReadTickets = can("help", "read")
+  // Who can be put on this app (8.10) — the team, from the cache the members
+  // screen already fills.
+  const members = useTeamMembers(teamId)
 
   const [tab, setTab] = React.useState("overview")
   const [editOpen, setEditOpen] = React.useState(false)
@@ -106,6 +120,13 @@ export function AppDetailScreen({
       clientContext: values.clientContext || null,
       solution: values.solution || null,
       keyActors: values.keyActors || null,
+      // The two sets are re-sent WHOLE — the door replaces what it is given and
+      // touches nothing it is not, so an edit that changed only the stage would
+      // leave both alone and this one says both out loud.
+      staffUserIds: values.staffUserIds,
+      leadUserId: values.leadUserId || null,
+      stakeholderContactIds: values.stakeholderContactIds,
+      mainStakeholderContactId: values.mainStakeholderContactId || null,
     })
     refresh()
     toast.success(t("App updated."))
@@ -132,6 +153,39 @@ export function AppDetailScreen({
   const account = app.accountId ? (accountsQ.data ?? []).find((a) => a.id === app.accountId) : null
   const accountName = account?.name ?? (app.accountId ? "A client" : null)
 
+  // ONLY THE STAFF ON IT AND AN ADMIN OPEN THIS PAGE (CHECKLIST 8.11, Aurora's
+  // ap1 over the narrower reading). The refusal is the DOOR's — the app row
+  // arrived with its context fields, its address and its people withheld — and
+  // this is the sentence that explains what happened rather than the thing that
+  // enforces it. An overview tile is still theirs to see; the record is not.
+  if (!app.canOpen)
+    return (
+      <div className="flex flex-col gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight">{app.name}</h1>
+        <p className="text-muted-foreground text-sm">
+          {t(
+            "You're not on this app, so its page is closed. Ask an admin to add you to the team on it."
+          )}
+        </p>
+      </div>
+    )
+
+  // The people on it, as NAMES. The row carries ids — a staff row points at a
+  // login in the core database and a stakeholder at an account row — and both
+  // caches are already open on this screen, so the names cost nothing.
+  const memberNames = new Map(members.map((m) => [m.id, m.name]))
+  const contactNames = new Map((accountsQ.data ?? []).map((a) => [a.id, a.name]))
+  const staffLine = app.staff.length
+    ? app.staff
+        .map((p) => `${memberNames.get(p.userId) ?? "Somebody"}${p.isLead ? " (team lead)" : ""}`)
+        .join(", ")
+    : "Nobody yet"
+  const stakeholderLine = app.stakeholders.length
+    ? app.stakeholders
+        .map((p) => `${contactNames.get(p.contactId) ?? "Somebody"}${p.isMain ? " (main)" : ""}`)
+        .join(", ")
+    : "Nobody yet"
+
   // THE CONTEXT AN APP CARRIES, above the housekeeping. The four prose fields
   // are what somebody joining the account reads first and what the assistant
   // answers "what is this system for?" out of, so they lead the Overview rather
@@ -144,6 +198,11 @@ export function AppDetailScreen({
     { label: t("Client context"), value: app.clientContext || "—" },
     { label: t("Solution"), value: app.solution || "—" },
     { label: t("Key actors"), value: app.keyActors || "—" },
+    // WHO IS ON IT, both sides (8.10 + 8.5). High on the Overview rather than
+    // under the audit block: "who do I ask about this?" is the question a person
+    // opens an app record to answer.
+    { label: t("Who is on it"), value: staffLine },
+    { label: t("Their people"), value: stakeholderLine },
     { label: t("Address"), value: app.url || "—" },
     ...auditItems({
       createdByName: app.createdByName ?? null,
@@ -187,6 +246,35 @@ export function AppDetailScreen({
         badge: formatCount(meetingsTotal),
         badgeVariant: "" as const,
       },
+      // TICKETS ABOUT THIS SYSTEM (8.6). Behind the caller's own help right: a
+      // role without it sees no tab at all rather than a tab that refuses.
+      ...(canReadTickets
+        ? [
+            {
+              value: "tickets",
+              label: t("Tickets"),
+              icon: CONCEPT_ICON.tickets,
+              badge: formatCount(ticketsTotal),
+              badgeVariant: "" as const,
+            },
+          ]
+        : []),
+      // THE KNOWLEDGE BASE, IN CONTEXT (8.9 + 12.1). Not a collection and so not
+      // counted — see RECORD_TAB_COUNT_EXCEPTIONS. What it is instead is the
+      // ordinary ask box with THIS record's own details already in the question,
+      // which is what Aurora meant by "in context": nobody should have to retype
+      // which system they are asking about while standing on its page.
+      ...(canReadKnowledge
+        ? [
+            {
+              value: "knowledge",
+              label: t("Knowledge"),
+              icon: CONCEPT_ICON.knowledge,
+              badge: "",
+              badgeVariant: "" as const,
+            },
+          ]
+        : []),
       {
         value: "activity",
         label: t("Activity"),
@@ -291,6 +379,21 @@ export function AppDetailScreen({
               />
             )
           if (t.value === "meetings") return <AppMeetingsPanel appId={appId} host={host} />
+          if (t.value === "tickets") return <AppTicketsPanel appId={appId} host={host} />
+          if (t.value === "knowledge")
+            return (
+              <KnowledgeAsk
+                accountId={app.accountId}
+                context={[
+                  `the app "${app.name}"`,
+                  accountName ? `built for ${accountName}` : "one of our own systems",
+                  app.stage ? `at stage ${app.stage}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(", ")}
+                onOpenSource={(sourceId) => softNavigate(`${host.base}/knowledge/${sourceId}`)}
+              />
+            )
           if (t.value === "activity")
             return <ActivityPanel activity={activity} />
           return <OverviewList items={overviewItems} />
@@ -301,6 +404,7 @@ export function AppDetailScreen({
         open={editOpen}
         onOpenChange={setEditOpen}
         teamId={teamId}
+        members={members}
         accounts={(accountsQ.data ?? [])
           .filter((a) => a.active && a.accountType === "entity")
           .map((a) => ({ id: a.id, name: a.name }))}
@@ -317,6 +421,10 @@ export function AppDetailScreen({
           clientContext: app.clientContext ?? "",
           solution: app.solution ?? "",
           keyActors: app.keyActors ?? "",
+          staffUserIds: app.staff.map((p) => p.userId),
+          leadUserId: app.staff.find((p) => p.isLead)?.userId ?? "",
+          stakeholderContactIds: app.stakeholders.map((p) => p.contactId),
+          mainStakeholderContactId: app.stakeholders.find((p) => p.isMain)?.contactId ?? "",
         }}
         draftKey={`app:edit:${appId}`}
         onSubmit={save}
@@ -365,6 +473,7 @@ export function AppDetailScreen({
         fixedApp={{ id: appId, name: app.name }}
         tickets={options.tickets}
         members={options.members}
+        appStaff={options.appStaff}
         processes={options.processes}
         storyTypes={options.storyTypes}
         draftKey={`story:add:app:${appId}`}

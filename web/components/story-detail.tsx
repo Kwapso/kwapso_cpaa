@@ -422,6 +422,7 @@ export function StoryDetailScreen({
         apps={options.apps}
         tickets={options.tickets}
         members={options.members}
+        appStaff={options.appStaff}
         processes={options.processes}
         storyTypes={options.storyTypes}
         initial={{

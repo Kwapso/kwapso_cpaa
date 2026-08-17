@@ -295,9 +295,40 @@ export function ticketFence(
   const col = (name: string) => (table ? `${table}.${name}` : name)
   const parts = [
     accountScopeClause(scope, col("account_id")),
-    tab === "mine" ? { sql: `${col("creator_id")} = ?`, params: [guard.userId] } : { sql: "", params: [] },
+    tab === "mine" ? mineClause(guard, scope, col) : { sql: "", params: [] },
   ].filter((p) => p.sql)
   return { sql: parts.map((p) => p.sql).join(" AND "), params: parts.flatMap((p) => p.params) }
+}
+
+/** WHAT "MY TICKETS" MEANS, and it changed on 17 Aug 2026 (CHECKLIST 2.3).
+ *
+ * It used to mean "tickets I typed", which was the wrong question in an agency
+ * where 220 of 221 requests were typed by staff on a client's behalf: the person
+ * who typed it is rarely the person who has to do anything about it. Aurora's
+ * answer, taken over the owner's, is **tickets on the apps I am staffed to** —
+ * the systems I am actually responsible for. That is a real inbox.
+ *
+ * A CLIENT LOGIN KEEPS THE OLD MEANING, deliberately: staffing is our rota, a
+ * contact is on nobody's, and "tickets on the apps you are staffed to" would
+ * hand every client an empty tab forever. For them "mine" is still what they
+ * raised, which is the only version of the word that means anything on their
+ * side.
+ *
+ * A SUBQUERY rather than a resolved list of ids: the staffed set is read INSIDE
+ * the statement, so the list and its count (which share this clause) can never
+ * be asked about two different moments — and an id list would be one more
+ * unbounded `IN (…)` to cap. A member staffed to nothing matches no ticket,
+ * which is the honest empty answer rather than an error. */
+function mineClause(
+  guard: MemberGuard,
+  scope: AccountScope,
+  col: (name: string) => string
+): { sql: string; params: string[] } {
+  if (scope.kind === "portal") return { sql: `${col("creator_id")} = ?`, params: [guard.userId] }
+  return {
+    sql: `${col("app_id")} IN (SELECT app_id FROM app_staff WHERE user_id = ? AND deactivated_at IS NULL)`,
+    params: [guard.userId],
+  }
 }
 
 /** LIVE OR PUT AWAY — the everyday list against the archive drawer.
@@ -328,6 +359,15 @@ function archiveClause(view: "live" | "archived"): string {
  * different question from the rows (R16). */
 function accountClause(accountId: string | undefined): { sql: string; params: string[] } {
   return accountId ? { sql: "account_id = ?", params: [accountId] } : { sql: "", params: [] }
+}
+
+/** WHICH SYSTEM — the app record's own Tickets tab (CHECKLIST 8.6). The same
+ * shape as the account narrowing above and for the same reason: a filter on top
+ * of the fence, riding the list AND its count so the badge and the rows answer
+ * one question (R16). A ticket that names no app never matches, which is right —
+ * "tickets about this system" cannot include the ones nobody said were. */
+function appClause(appId: string | undefined): { sql: string; params: string[] } {
+  return appId ? { sql: "app_id = ?", params: [appId] } : { sql: "", params: [] }
 }
 
 /** WHICH KIND, AND WHICH STAGE — the sub-tabs under All / My / Archived
@@ -375,6 +415,8 @@ export type TicketFilter = {
   q?: string
   /** one client's tickets — a FILTER on top of the fence */
   accountId?: string
+  /** one system's tickets — the app record's Tickets tab (8.6) */
+  appId?: string
   /** one kind — the sub-tab strip's four type tabs */
   helpType?: string
   /** one stage — the sub-tab strip's Ready and Closed tabs */
@@ -391,6 +433,7 @@ function ticketWhere(
   const fence = ticketFence(guard, scope, filter.tab)
   const parts = [
     accountClause(filter.accountId),
+    appClause(filter.appId),
     typeClause(filter.helpType),
     statusClause(filter.status),
     searchClause(filter.q),
@@ -465,12 +508,18 @@ export async function countTickets(
   // seam. Both numbers are BADGES, so both are clamped — "my" tickets cannot
   // exceed all tickets, and a partial tally beside a partial total tells the same
   // story at the same ceiling.
+  //
+  // The "mine" tally is the SAME expression the My tab filters by (mineClause),
+  // not a second idea of the word — R16's whole point. When that sentence
+  // changed from "tickets I typed" to "tickets on my apps", the badge changed
+  // with it because there is only one place it is written.
+  const mine = mineClause(guard, scope, (n) => n)
   const row = await countCollectionWith<{ total: number; mine: number }>(
     cfg,
     guard.databaseId,
-    `SELECT (creator_id = ?) AS is_mine FROM help WHERE ${where.sql.join(" AND ")}`,
+    `SELECT (${mine.sql}) AS is_mine FROM help WHERE ${where.sql.join(" AND ")}`,
     "COUNT(*) AS total, SUM(is_mine) AS mine",
-    [guard.userId, ...where.params]
+    [...mine.params, ...where.params]
   )
   return { total: reportedTotal(row?.total ?? 0), mineTotal: reportedTotal(row?.mine ?? 0) }
 }

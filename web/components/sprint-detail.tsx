@@ -303,6 +303,7 @@ export function SprintDetailScreen({
           : {})}
         tickets={options.tickets}
         members={options.members}
+        appStaff={options.appStaff}
         processes={options.processes}
         storyTypes={options.storyTypes}
         draftKey={`story:add:sprint:${sprintId}`}

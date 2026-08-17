@@ -263,10 +263,14 @@ async function accountInboxes(
  * named we fall back to whoever created the row, which is only ever an address if
  * they were a client login in the first place.
  *
- * WHO THE MAIN STAKEHOLDER IS. `account_links.is_main_stakeholder` — the person
- * at the company who owns the relationship. The APP-level stakeholder set
- * (CHECKLIST 8.5) does not exist yet and is another lane's work; when it lands,
- * this is the one function that changes, and the sentence it implements does not.
+ * WHO THE MAIN STAKEHOLDER IS — and this is the sentence that changed when
+ * CHECKLIST 8.5 landed. The APP's main stakeholder when the ticket names an app
+ * that has one (`app_stakeholders.is_main`), and the ACCOUNT's
+ * (`account_links.is_main_stakeholder`) otherwise. In that order and not both:
+ * the person who owns the dispatch system is the person who wants to hear that
+ * a dispatch question was answered, and the account's relationship owner is the
+ * fallback for the tickets that name no system. It is one function and one
+ * sentence, exactly as the note that stood here predicted.
  *
  * DE-DUPED BY ADDRESS, because the raiser very often IS the main stakeholder at a
  * small client, and two copies of one answer reads as a system that is not paying
@@ -277,21 +281,41 @@ async function resolutionInboxes(
   cfg: D1Rest,
   guard: MemberGuard,
   accountId: string,
-  ticket: { raised_by_contact_id: string | null; creator_id: string | null }
+  ticket: { raised_by_contact_id: string | null; creator_id: string | null; app_id: string | null }
 ): Promise<{ email: string; name: string }[]> {
+  // THE APP'S OWN MAIN STAKEHOLDER FIRST (8.5). One row at most — the partial
+  // unique index says so — and it is read before the account's so the narrower,
+  // truer answer wins when there is one.
+  const appMain = ticket.app_id
+    ? await d1Query<{ contact_id: string }>(
+        cfg,
+        guard.databaseId,
+        // R14: at most one live main stakeholder exists per app, by index.
+        `SELECT contact_id FROM app_stakeholders
+          WHERE app_id = ? AND is_main = 1 AND deactivated_at IS NULL LIMIT 1`,
+        [ticket.app_id]
+      )
+    : []
+  const mainContactId = appMain[0]?.contact_id ?? null
   // The two PEOPLE, as account rows: whoever asked, and whoever owns the
   // relationship. One read, because they are one question about one company.
+  //
+  // The account-level clause is asked ONLY when the app named nobody — an app
+  // with its own stakeholder is a deliberate answer to "who cares about this
+  // system?", and quietly copying the account's relationship owner as well
+  // would put the narrowing back where it was.
   const rows = await d1Query<{ user_id: string }>(
     cfg,
     guard.databaseId,
     `SELECT pu.user_id FROM portal_users pu
       WHERE pu.deactivated_at IS NULL
         AND (pu.account_id = ?
-             OR EXISTS (SELECT 1 FROM account_links l
+             OR pu.account_id = ?
+             OR (? = '' AND EXISTS (SELECT 1 FROM account_links l
                          WHERE l.person_account_id = pu.account_id AND l.account_id = ?
-                           AND l.deactivated_at IS NULL AND l.is_main_stakeholder = 1))
+                           AND l.deactivated_at IS NULL AND l.is_main_stakeholder = 1)))
       LIMIT 100`, // R14 bound
-    [ticket.raised_by_contact_id ?? "", accountId]
+    [ticket.raised_by_contact_id ?? "", mainContactId ?? "", mainContactId ?? "", accountId]
   )
   const ids = new Set(rows.map((r) => r.user_id).filter(Boolean))
   // …and the person who TYPED it, when that was a client login. A contact who
@@ -470,10 +494,11 @@ export async function notifyTicketResolved(
       account_id: string | null
       raised_by_contact_id: string | null
       creator_id: string | null
+      app_id: string | null
     }>(
       cfg,
       guard.databaseId,
-      `SELECT ref, description, account_id, raised_by_contact_id, creator_id FROM help WHERE id = ? LIMIT 1`,
+      `SELECT ref, description, account_id, raised_by_contact_id, creator_id, app_id FROM help WHERE id = ? LIMIT 1`,
       [ticketId]
     )
     const ticket = rows[0]

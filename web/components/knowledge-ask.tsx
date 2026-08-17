@@ -53,7 +53,24 @@ import { useT } from "@shared/web/language"
 import { AgentMarkdown } from "@/components/agent-markdown"
 import { ApiFailure, content } from "@/lib/api"
 
-export function KnowledgeAsk({ onOpenSource }: { onOpenSource: (sourceId: string) => void }) {
+export function KnowledgeAsk({
+  onOpenSource,
+  accountId,
+  context,
+}: {
+  onOpenSource: (sourceId: string) => void
+  /** WHICH CLIENT'S COMPARTMENT to search, when the screen already knows (R23:
+   * `reason` says which one it chose, and naming it here is what stops a
+   * question about one client being answered out of another's material). Null on
+   * the knowledge page itself, where the question's own words decide. */
+  accountId?: string | null
+  /** THE RECORD'S OWN DETAILS, fed into the question automatically (CHECKLIST
+   * 8.9 and 12.1 — Aurora asked for the base "in context"). It is prepended to
+   * what the person types and it is SHOWN to them, because a question that was
+   * quietly changed on the way to the server is an answer nobody can account
+   * for. Absent on the knowledge page, which is about nothing in particular. */
+  context?: string
+}) {
   const [question, setQuestion] = React.useState("")
   const [busy, setBusy] = React.useState(false)
   // The question the ANSWER is about, kept separately from the box — otherwise
@@ -68,7 +85,10 @@ export function KnowledgeAsk({ onOpenSource }: { onOpenSource: (sourceId: string
     if (!q || busy) return
     setBusy(true)
     try {
-      setAnswer(await content.askKnowledge(q))
+      // In context, the record's own details lead the question — so "when is it
+      // due?" asked on an app's page is "About the app Dispatch, built for
+      // Bergman GmbH: when is it due?" by the time it reaches retrieval.
+      setAnswer(await content.askKnowledge(context ? `About ${context}: ${q}` : q, accountId))
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't ask the knowledge base.")
     } finally {
@@ -82,7 +102,11 @@ export function KnowledgeAsk({ onOpenSource }: { onOpenSource: (sourceId: string
         <Input
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder={t("Ask the knowledge base — e.g. what did we agree about Bergman's dispatch window?")}
+          placeholder={
+            context
+              ? t("Ask about this record — e.g. what did we agree the last time?")
+              : t("Ask the knowledge base — e.g. what did we agree about Bergman's dispatch window?")
+          }
           disabled={busy}
           aria-label={t("Ask the knowledge base")}
         />
@@ -97,6 +121,13 @@ export function KnowledgeAsk({ onOpenSource }: { onOpenSource: (sourceId: string
       <p className="text-muted-foreground text-xs">
         {t("This looks through what the assistant can read and shows you the passages and their sources. It doesn't use the team's assistant allowance — open the assistant if you want the answer written out.")}
       </p>
+      {/* SAID OUT LOUD, because the question that gets asked is not the question
+          that was typed. A person has to be able to see what was added. */}
+      {context && (
+        <p className="text-muted-foreground text-xs">
+          {t("Your question is asked about")} {context}.
+        </p>
+      )}
 
       {answer && (
         <div className="flex flex-col gap-4 border-t pt-4">

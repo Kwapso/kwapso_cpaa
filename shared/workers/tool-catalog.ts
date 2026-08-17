@@ -98,6 +98,28 @@ const accountFields = (i: Record<string, unknown>): Record<string, unknown> => (
   status: sent(i, "status"),
 })
 
+/** WHO IS ON AN APP — the four fields the app doors read off the body for the
+ * two sides of a project (CHECKLIST 8.10 + 8.5). Declared once and spread into
+ * both tools, for the same reason the account fields are: create and edit must
+ * offer one contract, and R22 proves the forwarding half by RUNNING the builder.
+ *
+ * The two lists stay `undefined` when the caller did not send them, because the
+ * door only touches a set it was actually given — a machine renaming an app must
+ * not empty its staff. */
+const APP_PEOPLE_SCHEMA = {
+  staffUserIds: { type: "array" },
+  leadUserId: S,
+  stakeholderContactIds: { type: "array" },
+  mainStakeholderContactId: S,
+}
+
+const appPeopleBody = (i: Record<string, unknown>): Record<string, unknown> => ({
+  staffUserIds: Array.isArray(i.staffUserIds) ? i.staffUserIds : undefined,
+  leadUserId: sent(i, "leadUserId"),
+  stakeholderContactIds: Array.isArray(i.stakeholderContactIds) ? i.stakeholderContactIds : undefined,
+  mainStakeholderContactId: sent(i, "mainStakeholderContactId"),
+})
+
 /** The account fields' SCHEMA half — declared once beside `accountFields` so the
  * shape a tool advertises and the body it builds are written in one place. R22
  * proves them equal by RUNNING buildBody; this is what keeps them equal. */
@@ -237,13 +259,14 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_help_tickets",
     summary:
-      "List the team's tickets. scope: 'mine' (yours) or 'all' (default all); view: 'live' (default — the everyday list) or 'archived' (tickets that have been put away); `q` searches the reference, the description and the title; `accountId` narrows to one client's tickets; `helpType` narrows to one kind, as the team spells it in their own Ticket type list; `status` narrows to one stage of the lifecycle — 'awaiting_validation', 'new', 'triaged', 'scheduled', 'in_progress', 'ready' or 'resolved'. Pass `id` to fetch just one ticket, archived or not. The `total` counts the SAME filtered question the rows answer; `byType` and `byStatus` tally the whole (unfiltered by kind or stage) list a kind or a stage at a time. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
+      "List the team's tickets. scope: 'mine' — which now means the tickets on the apps you are STAFFED to, not the ones you typed — or 'all' (default all); view: 'live' (default — the everyday list) or 'archived' (tickets that have been put away); `q` searches the reference, the description and the title; `accountId` narrows to one client's tickets; `appId` narrows to one system's; `helpType` narrows to one kind, as the team spells it in their own Ticket type list; `status` narrows to one stage of the lifecycle — 'awaiting_validation', 'new', 'triaged', 'scheduled', 'in_progress', 'ready' or 'resolved'. Pass `id` to fetch just one ticket, archived or not. The `total` counts the SAME filtered question the rows answer; `byType` and `byStatus` tally the whole (unfiltered by kind or stage) list a kind or a stage at a time. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
     binding: "CONTENT", method: "GET", path: "/api/content/help",
-    schema: obj({ scope: S, view: S, q: S, accountId: S, helpType: S, status: S, id: S, cursor: S }),
+    schema: obj({ scope: S, view: S, q: S, accountId: S, appId: S, helpType: S, status: S, id: S, cursor: S }),
     buildQuery: (i) => {
       const q = [str(i, "scope") === "mine" ? "scope=mine" : "scope=all"]
       if (str(i, "q")) q.push(`q=${encodeURIComponent(str(i, "q"))}`)
       if (str(i, "accountId")) q.push(`accountId=${encodeURIComponent(str(i, "accountId"))}`)
+      if (str(i, "appId")) q.push(`appId=${encodeURIComponent(str(i, "appId"))}`)
       if (str(i, "helpType")) q.push(`helpType=${encodeURIComponent(str(i, "helpType"))}`)
       if (str(i, "status")) q.push(`status=${encodeURIComponent(str(i, "status"))}`)
       // Forwarded only when the caller asked for the archive: the door defaults
@@ -1503,10 +1526,13 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_app",
     summary:
-      "Record a system we have built. `accountId` is whose it is (leave it out for the agency's own). `toolCostCentsPerMonth` is what it costs US to keep running — an internal figure, never shown to a client. `stage` is where it has got to, one of the team's App stage values. The four context fields are prose: `about` is what the system is, `clientContext` is the situation it was built into, `solution` is what we did about it, and `keyActors` is who actually uses it.",
+      "Record a system we have built. `accountId` is whose it is (leave it out for the agency's own). `toolCostCentsPerMonth` is what it costs US to keep running — an internal figure, never shown to a client. `stage` is where it has got to, one of the team's App stage values. The four context fields are prose: `about` is what the system is, `clientContext` is the situation it was built into, `solution` is what we did about it, and `keyActors` is who actually uses it. `staffUserIds` is who from OUR team is on it (`leadUserId` names the team lead, who must be one of them) and `stakeholderContactIds` is the client's own people (`mainStakeholderContactId` names the main one, who must be one of them, and is who a resolved ticket on this app is emailed to).",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/apps",
     schema: obj(
-      { name: S, accountId: S, url: S, stage: S, toolCostCentsPerMonth: N, about: S, clientContext: S, solution: S, keyActors: S },
+      {
+        name: S, accountId: S, url: S, stage: S, toolCostCentsPerMonth: N, about: S, clientContext: S,
+        solution: S, keyActors: S, ...APP_PEOPLE_SCHEMA,
+      },
       ["name"]
     ),
     buildBody: (i) => ({
@@ -1519,16 +1545,20 @@ export const SHARED_TOOLS: SharedTool[] = [
       clientContext: opt(i, "clientContext"),
       solution: opt(i, "solution"),
       keyActors: opt(i, "keyActors"),
+      ...appPeopleBody(i),
     }),
     agent: { write: true, confirm: false, summarize: (i) => `Record the app "${str(i, "name")}"` },
   },
   {
     name: "update_app",
     summary:
-      "Edit an app's own details (by id) — never which account it belongs to, which is set once when it is created. Send ONLY the fields you are changing; anything you leave out keeps its current value. The four context fields (`about`, `clientContext`, `solution`, `keyActors`) are prose and are edited here like any other field.",
+      "Edit an app's own details (by id) — never which account it belongs to, which is set once when it is created. Send ONLY the fields you are changing; anything you leave out keeps its current value. The four context fields (`about`, `clientContext`, `solution`, `keyActors`) are prose and are edited here like any other field. `staffUserIds` and `stakeholderContactIds` are each re-sent WHOLE — the set you name replaces the one the app has, and anybody dropped keeps their history rather than being deleted. Leave a list out entirely to change nobody.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/apps/update",
     schema: obj(
-      { id: S, name: S, url: S, stage: S, toolCostCentsPerMonth: N, about: S, clientContext: S, solution: S, keyActors: S },
+      {
+        id: S, name: S, url: S, stage: S, toolCostCentsPerMonth: N, about: S, clientContext: S,
+        solution: S, keyActors: S, ...APP_PEOPLE_SCHEMA,
+      },
       ["id", "name"]
     ),
     buildBody: (i) => ({
@@ -1541,6 +1571,7 @@ export const SHARED_TOOLS: SharedTool[] = [
       clientContext: sent(i, "clientContext"),
       solution: sent(i, "solution"),
       keyActors: sent(i, "keyActors"),
+      ...appPeopleBody(i),
     }),
     agent: { write: true, confirm: false, summarize: (i) => `Edit the app "${str(i, "name")}"` },
   },
