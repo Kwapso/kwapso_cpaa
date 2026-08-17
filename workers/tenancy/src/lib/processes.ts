@@ -22,6 +22,7 @@
 
 import { logActivity, describeChanges, type Actor } from "@shared/workers/activity"
 import { accountScopeClause, requireAccountInScope, type AccountScope } from "@shared/workers/account-scope"
+import { countCollection } from "@shared/workers/count"
 import { d1Query, likeLiteral, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { LIST_HARD_CAP, THREAD_HARD_CAP } from "@shared/workers/limits"
@@ -305,12 +306,13 @@ export async function listProcesses(
         ORDER BY p.created_at DESC, p.id DESC LIMIT ${PAGE_SIZE + 1}`,
       [...params, ...after.params]
     ),
-    // R16: the exact total behind the page — the SAME WHERE, so a badge can never
-    // count rows the list withholds.
-    d1Query<{ n: number }>(
+    // R16 (amended): the total behind the page — the SAME WHERE and the SAME
+    // join, so a badge can never count rows the list withholds — counted exactly
+    // to TOTAL_COUNT_CAP and "at least" beyond it.
+    countCollection(
       cfg,
       guard.databaseId,
-      `SELECT COUNT(*) AS n FROM processes p JOIN apps a ON a.id = p.app_id${base}`,
+      `SELECT 1 FROM processes p JOIN apps a ON a.id = p.app_id${base}`,
       params
     ),
   ])
@@ -330,7 +332,7 @@ export async function listProcesses(
       active: r.deactivated_at == null,
       createdAt: r.created_at,
     })),
-    total: counted[0]?.n ?? 0,
+    total: counted,
   }
 }
 

@@ -20,6 +20,7 @@
 // never touches. Keyset, newest first, exactly like the ticket list.
 
 import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
+import { countCollection } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { ulid } from "@shared/workers/id"
@@ -170,13 +171,13 @@ export async function countMeetings(
   filter: MeetingFilter
 ): Promise<number> {
   const base = whereFor(filter)
-  const rows = await d1Query<{ n: number }>(
+  // R16 (amended): counted exactly to TOTAL_COUNT_CAP, then "at least".
+  return countCollection(
     cfg,
     guard.databaseId,
-    `SELECT COUNT(*) AS n FROM meetings m WHERE ${base.sql}`,
+    `SELECT 1 FROM meetings m WHERE ${base.sql}`,
     base.params
   )
-  return rows[0]?.n ?? 0
 }
 
 /** One meeting by id, or null. Reads a cancelled one too: the record survives

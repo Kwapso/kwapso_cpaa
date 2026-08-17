@@ -257,7 +257,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_help_tickets",
     summary:
-      "List the team's tickets. scope: 'mine' (yours) or 'all' (default all); view: 'live' (default — the everyday list) or 'archived' (tickets that have been put away); pass `id` to fetch just one ticket, archived or not. Returns ONE page plus the exact `total`, `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
+      "List the team's tickets. scope: 'mine' (yours) or 'all' (default all); view: 'live' (default — the everyday list) or 'archived' (tickets that have been put away); pass `id` to fetch just one ticket, archived or not. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
     binding: "CONTENT", method: "GET", path: "/api/content/help",
     schema: obj({ scope: S, view: S, id: S, cursor: S }),
     buildQuery: (i) => {
@@ -313,7 +313,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_accounts",
     summary:
-      "List the team's accounts — companies and people in one list. Filters: `q` (searches name, reference and email), `type` ('entity' for a company or 'individual' for a person), `parentId` (only the accounts sitting under that one). Returns ONE page plus the exact `total`, `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
+      "List the team's accounts — companies and people in one list. Filters: `q` (searches name, reference and email), `type` ('entity' for a company or 'individual' for a person), `parentId` (only the accounts sitting under that one). Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/accounts",
     schema: obj({ q: S, type: S, parentId: S, cursor: S }),
     buildQuery: (i) => {
@@ -822,7 +822,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_stories",
     summary:
-      "List the team's STORIES — the pieces of work WE do, as opposed to the tickets a client raises. Filters: `status` (open / in_progress / in_review / done), `ticketId` (the work on one request), `sprintId`, `appId` (all the work on one system — a story always has an app and only sometimes a sprint), `assigneeId`, and `view` ('open' by default, which hides finished work — pass 'all' to include it). Pass `id` to fetch one story. Returns ONE page plus the exact `total`, `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
+      "List the team's STORIES — the pieces of work WE do, as opposed to the tickets a client raises. Filters: `status` (open / in_progress / in_review / done), `ticketId` (the work on one request), `sprintId`, `appId` (all the work on one system — a story always has an app and only sometimes a sprint), `assigneeId`, and `view` ('open' by default, which hides finished work — pass 'all' to include it). Pass `id` to fetch one story. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
     binding: "CONTENT", method: "GET", path: "/api/content/stories",
     schema: obj({ id: S, status: S, ticketId: S, sprintId: S, appId: S, assigneeId: S, view: S, cursor: S }),
     buildQuery: (i) => {
@@ -1002,7 +1002,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_meetings",
     summary:
-      "List MEETINGS — conversations we have had or are about to have, newest first, with the agenda and the notes on each. `view` is 'upcoming' by default (what is still to come); pass 'all' for the whole diary including cancelled ones. `accountId` narrows to one client, `purposeId` to one reason we meet, `status` to 'scheduled' or 'held', and `q` searches the title, the agenda and the notes. Pass `id` for one meeting. Returns ONE page plus the exact `total`, `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one). A meeting is NOT a work log: it says what was agreed, never how long it took.",
+      "List MEETINGS — conversations we have had or are about to have, newest first, with the agenda and the notes on each. `view` is 'upcoming' by default (what is still to come); pass 'all' for the whole diary including cancelled ones. `accountId` narrows to one client, `purposeId` to one reason we meet, `status` to 'scheduled' or 'held', and `q` searches the title, the agenda and the notes. Pass `id` for one meeting. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one). A meeting is NOT a work log: it says what was agreed, never how long it took.",
     binding: "CONTENT", method: "GET", path: "/api/content/meetings",
     schema: obj({ id: S, accountId: S, purposeId: S, status: S, view: S, q: S, cursor: S }),
     buildQuery: (i) => {
@@ -1227,7 +1227,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_work_logs",
     summary:
-      "List rows of time — who worked on what, and for how long in whole seconds. Filters: `scope` ('mine' for the caller's own, 'all' otherwise), `targetTable` + `targetId` (the time against one story or ticket), and `userId`. Returns ONE page plus the exact `total` (rows), `totalSeconds` (the number anybody actually wants), `hasMore` and an opaque `nextCursor` — call again passing that as `cursor` to read further. Binned runaway timers are never in the list.",
+      "List rows of time — who worked on what, and for how long in whole seconds. Filters: `scope` ('mine' for the caller's own, 'all' otherwise), `targetTable` + `targetId` (the time against one story or ticket), and `userId`. Returns ONE page plus `total` (rows — exact up to 1,000,000; `totalCapped` true means there are more than that), `totalSeconds` (the number anybody actually wants, and ALWAYS exact — it is billable time, never capped), `hasMore` and an opaque `nextCursor` — call again passing that as `cursor` to read further. Binned runaway timers are never in the list.",
     binding: "CONTENT", method: "GET", path: "/api/content/work-logs",
     schema: obj({ scope: S, targetTable: S, targetId: S, userId: S, cursor: S }),
     buildQuery: (i) => {
@@ -1353,7 +1353,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_knowledge_sources",
     summary:
-      "List what the assistant is allowed to read. Filters: `kind` ('note' for something typed here, or 'ticket' / 'article' / 'account' / 'app' / 'story' / 'sprint' for material mirrored from the app's own rows), `compartment` ('agency' or 'account:<id>'), `q` (searches the title and the summary). Pass `id` for one source — a list row carries the SUMMARY of each source rather than its material, because a source can be a three-hundred-page contract; read one by id for its words. Returns ONE page plus the exact `total`, `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
+      "List what the assistant is allowed to read. Filters: `kind` ('note' for something typed here, or 'ticket' / 'article' / 'account' / 'app' / 'story' / 'sprint' for material mirrored from the app's own rows), `compartment` ('agency' or 'account:<id>'), `q` (searches the title and the summary). Pass `id` for one source — a list row carries the SUMMARY of each source rather than its material, because a source can be a three-hundred-page contract; read one by id for its words. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
     binding: "CONTENT", method: "GET", path: "/api/content/knowledge",
     schema: obj({ id: S, kind: S, compartment: S, q: S, cursor: S }),
     buildQuery: (i) => {
@@ -1511,7 +1511,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_processes",
     summary:
-      "List process maps — a Process is a way of working inside an App. Filters: `q` (searches the name and description), `appId` (only that app's maps). Returns ONE page plus the exact `total`, `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
+      "List process maps — a Process is a way of working inside an App. Filters: `q` (searches the name and description), `appId` (only that app's maps). Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/processes",
     schema: obj({ q: S, appId: S, cursor: S }),
     buildQuery: (i) => {

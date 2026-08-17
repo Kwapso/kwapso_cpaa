@@ -22,6 +22,7 @@
 //     answers on Monday morning instead (see resolveRunaway).
 
 import { logActivity, type Actor } from "@shared/workers/activity"
+import { boundedInner, reportedTotal } from "@shared/workers/count"
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
@@ -206,9 +207,25 @@ export async function listWorkLogs(
   return { ...page, rows: page.rows.map(toLog) }
 }
 
-/** R16: the exact COUNT(*) and the exact SUM, over the SAME filter the page came
- * from. Both, because a list of time is one of the few collections where the
- * number a person cares about is not how many rows there are. */
+/** The COUNT and the SUM, over the SAME filter the page came from. Both, because
+ * a list of time is one of the few collections where the number a person cares
+ * about is not how many rows there are.
+ *
+ * AND THE TWO NUMBERS ARE COUNTED DIFFERENTLY, which is the whole point of this
+ * function keeping its own statement instead of using the seam:
+ *
+ *   • `total` is a BADGE. R16's amendment applies — counted exactly to
+ *     TOTAL_COUNT_CAP, then reported as "at least", because past a million rows
+ *     the badge renders "1m+" either way.
+ *   • `totalSeconds` is BILLABLE TIME, and it stays EXACT. It is not a display
+ *     tally; it is the number an invoice is argued about. Wrapping it in the
+ *     bounded subquery beside the count would have made it a PARTIAL SUM of hours,
+ *     silently, with nothing on screen to say so — a display cap quietly becoming
+ *     a billing error. The two numbers happened to share a statement; they never
+ *     shared a purpose.
+ *
+ * Still ONE round trip: two scalar subqueries in one statement, so the split costs
+ * nothing but the repeated parameters. */
 export async function countWorkLogs(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -218,10 +235,14 @@ export async function countWorkLogs(
   const rows = await d1Query<{ n: number; s: number | null }>(
     cfg,
     guard.databaseId,
-    `SELECT COUNT(*) AS n, SUM(w.seconds) AS s FROM work_logs w WHERE ${where.sql}`,
-    where.params
+    `SELECT (SELECT COUNT(*) FROM ${boundedInner(`SELECT 1 FROM work_logs w WHERE ${where.sql}`)}) AS n,
+            (SELECT SUM(w.seconds) FROM work_logs w WHERE ${where.sql}) AS s`,
+    [...where.params, ...where.params]
   )
-  return { total: rows[0]?.n ?? 0, totalSeconds: Math.max(0, Math.round(rows[0]?.s ?? 0)) }
+  return {
+    total: reportedTotal(rows[0]?.n ?? 0),
+    totalSeconds: Math.max(0, Math.round(rows[0]?.s ?? 0)),
+  }
 }
 
 /** EVERY TIMER THIS PERSON HAS RUNNING — what the header asks on every screen.

@@ -11,6 +11,23 @@ export const LIST_HARD_CAP = 1000
  * deliberate download), still bounded so one request can't stream a whole shard. */
 export const EXPORT_HARD_CAP = 10_000
 
+/** WHERE COUNTING STOPS — the one ceiling on every total this app reports, for a
+ * filtered SEARCH and (since R16 was amended on 2026-08-14) for a COLLECTION too.
+ *
+ * ONE number rather than two, deliberately. A filtered search has always counted
+ * exactly to a million and then said "1m+"; the amendment gives a collection total
+ * the same ceiling and the same sentence, so there is one place in the product
+ * where counting stops instead of two that could drift apart. A door that stopped
+ * counting at one number while the badge started hedging at another would produce
+ * precisely the output this seam exists to prevent: a total that is quietly wrong
+ * and looks exact.
+ *
+ * It lives HERE, beside the other read ceilings, because both sides need it and
+ * neither may own it — `shared/workers/count.ts` bounds the scan with it and
+ * `shared/web/format-count.ts` renders the "+" from it. This file is pure
+ * constants with no imports, so the browser pays nothing to read it. */
+export const TOTAL_COUNT_CAP = 1_000_000
+
 /** Hard cap on a conversation/derived read (a ticket's replies, a chat thread's
  * messages, a per-member progress matrix). */
 export const THREAD_HARD_CAP = 500

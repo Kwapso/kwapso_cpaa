@@ -20,6 +20,7 @@ import {
   requireStandableRoot,
   type AccountScope,
 } from "@shared/workers/account-scope"
+import { countCollection } from "@shared/workers/count"
 import { d1Query, likeLiteral, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { EXPORT_HARD_CAP, LIST_HARD_CAP, MAX_ACCOUNT_DEPTH } from "@shared/workers/limits"
@@ -193,13 +194,14 @@ export async function listAccounts(
         ORDER BY created_at DESC, id DESC LIMIT ${PAGE_SIZE + 1}`,
       [...params, ...after.params]
     ),
-    // R16: the exact total of what THIS caller may see — the same WHERE, so a
-    // badge can never count rows the list withholds.
-    d1Query<{ n: number }>(cfg, guard.databaseId, `SELECT COUNT(*) AS n FROM accounts${base}`, params),
+    // R16 (amended): the total of what THIS caller may see — the same WHERE, so a
+    // badge can never count rows the list withholds — counted exactly to
+    // TOTAL_COUNT_CAP and reported as "at least" beyond it.
+    countCollection(cfg, guard.databaseId, `SELECT 1 FROM accounts${base}`, params),
   ])
 
   const page = toPage(rows, PAGE_SIZE, (r) => [r.created_at, r.id])
-  return { ...page, rows: page.rows.map((r) => toAccount(r, scope)), total: counted[0]?.n ?? 0 }
+  return { ...page, rows: page.rows.map((r) => toAccount(r, scope)), total: counted }
 }
 
 /** Every account this caller may see — NARROWED the same way the list narrows —

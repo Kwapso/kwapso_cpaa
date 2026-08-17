@@ -26,6 +26,7 @@
 // count is served by the ticket door (BUILD-1 §7).
 
 import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
+import { countCollectionWith, reportedTotal } from "@shared/workers/count"
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
@@ -201,14 +202,15 @@ export async function countStories(
   filter: StoryFilter
 ): Promise<{ total: number; mineTotal: number }> {
   const where = storyWhere(filter)
-  const rows = await d1Query<{ total: number; mine: number }>(
+  // R16 (amended): both numbers are badges, both clamped at the one ceiling.
+  const row = await countCollectionWith<{ total: number; mine: number }>(
     cfg,
     guard.databaseId,
-    `SELECT COUNT(*) AS total, SUM(CASE WHEN s.assignee_id = ? THEN 1 ELSE 0 END) AS mine
-       FROM stories s WHERE ${where.sql}`,
+    `SELECT (s.assignee_id = ?) AS is_mine FROM stories s WHERE ${where.sql}`,
+    "COUNT(*) AS total, SUM(is_mine) AS mine",
     [guard.userId, ...where.params]
   )
-  return { total: rows[0]?.total ?? 0, mineTotal: rows[0]?.mine ?? 0 }
+  return { total: reportedTotal(row?.total ?? 0), mineTotal: reportedTotal(row?.mine ?? 0) }
 }
 
 /** One story by id, or null. */
