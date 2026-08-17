@@ -16,13 +16,15 @@ being done, the reason is written next to it and you can overrule it with one wo
 
 Last updated 17 Aug 2026.
 
-**Two migrations are written and NOT yet rolled out.** `0025` drops the purged
-tables and folds the delivery programmes onto the sprint type; `0026` retires the
-duplicated dropdown values older teams carry. Both run against every existing
-team through `POST /api/tenancy/admin/migrate-teams`, which is an owner-gated
-deploy step and has deliberately not been taken here. A team created after this
-change needs neither: the schema no longer builds the tables, and the seed no
-longer duplicates a value.
+**Six migrations are written and roll out through the same owner-gated step.**
+`0025` drops the purged tables and folds the delivery programmes onto the sprint
+type; `0026` retires the duplicated dropdown values older teams carry; `0027`
+gives a task its admin fields; `0030` adds who is on an app and who the client's
+people are; `0031` adds the role rate card and the role on a process; `0032`
+gives the diary its transcript and its series. Every one runs against every
+existing team through `POST /api/tenancy/admin/migrate-teams`. A team created
+after these changes needs none of them: the schema builds the new tables and no
+longer builds the purged ones.
 
 ---
 
@@ -44,7 +46,7 @@ longer duplicates a value.
 |---|---|---|
 | 2.1 | Ticket types become Question, Issue, Request, Extra, Requirements | TO DO — **CHANGED**: Aurora retires Feedback and Bug. You wanted Feedback kept. This is a "what", so Aurora wins by your own rule |
 | 2.2 | Story types Fix, Feature, Change, and editable in Dropdown values | TO DO |
-| 2.3 | "My tickets" becomes tickets on apps I am staffed to | TO DO — **CHANGED**: tickets on apps I am staffed to. Genuinely blocked: nothing records who is staffed to an app yet. That is 8.10, and it unblocks this |
+| 2.3 | "My tickets" becomes tickets on apps I am staffed to | **DONE** — **CHANGED**: tickets on apps I am staffed to, Aurora's answer. One clause once 8.10 existed, and the My badge counts the same sentence, because there is one place it is written. A client login keeps the old meaning (what they raised), or their tab would be empty for ever |
 | 2.4 | "Request behind it" becomes "Tickets" | TO DO |
 | 2.5 | "By when" becomes "Deadline" everywhere | **PART DONE** — done on the task screens; the rest rides the wider rename |
 | 2.6 | The Time page becomes "Work logs" | TO DO |
@@ -115,11 +117,11 @@ longer duplicates a value.
 | 6.3 | The sprint list filters to that app and to current and future sprints, with an icon for active, done and upcoming | **DONE** |
 | 6.4 | The ticket list filters to that app and to open tickets only | **DONE** |
 | 6.5 | A story links to one or more processes | **DONE** — **CHANGED**: an empty list is refused unless the "no process" tick is deliberately set, Aurora's answer |
-| 6.6 | "Who's doing it" limits to staff on that app | TO DO — blocked on 8.10 for the same reason as 2.3: nothing records app staffing yet |
+| 6.6 | "Who's doing it" limits to staff on that app | **DONE** — at the DOOR, not only in the picker: a narrowed dropdown is a suggestion and this is a rule. Silent on an app nobody is staffed to yet, or recording who is doing the work would be impossible on precisely the apps that need it |
 | 6.7 | The status becomes a label; a timer moves it, not the other way round | **DONE** — a timer moves the status now, not the reverse |
 | 6.8 | A work logs tab on the story, and everywhere else time is captured | **DONE** |
 | 6.9 | Review is refused until the timers are stopped and an explanation is written | **DONE** — **CHANGED**: timers stopped and an explanation written; the file only when there is something to show, Aurora's answer |
-| 6.10 | The reviewer gets one Done button | **PART DONE** — one button, one place. "Pressed by the app's team lead" waits on 8.10 |
+| 6.10 | The reviewer gets one Done button | **DONE** — one button, one place, and it now belongs to the app's team lead. Silent when the app has no lead, which is the migration path rather than a loophole: 3,677 imported stories sit on apps nobody has staffed |
 
 ## 7 · Companies and contacts
 
@@ -150,27 +152,27 @@ longer duplicates a value.
 | 8.2 | Active and Inactive tabs, sub-grouped by stage | **DONE** — Active and Inactive, sub-grouped by stage. And the real vocabulary turned out to be EIGHT stages, not the four in the brief: Not started, Blueprint, Development, Documentation, Iteration, Maintenance, Completed, Archived. Read off your legacy data rather than invented |
 | 8.3 | Stage becomes a proper choice component | **DONE** |
 | 8.4 | The context fields come back: about, client context, solution, key actors | **DONE** — about, client context, solution and key actors are back |
-| 8.5 | Stakeholders inside an app, one of them the main one | TO DO — stakeholders inside an app. Not reached |
-| 8.6 | A related tickets tab | TO DO — the tickets tab needs the ticket list to accept an app filter, and that file was locked by the lane running beside it |
+| 8.5 | Stakeholders inside an app, one of them the main one | **DONE** — chosen from that account's own contacts, exactly one marked main, enforced by a partial unique index rather than a check two people can race past. And the ticket resolution email (5.7) now goes to the APP's main stakeholder, falling back to the account's when the ticket names no app. One function, as the note there predicted |
+| 8.6 | A related tickets tab | **DONE** — the ticket door now parses an app filter, so the rows and the tab badge answer one question |
 | 8.7 | A related deliverables tab | TO DO — **this is a whole new module, not a tab.** There is no deliverables table, module or permission anywhere in the app. Sizing it honestly rather than half-building it |
 | 8.8 | A meetings tab | **DONE** — and a meeting can now say which app it was about, which is what made the tab possible |
-| 8.9 | A knowledge tab | TO DO — knowledge tab. Not reached |
-| 8.10 | Staff assigned on the add screen, with a team lead | TO DO — staff and team lead on the add screen. Not reached |
-| 8.11 | Only assigned staff and admins open an app | TO DO — only assigned staff open the detail page. Not reached |
+| 8.9 | A knowledge tab | **DONE** — with the record's own details fed into the question automatically, and said out loud on the screen: the question that gets asked is not the question that was typed, so a person has to be able to see what was added |
+| 8.10 | Staff assigned on the add screen, with a team lead | **DONE** — on the add screen and the edit screen, riding the same submit that records the app, so there is no second request that can fail on its own and leave an app with nobody on it. It unblocked 2.3, 6.6 and 6.10, each of which turned out to be one clause |
+| 8.11 | Only assigned staff and admins open an app | **DONE** — everyone still sees the tile; only the staff on it and an admin open the page. Record-level visibility, which this codebase had never done: the DOOR withholds the material, so it is not in the network tab either. A client login is not subject to it — the account fence has already decided, and staffing is our rota |
 | 8.12 | Processes live under the app, with an add button | **DONE** |
-| 8.13 | Hours and money given back, shown per app | TO DO — **left deliberately rather than half-built.** Aurora's model needs a rate per ROLE, which does not exist. It is an internal number, so it must never reach the portal, and the law forbids one screen reading both rate cards. Worth getting right |
+| 8.13 | Hours and money given back, shown per app | **DONE** — Aurora's model: each process names the role that does it, each role has a rate, and the figure is the hours times that rate. A third rate card, in the one file no portal-reachable path imports. A process with no priced role contributes its HOURS and no money, and the screen says how many it left out |
 
 ## 9 · Meetings and sprints
 
 | # | The thing | Status |
 |---|---|---|
-| 9.1 | Meeting views: this week, calendar, all | TO DO — this week, calendar and all. Not reached |
-| 9.2 | A transcript creates a work log per participant | TO DO — a transcript creating a work log per staff member. Not reached |
-| 9.3 | Those logs are marked as meeting time and can be excluded from any figure | TO DO |
-| 9.4 | "Meeting held" ticks itself when a transcript arrives | TO DO |
+| 9.1 | Meeting views: this week, calendar, all | **DONE** — this week is past AND upcoming, with its boundary worked out on the server so the badge and the rows mean one week; the calendar is the library's; All carries nine columns instead of two |
+| 9.2 | A transcript creates a work log per participant | **DONE** — **CHANGED**: our own staff only, Aurora's answer. A client's hour is not our cost, so the attendee list is intersected with the team's own membership and an address we do not employ produces nothing |
+| 9.3 | Those logs are marked as meeting time and can be excluded from any figure | **DONE** — one constant with one writer and one reader, so "with or without meeting time" is a filter rather than a guess about a string. The work-log door takes all of it, none of it, or only it |
+| 9.4 | "Meeting held" ticks itself when a transcript arrives | **DONE** — the same act as 9.2, because it is the same moment: making somebody press two buttons about one fact is how the second stops being pressed. Idempotent by the predicate that claims the row |
 | 9.5 | "Add to my calendar" hides when it is already there | **DONE** — it already was. "Add to my calendar" has been hiding itself when the meeting is already there |
-| 9.6 | Agenda edited from the edit page; notes open on the detail screen until the meeting closes | TO DO |
-| 9.7 | Recurring calendar meetings appear | TO DO |
+| 9.6 | Agenda edited from the edit page; notes open on the detail screen until the meeting closes | **DONE** — an open box on the record while the meeting is still to come, read-only once it is held or cancelled, and a later correction is then a deliberate edit rather than a stray keystroke |
+| 9.7 | Recurring calendar meetings appear | **DONE** — **CHANGED**: a real record four weeks ahead, Aurora's answer over "read-only always", so there is a month to prepare the notes. Further out they are shown and not stored: an entry six months away can still be moved, and a record you can edit is a promise the edit means something |
 | 9.8 | Sprints get a calendar view | **DONE** — a calendar view |
 | 9.9 | Sprints get an overview by type and status | **DONE** — grouped by running, coming up and wrapped, then by kind |
 | 9.10 | Sprint types get their icon and colour | **DONE** — each type carries its mark, with one gap: the flat All tab has none, because the list renderer has no icon slot and putting a glyph inside the title is the one shape the law refuses |
@@ -203,7 +205,7 @@ longer duplicates a value.
 
 | # | The thing | Status |
 |---|---|---|
-| 12.1 | Reachable from inside an account, app, ticket, story and task, with that record's context fed in | TO DO |
+| 12.1 | Reachable from inside an account, app, ticket, story and task, with that record's context fed in | **PART DONE** — an account and an app both carry a Knowledge tab with the record's own details fed into the question. A ticket, a story and a task do not yet |
 | 12.2 | Learning's articles ingested before Learning is destroyed | **DONE** — all 41 are already indexed. Measured, not assumed |
 | 12.3 | Control over who can see what inside it | TO DO |
 
