@@ -128,12 +128,110 @@ function usageTitle(tally: UsageTally, prompt: string): string {
   return tally.actions.join(" · ").slice(0, 200)
 }
 
-/** Tool result → the fenced DATA string the model sees (capped so a big list can't
- * blow the context / cost). */
+/** How much of one tool result the model is handed. Bounded so a page of fifty
+ * records cannot blow the context — or the bill — on a turn that only needed a
+ * number out of it. */
+const RESULT_CHARS = 2000
+
+/** WHAT A TOOL RETURNED, TRIMMED TO FIT — by dropping ROWS, never by cutting the
+ * string, and never silently.
+ *
+ * THIS IS THE FOUR-IDENTICAL-CALLS BUG. It used to be
+ * `JSON.stringify(data).slice(0, 2000)`. A list door answers through `pagedJson`,
+ * whose shape is `{rows: […50…], total, hasMore, nextCursor}` — the ROWS FIRST.
+ * A ticket carries about thirty fields including a free-text description, so two
+ * thousand characters is three or four rows and then the cut lands mid-object,
+ * taking `total`, `hasMore` and `nextCursor` with it. `total` is the exact count;
+ * `nextCursor` is the only way to read further; `list_help_tickets`' own
+ * description PROMISES both. So asked "how many open tickets does Confia have?"
+ * the model received a truncated array, no count, no way to page, and no word
+ * saying anything had been removed — and did the only thing left open to it,
+ * which was to call the same tool with the same arguments again. Four times, at
+ * one AI unit of the team's allowance per attempt.
+ *
+ * So the trim is shape-aware and it is LOUD. Every field that is not the row list
+ * survives whatever else has to go — they are the summary, and they are tiny —
+ * the rows are dropped from the END in whole rows, and a plain sentence says how
+ * many of how many are here. It stays valid JSON, so the model can still parse
+ * it. Anything already under the ceiling is handed over untouched.
+ *
+ * The note is stated as a FACT, not as an instruction: everything inside a tool
+ * result is data the model must never take orders from (TOOL_RESULT_TAG, and the
+ * system prompt that names it), and that has to hold for the sentences we write
+ * ourselves too. */
+export function trimResult(data: unknown): string {
+  const whole = typeof data === "string" ? data : JSON.stringify(data)
+  if (whole === undefined) return "" // a door that answered with nothing at all
+  if (whole.length <= RESULT_CHARS) return whole
+  const rows = data && typeof data === "object" && !Array.isArray(data) ? rowList(data) : null
+  if (!rows)
+    return `${whole.slice(0, RESULT_CHARS)}\n[Trimmed here: the result was longer than ${RESULT_CHARS} characters, so what is above is incomplete.]`
+  const [key, list] = rows
+  const rest = { ...(data as Record<string, unknown>), [key]: [] as unknown[] }
+  let budget = RESULT_CHARS - JSON.stringify(rest).length
+  const kept: unknown[] = []
+  for (const row of list) {
+    const size = JSON.stringify(row).length + 1 // + the separating comma
+    if (size > budget) break
+    kept.push(row)
+    budget -= size
+  }
+  return (
+    JSON.stringify({ ...(data as Record<string, unknown>), [key]: kept }) +
+    `\n[${kept.length} of ${list.length} ${key} are shown; the rest were dropped to fit. Every other field above is complete and counts the whole set, not what is shown.]`
+  )
+}
+
+/** The one array on a paged result — `sources`, `tickets`, `members`, whatever the
+ * door named its rows. The first array wins: `pagedJson` puts the rows first and
+ * every other field it adds is a scalar. */
+function rowList(data: object): [string, unknown[]] | null {
+  for (const [k, v] of Object.entries(data)) if (Array.isArray(v)) return [k, v]
+  return null
+}
+
+/** Tool result → the fenced DATA string the model sees. */
 function fence(result: ToolResult): string {
-  const payload = typeof result.data === "string" ? result.data : JSON.stringify(result.data)
-  const body = (payload ?? "").slice(0, 2000)
-  return result.ok ? `OK. Result data: ${body}` : `FAILED: ${result.error ?? "unknown error"}`
+  return result.ok
+    ? `OK. Result data: ${trimResult(result.data)}`
+    : `FAILED: ${result.error ?? "unknown error"}`
+}
+
+/** THE REPEAT BACKSTOP — the same READ, with the same arguments, twice in one
+ * turn answers from the first one instead of running again.
+ *
+ * The CAUSE of the repetition is fixed above (a result that had its count cut off
+ * gave the model nothing to do but ask again). This is the cheap guard behind it,
+ * because that cause is one of a family: any turn where the model does not use
+ * what it was handed costs the team an AI unit per attempt, and there is no
+ * reading of "list the same thing again, unchanged, within one turn" that is
+ * worth paying for.
+ *
+ * READS ONLY, and that restriction is the whole safety argument: a read is
+ * idempotent, so replaying its result is not an approximation of what a second
+ * call would have returned, it is the same answer. A WRITE is not — two identical
+ * writes in one turn are almost always a mistake, but swallowing the second one
+ * would be this seam quietly deciding a thing the door and the confirm panel are
+ * there to decide. So a write always runs, and is always audited.
+ *
+ * Per TURN, never across turns: the loop makes one of these and throws it away,
+ * so asking the same question again in the next message really does re-read. */
+export function repeatGuard() {
+  const seen = new Map<string, string>()
+  // Key order must not make two identical calls look different, so the fields are
+  // sorted: {scope,view} and {view,scope} are one call.
+  const key = (tc: ToolCall): string =>
+    `${tc.name} ${JSON.stringify(
+      Object.fromEntries(Object.entries(tc.input ?? {}).sort(([a], [b]) => (a < b ? -1 : 1)))
+    )}`
+  return {
+    /** The fenced result this exact read already produced this turn, or null. */
+    recall: (write: boolean, tc: ToolCall): string | null =>
+      write ? null : (seen.get(key(tc)) ?? null),
+    remember: (write: boolean, tc: ToolCall, content: string): void => {
+      if (!write) seen.set(key(tc), content)
+    },
+  }
 }
 
 /** The id-ish fields of a tool call (id, roleId, userId, …) — slim enough to ride
@@ -315,6 +413,8 @@ type StepCtx = {
   tally: UsageTally
   /** id → friendly name, so a step summary reads "Remove Jane Doe" not a ULID. */
   names: Record<string, string>
+  /** this turn's already-run READS, so an identical one answers from the first. */
+  repeats: ReturnType<typeof repeatGuard>
   emit?: Emit
 }
 
@@ -340,6 +440,25 @@ async function runToolCall(ctx: StepCtx, tc: ToolCall): Promise<{ message: ChatM
   const { emit, tally } = ctx
   const t = getTool(tc.name)
   const summary = t ? t.summarize(tc.input, ctx.names) : `Run ${tc.name}`
+  // THE SAME READ, TWICE, IN ONE TURN. Answered from the first one — see
+  // repeatGuard for why this is reads only. It is not hidden: the step row is
+  // still emitted and still written, and it SAYS which it was, because the model
+  // really did ask again and a trail that pretended otherwise would make the next
+  // one of these invisible. The tool message carries THIS call's id, or the
+  // provider would reject a tool_use with no result of its own.
+  const cached = t ? ctx.repeats.recall(!!t.write, tc) : null
+  if (cached !== null) {
+    const again = `${summary} — answered from the same call earlier this turn`
+    emit?.({ t: "step_start", tool: tc.name, summary: again, ids: traceIds(tc.input) })
+    emit?.({ t: "step_end", tool: tc.name, ok: true, summary: again })
+    await appendMessage(ctx.cfg, ctx.guard, ctx.actor, ctx.threadId, {
+      role: "tool",
+      content: cached,
+      toolCallsJson: JSON.stringify([{ tool: tc.name, summary: again, status: "done" }]),
+      source: ctx.source,
+    })
+    return { message: { role: "tool", content: cached, toolCallId: tc.id, toolName: tc.name }, ok: true }
+  }
   emit?.({ t: "step_start", tool: tc.name, summary, ids: traceIds(tc.input) })
   const result: ToolResult = t
     ? await executeTool(ctx.env, ctx.request, t, tc.input)
@@ -355,6 +474,9 @@ async function runToolCall(ctx: StepCtx, tc: ToolCall): Promise<{ message: ChatM
     tally.actions.push(result.ok ? summary : `${summary} (failed)`)
   }
   const content = fence(result)
+  // Only a result worth replaying is remembered: a failure is not the answer to
+  // the question, and a retry after a bad minute is a reasonable thing to do.
+  if (t && result.ok) ctx.repeats.remember(!!t.write, tc, content)
   await appendMessage(ctx.cfg, ctx.guard, ctx.actor, ctx.threadId, {
     role: "tool",
     content,
@@ -525,6 +647,11 @@ async function runPlanLoop(
   // Stream text deltas only when the caller wants live progress AND the model supports
   // it; otherwise take the one-shot path (Workers AI, or any non-streamed request).
   const streaming = !!emit && model.canStream && !!model.stream
+
+  // ONE guard for the WHOLE turn, not one per step: the repetition being caught
+  // happens ACROSS steps — call a tool, get a model turn back, call the identical
+  // tool again — so a guard rebuilt each iteration would never see the repeat.
+  const repeats = repeatGuard()
 
   // ONE narration seam: everything the assistant says flows out as a `text` event —
   // streamed deltas from the model, or one say() chunk for a non-streaming model and
@@ -709,7 +836,7 @@ async function runPlanLoop(
       emit && reply.toolCalls.some((tc) => hasNameableId(tc.input))
         ? await resolveNames(env, request, reply.toolCalls)
         : {}
-    const stepCtx: StepCtx = { env, request, cfg, guard, actor, threadId, source: opts.source, tally: opts.tally, names, emit }
+    const stepCtx: StepCtx = { env, request, cfg, guard, actor, threadId, source: opts.source, tally: opts.tally, names, repeats, emit }
     let failed = false
     for (const tc of reply.toolCalls) {
       const { message, ok } = await runToolCall(stepCtx, tc)
@@ -808,7 +935,9 @@ export async function confirmAndRun(
   const names = emit ? await resolveNames(env, request, calls) : {}
   // The SAME step seam the plan loop uses — one audit trail, one tally rule, whichever
   // loop ran the call (see runToolCall: writes title the row, reads ride along quietly).
-  const stepCtx: StepCtx = { env, request, cfg, guard, actor, threadId: opts.threadId, source: opts.source, tally, names, emit }
+  // A fresh guard: these are the CONFIRMED calls, which are writes — the guard
+  // never touches a write — and the plan this turn resumes into gets its own.
+  const stepCtx: StepCtx = { env, request, cfg, guard, actor, threadId: opts.threadId, source: opts.source, tally, names, repeats: repeatGuard(), emit }
   const toolMsgs: ChatMessage[] = []
   let failed = false
   for (const tc of calls) {

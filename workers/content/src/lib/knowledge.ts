@@ -1226,13 +1226,25 @@ async function deriveRoute(
     { level: "record", ...compartmentFilter(choice.compartments) },
     ROUTER_TOP_RECORDS
   )
-  if (!hits.length) return { ...choice, records: [] }
-  const titles = await sourceTitles(
-    cfg,
-    guard,
-    hits.map((h) => h.id.replace(/:summary$/, ""))
-  )
-  const records = [...titles.entries()].map(([sourceId, title]) => ({ sourceId, title }))
+  // THE REASONING IS HELD TO THE SAME FLOOR AS THE ANSWER. A vector search always
+  // returns a nearest neighbour, and this one had no floor at all — so the
+  // sentence that rides every answer said "it reads like a question about X, Y,
+  // Z" for EVERY question, including the ones the base has nothing on. Asked
+  // "what is the capital of France?", the app's own documents come back at 0.32
+  // and the reader was told the question was about three of them, next to a
+  // refusal. Under R23 the reasoning is part of the answer, so it cannot assert a
+  // subject on evidence the answer itself would throw away.
+  const near = hits.filter((h) => h.score >= numberVar(env.KNOWLEDGE_MIN_SCORE, MIN_VECTOR_SCORE))
+  if (!near.length) return { ...choice, records: [] }
+  // In the order the SEARCH put them, best first. Reading them back off the Map
+  // handed them over in whatever order the database returned, so "best first" —
+  // which is what the sentence claims — was a coincidence of row order.
+  const ids = near.map((h) => h.id.replace(/:summary$/, ""))
+  const titles = await sourceTitles(cfg, guard, ids)
+  const records = ids.flatMap((sourceId) => {
+    const title = titles.get(sourceId)
+    return title ? [{ sourceId, title }] : []
+  })
   return {
     ...choice,
     records,
@@ -1377,7 +1389,7 @@ export function knowledgeAnswer(input: {
   }
 }
 
-type CandidateRow = { chunk_id: string; lex: number; hits: number }
+type CandidateRow = { chunk_id: string; lex: number }
 
 /** How much of a question a chunk must actually CONTAIN before the word match
  * will call it evidence.
@@ -1388,6 +1400,39 @@ type CandidateRow = { chunk_id: string; lex: number; hits: number }
  * impossible to say the moment the word arm was allowed to run alone. Its only
  * honest unit is how many of the question's own terms are in it. */
 const MIN_TERM_SHARE = 0.5
+
+/** A question with no room in it for a SHARE. Measured on staging: "What is the
+ * capital of France?" tokenises to two terms, and half of two is one — so the
+ * knowledge base answered a question about France out of whatever it held that
+ * said "capital", confidently, with citations. A share is a proportion, and a
+ * proportion of two is not a floor; below this many terms the only honest
+ * requirement is all of them. */
+const SHORT_QUESTION_TERMS = 3
+
+/** HOW MUCH OF THE QUESTION A CHUNK MUST HOLD — and it is not one number,
+ * because the word arm has two jobs and only one of them can lie.
+ *
+ * Running BESIDE the vector arm (`sole` false) it is a tenth of a vote on a list
+ * the vector arm already decided the shape of. It cannot turn a refusal into an
+ * answer, so a share is enough and the measured 0.5 stands.
+ *
+ * Running as EVERYTHING WE HAVE (`sole` true — the vector arm found nothing over
+ * its floor) it decides `found` on its own, which is the one decision R23 is
+ * about. There a short question has to be present in FULL: "capital of France"
+ * must mean a chunk that says both, or the base says it has nothing.
+ *
+ * WHAT THIS DOES NOT TOUCH, measured against the real model (bge-m3) on the
+ * app's own 17 documents rather than assumed: a question the base can answer
+ * clears the VECTOR floor and never reaches the sole branch at all — the German
+ * access question tops out at 0.585 over 13 chunks, "who can see the margin?" at
+ * 0.520, "what is an account in kwapso?" at 0.631 over 32. The France question
+ * peaks at 0.321 and nothing is over the floor. So the only questions whose
+ * behaviour changes here are the ones the vector arm had already refused. */
+function termFloor(terms: number, sole: boolean): number {
+  const share = Math.max(1, Math.ceil(terms * MIN_TERM_SHARE))
+  if (!sole) return share
+  return terms <= SHORT_QUESTION_TERMS ? terms : share
+}
 
 /** DID SOMEBODY TYPE SOMETHING EXACT? A token with a digit in it — a ticket
  * reference, an invoice number, an error code, a date — or a phrase they put in
@@ -1415,7 +1460,10 @@ async function lexicalArm(
   cfg: D1Rest,
   guard: MemberGuard,
   terms: string[],
-  compartments: string[]
+  compartments: string[],
+  /** true when the vector arm found nothing, so this list IS the answer — see
+   * `termFloor`, which is where the two jobs stop being the same job. */
+  sole: boolean
 ): Promise<CandidateRow[]> {
   if (!terms.length) return []
   const owner = ownerClause(guard)
@@ -1432,17 +1480,27 @@ async function lexicalArm(
     // the compartment holds. The statement binds at most 24 terms + 1 owner + a
     // handful of compartments — D1 refuses a statement past 100 parameters.
     //
-    // `hits` counts the DISTINCT terms of the question this chunk contains; the
-    // primary key is (term, chunk_id), so a row per term is a term. That is the
-    // number the floor below is expressed in — SUM(weight) says how loudly a
-    // chunk matched, and only this says how MUCH of the question it answered.
-    `SELECT chunk_id, SUM(weight) AS lex, COUNT(*) AS hits FROM knowledge_terms
+    // `COUNT(*)` counts the DISTINCT terms of the question this chunk contains;
+    // the primary key is (term, chunk_id), so a row per term is a term. That is
+    // the number the floor is expressed in — SUM(weight) says how loudly a chunk
+    // matched, and only this says how MUCH of the question it answered.
+    //
+    // THE FLOOR IS A `HAVING`, NOT A FILTER ON WHAT CAME BACK, and that is the
+    // second half of the same bug. Filtering afterwards meant the LIMIT chose the
+    // ten LOUDEST chunks first and the floor then threw most of them away — so a
+    // chunk holding every word of the question could be cut before the floor ever
+    // saw it, by ten chunks that repeated one word. Deciding eligibility in the
+    // statement makes the ten a page of chunks that already qualify. The number
+    // is derived from the question's own term count and is an integer, so it is
+    // interpolated like every other server-owned value (CONVENTIONS); the ORDER
+    // BY is left exactly as it was measured.
+    `SELECT chunk_id, SUM(weight) AS lex FROM knowledge_terms
       WHERE ${where.join(" AND ")}
-      GROUP BY chunk_id ORDER BY lex DESC LIMIT ${LEXICAL_TOP_K}`,
+      GROUP BY chunk_id HAVING COUNT(*) >= ${termFloor(terms.length, sole)}
+      ORDER BY lex DESC LIMIT ${LEXICAL_TOP_K}`,
     params
   )
-  const needed = Math.max(1, Math.ceil(terms.length * MIN_TERM_SHARE))
-  return rows.filter((r) => r.hits >= needed)
+  return rows
 }
 
 type ScoredRow = {
@@ -1526,14 +1584,15 @@ export async function retrieve(
   //     it has no vector, or nothing in the base is close enough. Then it is not
   //     a peer, it is everything we have.
   // The second case is only safe because the word arm has a floor of its own
-  // (MIN_TERM_SHARE): a chunk has to contain half the question before it counts.
-  // Without that, letting it run whenever the vector arm drew a blank would turn
-  // every honest "we have nothing on this" into a bag of vaguely related
-  // paragraphs — which is the failure R23 exists to prevent.
+  // (`termFloor`), and it is a STRICTER floor in exactly that case — a short
+  // question must be present in full. Without that, letting it run whenever the
+  // vector arm drew a blank turns every honest "we have nothing on this" into a
+  // bag of vaguely related paragraphs, which is the failure R23 exists to
+  // prevent and which "half the question" was too weak to stop: half of a
+  // two-word question is one word.
+  const sole = !vector.length
   const lexical =
-    hasExactTerm(question) || !vector.length
-      ? await lexicalArm(cfg, guard, terms, route.compartments)
-      : []
+    hasExactTerm(question) || sole ? await lexicalArm(cfg, guard, terms, route.compartments, sole) : []
 
   const fused = fuse(vector, lexical)
   if (!fused.length)
