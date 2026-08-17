@@ -102,7 +102,7 @@ route may reach `/internal/*`, the agent, or the act-as-user surface).
 | `realtime` | no | the `TeamChannel` Durable Object — fans out live change pings |
 | `auth` | no | email-code and Google login, sessions, the email sender |
 | `tenancy` | no | teams, members, Member roles + permissions, invites, dropdown values, the customer spine |
-| `content` | no | Learning + Tickets |
+| `content` | no | Tickets, the work engine, the knowledge base |
 | `data-ops` | no | CSV import + the AI agent |
 | `mcp` | no | the external machine surface: personal access tokens → team-pinned sessions → the MCP tool catalog at `/mcp` (routed only via the agency gateway) |
 | `gateway` | **YES** | the AGENCY front desk: serves `web/out` + routes `/api/*` (incl. `/mcp` + `/api/mcp/*`) by PREFIX + serves `/media/*` |
@@ -124,10 +124,10 @@ route may reach `/internal/*`, the agent, or the act-as-user surface).
    ┌───────┴──────────┬──────────┬───────────┬─────────────┴──┐
    ▼                  ▼          ▼           ▼                ▼
  auth             tenancy     content    data-ops           mcp
- login,           teams,      learning,  CSV import,   tokens → team-pinned
- sessions,        roles,      tickets,   the AI agent  sessions → MCP tools
- the sender       the money   the work                 (bound only to the
-                              engine, KB               agency gateway)
+ login,           teams,      tickets,   CSV import,   tokens → team-pinned
+ sessions,        roles,      the work   the AI agent  sessions → MCP tools
+ the sender       the money   engine,                  (bound only to the
+                              the KB                   agency gateway)
    │                  │          │           │                │
    └──────────────────┴────┬─────┴───────────┴────────────────┘
                            ▼
@@ -222,7 +222,7 @@ before deploying content/gateway:
 ```bash
 npx wrangler r2 bucket create kwapso-media                    # profile photos + team logos (gateway MEDIA)
 npx wrangler r2 bucket create kwapso-media-staging
-npx wrangler r2 bucket create kwapso-learning-media           # learning attachments (content LEARNING_MEDIA)
+npx wrangler r2 bucket create kwapso-learning-media           # read-only legacy: the gateway still serves /media/learning/* (content + gateway LEARNING_MEDIA)
 npx wrangler r2 bucket create kwapso-learning-media-staging
 npx wrangler r2 bucket create kwapso-help-media               # ticket attachments — name follows the table (content HELP_MEDIA)
 npx wrangler r2 bucket create kwapso-help-media-staging
@@ -230,9 +230,15 @@ npx wrangler r2 bucket create kwapso-internal-media            # the agency's OW
 npx wrangler r2 bucket create kwapso-internal-media-staging
 ```
 
-Inside each bucket, keys are prefixed per team (`teams/<id>`, `learning/<teamId>/<fileId>`, …).
+**Why `kwapso-learning-media` is still on this list although the Learning module
+was purged on 17 Aug 2026:** both the gateway and content still BIND it and the
+gateway still serves `GET /media/learning/*`, so a fresh environment that skips it
+deploys a worker with a missing binding. Nothing writes to it any more — create it
+empty and leave it alone.
+
+Inside each bucket, keys are prefixed per team (`teams/<id>`, `<teamId>/<fileId>`, …).
 `/media/*` is served by the gateway **without a session check** — safe for the current
-low-sensitivity uploads because learning keys carry an unguessable file id; see the
+low-sensitivity uploads because every key carries an unguessable random ULID; see the
 ARCHITECTURE.md `/media/*` note before storing anything sensitive.
 
 ---
@@ -422,7 +428,7 @@ npm run smoke:staging     # scripted end-to-end: health, login, team, context, l
 ```
 
 Or by hand: the agency gateway's URL returns the app (HTTP 200); you can sign in, land
-in a team, see Home / Accounts / Learning / Tickets / Settings, and open the AI assistant. Then the
+in a team, see Home / Accounts / Tickets / Settings, and open the AI assistant. Then the
 portal gateway's URL: a client login lands in its own company's world. If the smoke's
 login step reports `too_soon`, that's the 60-second cooldown between code requests, and
 `too_many_sends` is the hourly cap on the address or the caller — both are the send

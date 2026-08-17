@@ -32,7 +32,7 @@ service-binding calls (never a public hop).
 | **auth** | `kwapso-auth` | Sign-in — a 6-digit email code via Resend or Google (no Clerk), sessions, the email-change flow, profile, `/api/auth/me`, and `/internal/send-email` | Identity is the one thing every other worker trusts. It's the single session authority: everyone else asks it "who is this?" (`whoAmI`) rather than parsing cookies themselves. |
 | **tenancy** | `kwapso-tenancy` | Teams, members, Member roles (`member_roles`) + the permission sheet, invites, per-team dropdown values, the screen-recipe config store, the team-DB migration/sharding admin endpoints — **and the three subsystems that hang off the same spine:** the **customer spine** (accounts, contact links, portal logins + the one account-fence corridor), **process maps** (App → Process → Step and the savings cut from them), and **the money** (the two rate cards + margin, split across two files because R24 forbids the internal one reaching the portal) | This is the multi-tenancy engine — it owns the global "who's in which team, in which role" catalog and the per-team database lifecycle. The permission seam that every module gates against lives here, and so does the *second* fence the product needs: which **accounts** a caller may see. Both are decisions about who may read what, so they belong to one worker. |
 | **realtime** | `kwapso-realtime` | The live switchboard — one `TeamChannel` Durable Object per channel, fanning out row-level `{resource,id,op}` change pings over WebSockets | Live-sync is a cross-cutting concern with a stateful runtime (open sockets). It holds **no app data** — the databases stay the source of truth — so it can be a thin, hibernatable coordinator instead of a second copy of everything. |
-| **content** | `kwapso-content` | **Learning** (how-to articles + per-user "done" progress), **Tickets** (tickets + threaded replies — one module, no help section; the key, tables and path stay `help`, DATA-MODEL.md says why), **the work engine** (stories, sprints, work logs, to-dos, tasks, triage duty, meetings), **the knowledge base** (sources → chunks → terms → the Vectorize index, plus the 15-minute sweep and the 07:00 digest), **the per-person Google connections**, and **the agency's own housekeeping** (marketing, brand assets, delivery, staff profiles) | Everything a team AUTHORS lives here. They're grouped because they share one shape — team-DB CRUD gated on a permission module, deactivate-not-delete, an audit block, R2 media — and none is big enough to deserve its own worker. It is the only domain worker besides tenancy with a cron, and both of its crons record failures to the error store (R12). |
+| **content** | `kwapso-content` | **Tickets** (tickets + threaded replies — one module, no help section; the key, tables and path stay `help`, DATA-MODEL.md says why), **the work engine** (stories, sprints, work logs, to-dos, tasks, triage duty, meetings), **the knowledge base** (sources → chunks → terms → the Vectorize index, plus the 15-minute sweep and the 07:00 digest), **the per-person Google connections**, and **the agency's own housekeeping** (brand assets, meeting purposes, staff profiles) | Everything a team AUTHORS lives here. They're grouped because they share one shape — team-DB CRUD gated on a permission module, deactivate-not-delete, an audit block, R2 media — and none is big enough to deserve its own worker. It is the only domain worker besides tenancy with a cron, and both of its crons record failures to the error store (R12). |
 | **data-ops** | `kwapso-data-ops` | **CSV import** (the 3-stage single-target session + the agentic multi-file batch import, AGENTIC-IMPORT.md) and **the AI agent** | Both are "operations over the other modules' data" rather than modules of their own. Import writes act-as-user through a target's create endpoint; the agent acts-as-user through every gated endpoint. Neither owns a table of user content — they orchestrate. |
 | **mcp** | `kwapso-mcp` | The external machine surface: personal access tokens → a team-pinned session bridge → an opt-in tool catalogue for outside machines | It proves the point of the door design: it slots onto the same gated endpoints the agent already uses, so it added zero new trust surface beyond the token itself. How an outside tool connects + the cost model: **MCP.md**. |
 | **gateway** | `kwapso` / `kwapso-staging` | The AGENCY public door: serves `web/out`, serves uploaded media from R2, and routes `/api/*` to the right worker by PREFIX | One of the two workers with a public URL. |
@@ -76,7 +76,7 @@ everything that is about *identity and billing across teams*:
 
 **One isolated D1 database per team, reached over the D1 REST door.** Each team
 gets its *own* database holding all of that team's content: `member_roles` +
-`role_permissions`, `selectable_data`, `learning` + `learning_progress`, `help` +
+`role_permissions`, `selectable_data`, `help` +
 `help_threads`, `invite_logs`, `activity`, `data_import_sessions`,
 `agent_threads` + `agent_messages`. The master definition of what lives in a team
 DB — and the seed rows a newborn team starts with — is
@@ -150,7 +150,7 @@ sentence) is a copy. It began as the six Glide modules plus `screens` and `agent
 and has grown with the product — today it also carries the customer spine
 (`accounts`, `portal_users`), the knowledge base (`knowledge`), the work engine
 (`processes`, `commercials`, `work`, `todos`, `meetings`), the agency's own
-housekeeping (`marketing`, `brand_assets`, `delivery`, `staff_profiles`) and the
+housekeeping (`brand_assets`, `delivery`, `staff_profiles`) and the
 three Google switches (`google`, `google_mail`, `google_events`). Every team is born
 with an **Admin** (locked, full rights) and a **Viewer** (read-only) role.
 
@@ -170,7 +170,7 @@ with an **Admin** (locked, full rights) and a **Viewer** (read-only) role.
 
 ### The AI agent acts AS the signed-in user
 
-**One shell, and the co-pilot rides above it.** The whole post-auth app is ONE client-resolved shell (`web/components/deep-link-screen.tsx` — it resolves `/home`, `/settings`, `/invitations`, `/learning`, `/tickets`, and the `/t/**` tree from the URL), so all in-app navigation is soft History-API (`softNavigate` / `go()`) — no reload anywhere (EDGE-CASES §1). The assistant panel is mounted ONCE at the root layout (`web/components/agent-host.tsx`) above that shell, so navigating — including the agent's own screen-trace — moves the page *underneath* it and never closes it. The launcher is gated by `agent:create`, on a reactive session cache so it appears the instant you sign in.
+**One shell, and the co-pilot rides above it.** The whole post-auth app is ONE client-resolved shell (`web/components/deep-link-screen.tsx` — it resolves `/home`, `/settings`, `/invitations`, `/tickets`, and the `/t/**` tree from the URL), so all in-app navigation is soft History-API (`softNavigate` / `go()`) — no reload anywhere (EDGE-CASES §1). The assistant panel is mounted ONCE at the root layout (`web/components/agent-host.tsx`) above that shell, so navigating — including the agent's own screen-trace — moves the page *underneath* it and never closes it. The launcher is gated by `agent:create`, on a reactive session cache so it appears the instant you sign in.
 
 **Screen tracing.** While the agent works, its steps DRIVE the real screen to where the change is now VISIBLE — the affected record's detail, or the collection list where row-level live-sync makes the new/changed row appear — then rings it. Because the app is one shell, the engine soft-drives the screen from **anywhere** (Home included) with the History API — no reload. A trace **never opens an input form** (`?panel=add|edit`): the agent writes directly through the gated API, so re-opening the manual form would just leave a blank, stale dialog sitting open after the record already exists (the "created the role but left an empty new-role form open" bug). `TraceTarget` has no query field at all, so that class of bug can't be expressed. The tool→screen map is pure (`web/lib/agent-trace.ts`) and machine-checked: `trace-parity.test.ts` fails the build if a write tool ships without a result screen, or if a trace tries to carry a dialog query.
 
@@ -428,8 +428,11 @@ fork's target picker works with no seed step; `seed-targets` only refreshes labe
 are not oversights; they are deliberate positions the base takes, which are right
 for some products and wrong for others.
 
-1. **Uploaded files are capability URLs, not gated reads.** `/media/*` and
-   `/media/learning/*` serve any object whose key you know: every key is minted
+1. **Uploaded files are capability URLs, not gated reads.** `/media/*`,
+   `/media/internal/*` and `/media/learning/*` (a read-only legacy prefix —
+   nothing writes to that bucket since the Learning module was purged, and it
+   stays so the images inside articles the knowledge base kept still load) serve
+   any object whose key you know: every key is minted
    by one seam (`mediaKey`, `shared/workers/image.ts`) as owner ids plus a random
    ULID, the gateway validates the requested key at the boundary (`safeMediaKey`)
    and serves it with `default-src 'none'; sandbox` + `nosniff`, but it checks
@@ -438,7 +441,7 @@ for some products and wrong for others.
    so "you must know the key" wasn't a barrier for them at all; that half is
    closed, the decision itself stands.) *The threat, plainly:* anyone who was
    ever given a link keeps it
-   — a removed ex-member who saved the URL of a learning attachment can still open
+   — a removed ex-member who saved the URL of a to-do's attachment can still open
    it after losing access, and so can anyone they forwarded it to. There is no
    expiry and no revocation. That is an acceptable trade for product photos and
    team logos. It is **not** acceptable for invoices, contracts, ID documents,
@@ -446,11 +449,10 @@ for some products and wrong for others.
    product stores any of that, fix this before launch:** require a session on
    `/media/*` and check membership against the key's leading team segment (or
    move to short-lived signed URLs).
-2. **Three reads return identity data behind a neighbouring module's right.**
+2. **Two reads return identity data behind a neighbouring module's right.**
    `GET /api/content/help/stakeholders` (gated `help:read`) returns teammates'
-   email addresses; `GET /api/tenancy/team-meta` returns the creator's email to
-   any member; `GET /api/content/learning/progress` (gated `learning:read`)
-   returns every member's user id and completion state. All three are correctly
+   email addresses, and `GET /api/tenancy/team-meta` returns the creator's email
+   to any member. Both are correctly
    **tenant-scoped** — no other team's data is reachable — so this is a
    wrong-right mismatch inside one team, not a leak between customers. It is left
    as-is because the alternative (splitting those responses per-right) costs more

@@ -3,12 +3,12 @@
 **The multi-tenant SaaS base by Swift Struck.** Not an app for one industry —
 the reusable foundation every future app (ERP, CRM, portal…) is built on: login
 (an email code or Google), teams, Member roles (module key `member_roles`), invites,
-learning, tickets, dropdown management, CSV data import, and an in-app **AI
+tickets, dropdown management, CSV data import, and an in-app **AI
 agent** that acts AS the signed-in user through the same gated endpoints (never
 exceeding their rights), all hosted on Cloudflare.
 
 **Eight workers are on disk** — six shared brains (auth, tenancy, realtime,
-**content** (learning + tickets), **data-ops** (import + the AI agent), and **mcp**)
+**content** (tickets, the work engine, the knowledge base), **data-ops** (import + the AI agent), and **mcp**)
 under **two front doors**: `gateway` (the agency app, `web/`) and `portal-gateway`
 (the client portal, `web-portal/`). The mcp worker is the external machine
 surface: personal access tokens (hashed, shown-once, team-pinned, revocable;

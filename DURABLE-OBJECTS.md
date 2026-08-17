@@ -263,7 +263,7 @@ Defined in `shared/workers/realtime.ts` and consumed by `shared/web/realtime.ts`
 
 | Scope | Name | Members | Carries |
 |---|---|---|---|
-| **Team** | `team:<teamId>` | Every active member of that team | Team data pings (`members`, `member_roles`, `invites`, `learning`, `help`, `activity`, …) |
+| **Team** | `team:<teamId>` | Every active member of that team | Team data pings (`members`, `member_roles`, `invites`, `help`, `stories`, `activity`, …) |
 | **User** | `user:<userId>` | Every signed-in device of one person | Identity/cross-team events (`profile`, `account_activity`, `teams`) + a forced sign-out (`session`) |
 
 A browser opens **two** sockets: the active team's channel
@@ -580,7 +580,7 @@ list-sized payloads.
 pings — import per table + the `agent_usage` quota meter — is in CACHING.md.)
 CSV import (`data-ops`) writes many
 rows then publishes **one id-less** ping on the target table (`member_roles` /
-`learning`); the client refetches that one list via reconnect-style `reconcile`
+`selectable_data`); the client refetches that one list via reconnect-style `reconcile`
 rather than patching N rows. An id-less ping means "refetch this collection", not
 "patch a row" — see the `if (!event.id)` branch in the app-shell handler.
 

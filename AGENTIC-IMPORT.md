@@ -124,15 +124,20 @@ type ReferenceDef = {
 }
 ```
 
-**The base ships one worked dependency: Dropdown values → Learning.** A learning
-article's `category` references a **Selectable data** value of type
-"Learning category". Import a dropdowns file + a learning file together and the
-agent orders **dropdowns first**, imports them, then imports the articles whose
-`category` now matches the values that exist (mode `"value"`, `onMissing: "create"`
-— learning's endpoint auto-creates a missing category, so nothing is lost either
-way; the ordering makes the values canonical rather than accidental). This proves
-multi-file batching, dependency ordering, and reference resolution **inside the
-base**, with no emails fired and no destructive surface.
+**The base ships one worked dependency: Dropdown values → Brand library.** A
+brand asset's `category` references a **Selectable data** value of type
+"Brand asset category" (`SELECTABLE_GROUPS.brandCategory`). Import a dropdowns
+file + a brand-assets file together and the agent orders **dropdowns first**,
+imports them, then imports the assets whose `category` now matches the values
+that exist (mode `"value"`, `onMissing: "create"` — the brand-assets endpoint
+pick-or-creates a missing category, so nothing is lost either way; the ordering
+makes the values canonical rather than accidental). This proves multi-file
+batching, dependency ordering, and reference resolution **inside the base**, with
+no emails fired and no destructive surface. Meeting purposes → Department is the
+same shape, and `meetings` is the one `mode: "id"` reference the base ships: a
+meeting's `account` is resolved to a real account id, and a name matching nothing
+REJECTS the line rather than filing a client's note in the agency's own
+compartment.
 
 **The canonical `id`-mode example (for your next app): products → inventory.**
 
@@ -186,7 +191,7 @@ Model calls happen only in **analysis** (planning). Execution is deterministic:
   - **`mode:"id"`** → put the found id into the `refs` object passed to `buildBody`.
     Not found + required (`onMissing:"reject"`) → reject the row with the reason.
   - **`mode:"value"`** → leave the string; ordering guaranteed the parent exists.
-    `onMissing:"create"` → the child's own endpoint creates it (learning/category).
+    `onMissing:"create"` → the child's own endpoint creates it (brand asset/category).
 - Natural keys are matched **normalized** (trim + casefold + collapse spaces) so
   "Getting Started" == "getting  started". Same `norm()` the column auto-mapper uses.
 
@@ -302,7 +307,7 @@ through the importer.
 
 1. **v1 (this milestone):** batch table + endpoints, the agent analyze/plan step
    (metered, JSON out over the model seam, deterministic fallback), ordered
-   execution with **both** reference modes, the `dropdowns → learning` base demo,
+   execution with **both** reference modes, the `dropdowns → brand assets` base demo,
    the upgraded wizard (multi-file → plan review → run → report), tests
    (planner + resolver + the seam), docs. **← delivered together, per the owner.**
 2. **Next:** update-on-import (match-and-update existing rows by natural key),

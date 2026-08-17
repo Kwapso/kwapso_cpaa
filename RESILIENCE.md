@@ -94,8 +94,8 @@ down is a split the next person will not preserve.
 | store | holds | recoverable by |
 |---|---|---|
 | `kwapso-core` (D1) | users, teams, team_members, invites, mcp_tokens, error_logs | dump + Time Travel |
-| one D1 **per team** | that team's everything: roles, permissions, learning, tickets, work engine, knowledge, activity | dump + Time Travel, **per team** |
-| R2 buckets (4) | uploaded media, learning attachments, ticket attachments, the agency's own files | object-by-object dump — **no Time Travel**, so the last run is the only copy |
+| one D1 **per team** | that team's everything: roles, permissions, tickets, work engine, knowledge, accounts, activity | dump + Time Travel, **per team** |
+| R2 buckets (4) | uploaded media, ticket attachments, the agency's own files, and the legacy article media nothing writes to any more | object-by-object dump — **no Time Travel**, so the last run is the only copy |
 | Vectorize index | knowledge embeddings | **derived** — rebuilt from the team databases |
 | Durable Objects | open WebSockets | **nothing to recover** — holds no app data (ARCHITECTURE §2) |
 

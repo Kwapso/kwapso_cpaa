@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest"
 import { sqlString } from "@shared/workers/d1-rest"
 import {
   buildTeamSeed,
+  SPRINT_TYPE_CATALOGUE,
   DEFAULT_SELECTABLE,
   TEAM_MIGRATIONS,
   TEAM_MODULES,
@@ -323,5 +324,134 @@ describe("the agency-internal migration", () => {
     expect(tables, "an agency-internal table with an account column is a category error").not.toContain(
       "account_id"
     )
+  })
+})
+
+// THE PURGE, RUN FOR REAL — migrations 0025 and 0026 against a real SQLite
+// database, because both of them are the kind of change whose only honest proof
+// is doing it. 0025 drops four tables and folds a retired module's fields onto a
+// dropdown value; 0026 retires rows every team born before the seed was guarded
+// is still carrying. A comment saying either worked is not evidence.
+describe("0025 — the purge, and the one thing it refused to throw away", () => {
+  const db = new DatabaseSync(":memory:")
+  for (const m of TEAM_MIGRATIONS) db.exec(m.sql)
+  db.exec(buildTeamSeed(ACTOR, "2026-06-12T00:00:00.000Z").script)
+
+  const tables = new Set(
+    (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map(
+      (r) => r.name
+    )
+  )
+
+  it("a database built from this file has none of the four purged tables", () => {
+    // Belt AND braces: the CREATEs are gone from 0004 and 0018 (so a fresh
+    // database never has them) and 0025 drops them (so an old one loses them).
+    // This asserts the END STATE, which is the only thing both paths share.
+    for (const t of ["learning", "learning_progress", "marketing_posts", "programs"])
+      expect(tables.has(t), `${t} must not exist in a database built from this schema`).toBe(false)
+  })
+
+  it("…and still has everything the purge was not about", () => {
+    // The tripwire on the assertion above: a migration that dropped the whole
+    // database would pass it.
+    for (const t of ["help", "accounts", "stories", "sprints", "brand_assets", "meeting_purposes"])
+      expect(tables.has(t), `${t} must survive`).toBe(true)
+  })
+
+  it("every delivery programme is on a sprint type, with what it carried", () => {
+    for (const entry of SPRINT_TYPE_CATALOGUE) {
+      const row = db
+        .prepare("SELECT mark, name_de, description, standard_days FROM selectable_data WHERE type = 'Sprint type' AND value = ?")
+        .get(entry.value) as
+        | { mark: string | null; name_de: string | null; description: string | null; standard_days: number | null }
+        | undefined
+      expect(row, `${entry.value} must be a sprint type`).toBeDefined()
+      expect(row?.mark ?? null, `${entry.value}'s mark`).toBe(entry.mark)
+      expect(row?.name_de ?? null, `${entry.value}'s German name`).toBe(entry.nameDe)
+      expect(row?.description ?? null, `${entry.value}'s description`).toBe(entry.description)
+      expect(row?.standard_days ?? null, `${entry.value}'s standard length`).toBe(entry.standardDays)
+    }
+  })
+
+  it("the two SCOPE names that have no catalogue row keep their place, bare", () => {
+    // Planning and Iteration are SCOPE ch.02's words and the delivery catalogue
+    // has no entry for either. They stay, and they stay EMPTY rather than being
+    // handed somebody else's mark — a starting vocabulary, not an enum.
+    for (const v of ["Planning", "Iteration"]) {
+      const row = db
+        .prepare("SELECT mark, standard_days FROM selectable_data WHERE type = 'Sprint type' AND value = ?")
+        .get(v) as { mark: string | null; standard_days: number | null } | undefined
+      expect(row, `${v} must still be a sprint type`).toBeDefined()
+      expect(row?.mark ?? null).toBeNull()
+      expect(row?.standard_days ?? null).toBeNull()
+    }
+  })
+
+  it("a team that had already written its own description keeps it", () => {
+    // The fold is pick-or-create plus an UPDATE, and the UPDATE COALESCEs the
+    // description on purpose: an agency that wrote its own sentence about
+    // Implementation keeps it and still gains the mark, the German name and the
+    // length. Asserted on the SQL because the condition cannot be reached at
+    // runtime — the column being written is added by this same migration, so
+    // there is no moment in a real database where a team has both an old
+    // description and no `description` column.
+    const sql = TEAM_MIGRATIONS.find((m) => m.version === "0025_purge_learning_marketing_programmes")!.sql
+    expect(sql, "a fold must never overwrite words somebody typed").toContain("description = COALESCE(description,")
+    expect(sql, "…while the mark, the German name and the length are ours to set").toMatch(/SET mark = /)
+  })
+})
+
+describe("0026 — the 26 duplicates every older team is carrying", () => {
+  /** A team as it was BORN before the seed was guarded: the migrations run, and
+   * then an unguarded seed inserts the same words again. */
+  function bornWithDuplicates(): DatabaseSync {
+    const db = new DatabaseSync(":memory:")
+    for (const m of TEAM_MIGRATIONS) {
+      if (m.version === "0026_retire_duplicate_dropdown_values") {
+        // …the unguarded seed, one day later than the migration's own back-fill.
+        db.exec(
+          `INSERT INTO selectable_data (id, type, value, is_default, created_at, creator_name)
+           VALUES ('DUP1', 'Ticket type', 'Question', 1, '2026-02-01', 'System'),
+                  ('DUP2', 'Ticket type', 'Question', 1, '2026-03-01', 'System');`
+        )
+      }
+      db.exec(m.sql)
+    }
+    return db
+  }
+
+  const live = (db: DatabaseSync) =>
+    db
+      .prepare(
+        "SELECT id FROM selectable_data WHERE type = 'Ticket type' AND value = 'Question' AND deactivated_at IS NULL"
+      )
+      .all() as { id: string }[]
+
+  it("leaves exactly one live copy of a repeated value", () => {
+    expect(live(bornWithDuplicates())).toHaveLength(1)
+  })
+
+  it("keeps the OLDEST, because every earlier reference was looking at it", () => {
+    const db = bornWithDuplicates()
+    // The migration's own back-fill wrote the first Question with datetime('now'),
+    // which is later than either fixture row — so DUP1 (1 Feb) is the oldest.
+    expect(live(db)[0].id).toBe("DUP1")
+  })
+
+  it("retires rather than deletes, and says who did it", () => {
+    const db = bornWithDuplicates()
+    const gone = db
+      .prepare("SELECT deactivator_name FROM selectable_data WHERE id = 'DUP2'")
+      .get() as { deactivator_name: string | null } | undefined
+    expect(gone, "a duplicate is retired, never removed").toBeDefined()
+    expect(gone?.deactivator_name).toBe("System")
+  })
+
+  it("is idempotent — a second pass finds nothing left to retire", () => {
+    const db = bornWithDuplicates()
+    const sql = TEAM_MIGRATIONS.find((m) => m.version === "0026_retire_duplicate_dropdown_values")!.sql
+    const before = live(db).map((r) => r.id)
+    db.exec(sql)
+    expect(live(db).map((r) => r.id)).toEqual(before)
   })
 })

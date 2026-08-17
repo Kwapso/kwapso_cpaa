@@ -24,7 +24,8 @@ the whole SPA — a running agent included — down.
 **Why it's a non-issue now.** The **entire post-auth app is ONE client-resolved
 shell** — `deep-link-screen.tsx` mounts once and never unmounts, and it resolves
 *every* app URL from `window.location`: the team tree `/t/**`, the sidebar pages
-`/learning` + `/tickets`, AND the account screens `/home` + `/settings` +
+(`/accounts`, `/tickets`, `/knowledge`, the work-engine screens, …), AND the
+account screens `/home` + `/settings` +
 `/invitations` (each renders `<DeepLinkScreen/>` and is dispatched to a screen
 component — `ACCOUNT_MODULES` in `deep-link/route.ts`). So there is no cross-route
 boundary left to cross *inside the app*. Only the **pre-auth** routes (`/login`,
@@ -33,8 +34,9 @@ navigation, and a reload there is fine (one-time).
 
 **The rule.** In-app navigation goes through the **History API**, never the
 router. `go()` in `deep-link-screen.tsx` pushes state for any `isInAppPath` (the
-whole `/t/*` tree + every `TOP_LEVEL_MODULES` entry — now `accounts · learning ·
-tickets · home · settings · invitations`) and swaps the screen from local `route`
+whole `/t/*` tree + every `TOP_LEVEL_MODULES` entry in
+`web/components/deep-link/route.ts` — read the list there, this sentence would
+only be a copy that drifts) and swaps the screen from local `route`
 state; the
 segment never changes, so nothing reloads. Deep components that can't reach `go()`
 (the profile menu, team switcher, invite inbox) call **`softNavigate`** from
@@ -59,11 +61,13 @@ depth under `/t/*` and under every module in `SHELL_MODULES` — and always had.
 `assets.run_worker_first` in `workers/gateway/wrangler.jsonc` is an **ARRAY**, and an
 array means every path NOT listed **skips the Worker entirely** and is answered by
 the asset layer, which with `not_found_handling: "404-page"` is a 404. That array
-read `["/api/*", "/media/*", "/t/*", "/learning/*", "/help/*", "/mcp"]`: one live
-module, plus a `/help/*` that stopped being a URL segment when the section was
-renamed to `tickets`. So `/tickets/<id>`, `/stories/<id>`, `/tasks/<id>` and eleven
-more 404'd on a shared link or a reload, while `/t/<team>/tickets/<id>` worked
-perfectly — which is why it read as random rather than as one bug.
+read `["/api/*", "/media/*", "/t/*", "/learning/*", "/help/*", "/mcp"]` — and
+NEITHER of the two module prefixes in it was a URL segment any more: `/help/*`
+stopped being one when the section was renamed to `tickets`, and `/learning/*`
+went with the module itself. So `/tickets/<id>`, `/stories/<id>`, `/tasks/<id>`
+and eleven more 404'd on a shared link or a reload, while
+`/t/<team>/tickets/<id>` worked perfectly — which is why it read as random rather
+than as one bug.
 
 Neither half looks wrong alone: the loop looks complete, the array looks like a
 deliberate short list. And `web/test/nav.test.ts` had checked the loop against
@@ -124,15 +128,17 @@ one record **out of the cached list**. So if you trim a column out of a list
 `SELECT` to make the list "lean," you can silently blank a field on the detail
 screen (or the agent's reading copy).
 
-**Why.** The client cache is keyed by collection (`learning:<teamId>`,
-`help:<teamId>`, members, …). A detail screen subscribes to that **same key**
+**Why.** The client cache is keyed by collection (`help:<teamId>`,
+`members:<teamId>`, …). A detail screen subscribes to that **same key**
 and `.find()`s its row — so the first tap paints instantly from the warm list
 cache, and a row-level live patch updates detail and list together. From
-`web/components/learning-detail.tsx`:
+`web/components/help-detail.tsx`:
 
 ```ts
-const learningQ = useCached<Learning[]>(`learning:${teamId}`, () => content.learning(teamId))
-const item = learningQ.data?.find((l) => l.id === learningId) ?? null
+const ticketsQ = useCached<HelpTicket[]>(`help:${teamId}`, () =>
+  content.help("all").then((r) => r.tickets)
+)
+const ticket = ticketsQ.data?.find((t) => t.id === helpId) ?? null
 ```
 
 This is deliberate (CACHING.md): **derive detail from the list, never
@@ -140,10 +146,10 @@ double-fetch a collection for a derived value.**
 
 **The rule.** The list `SELECT`s are intentionally **"fat"** — they carry every
 field the detail screen renders, not just the columns the list *shows*. Look at
-`listLearning` in `workers/content/src/lib/learning.ts`: it
-selects `content_body` — the full article HTML the detail screen and the agent
-read — even though the list card only shows a title + a short
-`content_description`. **Don't blindly trim a list SELECT to reduce payload.**
+`TICKET_COLS` in `workers/content/src/lib/help.ts`: one column list serves both
+the list and the single-row read, and it carries `screen_recording_link` and
+`source_screen` — things only the detail screen renders — beside the
+`description` the list card shows. **Don't blindly trim a list SELECT to reduce payload.**
 Before removing a column, grep the matching `*-detail.tsx` for the field. If a
 column is genuinely list-only bloat, fine — but the default assumption is that
 every selected column is load-bearing for detail.
@@ -331,12 +337,12 @@ input-aware toggles):
 
 | Behaviour | Tools | Why |
 |---|---|---|
-| **Pause for a yes/no panel** | the destructive acts — `remove_member`, `revoke_invite` — plus `set_account_active` / `set_role_active` / `set_learning_active` / `set_dropdown_active` **only when deactivating** (`active !== true`) | It removes/withdraws access, or switches an existing record OFF. Reversible, but destructive-feeling — the app double-checks, exactly as the red UI action does. |
+| **Pause for a yes/no panel** | the destructive acts — `remove_member`, `revoke_invite`, `set_role_active` (a privilege write, so both ways) — plus every `set_*_active` toggle **only when deactivating** (`active !== true`): `set_account_active`, `set_dropdown_active`, `set_knowledge_source_active`, `set_app_active`, `set_process_active`, `set_brand_asset_active`, `set_meeting_purpose_active`, `set_staff_certificate_active`, `set_meeting_active` | It removes/withdraws access, or switches an existing record OFF. Reversible, but destructive-feeling — the app double-checks, exactly as the red UI action does. |
 | **Pause for a yes/no panel (privilege writes)** | DERIVED — every write gated on `member_roles:`, `team_members:` or `portal_users:` (today: `create_role`, `update_role`, `set_role_active`, `set_role_permissions`, `set_member_role`, `remove_member`, `invite_member`, `revoke_invite`, `grant_portal_access`, `set_portal_access_active`) | They decide WHO CAN DO WHAT, and the model reaches them while reading team data an attacker can author. A silent one is a silent privilege escalation. Derived, so the next such tool is covered the day it lands. |
 | **Pause for a yes/no panel (account-fence writes)** | DERIVED from `FENCE_INPUTS` — every write whose door writes `portal_users`, `account_links`, or `accounts.parent_account_id` (today: `create_account`, `set_account_parent`, `link_contact`, `set_contact_link_active`, plus the two portal-access writes above) | They decide WHO CAN SEE WHOSE. `accountScope()` builds a client login's whole world from these rows, so a silent link or re-parent widens what an outside company reads — without touching a permission. Both directions confirm: a relink hands a company back as surely as an unlink takes it away. |
 | **Pause for a yes/no panel (row-owner writes)** | DERIVED from `FENCED_ROW_OWNERS` — every tool exposing the column that says which account owns a row (today: `raise_help_ticket`, `update_help_ticket`, via `help.account_id`) | It moves a ROW across the fence rather than moving the fence. Naming a client on an agency ticket publishes that whole conversation into their portal in one call. |
 | **Pause for a yes/no panel (identity writes)** | DERIVED from `FENCE_IDENTITY_INPUTS` — every tool exposing the column a portal grant resolves a person from (today: `create_account`, `update_account`, via `accounts.email`) | It decides WHO a later login goes to. The grant door reads a person's email off their account row and grants to whoever holds that address — and anyone can put a `users` row behind an address by signing in once. `create_account` always confirmed for this reason; `update_account` did not, so the address could be re-pointed in silence under the trace line "Edit account 01J…". |
-| **Confirm-with-a-count** | `bulk_set_help_status`, `bulk_set_learning_active`, `run_import_batch` | High-blast: "Set 12 tickets to resolved" / a whole imported file is confirmed by the count before it runs. |
+| **Confirm-with-a-count** | `bulk_set_help_status`, `set_help_status_by_filter`, `run_import_batch` | High-blast: "Set 12 tickets to resolved" / a whole imported file is confirmed by the count before it runs. |
 | **Run straight away** | every OTHER constructive write — `update_team`, `create_dropdown_value`, `update_dropdown_value`, the content (re)activations, and all single content edits | Ordinary re-gated + reversible + audited CRUD; the server gates each call, so no panel. |
 
 The system prompt (`agent.ts`) tells the model **not** to also ask in
@@ -549,7 +555,7 @@ paths already route through it. They don't.
 **Why.** Sharding was built up front (a locked decision) as a relief valve:
 **alarm** (nightly size check) → **mover** (relocate a module to its own DB) →
 **split** (merged reads across shards). But today every module hot-read queries
-`guard.databaseId` **directly** — `listLearning`, `listHelp`, `listMembers`,
+`guard.databaseId` **directly** — `listHelp`, `listMembers`,
 `listRoles`, `listSelectable` all call `d1Query(cfg, guard.databaseId, …)`, not
 `queryModule`. Grep confirms: no hot read path imports `queryModule` /
 `resolveModuleDatabases` / `d1QueryAcross`.

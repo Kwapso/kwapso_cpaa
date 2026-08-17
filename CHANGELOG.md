@@ -20,6 +20,24 @@ and costs one command each.
 
 ---
 
+## Three modules leave — 17 Aug 2026
+The owner retired Marketing, Learning and the Delivery method page. Only one of
+them took anything with it. Learning's 41 articles had already been indexed into
+the knowledge base, so the material outlived the module — the sources survive
+under the kind `article`, and the gateway still serves `/media/learning/*` so the
+images inside them still load. The ten delivery programmes turned out to be the
+sprint types wearing a second name, so everything they carried (a mark, the German
+label, the sentence that explains the block, how long one normally runs) was
+folded onto the sprint type as four nullable columns on `selectable_data`.
+Marketing's posts are the one genuine loss, and the ruling was explicit; the
+legacy rows are still in the Glide export. Marketing stays as a task
+**department**, which is a dropdown value and always was. Two team migrations did
+the work: `0025_purge_learning_marketing_programmes` and, alongside it,
+`0026_retire_duplicate_dropdown_values`, which deactivated the 26 duplicated
+dropdown values every team born before the seed was guarded had been carrying —
+the reason a tester saw each ticket type two, three and four times in every
+picker.
+
 ## The opening frame — 14 Aug 2026
 The app opens on its own mark: a splash and a first screen that belong to this
 product rather than to a framework default.

@@ -22,7 +22,7 @@ Nine and a half thousand words is too many to scroll, so: the two tiers, in orde
 | Subsystem | Tables |
 |---|---|
 | Permissions + vocabulary | `member_roles` + `role_permissions` · `selectable_data` |
-| Content | `learning` + `learning_progress` · `help` + `help_threads` (**Tickets**) · `ref_counters` |
+| Content | `help` + `help_threads` (**Tickets**) · `ref_counters` |
 | History + invites | `activity` · `invite_logs` |
 | Import | `data_import_sessions` · `data_import_batches` |
 | The assistant | `agent_threads` + `agent_messages` |
@@ -30,7 +30,7 @@ Nine and a half thousand words is too many to scroll, so: the two tiers, in orde
 | The knowledge base | `knowledge_sources` + `_chunks` + `_terms` + `_ingest` (+ Vectorize) |
 | Process maps + the money | `apps` + `processes` + `process_versions` + `process_steps` + `process_comments` · `account_rates` + `internal_rates` |
 | The work engine | `stories` + `sprints` · `work_logs` + `work_prefs` · `todos` + `tasks` · `triage_duty` · `meetings` |
-| The agency's own housekeeping | `marketing_posts` · `brand_assets` · `programs` · `meeting_purposes` · `staff_profiles` · `staff_certificates` |
+| The agency's own housekeeping | `brand_assets` · `meeting_purposes` · `staff_profiles` · `staff_certificates` |
 | One person's own Google | `google_connections` + `google_sources` |
 
 **Closing** — [Status: what's built vs. to build](#status-whats-built-vs-to-build) · *Resolutions (2026-06-13), cross-cutting model LOCKED*
@@ -137,11 +137,12 @@ never in SQL, or "switched off" and "never existed" would look identical. The
 by-key door heals on a miss only (the per-import path pays nothing). The owner
 seed door (`POST /api/data-ops/admin/seed-targets`, x-admin-key) now only refreshes
 LABELS (display name / description / schema) and never re-activates a switched-off
-target — it is no longer a step anyone must remember. Three targets are wired
-today: `selectable_data` (Dropdown values), `member_roles`, and `learning`
-(`team_members`/`help`/`teams`/`screens`/`agent` are pinned non-importable in
-`CATALOG_EXEMPT`); the agentic multi-file importer (AGENTIC-IMPORT.md) orders them
-by their declared references.
+target — it is no longer a step anyone must remember. Seven targets are wired
+today: `selectable_data` (Dropdown values), `member_roles`, `accounts`,
+`meetings`, `stories`, `brand_assets` and `meeting_purposes`
+(`team_members`/`help`/`teams`/`screens`/`agent` and the rest are pinned
+non-importable in `CATALOG_EXEMPT`, each with its reason); the agentic multi-file
+importer (AGENTIC-IMPORT.md) orders them by their declared references.
 
 ### agent_usage — KEEP (BUILT 2026-06-23, GLOBAL — `db/core/0009`)
 Purpose: the per-team **free** half of the AI agent quota. Real data: `team_id`,
@@ -234,9 +235,12 @@ global standard GROUPS + per-team VALUES)
 Glide: 3 rows (`File type`, `Learning category`, `Help type`), no team key, no
 audit → a tiny GLOBAL reference of dropdown GROUPS. But the values table also
 uses `Help status` (not listed as a type) and `Learning category` has no
-values. (We seed those two groups as **`Ticket type`** and **`Ticket status`** —
-the module is called Tickets, and team migration `0010_ticket_vocabulary`
-relabelled the rows every existing team already had.) So the types list and the values were loosely coupled in Glide.
+values. (We seed the two `Help` ones as **`Ticket type`** and **`Ticket
+status`** — the module is called Tickets, and team migration
+`0010_ticket_vocabulary` relabelled the rows every existing team already had.
+`Learning category` has no successor at all: it named a module that was purged on
+17 Aug 2026, and it arrived with no values to carry across.) So the types list
+and the values were loosely coupled in Glide.
 
 ### Retention in core — the ONE place rows are actually deleted
 
@@ -333,12 +337,15 @@ watches **every** database in the account, core included — it used to filter
 Glide `Member roles` was WIDE: `Identity/Title`, `Description`, `Is default`,
 then **24 boolean columns** = 6 modules × {read,create,edit,delete}. Modules:
 **Teams, Team members, Member roles, Learning, Help, Selectable data** — the six
-our `TEAM_MODULES` (`shared/team-modules.ts`) STARTED as, and still carries
-unchanged (the module a person now reads as **Tickets** is still keyed `help`,
-because that string sits in every role's permission sheet). The list has grown well
-past those six since — the customer spine, the knowledge base, the work engine, the
-agency's own housekeeping and the three Google switches all added rows, never
-columns, which is the whole point of the tall sheet. Read the list in that file. We store the 24 booleans as a TALL `role_permissions` sheet
+our `TEAM_MODULES` (`shared/team-modules.ts`) STARTED as. Five of them are still
+there unchanged (the module a person now reads as **Tickets** is still keyed
+`help`, because that string sits in every role's permission sheet); `learning`
+was retired on 17 Aug 2026 with the module it named, which is the tall sheet
+working as designed — a module leaves by dropping rows, and no other role's
+permissions moved. The list has grown well past those six since — the customer
+spine, the knowledge base, the work engine, the agency's own housekeeping and the
+three Google switches all added rows, never columns, which is the whole point of
+the tall sheet. Read the list in that file. We store the 24 booleans as a TALL `role_permissions` sheet
 (role × module × 4 bits) so a new module = new rows, not new columns. `is_default`
 flags the seeded Admin (locked) + Viewer. Roles are **edit-live + deactivate-only,
 never delete** (holders keep the role). Q4 RESOLVED (see Resolutions): Admin
@@ -348,16 +355,51 @@ locked; Viewer is a normal editable role.
 Real data: audit block + `type`, `value`, `is_default`. Per-team dropdown
 values, seeded from Base v3 defaults on team creation.
 
-### learning + learning_progress — KEEP (BUILT 2026-06-23, team migration `0004_modules`)
-Purpose: a team's own how-to content. `learning`: audit + `category` (a
-`Learning category` selectable value, pick-or-create → `selectable_data`),
-`content_title`, `content_description`, `content_type` (a `File type` value:
-image/video/link…), `content_link`, an in-app `body`, `sequence` (manual
-ordering); deactivate-not-delete. **`Details/Seen` is RESOLVED** by a separate
-`learning_progress` table (the user×learning join the open question called for):
-audit + `learning_id`, `user_id`, and the reversible "mark as done" state, so a
-curator dashboard can show every member's done state. Per-module file storage is
-R2 (`kwapso-learning-media`), not a DB column.
+**Four optional columns of enrichment (team migration `0025`).** `mark`,
+`name_de`, `description` and `standard_days` — every one nullable, and empty on
+almost every group. They arrived when the Delivery method page was retired on
+17 Aug 2026: a programme was never anything but "the kind of block this sprint
+is", which is the question the **sprint type** already answers, so the two were
+one idea wearing two names. What the ten programmes carried and the sprint type
+did not is now carried by the sprint type itself — the `mark` somebody
+recognises it by, the German `name_de` the agency already uses with its German
+clients, the `description` that says what the block includes, and
+`standard_days`, how long one normally runs. That is what lets a sprint read
+"Implementation, 21 days".
+
+They sit **on `selectable_data` rather than on a sprint-type table**, because a
+sprint type is a dropdown value and a table for it would be a second vocabulary
+seam beside the one that already exists. Three of the four are meaningful well
+beyond sprint types: a mark is what a type mark renders, a description is what a
+picker's hint line shows, and a curated foreign label is what an agency writes
+once for a client who reads another language. `standard_days` is the only narrow
+one, and it is a number nobody else has to look at. The starting values live in
+`SPRINT_TYPE_CATALOGUE` (`workers/tenancy/src/team-schema.ts`) — a starting
+vocabulary like the ticket types, editable on the team's own Dropdown values
+screen, and both the seed and the migration are pick-or-create, so a team that
+already has "Implementation" keeps its own row, its own id and its own history
+and simply gains the enrichment. `standard_days` is a suggestion, never a rule:
+a sprint's real dates are the ones somebody agreed with the client. `name_de` is
+the ONE curated label carried over from the legacy catalogue, because those
+words were already in front of German clients; every other language comes from
+the translation layer, which is why there is no third label column.
+
+**Duplicates retired, never deleted (team migration `0026`).** `createTeam`
+applies every migration and THEN runs the seed. Several migrations back-fill a
+default vocabulary into existing teams and guard themselves with `WHERE NOT
+EXISTS`, because they have to be safe against a team that already has the value.
+The seed did not, because when it was written it ran into an empty table — so a
+team born before the seed was guarded got 26 of those values twice, and every
+picker offered each word twice. The seed is guarded now; `0026` is the other
+half, for the teams that already were. A dropdown value is referenced by its
+STRING everywhere in this app (a ticket's `help_type` holds the word
+"Question", not a row id), so two live rows reading the same (type, value) are
+indistinguishable to every reference in the database and there is no count to
+compare — the OLDEST row survives, ties broken by id, which is the row every
+earlier reference was looking at anyway. The losers are **deactivated, never
+deleted**: each keeps its id, its audit block and its history, shows greyed on
+the Dropdown values screen with an Activate button, and says `System` as its
+deactivator. Running it twice is a no-op.
 
 ### help + help_threads — KEEP (BUILT 2026-06-23, team migration `0004_modules`, two-tier)
 
@@ -612,8 +654,14 @@ them. Four tables, one per job:
   Three families in one table, because a person edits them in one list: a `note`
   somebody typed here (the body IS the truth), a `file` somebody uploaded (THE
   FILE is the truth and the body is a READING of it), and a MIRROR of a row we
-  already own — `ticket` / `article` / `account` / `app` / `story` / `sprint` —
-  where the row is the truth and the sweep keeps the body in step. `compartment` is the design in one
+  already own — `ticket` / `account` / `app` / `story` / `sprint` — where the row
+  is the truth and the sweep keeps the body in step. **`article` is a kind with no
+  mirror behind it any more, and deliberately kept:** the Learning module was
+  purged on 17 Aug 2026 and its table went with it, but its 41 articles had
+  already been indexed here, so the material outlived the module. Dropping the
+  kind would orphan those rows — the sweep no longer writes one, nothing reads a
+  learning table, and the word is now only what an existing source calls itself
+  and what a person filters by to find one. `compartment` is the design in one
   column (`agency`, or `account:<id>`), DERIVED on write and correctable by hand,
   never free-typed. `owner_user_id` is the second fence: NULL = the team's, a
   value = one person's (what THEY can see, through their own connection).
@@ -874,14 +922,14 @@ can answer *"what did we agree in March"*.
 once a year. A meeting is a record that accumulates forever. Sharing one permission
 row would mean granting the right to read every note ever taken in order to let
 somebody see the list of purposes.
-### marketing_posts + brand_assets + programs + meeting_purposes + staff_profiles + staff_certificates — KEEP (BUILT 2026-08-12, team migration `0018_agency_internal`) — THE AGENCY'S OWN HOUSEKEEPING
+### brand_assets + meeting_purposes + staff_profiles + staff_certificates — KEEP (BUILT 2026-08-12, team migration `0018_agency_internal`) — THE AGENCY'S OWN HOUSEKEEPING
 
-Six tables, four permission modules, and the seven agency-internal tables of the
-legacy Glide app finally landed. What they have in common is the whole of their
-security story: **none of them carries an `account_id`**, because none of these
-rows belongs to a customer. There is nothing here for the account fence to fence
-— so the defence is at the door instead, and it is a REFUSAL rather than a
-filter: every handler on all four modules opens with `refusePortalCaller`, and
+Four tables, three permission modules, and the agency-internal side of the legacy
+Glide app finally landed. What they have in common is the whole of their security
+story: **none of them carries an `account_id`**, because none of these rows
+belongs to a customer. There is nothing here for the account fence to fence — so
+the defence is at the door instead, and it is a REFUSAL rather than a filter:
+every handler on all three modules opens with `refusePortalCaller`, and
 `workers/content/test/agency-internal.test.ts` proves three things off disk (none
 of the doors is on the portal gateway's surface, every one of them refuses, and
 no file in `web-portal/` names these tables, paths or fields). That is the same
@@ -889,22 +937,31 @@ structural shape R24 uses for margin, applied to a different secret.
 
 | Table | Module | From (Glide) | Rows | What it is |
 |---|---|---|---|---|
-| `marketing_posts` | `marketing` | `content` | 251 | What the agency published about itself — title, channel, status, body, link, and the DAY it went out. |
 | `brand_assets` | `brand_assets` | `branding` | 74 | The material everything else is made with: logos, decks, templates. `file_url` holds either an object we host or a link elsewhere. |
-| `programs` | `delivery` | `program` | 10 | How the agency runs an engagement. `sequence` is display order only. |
 | `meeting_purposes` | `delivery` | `purposes` | 27 | Why the agency meets, and the department it belongs to. |
 | `staff_profiles` | `staff_profiles` | `users` (six profile columns) | 6 | The person behind the member row: personality type, what they are best at, what they find hard, who they look up to, a photo. |
 | `staff_certificates` | `staff_profiles` | `certificates` | 5 | A qualification somebody holds — issuer, granted, lapses, the paper itself. |
 
-**Two of the seven legacy tables are deliberately NOT tables here.**
+**The `delivery` module is now one table.** It was born holding two — a
+`programs` table behind the Delivery method page, and `meeting_purposes` — and
+the page went on 17 Aug 2026 (the ten programmes were the sprint types wearing a
+second name; see `selectable_data` above for where their enrichment lives now).
+The permission module key stays `delivery`, because that string sits in every
+role's permission sheet and renaming it would take somebody's access away; its
+LABEL is now "Meeting purposes", which is what it actually covers. The page is
+reached from a link on the Meetings screen rather than from the sidebar, because
+the taxonomy of why we meet is read where meetings are.
+
+**Two of the legacy lookup tables are deliberately NOT tables here.**
 `departments` (8 rows) and `channels` (6) are bare labels with no fields of their
 own, and the base already has exactly one home for a team's editable vocabulary:
 `selectable_data`, which carries its own permissions, screen, import, export and
-machine tools. They became the dropdown GROUPS "Department" and "Marketing
-channel", pick-or-created the way a learning article's category always has been
-(`workers/content/src/lib/vocabulary.ts`). A module built to hold a word is
-ceremony. `purposes` is the one that could NOT go the same way, and the reason is
-worth keeping: it carries a department, and a dropdown row is a single label with
+machine tools. `departments` became the dropdown GROUP "Department",
+pick-or-created the way every other vocabulary in this app is
+(`workers/content/src/lib/vocabulary.ts`); `channels` had only the Marketing
+module to serve and left with it. A module built to hold a word is ceremony.
+`purposes` is the one that could NOT go the same way, and the reason is worth
+keeping: it carries a department, and a dropdown row is a single label with
 nowhere to put a second fact — so the purpose is a record and the department is
 the dropdown value, each fact stored the way its own shape asks.
 
@@ -938,9 +995,9 @@ everybody read it" is not a mistake somebody could make here, it is a column tha
 does not exist.
 
 **`google_connections`** — `user_id` (the GLOBAL user id, plain TEXT with no
-`REFERENCES`, exactly like `learning_progress.user_id` and
-`staff_profiles.user_id`: the members live in the core database, so a foreign key
-would name a table this one does not have), `service` (`drive` / `gmail` /
+`REFERENCES`, exactly like `staff_profiles.user_id`: the members live in the core
+database, so a foreign key would name a table this one does not have),
+`service` (`drive` / `gmail` /
 `calendar` / `chat`), `google_email` (which account, so a person with two can
 tell them apart), `scopes` (**what Google actually granted**, not what we asked
 for — somebody can untick a box, and a connection that quietly works for less
@@ -1014,7 +1071,7 @@ Google surface; every handler opens with `refusePortalCaller` and both tables ar
   email_change_codes (the hashed-OTP split; BUILT 2026-06-17), invite_logs
   (per-team audit; BUILT 2026-06-22, M4). **Agent-modules build (BUILT
   2026-06-23)**: importable_databases, agent_usage, agent_credits, mcp_tokens (GLOBAL core
-  0008/0009/0010); learning, learning_progress, help, help_threads,
+  0008/0009/0010); help, help_threads,
   data_import_sessions, agent_threads, agent_messages (per-team `0004_modules`).
   **Knowledge base (BUILT 2026-08-11, retrieval rebuilt 2026-08-12)**:
   knowledge_sources, knowledge_chunks, knowledge_terms, knowledge_ingest
@@ -1036,9 +1093,18 @@ Google surface; every handler opens with `refusePortalCaller` and both tables ar
   housekeeping (`0018_agency_internal`), Google connections
   (`0019_google_connections`), the knowledge base's vector columns
   (`0020_knowledge_vectors`) and meetings (`0021_meetings`).
+  **The purge (17 Aug 2026):** `0025_purge_learning_marketing_programmes` adds
+  the four enrichment columns to `selectable_data`, folds the ten programmes onto
+  the sprint types and drops `learning`, `learning_progress`, `marketing_posts`
+  and `programs`; `0026_retire_duplicate_dropdown_values` retires the 26
+  duplicated dropdown values a team born before the seed was guarded still
+  carries. Both are described in full under `selectable_data` above. The CREATE
+  statements for those four tables also left migrations `0004` and `0018`
+  themselves, so a database built from the file today never has them — `0025`
+  drops them `IF EXISTS`, for the teams that ran the old versions.
 - **The per-team migration list is `TEAM_MIGRATIONS` in
-  `workers/tenancy/src/team-schema.ts`** — **twenty-one today, `0001_team_base`
-  through `0021_meetings`** (this line said "eleven, through
+  `workers/tenancy/src/team-schema.ts`** — **twenty-seven today, `0001_team_base`
+  through `0027_task_admin`** (this line said "eleven, through
   `0011_ticket_work_engine`" while the sections above it documented `0012` to
   `0020`; a count in prose beside the list it counts is a copy that only ever
   drifts one way). A new team's database runs all of them at creation; existing
@@ -1050,8 +1116,7 @@ Google surface; every handler opens with `refusePortalCaller` and both tables ar
 
 Open questions Q1–Q4 (audit scope, selectable types, activity design, role
 defaults) were resolved before the foundation build; the "(later)" questions are
-now resolved too — learning `Seen` became `learning_progress` (the user×learning
-join), import details are the 3-stage `data_import_sessions`, and
+now resolved too — import details are the 3-stage `data_import_sessions`, and
 `importable_databases` stayed SEPARATE from the recipe/config system (an
 owner-maintained catalog).
 
@@ -1063,7 +1128,7 @@ owner-maintained catalog).
   Pure system/auth tables (sessions, login_codes) stay light — no meaningful
   actor. Actor name+email are point-in-time snapshots.
 - **Q2 Dropdowns → global standard GROUPS + per-team VALUES.** The group list
-  (file type, help type, help status, learning category, + any the base needs)
+  (file type, ticket type, ticket status, + any the base needs)
   is global + standard so code can rely on a group existing; values inside each
   group are per-team and editable, seeded with defaults. (`selectable_data_types`
   = global; `selectable_data` = per-team, as built.)
@@ -1086,7 +1151,7 @@ owner-maintained catalog).
   actions — Glide's async "updated role id + webhook complete" two-step is
   dropped (it was a Glide limitation we don't have).
 
-Resolved in the agent-modules build (2026-06-23): learning `Seen` shipped as the
-`learning_progress` user×learning join; the import-session details shipped as
-`data_import_sessions` (the 3-stage session); and `importable_databases` stayed
-SEPARATE from the recipe/config system (the locked decision above).
+Resolved in the agent-modules build (2026-06-23): the import-session details
+shipped as `data_import_sessions` (the 3-stage session); and
+`importable_databases` stayed SEPARATE from the recipe/config system (the locked
+decision above).

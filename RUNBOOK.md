@@ -157,6 +157,13 @@ restore and no versioning**. A deleted object is gone. Nothing in the app delete
 objects today, which is why this has not bitten anyone; treat any future bulk
 delete as irreversible and copy the bucket out first.
 
+`kwapso-learning-media` deserves a line of its own: nothing writes to it any more
+(the Learning module was purged on 17 Aug 2026) but the gateway still serves it at
+`/media/learning/*`, because the images inside the articles the knowledge base
+kept still point there. It is the one bucket that can only ever lose objects, so
+it is the one where a bulk delete is unrecoverable by definition — there is no
+process left that would put anything back.
+
 The rescued Glide files are a special case — see INVENTORY.md § *The legacy Glide
 data*.
 

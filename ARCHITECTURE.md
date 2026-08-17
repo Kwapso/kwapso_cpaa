@@ -13,14 +13,16 @@ Do not relitigate any "LOCKED" item without the user.
 > "v1" or "MVP". Reference data model: the user's Glide "Base v3" exports
 > (users, teams, team members, member roles, learning, help + help threads,
 > invite logs, email change logs, all activity, selectable data + types,
-> importable databases, data import sessions).
+> importable databases, data import sessions). That list is the EXPORT, not the
+> app: learning is the one sheet with nothing behind it any more — the module was
+> purged on 17 Aug 2026 (DATA-MODEL.md says what became of its material).
 
 ## 1 · Data — where things live (LOCKED)
 
 - **Per-team databases.** A small GLOBAL D1 core holds: `users`, `teams`,
   `team_members` (the card catalog: user → team → role id), `email_change_logs`,
   and the import registry. Every team then gets **its own D1 database** holding
-  all its tables: roles + permissions, learning, help + threads, invite logs,
+  all its tables: roles + permissions, help + threads, invite logs,
   selectable data, activity, import sessions. Another team's rows are never in
   the same database — isolation by physics, not by query discipline.
 - **Sharding machinery: BUILT (2026-06-12)** per the locked build-everything
@@ -157,12 +159,6 @@ on top follows [CACHING.md](CACHING.md).
 | POST /api/tenancy/admin/migrate-teams | tenancy | roll team-schema migrations to every team DB (x-admin-key) |
 | GET /api/tenancy/admin/db-sizes | tenancy | size check + open 80% alarms (x-admin-key) |
 | POST /api/tenancy/admin/move-module | tenancy | the mover: relocate a module to its own DB (x-admin-key) |
-| GET /api/content/learning | content | list the team's learning items (caller's own `done` state merged in); `?id=` → one item |
-| GET /api/content/learning/progress | content | curator dashboard — every member's done state across items |
-| POST /api/content/learning | content | create a learning item (`learning:create`; pick-or-create category → `selectable_data`) |
-| POST /api/content/learning/update | content | edit a learning item (`learning:edit`) |
-| POST /api/content/learning/active | content | deactivate/reactivate an item (`learning:delete`; never hard-deleted, progress survives) |
-| POST /api/content/learning/done | content | mark an item done/not-done for the caller (own progress; `learning:read`) |
 | GET /api/content/help | content | list the team's tickets (`?scope=mine\|all`; `?id=` → one) |
 | GET /api/content/help/thread | content | one ticket's reply thread, oldest-first (`?id=`) |
 | POST /api/content/help | content | raise a ticket (`help:create`; always opens `open`) |
@@ -178,7 +174,7 @@ on top follows [CACHING.md](CACHING.md).
 | POST /api/data-ops/import/batch(/file) | data-ops | start an agentic multi-file batch; attach a parsed CSV (AGENTIC-IMPORT.md) |
 | POST /api/data-ops/import/batch/plan | data-ops | the agent builds the plan (targets, mappings, order, references) — METERED on the credit pool |
 | POST /api/data-ops/import/batch/confirm | data-ops | run the plan in dependency order; per-row report; one ping per changed module |
-| GET /api/content/learning/export · GET /api/tenancy/roles/export · GET /api/tenancy/selectable/export | content/tenancy | full-field CSV export (EXPORT NEEDS READ; team-bound) |
+| GET /api/tenancy/roles/export · GET /api/tenancy/selectable/export · GET /api/content/brand-assets/export | tenancy/content | full-field CSV export (EXPORT NEEDS READ; team-bound) |
 | GET /api/data-ops/import/sample | data-ops | a downloadable sample CSV for a target — a good-file template (AGENTIC-IMPORT §10) |
 | GET /api/data-ops/import/batches | data-ops | the team's import history, newest first — summaries only (who, when, files → tables, totals) |
 | POST /api/data-ops/admin/seed-targets | data-ops | seed the global import catalog (owner-only, x-admin-key) |
@@ -219,7 +215,7 @@ on top follows [CACHING.md](CACHING.md).
     R2 has no directory listing, so only someone holding a file's exact key can
     fetch it. **Every key is now unguessable**: one seam mints them
     (`mediaKey`, `shared/workers/image.ts`) as `<owner ids>/<random ULID>` —
-    learning media has always been `<teamId>/<ULID>`, and team logos + profile
+    module media has always been `<teamId>/<ULID>`, and team logos + profile
     photos now carry the same random tail. They used to be `teams/<teamId>` and
     `users/<userId>` — DERIVABLE from an id anyone had already seen in a normal
     URL, which quietly made those two "no session" full stop. New uploads get
