@@ -21,7 +21,7 @@ export const MAX_IMAGE_BYTES = 2_500_000 // ~2.5MB after the client-side downsiz
  * team logos `teams/<teamId>` — keys anyone could DERIVE from an id they had
  * already seen (a member list, a `/t/<teamId>/…` URL, a live ping), which made
  * "no session, but you must know the key" mean "no session" for those two. The
- * ULID's 80 random bits are what the learning attachments always had, and what
+ * ULID's 80 random bits are what the module-media keys always had, and what
  * ARCHITECTURE.md told the next person to add if the exposure ever mattered.
  *
  * A new key per upload also means an object is never overwritten in place, so a
@@ -154,7 +154,7 @@ export function parseDataUrl(
 // type (text/html, application/xhtml+xml, image/svg+xml) would be stored XSS — a member
 // could upload a page that runs JS in the app origin and rides any viewer's session.
 // This allowlist is the boundary that stops it. Raster images, short A/V clips, and PDFs
-// only — exactly what a learning attachment is.
+// only — exactly what an uploaded attachment is.
 /** EXPORTED, because the STREAMING doors have to test the same list.
  *
  * A streamed upload has no data URL to parse, so it cannot go through
@@ -197,7 +197,7 @@ export const ANY_FILE_TYPE = /^[\w.+-]+\/[\w.+-]+$/
  * an instruction to a renderer.) */
 export const NEUTRALISED_CONTENT_TYPE = "application/octet-stream"
 
-/** General data-URL parser for learning attachments: base64-decodes, enforces a
+/** General data-URL parser for uploaded attachments: base64-decodes, enforces a
  * caller-supplied byte cap, and — critically — accepts ONLY an inline-safe media mime
  * (`INLINE_SAFE_UPLOAD`; never text/html or svg). Returns null if the input isn't a
  * well-formed base64 data URL, the mime isn't allow-listed, or the decoded payload is

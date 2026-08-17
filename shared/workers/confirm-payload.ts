@@ -174,7 +174,7 @@ function renderGrid(grid: Record<string, unknown>): string[] {
  *
  * Keyed by the TOOL, never inferred from the payload. The payload is written by
  * the model, so any shape test on it is a test the model can fail on purpose: an
- * earlier version asked "do all the keys hold objects?", and `{ learning: {…},
+ * earlier version asked "do all the keys hold objects?", and `{ knowledge: {…},
  * note: "" }` answered no — which sent the whole sheet down the generic path and
  * silently dropped the nine modules being set to no access, while the door wrote
  * them anyway. The tool declares what a field means; the data does not get a
@@ -185,7 +185,7 @@ const PERMISSION_GRID_FIELDS = new Set([
   // `setRolePermissions` through the same door, writing every module, so the
   // panel owes the reader the same module-by-module sheet. (R21 put this field
   // on the tool; the panel had to learn it in the same breath, or an admin would
-  // have approved "Permissions — Learning — Read: Yes" and never been shown the
+  // have approved "Permissions — Knowledge base — Read: Yes" and never been shown the
   // nine modules the same call sets to no access.)
   "create_role.permissions",
 ])

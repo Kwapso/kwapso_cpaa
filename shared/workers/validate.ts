@@ -150,10 +150,11 @@ export function optionalMoment(value: unknown, field: string): string | undefine
  * and is not one until something says so. `Number.isFinite` refuses NaN and both
  * infinities; `Math.trunc` refuses a float where a row order is expected.
  *
- * It lives in the seam rather than beside a module because it was written twice —
- * Learning and Delivery each carried a copy, and Delivery's comment said so
- * ("the same guard Learning carries, and for the same reason"). A guard that has
- * to be remembered twice is a guard the third module ships without. */
+ * It lives in the seam rather than beside a module because it was written twice,
+ * in two modules that have both since been retired, and the second one's comment
+ * said as much ("the same guard the other carries, and for the same reason"). A
+ * guard that has to be remembered twice is a guard the third module ships
+ * without. */
 export function intOr(value: unknown, fallback: number): number {
   const n = Number(value)
   return Number.isFinite(n) ? Math.trunc(n) : fallback

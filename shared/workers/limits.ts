@@ -156,9 +156,9 @@ export const AGENT_MAX_FILES = 8
 
 /** Bytes one uploaded file may carry into the knowledge base.
  *
- * 25 MB is the number the product already teaches: it is the learning-attachment
- * cap, so the sentence a person meets when they pick something enormous is the
- * one they have already met once. It is a ceiling on the FILE, not on the
+ * 25 MB is the number the product already teaches: it is the cap on every other
+ * upload door, so the sentence a person meets when they pick something enormous
+ * is the one they have already met once. It is a ceiling on the FILE, not on the
  * material — a 25 MB scanned PDF may convert to a few hundred kilobytes of text,
  * and a 3 MB spreadsheet may convert to more than the row can hold. The text has
  * its own, separate ceiling (`DOCUMENT_LIMIT_BYTES` in validate.ts), because the
@@ -197,11 +197,11 @@ export const KNOWLEDGE_UPLOAD_MAX_BYTES = Math.ceil(KNOWLEDGE_FILE_MAX_BYTES * (
 // So this sits deliberately UNDER the platform wall, with headroom for headers
 // and the query string: refused by us, with a sentence a person can act on,
 // rather than cut off mid-body by the edge with nothing useful to say.
-// ONE NUMBER FOR ALL FOUR STREAMING DOORS — the knowledge base, learning media,
-// staff files and brand assets. They differ in which bucket they write and in
-// whether the bytes are ever served back under their declared type; they do not
-// differ in what the platform will carry, and that is the only thing this number
-// is about. Four constants would be four chances to raise one and forget three.
+// ONE NUMBER FOR EVERY STREAMING DOOR — the knowledge base, staff files and
+// brand assets. They differ in which bucket they write and in whether the bytes
+// are ever served back under their declared type; they do not differ in what the
+// platform will carry, and that is the only thing this number is about. A
+// constant each would be a chance to raise one and forget the rest.
 //
 // Decimal megabytes, not binary, because `mb()` renders the refusal by dividing
 // by 1,000,000 — so this way the number in the code and the number the person is

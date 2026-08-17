@@ -45,7 +45,7 @@ const grant: PendingCall = {
     "Role: Sub Admin",
     "Members: read, create, edit, delete",
     "Roles & permissions: read, edit",
-    "Learning: no access",
+    "Knowledge base: no access",
   ],
 }
 
@@ -72,7 +72,7 @@ describe("the confirm panel shows what it is asking the admin to approve", () =>
     expect(shown).toContain("Members: read, create, edit, delete")
     expect(shown).toContain("Roles & permissions: read, edit")
     // A module being taken down to nothing is a change too — it must be readable.
-    expect(shown).toContain("Learning: no access")
+    expect(shown).toContain("Knowledge base: no access")
     // Still pending: nothing has run, the human hasn't decided.
     expect(shown).toContain("Pending")
   })

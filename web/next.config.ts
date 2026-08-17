@@ -14,7 +14,7 @@ const staticExport = process.env.BUILD_STATIC
           { source: "/api/tenancy/:path*", destination: "http://127.0.0.1:8788/api/tenancy/:path*" },
           // …and the content worker, which web-portal's config has always
           // forwarded and this one never did. It is not a new capability, it is
-          // a gap: the agency app's Learning, Tickets and Knowledge screens are
+          // a gap: the agency app's Accounts, Tickets and Knowledge screens are
           // ALL /api/content, so none of them could be opened on localhost while
           // the portal's could. Found while verifying the knowledge page by hand
           // — which is the point of verifying by hand.

@@ -11,30 +11,30 @@ afterEach(() => sessionStorage.clear())
 
 describe("useFormDraft", () => {
   it("returns the initial values when there is no saved draft", () => {
-    const { result } = renderHook(() => useFormDraft("learning:new:t1", { title: "" }, true))
+    const { result } = renderHook(() => useFormDraft("brand:new:t1", { title: "" }, true))
     expect(result.current[0]).toEqual({ title: "" })
   })
 
   it("persists changes and restores them on a fresh mount (the navigate-away case)", () => {
-    const first = renderHook(() => useFormDraft("learning:new:t1", { title: "" }, true))
+    const first = renderHook(() => useFormDraft("brand:new:t1", { title: "" }, true))
     act(() => first.result.current[1]({ title: "Half-written" }))
     // A brand-new mount, as after navigating elsewhere and reopening the form:
-    const second = renderHook(() => useFormDraft("learning:new:t1", { title: "" }, true))
+    const second = renderHook(() => useFormDraft("brand:new:t1", { title: "" }, true))
     expect(second.result.current[0]).toEqual({ title: "Half-written" })
   })
 
   it("clear() drops the draft so the next open starts fresh", () => {
-    const a = renderHook(() => useFormDraft("learning:new:t1", { title: "" }, true))
+    const a = renderHook(() => useFormDraft("brand:new:t1", { title: "" }, true))
     act(() => a.result.current[1]({ title: "x" }))
     act(() => a.result.current[2]())
-    const b = renderHook(() => useFormDraft("learning:new:t1", { title: "" }, true))
+    const b = renderHook(() => useFormDraft("brand:new:t1", { title: "" }, true))
     expect(b.result.current[0]).toEqual({ title: "" })
   })
 
   it("does not write while inactive (a closed form)", () => {
-    const { result } = renderHook(() => useFormDraft("learning:new:t1", { title: "" }, false))
+    const { result } = renderHook(() => useFormDraft("brand:new:t1", { title: "" }, false))
     act(() => result.current[1]({ title: "y" }))
-    expect(sessionStorage.getItem("kwapso:draft:learning:new:t1")).toBeNull()
+    expect(sessionStorage.getItem("kwapso:draft:brand:new:t1")).toBeNull()
   })
 
   it("is a no-op store when draftKey is omitted", () => {
@@ -44,9 +44,9 @@ describe("useFormDraft", () => {
   })
 
   it("keys are isolated per form (edit vs new, per record)", () => {
-    const newForm = renderHook(() => useFormDraft("learning:new:t1", { title: "" }, true))
+    const newForm = renderHook(() => useFormDraft("brand:new:t1", { title: "" }, true))
     act(() => newForm.result.current[1]({ title: "drafting a new one" }))
-    const editForm = renderHook(() => useFormDraft("learning:edit:abc", { title: "real" }, true))
+    const editForm = renderHook(() => useFormDraft("brand:edit:abc", { title: "real" }, true))
     expect(editForm.result.current[0]).toEqual({ title: "real" })
   })
 
