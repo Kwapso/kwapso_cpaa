@@ -147,6 +147,7 @@ import {
   postCreateMeeting,
   postMeetingHeld,
   postMeetingTranscript,
+  postSyncCalendarSeries,
   postSetMeetingActive,
   postUpdateMeeting,
 } from "./routes/meetings"
@@ -405,6 +406,9 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // ticks "held" and writes a work log for every one of OUR people who was in
   // the room (9.4 + 9.2). One door, because it is one moment.
   "POST /api/content/meetings/transcript": { handler: postMeetingTranscript, kind: "mutation" },
+  // A repeating calendar entry becomes a real record four weeks ahead, and the
+  // instances beyond that come back read-only (9.7).
+  "POST /api/content/meetings/sync-calendar": { handler: postSyncCalendarSeries, kind: "mutation" },
   "POST /api/content/meetings/active": { handler: postSetMeetingActive, kind: "mutation" },
 
   // ── THE AGENCY'S OWN HOUSEKEEPING ──────────────────────────────────────────

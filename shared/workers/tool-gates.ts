@@ -173,6 +173,9 @@ export const TOOL_GATES: Record<string, string> = {
   // so it is an edit of the meeting — and `google:read` besides, which the door
   // asks for itself because it reaches the caller's own Drive.
   read_meeting_transcript: "meetings:edit",
+  // It MAKES meetings, so it is a create — and `google:read` besides, which the
+  // door asks for itself.
+  sync_calendar_series: "meetings:create",
   set_internal_rate_active: "commercials:delete",
   // GOOGLE. Every write through somebody's own connection is `google:edit` —
   // "change something in the world you connected" — because `create` on this

@@ -24,7 +24,7 @@ import { countCollection } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { accessTokenFor, listNamedSources } from "./google"
-import { calendarGet, driveList } from "./google-api"
+import { calendarGet, calendarList, driveList } from "./google-api"
 import { MEETING_LOG_KIND } from "./work-logs"
 import type { Env } from "../env"
 
@@ -33,6 +33,7 @@ import type { Env } from "../env"
  * diary entry can never disagree about the length of the same conversation. */
 const DEFAULT_MEETING_MS = 60 * 60 * 1000
 import { ulid } from "@shared/workers/id"
+import { LIST_HARD_CAP } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { optionalMoment, optionalText, requireMoment, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import type { Meeting } from "@shared/types"
@@ -130,8 +131,9 @@ export type MeetingFilter = {
   appId?: string
   purposeId?: string
   status?: string
-  /** 'upcoming' (the default view) hides what has already been held; 'all'
-   * shows the lot, cancelled ones included. */
+  /** 'upcoming' (the default view) hides what has already been held; 'week' is
+   * the week we are in, past and upcoming both (9.1); 'all' shows the lot,
+   * cancelled ones included. */
   view?: string
   q?: string
 }
@@ -139,6 +141,25 @@ export type MeetingFilter = {
 /** The WHERE both the list and its count are built from — one function, so the
  * badge can never count a different question from the one the rows answered
  * (R16 is only true if the two statements agree). */
+/** MONDAY TO SUNDAY, IN UTC, as two ISO moments. The week is computed on the
+ * SERVER because the count and the rows must agree about which week they mean —
+ * a browser working out its own boundary and a door working out another is the
+ * R16 failure in its quietest form, two true numbers about different weeks.
+ *
+ * UTC rather than the reader's zone, deliberately and with the cost named: an
+ * agency in Berlin sees Monday's 00:30 stand-up in the right week and a meeting
+ * at 01:30 on Monday morning would land in the previous one. The alternative is
+ * a timezone travelling on every request and being wrong in a different way. */
+function thisWeek(): { from: string; to: string } {
+  const now = new Date()
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  // getUTCDay is 0 for Sunday, so Sunday is six days after the Monday it belongs to.
+  start.setUTCDate(start.getUTCDate() - ((start.getUTCDay() + 6) % 7))
+  const end = new Date(start)
+  end.setUTCDate(end.getUTCDate() + 7)
+  return { from: start.toISOString(), to: end.toISOString() }
+}
+
 function whereFor(filter: MeetingFilter): { sql: string; params: (string | number)[] } {
   const where: string[] = []
   const params: (string | number)[] = []
@@ -146,6 +167,14 @@ function whereFor(filter: MeetingFilter): { sql: string; params: (string | numbe
   // deleted, so it stays readable by id and by asking for everything.
   if (filter.view !== "all") where.push("m.deactivated_at IS NULL")
   if (filter.view === "upcoming") where.push("m.status <> 'held'")
+  // THIS WEEK — past AND upcoming (CHECKLIST 9.1). Monday to Sunday, so a
+  // Friday afternoon still shows Monday's kickoff: "this week" means the week
+  // somebody is IN, not the days that are left of it.
+  if (filter.view === "week") {
+    const { from, to } = thisWeek()
+    where.push("m.starts_at >= ? AND m.starts_at < ?")
+    params.push(from, to)
+  }
   if (filter.accountId) {
     where.push("m.account_id = ?")
     params.push(filter.accountId)
@@ -661,4 +690,115 @@ VALUES (${sqlString(ulid())}, ${sqlString(meeting.accountId)}, 'meetings', ${sql
     relatedRowId: id,
   })
   return { captured: true, fileId: found.id, fileName: found.name, logsWritten: staff.length, note: null }
+}
+
+/* ------------------- the repeating entries in a calendar ------------------- */
+//
+// CHECKLIST 9.7, and it is Aurora's answer over the owner's "read-only always":
+// a repeating Google entry becomes a REAL RECORD four weeks ahead, and the
+// instances further out are shown read-only until their turn comes.
+//
+// WHY FOUR WEEKS. There has to be a month to prepare the notes — an agenda
+// written the morning of the call is an agenda nobody read. And there has to be
+// a horizon at all: a weekly stand-up with no end date is an infinite series,
+// and materialising it would be a table that grows for ever with rows nobody
+// will ever open.
+//
+// WHY THE INSTANCES FURTHER OUT ARE NOT ROWS. A record you can edit is a promise
+// that the edit means something, and an instance six months out can be moved,
+// renamed or cancelled in Google before it ever happens. So it is SHOWN and not
+// STORED — the diary tells you it is coming, and the moment it enters the
+// window it becomes a record with somewhere to write.
+
+/** How far ahead a repeating entry becomes a real record. Four weeks, so there
+ * is a month to prepare (Aurora's tk3). */
+const SERIES_HORIZON_DAYS = 28
+
+/** One instance of a repeating entry that is NOT yet a record — read-only, and
+ * shown so nobody is surprised by it. */
+export type AheadOfUs = {
+  eventId: string
+  title: string
+  startsAt: string
+  url: string | null
+}
+
+/** BRING THE REPEATING ENTRIES IN. Reads the caller's own calendar to the
+ * horizon, makes a record of every repeating instance inside it that does not
+ * have one yet, and hands back the ones beyond it so the diary can show them
+ * without pretending they are rows.
+ *
+ * IDEMPOTENT BY THE INDEX, not by a check: `idx_meetings_event` is unique on
+ * `google_event_id`, so an instance that already has a record cannot get a
+ * second one however many times this runs. The insert is skipped for ids we can
+ * already see and the index is the backstop for the race between two people
+ * pressing the button at once.
+ *
+ * ONLY REPEATING ENTRIES. A one-off in somebody's calendar is their own diary,
+ * not the agency's record of a client conversation — importing those would turn
+ * the meetings module into a copy of one person's Google account. */
+export async function syncCalendarSeries(
+  env: Env,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor
+): Promise<{ created: number; ahead: AheadOfUs[] }> {
+  const { token } = await accessTokenFor(env, cfg, guard, "calendar")
+  const now = new Date()
+  const horizon = new Date(now.getTime() + SERIES_HORIZON_DAYS * 24 * 60 * 60 * 1000)
+  // Two reads, because they answer two questions: what to MAKE (inside the
+  // horizon) and what to SHOW (beyond it, to the end of the quarter). The second
+  // is deliberately short — "there is a stand-up every Monday for ever" is not
+  // information, and the calendar read is bounded either way.
+  const [inWindow, beyond] = await Promise.all([
+    calendarList(token, { from: now.toISOString(), to: horizon.toISOString() }),
+    calendarList(token, {
+      from: horizon.toISOString(),
+      to: new Date(horizon.getTime() + SERIES_HORIZON_DAYS * 2 * 24 * 60 * 60 * 1000).toISOString(),
+    }),
+  ])
+  const repeating = inWindow.filter((e) => e.recurringEventId && e.status !== "cancelled")
+  const known = new Set<string>()
+  if (repeating.length) {
+    const rows = await d1Query<{ google_event_id: string }>(
+      cfg,
+      guard.databaseId,
+      // R14: bounded by the calendar read that produced the ids (GOOGLE_PAGE_SIZE).
+      `SELECT google_event_id FROM meetings
+        WHERE google_event_id IN (${repeating.map((e) => sqlString(e.id)).join(", ")})
+        LIMIT ${LIST_HARD_CAP}`
+    )
+    for (const r of rows) known.add(r.google_event_id)
+  }
+  const at = new Date().toISOString()
+  let created = 0
+  for (const event of repeating) {
+    if (known.has(event.id)) continue
+    const id = ulid()
+    await d1ExecScript(
+      cfg,
+      guard.databaseId,
+      `INSERT INTO meetings (id, title, agenda, location, starts_at, ends_at, status,
+         google_event_id, google_event_url, recurring_event_id,
+         created_at, creator_id, creator_email, creator_name)
+VALUES (${sqlString(id)}, ${sqlString(event.summary || "A repeating meeting")}, ${sqlString(event.description || null)}, ${sqlString(event.location || null)}, ${sqlString(event.start)}, ${sqlString(event.end || null)}, 'scheduled', ${sqlString(event.id)}, ${sqlString(event.url)}, ${sqlString(event.recurringEventId)}, ${sqlString(at)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+    )
+    created++
+  }
+  if (created > 0)
+    await logActivity(cfg, guard.databaseId, actor, {
+      type: "Repeating meetings brought in",
+      description: `${actor.name} brought in ${created} repeating ${
+        created === 1 ? "meeting" : "meetings"
+      } from their calendar`,
+      relatedTable: "meetings",
+    })
+  return {
+    created,
+    // Read-only, and shown as such: these are not records and nothing may be
+    // written against them until they cross the horizon.
+    ahead: beyond
+      .filter((e) => e.recurringEventId && e.status !== "cancelled")
+      .map((e) => ({ eventId: e.id, title: e.summary || "A repeating meeting", startsAt: e.start, url: e.url })),
+  }
 }

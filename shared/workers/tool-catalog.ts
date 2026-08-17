@@ -1138,6 +1138,19 @@ export const SHARED_TOOLS: SharedTool[] = [
     },
   },
   {
+    name: "sync_calendar_series",
+    summary:
+      "Bring the caller's REPEATING calendar entries into the diary. Every repeating instance in the next four weeks that has no record yet becomes one, so there is a month to prepare its notes; the instances further out come back in `ahead` as read-only, because an entry six months away can still be moved or called off in Google. `created` counts the records it made. One-off entries are never imported — somebody's own diary is not the agency's record of a client conversation. Safe to call twice: an instance that already has a record cannot get a second one.",
+    binding: "CONTENT", method: "POST", path: "/api/content/meetings/sync-calendar",
+    schema: obj({}),
+    buildBody: () => ({}),
+    agent: {
+      write: true,
+      confirm: false,
+      summarize: () => "Bring in the repeating meetings from your calendar",
+    },
+  },
+  {
     name: "read_meeting_transcript",
     summary:
       "Read the transcript of a meeting that has already happened, by `id`, and record what its arrival means: the meeting is marked held and a row of time is written for every one of OUR OWN people who was in the room. The client's people are never given one — a client's hour is not our cost. It looks only in the Drive folders the caller has shared, first by the meeting's title and then by its Meet code. `captured` false means nothing was found or it had already been read, and `note` says which in a sentence; `logsWritten` counts the rows of time it wrote. Reading it twice does nothing the second time.",

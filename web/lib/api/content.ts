@@ -571,7 +571,7 @@ export const content = {
    * count the heading shows. `view` is 'upcoming' by default. */
   meetings: (
     cursor?: string | null,
-    view?: "upcoming" | "all",
+    view?: "upcoming" | "week" | "all",
     /** the diary's search box, answered by the DOOR — the list pages, and the
      * meeting somebody digs for is the OLD one. */
     q?: string,
@@ -582,10 +582,17 @@ export const content = {
      * app's meetings among the newest fifty" is an answer that looks like one. */
     appId?: string
   ) =>
-    api<PagedResponse<{ meetings: Meeting[] }>>(
+    api<PagedResponse<{ meetings: Meeting[]; weekTotal: number }>>(
       `/api/content/meetings?view=${enc(view ?? "all")}${q ? `&q=${enc(q)}` : ""}${
         accountId ? `&accountId=${enc(accountId)}` : ""
       }${appId ? `&appId=${enc(appId)}` : ""}${cursor ? `&cursor=${enc(cursor)}` : ""}`
+    ),
+  /** BRING IN THE REPEATING CALENDAR ENTRIES (9.7). The next four weeks become
+   * real records; `ahead` is the instances beyond that, read-only. */
+  syncCalendarSeries: () =>
+    api<{ created: number; ahead: { eventId: string; title: string; startsAt: string; url: string | null }[] }>(
+      "/api/content/meetings/sync-calendar",
+      post({})
     ),
   meetingOne: (id: string) =>
     api<{ meetings: Meeting[] }>(`/api/content/meetings?id=${enc(id)}`).then((r) => r.meetings[0] ?? null),

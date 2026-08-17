@@ -27,6 +27,7 @@ import {
   listMeetings,
   captureTranscript,
   setMeetingActive,
+  syncCalendarSeries,
   setMeetingHeld,
   updateMeeting,
   type MeetingFilter,
@@ -67,13 +68,18 @@ export async function getMeetings(request: Request, env: Env): Promise<Response>
     })
   }
   const filter = filterFrom(url)
-  const [page, total] = await Promise.all([
+  const [page, total, weekTotal] = await Promise.all([
     listMeetings(cfg, guard, filter, queryText(url.searchParams.get("cursor"), "Cursor") ?? null),
     // R16: the exact server total rides every list response, over the SAME
     // question the rows answered.
     countMeetings(cfg, guard, filter),
+    // …and the OTHER view's total beside it, so the three-tab strip (9.1) badges
+    // two exact server counts from one response rather than asking twice. The
+    // week is worked out on the server, so the badge and the rows under it can
+    // never mean two different weeks.
+    countMeetings(cfg, guard, { ...filter, view: "week" }),
   ])
-  return pagedJson("meetings", { ...page, total })
+  return pagedJson("meetings", { ...page, total }, { weekTotal })
 }
 
 /** POST /api/content/meetings — put one in the diary. Gated on the meetings
@@ -172,4 +178,29 @@ export async function postMeetingTranscript(request: Request, env: Env): Promise
     note: result.note,
     meeting: await getMeeting(cfg, guard, id),
   })
+}
+
+/** POST /api/content/meetings/sync-calendar — bring the repeating entries in
+ * (CHECKLIST 9.7).
+ *
+ * A repeating entry becomes a REAL RECORD four weeks ahead, so there is a month
+ * to prepare its notes, and the instances further out come back read-only in
+ * `ahead` — shown so nobody is surprised by them, not stored, because an
+ * instance six months out can still be moved or called off in Google.
+ *
+ * It creates meetings, so it opens on this module's `create` right; it reads the
+ * caller's own calendar with the caller's own token, so it demands `google:read`
+ * besides. Idempotent by the unique index on the event id rather than by a
+ * check: two people pressing it at once cannot make two records of one call. */
+export async function postSyncCalendarSeries(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard } = await gatedBody<Record<string, unknown>>(request, env, "meetings", "create")
+  await refusePortalCaller(cfg, guard)
+  await requireRight(cfg, guard, "google", "read")
+  const result = await syncCalendarSeries(env, cfg, guard, actor)
+  // R1 — only when something actually landed in the diary.
+  if (result.created > 0) await publishChange(env, guard.teamId, "meetings", "series", "add")
+  // Spelled out rather than spread: R27 derives what a tool may PROMISE from the
+  // literal a door returns, so a shorthand response is a door whose contract
+  // nothing can read.
+  return json({ created: result.created, ahead: result.ahead })
 }

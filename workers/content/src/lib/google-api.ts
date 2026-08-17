@@ -791,6 +791,14 @@ export type CalendarEvent = {
    * meeting's own recordings and transcripts are named, so it is the thread from
    * a diary entry to what was said in the room. */
   meetingCode: string
+  /** THE SERIES THIS INSTANCE BELONGS TO, or "" for a one-off (CHECKLIST 9.7).
+   *
+   * The calendar read asks for `singleEvents=true`, which expands a repeating
+   * entry into its instances and puts the PARENT's id on every one of them. That
+   * id was being thrown away here, which is why nothing in the app could tell
+   * the eleventh Monday stand-up from a one-off — and why "recurring meetings
+   * appear" had no fact to stand on. */
+  recurringEventId: string
 }
 
 /** Guests read off one event — and the most this app will REWRITE in one go.
@@ -981,6 +989,7 @@ function toEvent(raw: unknown): CalendarEvent {
     location: str(e.location),
     status: str(e.status),
     meetingCode: str(conference.conferenceId),
+    recurringEventId: str(e.recurringEventId),
     // Bounded like every other list here: an event with two hundred guests is
     // one somebody was BCC'd on, and reading all of them would make the cost of
     // one calendar read a number a stranger sets.

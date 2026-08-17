@@ -31,7 +31,7 @@ type Translate = (english: string) => string
 
 /** A plain text column/field for a recipe (label only — the host supplies the
  * already-formatted value in the row/record). */
-function field(column: string, label: string): RecipeField {
+export function field(column: string, label: string): RecipeField {
   return { column, type: "text", field: { ...defaultFieldConfig, label } }
 }
 

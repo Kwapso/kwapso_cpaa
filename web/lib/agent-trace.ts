@@ -252,6 +252,9 @@ export function traceFor(
     // meeting's own "it is in your calendar" line. The entry it made is in
     // Google, which is not a screen this app can ring.
     case "create_meeting":
+    // Bringing a series in makes many records and no one of them is the change,
+    // so it lands on the diary rather than on a record.
+    case "sync_calendar_series":
       return { path: seg(teamId, "meetings"), highlight: "main" }
     case "update_meeting":
     case "set_meeting_held":

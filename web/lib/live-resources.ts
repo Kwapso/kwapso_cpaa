@@ -239,6 +239,11 @@ export const listFetch = {
   meetings: (teamId: string) =>
     contentApi.meetings().then((r) => {
       primeCache(totalKey("meetings", teamId), r.total)
+      // THE WEEK'S OWN EXACT TOTAL, off the same response (9.1). The three-view
+      // strip badges two server counts and asks for one page — the week is
+      // decided by the door, so the badge and the rows can never mean two
+      // different weeks (R16).
+      primeCache(totalKey("meetings-week", teamId), r.weekTotal)
       primeCache(cursorKey(meetingsKey(teamId)), r.nextCursor)
       return r.meetings
     }),

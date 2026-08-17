@@ -219,6 +219,18 @@ export function shapeMeetingsList(meetings: Meeting[]): ScreenData {
       client: m.accountName ?? "Ours",
       purpose: m.purposeName ?? "Not said",
       state: !m.active ? "Cancelled" : m.status === "held" ? "Held" : "Scheduled",
+      // THE COLUMNS THE "ALL" VIEW SHOWS (CHECKLIST 9.1: "all, with far more
+      // columns"). They ride every row rather than a second shaper, because the
+      // three views are three renderings of ONE list — a second shaper is a
+      // second idea of what a meeting row is, and the two drift.
+      when: formatDate(m.startsAt),
+      // The bare day the calendar view keys entries on — it wants a date, not a
+      // moment, and formatting it for the grid is the grid's job.
+      startsOn: m.startsAt.slice(0, 10),
+      app: m.appName ?? "—",
+      where: m.location ?? "—",
+      written: m.notes ? "Yes" : "—",
+      reference: m.ref ?? "—",
     })),
   }
 }
