@@ -57,6 +57,9 @@ function storyFilterFrom(url: URL): StoryFilter {
     sprintId: queryText(url.searchParams.get("sprintId"), "Sprint"),
     appId: queryText(url.searchParams.get("appId"), "App"),
     assigneeId: queryText(url.searchParams.get("assigneeId"), "Assignee"),
+    // The screen's search box. It rides the same filter object as everything
+    // else here, so the page and its count are asked the one question.
+    q: queryText(url.searchParams.get("q"), "Search"),
     // Anything but the exact word "all" means the everyday backlog — a fail-safe
     // default, because the everyday list is where a mistyped parameter should land.
     view: queryText(url.searchParams.get("view"), "View") === "all" ? "all" : "open",

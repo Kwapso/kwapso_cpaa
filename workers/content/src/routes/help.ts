@@ -75,13 +75,15 @@ async function ticketPage(
   scope: AccountScope,
   tab: "mine" | "all",
   view: "live" | "archived",
-  cursor: string | null
+  cursor: string | null,
+  q?: string
 ): Promise<Response> {
   const [page, counts] = await Promise.all([
-    listTickets(cfg, guard, scope, tab, view, cursor),
+    listTickets(cfg, guard, scope, tab, view, cursor, q),
     // R16: the total is counted over the SAME view the page came from, or the
-    // badge is a number the list cannot reach.
-    countTickets(cfg, guard, scope, view),
+    // badge is a number the list cannot reach — and over the same SEARCH, or a
+    // search's own count is a number about somebody else's question.
+    countTickets(cfg, guard, scope, view, q),
   ])
   return pagedJson("tickets", { ...page, total: counts.total }, { mineTotal: counts.mineTotal })
 }
@@ -125,7 +127,19 @@ export async function getHelp(request: Request, env: Env): Promise<Response> {
   // R14: tickets are a GROWING collection, so the door pages by key — the opaque
   // cursor comes straight back from the previous response. R16: the exact server
   // totals (All + the caller's My) ride every list response.
-  return ticketPage(cfg, guard, scope, tab, view, queryText(url.searchParams.get("cursor"), "Cursor") ?? null)
+  //
+  // `q` is the screen's search box, answered HERE rather than in the browser: a
+  // list that pages cannot be searched by filtering the page it loaded, or a
+  // ticket raised last spring is unfindable while the badge above still counts it.
+  return ticketPage(
+    cfg,
+    guard,
+    scope,
+    tab,
+    view,
+    queryText(url.searchParams.get("cursor"), "Cursor") ?? null,
+    queryText(url.searchParams.get("q"), "Search")
+  )
 }
 
 /** GET /api/content/help/thread?id=<ticketId> → the ticket's replies (oldest first).

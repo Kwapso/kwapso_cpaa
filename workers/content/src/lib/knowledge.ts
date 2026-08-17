@@ -409,25 +409,25 @@ function ownerClause(guard: MemberGuard, column = "owner_user_id"): { sql: strin
 /** The sort a source list is keyed by: newest first, id breaking ties. */
 const SOURCE_ORDER = "COALESCE(updated_at, created_at)"
 
-/** The team's sources, newest first. R14 GROWING collection: keyset-PAGED, not
- * capped — the agency's own history alone is thousands of sources, so the door
- * answers "here is a page and where the next one starts" rather than refusing
- * past a ceiling. `cursor` is the opaque one from the previous page. */
-export async function listSources(
-  cfg: D1Rest,
-  guard: MemberGuard,
-  filter: { kind?: string; compartment?: string; q?: string },
-  cursor: string | null
-): Promise<Page<KnowledgeSource>> {
+/** What a caller may narrow a source list to: the search box, and the two words
+ * a source is filed under. */
+export type SourceFilters = { kind?: string; compartment?: string; q?: string }
+
+/** THE FENCE PLUS THE FILTERS, built ONCE — because the list and the COUNT have
+ * to be the same question. They were not: the count was the fence alone, so a
+ * search answering with 12 sources was badged with the whole base's 3,400. R16
+ * is about the badge being exact; it is exact about the wrong question if the
+ * two clauses drift. One builder, no drift. */
+function sourcesWhere(guard: MemberGuard, filter: SourceFilters): { sql: string[]; params: string[] } {
   const owner = ownerClause(guard)
-  const where: string[] = [owner.sql]
-  const params: (string | number)[] = [...owner.params]
+  const sql = [owner.sql]
+  const params = [...owner.params]
   if (filter.kind) {
-    where.push("kind = ?")
+    sql.push("kind = ?")
     params.push(filter.kind)
   }
   if (filter.compartment) {
-    where.push("compartment = ?")
+    sql.push("compartment = ?")
     params.push(filter.compartment)
   }
   if (filter.q) {
@@ -437,10 +437,26 @@ export async function listSources(
     // title and the SUMMARY rather than the body: a LIKE over 300-page documents
     // is a full scan of every byte the team owns, and the summary is the part
     // that says what each one is.
-    where.push(`(LOWER(title) LIKE ? ESCAPE '\\' OR LOWER(summary) LIKE ? ESCAPE '\\')`)
+    sql.push(`(LOWER(title) LIKE ? ESCAPE '\\' OR LOWER(summary) LIKE ? ESCAPE '\\')`)
     const needle = `%${likeLiteral(filter.q.toLowerCase())}%`
     params.push(needle, needle)
   }
+  return { sql, params }
+}
+
+/** The team's sources, newest first. R14 GROWING collection: keyset-PAGED, not
+ * capped — the agency's own history alone is thousands of sources, so the door
+ * answers "here is a page and where the next one starts" rather than refusing
+ * past a ceiling. `cursor` is the opaque one from the previous page. */
+export async function listSources(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  filter: SourceFilters,
+  cursor: string | null
+): Promise<Page<KnowledgeSource>> {
+  const narrowed = sourcesWhere(guard, filter)
+  const where = [...narrowed.sql]
+  const params: (string | number)[] = [...narrowed.params]
   const after = keysetAfter(decodeCursor(cursor), SOURCE_ORDER)
   if (after.sql) {
     where.push(after.sql)
@@ -459,14 +475,20 @@ export async function listSources(
 
 /** R16: the exact server COUNT(*) for the badge — never rows.length. Carries the
  * same personal fence as the list, or the badge would count sources the reader
- * cannot see. */
-export async function countSources(cfg: D1Rest, guard: MemberGuard): Promise<number> {
-  const owner = ownerClause(guard)
+ * cannot see — and the same FILTERS, or a search's own count is a number about
+ * somebody else's question. Called with no filter (the default) it is still the
+ * whole collection's total, which is what the badge above the list shows. */
+export async function countSources(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  filter: SourceFilters = {}
+): Promise<number> {
+  const narrowed = sourcesWhere(guard, filter)
   const rows = await d1Query<{ n: number }>(
     cfg,
     guard.databaseId,
-    `SELECT COUNT(*) AS n FROM knowledge_sources WHERE ${owner.sql}`,
-    owner.params
+    `SELECT COUNT(*) AS n FROM knowledge_sources WHERE ${narrowed.sql.join(" AND ")}`,
+    narrowed.params
   )
   return rows[0]?.n ?? 0
 }

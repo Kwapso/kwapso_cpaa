@@ -257,11 +257,12 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_help_tickets",
     summary:
-      "List the team's tickets. scope: 'mine' (yours) or 'all' (default all); view: 'live' (default — the everyday list) or 'archived' (tickets that have been put away); pass `id` to fetch just one ticket, archived or not. Returns ONE page plus the exact `total`, `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
+      "List the team's tickets. scope: 'mine' (yours) or 'all' (default all); view: 'live' (default — the everyday list) or 'archived' (tickets that have been put away); `q` searches the reference, the description and the title. Pass `id` to fetch just one ticket, archived or not. The `total` counts the SAME filtered question the rows answer. Returns ONE page plus the exact `total`, `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
     binding: "CONTENT", method: "GET", path: "/api/content/help",
-    schema: obj({ scope: S, view: S, id: S, cursor: S }),
+    schema: obj({ scope: S, view: S, q: S, id: S, cursor: S }),
     buildQuery: (i) => {
       const q = [str(i, "scope") === "mine" ? "scope=mine" : "scope=all"]
+      if (str(i, "q")) q.push(`q=${encodeURIComponent(str(i, "q"))}`)
       // Forwarded only when the caller asked for the archive: the door defaults
       // to the live list, and sending `view=live` on every call would be noise
       // the model has to keep re-reading.
@@ -313,12 +314,12 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_accounts",
     summary:
-      "List the team's accounts — companies and people in one list. Filters: `q` (searches name, reference and email), `type` ('entity' for a company or 'individual' for a person), `parentId` (only the accounts sitting under that one). Returns ONE page plus the exact `total`, `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
+      "List the team's accounts — companies and people in one list. Filters: `q` (searches name, reference and email), `type` ('entity' for a company or 'individual' for a person), `status` (the team's own word for where an account stands, e.g. 'client' or 'past_client' — as stored), `archived` ('yes' for only the put-away ones, 'no' for only the live ones; both by default), `parentId` (only the accounts sitting under that one). The `total` counts the SAME filtered question the rows answer, so it is the answer to 'how many are there?' as well. Returns ONE page plus the exact `total`, `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/accounts",
-    schema: obj({ q: S, type: S, parentId: S, cursor: S }),
+    schema: obj({ q: S, type: S, status: S, archived: S, parentId: S, cursor: S }),
     buildQuery: (i) => {
       const q: string[] = []
-      for (const key of ["q", "type", "parentId", "cursor"])
+      for (const key of ["q", "type", "status", "archived", "parentId", "cursor"])
         if (str(i, key)) q.push(`${key}=${encodeURIComponent(str(i, key))}`)
       return q.length ? `?${q.join("&")}` : ""
     },
@@ -822,12 +823,12 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_stories",
     summary:
-      "List the team's STORIES — the pieces of work WE do, as opposed to the tickets a client raises. Filters: `status` (open / in_progress / in_review / done), `ticketId` (the work on one request), `sprintId`, `appId` (all the work on one system — a story always has an app and only sometimes a sprint), `assigneeId`, and `view` ('open' by default, which hides finished work — pass 'all' to include it). Pass `id` to fetch one story. Returns ONE page plus the exact `total`, `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
+      "List the team's STORIES — the pieces of work WE do, as opposed to the tickets a client raises. Filters: `status` (open / in_progress / in_review / done), `ticketId` (the work on one request), `sprintId`, `appId` (all the work on one system — a story always has an app and only sometimes a sprint), `assigneeId`, `q` (searches the reference, the title and the detail), and `view` ('open' by default, which hides finished work — pass 'all' to include it). Pass `id` to fetch one story. Returns ONE page plus the exact `total`, `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
     binding: "CONTENT", method: "GET", path: "/api/content/stories",
-    schema: obj({ id: S, status: S, ticketId: S, sprintId: S, appId: S, assigneeId: S, view: S, cursor: S }),
+    schema: obj({ id: S, status: S, ticketId: S, sprintId: S, appId: S, assigneeId: S, q: S, view: S, cursor: S }),
     buildQuery: (i) => {
       const q: string[] = []
-      for (const k of ["id", "status", "ticketId", "sprintId", "appId", "assigneeId", "view", "cursor"])
+      for (const k of ["id", "status", "ticketId", "sprintId", "appId", "assigneeId", "q", "view", "cursor"])
         if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
       return q.length ? `?${q.join("&")}` : ""
     },

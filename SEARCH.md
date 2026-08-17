@@ -37,14 +37,42 @@ Right for members, roles, invites, dropdown values: lists that are bounded per
 team. This is `selectRows` (limit → filter + facets → search → sort → paginate)
 running in the browser. No worker work at all.
 
-### Layer 2 — server-side query (growing lists)
-When a list can outgrow "fetch it all" (hundreds+ of rows), the recipe sets
-`serverSide: true`. The collection then **does not** filter in memory: it
-debounces the typed query + chosen facets and calls the module's list endpoint
-with `?q=` + filter params; the worker returns a filtered **page**. Reads stay
-cache-first (the cache key includes the query/facets); the live channel still
-invalidates on writes. The worker does the filtering with ordinary indexed
-`WHERE`/`LIKE` over the per-team database.
+### Layer 2 — server-side query (growing lists) · every PAGED collection
+When a list can outgrow "fetch it all" — in practice, every collection in
+`GROWING_COLLECTIONS` (Law **R14**) — the search box and the filters are answered
+by the **door**, not by the browser. The reason is the one R14 already gives about
+paging: the client holds page one, so filtering it in memory answers "among the
+newest fifty" while the exact count above (R16) still says 3,677. Two numbers,
+both true, neither about what was asked. Reported from staging, in a manager's
+words, as *"it only searches on loaded screen"*.
+
+The host owns this, in **one** component — `web/components/paged-find.tsx`:
+
+- the recipe turns the frame's own search box OFF (`listCollection(…, { paged: true })`
+  sets `searchable: false`), so a paged screen has exactly one box and it is the
+  honest one;
+- what is typed (debounced by the library `SearchInput`) and picked (the library
+  `FilterBar`) becomes the door's own query parameters — `?q=` plus that door's
+  filters;
+- the matches land in a cache key of their **own** (`find:<listKey>:<question>`),
+  with their own cursor sidecar, so `<LoadMore>` pages the SEARCH rather than the
+  list underneath it, and clearing the box leaves the unfiltered list exactly as
+  it was;
+- the exact server total **of that question** renders through `formatSearchTotal`
+  — the one seam in the app allowed to end in a "+" — beside the collection's own
+  R16 badge, which never moves. A collection total and a filtered total are two
+  different numbers, and the screen now says both, each labelled.
+
+Every door's count is taken over the same `WHERE` as its rows, so the filtered
+total can never be a number the list cannot reach.
+
+The check that keeps it true is `web/test/paged-search.test.ts`: for every growing
+collection with a list screen, its door parses `q`, its recipe leaves the frame's
+box off, and a `<PagedFind>` is wired to that collection's own cache key.
+
+> The library's `CollectionFrame` has a `serverSide` + `onQueryChange` seam of its
+> own, which would be the neater home for this — but `ScreenRenderer` does not pass
+> it through, and the library is not edited from this repo (UI-GAPS #15).
 
 ### Layer 3 — full-text "search anything" (FTS5)
 For record modules where Glide-style "match anything on the detail screen" is
@@ -139,16 +167,25 @@ for "how does search work" leaves knowing it exists:
 DATA-MODEL.md § *THE KNOWLEDGE BASE* is the owning reference (the four tables, the
 compartment model, the two fences); BOOTSTRAP.md §3b is how you stand the index up.
 
-## Status (updated 2026-08-12)
+## Status (updated 2026-08-17)
 
 - **Layer 1 + the library search/filter UI**: SHIPPED — the library search/filter
-  bar landed and the app turned it on across the collections (members / roles /
-  invites / dropdowns / learning / tickets) via the recipes (`listCollection` +
+  bar landed and the app turned it on across the BOUNDED collections (members /
+  roles / invites / dropdowns / learning) via the recipes (`listCollection` +
   `withDataDrivenCollection`, which hides search/filters when a list is empty or
   a facet has no options). See UI-CONVENTIONS §6.
-- **Layer 2 (server-side filters)**: available through the recipes' hints where a
-  list is bounded; nothing needed beyond the shipped client-side layer at today's
-  data sizes.
+- **Layer 2 (server-side query)**: SHIPPED 2026-08-17 for every PAGED collection —
+  accounts, tickets, the knowledge base, the backlog, the diary and the process
+  maps all search through their own door (`?q=`), and the accounts screen's three
+  filters (type / status / archived) are door filters too, so the filtered count
+  moves with them. Two doors learned `q` in the same change (tickets, stories);
+  the other four already parsed it and simply had nothing asking.
+  - **Not done, and named rather than left quiet:** the OTHER paged screens'
+    facets (kind / filed / status on the knowledge base, client / purpose / status
+    in the diary, app / archived on the maps, status / assignee / sprint / app on
+    the backlog) are still the frame's own, so they narrow the loaded page. Their
+    search is now honest and their counts do not claim otherwise — but the facets
+    are the same class of defect as B4 was on accounts. UI-GAPS #15 carries it.
 - **Layer 3 (FTS5 full-text)**: designed here, still NOT BUILT — the content/data-ops
   workers shipped (2026-06-23) without it because client-side search over the
   cached list covers current volumes. The FTS5 migration ships with the first

@@ -52,6 +52,9 @@ export type StoryQuery = {
   assigneeId?: string
   /** "all" includes finished work; the default backlog view hides it. */
   view?: "open" | "all"
+  /** the screen's search box — the reference, the title and the detail, matched
+   * by the DOOR (the backlog pages, so a browser could only search page one). */
+  q?: string
 }
 
 /** What a story create / edit may set. */
@@ -107,6 +110,7 @@ function storyQuery(filter: StoryQuery | undefined, cursor: string | null | unde
   if (filter?.appId) q.set("appId", filter.appId)
   if (filter?.assigneeId) q.set("assigneeId", filter.assigneeId)
   if (filter?.view) q.set("view", filter.view)
+  if (filter?.q) q.set("q", filter.q)
   if (cursor) q.set("cursor", cursor)
   const s = q.toString()
   return s ? `?${s}` : ""
@@ -137,9 +141,18 @@ export const content = {
 
   /** R14: a PAGE of tickets (a GROWING collection) — hand back `nextCursor` from
    * the previous response to get the next one. `total`/`mineTotal` are exact. */
-  help: (scope: "mine" | "all" = "all", cursor?: string | null, view: "live" | "archived" = "live") =>
+  help: (
+    scope: "mine" | "all" = "all",
+    cursor?: string | null,
+    view: "live" | "archived" = "live",
+    /** the search box, answered by the DOOR — the list pages, so a browser could
+     * only ever search the page it had loaded. `total` counts the same question. */
+    q?: string
+  ) =>
     api<PagedResponse<{ tickets: HelpTicket[]; mineTotal: number }>>(
-      `/api/content/help?scope=${scope}&view=${view}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`
+      `/api/content/help?scope=${scope}&view=${view}${q ? `&q=${enc(q)}` : ""}${
+        cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""
+      }`
     ),
   /** PUT IT AWAY, or take it back out. The door has answered this since archive
    * shipped; nothing on any screen called it, so a ticket could be archived by
@@ -339,10 +352,20 @@ export const content = {
   /* ------------------------------- knowledge ------------------------------- */
   /** R14: a PAGE of sources (a GROWING collection) — hand `nextCursor` back to
    * get the next one. `total` is the exact server count the badge shows. */
-  knowledge: (cursor?: string | null) =>
-    api<PagedResponse<{ sources: KnowledgeSource[] }>>(
-      `/api/content/knowledge${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`
-    ),
+  knowledge: (cursor?: string | null, find: { q?: string; kind?: string; compartment?: string } = {}) => {
+    // The door's own three filters (SEARCH.md layer 2). The list pages, so the
+    // search box has to be answered here — page one of a thousand sources is not
+    // the knowledge base, it is the newest fifty of it.
+    const p = new URLSearchParams()
+    if (find.q) p.set("q", find.q)
+    if (find.kind) p.set("kind", find.kind)
+    if (find.compartment) p.set("compartment", find.compartment)
+    if (cursor) p.set("cursor", cursor)
+    const qs = p.toString()
+    return api<PagedResponse<{ sources: KnowledgeSource[] }>>(
+      `/api/content/knowledge${qs ? `?${qs}` : ""}`
+    )
+  },
   knowledgeOne: (id: string) =>
     api<{ sources: KnowledgeSource[] }>(`/api/content/knowledge?id=${enc(id)}`).then(
       (r) => r.sources[0] ?? null
@@ -422,9 +445,17 @@ export const content = {
   /** R14: a PAGE of meetings (a GROWING collection — an event is never curated
    * away) — hand `nextCursor` back for the next one. `total` is the exact server
    * count the heading shows. `view` is 'upcoming' by default. */
-  meetings: (cursor?: string | null, view?: "upcoming" | "all") =>
+  meetings: (
+    cursor?: string | null,
+    view?: "upcoming" | "all",
+    /** the diary's search box, answered by the DOOR — the list pages, and the
+     * meeting somebody digs for is the OLD one. */
+    q?: string
+  ) =>
     api<PagedResponse<{ meetings: Meeting[] }>>(
-      `/api/content/meetings?view=${enc(view ?? "all")}${cursor ? `&cursor=${enc(cursor)}` : ""}`
+      `/api/content/meetings?view=${enc(view ?? "all")}${q ? `&q=${enc(q)}` : ""}${
+        cursor ? `&cursor=${enc(cursor)}` : ""
+      }`
     ),
   meetingOne: (id: string) =>
     api<{ meetings: Meeting[] }>(`/api/content/meetings?id=${enc(id)}`).then((r) => r.meetings[0] ?? null),

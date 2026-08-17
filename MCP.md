@@ -156,9 +156,11 @@ Today it covers:
 
   Each list tool that sits on a door with an
   `?id=` filter EXPOSES + FORWARDS it (R19 parity) — pass `id` to fetch one record
-  instead of pulling the whole collection (`list_help_tickets` also takes `scope`
-  and `view`, the latter choosing the everyday list or the archive drawer;
-  `list_accounts` takes `q`, `type` and `parentId`).
+  instead of pulling the whole collection (`list_help_tickets` also takes `scope`,
+  `view` — the everyday list or the archive drawer — and `q`; `list_accounts` takes
+  `q`, `type`, `status`, `archived` and `parentId`; `list_stories` takes `q` beside
+  its five). On every paged list the `total` counts the SAME filtered question the
+  rows answer, so a narrowed call answers "how many are there?" in one round trip.
 
   **`my_permissions` is the one to call first.** `whoami` says who the token is and
   which team it is pinned to; `my_permissions` says what that person may DO there,
@@ -247,8 +249,9 @@ Today it covers:
   curated by hand and stop growing), and the law says in as many words that a bounded
   collection doesn't need a cursor to be
   honest. **Accounts is the one that grows** — every company and every person an agency
-  works with — so `export_accounts_csv` narrows by the same three filters as
-  `list_accounts` (`q`, `type`, `parentId`), and past what one file can carry the door
+  works with — so `export_accounts_csv` narrows by the same five filters as
+  `list_accounts` (`q`, `type`, `status`, `archived`, `parentId`), and past what one
+  file can carry the door
   answers `export_too_large` rather than handing back the first rows as though they
   were all of them. The browser's Export CSV button gets exactly the same sentence from
   exactly the same door: a truncated export re-imported is data loss that looks like a

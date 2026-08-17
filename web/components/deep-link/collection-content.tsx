@@ -40,11 +40,14 @@ import { NotFound, LoadError, SectionWithCreate, CollectionCard } from "@/compon
 import { CollectionHeading } from "@/components/collection-heading"
 import { KnowledgeAsk } from "@/components/knowledge-ask"
 import { LoadMore } from "@/components/load-more"
+import { PagedFind } from "@/components/paged-find"
 import { content as contentApi, tenancy } from "@/lib/api"
 import { accountsKey, helpKey, knowledgeKey, type HelpScope } from "@/lib/live-resources"
 import { CountedAbove } from "@/components/counted-tabs"
 import { formatCount } from "@shared/web/format-count"
 import {
+  ACCOUNT_TYPE,
+  accountStatus,
   shapeAccountsList,
   shapeHelpList,
   shapeInvitesList,
@@ -57,6 +60,7 @@ import {
   resolveRecipe,
   withDataDrivenCollection,
 } from "@/lib/screens"
+import type { Account, HelpTicket, KnowledgeSource } from "@shared/types"
 import type { ModuleContentCtx } from "./module-content"
 
 /** The list screen for `module`, or the honest refusal/empty state. */
@@ -411,45 +415,110 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
   if (module === "accounts") {
     if (accountsQ.error) return <LoadError what="accounts" />
     if (accountsQ.data === undefined) return <Skeleton variant="list" lines={4} />
-    const data = shapeAccountsList(accountsQ.data)
-    const accountsRecipe = withDataDrivenCollection(recipe, data.rows ?? [])
+    const loaded = accountsQ.data
     // R16: the count lives in the heading (a sidebar page has no tab strip to
     // badge), and it is the door's exact COUNT(*) — never the loaded page's
-    // length, which on a paged list is just "50" forever.
+    // length, which on a paged list is just "50" forever. The find bar's own
+    // count is a different number about a different question, and says so.
     return (
       <div className="flex flex-col gap-4">
         <CollectionHeading sectionKey="accounts" total={totals.accounts} />
-        <SectionWithCreate
-          show={can("accounts", "create")}
-          label="New account"
-          icon="plus"
-          secondary={{
-            show: can("accounts", "create"),
-            label: "Import CSV",
-            onClick: () => go(`/t/${teamId}/import/accounts`),
-          }}
-          // Parity, in the direction nobody checks. `export_accounts_csv` has been
-          // on the machine surface — and a declared import target — while this
-          // screen offered no way to do it: a machine could export the customer
-          // book and a person could not. Same rule as its three siblings above:
-          // export needs READ, which is implied by seeing the list at all.
-          download={{
-            show: (data.rows?.length ?? 0) > 0,
-            label: "Export CSV",
-            href: "/api/tenancy/accounts/export",
-          }}
-          onCreate={() => go(sectionPath, { panel: "add", module: "accounts" })}
-        >
-          <ScreenRenderer recipe={accountsRecipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
-        </SectionWithCreate>
-        {/* R14: every company AND every person is a row here — the list pages. */}
-        <LoadMore
+        {/* R14's other half: the list pages, so the search box and every filter
+            are answered by the DOOR. `status` options come from what is loaded
+            (the team's own words, which no enum here could keep up with) while
+            the filtering itself still happens over the whole collection. */}
+        <PagedFind<Account>
           listKey={accountsKey(teamId as string)}
-          label="Load more accounts"
-          fetchPage={(c: string) =>
-            tenancy.accounts({ cursor: c }).then((r) => ({ rows: r.accounts, nextCursor: r.nextCursor }))
+          placeholder="Search accounts…"
+          noun="accounts"
+          facets={[
+            {
+              field: "type",
+              label: "Type",
+              control: "select",
+              options: [
+                { value: "entity", label: ACCOUNT_TYPE.entity },
+                { value: "individual", label: ACCOUNT_TYPE.individual },
+              ],
+            },
+            {
+              field: "status",
+              label: "Status",
+              control: "select",
+              options: [...new Set(loaded.map((a) => a.status).filter((s): s is string => !!s))].map(
+                (s) => ({ value: s, label: accountStatus(s) })
+              ),
+            },
+            {
+              field: "archived",
+              label: "Archived",
+              control: "select",
+              options: [
+                { value: "no", label: "No" },
+                { value: "yes", label: "Yes" },
+              ],
+            },
+          ]}
+          fetchPage={(query, cursor) =>
+            tenancy
+              .accounts({ ...query, cursor })
+              .then((r) => ({ rows: r.accounts, nextCursor: r.nextCursor, total: r.total }))
           }
-        />
+        >
+          {(found) => {
+            const rows = found.active ? found.rows : loaded
+            if (rows === null) return <Skeleton variant="list" lines={4} />
+            const data = shapeAccountsList(rows)
+            const accountsRecipe = withDataDrivenCollection(recipe, data.rows ?? [], found.emptyText)
+            return (
+              <>
+                <SectionWithCreate
+                  show={can("accounts", "create")}
+                  label="New account"
+                  icon="plus"
+                  secondary={{
+                    show: can("accounts", "create"),
+                    label: "Import CSV",
+                    onClick: () => go(`/t/${teamId}/import/accounts`),
+                  }}
+                  // Parity, in the direction nobody checks. `export_accounts_csv` has been
+                  // on the machine surface — and a declared import target — while this
+                  // screen offered no way to do it: a machine could export the customer
+                  // book and a person could not. Same rule as its three siblings above:
+                  // export needs READ, which is implied by seeing the list at all.
+                  //
+                  // It carries the FIND with it: the export door narrows by the
+                  // same five words as the list, deliberately, so that "export
+                  // what I'm looking at" is one book and not two. It is also how
+                  // a filtered book past the export ceiling gets out at all —
+                  // the door's own refusal says "narrow it", and this is the
+                  // narrowing.
+                  download={{
+                    show: (data.rows?.length ?? 0) > 0,
+                    label: "Export CSV",
+                    href: `/api/tenancy/accounts/export${found.queryString}`,
+                  }}
+                  onCreate={() => go(sectionPath, { panel: "add", module: "accounts" })}
+                >
+                  <ScreenRenderer
+                    recipe={accountsRecipe}
+                    data={data}
+                    rights={rights}
+                    onAction={onAction}
+                    onIntent={onIntent}
+                  />
+                </SectionWithCreate>
+                {/* R14: every company AND every person is a row here — the list
+                    pages, and so do the matches when a find is on. */}
+                <LoadMore
+                  listKey={found.listKey ?? accountsKey(teamId as string)}
+                  label="Load more accounts"
+                  fetchPage={found.fetchPage}
+                />
+              </>
+            )
+          }}
+        </PagedFind>
       </div>
     )
   }
@@ -461,8 +530,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     // accounts screen; here it is cache-first and empty until it lands, which
     // the shaping reads as the honest "A client".
     const names = new Map((accountsQ.data ?? []).map((a) => [a.id, a.name]))
-    const data = shapeKnowledgeList(knowledgeQ.data, names)
-    const knowledgeRecipe = withDataDrivenCollection(recipe, data.rows ?? [])
+    const loadedSources = knowledgeQ.data
     // R16: the count lives in the heading (a sidebar page has no tab strip to
     // badge), and it is the door's exact COUNT(*) — never the loaded page's
     // length, which on a paged list is just "50" forever.
@@ -475,32 +543,59 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
             is a question box is a page people ask questions on. It spends no
             assistant allowance and says so — see knowledge-ask.tsx. */}
         <KnowledgeAsk onOpenSource={(id) => go(`${sectionPath}/${id}`)} />
-        <SectionWithCreate
-          show={can("knowledge", "create")}
-          label="Add a source"
-          icon="plus"
-          // The third way in, beside the other two. It sits in the SECONDARY
-          // slot — the same place "Import CSV" sits on the accounts screen —
-          // because it is the same kind of affordance: another road to the same
-          // record, for material that already exists somewhere else.
-          secondary={{
-            show: can("knowledge", "create"),
-            label: "Upload a file",
-            onClick: () => go(sectionPath, { panel: "add", module: "knowledge-file" }),
-          }}
-          onCreate={() => go(sectionPath, { panel: "add", module: "knowledge" })}
-        >
-          <ScreenRenderer recipe={knowledgeRecipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
-        </SectionWithCreate>
-        {/* R14: one source per ticket, per article, per account, plus every note
-            anybody writes — the list pages. */}
-        <LoadMore
+        {/* R14's other half: the sweep only ever adds, so the search box is
+            answered by the door — over every source, not the newest fifty. */}
+        <PagedFind<KnowledgeSource>
           listKey={knowledgeKey(teamId as string)}
-          label="Load more sources"
-          fetchPage={(c: string) =>
-            contentApi.knowledge(c).then((r) => ({ rows: r.sources, nextCursor: r.nextCursor }))
+          placeholder="Search the knowledge base…"
+          noun="sources"
+          fetchPage={(query, cursor) =>
+            contentApi
+              .knowledge(cursor, query)
+              .then((r) => ({ rows: r.sources, nextCursor: r.nextCursor, total: r.total }))
           }
-        />
+        >
+          {(found) => {
+            const rows = found.active ? found.rows : loadedSources
+            if (rows === null) return <Skeleton variant="list" lines={4} />
+            const data = shapeKnowledgeList(rows, names)
+            const knowledgeRecipe = withDataDrivenCollection(recipe, data.rows ?? [], found.emptyText)
+            return (
+              <>
+                <SectionWithCreate
+                  show={can("knowledge", "create")}
+                  label="Add a source"
+                  icon="plus"
+                  // The third way in, beside the other two. It sits in the SECONDARY
+                  // slot — the same place "Import CSV" sits on the accounts screen —
+                  // because it is the same kind of affordance: another road to the same
+                  // record, for material that already exists somewhere else.
+                  secondary={{
+                    show: can("knowledge", "create"),
+                    label: "Upload a file",
+                    onClick: () => go(sectionPath, { panel: "add", module: "knowledge-file" }),
+                  }}
+                  onCreate={() => go(sectionPath, { panel: "add", module: "knowledge" })}
+                >
+                  <ScreenRenderer
+                    recipe={knowledgeRecipe}
+                    data={data}
+                    rights={rights}
+                    onAction={onAction}
+                    onIntent={onIntent}
+                  />
+                </SectionWithCreate>
+                {/* R14: one source per ticket, per article, per account, plus every note
+                    anybody writes — the list pages. */}
+                <LoadMore
+                  listKey={found.listKey ?? knowledgeKey(teamId as string)}
+                  label="Load more sources"
+                  fetchPage={found.fetchPage}
+                />
+              </>
+            )
+          }}
+        </PagedFind>
       </div>
     )
   }
@@ -511,8 +606,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     const scopedQ = helpScope === "mine" ? helpMineQ : helpScope === "archived" ? ctx.helpArchivedQ : helpQ
     if (scopedQ.error) return <LoadError what="tickets" />
     if (scopedQ.data === undefined) return <Skeleton variant="list" lines={4} />
-    const data = shapeHelpList(scopedQ.data)
-    const helpRecipe = withDataDrivenCollection(recipe, data.rows ?? [])
+    const loadedTickets = scopedQ.data
     // R16: both scope badges are exact server totals (All + My come back from
     // the door's one COUNT read) through the ONE seam — never a filter's length.
     const helpBadge = formatCount(totals.help)
@@ -524,6 +618,32 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
           is the sentence a person needs before they look, and a page they have
           to go and open is a page nobody opens (BUILD-1 §6). */}
       <TriageStrip teamId={teamId as string} canSetDuty={can("help", "edit")} />
+      {/* R14's other half: tickets accumulate forever, so the search box is
+          answered by the door — inside the scope the strip below has chosen, so
+          "search my tickets" means mine and "search the archive" means the
+          archive. */}
+      <PagedFind<HelpTicket>
+        listKey={helpKey(teamId as string, helpScope)}
+        placeholder="Search tickets…"
+        noun="tickets"
+        fetchPage={(query, cursor) =>
+          contentApi
+            .help(
+              helpScope === "archived" ? "all" : helpScope,
+              cursor,
+              helpScope === "archived" ? "archived" : "live",
+              query.q
+            )
+            .then((r) => ({ rows: r.tickets, nextCursor: r.nextCursor, total: r.total }))
+        }
+      >
+        {(found) => {
+          const rows = found.active ? found.rows : loadedTickets
+          if (rows === null) return <Skeleton variant="list" lines={4} />
+          const data = shapeHelpList(rows)
+          const helpRecipe = withDataDrivenCollection(recipe, data.rows ?? [], found.emptyText)
+          return (
+            <>
       <SectionWithCreate
         show={can("help", "create")}
         label="Raise ticket"
@@ -571,14 +691,14 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         <ScreenRenderer recipe={helpRecipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
       </SectionWithCreate>
       <LoadMore
-        listKey={helpKey(teamId as string, helpScope)}
+        listKey={found.listKey ?? helpKey(teamId as string, helpScope)}
         label="Load more tickets"
-        fetchPage={(c: string) =>
-          contentApi
-            .help(helpScope === "archived" ? "all" : helpScope, c, helpScope === "archived" ? "archived" : "live")
-            .then((r) => ({ rows: r.tickets, nextCursor: r.nextCursor }))
-        }
+        fetchPage={found.fetchPage}
       />
+            </>
+          )
+        }}
+      </PagedFind>
       </div>
       </CountedAbove>
     )

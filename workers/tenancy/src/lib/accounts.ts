@@ -136,14 +136,24 @@ function editedBy(actor: Actor, now: string): { sql: string; params: string[] } 
  * GROWING_COLLECTIONS row in shared/rules/registry.ts, which also holds the
  * check to a client that can actually reach page two.
  *
- * `q` searches name, code and email. `type` narrows to entities or individuals.
- * Archived rows are included and carry `active` (the manager greys them with a
- * Restore button — the same shape as a retired role). */
-/** WHAT A CALLER MAY NARROW an accounts read to — the fence plus the three
+ * `q` searches name, code and email. `type` narrows to entities or individuals,
+ * `status` to the team's own word for where an account stands. Archived rows are
+ * included by default and carry `active` (the manager greys them with a Restore
+ * button — the same shape as a retired role); `archived` asks for one of the two
+ * piles on its own. */
+/** WHAT A CALLER MAY NARROW an accounts read to — the fence plus the five
  * filters, built ONCE so the paged list and the CSV export can never disagree
  * about what a filter means. They are the same question asked for a screen and
  * for a file; two copies of this would be two answers waiting to drift. */
-export type AccountFilters = { q?: string; type?: "entity" | "individual"; parentId?: string }
+export type AccountFilters = {
+  q?: string
+  type?: "entity" | "individual"
+  /** the team's own word for where an account stands, matched as stored */
+  status?: string
+  /** "yes" = only the put-away ones, "no" = only the live ones, absent = both */
+  archived?: "yes" | "no"
+  parentId?: string
+}
 
 function accountsWhere(scope: AccountScope, opts: AccountFilters): { sql: string; params: string[] } {
   const fence = accountScopeClause(scope, "id")
@@ -167,6 +177,14 @@ function accountsWhere(scope: AccountScope, opts: AccountFilters): { sql: string
     filters.push("account_type = ?")
     params.push(opts.type)
   }
+  if (opts.status) {
+    filters.push("status = ?")
+    params.push(opts.status)
+  }
+  // ARCHIVED IS A FILTER, NOT A FENCE. Both states stay listable (deactivate,
+  // never delete) — this only says which of the two the caller asked for, so the
+  // exact total beside it counts the same question the rows answer.
+  if (opts.archived) filters.push(`deactivated_at IS ${opts.archived === "yes" ? "NOT NULL" : "NULL"}`)
   if (opts.parentId) {
     filters.push("parent_account_id = ?")
     params.push(opts.parentId)

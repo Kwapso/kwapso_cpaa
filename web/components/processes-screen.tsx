@@ -26,6 +26,7 @@ import type { ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
 
 import { CollectionHeading } from "@/components/collection-heading"
 import { LoadMore } from "@/components/load-more"
+import { PagedFind } from "@/components/paged-find"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { AppFormDialog, type AppFormValues } from "@/components/app-form-dialog"
 import { ProcessFormDialog, type ProcessFormValues } from "@/components/process-form-dialog"
@@ -129,8 +130,7 @@ export function ProcessesScreen({
     return <p className="text-destructive text-sm">Couldn&apos;t load the process maps.</p>
   if (processesQ.data === undefined) return <Skeleton variant="list" lines={4} />
 
-  const data = shapeProcessesList(processesQ.data)
-  const listRecipe = withDataDrivenCollection(recipe, data.rows)
+  const loaded = processesQ.data
   const apps = (appsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))
 
   return (
@@ -142,34 +142,56 @@ export function ProcessesScreen({
 
       <ValuePanel view={valueQ.data} />
 
-      {/* A map lives inside an app, so a team with no apps yet has to be able to
-          record one from here — otherwise this screen is a dead end with a
-          create button that cannot be pressed. */}
-      <SectionWithCreate
-        show={canCreate && apps.length > 0}
-        label="Map a process"
-        icon="plus"
-        secondary={{ show: canCreate, label: "Record an app", onClick: () => setAppOpen(true) }}
-        onCreate={() => setAddOpen(true)}
-      >
-        <ScreenRenderer
-          recipe={listRecipe}
-          data={data}
-          rights={rights}
-          onAction={onAction}
-          onIntent={onIntent}
-        />
-      </SectionWithCreate>
-
-      {/* R14: every app of every client grows maps, and none is ever deleted —
-          the list pages. */}
-      <LoadMore
+      {/* R14's other half: maps are kept rather than replaced, and the oldest is
+          the one a client asks about — so the search box is answered by the door
+          rather than by filtering the page the browser happens to hold. */}
+      <PagedFind<ProcessSummary>
         listKey={processesKey(teamId)}
-        label="Load more process maps"
-        fetchPage={(c: string) =>
-          tenancy.processes({ cursor: c }).then((r) => ({ rows: r.processes, nextCursor: r.nextCursor }))
+        placeholder="Search process maps…"
+        noun="maps"
+        fetchPage={(query, cursor) =>
+          tenancy
+            .processes({ ...query, cursor })
+            .then((r) => ({ rows: r.processes, nextCursor: r.nextCursor, total: r.total }))
         }
-      />
+      >
+        {(found) => {
+          const rows = found.active ? found.rows : loaded
+          if (rows === null) return <Skeleton variant="list" lines={4} />
+          const data = shapeProcessesList(rows)
+          const listRecipe = withDataDrivenCollection(recipe, data.rows, found.emptyText)
+          return (
+            <>
+              {/* A map lives inside an app, so a team with no apps yet has to be able to
+                  record one from here — otherwise this screen is a dead end with a
+                  create button that cannot be pressed. */}
+              <SectionWithCreate
+                show={canCreate && apps.length > 0}
+                label="Map a process"
+                icon="plus"
+                secondary={{ show: canCreate, label: "Record an app", onClick: () => setAppOpen(true) }}
+                onCreate={() => setAddOpen(true)}
+              >
+                <ScreenRenderer
+                  recipe={listRecipe}
+                  data={data}
+                  rights={rights}
+                  onAction={onAction}
+                  onIntent={onIntent}
+                />
+              </SectionWithCreate>
+
+              {/* R14: every app of every client grows maps, and none is ever deleted —
+                  the list pages. */}
+              <LoadMore
+                listKey={found.listKey ?? processesKey(teamId)}
+                label="Load more process maps"
+                fetchPage={found.fetchPage}
+              />
+            </>
+          )
+        }}
+      </PagedFind>
 
       <AppFormDialog
         open={appOpen}

@@ -38,6 +38,7 @@ import {
   setLinkActive,
   setPortalAccessActive,
   updateAccount,
+  type AccountFilters,
 } from "../lib/accounts"
 import type { Env } from "../env"
 
@@ -77,14 +78,25 @@ export async function getAccounts(request: Request, env: Env): Promise<Response>
   return pagedJson("accounts", page)
 }
 
-/** The three filters an accounts read accepts, parsed ONCE — the list door and
- * the export door narrow by the same words, so "export what I'm looking at" and
- * "list what I'm looking at" can never mean two different things. */
-function accountQuery(url: URL): { q?: string; type?: "entity" | "individual"; parentId?: string } {
+/** The filters an accounts read accepts, parsed ONCE — the list door and the
+ * export door narrow by the same words, so "export what I'm looking at" and
+ * "list what I'm looking at" can never mean two different things.
+ *
+ * `status` and `archived` joined the original three when the screen's filter bar
+ * moved to the door: a facet applied to the loaded PAGE narrows fifty rows under
+ * a badge counting all of them, which is the same sentence R14 already says
+ * about search. A filter a person can pick has to be one the server can apply. */
+function accountQuery(url: URL): AccountFilters {
   const rawType = queryText(url.searchParams.get("type"), "Type")
+  const rawArchived = queryText(url.searchParams.get("archived"), "Archived")
   return {
     q: queryText(url.searchParams.get("q"), "Search"),
     type: rawType === "entity" || rawType === "individual" ? rawType : undefined,
+    // The team's OWN word for where an account stands ("past_client") — stored as
+    // written, so it is matched as written rather than mapped to an enum we'd
+    // then have to keep in step with a dropdown somebody edits.
+    status: queryText(url.searchParams.get("status"), "Status"),
+    archived: rawArchived === "yes" || rawArchived === "no" ? rawArchived : undefined,
     parentId: queryText(url.searchParams.get("parentId"), "Parent"),
   }
 }
@@ -101,9 +113,9 @@ function accountQuery(url: URL): { q?: string; type?: "entity" | "individual"; p
  * worst of the three possible answers, and worse here than anywhere: the columns
  * lead with the import format, so re-importing a silently-truncated export is
  * data loss wearing a round trip's clothes. Over the cap the caller narrows with
- * q / type / parentId (the same three the screen and `list_accounts` take), or
- * reads the paged list. Both surfaces get this same sentence from this same
- * door. */
+ * q / type / status / archived / parentId (the same five the screen's find bar
+ * and `list_accounts` take), or reads the paged list. Both surfaces get this
+ * same sentence from this same door. */
 export async function getAccountsExport(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "accounts", "read")
   const scope = await accountScope(cfg, guard)
