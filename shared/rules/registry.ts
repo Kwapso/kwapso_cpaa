@@ -216,6 +216,14 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "described-contracts",
     status: "enforced",
   },
+  {
+    id: "R28",
+    dimension: "ui",
+    law: "A STRING THE APP SAYS IS IN THE CATALOGUE, AND THE CATALOGUE SAYS NOTHING THE APP DOESN'T. `shared/i18n-strings.json` must be exactly the set of user-visible English sentences in `web/` and `web-portal/`, derived by re-running the ONE shared definition of what a person reads (`scripts/lib/i18n-source.mjs` — the same walk the extractor writes from and the adoption codemod wraps). A sentence in the source that is MISSING from the catalogue fails the build: English is the key, so an uncatalogued string is translated nowhere and ships in English to a reader who chose German. A catalogue entry that matches no string in the app is an ORPHAN and fails too — a ratchet, the same shape as R20's exemption list and R27's vocabulary: nothing breaks today, which is precisely why it rots into a record of what the app used to say while being paid for on every build.",
+    why: "The translation pipeline is BUILD-TIME (13.5): 29 languages produced once per deploy, costing nothing at runtime. That design's whole load-bearing assumption is that the catalogue is current, and its only enforcement was a person remembering to re-run a script — the weakest kind of rule in a codebase whose other twenty-seven are machine-checked. The extractor already had a `--check` mode and it was never wired to anything; this law is that mode with a test in front of it, plus the second half `--check` could only report as one byte-diff. It re-runs the real walker rather than describing it: a check with its own idea of 'a string a person reads' would be a second definition, and the day the two drifted the build would stay green while the app spoke English.",
+    checkId: "catalogued-strings",
+    status: "enforced",
+  },
 ]
 
 /** R13 — reviewed exemptions: modules that are deliberately NOT import targets,
@@ -230,6 +238,8 @@ export const CATALOG_EXEMPT: Record<string, string> = {
     "not a table — the module is a SWITCH over rows the `accounts` target already imports. A company and a person are one row shape (SCOPE ch.03), so a file of people is a file of accounts with the Type column set to person, and the link between a person and a company is set on the account afterwards for the same reason the parent pointer is: a file's own rows cannot be resolved to ids until the file has been written. Giving this module a second import target would be two ways to load one table, and the second one would be the one nobody keeps in step.",
   portal_users:
     "a login is a granted identity, not importable content — a CSV cannot consent for a person (the same reason team_members is exempt)",
+  all_tasks:
+    "not a table — the module is a SWITCH over whose tasks a list answers about (4.9). The rows themselves are `tasks`, which the work engine's own target already imports; giving this module a second target would be two ways to load one table, and the second one would be the one nobody keeps in step. The same shape as `contacts`, one spine along.",
   knowledge:
     "a source is either TYPED here — and indexed in the same call, because the owner asked for instant syncing, which costs one embedding per chunk — or MIRRORED from a row the app already owns and kept in step by the sweep. A CSV would be a third way in with the first one's cost and neither one's upkeep: the importer writes row by row through the module's own gated create door, so a 5,000-row file would be 5,000 chunkings and 5,000 model calls inside one request, against a €50/month ceiling. The in-rule answer to 'we have a spreadsheet of process notes' is to point the sweep at where they already live, or to import them into the module they belong to and let the mirror do it.",
   processes:

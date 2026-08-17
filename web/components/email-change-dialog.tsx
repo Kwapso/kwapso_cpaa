@@ -63,7 +63,7 @@ export function EmailChangeDialog({
       setStep("code")
       setCode("")
       // The code goes ONLY to the new inbox — never the response or a toast.
-      toast.success(`Code sent — check ${email.trim()}.`)
+      toast.success(`Code sent. Check ${email.trim()}.`)
     } catch (e) {
       setError(e instanceof ApiFailure ? e.message : "Couldn't send the code.")
     } finally {

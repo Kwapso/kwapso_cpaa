@@ -152,7 +152,7 @@ async function targetOrThrow(
     throw new GuardError(
       400,
       "invalid_target",
-      `Time is logged against a ${Object.values(WORK_LOG_TARGETS).map((t) => t.noun).join(", a ")} — nothing else.`
+      `Time is logged against a ${Object.values(WORK_LOG_TARGETS).map((t) => t.noun).join(", a ")}, nothing else.`
     )
   const rows = await d1Query<{ account_id: string | null }>(
     cfg,
@@ -461,7 +461,7 @@ export async function logTime(
   const { accountId } = await targetOrThrow(cfg, guard, input.targetTable, input.targetId)
   const seconds = secondsBetween(input.startedAt, input.endedAt)
   if (seconds === 0)
-    throw new GuardError(400, "invalid_input", "That's no time at all — check the start and the finish.")
+    throw new GuardError(400, "invalid_input", "That's no time at all. Check the start and the finish.")
 
   const id = ulid()
   const now = new Date().toISOString()
@@ -601,7 +601,7 @@ export function requireTarget(
     throw new GuardError(
       400,
       "invalid_target",
-      `Time is logged against a ${Object.values(WORK_LOG_TARGETS).map((t) => t.noun).join(", a ")} — nothing else.`
+      `Time is logged against a ${Object.values(WORK_LOG_TARGETS).map((t) => t.noun).join(", a ")}, nothing else.`
     )
   return { targetTable, targetId }
 }

@@ -45,13 +45,13 @@ export function WaitingOnYou() {
     setBusy(id)
     try {
       if (file && file.size > MAX_FILE_BYTES) {
-        toast.error(t("That file is too big — 10 MB is the most we can take."))
+        toast.error(t("That file is too big, 10 MB is the most we can take."))
         return
       }
       const attachment = file ? { dataUrl: await readFileAsDataUrl(file), name: file.name } : undefined
       await delivery.completeTodo(id, attachment)
       invalidate(cacheKeys.todos)
-      toast.success(t("Thank you — that's off your list."))
+      toast.success(t("Thank you, that's off your list."))
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't mark that done.")
     } finally {

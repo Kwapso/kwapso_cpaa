@@ -22,7 +22,7 @@ import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Card, CardContent } from "@kwapso/ui/registry/primitives/card/card"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { Pencil, Plus, Power } from "lucide-react"
+import { Pencil, Power } from "lucide-react"
 
 import { CertificateFormDialog, type CertificateValues } from "@/components/certificate-form-dialog"
 import { StaffProfileDialog, type StaffProfileValues } from "@/components/staff-profile-dialog"
@@ -36,6 +36,7 @@ import { safeHref } from "@/lib/rich-text"
 import { primeCache, useCached, useCachedValue } from "@shared/web/store"
 import type { StaffCertificate, StaffProfile } from "@shared/types"
 import { useT } from "@shared/web/language"
+import { AddButton } from "@/components/deep-link/screen-bits"
 
 export function StaffPanel({
   teamId,
@@ -213,18 +214,13 @@ export function StaffPanel({
           ) : null}
         </h2>
         {mayAdd && (
-          <Button
-            variant="outline"
-            size="sm"
+          <AddButton
+            label={t("Record one")}
             onClick={() => {
               setEditingCert(null)
               setCertOpen(true)
             }}
-            className="gap-1.5"
-          >
-            <Plus className="size-3.5" />
-            {t("Record one")}
-          </Button>
+          />
         )}
       </div>
       <Card>

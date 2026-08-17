@@ -28,7 +28,6 @@
 
 import * as React from "react"
 
-import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
@@ -59,7 +58,13 @@ import { OverviewList } from "@/components/overview-list"
 import { RichText } from "@/components/rich-text"
 import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, tenancy } from "@/lib/api"
-import { auditItems } from "@/lib/audit-overview"
+import {
+  RecordActionsMenu,
+  RecordFooter,
+  RecordScreen,
+  STICKY_TABS,
+  type RecordAction,
+} from "@/components/record-chrome"
 import { formatCount } from "@shared/web/format-count"
 import { accountKey, accountsKey, listFetch, totalKey } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
@@ -206,13 +211,7 @@ export function ContactDetailScreen({
     { label: t("Language"), value: account.locale || "Ours" },
     { label: t("Reference"), value: account.code || "—" },
     { label: t("Status"), value: statusText || "—" },
-    ...auditItems({
-      createdByName: account.createdByName,
-      createdAt: account.createdAt,
-      editedByName: account.editedByName,
-      updatedAt: account.updatedAt,
-      status: account.active ? "Active" : "Archived",
-    }),
+    // The audit rows moved to the record footer (D7 / CHECKLIST 11.3).
   ]
 
   const parentOptions = (accountsQ.data ?? [])
@@ -295,29 +294,70 @@ export function ContactDetailScreen({
     ],
   }
 
+  /* B1 / CHECKLIST 11.2 — Edit stays visible, archiving moves into the menu with
+   * its red and its confirm intact. */
+  const overflow: RecordAction[] = canArchive
+    ? [
+        account.active
+          ? {
+              key: "archive",
+              label: t("Archive"),
+              icon: <Power className="size-3.5" />,
+              disabled: busy,
+              destructive: true,
+              onSelect: () =>
+                setConfirm({
+                  title: `Archive ${account.name}?`,
+                  body: "They stop showing in the everyday lists. Everything they are attached to stays exactly where it is, and you can bring them back any time.",
+                  action: "Archive",
+                  run: () =>
+                    run(
+                      () => tenancy.setAccountActive(accountId, false),
+                      "Contact archived.",
+                      "Couldn't archive the contact."
+                    ),
+                }),
+            }
+          : {
+              key: "restore",
+              label: t("Restore"),
+              icon: <Power className="size-3.5" />,
+              disabled: busy,
+              onSelect: () =>
+                void run(
+                  () => tenancy.setAccountActive(accountId, true),
+                  "Contact restored.",
+                  "Couldn't restore the contact."
+                ),
+            },
+      ]
+    : []
+
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-            {t("Contact")}
-          </p>
-          <h1 className="flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight">
-            <span className="truncate">{account.name}</span>
-            {!account.active && (
-              <Badge variant="outline" className="text-muted-foreground text-[10px]">
-                {t("Archived")}
-              </Badge>
-            )}
-            {liveLogin && (
-              <Badge variant="secondary" className="text-[10px]">
-                {t("Can sign in")}
-              </Badge>
-            )}
-          </h1>
-          <p className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-            {account.email && <span>{account.email}</span>}
-            {statusText && <span>{statusText}</span>}
+    <RecordScreen
+      eyebrow={[
+        t("Contact"),
+        account.active ? null : t("Archived"),
+        liveLogin ? t("Can sign in") : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")}
+      title={account.name}
+      status={[account.email, statusText].filter(Boolean).join(" · ")}
+      actions={
+        <>
+          {canEdit && (
+            <Button variant="outline" onClick={() => setEditOpen(true)} className="gap-1.5">
+              <Pencil className="size-3.5" />
+              {t("Edit")}
+            </Button>
+          )}
+          <RecordActionsMenu actions={overflow} />
+        </>
+      }
+      headerExtra={
+        companies.some((c) => c.active) ? (
+          <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
             {companies
               .filter((c) => c.active)
               .map((c) => (
@@ -331,59 +371,11 @@ export function ContactDetailScreen({
                 </button>
               ))}
           </p>
-        </div>
-        <div className="flex flex-wrap gap-2 sm:ml-auto sm:shrink-0">
-          {canEdit && (
-            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-1.5">
-              <Pencil className="size-3.5" />
-              {t("Edit")}
-            </Button>
-          )}
-          {canArchive &&
-            (account.active ? (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={busy}
-                onClick={() =>
-                  setConfirm({
-                    title: `Archive ${account.name}?`,
-                    body: "They stop showing in the everyday lists. Everything they are attached to stays exactly where it is, and you can bring them back any time.",
-                    action: "Archive",
-                    run: () =>
-                      run(
-                        () => tenancy.setAccountActive(accountId, false),
-                        "Contact archived.",
-                        "Couldn't archive the contact."
-                      ),
-                  })
-                }
-                className="text-destructive hover:text-destructive gap-1.5"
-              >
-                <Power className="size-3.5" />
-                {t("Archive")}
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                disabled={busy}
-                onClick={() =>
-                  void run(
-                    () => tenancy.setAccountActive(accountId, true),
-                    "Contact restored.",
-                    "Couldn't restore the contact."
-                  )
-                }
-                className="gap-1.5"
-              >
-                {busy ? <Spinner /> : <Power className="size-3.5" />}
-                {t("Restore")}
-              </Button>
-            ))}
-        </div>
-      </div>
-
+        ) : undefined
+      }
+    >
       <TabsView
+        className={STICKY_TABS}
         config={tabsConfig}
         value={tab}
         onValueChange={setTab}
@@ -499,6 +491,14 @@ export function ContactDetailScreen({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    <RecordFooter
+        audit={{
+          createdByName: account.createdByName,
+          createdAt: account.createdAt,
+          editedByName: account.editedByName,
+          updatedAt: account.updatedAt,
+        }}
+      />
+    </RecordScreen>
   )
 }

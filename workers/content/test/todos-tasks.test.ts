@@ -204,6 +204,81 @@ describe("the fence rides the WRITE, not only the read in front of it", () => {
   })
 })
 
+describe("who sees everyone else's tasks is a permission (4.9)", () => {
+  /** A second staff member on a role that holds `work` but NOT `all_tasks` —
+   * which is what "off by default for every role except Admin" means in
+   * practice. Everything else about them is ordinary. */
+  const NARROW_USER = "U_NARROW"
+  const NARROW_ROLE = "R_NARROW"
+  beforeEach(() => {
+    db().exec(`
+      INSERT INTO users (id, email, first_name, current_team_id)
+        VALUES ('${NARROW_USER}', 'narrow@kwapso.app', 'Nadia', '${IDS.team}');
+      INSERT INTO team_members (id, team_id, user_id, role_id, created_at)
+        VALUES ('m_narrow', '${IDS.team}', '${NARROW_USER}', '${NARROW_ROLE}', '2026-01-01');
+      INSERT INTO member_roles (id, title, is_default, created_at)
+        VALUES ('${NARROW_ROLE}', 'Developer', 0, '2026-01-01');
+      INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+        VALUES ('rp_narrow_work', '${NARROW_ROLE}', 'work', 1, 1, 1, 1);
+    `)
+  })
+
+  const titles = async (userId: string, query = "") =>
+    ((await (await call(userId, "GET /api/content/tasks", undefined, query)).json()) as {
+      tasks: { title: string }[]
+    }).tasks.map((t) => t.title)
+
+  it("without the right, the list is YOUR tasks — not a refusal, and not everyone's", async () => {
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Somebody else's job" })
+    await call(IDS.staffUser, "POST /api/content/tasks", {
+      title: "Mine to do",
+      assigneeId: NARROW_USER,
+    })
+
+    // The door OPENS — `work:read` is what gets you the screen — and answers
+    // about you. A 403 here would teach a screen to hide a tab instead of
+    // showing the right rows.
+    const res = await call(NARROW_USER, "GET /api/content/tasks")
+    expect(res.status).toBe(200)
+    expect(await titles(NARROW_USER)).toEqual(["Mine to do"])
+
+    // …and the same caller cannot ask about somebody else by naming them: the
+    // door REPLACES the filter rather than trusting it.
+    expect(await titles(NARROW_USER, `?assigneeId=${IDS.staffUser}`)).toEqual(["Mine to do"])
+  })
+
+  it("every count comes back narrowed too — the badge can't advertise rows the list withholds (R16)", async () => {
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Somebody else's job" })
+    await call(IDS.staffUser, "POST /api/content/tasks", {
+      title: "Mine to do",
+      assigneeId: NARROW_USER,
+    })
+    const body = (await (await call(NARROW_USER, "GET /api/content/tasks")).json()) as {
+      total: number
+      openTotal: number
+      allTotal: number
+    }
+    expect({ total: body.total, openTotal: body.openTotal, allTotal: body.allTotal }).toEqual({
+      total: 1,
+      openTotal: 1,
+      allTotal: 1,
+    })
+  })
+
+  it("with the right, the same door answers about the whole team", async () => {
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Somebody else's job" })
+    await call(IDS.staffUser, "POST /api/content/tasks", {
+      title: "Mine to do",
+      assigneeId: NARROW_USER,
+    })
+    db().exec(
+      `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+         VALUES ('rp_narrow_all', '${NARROW_ROLE}', 'all_tasks', 1, 0, 0, 0);`
+    )
+    expect((await titles(NARROW_USER)).sort()).toEqual(["Mine to do", "Somebody else's job"])
+  })
+})
+
 describe("a task is ours, and a client never learns one exists", () => {
   it("is written down with no client, and no reference to quote", async () => {
     const res = await call(IDS.staffUser, "POST /api/content/tasks", {

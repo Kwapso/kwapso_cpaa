@@ -9,14 +9,12 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import {
   DialogDescription,
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Plus } from "lucide-react"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
@@ -28,6 +26,16 @@ import { useT } from "@shared/web/language"
 
 const groupField = { ...defaultFieldConfig, label: "Group", required: true }
 const optionField = { ...defaultFieldConfig, label: "Option", required: true }
+/** THE TYPE MARK (CHECKLIST 11.8, UI-RULEBOOK G2). One glyph, set HERE rather
+ * than written into a component, which is the fourth condition UI-CONVENTIONS §5
+ * puts on a type mark. Optional on purpose: most groups are plain labels, and a
+ * missing glyph costs nothing because the word is always beside it. */
+const markField = {
+  ...defaultFieldConfig,
+  label: "Mark",
+  required: false,
+  hint: "One small picture shown beside this word, wherever the type appears. Leave it empty for a plain label.",
+}
 
 export function SelectableFormDialog({
   open,
@@ -40,12 +48,12 @@ export function SelectableFormDialog({
   onOpenChange: (open: boolean) => void
   /** Existing group names, offered as a pick-or-create datalist. */
   types: string[]
-  onSubmit: (type: string, value: string) => Promise<void>
+  onSubmit: (type: string, value: string, mark: string) => Promise<void>
   /** Stable id for per-session draft persistence (CACHING.md §11); omit to disable. */
   draftKey?: string
 }) {
   const t = useT()
-  const [values, setValues, clearDraft] = useFormDraft(draftKey, { type: "", value: "" }, open)
+  const [values, setValues, clearDraft] = useFormDraft(draftKey, { type: "", value: "", mark: "" }, open)
   const [busy, setBusy] = React.useState(false)
 
   async function submit(e: React.FormEvent) {
@@ -53,7 +61,7 @@ export function SelectableFormDialog({
     if (!values.type.trim() || !values.value.trim()) return
     setBusy(true)
     try {
-      await onSubmit(values.type.trim(), values.value.trim())
+      await onSubmit(values.type.trim(), values.value.trim(), values.mark.trim())
       clearDraft()
       onOpenChange(false)
     } catch (err) {
@@ -76,16 +84,11 @@ export function SelectableFormDialog({
           {t("Pick an existing group or start a new one, then add the option.")}
         </DialogDescription>
       }
-      footer={
-        <Button
-          type="submit"
-          disabled={busy || !values.type.trim() || !values.value.trim()}
-          className="gap-1.5"
-        >
-          {busy ? <Spinner /> : <Plus className="size-4" />}
-          {busy ? "Adding…" : "Add value"}
-        </Button>
-      }
+      submit={{
+        busy,
+        disabled: !values.type.trim() || !values.value.trim(),
+        icon: <Plus className="size-4" />,
+      }}
     >
       <Field config={groupField} htmlFor="selectable-group" className={fieldSpacing}>
         <Input
@@ -109,6 +112,15 @@ export function SelectableFormDialog({
           value={values.value}
           onChange={(e) => setValues((v) => ({ ...v, value: e.target.value }))}
           placeholder={t("New option")}
+          disabled={busy}
+        />
+      </Field>
+      <Field config={markField} htmlFor="selectable-mark" className={fieldSpacing}>
+        <Input
+          id="selectable-mark"
+          value={values.mark}
+          onChange={(e) => setValues((v) => ({ ...v, mark: e.target.value }))}
+          placeholder={t("e.g. a question mark")}
           disabled={busy}
         />
       </Field>

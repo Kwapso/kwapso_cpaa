@@ -25,7 +25,7 @@ import * as React from "react"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { AlarmClockOff, CircleStop, Clock, Pencil, Play, Plus, Trash2 } from "lucide-react"
+import { AlarmClockOff, CircleStop, Clock, Pencil, Play, Trash2 } from "lucide-react"
 
 import { LoadMore } from "@/components/load-more"
 import { clockFrom } from "@/components/timer-bar"
@@ -43,6 +43,7 @@ import { useActiveTeam } from "@/lib/use-active-team"
 import type { RunningTimer, Story, WorkLog } from "@shared/types"
 import { invalidate, invalidatePrefix, useCached, useCachedValue } from "@shared/web/store"
 import { useT } from "@shared/web/language"
+import { AddButton } from "@/components/deep-link/screen-bits"
 
 /** One row of time, in a sentence: what it was on, who, how long, and whether we
  * are charging for it. */
@@ -102,7 +103,7 @@ export function StartTimerStrip({ teamId, canCreate }: { teamId: string; canCrea
     try {
       await contentApi.resolveRunaway(id, answer)
       refreshTime(teamId)
-      toast.success(answer === "discard" ? "Binned — nothing was counted." : "Stopped, kept in full.")
+      toast.success(answer === "discard" ? "Binned, nothing was counted." : "Stopped, kept in full.")
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't do that.")
     }
@@ -239,7 +240,7 @@ export function TimePanel({
     try {
       await contentApi.resolveRunaway(id, answer)
       refreshTime(teamId)
-      toast.success(answer === "discard" ? "Binned — nothing was counted." : "Stopped, kept in full.")
+      toast.success(answer === "discard" ? "Binned, nothing was counted." : "Stopped, kept in full.")
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't do that.")
     }
@@ -259,10 +260,7 @@ export function TimePanel({
           {totalSeconds ? `${clockFrom(totalSeconds)} logged` : "Nothing logged yet"}
         </p>
         {canCreate && (
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setAddOpen(true)}>
-            <Plus className="size-3.5" />
-            {t("Log time")}
-          </Button>
+          <AddButton label={t("Log time")} onClick={() => setAddOpen(true)} />
         )}
       </div>
 

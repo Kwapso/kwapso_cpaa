@@ -77,7 +77,7 @@ export function buildSummary(facts: SummaryFacts): string {
   const who = facts.accountName ? ` for ${facts.accountName}` : ""
   const ref = facts.ref ? ` (${facts.ref})` : ""
   const state = facts.status ? `, ${facts.status}` : ""
-  const opening = `${facts.title}${ref} — a ${facts.noun}${who}${state}.`
+  const opening = `${facts.title}${ref}, a ${facts.noun}${who}${state}.`
   const extras = (facts.notes ?? []).filter(Boolean).join(" ")
   const detail = firstSentences(facts.detail ?? "", SUMMARY_MAX_CHARS - opening.length - extras.length - 2)
   return [opening, extras, detail].filter(Boolean).join(" ").slice(0, SUMMARY_MAX_CHARS).trim()

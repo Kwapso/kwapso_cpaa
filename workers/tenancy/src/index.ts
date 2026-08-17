@@ -321,12 +321,12 @@ export default {
       await recordWorkerError(env.DB, "tenancy", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request))
       const message = e instanceof Error ? e.message : ""
       if (message.startsWith("cloud_key_missing:"))
-        return fail(503, "cloud_key_missing", `${brand.name}'s cloud key isn't set up yet — team creation is paused.`)
+        return fail(503, "cloud_key_missing", `${brand.name}'s cloud key isn't set up yet, team creation is paused.`)
       // Set, but no longer ours — see d1-rest.ts. 503 because it is temporary and
       // ours to fix, and NOT a 500, because the browser reads a 500 as "something
       // is wrong with you" and a 503 as "something is wrong with us".
       if (message.startsWith("cloud_key_rejected:"))
-        return fail(503, "cloud_key_rejected", `${brand.name} can't reach its databases right now. You're still signed in — this is our end, and we're on it.`)
+        return fail(503, "cloud_key_rejected", `${brand.name} can't reach its databases right now. You're still signed in, this is our end, and we're on it.`)
       return fail(500, "internal", "Something went wrong on our side. Try again.")
     }
   },
@@ -356,7 +356,7 @@ export default {
           "tenancy",
           "cron/retention",
           new Error(
-            `retention sweep hit its per-table ceiling on ${swept.capped.join(", ")} — those tables still hold rows past their retention window and were NOT fully swept tonight. Tomorrow's run continues.`
+            `retention sweep hit its per-table ceiling on ${swept.capped.join(", ")}, those tables still hold rows past their retention window and were NOT fully swept tonight. Tomorrow's run continues.`
           )
         )
     } catch (e) {
@@ -379,7 +379,7 @@ export default {
           "tenancy",
           "cron/size-check",
           new Error(
-            `size check stopped at its ${result.alerted.length}-alarm ceiling — more team databases are over the threshold and were NOT alarmed tonight. Tomorrow's run continues from where this one stopped.`
+            `size check stopped at its ${result.alerted.length}-alarm ceiling, more team databases are over the threshold and were NOT alarmed tonight. Tomorrow's run continues from where this one stopped.`
           )
         )
       // TELL A HUMAN. Its OWN try, inside this one, for the reason the two outer

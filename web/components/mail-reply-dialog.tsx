@@ -165,15 +165,14 @@ export function MailReplyDialog({
               {busy === "draft" ? <Spinner /> : <PenLine className="size-4" />}
               {busy === "draft" ? "Writing…" : written ? "Write it again" : "Save to Gmail drafts"}
             </Button>
-            {canSend && (
-              <Button type="submit" disabled={!ready || busy !== null} className="gap-1.5">
-                {busy === "send" ? <Spinner /> : <Send className="size-4" />}
-                {busy === "send" ? "Sending…" : "Send it from kwapso"}
-              </Button>
-            )}
           </div>
         </div>
       }
+      /* THE ONE FORM WITH A SECOND ACTION. Saving a draft to Gmail is a
+         different act from sending, so it keeps its own words in the footer
+         above; the SUBMIT is the send, and it says Submit like every other form
+         (F1). It is offered only to somebody who may send. */
+      submit={canSend ? { busy: busy === "send", disabled: !ready || busy !== null, icon: <Send className="size-4" /> } : undefined}
     >
       <Field config={toField} htmlFor="mail-to" className={fieldSpacing}>
         <Input

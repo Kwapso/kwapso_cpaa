@@ -47,6 +47,7 @@ import { TaskFormDialog, type TaskFormValues } from "@/components/task-form-dial
 import { TodoFormDialog, type TodoFormValues } from "@/components/todo-form-dialog"
 import { TodosPanel } from "@/components/work-panels"
 import { content as contentApi, tenancy } from "@/lib/api"
+import { usePermissions } from "@/lib/perms"
 import { appsKey, listFetch, tasksKey, todosKey, type TaskView } from "@/lib/live-resources"
 import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
 import { withDataDrivenCollection } from "@/lib/screens"
@@ -213,6 +214,13 @@ export function TasksScreen({
   const t = useT()
   const tasksQ = useCached<Task[]>(tasksKey(teamId, view), () => listFetch.tasks(teamId, view))
   const options = useTaskFormOptions(teamId)
+  // WHOSE LIST THIS IS (4.9). The DOOR decides — a caller without
+  // `all_tasks:read` is narrowed to their own name there, and every count above
+  // comes back narrowed with it. This only says so, because a list that is
+  // quietly shorter than a colleague's is the kind of thing people work around
+  // for months rather than ask about. The same shape as 8.11: the door withholds,
+  // the screen explains.
+  const seesEveryones = usePermissions(teamId).can("all_tasks", "read")
   const [taskOpen, setTaskOpen] = React.useState(false)
   const [todoOpen, setTodoOpen] = React.useState(false)
 
@@ -243,7 +251,7 @@ export function TasksScreen({
       dueOn: values.dueOn ? new Date(values.dueOn).toISOString() : undefined,
     })
     invalidate(todosKey(teamId))
-    toast.success(t("Asked — and emailed to them."))
+    toast.success(t("Asked, and emailed to them."))
   }
 
   // R16: the badge on every tab is an exact server count, all seven numbers out
@@ -275,6 +283,11 @@ export function TasksScreen({
         </p>
       </div>
       <Progress value={dueToday === 0 ? 100 : Math.round((doneToday / dueToday) * 100)} />
+      {!seesEveryones && (
+        <p className="text-muted-foreground text-xs">
+          {t("These are the tasks assigned to you. Seeing everyone's is a separate access right.")}
+        </p>
+      )}
     </section>
   )
 

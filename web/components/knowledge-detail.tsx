@@ -25,14 +25,14 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import { Paperclip, Pencil, Power } from "lucide-react"
 
-import type { Account, KnowledgeSource } from "@shared/types"
+import type { Account, AppRow, KnowledgeSource } from "@shared/types"
 import { KnowledgeFormDialog, type KnowledgeFormValues } from "@/components/knowledge-form-dialog"
 import { KNOWLEDGE_KIND } from "@/components/deep-link/shape"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, content, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
-import { knowledgeKey } from "@/lib/live-resources"
+import { appsKey, knowledgeKey, listFetch } from "@/lib/live-resources"
 import { formatCount } from "@shared/web/format-count"
 import { formatDateTime } from "@shared/web/format"
 import { safeHref } from "@/lib/rich-text"
@@ -78,6 +78,9 @@ export function KnowledgeDetailScreen({
     tenancy.accounts().then((r) => r.accounts)
   )
   const accountNames = new Map((accountsQ.data ?? []).map((a) => [a.id, a.name]))
+  // The apps a source may be LIMITED TO (12.3). `canOpen` is the door's own
+  // answer to 8.11, so this list is the server's and not a second opinion.
+  const appsQ = useCached<AppRow[]>(appsKey(teamId), () => listFetch.apps(teamId))
 
   const { can } = usePermissions(teamId)
   const canEdit = can("knowledge", "edit")
@@ -106,6 +109,7 @@ export function KnowledgeDetailScreen({
       sourceUrl: values.sourceUrl || null,
       accountId: values.accountId || null,
       visibility: values.visibility,
+      visibleToAppId: values.visibleToAppId || null,
     })
     patchLists(source)
     toast.success(t("Source updated."))
@@ -144,7 +148,15 @@ export function KnowledgeDetailScreen({
     { label: t("Filed under"), value: filedUnder },
     {
       label: t("Who can use it"),
-      value: item.visibility === "private" ? "Only you" : "Anyone who can read the knowledge base",
+      // The three settings, said as a sentence rather than as a word a reader has
+      // to map back (12.3). The app's own NAME rides the row, so the middle one
+      // names the room instead of an id.
+      value:
+        item.visibility === "private"
+          ? "Only you"
+          : item.visibility === "app"
+            ? `Only the people on ${item.visibleToAppName ?? "one app"}`
+            : "Anyone who can read the knowledge base",
     },
     {
       label: t("Searchable pieces"),
@@ -154,7 +166,7 @@ export function KnowledgeDetailScreen({
       // read — so it is said in words rather than as a zero somebody has to
       // interpret.
       value: item.fileUrl && !item.chunkCount
-        ? "None — stored, not searchable"
+        ? "None, stored, not searchable"
         : item.indexedAt
           ? String(item.chunkCount)
           : "Not indexed yet",
@@ -212,6 +224,11 @@ export function KnowledgeDetailScreen({
                 {t("Private to you")}
               </Badge>
             )}
+            {item.visibility === "app" && (
+              <Badge variant="secondary" className="text-[10px]">
+                {item.visibleToAppName ?? t("Limited to one app")}
+              </Badge>
+            )}
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
             {KNOWLEDGE_KIND[item.kind] ?? item.kind} · {filedUnder}
@@ -243,7 +260,7 @@ export function KnowledgeDetailScreen({
             <div className="flex flex-col gap-6">
               {mirrored && (
                 <p className="text-muted-foreground text-sm">
-                  Kept in step with the record it came from — its words change when that record does.
+                  Kept in step with the record it came from, its words change when that record does.
                 </p>
               )}
               {/* THE FILE THIS WAS READ FROM, and — when there was nothing to
@@ -277,7 +294,7 @@ export function KnowledgeDetailScreen({
               {item.bodyTruncated ? (
                 <p className="text-muted-foreground text-sm">
                   Showing the first part of {Math.round(item.bodyBytes / 1000).toLocaleString()} KB of
-                  material. Every word of it is searchable — this is the screen being kind to itself.
+                  material. Every word of it is searchable, this is the screen being kind to itself.
                 </p>
               ) : null}
               {item.body ? (
@@ -325,7 +342,7 @@ export function KnowledgeDetailScreen({
                   <span className="text-muted-foreground text-xs">
                     {item.active
                       ? "The assistant stops reading it. Nothing is deleted, and the sweep won't put it back."
-                      : "Nothing was deleted — this puts it back in front of the assistant."}
+                      : "Nothing was deleted, this puts it back in front of the assistant."}
                   </span>
                 </div>
               )}
@@ -339,6 +356,11 @@ export function KnowledgeDetailScreen({
         onOpenChange={setEditingOpen}
         draftKey={`knowledge:edit:${sourceId}`}
         accountOptions={(accountsQ.data ?? []).map((a) => ({ id: a.id, name: a.name }))}
+        // Only the apps this caller may OPEN (8.11) — the door refuses any other,
+        // so offering one would be offering a refusal.
+        appOptions={(appsQ.data ?? [])
+          .filter((a) => a.canOpen && a.active)
+          .map((a) => ({ id: a.id, name: a.name }))}
         textOwnedElsewhere={textOwnedElsewhere}
         titleOwnedElsewhere={mirrored}
         textOwnedNote={
@@ -352,6 +374,7 @@ export function KnowledgeDetailScreen({
           sourceUrl: item.sourceUrl ?? "",
           accountId: item.accountId ?? "",
           visibility: item.visibility,
+          visibleToAppId: item.visibleToAppId ?? "",
         }}
         onSubmit={saveDetails}
       />

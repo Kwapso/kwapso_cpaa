@@ -211,11 +211,15 @@ describe("HELP_STATUS", () => {
 })
 
 describe("shapeHelpList", () => {
-  it("maps id, a truncated description→name, and a 'type · status' detail", () => {
+  // K1 / CHECKLIST 11.9: the title alone, then ONE line of two facts. The
+  // reference used to be prefixed into the name and the line used to carry four
+  // things; both are what made a page of tickets read as a wall of text.
+  it("maps id, a truncated description→name, and a 'status · type' detail", () => {
     const { rows } = shapeHelpList([ticket])
     expect(rows?.[0].id).toBe("h1")
     expect(String(rows?.[0].name).length).toBeLessThanOrEqual(80)
-    expect(rows?.[0].detail).toBe(`Bug · ${HELP_STATUS.in_progress}`)
+    expect(rows?.[0].name).not.toContain(ticket.ref as string)
+    expect(rows?.[0].detail).toBe(`${HELP_STATUS.in_progress} · Bug`)
   })
 
   it("ends a long description with an ellipsis", () => {
@@ -228,7 +232,7 @@ describe("shapeHelpList", () => {
   // to say "Help", which was the section's old name doing duty as a type.
   it('falls back the type to "General" when helpType is null', () => {
     const { rows } = shapeHelpList([{ ...ticket, helpType: null }])
-    expect(String(rows?.[0].detail).startsWith("General · ")).toBe(true)
+    expect(String(rows?.[0].detail).endsWith(" · General")).toBe(true)
   })
 })
 
@@ -310,12 +314,15 @@ const account = (over: Partial<Account> & { id: string; name: string }): Account
 })
 
 describe("shapeAccountsList", () => {
-  it("says what a row IS on one line — kind, reference, status", () => {
+  // K1: three facts at most. The reference CODE left the line on 17 Aug 2026 —
+  // it is a lookup key, not something anybody scans a list for — and it leads
+  // the eyebrow on the account's own screen instead.
+  it("says what a row IS on one line — kind and status, never the code", () => {
     const rows = shapeAccountsList([
       account({ id: "a1", name: "Bergman S.A.", code: "BERG", status: "past_client" }),
     ]).rows
     expect(rows?.[0].name).toBe("Bergman S.A.")
-    expect(rows?.[0].detail).toBe("Company · BERG · Past client")
+    expect(rows?.[0].detail).toBe("Company · Past client")
     // Facet columns the filter bar reads.
     expect(rows?.[0].type).toBe(ACCOUNT_TYPE.entity)
     expect(rows?.[0].status).toBe("Past client")

@@ -23,7 +23,7 @@ import * as React from "react"
 import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
-import { Pencil, Plus, Power } from "lucide-react"
+import { Pencil, Power } from "lucide-react"
 
 import type { AccountRate } from "@shared/types"
 import { RateFormDialog, type RateFormValues } from "@/components/rate-form-dialog"
@@ -33,6 +33,7 @@ import { ratesKey, totalKey } from "@/lib/live-resources"
 import { rateText } from "@shared/web/money"
 import { primeCache, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
+import { AddButton } from "@/components/deep-link/screen-bits"
 
 /** One account's card. Keyed by the ACCOUNT (`rates:<id>`) — the same key the
  * live registry's `account_rates` listener drops, so a colleague setting a price
@@ -102,16 +103,13 @@ export function AccountRateCard({
     <div className="flex flex-col gap-3">
       {canCreate && (
         <div className="flex flex-wrap justify-end gap-2">
-          <Button size="sm" onClick={() => setAdding(true)} className="gap-1.5">
-            <Plus className="size-4" />
-            {t("New rate")}
-          </Button>
+          <AddButton label={t("New rate")} onClick={() => setAdding(true)} />
         </div>
       )}
 
       {rates.length === 0 ? (
         <p className="text-muted-foreground text-sm">
-          {t("No rates set for")} {accountName} {t("yet — nothing is being charged by the hour.")}
+          {t("No rates set for")} {accountName} {t("yet, nothing is being charged by the hour.")}
         </p>
       ) : (
         <ul className="flex flex-col gap-1.5">
@@ -198,7 +196,6 @@ export function AccountRateCard({
         draftKey={`account-rate:add:${accountId}`}
         title={t("New rate")}
         subtitle={`What ${accountName} is charged for an hour of this kind of work.`}
-        submitLabel={t("Add it")}
         onSubmit={add}
       />
       <RateFormDialog
@@ -207,7 +204,6 @@ export function AccountRateCard({
         draftKey={editing ? `account-rate:edit:${editing.id}` : undefined}
         title={t("Edit rate")}
         subtitle="Changing it affects what is charged from now on, not what has already been charged."
-        submitLabel={t("Save")}
         initial={
           editing
             ? { label: editing.label, centsPerHour: editing.centsPerHour, currency: editing.currency }

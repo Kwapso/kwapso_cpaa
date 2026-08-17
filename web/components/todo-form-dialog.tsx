@@ -11,7 +11,6 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
@@ -22,7 +21,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Send } from "lucide-react"
@@ -103,12 +101,11 @@ export function TodoFormDialog({
           {t("This lands in their portal with a due date, and we email them about it. Only for something we genuinely can't get on without.")}
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !ready} className="gap-1.5">
-          {busy ? <Spinner /> : <Send className="size-4" />}
-          {busy ? "Sending…" : "Ask and email"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !ready,
+        icon: <Send className="size-4" />,
+      }}
     >
       <Field config={accountField} htmlFor="todo-account" className={fieldSpacing}>
         <Select

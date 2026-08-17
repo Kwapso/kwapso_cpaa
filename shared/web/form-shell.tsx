@@ -36,13 +36,54 @@
 
 import * as React from "react"
 
+import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Dialog, DialogContent } from "@kwapso/ui/registry/primitives/dialog/dialog"
+import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
+
+import { useT } from "./language"
+
+/** What a form's ONE button needs to know. Deliberately not a label: see
+ * `FormShell`'s `submit` prop. */
+export type SubmitConfig = {
+  /** A save in flight — spins, and refuses a second press. */
+  busy?: boolean
+  /** The form is not yet answerable (a required field is empty). */
+  disabled?: boolean
+  /** The optional glyph before the word, from the UI-CONVENTIONS §4 mapping. */
+  icon?: React.ReactNode
+}
+
+/** EVERY FORM'S BUTTON SAYS "SUBMIT" (UI-RULEBOOK F1, CHECKLIST 2.9).
+ *
+ * There were 31 different words for one act across 37 forms — "Save changes"
+ * thirteen times, "Add it" seven, and then "Put it in the diary", "Map it",
+ * "Log it", "Start it", "Ask and email". They are not synonyms a person can
+ * learn; they are 31 things to read before pressing the only button on the
+ * screen.
+ *
+ * It is a PROP rather than 37 rewritten call sites on purpose: a label somebody
+ * cannot pass is a label somebody cannot invent, so the thirty-second form is
+ * right by construction. It also converges with the library, whose own `Form`
+ * collection already defaults `submitLabel: "Submit"`.
+ *
+ * `footer` survives for the handful of forms whose action bar is genuinely not
+ * one button (a second, differently-typed action beside it). */
+function SubmitButton({ submit }: { submit: SubmitConfig }) {
+  const t = useT()
+  return (
+    <Button type="submit" disabled={submit.busy || submit.disabled} className="gap-1.5">
+      {submit.busy ? <Spinner /> : submit.icon}
+      {submit.busy ? t("Submitting…") : t("Submit")}
+    </Button>
+  )
+}
 
 export function FormShell({
   title,
   subtitle,
   children,
   footer,
+  submit,
   onSubmit,
 }: {
   /** Pass a <DialogTitle>…</DialogTitle>. */
@@ -51,8 +92,10 @@ export function FormShell({
   subtitle?: React.ReactNode
   /** The fields (each a <Field>). */
   children: React.ReactNode
-  /** The action button(s). */
-  footer: React.ReactNode
+  /** Extra action(s) beside the submit button. Most forms pass none. */
+  footer?: React.ReactNode
+  /** The form's one button. Every form should pass this rather than a footer. */
+  submit?: SubmitConfig
   onSubmit?: (e: React.FormEvent) => void
 }) {
   return (
@@ -74,8 +117,11 @@ export function FormShell({
       <div className="overflow-y-auto overscroll-contain border-t px-6 py-5">
         <div className="flex flex-col gap-4">{children}</div>
       </div>
-      {/* The bar's own top edge IS the hairline — nothing to collide with. */}
-      <div className="bg-card flex flex-wrap justify-end gap-2 border-t px-6 py-4">{footer}</div>
+      {/* The bar's own top edge IS the hairline, nothing to collide with. */}
+      <div className="bg-card flex flex-wrap justify-end gap-2 border-t px-6 py-4">
+        {footer}
+        {submit && <SubmitButton submit={submit} />}
+      </div>
     </form>
   )
 }
@@ -99,6 +145,7 @@ export function FormShellDialog({
   subtitle,
   children,
   footer,
+  submit,
   onSubmit,
 }: {
   open: boolean
@@ -113,8 +160,10 @@ export function FormShellDialog({
   subtitle?: React.ReactNode
   /** The fields (each a <Field>). */
   children: React.ReactNode
-  /** The action button(s). */
-  footer: React.ReactNode
+  /** Extra action(s) beside the submit button. Most forms pass none. */
+  footer?: React.ReactNode
+  /** The form's one button (F1). */
+  submit?: SubmitConfig
   onSubmit?: (e: React.FormEvent) => void
 }) {
   return (
@@ -131,7 +180,7 @@ export function FormShellDialog({
           form would be 85dvh + 48px — taller than the window again — and both
           hairlines would stop 24px short of the sheet they are meant to divide. */}
       <DialogContent className="gap-0 overflow-hidden p-0">
-        <FormShell onSubmit={onSubmit} title={title} subtitle={subtitle} footer={footer}>
+        <FormShell onSubmit={onSubmit} title={title} subtitle={subtitle} footer={footer} submit={submit}>
           {children}
         </FormShell>
       </DialogContent>

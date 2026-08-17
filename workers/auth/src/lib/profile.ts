@@ -171,7 +171,7 @@ export async function updateProfile(
   await reclaimMedia(env.MEDIA, [supersededKey], {
     db: env.DB,
     source: "auth",
-    place: "POST /api/auth/profile — photo reclaim",
+    place: "POST /api/auth/profile, photo reclaim",
   })
 
   // Account-activity (best-effort): record name / photo edits to the person's

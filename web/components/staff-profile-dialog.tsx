@@ -18,13 +18,11 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
@@ -136,20 +134,17 @@ export function StaffProfileDialog({
       title={<DialogTitle>{subjectName}&apos;s profile</DialogTitle>}
       subtitle={
         <DialogDescription>
-          {t("Anyone on the team can read this. No client ever can — it doesn't appear in the portal, and no client login can reach it.")}
+          {t("Anyone on the team can read this. No client ever can, it doesn't appear in the portal, and no client login can reach it.")}
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy}>
-          {busy ? <Spinner /> : null}
-          {busy ? "Saving…" : "Save profile"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+      }}
     >
       {text("headline", "In one line", "How you would introduce them to a new client")}
-      {text("personalityType", "Personality type", "From whichever test you use — Myers-Briggs, DISC, Enneagram")}
+      {text("personalityType", "Personality type", "From whichever test you use. Myers-Briggs, DISC, Enneagram")}
       {prose("strengths", "What they are best at", "The work you would give them first.")}
-      {prose("weaknesses", "What they find hard", "Written kindly — this is here to help people work together.")}
+      {prose("weaknesses", "What they find hard", "Written kindly, this is here to help people work together.")}
       {text("roleModels", "Who they look up to", "People, or ways of working")}
       {prose("about", "Anything else", "The rest of the picture.")}
       {/* THE PHOTO ITSELF. This field used to ask for "a link, or the URL of a

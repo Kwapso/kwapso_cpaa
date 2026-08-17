@@ -79,13 +79,13 @@ export function useEmailSignIn({
       await startEmail(email)
       setStep("code")
       setCode("")
-      announce?.("Code sent — check your email.")
+      announce?.("Code sent. Check your email.")
     } catch (e) {
       // Decision 2 above. Recognised by its CODE, not its wording — copy changes.
       if (e instanceof ApiFailure && e.code === "too_soon") {
         setStep("code")
         setCode("")
-        announce?.("A code is already on its way — check your email.")
+        announce?.("A code is already on its way. Check your email.")
         return
       }
       setError(e instanceof ApiFailure ? e.message : "Couldn't send the code.")

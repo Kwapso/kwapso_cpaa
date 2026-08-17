@@ -281,7 +281,7 @@ export async function teamSlice(
   const window = windows <= 1 ? 0 : Math.floor(scheduledTime / everyMs) % windows
   if (windows > 1)
     console.warn(
-      `${job}: ${total} teams needs ${windows} ticks per lap — this tick takes window ${window + 1}/${windows}. ` +
+      `${job}: ${total} teams needs ${windows} ticks per lap, this tick takes window ${window + 1}/${windows}. ` +
         `A team is now visited once every ${windows} ticks; past a few windows this wants a work queue, not a bigger cap.`
     )
   const rows = await env.DB.prepare(
@@ -536,10 +536,10 @@ export default {
       await recordWorkerError(env.DB, "content", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request))
       const message = e instanceof Error ? e.message : ""
       if (message.startsWith("cloud_key_missing:"))
-        return fail(503, "cloud_key_missing", `${brand.name}'s cloud key isn't set up yet — content is paused.`)
+        return fail(503, "cloud_key_missing", `${brand.name}'s cloud key isn't set up yet, content is paused.`)
       // Set, but no longer ours — see d1-rest.ts.
       if (message.startsWith("cloud_key_rejected:"))
-        return fail(503, "cloud_key_rejected", `${brand.name} can't reach its databases right now. You're still signed in — this is our end, and we're on it.`)
+        return fail(503, "cloud_key_rejected", `${brand.name} can't reach its databases right now. You're still signed in, this is our end, and we're on it.`)
       return fail(500, "internal", "Something went wrong on our side. Try again.")
     }
   },

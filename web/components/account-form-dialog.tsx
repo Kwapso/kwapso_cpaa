@@ -32,7 +32,6 @@
 import * as React from "react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@kwapso/ui/registry/primitives/avatar/avatar"
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import {
   DialogDescription,
   DialogTitle,
@@ -48,10 +47,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
-import { Plus } from "lucide-react"
 
 import { ApiFailure, tenancy } from "@/lib/api"
 import { fileToDataUrl } from "@/lib/image"
@@ -177,7 +174,7 @@ export function AccountFormDialog({
     try {
       set({ [field]: await fileToDataUrl(files[0]) } as Partial<AccountFormValues>)
     } catch {
-      toast.error(t("Couldn't read that image — try another one."))
+      toast.error(t("Couldn't read that image. Try another one."))
     }
   }
 
@@ -252,12 +249,10 @@ export function AccountFormDialog({
             : "A company, a client, or one person on their own."}
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !values.name.trim()} className="gap-1.5">
-          {busy ? <Spinner /> : isEdit ? null : <Plus className="size-4" />}
-          {busy ? "Saving…" : isEdit ? "Submit" : "Submit"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !values.name.trim(),
+      }}
     >
       {!isEdit && (
         <Field config={typeField} htmlFor="account-type" className={fieldSpacing}>

@@ -68,7 +68,7 @@ export function FilePicker({
     e.target.value = "" // let the same file be re-picked after a remove
     if (!file) return
     if (file.size > MAX_UPLOAD_BYTES) {
-      toast.error(t("That file is over 25 MB — please pick a smaller one."))
+      toast.error(t("That file is over 25 MB, please pick a smaller one."))
       return
     }
     setUploading(true)

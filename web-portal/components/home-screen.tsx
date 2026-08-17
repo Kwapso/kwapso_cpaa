@@ -95,7 +95,7 @@ export function HomeScreen({ ready }: { ready: PortalReady }) {
         ) : newest.length === 0 ? (
           <div className="text-muted-foreground rounded-xl border border-dashed p-8 text-center">
             <p>{t("You haven't asked us for anything yet.")}</p>
-            <p className="mt-1 text-sm">{t("When you do, it'll live here — and so will our reply.")}</p>
+            <p className="mt-1 text-sm">{t("When you do, it'll live here, and so will our reply.")}</p>
           </div>
         ) : (
           <div className="flex flex-col gap-3">

@@ -20,11 +20,9 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { ClipboardCheck } from "lucide-react"
@@ -109,12 +107,11 @@ export function ReviewDialog({
           {t("Stop your timer first, then say what you did. A file only if there is one.")}
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !ready} className="gap-1.5">
-          {busy ? <Spinner /> : <ClipboardCheck className="size-4" />}
-          {busy ? "Submitting…" : "Submit"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !ready,
+        icon: <ClipboardCheck className="size-4" />,
+      }}
     >
       <Field config={noteField} htmlFor="review-note" className={fieldSpacing}>
         <Textarea

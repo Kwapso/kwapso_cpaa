@@ -165,10 +165,20 @@ describe("R26 part 1 — tenancy is a partition, not a filter", () => {
 
   it("the answer's words are read out of the database, not out of the index", () => {
     const lib = stripComments(readFileSync(LIB, "utf8"))
-    // The one read that materialises a passage, and the two clauses that fence
-    // it. A passage is built from `row`, which came from d1Query.
+    // The one read that materialises a passage, and the clause that fences it.
+    // A passage is built from `row`, which came from d1Query.
     expect(lib).toMatch(/FROM knowledge_chunks c JOIN knowledge_sources s/)
-    expect(lib).toMatch(/AND s\.deactivated_at IS NULL AND \$\{owner\.sql\}/)
+    // ONE CLAUSE, BOTH FENCES, and it is read off the SOURCE row (`s.`) rather
+    // than the chunk's denormalised copy: 12.3 added a second answer to "who may
+    // read this" — the people staffed to one app — and a fence assembled from two
+    // clauses at four call sites is a fence with a call site somebody forgets.
+    // `readerClause` is that one place; this is the assertion that it is used here.
+    expect(lib).toMatch(/AND s\.deactivated_at IS NULL AND \$\{reader\.sql\}/)
+    expect(lib).toMatch(/const reader = readerClause\(guard, "s\."\)/)
+    // Both halves live in it — the personal owner and the app's own staffing
+    // rule — so neither can be dropped without this going red.
+    expect(lib).toMatch(/function readerClause[\s\S]{0,400}?ownerClause\(guard/)
+    expect(lib).toMatch(/function readerClause[\s\S]{0,400}?appClause\(guard/)
     expect(lib).toMatch(/text: plainText\(row\.text\)/)
     // …and the search's own results are never read for anything but their id.
     expect(lib).not.toMatch(/hit\.(text|title|metadata)/)

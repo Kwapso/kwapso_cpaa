@@ -706,7 +706,7 @@ export async function updateAccount(
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Account edited",
-    description: `${actor.name} edited ${input.name}${changes ? ` — ${changes}` : ""}`,
+    description: `${actor.name} edited ${input.name}${changes ? `, ${changes}` : ""}`,
     relatedTable: "accounts",
     relatedRowId: id,
   })
@@ -783,7 +783,7 @@ export async function setAccountParent(
     throw new GuardError(
       409,
       "would_loop",
-      "That would put the account inside itself — pick a parent that isn't already underneath it."
+      "That would put the account inside itself. Pick a parent that isn't already underneath it."
     )
 
   await logActivity(cfg, guard.databaseId, actor, {

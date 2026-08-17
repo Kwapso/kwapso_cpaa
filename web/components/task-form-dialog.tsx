@@ -23,7 +23,6 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Checkbox } from "@kwapso/ui/registry/primitives/checkbox/checkbox"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
@@ -36,7 +35,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Plus } from "lucide-react"
@@ -78,7 +76,7 @@ const assigneeField = {
   ...defaultFieldConfig,
   label: "Who's doing it",
   required: false,
-  helpText: "Yours unless you say otherwise — an unassigned task is a task nobody picks up.",
+  helpText: "Yours unless you say otherwise, an unassigned task is a task nobody picks up.",
 }
 const departmentField = { ...defaultFieldConfig, label: "Department", required: false }
 const fileField = { ...defaultFieldConfig, label: "A photo or a file", required: false }
@@ -198,12 +196,11 @@ export function TaskFormDialog({
       onSubmit={submit}
       title={<DialogTitle>{t("New task")}</DialogTitle>}
       subtitle={<DialogDescription>{t("Our own admin. Time can be logged against it.")}</DialogDescription>}
-      footer={
-        <Button type="submit" disabled={busy || !ready} className="gap-1.5">
-          {busy ? <Spinner /> : <Plus className="size-4" />}
-          {busy ? "Saving…" : "Add it"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !ready,
+        icon: <Plus className="size-4" />,
+      }}
     >
       <Field config={titleField} htmlFor="task-title" className={fieldSpacing}>
         <Input
@@ -265,7 +262,7 @@ export function TaskFormDialog({
             ...defaultFieldConfig,
             label: "Client",
             required: asks.required,
-            helpText: asks.required ? "" : "Optional — leave it off for our own housekeeping.",
+            helpText: asks.required ? "" : "Optional. Leave it off for our own housekeeping.",
           }}
           htmlFor="task-account"
           className={fieldSpacing}
@@ -302,7 +299,7 @@ export function TaskFormDialog({
               disabled={busy}
             />
             <Label htmlFor="task-important" className="text-sm font-normal">
-              {t("Important — it moves something that matters")}
+              {t("Important, it moves something that matters")}
             </Label>
           </div>
           <div className="flex items-center gap-2">
@@ -313,7 +310,7 @@ export function TaskFormDialog({
               disabled={busy}
             />
             <Label htmlFor="task-urgent" className="text-sm font-normal">
-              {t("Urgent — it has to happen soon")}
+              {t("Urgent, it has to happen soon")}
             </Label>
           </div>
           <p className="text-muted-foreground text-xs">

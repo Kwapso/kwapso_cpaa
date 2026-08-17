@@ -119,11 +119,11 @@ const PLAIN_TEXT_EXTENSIONS = new Set([
  * through to the general one, which is still true and still says the two things
  * that matter: it is kept, and it is not searchable. */
 const UNREADABLE_REASON: Record<string, string> = {
-  pptx: "We keep presentations but can't read their words yet — export it as a PDF and add that too if you want it searchable.",
-  ppt: "We keep presentations but can't read their words yet — export it as a PDF and add that too if you want it searchable.",
-  key: "We keep presentations but can't read their words yet — export it as a PDF and add that too if you want it searchable.",
-  zip: "This is an archive, so there is nothing to read until it is unpacked — the file is kept, and the assistant can't answer from it.",
-  doc: "This is the old Word format, which we can't read — save it as .docx or a PDF and add that too if you want it searchable.",
+  pptx: "We keep presentations but can't read their words yet. Export it as a PDF and add that too if you want it searchable.",
+  ppt: "We keep presentations but can't read their words yet. Export it as a PDF and add that too if you want it searchable.",
+  key: "We keep presentations but can't read their words yet. Export it as a PDF and add that too if you want it searchable.",
+  zip: "This is an archive, so there is nothing to read until it is unpacked, the file is kept, and the assistant can't answer from it.",
+  doc: "This is the old Word format, which we can't read. Save it as .docx or a PDF and add that too if you want it searchable.",
 }
 
 /** What one file became. `text` null means we could not read it, and then `note`
@@ -210,7 +210,7 @@ export function capToRow(text: string): ExtractedFile {
   }
   return {
     text: text.slice(0, end),
-    note: `This file holds ${mb(bytes)} of text and one source can hold ${mb(DOCUMENT_LIMIT_BYTES)} — the first ${mb(DOCUMENT_LIMIT_BYTES)} is searchable and the whole file is kept. Add the rest as a second source if you need it.`,
+    note: `This file holds ${mb(bytes)} of text and one source can hold ${mb(DOCUMENT_LIMIT_BYTES)}, the first ${mb(DOCUMENT_LIMIT_BYTES)} is searchable and the whole file is kept. Add the rest as a second source if you need it.`,
   }
 }
 
@@ -276,7 +276,7 @@ export async function extractFile(
       ? capToRow(text)
       : {
           text: null,
-          note: "We read this file and found no text in it — an image with nothing written on it, or a scan we couldn't make out. It is kept here either way.",
+          note: "We read this file and found no text in it, an image with nothing written on it, or a scan we couldn't make out. It is kept here either way.",
         }
   } catch (e) {
     // Loud in the log, honest on the row. ERROR-HANDLING.md's rule is never to
@@ -285,7 +285,7 @@ export async function extractFile(
     console.error("knowledge file conversion failed:", e)
     return {
       text: null,
-      note: "We couldn't read this file just now — it is kept here, and you can add it again later to try once more.",
+      note: "We couldn't read this file just now, it is kept here, and you can add it again later to try once more.",
     }
   }
 }

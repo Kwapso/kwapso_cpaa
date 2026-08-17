@@ -54,7 +54,7 @@ export function decodeCursor(raw: string | null | undefined): Position | null {
     if (typeof v?.k !== "string" || typeof v?.id !== "string" || !v.id) throw new Error("shape")
     return v
   } catch {
-    throw new GuardError(400, "invalid_cursor", "That page link is no longer valid — reload the list.")
+    throw new GuardError(400, "invalid_cursor", "That page link is no longer valid. Reload the list.")
   }
 }
 

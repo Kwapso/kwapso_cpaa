@@ -130,7 +130,7 @@ export function MarginPanel({
         </p>
         {/* The one sentence that keeps this figure honest. Our time is priced off
             the internal rate card, which is an agreed number rather than a
-            measured one — say so here rather than let somebody discover it. */}
+            measured one. Say so here rather than let somebody discover it. */}
         <p className="text-muted-foreground mt-2 text-xs">
           {t("Sold, minus our own time at the rates on our cost card, minus what the tools cost each month. Our time is priced at agreed rates, not measured cost.")}
         </p>
@@ -159,7 +159,7 @@ export function MarginPanel({
         {m.lines.map((l) => (
           <Line
             key={l.label}
-            label={`Our time — ${l.label}`}
+            label={`Our time, ${l.label}`}
             detail={`${hoursOf(l.seconds)} at ${moneyText(l.centsPerHour)} an hour`}
             cents={l.costCents}
             subtract
@@ -179,7 +179,7 @@ export function MarginPanel({
           missing rather than show a confident wrong number. */}
       {!m.loggedTimeAvailable && (
         <p className="text-muted-foreground text-xs">
-          {t("Our own time isn't counted in this yet — the work log for this account hasn't been set up, so the figure above is what was sold minus the tools only.")}
+          {t("Our own time isn't counted in this yet, the work log for this account hasn't been set up, so the figure above is what was sold minus the tools only.")}
         </p>
       )}
     </div>

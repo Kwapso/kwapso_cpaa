@@ -14,10 +14,8 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { FormShell, fieldSpacing } from "@shared/web/form-shell"
@@ -70,12 +68,10 @@ export function NeedsName({ onDone }: { onDone: () => void }) {
           </p>
         }
         onSubmit={save}
-        footer={
-          <Button type="submit" className="w-full" disabled={busy || !ready}>
-            {busy ? <Spinner /> : null}
-            {t("Continue")}
-          </Button>
-        }
+        submit={{
+          busy: busy,
+          disabled: !ready,
+        }}
       >
         <Field config={firstConfig} htmlFor="firstName" className={fieldSpacing}>
           <Input

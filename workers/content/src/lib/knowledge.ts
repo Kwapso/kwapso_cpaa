@@ -326,6 +326,8 @@ type SourceRow = {
   file_bytes: number
   file_note: string | null
   owner_user_id: string | null
+  visible_to_app_id: string | null
+  visible_to_app_name: string | null
   indexed_at: string | null
   chunk_count: number
   indexed_chunks: number
@@ -345,7 +347,8 @@ type SourceRow = {
  * a detail is for. */
 const LIST_COLS = `id, kind, origin_table, origin_row_id, compartment, account_id, app_id, ticket_id, sprint_id,
   record_date, title, summary, NULL AS body, body_bytes, source_url,
-  file_url, file_name, file_type, file_bytes, file_note, owner_user_id, indexed_at,
+  file_url, file_name, file_type, file_bytes, file_note, owner_user_id,
+  visible_to_app_id, (SELECT name FROM apps WHERE id = visible_to_app_id) AS visible_to_app_name, indexed_at,
   chunk_count, indexed_chunks, index_error,
   created_at, creator_name, editor_name, updated_at, deactivated_at`
 
@@ -389,9 +392,15 @@ function toSource(r: SourceRow): KnowledgeSource {
     fileBytes: r.file_bytes,
     fileNote: r.file_note,
     // The FIELD a person edits is "who may this be read by", so the wire says
-    // that rather than making every reader remember what a null id means.
-    visibility: r.owner_user_id ? "private" : "team",
+    // that rather than making every reader remember what two null ids mean.
+    // Three settings, in narrowing order — private beats app, because a source
+    // that is both is answerable to one person and the app half is noise.
+    visibility: r.owner_user_id ? "private" : r.visible_to_app_id ? "app" : "team",
     ownerUserId: r.owner_user_id,
+    visibleToAppId: r.visible_to_app_id,
+    // The app's NAME rides the row so a list can say "only the people on
+    // Dispatch" without fetching every app to look one id up.
+    visibleToAppName: r.visible_to_app_name,
     indexedAt: r.indexed_at,
     chunkCount: r.chunk_count,
     indexedChunks: r.indexed_chunks,
@@ -413,6 +422,59 @@ function ownerClause(guard: MemberGuard, column = "owner_user_id"): { sql: strin
   return { sql: `(${column} IS NULL OR ${column} = ?)`, params: [guard.userId] }
 }
 
+/** THE APP FENCE, as SQL — the middle setting the module was missing (12.3).
+ *
+ * The owner asked to "choose what information in the knowledge base is
+ * accessible by whom", and the base had two answers: the whole team, or one
+ * person. What was missing is the ordinary case in between — material somebody
+ * wants kept off a wider audience INSIDE the agency without making it answerable
+ * to themselves alone.
+ *
+ * IT RIDES A FENCE THE APP ALREADY HAS rather than inventing an access list. The
+ * app record already decided who may open it (8.11: the staff on it, plus an
+ * admin), and `app_staff` is where that lives. So a source can say "the people on
+ * this app", and the sentence a reader must learn is one they already know from
+ * every other screen. An access-control table would have been a second, parallel
+ * answer to a question this codebase has already answered once.
+ *
+ * A SUBQUERY, NOT A RESOLVED LIST OF IDS — help.ts's `mineClause` made this
+ * argument first and it is the same one: the staffed set is read INSIDE the
+ * statement, so a list and the COUNT beside it can never be asked about two
+ * different moments, and there is no unbounded `IN (…)` to cap. The admin half is
+ * an `EXISTS` over the same statement for the same reason: one round trip, one
+ * moment, and no second fetch to forget at a call site.
+ *
+ * A member staffed to nothing simply matches no restricted source, which is the
+ * honest empty answer rather than an error. */
+function appClause(guard: MemberGuard, prefix = ""): { sql: string; params: string[] } {
+  const col = `${prefix}visible_to_app_id`
+  return {
+    sql: `(${col} IS NULL
+        OR ${col} IN (SELECT app_id FROM app_staff WHERE user_id = ? AND deactivated_at IS NULL)
+        OR EXISTS (SELECT 1 FROM member_roles WHERE is_default = 1 AND id = ?))`,
+    params: [guard.userId, guard.roleId],
+  }
+}
+
+/** BOTH FENCES, FOR A READ THAT CAN SEE THE SOURCE ROW. Every read on
+ * `knowledge_sources` goes through here — the list, its count, one source by id,
+ * and the passage read-back that decides what an answer is made of.
+ *
+ * WHY THE LEXICAL ARM DOES NOT USE IT, said here because this is where somebody
+ * will look for the inconsistency. `knowledge_terms` carries copies of the
+ * chunk's `compartment` and `owner_user_id` so stage one is a single-table read,
+ * and it carries no app. Rather than denormalise a third column onto two tables
+ * and re-index the world to back-fill it, the app half is decided where R26 says
+ * decisions are made: the index (and the word-match beside it) NARROWS, and the
+ * team's database DECIDES. A restricted chunk can reach the candidate pool and
+ * cost a relevant passage its place; it cannot reach an answer, because the
+ * read-back below is a join to `knowledge_sources` and this clause is on it. */
+function readerClause(guard: MemberGuard, prefix = ""): { sql: string; params: string[] } {
+  const owner = ownerClause(guard, `${prefix}owner_user_id`)
+  const app = appClause(guard, prefix)
+  return { sql: `${owner.sql} AND ${app.sql}`, params: [...owner.params, ...app.params] }
+}
+
 /** The sort a source list is keyed by: newest first, id breaking ties. */
 const SOURCE_ORDER = "COALESCE(updated_at, created_at)"
 
@@ -426,9 +488,9 @@ export type SourceFilters = { kind?: string; compartment?: string; q?: string }
  * is about the badge being exact; it is exact about the wrong question if the
  * two clauses drift. One builder, no drift. */
 function sourcesWhere(guard: MemberGuard, filter: SourceFilters): { sql: string[]; params: string[] } {
-  const owner = ownerClause(guard)
-  const sql = [owner.sql]
-  const params = [...owner.params]
+  const reader = readerClause(guard)
+  const sql = [reader.sql]
+  const params = [...reader.params]
   if (filter.kind) {
     sql.push("kind = ?")
     params.push(filter.kind)
@@ -509,12 +571,12 @@ export async function getSource(
   guard: MemberGuard,
   id: string
 ): Promise<KnowledgeSource | null> {
-  const owner = ownerClause(guard)
+  const reader = readerClause(guard)
   const rows = await d1Query<SourceRow>(
     cfg,
     guard.databaseId,
-    `SELECT ${DETAIL_COLS} FROM knowledge_sources WHERE id = ? AND ${owner.sql}`,
-    [id, ...owner.params]
+    `SELECT ${DETAIL_COLS} FROM knowledge_sources WHERE id = ? AND ${reader.sql}`,
+    [id, ...reader.params]
   )
   return rows[0] ? toSource(rows[0]) : null
 }
@@ -537,6 +599,12 @@ export type SourceInput = {
   sourceUrl?: unknown
   accountId?: unknown
   visibility?: unknown
+  /** WHICH APP'S PEOPLE may read this (12.3), or absent for the whole team.
+   * Deliberately NOT the same field as `appId` on the row: that one is the
+   * SWEEP's — it says what a mirrored source is about and is rewritten on every
+   * pass — and a person's decision about who may read something cannot live in a
+   * column a background job overwrites. */
+  visibleToAppId?: unknown
 }
 
 /** The fields a create and an edit share, validated identically so the two can't
@@ -553,14 +621,60 @@ function readInput(input: SourceInput): {
   sourceUrl: string | null
   accountId: string | null
   privateToMe: boolean
+  visibleToAppId: string | null
 } {
+  const privateToMe = input.visibility === "private"
   return {
     title: requireText(input.title, "Title", TEXT_LIMITS.short),
     body: optionalDocument(input.body, "The material") ?? null,
     sourceUrl: optionalText(input.sourceUrl, "Link", TEXT_LIMITS.link) ?? null,
     accountId: optionalText(input.accountId, "Account", TEXT_LIMITS.short) ?? null,
-    privateToMe: input.visibility === "private",
+    privateToMe,
+    // PRIVATE WINS, AND IT WINS HERE rather than in three write statements.
+    // "Only me" and "only the people on this app" are two answers to one
+    // question, so a caller sending both gets the narrower one stored — and the
+    // row can then never be in a state the reader (`toSource`) has to guess at.
+    visibleToAppId: privateToMe
+      ? null
+      : (optionalText(input.visibleToAppId, "App", TEXT_LIMITS.short) ?? null),
   }
+}
+
+/** THE APP A SOURCE MAY BE LIMITED TO must be one this caller can open — the
+ * same sentence 8.11 says about the app record itself, asked of the same table.
+ *
+ * The failure path this closes is the boring one, and it is why the check is a
+ * refusal rather than a silent store: somebody files a contract "for the people
+ * on Dispatch", is not on Dispatch themselves, and has just written a source
+ * they can no longer read, edit or take back. The fence has no exception for its
+ * own author — a fence with one is not a fence — so the door refuses the move
+ * instead of letting a person lock themselves out of their own material.
+ *
+ * ONE STATEMENT: the app must exist, and the caller must be staffed to it or
+ * hold the locked Admin role. Same shape as the read fence, so the two can never
+ * disagree about what "can open" means. */
+async function requireOpenableApp(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  appId: string
+): Promise<{ id: string; name: string }> {
+  const app = appClause(guard)
+  const rows = await d1Query<{ id: string; name: string }>(
+    cfg,
+    guard.databaseId,
+    // R14: one row by primary key. `visible_to_app_id` in the fence is spelled by
+    // `appClause`, so the id under test is aliased into that name.
+    `SELECT id, name FROM (SELECT id, name, id AS visible_to_app_id FROM apps WHERE id = ?)
+      WHERE ${app.sql} LIMIT 1`,
+    [appId, ...app.params]
+  )
+  if (!rows[0])
+    throw new GuardError(
+      400,
+      "invalid_input",
+      "You can only limit a source to an app you are on, otherwise you'd be the first person locked out of it."
+    )
+  return rows[0]
 }
 
 /** The account a source is filed under must be one this team really has — a
@@ -599,6 +713,7 @@ export async function createSource(
 ): Promise<string> {
   const v = readInput(input)
   const account = v.accountId ? await requireAccount(cfg, guard, v.accountId) : null
+  if (v.visibleToAppId) await requireOpenableApp(cfg, guard, v.visibleToAppId)
   const id = ulid()
   const now = new Date().toISOString()
   const compartment = account ? accountCompartment(account.id) : AGENCY_COMPARTMENT
@@ -612,8 +727,8 @@ export async function createSource(
     cfg,
     guard.databaseId,
     `INSERT INTO knowledge_sources (id, kind, compartment, account_id, title, summary, body, body_bytes, source_url,
-       owner_user_id, record_date, created_at, creator_id, creator_email, creator_name)
-     VALUES (?, 'note', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       owner_user_id, visible_to_app_id, record_date, created_at, creator_id, creator_email, creator_name)
+     VALUES (?, 'note', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       compartment,
@@ -624,6 +739,7 @@ export async function createSource(
       byteLength(v.body),
       v.sourceUrl,
       v.privateToMe ? guard.userId : null,
+      v.visibleToAppId,
       now,
       now,
       actor.id,
@@ -674,11 +790,16 @@ export async function createFileSource(
     title: string
     accountId: string | null
     privateToMe: boolean
+    /** 12.3: limit it to the people on one app. Ignored when `privateToMe` — the
+     * narrower answer wins, exactly as it does for a typed note. */
+    visibleToAppId?: string | null
     file: { url: string; name: string; type: string; bytes: number }
     extract: { text: string | null; note: string | null }
   }
 ): Promise<string> {
   const account = input.accountId ? await requireAccount(cfg, guard, input.accountId) : null
+  const visibleToAppId = input.privateToMe ? null : (input.visibleToAppId ?? null)
+  if (visibleToAppId) await requireOpenableApp(cfg, guard, visibleToAppId)
   const id = ulid()
   const now = new Date().toISOString()
   const compartment = account ? accountCompartment(account.id) : AGENCY_COMPARTMENT
@@ -696,8 +817,8 @@ export async function createFileSource(
     guard.databaseId,
     `INSERT INTO knowledge_sources (id, kind, compartment, account_id, title, summary, body, body_bytes,
        file_url, file_name, file_type, file_bytes, file_note,
-       owner_user_id, record_date, created_at, creator_id, creator_email, creator_name)
-     VALUES (?, 'file', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       owner_user_id, visible_to_app_id, record_date, created_at, creator_id, creator_email, creator_name)
+     VALUES (?, 'file', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       compartment,
@@ -712,6 +833,7 @@ export async function createFileSource(
       input.file.bytes,
       input.extract.note,
       input.privateToMe ? guard.userId : null,
+      visibleToAppId,
       now,
       now,
       actor.id,
@@ -726,7 +848,7 @@ export async function createFileSource(
     // and "the assistant can answer from that file" are different promises and
     // somebody will one day need to know which one was made.
     description: `${actor.name} uploaded "${input.file.name}" to the knowledge base${
-      input.extract.text ? "" : " — kept, but not searchable"
+      input.extract.text ? "" : ", kept, but not searchable"
     }`,
     relatedTable: "knowledge_sources",
     relatedRowId: id,
@@ -750,6 +872,7 @@ export async function updateSource(
   const before = await sourceOrThrow(cfg, guard, id)
   const v = readInput(input)
   const account = v.accountId ? await requireAccount(cfg, guard, v.accountId) : null
+  if (v.visibleToAppId) await requireOpenableApp(cfg, guard, v.visibleToAppId)
   // WHOSE WORDS ARE THESE? Two families answer "not this form's": a MIRRORED
   // source, whose row the sweep would overwrite an edit from; and an UPLOADED
   // FILE, whose truth is the file — its body is a READING of it, and a form is
@@ -774,14 +897,20 @@ export async function updateSource(
   // the stored body alone rather than writing an excerpt over the document.
   const compartment = account ? accountCompartment(account.id) : AGENCY_COMPARTMENT
   const owner = v.privateToMe ? guard.userId : null
+  // WHO MAY READ IT is one decision with three answers, and all three families
+  // below carry it — a MIRRORED source's filing is exactly the thing that stays
+  // editable when its words do not, and limiting a file to one app's people is
+  // the commonest reason anybody opens this form at all.
+  const visibleToApp = v.visibleToAppId
   const now = new Date().toISOString()
   if (mirrored) {
     await d1Query(
       cfg,
       guard.databaseId,
-      `UPDATE knowledge_sources SET account_id = ?, compartment = ?, owner_user_id = ?, updated_at = ?,
+      `UPDATE knowledge_sources SET account_id = ?, compartment = ?, owner_user_id = ?,
+         visible_to_app_id = ?, updated_at = ?,
          editor_id = ?, editor_email = ?, editor_name = ? WHERE id = ?`,
-      [v.accountId, compartment, owner, now, actor.id, actor.email, actor.name, id]
+      [v.accountId, compartment, owner, visibleToApp, now, actor.id, actor.email, actor.name, id]
     )
   } else if (fileBacked) {
     // Everything but the words. The body and its summary are left exactly as the
@@ -790,15 +919,28 @@ export async function updateSource(
       cfg,
       guard.databaseId,
       `UPDATE knowledge_sources SET title = ?, source_url = ?, account_id = ?, compartment = ?,
-         owner_user_id = ?, updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ? WHERE id = ?`,
-      [title, v.sourceUrl, v.accountId, compartment, owner, now, actor.id, actor.email, actor.name, id]
+         owner_user_id = ?, visible_to_app_id = ?, updated_at = ?,
+         editor_id = ?, editor_email = ?, editor_name = ? WHERE id = ?`,
+      [
+        title,
+        v.sourceUrl,
+        v.accountId,
+        compartment,
+        owner,
+        visibleToApp,
+        now,
+        actor.id,
+        actor.email,
+        actor.name,
+        id,
+      ]
     )
   } else {
     await d1Query(
       cfg,
       guard.databaseId,
       `UPDATE knowledge_sources SET title = ?, body = ?, body_bytes = ?, summary = ?, source_url = ?,
-         account_id = ?, compartment = ?, owner_user_id = ?, updated_at = ?,
+         account_id = ?, compartment = ?, owner_user_id = ?, visible_to_app_id = ?, updated_at = ?,
          editor_id = ?, editor_email = ?, editor_name = ? WHERE id = ?`,
       [
         title,
@@ -809,6 +951,7 @@ export async function updateSource(
         v.accountId,
         compartment,
         owner,
+        visibleToApp,
         now,
         actor.id,
         actor.email,
@@ -824,7 +967,11 @@ export async function updateSource(
   const changes = describeChanges([
     { label: "Title", from: before.title, to: title },
     { label: "Filed under", from: before.compartment, to: compartment },
-    { label: "Visible to", from: before.visibility, to: owner ? "private" : "team" },
+    {
+      label: "Visible to",
+      from: before.visibility,
+      to: owner ? "private" : visibleToApp ? "app" : "team",
+    },
     {
       label: "Body",
       from: before.body,
@@ -834,7 +981,7 @@ export async function updateSource(
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Knowledge source edited",
-    description: `${actor.name} corrected "${title}" in the knowledge base${changes ? ` — ${changes}` : ""}`,
+    description: `${actor.name} corrected "${title}" in the knowledge base${changes ? `, ${changes}` : ""}`,
     relatedTable: "knowledge_sources",
     relatedRowId: id,
   })
@@ -1408,10 +1555,10 @@ export function knowledgeAnswer(input: {
     message: found
       ? `${citations.length} source${citations.length === 1 ? "" : "s"} in the knowledge base answer this.${
           stale.length
-            ? ` I checked the live record${stale.length === 1 ? "" : "s"} just now — say what ${stale.length === 1 ? "it says" : "they say"} today, not what the passage says.`
+            ? ` I checked the live record${stale.length === 1 ? "" : "s"} just now. Say what ${stale.length === 1 ? "it says" : "they say"} today, not what the passage says.`
             : ""
         }`
-      : "The knowledge base has nothing on this. Say so plainly — do not answer from memory.",
+      : "The knowledge base has nothing on this. Say so plainly, do not answer from memory.",
     compartments: input.compartments,
     reason: input.reason,
     records: input.records,
@@ -1641,7 +1788,12 @@ export async function retrieve(
   // here, out of the team's own database, under the caller's own fence, with
   // excluded sources gone. Nothing readable ever left the vector store.
   const pool = fused.slice(0, RANKING_POOL)
-  const owner = ownerClause(guard, "c.owner_user_id")
+  // BOTH FENCES, ON THE SOURCE ROW. The personal one used to be read off the
+  // CHUNK's copy of it; it is read off `s` now so that the two halves of "who may
+  // read this" are one clause in one place, on the row that owns the decision.
+  // The chunk's copy is a denormalisation for the word-match's single-table read,
+  // never the authority (see readerClause).
+  const reader = readerClause(guard, "s.")
   const rows = await d1Query<ScoredRow>(
     cfg,
     guard.databaseId,
@@ -1653,9 +1805,9 @@ export async function retrieve(
             s.origin_table, s.origin_row_id
        FROM knowledge_chunks c JOIN knowledge_sources s ON s.id = c.source_id
       WHERE c.id IN (${pool.map(({ id }) => sqlString(id)).join(", ")})
-        AND s.deactivated_at IS NULL AND ${owner.sql}
+        AND s.deactivated_at IS NULL AND ${reader.sql}
       LIMIT ${RANKING_POOL}`,
-    owner.params
+    reader.params
   )
 
   const ranked = rankPassages(fused, rows)

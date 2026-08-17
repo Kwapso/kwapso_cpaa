@@ -16,10 +16,8 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Send } from "lucide-react"
@@ -86,12 +84,11 @@ export function ResolveDialog({
           {t("It resolves the ticket, joins the conversation, and goes to the client by email.")}
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !ready} className="gap-1.5">
-          {busy ? <Spinner /> : <Send className="size-4" />}
-          {busy ? "Sending…" : "Send and resolve"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !ready,
+        icon: <Send className="size-4" />,
+      }}
     >
       <Field config={resolutionField} htmlFor="resolve-text" className={fieldSpacing}>
         <Textarea

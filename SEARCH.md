@@ -1,4 +1,4 @@
-# Search & filters — the ruleset (DESIGNED 2026-06-18)
+# Search & filters, the ruleset (DESIGNED 2026-06-18)
 
 How Brimba (and every app on this base) searches and filters records across
 collections. Glide configured this at the component level and searched "anything
@@ -19,10 +19,10 @@ the engine picks the right layer automatically.
   recipe, the query endpoints (`?q=` + filter params), and the per-team
   **FTS5** index for record-level "search anything."
 
-> **Scope — read this before you conclude the app has no full-text search.** This
+> **Scope. Read this before you conclude the app has no full-text search.** This
 > document owns **record search**: finding rows in a collection you are looking at.
 > It does **not** own the **knowledge base**, which is a different question
-> (*"what do we know about X?"* — answered from passages, with citations) and a
+> (*"what do we know about X?"*, answered from passages, with citations) and a
 > different mechanism (§ *The fourth layer*, below). Both are search; only one of
 > them is what a search box over a list does.
 
@@ -30,36 +30,36 @@ the engine picks the right layer automatically.
 
 A collection picks exactly one based on its expected size (declared in the recipe).
 
-### Layer 1 — client-side (small, bounded lists) · the default today
+### Layer 1, client-side (small, bounded lists) · the default today
 The list is already fetched and cached ([CACHING.md](CACHING.md) `useCached`), so
-search + filters run **in memory** over that array — instant, zero new requests.
+search + filters run **in memory** over that array, instant, zero new requests.
 Right for members, roles, invites, dropdown values: lists that are bounded per
 team. This is `selectRows` (limit → filter + facets → search → sort → paginate)
 running in the browser. No worker work at all.
 
-### Layer 2 — server-side query (growing lists) · every PAGED collection
-When a list can outgrow "fetch it all" — in practice, every collection in
-`GROWING_COLLECTIONS` (Law **R14**) — the search box and the filters are answered
+### Layer 2, server-side query (growing lists) · every PAGED collection
+When a list can outgrow "fetch it all", in practice, every collection in
+`GROWING_COLLECTIONS` (Law **R14**), the search box and the filters are answered
 by the **door**, not by the browser. The reason is the one R14 already gives about
 paging: the client holds page one, so filtering it in memory answers "among the
 newest fifty" while the exact count above (R16) still says 3,677. Two numbers,
 both true, neither about what was asked. Reported from staging, in a manager's
 words, as *"it only searches on loaded screen"*.
 
-The host owns this, in **one** component — `web/components/paged-find.tsx`:
+The host owns this, in **one** component, `web/components/paged-find.tsx`:
 
 - the recipe turns the frame's own search box OFF (`listCollection(…, { paged: true })`
   sets `searchable: false`), so a paged screen has exactly one box and it is the
   honest one;
 - what is typed (debounced by the library `SearchInput`) and picked (the library
-  `FilterBar`) becomes the door's own query parameters — `?q=` plus that door's
+  `FilterBar`) becomes the door's own query parameters, `?q=` plus that door's
   filters;
 - the matches land in a cache key of their **own** (`find:<listKey>:<question>`),
   with their own cursor sidecar, so `<LoadMore>` pages the SEARCH rather than the
   list underneath it, and clearing the box leaves the unfiltered list exactly as
   it was;
 - the exact server total **of that question** renders through `formatSearchTotal`
-  — the one seam in the app allowed to end in a "+" — beside the collection's own
+ , the one seam in the app allowed to end in a "+", beside the collection's own
   R16 badge, which never moves. A collection total and a filtered total are two
   different numbers, and the screen now says both, each labelled.
 
@@ -71,10 +71,10 @@ collection with a list screen, its door parses `q`, its recipe leaves the frame'
 box off, and a `<PagedFind>` is wired to that collection's own cache key.
 
 > The library's `CollectionFrame` has a `serverSide` + `onQueryChange` seam of its
-> own, which would be the neater home for this — but `ScreenRenderer` does not pass
+> own, which would be the neater home for this, but `ScreenRenderer` does not pass
 > it through, and the library is not edited from this repo (UI-GAPS #15).
 
-### Layer 3 — full-text "search anything" (FTS5)
+### Layer 3, full-text "search anything" (FTS5)
 For record modules where Glide-style "match anything on the detail screen" is
 wanted (tickets, imported datasets), each per-team database gets a
 **SQLite FTS5** virtual table mirroring the record table's text columns. The
@@ -83,7 +83,7 @@ span *all* of a record's fields, not just a column, at scale.
 
 ## FTS5 design (per-team, per record module)
 
-D1 *is* SQLite, so FTS5 lives **inside each team's own database** — isolation by
+D1 *is* SQLite, so FTS5 lives **inside each team's own database**, isolation by
 physics, same as every other per-team table ([ARCHITECTURE.md](ARCHITECTURE.md) §1).
 Pattern, added by the module's team-schema migration when that module is built:
 
@@ -109,20 +109,20 @@ END;
 ```
 
 Query path (in the module's worker): `SELECT h.* FROM help_fts f JOIN help h
-ON h.rowid = f.rowid WHERE help_fts MATCH ? ORDER BY rank LIMIT ?` — then the
+ON h.rowid = f.rowid WHERE help_fts MATCH ? ORDER BY rank LIMIT ?`, then the
 **same permission gate** as every read runs first (a viewer with no
 right gets nothing back; FTS never bypasses [permissions](ARCHITECTURE.md) §3),
 and the account fence narrows it further for a client login. Archived rows are
 filtered in the JOIN, never hard-deleted ([records rule](ARCHITECTURE.md) §4).
 Note the missing `OFFSET`: tickets are a `GROWING_COLLECTIONS` member, so an
-FTS read pages by key like every other read of them (Law **R14**) — the ranked
+FTS read pages by key like every other read of them (Law **R14**), the ranked
 hits are ordered and cursored, never skipped over.
 
 Rules for FTS5 here:
 - **One virtual table per searchable record table**, created by that module's
   team-schema migration and rolled to every team via `migrate-teams` (the locked
   maintenance path). New module = new migration, never a change to others.
-- **Triggers keep it in sync** — never write the FTS table from app code, so it
+- **Triggers keep it in sync**. Never write the FTS table from app code, so it
   can't drift from the base rows.
 - **Mirror only the text fields the detail screen shows** (Glide parity), not ids
   or audit columns.
@@ -138,10 +138,10 @@ Layer 3). The engine wires `searchable` fields → the library `searchKeys`,
 `filterable` fields → filter facets, and chooses client vs server by the hint —
 so turning on search for a new screen is a recipe edit, not new plumbing.
 
-## The fourth layer — the knowledge base (BUILT 2026-08-11, retrieval rebuilt 2026-08-12)
+## The fourth layer, the knowledge base (BUILT 2026-08-11, retrieval rebuilt 2026-08-12)
 
 Layers 1–3 answer *"which rows match these words?"*. The knowledge base answers
-*"what do we know about this?"* — and because the answer is prose rather than a row,
+*"what do we know about this?"*, and because the answer is prose rather than a row,
 it is built and governed completely differently. It is **not** a fourth setting on a
 recipe and no collection opts into it; it is its own subsystem in the content
 worker, reached at `GET /api/content/knowledge/ask`, in the app's Knowledge base
@@ -150,22 +150,22 @@ screen, and through `ask_knowledge` on the machine surface.
 Three things about it belong here, so that a reader who came to this file looking
 for "how does search work" leaves knowing it exists:
 
-- **It does not use FTS5, and that is deliberate** — which is why Layer 3 below
+- **It does not use FTS5, and that is deliberate**, which is why Layer 3 below
   being unbuilt is not a contradiction. Its word index is `knowledge_terms`, an
   ORDINARY indexed table, because the operation that matters is the DELETE: a
   re-index removes one source's postings, which on FTS5 is a scan of every posting
   in the team and here is one keyed delete. It also behaves identically in the test
   harness and in D1, which a virtual table kept in step by triggers does not.
-- **The ranking half is vectors, not words** — one account-wide Cloudflare Vectorize
+- **The ranking half is vectors, not words**, one account-wide Cloudflare Vectorize
   index, every team in its own NAMESPACE. Law **R26** is both halves of why that is
   safe: a namespace is a PARTITION Vectorize applies *before* the search (not a
   filter somebody wrote correctly today), and nothing readable comes out of the index
-  at all — it is asked for ids and scores only, and every passage in every answer is
+  at all, it is asked for ids and scores only, and every passage in every answer is
   read back out of the team's own database under the caller's own fence. **The vector
   store narrows; the database decides.**
 - **An answer carries its sources or it is not an answer** (Law **R23**). Retrieval
   never writes prose: it hands back the passages, the sources they came from, the
-  compartment it searched and the reasoning that chose it — and when it finds nothing
+  compartment it searched and the reasoning that chose it, and when it finds nothing
   it says so, with a sentence for the assistant to repeat instead of inventing one.
 
 DATA-MODEL.md § *THE KNOWLEDGE BASE* is the owning reference (the four tables, the
@@ -173,7 +173,7 @@ compartment model, the two fences); BOOTSTRAP.md §3b is how you stand the index
 
 ## Status (updated 2026-08-17)
 
-- **Layer 1 + the library search/filter UI**: SHIPPED — the library search/filter
+- **Layer 1 + the library search/filter UI**: SHIPPED, the library search/filter
   bar landed and the app turned it on across the BOUNDED collections (members /
   roles / invites / dropdown values / the brand library / meeting purposes) via
   the recipes (`listCollection` + `withDataDrivenCollection`, which hides
@@ -191,13 +191,13 @@ compartment model, the two fences); BOOTSTRAP.md §3b is how you stand the index
     the backlog) are still the frame's own, so they narrow the loaded page. Their
     search is now honest and their counts do not claim otherwise — but the facets
     are the same class of defect as B4 was on accounts. UI-GAPS #15 carries it.
-- **Layer 3 (FTS5 full-text)**: designed here, still NOT BUILT — the content/data-ops
+- **Layer 3 (FTS5 full-text)**: designed here, still NOT BUILT, the content/data-ops
   workers shipped (2026-06-23) without it because client-side search over the
   cached list covers current volumes. The FTS5 migration ships with the first
   module whose data outgrows the client-side layer. **Note what did NOT happen
   here:** the knowledge base (§ *The fourth layer*) shipped its own retrieval in
   August and deliberately did *not* use FTS5, for reasons that are about re-indexing
-  cost rather than about search quality — so its arrival neither builds this layer
+  cost rather than about search quality, so its arrival neither builds this layer
   nor argues against it.
 - **The fourth layer (the knowledge base)**: BUILT 2026-08-11, retrieval rebuilt onto
   Vectorize 2026-08-12. Governed by Laws R23 and R26; owned by

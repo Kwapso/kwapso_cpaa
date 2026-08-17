@@ -37,6 +37,33 @@ export function CollectionCard({ children }: { children: React.ReactNode }) {
   )
 }
 
+/** THE ADD BUTTON, wherever one appears (UI-RULEBOOK B3 / D9, CHECKLIST 11.7).
+ *
+ * A plus glyph and nothing else. The words it used to carry become the button's
+ * accessible name and its tooltip, which is where a label belongs on a control
+ * whose meaning is already in the collection it sits above.
+ *
+ * It is a seam and not a class string because it was written out ten times, in
+ * six files, for the same act — and ten copies is ten chances for the eleventh
+ * sub-collection to grow a wordy button again. */
+export function AddButton({
+  label,
+  onClick,
+  icon,
+}: {
+  /** The old label. Now the accessible name and the tooltip. */
+  label: string
+  onClick: () => void
+  /** Defaults to `Plus` — the UI-CONVENTIONS §4 icon for create. */
+  icon?: React.ReactNode
+}) {
+  return (
+    <Button size="icon" onClick={onClick} aria-label={label} title={label}>
+      {icon ?? <Plus className="size-4" />}
+    </Button>
+  )
+}
+
 /** A list screen with a host-rendered create button above it (the engine list
  * has no "add" affordance — creating opens a ?panel form). The collection itself
  * is boxed in a CollectionCard so title/search/filter/rows read as one unit. */
@@ -91,12 +118,16 @@ export function SectionWithCreate({
               {secondary.label}
             </Button>
           )}
-          {show && (
-            <Button onClick={onCreate} className="gap-1.5">
-              <Icon className="size-4" />
-              {label}
-            </Button>
-          )}
+          {/* THE ADD BUTTON IS A GLYPH (UI-RULEBOOK B3, CHECKLIST 11.7). One seam,
+              so every collection in the agency app loses its label at once, and
+              the thirteen labels it deletes ("New task", "Start a sprint", "Raise
+              ticket", "Map a process"…) become the accessible name and the
+              tooltip rather than disappearing. That also ends the two competing
+              naming families the screens had grown, "New <noun>" and "<verb> a
+              <noun>", without anybody having to choose between them.
+              Import and Export keep their words above (B4): they are rare,
+              consequential and not guessable from a glyph. */}
+          {show && <AddButton label={label} onClick={onCreate} icon={<Icon className="size-4" />} />}
         </div>
       )}
       {aboveCard}

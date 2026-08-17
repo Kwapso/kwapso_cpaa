@@ -319,7 +319,7 @@ export async function setAppStaff(
     )
   await logActivity(cfg, guard.databaseId, actor, {
     type: "App staffed",
-    description: `${actor.name} set who is on this app — ${wanted.length} ${
+    description: `${actor.name} set who is on this app, ${wanted.length} ${
       wanted.length === 1 ? "person" : "people"
     }${leadUserId ? ", with a team lead" : ""}`,
     relatedTable: "apps",
@@ -401,7 +401,7 @@ export async function setAppStakeholders(
     )
   await logActivity(cfg, guard.databaseId, actor, {
     type: "App stakeholders set",
-    description: `${actor.name} set the client's people on this app — ${wanted.length} named${
+    description: `${actor.name} set the client's people on this app, ${wanted.length} named${
       mainContactId ? ", one of them the main one" : ""
     }`,
     relatedTable: "apps",
@@ -537,7 +537,7 @@ export async function updateApp(
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "App edited",
-    description: `${actor.name} edited ${input.name}${changes ? ` — ${changes}` : ""}`,
+    description: `${actor.name} edited ${input.name}${changes ? `, ${changes}` : ""}`,
     relatedTable: "apps",
     relatedRowId: id,
   })
@@ -942,7 +942,7 @@ export async function updateProcess(
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Process edited",
-    description: `${actor.name} edited ${input.name}${changes ? ` — ${changes}` : ""}`,
+    description: `${actor.name} edited ${input.name}${changes ? `, ${changes}` : ""}`,
     relatedTable: "processes",
     relatedRowId: id,
   })
@@ -1087,7 +1087,7 @@ export async function updateStep(
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Step edited",
-    description: `${actor.name} edited the step "${input.name}"${changes ? ` — ${changes}` : ""}`,
+    description: `${actor.name} edited the step "${input.name}"${changes ? `, ${changes}` : ""}`,
     relatedTable: "process_steps",
     relatedRowId: id,
   })
@@ -1604,7 +1604,7 @@ async function latestVersionOrThrow(
     [...fence.params, processId]
   )
   if (!rows[0])
-    throw new GuardError(409, "no_baseline", "That process has no version 1 yet — it can't be measured from.")
+    throw new GuardError(409, "no_baseline", "That process has no version 1 yet, it can't be measured from.")
   return { id: rows[0].id, versionNo: rows[0].version_no }
 }
 

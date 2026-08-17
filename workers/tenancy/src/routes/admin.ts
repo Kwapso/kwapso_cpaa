@@ -122,7 +122,7 @@ export async function moveModule(request: Request, env: Env): Promise<Response> 
     ...result,
     next: result.done
       ? null
-      : "Not finished — call this door again with the same body to continue. Nothing is wrong.",
+      : "Not finished. Call this door again with the same body to continue. Nothing is wrong.",
   })
 }
 

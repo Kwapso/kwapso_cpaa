@@ -78,7 +78,7 @@ export function TicketsScreen({ ready }: { ready: PortalReady }) {
         <div className="text-muted-foreground rounded-xl border border-dashed p-10 text-center">
           <p>{t("Nothing here yet.")}</p>
           <p className="mt-1 text-sm">
-            {t("Anything you ask us — a question, a problem, a change — lives on this page.")}
+            {t("Anything you ask us, a question, a problem, a change, lives on this page.")}
           </p>
         </div>
       ) : (

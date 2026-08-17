@@ -102,7 +102,7 @@ export async function checkDatabaseSizes(
     if (alerted.length >= CRON_ALERT_CAP) {
       capped = true
       console.error(
-        `D1 SIZE ALARM: stopped at the ${CRON_ALERT_CAP}-alarm ceiling for this run — more databases are over the threshold; tomorrow's run continues.`
+        `D1 SIZE ALARM: stopped at the ${CRON_ALERT_CAP}-alarm ceiling for this run, more databases are over the threshold; tomorrow's run continues.`
       )
       break
     }
@@ -260,7 +260,7 @@ export async function alertNewAlarms(
         : days < 1
           ? "FULL WITHIN A DAY at the current rate"
           : `about ${Math.round(days)} day${Math.round(days) === 1 ? "" : "s"} left at the current rate`
-    return `${name} — ${gb} GB of 10 GB, ${when}.`
+    return `${name}, ${gb} GB of 10 GB, ${when}.`
   })
 
   let mailed = 0
@@ -691,7 +691,7 @@ export async function moveModuleToOwnDatabase(
         const err =
           `move_drain_incomplete: ${table} still holds ${left} rows in the OLD database after ` +
           `${MOVE_DRAIN_PASSES} passes. Routing is already pointing at ${newDbId}, so reads are ` +
-          `MERGED and these rows are duplicates — empty ${table} in ${sourceDbId} before ` +
+          `MERGED and these rows are duplicates, empty ${table} in ${sourceDbId} before ` +
           `the module is read again.`
         await saveMove(env, move.id, { lastError: err, claimedAt: null })
         throw new Error(err)

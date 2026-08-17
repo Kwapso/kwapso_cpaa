@@ -66,7 +66,7 @@ export function ProfileDialog({
     try {
       setPhoto(await fileToDataUrl(files[0]))
     } catch {
-      toast.error(t("Couldn't read that image — try another one."))
+      toast.error(t("Couldn't read that image. Try another one."))
     }
   }
 

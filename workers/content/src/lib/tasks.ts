@@ -314,7 +314,7 @@ VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(accountId)}, ${sqlStrin
   )
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Task created",
-    description: `${actor.name} wrote down a task — ${input.title}`,
+    description: `${actor.name} wrote down a task, ${input.title}`,
     relatedTable: "tasks",
     relatedRowId: id,
   })

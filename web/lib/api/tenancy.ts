@@ -167,10 +167,10 @@ export const tenancy = {
 
   /** Add a dropdown value to a type group (pick-or-create the type). Needs
    * selectable_data:create. Returns the refreshed value list. */
-  createSelectable: (type: string, value: string) =>
+  createSelectable: (type: string, value: string, mark?: string) =>
     api<{ values: SelectableValue[] }>("/api/tenancy/selectable", {
       method: "POST",
-      body: JSON.stringify({ type, value }),
+      body: JSON.stringify({ type, value, mark }),
     }),
 
   /** Rename a dropdown value (its type stays). Needs selectable_data:edit. */

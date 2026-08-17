@@ -119,7 +119,7 @@ export function TicketAttachments({ ticketId }: { ticketId: string }) {
     // memory to be refused. The door's cap is the one that counts, and it is the
     // same number (shared/workers/limits TICKET_FILE_MAX_BYTES).
     if (file.size > TICKET_FILE_MAX_BYTES) {
-      toast.error(t("That file is too big — 10 MB is the most we can take."))
+      toast.error(t("That file is too big, 10 MB is the most we can take."))
       return
     }
     setBusy("file")

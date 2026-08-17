@@ -139,7 +139,7 @@ function renderValue(key: string, value: unknown, names?: Record<string, string>
       .slice(0, MAX_ITEMS)
       .map((v) => (typeof v === "string" ? (names?.[v] ?? v) : String(v)))
       .join(", ")
-    return clip(value.length > MAX_ITEMS ? `${value.length} in total — ${shown}, …` : shown)
+    return clip(value.length > MAX_ITEMS ? `${value.length} in total, ${shown}, …` : shown)
   }
   return null
 }
@@ -214,7 +214,7 @@ export function describePayload(
       else if (isPermissionGrid(tool, key)) {
         hasGrid = true
         lines.push(...renderGrid(value))
-      } else lines.push(...describePayload(tool, value, names).map((l) => `${fieldLabel(tool, key)} — ${l}`))
+      } else lines.push(...describePayload(tool, value, names).map((l) => `${fieldLabel(tool, key)}, ${l}`))
       continue
     }
     const shown = renderValue(key, value, names)

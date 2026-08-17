@@ -188,7 +188,7 @@ describe("the confirm panel shows the payload it asks an admin to approve", () =
       ids: ["01A", "01B", "01C", "01D", "01E"],
       status: "resolved",
     }).join("\n")
-    expect(text).toContain("5 in total — 01A, 01B, 01C, …")
+    expect(text).toContain("5 in total, 01A, 01B, 01C, …")
     expect(text).toContain("New status: resolved")
   })
 

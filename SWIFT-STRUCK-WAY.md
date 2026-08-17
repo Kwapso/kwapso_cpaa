@@ -1,13 +1,13 @@
-# The Swift Struck way — global habits for every build
+# The Swift Struck way, global habits for every build
 
 > This is the **canonical, public copy** of the Swift Struck global habits. It lives in
-> the base repo so it **travels with every fork** — anyone who clones the base (or reuses
+> the base repo so it **travels with every fork**, anyone who clones the base (or reuses
 > the `new-app` skill) gets it without needing anything from the author's machine. A
 > mirror may exist at `~/.claude/SWIFT-STRUCK-WAY.md` for pre-clone reading; if the two
 > ever differ, **this repo copy wins**.
 
 These are the habits common to EVERY Swift Struck project. Project-specific canon
-(architecture, laws, data model) lives in each repo — read that repo's CLAUDE.md and
+(architecture, laws, data model) lives in each repo. Read that repo's CLAUDE.md and
 README first. This page is what stays true across all of them.
 
 ## The two prime directives
@@ -21,28 +21,28 @@ README first. This page is what stays true across all of them.
 
 ## Voice
 Warm, plain, sentence case, no jargon, no emoji. Write for a 45–55-year-old manager.
-One glossary per app is the single source of product terms — use those exact words in
+One glossary per app is the single source of product terms. Use those exact words in
 UI copy and never invent a synonym. When handing the owner shell commands, give
-paste-safe blocks (no `#` comment lines — their shell breaks on them) and say which
+paste-safe blocks (no `#` comment lines, their shell breaks on them) and say which
 directory to run them in.
 
 ## The library is lego
 UI primitives and collections come from `@kwapso/ui` (its own repo). Apps
 assemble screens from them and never fork or hand-roll library components locally.
 If a primitive needs changing, flag the gap (the app's UI-GAPS list) and fix it in
-the library — then every app inherits the fix.
+the library, then every app inherits the fix.
 
 ## The ship pipeline
 Local → GitHub → staging (deploy ends with an automated smoke that must pass) →
-the quality gates — lean_mean_check (score 92 or better), story_checks_out,
-security_sentry (no critical/high), and a clean error store — → reset data only if
+the quality gates, lean_mean_check (score 92 or better), story_checks_out,
+security_sentry (no critical/high), and a clean error store, → reset data only if
 the owner asks (destructive; confirm scope) → production, always owner-gated →
 merging `main` means "this is what production runs". `npm run check` (types + full
 test suite) must be green before any commit; deploy order is realtime-first.
 
 ## Security and data habits
-- **Act-as-user everywhere.** Every automation surface — the AI agent, imports,
-  the MCP tools — acts AS the signed-in user through the same gated endpoints. No
+- **Act-as-user everywhere.** Every automation surface, the AI agent, imports,
+  the MCP tools, acts AS the signed-in user through the same gated endpoints. No
   separate robot role, no privilege it wouldn't have in the UI.
 - **Every state-changing route gates.** No write ships without a permission gate
   (requireRight / the gated wrapper / an admin key), or a reviewed identity gate for
@@ -59,14 +59,14 @@ test suite) must be green before any commit; deploy order is realtime-first.
   `wrangler secret put` (or the platform equivalent) and live locally only in
   git-ignored `.dev.vars` files.
 - **One cloud account per product**, and every worker, database, and bucket carries the
-  product's name prefix — the prefix is the project grouping. **Cloudflare is the
+  product's name prefix, the prefix is the project grouping. **Cloudflare is the
   recommended stack** (the base is native to it and `new-app` stands it up turnkey); the
-  base can be ported to any top-10 provider by swapping ~4 seam files — see the app's
+  base can be ported to any top-10 provider by swapping ~4 seam files. See the app's
   `PLATFORMS.md` for the per-provider map.
 
 ## Reset and confirm conventions
 Destructive operations always confirm scope first, and production is always named
-explicitly — never bundled silently into "both". A reset wipes rows but keeps schema
+explicitly. Never bundled silently into "both". A reset wipes rows but keeps schema
 and migrations; after one, re-seed what the app needs (catalogs, first team) before
 calling it usable. Dangerous or bulk actions in-app follow the same rule: one clear
 confirm before the act.

@@ -45,6 +45,7 @@ import { invalidate, invalidatePrefix, patchRow, primeCache, readCache, reconcil
 import { NAV, TEAM_SECTIONS, bottomNavItems, isNavActive, type Crumb, type NavGroup } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useTeamPrewarm } from "@/lib/use-team-prewarm"
+import { useGoogleCatchUp } from "@/lib/use-google-catch-up"
 import { useT } from "@shared/web/language"
 import { CreateTeamDialog } from "@/components/create-team-dialog"
 import { TEAM_CREATION_CLOSED } from "@shared/product"
@@ -140,6 +141,10 @@ export function AppShell({
   }
 
   const { can } = usePermissions(teamId)
+  // GOOGLE COMES INTO STEP ON OPEN (14.12). One background request, behind first
+  // paint, only for somebody who holds both rights the door asks for — see the
+  // hook, which is where all the reasoning about why this is not a cron lives.
+  useGoogleCatchUp(teamId, can)
   const navigate = onNavigate ?? softNavigate
   const here = activePath ?? pathname
 
@@ -362,9 +367,20 @@ export function AppShell({
         </div>
       </aside>
 
-      <div className="flex min-h-[100svh] min-w-0 flex-1 flex-col">
-        {/* Mobile top bar */}
-        <header className="glass sticky top-0 z-20 flex items-center justify-between gap-2 border-b px-4 py-2.5 md:hidden">
+      {/* `--shell-top`. HOW FAR DOWN THE SHELL'S OWN CHROME REACHES, published
+       * once here and read by anything inside `<main>` that wants to pin itself
+       * (today: a record's collapsed title line and its tab strip — UI-RULEBOOK
+       * D3). On a phone the app bar below is sticky at the top of the window, so
+       * content pinned at 0 would slide UNDER it; on desktop that bar is not
+       * rendered at all and the offset is zero. In `rem` so it moves with the
+       * display-scale setting (S4) rather than being pinned to 16px.
+       *
+       * This is the shell half of L6: the frame owns z-20 and this variable, the
+       * in-content sticky layer takes z-10 and reads it. */}
+      <div className="flex min-h-[100svh] min-w-0 flex-1 flex-col [--shell-top:3.75rem] md:[--shell-top:0px]">
+        {/* Mobile top bar, an explicit height, because `--shell-top` above is a
+            promise about it. */}
+        <header className="glass sticky top-0 z-20 flex h-[3.75rem] items-center justify-between gap-2 border-b px-4 md:hidden">
           <TeamSwitcher active={active} onCreateTeam={() => setCreating(true)} />
           <div className="flex items-center gap-1">
             {/* BUILD-1 §5: the running timer is in the header of EVERY screen, so
@@ -381,7 +397,7 @@ export function AppShell({
          * The running timer sits on the same row on desktop (the mobile bar has
          * its own copy above): one line that is present on every screen and shows
          * nothing at all when nobody is timing anything. */}
-        <div className="flex items-center justify-between gap-3 px-4 pt-4">
+        <div className="flex items-center justify-between gap-3 px-4 pt-4 sm:px-6 lg:px-10">
           <div className="min-w-0">
             {breadcrumbs && breadcrumbs.length > 0 && (
               <Breadcrumbs items={breadcrumbs} onNavigate={onNavigate ?? softNavigate} />
@@ -392,7 +408,20 @@ export function AppShell({
           </div>
         </div>
 
-        <main className="min-w-0 flex-1 overflow-x-hidden px-4 py-6 pb-24 md:pb-8">
+        {/* THE PAGE GUTTERS (UI-RULEBOOK L1 / S2). One string, used here and by
+            the record header band so both align to the same left edge. `lg:px-10`
+            is 40px, the brand site's own `--margin--m`, and what `.nk-container`
+            computes to at every desktop width.
+
+            `overflow-x-clip`, NOT `overflow-x-hidden`. They look identical and
+            they are not: CSS says an element with `overflow-x: hidden` and a
+            visible other axis computes `overflow-y` to `auto`, which makes this
+            a SCROLL CONTAINER. A `position: sticky` child then sticks to a box
+            that never scrolls, so it silently does nothing, which is exactly
+            what happened to the record header and tab strip (D3) the first time
+            they were built. `clip` clips the same overflow and creates no scroll
+            container, so the document stays the scroller and sticky works. */}
+        <main className="min-w-0 flex-1 overflow-x-clip px-4 py-6 pb-24 sm:px-6 md:pb-8 lg:px-10">
           {children}
         </main>
 

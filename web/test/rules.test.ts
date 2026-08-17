@@ -1362,6 +1362,7 @@ describe("RULES — the laws of the base", () => {
       "savings-caption", // R25: the derived-screens scan above
       "vector-fence", // R26: workers/content/test/vector-fence.test.ts
       "described-contracts", // R27: workers/mcp/test/described-contracts.test.ts, beside R19/R22 on the same door census
+      "catalogued-strings", // R28: web/test/catalogued-strings.test.ts — re-runs the real extractor over both front doors
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

@@ -224,7 +224,7 @@ export async function getAccountsExport(request: Request, env: Env): Promise<Res
     return exportTooLarge(
       EXPORT_HARD_CAP,
       "accounts",
-      "Narrow it — search for a name, pick companies or people, or ask for one parent's accounts — or read the list a page at a time."
+      "Narrow it. Search for a name, pick companies or people, or ask for one parent's accounts, or read the list a page at a time."
     )
   const csv = toCsv(
     [
@@ -487,7 +487,7 @@ export async function postGrantPortalAccess(request: Request, env: Env): Promise
     return fail(
       409,
       "is_staff",
-      "That person is a member of your team — a client login would lock them out of the agency app."
+      "That person is a member of your team, a client login would lock them out of the agency app."
     )
   const id = await grantPortalAccess(cfg, guard, scope, actor, {
     onAccountId: accountId,
@@ -510,12 +510,33 @@ async function userIdForPerson(
   personAccountId: string
 ): Promise<string> {
   const person = await getAccountRow(cfg, guard, scope, personAccountId)
+  // ONLY A CONTACT MAY HOLD A LOGIN (7.4 — Aurora's ruling, over "both levels").
+  //
+  // The refusal that matters is `grantPortalAccess`'s, one file along: a stored
+  // grant whose row is a company would widen the fence to every sibling under
+  // that company's parent, so it is refused where the row is written. This is the
+  // same sentence said EARLIER, and it is not a duplicate — it is the difference
+  // between the right answer and the right answer.
+  //
+  // Identity is resolved before the write, and it is resolved BY EMAIL. A company
+  // row with an info@ address on it therefore reached "hasn't signed in here yet.
+  // Ask them to sign in once with info@…", and one without an address reached
+  // "Add an email address to Bergman GmbH first — that's how they sign in." Both
+  // are instructions for making a company into a login-holder, offered by a door
+  // that was always going to refuse. Nobody is misled about what the product
+  // allows now: the FIRST thing this door reads decides it.
+  if (person.accountType !== "individual")
+    throw new GuardError(
+      400,
+      "invalid_input",
+      "A login belongs to a person, not to a company. Pick one of their contacts."
+    )
   const email = person.email?.trim().toLowerCase()
   if (!email)
     throw new GuardError(
       400,
       "no_email",
-      `Add an email address to ${person.name} first — that's how they sign in.`
+      `Add an email address to ${person.name} first, that's how they sign in.`
     )
   const row = await env.DB.prepare("SELECT id FROM users WHERE email = ? AND deactivated_at IS NULL")
     .bind(email)

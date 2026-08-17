@@ -25,11 +25,9 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { Switch } from "@kwapso/ui/registry/primitives/switch/switch"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
@@ -71,7 +69,6 @@ export function RateFormDialog({
   draftKey,
   title,
   subtitle,
-  submitLabel,
   initial,
   showDefault = false,
 }: {
@@ -82,7 +79,6 @@ export function RateFormDialog({
   draftKey?: string
   title: string
   subtitle: string
-  submitLabel: string
   /** present = EDIT mode (prefilled); absent = add mode */
   initial?: { label: string; centsPerHour: number; currency: string | null; isDefault?: boolean }
   /** the internal card's fallback switch — see the note at the top of the file */
@@ -138,12 +134,10 @@ export function RateFormDialog({
       onSubmit={submit}
       title={<DialogTitle>{title}</DialogTitle>}
       subtitle={<DialogDescription>{subtitle}</DialogDescription>}
-      footer={
-        <Button type="submit" disabled={busy || !ready}>
-          {busy ? <Spinner /> : null}
-          {busy ? "Saving…" : submitLabel}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !ready,
+      }}
     >
       <Field config={labelField} htmlFor="rate-label" className={fieldSpacing}>
         <Input

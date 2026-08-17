@@ -784,9 +784,21 @@ export type KnowledgeSource = {
   fileType: string | null
   fileBytes: number
   fileNote: string | null
-  /** "team" = anyone who may read the knowledge base; "private" = only its owner */
-  visibility: "team" | "private"
+  /** WHO MAY READ THIS SOURCE, in narrowing order (12.3):
+   *   "team"    — anyone who may read the knowledge base;
+   *   "app"     — only the people staffed to `visibleToAppId` (plus an admin),
+   *               which is the same sentence the app record itself says (8.11);
+   *   "private" — only its owner.
+   * Derived from the two id columns, never stored twice: "private" wins over
+   * "app" when both are set, so no row can be in a state a reader has to guess. */
+  visibility: "team" | "app" | "private"
   ownerUserId: string | null
+  /** the app whose people may read it, or null for the whole team. NOT `appId`
+   * above — that one says what a mirrored source is ABOUT and belongs to the
+   * sweep, which rewrites it on every pass. */
+  visibleToAppId: string | null
+  /** that app's name, so a list can say whose it is without a second read */
+  visibleToAppName: string | null
   indexedAt: string | null
   chunkCount: number
   /** how far through this source the indexer has got. Below `chunkCount` means

@@ -34,7 +34,14 @@ import { RecordTimerButton } from "@/components/timer-bar"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, content as contentApi } from "@/lib/api"
-import { auditItems } from "@/lib/audit-overview"
+import {
+  RecordActionsMenu,
+  RecordFooter,
+  RecordScreen,
+  STICKY_TABS,
+  type RecordAction,
+} from "@/components/record-chrome"
+import { MARK_GROUP, typeMark } from "@/lib/type-marks"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
 import { cursorKey, recordTimeKey, storiesKey, totalKey } from "@/lib/live-resources"
@@ -195,13 +202,8 @@ export function StoryDetailScreen({
     },
     { label: t("What was done"), value: story.reviewNote || "—" },
     { label: t("What we'll tell them"), value: story.closingNote || "—" },
-    ...auditItems({
-      createdByName: story.createdByName,
-      createdAt: story.createdAt,
-      editedByName: story.editedByName,
-      updatedAt: story.updatedAt,
-      status: STORY_STATUS_LABEL[story.status],
-    }),
+    // The audit rows moved to the footer at the foot of the record (D7 /
+    // CHECKLIST 11.3); the status is on the header band's own line.
   ]
 
   const tabsConfig = {
@@ -229,19 +231,88 @@ export function StoryDetailScreen({
     ],
   }
 
+  /* B1 / CHECKLIST 11.2 — one primary, one secondary, and a menu. The act that
+   * MOVES THE STORY FORWARD is the primary (ready for review, then done: only
+   * ever one is offered, because they belong to different stages), the clock is
+   * the secondary, and Edit goes into the three-dot menu. */
+  const overflow: RecordAction[] = canEdit
+    ? [
+        {
+          key: "edit",
+          label: t("Edit"),
+          icon: <Pencil className="size-3.5" />,
+          onSelect: () => setEditOpen(true),
+        },
+      ]
+    : []
+
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight">
-            <span className="truncate">{story.title}</span>
-            {story.status === "done" && (
-              <Badge variant="secondary" className="text-[10px]">
-                {t("Done")}
-              </Badge>
-            )}
-          </h1>
-          {/* THE CROSS-LINKS UP THE TREE — the app the work is on, the sprint it
+    <RecordScreen
+      mark={typeMark(options.selectableValues, MARK_GROUP.story, story.storyType)}
+      // D4: the type word and the reference, above the title.
+      eyebrow={[story.storyType || t("Story"), story.ref].filter(Boolean).join(" · ")}
+      title={story.title}
+      // D5: where it is, who has it, when it is due. Three facts, no more.
+      status={[
+        STORY_STATUS_LABEL[story.status],
+        story.assigneeName ?? undefined,
+        formatDate(story.sprintEndsOn) || undefined,
+      ]
+        .filter(Boolean)
+        .join(" · ")}
+      actions={
+        <>
+          {/* START, AND STOP. It used to be a permanent "Start timer" that could
+              not see the timer already running on this very story, so pressing it
+              again asked the door a question it had to refuse. The shared control
+              reads the same running-timers cache the header bar reads. */}
+          <RecordTimerButton
+            teamId={teamId}
+            targetTable="stories"
+            targetId={storyId}
+            canLog={canLogTime}
+            disabled={story.status === "done"}
+          />
+          {/* READY FOR REVIEW (CHECKLIST 6.9). Offered only while the work is
+              actually in hand: a story nobody has started has nothing to explain,
+              and one already in review or done has been explained. The panel
+              collects the words; the door refuses if a timer is still running. */}
+          {canEdit && (story.status === "open" || story.status === "in_progress") && (
+            <Button disabled={busy} onClick={() => setReviewOpen(true)} className="gap-1.5">
+              <ClipboardCheck className="size-3.5" />
+              {t("Ready for review")}
+            </Button>
+          )}
+          {/* ONE DONE BUTTON, TOP RIGHT (CHECKLIST 6.10). It appears only on a
+              story that has been reviewed, so "done" stays downstream of somebody
+              having looked. */}
+          {canEdit && story.status === "in_review" && (
+            <Button
+              disabled={busy}
+              onClick={() =>
+                void run(
+                  () => contentApi.setStoryStatus(storyId, "done", story.closingNote ?? undefined),
+                  "Done.",
+                  "Couldn't close that story."
+                )
+              }
+              className="gap-1.5"
+            >
+              <Check className="size-3.5" />
+              {t("Done")}
+            </Button>
+          )}
+          <RecordActionsMenu actions={overflow} />
+        </>
+      }
+      /* THE LIFECYCLE AS A FACT (CHECKLIST 6.7). It used to be four buttons, and
+         pressing "in progress" started a timer — the tester asked for that
+         inversion and this is it: a timer start moves the story, and the track
+         reports where it got to. */
+      headerExtra={
+        <>
+          <StoryStatusStepper status={story.status} />
+          {/* THE CROSS-LINKS UP THE TREE, the app the work is on, the sprint it
               was sold inside, and the request it answers. The owner's answer on
               which path a person takes was "all three should get her there", and
               this is the other end of all three. */}
@@ -275,73 +346,12 @@ export function StoryDetailScreen({
               </button>
             )}
           </p>
-        </div>
-        {/* ml-auto on the GROUP so a narrow phone reflows instead of clipping. */}
-        <div className="flex flex-wrap gap-2 sm:ml-auto sm:shrink-0">
-          {/* START, AND STOP. It used to be a permanent "Start timer" that could
-              not see the timer already running on this very story, so pressing it
-              again asked the door a question it had to refuse. The shared control
-              reads the same running-timers cache the header bar reads. */}
-          <RecordTimerButton
-            teamId={teamId}
-            targetTable="stories"
-            targetId={storyId}
-            canLog={canLogTime}
-            disabled={story.status === "done"}
-          />
-          {/* READY FOR REVIEW (CHECKLIST 6.9). Offered only while the work is
-              actually in hand: a story nobody has started has nothing to explain,
-              and one already in review or done has been explained. The panel
-              collects the words; the door refuses if a timer is still running. */}
-          {canEdit && (story.status === "open" || story.status === "in_progress") && (
-            <Button size="sm" disabled={busy} onClick={() => setReviewOpen(true)} className="gap-1.5">
-              <ClipboardCheck className="size-3.5" />
-              {t("Ready for review")}
-            </Button>
-          )}
-          {/* ONE DONE BUTTON, TOP RIGHT (CHECKLIST 6.10). Aurora's ts2: the app's
-              team lead presses it, not "anyone with the right". The lead is a
-              field on an app that does not exist yet (CHECKLIST 8.10, another
-              lane) — until it does, this is gated on `work:edit` and it is ONE
-              button in ONE place, which is the half of the ask that was about the
-              screen. When the lead lands, the condition changes here and nothing
-              else moves.
-              It appears only on a story that has been reviewed, so "done" stays
-              downstream of somebody having looked. */}
-          {canEdit && story.status === "in_review" && (
-            <Button
-              size="sm"
-              disabled={busy}
-              onClick={() =>
-                void run(
-                  () => contentApi.setStoryStatus(storyId, "done", story.closingNote ?? undefined),
-                  "Done.",
-                  "Couldn't close that story."
-                )
-              }
-              className="gap-1.5"
-            >
-              <Check className="size-3.5" />
-              {t("Done")}
-            </Button>
-          )}
-          {canEdit && (
-            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-1.5">
-              <Pencil className="size-3.5" />
-              {t("Edit")}
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* THE LIFECYCLE AS A FACT (CHECKLIST 6.7). It used to be four buttons, and
-          pressing "in progress" started a timer — the tester asked for that
-          inversion and this is it: a timer start moves the story, and the track
-          reports where it got to. Two of the four stages are reached by a named
-          act instead (the two buttons above), and neither of them is on here. */}
-      <StoryStatusStepper status={story.status} />
+        </>
+      }
+    >
 
       <TabsView
+        className={STICKY_TABS}
         config={tabsConfig}
         value={tab}
         onValueChange={setTab}
@@ -415,6 +425,16 @@ export function StoryDetailScreen({
         }}
       />
 
+      {/* D7 / CHECKLIST 11.3, the audit line, grey, at the foot of the record. */}
+      <RecordFooter
+        audit={{
+          createdByName: story.createdByName,
+          createdAt: story.createdAt,
+          editedByName: story.editedByName,
+          updatedAt: story.updatedAt,
+        }}
+      />
+
       <StoryFormDialog
         open={editOpen}
         onOpenChange={setEditOpen}
@@ -457,6 +477,6 @@ export function StoryDetailScreen({
         initial={editingLog}
         onSubmit={correctTime}
       />
-    </div>
+    </RecordScreen>
   )
 }

@@ -754,7 +754,7 @@ async function contactForTicket(
   const id = optionalText(raw, "Raised by", TEXT_LIMITS.short)
   if (!id) return null
   if (!accountId)
-    throw new GuardError(400, "invalid_input", "Name the client first — a contact belongs to one.")
+    throw new GuardError(400, "invalid_input", "Name the client first, a contact belongs to one.")
   const rows = await d1Query<{ id: string }>(
     cfg,
     guard.databaseId,
@@ -888,7 +888,7 @@ function refuseIfLocked(scope: AccountScope, row: TicketRow, what: string): void
     throw new GuardError(
       409,
       "ticket_locked",
-      `We've already picked this one up, so ${what} is fixed now — add a comment and we'll pick it up from there.`
+      `We've already picked this one up, so ${what} is fixed now. Add a comment and we'll pick it up from there.`
     )
 }
 
@@ -911,7 +911,7 @@ export async function updateTicket(
   // a colleague's question is not being allowed to rewrite it.
   refuseIfLocked(scope, before, "the wording")
   if (scope.kind === "portal" && before.creator_id !== guard.userId)
-    throw new GuardError(403, "not_yours", "This one was raised by a colleague — add a comment instead.")
+    throw new GuardError(403, "not_yours", "This one was raised by a colleague. Add a comment instead.")
 
   // NAMING THE CLIENT ON A TICKET THAT HAS NONE — set once, never moved.
   //
@@ -994,7 +994,7 @@ export async function updateTicket(
     throw new GuardError(
       409,
       "ticket_locked",
-      "We've already picked this one up, so the wording is fixed now — add a comment and we'll pick it up from there."
+      "We've already picked this one up, so the wording is fixed now. Add a comment and we'll pick it up from there."
     )
 
   const changes = describeChanges([
@@ -1010,7 +1010,7 @@ export async function updateTicket(
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Ticket edited",
-    description: `${actor.name} edited ${before.ref ?? "a ticket"}${changes ? ` — ${changes}` : ""}`,
+    description: `${actor.name} edited ${before.ref ?? "a ticket"}${changes ? `, ${changes}` : ""}`,
     relatedTable: "help",
     relatedRowId: id,
   })
@@ -1080,7 +1080,7 @@ export function refuseDirectResolve(status: HelpStatus): void {
   throw new GuardError(
     400,
     "resolution_required",
-    "A ticket is resolved by sending the answer, not by setting a status — write the resolution and send it."
+    "A ticket is resolved by sending the answer, not by setting a status. Write the resolution and send it."
   )
 }
 
@@ -1350,7 +1350,7 @@ export async function bulkSetStatusByFilter(
     throw new GuardError(
       400,
       "too_many",
-      `That filter matches ${matched} tickets — the bulk ceiling is ${BULK_IDS_LIMIT}. Narrow the filter.`
+      `That filter matches ${matched} tickets, the bulk ceiling is ${BULK_IDS_LIMIT}. Narrow the filter.`
     )
 
   const now = new Date().toISOString()

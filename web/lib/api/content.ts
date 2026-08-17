@@ -487,6 +487,9 @@ export const content = {
     sourceUrl?: string | null
     accountId?: string | null
     visibility?: string
+    /** 12.3: limit it to the people staffed to one app. The door refuses an app
+     * the caller is not on, so this can never lock somebody out of their own. */
+    visibleToAppId?: string | null
   }) => api<{ source: KnowledgeSource | null; total: number }>("/api/content/knowledge", post(input)),
   /** Hand the knowledge base a FILE. One call, one record: the bytes and the row
    * are written together, so closing the tab halfway can never leave a stored
@@ -515,12 +518,14 @@ export const content = {
     title?: string
     accountId?: string | null
     visibility?: string
+    visibleToAppId?: string | null
   }) => {
     const blob = await (await fetch(input.fileDataUrl)).blob()
     const q = new URLSearchParams({ fileName: input.fileName })
     if (input.title) q.set("title", input.title)
     if (input.accountId) q.set("accountId", input.accountId)
     if (input.visibility) q.set("visibility", input.visibility)
+    if (input.visibleToAppId) q.set("visibleToAppId", input.visibleToAppId)
     return api<{ source: KnowledgeSource | null; total: number }>(
       `/api/content/knowledge/upload-stream?${q}`,
       {
@@ -539,6 +544,7 @@ export const content = {
     sourceUrl?: string | null
     accountId?: string | null
     visibility?: string
+    visibleToAppId?: string | null
   }) =>
     api<{ source: KnowledgeSource | null; total: number }>("/api/content/knowledge/update", post(input)),
   setKnowledgeActive: (id: string, active: boolean) =>
@@ -558,12 +564,19 @@ export const content = {
    * diary, read through MY connection. Empty results mean I have connected
    * nothing yet — the consent screen is a browser round-trip nobody can do for
    * me. */
-  syncGoogleKnowledge: () =>
+  /** `onlyIfStale` is what the app-open catch-up sends (14.12): don't ask Google
+   * when this person's kinds were swept inside the door's five-minute floor.
+   * The Settings BUTTON leaves it off — a deliberate press always asks. */
+  syncGoogleKnowledge: (onlyIfStale = false) =>
     api<{
       results: { kind: string; read: number; indexed: number; caughtUp: boolean; error?: string }[]
+      /** true = we did NOT ask Google, because this person's kinds were already
+       * brought into step inside the door's five-minute floor (14.12). The
+       * results are then the state as of that last real sweep. */
+      skipped: boolean
       caughtUp: boolean
       total: number
-    }>("/api/content/knowledge/sync-google", post({})),
+    }>("/api/content/knowledge/sync-google", post({ onlyIfStale })),
 
   /* -------------------------------- meetings -------------------------------- */
   /** R14: a PAGE of meetings (a GROWING collection — an event is never curated

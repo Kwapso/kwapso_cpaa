@@ -41,7 +41,7 @@ export function LoadMore<T>({
   if ((loaded?.length ?? 0) >= CLIENT_PAGE_ROWS_CAP)
     return (
       <p className="text-muted-foreground text-center text-sm">
-        {t("That's the first")} {CLIENT_PAGE_ROWS_CAP.toLocaleString()} — search or filter to find
+        {t("That's the first")} {CLIENT_PAGE_ROWS_CAP.toLocaleString()}. Search or filter to find
         what you&apos;re after.
       </p>
     )

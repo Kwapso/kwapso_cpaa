@@ -16,7 +16,6 @@
 
 import * as React from "react"
 
-import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
@@ -30,7 +29,13 @@ import { MeetingFormDialog, type MeetingFormValues } from "@/components/meeting-
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, content, tenancy } from "@/lib/api"
-import { auditItems } from "@/lib/audit-overview"
+import {
+  RecordActionsMenu,
+  RecordFooter,
+  RecordScreen,
+  STICKY_TABS,
+  type RecordAction,
+} from "@/components/record-chrome"
 import { appsKey, listFetch, meetingsKey } from "@/lib/live-resources"
 import { usePermissions } from "@/lib/perms"
 import { formatCount } from "@shared/web/format-count"
@@ -183,7 +188,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
     try {
       const { meeting } = await content.setMeetingActive(meetingId, active)
       patchLists(meeting)
-      toast.success(active ? "Back in the diary." : "Cancelled — the record and its notes are kept.")
+      toast.success(active ? "Back in the diary." : "Cancelled, the record and its notes are kept.")
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't change that.")
     } finally {
@@ -215,7 +220,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
   if (!item) return <p className="text-muted-foreground text-sm">{t("That meeting doesn't exist.")}</p>
 
   const overviewItems = [
-    { label: t("Who it is with"), value: item.accountName ?? "Nobody — it is ours" },
+    { label: t("Who it is with"), value: item.accountName ?? "Nobody, it is ours" },
     { label: t("Which app"), value: item.appName ?? "—" },
     { label: t("Why we are meeting"), value: item.purposeName ?? "—" },
     { label: t("When"), value: formatDateTime(item.startsAt) },
@@ -229,13 +234,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
       // pushed it.
       value: item.googleEventId ? "Yes" : "Not yet",
     },
-    ...auditItems({
-      createdByName: item.creatorName,
-      createdAt: item.createdAt,
-      editedByName: item.editorName,
-      updatedAt: item.updatedAt,
-      status: !item.active ? "Cancelled" : item.status === "held" ? "Held" : "Scheduled",
-    }),
+    // The audit rows moved to the record footer (D7 / CHECKLIST 11.3).
   ]
 
   const tabsConfig = {
@@ -254,92 +253,86 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
     ],
   }
 
+  /* B1 / CHECKLIST 11.2 — this title carried five. "Mark held" is the act that
+   * moves the meeting on, so it is the primary; Edit is the everyday one, so it
+   * is the secondary. Reading the transcript, adding it to a calendar and
+   * calling it off go into the menu, the last of them still red. */
+  const overflow: RecordAction[] = [
+    // 9.4 — the transcript is what tells the app the conversation happened, so
+    // this one act ticks "held" and logs everybody's time. Offered only once the
+    // entry is in a calendar (there is nowhere else to look) and only while
+    // nothing has been read yet.
+    ...(canEdit && canPush && item.active && item.googleEventId && !item.transcriptCapturedAt
+      ? [
+          {
+            key: "transcript",
+            label: t("Read the transcript"),
+            icon: <FileText className="size-3.5" />,
+            disabled: busy !== null,
+            onSelect: readTranscript,
+          },
+        ]
+      : []),
+    ...(canPush && item.active && !item.googleEventId
+      ? [
+          {
+            key: "calendar",
+            label: t("Add to my calendar"),
+            icon: <CalendarPlus className="size-3.5" />,
+            disabled: busy !== null,
+            onSelect: addToCalendar,
+          },
+        ]
+      : []),
+    ...(canCancel
+      ? [
+          {
+            key: "active",
+            label: item.active ? t("Cancel it") : t("Put it back"),
+            icon: <Power className="size-3.5" />,
+            disabled: busy !== null,
+            destructive: item.active,
+            onSelect: () => setActive(!item.active),
+          },
+        ]
+      : []),
+  ]
+
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-            <span className="truncate">{item.title}</span>
-            {!item.active && (
-              <Badge variant="outline" className="text-muted-foreground text-[10px]">
-                {t("Cancelled")}
-              </Badge>
-            )}
-            {item.active && item.status === "held" && (
-              <Badge variant="secondary" className="text-[10px]">
-                {t("Held")}
-              </Badge>
-            )}
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {formatDateTime(item.startsAt)}
-            {item.accountName ? ` · ${item.accountName}` : ""}
-            {item.purposeName ? ` · ${item.purposeName}` : ""}
-          </p>
-        </div>
-        <div className="flex shrink-0 flex-wrap gap-2">
-          {canEdit && (
-            <Button variant="outline" size="sm" onClick={() => setEditing(true)} className="gap-1.5">
-              <Pencil className="size-3.5" />
-              {t("Edit")}
-            </Button>
-          )}
+    <RecordScreen
+      eyebrow={[t("Meeting"), item.ref].filter(Boolean).join(" · ")}
+      title={item.title}
+      status={[
+        formatDateTime(item.startsAt),
+        item.accountName ?? undefined,
+        !item.active ? t("Cancelled") : item.status === "held" ? t("Held") : undefined,
+      ]
+        .filter(Boolean)
+        .join(" · ")}
+      actions={
+        <>
           {canEdit && item.active && (
             <Button
-              variant="outline"
-              size="sm"
               disabled={busy !== null}
               onClick={() => setHeld(item.status !== "held")}
               className="gap-1.5"
             >
               {busy === "held" ? <Spinner /> : <CheckCheck className="size-3.5" />}
-              {item.status === "held" ? "Not held after all" : "Mark held"}
+              {item.status === "held" ? t("Not held after all") : t("Mark held")}
             </Button>
           )}
-          {/* 9.4 — the transcript is what tells the app the conversation
-              happened, so this one button ticks "held" and logs everybody's
-              time. Offered only once the entry is in a calendar (there is
-              nowhere else to look) and only while nothing has been read yet. */}
-          {canEdit && canPush && item.active && item.googleEventId && !item.transcriptCapturedAt && (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={busy !== null}
-              onClick={readTranscript}
-              className="gap-1.5"
-            >
-              {busy === "transcript" ? <Spinner /> : <FileText className="size-3.5" />}
-              {t("Read the transcript")}
+          {canEdit && (
+            <Button variant="outline" onClick={() => setEditing(true)} className="gap-1.5">
+              <Pencil className="size-3.5" />
+              {t("Edit")}
             </Button>
           )}
-          {canPush && item.active && !item.googleEventId && (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={busy !== null}
-              onClick={addToCalendar}
-              className="gap-1.5"
-            >
-              {busy === "calendar" ? <Spinner /> : <CalendarPlus className="size-3.5" />}
-              {t("Add to my calendar")}
-            </Button>
-          )}
-          {canCancel && (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={busy !== null}
-              onClick={() => setActive(!item.active)}
-              className={`gap-1.5 ${item.active ? "text-destructive hover:text-destructive" : ""}`}
-            >
-              {busy === "active" ? <Spinner /> : <Power className="size-3.5" />}
-              {item.active ? "Cancel it" : "Put it back"}
-            </Button>
-          )}
-        </div>
-      </div>
-
+          <RecordActionsMenu actions={overflow} />
+        </>
+      }
+    >
       <TabsView
+        className={STICKY_TABS}
         config={tabsConfig}
         value={tab}
         onValueChange={setTab}
@@ -373,7 +366,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
                       rows={8}
                       value={notesDraft ?? item.notes ?? ""}
                       onChange={(e) => setNotesDraft(e.target.value)}
-                      placeholder="Type as you go — this is the part worth keeping."
+                      placeholder="Type as you go, this is the part worth keeping."
                       disabled={busy !== null}
                       aria-label="Notes"
                     />
@@ -393,7 +386,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
                   <p className="text-sm whitespace-pre-wrap">{item.notes}</p>
                 ) : (
                   <p className="text-muted-foreground text-sm">
-                    Nothing written up yet — the notes are the part worth keeping.
+                    Nothing written up yet, the notes are the part worth keeping.
                   </p>
                 )}
               </section>
@@ -422,6 +415,14 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
         }}
         onSubmit={save}
       />
-    </div>
+    <RecordFooter
+        audit={{
+          createdByName: item.creatorName,
+          createdAt: item.createdAt,
+          editedByName: item.editorName,
+          updatedAt: item.updatedAt,
+        }}
+      />
+    </RecordScreen>
   )
 }

@@ -71,7 +71,7 @@ import {
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
 import { Comments } from "@kwapso/ui/registry/collections/comments/comments"
-import { GitBranch, ListOrdered, Pencil, Plus, Power } from "lucide-react"
+import { GitBranch, ListOrdered, Pencil, Power } from "lucide-react"
 
 import type { ProcessComment, ProcessDetail, ProcessStep, ProcessVersion } from "@shared/types"
 // The number and the words for it come from the file that computes it — never
@@ -84,7 +84,13 @@ import { SavingStepLine } from "@/components/value-panel"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, tenancy } from "@/lib/api"
-import { auditItems } from "@/lib/audit-overview"
+import {
+  RecordActionsMenu,
+  RecordFooter,
+  RecordScreen,
+  STICKY_TABS,
+  type RecordAction,
+} from "@/components/record-chrome"
 import { formatCount } from "@shared/web/format-count"
 import {
   PROCESS_VERSION_SLICES,
@@ -99,12 +105,13 @@ import { usePermissions } from "@/lib/perms"
 import { invalidate, invalidatePrefix, useCached } from "@shared/web/store"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import { useT } from "@shared/web/language"
+import { AddButton } from "@/components/deep-link/screen-bits"
 
 /** How a version is named out loud, everywhere on this screen: its number, then
  * what somebody called it. Written once so the picker, the banner and the
  * versions list cannot describe the same version three ways. */
 function versionLabel(v: ProcessVersion): string {
-  return `Version ${v.versionNo}${v.label ? ` — ${v.label}` : ""}${v.isBaseline ? " (baseline)" : ""}`
+  return `Version ${v.versionNo}${v.label ? `, ${v.label}` : ""}${v.isBaseline ? " (baseline)" : ""}`
 }
 
 /** One step's whole monthly cost: how long it takes, times how often it happens.
@@ -239,7 +246,7 @@ export function ProcessDetailScreen({
   const current = versions[0] ?? null
   const baseline = versions.find((v) => v.isBaseline) ?? null
   const currentLabel = current
-    ? `version ${current.versionNo}${current.label ? ` — ${current.label}` : ""}`
+    ? `version ${current.versionNo}${current.label ? `, ${current.label}` : ""}`
     : "the current version"
 
   // The steps on screen, and the version they belong to. While an older version
@@ -259,13 +266,7 @@ export function ProcessDetailScreen({
     { label: t("App"), value: process.appName },
     { label: t("Current version"), value: current ? versionLabel(current) : "—" },
     { label: t("Baseline"), value: baseline ? versionLabel(baseline) : "Version 1" },
-    ...auditItems({
-      createdByName: null,
-      createdAt: process.createdAt,
-      editedByName: null,
-      updatedAt: null,
-      status: process.active ? "Active" : "Archived",
-    }),
+    // The audit rows moved to the record footer (D7 / CHECKLIST 11.3).
   ]
 
   const tabsConfig = {
@@ -309,61 +310,37 @@ export function ProcessDetailScreen({
     ],
   }
 
-  return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight">
-            <span className="truncate">{process.name}</span>
-            {!process.active && (
-              <Badge variant="outline" className="text-muted-foreground text-[10px]">
-                {t("Archived")}
-              </Badge>
-            )}
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {process.appName}
-            {current ? ` · version ${current.versionNo}` : ""}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2 sm:ml-auto sm:shrink-0">
-          {canEdit && (
-            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-1.5">
-              <Pencil className="size-3.5" />
-              {t("Edit")}
-            </Button>
-          )}
-          {canCreate && (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={busy}
-              onClick={() =>
-                setConfirm({
-                  title: t("Cut a new version?"),
-                  body: "Today's steps are copied into a new version, and this one is kept exactly as it was agreed. Edits from now on describe the new way of working.",
-                  action: "Cut version",
-                  run: () =>
-                    run(
-                      () => tenancy.cutVersion(processId),
-                      "New version cut.",
-                      "Couldn't cut a new version."
-                    ),
-                })
-              }
-              className="gap-1.5"
-            >
-              <GitBranch className="size-3.5" />
-              {t("Cut version")}
-            </Button>
-          )}
-          {canArchive &&
-            (process.active ? (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={busy}
-                onClick={() =>
+  /* B1 / CHECKLIST 11.2 — Edit is the everyday act and stays visible; cutting a
+   * version and archiving move into the menu, each keeping its own confirm. */
+  const overflow: RecordAction[] = [
+    ...(canCreate
+      ? [
+          {
+            key: "cut",
+            label: t("Cut version"),
+            icon: <GitBranch className="size-3.5" />,
+            disabled: busy,
+            onSelect: () =>
+              setConfirm({
+                title: t("Cut a new version?"),
+                body: "Today's steps are copied into a new version, and this one is kept exactly as it was agreed. Edits from now on describe the new way of working.",
+                action: "Cut version",
+                run: () =>
+                  run(() => tenancy.cutVersion(processId), "New version cut.", "Couldn't cut a new version."),
+              }),
+          },
+        ]
+      : []),
+    ...(canArchive
+      ? [
+          process.active
+            ? {
+                key: "archive",
+                label: t("Archive"),
+                icon: <Power className="size-3.5" />,
+                disabled: busy,
+                destructive: true,
+                onSelect: () =>
                   setConfirm({
                     title: `Archive ${process.name}?`,
                     body: "It stops showing in the everyday lists and drops out of the value figures. Every version, every step and the whole conversation stay exactly where they are, and you can bring it back any time.",
@@ -374,34 +351,50 @@ export function ProcessDetailScreen({
                         "Process archived.",
                         "Couldn't archive the process."
                       ),
-                  })
-                }
-                className="text-destructive hover:text-destructive gap-1.5"
-              >
-                <Power className="size-3.5" />
-                {t("Archive")}
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                disabled={busy}
-                onClick={() =>
+                  }),
+              }
+            : {
+                key: "restore",
+                label: t("Restore"),
+                icon: <Power className="size-3.5" />,
+                disabled: busy,
+                onSelect: () =>
                   void run(
                     () => tenancy.setProcessActive(processId, true),
                     "Process restored.",
                     "Couldn't restore the process."
-                  )
-                }
-                className="gap-1.5"
-              >
-                {busy ? <Spinner /> : <Power className="size-3.5" />}
-                {t("Restore")}
-              </Button>
-            ))}
-        </div>
-      </div>
+                  ),
+              },
+        ]
+      : []),
+  ]
+
+  return (
+    <RecordScreen
+      eyebrow={t("Process")}
+      title={process.name}
+      status={[
+        process.appName,
+        current ? `${t("version")} ${current.versionNo}` : undefined,
+        process.active ? undefined : t("Archived"),
+      ]
+        .filter(Boolean)
+        .join(" · ")}
+      actions={
+        <>
+          {canEdit && (
+            <Button variant="outline" onClick={() => setEditOpen(true)} className="gap-1.5">
+              <Pencil className="size-3.5" />
+              {t("Edit")}
+            </Button>
+          )}
+          <RecordActionsMenu actions={overflow} />
+        </>
+      }
+    >
 
       <TabsView
+        className={STICKY_TABS}
         config={tabsConfig}
         value={tab}
         onValueChange={setTab}
@@ -458,17 +451,13 @@ export function ProcessDetailScreen({
                     </Select>
                   </div>
                   {canCreate && isCurrent && (
-                    <Button
-                      size="sm"
+                    <AddButton
+                      label="Add step"
                       onClick={() => {
                         setEditingStep(null)
                         setStepOpen(true)
                       }}
-                      className="gap-1.5"
-                    >
-                      <Plus className="size-3.5" />
-                      Add step
-                    </Button>
+                    />
                   )}
                 </div>
 
@@ -481,7 +470,7 @@ export function ProcessDetailScreen({
                     This is how the work was described when{" "}
                     {shownVersion ? versionLabel(shownVersion).toLowerCase() : "this version"} was
                     cut{shownVersion ? ` on ${new Date(shownVersion.createdAt).toLocaleDateString()}` : ""}.
-                    Older versions can be read but never edited — every saving is a subtraction from
+                    Older versions can be read but never edited, every saving is a subtraction from
                     them, so they stay exactly as they were agreed.
                   </p>
                 )}
@@ -500,7 +489,7 @@ export function ProcessDetailScreen({
                 ) : shownSteps.length === 0 ? (
                   <p className="text-muted-foreground text-sm">
                     {isCurrent
-                      ? "No steps yet. Add the first one and say how long it takes and how often it happens — that is what a saving is measured from."
+                      ? "No steps yet. Add the first one and say how long it takes and how often it happens, that is what a saving is measured from."
                       : "This version has no steps recorded."}
                   </p>
                 ) : (
@@ -560,7 +549,7 @@ export function ProcessDetailScreen({
                               onClick={() =>
                                 setConfirm({
                                   title: `Does "${step.name}" still happen?`,
-                                  body: "Recording that it stopped is how its whole time becomes a saving. The step keeps its place in this version and in every older one — nothing is deleted.",
+                                  body: "Recording that it stopped is how its whole time becomes a saving. The step keeps its place in this version and in every older one, nothing is deleted.",
                                   action: "It no longer happens",
                                   run: () =>
                                     run(
@@ -608,7 +597,7 @@ export function ProcessDetailScreen({
                 {saving && saving.steps.length > 0 && (
                   <div className="rounded-lg border p-4">
                     <p className="text-muted-foreground text-sm">
-                      Time given back, every month — {baseline ? versionLabel(baseline) : "the baseline"}{" "}
+                      Time given back, every month, {baseline ? versionLabel(baseline) : "the baseline"}{" "}
                       minus {current ? versionLabel(current) : "today"}
                     </p>
                     <p className="text-2xl font-semibold tracking-tight">
@@ -634,7 +623,7 @@ export function ProcessDetailScreen({
               <div className="flex flex-col gap-3">
                 <p className="text-muted-foreground text-sm">
                   Every version this way of working has been through. Open one to read its steps and
-                  the times they were agreed at — version 1 is how the work was done before us, and
+                  the times they were agreed at, version 1 is how the work was done before us, and
                   every saving is measured from it.
                 </p>
                 <div className="rounded-lg border">
@@ -646,7 +635,7 @@ export function ProcessDetailScreen({
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">
                           Version {v.versionNo}
-                          {v.label ? ` — ${v.label}` : ""}
+                          {v.label ? `, ${v.label}` : ""}
                           {v.isBaseline && (
                             <Badge variant="secondary" className="ml-2 text-[10px]">
                               baseline
@@ -693,7 +682,7 @@ export function ProcessDetailScreen({
                 items={(commentsQ.data?.comments ?? []).map((c) => ({
                   id: c.id,
                   author: c.createdByName ?? (c.fromStaff ? "Your team" : "A colleague"),
-                  body: c.explainsStepKey ? `Why a step takes longer — ${c.body}` : c.body,
+                  body: c.explainsStepKey ? `Why a step takes longer, ${c.body}` : c.body,
                   time: new Date(c.createdAt).toLocaleDateString(),
                 }))}
                 onAdd={
@@ -767,6 +756,13 @@ export function ProcessDetailScreen({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    <RecordFooter
+        audit={{
+          // The summary row carries the creation date and no names, so the
+          // footer says the one fact it has rather than four dashes.
+          createdAt: process.createdAt,
+        }}
+      />
+    </RecordScreen>
   )
 }

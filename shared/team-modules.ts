@@ -27,6 +27,13 @@ export const TEAM_MODULES = [
   "processes",
   "commercials",
   "work",
+  // EVERYONE ELSE'S TASKS — a switch over a SIGHT, not over a record. `work`
+  // already decides whether a person reaches the tasks screen at all; this
+  // decides whether the list they get is the whole team's or their own. It is a
+  // module row because that is what a right IS in this base (one row per role ×
+  // module on the tall sheet), and Aurora's ruling was that this particular
+  // question must be configurable rather than settled once for everybody.
+  "all_tasks",
   "todos",
   // MEETINGS — its own switch, because a meeting's NOTES are the thing being
   // permissioned. The taxonomy of why we meet lives under `delivery`; what was
@@ -97,7 +104,7 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   // `commercials` covers the two rate cards and the margin. It is AGENCY
   // material, and no client login ever passes one of its doors — which is why
   // it is a second module and not four more rights on the first.
-  processes: "Process maps",
+  processes: "Processes",
   commercials: "Rates & margin",
   // THE WORK ENGINE — what we DO, as opposed to what an account asks for. One
   // module covers stories, the sprints they sit in and the time logged against
@@ -110,6 +117,13 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   // To-dos are deliberately NOT here: a to-do is aimed at the client and they
   // must be able to complete one, so it is its own module with its own right.
   work: "Work",
+  // WHOSE TASKS YOU SEE. Read the row as a sentence: "this role may see
+  // everyone's tasks". Without it the tasks screen is still there and still
+  // works — it shows the ones assigned to you, and every count above it counts
+  // the same narrowed question. Only `read` is meaningful here, like `google`
+  // and `agent`: the module IS the switch, and creating or editing a task is
+  // still `work`'s decision.
+  all_tasks: "Everyone's tasks",
   // TO-DOS — the one part of the work engine a client login can WRITE to, which
   // is exactly why it is its own module and not four more rights on `work`. A
   // contact completes theirs and uploads a file against it from the portal

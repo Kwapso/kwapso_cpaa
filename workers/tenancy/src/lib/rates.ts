@@ -178,7 +178,7 @@ export async function updateAccountRate(
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Rate edited",
-    description: `${actor.name} edited the rate for ${input.label}${changes ? ` — ${changes}` : ""}`,
+    description: `${actor.name} edited the rate for ${input.label}${changes ? `, ${changes}` : ""}`,
     relatedTable: "account_rates",
     relatedRowId: id,
   })

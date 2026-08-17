@@ -210,7 +210,7 @@ export async function requireRight(
     throw new GuardError(
       403,
       "forbidden",
-      `You don't have permission to do that — your role is missing the "${right}" right on ${module.replace(/_/g, " ")}.`
+      `You don't have permission to do that, your role is missing the "${right}" right on ${module.replace(/_/g, " ")}.`
     )
 }
 

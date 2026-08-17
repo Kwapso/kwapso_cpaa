@@ -170,7 +170,7 @@ ON CONFLICT(user_id) WHERE deactivated_at IS NULL DO UPDATE SET
     // decorate a history line would be a cross-database read on every write.
     // The screen that renders the feed already has the member list in hand.
     description: before
-      ? `${actor.name} edited a staff profile${changes ? ` — ${changes}` : ""}`
+      ? `${actor.name} edited a staff profile${changes ? `, ${changes}` : ""}`
       : `${actor.name} wrote a staff profile`,
     relatedTable: "staff_profiles",
     relatedRowId: id,
@@ -366,7 +366,7 @@ export async function updateStaffCertificate(
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Certificate edited",
-    description: `${actor.name} edited the "${v.title}" certificate${changes ? ` — ${changes}` : ""}`,
+    description: `${actor.name} edited the "${v.title}" certificate${changes ? `, ${changes}` : ""}`,
     relatedTable: "staff_certificates",
     relatedRowId: id,
   })

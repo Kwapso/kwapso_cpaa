@@ -12,7 +12,6 @@
 
 import * as React from "react"
 
-import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
@@ -33,14 +32,14 @@ import {
   type PermissionMatrixConfig,
 } from "@kwapso/ui/registry/collections/permission-matrix/permission-matrix"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
-import { Lock, Pencil, Power } from "lucide-react"
+import { Pencil, Power } from "lucide-react"
 
 import type { PermissionValue, RolePermissions, TeamRole } from "@shared/types"
 import { RoleFormDialog } from "@/components/role-form-dialog"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, tenancy } from "@/lib/api"
-import { auditItems } from "@/lib/audit-overview"
+import { RecordFooter, RecordScreen, STICKY_TABS } from "@/components/record-chrome"
 import { formatCount } from "@shared/web/format-count"
 import { usePermissions } from "@/lib/perms"
 import { primeCache, useCached } from "@shared/web/store"
@@ -156,13 +155,7 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
   const overviewItems = [
     { label: t("Description"), value: role.description || "—" },
     { label: t("Members with this role"), value: String(role.memberCount) },
-    ...auditItems({
-      createdByName: role.createdByName,
-      createdAt: role.createdAt,
-      editedByName: role.editedByName,
-      updatedAt: role.updatedAt,
-      status: role.active ? "Active" : "Inactive",
-    }),
+    // The audit rows moved to the record footer (D7 / CHECKLIST 11.3).
   ]
 
 
@@ -183,42 +176,25 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Role header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-            <span className="truncate">{role.title}</span>
-            {role.isDefault && (
-              <Badge variant="outline" className="gap-1 text-[10px]">
-                <Lock className="size-2.5" aria-hidden />
-                {t("Locked")}
-              </Badge>
-            )}
-            {!role.active && (
-              <Badge variant="outline" className="text-muted-foreground text-[10px]">
-                {t("Inactive")}
-              </Badge>
-            )}
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {role.description || `${role.memberCount} member${role.memberCount === 1 ? "" : "s"}`}
-          </p>
-        </div>
-        {canSave && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setEditingOpen(true)}
-            className="shrink-0 gap-1.5"
-          >
+    <RecordScreen
+      eyebrow={[t("Role"), role.isDefault ? t("Locked") : null, role.active ? null : t("Inactive")]
+        .filter(Boolean)
+        .join(" · ")}
+      title={role.title}
+      status={
+        role.description || `${role.memberCount} member${role.memberCount === 1 ? "" : "s"}`
+      }
+      actions={
+        canSave ? (
+          <Button variant="outline" onClick={() => setEditingOpen(true)} className="shrink-0 gap-1.5">
             <Pencil className="size-3.5" />
             {t("Edit details")}
           </Button>
-        )}
-      </div>
-
+        ) : undefined
+      }
+    >
       <TabsView
+        className={STICKY_TABS}
         config={tabsConfig}
         value={tab}
         onValueChange={setTab}
@@ -323,6 +299,14 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    <RecordFooter
+        audit={{
+          createdByName: role.createdByName,
+          createdAt: role.createdAt,
+          editedByName: role.editedByName,
+          updatedAt: role.updatedAt,
+        }}
+      />
+    </RecordScreen>
   )
 }

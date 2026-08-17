@@ -125,7 +125,7 @@ export function AgentPanel({
               </div>
             )}
           </div>
-          <SheetDescription>{t("Ask me anything, or tell me what to change — I'll only do what you can do.")}</SheetDescription>
+          <SheetDescription>{t("Ask me anything, or tell me what to change. I'll only do what you can do.")}</SheetDescription>
         </SheetHeader>
 
         {!canUse ? (

@@ -83,14 +83,14 @@ export const SPRINT_TYPE_CATALOGUE: {
 }[] = [
   { value: "Assessment", mark: null, nameDe: null, description: null, standardDays: null },
   { value: "Diagnostic", mark: "🔎", nameDe: "Prozessanalyse", description: "We map the organisation around the solution, the tool stack, the data architecture, the way the work is done today and the main user stories behind it, and we set out what it costs in time and money now, alongside the needs and expectations.", standardDays: 14 },
-  { value: "Process Optimization", mark: "🎯", nameDe: "Prozessoptimierung", description: "Working from the diagnostic, we design the improved process — removing steps, simplifying them, automating them — and produce the assets and the solution paper that meet the needs and expectations and bring the running cost down.", standardDays: 7 },
+  { value: "Process Optimization", mark: "🎯", nameDe: "Prozessoptimierung", description: "Working from the diagnostic, we design the improved process, removing steps, simplifying them, automating them, and produce the assets and the solution paper that meet the needs and expectations and bring the running cost down.", standardDays: 7 },
   { value: "Data Migration", mark: "🗂️", nameDe: "Datenpflege", description: null, standardDays: 7 },
   { value: "Foundation", mark: "🛠️", nameDe: "Fundament", description: "Your data, in your app. This is the foundation everything else is built on.", standardDays: 7 },
   { value: "Implementation", mark: "💎", nameDe: "Umsetzung", description: "We build everything designed during the process optimization, on top of the foundation.", standardDays: 21 },
-  { value: "Validation", mark: "👀", nameDe: "Validierung", description: "The stakeholders watch the walkthrough, and at the end of the week we meet so you can show us how you use the app. We answer your questions, find what can still be improved, and write the tickets together — though you can raise one at any moment.", standardDays: 14 },
+  { value: "Validation", mark: "👀", nameDe: "Validierung", description: "The stakeholders watch the walkthrough, and at the end of the week we meet so you can show us how you use the app. We answer your questions, find what can still be improved, and write the tickets together, though you can raise one at any moment.", standardDays: 14 },
   { value: "Refinement", mark: "✨", nameDe: "Anpassung", description: null, standardDays: 14 },
   { value: "Training", mark: "🎓", nameDe: "Schulung", description: "One live online training with the main stakeholders, and a follow-up meeting a few days later to answer what came up.", standardDays: 7 },
-  { value: "Enhancement", mark: "🚀", nameDe: "Erweiterung", description: "An enhancement cycle adds new steps around what is already live — better automations, new screens, new user stories. It covers a fixed number of tickets and is priced on its own. It opens with one clarification and ideation meeting where we adjust the process map and agree expectations, and closes with a recording of what was built and one follow-up meeting for questions and training.", standardDays: 21 },
+  { value: "Enhancement", mark: "🚀", nameDe: "Erweiterung", description: "An enhancement cycle adds new steps around what is already live, better automations, new screens, new user stories. It covers a fixed number of tickets and is priced on its own. It opens with one clarification and ideation meeting where we adjust the process map and agree expectations, and closes with a recording of what was built and one follow-up meeting for questions and training.", standardDays: 21 },
 ]
 
 export const TEAM_MIGRATIONS: { version: string; sql: string }[] = [
@@ -2271,6 +2271,97 @@ ALTER TABLE meetings ADD COLUMN recurring_event_id TEXT;
 CREATE INDEX idx_meetings_recurring ON meetings (recurring_event_id);
 `,
   },
+  {
+    // WHO MAY READ WHAT, IN TWO PLACES THAT ASK THE SAME QUESTION (12.3 + 4.9).
+    //
+    // ── ONE COLUMN, AND WHY IT IS NOT \`app_id\` ─────────────────────────────
+    // The knowledge base had exactly two settings: the team's, or one person's
+    // (\`owner_user_id\`). The owner asked to "choose what information in the
+    // knowledge base is accessible by whom", and the gap was the middle: a source
+    // somebody wants kept off a wider audience INSIDE the agency without making
+    // it answerable to themselves alone.
+    //
+    // The answer rides a fence the app already has rather than inventing an
+    // access-control list. 8.11 already decided that only the staff on an app
+    // (plus an admin) open it, and \`app_staff\` is where that lives — so a source
+    // can now say "the people on this app", and the sentence a reader has to
+    // learn is one they already know.
+    //
+    // A SECOND COLUMN RATHER THAN A MEANING ON \`app_id\`, and this is the load-
+    // bearing bit: \`app_id\` is the SWEEP's. It says what a mirrored source is
+    // ABOUT and is rewritten on every pass (knowledge-ingest.ts's upsert sets
+    // \`app_id = excluded.app_id\`). A person's decision about who may read
+    // something cannot live in a column a background job overwrites. Two columns,
+    // two owners, no collision.
+    //
+    // NULL means the team's, so every row that exists keeps exactly the reach it
+    // had. No back-fill: the absence IS the old behaviour.
+    //
+    // ── AND THE PERMISSION ROW BESIDE IT ───────────────────────────────────
+    // "Everything with permissions should be configurable" (Aurora, 17 Aug). Who
+    // may see everyone ELSE's tasks was hard-coded to "everybody" — so it becomes
+    // an ordinary module row on the tall sheet, and the door narrows a caller
+    // without it to their own name through the \`assigneeId\` filter it already
+    // parses. \`is_default\` is 1 on the locked Admin role alone, so it doubles as
+    // the bit: Admin gains it in full, every other role gains nothing. The same
+    // shape as 0007, 0013, 0018, 0019, 0021 and 0024. New teams don't reach this
+    // — their seed writes the rows already, and it writes this one OFF.
+    version: "0033_knowledge_visibility_and_task_sight",
+    sql: `
+ALTER TABLE knowledge_sources ADD COLUMN visible_to_app_id TEXT REFERENCES apps (id);
+
+INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+SELECT lower(hex(randomblob(16))), r.id, 'all_tasks', r.is_default, r.is_default, r.is_default, r.is_default
+  FROM member_roles r
+ WHERE NOT EXISTS (
+   SELECT 1 FROM role_permissions p WHERE p.role_id = r.id AND p.module = 'all_tasks'
+ );
+`,
+  },
+  {
+    // ── THE WORDS, AND THE GLYPH BESIDE EACH ONE ──────────────────────────────
+    //
+    // CHECKLIST 2.1 and 2.2 settle the vocabulary: a ticket is a Question, an
+    // Issue, a Request, an Extra or Requirements, and a story is a Fix, a
+    // Feature or a Change. Two of the old ticket words go — Aurora retired
+    // Feedback and Bug, and this is a "what", so hers is the answer.
+    //
+    // RETIRED, NEVER DELETED. Every ticket ever filed as a Bug still says Bug:
+    // the row is deactivated, so it vanishes from the pickers and from its
+    // sub-tab while every historic record reads exactly as it was written. That
+    // is deactivate-not-delete applied to a WORD, and it is the whole reason the
+    // Dropdown values screen has an Activate button.
+    //
+    // AND THE MARK (CHECKLIST 11.8, UI-RULEBOOK G2). One glyph per type, in the
+    // slot an icon would take, so a list of forty is readable without reading.
+    // It is set as DATA rather than written into a component, which is the
+    // fourth of the four conditions UI-CONVENTIONS §5 puts on a type mark: a
+    // team changes any of these on its own Dropdown values screen. Only rows
+    // with no glyph yet are touched, so a team that has already chosen one keeps
+    // it. Sprint types already carry theirs (0025).
+    //
+    // Extra and Requirements deliberately get none: the agency's legacy data has
+    // no pictograph for either, and an invented one would be a guess wearing the
+    // authority of a seeded default. A missing mark costs nothing — the WORD is
+    // always beside it (condition three), so it is never the only thing carrying
+    // the meaning.
+    version: "0034_ticket_and_story_vocabulary",
+    sql: `
+INSERT INTO selectable_data (id, type, value, is_default, created_at, creator_id, creator_email, creator_name)
+SELECT lower(hex(randomblob(16))), 'Ticket type', 'Requirements', 1, datetime('now'), NULL, NULL, 'System'
+ WHERE NOT EXISTS (SELECT 1 FROM selectable_data s WHERE s.type = 'Ticket type' AND s.value = 'Requirements');
+
+UPDATE selectable_data SET deactivated_at = datetime('now'), deactivator_name = 'System'
+ WHERE type = 'Ticket type' AND value IN ('Feedback', 'Bug') AND deactivated_at IS NULL;
+
+UPDATE selectable_data SET mark = '❓' WHERE type = 'Ticket type' AND value = 'Question' AND mark IS NULL;
+UPDATE selectable_data SET mark = '⚠️' WHERE type = 'Ticket type' AND value = 'Issue' AND mark IS NULL;
+UPDATE selectable_data SET mark = '💭' WHERE type = 'Ticket type' AND value = 'Request' AND mark IS NULL;
+UPDATE selectable_data SET mark = '🐛' WHERE type = 'Story type' AND value = 'Fix' AND mark IS NULL;
+UPDATE selectable_data SET mark = '✨' WHERE type = 'Story type' AND value = 'Feature' AND mark IS NULL;
+UPDATE selectable_data SET mark = '🔀' WHERE type = 'Story type' AND value = 'Change' AND mark IS NULL;
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }
@@ -2296,14 +2387,26 @@ export const DEFAULT_SELECTABLE: DefaultSelectable[] = [
   { type: "File type", value: "Video link" },
   { type: "File type", value: "Other file" },
   { type: "File type", value: "Other link" },
-  // The four types SCOPE ch.07 names, and no more. It calls this an EDITABLE
-  // list, so these are a starting vocabulary rather than a fixed set — a team
-  // adds its own on the Dropdown values screen, and the migration that brought
-  // these to existing teams left their older types alone for the same reason.
-  { type: "Ticket type", value: "Feedback" },
-  { type: "Ticket type", value: "Bug" },
-  { type: "Ticket type", value: "Question" },
+  // THE FIVE WORDS THE AGENCY ACTUALLY USES (CHECKLIST 2.1), each carrying the
+  // mark it is recognised by (11.8, UI-RULEBOOK G2). "Feedback" and "Bug" are
+  // gone from the starting vocabulary: Aurora retired them, and a "bug" is an
+  // Issue and "feedback" is a Request in the words of the people who file them.
+  // Existing teams keep their rows — migration 0034 DEACTIVATES those two rather
+  // than deleting them, so every historic ticket still reads correctly.
+  //
+  // It is still an EDITABLE list, not an enum: a team adds its own on the
+  // Dropdown values screen, and sets its own glyph beside each word there.
+  { type: "Ticket type", value: "Question", mark: "❓" },
+  { type: "Ticket type", value: "Issue", mark: "⚠️" },
+  { type: "Ticket type", value: "Request", mark: "💭" },
   { type: "Ticket type", value: "Extra" },
+  { type: "Ticket type", value: "Requirements" },
+  // THE THREE KINDS OF WORK (CHECKLIST 2.2), same shape and same reason. They
+  // reached existing teams through migration 0028 and were never in the seed, so
+  // a brand-new team's story form offered an empty picker.
+  { type: "Story type", value: "Fix", mark: "🐛" },
+  { type: "Story type", value: "Feature", mark: "✨" },
+  { type: "Story type", value: "Change", mark: "🔀" },
   // Display-only labels for the five built-in states. The status the code trusts
   // is HELP_STATUSES in shared/types.ts — these rows are what a team may reword
   // on screen, and renaming one can never move a ticket.
@@ -2392,15 +2495,24 @@ export function buildTeamSeed(
     [sqlString(now), sqlString(actor.id), sqlString(actor.email), sqlString(actor.name), ...extra].join(", ")
 
   const statements: string[] = [
-    `INSERT INTO member_roles (id, title, description, is_default, created_at, creator_id, creator_email, creator_name) VALUES (${sqlString(adminRoleId)}, 'Admin', 'Default role — full access, can''t be edited.', 1, ${a([])});`,
-    `INSERT INTO member_roles (id, title, description, is_default, created_at, creator_id, creator_email, creator_name) VALUES (${sqlString(viewerRoleId)}, 'Viewer', 'Read-only — can view everything, change nothing.', 0, ${a([])});`,
+    `INSERT INTO member_roles (id, title, description, is_default, created_at, creator_id, creator_email, creator_name) VALUES (${sqlString(adminRoleId)}, 'Admin', 'Default role, full access, can''t be edited.', 1, ${a([])});`,
+    `INSERT INTO member_roles (id, title, description, is_default, created_at, creator_id, creator_email, creator_name) VALUES (${sqlString(viewerRoleId)}, 'Viewer', 'Read-only, can view everything, change nothing.', 0, ${a([])});`,
   ]
 
   for (const module of TEAM_MODULES) {
-    // Default Viewer rights are read-only everywhere, EXCEPT the agent: everyone
-    // may USE it out of the box (read+create) — it still can't exceed the user's
-    // other rights, so a Viewer's agent is read-only in practice anyway.
-    const [vr, vc, ve, vd] = module === "agent" ? [1, 1, 0, 0] : [1, 0, 0, 0]
+    // Default Viewer rights are read-only everywhere, with two exceptions.
+    //
+    // THE AGENT: everyone may USE it out of the box (read+create) — it still
+    // can't exceed the user's other rights, so a Viewer's agent is read-only in
+    // practice anyway.
+    //
+    // EVERYONE ELSE'S TASKS: off, like every right that widens what one person
+    // sees of another's work. 4.9's ruling is "off by default for every role
+    // except Admin", and the Admin row below is the one that says 1, 1, 1, 1 to
+    // everything. A Viewer without it still sees their own tasks — the door
+    // narrows, it does not refuse.
+    const [vr, vc, ve, vd] =
+      module === "agent" ? [1, 1, 0, 0] : module === "all_tasks" ? [0, 0, 0, 0] : [1, 0, 0, 0]
     statements.push(
       `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete) VALUES (${sqlString(ulid())}, ${sqlString(adminRoleId)}, ${sqlString(module)}, 1, 1, 1, 1);`,
       `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete) VALUES (${sqlString(ulid())}, ${sqlString(viewerRoleId)}, ${sqlString(module)}, ${vr}, ${vc}, ${ve}, ${vd});`

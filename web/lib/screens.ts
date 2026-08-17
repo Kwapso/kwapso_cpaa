@@ -437,8 +437,8 @@ const processesListRecipe: ScreenRecipe = {
   fields: [field("name", "Process"), field("detail", "Details")],
   actions: [],
   collection: listCollection(
-    "No process maps yet.",
-    "Search process maps…",
+    "No processes yet.",
+    "Search processes…",
     [
       { field: "app", label: "App", control: "select" },
       { field: "archived", label: "Archived", control: "select" },

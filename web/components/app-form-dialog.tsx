@@ -24,7 +24,6 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Checkbox } from "@kwapso/ui/registry/primitives/checkbox/checkbox"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
@@ -36,10 +35,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { Pencil, Plus } from "lucide-react"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure, tenancy } from "@/lib/api"
@@ -289,15 +286,13 @@ export function AppFormDialog({
         <DialogDescription>
           {editing
             ? "Change what it's called, or where it has got to."
-            : "A system we built for somebody. Process maps live inside one."}
+            : "A system we built for somebody. Processes live inside one."}
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !ready} className="gap-1.5">
-          {busy ? <Spinner /> : editing ? <Pencil className="size-4" /> : <Plus className="size-4" />}
-          {busy ? "Saving…" : editing ? "Save changes" : "Record it"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !ready,
+      }}
     >
       <Field config={nameField} htmlFor="app-name" className={fieldSpacing}>
         <Input

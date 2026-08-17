@@ -217,29 +217,33 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // belong on the story — and neither is a place a person goes to find "the time
   // I logged". A tester with 115 entries reported she could not find any of it.
   //
-  // "Time" rather than "Work logs": the glossary defines a work log as "one row
-  // of time", and the two screens that already show them are both headed Time.
+  // "WORK LOGS", not "Time" (CHECKLIST 2.6). It was headed Time on the argument
+  // that the glossary defines a work log as "one row of time" — but the glossary
+  // TERM is `Work log`, and the story record's own tab had already moved to that
+  // word, so the rail was the last screen calling one thing two names (Law R6).
+  // The URL segment is deliberately left alone: `/time` is a link people have
+  // already sent each other, and a slug is not a word anybody reads.
   // The count is the exact number of ROWS (R16), keyed off the same cache the
   // list reads; the hours are a second, different number the screen says itself.
-  { key: "time", title: "Time", module: "work", segment: "time", placement: "sidebar", countCacheKey: "work-logs", group: "daily" },
+  { key: "time", title: "Work logs", module: "work", segment: "time", placement: "sidebar", countCacheKey: "work-logs", group: "daily" },
   // ── and below the divider ────────────────────────────────────────────────
   { key: "meetings", title: "Meetings", module: "meetings", segment: "meetings", placement: "sidebar", countCacheKey: "meetings", group: "occasional" },
-  // Apps gate on `processes`, not `work`: an app is the thing a process map
+  // Apps gate on `processes`, not `work`: an app is the thing a process
   // hangs off, and the module that owns the App → Process → Step chain is the
   // one whose right a person needs to see any of it.
   { key: "apps", title: "Apps", module: "processes", segment: "apps", placement: "sidebar", countCacheKey: "apps", group: "occasional" },
-  // PROCESS MAPS — App → Process → Step, and the value drilled through them.
-  // CONTEXTUAL since 17 Aug 2026: the owner's ruling is that a map lives under
+  // PROCESSES — App → Process → Step, and the value drilled through them.
+  // CONTEXTUAL since 17 Aug 2026: the owner's ruling is that a process lives under
   // the APP it belongs to, and it is reached from that app's own screen. Nothing
   // under it changed — the list, the record, the versions, the steps and the
   // arithmetic are all still here, and `/t/<team>/processes/<id>` still opens a
-  // map. What went is the line on the nav rail, because "which app is this a map
-  // of?" is a question a rail full of maps makes somebody ask every time.
+  // process. What went is the line on the nav rail, because "which app is this
+  // a process of?" is a question a rail full of them makes somebody ask every time.
   //
   // It keeps its count key: the heading on the screen still badges the exact
   // server total of the PROCESSES, keyed off the same `processes:<teamId>` cache
   // the list reads.
-  { key: "processes", title: "Process maps", module: "processes", segment: "processes", placement: "contextual", countCacheKey: "processes" },
+  { key: "processes", title: "Processes", module: "processes", segment: "processes", placement: "contextual", countCacheKey: "processes" },
   { key: "sprints", title: "Sprints", module: "work", segment: "sprints", placement: "sidebar", countCacheKey: "sprints", group: "occasional" },
   // THE AGENCY'S OWN HOUSEKEEPING — one sidebar page, gated by its own read
   // right so a role without it never sees the destination at all. Its count is

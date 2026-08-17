@@ -18,14 +18,11 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { Pencil, Plus } from "lucide-react"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
@@ -47,7 +44,7 @@ const minutesField = {
   ...defaultFieldConfig,
   label: "Minutes it takes, each time",
   required: true,
-  hint: "The time you agreed with them — not a measurement.",
+  hint: "The time you agreed with them, not a measurement.",
 }
 const runsField = {
   ...defaultFieldConfig,
@@ -128,12 +125,10 @@ export function StepFormDialog({
           {t("It goes into")} {versionLabel}. Older versions stay exactly as they were agreed.
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !ready} className="gap-1.5">
-          {busy ? <Spinner /> : editing ? <Pencil className="size-4" /> : <Plus className="size-4" />}
-          {busy ? "Saving…" : editing ? "Save step" : "Add step"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !ready,
+      }}
     >
       <Field config={nameField} htmlFor="step-name" className={fieldSpacing}>
         <Input

@@ -145,6 +145,14 @@ export function buildSpineDb(): DatabaseSync {
   // would ever hold it — every work-engine door refuses a portal caller outright
   // — which is precisely why the burglar must: a refusal proved against a caller
   // whose ROLE already stopped them proves nothing about the door.
+  // `all_tasks` (4.9) is on the list for BOTH reasons at once. For the staff
+  // caller it is the ordinary case — this harness's suites are about what the
+  // task doors DO, and a role missing the right would narrow every one of them
+  // to one person's list and quietly turn six view tests into assertions about
+  // an empty array. For the burglar it is the worst case: the widest sight of
+  // our own admin a role can be given, so a refusal proved with it held is a
+  // refusal proved by the DOOR. The narrowing itself is proved separately, by a
+  // caller who deliberately does not hold it (todos-tasks.test.ts).
   const grantAll = (roleId: string) =>
     db.exec(`
       INSERT INTO member_roles (id, title, is_default, created_at) VALUES ('${roleId}', '${roleId}', 0, '2026-01-01');
@@ -154,7 +162,8 @@ export function buildSpineDb(): DatabaseSync {
               UNION ALL SELECT 'portal_users'
               UNION ALL SELECT 'team_members' UNION ALL SELECT 'member_roles'
               UNION ALL SELECT 'help' UNION ALL SELECT 'processes'
-              UNION ALL SELECT 'work' UNION ALL SELECT 'todos') m;`)
+              UNION ALL SELECT 'work' UNION ALL SELECT 'all_tasks'
+              UNION ALL SELECT 'todos') m;`)
   grantAll(IDS.adminRole)
   grantAll(IDS.clientRole)
 

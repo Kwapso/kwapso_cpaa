@@ -345,7 +345,7 @@ async function resolveProcesses(
     throw new GuardError(
       400,
       "process_required",
-      "Say which process this work changes — or tick that it changes none."
+      "Say which process this work changes, or tick that it changes none."
     )
   }
   if (ids.length > STORY_PROCESS_CAP)
@@ -609,7 +609,7 @@ VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(accountId)}, ${sqlStrin
 
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Story created",
-    description: `${actor.name} created ${ref ? `story ${ref}` : "a story"} — ${title}`,
+    description: `${actor.name} created ${ref ? `story ${ref}` : "a story"}, ${title}`,
     relatedTable: "stories",
     relatedRowId: id,
   })
@@ -701,7 +701,7 @@ export async function updateStory(
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Story edited",
-    description: `${actor.name} edited ${before.ref ?? "a story"}${changes ? ` — ${changes}` : ""}`,
+    description: `${actor.name} edited ${before.ref ?? "a story"}${changes ? `, ${changes}` : ""}`,
     relatedTable: "stories",
     relatedRowId: id,
   })
@@ -722,7 +722,7 @@ export function refuseUnstepped(row: { step_key: string | null; changes_no_step:
   throw new GuardError(
     400,
     "step_required",
-    "Before this can be done, say which process step it changed — or tick that it changed none."
+    "Before this can be done, say which process step it changed, or tick that it changed none."
   )
 }
 
@@ -758,7 +758,7 @@ async function refuseUnreviewable(
     throw new GuardError(
       400,
       "review_note_required",
-      "Before this goes for review, say what you did — a line or two is plenty."
+      "Before this goes for review, say what you did, a line or two is plenty."
     )
   const running = await d1Query<{ n: number }>(
     cfg,
@@ -773,7 +773,7 @@ async function refuseUnreviewable(
     throw new GuardError(
       409,
       "timer_running",
-      "Stop the timer on this first — work still being clocked isn't finished work."
+      "Stop the timer on this first, work still being clocked isn't finished work."
     )
 }
 
@@ -1073,7 +1073,7 @@ VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(accountId)}, ${sqlStrin
   )
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Sprint created",
-    description: `${actor.name} started ${ref ? `sprint ${ref}` : "a sprint"} — ${name}`,
+    description: `${actor.name} started ${ref ? `sprint ${ref}` : "a sprint"}, ${name}`,
     relatedTable: "sprints",
     relatedRowId: id,
   })
@@ -1144,7 +1144,7 @@ export async function updateSprint(
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Sprint edited",
-    description: `${actor.name} edited ${before.ref ?? before.name}${changes ? ` — ${changes}` : ""}`,
+    description: `${actor.name} edited ${before.ref ?? before.name}${changes ? `, ${changes}` : ""}`,
     relatedTable: "sprints",
     relatedRowId: id,
   })

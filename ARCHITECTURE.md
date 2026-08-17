@@ -1,50 +1,50 @@
-# Brimba — Architecture (the 20 locked decisions)
+# Brimba. Architecture (the 20 locked decisions)
 
 The gateway is also the app's public address: it serves the web screens as
 static assets AND routes /api/* to the domain workers (service bindings), so
-screens and brains share one origin — login cookies work everywhere, including
+screens and brains share one origin, login cookies work everywhere, including
 installed iPhone apps.
 
 Decided with the user on 2026-06-12 across 20 targeted questions. This is the
-**master decision document** — every worker, table, and screen must follow it.
+**master decision document**, every worker, table, and screen must follow it.
 Do not relitigate any "LOCKED" item without the user.
 
-> Brimba is a real product meant to run at scale immediately — never call it a
+> Brimba is a real product meant to run at scale immediately. Never call it a
 > "v1" or "MVP". Reference data model: the user's Glide "Base v3" exports
 > (users, teams, team members, member roles, learning, help + help threads,
 > invite logs, email change logs, all activity, selectable data + types,
 > importable databases, data import sessions). That list is the EXPORT, not the
-> app: learning is the one sheet with nothing behind it any more — the module was
+> app: learning is the one sheet with nothing behind it any more, the module was
 > purged on 17 Aug 2026 (DATA-MODEL.md says what became of its material).
 
-## 1 · Data — where things live (LOCKED)
+## 1 · Data, where things live (LOCKED)
 
 - **Per-team databases.** A small GLOBAL D1 core holds: `users`, `teams`,
   `team_members` (the card catalog: user → team → role id), `email_change_logs`,
   and the import registry. Every team then gets **its own D1 database** holding
   all its tables: roles + permissions, help + threads, invite logs,
   selectable data, activity, import sessions. Another team's rows are never in
-  the same database — isolation by physics, not by query discipline.
+  the same database, isolation by physics, not by query discipline.
 - **Sharding machinery: BUILT (2026-06-12)** per the locked build-everything
   call: a nightly cron sizes every team database and alarms at 80% of D1's
   10GB cap (`db_alerts`); the **mover** relocates a heavy module to its own
   database (`team_module_databases` routing); reads merge across locations
-  via `d1QueryAcross` + `resolveModuleDatabases` — the splitter read-path
+  via `d1QueryAcross` + `resolveModuleDatabases`, the splitter read-path
   modules will use. Maintenance via x-admin-key endpoints.
 - Every row: globally-unique, team-stamped IDs (rows can move homes without
   collisions). Every worker reads/writes through ONE data-access layer.
 
-## 2 · The machine — workers (LOCKED)
+## 2 · The machine, workers (LOCKED)
 
 Domain workers, each small enough for an AI agent to hold fully in its head.
-**8 are built & on disk** — the six shared brains (auth, tenancy, realtime,
+**8 are built & on disk**, the six shared brains (auth, tenancy, realtime,
 content, data-ops, mcp) under **TWO front doors**: `gateway` (the agency app,
 `web/`) and `portal-gateway` (the client portal, `web-portal/`). `npm run check`
 type-checks both front ends and all eight workers, then runs the full
 unit/integration suite across every workspace.
 
-**ONE ROSTER, AND IT IS NOT HERE.** What each worker owns — and, more usefully,
-*why each one is its own worker* — is a table in
+**ONE ROSTER, AND IT IS NOT HERE.** What each worker owns, and, more usefully,
+*why each one is its own worker*, is a table in
 **[BASE-MANUAL.md §1](BASE-MANUAL.md)**. What each one BINDS, when its crons run
 and which hostname it answers on is in **[OPERATIONS.md](OPERATIONS.md)**. This
 section used to carry a third copy of both, and it is how the sentence below it
@@ -55,10 +55,10 @@ What is LOCKED here is the shape, not the inventory:
 
 | The decision | Why it is locked |
 |---|---|
-| **Split by DOMAIN, not by convenience** — each worker small enough for an agent to hold fully in its head | The unit of understanding is the unit of deployment. A worker you cannot read in one sitting is one nobody changes safely. |
-| **Exactly TWO public doors** — `gateway` (agency, `web/`) and `portal-gateway` (client, `web-portal/`) | A third public address would be a third route onto `/internal/*`, the agent and the act-as-user surface. Everything else sets `workers_dev:false` **and** `preview_urls:false`. |
-| **Neither door owns data** — both forward to the same gated routes | It is what makes the portal and the agency app two VIEWS of the same rows (SCOPE ch.04 "two front doors, one building") rather than two systems that drift. |
-| **The agency door routes by PREFIX; the portal door by a NAMED allow-list** | The one structural difference between them, and the whole point of a second door: a prefix fan-out on a client-facing origin would publish every tenancy route, data-ops and `/mcp` to the client internet, each defended only by a role check. The allow-list is the door table in `workers/portal-gateway/src/index.ts` — the count lives there, never in prose. |
+| **Split by DOMAIN, not by convenience**, each worker small enough for an agent to hold fully in its head | The unit of understanding is the unit of deployment. A worker you cannot read in one sitting is one nobody changes safely. |
+| **Exactly TWO public doors**, `gateway` (agency, `web/`) and `portal-gateway` (client, `web-portal/`) | A third public address would be a third route onto `/internal/*`, the agent and the act-as-user surface. Everything else sets `workers_dev:false` **and** `preview_urls:false`. |
+| **Neither door owns data**, both forward to the same gated routes | It is what makes the portal and the agency app two VIEWS of the same rows (SCOPE ch.04 "two front doors, one building") rather than two systems that drift. |
+| **The agency door routes by PREFIX; the portal door by a NAMED allow-list** | The one structural difference between them, and the whole point of a second door: a prefix fan-out on a client-facing origin would publish every tenancy route, data-ops and `/mcp` to the client internet, each defended only by a role check. The allow-list is the door table in `workers/portal-gateway/src/index.ts`, the count lives there, never in prose. |
 | **The planned `workers/config` recipe store was folded into `tenancy`** | It was one table and two routes hanging off the tenant spine. A worker for that would have been a deployment boundary bought with nothing. |
 
 Both gateways are guarded by tests that derive their surface from code rather
@@ -67,27 +67,27 @@ the portal does not name must 404) and `web-portal/test/portal-fence.test.ts`
 (every read it does name is walked through to the lib function behind it, which
 must carry the account fence).
 
-### Durable Objects — code vs runtime, and how they scale (LOCKED 2026-06-15)
+### Durable Objects, code vs runtime, and how they scale (LOCKED 2026-06-15)
 
 **The decision: a worker count and a Durable-Object count are different things,
 and the runtime one is the only one that grows with teams.** Deployed code does
 not scale with the tenant list; addressed instances do, without limit, and idle
 ones hibernate for ~nothing.
 
-The distinction itself — worker vs DO *class* vs DO *instance*, with the counts
-and what each one costs — is explained once, in a table, in
+The distinction itself, worker vs DO *class* vs DO *instance*, with the counts
+and what each one costs, is explained once, in a table, in
 **[DURABLE-OBJECTS.md §1](DURABLE-OBJECTS.md)**. It is not repeated here: this
 section is the ruling, that document is the mechanism, and two step-by-step
 accounts of one model are two accounts that can disagree.
 
 What this section locks is the part that is a DECISION rather than a fact of the
-platform — **what gets a DO instance, and what does NOT:**
-- **Live channels — one instance per team AND one per user** (`TeamChannel`,
+platform, **what gets a DO instance, and what does NOT:**
+- **Live channels, one instance per team AND one per user** (`TeamChannel`,
   addressed `team:<id>` or `user:<id>`). A team change pings that team's channel
   (every active member); an identity / cross-team-membership / sign-out event pings
   that user's channel (their devices). Each ping is **row-level** (`{resource, id,
   op}`), NOT one-DO-per-record.
-- **Transactional entity — one instance per *contended* thing** (an inventory
+- **Transactional entity, one instance per *contended* thing** (an inventory
   cell, a ledger account, a booking slot), and ONLY where serialized
   read-modify-write matters. Reserved for hot counters/balances. Race-free
   because one instance handles its requests one at a time (single-threaded);
@@ -104,13 +104,13 @@ on top follows [CACHING.md](CACHING.md).
 
 > **That paragraph is about the NUMBER of instances, and it is only half the
 > story.** Instances scale by key without limit; what does *not* scale without
-> limit is **one instance's fan-out** — a channel broadcasts to its sockets
+> limit is **one instance's fan-out**, a channel broadcasts to its sockets
 > serially, and a team is one channel. The measured ceiling and the decision to
 > accept it are in **§7** below. Read that before proposing a fan-out change.
 
 ### The actions today (each becomes an MCP-catalogued tool)
 
-> **UPDATED 2026-08-12 — read this table as the base's SHAPE, not as its census.**
+> **UPDATED 2026-08-12. Read this table as the base's SHAPE, not as its census.**
 > It lists the doors the base was designed around and is the right thing to read to
 > learn what a door looks like here. It is **not** the live list and must not be
 > trusted as one: the four domain workers today declare **224** routes between them
@@ -118,7 +118,7 @@ on top follows [CACHING.md](CACHING.md).
 > process maps, the money, the work engine, the knowledge base, the agency's own
 > housekeeping and the Google connections all shipped after this table was written.
 > **The live list is each worker's own declarative `ROUTES` table**
-> (`workers/<worker>/src/index.ts`) — which is also what the seam checks read off
+> (`workers/<worker>/src/index.ts`), which is also what the seam checks read off
 > disk, so it is the one that cannot drift. Two things below the families named here
 > are worth knowing without opening the code: the client portal's own standing doors
 > (`GET /api/tenancy/portal/context`, `POST /api/tenancy/portal/switch-account`) and
@@ -132,15 +132,15 @@ on top follows [CACHING.md](CACHING.md).
 | POST /api/auth/email/change/start | auth | send a 6-digit code to the NEW email (signed-in) |
 | POST /api/auth/email/change/verify | auth | check code → switch `users.email`, log it, sign out other devices, warn the old email |
 | GET /api/auth/me | auth | who am I? |
-| GET /api/auth/activity | auth | the caller's OWN account history (name/photo/email changes) — identity-level, not team-tied |
+| GET /api/auth/activity | auth | the caller's OWN account history (name/photo/email changes), identity-level, not team-tied |
 | POST /api/auth/profile | auth | onboarding names + photo (R2) |
 | POST /api/auth/logout | auth | end session |
 | POST /api/tenancy/bootstrap | tenancy | accept invites OR create the personal team (+ its database) |
 | GET /api/tenancy/teams | tenancy | my teams (switcher/home) |
 | POST /api/tenancy/teams/update | tenancy | edit the active team's name + logo (teams:edit) |
 | GET /api/tenancy/members | tenancy | the active team's members (+ identity + role) |
-| POST /api/tenancy/members/role | tenancy | change a member's role (guards: not self, ≥1 admin); also emails the member a branded role-change notification via auth `/internal/send-email` (best-effort — see below) |
-| POST /api/tenancy/members/remove | tenancy | remove (deactivate) a member; also emails the member a branded "removed from team" notification via auth `/internal/send-email` (best-effort — see below) |
+| POST /api/tenancy/members/role | tenancy | change a member's role (guards: not self, ≥1 admin); also emails the member a branded role-change notification via auth `/internal/send-email` (best-effort. See below) |
+| POST /api/tenancy/members/remove | tenancy | remove (deactivate) a member; also emails the member a branded "removed from team" notification via auth `/internal/send-email` (best-effort. See below) |
 | GET /api/tenancy/my-permissions | tenancy | the caller's own rights for the active team (drives the page-visibility guard) |
 | GET /api/tenancy/roles | tenancy | the team's roles (+ member counts) |
 | POST /api/tenancy/roles | tenancy | create a new role (starts with no rights) |
@@ -152,8 +152,8 @@ on top follows [CACHING.md](CACHING.md).
 | GET /api/tenancy/team-meta | tenancy | the active team's Overview metadata (created by/when, last updated) |
 | GET /api/tenancy/invites | tenancy | the team's invites (pending/accepted/revoked/expired) |
 | POST /api/tenancy/invites | tenancy | invite by email to a role (branded email via auth) |
-| POST /api/tenancy/invites/revoke | tenancy | revoke ("redact") a pending invite; also emails the invitee a branded "invite revoked" notification via auth `/internal/send-email` (best-effort — see below) |
-| GET /api/tenancy/invitations | tenancy | invites the caller has RECEIVED (by email) — the inbox; works for any signed-in user, not just teamless ones |
+| POST /api/tenancy/invites/revoke | tenancy | revoke ("redact") a pending invite; also emails the invitee a branded "invite revoked" notification via auth `/internal/send-email` (best-effort. See below) |
+| GET /api/tenancy/invitations | tenancy | invites the caller has RECEIVED (by email), the inbox; works for any signed-in user, not just teamless ones |
 | POST /api/tenancy/invitations/accept | tenancy | accept one received invite → join + switch to that team (validates email-ownership + pending + unexpired; race-safe) |
 | POST /internal/send-email | auth | send a branded email composed by another worker (service-binding only) |
 | POST /api/tenancy/admin/migrate-teams | tenancy | roll team-schema migrations to every team DB (x-admin-key) |
@@ -172,20 +172,20 @@ on top follows [CACHING.md](CACHING.md).
 | GET /api/data-ops/import/preview | data-ops | the session's current preview (`?id=`) |
 | POST /api/data-ops/import/confirm | data-ops | write every mapped row INSERT-ONLY through the gated create endpoint; one list-ping |
 | POST /api/data-ops/import/batch(/file) | data-ops | start an agentic multi-file batch; attach a parsed CSV (AGENTIC-IMPORT.md) |
-| POST /api/data-ops/import/batch/plan | data-ops | the agent builds the plan (targets, mappings, order, references) — METERED on the credit pool |
+| POST /api/data-ops/import/batch/plan | data-ops | the agent builds the plan (targets, mappings, order, references). METERED on the credit pool |
 | POST /api/data-ops/import/batch/confirm | data-ops | run the plan in dependency order; per-row report; one ping per changed module |
 | GET /api/tenancy/roles/export · GET /api/tenancy/selectable/export · GET /api/content/brand-assets/export | tenancy/content | full-field CSV export (EXPORT NEEDS READ; team-bound) |
-| GET /api/data-ops/import/sample | data-ops | a downloadable sample CSV for a target — a good-file template (AGENTIC-IMPORT §10) |
-| GET /api/data-ops/import/batches | data-ops | the team's import history, newest first — summaries only (who, when, files → tables, totals) |
+| GET /api/data-ops/import/sample | data-ops | a downloadable sample CSV for a target, a good-file template (AGENTIC-IMPORT §10) |
+| GET /api/data-ops/import/batches | data-ops | the team's import history, newest first, summaries only (who, when, files → tables, totals) |
 | POST /api/data-ops/admin/seed-targets | data-ops | seed the global import catalog (owner-only, x-admin-key) |
 | POST /api/data-ops/admin/grant-credits | data-ops | top up a team's AI credits (owner-only, x-admin-key) |
 | GET /api/data-ops/agent/usage | data-ops | the team's AI quota snapshot (free + credits) |
-| POST /api/data-ops/agent/chat | data-ops | run one agent turn (answer, or propose/take an action act-as-you); accepts attached CSVs — planned through the import batch engine, run via run_import_batch behind the confirm panel (AGENTIC-IMPORT §8.5) |
+| POST /api/data-ops/agent/chat | data-ops | run one agent turn (answer, or propose/take an action act-as-you); accepts attached CSVs, planned through the import batch engine, run via run_import_batch behind the confirm panel (AGENTIC-IMPORT §8.5) |
 | POST /api/data-ops/agent/confirm | data-ops | approve/decline a proposed dangerous action; resume the turn |
 | GET /api/data-ops/agent/threads | data-ops | the caller's saved agent conversations |
 | GET /api/data-ops/agent/thread | data-ops | one conversation's messages (`?id=`) |
 | GET /api/content/google/connections | content | my own Google connections + the folders/spaces I share |
-| GET /api/content/google/start · GET /api/content/google/callback | content | the consent round-trip for ONE service (the callback writes no row — it parks the code in the one-shot cookie) |
+| GET /api/content/google/start · GET /api/content/google/callback | content | the consent round-trip for ONE service (the callback writes no row, it parks the code in the one-shot cookie) |
 | POST /api/content/google/connect · /disconnect | content | keep the handshake (`google:create`) · stop using it + revoke at Google (`google:delete`) |
 | GET /api/content/google/pick | content | the Drive folders / Chat spaces I could name |
 | POST /api/content/google/sources · /sources/active | content | name a folder or space + say who may read it (private/team) · stop sharing one |
@@ -193,9 +193,9 @@ on top follows [CACHING.md](CACHING.md).
 | POST /api/content/google/drive/upload | content | write a file INTO a folder I named (`google:edit`) |
 | GET /api/content/google/gmail/messages · /gmail/message | content | mail to/from a KNOWN CONTACT only · one message |
 | POST /api/content/google/gmail/draft | content | leave a reply in my own Gmail drafts + hand back its link (`google:edit`) |
-| POST /api/content/google/gmail/send | content | actually send it — `google:edit` **plus** the `google_mail` switch |
+| POST /api/content/google/gmail/send | content | actually send it, `google:edit` **plus** the `google_mail` switch |
 | GET /api/content/google/calendar/events | content | my own diary, in a window |
-| POST /api/content/google/calendar/events · /calendar/sprint | content | add an event · put a sprint's dates in — `google:edit` **plus** the `google_events` switch |
+| POST /api/content/google/calendar/events · /calendar/sprint | content | add an event · put a sprint's dates in, `google:edit` **plus** the `google_events` switch |
 | GET /api/content/google/chat/messages · POST (same path) | content | one NAMED space's messages · post in it (`google:edit`) |
 | GET /media/* | gateway | serve uploaded files from R2 |
 | (WebSocket) /api/realtime?team= | realtime | join a team's live channel; receive row-level `{resource,id,op}` pings (gated by active membership of THAT team) |
@@ -235,24 +235,24 @@ on top follows [CACHING.md](CACHING.md).
     (BASE-MANUAL §5, "Two REASONED exceptions").
 - **Deep-link access story (UPDATED 2026-06-21).** Deep links now use the
   `/t/<teamId>/<module>/<id>` grammar, rendered by the screen engine. A deep link
-  to a team you are **NOT** a member of does **NOT** switch your active team — the
+  to a team you are **NOT** a member of does **NOT** switch your active team, the
   server refuses the switch, so there is **no partial switch**; you see a
   no-access screen. A logged-out hit on a deep link → login. (The old
   `/settings/team` + `/settings/team/member` routes are RETIRED/deleted; top-level
   `/members` and `/roles` are thin redirects to `/t/<teamId>/members` and
   `/t/<teamId>/roles`. In-shell navigation uses the History API, never the
-  framework router — see CACHING.md "Navigation never reloads".)
+  framework router. See CACHING.md "Navigation never reloads".)
 - **Block at every step (LOCKED 2026-06-21).** `?panel` / `?confirm` overlays are
   permission-gated on open (client) AND each action re-checks `requireRight` on the
   SERVER, so the guarantee is never UI-only.
-- **Permissions: tall sheet** per team — `role | module | read/create/edit/delete`.
+- **Permissions: tall sheet** per team, `role | module | read/create/edit/delete`.
   New module = new rows, never a schema change. Members point at one role;
   editing a role applies instantly to every holder.
 - Any write right (create/edit/delete) **auto-flips READ on**, visibly.
-- The enforcement seam is BUILT — it lives in **`shared/workers/gating.ts`**
+- The enforcement seam is BUILT, it lives in **`shared/workers/gating.ts`**
   (requireMember + requireRight reading the tall sheet; the ONE seam every
-  worker uses — `workers/tenancy/src/lib/permissions.ts` is a thin re-export
-  kept for old imports) — every module endpoint starts with it the day the
+  worker uses, `workers/tenancy/src/lib/permissions.ts` is a thin re-export
+  kept for old imports), every module endpoint starts with it the day the
   first module lands.
 - **Export needs READ only. Import needs CREATE.**
 - Default roles seeded per team: **Admin** (locked, full rights) + **Viewer**
@@ -262,19 +262,19 @@ on top follows [CACHING.md](CACHING.md).
 
 - Every table carries the audit block: created/edited/deactivated timestamps +
   actor id/email/name snapshots (exactly like Base v3).
-- **Master records are NEVER hard-deleted** — deactivate/activate only
+- **Master records are NEVER hard-deleted**, deactivate/activate only
   (the words are "deactivate"/"activate", not archive). The delete right stays
   in the grid for future child-table cases; base modules don't expose it.
-- **Activity log records meaningful changes** — created, edited, role changed,
+- **Activity log records meaningful changes**, created, edited, role changed,
   invite sent/revoked, member removed (deletes don't happen). One reusable writer
   (`shared/workers/activity.ts`) writes to each team's own `activity` table; each
   row carries a relation (`related_table`/`related_row_id`) so the SAME feed
-  surfaces four ways — the whole team, one user, one role, or one invite.
+  surfaces four ways, the whole team, one user, one role, or one invite.
 - **Every record screen has an Overview tab + an Activity tab** (LOCKED
   2026-06-17): Overview = the audit block (created/edited/deactivated + who);
   Activity = that record's slice of the log. Both tabs render from LIBRARY
   collections (`RecordDetail` / `DescriptionList` / `ActivityFeed` in
-  `@kwapso/ui`) through the screen engine — never a hand-built app
+  `@kwapso/ui`) through the screen engine. Never a hand-built app
   component (UI comes only from the library, §6). See the activity read path in
   `workers/tenancy/src/lib/activity-read.ts`.
 - Race-safety for invariant writes follows [CONCURRENCY.md](CONCURRENCY.md);
@@ -282,7 +282,7 @@ on top follows [CACHING.md](CACHING.md).
 
 ## 5 · Users, onboarding, invites (LOCKED)
 
-- Sign-in: a 6-digit email code (Resend sends ALL email) **or Google** — two ways to prove ONE
+- Sign-in: a 6-digit email code (Resend sends ALL email) **or Google**, two ways to prove ONE
   identity, never two accounts. All user data lives in OUR database; no auth vendor holds anything.
   - **Google was parked on 2026-06-12** and its `users.google_sub` column dropped (`db/core/0003`).
     That was a **Brimba** scope decision ("strict email-OTP only") for the generic base, not a
@@ -299,7 +299,7 @@ on top follows [CACHING.md](CACHING.md).
     Google → `GET /api/auth/google/callback`), not the Identity-Services button: that button POSTs
     its credential cross-site from `accounts.google.com`, which `refuseForeignOrigin` refuses at
     both front doors, and loosening that check is not a trade worth making.
-  - **Google's assertion is verified server-side** — RS256 signature against Google's published
+  - **Google's assertion is verified server-side**. RS256 signature against Google's published
     JWKS, plus issuer (by exact match, never `.includes`), audience, expiry and `email_verified`.
   - **Two redirect URIs**, one per front door (`<agency>/api/auth/google/callback` and
     `<portal>/api/auth/google/callback`); the worker will bounce a person back to those two origins
@@ -308,7 +308,7 @@ on top follows [CACHING.md](CACHING.md).
     stranger typing a code gets — a teamless user row and the "nothing here yet" screen.
 - **CONNECTING a Google account is a different question from signing in with one (BUILT 2026-08-12).**
   Sign-in asks Google "who is this?" and keeps nothing. A CONNECTION asks for Drive, Gmail, Calendar
-  or Google Chat and keeps a refresh token — so it is a **second OAuth app** (`kwapso sync`,
+  or Google Chat and keeps a refresh token, so it is a **second OAuth app** (`kwapso sync`,
   `GOOGLE_CONNECT_*` on the CONTENT worker), consented **one service at a time**, and stored **per
   person**. There is no team-wide service account and nowhere to put one: the row hangs off a user
   id, so "connect the agency's Drive once and let everybody read it" is a column that does not exist.
@@ -318,7 +318,7 @@ on top follows [CACHING.md](CACHING.md).
     caller's words are ANDed inside it), Calendar is their own diary. Every empty case answers with
     NOTHING rather than everything — the three fences are run, not read, in
     `workers/content/test/google-fences.test.ts`.
-  - **Every source declares its SHELF at the moment it is shared** — `private` (this person alone)
+  - **Every source declares its SHELF at the moment it is shared**, `private` (this person alone)
     or `team` — because "who will be able to read this?" is the question a person is actually
     answering when they share a folder, and answering it later is answering it wrong.
   - **Tokens are ciphertext in the column** (AES-GCM, `GOOGLE_TOKEN_KEY`), not merely on Cloudflare's
@@ -342,22 +342,22 @@ on top follows [CACHING.md](CACHING.md).
   auto-created **only if there are no active invites**.
 - **Member-notification emails (LOCKED 2026-06-21).** A member is emailed when
   their role changes, they are removed from a team, or their pending invite is
-  revoked — a branded email (shared `brandedEmail` template) via auth
+  revoked, a branded email (shared `brandedEmail` template) via auth
   `/internal/send-email`. **Best-effort:** the STATE CHANGE commits first and is the
   authority; a failed/bounced email is logging-only and NEVER rolls it back (same
   pattern as best-effort activity writes in §4). (email-change already warns the
-  old address — §2 auth.)
+  old address, §2 auth.)
 - **Invitations inbox (BUILT 2026-06-18).** An ALREADY-onboarded user (who has a
   team) is not covered by the onboarding auto-accept, so they get an in-app
   **inbox** (`GET /api/tenancy/invitations` by their email; reachable from the
   team switcher, the top of Settings, and the `/invitations` route the invite
   email deep-links to). Accepting (`POST .../invitations/accept`) **joins +
   switches** to that team. This makes an invite recoverable even if the email
-  never arrives — no invite is ever a dead end.
+  never arrives, no invite is ever a dead end.
 
 ## 6 · App shell (LOCKED)
 
-- **PWA, online-only — install prompt BUILT (2026-06-18).** The app ships a web
+- **PWA, online-only, install prompt BUILT (2026-06-18).** The app ships a web
   manifest (`web/app/manifest.ts`, name/description from `shared/brand.ts`) +
   brand-monogram icons (`web/public/icons/*`, swappable via `brand.logoUrl`) +
   per-mode `theme-color`, so it is installable to a home screen / dock. A library
@@ -368,12 +368,12 @@ on top follows [CACHING.md](CACHING.md).
   browser that can't install (don't nag where the action is impossible); show
   once on the first visit (any page), then only on the **login page** and at most
   once per **14 days** after a dismissal (a dismissal or install stamps the
-  cooldown, kept in `localStorage`). No service worker — online-only;
+  cooldown, kept in `localStorage`). No service worker, online-only;
   installability is manifest-based (Chrome ≥90 needs no SW). A reusable
   `pwa-install-prompt` library collection is flagged in UI-GAPS.md for later.
 - **Mobile is not desktop-shrunk (LOCKED 2026-06-18).** Controls placed
   side-by-side on desktop must NOT blindly stay side-by-side on mobile. The rule
-  in full — and the reason it is a rule — lives in
+  in full, and the reason it is a rule, lives in
   [UI-CONVENTIONS.md](UI-CONVENTIONS.md) §4, "Mobile is not desktop-shrunk",
   beside its twin (action-button rows never clip). It is written down HERE as a
   locked decision and THERE as the convention you apply; it is not in the
@@ -383,11 +383,11 @@ on top follows [CACHING.md](CACHING.md).
 - Anti-bloat is law: one master copy of every rule/doc/component; reuse over
   recode; keep every piece small enough for an agent to reason about.
 
-## 7 · Scale — the live layer's ceiling, and where it now sits (LOCKED 2026-08-14)
+## 7 · Scale, the live layer's ceiling, and where it now sits (LOCKED 2026-08-14)
 
 **History, because this decision was made twice.** The twelve-dimension scaling audit
 of 14 Aug 2026 scored the base 78/100 (79 once the growth alarms were delivered), and
-its largest single gap — the whole of dimension 9 — *was* the decision recorded in §2:
+its largest single gap, the whole of dimension 9, *was* the decision recorded in §2:
 one `TeamChannel` per team, broadcasting serially. That ceiling was first **accepted**,
 on the grounds that it sat about seventy-five times above what this deployment peaks
 at. The owner then chose to raise it instead. Both were reasonable; this section records
@@ -399,7 +399,7 @@ where it ended up and what is still true.
 - **The split lives in the realtime worker's `/publish` door**, not at the publishers.
   A publisher still makes one call naming `team:<id>`; the door fans it out to
   `team:<id>#0…3`. All hundred-odd `publishChange` call sites are untouched, which is
-  the point — a fan-out written at the publisher would have been a hundred chances to
+  the point, a fan-out written at the publisher would have been a hundred chances to
   write it differently. Listeners join the shard of `shardFor(userId)`, so one person's
   devices land together and a reconnect returns to the same object.
 - **Subscriptions narrow the sends.** The socket URL carries `?sub=`, the DO keeps it
@@ -410,7 +410,7 @@ where it ended up and what is still true.
   listener MAY hear: resolved from their session, never read off the URL, fails
   **closed**. The subscription decides what it WANTS to hear: declared by the client,
   fails **open**. That is why one is safe to take from a request and the other is not,
-  and why a client on an older build — sending no subscription — is over-served rather
+  and why a client on an older build, sending no subscription, is over-served rather
   than silently starved.
 - **The agency app is deliberately NOT narrowed.** Its shell refreshes the team
   activity feed on *any* resource, so a derived subscription would have made that feed
@@ -418,32 +418,32 @@ where it ended up and what is still true.
   proved complete is a screen that goes quietly out of date, which is the failure shape
   with no symptom. It stays un-narrowed until the feed listens for something narrower.
 
-**WHERE THE CEILING NOW SITS — and the arithmetic, because the honest answer is not
+**WHERE THE CEILING NOW SITS, and the arithmetic, because the honest answer is not
 "solved".** Wall-clock per broadcast falls by the shard count, so the per-object
 listener ceiling goes from ~3,000–5,000 to roughly **12,000–20,000 per team**. But the
 work is `publishes/second × sockets × per-socket cost`, and sharding divides only by N:
 
 | shards | sockets/shard at 25,000 | CPU-seconds per second, per shard |
 |---|---|---|
-| 1 | 25,000 | ~130 — over by 130× |
-| **4 (today)** | **6,250** | **~33 — over by 33×** |
+| 1 | 25,000 | ~130, over by 130× |
+| **4 (today)** | **6,250** | **~33, over by 33×** |
 | 8 | 3,125 | ~16 |
-| 128 | 195 | ~1 — and now the *publish* side is the bottleneck, at ~22,000 object calls/second |
+| 128 | 195 | ~1, and now the *publish* side is the bottleneck, at ~22,000 object calls/second |
 
 So at a base yardstick of 250,000 people in ONE tenant (~174 publishes/second),
 **sharding alone does not get there and cannot**: it would take ~128 shards, at which
 point every ping costs 128 object calls and the cost has simply moved. Reaching that
-scale needs a different shape — routing a ping only to shards holding interested
+scale needs a different shape, routing a ping only to shards holding interested
 listeners, instead of broadcasting every ping to every shard. That is not built and is
 not planned; it is the thing to design if a tenant ever approaches the yardstick.
 
 **What it means for kwapso: comfortably solved, with four times the margin it had.**
 The estate ([glide/RECONCILIATION.md](glide/RECONCILIATION.md) §3, confirmed with the
-owner 14 Aug 2026) is 20 client companies, 104 contacts, 6 staff — about 125 rows in
+owner 14 Aug 2026) is 20 client companies, 104 contacts, 6 staff, about 125 rows in
 `accounts`. Realistic peak is ~40 concurrent sockets; every human it works with, at
 once, on three devices each, is ~350. Against 12,000–20,000 that is 300× and ~40×.
 
-**The signal to revisit — specific, and observable today.** Nothing measures concurrent
+**The signal to revisit, specific, and observable today.** Nothing measures concurrent
 sockets, so do not go looking for that metric. These three are real:
 
 1. **The roster, which is countable.** `team_members` + `portal_users` on one team
@@ -464,7 +464,7 @@ rather than to all of them.
 
 **THIS IS ABOUT THIS DEPLOYMENT, NOT ABOUT THE BASE.** Brimba is reusable and the audit
 scored it against a base's yardstick. A fork whose one tenant is a company rather than
-an agency meets the arithmetic in that table for real — see
+an agency meets the arithmetic in that table for real. See
 [BASE-MANUAL.md](BASE-MANUAL.md) §5. A fork's first architectural question is whether
 its largest tenant is a few hundred people or a few hundred thousand.
 
@@ -473,11 +473,11 @@ its largest tenant is a few hundred people or a few hundred thousand.
 | accepted | why it stays | the trigger |
 |---|---|---|
 | Base64 uploads through the worker (not presigned direct-to-R2) | changes the client contract *and* the capability-URL model SCOPE ch.06 records | a file cap above ~25 MB, or the 128 MB isolate budget being hit in practice |
-| ~~The module mover is one non-resumable request~~ **RESUMED 2026-08-17** | progress lives in `team_module_moves` (db/core/0023), not in a stack frame: bounded copy batches per call, a per-table cursor, an idempotent `INSERT OR IGNORE`, and a claim a killed Worker cannot strand. A killed call is continued by calling again, and routing is still flipped last so an interrupted move is never a doubled read. | the FIRST real move — the resumption logic is unit-proven against an in-memory D1, never against Cloudflare's |
+| ~~The module mover is one non-resumable request~~ **RESUMED 2026-08-17** | progress lives in `team_module_moves` (db/core/0023), not in a stack frame: bounded copy batches per call, a per-table cursor, an idempotent `INSERT OR IGNORE`, and a claim a killed Worker cannot strand. A killed call is continued by calling again, and routing is still flipped last so an interrupted move is never a doubled read. | the FIRST real move, the resumption logic is unit-proven against an in-memory D1, never against Cloudflare's |
 | No cross-shard merge (`d1QueryAcross` refuses a paged or counted read across shards) | nothing paged is on the split path, and refusing beats answering wrongly | the first time a PAGED module has to be split |
 | The crons rotate their team window rather than queueing | rotation makes a late team late, not skipped | more than ~600 teams |
-| R16's exact `COUNT(*)` on every feed page | it is a **Law** (RULES.md) — changing it means rule, registry and check together | an activity table past ~5M rows in one team |
+| R16's exact `COUNT(*)` on every feed page | it is a **Law** (RULES.md), changing it means rule, registry and check together | an activity table past ~5M rows in one team |
 | Per-caller rate limiting on ordinary doors | not the config change it looks like: neither gateway decodes a session, so neither can key a limiter on a user; per-IP puts one office behind one bucket | any abuse, or a paid tier where a caller's cost is somebody else's bill |
 
 The growth alarms **are** delivered (`ALERT_TO` on tenancy, one mail per tick, once per
-new alarm) — [OPERATIONS.md](OPERATIONS.md) § *Growth watch*.
+new alarm), [OPERATIONS.md](OPERATIONS.md) § *Growth watch*.

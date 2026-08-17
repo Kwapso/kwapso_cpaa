@@ -47,14 +47,16 @@ function shapeStories(stories: Story[], appNames: Map<string, string>) {
   return {
     rows: stories.map((s) => ({
       id: s.id,
-      name: s.ref ? `${s.ref} · ${s.title}` : s.title,
+      // The title alone (K1 / CHECKLIST 11.9). The reference leads the eyebrow on
+      // the story's own screen, where it belongs (D4).
+      name: s.title,
+      // Three facts: where it is, who has it, when it is due. The sprint and the
+      // ticket it answers are cross-links on the record, not row noise.
       detail:
         [
           STORY_STATUS_LABEL[s.status],
           s.assigneeName ?? "unassigned",
           s.sprintEndsOn ? `due ${formatDate(s.sprintEndsOn)}` : null,
-          s.sprintName,
-          s.ticketRef,
         ]
           .filter(Boolean)
           .join(" · ") || "—",
@@ -122,6 +124,10 @@ export function useStoryFormOptions(teamId: string) {
     storyTypes: (selectableQ.data ?? [])
       .filter((v) => v.type === "Story type" && v.active)
       .map((v) => v.value),
+    // The dropdown rows themselves, so a screen can read a type's MARK as well
+    // as its word (UI-RULEBOOK G2). The words above stay because a picker wants
+    // words; a header band wants the glyph beside them.
+    selectableValues: selectableQ.data,
     members: (membersQ.data ?? []).map((m) => ({
       id: m.userId,
       name: [m.firstName, m.lastName].filter(Boolean).join(" ") || m.email,

@@ -122,7 +122,7 @@ export function assertSameOrigin(source: SplashSource): void {
   // below is the one that noticed, which is the only reason it says `//` here.
   if (!source.src.startsWith("/") || source.src.startsWith("//"))
     throw new Error(
-      `shared/web/splash.ts: splashSource.src must be a same-origin path beginning with a single "/" — got ${JSON.stringify(source.src)}`
+      `shared/web/splash.ts: splashSource.src must be a same-origin path beginning with a single "/", got ${JSON.stringify(source.src)}`
     )
 }
 

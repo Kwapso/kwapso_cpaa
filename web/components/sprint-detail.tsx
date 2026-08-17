@@ -14,7 +14,6 @@
 
 import * as React from "react"
 
-import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
@@ -34,7 +33,13 @@ import { StoriesPanel, sliceKey } from "@/components/work-panels"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, content as contentApi } from "@/lib/api"
-import { auditItems } from "@/lib/audit-overview"
+import {
+  RecordActionsMenu,
+  RecordFooter,
+  RecordScreen,
+  STICKY_TABS,
+  type RecordAction,
+} from "@/components/record-chrome"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
 import { listFetch, sprintsKey, totalKey } from "@/lib/live-resources"
@@ -132,7 +137,7 @@ export function SprintDetailScreen({
     // always describing. The DATES are still the ones somebody agreed; this
     // number is what to expect, said beside them.
     { label: t("Kind"), value: kindLine },
-    { label: t("Client"), value: sprint.accountName || "Ours — no client" },
+    { label: t("Client"), value: sprint.accountName || "Ours, no client" },
     { label: t("App"), value: sprint.appName || "—" },
     { label: t("What it's for"), value: sprint.goal || "—" },
     {
@@ -147,13 +152,7 @@ export function SprintDetailScreen({
       label: t("Work inside it"),
       value: sprint.storyCount > 0 ? `${done} of ${sprint.storyCount} done` : "Nothing in it yet",
     },
-    ...auditItems({
-      createdByName: sprint.createdByName,
-      createdAt: sprint.createdAt,
-      editedByName: null,
-      updatedAt: null,
-      status: sprint.completedAt ? "Complete" : "Running",
-    }),
+    // The audit rows moved to the record footer (D7 / CHECKLIST 11.3).
   ]
 
   const tabsConfig = {
@@ -178,80 +177,37 @@ export function SprintDetailScreen({
     ],
   }
 
+  /* B1 / CHECKLIST 11.2 — Complete (the act that moves the sprint on) is the
+   * primary; Edit goes into the three-dot menu. Neither is destructive, so
+   * neither asks first (UI-CONVENTIONS §4). */
+  const overflow: RecordAction[] = canEdit
+    ? [
+        {
+          key: "edit",
+          label: t("Edit"),
+          icon: <Pencil className="size-3.5" />,
+          disabled: busy,
+          onSelect: () => setEditOpen(true),
+        },
+      ]
+    : []
+
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 items-start gap-3">
-          {kindMark && (
-            <span
-              aria-hidden
-              className="bg-muted grid size-11 shrink-0 place-items-center rounded-xl text-2xl leading-none"
-            >
-              {kindMark}
-            </span>
-          )}
-          <div className="min-w-0">
-            <p className="text-muted-foreground text-xs font-medium tracking-[0.5px] uppercase">
-              {kindWord}
-            </p>
-            <h1 className="flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight">
-              <span className="truncate">{sprint.name}</span>
-              {sprint.completedAt && (
-                <Badge variant="secondary" className="text-[10px]">
-                  {t("Complete")}
-                </Badge>
-              )}
-            </h1>
-            {/* THE CROSS-LINKS UP THE TREE — the app it covers and the client who
-                bought it, both one tap away. */}
-            <p className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-              {sprint.ref && <span>{sprint.ref}</span>}
-              {sprint.appId && sprint.appName && (
-                <button
-                  type="button"
-                  onClick={() => softNavigate(`${host.base}/apps/${sprint.appId}`)}
-                  className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
-                >
-                  {t("On")} {sprint.appName}
-                </button>
-              )}
-              {sprint.accountId && sprint.accountName && (
-                <button
-                  type="button"
-                  onClick={() => softNavigate(`${host.base}/accounts/${sprint.accountId}`)}
-                  className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
-                >
-                  {t("For")} {sprint.accountName}
-                </button>
-              )}
-            </p>
-          </div>
-        </div>
-        {/* ml-auto on the GROUP so a narrow phone reflows instead of clipping. */}
-        <div className="flex flex-wrap gap-2 sm:ml-auto sm:shrink-0">
-          {/* EDIT — first, because it is the everyday one. Completing a sprint is
-              an event with consequences and sits to its right; neither is
-              destructive, so neither asks first (UI-CONVENTIONS §4). */}
-          {canEdit && (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={busy}
-              onClick={() => setEditOpen(true)}
-              className="gap-1.5"
-            >
-              <Pencil className="size-3.5" />
-              {t("Edit")}
-            </Button>
-          )}
-          {canEdit && (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={busy}
-              onClick={() => void setComplete(!sprint.completedAt)}
-              className="gap-1.5"
-            >
+    <RecordScreen
+      mark={kindMark}
+      eyebrow={[kindWord, sprint.ref].filter(Boolean).join(" · ")}
+      title={sprint.name}
+      status={[
+        sprint.completedAt ? t("Complete") : sprint.active ? t("Running") : t("Cancelled"),
+        sprint.appName ?? undefined,
+        sprint.accountName ?? undefined,
+      ]
+        .filter(Boolean)
+        .join(" · ")}
+      actions={
+        canEdit ? (
+          <>
+            <Button disabled={busy} onClick={() => void setComplete(!sprint.completedAt)} className="gap-1.5">
               {busy ? (
                 <Spinner />
               ) : sprint.completedAt ? (
@@ -259,19 +215,46 @@ export function SprintDetailScreen({
               ) : (
                 <CheckCheck className="size-3.5" />
               )}
-              {sprint.completedAt ? "Reopen" : "Complete"}
+              {sprint.completedAt ? t("Reopen") : t("Complete")}
             </Button>
+            <RecordActionsMenu actions={overflow} />
+          </>
+        ) : undefined
+      }
+      headerExtra={
+        <>
+          {/* THE CROSS-LINKS UP THE TREE, the app it covers and the client who
+              bought it, both one tap away. */}
+          <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            {sprint.appId && sprint.appName && (
+              <button
+                type="button"
+                onClick={() => softNavigate(`${host.base}/apps/${sprint.appId}`)}
+                className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
+              >
+                {t("On")} {sprint.appName}
+              </button>
+            )}
+            {sprint.accountId && sprint.accountName && (
+              <button
+                type="button"
+                onClick={() => softNavigate(`${host.base}/accounts/${sprint.accountId}`)}
+                className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
+              >
+                {t("For")} {sprint.accountName}
+              </button>
+            )}
+          </p>
+          {canEdit && !sprint.completedAt && (
+            <p className="text-muted-foreground text-sm">
+              {t("Completing this sprint cuts a new version of every process inside its app, so the savings can be measured from what changed.")}
+            </p>
           )}
-        </div>
-      </div>
-
-      {canEdit && !sprint.completedAt && (
-        <p className="text-muted-foreground text-sm">
-          {t("Completing this sprint cuts a new version of every process map inside its app, so the savings can be measured from what changed.")}
-        </p>
-      )}
-
+        </>
+      }
+    >
       <TabsView
+        className={STICKY_TABS}
         config={tabsConfig}
         value={tab}
         onValueChange={setTab}
@@ -290,6 +273,15 @@ export function SprintDetailScreen({
           if (t.value === "activity")
             return <ActivityPanel activity={activity} />
           return <OverviewList items={overviewItems} />
+        }}
+      />
+
+      <RecordFooter
+        audit={{
+          createdByName: sprint.createdByName,
+          createdAt: sprint.createdAt,
+          // A sprint keeps no editor snapshot, so the footer shows the half it
+          // knows rather than two rows of dashes.
         }}
       />
 
@@ -349,6 +341,6 @@ export function SprintDetailScreen({
           toast.success(t("Sprint updated."))
         }}
       />
-    </div>
+    </RecordScreen>
   )
 }

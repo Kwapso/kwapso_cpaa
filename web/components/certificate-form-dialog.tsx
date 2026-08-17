@@ -15,12 +15,10 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
@@ -111,12 +109,10 @@ export function CertificateFormDialog({
           {t("What they hold, who issued it, and when it lapses. The team can see this; no client can.")}
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !values.title.trim()}>
-          {busy ? <Spinner /> : null}
-          {busy ? "Saving…" : isEdit ? "Save changes" : "Record it"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !values.title.trim(),
+      }}
     >
       {input("title", "What is it?", "text", "e.g. Cloudflare Workers certified", true)}
       {input("issuer", "Who issued it?", "text", "e.g. Cloudflare")}

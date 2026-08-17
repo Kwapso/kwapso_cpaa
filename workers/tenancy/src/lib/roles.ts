@@ -220,7 +220,7 @@ export async function requireGrantableRights(
     const want = normalizeRights(wanted?.[m.key])
     const have = normalizeRights(mine[m.key])
     for (const right of ["read", "create", "edit", "delete"] as const)
-      if (want[right] && !have[right]) over.push(`${m.label} — ${right}`)
+      if (want[right] && !have[right]) over.push(`${m.label}, ${right}`)
   }
   if (over.length)
     throw new GuardError(
@@ -269,7 +269,7 @@ export async function setRolePermissions(
     throw new GuardError(
       409,
       "locked_role",
-      "The Admin role is locked — its permissions can't be changed."
+      "The Admin role is locked, its permissions can't be changed."
     )
   // NO SELF-GRANT. member_roles:edit lets you shape OTHER people's access; it
   // must not be a ladder to every right you weren't given. Without this, a
@@ -280,7 +280,7 @@ export async function setRolePermissions(
     throw new GuardError(
       403,
       "self_grant",
-      "You can't change your own role's access rights — ask an admin."
+      "You can't change your own role's access rights. Ask an admin."
     )
   // …AND NO GRANTING WHAT YOU WERE NOT GIVEN. The line above names one role id,
   // so it only ever caught the caller widening THEMSELVES; a role created a
@@ -319,7 +319,7 @@ export async function updateRole(
 ): Promise<void> {
   const role = await roleOrThrow(cfg, guard, roleId)
   if (role.is_default === 1)
-    throw new GuardError(409, "locked_role", "The Admin role is locked — it can't be renamed.")
+    throw new GuardError(409, "locked_role", "The Admin role is locked, it can't be renamed.")
   const cleanTitle = title.trim()
   if (!cleanTitle) throw new GuardError(400, "invalid_input", "A role needs a name.")
 
@@ -338,7 +338,7 @@ export async function updateRole(
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Role edited",
-    description: `${actor.name} edited the ${cleanTitle} role${changes ? ` — ${changes}` : ""}`,
+    description: `${actor.name} edited the ${cleanTitle} role${changes ? `, ${changes}` : ""}`,
     relatedTable: "member_roles",
     relatedRowId: roleId,
   })
@@ -366,7 +366,7 @@ export async function setRoleActive(
   const role = rows[0]
   if (!role) throw new GuardError(404, "role_not_found", "That role doesn't exist.")
   if (role.is_default === 1)
-    throw new GuardError(409, "locked_role", "The Admin role is locked — it can't be deactivated.")
+    throw new GuardError(409, "locked_role", "The Admin role is locked, it can't be deactivated.")
 
   // R17: the UPDATE carries the current-status predicate, so a repeat (a double
   // click, a retried request) moves ZERO rows — and a record's history then says

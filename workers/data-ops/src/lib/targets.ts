@@ -125,7 +125,7 @@ export const TARGETS: Record<string, TargetDef> = {
     module: "member_roles",
     displayName: "Member roles",
     description:
-      "Create team roles in bulk — optionally with their permission matrix (one module.right column each, yes/no). Rows without matrix columns start with permissions off.",
+      "Create team roles in bulk, optionally with their permission matrix (one module.right column each, yes/no). Rows without matrix columns start with permissions off.",
     columns: [
       { key: "title", label: "Role name", required: true },
       { key: "description", label: "Description", required: false },
@@ -164,7 +164,7 @@ export const TARGETS: Record<string, TargetDef> = {
     module: "accounts",
     displayName: "Accounts",
     description:
-      "Create accounts in bulk — companies and people in one file. Say which each row is in the Type column (company or person). The account each one sits under is set afterwards on the account itself.",
+      "Create accounts in bulk, companies and people in one file. Say which each row is in the Type column (company or person). The account each one sits under is set afterwards on the account itself.",
     columns: [
       { key: "name", label: "Name", required: true },
       { key: "accountType", label: "Type", required: true },
@@ -222,7 +222,7 @@ export const TARGETS: Record<string, TargetDef> = {
     module: "meetings",
     displayName: "Meetings",
     description:
-      "Bring the diary in in bulk — one row per conversation, with what was on the agenda and what was decided. The reason we met is set afterwards on the meeting itself, because a meeting purpose is a record here and only a word in a file.",
+      "Bring the diary in in bulk, one row per conversation, with what was on the agenda and what was decided. The reason we met is set afterwards on the meeting itself, because a meeting purpose is a record here and only a word in a file.",
     columns: [
       { key: "title", label: "Title", required: true },
       { key: "startsAt", label: "When", required: true },
@@ -277,7 +277,7 @@ export const TARGETS: Record<string, TargetDef> = {
     module: "work",
     displayName: "Stories",
     description:
-      "Create stories in bulk — one row per piece of work. The sprint, the assignee and the process step each story changes are set afterwards on the story itself, because those are records here and only names in a file.",
+      "Create stories in bulk, one row per piece of work. The sprint, the assignee and the process step each story changes are set afterwards on the story itself, because those are records here and only names in a file.",
     columns: [
       { key: "title", label: "Title", required: true },
       { key: "detail", label: "Detail", required: false },
@@ -316,7 +316,7 @@ export const TARGETS: Record<string, TargetDef> = {
     module: "brand_assets",
     displayName: "Brand library",
     description:
-      "Bring the agency's own brand material in in bulk — logos, decks, templates. The file column takes a link; the bytes are re-hosted separately.",
+      "Bring the agency's own brand material in in bulk, logos, decks, templates. The file column takes a link; the bytes are re-hosted separately.",
     columns: [
       { key: "name", label: "Name", required: true },
       { key: "category", label: "Category", required: false },

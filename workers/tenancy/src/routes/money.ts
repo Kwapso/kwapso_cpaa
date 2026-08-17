@@ -50,7 +50,7 @@ function centsPerHour(value: number): number {
   if (!Number.isFinite(value) || value < 0)
     throw new GuardError(400, "invalid_input", "A rate is a whole number of cents an hour, zero or more.")
   if (value > MAX_CENTS_PER_HOUR)
-    throw new GuardError(400, "invalid_input", "That rate is higher than this can be — check the number.")
+    throw new GuardError(400, "invalid_input", "That rate is higher than this can be. Check the number.")
   return Math.floor(value)
 }
 

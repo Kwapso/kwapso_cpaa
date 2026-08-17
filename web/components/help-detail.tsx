@@ -28,7 +28,14 @@ import type {
   TeamMember,
 } from "@shared/types"
 import { ApiFailure, content, dataOps, tenancy } from "@/lib/api"
-import { auditItems } from "@/lib/audit-overview"
+import {
+  RecordActionsMenu,
+  RecordFooter,
+  RecordScreen,
+  STICKY_TABS,
+  type RecordAction,
+} from "@/components/record-chrome"
+import { MARK_GROUP, typeMark } from "@/lib/type-marks"
 import { useFollowNewest } from "@shared/web/follow-newest"
 import { formatRelative } from "@shared/web/format"
 import { personName } from "@/lib/identity"
@@ -315,13 +322,10 @@ export function HelpDetailScreen({
     { label: t("Title"), value: ticket.titleDe || "" },
     { label: t("Title (English)"), value: ticket.titleEn || "" },
     { label: t("Raised from"), value: ticket.sourceScreen || "" },
-    ...auditItems({
-      createdByName: ticket.raiserName,
-      createdAt: ticket.createdAt,
-      editedByName: ticket.editorName,
-      updatedAt: ticket.updatedAt,
-      status: STATUS_LABEL[ticket.status],
-    }),
+    // The audit rows are NOT here any more: created-by and last-edited-by moved
+    // to the footer at the foot of the record (D7 / CHECKLIST 11.3), where they
+    // stop pushing the ticket's own facts below the fold. The status is on the
+    // header band's own line.
     { label: t("Resolved"), value: ticket.resolvedAt ? formatRelative(ticket.resolvedAt) : "" },
   ]
 
@@ -371,136 +375,140 @@ export function HelpDetailScreen({
     ],
   }
 
-  return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-start gap-3">
-          <div className="min-w-0 flex-1">
-            {/* THE NUMBER THE CLIENT QUOTES. It has existed on this record since
-                the work engine landed and appeared on no screen — the one thing
-                a person needs when a client rings up saying "about BERG-T0412". */}
-            {(ticket.ref || ticket.archivedAt) && (
-              <p className="text-muted-foreground mb-0.5 flex flex-wrap items-center gap-2 text-xs">
-                {ticket.ref && <span>{ticket.ref}</span>}
-                {ticket.archivedAt && (
-                  <span className="text-muted-foreground">{t("Archived")}</span>
-                )}
-              </p>
-            )}
-            <p className="truncate text-sm font-medium">{ticket.description}</p>
-          </div>
-          {/* TRANSLATE, on a ticket that has a German title and no English one
-              yet. It SETS the field rather than showing a preview (BUILD-1 §8):
-              a preview is a thing one person reads once, and a set field is a
-              thing the whole team, the search and the assistant read afterwards.
-              It disappears the moment there is an English title, because there
-              is then nothing to ask for. */}
-          {canEdit && ticket.titleDe && !ticket.titleEn && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void translate()}
-              disabled={translating}
-              className="shrink-0 gap-1.5"
-            >
-              <Languages className="size-3.5" />
-              {translating ? "Translating…" : "Translate"}
-            </Button>
-          )}
-          {/* THE CLOCK ON A REQUEST. Reading, triaging and resolving one is real
-              work and BUILD-1 §5 is explicit that it is loggable against the
-              request — the door has accepted `help` as a work-log target since
-              work logs shipped, and no screen had ever offered the button. */}
-          <RecordTimerButton
-            teamId={teamId}
-            targetTable="help"
-            targetId={helpId}
-            canLog={canLogTime}
-            disabled={ticket.status === "resolved"}
-          />
-          {/* THE CLIENT SAYS YES (CHECKLIST 5.13). Staff press it for the answer
-              that arrives by phone; the client presses the same door in their own
-              portal. It appears only while the request is actually waiting, and
-              disappears the moment it is not — a control that can only be refused
-              should not be a control. */}
-          {ticket.status === "awaiting_validation" && (
-            <Button
-              size="sm"
-              disabled={statusBusy}
-              onClick={() =>
-                void run(
-                  () => content.validateHelp(helpId),
-                  "Confirmed — it's in the queue.",
-                  "Couldn't confirm that."
-                )
+  /* ONE PRIMARY, ONE SECONDARY, AND A MENU (UI-RULEBOOK B1, CHECKLIST 11.2).
+   *
+   * This title carried six controls and was the worst case in the app. The
+   * ranking picks the two that stay: the act that MOVES THE TICKET FORWARD is
+   * the primary (confirming it, or answering it — only ever one of the two is
+   * offered, because they belong to different stages), and the clock is the
+   * secondary, because logging time is the thing somebody does on a ticket most
+   * often that is not destructive.
+   *
+   * Translate, Edit and Archive go into the three-dot menu. None of them loses
+   * its confirm or its colour by moving. */
+  const overflow: RecordAction[] = [
+    // TRANSLATE, on a ticket that has a German title and no English one yet. It
+    // SETS the field rather than showing a preview (BUILD-1 §8): a preview is a
+    // thing one person reads once, and a set field is a thing the whole team,
+    // the search and the assistant read afterwards. It disappears the moment
+    // there is an English title, because there is then nothing to ask for.
+    ...(canEdit && ticket.titleDe && !ticket.titleEn
+      ? [
+          {
+            key: "translate",
+            label: translating ? t("Translating…") : t("Translate"),
+            icon: <Languages className="size-3.5" />,
+            disabled: translating,
+            onSelect: () => void translate(),
+          },
+        ]
+      : []),
+    ...(canEdit
+      ? [
+          {
+            key: "edit",
+            label: t("Edit"),
+            icon: <Pencil className="size-3.5" />,
+            onSelect: () => setEditing(true),
+          },
+        ]
+      : []),
+    // PUT IT AWAY. Available from any state (SCOPE ch.07), destructive in colour
+    // because it takes the request out of the everyday lists, and reversible,
+    // which the confirm-free restore says out loud.
+    ...(canEdit
+      ? [
+          ticket.archivedAt
+            ? {
+                key: "unarchive",
+                label: t("Take it back out"),
+                icon: <ArchiveRestore className="size-3.5" />,
+                disabled: statusBusy,
+                onSelect: () => void setArchived(false),
               }
-              className="shrink-0 gap-1.5"
-            >
-              <CheckCheck className="size-3.5" />
-              {t("They've confirmed it")}
-            </Button>
-          )}
-          {/* ANSWER IT AND TELL THEM. Offered from READY onward — the stage that
-              means every piece of work is done and only the telling is left — and
-              never on a ticket already answered. The panel is where the words are
-              written, because the door refuses without them (5.6). */}
-          {canEdit && ticket.status === "ready" && (
-            <Button
-              size="sm"
-              disabled={statusBusy}
-              onClick={() => setResolving(true)}
-              className="shrink-0 gap-1.5"
-            >
-              <Send className="size-3.5" />
-              {t("Answer and close")}
-            </Button>
-          )}
-          {canEdit && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setEditing(true)}
-              className="shrink-0 gap-1.5"
-            >
-              <Pencil className="size-3.5" />
-              {t("Edit")}
-            </Button>
-          )}
-          {/* PUT IT AWAY. Available from any state (SCOPE ch.07), destructive in
-              colour because it takes the request out of the everyday lists —
-              and reversible, which the confirm-free restore says out loud. */}
-          {canEdit &&
-            (ticket.archivedAt ? (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={statusBusy}
-                onClick={() => void setArchived(false)}
-                className="shrink-0 gap-1.5"
-              >
-                <ArchiveRestore className="size-3.5" />
-                {t("Take it back out")}
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={statusBusy}
-                onClick={() => void setArchived(true)}
-                className="text-destructive hover:text-destructive shrink-0 gap-1.5"
-              >
-                <Archive className="size-3.5" />
-                {t("Archive")}
-              </Button>
-            ))}
-        </div>
-        {/* A STATUS IS A FACT, NOT A BUTTON. The track still says how far along
-            the request is, because that is what a track is for — it simply is
-            not something anybody can press (CHECKLIST 5.2). */}
-        <HelpStatusStepper status={ticket.status} />
-      </div>
+            : {
+                key: "archive",
+                label: t("Archive"),
+                icon: <Archive className="size-3.5" />,
+                disabled: statusBusy,
+                destructive: true,
+                onSelect: () => void setArchived(true),
+              },
+        ]
+      : []),
+  ]
 
+  const actions = (
+    <>
+      {/* THE CLIENT SAYS YES (CHECKLIST 5.13). Staff press it for the answer that
+          arrives by phone; the client presses the same door in their own portal.
+          It appears only while the request is actually waiting, and disappears
+          the moment it is not, a control that can only be refused should not be
+          a control. */}
+      {ticket.status === "awaiting_validation" && (
+        <Button
+          disabled={statusBusy}
+          onClick={() =>
+            void run(
+              () => content.validateHelp(helpId),
+              "Confirmed, it's in the queue.",
+              "Couldn't confirm that."
+            )
+          }
+          className="shrink-0 gap-1.5"
+        >
+          <CheckCheck className="size-3.5" />
+          {t("They've confirmed it")}
+        </Button>
+      )}
+      {/* ANSWER IT AND TELL THEM. Offered from READY onward, the stage that means
+          every piece of work is done and only the telling is left, and never on a
+          ticket already answered. The panel is where the words are written,
+          because the door refuses without them (5.6). */}
+      {canEdit && ticket.status === "ready" && (
+        <Button disabled={statusBusy} onClick={() => setResolving(true)} className="shrink-0 gap-1.5">
+          <Send className="size-3.5" />
+          {t("Answer and close")}
+        </Button>
+      )}
+      {/* THE CLOCK ON A REQUEST. Reading, triaging and resolving one is real work
+          and BUILD-1 §5 is explicit that it is loggable against the request. */}
+      <RecordTimerButton
+        teamId={teamId}
+        targetTable="help"
+        targetId={helpId}
+        canLog={canLogTime}
+        disabled={ticket.status === "resolved"}
+      />
+      <RecordActionsMenu actions={overflow} />
+    </>
+  )
+
+  return (
+    <RecordScreen
+      // The glyph the team set beside this ticket type on the Dropdown values
+      // screen, in the square the header band keeps for it (G3).
+      mark={typeMark(selectableQ.data, MARK_GROUP.ticket, ticket.helpType)}
+      // D4: the type word and THE NUMBER THE CLIENT QUOTES, above the title. The
+      // reference had existed on this record since the work engine landed and
+      // appeared on no screen — the one thing a person needs when a client rings
+      // up saying "about BERG-T0412".
+      eyebrow={[ticket.helpType || t("Ticket"), ticket.ref, ticket.archivedAt ? t("Archived") : null]
+        .filter(Boolean)
+        .join(" · ")}
+      title={ticket.description}
+      // D5: one line, three facts at most.
+      status={[STATUS_LABEL[ticket.status], ticket.appName, ticket.raisedByContactName]
+        .filter(Boolean)
+        .join(" · ")}
+      actions={actions}
+      /* A STATUS IS A FACT, NOT A BUTTON. The track still says how far along the
+         request is, because that is what a track is for — it simply is not
+         something anybody can press (CHECKLIST 5.2). */
+      headerExtra={<HelpStatusStepper status={ticket.status} />}
+    >
       <TabsView
+        className={STICKY_TABS}
         config={tabsConfig}
         value={tab}
         onValueChange={setTab}
@@ -556,6 +564,17 @@ export function HelpDetailScreen({
         }}
       />
 
+      {/* D7 / CHECKLIST 11.3: who made it and who last touched it, grey, at the
+          foot of the record rather than five rows in the middle of Overview. */}
+      <RecordFooter
+        audit={{
+          createdByName: ticket.raiserName,
+          createdAt: ticket.createdAt,
+          editedByName: ticket.editorName,
+          updatedAt: ticket.updatedAt,
+        }}
+      />
+
       <ResolveDialog
         open={resolving}
         onOpenChange={setResolving}
@@ -579,6 +598,6 @@ export function HelpDetailScreen({
         }}
         onSubmit={editTicket}
       />
-    </div>
+    </RecordScreen>
   )
 }

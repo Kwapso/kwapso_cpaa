@@ -1,4 +1,4 @@
-# BASE-IMPROVEMENTS.md — the honest backlog
+# BASE-IMPROVEMENTS.md, the honest backlog
 
 The living list of known base issues and their status, from an **objective third-party
 review** (2026-07-09): a fresh multi-agent `security_sentry` on this repo + an independent
@@ -10,7 +10,7 @@ Keep this current: when an item ships, move it to **Fixed** with the commit.
 
 ---
 
-## Fixed (2026-08-04, final) — four findings ported back FROM the downstream product
+## Fixed (2026-08-04, final), four findings ported back FROM the downstream product
 
 The fork shipped its side and sent four findings back. Three were live here too;
 the fourth was a UX bug their seam tests caught that mine would have shipped.
@@ -18,13 +18,13 @@ the fourth was a UX bug their seam tests caught that mine would have shipped.
 
 | Sev | Issue | Fix |
 |---|---|---|
-| BLIND CHECK | **The gate scan read COMMENTS AS CODE.** Reproduced exactly: a mutation's real `requireRight(…)` was replaced with a comment mentioning it, and R10 stayed GREEN. This repo comments densely about the very seams being scanned, and a handler's slice runs to the next top-level export — so it swallows the next function's doc comment too. | All four gate scans (tenancy, content, data-ops, mcp) strip comments before matching, require `\s*\(` on every alternative, and allow the generic (`(?:<[^(<>]*>)?`) so `gatedBody<{…}>(` isn't a miss. |
-| BLIND CHECK | **R14's LIMIT test read comments** — `// no LIMIT needed here` satisfied the very bound it describes the absence of. (The arrow-shape blindness and the saw-something tripwire were already fixed in the previous round.) | Comment-stripped before matching; proven with an unbounded read whose comment says LIMIT. |
-| BUG | **A deliberate `0` in config silently became the default.** `Number(env.X) \|\| DEFAULT` at all three numeric env-var reads: `AGENT_FREE_DAILY=0` would have granted the full quota, and `MAX_TEAMS_PER_USER=0` the default 5. | One `numberVar()` parse — unset/empty/unparseable → fallback, every real number incl. zero honoured. Tested at both boundaries, plus a scan so the raw spellings can't return. |
-| BUG | **The OTP cooldown counted CONSUMED codes**, so signing in on a laptop and then a phone made the second device wait a minute — the cooldown punished the one user who had already proved they own the inbox. | The probe carries `consumed_at IS NULL`. Their seam tests caught this; mine would have shipped it. |
+| BLIND CHECK | **The gate scan read COMMENTS AS CODE.** Reproduced exactly: a mutation's real `requireRight(…)` was replaced with a comment mentioning it, and R10 stayed GREEN. This repo comments densely about the very seams being scanned, and a handler's slice runs to the next top-level export, so it swallows the next function's doc comment too. | All four gate scans (tenancy, content, data-ops, mcp) strip comments before matching, require `\s*\(` on every alternative, and allow the generic (`(?:<[^(<>]*>)?`) so `gatedBody<{…}>(` isn't a miss. |
+| BLIND CHECK | **R14's LIMIT test read comments**, `// no LIMIT needed here` satisfied the very bound it describes the absence of. (The arrow-shape blindness and the saw-something tripwire were already fixed in the previous round.) | Comment-stripped before matching; proven with an unbounded read whose comment says LIMIT. |
+| BUG | **A deliberate `0` in config silently became the default.** `Number(env.X) \|\| DEFAULT` at all three numeric env-var reads: `AGENT_FREE_DAILY=0` would have granted the full quota, and `MAX_TEAMS_PER_USER=0` the default 5. | One `numberVar()` parse, unset/empty/unparseable → fallback, every real number incl. zero honoured. Tested at both boundaries, plus a scan so the raw spellings can't return. |
+| BUG | **The OTP cooldown counted CONSUMED codes**, so signing in on a laptop and then a phone made the second device wait a minute, the cooldown punished the one user who had already proved they own the inbox. | The probe carries `consumed_at IS NULL`. Their seam tests caught this; mine would have shipped it. |
 
 Confirmed already correct here: the team cap counts `teams.creator_id` (not
-memberships) and does **not** filter deactivated teams — "create five, switch them
+memberships) and does **not** filter deactivated teams, "create five, switch them
 off, repeat" would otherwise be an unbounded database generator wearing a cap.
 Now locked by a test.
 
@@ -36,17 +36,17 @@ Two things a review will flag every time. Both are deliberate positions with the
 threat named, documented in BASE-MANUAL §5 (the fork chapter) and OPERATIONS.md
 so a fork decides consciously rather than inheriting them by accident:
 
-- **`/media/*` capability URLs** — no session check on uploaded files. An
+- **`/media/*` capability URLs**, no session check on uploaded files. An
   ex-member who saved a link keeps it, forever. Acceptable for product photos;
   **not** for invoices, IDs or personal data. Any fork storing those must fix it
   before launch.
-- **Identity fields behind a neighbouring right** — stakeholder emails, the team
+- **Identity fields behind a neighbouring right**, stakeholder emails, the team
   creator's email, learning-progress user ids. Tenant-scoped throughout, so it is
   a wrong-right mismatch within one team, not a cross-customer leak.
 
 ---
 
-## Fixed (2026-08-04, follow-up) — the independent security review
+## Fixed (2026-08-04, follow-up), the independent security review
 
 Three no-prior-context auditors read a clean clone (no session notes, no prior
 reports, no explanation of why anything was built) and refuted by default. Nine
@@ -54,20 +54,20 @@ findings survived; all nine are fixed below. 371 tests.
 
 | Sev | Issue | Fix |
 |---|---|---|
-| HIGH | **Stored prompt injection reached UNCONFIRMED privilege grants.** Any member with `help:create` writes instructions into a 20,000-character ticket description; an admin later asks the assistant anything that lists tickets; `set_role_permissions` / `set_member_role` / `create_role` / `invite_member` then run AS the admin with no panel. | Those four now confirm — see EDGE-CASES §5 (this REVERSES the 2026-07-10 destructive-only decision, narrowly: every other constructive write still runs free). |
-| MED | **`?scope=user` with no `id` returned the WHOLE team feed, unfiltered** — it matched no branch, leaving an empty WHERE. Exactly the leak R18 exists to stop, arrived at by omission; the source-scan stayed green because the clause still *existed*. | Fails closed at both layers (the route validates the scope and refuses an id-scope with no id; the reader returns nothing rather than widening), locked by `activity-scope.test.ts`, which RUNS the reader over every scope shape. |
-| MED | **A role could grant ITSELF every right** — `member_roles:edit` + your own role id = admin in one call. | `setRolePermissions` refuses a self-grant, matching the sibling "you can't change your own role" invariant. |
-| MED | **An unauthenticated request could write into the GLOBAL core DB** — the client-error beacon's gate was `Cookie.includes("session")`, a substring test on an attacker-controlled header, next to a comment claiming a drive-by couldn't fill the table. | The gateway resolves the session with auth before forwarding; a forged cookie now writes nothing (verified live on staging). |
-| MED | **The daily AI allowance was advisory** — read-then-check, so N simultaneous chats all passed. | The cap rides the UPDATE, like the paid-credit path beside it. |
-| MED | **The impersonation door shared a name with the maintenance key.** `ADMIN_KEY` is set on tenancy + data-ops in BOTH environments, so one mistyped `wrangler secret put` directory would have armed sign-in-as-anyone on production. | Its own `TEST_LOGIN_KEY` secret **and** a hard refusal when `ENVIRONMENT` is production — two independent locks, neither a runbook sentence. `ADMIN_KEY` deleted from staging auth. |
-| LOW | **R10 claimed three gating-seam suites that did not exist** (tenancy, content, data-ops) — a documented control, absent. | The three suites now exist and are sabotage-proven. (Writing them found a bug in my own scanner: no word boundary, so `ungatedBody(` matched `gatedBody(` and the check passed its own sabotage.) |
-| LOW | **The email-change door was an enumeration oracle** — the "already in use?" check ran before the throttle, and a rejected probe counted toward nothing. | Throttle first; probes count. |
-| LOW | **A double-clicked CSV import could write every row twice** — read-then-write, while CONCURRENCY.md claimed it was guarded. | The session is claimed atomically, like its batch sibling. |
-| LOW | **Learning `body` + `contentLink` skipped the boundary seam** — a NUL byte was a 500, and the body had no length cap. | Both go through `optionalText` first, then the XSS scrub. |
+| HIGH | **Stored prompt injection reached UNCONFIRMED privilege grants.** Any member with `help:create` writes instructions into a 20,000-character ticket description; an admin later asks the assistant anything that lists tickets; `set_role_permissions` / `set_member_role` / `create_role` / `invite_member` then run AS the admin with no panel. | Those four now confirm. See EDGE-CASES §5 (this REVERSES the 2026-07-10 destructive-only decision, narrowly: every other constructive write still runs free). |
+| MED | **`?scope=user` with no `id` returned the WHOLE team feed, unfiltered**, it matched no branch, leaving an empty WHERE. Exactly the leak R18 exists to stop, arrived at by omission; the source-scan stayed green because the clause still *existed*. | Fails closed at both layers (the route validates the scope and refuses an id-scope with no id; the reader returns nothing rather than widening), locked by `activity-scope.test.ts`, which RUNS the reader over every scope shape. |
+| MED | **A role could grant ITSELF every right**, `member_roles:edit` + your own role id = admin in one call. | `setRolePermissions` refuses a self-grant, matching the sibling "you can't change your own role" invariant. |
+| MED | **An unauthenticated request could write into the GLOBAL core DB**, the client-error beacon's gate was `Cookie.includes("session")`, a substring test on an attacker-controlled header, next to a comment claiming a drive-by couldn't fill the table. | The gateway resolves the session with auth before forwarding; a forged cookie now writes nothing (verified live on staging). |
+| MED | **The daily AI allowance was advisory**, read-then-check, so N simultaneous chats all passed. | The cap rides the UPDATE, like the paid-credit path beside it. |
+| MED | **The impersonation door shared a name with the maintenance key.** `ADMIN_KEY` is set on tenancy + data-ops in BOTH environments, so one mistyped `wrangler secret put` directory would have armed sign-in-as-anyone on production. | Its own `TEST_LOGIN_KEY` secret **and** a hard refusal when `ENVIRONMENT` is production, two independent locks, neither a runbook sentence. `ADMIN_KEY` deleted from staging auth. |
+| LOW | **R10 claimed three gating-seam suites that did not exist** (tenancy, content, data-ops), a documented control, absent. | The three suites now exist and are sabotage-proven. (Writing them found a bug in my own scanner: no word boundary, so `ungatedBody(` matched `gatedBody(` and the check passed its own sabotage.) |
+| LOW | **The email-change door was an enumeration oracle**, the "already in use?" check ran before the throttle, and a rejected probe counted toward nothing. | Throttle first; probes count. |
+| LOW | **A double-clicked CSV import could write every row twice**, read-then-write, while CONCURRENCY.md claimed it was guarded. | The session is claimed atomically, like its batch sibling. |
+| LOW | **Learning `body` + `contentLink` skipped the boundary seam**, a NUL byte was a 500, and the body had no length cap. | Both go through `optionalText` first, then the XSS scrub. |
 
 ---
 
-# SECURITY ADVISORY — for apps forked from this base BEFORE 2026-08-04
+# SECURITY ADVISORY, for apps forked from this base BEFORE 2026-08-04
 
 A base that fixes a vulnerability silently leaves its own children exposed. Every
 app forked before commit `5da1c76` carries the defects below in its own source —
@@ -75,12 +75,12 @@ the fork copied the code, and no deploy of this repo reaches it. **Six of these
 have been independently confirmed live in a downstream product's production.**
 
 Each entry gives the grep that finds it in a fork and the minimal patch. Run the
-greps from the fork's root. **Every grep here was validated both ways** — it reads
-clear against the fixed base and FLAGS the pre-fix base (`3bebf0b`) — so a grep
+greps from the fork's root. **Every grep here was validated both ways**, it reads
+clear against the fixed base and FLAGS the pre-fix base (`3bebf0b`), so a grep
 that comes back clear is evidence, not an absence of evidence. The one caveat: if
 you renamed the symbol it names, check that spot by hand.
 
-## A1 · CRITICAL-if-agent-enabled — the assistant grants privileges with no confirmation
+## A1 · CRITICAL-if-agent-enabled, the assistant grants privileges with no confirmation
 **Who is exposed:** any fork whose AI assistant is switched on and whose members
 can write free text anyone else's assistant will read (a ticket, an article, an
 imported row). **The attack:** a member writes instructions into a ticket
@@ -98,7 +98,7 @@ most tools legitimately don't confirm; only the privilege ones must.)
 — copy `isPrivilegeWrite()` from `shared/workers/tool-catalog.ts` and the
 `requiresConfirm` guard in `workers/data-ops/src/lib/tools.ts`.
 
-## A2 · HIGH — the activity feed leaks every module's history
+## A2 · HIGH, the activity feed leaks every module's history
 **The attack:** any member with `team_members:read` requests
 `GET /api/tenancy/activity?scope=user` **with no `id`**. It matches no branch,
 the WHERE comes out empty, and the whole team's cross-module history returns —
@@ -113,7 +113,7 @@ so an unresolved scope still gets the visibility filter, return empty when a
 non-team scope arrives without an `id`, and validate `scope` against the literal
 set in the route instead of casting it.
 
-## A3 · HIGH — a role can grant itself every right
+## A3 · HIGH, a role can grant itself every right
 **The attack:** a member holding `member_roles:edit` posts their OWN role id to
 `/api/tenancy/roles/permissions` with every module true, and is an admin.
 
@@ -122,11 +122,11 @@ grep -n "export async function setRolePermissions" -A 12 workers/tenancy/src/lib
 ```
 **Patch:** returns `0` → vulnerable. Refuse when `roleId === guard.roleId`.
 
-## A4 · MEDIUM — anyone can write to your global database
+## A4 · MEDIUM, anyone can write to your global database
 **The attack:** `curl -X POST <app>/api/log/client -H 'Cookie: session=x' -d
 '{"message":"…"}'` in a loop. The gate is a substring test on an
 attacker-controlled header, so unauthenticated rows accumulate in the core
-database that also holds users, sessions and teams — toward D1's 10 GB cap.
+database that also holds users, sessions and teams, toward D1's 10 GB cap.
 
 ```bash
 grep -n 'includes("session")' workers/gateway/src/index.ts
@@ -135,7 +135,7 @@ grep -n 'includes("session")' workers/gateway/src/index.ts
 `env.AUTH.fetch("https://internal/api/auth/me", { headers: { Cookie: cookie } })`
 — and drop the beacon when it isn't ok.
 
-## A5 · MEDIUM — one mistyped directory arms sign-in-as-anyone
+## A5 · MEDIUM, one mistyped directory arms sign-in-as-anyone
 **Why it matters:** if the test-login door is gated by `ADMIN_KEY`, it shares its
 name with the maintenance key your runbook tells operators to set on tenancy and
 data-ops **in both environments**. One `wrangler secret put ADMIN_KEY` run in the
@@ -148,7 +148,7 @@ grep -n "env.ADMIN_KEY" workers/auth/src/index.ts
 add `if (env.ENVIRONMENT === "production") return fail(403, …)`, and set
 `"ENVIRONMENT"` in `workers/auth/wrangler.jsonc` vars for every environment.
 
-## A6 · MEDIUM — the daily AI allowance is advisory
+## A6 · MEDIUM, the daily AI allowance is advisory
 **The attack:** fire N chat requests at once; every one reads `used < cap` before
 any writes, so all N proceed. The free allowance overruns by the burst width and
 paid credits are never reached.
@@ -156,13 +156,13 @@ paid credits are never reached.
 ```bash
 grep -c "agent_usage.used <" workers/data-ops/src/lib/credits.ts
 ```
-**Patch:** a count of `0` is vulnerable — the cap isn't in the write.
+**Patch:** a count of `0` is vulnerable, the cap isn't in the write.
 (Don't grep for `SELECT used FROM agent_usage`: a legitimate read of the same
 row backs the quota display.) Put the cap in the write —
 `INSERT … ON CONFLICT … DO UPDATE SET used = used + 1 WHERE agent_usage.used < ?`
 — and proceed only when a row changed.
 
-## A7 · MEDIUM — an uncapped database-creation door
+## A7 · MEDIUM, an uncapped database-creation door
 **The attack:** sign up, then POST `/api/tenancy/teams` in a loop. Every call
 provisions a real D1 database until the Cloudflare account's quota is gone. No
 permission is exceeded; the platform simply stops working.
@@ -173,7 +173,7 @@ grep -n "creator_id = ?" workers/tenancy/src/routes/team.ts
 **Patch:** returns nothing → vulnerable. Count teams the caller CREATED and
 refuse at a cap (`MAX_TEAMS_PER_USER`, default 5, overridable per environment).
 
-## A8 · LOW — an unthrottled user-enumeration oracle
+## A8 · LOW, an unthrottled user-enumeration oracle
 **The attack:** any signed-in account POSTs `/api/auth/email/change/start` in a
 loop; `409 email_taken` vs `{}` reveals whether any address has an account, at
 full request rate. The login door is deliberately non-enumerable; this undoes it.
@@ -181,12 +181,12 @@ full request rate. The login door is deliberately non-enumerable; this undoes it
 ```bash
 grep -n "export async function startEmailChange" -A 25 workers/auth/src/lib/email-change.ts | grep -c "findUserByEmail"
 ```
-**Patch:** any count above `0` is vulnerable — the START door answers "does this
+**Patch:** any count above `0` is vulnerable, the START door answers "does this
 address exist?" before the throttle. Move the check to the VERIFY step (where the
 caller has already proved they control the new inbox) and keep the UNIQUE
 constraint as the backstop.
 
-## A9 · LOW — anyone can lock a real person out of sign-in
+## A9 · LOW, anyone can lock a real person out of sign-in
 **The attack:** request five codes for someone else's address. For the rest of
 the hour their own sign-in returns `429`. (This one bit a real operator on their
 own staging, self-inflicted, by retrying.)
@@ -196,10 +196,10 @@ grep -n "Try again in an hour" workers/auth/src/lib/login-codes.ts
 ```
 **Patch:** any hit is vulnerable. Throttle the SEND with a short cooldown
 (~60s); past the hourly cap, ROTATE the live code row in place instead of
-refusing — codes are hashed at rest, so rotation (a fresh secret, fresh TTL,
+refusing, codes are hashed at rest, so rotation (a fresh secret, fresh TTL,
 `attempts = 0`) is the only way to let the inbox owner back in.
 
-## A10 · LOW — a double-clicked import writes every row twice
+## A10 · LOW, a double-clicked import writes every row twice
 ```bash
 grep -n "import_complete === 1" -A 6 workers/data-ops/src/lib/import.ts | grep -c "import_initiated = 1 WHERE"
 ```
@@ -207,32 +207,32 @@ grep -n "import_complete === 1" -A 6 workers/data-ops/src/lib/import.ts | grep -
 statement (`UPDATE … WHERE id = ? AND import_complete = 0 AND import_initiated = 0
 RETURNING id`), placed BELOW every validation, and release it on failure.
 
-## A11 · LOW — a NUL byte is a 500
+## A11 · LOW, a NUL byte is a 500
 ```bash
 grep -n "safeBody(input.body)" workers/content/src/lib/learning.ts
 ```
 **Patch:** any hit is vulnerable. Wrap with the boundary seam first —
-`safeBody(optionalText(input.body, "Body", TEXT_LIMITS.long))` — and the same for
+`safeBody(optionalText(input.body, "Body", TEXT_LIMITS.long))`, and the same for
 `contentLink`.
 
-## A12 · LOW — a deliberate `0` in config silently becomes the default
+## A12 · LOW, a deliberate `0` in config silently becomes the default
 **The shape:** `Number(env.X) || DEFAULT`. Set the AI allowance to `0` to switch
 free usage off and you silently grant the full daily quota; the mirror shape,
-bare `Number(env.X)`, turns *unset* into `0` — a cap that refuses everyone.
+bare `Number(env.X)`, turns *unset* into `0`, a cap that refuses everyone.
 
 ```bash
 grep -rnE "(?:Number|parseInt|parseFloat)\s*\(\s*env\." --include="*.ts" workers/ shared/ \
   | grep -v node_modules | grep -vE ":[0-9]+: *(\*|//)"
 ```
 **Patch:** any hit is vulnerable (the second `grep -v` drops doc comments that
-DESCRIBE the bad shape — including the one in the patched file itself). Route them
+DESCRIBE the bad shape, including the one in the patched file itself). Route them
 all through one parse that treats
 unset/empty/unparseable as the fallback and honours every real number including
-zero — copy `numberVar` from `shared/workers/limits.ts`, and test at `0` and `""`.
+zero, copy `numberVar` from `shared/workers/limits.ts`, and test at `0` and `""`.
 
 ## And the two blind CHECKS, which matter as much
 A fork also inherits the checks. Two flaw classes made several of them unable to
-fail — a green check that cannot go red is worse than no check, because it is
+fail, a green check that cannot go red is worse than no check, because it is
 reported as a pass:
 
 ```bash
@@ -240,40 +240,40 @@ grep -L "stripComments" workers/*/test/gating-seam.test.ts web/test/rules.test.t
 ```
 **Patch:** every file listed reads COMMENTS AS CODE. This is the worst of the
 three, because this repo comments densely about the very seams being scanned and
-a handler's slice runs to the next top-level export — so it swallows the doc
+a handler's slice runs to the next top-level export, so it swallows the doc
 comment introducing the next function. A gate deleted from a handler stayed green,
 satisfied by prose thirty lines below. Three fixes together:
 1. **strip comments** before matching (block comments, then line comments whose
    `//` isn't part of a `https://`);
-2. **match a CALL, not a word** — every alternative ends `\s*\(`, and allow the
+2. **match a CALL, not a word**, every alternative ends `\s*\(`, and allow the
    generic between name and paren (`(?:<[^(<>]*>)?`) or `gatedBody<{…}>(` reads
    as a miss;
-3. **boundary every identifier** — `(?<![A-Za-z0-9_$.])`, without which
+3. **boundary every identifier**, `(?<![A-Za-z0-9_$.])`, without which
    `ungatedBody(` satisfies a search for `gatedBody(`.
 
 Then teach every source-scan BOTH export shapes (`export function listX` and
 `export const listX = async (…) =>`) and give it a **tripwire** asserting it
-matched something — a scan that silently finds nothing returns an empty offender
+matched something, a scan that silently finds nothing returns an empty offender
 list, which reads exactly like a pass. See `web/test/hooks-order.test.ts` for the
 fixture pattern that locks a scanner's own blind spots.
 
 ---
 
-## Fixed (2026-08-04, follow-up) — the five close-out items
+## Fixed (2026-08-04, follow-up), the five close-out items
 
 The hardening round's own review found five loose ends. 354 tests (up from 342).
 
 | Sev | Issue | Fix |
 |---|---|---|
-| SCALE | **A hard cap is an honest refusal, not an answer.** R14 capped growing collections at 1,000 rows and called cursor paging a "next step"; a downstream product had already shipped keyset paging on its growing collections and proved it at 24,000 rows. | R14 WIDENED: a collection that grows with ordinary use must PAGE by key — `shared/workers/paging.ts` (opaque cursor, id tiebreak, `LIMIT+1` for `hasMore`) answered through the one `pagedJson` seam. Support tickets + the team activity feed page end to end; the My/All tabs became SERVER scopes (a client filter over a page disagrees with its exact badge). `GROWING_COLLECTIONS` is registry DATA; the check asserts the lib seam, the response, and that the client can reach page two. |
-| BUG | **The agent was told a bulk cap it could not physically write.** The reply ceiling was 4,096 tokens while the declared cap was 500 ids (~8,000 tokens) — the tool call truncates mid-JSON, the turn dies, nothing changed, no error. | `AGENT_MAX_TOKENS` raised to 8,192 and `BULK_IDS_LIMIT` DERIVED from it (512). `reply-ceiling.test.ts` asserts the arithmetic and that every bulk schema declares the derived number. |
-| BUG | **The hooks-order scanner had a third blind spot**: a guard written the ordinary way (`if (!ready) {` newline `return null` newline `}`) put its return at brace depth 2, so it never registered as an early return — switching the white-screen check OFF for that whole file. | Rewritten around the real semantic: a return counts unless it is inside a NESTED FUNCTION. Arrow components are scanned too, and fixtures now lock the scanner's own blind spots (a check that cannot fail is not a check). |
-| BUG | **The dropdown-ordering rule was stated but not locked** — nothing stopped either surface losing it. | The rule is pinned as `DROPDOWN_ORDER_RULE` and asserted on BOTH surfaces the model reads (the tool description and the system rule wall), including that CREATE is the step named first (R9's vocabulary half). |
-| OPS | **Staging's smoke was red (16/18)** on a stale team-database pointer — indistinguishable, to the next reader, from a real regression. | Staging reset (3 of 4 team-DB pointers were dangling), re-deployed, smoke back to **18/18**. |
+| SCALE | **A hard cap is an honest refusal, not an answer.** R14 capped growing collections at 1,000 rows and called cursor paging a "next step"; a downstream product had already shipped keyset paging on its growing collections and proved it at 24,000 rows. | R14 WIDENED: a collection that grows with ordinary use must PAGE by key, `shared/workers/paging.ts` (opaque cursor, id tiebreak, `LIMIT+1` for `hasMore`) answered through the one `pagedJson` seam. Support tickets + the team activity feed page end to end; the My/All tabs became SERVER scopes (a client filter over a page disagrees with its exact badge). `GROWING_COLLECTIONS` is registry DATA; the check asserts the lib seam, the response, and that the client can reach page two. |
+| BUG | **The agent was told a bulk cap it could not physically write.** The reply ceiling was 4,096 tokens while the declared cap was 500 ids (~8,000 tokens), the tool call truncates mid-JSON, the turn dies, nothing changed, no error. | `AGENT_MAX_TOKENS` raised to 8,192 and `BULK_IDS_LIMIT` DERIVED from it (512). `reply-ceiling.test.ts` asserts the arithmetic and that every bulk schema declares the derived number. |
+| BUG | **The hooks-order scanner had a third blind spot**: a guard written the ordinary way (`if (!ready) {` newline `return null` newline `}`) put its return at brace depth 2, so it never registered as an early return, switching the white-screen check OFF for that whole file. | Rewritten around the real semantic: a return counts unless it is inside a NESTED FUNCTION. Arrow components are scanned too, and fixtures now lock the scanner's own blind spots (a check that cannot fail is not a check). |
+| BUG | **The dropdown-ordering rule was stated but not locked**, nothing stopped either surface losing it. | The rule is pinned as `DROPDOWN_ORDER_RULE` and asserted on BOTH surfaces the model reads (the tool description and the system rule wall), including that CREATE is the step named first (R9's vocabulary half). |
+| OPS | **Staging's smoke was red (16/18)** on a stale team-database pointer, indistinguishable, to the next reader, from a real regression. | Staging reset (3 of 4 team-DB pointers were dangling), re-deployed, smoke back to **18/18**. |
 
 ---
 
-## Fixed (2026-08-04) — the base hardening round (7 new laws + security/UI)
+## Fixed (2026-08-04), the base hardening round (7 new laws + security/UI)
 
 Ported the twenty defects a downstream product (Acrymold) found under real load —
 each was a base defect. Seven became machine-checked Laws (R13–R19), each
@@ -281,59 +281,59 @@ sabotage-proven; the rest are security/agent/UI fixes. 342 tests (up from 302).
 
 | Sev | Issue | Fix |
 |---|---|---|
-| DESIGN | **A capability shipped in code was invisible until a catalogue ROW existed** — staging could import modules production (byte-identical code) could not. | R13 widened: the import catalogue reconciles itself against the code on READ (INSERT-only; an owner's OFF stays off; the picker filters is_active in memory). Shipping the code now ships the capability. (`catalog-coverage`) |
+| DESIGN | **A capability shipped in code was invisible until a catalogue ROW existed**, staging could import modules production (byte-identical code) could not. | R13 widened: the import catalogue reconciles itself against the code on READ (INSERT-only; an owner's OFF stays off; the picker filters is_active in memory). Shipping the code now ships the capability. (`catalog-coverage`) |
 | SCALE | **Unbounded list reads** would stall a worker at 100k rows. | R14: every `list*`/`search*` carries a hard cap from `shared/workers/limits.ts` with its comment (`bounded-lists`). *Widened in the follow-up round above: a GROWING collection must page, not cap.* |
-| BUG | **Deaf publishers / stale paged screens** — a worker pinged `selectable_data` and nothing listened; paged rows live outside the row caches. | R15: the live registry (`web/lib/live-resources.ts`) + a ping bus + `useLiveRefetch`; every published resource reaches a listener or a reasoned `DEAF_EXEMPT`. (`live-collections`) |
+| BUG | **Deaf publishers / stale paged screens**, a worker pinged `selectable_data` and nothing listened; paged rows live outside the row caches. | R15: the live registry (`web/lib/live-resources.ts`) + a ping bus + `useLiveRefetch`; every published resource reaches a listener or a reasoned `DEAF_EXEMPT`. (`live-collections`) |
 | BUG | **A 24,011-row catalogue advertised "1000"** (a capped list's length) and the same count showed twice on one screen. | R16: exact server COUNT(*) through the one `formatCount` seam; tab-vs-heading arbitration by React context. (`counted-collections`) |
 | BUG | **A double-clicked Deactivate wrote two history rows** 2s apart. | R17: the current-status predicate rides the UPDATE; zero rows moved = no activity, no ping. (`idempotent-transitions`) |
 | LEAK | **The team activity feed showed every module's before/after behind one gate.** | R18: it subtracts the caller's denied modules through one clause; every relatedTable resolves through `ACTIVITY_GATE_MAP` or a pinned exemption. (`activity-gate-coverage`) |
-| BUG | **The agent answered a DIFFERENT question** — free-text fallback matched 3,465 mentions instead of 134 records. | R19: every list tool exposes + forwards its door's filters, derived from the door's own source. (`agent-filter-parity`) |
+| BUG | **The agent answered a DIFFERENT question**, free-text fallback matched 3,465 mentions instead of 134 records. | R19: every list tool exposes + forwards its door's filters, derived from the door's own source. (`agent-filter-parity`) |
 | SEC | **Login codes echoed in API responses + a toast** on staging. | B1: echo + var DELETED (inbox-only, every env); ADMIN_KEY-gated staging test-login door mints a normal code for tests. |
 | SEC | **Internal doors waved callers through** when `INTERNAL_KEY` was unset. | B2: send-email / log-error / mcp-session all FAIL CLOSED. |
 | SEC | **The 5-try attempt cap was burstable** (read-then-write). | B3: one atomic UPDATE checks + consumes a slot (login + email-change). |
 | SEC | **Preview URLs were a second public door.** | B4: `preview_urls: false` beside `workers_dev: false` on every non-gateway worker. |
 | CRASH | **A hook below an early return white-screened the app** (React #310), and the ErrorBoundary was never mounted. | C1: the boundary is mounted at the root; `hooks-order.test.ts` makes the class unshippable. |
-| AGENT | **Bulk tool JSON truncated mid-call** (1024 max_tokens); no set-shaped tool. | C2: `AGENT_MAX_TOKENS` 4096 *(superseded — see the follow-up round above: 8,192, with the bulk cap derived from it)*; a filter-shaped `set_help_status_by_filter` (dry-run counts first, idempotent); the bulk cap is one declared constant; dropdown-never-invents rule. |
-| BUG | **The usage log showed an admin four blank rows** with a teammate's name. | C3: `agent_usage_log.kind` (0014) — action rows team-visible, prompt rows the author's; the fold APPENDS its actions, never replaces. |
+| AGENT | **Bulk tool JSON truncated mid-call** (1024 max_tokens); no set-shaped tool. | C2: `AGENT_MAX_TOKENS` 4096 *(superseded. See the follow-up round above: 8,192, with the bulk cap derived from it)*; a filter-shaped `set_help_status_by_filter` (dry-run counts first, idempotent); the bulk cap is one declared constant; dropdown-never-invents rule. |
+| BUG | **The usage log showed an admin four blank rows** with a teammate's name. | C3: `agent_usage_log.kind` (0014), action rows team-visible, prompt rows the author's; the fold APPENDS its actions, never replaces. |
 | UI | **Action rows clipped off the left edge**; the brand mark lost its corners. | C4/C5: flex-wrap + ml-auto; object-contain at `LOGO_SAFE_RATIO` 0.76. |
 
 Also this round: R10 widened with an mcp gating-seam suite (identity-gated writes); every exemption is DATA in the rules registry (B5). Core migration **0014** (`agent_usage_log.kind`) applies before deploy.
 
-## Fixed (2026-07-13) — the invite + credit-fairness round (team testing on staging)
+## Fixed (2026-07-13), the invite + credit-fairness round (team testing on staging)
 
 Three real bugs a teammate (chilavert) hit exercising the AI co-pilot's invite flow.
-(A fourth report — "chat creates a role but also opens an empty form" — was already fixed
+(A fourth report, "chat creates a role but also opens an empty form", was already fixed
 by the one-shell round; re-verified live, no change needed.)
 
 | Sev | Issue | Fix |
 |---|---|---|
-| MED | **Agent accepted a self / existing-member invite** — asked "which role?" and only failed at the door, wasting a turn (and credits). No explicit self-invite guard existed (blocked only transitively via already-member). | Added a `self_invite` guard in `createInvite` (clear "you can't invite yourself" message) + system-prompt guidance so the agent checks membership and refuses UPFRONT. Verified live: it now says "that's your own email — you're already on the team." (`workers/tenancy/src/lib/invites.ts`, `agent.ts` SYSTEM; `integration.test.ts`) |
-| MED | **Dishonest email narration** — the invite email was fire-and-forget, and the agent's "no email was sent" line was free model text, not bound to the real outcome; a *successful* invite mis-narrated as a duplicate would send an email while the bot claimed it hadn't. | `createInvite` now AWAITS the send and returns `emailSent`; the route returns it (first); the agent is told to report it honestly and never claim an email was sent when it wasn't. The invite still succeeds if mail fails (the invite_index row routes acceptance; accept in-app). (`invites.ts`, `routes/invites.ts`, `tool-catalog.ts`, `agent.ts`; `integration.test.ts`) |
-| MED | **Charged for refused actions + mislabeled** — a turn that only asked a clarifying question or hit a refused action still cost credits and was titled by the read it ran ("List roles"), not what the user did. | A turn that changed NOTHING (a refused action or a model hiccup) now REFUNDS its metered units (`refundAiUnits` reverses both pools) — a blocked action costs 0. Usage rows title by WRITES only, so a read-only clarify turn reads as the question. Verified live in the credit log (a failed invite → **0 credits**). (`credits.ts`, `agent.ts`; `credit-reconcile.test.ts`) **NARROWED 2026-08-11** — the refused-action half of this refund was itself the hole: that failure is reachable on demand, so the credit lane became unbounded (the free allowance was already protected from exactly this, in a comment one line above the code that did it). A unit is spent the moment the model answers; only a model call that THREW is refunded now. See DATA-MODEL.md `agent_usage`. |
+| MED | **Agent accepted a self / existing-member invite**, asked "which role?" and only failed at the door, wasting a turn (and credits). No explicit self-invite guard existed (blocked only transitively via already-member). | Added a `self_invite` guard in `createInvite` (clear "you can't invite yourself" message) + system-prompt guidance so the agent checks membership and refuses UPFRONT. Verified live: it now says "that's your own email, you're already on the team." (`workers/tenancy/src/lib/invites.ts`, `agent.ts` SYSTEM; `integration.test.ts`) |
+| MED | **Dishonest email narration**, the invite email was fire-and-forget, and the agent's "no email was sent" line was free model text, not bound to the real outcome; a *successful* invite mis-narrated as a duplicate would send an email while the bot claimed it hadn't. | `createInvite` now AWAITS the send and returns `emailSent`; the route returns it (first); the agent is told to report it honestly and never claim an email was sent when it wasn't. The invite still succeeds if mail fails (the invite_index row routes acceptance; accept in-app). (`invites.ts`, `routes/invites.ts`, `tool-catalog.ts`, `agent.ts`; `integration.test.ts`) |
+| MED | **Charged for refused actions + mislabeled**, a turn that only asked a clarifying question or hit a refused action still cost credits and was titled by the read it ran ("List roles"), not what the user did. | A turn that changed NOTHING (a refused action or a model hiccup) now REFUNDS its metered units (`refundAiUnits` reverses both pools), a blocked action costs 0. Usage rows title by WRITES only, so a read-only clarify turn reads as the question. Verified live in the credit log (a failed invite → **0 credits**). (`credits.ts`, `agent.ts`; `credit-reconcile.test.ts`) **NARROWED 2026-08-11**, the refused-action half of this refund was itself the hole: that failure is reachable on demand, so the credit lane became unbounded (the free allowance was already protected from exactly this, in a comment one line above the code that did it). A unit is spent the moment the model answers; only a model call that THREW is refunded now. See DATA-MODEL.md `agent_usage`. |
 
-## Fixed (2026-07-10) — the unification + one-shell round
+## Fixed (2026-07-10), the unification + one-shell round
 
 The two big structural moves the owner asked for after the hardening round.
 
 | Sev | Issue | Fix |
 |---|---|---|
 | P1 #2 | **Two tool catalogs drift.** The agent (data-ops) + MCP each hand-declared the same ~two dozen tenancy/content endpoints, so a capability had to be added twice and they could diverge (the drift the owner hit adding list_invites). | Collapsed the 24 overlapping endpoints into ONE `shared/workers/tool-catalog.ts` (SHARED_TOOLS); each surface PROJECTS them (`toAgentTool` / `toMcpTool`) + adds its surface-only tools. `mcpName` preserves the 3 external MCP names. Bonus: the agent gained `list_dropdown_values` (a parity gap). Adding a CRUD tool is now one edit. |
-| P1 (new) | **Navigating into a team screen HARD-RELOADED** (static-export boundary), tearing down the SPA + a running agent; the agent's screen-trace couldn't drive across it. | The **whole post-auth app is now ONE shell** — `/home`, `/settings`, `/invitations` render `<DeepLinkScreen/>` like `/t`, `/learning`, `/tickets`; all in-app nav is soft History-API (`softNavigate` / `go()`), no reload anywhere. Only pre-auth (`/login`, `/onboarding`) is a real navigation. The trace now soft-drives from any screen (EDGE-CASES §1). |
+| P1 (new) | **Navigating into a team screen HARD-RELOADED** (static-export boundary), tearing down the SPA + a running agent; the agent's screen-trace couldn't drive across it. | The **whole post-auth app is now ONE shell**, `/home`, `/settings`, `/invitations` render `<DeepLinkScreen/>` like `/t`, `/learning`, `/tickets`; all in-app nav is soft History-API (`softNavigate` / `go()`), no reload anywhere. Only pre-auth (`/login`, `/onboarding`) is a real navigation. The trace now soft-drives from any screen (EDGE-CASES §1). |
 
-## Fixed (2026-07-10) — the agent hardening round (team testing on staging)
+## Fixed (2026-07-10), the agent hardening round (team testing on staging)
 
 A sweep of real bugs surfaced by the team exercising the AI co-pilot on staging.
 
 | Sev | Issue | Fix |
 |---|---|---|
-| HIGH | **Agent panel died when the trace entered `/t`** — the off-host screen-trace `router.push`ed into a deep `/t` path, a hard reload (static export) that tore down the running agent + its live steps | The co-pilot is mounted once at the ROOT (`agent-host.tsx`) + its open state mirrors to `sessionStorage` (survives a real refresh; `agent-host.test.ts`). Trace first NARRATED off-host — then **superseded by the one-shell round (above): with no reload boundary left, the trace soft-drives from anywhere** (EDGE-CASES §1). |
-| HIGH | **First-turn confirm buttons dead** — a brand-new chat's first dangerous action paused at a confirm whose Go-ahead/Not-now no-op'd (the event omitted `threadId`) | `threadId` added to the `confirm` stream event; client adopts it (EDGE-CASES §6; `stream.test.ts`) |
-| MED | **Credit history didn't reconcile** — a confirmed command split into a row + a cryptic "(continued)" row, so it didn't sum to the balance | The confirm turn FOLDS its units into the command's one row; rows are titled by the ACTION taken, not the prompt (DATA-MODEL; `credit-reconcile.test.ts`) |
+| HIGH | **Agent panel died when the trace entered `/t`**, the off-host screen-trace `router.push`ed into a deep `/t` path, a hard reload (static export) that tore down the running agent + its live steps | The co-pilot is mounted once at the ROOT (`agent-host.tsx`) + its open state mirrors to `sessionStorage` (survives a real refresh; `agent-host.test.ts`). Trace first NARRATED off-host, then **superseded by the one-shell round (above): with no reload boundary left, the trace soft-drives from anywhere** (EDGE-CASES §1). |
+| HIGH | **First-turn confirm buttons dead**, a brand-new chat's first dangerous action paused at a confirm whose Go-ahead/Not-now no-op'd (the event omitted `threadId`) | `threadId` added to the `confirm` stream event; client adopts it (EDGE-CASES §6; `stream.test.ts`) |
+| MED | **Credit history didn't reconcile**, a confirmed command split into a row + a cryptic "(continued)" row, so it didn't sum to the balance | The confirm turn FOLDS its units into the command's one row; rows are titled by the ACTION taken, not the prompt (DATA-MODEL; `credit-reconcile.test.ts`) |
 | MED | **Screen-trace opened a blank input form** and left it open after the record already existed | Trace lands on the RESULT (detail/list), never a dialog; `TraceTarget` has no query field by construction (`trace-parity.test.ts`) |
-| MED | **Agent over-confirmed** — it asked before ordinary building (create a role, invite) | Confirm relaxed to **destructive-only** (removals + deactivations + bulk); constructive writes run free (EDGE-CASES §5) |
-| MED | **Agent couldn't revoke an invite by email** — `revoke_invite` needs an id but there was no way to list pending invites | Added a `list_invites` read tool to the agent + MCP catalogs (`agent.test.ts`) |
-| LOW | **Launcher needed a reload on first login** — the root host mounts before login and its non-reactive session copy never updated | `useActiveTeam` session cache made reactive (pub-sub); the launcher appears the instant you sign in (`agent-host.test.ts`) |
-| LOW | **"Blank pills"** — empty tool-only assistant turns painted as empty bubbles on resume | `toChatItems` drops blank-content assistant turns (kept server-side for replay) |
+| MED | **Agent over-confirmed**, it asked before ordinary building (create a role, invite) | Confirm relaxed to **destructive-only** (removals + deactivations + bulk); constructive writes run free (EDGE-CASES §5) |
+| MED | **Agent couldn't revoke an invite by email**, `revoke_invite` needs an id but there was no way to list pending invites | Added a `list_invites` read tool to the agent + MCP catalogs (`agent.test.ts`) |
+| LOW | **Launcher needed a reload on first login**, the root host mounts before login and its non-reactive session copy never updated | `useActiveTeam` session cache made reactive (pub-sub); the launcher appears the instant you sign in (`agent-host.test.ts`) |
+| LOW | **"Blank pills"**, empty tool-only assistant turns painted as empty bubbles on resume | `toChatItems` drops blank-content assistant turns (kept server-side for replay) |
 
 ---
 
@@ -341,45 +341,45 @@ A sweep of real bugs surfaced by the team exercising the AI co-pilot on staging.
 
 | Sev | Issue | Fix |
 |---|---|---|
-| HIGH | Agent could make privilege/identity writes (rename team, change roles, set permissions, invite) with **no confirmation** — reproduced live (a read-only question silently renamed a team) | `confirm: true` on the 7 privilege/identity tools; `agent.test.ts` flipped to the safe contract (`workers/data-ops/src/lib/tools.ts`). **Superseded 2026-07-10:** by owner decision the confirm rule was relaxed to **destructive-only** (removals + deactivations + bulk); the privilege-confirm defense-in-depth was traded for a smoother agent — the fence (untrusted content as DATA) + act-as-user gating + audit remain the primary defenses. See EDGE-CASES §5. |
+| HIGH | Agent could make privilege/identity writes (rename team, change roles, set permissions, invite) with **no confirmation**, reproduced live (a read-only question silently renamed a team) | `confirm: true` on the 7 privilege/identity tools; `agent.test.ts` flipped to the safe contract (`workers/data-ops/src/lib/tools.ts`). **Superseded 2026-07-10:** by owner decision the confirm rule was relaxed to **destructive-only** (removals + deactivations + bulk); the privilege-confirm defense-in-depth was traded for a smoother agent, the fence (untrusted content as DATA) + act-as-user gating + audit remain the primary defenses. See EDGE-CASES §5. |
 | HIGH | **Stored XSS**: `parseUploadDataUrl` accepted any MIME (`text/html`, `svg`); gateway served `/media/learning/*` back with it on the app origin (worker-built response, so `_headers` didn't apply) → attacker JS rides a viewer's session, cross-team | Allow-listed inline-safe MIME at the boundary + `mediaHeaders()` adds `CSP: default-src 'none'; sandbox` + `nosniff` on both gateway media branches (`shared/workers/image.ts`, `workers/gateway/src/index.ts`) |
 | MEDIUM | AI usage-log returned **every member's raw prompt** to any teammate who opened it | `readUsageLog` redacts the summary to the viewer's own rows (`workers/data-ops/src/lib/credits.ts`) |
 | MEDIUM | No anti-clickjacking / MIME / referrer headers served | `X-Frame-Options: DENY` + `nosniff` + `Referrer-Policy` in `web/public/_headers` |
 | LOW | Boundary validation gaps: role `description`, team `name`, member/invite ids not type-checked → a non-string body was a **500, not a 400** | `optionalText` / `requireText` / `typeof` guards (tenancy routes) |
 | CRIT (forks) | `mcp` binds the core DB but docs said "**five** core-bound workers" → a fork on a shared account silently binds mcp to the ORIGINAL core DB (cross-tenant) | "SIX core-bound workers" everywhere (BOOTSTRAP, OPERATIONS, new-app); OPERATIONS now lists migration 0013 + mcp in the `INTERNAL_KEY` set |
-| — | Fork sweep left `kwapso.kwapso.workers.dev` host URLs in the MCP docs | new-app sweep now treats host URLs as live references, not history |
+|, | Fork sweep left `kwapso.kwapso.workers.dev` host URLs in the MCP docs | new-app sweep now treats host URLs as live references, not history |
 
 ---
 
-## Open — ranked (the "three moves that each kill several findings" first)
+## Open, ranked (the "three moves that each kill several findings" first)
 
-### P1 · resilience + leanness — high leverage, real refactors
-1. **One `callInternal(path, {cookie, timeout})` seam** (`shared/workers/`). Kills THREE findings at once: the cookie-forward internal-fetch dance is copy-pasted 5+ times (DRY), **no `fetch` has an `AbortSignal`** anywhere — the D1 REST door (`cf()`), cross-worker calls, and the agent's model calls all lack a timeout, so one hung socket stalls a whole worker (resilience) — and the forward executors flatten 403/409/500 into one generic string (status preservation; also the cause of the agent's "stuck pending step"). **Highest-leverage single change.**
-2. ~~**Unify the two tool catalogs.**~~ **DONE 2026-07-10** — one `shared/workers/tool-catalog.ts` both surfaces project from (see Fixed above).
+### P1 · resilience + leanness, high leverage, real refactors
+1. **One `callInternal(path, {cookie, timeout})` seam** (`shared/workers/`). Kills THREE findings at once: the cookie-forward internal-fetch dance is copy-pasted 5+ times (DRY), **no `fetch` has an `AbortSignal`** anywhere, the D1 REST door (`cf()`), cross-worker calls, and the agent's model calls all lack a timeout, so one hung socket stalls a whole worker (resilience), and the forward executors flatten 403/409/500 into one generic string (status preservation; also the cause of the agent's "stuck pending step"). **Highest-leverage single change.**
+2. ~~**Unify the two tool catalogs.**~~ **DONE 2026-07-10**, one `shared/workers/tool-catalog.ts` both surfaces project from (see Fixed above).
 3. **Idempotency + partial-failure cleanup on the fleet writes.** `import-confirm` has no idempotency (retry → duplicate rows); `migrateTeams` aborts the whole fleet on the first bad team and leaves schema drift; the module-mover can orphan a DB / double-count on interruption. Add an idempotency guard + per-item try/catch + cleanup.
-4. **Close the two error-log blind spots.** The nightly cron catch and the agent model-call catch swallow unexpected errors (console-only / nothing) — invisible in the 90-day `error_logs` table meant to catch exactly those. Add `recordWorkerError` in both.
+4. **Close the two error-log blind spots.** The nightly cron catch and the agent model-call catch swallow unexpected errors (console-only / nothing), invisible in the 90-day `error_logs` table meant to catch exactly those. Add `recordWorkerError` in both.
 5. **`d1QueryAcross` uses `Promise.all`** → one slow/failed shard fails an entire split-module read. Use `allSettled` + record the degraded shard.
 
 ### P2 · deploy + docs
-6. **realtime↔auth cold-start cut.** A genuinely fresh-account first deploy dies `code 10143` (realtime binds auth, auth binds realtime). Document the one-time binding cut as a first-class BOOTSTRAP step AND make `deploy:*` tolerate it — not the current footnote ("in practice auth already exists" — false for `new-app`).
-7. ~~**`DEV_ECHO_CODES=1` on staging** echoes login codes in API responses.~~ **DONE 2026-08-04** — the echo (code path + config var) is DELETED, code appears inbox-only in every env; automated sign-in uses the ADMIN_KEY-gated staging test-login door (B1, see Fixed below).
+6. **realtime↔auth cold-start cut.** A genuinely fresh-account first deploy dies `code 10143` (realtime binds auth, auth binds realtime). Document the one-time binding cut as a first-class BOOTSTRAP step AND make `deploy:*` tolerate it, not the current footnote ("in practice auth already exists", false for `new-app`).
+7. ~~**`DEV_ECHO_CODES=1` on staging** echoes login codes in API responses.~~ **DONE 2026-08-04**, the echo (code path + config var) is DELETED, code appears inbox-only in every env; automated sign-in uses the ADMIN_KEY-gated staging test-login door (B1, see Fixed below).
 
 ### P3 · structure / honesty
-8. **Eight god-files >400 LOC** (`agent.ts` ~570, both `tools.ts`, `api.ts` ~535…) — split by seam. Largely dissolved by #1 + #2.
-9. **Reconcile the lean score.** A fresh honest `lean_mean_check` scores **~84–90 (B/A-)**, not the committed report's 93 — the leanness dimension (~73) is dragged by #1 + #2 + the god-files. Either land #1/#2 (which genuinely raises it) or regenerate the report honestly. Don't ship an over-stated score.
+8. **Eight god-files >400 LOC** (`agent.ts` ~570, both `tools.ts`, `api.ts` ~535…). Split by seam. Largely dissolved by #1 + #2.
+9. **Reconcile the lean score.** A fresh honest `lean_mean_check` scores **~84–90 (B/A-)**, not the committed report's 93, the leanness dimension (~73) is dragged by #1 + #2 + the god-files. Either land #1/#2 (which genuinely raises it) or regenerate the report honestly. Don't ship an over-stated score.
 
 ---
 
-## OPEN — the Google connector layer (the knowledge base's other half)
+## OPEN, the Google connector layer (the knowledge base's other half)
 
-The knowledge base shipped on 2026-08-11 reading the app's OWN rows — tickets and
+The knowledge base shipped on 2026-08-11 reading the app's OWN rows, tickets and
 their conversations, learning articles, accounts. `.plans/BUILD-2-knowledge-base.md`
 §3 also asks for six Google sources (Calendar two-way, Drive folders, Drive files,
 Gmail threads, Chat spaces, Meet transcripts). Those are NOT built, and this is the
 note that says so out loud rather than leaving a reader to notice.
 
 **Why not.** There are no Google credentials in this environment and nothing that
-could be verified against Google's APIs — so it would be a few thousand lines that
+could be verified against Google's APIs, so it would be a few thousand lines that
 no test in this repo can run. "Too much code is a defect" cuts hardest on code that
 cannot be proved. The brief's own sequence agrees: §3 puts the in-app sources first
 precisely because "they are how you prove retrieval works", and §7 puts the
@@ -390,9 +390,9 @@ connector layer at step 6, after the screens and the agent's tools.
 - `INGEST_KINDS` in `workers/content/src/lib/knowledge-ingest.ts` is DATA: a kind
   is `{ kind, table, label, read(cfg, guard, cursor, limit) }`. A Google source is
   one more entry whose `read` calls Google instead of D1 and returns the same
-  `IngestRow[]`. Everything around it — the resumable cursor, the bounded slice,
+  `IngestRow[]`. Everything around it, the resumable cursor, the bounded slice,
   the content-hash skip, the failure recording (R12), the compartment derivation,
-  the "an excluded source is never put back" rule — is written once and inherited.
+  the "an excluded source is never put back" rule, is written once and inherited.
 - `knowledge_sources.owner_user_id` is already the fence the TWO CONNECTION LAYERS
   need: NULL = what the organisation can see (a service account), a value = what
   one member can see (their own OAuth). Retrieval already ANDs it, and
@@ -405,7 +405,7 @@ connector layer at step 6, after the screens and the agent's tools.
 project with the six scopes, an OAuth client for the personal layer, a service
 account with domain-wide delegation for the organisation layer, a `knowledge_connections`
 table (per team: kind, owner, refresh token, scopes, status, last error), token
-refresh with R11 timeouts, and — for Calendar — the two-way write half, which is
+refresh with R11 timeouts, and, for Calendar, the two-way write half, which is
 the only one of the six that is not just ingestion and deserves its own design.
 Note that `workers/auth/src/lib/google.ts` (Google SIGN-IN, landed 2026-08-11)
 already establishes a Google client in this project; the data scopes are a
@@ -413,7 +413,7 @@ different consent screen, but not a different account.
 
 ---
 
-## NOTE — the bulk-triage flow, and whose door the last piece is
+## NOTE, the bulk-triage flow, and whose door the last piece is
 
 `.plans/BUILD-2-knowledge-base.md` §2 names two flows as the acceptance test.
 Both are reachable TODAY with the tools that shipped, and the confirm panel
@@ -429,7 +429,7 @@ receive. So twenty proposed triage writes are twenty rows in one yes/no, which i
 exactly what the brief asks for, with no bulk-triage door at all.
 
 **What was deliberately NOT built here:** a `POST /api/content/help/bulk-triage`
-door taking `[{id, helpType, status}]`. It would be tidier than N calls — and it
+door taking `[{id, helpType, status}]`. It would be tidier than N calls, and it
 belongs to the WORK ENGINE's lane, not this one. That lane owns the ticket
 lifecycle (`new → triaged → in progress → ready → resolved`), the first-staff-
 touch lock, the per-account reference and the drag-rank, and it is mid-flight in
@@ -441,7 +441,7 @@ the shared tool catalogue.
 **"Stories from a transcript"** cannot be finished by anyone yet: there is no
 `stories` table. The work engine's migration `0011_ticket_work_engine` landed the
 ticket's own columns; the story is still to come. The knowledge half of that flow
-— find the transcript, retrieve the app and process context — needs the Google
+— find the transcript, retrieve the app and process context, needs the Google
 connector above.
 
 ---
@@ -449,7 +449,7 @@ connector above.
 ## When each piece landed
 
 Lifted out of README.md's opening paragraphs, where five `UPDATED <date>:` stamps had
-grown inside the prose describing what is true NOW — including two competing dates for
+grown inside the prose describing what is true NOW, including two competing dates for
 the same fact. That file is the first thing every reader and every agent opens; current
 state should not have to be sifted out of history. The history is not worthless, so it
 lives here, where changes already go.
@@ -459,13 +459,13 @@ lives here, where changes already go.
 | 2026-06-21 | The module formerly called "roles & permissions" became **Member roles** (module key `member_roles`). |
 | 2026-06-21 | The team area (Overview, Members, Member roles, Invites) moved to `/t/<teamId>/…` deep-link URLs under the screen engine; top-level `/members` and `/roles` became thin redirects. |
 | 2026-06-23 | The **agent-modules build** landed (branch `agent-modules`): learning, help, CSV import and the AI agent all BUILT. |
-| 2026-07-07 | The **mcp** worker — the external machine surface — shipped: access tokens bridged to team-pinned sessions, gated doors exposed as MCP tools at `/mcp`. |
+| 2026-07-07 | The **mcp** worker, the external machine surface, shipped: access tokens bridged to team-pinned sessions, gated doors exposed as MCP tools at `/mcp`. |
 | 2026-08-10 | The eighth worker made the roster **eight**: six brains under two front doors, `gateway` and `portal-gateway`. |
-| 2026-08-11 | The module called "help" became **Tickets** — everywhere a person or a URL can see it. There was never a help section *and* a ticket section; there was one module wearing the wrong name, and an agency does not need somewhere to file complaints about its own app. The permission key, the tables, the API path and the MCP tool names stay `help` on purpose (DATA-MODEL.md § *help + help_threads* lists all four and why each never moves). |
-| 2026-08-11 | **Google sign-in came back on** — a decision REVERSED, not a new feature. `db/core/0003` parked it on 2026-06-12 as a *Brimba* scope call (the generic base, email codes only); kwapso's SCOPE re-decides it in ch.03 and ch.06, and SCOPE wins where it speaks. Rebuilt without re-adding `google_sub` — the verified email is the identity, so both doors go through one seam. The migration is not reverted; it carries a comment pointing forward. The Brimba base upstream may still be email-only. |
+| 2026-08-11 | The module called "help" became **Tickets**, everywhere a person or a URL can see it. There was never a help section *and* a ticket section; there was one module wearing the wrong name, and an agency does not need somewhere to file complaints about its own app. The permission key, the tables, the API path and the MCP tool names stay `help` on purpose (DATA-MODEL.md § *help + help_threads* lists all four and why each never moves). |
+| 2026-08-11 | **Google sign-in came back on**, a decision REVERSED, not a new feature. `db/core/0003` parked it on 2026-06-12 as a *Brimba* scope call (the generic base, email codes only); kwapso's SCOPE re-decides it in ch.03 and ch.06, and SCOPE wins where it speaks. Rebuilt without re-adding `google_sub`, the verified email is the identity, so both doors go through one seam. The migration is not reverted; it carries a comment pointing forward. The Brimba base upstream may still be email-only. |
 
 ---
 
 ## The meta-lesson (worth its own guardrail)
 
-Two of the worst issues (the agent confirm gap, the fork-sweep leaving live URLs) **slipped past our own checks because a check encoded the wrong intent** — a test that asserted the vulnerable behaviour as correct, and a sweep rule that treated a live URL as "history." An incumbent review rationalises what's already there. **Schedule a periodic fresh, no-prior-context review** (a clean clone, independent agents) — it finds what the incumbent gate accepts. This is why the base now recommends running the audits against a *pristine* clone, not the working tree.
+Two of the worst issues (the agent confirm gap, the fork-sweep leaving live URLs) **slipped past our own checks because a check encoded the wrong intent**, a test that asserted the vulnerable behaviour as correct, and a sweep rule that treated a live URL as "history." An incumbent review rationalises what's already there. **Schedule a periodic fresh, no-prior-context review** (a clean clone, independent agents), it finds what the incumbent gate accepts. This is why the base now recommends running the audits against a *pristine* clone, not the working tree.

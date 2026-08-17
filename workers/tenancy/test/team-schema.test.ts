@@ -26,7 +26,7 @@ describe("buildTeamSeed", () => {
     expect(inserts.length).toBe(2 + 2 * TEAM_MODULES.length + DEFAULT_SELECTABLE.length)
   })
 
-  it("Admin gets every switch; Viewer is read-only except the agent (use)", () => {
+  it("Admin gets every switch; Viewer is read-only except the agent (use) and everyone's tasks (off)", () => {
     const adminRows = seed.script
       .split("\n")
       .filter((l) => l.includes("role_permissions") && l.includes(seed.adminRoleId))
@@ -36,10 +36,14 @@ describe("buildTeamSeed", () => {
     expect(adminRows).toHaveLength(TEAM_MODULES.length)
     expect(viewerRows).toHaveLength(TEAM_MODULES.length)
     for (const row of adminRows) expect(row).toContain("1, 1, 1, 1")
-    // Viewer is read-only everywhere, EXCEPT the agent: everyone may USE it
-    // (read+create) — still capped by their other rights.
+    // Viewer is read-only everywhere, with two exceptions. The AGENT: everyone
+    // may USE it (read+create) — still capped by their other rights. And
+    // EVERYONE ELSE'S TASKS: off, because 4.9's ruling is "off by default for
+    // every role except Admin", and a right that widens what one person sees of
+    // another's work is a deliberate grant rather than a default.
     for (const row of viewerRows) {
       if (row.includes("'agent'")) expect(row).toContain("1, 1, 0, 0")
+      else if (row.includes("'all_tasks'")) expect(row).toContain("0, 0, 0, 0")
       else expect(row).toContain("1, 0, 0, 0")
     }
   })
@@ -177,6 +181,10 @@ describe("team schema", () => {
       // against them. Agency material: a client login never holds it, and every
       // door on it refuses a portal caller rather than fencing one.
       "work",
+      // WHOSE TASKS YOU SEE (4.9). A switch over a SIGHT rather than a record:
+      // `work` decides whether you reach the tasks screen, this decides whether
+      // the list is the whole team's or your own. Off for every role but Admin.
+      "all_tasks",
       // TO-DOS are the exception in this list: the one module a CLIENT login is
       // meant to hold rights on, because a to-do is aimed at them and they
       // complete it themselves. That is why it is not four more rights on

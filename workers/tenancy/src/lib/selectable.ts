@@ -104,10 +104,15 @@ export async function createSelectable(
   guard: MemberGuard,
   actor: Actor,
   type: string,
-  value: string
+  value: string,
+  /** THE TYPE MARK (UI-RULEBOOK G2, CHECKLIST 11.8) — one glyph in the slot an
+   * icon would take, beside the word it marks. Optional, and null is a real
+   * answer: most groups are labels and want no pictograph. */
+  mark?: string | null
 ): Promise<string> {
   const t = type.trim()
   const v = value.trim()
+  const m = mark?.trim() || null
   if (!t || !v)
     throw new GuardError(400, "invalid_input", "A dropdown value needs a type and a value.")
 
@@ -124,7 +129,7 @@ export async function createSelectable(
   await d1ExecScript(
     cfg,
     guard.databaseId,
-    `INSERT INTO selectable_data (id, type, value, is_default, created_at, creator_id, creator_email, creator_name) VALUES (${sqlString(id)}, ${sqlString(t)}, ${sqlString(v)}, 0, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+    `INSERT INTO selectable_data (id, type, value, is_default, mark, created_at, creator_id, creator_email, creator_name) VALUES (${sqlString(id)}, ${sqlString(t)}, ${sqlString(v)}, 0, ${sqlString(m)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
   )
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Dropdown value created",
@@ -141,7 +146,9 @@ export async function updateSelectable(
   guard: MemberGuard,
   actor: Actor,
   id: string,
-  value: string
+  value: string,
+  /** The type mark. `undefined` leaves it alone; an empty string clears it. */
+  mark?: string | null
 ): Promise<void> {
   const v = value.trim()
   if (!v) throw new GuardError(400, "invalid_input", "A dropdown value can't be empty.")
@@ -159,7 +166,7 @@ export async function updateSelectable(
   await d1ExecScript(
     cfg,
     guard.databaseId,
-    `UPDATE selectable_data SET value = ${sqlString(v)}, updated_at = ${sqlString(now)}, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE id = ${sqlString(id)};`
+    `UPDATE selectable_data SET value = ${sqlString(v)}, ${mark === undefined ? "" : `mark = ${sqlString(mark?.trim() || null)}, `}updated_at = ${sqlString(now)}, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE id = ${sqlString(id)};`
   )
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Dropdown value edited",

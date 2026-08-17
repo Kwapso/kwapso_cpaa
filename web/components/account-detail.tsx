@@ -1,7 +1,7 @@
 "use client"
 
 // Account detail — one COMPANY at /accounts/<id>, as a tabbed record (Law R2):
-// Overview / Contacts / Under this account / its work / Rates / Activity.
+// Overview / Contacts / its work / Rates / Knowledge / Activity.
 // Host-composed, because most of those tabs are collections with their own
 // actions — link a person, add an app, retire a rate — and no engine block draws
 // those. Those list bodies live next door in account-detail-panels.tsx; this file
@@ -24,10 +24,13 @@
 // address book. The server withholds the rows too (routes/accounts.ts): a tab
 // that is not drawn is not a permission.
 //
-// The hierarchy is meant to be readable at a glance, so it is stated twice over:
-// the header says which account this one sits under (a link, one tap up the tree),
-// and a tab lists the accounts sitting under it — with an exact count on both, and
-// a Load more when a holding company has more than a page of businesses.
+// THE HIERARCHY IS STATED ONCE, IN THE HEADER — which account this one sits
+// under, as a link one tap up the tree. It used to be stated twice, and the
+// second telling was a tab called "Under this account" listing the rows whose
+// parent pointer names this one. In this agency's data those rows are its
+// people, so the record carried two tabs answering the same question under two
+// names, which is the duplication the tester reported (7.2). The tab is gone and
+// Contacts is the survivor; the parent pointer itself is untouched.
 //
 // Every count here is an exact server COUNT(*) through the ONE formatCount seam
 // (R16) — never the length of a list the door capped. Every destructive action is
@@ -36,7 +39,6 @@
 
 import * as React from "react"
 
-import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
@@ -61,7 +63,6 @@ import { AccountFormDialog, type AccountFormValues } from "@/components/account-
 import { AccountRateCard } from "@/components/account-rate-card"
 import { MarginPanel } from "@/components/margin-panel"
 import {
-  ChildrenPanel,
   ContactsPanel,
   type Confirm,
   type PanelActions,
@@ -79,13 +80,18 @@ import { accountStatus } from "@/components/deep-link/shape"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, tenancy } from "@/lib/api"
-import { auditItems } from "@/lib/audit-overview"
+import {
+  RecordActionsMenu,
+  RecordFooter,
+  RecordScreen,
+  STICKY_TABS,
+  type RecordAction,
+} from "@/components/record-chrome"
 import { formatCount } from "@shared/web/format-count"
 import {
   accountKey,
   accountValueKey,
   accountsKey,
-  childrenKey,
   listFetch,
   ratesKey,
   totalKey,
@@ -112,12 +118,6 @@ export function AccountDetailScreen({
   const detailQ = useCached<AccountDetail>(accountKey(accountId), () =>
     tenancy.accountDetail(accountId)
   )
-  // The accounts nested under this one — its own paged list (a holding company can
-  // hold more than a page of businesses).
-  const childrenQ = useCached<Account[]>(childrenKey(accountId), () =>
-    listFetch.accountChildren(accountId)
-  )
-  const childrenTotal = useCachedValue<number>(totalKey("account-children", accountId))
   // The ONE web-side read of a record's history (R5) — rows, the door's exact
   // COUNT(*) for the tab badge, and the cursor the feed below spends. Hand-rolling
   // this read is what let a badge and its feed disagree elsewhere.
@@ -192,7 +192,6 @@ export function AccountDetailScreen({
    * catches up from the live ping — see the accounts entries in live-resources.) */
   const refresh = React.useCallback(() => {
     invalidate(accountKey(accountId))
-    invalidate(childrenKey(accountId))
     invalidate(`activity:record:accounts:${accountId}`)
     invalidate(accountsKey(teamId))
   }, [accountId, teamId])
@@ -273,7 +272,6 @@ export function AccountDetailScreen({
   if (detailQ.data === undefined) return <Skeleton variant="list" lines={5} />
 
   const { account, parent, links, linksTotal } = detailQ.data
-  const children = childrenQ.data ?? []
   const statusText = accountStatus(account.status)
 
   // A PERSON IS A DIFFERENT SCREEN. One table, one door, one read — and from here
@@ -320,13 +318,7 @@ export function AccountDetailScreen({
     { label: t("Address"), value: where || "—" },
     { label: t("Language"), value: account.locale || "Ours" },
     { label: t("Status"), value: statusText || "—" },
-    ...auditItems({
-      createdByName: account.createdByName,
-      createdAt: account.createdAt,
-      editedByName: account.editedByName,
-      updatedAt: account.updatedAt,
-      status: account.active ? "Active" : "Archived",
-    }),
+    // The audit rows moved to the record footer (D7 / CHECKLIST 11.3).
   ]
 
   // The parent picker: the account it sits under TODAY (which may be archived, or
@@ -362,13 +354,14 @@ export function AccountDetailScreen({
             },
           ]
         : []),
-      {
-        value: "children",
-        label: t("Under this account"),
-        icon: CONCEPT_ICON.accounts,
-        badge: formatCount(childrenTotal),
-        badgeVariant: "" as const,
-      },
+      // NO "UNDER THIS ACCOUNT" TAB (7.2). It listed the account rows whose
+      // parent pointer names this one, which — in the way this agency actually
+      // uses the record — is the same list of people the Contacts tab above
+      // already shows, under a second name. Two tabs answering "who is inside
+      // this company" is the duplication the tester reported; the answer is the
+      // one with the right word on it. The PARENT POINTER is untouched: a company
+      // still sits under its holding company, the form still moves it, and the
+      // header still links up the tree.
       // The work hanging off this client, each behind its own read right.
       ...(canSeeApps
         ? [
@@ -447,96 +440,82 @@ export function AccountDetailScreen({
 
   const openAccount = (id: string) => softNavigate(`${basePath}/${id}`)
 
+  /* B1 / CHECKLIST 11.2 — Edit stays visible, archiving moves into the menu with
+   * its red and its confirm intact. */
+  const overflow: RecordAction[] = canArchive
+    ? [
+        account.active
+          ? {
+              key: "archive",
+              label: t("Archive"),
+              icon: <Power className="size-3.5" />,
+              disabled: busy,
+              destructive: true,
+              onSelect: () =>
+                setConfirm({
+                  title: `Archive ${account.name}?`,
+                  body: "It stops showing in the everyday lists. Everything on it, its people and its history, stays exactly where it is, and you can bring it back any time.",
+                  action: "Archive",
+                  run: () =>
+                    run(
+                      () => tenancy.setAccountActive(accountId, false),
+                      "Account archived.",
+                      "Couldn't archive the account."
+                    ),
+                }),
+            }
+          : {
+              key: "restore",
+              label: t("Restore"),
+              icon: <Power className="size-3.5" />,
+              disabled: busy,
+              onSelect: () =>
+                void run(
+                  () => tenancy.setAccountActive(accountId, true),
+                  "Account restored.",
+                  "Couldn't restore the account."
+                ),
+            },
+      ]
+    : []
+
   return (
-    <div className="flex flex-col gap-5">
-      {/* Header — what this is, where it sits, and what you can do to it. */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight">
-            <span className="truncate">{account.name}</span>
-            <Badge variant="secondary" className="text-[10px]">
-              {t("Company")}
-            </Badge>
-            {!account.active && (
-              <Badge variant="outline" className="text-muted-foreground text-[10px]">
-                {t("Archived")}
-              </Badge>
-            )}
-          </h1>
-          <p className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-            {account.code && <span>{account.code}</span>}
-            {statusText && <span>{statusText}</span>}
-            {parent ? (
-              <button
-                type="button"
-                onClick={() => openAccount(parent.id)}
-                className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
-              >
-                {t("Part of")} {parent.name}
-              </button>
-            ) : (
-              <span>{t("Sits on its own")}</span>
-            )}
-          </p>
-        </div>
-        {/* ml-auto on the GROUP so a narrow phone reflows instead of clipping. */}
-        <div className="flex flex-wrap gap-2 sm:ml-auto sm:shrink-0">
+    <RecordScreen
+      eyebrow={[t("Company"), account.code, account.active ? null : t("Archived")]
+        .filter(Boolean)
+        .join(" · ")}
+      title={account.name}
+      status={statusText || undefined}
+      actions={
+        <>
           {canEdit && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setEditOpen(true)}
-              className="gap-1.5"
-            >
+            <Button variant="outline" onClick={() => setEditOpen(true)} className="gap-1.5">
               <Pencil className="size-3.5" />
               {t("Edit")}
             </Button>
           )}
-          {canArchive &&
-            (account.active ? (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={busy}
-                onClick={() =>
-                  setConfirm({
-                    title: `Archive ${account.name}?`,
-                    body: "It stops showing in the everyday lists. Everything on it — its people, its history — stays exactly where it is, and you can bring it back any time.",
-                    action: "Archive",
-                    run: () =>
-                      run(
-                        () => tenancy.setAccountActive(accountId, false),
-                        "Account archived.",
-                        "Couldn't archive the account."
-                      ),
-                  })
-                }
-                className="text-destructive hover:text-destructive gap-1.5"
-              >
-                <Power className="size-3.5" />
-                {t("Archive")}
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                disabled={busy}
-                onClick={() =>
-                  void run(
-                    () => tenancy.setAccountActive(accountId, true),
-                    "Account restored.",
-                    "Couldn't restore the account."
-                  )
-                }
-                className="gap-1.5"
-              >
-                {busy ? <Spinner /> : <Power className="size-3.5" />}
-                {t("Restore")}
-              </Button>
-            ))}
-        </div>
-      </div>
+          <RecordActionsMenu actions={overflow} />
+        </>
+      }
+      headerExtra={
+        <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+          {parent ? (
+            <button
+              type="button"
+              onClick={() => openAccount(parent.id)}
+              className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
+            >
+              {t("Part of")} {parent.name}
+            </button>
+          ) : (
+            <span>{t("Sits on its own")}</span>
+          )}
+        </p>
+      }
+    >
 
       <TabsView
+        className={STICKY_TABS}
         config={tabsConfig}
         value={tab}
         onValueChange={setTab}
@@ -604,11 +583,6 @@ export function AccountDetailScreen({
               />
             )
 
-          if (tabItem.value === "children")
-            return (
-              <ChildrenPanel accountId={accountId} accounts={children} onOpen={openAccount} />
-            )
-
           // THE WORK HANGING OFF THIS CLIENT. Each panel asks the SERVER its own
           // narrowed question (?accountId=), so the rows and the badge above are
           // the same answer — never a page of everything filtered in the browser.
@@ -633,13 +607,26 @@ export function AccountDetailScreen({
             )
           if (tabItem.value === "todos")
             return <TodosPanel teamId={teamId} accountId={accountId} canCancel={canCancelTodo} />
+          // THE KNOWLEDGE BASE, IN CONTEXT (7.15), THE SAME WAY AN APP DOES IT
+          // (8.9). Two things travel and they do different jobs. `accountId`
+          // names the COMPARTMENT, so a question typed here cannot be answered
+          // out of another client's material and R23's `reason` says which one
+          // it searched. `context` is the record's own details prepended to the
+          // question — and the panel SHOWS what it added, because a question
+          // quietly changed on the way to the server is an answer nobody can
+          // account for. It is written as a phrase that reads after the word
+          // "About", exactly as the app's does.
           if (tabItem.value === "knowledge")
             return (
               <KnowledgeAsk
                 accountId={accountId}
-                context={[account.name, account.industry ? `(${account.industry})` : null]
+                context={[
+                  `the client ${account.name}`,
+                  account.industry ? `in ${account.industry}` : null,
+                  statusText || null,
+                ]
                   .filter(Boolean)
-                  .join(" ")}
+                  .join(", ")}
                 onOpenSource={(sourceId) =>
                   softNavigate(`${basePath.replace(/\/accounts$/, "")}/knowledge/${sourceId}`)
                 }
@@ -759,6 +746,14 @@ export function AccountDetailScreen({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    <RecordFooter
+        audit={{
+          createdByName: account.createdByName,
+          createdAt: account.createdAt,
+          editedByName: account.editedByName,
+          updatedAt: account.updatedAt,
+        }}
+      />
+    </RecordScreen>
   )
 }

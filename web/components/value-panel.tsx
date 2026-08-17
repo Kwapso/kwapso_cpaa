@@ -122,7 +122,7 @@ export function ValuePanel({ view }: { view: SavingsView | undefined }) {
             {unexplained === 1
               ? "1 step takes longer than it used to and has no explanation yet."
               : `${unexplained} steps take longer than they used to and have no explanation yet.`}{" "}
-            {t("Add one on the map — the client sees these either way.")}
+            {t("Add one on the map, the client sees these either way.")}
           </p>
         )}
       </div>

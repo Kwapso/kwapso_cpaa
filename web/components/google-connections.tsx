@@ -52,10 +52,10 @@ import { useT } from "@shared/web/language"
  * connecting it actually lets kwapso see. The second half matters more than the
  * first: "Gmail" tells somebody nothing about what they are agreeing to. */
 const SERVICE_COPY: Record<GoogleService, { label: string; scope: string }> = {
-  drive: { label: "Drive", scope: "Only the folders you share below — nothing else in your Drive." },
+  drive: { label: "Drive", scope: "Only the folders you share below, nothing else in your Drive." },
   gmail: { label: "Gmail", scope: "Only mail to or from someone on one of your accounts." },
   calendar: { label: "Calendar", scope: "Your own calendar, so meetings and sprints can be read and added." },
-  chat: { label: "Google Chat", scope: "Only the spaces you share below — nothing else in Chat." },
+  chat: { label: "Google Chat", scope: "Only the spaces you share below, nothing else in Chat." },
 }
 
 /** Which services are shared through NAMED folders or spaces. */
@@ -175,7 +175,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
       toast.success(
         r.revokedAtGoogle
           ? "Disconnected."
-          : "Disconnected here — remove kwapso in your Google account too."
+          : "Disconnected here. Remove kwapso in your Google account too."
       )
       setDisconnecting(null)
     } catch (err) {
@@ -189,7 +189,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
     <section className="animate-rise flex flex-col gap-3">
       <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Google")}</h2>
       <p className="text-muted-foreground text-sm">
-        {t("Connect your own Google account, one service at a time. kwapso never uses anyone else's — the assistant working for you sees exactly what you can see, and nothing more.")}
+        {t("Connect your own Google account, one service at a time. kwapso never uses anyone else's, the assistant working for you sees exactly what you can see, and nothing more.")}
       </p>
 
       {q.error ? (
@@ -386,7 +386,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
             await content.googleAddSource({ service: sharing, ...values })
             await refresh()
             toast.success(
-              values.shelf === "team" ? "Shared — the team can read it." : "Shared — only you can read it."
+              values.shelf === "team" ? "Shared, the team can read it." : "Shared, only you can read it."
             )
           }}
         />

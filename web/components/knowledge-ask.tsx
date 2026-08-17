@@ -104,8 +104,8 @@ export function KnowledgeAsk({
           onChange={(e) => setQuestion(e.target.value)}
           placeholder={
             context
-              ? t("Ask about this record — e.g. what did we agree the last time?")
-              : t("Ask the knowledge base — e.g. what did we agree about Bergman's dispatch window?")
+              ? t("Ask about this record, e.g. what did we agree the last time?")
+              : t("Ask the knowledge base, e.g. what did we agree about Bergman's dispatch window?")
           }
           disabled={busy}
           aria-label={t("Ask the knowledge base")}
@@ -119,7 +119,7 @@ export function KnowledgeAsk({
           the box rather than a tooltip because the whole point is that nobody
           should have to go looking for it. */}
       <p className="text-muted-foreground text-xs">
-        {t("This looks through what the assistant can read and shows you the passages and their sources. It doesn't use the team's assistant allowance — open the assistant if you want the answer written out.")}
+        {t("This looks through what the assistant can read and shows you the passages and their sources. It doesn't use the team's assistant allowance. Open the assistant if you want the answer written out.")}
       </p>
       {/* SAID OUT LOUD, because the question that gets asked is not the question
           that was typed. A person has to be able to see what was added. */}
@@ -207,7 +207,7 @@ export function KnowledgeAsk({
                       {c.liveStatus && (
                         <span className="text-muted-foreground text-xs">
                           {" "}
-                          — that record says &ldquo;{c.liveStatus}{t("” right now")}
+                         , that record says &ldquo;{c.liveStatus}{t("” right now")}
                         </span>
                       )}
                     </li>

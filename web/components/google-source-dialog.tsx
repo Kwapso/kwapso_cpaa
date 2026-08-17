@@ -74,7 +74,7 @@ const SHELVES: { value: GoogleShelf; title: string; detail: string }[] = [
   {
     value: "private",
     title: "Just me",
-    detail: "Only you — and the assistant when it is answering you.",
+    detail: "Only you, and the assistant when it is answering you.",
   },
   {
     value: "team",
@@ -159,12 +159,11 @@ export function GoogleSourceDialog({
           {t("Nothing outside the")} {noun}{t("s you share here is ever read.")}
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !ready} className="gap-1.5">
-          {busy ? <Spinner /> : <Plus className="size-4" />}
-          {busy ? "Sharing…" : "Share it"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !ready,
+        icon: <Plus className="size-4" />,
+      }}
     >
       <Field config={searchField} htmlFor="google-source-search" className={fieldSpacing}>
         {/* Stacked on narrow screens: an input and a button side by side is how a
@@ -246,10 +245,10 @@ export function GoogleSourceDialog({
           disabled={busy}
         >
           <SelectTrigger id="google-source-client">
-            <SelectValue placeholder={t("Ours — not a client's")} />
+            <SelectValue placeholder={t("Ours, not a client's")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={AGENCY}>{t("Ours — not a client's")}</SelectItem>
+            <SelectItem value={AGENCY}>{t("Ours, not a client's")}</SelectItem>
             {accountOptions.map((a) => (
               <SelectItem key={a.id} value={a.id}>
                 {a.name}

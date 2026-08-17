@@ -1101,15 +1101,15 @@ Representative rewrites:
 
 | Today | Rule |
 |---|---|
-| `"Couldn't read that image — try another one."` | `"Couldn't read that image. Try another one."` |
-| `"It starts with no access — you'll choose what it can do in the next step."` | `"It starts with no access. You'll choose what it can do next."` |
-| `"That file is over 25 MB — please pick a smaller one."` | `"That file is over 25 MB. Please pick a smaller one."` |
-| `"Ours — not a client's"` | `"Ours, not a client's"` |
-| `"Answered — and emailed to them."` | `"Answered, and emailed to them."` |
+| `"Couldn't read that image. Try another one."` | `"Couldn't read that image. Try another one."` |
+| `"It starts with no access, you'll choose what it can do in the next step."` | `"It starts with no access. You'll choose what it can do next."` |
+| `"That file is over 25 MB, please pick a smaller one."` | `"That file is over 25 MB. Please pick a smaller one."` |
+| `"Ours, not a client's"` | `"Ours, not a client's"` |
+| `"Answered, and emailed to them."` | `"Answered, and emailed to them."` |
 
 Evidence: the old app breaks this rule and it shows. `P-4.09.52`: "We fix most bugs
-within 48 hours (Mon–Fri) — even faster in urgent cases." `P-4.10.31`: "Feel free to
-attach screenshots — a picture is worth a thousand words."
+within 48 hours (Mon–Fri), even faster in urgent cases." `P-4.10.31`: "Feel free to
+attach screenshots, a picture is worth a thousand words."
 
 ### W2: the empty-value placeholder is an en dash, and it is the one exception
 

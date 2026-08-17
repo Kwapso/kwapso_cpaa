@@ -229,7 +229,7 @@ export const TOOL_GATES: Record<string, string> = {
  * the list can only shrink. */
 export const GATELESS_WRITES: Record<string, string> = {
   run_import_batch:
-    "binding:'SELF' — it runs the attached-in-chat batch INSIDE data-ops rather than posting to a door, and the rows it writes go through each target module's OWN gated door one at a time (the batch doors themselves open with requireAnyImportRight, which is an ANY-of set, not one module:right). So there is no single gate to name, and isPrivilegeWrite is answered by what it does: an import writes records, never who may do what.",
+    "binding:'SELF', it runs the attached-in-chat batch INSIDE data-ops rather than posting to a door, and the rows it writes go through each target module's OWN gated door one at a time (the batch doors themselves open with requireAnyImportRight, which is an ANY-of set, not one module:right). So there is no single gate to name, and isPrivilegeWrite is answered by what it does: an import writes records, never who may do what.",
 }
 
 /** Lookup by canonical name (the agent's name). */

@@ -30,7 +30,6 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Checkbox } from "@kwapso/ui/registry/primitives/checkbox/checkbox"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
@@ -43,10 +42,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { Pencil, Plus } from "lucide-react"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
@@ -272,12 +269,10 @@ export function StoryFormDialog({
             : "One piece of work, on one app. Start with the app and the rest narrows to it."}
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !ready} className="gap-1.5">
-          {busy ? <Spinner /> : editing ? <Pencil className="size-4" /> : <Plus className="size-4" />}
-          {busy ? "Submitting…" : "Submit"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !ready,
+      }}
     >
       {/* FIRST, and everything below is narrowed by it (CHECKLIST 6.1). */}
       <Field config={appField} htmlFor="story-app" className={fieldSpacing}>
@@ -341,7 +336,7 @@ export function StoryFormDialog({
           // THE MARK RIDES THE LABEL (CHECKLIST 6.3). A person picking a sprint is
           // choosing between "the one running now" and "the one starting in
           // October", and the two are otherwise two names.
-          sprintOptions.map((s) => ({ id: s.id, label: `${s.name} — ${s.mark.toLowerCase()}` })),
+          sprintOptions.map((s) => ({ id: s.id, label: `${s.name}, ${s.mark.toLowerCase()}` })),
           (v) => setValues((s) => ({ ...s, sprintId: v }))
         )}
       </Field>
@@ -351,7 +346,7 @@ export function StoryFormDialog({
             {fixedTicket.label}
           </p>
         ) : (
-          picker("story-ticket", values.ticketId, "No request behind it", ticketOptions, (v) =>
+          picker("story-ticket", values.ticketId, "No ticket", ticketOptions, (v) =>
             setValues((s) => ({ ...s, ticketId: v }))
           )
         )}
@@ -373,7 +368,7 @@ export function StoryFormDialog({
           {!values.changesNoStep &&
             (processOptions.length === 0 ? (
               <p className="text-muted-foreground text-sm">
-                {t("No process maps on this app yet — tick the box above if it changes none.")}
+                {t("No processes on this app yet. Tick the box above if it changes none.")}
               </p>
             ) : (
               processOptions.map((p) => (

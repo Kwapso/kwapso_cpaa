@@ -147,7 +147,7 @@ export async function postStreamStaffFile(request: Request, env: Env): Promise<R
     return fail(
       413,
       "too_large",
-      `That upload is too big — the most we can take in one file is ${Math.round(STREAM_UPLOAD_MAX_BYTES / 1_000_000)} MB. Nothing was saved.`
+      `That upload is too big, the most we can take in one file is ${Math.round(STREAM_UPLOAD_MAX_BYTES / 1_000_000)} MB. Nothing was saved.`
     )
 
   const { cfg, guard } = await gated(request, env, "staff_profiles", "edit")

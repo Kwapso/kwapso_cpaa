@@ -84,7 +84,7 @@ async function googleFetch(
       throw new GuardError(
         409,
         "google_access_lost",
-        "Google wouldn't allow that any more — the connection may have been removed in your Google account. Connect it again in Settings."
+        "Google wouldn't allow that any more, the connection may have been removed in your Google account. Connect it again in Settings."
       )
     throw new GuardError(502, "google_refused", "Google couldn't answer that just now. Try again.")
   }
@@ -225,7 +225,7 @@ export async function driveFileText(token: string, fileId: string): Promise<stri
   // metadata call above and this one, and the caller has to hear that rather
   // than watch the rest of the folder quietly become empty strings.
   if (res.status === 401)
-    throw new GuardError(409, "google_access_lost", "Google wouldn't allow that any more — connect it again in Settings.")
+    throw new GuardError(409, "google_access_lost", "Google wouldn't allow that any more. Connect it again in Settings.")
   // A 403 IS NOT, and this line used to treat them alike. The metadata call
   // ahead of this one goes through googleFetch, which throws on 401/403 — so the
   // token is already proven good ON THIS FILE, and a refusal here is about the
@@ -941,7 +941,7 @@ export async function calendarGuests(
     throw new GuardError(
       409,
       "google_too_many_guests",
-      `That event has more than ${EVENT_ATTENDEE_CAP} guests — change the guest list in Google Calendar itself.`
+      `That event has more than ${EVENT_ATTENDEE_CAP} guests, change the guest list in Google Calendar itself.`
     )
   const drop = new Set(input.remove.map((e) => e.trim().toLowerCase()).filter(Boolean))
   const kept = rows.filter((raw) => !drop.has(str((raw as Record<string, unknown>).email).toLowerCase()))

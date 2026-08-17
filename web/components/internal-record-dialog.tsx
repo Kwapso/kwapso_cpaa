@@ -19,13 +19,11 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
@@ -59,7 +57,6 @@ export function InternalRecordDialog({
   fields,
   title,
   subtitle,
-  submitLabel,
   initial,
   draftKey,
 }: {
@@ -69,7 +66,6 @@ export function InternalRecordDialog({
   fields: InternalField[]
   title: string
   subtitle: string
-  submitLabel: string
   /** Present = EDIT mode (prefilled). */
   initial?: InternalRecordValues
   /** stable id for per-session draft persistence (CACHING.md §11). */
@@ -111,12 +107,10 @@ export function InternalRecordDialog({
       onSubmit={submit}
       title={<DialogTitle>{title}</DialogTitle>}
       subtitle={<DialogDescription>{subtitle}</DialogDescription>}
-      footer={
-        <Button type="submit" disabled={busy || !ready}>
-          {busy ? <Spinner /> : null}
-          {busy ? "Saving…" : submitLabel}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !ready,
+      }}
     >
       {fields.map((f, i) => {
         const id = `internal-${f.key}`

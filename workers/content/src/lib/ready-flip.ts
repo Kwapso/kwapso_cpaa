@@ -139,7 +139,7 @@ export async function readyFlipForTicket(
 
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Ticket ready",
-    description: `Every piece of work on this ticket is done — ${total} ${total === 1 ? "story" : "stories"}`,
+    description: `Every piece of work on this ticket is done, ${total} ${total === 1 ? "story" : "stories"}`,
     relatedTable: "help",
     relatedRowId: ticketId,
   })

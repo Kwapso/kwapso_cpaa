@@ -99,14 +99,6 @@ export const listFetch = {
       primeCache(cursorKey(accountsKey(teamId)), r.nextCursor)
       return r.accounts
     }),
-  // The accounts nested UNDER one account — the same paged door, narrowed by
-  // parent. Keyed by the ACCOUNT (not the team): it is that record's own list.
-  accountChildren: (accountId: string) =>
-    tenancy.accounts({ parentId: accountId }).then((r) => {
-      primeCache(totalKey("account-children", accountId), r.total)
-      primeCache(cursorKey(childrenKey(accountId)), r.nextCursor)
-      return r.accounts
-    }),
   // R14: help is PAGED — the fetchers below load page ONE and park the next
   // cursor in its sidecar; <LoadMore> appends from there. A fresh load (or a
   // reconnect catch-up) resets to page one, which is what a reconnect should do.
@@ -457,14 +449,12 @@ export function accountsKey(teamId: string): string {
   return `accounts:${teamId}`
 }
 
-/** One account's own caches: the opened record (with its people, its logins and
- * their exact totals) and the accounts nested under it. Keyed by the ACCOUNT, so
- * moving between records never clobbers the one you came from. */
+/** One account's own cache: the opened record, with its people, its logins and
+ * their exact totals. Keyed by the ACCOUNT, so moving between records never
+ * clobbers the one you came from. (There was a second key here — the accounts
+ * nested under this one — and it went with the tab that read it, 7.2.) */
 export function accountKey(accountId: string): string {
   return `account:${accountId}`
-}
-export function childrenKey(accountId: string): string {
-  return `account-children:${accountId}`
 }
 
 /** The knowledge-source list's cache key. */
@@ -584,7 +574,7 @@ export const TEAM_RESOURCES: Record<
     idField: "id",
     fetchOne: (id) => tenancy.accountRow(id),
     fetchList: (t) => listFetch.accounts(t),
-    deps: (_t, id) => [accountKey(id), childrenKey(id), `activity:record:accounts:${id}`],
+    deps: (_t, id) => [accountKey(id), `activity:record:accounts:${id}`],
   },
   account_links: {
     key: (t) => accountsKey(t),

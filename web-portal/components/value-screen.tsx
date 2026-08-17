@@ -135,7 +135,7 @@ export function ValueScreen({ ready }: { ready: PortalReady }) {
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold tracking-tight">{t("What this has been worth")}</h1>
         <p className="text-muted-foreground">
-          {t("Time your team gets back, every month — and where every hour of it comes from.")}
+          {t("Time your team gets back, every month, and where every hour of it comes from.")}
         </p>
       </div>
 
@@ -266,7 +266,7 @@ function ProcessConversation({ processId, open }: { processId: string; open: boo
         items={(data?.comments ?? []).map((c) => ({
           id: c.id,
           author: c.createdByName ?? (c.fromStaff ? "Your team" : "A colleague"),
-          body: c.explainsStepKey ? `Why a step takes longer — ${c.body}` : c.body,
+          body: c.explainsStepKey ? `Why a step takes longer, ${c.body}` : c.body,
           time: new Date(c.createdAt).toLocaleDateString(),
         }))}
         onAdd={busy ? undefined : (body) => void add(body)}

@@ -75,7 +75,7 @@ export async function getRolesExport(request: Request, env: Env): Promise<Respon
     return exportTooLarge(
       Math.min(total, LIST_HARD_CAP),
       "roles",
-      "Retire the roles you no longer use, or read the Roles screen instead — a file this size would import back as a permission change nobody asked for."
+      "Retire the roles you no longer use, or read the Roles screen instead, a file this size would import back as a permission change nobody asked for."
     )
   const permsByRole = perms.byRole
   const auditBy = new Map(audit.map((a) => [a.id, a]))

@@ -53,6 +53,7 @@ import { usePermissions } from "@/lib/perms"
 import { rateText } from "@shared/web/money"
 import { primeCache, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
+import { AddButton } from "@/components/deep-link/screen-bits"
 
 export function InternalRateCardScreen({ teamId }: { teamId: string }) {
   const t = useT()
@@ -141,15 +142,12 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
               in a doc. Somebody setting these numbers should know before they
               type them, not after. */}
           <p className="text-muted-foreground mt-1 text-sm">
-            {t("What an hour of our own work costs us, by kind of work. Ours alone — it never appears in a client's portal, and no client login can reach it.")}
+            {t("What an hour of our own work costs us, by kind of work. Ours alone, it never appears in a client's portal, and no client login can reach it.")}
           </p>
         </div>
         {canCreate && (
           <div className="flex flex-wrap gap-2 sm:ml-auto sm:shrink-0">
-            <Button size="sm" onClick={() => setAdding(true)} className="gap-1.5">
-              <Plus className="size-4" />
-              {t("New internal rate")}
-            </Button>
+            <AddButton label={t("New internal rate")} onClick={() => setAdding(true)} />
           </div>
         )}
       </div>
@@ -234,7 +232,6 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
         draftKey={`internal-rate:add:${teamId}`}
         title={t("New internal rate")}
         subtitle="What this kind of work costs us for an hour of somebody's time."
-        submitLabel={t("Add it")}
         showDefault
         onSubmit={add}
       />
@@ -244,7 +241,6 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
         draftKey={editing ? `internal-rate:edit:${editing.id}` : undefined}
         title={t("Edit internal rate")}
         subtitle="It applies from now on. Figures already worked out keep the rate they were worked out with."
-        submitLabel={t("Save")}
         showDefault
         initial={
           editing
@@ -364,7 +360,7 @@ export function RoleRateCard({ teamId }: { teamId: string }) {
       <div className="min-w-0">
         <h2 className="text-lg font-semibold tracking-tight">{t("Role rates")}</h2>
         <p className="text-muted-foreground mt-1 text-sm">
-          {t("What an hour of each role is worth — the bookkeeper, the dispatcher, whoever actually does the work a process describes. This is what turns hours given back into money given back. Ours alone: it never appears in a client's portal.")}
+          {t("What an hour of each role is worth, the bookkeeper, the dispatcher, whoever actually does the work a process describes. This is what turns hours given back into money given back. Ours alone: it never appears in a client's portal.")}
         </p>
       </div>
 

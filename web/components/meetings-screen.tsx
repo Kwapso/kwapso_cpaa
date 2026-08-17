@@ -312,7 +312,7 @@ export function MeetingsScreen({
                   four weeks before they happen, which is when there is somewhere
                   to write the notes. */}
               <p className="text-muted-foreground text-xs">
-                {t("Further out, and not records yet — each becomes one four weeks before it happens.")}
+                {t("Further out, and not records yet, each becomes one four weeks before it happens.")}
               </p>
               <ul className="flex flex-col gap-1">
                 {ahead.map((a) => (

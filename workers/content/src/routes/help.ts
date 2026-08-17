@@ -378,7 +378,7 @@ export async function postHelpReply(request: Request, env: Env): Promise<Respons
   // refused rather than quietly dropped: silence would teach a script to keep
   // trying. Staff keep mentions; the cap above still bounds them.
   if (scope.kind === "portal" && Array.isArray(body.taggedUserIds) && body.taggedUserIds.length)
-    return fail(403, "no_mentions", "Just write your reply — we'll make sure the right people see it.")
+    return fail(403, "no_mentions", "Just write your reply, we'll make sure the right people see it.")
 
   // Untrusted: only keep string ids, and never the author's own id (you can't
   // @mention yourself). A mention is notify-only — never an instruction.

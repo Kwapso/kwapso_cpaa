@@ -79,7 +79,7 @@ const AGENT_ONLY: AgentTool[] = [
   {
     name: "get_role_permissions",
     description:
-      "Read a role's access rights (its permission matrix, by role id): for each module — read, create, edit, delete.",
+      "Read a role's access rights (its permission matrix, by role id): for each module. Read, create, edit, delete.",
     schema: obj({ roleId: S }, ["roleId"]),
     binding: "TENANCY",
     method: "GET",
@@ -92,9 +92,9 @@ const AGENT_ONLY: AgentTool[] = [
   {
     name: "set_help_status_by_filter",
     description:
-      "The SET-shaped bulk: move EVERY support ticket matching a facet filter (status and/or type — the " +
+      "The SET-shaped bulk: move EVERY support ticket matching a facet filter (status and/or type, the " +
       "same facets the Tickets screen sends; free text is NOT accepted for a write) to one status, in one " +
-      "call. Call it FIRST with dryRun:true to learn the TRUE match count, then again for real — the " +
+      "call. Call it FIRST with dryRun:true to learn the TRUE match count, then again for real, the " +
       `count you state must come from that dry run. Refuses a filter matching more than ${BULK_IDS_LIMIT} ` +
       "tickets; a re-run changes nothing (idempotent).",
     schema: obj(
@@ -122,7 +122,7 @@ const AGENT_ONLY: AgentTool[] = [
     name: "bulk_set_help_status",
     description:
       "Move MANY support tickets to the same status at once (open, in_progress, resolved, reopened). " +
-      "First list the tickets (a read) to get their ids, then call this with those ids — at most " +
+      "First list the tickets (a read) to get their ids, then call this with those ids, at most " +
       `${BULK_IDS_LIMIT} per call (the door refuses more). A bulk change is confirmed with a count ` +
       "before it runs. For a filter-shaped job prefer set_help_status_by_filter (one call, true count).",
     schema: obj(
@@ -188,7 +188,7 @@ const AGENT_ONLY: AgentTool[] = [
     description:
       "Which Google services the signed-in person has connected (Drive, Gmail, Calendar, Google Chat), " +
       "which Google account each is, and which folders and spaces they have shared. Call this FIRST if " +
-      "you are unsure whether you can read something — an unconnected service is not an error, it is a " +
+      "you are unsure whether you can read something, an unconnected service is not an error, it is a " +
       "thing to tell them about.",
     schema: obj({}),
     binding: "CONTENT",
@@ -201,7 +201,7 @@ const AGENT_ONLY: AgentTool[] = [
   {
     name: "google_drive_files",
     description:
-      "List files in the Drive FOLDERS this person has shared with kwapso — never their whole Drive. " +
+      "List files in the Drive FOLDERS this person has shared with kwapso, never their whole Drive. " +
       "`q` narrows by name INSIDE those folders. A person who has shared no folders gets an empty list, " +
       "which means 'nothing shared', not 'nothing there'.",
     schema: obj({ q: S }),
@@ -231,7 +231,7 @@ const AGENT_ONLY: AgentTool[] = [
     name: "google_drive_upload",
     description:
       "Write a text file INTO one of the folders this person has shared. `sourceId` is the shared " +
-      "folder's id from list_google_connections — not a Google folder id, because you can only ever " +
+      "folder's id from list_google_connections, not a Google folder id, because you can only ever " +
       "write into a folder they chose.",
     schema: obj({ sourceId: S, name: S, text: S, mimeType: S }, ["sourceId", "name", "text"]),
     binding: "CONTENT",
@@ -252,7 +252,7 @@ const AGENT_ONLY: AgentTool[] = [
   {
     name: "google_mail_search",
     description:
-      "Search this person's mail — ONLY messages to or from someone on one of the team's accounts. " +
+      "Search this person's mail. ONLY messages to or from someone on one of the team's accounts. " +
       "That fence is built by the door from the accounts' own email addresses; `q` narrows INSIDE it " +
       "and cannot widen it. If no contact has an email address yet, the answer says so.",
     schema: obj({ q: S }),
@@ -282,7 +282,7 @@ const AGENT_ONLY: AgentTool[] = [
       "Write a reply and LEAVE IT IN THEIR GMAIL DRAFTS. Nothing is sent. This is the normal way to " +
       "answer mail: the person opens the draft, changes what they like and sends it. Pass `threadId` " +
       "(from google_mail_search) to keep it in the same conversation. The answer carries a link " +
-      "straight to the draft — always give them that link.",
+      "straight to the draft, always give them that link.",
     schema: obj({ to: S, subject: S, body: S, threadId: S }, ["to", "subject", "body"]),
     binding: "CONTENT",
     method: "POST",
@@ -302,7 +302,7 @@ const AGENT_ONLY: AgentTool[] = [
   {
     name: "google_send_mail",
     description:
-      "ACTUALLY SEND mail as this person. Needs their role's own send switch — a role without it gets a " +
+      "ACTUALLY SEND mail as this person. Needs their role's own send switch, a role without it gets a " +
       "refusal, and that is the intended answer, not a problem to work around. Prefer google_draft_reply " +
       "unless the person has clearly asked for it to go now. Pass `draftId` to send a draft you already " +
       "wrote, or the message fields to send a new one.",
@@ -382,7 +382,7 @@ const AGENT_ONLY: AgentTool[] = [
     name: "google_chat_messages",
     description:
       "Read recent messages in ONE Google Chat space this person has shared. `sourceId` is the shared " +
-      "space's id from list_google_connections — a space they have not shared cannot be named here.",
+      "space's id from list_google_connections, a space they have not shared cannot be named here.",
     schema: obj({ sourceId: S }, ["sourceId"]),
     binding: "CONTENT",
     method: "GET",
@@ -434,7 +434,7 @@ const AGENT_ONLY: AgentTool[] = [
   {
     name: "google_drive_update",
     description:
-      "Rewrite a Drive file kwapso can write to — `text` replaces the WHOLE contents, it is not " +
+      "Rewrite a Drive file kwapso can write to, `text` replaces the WHOLE contents, it is not " +
       "appended. `fileId` comes from google_drive_files or from google_drive_upload. Pass `name` to " +
       "rename it in the same breath. Google refuses a file this app did not create, and that refusal " +
       "is the fence: you cannot rewrite something the person only ever let kwapso read.",
@@ -458,7 +458,7 @@ const AGENT_ONLY: AgentTool[] = [
     name: "google_drive_folder",
     description:
       "Make a new folder INSIDE one of the folders this person has shared. `sourceId` is the shared " +
-      "folder's id from list_google_connections — a folder can only be made somewhere they already " +
+      "folder's id from list_google_connections, a folder can only be made somewhere they already " +
       "chose. The answer carries the new folder's id, which google_drive_upload cannot use: uploads " +
       "name a SHARED folder, not any folder.",
     schema: obj({ sourceId: S, name: S }, ["sourceId", "name"]),
@@ -473,7 +473,7 @@ const AGENT_ONLY: AgentTool[] = [
   {
     name: "google_mail_to_drive",
     description:
-      "File a message — or a whole conversation — into a shared Drive folder as a readable text " +
+      "File a message, or a whole conversation, into a shared Drive folder as a readable text " +
       "document. Pass `threadId` for the whole exchange (from google_mail_search) or `messageId` for " +
       "one message; `sourceId` is the shared folder it goes into. Use it when somebody says 'put that " +
       "exchange in the client folder'. The document is text, not a mail archive, so it can be read, " +
@@ -495,7 +495,7 @@ const AGENT_ONLY: AgentTool[] = [
   {
     name: "google_drive_trash",
     description:
-      "Put a Drive file in the bin — never a permanent delete. It keeps its name and its sharing for " +
+      "Put a Drive file in the bin, never a permanent delete. It keeps its name and its sharing for " +
       "thirty days and the person can restore it in one click. Use it to undo a file kwapso wrote. " +
       "`fileId` comes from google_drive_upload or google_drive_files; the answer says whether anything " +
       "moved (`changed` is false when the file was already in the bin).",
@@ -513,7 +513,7 @@ const AGENT_ONLY: AgentTool[] = [
     name: "google_reply_mail",
     description:
       "SEND a reply inside an existing conversation. It takes `messageId` (from google_mail_search) " +
-      "and what to say — who it goes to, what it is called and which thread it belongs to are all read " +
+      "and what to say, who it goes to, what it is called and which thread it belongs to are all read " +
       "off the message being answered, so a reply can never land in the wrong person's inbox or start " +
       "a new conversation by accident. Needs their role's own send switch. Prefer google_draft_reply " +
       "unless the person has clearly asked for it to go now.",
@@ -551,7 +551,7 @@ const AGENT_ONLY: AgentTool[] = [
     name: "google_update_event",
     description:
       "Change what a calendar entry SAYS and WHEN it is. `eventId` comes from google_calendar_events. " +
-      "Send only the fields that change — anything left out stays as it is, so fixing a title cannot " +
+      "Send only the fields that change, anything left out stays as it is, so fixing a title cannot " +
       "wipe a guest list. `start` and `end` are RFC-3339 timestamps, or plain dates with allDay:true. " +
       "Guests are told. For where it is use google_event_location; for who is coming use " +
       "google_event_guests. Needs their role's own events switch.",
@@ -577,7 +577,7 @@ const AGENT_ONLY: AgentTool[] = [
   {
     name: "google_event_guests",
     description:
-      "Invite people to a calendar entry, or take them off — both in one call, so 'swap Ana for " +
+      "Invite people to a calendar entry, or take them off, both in one call, so 'swap Ana for " +
       "Marta' sends one notification rather than two. `add` and `remove` are lists of email " +
       "addresses. Everyone on the entry is emailed about the change. The answer's `changed` is false " +
       "when nobody new was invited and nobody was actually on it to remove. Needs their role's own " +
@@ -607,7 +607,7 @@ const AGENT_ONLY: AgentTool[] = [
   {
     name: "google_event_location",
     description:
-      "Say WHERE a calendar entry happens — a room, an address, anything a person would write down. " +
+      "Say WHERE a calendar entry happens, a room, an address, anything a person would write down. " +
       "`eventId` comes from google_calendar_events. Its own action because where is the one thing " +
       "people change on its own once the time is agreed, and doing it here cannot disturb a time " +
       "somebody moved in Google since. Guests are told. Needs their role's own events switch.",
@@ -618,13 +618,13 @@ const AGENT_ONLY: AgentTool[] = [
     write: true,
     confirm: false, // an event field, and events do not ask — see google_create_event.
     buildBody: (i) => ({ eventId: str(i, "eventId"), location: str(i, "location") }),
-    summarize: (i) => `Set where an event happens — ${str(i, "location")}`,
+    summarize: (i) => `Set where an event happens, ${str(i, "location")}`,
   },
   {
     name: "google_cancel_event",
     description:
       "Call a calendar entry off. It is marked CANCELLED rather than deleted, so it stays in " +
-      "everybody's calendar saying so and every guest is told — an appointment that silently vanished " +
+      "everybody's calendar saying so and every guest is told, an appointment that silently vanished " +
       "is worse than one that says it is off. `eventId` comes from google_calendar_events. The " +
       "answer's `changed` is false when it was already cancelled. Needs their role's own events switch.",
     schema: obj({ eventId: S }, ["eventId"]),
@@ -642,7 +642,7 @@ const AGENT_ONLY: AgentTool[] = [
     name: "google_meeting_transcript",
     description:
       "Read what was SAID in a meeting, starting from the meeting itself. Give it `eventId` from " +
-      "google_calendar_events and it finds the transcript Google Meet filed — Meet writes one as an " +
+      "google_calendar_events and it finds the transcript Google Meet filed. Meet writes one as an " +
       "ordinary document named after the meeting, so this is the only way to reach it without already " +
       "knowing which document it is. It looks ONLY in the Drive folders this person has shared: if the " +
       "answer's `transcript` is null the `note` says why, and 'share the Meet Recordings folder' is " +
@@ -661,7 +661,7 @@ const AGENT_ONLY: AgentTool[] = [
     description:
       "List every Google Chat space this person can see, and which of them are already shared with " +
       "kwapso. Each one carries `shared` and, where it is, the `sourceId` google_chat_messages needs. " +
-      "Call this when somebody names a space you have no id for — reading the LIST is not reading what " +
+      "Call this when somebody names a space you have no id for, reading the LIST is not reading what " +
       "is in them, and an unshared space still cannot be read.",
     schema: obj({}),
     binding: "CONTENT",

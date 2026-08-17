@@ -78,7 +78,7 @@ function wholeNumber(value: number, field: string, max: number): number {
   if (!Number.isFinite(value) || value < 0)
     throw new GuardError(400, "invalid_input", `${field} must be a whole number of zero or more.`)
   if (value > max)
-    throw new GuardError(400, "invalid_input", `${field} is higher than this can be — check the number.`)
+    throw new GuardError(400, "invalid_input", `${field} is higher than this can be. Check the number.`)
   return Math.floor(value)
 }
 

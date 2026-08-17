@@ -125,21 +125,16 @@ export function shapeHelpList(tickets: HelpTicket[]): ScreenData {
   return {
     rows: tickets.map((t) => ({
       id: t.id,
-      // THE NUMBER THE CLIENT QUOTES, first (SCOPE ch.02 — "BERG-T0412"). The
-      // whole point of a reference is that somebody can say it out loud, and it
-      // was rendered on no screen at all: the column shipped, the sequence
-      // shipped, the machine surface returned it, and a person could not see it.
-      name: t.ref ? `${t.ref} · ${truncate(t.description)}` : truncate(t.description),
-      detail: [
-        t.helpType || "General",
-        HELP_STATUS[t.status],
-        // How much work is on it, and nothing else about that work — the same
-        // two numbers a client is shown on their own side of the fence.
-        t.storyCount > 0 ? `${t.doneStoryCount} of ${t.storyCount} done` : null,
-        t.archivedAt ? "archived" : null,
-      ]
-        .filter(Boolean)
-        .join(" · "),
+      // THE TITLE, AND ONLY THE TITLE (UI-RULEBOOK K1, CHECKLIST 11.9). The
+      // reference used to be prefixed into it — `BERG-T0412 · Can you check…` —
+      // which is why a page of tickets read as a wall of text with no shape. It
+      // has not been lost: it leads the eyebrow on the record's own screen (D4),
+      // where a person looks when a client rings up saying it out loud.
+      name: truncate(t.description),
+      // ONE LINE, TWO FACTS. How far along, and what kind. The story counts and
+      // the archived flag went with the same edit: a subtitle carrying four
+      // facts is table content smuggled into a list (K2).
+      detail: [HELP_STATUS[t.status], t.helpType || "General"].filter(Boolean).join(" · "),
       // Facet column (read by the filter engine, not the renderer).
       status: HELP_STATUS[t.status],
     })),
@@ -206,15 +201,9 @@ export function shapeMeetingsList(meetings: Meeting[]): ScreenData {
       // so — "didn't we have a call in March?" is answered either way, and the
       // answer "yes, and we called it off" is a different one from silence.
       name: m.active ? m.title : `${m.title} (cancelled)`,
-      detail:
-        [
-          formatDate(m.startsAt),
-          m.accountName ?? "ours",
-          m.purposeName,
-          !m.active ? "cancelled" : m.status === "held" ? "held" : null,
-        ]
-          .filter(Boolean)
-          .join(" · ") || "—",
+      // K1: when, and who with. The purpose and the held flag are columns on the
+      // "all" view, which is where a person compares meetings on them (K2).
+      detail: [formatDate(m.startsAt), m.accountName ?? "ours"].filter(Boolean).join(" · ") || "—",
       // Facet columns (read by the filter engine, not the renderer).
       client: m.accountName ?? "Ours",
       purpose: m.purposeName ?? "Not said",
@@ -269,10 +258,14 @@ export function shapeAccountsList(accounts: Account[]): ScreenData {
         // Archived rows stay visible (archive-never-delete), flagged like retired
         // roles and articles are.
         name: a.active ? a.name : `${a.name} (archived)`,
+        // K1: three facts, no more. What it is, where it stands, and where it
+        // sits in the tree. The CODE left the line — it is a lookup key, not
+        // something anybody scans a list for, and it leads the eyebrow on the
+        // record's own screen. The parent stayed, because "under Bergman S.A."
+        // is a fact about this row that no other row carries.
         detail:
-          [ACCOUNT_TYPE[a.accountType], a.code, accountStatus(a.status), parent]
-            .filter(Boolean)
-            .join(" · ") || "—",
+          [ACCOUNT_TYPE[a.accountType], accountStatus(a.status), parent].filter(Boolean).join(" · ") ||
+          "—",
         // Facet columns (read by the filter engine, not the renderer).
         type: ACCOUNT_TYPE[a.accountType],
         status: accountStatus(a.status) || "—",

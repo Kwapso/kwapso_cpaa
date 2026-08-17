@@ -12,7 +12,6 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Checkbox } from "@kwapso/ui/registry/primitives/checkbox/checkbox"
 import {
   DialogDescription,
@@ -27,7 +26,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { Plus, Search } from "lucide-react"
@@ -115,12 +113,11 @@ export function ContactLinkDialog({
           as a person first.
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !values.personAccountId} className="gap-1.5">
-          {busy ? <Spinner /> : <Plus className="size-4" />}
-          {busy ? "Adding…" : "Add contact"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !values.personAccountId,
+        icon: <Plus className="size-4" />,
+      }}
     >
       <Field config={personField} htmlFor="contact-person" className={fieldSpacing}>
         <div className="relative">
@@ -174,7 +171,7 @@ export function ContactLinkDialog({
           disabled={busy}
         />
         <label htmlFor="contact-main" className="text-sm">
-          {t("Main contact — the person you deal with first")}
+          {t("Main contact, the person you deal with first")}
         </label>
       </div>
     </FormShellDialog>

@@ -148,7 +148,7 @@ export async function updateMeetingPurpose(
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Meeting purpose edited",
-    description: `${actor.name} edited the "${v.name}" meeting purpose${changes ? ` — ${changes}` : ""}`,
+    description: `${actor.name} edited the "${v.name}" meeting purpose${changes ? `, ${changes}` : ""}`,
     relatedTable: "meeting_purposes",
     relatedRowId: id,
   })

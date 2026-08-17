@@ -321,10 +321,20 @@ export function DeepLinkScreen() {
       {/* data-trace marks the screen the agent just drove; the ring is a short-lived
        * glance cue (auto-cleared) so the user sees WHERE a traced change landed. It
        * rings the content region — a just-opened dialog draws the eye on its own. */}
+      {/* ONE PAGE CONTAINER, ONE CAP (UI-RULEBOOK L1). This was `max-w-3xl`, 768px
+       * — and it was the ONLY width cap in the agency app, so it governed every
+       * module screen. On the 1283px laptop the feedback screenshots were taken
+       * at, that left a 138px gutter each side; on a 2560px display, over 700px.
+       * 1600px keeps a comfortable measure on a large display while the shell's
+       * own `px-4 sm:px-6 lg:px-10` gutters (S2, and exactly the brand site's own
+       * 40px `--margin--m`) do the work at every width below it.
+       *
+       * `rounded-xl transition-shadow` went with it: it rounded and animated a
+       * container that has no surface of its own. */}
       <div
         data-trace={traceHighlight ?? undefined}
-        className={`mx-auto flex w-full max-w-3xl flex-col gap-6 rounded-xl transition-shadow ${
-          traceHighlight ? "ring-primary/60 ring-2 ring-offset-2 ring-offset-background" : ""
+        className={`mx-auto flex w-full max-w-[1600px] flex-col gap-6 ${
+          traceHighlight ? "ring-primary/60 rounded-xl ring-2 ring-offset-2 ring-offset-background" : ""
         }`}
       >
         {showTabs && (

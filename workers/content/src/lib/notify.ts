@@ -102,7 +102,7 @@ async function sendToMany(
   const list = people.slice(0, SEND_FAN_CAP)
   if (people.length > list.length)
     console.error(
-      `${who}: ${people.length} recipients is past the ${SEND_FAN_CAP} one send may fan out to — ` +
+      `${who}: ${people.length} recipients is past the ${SEND_FAN_CAP} one send may fan out to, ` +
         `${people.length - list.length} were NOT emailed. This wants a queue, not a bigger number.`
     )
   for (let i = 0; i < list.length; i += SEND_CONCURRENCY)
@@ -382,7 +382,7 @@ export async function notifyTodoRaised(
     await sendToMany("to-do notice", people, (p) =>
       send(env, p.email, `${brand.name}: we need something from you`, {
         heading: "One thing from you",
-        intro: `${todo.title}${todo.due_on ? ` — by ${todo.due_on.slice(0, 10)}` : ""}.`,
+        intro: `${todo.title}${todo.due_on ? `, by ${todo.due_on.slice(0, 10)}` : ""}.`,
         footnote: `Open ${todo.ref ? `${todo.ref} ` : ""}in your ${name} portal to mark it done, and send the file with it if there is one.`,
       }).catch((e) => console.error("to-do notice failed:", e))
     )
@@ -448,7 +448,7 @@ export async function sendTriageDigest(
     const lines: string[] = []
     if (digest.waiting > 0)
       lines.push(
-        `${digest.waiting} ${digest.waiting === 1 ? "request has" : "requests have"} been waiting to be read — the oldest for ${digest.oldestDays} days.`
+        `${digest.waiting} ${digest.waiting === 1 ? "request has" : "requests have"} been waiting to be read, the oldest for ${digest.oldestDays} days.`
       )
     if (digest.missingTime.length > 0)
       lines.push(
@@ -460,7 +460,7 @@ export async function sendTriageDigest(
           intro: lines.join(" "),
           footnote: digest.onDutyName
             ? "Open Tickets to read them."
-          : "Put somebody on triage duty in Tickets — a backlog with no owner is the one nobody clears.",
+          : "Put somebody on triage duty in Tickets, a backlog with no owner is the one nobody clears.",
       }).catch((e) => console.error("triage digest failed:", e))
     )
   } catch (e) {
@@ -510,13 +510,13 @@ export async function notifyTicketResolved(
     const name = await teamName(env, guard.teamId)
     const asked = snippet(ticket.description)
     await sendToMany("resolution notice", people, (p) =>
-      send(env, p.email, `${name}: ${ticket.ref ? `${ticket.ref} — ` : ""}answered`, {
+      send(env, p.email, `${name}: ${ticket.ref ? `${ticket.ref}, ` : ""}answered`, {
         heading: "We've come back to you",
         // The ANSWER in full, and what they asked in one line above it, because
         // a resolution arriving with no reminder of the question is a paragraph
         // people have to go and look something up to understand.
         intro: `You asked: "${asked}"\n\n${resolution}`,
-        footnote: "Open the ticket if you want to reply — the whole conversation is there.",
+        footnote: "Open the ticket if you want to reply, the whole conversation is there.",
       }).catch((e) => console.error("resolution notice failed:", e))
     )
   } catch (e) {

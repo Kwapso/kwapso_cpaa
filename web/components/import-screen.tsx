@@ -167,7 +167,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
             <Upload className="text-muted-foreground size-6" aria-hidden />
             <span className="text-sm font-medium">{t("Drop your spreadsheets here, or click to choose")}</span>
             <span className="text-muted-foreground text-xs">
-              {t("CSV or Excel (.xlsx) files. Add several at once — the assistant sorts out how they connect.")}
+              {t("CSV or Excel (.xlsx) files. Add several at once, the assistant sorts out how they connect.")}
             </span>
             <input
               ref={fileRef}
@@ -262,7 +262,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
                       {r.column}
                     </span>
                   ))}{" "}
-                  {t("from an earlier table — that's why order matters.")}
+                  {t("from an earlier table, that's why order matters.")}
                 </p>
               )}
 
@@ -298,7 +298,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
                     ))}
                     {folded > 0 && (
                       <p className="text-muted-foreground text-xs">
-                        + {folded} {t("optional column")}{folded === 1 ? "" : "s"} {t("not in your file — fine to leave out.")}
+                        + {folded} {t("optional column")}{folded === 1 ? "" : "s"} {t("not in your file, fine to leave out.")}
                       </p>
                     )}
                   </div>
@@ -309,7 +309,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
                 <div className="bg-amber-500/10 flex flex-col gap-1 rounded-lg p-2.5">
                   <p className="text-xs font-medium text-amber-600 dark:text-amber-500">
                     {step.predictedRejects} of {step.rowCount} {t("row(s) will be skipped")}
-                    {step.notes ? ` — ${step.notes}` : ""}
+                    {step.notes ? `, ${step.notes}` : ""}
                   </p>
                   {(step.predictedRejections ?? []).slice(0, 3).map((r, j) => (
                     <p key={j} className="text-muted-foreground text-xs">
@@ -318,7 +318,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
                   ))}
                   {(step.predictedRejections?.length ?? 0) > 3 && (
                     <p className="text-muted-foreground text-xs">
-                      …and {step.predictedRejects - 3} {t("more — download the list below.")}
+                      …and {step.predictedRejects - 3} {t("more, download the list below.")}
                     </p>
                   )}
                 </div>
@@ -460,7 +460,7 @@ function PlanSummary({
       {rejections.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-muted-foreground text-xs">
-            {t("Skipped rows are listed with reasons — fix them and re-import, or run now without them.")}
+            {t("Skipped rows are listed with reasons. Fix them and re-import, or run now without them.")}
           </p>
           <Button
             variant="outline"

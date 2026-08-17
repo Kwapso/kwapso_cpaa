@@ -15,13 +15,11 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import {
   DialogDescription,
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
@@ -78,12 +76,11 @@ export function RaiseTicketDialog({
           {t("Tell us what's going on in your own words. You'll get the reply right here.")}
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" size="lg" disabled={busy || !values.description.trim()}>
-          {busy ? <Spinner /> : <Plus className="size-3.5" />}
-          {busy ? "Sending…" : "Send it"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !values.description.trim(),
+        icon: <Plus className="size-3.5" />,
+      }}
     >
       <Field config={descField} htmlFor="ticket-desc" className={fieldSpacing}>
         <Textarea

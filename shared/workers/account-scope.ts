@@ -482,7 +482,7 @@ export async function refusePortalCaller(cfg: D1Rest, guard: MemberGuard): Promi
     throw new GuardError(
       403,
       "client_login",
-      "This sign-in is a client login — your company's work is on the client portal."
+      "This sign-in is a client login, your company's work is on the client portal."
     )
   return scope
 }

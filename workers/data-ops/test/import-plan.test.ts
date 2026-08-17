@@ -160,7 +160,7 @@ describe("scanRows: the ONE row pass behind plan prediction AND execution", () =
       ["editor ", "same role typed twice"],
       ["Approver", "fine"],
     ])
-    expect(scans[1].reject).toBe("Duplicate of row 1 in this file — skipped.")
+    expect(scans[1].reject).toBe("Duplicate of row 1 in this file, skipped.")
     expect(scans[2].reject).toBeUndefined()
   })
 

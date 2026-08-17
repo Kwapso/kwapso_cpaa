@@ -102,7 +102,7 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
       <main className="mx-auto flex min-h-[100svh] max-w-md flex-col items-center justify-center gap-5 px-6 text-center">
         <h1 className="text-2xl font-semibold tracking-tight">{t("We can't reach your account")}</h1>
         <p className="text-muted-foreground">
-          {t("Something on our side isn't responding. Nothing is lost — try again in a moment.")}
+          {t("Something on our side isn't responding. Nothing is lost. Try again in a moment.")}
         </p>
         <Button onClick={refresh}>{t("Try again")}</Button>
       </main>

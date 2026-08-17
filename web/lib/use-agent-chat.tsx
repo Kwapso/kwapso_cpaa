@@ -205,7 +205,7 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
           const stepId = stepIdByTool.get(ev.tool)
           // A failed step shows WHY on the row itself (the door's short reason, e.g.
           // which permission was missing) — same combined label the server persists.
-          const label = ev.ok || !ev.error ? ev.summary : `${ev.summary} — ${ev.error}`
+          const label = ev.ok || !ev.error ? ev.summary : `${ev.summary}, ${ev.error}`
           setItems((prev) =>
             prev.map((it) =>
               it.id === stepId

@@ -1,7 +1,7 @@
-# AGENTIC-IMPORT.md — agent-driven, multi-table data import (LOCKED 2026-07-04)
+# AGENTIC-IMPORT.md, agent-driven, multi-table data import (LOCKED 2026-07-04)
 
 The vision, in one line: **a user dumps their old system's exports (CSV/XLSX) and
-Brimba ingests them** — the agent normalizes the data, maps their columns onto our
+Brimba ingests them**, the agent normalizes the data, maps their columns onto our
 fields, orders interdependent tables, resolves foreign keys, rejects what it
 honestly can't, and writes every row **through the same gated door a person uses**
 so the audit trail is identical. No weeks of manual re-entry.
@@ -23,18 +23,18 @@ inherits it by declaring its targets. This doc is the locked contract.
   create endpoint, act-as-user** (the caller's cookie is forwarded). So it gets
   the *same* activity log, audit block (creator id/email/name + timestamp), live
   ping, and validation as if the person typed it in the UI. A raw `INSERT` would
-  skip all of that — which is exactly why we don't do it. This property already
+  skip all of that, which is exactly why we don't do it. This property already
   holds in the single-table importer and is preserved here.
 - **Never exceed the caller's rights.** Import into a target needs `create` on
   that target's module (import has no permission key of its own). The agent is the
-  invoker — it can't import what the invoker couldn't create by hand.
+  invoker, it can't import what the invoker couldn't create by hand.
 - **Team-bound both directions.** Import writes only into the caller's own team
   database (`teamContext` → their `databaseId`); export reads only from it.
 - **Honest rejections.** A required field that can't be normalized or a reference
   that can't resolve → the row is **rejected with a reason**, never silently
   dropped or half-written. The user gets a per-row report.
 - **One confirm, not per row.** The user reviews **one plan** and confirms once;
-  execution runs the whole ordered graph. (Bounded model spend — see §6.)
+  execution runs the whole ordered graph. (Bounded model spend. See §6.)
 - **Insert-only.** Import adds rows; it never updates or deletes existing records
   (that's a separate, later feature). Re-running a completed batch is refused.
 
@@ -49,9 +49,9 @@ upload N files ─▶ AGENT ANALYZES ─▶ PLAN (review) ─▶ one confirm ─
                                                                                           + reasons)
 ```
 
-1. **Upload** — one or many files into a **batch**. `.xlsx` is converted to CSV
+1. **Upload**, one or many files into a **batch**. `.xlsx` is converted to CSV
    **client-side** by Brimba's own zero-dependency reader (`web/lib/xlsx-to-csv.ts`:
-   hand-parsed ZIP + browser-native `DecompressionStream` + DOMParser — SheetJS was
+   hand-parsed ZIP + browser-native `DecompressionStream` + DOMParser. SheetJS was
    never bundled, its npm build carries a HIGH advisory); first sheet only, no
    formulas evaluated, date cells arrive as Excel serial numbers. The worker only
    ever sees CSV text. Legacy `.xls` asks for a Save-As.
@@ -62,11 +62,11 @@ upload N files ─▶ AGENT ANALYZES ─▶ PLAN (review) ─▶ one confirm ─
    yes/no→boolean, …), the **references** between targets, the **dependency order**
    (parents before children), and a **prediction** of which rows will be rejected
    and why. Bounded to a few model calls (§6), never one per row.
-3. **Review the plan.** The user sees the whole plan — order, mappings,
-   normalizations, reference resolutions, and the predicted rejections — and can
+3. **Review the plan.** The user sees the whole plan, order, mappings,
+   normalizations, reference resolutions, and the predicted rejections, and can
    nudge a mapping before running. This is the single point of confirmation.
 4. **Run (ordered).** Execute targets in dependency order. For each row: apply the
-   normalization rules (deterministic — no per-row model call), resolve any
+   normalization rules (deterministic, no per-row model call), resolve any
    references (§4), and if a required value is present and valid, write it through
    the gated create endpoint. Capture each new row's natural-key → new-id so a
    downstream child can resolve to it. A row missing a required value or an
@@ -79,13 +79,13 @@ upload N files ─▶ AGENT ANALYZES ─▶ PLAN (review) ─▶ one confirm ─
 
 ### 2.5 · The plan tells the truth (one scan backs plan AND run)
 
-The plan is not a hope — it is a **prediction the run is bound to**. One pure pass,
+The plan is not a hope, it is a **prediction the run is bound to**. One pure pass,
 `scanRows` (import-plan.ts), maps + normalizes every row and decides rejections
 (missing required value; an exact duplicate of an earlier row in the same file —
-same required values — is skipped, importing the first). `planStep` runs that scan
+same required values, is skipped, importing the first). `planStep` runs that scan
 at plan time and stores the predicted rejections (row + reason, capped at 200 —
 the count stays exact); `confirmBatch` runs the SAME scan at execution. Same
-checks, same wording — the review screen can never promise something the run
+checks, same wording, the review screen can never promise something the run
 won't do. The review shows per-step reasons, a bottom big-number strip (will
 import / will be skipped / columns not in your files) and a **downloadable
 fix-list before anything runs**. Database-level conflicts (e.g. a dropdown value
@@ -129,7 +129,7 @@ brand asset's `category` references a **Selectable data** value of type
 "Brand asset category" (`SELECTABLE_GROUPS.brandCategory`). Import a dropdowns
 file + a brand-assets file together and the agent orders **dropdowns first**,
 imports them, then imports the assets whose `category` now matches the values
-that exist (mode `"value"`, `onMissing: "create"` — the brand-assets endpoint
+that exist (mode `"value"`, `onMissing: "create"`, the brand-assets endpoint
 pick-or-creates a missing category, so nothing is lost either way; the ordering
 makes the values canonical rather than accidental). This proves multi-file
 batching, dependency ordering, and reference resolution **inside the base**, with
@@ -164,19 +164,19 @@ file is **rejected** ("no product matches SKU X"), never written half-formed.
 
 ---
 
-**Extra field — `exportPath`.** A target that also has a full-field CSV export door
+**Extra field, `exportPath`.** A target that also has a full-field CSV export door
 declares it (`exportPath: "/api/tenancy/roles/export"`). Export = the READ right;
 import = CREATE. The agent's capability brief (Law R9) is generated from this same
 catalog, so declaring it here is what makes the assistant KNOW the table can be
 exported.
 
-**The worked matrix case — member roles.** The roles export flattens the permission
+**The worked matrix case, member roles.** The roles export flattens the permission
 matrix to one `<module>.<right>` yes/no column each (built from
 `shared/team-modules.ts`, the ONE module list). The member_roles import target
 declares the same 32 optional columns, so an exported roles file imports straight
-back (**export ↔ import round-trip**) — and a hand-made file can carry permissions
+back (**export ↔ import round-trip**), and a hand-made file can carry permissions
 too (the sample shows the pattern). A row WITH matrix cells creates the role AND
-sets its matrix (the create door then demands create **and** edit — the same gate
+sets its matrix (the create door then demands create **and** edit, the same gate
 the Roles screen's matrix editor goes through); a row without stays a plain create
 with permissions off.
 
@@ -212,21 +212,21 @@ refs B refs A) is flagged in the plan as an error, not executed.
 
 The plan is a **proposal the user confirms**; the server re-derives and re-gates
 everything at execution. The agent can't make the import exceed the caller's rights
-or skip validation — same safety model as the chat agent.
+or skip validation, same safety model as the chat agent.
 
 ---
 
 ## 6 · Cost, metering, limits
 
-- **Metered on the team's AI credit pool** (same as chat — DATA-MODEL `agent_usage`
+- **Metered on the team's AI credit pool** (same as chat. DATA-MODEL `agent_usage`
   / `agent_credits`). Analysis is a **few** model calls per batch (roughly one per
   file to map/normalize + one to order the graph), **never per row**, so a typical
   import costs ~3–8 credits and shows up in the usage "why" view. Out of credits →
   the analyze step is blocked with the normal message; a plan already made can
   still be run.
-- **Row cap** stays (per target) — a single confirm is bounded; oversized files are
+- **Row cap** stays (per target), a single confirm is bounded; oversized files are
   rejected with a clear message. **Files per batch** capped too.
-- **No model call touches user data at write time** — execution is deterministic,
+- **No model call touches user data at write time**, execution is deterministic,
   so a huge file doesn't multiply model spend.
 
 ---
@@ -241,17 +241,17 @@ or skip validation — same safety model as the chat agent.
 - **Endpoints** (`/api/data-ops/import/batch*`, gated per-target `create` at write
   time; the batch shell is gated on `import`-capability = holding `create` on at
   least one catalog target):
-  - `POST …/batch` — start a batch.
-  - `POST …/batch/file` `{batchId, name, csvText}` — add a parsed file.
-  - `POST …/batch/plan` `{batchId}` — agent analyzes → stores + returns the plan. **Metered.**
-  - `POST …/batch/confirm` `{batchId}` — ordered execution → stores + returns the report.
-  - `GET …/batch?id=` — read plan + report (wizard rehydrate).
+  - `POST …/batch`. Start a batch.
+  - `POST …/batch/file` `{batchId, name, csvText}`. Add a parsed file.
+  - `POST …/batch/plan` `{batchId}`, agent analyzes → stores + returns the plan. **Metered.**
+  - `POST …/batch/confirm` `{batchId}`, ordered execution → stores + returns the report.
+  - `GET …/batch?id=`. Read plan + report (wizard rehydrate).
 - The **single-target** importer (`/api/data-ops/import*`) stays for the simple
   case + backward compat; the wizard leads with the batch flow.
 
 ---
 
-**Import history.** `GET /api/data-ops/import/batches` — the team's past import runs,
+**Import history.** `GET /api/data-ops/import/batches`, the team's past import runs,
 newest first (who, when, files → tables, totals). TEAM-visible summaries (any
 signed-in member): the same altitude as the activity feed's "imported N rows" line —
 row contents and rejection reasons stay on the creator-scoped batch. Shown as
@@ -260,16 +260,16 @@ row contents and rejection reasons stay on the creator-scoped batch. Shown as
 ## 8.5 · Import straight from the assistant chat
 
 The user can also **attach CSV files in the assistant panel** (paperclip or drop).
-The files go straight into the SAME batch engine — never into the model prompt
+The files go straight into the SAME batch engine. Never into the model prompt
 (injection-safe by construction): the app creates + plans the batch (metered one AI
 unit, exactly like the wizard's plan step), then hands the model a compact
 `ATTACHED-IMPORT-PLAN` block (tables, counts, what will be skipped and why, the
 batchId). The model presents the plan in a sentence and proposes
-`run_import_batch` — a `binding:"SELF"` tool that runs inside data-ops: its handler
+`run_import_batch`, a `binding:"SELF"` tool that runs inside data-ops: its handler
 re-opens `teamContext` from the same request (act-as-user), re-gates `create` on
 every target module, executes in dependency order, and publishes one ping per
 changed module. It is `confirm:true` (writing a whole file is high-blast), so the
-normal confirm panel shows first, and the batch is creator-scoped — the model can
+normal confirm panel shows first, and the batch is creator-scoped, the model can
 never run someone else's import. Locked by `agent.test.ts` (a SELF tool must carry
 a run handler; the runner must confirm) and by the Law R9 parity test (the brief
 tells the agent this capability exists).
@@ -279,7 +279,7 @@ tells the agent this capability exists).
 When `ANTHROPIC_API_KEY` is unset, the analyze step falls back to the deterministic
 planner: fuzzy `autoMap` per file + target detection by matching a file's headers
 to each target's required columns + the declared `references`/order. Less clever at
-messy real-world headers, but the base still imports — the model makes it *better*,
+messy real-world headers, but the base still imports, the model makes it *better*,
 it isn't a hard dependency (mirrors the chat agent's Workers-AI fallback).
 
 ---
@@ -287,14 +287,14 @@ it isn't a hard dependency (mirrors the chat agent's Workers-AI fallback).
 ## 10 · Every import place shows a sample (enforceable)
 
 **Rule:** wherever a user can import, they can first **download a sample file** that
-shows a good file for that table. So no one guesses the format — they see it. This is
+shows a good file for that table. So no one guesses the format, they see it. This is
 automatic: the sample is built from the target's own `columns` (header = the labels,
 one example row from the target's optional `sample` map; a REQUIRED column with no
-example falls back to `Example <label>`, an optional one stays **empty** — a good file
+example falls back to `Example <label>`, an optional one stays **empty**, a good file
 doesn't have to fill every column), served by
 `GET /api/data-ops/import/sample?tableKey=X` and offered in the wizard as a
 "Download a sample" link. **Arriving from a specific tab** (Roles → Import,
-Dropdown values → Import…) shows ONLY that table's sample — the one the user came to
+Dropdown values → Import…) shows ONLY that table's sample, the one the user came to
 import; the generic Import screen shows all. Locked by
 `workers/data-ops/test/import-plan.test.ts`: every `TARGETS` entry yields a sample,
 every required cell carries an example, and **every sample must itself import

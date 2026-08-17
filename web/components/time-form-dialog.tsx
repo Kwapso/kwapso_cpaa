@@ -20,7 +20,6 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
@@ -31,11 +30,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { Switch } from "@kwapso/ui/registry/primitives/switch/switch"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { Pencil, Plus } from "lucide-react"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
@@ -171,15 +168,13 @@ export function TimeFormDialog({
         <DialogDescription>
           {isEdit
             ? "Fix what was written down. The change is kept in the record's history, with your name on it."
-            : "For work already finished. Say when it started and when it stopped — we work out the rest."}
+            : "For work already finished. Say when it started and when it stopped, we work out the rest."}
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !ready} className="gap-1.5">
-          {busy ? <Spinner /> : isEdit ? <Pencil className="size-4" /> : <Plus className="size-4" />}
-          {busy ? "Saving…" : isEdit ? "Save the correction" : "Log it"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !ready,
+      }}
     >
       <Field config={workField} htmlFor="time-target" className={fieldSpacing}>
         {isEdit ? (

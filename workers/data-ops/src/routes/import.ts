@@ -115,7 +115,7 @@ export async function postBatchPlan(request: Request, env: Env): Promise<Respons
   const batchId = requireText(body.batchId, "Batch", TEXT_LIMITS.short)
   const c = await consumeAiUnit(env, guard.teamId)
   if (!c.ok)
-    return fail(429, "over_quota", "You're out of AI requests for now — the plan step uses the assistant. They reset tomorrow, or an admin can add credits.")
+    return fail(429, "over_quota", "You're out of AI requests for now, the plan step uses the assistant. They reset tomorrow, or an admin can add credits.")
   return json({ batch: await planBatch(env, cfg, guard, batchId), quota: c.quota })
 }
 

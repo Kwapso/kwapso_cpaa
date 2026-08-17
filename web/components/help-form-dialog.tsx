@@ -27,7 +27,6 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import {
   DialogDescription,
   DialogTitle,
@@ -42,7 +41,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { X } from "lucide-react"
@@ -207,19 +205,17 @@ export function HelpFormDialog({
             : "Describe the problem you're facing. Chat with others, or use this ticket as a forum to discuss solutions."}
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !values.description.trim()}>
-          {busy ? <Spinner /> : null}
-          {busy ? (isEdit ? "Saving…" : "Raising…") : isEdit ? "Save changes" : "Raise ticket"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !values.description.trim(),
+      }}
     >
       <Field config={descField} htmlFor="help-desc" className={fieldSpacing}>
         <Textarea
           id="help-desc"
           value={values.description}
           onChange={(e) => setValues((v) => ({ ...v, description: e.target.value }))}
-          placeholder={t("Tell us what's going on — e.g. I can't invite a new member, the button is greyed out.")}
+          placeholder={t("Tell us what's going on, e.g. I can't invite a new member, the button is greyed out.")}
           disabled={busy}
           rows={4}
           autoFocus
@@ -289,7 +285,7 @@ export function HelpFormDialog({
       <Field config={accountField} htmlFor="help-account" className={fieldSpacing}>
         {fixedAccount ? (
           <p className="text-muted-foreground text-sm" id="help-account">
-            {fixedAccount.name} — a ticket can&apos;t be moved to another client.
+            {fixedAccount.name}, a ticket can&apos;t be moved to another client.
           </p>
         ) : (
           <Select
@@ -298,10 +294,10 @@ export function HelpFormDialog({
             disabled={busy}
           >
             <SelectTrigger id="help-account">
-              <SelectValue placeholder={t("Ours — no client")} />
+              <SelectValue placeholder={t("Ours, no client")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={NONE}>{t("Ours — no client")}</SelectItem>
+              <SelectItem value={NONE}>{t("Ours, no client")}</SelectItem>
               {accountOptions.map((a) => (
                 <SelectItem key={a.id} value={a.id}>
                   {a.name}
@@ -333,7 +329,7 @@ export function HelpFormDialog({
                 .map((l) => (
                   <SelectItem key={l.personAccountId} value={l.personAccountId}>
                     {l.personName}
-                    {l.isMainStakeholder ? " — main contact" : ""}
+                    {l.isMainStakeholder ? ", main contact" : ""}
                   </SelectItem>
                 ))}
             </SelectContent>

@@ -156,7 +156,7 @@ export async function listInternalRates(
 
 const RATE_TAKEN = "That kind of work already has an internal rate. Edit the one that's there."
 const DEFAULT_TAKEN =
-  "Another rate is already the default one. Turn that one off first — a margin can only apply one."
+  "Another rate is already the default one. Turn that one off first, a margin can only apply one."
 
 /** A UNIQUE INDEX REFUSING A ROW IS BAD INPUT, NOT A CRASH. Two indexes guard
  * this table: one live rate per label, and at most one default. They give
@@ -243,7 +243,7 @@ export async function updateInternalRate(
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Internal rate edited",
-    description: `${actor.name} edited the internal rate for ${input.label}${changes ? ` — ${changes}` : ""}`,
+    description: `${actor.name} edited the internal rate for ${input.label}${changes ? `, ${changes}` : ""}`,
     relatedTable: "internal_rates",
     relatedRowId: id,
   })

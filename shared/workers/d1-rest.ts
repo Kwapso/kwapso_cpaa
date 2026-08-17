@@ -93,7 +93,7 @@ async function cf<T>(
       // key is no longer ours; say so, and let the central catches answer 503.
       if (res.status === 401 || res.status === 403)
         throw new Error(
-          `cloud_key_rejected: the Cloudflare D1 token was refused (${msg}) — it has probably been rotated. Re-set CF_D1_TOKEN on tenancy, content, data-ops and realtime, in both environments.`
+          `cloud_key_rejected: the Cloudflare D1 token was refused (${msg}), it has probably been rotated. Re-set CF_D1_TOKEN on tenancy, content, data-ops and realtime, in both environments.`
         )
       throw new Error(`Cloudflare D1 API failed: ${msg}`)
     }
@@ -136,7 +136,7 @@ export async function d1ListDatabases(
     if (batch.length < 100) return all
   }
   console.error(
-    `d1ListDatabases: stopped at the ${D1_LIST_PAGE_CAP}-page ceiling (${all.length} databases) — the list is INCOMPLETE.`
+    `d1ListDatabases: stopped at the ${D1_LIST_PAGE_CAP}-page ceiling (${all.length} databases), the list is INCOMPLETE.`
   )
   return all
 }
@@ -189,7 +189,7 @@ const UNMERGEABLE: { pattern: RegExp; what: string }[] = [
     pattern: /\b(COUNT|SUM|AVG|MIN|MAX|GROUP_CONCAT)\s*\(/i,
     what:
       "an aggregate (one row per shard, and every caller reads the first). " +
-      "A collection COUNT now HAS a real merge — countCollectionAcross in " +
+      "A collection COUNT now HAS a real merge, countCollectionAcross in " +
       "shared/workers/count.ts sums the per-shard bounded counts and clamps once, " +
       "which is exact below the ceiling and an honest floor above it. Use that " +
       "rather than reaching for this seam",

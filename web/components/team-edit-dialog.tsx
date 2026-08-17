@@ -10,7 +10,6 @@ import {
   AvatarFallback,
   AvatarImage,
 } from "@kwapso/ui/registry/primitives/avatar/avatar"
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import {
   DialogDescription,
   DialogTitle,
@@ -19,7 +18,6 @@ import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { FileUpload } from "@kwapso/ui/registry/primitives/file-upload/file-upload"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
@@ -62,7 +60,7 @@ export function TeamEditDialog({
       const dataUrl = await fileToDataUrl(files[0])
       setValues((v) => ({ ...v, logo: dataUrl }))
     } catch {
-      toast.error(t("Couldn't read that image — try another one."))
+      toast.error(t("Couldn't read that image. Try another one."))
     }
   }
 
@@ -97,12 +95,10 @@ export function TeamEditDialog({
           {t("Change your team's name or add a logo. This is what everyone sees.")}
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !name.trim()}>
-          {busy ? <Spinner /> : null}
-          {busy ? "Saving…" : "Save changes"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !name.trim(),
+      }}
     >
       <div className="flex flex-col items-center gap-3">
         <Avatar className="size-20">

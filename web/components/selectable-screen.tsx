@@ -19,7 +19,7 @@ import {
 } from "@kwapso/ui/registry/primitives/select/select"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { Plus, Pencil, X, Check, Upload, Download, Power, Search } from "lucide-react"
+import { Pencil, X, Check, Upload, Download, Power, Search } from "lucide-react"
 
 import type { SelectableValue } from "@shared/types"
 import { ApiFailure, tenancy } from "@/lib/api"
@@ -27,6 +27,7 @@ import { SelectableFormDialog } from "@/components/selectable-form-dialog"
 import { usePermissions } from "@/lib/perms"
 import { primeCache, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
+import { AddButton } from "@/components/deep-link/screen-bits"
 
 export function SelectableScreen({
   teamId,
@@ -74,8 +75,8 @@ export function SelectableScreen({
 
   // Create — the dialog calls this; it throws on failure so the dialog surfaces the
   // reason and stays open, and closes itself on success.
-  async function addValue(type: string, value: string) {
-    const { values: next } = await tenancy.createSelectable(type, value)
+  async function addValue(type: string, value: string, mark: string) {
+    const { values: next } = await tenancy.createSelectable(type, value, mark || undefined)
     primeCache(`selectable:${teamId}`, next)
     toast.success(`Added "${value}".`)
   }
@@ -115,7 +116,7 @@ export function SelectableScreen({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{t("Dropdown values")}</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            {t("The options behind your team's dropdowns — Ticket types, Learning categories and more. Pick a group, or start a new one.")}
+            {t("The options behind your team's dropdowns. Ticket types, Learning categories and more. Pick a group, or start a new one.")}
           </p>
         </div>
         {/* Actions — New value / Import / Export. flex-wrap so the buttons never
@@ -135,9 +136,7 @@ export function SelectableScreen({
             </Button>
           )}
           {canCreate && (
-            <Button onClick={() => setAddOpen(true)} className="gap-1.5">
-              <Plus className="size-4" aria-hidden /> {t("New value")}
-            </Button>
+            <AddButton label={t("New value")} onClick={() => setAddOpen(true)} />
           )}
         </div>
       </div>
@@ -152,7 +151,7 @@ export function SelectableScreen({
         />
       )}
 
-      {/* Filter bar — search + status, matching the other collections. Deactivated
+      {/* Filter bar. Search + status, matching the other collections. Deactivated
        * values are hidden under the Active default; switch to Inactive/All to see and
        * reactivate them. flex-wrap so the controls never clip on a phone. */}
       {values.length > 0 && (
@@ -233,6 +232,16 @@ export function SelectableScreen({
                       </>
                     ) : (
                       <>
+                        {/* THE TYPE MARK, where it is SET (CHECKLIST 11.8). It
+                            sits in the leading icon slot and is `aria-hidden`,
+                            with the word right beside it, two of the four
+                            conditions UI-CONVENTIONS §5 puts on a type mark, and
+                            this screen is the third one (it is data, set here). */}
+                        {v.mark && (
+                          <span aria-hidden className="w-5 shrink-0 text-base leading-none">
+                            {v.mark}
+                          </span>
+                        )}
                         <span className="flex-1 text-sm">{v.value}</span>
                         {!v.active && (
                           <span className="text-muted-foreground text-xs">{t("Deactivated")}</span>

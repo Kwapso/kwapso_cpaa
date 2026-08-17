@@ -466,3 +466,59 @@ describe("the sync screen shows one person their own state", () => {
     expect(kinds).toContain("ticket")
   })
 })
+
+describe("Google comes into step when you open the app (14.12)", () => {
+  /** What the door answers, unwrapped. `skipped` is the whole subject here. */
+  const sync = async (userId: string, body: unknown = {}) => {
+    const res = await call(userId, "POST /api/content/knowledge/sync-google", body)
+    expect(res.status).toBe(200)
+    return (await res.json()) as {
+      results: { kind: string; read: number; indexed: number }[]
+      skipped: boolean
+    }
+  }
+
+  it("the automatic caller asks once and is then told it already did", async () => {
+    const first = await sync(IDS.staffUser, { onlyIfStale: true })
+    expect(first.skipped, "nothing has run yet — this one has to really sweep").toBe(false)
+    expect(first.results.some((r) => r.read > 0)).toBe(true)
+
+    // The SAME caller, a moment later. The floor is read off
+    // `knowledge_ingest.last_run_at`, which the sweep above just stamped.
+    const second = await sync(IDS.staffUser, { onlyIfStale: true })
+    expect(second.skipped).toBe(true)
+    // Nothing was read and nothing was indexed, and it says so rather than
+    // reporting the first call's numbers a second time.
+    expect(second.results.every((r) => r.read === 0 && r.indexed === 0)).toBe(true)
+    // …and it is still a line per connected kind, so a screen reading this does
+    // not suddenly show an empty Google.
+    expect(second.results.map((r) => r.kind).sort()).toEqual(first.results.map((r) => r.kind).sort())
+  })
+
+  it("a deliberate press is never floored — the flag is what asks for it", async () => {
+    await sync(IDS.staffUser, { onlyIfStale: true })
+    // The Settings button sends nothing. Re-shelving a folder and pressing sync
+    // is an act with an expected result; a door that answered "already did that
+    // four minutes ago" would have broken every proved path in §14 to add this one.
+    const pressed = await sync(IDS.staffUser)
+    expect(pressed.skipped).toBe(false)
+    expect(pressed.results.some((r) => r.read > 0)).toBe(true)
+  })
+
+  it("anything that is not exactly true means the ordinary sweep (R20)", async () => {
+    await sync(IDS.staffUser, { onlyIfStale: true })
+    for (const lie of ["true", 1, {}, [], null]) {
+      const res = await sync(IDS.staffUser, { onlyIfStale: lie })
+      expect(res.skipped, `onlyIfStale: ${JSON.stringify(lie)} is not true`).toBe(false)
+    }
+  })
+
+  it("somebody who has connected nothing sees no sweep and no failure", async () => {
+    // OTHER_STAFF holds every right the door asks for and has connected nothing.
+    // The answer is an empty list of kinds — not an error, and not a floor
+    // either: there was nothing of theirs to be recent about.
+    const res = await sync(OTHER_STAFF, { onlyIfStale: true })
+    expect(res.results).toEqual([])
+    expect(res.skipped).toBe(false)
+  })
+})

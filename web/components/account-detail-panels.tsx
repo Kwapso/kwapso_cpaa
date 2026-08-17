@@ -1,11 +1,13 @@
 "use client"
 
-// THE THREE COLLECTION TABS of the account record — the people linked to it, the
-// accounts sitting under it, and who can sign in to it.
+// THE COLLECTION TABS of the account record — the people linked to it, and who
+// can sign in to it. There were three; "the accounts sitting under it" went on
+// 17 Aug 2026, because it and the Contacts tab were answering the same question
+// under two names (CHECKLIST 7.2).
 //
 // They live beside account-detail.tsx rather than inside it because they are the
 // part of that screen that GREW: one 611-line function with seventeen hooks, in
-// which three list bodies, their empty states, their per-row actions and their
+// which the list bodies, their empty states, their per-row actions and their
 // confirms were interleaved with the record's own header, dialogs and data
 // reads. Each of these is one list, one question.
 //
@@ -17,15 +19,13 @@
 
 import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { Ban, ChevronRight, KeyRound, Plus, Power, UserMinus } from "lucide-react"
+import { Ban, KeyRound, Power, UserMinus } from "lucide-react"
 
-import type { Account, AccountDetail } from "@shared/types"
-import { LoadMore } from "@/components/load-more"
-import { ACCOUNT_TYPE } from "@/components/deep-link/shape"
+import type { AccountDetail } from "@shared/types"
 import { tenancy } from "@/lib/api"
 import { formatDate } from "@shared/web/format"
-import { childrenKey } from "@/lib/live-resources"
 import { useT } from "@shared/web/language"
+import { AddButton } from "@/components/deep-link/screen-bits"
 
 /** A destructive action waiting for a yes. One dialog in the host serves all of
  * them — they differ only in their words and what they run. `run` answers
@@ -81,10 +81,7 @@ export function ContactsPanel({
     <div className="flex flex-col gap-3">
       {canCreate && (
         <div className="flex flex-wrap justify-end gap-2">
-          <Button size="sm" onClick={onAdd} className="gap-1.5">
-            <Plus className="size-4" />
-            {t("Add contact")}
-          </Button>
+          <AddButton label={t("Add contact")} onClick={onAdd} />
         </div>
       )}
       {links.length === 0 ? (
@@ -159,59 +156,6 @@ export function ContactsPanel({
   )
 }
 
-/** The accounts sitting under this one. R14: a holding company can hold more
- * than one page of businesses, and the tab badge counts all of them — so the
- * list under it must be able to reach all of them. */
-export function ChildrenPanel({
-  accountId,
-  // Not `children`: that name belongs to JSX, and a list of records is not the
-  // content between the tags.
-  accounts,
-  onOpen,
-}: {
-  accountId: string
-  accounts: Account[]
-  onOpen: (accountId: string) => void
-}) {
-  const t = useT()
-  return (
-    <div className="flex flex-col gap-3">
-      {accounts.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t("Nothing sits under this account yet.")}</p>
-      ) : (
-        <ul className="flex flex-col gap-1.5">
-          {accounts.map((c) => (
-            <li key={c.id}>
-              <button
-                type="button"
-                onClick={() => onOpen(c.id)}
-                className={`border-border/60 hover:bg-muted/50 flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors ${
-                  c.active ? "" : "opacity-60"
-                }`}
-              >
-                <span className="min-w-0 flex-1 truncate text-sm">{c.name}</span>
-                <span className="text-muted-foreground text-xs">
-                  {ACCOUNT_TYPE[c.accountType]}
-                </span>
-                <ChevronRight className="text-muted-foreground size-4 shrink-0" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <LoadMore
-        listKey={childrenKey(accountId)}
-        label={t("Load more accounts")}
-        fetchPage={(c: string) =>
-          tenancy
-            .accounts({ parentId: accountId, cursor: c })
-            .then((r) => ({ rows: r.accounts, nextCursor: r.nextCursor }))
-        }
-      />
-    </div>
-  )
-}
-
 /** The login switch. Only rendered for someone who may see logins at all — the
  * host hides the tab itself otherwise. Taking access away never removes anyone:
  * their records and their history stay exactly where they are. */
@@ -264,7 +208,7 @@ export function PortalAccessPanel({
                     onClick={() =>
                       ask({
                         title: t("Take this login away?"),
-                        body: "They won't be able to sign in any more. Everything they're attached to — their records, their history — stays exactly where it is, and you can switch it back on later.",
+                        body: "They won't be able to sign in any more. Everything they're attached to, their records, their history, stays exactly where it is, and you can switch it back on later.",
                         action: "Take access away",
                         run: () =>
                           act(

@@ -131,7 +131,7 @@ export function ProcessesScreen({
   }
 
   if (processesQ.error)
-    return <p className="text-destructive text-sm">{t("Couldn't load the process maps.")}</p>
+    return <p className="text-destructive text-sm">{t("Couldn't load the processes.")}</p>
   if (processesQ.data === undefined) return <Skeleton variant="list" lines={4} />
 
   const loaded = processesQ.data
@@ -151,7 +151,7 @@ export function ProcessesScreen({
           rather than by filtering the page the browser happens to hold. */}
       <PagedFind<ProcessSummary>
         listKey={processesKey(teamId)}
-        placeholder={t("Search process maps…")}
+        placeholder={t("Search processes…")}
         noun="maps"
         fetchPage={(query, cursor) =>
           tenancy
@@ -189,7 +189,7 @@ export function ProcessesScreen({
                   the list pages. */}
               <LoadMore
                 listKey={found.listKey ?? processesKey(teamId)}
-                label={t("Load more process maps")}
+                label={t("Load more processes")}
                 fetchPage={found.fetchPage}
               />
             </>

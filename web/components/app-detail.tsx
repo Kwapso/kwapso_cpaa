@@ -16,10 +16,8 @@
 
 import * as React from "react"
 
-import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import { Pencil, Power } from "lucide-react"
@@ -43,7 +41,13 @@ import { AppMoneyPanel } from "@/components/app-money-panel"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, tenancy } from "@/lib/api"
-import { auditItems } from "@/lib/audit-overview"
+import {
+  RecordActionsMenu,
+  RecordFooter,
+  RecordScreen,
+  STICKY_TABS,
+  type RecordAction,
+} from "@/components/record-chrome"
 import { formatCount } from "@shared/web/format-count"
 import { accountsKey, appsKey, listFetch, totalKey, valueKey } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
@@ -212,7 +216,7 @@ export function AppDetailScreen({
   // than trailing the address. A field nobody has filled in is dropped rather
   // than shown empty (UI-RULEBOOK W2 — `hideEmpty` is the default).
   const overviewItems = [
-    { label: t("Client"), value: accountName ?? "Ours — no client" },
+    { label: t("Client"), value: accountName ?? "Ours, no client" },
     { label: t("Stage"), value: app.stage ? `${appStageMark(app.stage)} ${app.stage}`.trim() : "—" },
     { label: t("About"), value: app.about || "—" },
     { label: t("Client context"), value: app.clientContext || "—" },
@@ -224,13 +228,7 @@ export function AppDetailScreen({
     { label: t("Who is on it"), value: staffLine },
     { label: t("Their people"), value: stakeholderLine },
     { label: t("Address"), value: app.url || "—" },
-    ...auditItems({
-      createdByName: app.createdByName ?? null,
-      createdAt: app.createdAt ?? null,
-      editedByName: app.editedByName ?? null,
-      updatedAt: app.updatedAt ?? null,
-      status: app.active ? "Active" : "Archived",
-    }),
+    // The audit rows moved to the record footer (D7 / CHECKLIST 11.3).
   ]
 
   const tabsConfig = {
@@ -254,7 +252,7 @@ export function AppDetailScreen({
       },
       {
         value: "maps",
-        label: t("Process maps"),
+        label: t("Processes"),
         icon: CONCEPT_ICON.processes,
         badge: formatCount(mapsTotal),
         badgeVariant: "" as const,
@@ -319,65 +317,69 @@ export function AppDetailScreen({
     ],
   }
 
+  /* B1 / CHECKLIST 11.2 — an app has no lifecycle button, so its one visible
+   * action is Edit and everything else is in the menu. Archive keeps its red and
+   * its confirm by moving. */
+  const overflow: RecordAction[] = canArchive
+    ? [
+        app.active
+          ? {
+              key: "archive",
+              label: t("Archive"),
+              icon: <Power className="size-3.5" />,
+              disabled: busy,
+              destructive: true,
+              onSelect: () => void setActive(false),
+            }
+          : {
+              key: "restore",
+              label: t("Restore"),
+              icon: <Power className="size-3.5" />,
+              disabled: busy,
+              onSelect: () => void setActive(true),
+            },
+      ]
+    : []
+
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight">
-            <span className="truncate">{app.name}</span>
-            {!app.active && (
-              <Badge variant="outline" className="text-muted-foreground text-[10px]">
-                {t("Archived")}
-              </Badge>
-            )}
-          </h1>
-          {/* THE CROSS-LINK UP THE TREE — an app belongs to one account, always,
-              so its account is one tap away from every screen it appears on. */}
-          <p className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-            {app.accountId ? (
-              <button
-                type="button"
-                onClick={() => softNavigate(`${host.base}/accounts/${app.accountId}`)}
-                className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
-              >
-                {t("Built for")} {accountName}
-              </button>
-            ) : (
-              <span>{t("Ours — no client")}</span>
-            )}
-            {app.stage && <span>{app.stage}</span>}
-          </p>
-        </div>
-        {/* ml-auto on the GROUP so a narrow phone reflows instead of clipping. */}
-        <div className="flex flex-wrap gap-2 sm:ml-auto sm:shrink-0">
+    <RecordScreen
+      // An app's own mark is its STAGE mark, from the same shared list the tiles
+      // read, so a system looks the same wherever it appears (G3).
+      mark={appStageMark(app.stage)}
+      eyebrow={t("App")}
+      title={app.name}
+      status={[app.stage, accountName || t("Ours, no client"), app.active ? undefined : t("Archived")]
+        .filter(Boolean)
+        .join(" · ")}
+      actions={
+        <>
           {canEdit && (
-            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-1.5">
+            <Button variant="outline" onClick={() => setEditOpen(true)} className="gap-1.5">
               <Pencil className="size-3.5" />
               {t("Edit")}
             </Button>
           )}
-          {canArchive &&
-            (app.active ? (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={busy}
-                onClick={() => void setActive(false)}
-                className="text-destructive hover:text-destructive gap-1.5"
-              >
-                {busy ? <Spinner /> : <Power className="size-3.5" />}
-                {t("Archive")}
-              </Button>
-            ) : (
-              <Button size="sm" disabled={busy} onClick={() => void setActive(true)} className="gap-1.5">
-                {busy ? <Spinner /> : <Power className="size-3.5" />}
-                {t("Restore")}
-              </Button>
-            ))}
-        </div>
-      </div>
-
+          <RecordActionsMenu actions={overflow} />
+        </>
+      }
+      headerExtra={
+        /* THE CROSS-LINK UP THE TREE — an app belongs to one account, always, so
+           its account is one tap away from every screen it appears on. */
+        app.accountId ? (
+          <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            <button
+              type="button"
+              onClick={() => softNavigate(`${host.base}/accounts/${app.accountId}`)}
+              className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
+            >
+              {t("Built for")} {accountName}
+            </button>
+          </p>
+        ) : undefined
+      }
+    >
       <TabsView
+        className={STICKY_TABS}
         config={tabsConfig}
         value={tab}
         onValueChange={setTab}
@@ -517,6 +519,14 @@ export function AppDetailScreen({
           invalidate(sliceKey("stories-app", appId))
         }}
       />
-    </div>
+    <RecordFooter
+        audit={{
+          createdByName: app.createdByName,
+          createdAt: app.createdAt,
+          editedByName: app.editedByName,
+          updatedAt: app.updatedAt,
+        }}
+      />
+    </RecordScreen>
   )
 }

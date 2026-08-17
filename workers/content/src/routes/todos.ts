@@ -14,6 +14,7 @@
 import { fail, json } from "@shared/workers/http"
 import { optionalMoment, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
+import { hasRight } from "@shared/workers/gating"
 import { accountScope, refusePortalCaller, type AccountScope } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
 import { mediaKey, parseUploadDataUrl } from "@shared/workers/image"
@@ -229,11 +230,25 @@ async function taskPage(
  * `?view=` is how the other five piles are seen — overdue, upcoming, completed,
  * calendar, all. Two of the six shipped with the door and the screen sent
  * neither, so the app had one view of a six-view collection and no way to say so
- * — the tester's "cannot switch the view, I only see open ones". */
+ * — the tester's "cannot switch the view, I only see open ones".
+ *
+ * WHOSE TASKS COME BACK IS NOW A PERMISSION (4.9). `work:read` opens the screen;
+ * `all_tasks:read` decides whether the screen is the whole team's list or your
+ * own. Without it the caller's own user id REPLACES whatever `assigneeId` the
+ * request asked for — narrowed rather than refused, because "show me Ana's
+ * tasks" from somebody who may not see them is a question with a perfectly good
+ * answer (yours), and a 403 on a list door teaches a screen to hide a tab
+ * instead of showing the right rows.
+ *
+ * It rides the filter the door ALREADY parses, so the list, all eight counts and
+ * the progress bar are narrowed by construction — they are all built from this
+ * one object (see `taskPage`), and there is no second place to forget. */
 export async function getTasks(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "work", "read")
   await refusePortalCaller(cfg, guard)
-  return taskPage(cfg, guard, taskFilterFrom(new URL(request.url)))
+  const filter = taskFilterFrom(new URL(request.url))
+  const everyones = await hasRight(cfg, guard, "all_tasks", "read")
+  return taskPage(cfg, guard, everyones ? filter : { ...filter, assigneeId: guard.userId })
 }
 
 /** POST /api/content/tasks — write down a piece of admin (work:create).

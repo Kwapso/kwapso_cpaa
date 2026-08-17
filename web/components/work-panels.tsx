@@ -23,7 +23,7 @@ import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { Ban, ChevronRight, Plus } from "lucide-react"
+import { Ban, ChevronRight } from "lucide-react"
 
 import { LoadMore } from "@/components/load-more"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
@@ -33,6 +33,7 @@ import type { AppRow, HelpTicket, Meeting, ProcessSummary, Sprint, Story, Todo }
 import { formatDate } from "@shared/web/format"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
+import { AddButton } from "@/components/deep-link/screen-bits"
 
 /** The four states a story moves through, in the words a person reads. The
  * states the code trusts are STORY_STATUSES; this is only their spelling. */
@@ -146,10 +147,7 @@ export function StoriesPanel({
     <div className="flex flex-col gap-3">
       {onNew && (
         <div className="flex flex-wrap justify-end gap-2">
-          <Button size="sm" onClick={onNew} className="gap-1.5">
-            <Plus className="size-4" />
-            {t("New story")}
-          </Button>
+          <AddButton label={t("New story")} onClick={onNew} />
         </div>
       )}
       {rows.length === 0 ? (
@@ -249,10 +247,7 @@ export function SprintsPanel({
     <div className="flex flex-col gap-3">
       {onNew && (
         <div className="flex flex-wrap justify-end gap-2">
-          <Button size="sm" onClick={onNew} className="gap-1.5">
-            <Plus className="size-4" />
-            {t("Start a sprint")}
-          </Button>
+          <AddButton label={t("Start a sprint")} onClick={onNew} />
         </div>
       )}
       {rows.length === 0 ? (
@@ -319,10 +314,7 @@ export function AppsPanel({
     <div className="flex flex-col gap-3">
       {onNew && (
         <div className="flex flex-wrap justify-end gap-2">
-          <Button size="sm" onClick={onNew} className="gap-1.5">
-            <Plus className="size-4" />
-            {t("Record an app")}
-          </Button>
+          <AddButton label={t("Record an app")} onClick={onNew} />
         </div>
       )}
       {rows.length === 0 ? (
@@ -375,7 +367,7 @@ export function ProcessesPanel({
     })
   )
 
-  if (q.error) return <p className="text-destructive text-sm">{t("Couldn't load the process maps.")}</p>
+  if (q.error) return <p className="text-destructive text-sm">{t("Couldn't load the processes.")}</p>
   if (q.data === undefined) return <Skeleton variant="list" lines={3} />
   const rows = q.data
 
@@ -383,15 +375,12 @@ export function ProcessesPanel({
     <div className="flex flex-col gap-3">
       {onNew && (
         <div className="flex flex-wrap justify-end gap-2">
-          <Button size="sm" onClick={onNew} className="gap-1.5">
-            <Plus className="size-4" />
-            {t("Map a process")}
-          </Button>
+          <AddButton label={t("Map a process")} onClick={onNew} />
         </div>
       )}
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">
-          {t("No process maps drawn inside this app yet.")}
+          {t("No processes drawn inside this app yet.")}
         </p>
       ) : (
         <ul className="flex flex-col gap-1.5">
@@ -416,7 +405,7 @@ export function ProcessesPanel({
       )}
       <LoadMore
         listKey={key}
-        label={t("Load more process maps")}
+        label={t("Load more processes")}
         fetchPage={(c: string) =>
           tenancy
             .processes({ appId, cursor: c })
@@ -588,10 +577,7 @@ export function TodosPanel({
     <div className="flex flex-col gap-3">
       {onNew && (
         <div className="flex flex-wrap justify-end gap-2">
-          <Button size="sm" onClick={onNew} className="gap-1.5">
-            <Plus className="size-4" />
-            {t("Ask for something")}
-          </Button>
+          <AddButton label={t("Ask for something")} onClick={onNew} />
         </div>
       )}
       {rows.length === 0 ? (

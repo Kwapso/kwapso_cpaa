@@ -32,7 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@kwapso/ui/registry/primitives/alert-dialog/alert-dialog"
-import { Ban, ClipboardCopy, Copy, Plus } from "lucide-react"
+import { Ban, ClipboardCopy, Copy } from "lucide-react"
 
 import type { McpTokenSummary } from "@shared/types"
 import { MCP_TOKEN_TTL_DAYS } from "@shared/workers/limits"
@@ -41,6 +41,7 @@ import { ApiFailure, mcp } from "@/lib/api"
 import { formatActivityWhen, formatDate } from "@shared/web/format"
 import { useCached, primeCache } from "@shared/web/store"
 import { useT } from "@shared/web/language"
+import { AddButton } from "@/components/deep-link/screen-bits"
 
 /** Past its deadline (or missing one — the server treats that as expired too).
  * A token that has run out is not "active": it stops working the same way a
@@ -61,7 +62,7 @@ function connectPrompt(token: string): string {
 
 Endpoint: ${endpoint}
 Auth header: Authorization: Bearer ${token}
-Protocol: MCP over HTTP — JSON-RPC 2.0 (initialize, tools/list, tools/call)
+Protocol: MCP over HTTP. JSON-RPC 2.0 (initialize, tools/list, tools/call)
 
 If your tool runs MCP servers locally over stdio (e.g. Claude Desktop), add this to its config:
 {
@@ -80,8 +81,8 @@ plan_import) use the team's AI quota.`
 
 function copyInstructions(token: string) {
   void navigator.clipboard?.writeText(connectPrompt(token)).then(
-    () => toast.success("Setup instructions copied — paste into any AI."),
-    () => toast.error("Couldn't copy — try again.")
+    () => toast.success("Setup instructions copied. Paste into any AI."),
+    () => toast.error("Couldn't copy. Try again.")
   )
 }
 
@@ -135,12 +136,10 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
         <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
           {t("Access tokens")}
         </h2>
-        <Button variant="outline" size="sm" onClick={() => setCreateOpen(true)} className="gap-1.5">
-          <Plus className="size-3.5" aria-hidden /> {t("New token")}
-        </Button>
+        <AddButton label={t("New token")} onClick={() => setCreateOpen(true)} />
       </div>
       <p className="text-muted-foreground text-sm">
-        {t("Let an outside tool (an AI agent, a script, an automation) work in your team as you — capped by your role, in the team the token was made for.")}
+        {t("Let an outside tool (an AI agent, a script, an automation) work in your team as you, capped by your role, in the team the token was made for.")}
       </p>
 
       {tokensQ.error ? (
@@ -232,7 +231,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
               <DialogTitle>{t("Copy your token now")}</DialogTitle>
               <DialogDescription>
                 {t("This is the only time it's shown. Anyone holding it can act as you in")}{" "}
-                {teamName ?? "this team"} — treat it like a password. It works for{" "}
+                {teamName ?? "this team"}. Treat it like a password. It works for{" "}
                 {MCP_TOKEN_TTL_DAYS} {t("days, then you make a new one.")}
               </DialogDescription>
               <div className="bg-muted/60 flex items-center gap-2 rounded-lg border p-3">
@@ -244,7 +243,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
                   onClick={() => {
                     void navigator.clipboard?.writeText(secret).then(
                       () => toast.success(t("Copied.")),
-                      () => toast.error(t("Couldn't copy — select it by hand."))
+                      () => toast.error(t("Couldn't copy. Select it by hand."))
                     )
                   }}
                 >
@@ -282,15 +281,13 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
               subtitle={
                 <DialogDescription>
                   {t("Pinned to")} {teamName ?? "your current team"}. It can do exactly what you can do
-                  there — nothing more — and it stops working after {MCP_TOKEN_TTL_DAYS} {t("days.")}
+                  there, nothing more, and it stops working after {MCP_TOKEN_TTL_DAYS} {t("days.")}
                 </DialogDescription>
               }
-              footer={
-                <Button type="submit" disabled={busy || !label.trim()}>
-                  {busy ? <Spinner /> : null}
-                  {busy ? "Creating…" : "Create token"}
-                </Button>
-              }
+              submit={{
+                busy: busy,
+                disabled: !label.trim(),
+              }}
             >
               <Field
                 config={{ ...defaultFieldConfig, label: t("Name"), required: true }}
@@ -317,7 +314,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
           <AlertDialogHeader>
             <AlertDialogTitle>{t("Revoke")} {revoking?.label}?</AlertDialogTitle>
             <AlertDialogDescription>
-              {t("Anything using this token stops working immediately. This can't be undone — you can always create a new token.")}
+              {t("Anything using this token stops working immediately. This can't be undone, you can always create a new token.")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

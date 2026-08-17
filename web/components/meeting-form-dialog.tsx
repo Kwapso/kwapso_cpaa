@@ -15,7 +15,6 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
@@ -26,7 +25,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
@@ -149,16 +147,14 @@ export function MeetingFormDialog({
       subtitle={
         <DialogDescription>
           {isEdit
-            ? "Write up what was decided while it is still fresh — the notes are the part worth keeping."
+            ? "Write up what was decided while it is still fresh, the notes are the part worth keeping."
             : "A conversation, with what you mean to cover. You can add it to your own calendar afterwards."}
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !ready}>
-          {busy ? <Spinner /> : null}
-          {busy ? "Saving…" : isEdit ? "Save changes" : "Put it in the diary"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !ready,
+      }}
     >
       <Field config={titleField} htmlFor="meeting-title" className={fieldSpacing}>
         <Input
@@ -195,10 +191,10 @@ export function MeetingFormDialog({
           disabled={busy}
         >
           <SelectTrigger id="meeting-client">
-            <SelectValue placeholder={t("Nobody — it is ours")} />
+            <SelectValue placeholder={t("Nobody, it is ours")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={NONE}>{t("Nobody — it is ours")}</SelectItem>
+            <SelectItem value={NONE}>{t("Nobody, it is ours")}</SelectItem>
             {accountOptions.map((a) => (
               <SelectItem key={a.id} value={a.id}>
                 {a.name}

@@ -216,6 +216,7 @@ export function useScreenActions(teamId: string | null) {
         sourceUrl: values.sourceUrl || null,
         accountId: values.accountId || null,
         visibility: values.visibility,
+        visibleToAppId: values.visibleToAppId || null,
       })
       primeCache(knowledgeKey(teamId), await listFetch.knowledge(teamId))
       toast.success(`The assistant can now use "${values.title}".`)
@@ -235,7 +236,8 @@ export function useScreenActions(teamId: string | null) {
       fileDataUrl: string
       title: string
       accountId: string
-      visibility: "team" | "private"
+      visibility: "team" | "app" | "private"
+      visibleToAppId: string
     }) => {
       if (!teamId) return
       const { source } = await contentApi.uploadKnowledgeFile({
@@ -244,6 +246,7 @@ export function useScreenActions(teamId: string | null) {
         title: values.title || undefined,
         accountId: values.accountId || null,
         visibility: values.visibility,
+        visibleToAppId: values.visibleToAppId || null,
       })
       primeCache(knowledgeKey(teamId), await listFetch.knowledge(teamId))
       if (source?.fileNote) toast.warning(source.fileNote)

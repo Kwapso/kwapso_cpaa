@@ -249,7 +249,7 @@ async function redeem(
       // grant that has been revoked at Google's end, and the sentence says so.
       502,
       "google_refused",
-      "Google wouldn't complete that connection. It may have been removed from your Google account — connect it again."
+      "Google wouldn't complete that connection. It may have been removed from your Google account. Connect it again."
     )
   const data = (await res.json()) as {
     access_token?: unknown

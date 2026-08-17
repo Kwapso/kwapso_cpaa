@@ -440,7 +440,7 @@ export async function updateMeeting(
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Meeting updated",
-    description: `${actor.name} updated "${v.title}"${changes ? ` — ${changes}` : ""}`,
+    description: `${actor.name} updated "${v.title}"${changes ? `, ${changes}` : ""}`,
     relatedTable: "meetings",
     relatedRowId: id,
   })
@@ -683,7 +683,7 @@ VALUES (${sqlString(ulid())}, ${sqlString(meeting.accountId)}, 'meetings', ${sql
 
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Meeting transcript read",
-    description: `${actor.name} read the transcript of "${meeting.title}" — it was marked held and ${
+    description: `${actor.name} read the transcript of "${meeting.title}", it was marked held and ${
       staff.length
     } ${staff.length === 1 ? "person's time was" : "people's time was"} logged`,
     relatedTable: "meetings",

@@ -54,6 +54,6 @@ export async function requireStaff(env: Env, cookie: string): Promise<void> {
     throw new GuardError(
       403,
       "portal_login",
-      "Access tokens are for the team's own staff. Your login is a client portal login — sign in at your portal address instead."
+      "Access tokens are for the team's own staff. Your login is a client portal login, sign in at your portal address instead."
     )
 }

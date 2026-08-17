@@ -12,7 +12,6 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import {
   DialogDescription,
   DialogTitle,
@@ -25,7 +24,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { KeyRound } from "lucide-react"
@@ -89,12 +87,11 @@ export function PortalAccessDialog({
           it away again at any time, and nothing they&apos;re attached to is lost.
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !values.personAccountId} className="gap-1.5">
-          {busy ? <Spinner /> : <KeyRound className="size-4" />}
-          {busy ? "Switching on…" : "Give access"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !values.personAccountId,
+        icon: <KeyRound className="size-4" />,
+      }}
     >
       <Field config={personField} htmlFor="portal-person" className={fieldSpacing}>
         <Select

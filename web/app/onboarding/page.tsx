@@ -107,7 +107,7 @@ export default function OnboardingPage() {
     try {
       setPhoto(await fileToDataUrl(files[0]))
     } catch {
-      toast.error(t("Couldn't read that image — try another one."))
+      toast.error(t("Couldn't read that image. Try another one."))
     }
   }
 
@@ -198,7 +198,7 @@ export default function OnboardingPage() {
           <p className="text-muted-foreground mt-1 text-sm">
             {teamless
               ? "An admin can invite you back, or you can start a team of your own below."
-              : "Tell us who you are — your team gets created right after."}
+              : "Tell us who you are, your team gets created right after."}
           </p>
         </div>
         <form className="mt-6 flex flex-col gap-4" onSubmit={finish}>

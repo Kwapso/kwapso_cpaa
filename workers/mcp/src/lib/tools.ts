@@ -76,7 +76,7 @@ const MCP_ONLY: McpTool[] = [
   {
     name: "get_team",
     description:
-      "The pinned team's own record — its name, when it was created and by whom. The read half of update_team.",
+      "The pinned team's own record, its name, when it was created and by whom. The read half of update_team.",
     inputSchema: obj({}),
     binding: "TENANCY",
     method: "GET",
@@ -85,7 +85,7 @@ const MCP_ONLY: McpTool[] = [
   // ---- exports (READ right; the same full-field CSVs the Export buttons serve) ----
   {
     name: "export_roles_csv",
-    description: "Every member role as CSV — full fields incl. the flattened permission matrix.",
+    description: "Every member role as CSV, full fields incl. the flattened permission matrix.",
     inputSchema: obj({}),
     binding: "TENANCY",
     method: "GET",
@@ -121,7 +121,7 @@ const MCP_ONLY: McpTool[] = [
   {
     name: "export_certificates_csv",
     description:
-      "The team's credential register as CSV — who holds what, who issued it, when it lapses. Staff PROFILES have no export: a credential register is the kind of thing somebody hands an auditor, and a one-click spreadsheet of what the team is bad at is not.",
+      "The team's credential register as CSV, who holds what, who issued it, when it lapses. Staff PROFILES have no export: a credential register is the kind of thing somebody hands an auditor, and a one-click spreadsheet of what the team is bad at is not.",
     inputSchema: obj({}),
     binding: "CONTENT",
     method: "GET",
@@ -130,7 +130,7 @@ const MCP_ONLY: McpTool[] = [
   {
     name: "export_accounts_csv",
     description:
-      "Every account you can see as CSV — companies and people, full fields + audit. The columns lead with the import format, so the file goes straight back in through the importer. Narrows by the SAME five filters as list_accounts: `q` (name, reference, email), `type` ('entity' or 'individual'), `status` (the team's own word, as stored), `archived` ('yes' or 'no'), `parentId`. Without the contacts right the file is the COMPANIES, the same way the list is. THE FILE IS WHOLE OR IT IS AN ERROR — a collection bigger than one file comes back `export_too_large` rather than as a short CSV that looks complete; narrow it, or read list_accounts a page at a time.",
+      "Every account you can see as CSV, companies and people, full fields + audit. The columns lead with the import format, so the file goes straight back in through the importer. Narrows by the SAME five filters as list_accounts: `q` (name, reference, email), `type` ('entity' or 'individual'), `status` (the team's own word, as stored), `archived` ('yes' or 'no'), `parentId`. Without the contacts right the file is the COMPANIES, the same way the list is. THE FILE IS WHOLE OR IT IS AN ERROR, a collection bigger than one file comes back `export_too_large` rather than as a short CSV that looks complete; narrow it, or read list_accounts a page at a time.",
     inputSchema: obj({ q: S, type: S, status: S, archived: S, parentId: S }),
     binding: "TENANCY",
     method: "GET",
@@ -146,7 +146,7 @@ const MCP_ONLY: McpTool[] = [
   {
     name: "list_import_targets",
     description:
-      "What this team may import into: every active import target, with the table key you pass to get_import_sample. Read this before building a file — the catalogue is per-team, and an owner can switch a target off.",
+      "What this team may import into: every active import target, with the table key you pass to get_import_sample. Read this before building a file, the catalogue is per-team, and an owner can switch a target off.",
     inputSchema: obj({}),
     binding: "DATAOPS",
     method: "GET",
@@ -155,7 +155,7 @@ const MCP_ONLY: McpTool[] = [
   {
     name: "get_import_sample",
     description:
-      "A sample CSV for one import target (`tableKey` from list_import_targets): the column headers the importer expects, plus one example row. It is a template — no team data in it.",
+      "A sample CSV for one import target (`tableKey` from list_import_targets): the column headers the importer expects, plus one example row. It is a template, no team data in it.",
     inputSchema: obj({ tableKey: S }, ["tableKey"]),
     binding: "DATAOPS",
     method: "GET",
@@ -212,7 +212,7 @@ const MCP_ONLY: McpTool[] = [
   {
     name: "get_import",
     description:
-      "One import batch in full (by `id`): its files, the plan — which table each file feeds, the column mapping, the rows that will be skipped and why — and, once it has run, the per-row report. Re-READING a plan is free; re-PLANNING spends one request of the app's own daily AI allowance, so a client that lost a plan_import answer should come here first.",
+      "One import batch in full (by `id`): its files, the plan, which table each file feeds, the column mapping, the rows that will be skipped and why, and, once it has run, the per-row report. Re-READING a plan is free; re-PLANNING spends one request of the app's own daily AI allowance, so a client that lost a plan_import answer should come here first.",
     inputSchema: obj({ id: S }, ["id"]),
     binding: "DATAOPS",
     method: "GET",
@@ -223,7 +223,7 @@ const MCP_ONLY: McpTool[] = [
   {
     name: "get_ai_allowance",
     description:
-      "How much of the app's own daily AI allowance this team has left (the free daily amount plus any credits an admin has added). agent_chat, agent_confirm and plan_import each draw on it; every other tool here is free. When it runs out those three answer 429 until it resets — this is how a client sees that coming instead of discovering it. Needs agent:read.",
+      "How much of the app's own daily AI allowance this team has left (the free daily amount plus any credits an admin has added). agent_chat, agent_confirm and plan_import each draw on it; every other tool here is free. When it runs out those three answer 429 until it resets, this is how a client sees that coming instead of discovering it. Needs agent:read.",
     inputSchema: obj({}),
     binding: "DATAOPS",
     method: "GET",
@@ -250,7 +250,7 @@ const MCP_ONLY: McpTool[] = [
   {
     name: "get_agent_thread",
     description:
-      "One saved conversation's messages, oldest first (by `id` from list_agent_threads) — what was asked, what the assistant answered, and which actions it took. Needs agent:read.",
+      "One saved conversation's messages, oldest first (by `id` from list_agent_threads), what was asked, what the assistant answered, and which actions it took. Needs agent:read.",
     inputSchema: obj({ id: S }, ["id"]),
     binding: "DATAOPS",
     method: "GET",
@@ -260,7 +260,7 @@ const MCP_ONLY: McpTool[] = [
   {
     name: "agent_chat",
     description:
-      "Talk to the team's assistant — it can answer from live data or act (as the token's owner, capped by their permissions). If it proposes a guarded action, call agent_confirm with the returned threadId.",
+      "Talk to the team's assistant, it can answer from live data or act (as the token's owner, capped by their permissions). If it proposes a guarded action, call agent_confirm with the returned threadId.",
     inputSchema: obj({ message: S, threadId: S }, ["message"]),
     binding: "DATAOPS",
     method: "POST",
@@ -345,7 +345,7 @@ export async function forwardTool(
       ok: false,
       text: JSON.stringify({
         error: "door_timeout",
-        message: `${tool.name} didn't answer within ${Math.round(timeoutMs / 1000)} seconds. A write may or may not have landed — read before retrying it.`,
+        message: `${tool.name} didn't answer within ${Math.round(timeoutMs / 1000)} seconds. A write may or may not have landed. Read before retrying it.`,
       }),
     }
   }

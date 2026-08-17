@@ -6,7 +6,6 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import {
   DialogDescription,
   DialogTitle,
@@ -15,7 +14,6 @@ import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
@@ -79,15 +77,13 @@ export function RoleFormDialog({
         <DialogDescription>
           {isEdit
             ? "Rename it or update what it's for. You set what it can do over in the grid."
-            : "It starts with no access — you'll choose what it can do in the next step."}
+            : "It starts with no access, you'll choose what it can do in the next step."}
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !values.title.trim()}>
-          {busy ? <Spinner /> : null}
-          {busy ? "Saving…" : isEdit ? "Save changes" : "Create role"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !values.title.trim(),
+      }}
     >
       <Field config={titleField} htmlFor="role-title" className={fieldSpacing}>
         <Input

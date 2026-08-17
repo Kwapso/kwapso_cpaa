@@ -67,7 +67,7 @@ export async function logAccountActivity(
   if ((written.meta.changes ?? 0) === 0) {
     // Worth a line: an ordinary person never reaches sixty identity edits in an
     // hour, so this is either a stuck client or someone leaning on the door.
-    console.warn(`account activity ceiling reached for user ${userId} — row dropped`)
+    console.warn(`account activity ceiling reached for user ${userId}, row dropped`)
     return
   }
   // Live: the actor's own account feed gains this row (best-effort).

@@ -43,8 +43,10 @@ import { type usePermissions } from "@/lib/perms"
 import { type useActiveTeam } from "@/lib/use-active-team"
 import { type useScreenActions } from "@/lib/use-screen-actions"
 import { type useScreenData } from "@/lib/use-screen-data"
+import { appsKey, listFetch } from "@/lib/live-resources"
+import { useCached } from "@shared/web/store"
 import { reportError } from "@shared/web/log"
-import type { TeamRole } from "@shared/types"
+import type { AppRow, TeamRole } from "@shared/types"
 import { useT } from "@shared/web/language"
 
 /** Everything the write layer needs from the host: the URL's ?panel/?confirm, the
@@ -140,6 +142,20 @@ export function WritePanels({
   const t = useT()
   const [archiving, setArchiving] = React.useState(false)
 
+  // THE APPS THIS CALLER MAY OPEN (8.11), for the knowledge dialogs' visibility
+  // limit (12.3). `canOpen` is decided by the DOOR and rides every app row, so
+  // this list is the server's answer rather than a second opinion formed here.
+  // A caller staffed to nothing gets an empty list and the dialog leaves the
+  // option out — an option that can only end in a refusal is not an option.
+  const appsQ = useCached<AppRow[]>(teamId ? appsKey(teamId) : null, () =>
+    listFetch.apps(teamId as string)
+  )
+  const openableApps = React.useMemo(
+    () =>
+      (appsQ.data ?? []).filter((a) => a.canOpen && a.active).map((a) => ({ id: a.id, name: a.name })),
+    [appsQ.data]
+  )
+
   // WHICH agency-internal form the URL is asking for, and everything it needs to
   // open prefilled. Resolved once, here, because "is this panel mine?" and "what
   // does it show?" are the same question asked of two segments — answering it
@@ -152,15 +168,13 @@ export function WritePanels({
           brand: {
             fields: brandAssetFields(brandCategoryOptions),
             title: t("Brand asset"),
-            subtitle: "A piece of our own brand material — a logo, a deck, a template.",
-            submitLabel: t("Add it"),
+            subtitle: "A piece of our own brand material, a logo, a deck, a template.",
             rows: brandQ.data,
           },
           purposes: {
             fields: purposeFields(departmentOptions),
             title: t("Meeting purpose"),
             subtitle: "Why we meet, and the department it belongs to.",
-            submitLabel: t("Add it"),
             rows: purposesQ.data,
           },
         }[kind]
@@ -176,7 +190,6 @@ export function WritePanels({
       fields: spec?.fields ?? [],
       title: spec?.title ?? "",
       subtitle: spec?.subtitle ?? "",
-      submitLabel: spec?.submitLabel ?? "Save",
       // The dialog's own draft rule (R7) is keyed per record, so an edit prefills
       // from the loaded row and a create starts blank.
       initial: row ? (prefill(row) as Record<string, string>) : undefined,
@@ -262,12 +275,16 @@ export function WritePanels({
 
       {/* Add a knowledge source (?panel=add&module=knowledge) — gated by create.
           The account picker offers the accounts the caller can already see, so a
-          source can only ever be filed under a client they may read. */}
+          source can only ever be filed under a client they may read; the APP
+          picker offers only the apps they may OPEN (8.11's `canOpen`, decided by
+          the door), because those are the only ones the knowledge door will
+          accept as a visibility limit (12.3). */}
       <KnowledgeFormDialog
         open={query.panel === "add" && query.module === "knowledge" && can("knowledge", "create")}
         onOpenChange={(o) => !o && closePanel()}
         draftKey={teamId ? `knowledge:new:${teamId}` : undefined}
         accountOptions={(accountsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
+        appOptions={openableApps}
         onSubmit={createKnowledge}
       />
 
@@ -282,6 +299,7 @@ export function WritePanels({
         onOpenChange={(o) => !o && closePanel()}
         draftKey={teamId ? `knowledge:upload:${teamId}` : undefined}
         accountOptions={(accountsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
+        appOptions={openableApps}
         onSubmit={uploadKnowledgeFile}
       />
 
@@ -307,7 +325,6 @@ export function WritePanels({
         fields={internal.fields}
         title={internal.title}
         subtitle={internal.subtitle}
-        submitLabel={query.id ? "Save changes" : internal.submitLabel}
         initial={internal.initial}
         onSubmit={(values) =>
           saveInternalRecord(internal.kind as InternalKind, values, query.id || undefined)
@@ -325,7 +342,7 @@ export function WritePanels({
           <AlertDialogHeader>
             <AlertDialogTitle>{internalArchive.title}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t("It stops showing as live and nothing is deleted — its history stays, and you can put it back at any time.")}
+              {t("It stops showing as live and nothing is deleted, its history stays, and you can put it back at any time.")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

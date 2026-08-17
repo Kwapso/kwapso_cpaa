@@ -7,7 +7,6 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import {
   DialogDescription,
   DialogTitle,
@@ -22,7 +21,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Mail } from "lucide-react"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
@@ -75,7 +73,7 @@ export function InviteDialog({
       // generic toast is never mistaken for a permission block.
       if (!(err instanceof ApiFailure)) reportError("invite:send", err)
       toast.error(
-        err instanceof ApiFailure ? err.message : "Couldn't send the invite — please try again."
+        err instanceof ApiFailure ? err.message : "Couldn't send the invite, please try again."
       )
     } finally {
       setBusy(false)
@@ -95,12 +93,11 @@ export function InviteDialog({
           {t("We'll email them an invite to join in the role you pick.")}
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !values.email.trim() || !values.roleId} className="gap-1.5">
-          {busy ? <Spinner /> : <Mail className="size-4" />}
-          {busy ? "Sending…" : "Send invite"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !values.email.trim() || !values.roleId,
+        icon: <Mail className="size-4" />,
+      }}
     >
       <Field config={emailField} htmlFor="invite-email" className={fieldSpacing}>
         <Input

@@ -59,7 +59,7 @@ export function AgentHistoryDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{t("Your conversations")}</DialogTitle>
-          <DialogDescription>{t("Pick up any chat where you left off — on any device.")}</DialogDescription>
+          <DialogDescription>{t("Pick up any chat where you left off, on any device.")}</DialogDescription>
         </DialogHeader>
         {loading ? (
           <p className="text-muted-foreground py-6 text-center text-sm">{t("Loading…")}</p>

@@ -70,7 +70,7 @@ export function TriageStrip({ teamId, canSetDuty }: { teamId: string; canSetDuty
           <span className="text-destructive ml-2 flex items-center gap-1">
             <AlarmClock className="size-3.5" />
             {t.total} waiting to be read
-            {t.waiting[0] ? ` — the oldest ${t.waiting[0].days} days` : ""}
+            {t.waiting[0] ? `, the oldest ${t.waiting[0].days} days` : ""}
           </span>
         )}
       </span>

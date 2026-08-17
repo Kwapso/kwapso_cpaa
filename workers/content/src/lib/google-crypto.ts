@@ -99,7 +99,7 @@ function unreadable(): GuardError {
   return new GuardError(
     409,
     "google_token_unreadable",
-    "That Google connection can't be read any more — disconnect it and connect again."
+    "That Google connection can't be read any more. Disconnect it and connect again."
   )
 }
 

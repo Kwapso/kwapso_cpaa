@@ -583,7 +583,7 @@ export async function postGoogleMailDraft(request: Request, env: Env): Promise<R
   await recordGoogleAct(cfg, guard, actor, {
     connectionId,
     type: "Draft written",
-    description: `${actor.name} had a reply to ${to} drafted — "${subject}"`,
+    description: `${actor.name} had a reply to ${to} drafted, "${subject}"`,
   })
   await publishChange(env, guard.teamId, "google", connectionId)
   return json({ draft })
@@ -670,7 +670,7 @@ export async function postGoogleMailReply(request: Request, env: Env): Promise<R
   await recordGoogleAct(cfg, guard, actor, {
     connectionId,
     type: "Reply sent",
-    description: `kwapso replied to ${sent.to} as ${actor.name} — "${sent.subject}"`,
+    description: `kwapso replied to ${sent.to} as ${actor.name}, "${sent.subject}"`,
   })
   await publishChange(env, guard.teamId, "google", connectionId)
   return json({ sent })
@@ -826,7 +826,7 @@ export async function postGoogleEventUpdate(request: Request, env: Env): Promise
   // Nothing named is not a no-op, it is a caller who thinks they changed
   // something. Say so, rather than answering 200 to an empty edit.
   if (!change.summary && !change.description && !change.start && !change.end)
-    return fail(400, "invalid_input", "Say what to change — the title, the details, or the times.")
+    return fail(400, "invalid_input", "Say what to change, the title, the details, or the times.")
   const { token, connectionId } = await accessTokenFor(env, cfg, guard, "calendar")
   const event = await calendarUpdate(token, eventId, change)
   await recordGoogleAct(cfg, guard, actor, {
@@ -901,7 +901,7 @@ export async function postGoogleEventLocation(request: Request, env: Env): Promi
   await recordGoogleAct(cfg, guard, actor, {
     connectionId,
     type: "Event location set",
-    description: `kwapso set where "${event.summary}" happens — ${location}`,
+    description: `kwapso set where "${event.summary}" happens, ${location}`,
   })
   await publishChange(env, guard.teamId, "google", connectionId)
   return json({ event })
@@ -1048,7 +1048,7 @@ export async function postGoogleSprintEvent(request: Request, env: Env): Promise
   const { token, connectionId } = await accessTokenFor(env, cfg, guard, "calendar")
   const event = await calendarCreate(token, {
     summary: `${sprint.ref ? `${sprint.ref} · ` : ""}${sprint.name}`,
-    description: [sprint.goal, sprint.accountName].filter(Boolean).join(" — "),
+    description: [sprint.goal, sprint.accountName].filter(Boolean).join(", "),
     start: sprint.startsOn,
     // Google's all-day END is EXCLUSIVE: an entry ending on the 14th shows up to
     // the 13th. So the last day of the sprint has to be its end date plus one, or
@@ -1099,7 +1099,7 @@ export async function postGoogleMeetingEvent(request: Request, env: Env): Promis
   const meeting = await getMeeting(cfg, guard, requireText(body.meetingId, "Meeting", TEXT_LIMITS.short))
   if (!meeting) return fail(404, "meeting_not_found", "That meeting doesn't exist.")
   if (!meeting.active)
-    return fail(409, "meeting_cancelled", "That meeting is cancelled — put it back in the diary first.")
+    return fail(409, "meeting_cancelled", "That meeting is cancelled. Put it back in the diary first.")
   // Already there: answer with what exists. Not an error — somebody pressing a
   // button twice means it once.
   if (meeting.googleEventId)
