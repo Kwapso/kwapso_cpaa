@@ -16,9 +16,15 @@
   "preview_urls": false,
   "observability": { "enabled": true },
   "durable_objects": {
-    "bindings": [{ "name": "CHANNELS", "class_name": "TeamChannel" }]
+    "bindings": [
+      { "name": "CHANNELS", "class_name": "TeamChannel" },
+      { "name": "INTEREST", "class_name": "TeamInterest" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TeamChannel"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["TeamChannel"] },
+    { "tag": "v2", "new_sqlite_classes": ["TeamInterest"] }
+  ],
   "d1_databases": [
     {
       "binding": "DB",
@@ -39,9 +45,15 @@
       "preview_urls": false,
       "observability": { "enabled": true },
       "durable_objects": {
-        "bindings": [{ "name": "CHANNELS", "class_name": "TeamChannel" }]
+        "bindings": [
+      { "name": "CHANNELS", "class_name": "TeamChannel" },
+      { "name": "INTEREST", "class_name": "TeamInterest" }
+    ]
       },
-      "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TeamChannel"] }],
+      "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["TeamChannel"] },
+    { "tag": "v2", "new_sqlite_classes": ["TeamInterest"] }
+  ],
       "d1_databases": [
         {
           "binding": "DB",

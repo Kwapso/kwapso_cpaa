@@ -68,6 +68,46 @@ export function teamShardName(teamId: string, shard: number): string {
   return `team:${teamId}#${shard}`
 }
 
+/** The DO name for a team's INTEREST REGISTRY — one instance per team, holding
+ * which shards currently hold a listener for which resource. `!` for the same
+ * reason `#` is used above: it appears in no ULID, so a registry name can never
+ * collide with a shard's. */
+export function teamInterestName(teamId: string): string {
+  return `team:${teamId}!interest`
+}
+
+/** WHY A REGISTRY, AND THE HONEST ARITHMETIC.
+ *
+ * A publish fans out to every shard whether or not anybody there is listening
+ * for that resource. The registry lets the door ask once and skip the shards
+ * with nobody interested.
+ *
+ * At REALTIME_SHARDS = 4 this is roughly a wash and can cost one extra call:
+ * 1 registry read + K interested shards, against 4 unconditional shard calls.
+ * It wins at K ≤ 2 and loses at K = 4. That is not the reason it exists.
+ *
+ * IT EXISTS TO REMOVE THE CEILING ON THE SHARD COUNT ITSELF. Sharding divides
+ * broadcast work by N but multiplies publish work by N, so ARCHITECTURE.md §7's
+ * own table shows 128 shards failing on the publish side at ~22,000 object calls
+ * a second — the fan-out becomes the bottleneck exactly when the sharding starts
+ * to matter. With interest routing the publish side stops scaling with N and
+ * starts scaling with how many shards actually care, which is what makes a
+ * larger N worth having. Raising REALTIME_SHARDS is the follow-on decision this
+ * unlocks; it is deliberately NOT taken here, because that number is a locked
+ * one and this change is the prerequisite, not the change itself.
+ *
+ * FAIL OPEN, ALWAYS. Every unknown answers "interested": an unregistered shard,
+ * an entry older than a listener's own deadline, an unreachable registry, a
+ * malformed reply. The cost of a wrong "yes" is one wasted object call. The cost
+ * of a wrong "no" is a screen that goes quietly out of date, which is the single
+ * failure the live layer exists to prevent. */
+export const INTEREST_STALE_MS = 15 * 60 * 1000
+
+/** One shard's declared interest, as the registry stores it. `all: true` means
+ * that shard holds at least one listener that declared no subscription — the
+ * pre-subscription client, which must hear everything. */
+export type ShardInterest = { resources: string[]; all: boolean; at: number }
+
 /** What a publisher needs: the binding, and the shared internal key the realtime
  * worker checks. Taking the whole env (rather than just the binding) is what
  * lets the key travel with the call — a publisher that forgets it is a type

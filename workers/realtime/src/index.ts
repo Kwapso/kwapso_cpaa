@@ -18,7 +18,14 @@ import { DurableObject } from "cloudflare:workers"
 import type { SessionUser } from "@shared/types"
 import { accountScope, mayHearChange, scopeStamp, type ScopeStamp } from "@shared/workers/account-scope"
 import { AUTH_UNAVAILABLE_MS, d1ConfigFrom, GuardError, requireMember } from "@shared/workers/gating"
-import { REALTIME_SHARDS, shardFor, teamShardName } from "@shared/workers/realtime"
+import {
+  INTEREST_STALE_MS,
+  REALTIME_SHARDS,
+  type ShardInterest,
+  shardFor,
+  teamInterestName,
+  teamShardName,
+} from "@shared/workers/realtime"
 import { fail, json } from "@shared/workers/http"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { requestId, traceHeaders } from "@shared/workers/trace"
@@ -27,6 +34,10 @@ import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 export type Env = {
   /** The per-team live channels (one Durable Object instance per team). */
   CHANNELS: DurableObjectNamespace<TeamChannel>
+  /** The per-team INTEREST REGISTRY — which shards hold a listener for which
+   * resource, so a publish can skip the rest. Holds no readable data and fences
+   * nothing; see TeamInterest. */
+  INTEREST: DurableObjectNamespace<TeamInterest>
   /** The auth worker — answers "who is opening this socket?". */
   AUTH: Fetcher
   /** Global core DB — read to confirm the connector is a team member (and to
@@ -60,6 +71,13 @@ const SCOPE_HEADER = "x-listener-scope"
  * split below: sharding divides the sockets per object, this divides the sends per
  * socket. */
 const SUBS_HEADER = "x-listener-subs"
+
+/** WHICH SHARD THIS OBJECT IS, told to it by the door. A Durable Object cannot
+ * read its own name, and the shard number is needed to report interest — so it
+ * travels the same way the fence and the subscription do: written by this worker
+ * on the upgrade, never accepted from a caller. It decides nothing about what a
+ * listener may hear; getting it wrong costs a wasted publish, not a disclosure. */
+const SHARD_HEADER = "x-listener-shard"
 
 /** Resources one socket may name. A subscription is a list the object walks for
  * every message, so an unbounded one turns the optimisation into the cost. Far
@@ -124,7 +142,7 @@ export const LISTENER_MAX_AGE_MS = 15 * 60 * 1000
  * Every socket carries both halves, staff included — the issue time is what
  * makes the decision expire, so a socket without one is a socket with no
  * deadline, which is the hole above. */
-type Listener = { scope: ScopeStamp; at: number; subs?: string[] }
+type Listener = { scope: ScopeStamp; at: number; subs?: string[]; team?: string; shard?: number }
 
 /** One team's live channel: holds its members' sockets, relays change pings. */
 export class TeamChannel extends DurableObject<Env> {
@@ -153,7 +171,24 @@ export class TeamChannel extends DurableObject<Env> {
     // from before subscriptions existed and a socket that declared nothing are the
     // same object — one absent key, one meaning: send me everything.
     const subs = readSubs(request.headers.get(SUBS_HEADER))
-    server.serializeAttachment({ scope, at: Date.now(), ...(subs ? { subs } : {}) } satisfies Listener)
+    const shardStamp = request.headers.get(SHARD_HEADER)
+    const cut = shardStamp ? shardStamp.lastIndexOf(":") : -1
+    server.serializeAttachment({
+      scope,
+      at: Date.now(),
+      ...(subs ? { subs } : {}),
+      // Kept on the socket so a close AFTER hibernation can still name the
+      // registry to report to — the object has no memory of its own name.
+      ...(cut > 0 ? { team: shardStamp!.slice(0, cut), shard: Number(shardStamp!.slice(cut + 1)) } : {}),
+    } satisfies Listener)
+    // TELL THE REGISTRY BEFORE ANSWERING, not after. The socket is live the
+    // instant this response returns, so a report that happened later would leave
+    // a window where a publish could skip a shard that already holds a listener
+    // — the one failure direction that costs a stale screen. Awaited for the
+    // same reason. A failure here is swallowed: the registry falls back to
+    // "interested" for a shard it has not heard from, so the cost of not
+    // reporting is a wasted call, never a missed ping.
+    await this.reportInterest(request)
     return new Response(null, { status: 101, webSocket: client })
   }
 
@@ -198,6 +233,73 @@ export class TeamChannel extends DurableObject<Env> {
     }
   }
 
+  /** WHAT THIS SHARD CURRENTLY CARES ABOUT, computed from its live sockets.
+   *
+   * Recomputed from `getWebSockets()` rather than accumulated, so it is
+   * self-healing: a socket that closed, hibernated, or was dropped by the
+   * runtime simply is not in the answer, and no bookkeeping can drift from the
+   * truth. A socket with no `subs` (the pre-subscription client) sets `all`,
+   * which is the fail-open half — one such listener and this shard is interested
+   * in everything, exactly as it is today. */
+  /** Report this shard's interest to the team's registry.
+   *
+   * The TEAM ID comes off the upgrade request on join, and off any live socket
+   * afterwards — a shard's own name is not readable from inside the object, and
+   * inventing a way to pass it would be a second place for it to be wrong. On
+   * close with no sockets left there is nothing to address and nothing to say:
+   * the entry ages out on its own (INTEREST_STALE_MS), which is the same
+   * fail-open answer as never having reported. */
+  private async reportInterest(request?: Request): Promise<void> {
+    try {
+      let teamId: string | null = null
+      let shard: number | null = null
+      const stamp = request?.headers.get(SHARD_HEADER)
+      if (stamp) {
+        const cut = stamp.lastIndexOf(":")
+        teamId = stamp.slice(0, cut)
+        shard = Number(stamp.slice(cut + 1))
+      }
+      // On CLOSE there is no request, and after hibernation there is no memory —
+      // so the answer is read back off a surviving socket, which carried it.
+      if (teamId === null || shard === null || !Number.isInteger(shard)) {
+        for (const ws of this.ctx.getWebSockets()) {
+          const l = ws.deserializeAttachment() as Listener | null
+          if (l?.team && typeof l.shard === "number") {
+            teamId = l.team
+            shard = l.shard
+            break
+          }
+        }
+      }
+      if (!teamId || shard === null || !Number.isInteger(shard)) return
+      await this.env.INTEREST.getByName(teamInterestName(teamId)).report(shard, this.currentInterest())
+    } catch (e) {
+      // An unreported shard is a shard the registry treats as interested, so
+      // this failing costs a wasted object call and nothing else.
+      console.error("realtime: interest report failed (shard will be treated as interested):", e)
+    }
+  }
+
+  currentInterest(): ShardInterest {
+    const resources = new Set<string>()
+    let all = false
+    for (const ws of this.ctx.getWebSockets()) {
+      try {
+        const l = ws.deserializeAttachment() as Listener | null
+        if (!l?.subs) {
+          all = true
+          continue
+        }
+        for (const r of l.subs) resources.add(r)
+      } catch {
+        // Unreadable attachment: assume it wants everything. Same direction as
+        // every other unknown here — a wasted send, never a missed one.
+        all = true
+      }
+    }
+    return { resources: [...resources], all, at: Date.now() }
+  }
+
   // Clients only listen; inbound messages are ignored. These handlers keep the
   // object hibernation-eligible and tidy up on disconnect.
   async webSocketMessage(): Promise<void> {}
@@ -207,8 +309,55 @@ export class TeamChannel extends DurableObject<Env> {
     } catch {
       // already closing
     }
+    // The socket is gone, so this shard may no longer care about what it wanted.
+    // Recomputed from the survivors, so shrinking needs no bookkeeping.
+    await this.reportInterest()
   }
   async webSocketError(): Promise<void> {}
+}
+
+/** ONE TEAM'S INTEREST REGISTRY — which shards hold a listener for which
+ * resource, so a publish can skip the shards where nobody is listening.
+ *
+ * It stores only shard indexes and resource NAMES. No row ids, no account ids,
+ * no session data: nothing here is a thing anybody may or may not see, which is
+ * why it needs no fence of its own. The fence stays on the socket, in the shard,
+ * where it always was — this object narrows WHERE a ping is sent, never WHO may
+ * hear one. A wrong answer here costs a wasted object call or a stale screen,
+ * never a disclosure.
+ *
+ * See INTEREST_STALE_MS in the shared seam for why every unknown answers yes. */
+export class TeamInterest extends DurableObject<Env> {
+  /** A shard reports what it is holding. Called on join and on close. */
+  report(shard: number, interest: ShardInterest): void {
+    this.ctx.storage.kv.put(`s${shard}`, interest)
+  }
+
+  /** Which shards should receive a ping for this resource.
+   *
+   * FAIL OPEN, three ways, and each is a real case: a shard that has never
+   * reported (its first listener is mid-handshake), a report older than a
+   * listener's own deadline (LISTENER_MAX_AGE_MS — past it every socket has
+   * reconnected and re-reported anyway, so a stale entry describes nobody), and
+   * a shard holding a listener that declared no subscription at all. */
+  shardsFor(resource: string | null): number[] {
+    const now = Date.now()
+    const out: number[] = []
+    for (let shard = 0; shard < REALTIME_SHARDS; shard++) {
+      const entry = this.ctx.storage.kv.get(`s${shard}`) as ShardInterest | undefined
+      if (
+        !entry ||
+        typeof entry.at !== "number" ||
+        now - entry.at > INTEREST_STALE_MS ||
+        entry.all ||
+        !resource ||
+        entry.resources.includes(resource)
+      ) {
+        out.push(shard)
+      }
+    }
+    return out
+  }
 }
 
 /** The upgrade request, carrying the listener's fence to the channel. Staff
@@ -219,8 +368,17 @@ export class TeamChannel extends DurableObject<Env> {
  * here from their session, so an inbound `x-listener-scope` is either overwritten
  * or deleted. (It could only ever narrow what its sender hears, but a security
  * header that a request can carry is a habit worth not forming.) */
-function stamped(request: Request, stamp: ScopeStamp, subs: string | null): Request {
+function stamped(
+  request: Request,
+  stamp: ScopeStamp,
+  subs: string | null,
+  teamId?: string,
+  shard?: number
+): Request {
   const headers = new Headers(request.headers)
+  // Same hygiene as the two below: written here, and an inbound one dies.
+  if (teamId && shard !== undefined) headers.set(SHARD_HEADER, `${teamId}:${shard}`)
+  else headers.delete(SHARD_HEADER)
   if (stamp) headers.set(SCOPE_HEADER, JSON.stringify(stamp))
   else headers.delete(SCOPE_HEADER)
   // THE SUBSCRIPTION IS COPIED FROM THE QUERY STRING, NOT TRUSTED FROM A HEADER.
@@ -324,6 +482,28 @@ async function handle(request: Request, env: Env): Promise<Response> {
       const payload = JSON.stringify(body.event)
       const teamId = channel.startsWith("team:") ? channel.slice("team:".length) : null
       if (teamId && !teamId.includes("#")) {
+        // WHICH SHARDS ACTUALLY CARE. The registry narrows the fan-out to the
+        // shards holding a listener for this resource; every unknown answers
+        // "interested", so the worst case is exactly today's behaviour plus one
+        // read. An unreachable registry is one of those unknowns — a live layer
+        // that stops delivering because a bookkeeping object is unwell is a
+        // worse failure than a wasted call, by a distance.
+        let shards: number[] = Array.from({ length: REALTIME_SHARDS }, (_, i) => i)
+        try {
+          const resource =
+            typeof (body.event as { resource?: unknown })?.resource === "string"
+              ? (body.event as { resource: string }).resource
+              : null
+          const answer = await env.INTEREST.getByName(teamInterestName(teamId)).shardsFor(resource)
+          // A malformed answer is an unknown too: only a non-empty array of real
+          // shard indexes narrows anything. An EMPTY array is meaningful and
+          // kept — it means nobody is listening for this, which is the whole
+          // point — but it must be a genuine array to be believed.
+          if (Array.isArray(answer) && answer.every((n) => Number.isInteger(n) && n >= 0 && n < REALTIME_SHARDS))
+            shards = answer
+        } catch (e) {
+          console.error("realtime: interest registry unreachable, fanning out to every shard:", e)
+        }
         // Concurrently, and settled rather than raced: one slow shard must not
         // hold the write that triggered this, and one dead shard must not cost the
         // other three their ping. The publish is best-effort by contract
@@ -334,14 +514,14 @@ async function handle(request: Request, env: Env): Promise<Response> {
           // stub that does not return one — escapes the whole thing and 500s a
           // best-effort publish. An async arrow turns any throw into a rejection,
           // which is the only shape this loop is allowed to see.
-          Array.from({ length: REALTIME_SHARDS }, async (_, shard) =>
+          shards.map(async (shard) =>
             env.CHANNELS.getByName(teamShardName(teamId, shard)).broadcast(payload)
           )
         )
         const failed = results.filter((r) => r.status === "rejected").length
         if (failed)
           console.error(
-            `realtime: ${failed}/${REALTIME_SHARDS} shard(s) of team:${teamId} did not receive a ping`
+            `realtime: ${failed}/${shards.length} shard(s) of team:${teamId} did not receive a ping`
           )
       } else {
         // A `user:` channel, or a shard named explicitly (tests, and a future
@@ -434,9 +614,10 @@ async function handle(request: Request, env: Env): Promise<Response> {
         // the fence rather than being a property of which object holds it. A
         // caller who forced themselves onto another shard would be handed exactly
         // the same fence and exactly the same pings.
-        const shard = teamShardName(teamId, shardFor(user.id))
+        const shardIndex = shardFor(user.id)
+        const shard = teamShardName(teamId, shardIndex)
         return env.CHANNELS.getByName(shard).fetch(
-          stamped(request, stamp, queryText(url.searchParams.get("sub"), "Subscription") ?? null)
+          stamped(request, stamp, queryText(url.searchParams.get("sub"), "Subscription") ?? null, teamId, shardIndex)
         )
       }
 

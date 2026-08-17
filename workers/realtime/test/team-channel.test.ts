@@ -197,7 +197,14 @@ describe("fetch: joining the channel stamps the socket", () => {
   /** The Workers globals this method needs. `Response` is stubbed because a 101
    * is illegal in Node's Response and legal in the runtime — the one place the
    * two genuinely disagree. */
-  function withWorkerGlobals<T>(run: () => T): T {
+  // ASYNC-AWARE ON PURPOSE. `fetch` is an async method, so `run()` hands back a
+  // promise — and unstubbing in a synchronous `finally` tore the globals down
+  // before the method reached `new Response(101)`. It only ever passed because
+  // nothing was awaited BEFORE that line; the first real await (reporting shard
+  // interest, which must happen before the socket goes live) turned a latent
+  // harness bug into five red tests. Awaiting the result is what the harness
+  // always meant.
+  async function withWorkerGlobals<T>(run: () => T | Promise<T>): Promise<T> {
     const pair = { 0: socket(), 1: socket() }
     vi.stubGlobal(
       "WebSocketPair",
@@ -217,7 +224,7 @@ describe("fetch: joining the channel stamps the socket", () => {
       }
     )
     try {
-      return run()
+      return await run()
     } finally {
       vi.unstubAllGlobals()
     }
