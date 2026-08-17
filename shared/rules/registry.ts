@@ -333,6 +333,10 @@ export const PORTAL_VISIBLE_READS: Record<string, { fence: string | null; why: s
     fence: "ticketFence",
     why: "a client raises tickets; the team-wide default handed them every other client's — the thread doors, one table along, had to be taught the same sentence, and the door that RAISES a ticket answered with the whole list until the check learned that a POST can be a read. It is called ticketFence and no longer authorScope because it no longer fences by AUTHOR: the owner ruled on 11 Aug 2026 that a contact sees their COMPANY's questions, so the ticket carries the account it was raised for and this is accountScopeClause over that column — the same fence as the accounts list, reading a ticket.",
   },
+  "workers/content/src/lib/help-attachments.ts": {
+    fence: "attachmentFence",
+    why: "the files and links on a ticket (CHECKLIST 5.10), and the fence is the TICKET's fence one table along — `attachmentFence` wraps `ticketFence` as a subquery so it rides the same WHERE as the rows AND the count, exactly as `threadFence` does for a reply. It has to be here rather than merely be safe by accident: an attachment is the one thing on a ticket a CLIENT uploads, so it is the one place where the rows a caller may read and the rows a caller may write are being decided about the same table from two directions.",
+  },
   "workers/content/src/lib/notify.ts": {
     fence: null,
     why: "it sends email and returns no rows to the caller: the only ids it resolves are the ticket's own raiser (read through the fence) and the mentions the route already refused from a client login, and the lookup joins team_members so an address outside the team can never be reached.",
@@ -401,6 +405,20 @@ export const PORTAL_VISIBLE_WRITES: Record<string, { fence: string | null; why: 
   "POST /api/auth/logout": {
     fence: null,
     why: "ends the caller's own session; there is no record to be fenced from.",
+  },
+
+  // ── showing us what they mean, and saying yes ──────────────────────────────
+  "POST /api/content/help/attachments": {
+    fence: "callerScope",
+    why: "a client attaches the screenshot of the thing that is wrong (CHECKLIST 5.10). The ticket is resolved through `getTicket` under the caller's own scope BEFORE a byte is stored — bytes in a bucket cannot be un-put — and a miss answers 404 rather than 403, so 'not yours' never confirms the ticket exists. The file lands under a ULID key in the shared media bucket, which is a capability URL: unguessable, and the fence is what decides who is ever told it.",
+  },
+  "POST /api/content/help/attachments/remove": {
+    fence: "callerScope",
+    why: "the same door in reverse, and the same resolution first. Deactivate-never-delete: the row keeps its audit block and the object stays in the bucket, so taking a file off is reversible in the only sense that matters — nothing is destroyed.",
+  },
+  "POST /api/content/help/validate": {
+    fence: "callerScope",
+    why: "THE ONE LIFECYCLE DOOR A CLIENT MAY PUSH (CHECKLIST 5.13, Aurora's ap2), and the deliberate exception to this module's every-other-status-move-refuses-a-portal-caller rule. It is narrow by CONSTRUCTION rather than by a condition somebody could invert: the account fence rides the UPDATE, so it can only reach a ticket their own company raised, and R17's predicate is `status = 'awaiting_validation'`, so the only transition in it is into `new`. It cannot reopen, cannot resolve, and moves zero rows against a request somebody here has already started.",
   },
 
   // ── the client's own world ─────────────────────────────────────────────────

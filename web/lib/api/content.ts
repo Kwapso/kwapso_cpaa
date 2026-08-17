@@ -17,6 +17,7 @@ import type {
   GoogleService,
   GoogleShelf,
   GoogleSource,
+  HelpAttachment,
   HelpMessage,
   HelpStakeholder,
   HelpTicket,
@@ -85,6 +86,11 @@ export type StoryWrite = {
   sprintId?: string
   appId?: string
   processId?: string
+  /** EVERY map this work touches (CHECKLIST 6.5) — sent WHOLE, because the set
+   * replaces the one the story carries. An empty list is only accepted when
+   * `changesNoStep` is ticked: "no process" is Aurora's explicit CHOICE, not a
+   * field somebody left blank. */
+  processIds?: string[]
   stepKey?: string
   changesNoStep?: boolean
   assigneeId?: string
@@ -92,6 +98,9 @@ export type StoryWrite = {
   startsOn?: string
   dueOn?: string
   accountId?: string
+  /** Fix / Feature / Change — REQUIRED (CHECKLIST 6.2), and editable on the
+   * Dropdown values screen like every other vocabulary in the app. */
+  storyType: string
 }
 
 /** The facets the work-log list door parses. */
@@ -158,12 +167,28 @@ export const content = {
     q?: string,
     /** one client's tickets — the door narrows, so the rows and the exact total
      * beside them answer the same question (R16). */
-    accountId?: string
+    accountId?: string,
+    /** THE SUB-TAB STRIP (CHECKLIST 5.1), and both halves are the DOOR's filters
+     * rather than the browser's: the list pages, so narrowing a loaded page to
+     * "Questions" would answer "the questions among the newest fifty" while the
+     * badge above it counted them all. `byType` / `byStatus` come back with every
+     * page and are what the badges read. */
+    helpType?: string,
+    status?: HelpTicket["status"]
   ) =>
-    api<PagedResponse<{ tickets: HelpTicket[]; mineTotal: number }>>(
+    api<
+      PagedResponse<{
+        tickets: HelpTicket[]
+        mineTotal: number
+        byType: Record<string, number>
+        byStatus: Record<string, number>
+      }>
+    >(
       `/api/content/help?scope=${scope}&view=${view}${q ? `&q=${enc(q)}` : ""}${
         accountId ? `&accountId=${enc(accountId)}` : ""
-      }${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`
+      }${helpType ? `&helpType=${enc(helpType)}` : ""}${status ? `&status=${enc(status)}` : ""}${
+        cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""
+      }`
     ),
   /** PUT IT AWAY, or take it back out. The door has answered this since archive
    * shipped; nothing on any screen called it, so a ticket could be archived by
@@ -185,11 +210,51 @@ export const content = {
     helpType?: string
     sourceScreen?: string
     accountId?: string
+    /** WHICH SYSTEM (5.8) and WHO ASKED (5.9). The contact is checked against the
+     * account's own live links, so a ticket can never name a stranger. */
+    appId?: string
+    raisedByContactId?: string
   }) => api<{ tickets: HelpTicket[] }>("/api/content/help", post(input)),
-  updateHelp: (input: { id: string; description: string; helpType?: string; accountId?: string }) =>
-    api<{ tickets: HelpTicket[] }>("/api/content/help/update", post(input)),
+  updateHelp: (input: {
+    id: string
+    description: string
+    helpType?: string
+    accountId?: string
+    appId?: string
+    raisedByContactId?: string
+  }) => api<{ tickets: HelpTicket[] }>("/api/content/help/update", post(input)),
   setHelpStatus: (id: string, status: HelpTicket["status"]) =>
     api<{ tickets: HelpTicket[] }>("/api/content/help/status", post({ id, status })),
+  /** SOMEBODY HAS READ IT — the one judgement in the ticket lifecycle nothing can
+   * infer, and the only act the triage screen performs (5.11). Everything after
+   * it happens by itself. */
+  triageRead: (id: string) =>
+    api<{ tickets: HelpTicket[] }>("/api/content/help/triage-read", post({ id })),
+  /** THE CLIENT SAYS YES (5.13). Staff press it too, for the answer that arrives
+   * by phone; a client presses it in their own portal. */
+  validateHelp: (id: string) =>
+    api<{ tickets: HelpTicket[] }>("/api/content/help/validate", post({ id })),
+  /** ANSWER IT AND TELL THEM (5.6 + 5.7). The resolution is REQUIRED — the door
+   * refuses without it, which is the whole of 5.6 — and the send goes to whoever
+   * raised it and that client's main stakeholder. */
+  resolveHelp: (id: string, resolution: string) =>
+    api<{ sent: boolean; alreadyResolved: boolean }>("/api/content/help/resolve", post({ id, resolution })),
+  /** Several files and several links on one ticket (5.10). The same three doors
+   * the client portal calls — this is one record with one list, not two. */
+  helpAttachments: (id: string) =>
+    api<{ attachments: HelpAttachment[]; total: number }>(`/api/content/help/attachments?id=${enc(id)}`),
+  addHelpAttachment: (input: {
+    id: string
+    kind: "file" | "link"
+    label: string
+    url?: string
+    fileDataUrl?: string
+  }) => api<{ attachments: HelpAttachment[]; total: number }>("/api/content/help/attachments", post(input)),
+  removeHelpAttachment: (id: string, attachmentId: string) =>
+    api<{ attachments: HelpAttachment[]; total: number }>(
+      "/api/content/help/attachments/remove",
+      post({ id, attachmentId })
+    ),
   replyHelp: (helpId: string, body: string, taggedUserIds?: string[]) =>
     api<{ replies: HelpMessage[]; total: number }>("/api/content/help/reply", post({ helpId, body, taggedUserIds })),
   helpStakeholders: (id: string) =>
@@ -210,12 +275,27 @@ export const content = {
   createStory: (input: StoryWrite) => api<{ stories: Story[] }>("/api/content/stories", post(input)),
   updateStory: (input: StoryWrite & { id: string }) =>
     api<{ stories: Story[] }>("/api/content/stories/update", post(input)),
-  setStoryStatus: (id: string, status: Story["status"], closingNote?: string) =>
-    api<{ stories: Story[] }>("/api/content/stories/status", post({ id, status, closingNote })),
-  sprints: (filter: { accountId?: string; appId?: string } = {}) => {
+  /** Move a story. `review` carries what 6.9 requires before `in_review`: the
+   * explanation, and optionally something to show for it. The door refuses the
+   * move while a timer on the story is still running. */
+  setStoryStatus: (
+    id: string,
+    status: Story["status"],
+    closingNote?: string,
+    review?: { reviewNote?: string; reviewFileUrl?: string; reviewFileName?: string }
+  ) =>
+    api<{ stories: Story[] }>(
+      "/api/content/stories/status",
+      post({ id, status, closingNote, ...review })
+    ),
+  sprints: (filter: { accountId?: string; appId?: string; when?: "open" | "all" } = {}) => {
     const q = new URLSearchParams()
     if (filter.accountId) q.set("accountId", filter.accountId)
     if (filter.appId) q.set("appId", filter.appId)
+    // CHECKLIST 6.3: the story form asks for current-or-future blocks only, and
+    // the DOOR decides which those are — a browser filtering on `completedAt`
+    // alone would keep offering a sprint that ended in March.
+    if (filter.when) q.set("when", filter.when)
     const qs = q.toString()
     return api<{ sprints: Sprint[]; total: number }>(`/api/content/sprints${qs ? `?${qs}` : ""}`)
   },
@@ -256,6 +336,10 @@ export const content = {
   triage: (week?: string) =>
     api<{
       onDuty: { userId: string; userName: string | null; weekStart: string } | null
+      /** CHECKLIST 5.11 — is this caller the one on duty? The DOOR decides, and
+       * `waiting` is empty when they are not. A screen that hid a list it had
+       * already been handed would be a curtain rather than a rule. */
+      yours: boolean
       waiting: { id: string; ref: string | null; description: string; createdAt: string; days: number }[]
       total: number
     }>(`/api/content/triage${week ? `?week=${enc(week)}` : ""}`),

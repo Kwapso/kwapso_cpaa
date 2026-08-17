@@ -237,13 +237,15 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_help_tickets",
     summary:
-      "List the team's tickets. scope: 'mine' (yours) or 'all' (default all); view: 'live' (default — the everyday list) or 'archived' (tickets that have been put away); `q` searches the reference, the description and the title; `accountId` narrows to one client's tickets. Pass `id` to fetch just one ticket, archived or not. The `total` counts the SAME filtered question the rows answer. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
+      "List the team's tickets. scope: 'mine' (yours) or 'all' (default all); view: 'live' (default — the everyday list) or 'archived' (tickets that have been put away); `q` searches the reference, the description and the title; `accountId` narrows to one client's tickets; `helpType` narrows to one kind, as the team spells it in their own Ticket type list; `status` narrows to one stage of the lifecycle — 'awaiting_validation', 'new', 'triaged', 'scheduled', 'in_progress', 'ready' or 'resolved'. Pass `id` to fetch just one ticket, archived or not. The `total` counts the SAME filtered question the rows answer; `byType` and `byStatus` tally the whole (unfiltered by kind or stage) list a kind or a stage at a time. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
     binding: "CONTENT", method: "GET", path: "/api/content/help",
-    schema: obj({ scope: S, view: S, q: S, accountId: S, id: S, cursor: S }),
+    schema: obj({ scope: S, view: S, q: S, accountId: S, helpType: S, status: S, id: S, cursor: S }),
     buildQuery: (i) => {
       const q = [str(i, "scope") === "mine" ? "scope=mine" : "scope=all"]
       if (str(i, "q")) q.push(`q=${encodeURIComponent(str(i, "q"))}`)
       if (str(i, "accountId")) q.push(`accountId=${encodeURIComponent(str(i, "accountId"))}`)
+      if (str(i, "helpType")) q.push(`helpType=${encodeURIComponent(str(i, "helpType"))}`)
+      if (str(i, "status")) q.push(`status=${encodeURIComponent(str(i, "status"))}`)
       // Forwarded only when the caller asked for the archive: the door defaults
       // to the live list, and sending `view=live` on every call would be noise
       // the model has to keep re-reading.
@@ -628,14 +630,14 @@ export const SHARED_TOOLS: SharedTool[] = [
     name: "raise_help_ticket",
     mcpName: "create_help_ticket",
     summary:
-      "Raise a new support ticket (description required). `accountId` names the CLIENT it is raised for — use it whenever the ticket is on a client's behalf, because the client's own people see their company's tickets and a ticket with no client belongs to nobody. Leave it off only for the agency's own internal questions. A client-portal caller cannot set it; theirs is always their own company.",
+      "Raise a new support ticket (description required). `accountId` names the CLIENT it is raised for — use it whenever the ticket is on a client's behalf, because the client's own people see their company's tickets and a ticket with no client belongs to nobody. Leave it off only for the agency's own internal questions. A client-portal caller cannot set it; theirs is always their own company. `appId` names the system it is about, and `raisedByContactId` the person at that client who asked — which is not always whoever types it, since most of a client's history is written down on their behalf. A ticket whose kind is an extra, a request or feedback opens `awaiting_validation` and waits for that client's main stakeholder to confirm it; a question or an issue opens `new` and goes straight into the queue.",
     binding: "CONTENT", method: "POST", path: "/api/content/help",
-    schema: obj({ description: S, helpType: S, screenRecordingLink: S, accountId: S }, ["description"]),
+    schema: obj({ description: S, helpType: S, screenRecordingLink: S, accountId: S, appId: S, raisedByContactId: S }, ["description"]),
     // accountId is read in lib/help.ts, not in the handler, so R22's source scan
     // cannot derive it (see its own note on fields forwarded wholesale to a lib).
     // Exposed by hand, deliberately: without it a machine can only raise tickets
     // that no client will ever see.
-    buildBody: (i) => ({ description: str(i, "description"), helpType: opt(i, "helpType"), screenRecordingLink: opt(i, "screenRecordingLink"), accountId: opt(i, "accountId") }),
+    buildBody: (i) => ({ description: str(i, "description"), helpType: opt(i, "helpType"), screenRecordingLink: opt(i, "screenRecordingLink"), accountId: opt(i, "accountId"), appId: opt(i, "appId"), raisedByContactId: opt(i, "raisedByContactId") }),
     // CONFIRM, because `accountId` decides WHO CAN READ THIS TICKET. Naming a
     // client puts the conversation in their portal — the same order of decision
     // as a permission grant, reached by a model that has been reading ticket text
@@ -646,12 +648,12 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_help_ticket",
     summary:
-      "Edit a support ticket's details (by id). `accountId` names the client a ticket has none for — it can be SET once and never moved, because moving a ticket would take the conversation away from the people reading it.",
+      "Edit a support ticket's details (by id). `accountId` names the client a ticket has none for — it can be SET once and never moved, because moving a ticket would take the conversation away from the people reading it. `appId` (the system it is about) and `raisedByContactId` (the person at that client who asked) can both be corrected freely; leaving either out keeps whatever the ticket already carries.",
     binding: "CONTENT", method: "POST", path: "/api/content/help/update",
-    schema: obj({ id: S, description: S, helpType: S, screenRecordingLink: S, accountId: S }, ["id", "description"]),
+    schema: obj({ id: S, description: S, helpType: S, screenRecordingLink: S, accountId: S, appId: S, raisedByContactId: S }, ["id", "description"]),
     // Same note as create_help_ticket: read in lib/help.ts, so R22's scan cannot
     // derive it. Exposed by hand.
-    buildBody: (i) => ({ id: str(i, "id"), description: str(i, "description"), helpType: opt(i, "helpType"), screenRecordingLink: opt(i, "screenRecordingLink"), accountId: opt(i, "accountId") }),
+    buildBody: (i) => ({ id: str(i, "id"), description: str(i, "description"), helpType: opt(i, "helpType"), screenRecordingLink: opt(i, "screenRecordingLink"), accountId: opt(i, "accountId"), appId: opt(i, "appId"), raisedByContactId: opt(i, "raisedByContactId") }),
     // CONFIRM, and this is the one that mattered. The door SETS `account_id` on a
     // ticket that had none, and a ticket carries its whole reply history — so one
     // silent call could hand an internal agency conversation to a client's portal.
@@ -662,11 +664,64 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "set_help_status",
     summary:
-      "Move a ticket along its lifecycle, by id. In order: new (raised, nobody has read it), triaged (read and sorted), in_progress (being worked on), ready (every piece of work is done, the client has not been told yet), resolved (answered and closed). Moving a resolved ticket back to triaged is how a ticket is reopened — there is no separate reopened state.",
+      "Move a ticket along its lifecycle, by id. A STATUS IS A FACT here, not a switch — five of the seven stages are reached by something happening, so setting one by hand is a correction rather than the ordinary path. In order: awaiting_validation (an extra, a request or feedback, waiting for the client's main stakeholder — clear it with validate_help_ticket), new (raised, nobody has read it), triaged (somebody read it — set by triage_help_ticket), scheduled (its work is booked into a sprint — happens by itself), in_progress (a timer started on it or on one of its stories — happens by itself), ready (every story closed — happens by itself), resolved (answered and closed). `status` will NOT accept 'resolved': answering a client is resolve_help_ticket, which requires the words to send. Moving a resolved ticket back to triaged is how a ticket is reopened — there is no separate reopened state.",
     binding: "CONTENT", method: "POST", path: "/api/content/help/status",
     schema: obj({ id: S, status: S }, ["id", "status"]),
     buildBody: (i) => ({ id: str(i, "id"), status: str(i, "status") }),
     agent: { write: true, confirm: false, summarize: (i) => `Set ticket ${str(i, "id")} to "${str(i, "status")}"` },
+  },
+  {
+    // The two acts on the ladder a machine cannot infer. Everything else about a
+    // ticket's status now happens by itself, so these are doors with their own
+    // words rather than values in a status picker — and each is idempotent by
+    // construction, so a second call moves nothing.
+    name: "validate_help_ticket",
+    summary:
+      "The client CONFIRMS they want it: moves one ticket out of awaiting_validation and into the queue, by `id`. Only an extra, a request or feedback ever waits — a question or an issue goes straight in. A ticket in any other stage moves nothing, so this is safe to call twice.",
+    binding: "CONTENT", method: "POST", path: "/api/content/help/validate",
+    schema: obj({ id: S }, ["id"]),
+    buildBody: (i) => ({ id: str(i, "id") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Confirm ticket ${str(i, "id")} should go ahead` },
+  },
+  {
+    name: "triage_help_ticket",
+    summary:
+      "Record that somebody has READ a ticket, by `id` — the one judgement in the lifecycle nothing can infer. Moves it from new to triaged; a ticket already triaged, scheduled or being worked on moves nothing, so this never drags a started request backwards.",
+    binding: "CONTENT", method: "POST", path: "/api/content/help/triage-read",
+    schema: obj({ id: S }, ["id"]),
+    buildBody: (i) => ({ id: str(i, "id") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Mark ticket ${str(i, "id")} triaged` },
+  },
+  {
+    name: "list_help_attachments",
+    summary:
+      "The files and links on one ticket, by `id` — what somebody attached to show what they mean. `attachments` carries each one's `kind` ('file' or 'link'), its `label`, and the `url` to open it; `total` is how many there are.",
+    binding: "CONTENT", method: "GET", path: "/api/content/help/attachments",
+    schema: obj({ id: S }, ["id"]),
+    buildQuery: (i) => `?id=${encodeURIComponent(str(i, "id"))}`,
+    agent: { write: false, summarize: (i) => `List what's attached to ticket ${str(i, "id")}` },
+  },
+  {
+    name: "add_help_link",
+    summary:
+      "Attach a LINK to a ticket: `id` is the ticket, `label` what a person reads, `url` where it goes. A ticket holds several. Files are attached from the app rather than here — this tool sends `kind` as 'link' and never uploads bytes.",
+    binding: "CONTENT", method: "POST", path: "/api/content/help/attachments",
+    schema: obj({ id: S, label: S, url: S }, ["id", "label", "url"]),
+    // `kind` is fixed rather than exposed, and `fileDataUrl` is not offered at
+    // all: a machine surface has no file picker, and an argument that can only
+    // ever hold one value is a way to get it wrong. Both are named in
+    // NARROWED_BODY_FIELDS with this reason.
+    buildBody: (i) => ({ id: str(i, "id"), kind: "link", label: str(i, "label"), url: str(i, "url") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Attach "${str(i, "label")}" to ticket ${str(i, "id")}` },
+  },
+  {
+    name: "remove_help_attachment",
+    summary:
+      "Take a file or a link off a ticket: `id` is the ticket, `attachmentId` the one to remove (from list_help_attachments). Nothing is deleted — the row keeps its history and the file stays where it was stored; it simply stops being listed.",
+    binding: "CONTENT", method: "POST", path: "/api/content/help/attachments/remove",
+    schema: obj({ id: S, attachmentId: S }, ["id", "attachmentId"]),
+    buildBody: (i) => ({ id: str(i, "id"), attachmentId: str(i, "attachmentId") }),
+    agent: { write: true, confirm: false, summarize: (i) => `Take an attachment off ticket ${str(i, "id")}` },
   },
   {
     // Drag-rank is the ONLY priority signal the product has (SCOPE ch.07), so
@@ -777,14 +832,15 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_story",
     summary:
-      "Write down one piece of work. Only `title` is required. `ticketId` links it to the request it answers — most work has none, so leave it off unless you know the ticket. `stepKey` names the process step this work changes and `changesNoStep` says it changes none; one of the two is REQUIRED before the story can be marked done, so set it now if you know it. There is deliberately NO story type: the ticket carries the type.",
+      "Write down one piece of work. `title` and `storyType` are both required — the kind is one of the team's own Story type values (Fix, Feature, Change as seeded). `ticketId` links it to the request it answers — most work has none, so leave it off unless you know the ticket. `processIds` names EVERY process this work touches and `changesNoStep` says it touches none; one of the two is required at the door, because a saving nobody can trace to a map is a saving nobody can check. `stepKey` names the step inside the map, and is required before the story can be marked done, so set it now if you know it.",
     binding: "CONTENT", method: "POST", path: "/api/content/stories",
     schema: obj(
       {
         title: S, detail: S, ticketId: S, sprintId: S, appId: S, processId: S,
+        processIds: { type: "array" }, storyType: S,
         stepKey: S, changesNoStep: B, assigneeId: S, reviewerId: S, startsOn: S, dueOn: S, accountId: S,
       },
-      ["title"]
+      ["title", "storyType"]
     ),
     // Every field the door reads off the body, forwarded. Most are read inside
     // lib/stories.ts rather than in the handler, exactly as create_help_ticket's
@@ -792,11 +848,13 @@ export const SHARED_TOOLS: SharedTool[] = [
     // could only write a title.
     buildBody: (i) => ({
       title: str(i, "title"),
+      storyType: str(i, "storyType"),
       detail: opt(i, "detail"),
       ticketId: opt(i, "ticketId"),
       sprintId: opt(i, "sprintId"),
       appId: opt(i, "appId"),
       processId: opt(i, "processId"),
+      processIds: Array.isArray(i.processIds) ? i.processIds : undefined,
       stepKey: opt(i, "stepKey"),
       changesNoStep: i.changesNoStep === true ? true : undefined,
       assigneeId: opt(i, "assigneeId"),
@@ -810,23 +868,26 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_story",
     summary:
-      "Edit a story (by id). Same fields as create_story; `title` stays required. Re-pointing it at another ticket moves the work onto that client's books, which is why the reference number does NOT follow — a client may already be quoting it.",
+      "Edit a story (by id). Same fields as create_story; `title` and `storyType` both stay required, and `processIds` is re-sent WHOLE — the set it names replaces the one the story carries. Re-pointing it at another ticket moves the work onto that client's books, which is why the reference number does NOT follow — a client may already be quoting it.",
     binding: "CONTENT", method: "POST", path: "/api/content/stories/update",
     schema: obj(
       {
         id: S, title: S, detail: S, ticketId: S, sprintId: S, appId: S, processId: S,
+        processIds: { type: "array" }, storyType: S,
         stepKey: S, changesNoStep: B, assigneeId: S, reviewerId: S, startsOn: S, dueOn: S, accountId: S,
       },
-      ["id", "title"]
+      ["id", "title", "storyType"]
     ),
     buildBody: (i) => ({
       id: str(i, "id"),
       title: str(i, "title"),
+      storyType: str(i, "storyType"),
       detail: opt(i, "detail"),
       ticketId: opt(i, "ticketId"),
       sprintId: opt(i, "sprintId"),
       appId: opt(i, "appId"),
       processId: opt(i, "processId"),
+      processIds: Array.isArray(i.processIds) ? i.processIds : undefined,
       stepKey: opt(i, "stepKey"),
       changesNoStep: i.changesNoStep === true ? true : undefined,
       assigneeId: opt(i, "assigneeId"),
@@ -840,10 +901,17 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "set_story_status",
     summary:
-      "Move a story along its four states, by id: open, in_progress, in_review (someone is checking it), done. `closingNote` is what we will tell the client, and it is appended to the ticket's DRAFT resolution rather than sent. A story CANNOT be set to done until it names the process step it changed (`stepKey` on the story) or is marked as changing none — the door refuses with 'step_required' rather than guessing, because every savings figure is computed from that answer.",
+      "Move a story along its four states, by id: open, in_progress (which also happens BY ITSELF the moment a timer starts on the story), in_review (someone is checking it), done. `closingNote` is what we will tell the client, and it is appended to the ticket's DRAFT resolution rather than sent. Two refusals, both deliberate: a story cannot go to in_review while any timer on it is still running, or without `reviewNote` saying what was done (`reviewFileUrl` and `reviewFileName` attach something to show for it, and are optional because plenty of work has nothing); and it cannot be set to done until it names the process step it changed (`stepKey` on the story) or is marked as changing none — the door refuses with 'step_required' rather than guessing, because every savings figure is computed from that answer.",
     binding: "CONTENT", method: "POST", path: "/api/content/stories/status",
-    schema: obj({ id: S, status: S, closingNote: S }, ["id", "status"]),
-    buildBody: (i) => ({ id: str(i, "id"), status: str(i, "status"), closingNote: opt(i, "closingNote") }),
+    schema: obj({ id: S, status: S, closingNote: S, reviewNote: S, reviewFileUrl: S, reviewFileName: S }, ["id", "status"]),
+    buildBody: (i) => ({
+      id: str(i, "id"),
+      status: str(i, "status"),
+      closingNote: opt(i, "closingNote"),
+      reviewNote: opt(i, "reviewNote"),
+      reviewFileUrl: opt(i, "reviewFileUrl"),
+      reviewFileName: opt(i, "reviewFileName"),
+    }),
     agent: {
       write: true,
       confirm: false,
@@ -853,12 +921,12 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_sprints",
     summary:
-      "List the blocks of delivery work sold, newest first — each with its kind, its dates, the flat price it was sold for (in whole cents) and how many of its stories are done. Pass `accountId` for one client's, or `appId` for one system's (a sprint covers exactly one app). Bounded, not paged: a sprint is a contract, so there are few of them.",
+      "List the blocks of delivery work sold, newest first — each with its kind, its dates, the flat price it was sold for (in whole cents) and how many of its stories are done. Pass `accountId` for one client's, or `appId` for one system's (a sprint covers exactly one app). `when` is 'all' by default; pass 'open' for only the blocks still worth putting work into — not completed, not archived, and not already past their end date. Bounded, not paged: a sprint is a contract, so there are few of them.",
     binding: "CONTENT", method: "GET", path: "/api/content/sprints",
-    schema: obj({ accountId: S, appId: S }),
+    schema: obj({ accountId: S, appId: S, when: S }),
     buildQuery: (i) => {
       const q: string[] = []
-      for (const k of ["accountId", "appId"]) if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
+      for (const k of ["accountId", "appId", "when"]) if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
       return q.length ? `?${q.join("&")}` : ""
     },
     agent: { write: false, summarize: () => "List sprints" },
@@ -928,7 +996,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "get_triage",
     summary:
-      "Whose week it is on triage duty, and every ticket nobody has read yet that has been sitting more than three days — oldest first, with how many days each has waited. An INTERNAL prompt: it is never shown to a client and implies no service-level promise. Pass `week` (any date in it) to ask who was on duty for a different week.",
+      "Whose week it is on triage duty, and every ticket nobody has read yet that has been sitting more than three days — oldest first, with how many days each has waited. `onDuty` is public to the team; the `waiting` list is not — only the person on duty is given it, and `yours` says whether this caller is that person (when nobody holds the week, anyone who could triage it is). An INTERNAL prompt: it is never shown to a client and implies no service-level promise. Pass `week` (any date in it) to ask who was on duty for a different week.",
     binding: "CONTENT", method: "GET", path: "/api/content/triage",
     schema: obj({ week: S }),
     buildQuery: (i) => (str(i, "week") ? `?week=${encodeURIComponent(str(i, "week"))}` : ""),

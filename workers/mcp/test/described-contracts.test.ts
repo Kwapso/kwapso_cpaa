@@ -68,6 +68,11 @@ import {
 const DESCRIPTION_VOCABULARY: Record<string, string> = {
   runaway:
     "the flag on a running timer that has been going longer than RUNAWAY_HOURS — computed at read time in workers/content/src/lib/work-logs.ts (`runaway: elapsed > …`), so it is a real row field the row-mapper derivation cannot see: no column is copied, the value is arithmetic over one.",
+  awaiting_validation:
+    "the stage a ticket OPENS in when its kind is one that waits for the client (CHECKLIST 5.13). It is a VALUE of the `status` column, not a field: `createTicket` computes it and no door reads it off a body, so neither the schema census nor the response-key derivation can see it. The list it belongs to is HELP_STATUSES in shared/types.ts.",
+  new: "the other stage `createTicket` may open a ticket in — the same HELP_STATUSES value, and named beside its sibling for the same reason: a description that said one and not the other would describe half a decision.",
+  yours:
+    "the triage door's answer to 'is this caller the one on duty?' (CHECKLIST 5.11). It is a real key on the response and it is written as a SHORTHAND property (`json({ onDuty, yours, … })`), which the json-literal derivation reads as a variable rather than a field name. Named here rather than spelled out longhand at the door, because the shorthand is what a reader of that handler should see.",
   export_too_large:
     "the refusal code a too-big export answers with, thrown by the one CSV seam (shared/workers/csv.ts) — R14's posture applied to files: the export is whole or it is an error, never a silently short CSV. An error VALUE rather than a response key, so no door's own source names it.",
 }

@@ -1980,6 +1980,121 @@ SELECT lower(hex(randomblob(16))), '${SELECTABLE_GROUPS.department}', '${d.name}
 `,
   },
   {
+    // A STATUS IS A FACT, NOT A BUTTON (CHECKLIST §5 and §6, 17 Aug 2026).
+    //
+    // Everything below exists so that the app can REPORT what happened instead of
+    // asking somebody to declare it. The two lifecycles gained the facts they were
+    // missing, and the two records gained the relations that make those facts
+    // computable at all.
+    //
+    // ON THE TICKET:
+    //   `app_id`                which system it is about (5.8). Without it a
+    //                           request cannot be routed, scheduled or told to the
+    //                           right stakeholder;
+    //   `raised_by_contact_id`  WHO ASKED (5.9), which is not who typed it: 220 of
+    //                           the 221 seeded requests were typed by staff on a
+    //                           client's behalf. It points at an `accounts` row of
+    //                           type `individual` — a contact is a person's own
+    //                           account row (there is no contacts table, and 15.1
+    //                           says why);
+    //   `validated_at`          when the client's main stakeholder said yes (5.13).
+    //                           Only the kinds that WAIT ever carry one.
+    //
+    // ON THE STORY:
+    //   `story_type`            Fix / Feature / Change, editable like every other
+    //                           vocabulary here (6.2). Nullable, because 3,677
+    //                           stories arrived from the previous system with no
+    //                           type and a NOT NULL would have made the import the
+    //                           first thing this migration broke;
+    //   `review_note` + the two file columns  what was done, and optionally
+    //                           something to show for it (6.9 — Aurora's ruling
+    //                           that the file is required only when there IS one).
+    //
+    // AND TWO TABLES, because both are genuinely many:
+    //   `help_attachments`      several files AND several links on one ticket, from
+    //                           both front doors (5.10). One shape for both kinds:
+    //                           "here is the thing I mean" is one act, and a
+    //                           second table would have meant two lists, two
+    //                           counts and two ways to be wrong about the order;
+    //   `story_processes`       a story links to one or MORE processes (6.5). The
+    //                           `process_id` column on `stories` stays and is the
+    //                           first of these — the savings maths and the import
+    //                           both address a story's map by one id, and dropping
+    //                           a column is the one migration you cannot take back.
+    //
+    // THE TWO NEW STATUSES ARE NOT SCHEMA. `status` is a free TEXT column the code
+    // validates against `HELP_STATUSES`, so `awaiting_validation` and `scheduled`
+    // need no DDL — and no back-fill either, deliberately: an existing ticket sits
+    // in a state somebody genuinely put it in, and quietly re-deciding history is
+    // how a report stops being believable. New tickets get the new ladder.
+    //
+    // TWO TICKET TYPES ARE ADDED, never swapped. The sub-tabs (5.1) are DERIVED
+    // from the team's own live `Ticket type` values, so this migration only has to
+    // make sure the two words the feedback names — Issue and Request — exist.
+    // Retiring Feedback and Bug is CHECKLIST 2.1 and belongs to the words lane;
+    // adding here and retiring there compose, whichever order they land in.
+    version: "0028_ticket_and_story_facts",
+    sql: `
+ALTER TABLE help ADD COLUMN app_id TEXT REFERENCES apps (id);
+ALTER TABLE help ADD COLUMN raised_by_contact_id TEXT REFERENCES accounts (id);
+ALTER TABLE help ADD COLUMN validated_at TEXT;
+CREATE INDEX idx_help_app ON help (app_id);
+
+ALTER TABLE stories ADD COLUMN story_type TEXT;
+ALTER TABLE stories ADD COLUMN review_note TEXT;
+ALTER TABLE stories ADD COLUMN review_file_url TEXT;
+ALTER TABLE stories ADD COLUMN review_file_name TEXT;
+
+-- FILES AND LINKS ON A TICKET. \`kind\` is checked in the schema rather than in
+-- code because it decides how \`url\` is READ — a key inside the tickets bucket,
+-- or an address a browser follows — and a third value would be a row nothing
+-- knows how to render.
+CREATE TABLE help_attachments (
+  id TEXT PRIMARY KEY,
+  help_id TEXT NOT NULL REFERENCES help (id),
+  kind TEXT NOT NULL CHECK (kind IN ('file', 'link')),
+  label TEXT NOT NULL,
+  url TEXT NOT NULL,
+  content_type TEXT,
+  size_bytes INTEGER,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
+);
+CREATE INDEX idx_help_attachments_help ON help_attachments (help_id);
+
+-- EVERY PROCESS ONE STORY TOUCHES. The pair is unique on LIVE rows only, so
+-- unlinking a map and linking it again later is allowed and the old row stays.
+CREATE TABLE story_processes (
+  id TEXT PRIMARY KEY,
+  story_id TEXT NOT NULL REFERENCES stories (id),
+  process_id TEXT NOT NULL REFERENCES processes (id),
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT
+);
+CREATE UNIQUE INDEX idx_story_processes_pair ON story_processes (story_id, process_id);
+CREATE INDEX idx_story_processes_story ON story_processes (story_id);
+
+-- The story types SCOPE names, seeded the way every other vocabulary here is:
+-- ADDED, never swapped, and one statement per value (D1's compound-SELECT
+-- ceiling is five terms, which 0018 learned the hard way).
+${["Fix", "Feature", "Change"]
+  .map(
+    (v) => `INSERT INTO selectable_data (id, type, value, is_default, created_at, creator_id, creator_email, creator_name)
+SELECT lower(hex(randomblob(16))), 'Story type', ${sqlString(v)}, 1, datetime('now'), NULL, NULL, 'System'
+ WHERE NOT EXISTS (SELECT 1 FROM selectable_data s WHERE s.type = 'Story type' AND s.value = ${sqlString(v)});`
+  )
+  .join("\n")}
+
+-- The two ticket types the sub-tabs need a word for.
+${["Issue", "Request"]
+  .map(
+    (v) => `INSERT INTO selectable_data (id, type, value, is_default, created_at, creator_id, creator_email, creator_name)
+SELECT lower(hex(randomblob(16))), 'Ticket type', ${sqlString(v)}, 1, datetime('now'), NULL, NULL, 'System'
+ WHERE NOT EXISTS (SELECT 1 FROM selectable_data s WHERE s.type = 'Ticket type' AND s.value = ${sqlString(v)});`
+  )
+  .join("\n")}
+`,
+  },
+  {
     // ── AN APP BECOMES A RECORD, not a name with a URL on it ──────────────────
     //
     // FOUR CONTEXT FIELDS, and they are the reason this migration exists. An app

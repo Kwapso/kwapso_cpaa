@@ -125,6 +125,23 @@ export const PORTAL_DOORS: Record<string, Upstream> = {
   // and there is no client-side reopen button.
   "POST /api/content/help/update": "CONTENT",
   "POST /api/content/help/rank": "CONTENT",
+  // SHOWING US WHAT THEY MEAN (CHECKLIST 5.10). Several files and several links
+  // on one ticket, "from BOTH front doors" — a screenshot of the thing that is
+  // wrong is the client's half of a support conversation, and they had no way to
+  // send one. The file goes into the SHARED media bucket, which this gateway
+  // already serves at /media/*, so they can read their own back.
+  "GET /api/content/help/attachments": "CONTENT",
+  "POST /api/content/help/attachments": "CONTENT",
+  "POST /api/content/help/attachments/remove": "CONTENT",
+  // THE ONE LIFECYCLE DOOR A CLIENT MAY PUSH (CHECKLIST 5.13, Aurora's ap2). An
+  // extra, a request or a piece of feedback waits for the company that pays for
+  // it to confirm they want it — a question or an issue never waits at all. It is
+  // the deliberate exception to the paragraph above, and it is narrow by
+  // construction rather than by this table: the account fence rides its UPDATE,
+  // and R17's predicate means the ONLY move it can make is
+  // awaiting_validation → new. It cannot reopen, resolve, or touch a request
+  // somebody here has already started.
+  "POST /api/content/help/validate": "CONTENT",
 
   // ── what we are waiting on them for ────────────────────────────────────────
   // The only rows in the work engine a client writes to. They read their own

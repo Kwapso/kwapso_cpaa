@@ -33,6 +33,8 @@ import {
   stopTimer,
   type LogFilter,
 } from "../lib/work-logs"
+import { progressFlip, ticketBehind } from "../lib/ready-flip"
+import { storyProgressFlip } from "../lib/stories"
 import type { Env } from "../env"
 
 /** The filters this door parses — one place, so the list and its totals can never
@@ -113,6 +115,27 @@ export async function postStartTimer(request: Request, env: Env): Promise<Respon
   for (const was of stopped)
     await publishChange(env, guard.teamId, "work_logs", was.id, "edit", was.accountId ?? undefined)
   await publishChange(env, guard.teamId, "work_logs", id, "add", accountId ?? undefined)
+
+  // A STATUS IS A FACT, NOT A BUTTON (CHECKLIST 5.4 + 6.7) — and this is the door
+  // where the inversion actually happens. Marking a story "in progress" used to
+  // start a timer; starting a timer is now what marks it, on the story AND on the
+  // request behind it.
+  //
+  // R17 is what makes it safe to do on EVERY start: the predicate rides both
+  // UPDATEs, so the second timer of the morning moves zero rows, writes no
+  // activity and publishes nothing. Nothing is ever dragged backwards — a story
+  // in review, or a ticket already `ready`, is not a state a clock can undo.
+  if (target.targetTable === "stories") {
+    const flip = await storyProgressFlip(cfg, guard, actor, target.targetId)
+    if (flip.moved)
+      await publishChange(env, guard.teamId, "stories", target.targetId, "edit", accountId ?? undefined)
+  }
+  const ticketId = await ticketBehind(cfg, guard, target.targetTable, target.targetId)
+  if (ticketId) {
+    const flip = await progressFlip(cfg, guard, actor, ticketId)
+    if (flip.moved)
+      await publishChange(env, guard.teamId, "help", ticketId, "edit", flip.accountId ?? undefined)
+  }
   return json({ timers: await runningTimers(cfg, guard) })
 }
 

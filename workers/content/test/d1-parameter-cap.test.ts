@@ -39,7 +39,7 @@ import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
 import { sourceFiles } from "@shared/rules/source-scan"
-import { CRON_ALERT_CAP, D1_MAX_BOUND_PARAMS, PORTAL_ROOTS_CAP } from "@shared/workers/limits"
+import { CRON_ALERT_CAP, D1_MAX_BOUND_PARAMS, PORTAL_ROOTS_CAP, STORY_PROCESS_CAP } from "@shared/workers/limits"
 
 const SRC = join(__dirname, "..", "src")
 const REPO = join(__dirname, "..", "..", "..")
@@ -107,7 +107,24 @@ describe("no statement can bind more parameters than D1 accepts", () => {
         "the ingest state keys — INGEST_KINDS (3) plus one per GOOGLE_SERVICE (4), both fixed at author time",
       "content/src/lib/ready-flip.ts: FLIPPABLE":
         "a module-level constant: the ticket statuses a Ready flip may move from. " +
-        "Five strings, fixed at author time.",
+        "Derived from HELP_STATUSES, fixed at author time.",
+      // The same shape, one function along: `flip` takes the states an automatic
+      // move may claim, and every caller passes a module-level constant
+      // (SCHEDULABLE, STARTABLE) derived from HELP_STATUSES. There is no call
+      // site that hands it a list a request supplied.
+      "content/src/lib/ready-flip.ts: from":
+        "the ticket statuses an automatic flip may move OUT of — SCHEDULABLE / STARTABLE, " +
+        "both module-level constants derived from HELP_STATUSES",
+      // PROVEN by the cap the caller checks one line above the statement:
+      // `resolveProcesses` refuses past STORY_PROCESS_CAP before it builds the
+      // list, so the placeholder count cannot exceed 20.
+      "content/src/lib/stories.ts: unique":
+        `the processes one story links to, capped at STORY_PROCESS_CAP (${STORY_PROCESS_CAP}) by the door itself`,
+      // The resolution email's two named recipients, read back out of the core
+      // database. Bounded by the read that produced the ids: the portal-grant
+      // lookup carries `LIMIT 100`, and the set is de-duped before it is bound.
+      "content/src/lib/notify.ts: list":
+        "the resolution's recipients — the raiser and the main stakeholder, from a read bounded at LIMIT 100",
       "content/src/lib/stakeholders.ts: batch":
         "one slice of idBatches — bounded BY D1_MAX_BOUND_PARAMS itself, which is the point of it",
       "tenancy/src/routes/accounts.ts: batch":
@@ -160,6 +177,10 @@ describe("no statement can bind more parameters than D1 accepts", () => {
     expect(
       PORTAL_ROOTS_CAP,
       "PORTAL_ROOTS_CAP must stay under D1's parameter cap — the switcher binds one per root"
+    ).toBeLessThan(D1_MAX_BOUND_PARAMS)
+    expect(
+      STORY_PROCESS_CAP,
+      "STORY_PROCESS_CAP must stay under D1's parameter cap — the proof binds one per process"
     ).toBeLessThan(D1_MAX_BOUND_PARAMS)
     expect(
       CRON_ALERT_CAP,

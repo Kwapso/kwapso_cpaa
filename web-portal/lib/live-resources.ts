@@ -26,8 +26,23 @@ export const cacheKeys = {
   tickets: "portal:tickets",
   ticketsTotal: "portal:tickets:total",
   ticketsCursor: "portal:tickets:cursor",
+  /** ONE ticket, for a cold deep link out of an email — the ticket screen reads
+   * the warm list first and only falls back to the by-id door. Named here with
+   * the rest because a key spelled at its call site is a key the next screen
+   * spells differently. */
+  ticket: (ticketId: string) => `portal:ticket:${ticketId}`,
   thread: (ticketId: string) => `portal:thread:${ticketId}`,
   threadTotal: (ticketId: string) => `portal:thread:${ticketId}:total`,
+  /** The files and links on one ticket, and the door's exact count beside them —
+   * the same rows-plus-sidecar pair the thread uses, keyed the same way and for
+   * the same reason (R16: the badge is the server's number, not the list's
+   * length). Like the thread's, these are per-TICKET keys: a `help` ping carries
+   * a ticket id the listener below is not handed, so an open ticket picks up an
+   * attachment the agency added on its next read rather than mid-screen. Every
+   * write from THIS side re-primes both keys from the response, so the person
+   * doing the attaching never waits. */
+  attachments: (ticketId: string) => `portal:attachments:${ticketId}`,
+  attachmentsTotal: (ticketId: string) => `portal:attachments:${ticketId}:total`,
   value: "portal:value",
   /** What we are waiting on them for, and what they bought. */
   todos: "portal:todos",

@@ -89,6 +89,15 @@ const ticket: HelpTicket = {
   raiserId: "u1",
   raiserName: "Alaap",
   editorName: null,
+  // Which system it is about and who asked (CHECKLIST 5.8 + 5.9). The agency's
+  // own question is about no app and was asked by nobody outside the building,
+  // so both are null here — which is the case the row shape has to survive.
+  appId: null,
+  appName: null,
+  raisedByContactId: null,
+  raisedByContactName: null,
+  // Only a ticket that WAITED ever carries one, and this one never did.
+  validatedAt: null,
   createdAt: "2026-06-13T10:00:00.000Z",
   updatedAt: null,
   // The agency's own question belongs to no client, so it names no account —

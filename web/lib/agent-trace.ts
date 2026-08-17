@@ -89,6 +89,15 @@ export function traceFor(
       return { path: `${seg(teamId, "tickets")}/${str(input, "helpId")}`, highlight: "main" }
     case "update_help_ticket":
     case "set_help_status":
+    // The two acts on the ladder a person still performs (CHECKLIST 5.11, 5.13).
+    // Both land on the ticket, because both are statements ABOUT that request and
+    // the record is where the new stage is now written.
+    case "validate_help_ticket":
+    case "triage_help_ticket":
+    // Attaching or taking off a file or a link lands on the ticket too — its
+    // Files and links tab is where the change is.
+    case "add_help_link":
+    case "remove_help_attachment":
     // Answering lands on the ticket, where the words that were sent are now the
     // last thing in the conversation.
     case "resolve_help_ticket":

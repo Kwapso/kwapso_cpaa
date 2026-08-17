@@ -21,10 +21,11 @@ import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
-import { Pencil } from "lucide-react"
+import { Check, ClipboardCheck, Pencil } from "lucide-react"
 
 import { LoadMore } from "@/components/load-more"
 import { StoryFormDialog, type StoryFormValues } from "@/components/story-form-dialog"
+import { ReviewDialog, type ReviewFormValues } from "@/components/review-dialog"
 import { useStoryFormOptions } from "@/components/stories-screen"
 import { STORY_STATUS_LABEL } from "@/components/work-panels"
 import { TimeFormDialog, type TimeFormValues } from "@/components/time-form-dialog"
@@ -89,6 +90,7 @@ export function StoryDetailScreen({
 
   const [tab, setTab] = React.useState("overview")
   const [editOpen, setEditOpen] = React.useState(false)
+  const [reviewOpen, setReviewOpen] = React.useState(false)
   // THE ROW OF TIME BEING CORRECTED. Held rather than routed through the URL,
   // for the reason the Stories page's panel holds its own: a correction is a
   // thing you do to a line you are looking at, and Back should close the form
@@ -141,14 +143,32 @@ export function StoryDetailScreen({
     await contentApi.updateStory({
       id: storyId,
       title: values.title,
+      storyType: values.storyType,
       detail: values.detail || undefined,
       sprintId: values.sprintId || undefined,
       appId: values.appId || undefined,
       ticketId: values.ticketId || undefined,
       assigneeId: values.assigneeId || undefined,
+      processIds: values.processIds,
+      changesNoStep: values.changesNoStep,
     })
     refresh()
     toast.success(t("Story updated."))
+  }
+
+  /** READY FOR REVIEW (CHECKLIST 6.9) — refused until every timer on this story
+   * is stopped and an explanation is written. Both refusals live at the door, so
+   * this panel only has to collect the words; the file is optional, which is
+   * Aurora's ruling over "all three always" — plenty of work has nothing to show.
+   */
+  async function sendToReview(values: ReviewFormValues) {
+    await contentApi.setStoryStatus(storyId, "in_review", undefined, {
+      reviewNote: values.reviewNote,
+      reviewFileUrl: values.reviewFileUrl || undefined,
+      reviewFileName: values.reviewFileName || undefined,
+    })
+    refresh()
+    toast.success(t("Sent for review."))
   }
 
   if (storyQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the story.")}</p>
@@ -158,6 +178,7 @@ export function StoryDetailScreen({
 
   const overviewItems = [
     { label: t("Status"), value: STORY_STATUS_LABEL[story.status] },
+    { label: t("Kind"), value: story.storyType || "—" },
     { label: t("Reference"), value: story.ref || "—" },
     { label: t("Who's doing it"), value: story.assigneeName || "Nobody yet" },
     // INHERITED, not typed. A story is due when the block it was sold inside is
@@ -166,6 +187,13 @@ export function StoryDetailScreen({
     // with no sprint has no deadline to show, which is the honest answer.
     { label: t("Due"), value: formatDate(story.sprintEndsOn) || "—" },
     { label: t("Detail"), value: story.detail || "—" },
+    {
+      label: t("Processes it changes"),
+      value: story.changesNoStep
+        ? "None"
+        : story.processIds.map((id) => options.processNames.get(id) ?? id).join(", ") || "—",
+    },
+    { label: t("What was done"), value: story.reviewNote || "—" },
     { label: t("What we'll tell them"), value: story.closingNote || "—" },
     ...auditItems({
       createdByName: story.createdByName,
@@ -182,8 +210,11 @@ export function StoryDetailScreen({
     tabs: [
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       {
+        // CHECKLIST 6.8: "a work logs tab on the story, and on every other detail
+        // screen that captures time". The tab was already here and called Time;
+        // Work logs is the word the glossary and the section both use now.
         value: "time",
-        label: t("Time"),
+        label: t("Work logs"),
         icon: CONCEPT_ICON.time,
         badge: formatCount(timeTotal),
         badgeVariant: "" as const,
@@ -258,6 +289,42 @@ export function StoryDetailScreen({
             canLog={canLogTime}
             disabled={story.status === "done"}
           />
+          {/* READY FOR REVIEW (CHECKLIST 6.9). Offered only while the work is
+              actually in hand: a story nobody has started has nothing to explain,
+              and one already in review or done has been explained. The panel
+              collects the words; the door refuses if a timer is still running. */}
+          {canEdit && (story.status === "open" || story.status === "in_progress") && (
+            <Button size="sm" disabled={busy} onClick={() => setReviewOpen(true)} className="gap-1.5">
+              <ClipboardCheck className="size-3.5" />
+              {t("Ready for review")}
+            </Button>
+          )}
+          {/* ONE DONE BUTTON, TOP RIGHT (CHECKLIST 6.10). Aurora's ts2: the app's
+              team lead presses it, not "anyone with the right". The lead is a
+              field on an app that does not exist yet (CHECKLIST 8.10, another
+              lane) — until it does, this is gated on `work:edit` and it is ONE
+              button in ONE place, which is the half of the ask that was about the
+              screen. When the lead lands, the condition changes here and nothing
+              else moves.
+              It appears only on a story that has been reviewed, so "done" stays
+              downstream of somebody having looked. */}
+          {canEdit && story.status === "in_review" && (
+            <Button
+              size="sm"
+              disabled={busy}
+              onClick={() =>
+                void run(
+                  () => contentApi.setStoryStatus(storyId, "done", story.closingNote ?? undefined),
+                  "Done.",
+                  "Couldn't close that story."
+                )
+              }
+              className="gap-1.5"
+            >
+              <Check className="size-3.5" />
+              {t("Done")}
+            </Button>
+          )}
           {canEdit && (
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-1.5">
               <Pencil className="size-3.5" />
@@ -267,21 +334,12 @@ export function StoryDetailScreen({
         </div>
       </div>
 
-      {/* THE LIFECYCLE, as a track rather than a dropdown — the same control a
-          ticket gets. Closing a story settles the ticket half in the same call,
-          which is why the far end of it reads as a decision. */}
-      <StoryStatusStepper
-        status={story.status}
-        canEdit={canEdit}
-        busy={busy}
-        onChange={(next) =>
-          void run(
-            () => contentApi.setStoryStatus(storyId, next, story.closingNote ?? undefined),
-            `Moved to ${STORY_STATUS_LABEL[next].toLowerCase()}.`,
-            "Couldn't move that story."
-          )
-        }
-      />
+      {/* THE LIFECYCLE AS A FACT (CHECKLIST 6.7). It used to be four buttons, and
+          pressing "in progress" started a timer — the tester asked for that
+          inversion and this is it: a timer start moves the story, and the track
+          reports where it got to. Two of the four stages are reached by a named
+          act instead (the two buttons above), and neither of them is on here. */}
+      <StoryStatusStepper status={story.status} />
 
       <TabsView
         config={tabsConfig}
@@ -364,6 +422,8 @@ export function StoryDetailScreen({
         apps={options.apps}
         tickets={options.tickets}
         members={options.members}
+        processes={options.processes}
+        storyTypes={options.storyTypes}
         initial={{
           title: story.title,
           detail: story.detail ?? "",
@@ -371,9 +431,23 @@ export function StoryDetailScreen({
           appId: story.appId ?? "",
           ticketId: story.ticketId ?? "",
           assigneeId: story.assigneeId ?? "",
+          storyType: story.storyType ?? "",
+          processIds: story.processIds,
+          changesNoStep: story.changesNoStep,
         }}
         draftKey={`story:edit:${storyId}`}
         onSubmit={save}
+      />
+      <ReviewDialog
+        open={reviewOpen}
+        onOpenChange={setReviewOpen}
+        draftKey={`story:review:${storyId}`}
+        initial={{
+          reviewNote: story.reviewNote ?? "",
+          reviewFileUrl: story.reviewFileUrl ?? "",
+          reviewFileName: story.reviewFileName ?? "",
+        }}
+        onSubmit={sendToReview}
       />
       <TimeFormDialog
         open={!!editingLog}

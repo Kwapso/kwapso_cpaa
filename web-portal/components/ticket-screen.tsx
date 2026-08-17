@@ -14,8 +14,18 @@
 //    (PORTAL_ACTIVITY_EXEMPT) and held true by the portal's rules test — an
 //    exemption nobody checks is just a skip with better manners.
 //
-// 2. NO STATUS CONTROL. Moving a ticket along its lifecycle is gated on
-//    help:edit, which is the agency's job. The client sees where it stands.
+// 2. NO STATUS CONTROL — WITH EXACTLY ONE EXCEPTION, and the exception is the
+//    reason this paragraph is worth reading. Moving a ticket along its lifecycle
+//    is gated on help:edit, which is the agency's job: the client sees where it
+//    stands (CHECKLIST 5.2 — the status is a label, never a button). The one
+//    move a client makes is the FIRST one: an extra, a request or a piece of
+//    feedback waits in `awaiting_validation` until the company paying for it says
+//    it wants it (CHECKLIST 5.13). That is the "yes, go ahead" band below, and it
+//    is the only lifecycle control on this surface. It is narrow at the DOOR
+//    rather than by this screen being careful: the account fence rides the
+//    UPDATE, and R17's predicate means the only transition it can make is
+//    awaiting_validation → new. It cannot reopen, resolve, or move a started
+//    request, whatever this component sends it.
 //
 // THE ONE PIECE OF REAL LOGIC: who wrote a reply. A thread now has three kinds
 // of author, not two — since the owner ruled that a contact sees their COMPANY's
@@ -52,19 +62,22 @@ import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Card } from "@kwapso/ui/registry/primitives/card/card"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
+import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { ArrowLeft, Send } from "lucide-react"
+import { ArrowLeft, Check, Send } from "lucide-react"
 
 import { brand } from "@shared/brand"
 import type { HelpMessage } from "@shared/types"
 import { useFollowNewest } from "@shared/web/follow-newest"
 import { formatRelative } from "@shared/web/format"
-import { primeCache, useCached } from "@shared/web/store"
+import { reportError } from "@shared/web/log"
+import { invalidate, primeCache, useCached } from "@shared/web/store"
 import { ApiFailure, support } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 import { useTickets } from "@/lib/tickets"
 import { STATUS_WORDS } from "@/components/ticket-row"
+import { TicketAttachments } from "@/components/ticket-attachments"
 import type { PortalReady } from "@/components/portal-shell"
 import { useT } from "@shared/web/language"
 
@@ -110,7 +123,7 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
   // ticket out of it; fall back to the by-id door on a cold deep link from email.
   const { tickets } = useTickets()
   const fromList = (tickets ?? []).find((t) => t.id === ticketId)
-  const oneQ = useCached(fromList ? null : `portal:ticket:${ticketId}`, () =>
+  const oneQ = useCached(fromList ? null : cacheKeys.ticket(ticketId), () =>
     support.ticket(ticketId)
   )
   const ticket = fromList ?? oneQ.data ?? null
@@ -141,6 +154,7 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
 
   const [draft, setDraft] = React.useState("")
   const [sending, setSending] = React.useState(false)
+  const [confirming, setConfirming] = React.useState(false)
 
   // Land on the newest reply, and follow the one you just sent. Every hook here
   // sits ABOVE the `if (!ticket)` return below, deliberately — a hook under an
@@ -161,6 +175,30 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
       toast.error(e instanceof ApiFailure ? e.message : "Couldn't send that. Try again.")
     } finally {
       setSending(false)
+    }
+  }
+
+  /** YES, GO AHEAD (CHECKLIST 5.13). The door answers with the ticket page, but
+   * the list in this browser may already hold pages two and three, so the honest
+   * move is to drop what changed and let the screen re-read rather than to
+   * overwrite an appended list with a page one. Both keys, plus the by-id key a
+   * cold deep link is reading from — this screen takes its ticket from whichever
+   * of the two is warm, so refreshing only one leaves the band on screen half
+   * the time. */
+  async function confirmIt() {
+    if (confirming) return
+    setConfirming(true)
+    try {
+      await support.validate(ticketId)
+      invalidate(cacheKeys.tickets)
+      invalidate(cacheKeys.ticketsTotal)
+      invalidate(cacheKeys.ticket(ticketId))
+      toast.success(t("Thank you. We'll get started."))
+    } catch (e) {
+      reportError("portal-ticket.validate", e)
+      toast.error(e instanceof ApiFailure ? e.message : t("Couldn't send that. Try again."))
+    } finally {
+      setConfirming(false)
     }
   }
 
@@ -202,10 +240,49 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
        * and half of it was the agency's vocabulary rather than the client's. */}
       <Card className="hover-lift-none flex flex-col gap-3 p-4">
         <Badge variant={status.variant} className="w-fit">
-          {status.label}
+          {t(status.label)}
         </Badge>
         <p className="break-words">{ticket.description}</p>
       </Card>
+
+      {/* THE ONE THING A CLIENT DOES TO A TICKET'S STATE (CHECKLIST 5.13).
+       *
+       * It sits UNDER the description rather than above it, which is the one
+       * arrangement decision here: UI-RULEBOOK C8 puts a warning band directly
+       * under the header, and on this screen the description IS the header —
+       * asking somebody to approve a request before they have read it back is
+       * the wrong order to put two sentences in.
+       *
+       * Amber because nothing moves until they act, and it disappears the moment
+       * they have: the door answers, the list is re-read, the status is no longer
+       * `awaiting_validation`, and there is nothing left to press. That is why
+       * this is a band and not a permanent control — a client never gets a second
+       * lifecycle button, on this screen or any other. */}
+      {ticket.status === "awaiting_validation" ? (
+        <div className="bg-warning/10 text-warning-foreground flex flex-col gap-3 rounded-xl px-4 py-3 text-sm sm:flex-row sm:items-center">
+          <p className="flex-1">
+            {t(
+              "We've written this up the way we understood it. Say the word and we'll get started."
+            )}
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            className="shrink-0 self-start gap-1.5 sm:self-auto"
+            disabled={confirming}
+            onClick={() => void confirmIt()}
+          >
+            {confirming ? <Spinner /> : <Check className="size-3.5" />}
+            {t("Yes, go ahead")}
+          </Button>
+        </div>
+      ) : null}
+
+      {/* SHOW US WHAT YOU MEAN (CHECKLIST 5.10) — above the conversation, because
+       * the files are part of the request rather than part of the exchange about
+       * it. The thread below scrolls itself to the newest reply on arrival, so
+       * nothing here costs the person their place. */}
+      <TicketAttachments ticketId={ticketId} />
 
       <ol className="flex flex-col gap-3">
         {messages.map((m) => (

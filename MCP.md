@@ -178,7 +178,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth —
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **207 doors, 168 with a tool, 39 with a written reason** — the
+  red build. Today: **213 doors, 173 with a tool, 40 with a written reason** — the
   reasons being the team-pin doors (§3.2 below), the client-portal standing doors
   (§3.3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the THREE upload pairs — two media doors and the knowledge base, each a
@@ -187,7 +187,7 @@ Today it covers:
   called because a JSON-RPC request has no body to stream into. Same conclusion,
   two different reasons, both written down — the seven
   Google doors that are a person's own decision, the timesheet correction, one
-  invite's audit trail and the cross-module activity feed. Of the 168, **139 are on THIS surface** and 29 are the in-app assistant's
+  invite's audit trail and the cross-module activity feed. Of the 173, **144 are on THIS surface** and 29 are the in-app assistant's
   alone — the twenty-six Google tools, the two confirm-panel bulk writes and the role
   permission matrix read, each reasoned in §3. Those three numbers are asserted
   against the live census in `workers/mcp/test/filter-parity.test.ts`, so this
@@ -290,8 +290,11 @@ Today it covers:
     R23 is the knowledge base's citation law.)
   - learning — `create_learning`, `update_learning`, `set_learning_active`
   - tickets — `create_help_ticket`, `update_help_ticket`, `set_help_status`,
-    `resolve_help_ticket`, `rank_help_ticket`, `archive_help_ticket`,
-    `reply_help_ticket`, `add_help_stakeholder`. (The module is Tickets; the tool NAMES carry the old
+    `validate_help_ticket`, `triage_help_ticket`, `resolve_help_ticket`,
+    `rank_help_ticket`, `archive_help_ticket`, `reply_help_ticket`,
+    `add_help_stakeholder`, plus the three that carry the files and links on a
+    ticket: `list_help_attachments`, `add_help_link` and
+    `remove_help_attachment`. (The module is Tickets; the tool NAMES carry the old
     `help` spelling because they are a published contract outside developers
     already call by name, so the rename of the section a person reads
     deliberately stopped at them — DATA-MODEL.md says why it never moves.)
@@ -299,6 +302,20 @@ Today it covers:
     priority, and there is no priority field to set. `archive_help_ticket` puts a
     ticket away without deleting anything; read them back with
     `list_help_tickets` and `view: 'archived'`.
+
+    **A STATUS IS A FACT HERE, NOT A SWITCH** (17 Aug 2026). Five of the seven
+    stages are now reached by something HAPPENING rather than by anybody choosing
+    them: `scheduled` when the work on a request lands in a sprint, `in_progress`
+    when a timer starts on the ticket or on one of its stories, `ready` when the
+    last story closes, `resolved` only through `resolve_help_ticket`, and
+    `awaiting_validation` at birth for the kinds that wait. So `set_help_status`
+    is a CORRECTION rather than the ordinary path, and it **will not accept
+    `resolved`** — nor will either bulk — because answering a client means sending
+    words, and a value in a dropdown carries none. The two stages a person still
+    decides have doors of their own: `validate_help_ticket` (the client confirms
+    an extra, a request or a piece of feedback — a question or an issue never
+    waits) and `triage_help_ticket` (somebody has read it). Both are idempotent by
+    construction: a second call moves nothing.
   - the work engine, stories and sprints — `create_story`, `update_story`,
     `set_story_status` (`work:create` / `work:edit`), `create_sprint`,
     `update_sprint` and `complete_sprint`. `update_sprint` is where a sprint's flat
@@ -432,6 +449,14 @@ Today it covers:
      forwarded and the capability is whole. `fileName` is read only inside the
      `if (body.fileDataUrl …)` branch, so offering it alone would be a field that
      changes nothing, which is worse than an absent one.
+   - **`add_help_link` takes `label` and `url`, not `kind` or `fileDataUrl`.** A
+     ticket holds several files and several links; this surface can send the links.
+     A file is a base64 data URL up to 10 MB — around 14 million characters of
+     argument on that same 400,000-character surface — and it is attached from a
+     screen by the person holding it. `kind` is withheld for the other reason in
+     item 7's family: the tool forwards it as the constant `"link"`, so the door's
+     contract is honoured in full, and an argument that may hold exactly one value
+     is only a way to get it wrong.
    - **`agent_chat` takes `message`, not `files`.** Attaching up to 8 CSVs of 5 MB each
      is up to 40 MB on the same surface — and the capability is already here in a
      better machine shape: `start_import` → `add_import_file` → `plan_import` →

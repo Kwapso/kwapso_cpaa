@@ -63,7 +63,14 @@ const historyFor = (id: string): string[] =>
 
 /** A story to log against. */
 async function addStory(title: string): Promise<string> {
-  const res = await call(IDS.staffUser, "POST /api/content/stories", { title })
+  const res = await call(IDS.staffUser, "POST /api/content/stories", {
+    title,
+    // A kind and an answer about processes are both required now (CHECKLIST 6.2
+    // and 6.5). Neither is what these cases are about; they are the ordinary
+    // answers so the fixture reads as an ordinary story.
+    storyType: "Fix",
+    changesNoStep: true,
+  })
   expect(res.status).toBe(200)
   return (db().prepare(`SELECT id FROM stories WHERE title = ?`).get(title) as { id: string }).id
 }

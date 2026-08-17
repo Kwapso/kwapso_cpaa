@@ -83,6 +83,7 @@ async function seedWork(): Promise<{ ticketId: string; storyId: string }> {
 
   await call(IDS.staffUser, "POST /api/content/stories", {
     title: SECRET.storyTitle,
+    storyType: "Feature",
     ticketId: ticket,
     sprintId,
     changesNoStep: true,
@@ -96,6 +97,7 @@ async function seedWork(): Promise<{ ticketId: string; storyId: string }> {
 
   await call(IDS.staffUser, "POST /api/content/stories", {
     title: "A second piece of work",
+    storyType: "Feature",
     ticketId: ticket,
     sprintId,
     changesNoStep: true,

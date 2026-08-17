@@ -130,6 +130,29 @@ export const INVITE_SWEEP_CAP = 25
  * unbounded send from a trusted sender. */
 export const MENTIONS_LIMIT = 50
 
+/** Rows the ticket sub-tab tally may return (R14). It is a GROUP BY over
+ * (`help_type`, `status`) — two collections that cannot run away, since one is a
+ * team's own dropdown vocabulary and the other is the seven-value fixed
+ * lifecycle — so the ceiling is generous and exists to make the bound VISIBLE at
+ * the query rather than implied by the shape of the data. */
+export const TICKET_FACET_CAP = 500
+
+/** Files AND links one ticket may carry (CHECKLIST 5.10). "Several" is the ask,
+ * from both front doors; a ceiling turns "several" into something a list can be
+ * read to the end of and a count can be trusted. */
+export const TICKET_ATTACHMENT_CAP = 50
+
+/** Processes one story may link to (CHECKLIST 6.5). "One or more" is the ask; a
+ * ceiling is what makes the `IN (...)` proof a bounded statement rather than one
+ * with as many placeholders as somebody types. */
+export const STORY_PROCESS_CAP = 20
+
+/** Bytes one file attached to a ticket may carry, before base64. The same 10 MB a
+ * to-do's evidence gets (routes/todos.ts) — the ask is the same ask, "a photo of
+ * the thing I mean", and two different ceilings for the same act is two different
+ * refusals a person has to learn. */
+export const TICKET_FILE_MAX_BYTES = 10 * 1024 * 1024
+
 /** Bytes one agent chat request may declare. The per-file caps (8 files × ~5 MB)
  * are real, and they were all enforced AFTER `request.json()` had already parsed
  * the whole body — so the caps described what could be imported while the parse

@@ -24,6 +24,8 @@ import { describe, expect, it } from "vitest"
 
 import { PORTAL_ACTIVITY_EXEMPT } from "@shared/rules/registry"
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
+import { HELP_STATUSES } from "@shared/types"
+import { STATUS_WORDS } from "@/components/ticket-row"
 
 const PORTAL = join(__dirname, "..")
 const read = (p: string) => readFileSync(p, "utf8")
@@ -38,8 +40,15 @@ function componentFiles(): string[] {
   return sourceFiles(join(PORTAL, "components"), { extensions: [".tsx"] }).map((f) => f.path)
 }
 
-/** Portal components that render a form (a submit handler + fields). */
-const FORM_COMPONENTS = ["raise-ticket-dialog", "needs-name"]
+/** Portal components that render a form (a submit handler + fields).
+ *
+ * A list, and therefore a list somebody has to remember to add to — which is why
+ * the assertion below it also refuses a portal-local FormShell outright. The day
+ * this grew a third entry (`add-link-dialog`, the link half of CHECKLIST 5.10)
+ * is the day that trade-off was worth writing down: the enumeration is what makes
+ * R4 and R7 checkable per-form, and the anti-copy assertion is what stops a form
+ * that ISN'T listed from inventing its own layout. */
+const FORM_COMPONENTS = ["raise-ticket-dialog", "needs-name", "add-link-dialog"]
 
 describe("portal UI laws", () => {
   it("guards the scan (the portal has components to check)", () => {
@@ -186,6 +195,53 @@ describe("portal rules the agency app doesn't have", () => {
       offenders,
       `these links go nowhere — there is no web-portal/app/<segment>/page.tsx behind them: ${offenders.join(", ")}`
     ).toEqual([])
+  })
+
+  // CHECKLIST 5.2 — THE STATUS IS A FACT, AND EVERY ONE OF THEM HAS WORDS.
+  //
+  // The failure this catches is not a crash, which is why it is worth a test: a
+  // state with no entry renders `undefined` inside the badge, and the screen goes
+  // on working. It has happened once already — `awaiting_validation` and
+  // `scheduled` arrived with CHECKLIST 5.13 and 5.3 while this map still held the
+  // old five, and the only thing that said so was the type checker (the map is
+  // declared `Record<HelpTicket["status"], …>`). That is a strong lock right up
+  // until somebody widens the type to make a build pass, so the claim is asserted
+  // against HELP_STATUSES itself rather than left to the annotation.
+  //
+  // NOT asserted here, deliberately: "the portal has only one lifecycle control".
+  // That promise is kept in three places that cannot be talked round — the door is
+  // absent from the portal gateway's table, every other status handler opens with
+  // refusePortalCaller, and the fence suite next door walks every /api path this
+  // app names against that table. A hand-typed list of forbidden doors here would
+  // be a fourth copy that is correct until the next door is added, which is the
+  // exact shape R21 has already been bitten by twice.
+  it("every ticket state a client can be shown has words in the portal's voice", () => {
+    expect(HELP_STATUSES.length, "the status list did not load").toBeGreaterThan(4)
+    const labels = HELP_STATUSES.map((s) => {
+      const entry = STATUS_WORDS[s]
+      expect(entry, `${s} has no label — a client would read "undefined"`).toBeTruthy()
+      expect(entry.label.trim().length, `${s}'s label is empty`).toBeGreaterThan(0)
+      return entry.label
+    })
+    // Two states wearing one word is a screen that cannot tell a client the
+    // difference between "we've read it" and "we're doing it".
+    expect(new Set(labels).size, "two states share a label").toBe(labels.length)
+    // And the map holds NOTHING ELSE: a stale entry for a state that no longer
+    // exists is a translation somebody keeps paying to maintain.
+    expect(Object.keys(STATUS_WORDS).sort()).toEqual([...HELP_STATUSES].sort())
+  })
+
+  // …and those words are drawn through the translation seam. The labels are
+  // English KEYS in a module-level constant, so the `t()` has to happen at the
+  // two places the badge is rendered — a constant translated where it is declared
+  // would be frozen in whichever language the tab loaded in.
+  it("a status label is translated where it is drawn, not where it is declared", () => {
+    for (const c of ["ticket-row", "ticket-screen"]) {
+      const src = read(join(PORTAL, "components", `${c}.tsx`))
+      expect(src, `${c} must render t(status.label), not the raw English`).toContain(
+        "{t(status.label)}"
+      )
+    }
   })
 
   // SCOPE ch.06 — "the portal shows work status but never which staff member is

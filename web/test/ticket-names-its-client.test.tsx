@@ -29,13 +29,36 @@ const accounts = [
 // section. Warm it here rather than stubbing the component's internals.
 vi.mock("@shared/web/store", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@shared/web/store")>()
-  return { ...actual, useCached: () => ({ data: accounts, error: undefined }) }
+  // KEYED, not blanket. The form now holds three cached reads (accounts, apps,
+  // and the chosen company's contacts) and answering all of them with the same
+  // rows would put "Bergman" in two pickers, which is a fixture lying rather than
+  // a screen failing.
+  return {
+    ...actual,
+    useCached: (key: string | null) => ({
+      data: key?.startsWith("accounts:") ? accounts : [],
+      error: undefined,
+    }),
+  }
 })
 
 vi.mock("@/lib/live-resources", () => ({
   accountsKey: (t: string) => `accounts:${t}`,
-  listFetch: { accounts: async () => accounts },
+  // The form gained two more pickers on 17 Aug 2026 — WHICH SYSTEM the request is
+  // about (CHECKLIST 5.8) and WHO ASKED (5.9). Both read through the same store
+  // seam the client picker does, so the mock has to answer for all three or the
+  // dialog throws before any of these cases can look at it.
+  appsKey: (t: string) => `apps:${t}`,
+  listFetch: { accounts: async () => accounts, apps: async () => [] },
 }))
+
+// The contact picker asks the accounts DETAIL door for the chosen company's own
+// people. Empty here: these cases are about the client field, and a contact list
+// that answered would be a second thing to keep in step with them.
+vi.mock("@/lib/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api")>()
+  return { ...actual, tenancy: { ...actual.tenancy, accountDetail: async () => ({ links: [] }) } }
+})
 
 vi.mock("@/lib/perms", () => ({ usePermissions: () => ({ can: () => false }) }))
 

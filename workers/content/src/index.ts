@@ -93,6 +93,11 @@ import {
   postUpdateHelp,
   postBulkHelpStatusByFilter,
   postResolveHelp,
+  getHelpAttachments,
+  postHelpAttachment,
+  postRemoveHelpAttachment,
+  postHelpTriageRead,
+  postValidateHelp,
 } from "./routes/help"
 import {
   getSprints,
@@ -314,6 +319,16 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/content/help/reply": { handler: postHelpReply, kind: "mutation" },
   // COME BACK TO THE CLIENT — the second and last thing that emails one.
   "POST /api/content/help/resolve": { handler: postResolveHelp, kind: "mutation" },
+  // THE TWO ACTS ON THE LADDER A MACHINE CANNOT INFER (CHECKLIST 5.11, 5.13).
+  // Everything else about a ticket's status now happens by itself — a timer
+  // starts, a sprint is picked, the last story closes — so these two are doors
+  // with their own words rather than values in a dropdown of seven.
+  "POST /api/content/help/validate": { handler: postValidateHelp, kind: "mutation" },
+  "POST /api/content/help/triage-read": { handler: postHelpTriageRead, kind: "mutation" },
+  // Several files and several links on one ticket, from BOTH front doors.
+  "GET /api/content/help/attachments": { handler: getHelpAttachments, kind: "read" },
+  "POST /api/content/help/attachments": { handler: postHelpAttachment, kind: "mutation" },
+  "POST /api/content/help/attachments/remove": { handler: postRemoveHelpAttachment, kind: "mutation" },
   "GET /api/content/help/stakeholders": { handler: getHelpStakeholders, kind: "read" },
   "POST /api/content/help/stakeholders": { handler: postAddStakeholder, kind: "mutation" },
   // THE WORK ENGINE — what we DO about a request, and the block of work it was

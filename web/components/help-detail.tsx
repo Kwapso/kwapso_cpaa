@@ -18,7 +18,7 @@ import {
   type TicketMember,
   type TicketStatus,
 } from "@kwapso/ui/registry/collections/ticket-thread/ticket-thread"
-import { ArchiveRestore, Archive, Languages, Pencil } from "lucide-react"
+import { ArchiveRestore, Archive, CheckCheck, Languages, Pencil, Send } from "lucide-react"
 
 import type {
   HelpMessage,
@@ -36,9 +36,12 @@ import { usePermissions } from "@/lib/perms"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { formatCount } from "@shared/web/format-count"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
+import { HelpAttachmentsPanel, helpAttachmentsKey } from "@/components/help-attachments"
 import { HelpFormDialog } from "@/components/help-form-dialog"
 import { HelpStakeholders } from "@/components/help-stakeholders"
-import { HelpStatusStepper, type HelpStatusValue } from "@/components/help-status-stepper"
+import { HelpStatusStepper } from "@/components/help-status-stepper"
+import { HELP_STATUS } from "@/components/deep-link/shape"
+import { ResolveDialog, type ResolveFormValues } from "@/components/resolve-dialog"
 import { StoriesPanel } from "@/components/work-panels"
 import { RecordTimerButton } from "@/components/timer-bar"
 import { OverviewList } from "@/components/overview-list"
@@ -54,30 +57,24 @@ import { useT } from "@shared/web/language"
 // narrowing only reaches the library's own badge, because the real control is
 // HelpStatusStepper below, which speaks all five.
 const TO_LIBRARY: Record<HelpTicket["status"], TicketStatus> = {
-  // Read but not started, and read and triaged, are both "with us, not begun".
+  // Waiting on the client, raised and unread, and read but not begun are all
+  // "with us, nothing has started".
+  awaiting_validation: "open",
   new: "open",
   triaged: "open",
+  // Booked into a sprint IS in motion as far as the library's four words go:
+  // there is a date on it now, which is the fact "open" would hide.
+  scheduled: "in-progress",
   in_progress: "in-progress",
   // Every story is done and the client has not been told yet — still in motion,
   // because the telling is the part that finishes it.
   ready: "in-progress",
   resolved: "resolved",
 }
-const TO_SERVER: Record<TicketStatus, HelpTicket["status"]> = {
-  open: "new",
-  "in-progress": "in_progress",
-  resolved: "resolved",
-  // The library's "reopened" is a staff member pulling a ticket back into play,
-  // which in our five states is exactly `triaged`: read, and not yet started.
-  reopened: "triaged",
-}
-const STATUS_LABEL: Record<HelpTicket["status"], string> = {
-  new: "New",
-  triaged: "Triaged",
-  in_progress: "In progress",
-  ready: "Ready",
-  resolved: "Resolved",
-}
+/** The one map every ticket screen reads. Imported rather than retyped here: this
+ * file used to keep its own copy, and a copy is how the list and the record end
+ * up calling the same fact two different things. */
+const STATUS_LABEL = HELP_STATUS
 
 export function HelpDetailScreen({
   teamId,
@@ -130,8 +127,11 @@ export function HelpDetailScreen({
 
   const [tab, setTab] = React.useState("conversation")
   const [editing, setEditing] = React.useState(false)
+  const [resolving, setResolving] = React.useState(false)
   const [translating, setTranslating] = React.useState(false)
   const [statusBusy, setStatusBusy] = React.useState(false)
+  // R16: the Files and links tab badges the door's exact COUNT(*).
+  const attachmentsTotal = useCachedValue<number>(`total:${helpAttachmentsKey(helpId)}`)
   // THE WORK ANSWERING THIS REQUEST. One story may answer many tickets and one
   // ticket may need many stories (the owner's ruling), so this is a collection
   // on the record rather than a field on it. Its exact total badges the tab.
@@ -154,21 +154,50 @@ export function HelpDetailScreen({
     .filter((v) => v.type === "Ticket type")
     .map((v) => v.value)
 
-  async function changeStatus(next: HelpStatusValue) {
+  /** THE THREE ACTS THAT ARE LEFT. Everything else about this ticket's stage now
+   * happens by itself — a sprint is picked, a timer starts, the last story
+   * closes — so what a person can still DO is named rather than picked from a
+   * dropdown of seven (CHECKLIST 5.2).
+   *
+   * `run` is the shape all three share: do it, say plainly if it was refused,
+   * re-prime the list cache and the record's own history. */
+  async function run(what: () => Promise<{ tickets: HelpTicket[] } | void>, done: string, fallback: string) {
     setStatusBusy(true)
     try {
-      const { tickets } = await content.setHelpStatus(helpId, next)
-      primeCache(`help:${teamId}`, tickets)
+      const r = await what()
+      if (r && "tickets" in r) primeCache(`help:${teamId}`, r.tickets)
+      invalidate(`help:${teamId}`)
       invalidate(recordActivityKey("help", helpId))
-      toast.success(t("Status updated."))
+      toast.success(done)
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't update the status.")
+      toast.error(err instanceof ApiFailure ? err.message : fallback)
     } finally {
       setStatusBusy(false)
     }
   }
 
-  async function editTicket(input: { description: string; helpType?: string; accountId?: string }) {
+  /** ANSWER IT AND TELL THEM (CHECKLIST 5.6 + 5.7). The door refuses without the
+   * words, which is 5.6 stated where it can be enforced; the send goes to the
+   * person who raised it and that client's main stakeholder, which is 5.7 and
+   * Aurora's ts3 over the owner's "raiser only".
+   *
+   * A ticket already answered comes back `alreadyResolved` and emails nobody —
+   * R17 is the send guard, so a second press is not a second answer. */
+  async function resolve(values: ResolveFormValues) {
+    const r = await content.resolveHelp(helpId, values.resolution)
+    invalidate(`help:${teamId}`)
+    invalidate(`help-thread:${helpId}`)
+    invalidate(recordActivityKey("help", helpId))
+    toast.success(r.alreadyResolved ? "Already answered." : "Answered, and they've been told.")
+  }
+
+  async function editTicket(input: {
+    description: string
+    helpType?: string
+    accountId?: string
+    appId?: string
+    raisedByContactId?: string
+  }) {
     const { tickets } = await content.updateHelp({
       id: helpId,
       description: input.description,
@@ -177,6 +206,10 @@ export function HelpDetailScreen({
       // sends the SAME id back and the door leaves it where it is; it refuses a
       // DIFFERENT one, which is the case this field must never quietly cause.
       accountId: input.accountId,
+      // Both correctable, unlike the client: a request filed against the wrong
+      // system, or a colleague who actually raised it, are ordinary mistakes.
+      appId: input.appId,
+      raisedByContactId: input.raisedByContactId,
     })
     primeCache(`help:${teamId}`, tickets)
     invalidate(recordActivityKey("help", helpId))
@@ -269,6 +302,12 @@ export function HelpDetailScreen({
 
   const overviewItems = [
     { label: t("Type"), value: ticket.helpType || "General" },
+    // WHICH SYSTEM, AND WHO ASKED (CHECKLIST 5.8 + 5.9). "Who asked" is not "who
+    // typed": most of a client's history is written down on their behalf, so the
+    // contact and the audit line below are two different people more often than
+    // they are one.
+    { label: t("App"), value: ticket.appName || "" },
+    { label: t("Raised by"), value: ticket.raisedByContactName || "" },
     // BOTH TITLES, and the German one first when it is the original. 788 of the
     // requests arriving from the previous system exist ONLY in German (BUILD-1
     // §8), so "the title" is two fields here and the screen says so rather than
@@ -311,6 +350,13 @@ export function HelpDetailScreen({
         label: t("Related stories"),
         icon: CONCEPT_ICON.stories,
         badge: formatCount(storiesTotal),
+        badgeVariant: "" as const,
+      },
+      {
+        value: "files",
+        label: t("Files and links"),
+        icon: "paperclip",
+        badge: formatCount(attachmentsTotal),
         badgeVariant: "" as const,
       },
       {
@@ -372,6 +418,43 @@ export function HelpDetailScreen({
             canLog={canLogTime}
             disabled={ticket.status === "resolved"}
           />
+          {/* THE CLIENT SAYS YES (CHECKLIST 5.13). Staff press it for the answer
+              that arrives by phone; the client presses the same door in their own
+              portal. It appears only while the request is actually waiting, and
+              disappears the moment it is not — a control that can only be refused
+              should not be a control. */}
+          {ticket.status === "awaiting_validation" && (
+            <Button
+              size="sm"
+              disabled={statusBusy}
+              onClick={() =>
+                void run(
+                  () => content.validateHelp(helpId),
+                  "Confirmed — it's in the queue.",
+                  "Couldn't confirm that."
+                )
+              }
+              className="shrink-0 gap-1.5"
+            >
+              <CheckCheck className="size-3.5" />
+              {t("They've confirmed it")}
+            </Button>
+          )}
+          {/* ANSWER IT AND TELL THEM. Offered from READY onward — the stage that
+              means every piece of work is done and only the telling is left — and
+              never on a ticket already answered. The panel is where the words are
+              written, because the door refuses without them (5.6). */}
+          {canEdit && ticket.status === "ready" && (
+            <Button
+              size="sm"
+              disabled={statusBusy}
+              onClick={() => setResolving(true)}
+              className="shrink-0 gap-1.5"
+            >
+              <Send className="size-3.5" />
+              {t("Answer and close")}
+            </Button>
+          )}
           {canEdit && (
             <Button
               variant="outline"
@@ -411,12 +494,10 @@ export function HelpDetailScreen({
               </Button>
             ))}
         </div>
-        <HelpStatusStepper
-          status={ticket.status}
-          canEdit={canEdit}
-          onChange={(n) => void changeStatus(n)}
-          busy={statusBusy}
-        />
+        {/* A STATUS IS A FACT, NOT A BUTTON. The track still says how far along
+            the request is, because that is what a track is for — it simply is
+            not something anybody can press (CHECKLIST 5.2). */}
+        <HelpStatusStepper status={ticket.status} />
       </div>
 
       <TabsView
@@ -441,6 +522,8 @@ export function HelpDetailScreen({
                 emptyText="No work written down against this request yet."
               />
             )
+          if (t.value === "files")
+            return <HelpAttachmentsPanel ticketId={helpId} canEdit={can("help", "read")} />
           if (t.value === "stakeholders")
             return (
               <HelpStakeholders
@@ -460,13 +543,25 @@ export function HelpDetailScreen({
               }}
               replies={replies}
               members={mentionableMembers}
-              canResolve={canEdit}
+              // NEITHER CONTROL. `showStatusControl` was already off; `canResolve`
+              // is off now too, because the library's resolve button moves a
+              // status with no words attached and CHECKLIST 5.6 says resolving is
+              // refused until a resolution is written. The one way to answer this
+              // ticket is the panel on the title, which sends what a person typed.
+              canResolve={false}
               showStatusControl={false}
               onReply={onReply}
-              onStatusChange={(s) => void changeStatus(TO_SERVER[s])}
             />
           )
         }}
+      />
+
+      <ResolveDialog
+        open={resolving}
+        onOpenChange={setResolving}
+        draft={ticket.draftResolution}
+        draftKey={`help:resolve:${helpId}`}
+        onSubmit={resolve}
       />
 
       <HelpFormDialog
@@ -479,6 +574,8 @@ export function HelpDetailScreen({
           description: ticket.description,
           helpType: ticket.helpType,
           accountId: ticket.accountId,
+          appId: ticket.appId,
+          raisedByContactId: ticket.raisedByContactId,
         }}
         onSubmit={editTicket}
       />

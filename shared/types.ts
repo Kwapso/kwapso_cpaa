@@ -242,9 +242,54 @@ export type ApiError = {
 /** THE ticket lifecycle — the one list, for every side of the app. The server
  * validates against it, the stepper renders from it, and the agent's tool
  * descriptions name it. It was written out four times over; a fifth status was
- * four edits and TypeScript caught none of them. Now it's one edit. */
-export const HELP_STATUSES = ["new", "triaged", "in_progress", "ready", "resolved"] as const
+ * four edits and TypeScript caught none of them. Now it's one edit.
+ *
+ * A STATUS IS A FACT, NOT A BUTTON (the tester's sentence, 17 Aug 2026). Five of
+ * these seven are now reached by something HAPPENING rather than by somebody
+ * choosing them, and the two that a person does reach are doors of their own
+ * with their own words, not a dropdown:
+ *
+ *   awaiting_validation  the client's main stakeholder has not said yes yet, and
+ *                        only for the kinds that wait (Aurora's ap2: extras,
+ *                        requests and feedback wait; questions and issues go
+ *                        straight in). Set by `createTicket`, cleared by
+ *                        `/help/validate`;
+ *   new                  raised, nobody here has read it;
+ *   triaged              somebody on duty read it (`/help/triage-read`);
+ *   scheduled            work exists AND some of it is in a sprint — flipped by
+ *                        lib/ready-flip `scheduledFlip`;
+ *   in_progress          a timer started on the ticket or on one of its stories
+ *                        — flipped by lib/ready-flip `progressFlip`;
+ *   ready                every story closed — flipped by `readyFlipForTicket`;
+ *   resolved             a PERSON sent the answer (`/help/resolve`), which is
+ *                        refused until a resolution is written.
+ */
+export const HELP_STATUSES = [
+  "awaiting_validation",
+  "new",
+  "triaged",
+  "scheduled",
+  "in_progress",
+  "ready",
+  "resolved",
+] as const
 export type HelpStatus = (typeof HELP_STATUSES)[number]
+
+/** THE KINDS THAT WAIT FOR THE CLIENT TO CONFIRM (Aurora's ap2, over the owner's
+ * "everything waits"). Matched case-insensitively against the team's OWN editable
+ * `Ticket type` vocabulary — the words are a team's to rename, and a rule that
+ * hard-matched the seeded spelling would silently stop waiting the day somebody
+ * typed "Requests". A question or an issue is somebody stuck; making them ask
+ * their own colleague for permission first is the version of this rule that gets
+ * the feature switched off. */
+export const VALIDATED_TICKET_TYPES = ["extra", "request", "feedback"] as const
+
+/** Does a ticket of this type wait for the account's main stakeholder? */
+export function ticketTypeWaitsForValidation(helpType: string | null | undefined): boolean {
+  if (!helpType) return false
+  const word = helpType.trim().toLowerCase().replace(/s$/, "")
+  return (VALIDATED_TICKET_TYPES as readonly string[]).includes(word)
+}
 
 /** The states a ticket is NOT yet finished in — "still ours to do something
  * about". Derived from the one list above rather than retyped, so a sixth state
@@ -314,6 +359,42 @@ export type HelpTicket = {
    * the account fence reads, and what a live ping carries so a colleague's
    * question can reach their screen without reaching anyone else's. */
   accountId: string | null
+  /** WHICH SYSTEM IT IS ABOUT (CHECKLIST 5.8). A request that names no app is a
+   * request nobody can route: the app is what says whose work it is, which
+   * sprint it could be scheduled into, and who the stakeholder to tell is. */
+  appId: string | null
+  appName: string | null
+  /** WHO ASKED (CHECKLIST 5.9) — the CONTACT, a person row on the account, not
+   * the login that typed it. Staff raise most of a client's history on their
+   * behalf, so "who raised it" and "who typed it" are different people and the
+   * record has to be able to say both. */
+  raisedByContactId: string | null
+  raisedByContactName: string | null
+  /** WHEN THE CLIENT'S MAIN STAKEHOLDER CONFIRMED THEY WANT IT. Only the kinds
+   * that wait ever carry one (see `ticketTypeWaitsForValidation`); null on a
+   * ticket that never had to wait, which is why the STATUS and not this column
+   * is what a screen reads. */
+  validatedAt: string | null
+}
+
+/** A FILE OR A LINK ON A TICKET (CHECKLIST 5.10) — several of each, from either
+ * front door. One row shape for both, because "here is the thing I mean" is one
+ * act: a `file` carries the R2 key we stored it under, a `link` carries only a
+ * URL. Deactivate-never-delete, like everything else here. */
+export type HelpAttachment = {
+  id: string
+  ticketId: string
+  kind: "file" | "link"
+  /** what a person reads in the list — the file's name, or the link's label */
+  label: string
+  /** the file's key inside the tickets bucket, or the link's URL */
+  url: string
+  contentType: string | null
+  sizeBytes: number | null
+  createdAt: string
+  /** null on the way OUT to a client login when the person is on the agency's
+   * side of the fence — the same redaction `toTicket` makes about a raiser. */
+  addedByName: string | null
 }
 
 /** One reply on a ticket. `isAgent` marks the AI-drafted first reply; a mention
@@ -946,6 +1027,19 @@ export type Story = {
   title: string
   detail: string | null
   status: StoryStatus
+  /** WHAT KIND OF WORK IT IS (CHECKLIST 6.2) — Fix, Feature or Change, and
+   * editable on the Dropdown values screen like every other vocabulary here.
+   * REQUIRED on the way in; nullable on the way out because 3,677 stories
+   * arrived from the previous system without one, and a column that refused to
+   * describe them would be a column that lied about what is in the table. */
+  storyType: string | null
+  /** WHY IT MAY BE REVIEWED. Written before a story can move to `in_review`
+   * (CHECKLIST 6.9): the timers have to be stopped and this has to say what was
+   * done. The FILE is optional — Aurora's ruling, over "all three always" —
+   * because plenty of work has nothing to show. */
+  reviewNote: string | null
+  reviewFileUrl: string | null
+  reviewFileName: string | null
   /** the request this work answers, when there is one. Four out of five stories
    * in the real history stand on their own. */
   ticketId: string | null
@@ -959,6 +1053,12 @@ export type Story = {
    * `changesNoStep`; that pair is the hook the savings maths hangs off. */
   stepKey: string | null
   changesNoStep: boolean
+  /** EVERY PROCESS THIS WORK TOUCHES (CHECKLIST 6.5). `processId` above is the
+   * FIRST of these, kept because the savings maths and the import both address a
+   * story's map by one id; this is the full set, and one piece of work commonly
+   * changes two. An EMPTY list is only allowed when `changesNoStep` is ticked —
+   * Aurora's ruling that "no process" must be CHOSEN rather than left blank. */
+  processIds: string[]
   assigneeId: string | null
   assigneeName: string | null
   reviewerId: string | null

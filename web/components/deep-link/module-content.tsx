@@ -75,6 +75,10 @@ export type ModuleContentCtx = Pick<
   | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "helpQ" | "helpMineQ" | "helpArchivedQ" | "accountsQ" | "knowledgeQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "inviteAuditQ"
   | "brandQ" | "purposesQ" | "internalActivity"
   | "storiesQ" | "sprintsQ" | "appsQ" | "tasksOpenQ" | "tasksAllQ" | "workLogsQ" | "meetingsQ"
+  // The team's live `Ticket type` values. The tickets screen's sub-tab strip is
+  // DERIVED from them (CHECKLIST 5.1), so it has to travel with the bundle —
+  // the host already reads them for the ticket form's own picker.
+  | "helpTypeOptions"
 > & {
   noAccess: boolean
   enabled: boolean

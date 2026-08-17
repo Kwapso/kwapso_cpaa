@@ -99,10 +99,17 @@ export function shapeInvitesList(invites: Invite[]): ScreenData {
 
 /** Display label per ticket status (server's underscore form → friendly text).
  * One source for the list detail line; the thread's own status badge uses the
- * library's hyphen labels. */
+ * library's hyphen labels.
+ *
+ * SEVEN NOW, and every one of them is a FACT rather than a choice: two arrived on
+ * 17 Aug 2026 for the two things a person could previously only assert by hand.
+ * "Waiting on you" is deliberately not "Awaiting validation" — the client reads
+ * the same word we do, and the plain sentence is the one that gets answered. */
 export const HELP_STATUS: Record<HelpTicket["status"], string> = {
+  awaiting_validation: "Waiting on you",
   new: "New",
   triaged: "Triaged",
+  scheduled: "Scheduled",
   in_progress: "In progress",
   ready: "Ready",
   resolved: "Resolved",

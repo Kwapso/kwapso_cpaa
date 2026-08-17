@@ -13,7 +13,7 @@
 // a list primes its total in the same round-trip.
 
 import { content as contentApi, tenancy } from "@/lib/api"
-import { TASK_VIEWS, type TaskViewName } from "@shared/types"
+import { TASK_VIEWS, type HelpTicket, type TaskViewName } from "@shared/types"
 import { primeCache, readCache } from "@shared/web/store"
 
 /** The sidecar cache key holding a collection's exact server total (R16). */
@@ -124,6 +124,10 @@ export const listFetch = {
       primeCache(totalKey("help", teamId), r.total)
       primeCache(totalKey("help-mine", teamId), r.mineTotal)
       primeCache(cursorKey(helpKey(teamId, "all")), r.nextCursor)
+      // The sub-tab badges (CHECKLIST 5.1). One grouped read on the server rides
+      // every ticket page, so the strip costs nothing extra to draw.
+      primeCache(`help-by-type:${teamId}`, r.byType)
+      primeCache(`help-by-status:${teamId}`, r.byStatus)
       return r.tickets
     }),
   helpMine: (teamId: string) =>
@@ -144,6 +148,34 @@ export const listFetch = {
       primeCache(cursorKey(helpKey(teamId, "archived")), r.nextCursor)
       return r.tickets
     }),
+  /** ONE SUB-TAB'S PAGE (CHECKLIST 5.1). Same door, same paging, same exact
+   * totals — the narrowing is the door's, not the browser's, because the list
+   * pages and filtering a loaded page would answer "the questions among the
+   * newest fifty" under a badge counting all of them (R14 + R16).
+   *
+   * `byType` / `byStatus` are primed from EVERY ticket read, including this one:
+   * they are counted over the list ignoring the kind and stage facets, so the
+   * strip's badges stay right whichever sub-tab is open. */
+  helpFacet: (teamId: string, scope: HelpScope, facet: HelpFacet) => {
+    const f = helpFacetFilter(facet)
+    return contentApi
+      .help(
+        scope === "mine" ? "mine" : "all",
+        null,
+        scope === "archived" ? "archived" : "live",
+        undefined,
+        undefined,
+        f.helpType,
+        f.status as HelpTicket["status"] | undefined
+      )
+      .then((r) => {
+        primeCache(totalKey(`help-facet:${scope}:${facet}`, teamId), r.total)
+        primeCache(cursorKey(helpFacetKey(teamId, scope, facet)), r.nextCursor)
+        primeCache(`help-by-type:${teamId}`, r.byType)
+        primeCache(`help-by-status:${teamId}`, r.byStatus)
+        return r.tickets
+      })
+  },
   // R14: process maps are PAGED — every app of every client grows them, and none
   // is ever deleted (the savings computed from a baseline have to stay checkable
   // years later). Page one lands in the cache, its next cursor in the sidecar
@@ -436,6 +468,36 @@ export function helpKey(teamId: string, scope: HelpScope): string {
  * (`mine` / `all`) and one is a VIEW (`archived`), and they are one type because
  * a screen shows exactly one of the three at a time — the strip is one strip. */
 export type HelpScope = "mine" | "all" | "archived"
+
+/** THE SECOND STRIP (CHECKLIST 5.1): sub-tabs by TYPE beneath All / My /
+ * Archived, plus the two stage tabs and the triage queue.
+ *
+ * ONE STRING FOR TWO KINDS OF NARROWING, and the prefix is what tells them apart:
+ * `type:Question` is the team's own `Ticket type` vocabulary (so the strip is
+ * DERIVED from their values — retiring a word on the Dropdown values screen
+ * retires its tab) and `status:ready` is the fixed lifecycle. `all` is neither.
+ * `triage` is not a filter at all: it swaps the collection for the triage queue,
+ * which is a different screen wearing the same tab strip (5.11).
+ *
+ * A string rather than an object because it is a TAB VALUE — the library's
+ * `TabsView` hands back the value it was given, and an object would have to be
+ * encoded into one anyway. */
+export type HelpFacet = string
+
+/** Split a facet token into the two filters the door parses. `triage` and `all`
+ * narrow nothing; the caller decides what to render for the first. */
+export function helpFacetFilter(facet: HelpFacet): { helpType?: string; status?: string } {
+  if (facet.startsWith("type:")) return { helpType: facet.slice(5) }
+  if (facet.startsWith("status:")) return { status: facet.slice(7) }
+  return {}
+}
+
+/** The cache key for one sub-tab of one scope. It carries BOTH, because the two
+ * strips compose: "my questions" and "all questions" are different pages, and a
+ * key that named only the facet would show one under the other's badge. */
+export function helpFacetKey(teamId: string, scope: HelpScope, facet: HelpFacet): string {
+  return `${helpKey(teamId, scope)}::${facet}`
+}
 
 /** Row-level live registry: a "<resource> row <id> changed" ping → re-pull JUST
  * that row and patch it into the cached list (never refetch the whole list);

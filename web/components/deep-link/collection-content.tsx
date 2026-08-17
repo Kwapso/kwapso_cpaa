@@ -28,7 +28,7 @@ import { StoriesScreen } from "@/components/stories-screen"
 import { TasksScreen } from "@/components/tasks-screen"
 import { TimeScreen } from "@/components/time-screen"
 import { MeetingsScreen } from "@/components/meetings-screen"
-import { TriageStrip } from "@/components/triage-strip"
+import { TicketsCollection } from "@/components/tickets-collection"
 import {
   BrandLibraryScreen,
   PurposesScreen,
@@ -39,13 +39,12 @@ import { KnowledgeAsk } from "@/components/knowledge-ask"
 import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
 import { content as contentApi, tenancy } from "@/lib/api"
-import { accountsKey, helpKey, knowledgeKey, type HelpScope } from "@/lib/live-resources"
+import { accountsKey, knowledgeKey } from "@/lib/live-resources"
 import { CountedAbove } from "@/components/counted-tabs"
 import { formatCount } from "@shared/web/format-count"
 import {
   accountStatus,
   shapeAccountsList,
-  shapeHelpList,
   shapeInvitesList,
   shapeKnowledgeList,
   shapeMembersList,
@@ -55,7 +54,7 @@ import {
   resolveRecipe,
   withDataDrivenCollection,
 } from "@/lib/screens"
-import type { Account, HelpTicket, KnowledgeSource } from "@shared/types"
+import type { Account, KnowledgeSource } from "@shared/types"
 import type { ModuleContentCtx } from "./module-content"
 
 /** The list screen for `module`, or the honest refusal/empty state. */
@@ -71,7 +70,6 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     rolesQ,
     roles,
     invitesQ,
-    helpQ,
     accountsQ,
     knowledgeQ,
     brandQ,
@@ -82,8 +80,6 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     onIntent,
     sectionPath,
     helpScope,
-    helpMineQ,
-    setHelpScope,
   } = ctx
 
   // TIME — the one collection with NO recipe, so it is answered before the
@@ -540,107 +536,24 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     )
   }
   if (module === "tickets") {
-    // R14: each of the three is a SERVER scope with its own paged cache —
-    // filtering a loaded PAGE by raiser (or by whether it is put away) would
-    // disagree with the exact badge above it.
-    const scopedQ = helpScope === "mine" ? helpMineQ : helpScope === "archived" ? ctx.helpArchivedQ : helpQ
-    if (scopedQ.error) return <LoadError what="tickets" />
-    if (scopedQ.data === undefined) return <Skeleton variant="list" lines={4} />
-    const loadedTickets = scopedQ.data
-    // R16: both scope badges are exact server totals (All + My come back from
-    // the door's one COUNT read) through the ONE seam — never a filter's length.
-    const helpBadge = formatCount(totals.help)
+    // TWO TAB STRIPS AND A QUEUE (CHECKLIST 5.1 + 5.11), which is state — and
+    // this switch is deliberately pure (no hooks, no effects). So the screen is a
+    // component of its own now; the host still owns the recipe, the rights and
+    // the two callbacks, and hands them over.
     return (
-      <CountedAbove active={helpBadge !== ""}>
-      <div className="flex flex-col gap-4">
-      <CollectionHeading sectionKey="tickets" total={totals.help} />
-      {/* WHOSE WEEK IT IS, above the list rather than in a screen of its own: it
-          is the sentence a person needs before they look, and a page they have
-          to go and open is a page nobody opens (BUILD-1 §6). */}
-      <TriageStrip teamId={teamId as string} canSetDuty={can("help", "edit")} />
-      {/* R14's other half: tickets accumulate forever, so the search box is
-          answered by the door — inside the scope the strip below has chosen, so
-          "search my tickets" means mine and "search the archive" means the
-          archive. */}
-      <PagedFind<HelpTicket>
-        listKey={helpKey(teamId as string, helpScope)}
-        placeholder={t("Search tickets…")}
-        noun="tickets"
-        fetchPage={(query, cursor) =>
-          contentApi
-            .help(
-              helpScope === "archived" ? "all" : helpScope,
-              cursor,
-              helpScope === "archived" ? "archived" : "live",
-              query.q
-            )
-            .then((r) => ({ rows: r.tickets, nextCursor: r.nextCursor, total: r.total }))
-        }
-      >
-        {(found) => {
-          const rows = found.active ? found.rows : loadedTickets
-          if (rows === null) return <Skeleton variant="list" lines={4} />
-          const data = shapeHelpList(rows)
-          const helpRecipe = withDataDrivenCollection(recipe, data.rows ?? [], found.emptyText)
-          return (
-            <>
-      <SectionWithCreate
-        show={can("help", "create")}
-        label={t("Raise ticket")}
-        icon="plus"
+      <TicketsCollection
+        teamId={teamId as string}
+        recipe={recipe}
+        rights={rights}
+        helpScope={helpScope}
+        setHelpScope={ctx.setHelpScope}
+        helpTypeOptions={ctx.helpTypeOptions}
+        totals={totals}
+        can={can}
         onCreate={() => go(sectionPath, { panel: "add", module: "tickets" })}
-        // The My/All raiser strip sits ABOVE the boxed list — it scopes which
-        // tickets the collection card shows, so it isn't part of that unit.
-        aboveCard={
-          <TabsView
-            config={{
-              ...defaultTabsConfig,
-              variant: "line",
-              tabs: [
-                {
-                  value: "all",
-                  label: t("All tickets"),
-                  icon: "inbox",
-                  badge: helpBadge,
-                  badgeVariant: "",
-                },
-                {
-                  value: "mine",
-                  label: t("My tickets"),
-                  icon: "user",
-                  badge: formatCount(totals.helpMine),
-                  badgeVariant: "",
-                },
-                // THE PUT-AWAY PILE. Archive shipped as a door with no button;
-                // giving it a button without giving the pile a screen would have
-                // moved the dead end one step along instead of ending it.
-                {
-                  value: "archived",
-                  label: t("Archived"),
-                  icon: "archive",
-                  badge: formatCount(totals.helpArchived),
-                  badgeVariant: "",
-                },
-              ],
-            }}
-            value={helpScope}
-            onValueChange={(v) => setHelpScope(v as HelpScope)}
-          />
-        }
-      >
-        <ScreenRenderer recipe={helpRecipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
-      </SectionWithCreate>
-      <LoadMore
-        listKey={found.listKey ?? helpKey(teamId as string, helpScope)}
-        label={t("Load more tickets")}
-        fetchPage={found.fetchPage}
+        onAction={onAction}
+        onIntent={onIntent}
       />
-            </>
-          )
-        }}
-      </PagedFind>
-      </div>
-      </CountedAbove>
     )
   }
   return <NotFound />

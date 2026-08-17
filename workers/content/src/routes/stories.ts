@@ -37,9 +37,10 @@ import {
   updateStory,
   type StoryFilter,
   type StoryInput,
+  type SprintFilter,
   type SprintInput,
 } from "../lib/stories"
-import { readyFlipForTicket } from "../lib/ready-flip"
+import { readyFlipForTicket, scheduledFlip } from "../lib/ready-flip"
 import type { Env } from "../env"
 
 /** THE FILTERS THIS DOOR PARSES — read once, in one place, so the list and its
@@ -108,8 +109,14 @@ export async function postCreateStory(request: Request, env: Env): Promise<Respo
   const { actor, cfg, guard, body } = await gatedBody<StoryInput>(request, env, "work", "create")
   await refusePortalCaller(cfg, guard)
   requireText(body.title, "Title", TEXT_LIMITS.short)
+  requireText(body.storyType, "Story type", TEXT_LIMITS.short)
+  const ticketId = optionalText(body.ticketId, "Ticket", TEXT_LIMITS.short)
   const { id, accountId } = await createStory(cfg, guard, actor, body)
   await publishChange(env, guard.teamId, "stories", id, "add", accountId ?? undefined)
+  // CHECKLIST 5.3: work existing in a sprint is what SCHEDULES the request behind
+  // it. R17 rides the flip, so a second story on an already-scheduled ticket
+  // moves zero rows and publishes nothing.
+  await announceScheduled(env, cfg, guard, actor, ticketId ?? null)
   return storyPage(cfg, guard, storyFilterFrom(new URL(request.url)), null)
 }
 
@@ -124,9 +131,32 @@ export async function postUpdateStory(request: Request, env: Env): Promise<Respo
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Story", TEXT_LIMITS.short)
   requireText(body.title, "Title", TEXT_LIMITS.short)
+  requireText(body.storyType, "Story type", TEXT_LIMITS.short)
+  const ticketId = optionalText(body.ticketId, "Ticket", TEXT_LIMITS.short)
   const { accountId } = await updateStory(cfg, guard, actor, id, body)
   await publishChange(env, guard.teamId, "stories", id, "edit", accountId ?? undefined)
+  // The edit form is where a sprint gets attached, so this is the ordinary way a
+  // ticket becomes `scheduled`.
+  await announceScheduled(env, cfg, guard, actor, ticketId ?? null)
   return storyPage(cfg, guard, storyFilterFrom(new URL(request.url)), null)
+}
+
+/** THE SCHEDULED FLIP AND ITS PING, in one place because three doors do it and
+ * every one of them has to publish on exactly the same condition (R1 + R17): the
+ * flip reports whether a row genuinely moved, and only then is there anything to
+ * announce. The ping carries the TICKET's own account, so the people who raised
+ * the request watch it move and nobody else hears a thing. */
+async function announceScheduled(
+  env: Env,
+  cfg: Parameters<typeof scheduledFlip>[0],
+  guard: Parameters<typeof scheduledFlip>[1],
+  actor: Parameters<typeof scheduledFlip>[2],
+  ticketId: string | null
+): Promise<void> {
+  if (!ticketId) return
+  const flip = await scheduledFlip(cfg, guard, actor, ticketId)
+  if (flip.moved)
+    await publishChange(env, guard.teamId, "help", ticketId, "edit", flip.accountId ?? undefined)
 }
 
 /** POST /api/content/stories/status — move a story along its fixed lifecycle
@@ -151,12 +181,24 @@ export async function postStoryStatus(request: Request, env: Env): Promise<Respo
     id?: unknown
     status?: unknown
     closingNote?: unknown
+    reviewNote?: unknown
+    reviewFileUrl?: unknown
+    reviewFileName?: unknown
   }>(request, env, "work", "edit")
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Story", TEXT_LIMITS.short)
   if (typeof body.status !== "string" || !(STORY_STATUSES as readonly string[]).includes(body.status))
     return fail(400, "invalid_input", "id and a valid status are required.")
   const closingNote = optionalText(body.closingNote, "Closing note", TEXT_LIMITS.long) ?? null
+  // CHECKLIST 6.9: the words that let a story go for review, and the optional
+  // something-to-show beside them. Validated here at the boundary; whether they
+  // are ENOUGH is lib/stories' decision, because there is more than one way to
+  // move a story and the rule has to ride the model rather than the door.
+  const review = {
+    note: optionalText(body.reviewNote, "What you did", TEXT_LIMITS.long) ?? null,
+    fileUrl: optionalText(body.reviewFileUrl, "File", TEXT_LIMITS.link) ?? null,
+    fileName: optionalText(body.reviewFileName, "File name", TEXT_LIMITS.short) ?? null,
+  }
 
   const { moved, story, ticketId, accountId } = await setStoryStatus(
     cfg,
@@ -164,7 +206,8 @@ export async function postStoryStatus(request: Request, env: Env): Promise<Respo
     actor,
     id,
     body.status as StoryStatus,
-    closingNote
+    closingNote,
+    review
   )
   if (moved) await publishChange(env, guard.teamId, "stories", id, "edit", accountId ?? undefined)
   // THE TICKET HALF. Reached only when a row actually moved, and only when the
@@ -191,10 +234,14 @@ export async function postStoryStatus(request: Request, env: Env): Promise<Respo
 /** THE FILTERS THE SPRINT DOOR PARSES — read once, so the list and its count are
  * asked the same question (R16) and the machine surface has one thing to mirror
  * (R19). Same shape as storyFilterFrom above, for the same reasons. */
-function sprintFilterFrom(url: URL): { accountId: string | null; appId: string | null } {
+function sprintFilterFrom(url: URL): SprintFilter {
   return {
     accountId: queryText(url.searchParams.get("accountId"), "Client") ?? null,
     appId: queryText(url.searchParams.get("appId"), "App") ?? null,
+    // CHECKLIST 6.3: the story form asks for current-or-future blocks only.
+    // Anything but the exact word "open" means all of them — the fail-safe
+    // default, because the whole list is where a mistyped parameter should land.
+    when: queryText(url.searchParams.get("when"), "When") === "open" ? "open" : "all",
   }
 }
 

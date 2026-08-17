@@ -21,19 +21,33 @@ import {
   HELP_STATUSES,
   listReplies,
   listTickets,
+  markTriaged,
   maybeDraftFirstReply,
+  refuseDirectResolve,
   setStatus,
   setTicketArchived,
   setTicketRank,
   updateTicket,
+  validateTicket,
   type HelpStatus,
+  type TicketFilter,
   type TicketInput,
   countTickets,
+  countTicketFacets,
   countReplies,
   bulkSetStatusByFilter,
 } from "../lib/help"
+import {
+  addAttachment,
+  countAttachments,
+  listAttachments,
+  removeAttachment,
+} from "../lib/help-attachments"
 import { notifyReplyAndMentions, notifyTicketResolved } from "../lib/notify"
 import { addStakeholder, listStakeholders } from "../lib/stakeholders"
+import { mediaKey, parseUploadDataUrl } from "@shared/workers/image"
+import { safeExternalLink } from "../lib/internal-fields"
+import { TICKET_FILE_MAX_BYTES } from "@shared/workers/limits"
 import type { Env } from "../env"
 
 /** WHOSE WORLD IS THIS CALLER STANDING IN? Resolved ONCE per request, the same
@@ -73,22 +87,52 @@ async function ticketPage(
   cfg: Parameters<typeof listTickets>[0],
   guard: Parameters<typeof listTickets>[1],
   scope: AccountScope,
-  tab: "mine" | "all",
-  view: "live" | "archived",
-  cursor: string | null,
-  q?: string,
-  accountId?: string
+  filter: TicketFilter,
+  cursor: string | null
 ): Promise<Response> {
-  const [page, counts] = await Promise.all([
-    listTickets(cfg, guard, scope, tab, view, cursor, q, accountId),
+  const [page, counts, facets] = await Promise.all([
+    listTickets(cfg, guard, scope, filter, cursor),
     // R16: the total is counted over the SAME view the page came from, or the
-    // badge is a number the list cannot reach — and over the same SEARCH, or a
-    // search's own count is a number about somebody else's question.
-    // …and over the same ACCOUNT, when one is named: a tab badging one client's
-    // tickets over a total counting everybody's is the same failure again.
-    countTickets(cfg, guard, scope, view, q, accountId),
+    // badge is a number the list cannot reach — and over the same SEARCH, the
+    // same ACCOUNT, the same KIND and the same STAGE, for the same reason. One
+    // `ticketWhere` builds both (lib/help), so they cannot be asked differently.
+    countTickets(cfg, guard, scope, filter),
+    // …and the SUB-TAB badges (CHECKLIST 5.1), which are the same question asked
+    // once per facet. ONE grouped read rather than six counts: the strip is on
+    // the screen the team lives in.
+    countTicketFacets(cfg, guard, scope, filter),
   ])
-  return pagedJson("tickets", { ...page, total: counts.total }, { mineTotal: counts.mineTotal })
+  return pagedJson(
+    "tickets",
+    { ...page, total: counts.total },
+    { mineTotal: counts.mineTotal, byType: facets.byType, byStatus: facets.byStatus }
+  )
+}
+
+/** THE FILTERS THIS DOOR PARSES — read once, in one place, so the list, its
+ * count and its sub-tab tally can never be asked different questions (R16) and
+ * the machine surface has ONE thing to mirror (R19). Every value goes through the
+ * query half of the validation seam at the boundary, where the boundary is. */
+function ticketFilterFrom(url: URL): TicketFilter {
+  const status = queryText(url.searchParams.get("status"), "Status")
+  return {
+    tab: queryText(url.searchParams.get("scope"), "Scope") === "mine" ? "mine" : "all",
+    view: ticketView(queryText(url.searchParams.get("view"), "View")),
+    q: queryText(url.searchParams.get("q"), "Search"),
+    // WHOSE tickets — one account's, when the caller names one. A FILTER on top
+    // of the fence, never instead of it: naming somebody else's account narrows
+    // to rows the fence has already excluded, which is an empty page rather than
+    // a leak. It is what a client record's Tickets tab and a contact's own screen
+    // ask, so the rows and the badge answer the same question (R16).
+    accountId: queryText(url.searchParams.get("accountId"), "Client"),
+    // The sub-tab strip's two halves. The type is the team's OWN vocabulary, so
+    // it is not checked against a list here — an unknown word narrows to nothing,
+    // which is the honest answer for a type nobody uses.
+    helpType: queryText(url.searchParams.get("helpType"), "Type"),
+    status: (HELP_STATUSES as readonly string[]).includes(status ?? "")
+      ? (status as HelpStatus)
+      : undefined,
+  }
 }
 
 /** LIVE, or the archive drawer. One word, decided in one place, so the list and
@@ -104,6 +148,12 @@ function ticketView(raw: string | undefined): "live" | "archived" {
   return raw === "archived" ? "archived" : "live"
 }
 
+/** WHAT A MUTATION ANSWERS WITH: the everyday list, unfiltered. A write re-primes
+ * the screen's cache, and the screen re-asks for whatever sub-tab it is on — so a
+ * response narrowed to the facets of the request that CAUSED it would hand back a
+ * page the caller never asked for. Named once so all five writes agree. */
+const EVERYDAY_LIST: TicketFilter = { tab: "all", view: "live" }
+
 /** GET /api/content/help?scope=mine|all  (?id=<ticketId> → just that one). */
 export async function getHelp(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "help", "read")
@@ -111,8 +161,7 @@ export async function getHelp(request: Request, env: Env): Promise<Response> {
   // whose accounts: their company, and everything nested beneath it.
   const scope = await callerScope(cfg, guard)
   const url = new URL(request.url)
-  const tab = queryText(url.searchParams.get("scope"), "Scope") === "mine" ? "mine" : "all"
-  const view = ticketView(queryText(url.searchParams.get("view"), "View"))
+  const filter = ticketFilterFrom(url)
   const id = queryText(url.searchParams.get("id"), "Id")
   // One ticket by id is a LOOKUP, not a page — answer it directly rather than
   // filtering a page (which could legitimately not contain it once paged). It
@@ -120,7 +169,7 @@ export async function getHelp(request: Request, env: Env): Promise<Response> {
   // or nothing could ever be restored.
   if (id) {
     const one = await getTicket(cfg, guard, scope, id)
-    const counts = await countTickets(cfg, guard, scope, view)
+    const counts = await countTickets(cfg, guard, scope, filter)
     return pagedJson(
       "tickets",
       { rows: one ? [one] : [], total: counts.total, hasMore: false, nextCursor: null },
@@ -134,21 +183,7 @@ export async function getHelp(request: Request, env: Env): Promise<Response> {
   // `q` is the screen's search box, answered HERE rather than in the browser: a
   // list that pages cannot be searched by filtering the page it loaded, or a
   // ticket raised last spring is unfindable while the badge above still counts it.
-  return ticketPage(
-    cfg,
-    guard,
-    scope,
-    tab,
-    view,
-    queryText(url.searchParams.get("cursor"), "Cursor") ?? null,
-    queryText(url.searchParams.get("q"), "Search"),
-    // WHOSE tickets — one account's, when the caller names one. A FILTER on top
-    // of the fence, never instead of it: naming somebody else's account narrows
-    // to rows the fence has already excluded, which is an empty page rather than
-    // a leak. It is what a client record's Tickets tab and a contact's own screen
-    // ask, so the rows and the badge answer the same question (R16).
-    queryText(url.searchParams.get("accountId"), "Client")
-  )
+  return ticketPage(cfg, guard, scope, filter, queryText(url.searchParams.get("cursor"), "Cursor") ?? null)
 }
 
 /** GET /api/content/help/thread?id=<ticketId> → the ticket's replies (oldest first).
@@ -174,6 +209,10 @@ export async function getHelpThread(request: Request, env: Env): Promise<Respons
 export async function postCreateHelp(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<TicketInput>(request, env, "help", "create")
   const description = requireText(body.description, "Description", TEXT_LIMITS.long)
+  // R20 positional: every field this door reads sits inside a checker, here at
+  // the boundary, before lib/help proves the two ids point at live rows.
+  optionalText(body.appId, "App", TEXT_LIMITS.short)
+  optionalText(body.raisedByContactId, "Raised by", TEXT_LIMITS.short)
   const scope = await callerScope(cfg, guard)
   const { id, accountId } = await createTicket(cfg, guard, scope, actor, body)
   // The ping carries the ACCOUNT as well as the row, so the raiser's colleagues
@@ -182,7 +221,7 @@ export async function postCreateHelp(request: Request, env: Env): Promise<Respon
   // HOOK (Phase 3): the agent drafts the first reply here; a no-op today, so the
   // ticket simply opens awaiting a human (per "ticket always opens").
   await maybeDraftFirstReply(cfg, guard, id, description)
-  return ticketPage(cfg, guard, scope, "all", "live", null)
+  return ticketPage(cfg, guard, scope, EVERYDAY_LIST, null)
 }
 
 /** POST /api/content/help/update — edit a ticket (help:edit). */
@@ -190,10 +229,12 @@ export async function postUpdateHelp(request: Request, env: Env): Promise<Respon
   const { actor, cfg, guard, body } = await gatedBody<TicketInput & { id?: string }>(request, env, "help", "edit")
   const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
   requireText(body.description, "Description", TEXT_LIMITS.long)
+  optionalText(body.appId, "App", TEXT_LIMITS.short)
+  optionalText(body.raisedByContactId, "Raised by", TEXT_LIMITS.short)
   const scope = await callerScope(cfg, guard)
   const accountId = await updateTicket(cfg, guard, scope, actor, id, body)
   await publishChange(env, guard.teamId, "help", id, undefined, accountId ?? undefined)
-  return ticketPage(cfg, guard, scope, "all", "live", null)
+  return ticketPage(cfg, guard, scope, EVERYDAY_LIST, null)
 }
 
 /** POST /api/content/help/status — move a ticket along its fixed lifecycle.
@@ -214,6 +255,9 @@ export async function postHelpStatus(request: Request, env: Env): Promise<Respon
   if (typeof body.status !== "string" || !(HELP_STATUSES as readonly string[]).includes(body.status))
     return fail(400, "invalid_input", "id and a valid status are required.")
   const status = body.status as HelpStatus
+  // CHECKLIST 5.6: resolving is not a status move. `/help/resolve` is the door,
+  // and it refuses to send until a resolution is written.
+  refuseDirectResolve(status)
 
   const scope = await callerScope(cfg, guard)
   const ticket = await getTicket(cfg, guard, scope, id)
@@ -222,7 +266,7 @@ export async function postHelpStatus(request: Request, env: Env): Promise<Respon
   // R17: already at that status → zero rows moved → no ping, no duplicate history.
   const { moved, accountId } = await setStatus(cfg, guard, scope, actor, id, status)
   if (moved) await publishChange(env, guard.teamId, "help", id, undefined, accountId ?? undefined)
-  return ticketPage(cfg, guard, scope, "all", "live", null)
+  return ticketPage(cfg, guard, scope, EVERYDAY_LIST, null)
 }
 
 /** POST /api/content/help/bulk-status-by-filter — the SET-shaped bulk: move every
@@ -243,6 +287,9 @@ export async function postBulkHelpStatusByFilter(request: Request, env: Env): Pr
   await refusePortalCaller(cfg, guard)
   if (typeof body.toStatus !== "string" || !(HELP_STATUSES as readonly string[]).includes(body.toStatus))
     return fail(400, "invalid_input", "A valid toStatus is required.")
+  // CHECKLIST 5.6, and it matters most here: one call moves many, so a set-shaped
+  // route to `resolved` would be many client emails nobody wrote a word of.
+  refuseDirectResolve(body.toStatus as HelpStatus)
   const filter: { status?: HelpStatus; helpType?: string } = {}
   if (body.status !== undefined) {
     if (typeof body.status !== "string" || !(HELP_STATUSES as readonly string[]).includes(body.status))
@@ -282,6 +329,8 @@ export async function postBulkHelpStatus(request: Request, env: Env): Promise<Re
   const ids = requireIdList(body.ids)
   if (typeof body.status !== "string" || !(HELP_STATUSES as readonly string[]).includes(body.status))
     return fail(400, "invalid_input", "A valid status is required.")
+  // CHECKLIST 5.6 — the many-ids sibling, refused for the same reason.
+  refuseDirectResolve(body.status as HelpStatus)
   const { changed, skipped } = await bulkSetStatus(
     cfg, guard, await callerScope(cfg, guard), actor, ids, body.status as HelpStatus
   )
@@ -438,7 +487,7 @@ export async function postHelpRank(request: Request, env: Env): Promise<Response
   // R17: dropped back where it started → zero rows moved → no history, no ping.
   const { moved, accountId } = await setTicketRank(cfg, guard, scope, actor, id, afterId, beforeId)
   if (moved) await publishChange(env, guard.teamId, "help", id, "edit", accountId ?? undefined)
-  return ticketPage(cfg, guard, scope, "all", "live", null)
+  return ticketPage(cfg, guard, scope, EVERYDAY_LIST, null)
 }
 
 /** POST /api/content/help/archive — put a ticket away, or take it back out
@@ -463,7 +512,164 @@ export async function postHelpArchive(request: Request, env: Env): Promise<Respo
   // R17: archiving an archived ticket moves zero rows — no second history line.
   const { moved, accountId } = await setTicketArchived(cfg, guard, scope, actor, id, body.archived)
   if (moved) await publishChange(env, guard.teamId, "help", id, "edit", accountId ?? undefined)
-  return ticketPage(cfg, guard, scope, "all", "live", null)
+  return ticketPage(cfg, guard, scope, EVERYDAY_LIST, null)
+}
+
+/** POST /api/content/help/validate — THE CLIENT SAYS YES (CHECKLIST 5.13).
+ *
+ * The one lifecycle door a portal caller may push, and the only one they ever
+ * will: an extra, a request or a piece of feedback waits for the company that
+ * pays for it to confirm they want it (Aurora's ap2). Questions and issues never
+ * reach `awaiting_validation` at all, so this door has nothing to do to them.
+ *
+ * NOT `refusePortalCaller`, and it is the deliberate exception to R21's shape on
+ * this module — every OTHER status move is ours. Two things keep it safe: the
+ * account fence rides the UPDATE (a client can only validate a ticket their own
+ * company raised), and R17's predicate means the ONLY transition it can make is
+ * `awaiting_validation` → `new`. It cannot reopen, resolve, or move a started
+ * request; a caller who sends it at a ticket in any other state moves zero rows.
+ *
+ * Gated by help:READ, not edit. A contact who can see their company's requests is
+ * exactly the person being asked, and `help:edit` is a right the seeded Client
+ * role deliberately does not hold — gating on it would make this door unreachable
+ * by the only people it exists for. Staff may press it too, for the ordinary case
+ * where the answer arrives by phone. */
+export async function postValidateHelp(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown }>(request, env, "help", "read")
+  const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
+  const scope = await callerScope(cfg, guard)
+  // R17: not waiting → zero rows moved → no ping, no duplicate history.
+  const { moved, accountId } = await validateTicket(cfg, guard, scope, actor, id)
+  if (moved) await publishChange(env, guard.teamId, "help", id, "edit", accountId ?? undefined)
+  return ticketPage(cfg, guard, scope, EVERYDAY_LIST, null)
+}
+
+/** POST /api/content/help/triage-read — SOMEBODY HAS READ IT (CHECKLIST 5.11).
+ *
+ * The one act the triage screen performs, and the only stage of the ladder a
+ * machine cannot infer: "I have read this and it is real" is a judgement. Every
+ * stage after it happens by itself.
+ *
+ * Refused to a client login (R21): triage is our queue, and a request that has
+ * been read is a fact about us rather than about them. */
+export async function postHelpTriageRead(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown }>(request, env, "help", "edit")
+  const scope = await refusePortalCaller(cfg, guard)
+  const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
+  // R17: already read, already scheduled, already started → zero rows moved.
+  const { moved, accountId } = await markTriaged(cfg, guard, scope, actor, id)
+  if (moved) await publishChange(env, guard.teamId, "help", id, "edit", accountId ?? undefined)
+  return ticketPage(cfg, guard, scope, EVERYDAY_LIST, null)
+}
+
+/** GET /api/content/help/attachments?id=<ticketId> — the files and links on a
+ * ticket (CHECKLIST 5.10). ON BOTH FRONT DOORS: a client attaches the screenshot
+ * of the thing that is wrong, and reads back what we attached.
+ *
+ * The ticket fence decides whose (lib/help-attachments), so `help:read` plus the
+ * fence is the whole gate — the same pair the thread door stands on. */
+export async function getHelpAttachments(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "help", "read")
+  const scope = await callerScope(cfg, guard)
+  const id = queryText(new URL(request.url).searchParams.get("id"), "Id")
+  if (!id) return fail(400, "invalid_input", "A ticket id is required.")
+  return json({
+    attachments: await listAttachments(cfg, guard, scope, id),
+    // R16: the tab badge shows the door's exact COUNT(*), never the (capped)
+    // list's length.
+    total: await countAttachments(cfg, guard, scope, id),
+  })
+}
+
+/** POST /api/content/help/attachments — attach a file or a link (help:read; a
+ * person who can see a ticket can show you what they mean).
+ *
+ * TWO KINDS, ONE DOOR, because it is one act. `kind: "link"` carries a URL and
+ * nothing else; `kind: "file"` carries a data URL, which is parsed, capped and
+ * put in the SHARED media bucket — the one both gateways serve, so the client
+ * can read their own file back at their own hostname (lib/help-attachments says
+ * why it is not `HELP_MEDIA`).
+ *
+ * The fence resolves the ticket BEFORE anything is written or stored: bytes put
+ * in a bucket cannot be un-put, and 404 rather than 403 so "not yours" never
+ * confirms the ticket exists. */
+export async function postHelpAttachment(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{
+    id?: unknown
+    kind?: unknown
+    label?: unknown
+    url?: unknown
+    fileDataUrl?: unknown
+  }>(request, env, "help", "read")
+  const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
+  if (body.kind !== "file" && body.kind !== "link")
+    return fail(400, "invalid_input", "kind must be file or link.")
+  const label = requireText(body.label, "Name", TEXT_LIMITS.short)
+
+  const scope = await callerScope(cfg, guard)
+  const ticket = await getTicket(cfg, guard, scope, id)
+  if (!ticket) return fail(404, "help_not_found", "That ticket doesn't exist.")
+
+  let url: string
+  let contentType: string | null = null
+  let sizeBytes: number | null = null
+  if (body.kind === "link") {
+    // A LINK IS SOMETHING A COLLEAGUE WILL CLICK, so the SCHEME is checked here
+    // and not only its length. `safeExternalLink` allows `mailto:` as well, which
+    // is right for a contact's address field and wrong for this: what lands here
+    // goes into an `href` on a page a staff member already trusts, and a client
+    // login is one of the people who can put it there. `javascript:` in that
+    // position is stored XSS with a two-line setup — refused at the door rather
+    // than filtered at each of the two front ends, because there are two of them
+    // and a filter somebody forgets is a filter that is not there.
+    const raw = requireText(body.url, "Link", TEXT_LIMITS.link)
+    const safe = safeExternalLink(raw)
+    if (!safe || !/^https?:\/\//i.test(safe))
+      return fail(400, "invalid_input", "A link has to start with http:// or https://.")
+    url = safe
+  } else {
+    const parsed = parseUploadDataUrl(body.fileDataUrl, TICKET_FILE_MAX_BYTES)
+    if (!parsed)
+      return fail(400, "invalid_input", "That file didn't come through. Try again, up to 10MB.")
+    // The key carries a ULID, which is what makes the capability URL unguessable;
+    // the team id keeps one team's objects out of another's prefix.
+    const key = mediaKey("ticket", guard.teamId)
+    await env.MEDIA.put(key, parsed.bytes, { httpMetadata: { contentType: parsed.contentType } })
+    url = `/media/${key}`
+    contentType = parsed.contentType
+    sizeBytes = parsed.bytes.byteLength
+  }
+
+  const attachments = await addAttachment(cfg, guard, scope, actor, id, {
+    kind: body.kind,
+    label,
+    url,
+    contentType,
+    sizeBytes,
+  })
+  await publishChange(env, guard.teamId, "help", id, "edit", ticket.accountId ?? undefined)
+  return json({ attachments, total: attachments.length })
+}
+
+/** POST /api/content/help/attachments/remove — take a file or a link off
+ * (help:read, the right that put it there). Deactivate, never delete: the row
+ * keeps its audit block and the object stays in the bucket. */
+export async function postRemoveHelpAttachment(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown; attachmentId?: unknown }>(
+    request,
+    env,
+    "help",
+    "read"
+  )
+  const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
+  const attachmentId = requireText(body.attachmentId, "Attachment", TEXT_LIMITS.short)
+  const scope = await callerScope(cfg, guard)
+  const ticket = await getTicket(cfg, guard, scope, id)
+  if (!ticket) return fail(404, "help_not_found", "That ticket doesn't exist.")
+  // R17: already off → zero rows moved → no ping, no second history line.
+  const { moved, attachments } = await removeAttachment(cfg, guard, scope, actor, id, attachmentId)
+  if (moved) await publishChange(env, guard.teamId, "help", id, "edit", ticket.accountId ?? undefined)
+  return json({ attachments, total: attachments.length })
 }
 
 /** GET /api/content/help/stakeholders?id=<ticketId> — the full derived ∪ added

@@ -34,9 +34,9 @@ import { StoryFormDialog, type StoryFormValues } from "@/components/story-form-d
 import { StartTimerStrip } from "@/components/time-panel"
 import { STORY_STATUS_LABEL } from "@/components/work-panels"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
-import { appsKey, helpKey, listFetch, sprintsKey, storiesKey } from "@/lib/live-resources"
+import { appsKey, helpKey, listFetch, processesKey, sprintsKey, storiesKey } from "@/lib/live-resources"
 import { withDataDrivenCollection } from "@/lib/screens"
-import type { AppRow, HelpTicket, Sprint, Story, TeamMember } from "@shared/types"
+import type { AppRow, HelpTicket, ProcessSummary, SelectableValue, Sprint, Story, TeamMember } from "@shared/types"
 import { formatDate } from "@shared/web/format"
 import { invalidate, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
@@ -83,18 +83,64 @@ export function useStoryFormOptions(teamId: string) {
   const membersQ = useCached<TeamMember[]>(`members:${teamId}`, () =>
     tenancy.members().then((r) => r.members)
   )
+  // The maps a story can say it changes (CHECKLIST 6.5). Same cache key the
+  // Processes screen reads, so a person who has been there pays nothing.
+  const processesQ = useCached<ProcessSummary[]>(processesKey(teamId), () => listFetch.processes(teamId))
+  // The team's own word for the kind of work (CHECKLIST 6.2) — one cache, shared
+  // with every other dropdown in the app.
+  const selectableQ = useCached<SelectableValue[]>(`selectable:${teamId}`, () =>
+    tenancy.selectable().then((r) => r.values)
+  )
   return {
-    sprints: (sprintsQ.data ?? []).filter((s) => !s.completedAt).map((s) => ({ id: s.id, name: s.name })),
+    // CHECKLIST 6.3: current or future only, each carrying its mark. Computed
+    // from the two facts the row already holds rather than stored, so a mark can
+    // never disagree with the dates it came from — and the FORM narrows further,
+    // to the app being chosen, which is a fact only the form knows.
+    sprints: (sprintsQ.data ?? [])
+      .filter((s) => !s.completedAt && s.active && (!s.endsOn || s.endsOn >= todayISO()))
+      .map((s) => ({
+        id: s.id,
+        name: s.name,
+        appId: s.appId,
+        mark: sprintMark(s),
+      })),
     apps: (appsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name })),
     appNames: new Map((appsQ.data ?? []).map((a) => [a.id, a.name])),
+    // CHECKLIST 6.4: OPEN tickets only, each tagged with the app it is about so
+    // the form can narrow to the one being chosen.
     tickets: (ticketsQ.data ?? [])
-      .filter((t) => t.status !== "resolved")
-      .map((t) => ({ id: t.id, label: t.ref ? `${t.ref} · ${t.description}` : t.description })),
+      .filter((t) => t.status !== "resolved" && !t.archivedAt)
+      .map((t) => ({
+        id: t.id,
+        label: t.ref ? `${t.ref} · ${t.description}` : t.description,
+        appId: t.appId,
+      })),
+    processes: (processesQ.data ?? [])
+      .filter((p) => p.active)
+      .map((p) => ({ id: p.id, name: p.name, appId: p.appId })),
+    processNames: new Map((processesQ.data ?? []).map((p) => [p.id, p.name])),
+    storyTypes: (selectableQ.data ?? [])
+      .filter((v) => v.type === "Story type" && v.active)
+      .map((v) => v.value),
     members: (membersQ.data ?? []).map((m) => ({
       id: m.userId,
       name: [m.firstName, m.lastName].filter(Boolean).join(" ") || m.email,
     })),
   }
+}
+
+/** Today, as the ISO date the sprint columns are stored in. */
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+/** WHICH OF THE THREE MARKS A SPRINT CARRIES (CHECKLIST 6.3). Derived, never
+ * stored: a completed sprint is completed whatever its dates say, one that has
+ * not begun is upcoming, and everything else is running. */
+function sprintMark(s: Sprint): "Active" | "Upcoming" | "Completed" {
+  if (s.completedAt) return "Completed"
+  if (s.startsOn && s.startsOn > todayISO()) return "Upcoming"
+  return "Active"
 }
 
 /** Write a story through the door and re-read what changed. Shared by every
@@ -104,11 +150,14 @@ export async function createStoryFrom(teamId: string, values: StoryFormValues): 
   try {
     await contentApi.createStory({
       title: values.title,
+      storyType: values.storyType,
       detail: values.detail || undefined,
       sprintId: values.sprintId || undefined,
       appId: values.appId || undefined,
       ticketId: values.ticketId || undefined,
       assigneeId: values.assigneeId || undefined,
+      processIds: values.processIds,
+      changesNoStep: values.changesNoStep,
     })
     invalidate(storiesKey(teamId))
     invalidate(sprintsKey(teamId))
@@ -219,6 +268,8 @@ export function StoriesScreen({
         apps={options.apps}
         tickets={options.tickets}
         members={options.members}
+        processes={options.processes}
+        storyTypes={options.storyTypes}
         draftKey={`story:add:${teamId}`}
         onSubmit={(v) => createStoryFrom(teamId, v)}
       />

@@ -61,9 +61,33 @@ const historyFor = (id: string): string[] =>
     .map((h) => h.type)
     .sort()
 
-/** Write a story and hand back its id. */
+/** A live process map to hang a story off. CHECKLIST 6.5 makes "which maps does
+ * this change?" a question every story answers, so a case about anything else
+ * needs one to exist — written straight into the team database, because this
+ * suite is about stories and the process doors are another module's. */
+function seedProcess(): string {
+  const id = "01PROCESSFORSTORYTEST0001"
+  db().exec(
+    `INSERT INTO apps (id, name, created_at) VALUES ('01APPFORSTORYTEST00000001', 'Test app', '2026-08-17T00:00:00.000Z');
+     INSERT INTO processes (id, app_id, name, created_at)
+     VALUES ('${id}', '01APPFORSTORYTEST00000001', 'A way of working', '2026-08-17T00:00:00.000Z');`
+  )
+  return id
+}
+
+/** Write a story and hand back its id.
+ *
+ * TWO FIELDS ARE DEFAULTED IN, and both are new REFUSALS rather than conveniences
+ * (CHECKLIST 6.2 and 6.5): a story must name its kind, and must either name the
+ * processes it changes or tick that it changes none. Every case below is about
+ * something else, so the helper supplies the ordinary answer and the two cases
+ * that are about the refusals pass their own. */
 async function addStory(body: Record<string, unknown>): Promise<string> {
-  const res = await call(IDS.staffUser, "POST /api/content/stories", body)
+  const res = await call(IDS.staffUser, "POST /api/content/stories", {
+    storyType: "Fix",
+    changesNoStep: true,
+    ...body,
+  })
   expect(res.status, "the story door refused a plain create").toBe(200)
   const found = db()
     .prepare(`SELECT id FROM stories WHERE title = ? ORDER BY id DESC LIMIT 1`)
@@ -85,7 +109,16 @@ describe("a story is what WE do", () => {
     const id = await addStory({ title: "Walk the lifecycle" })
     expect(storyRow(id).status).toBe("open")
     for (const status of ["in_progress", "in_review"]) {
-      expect((await call(IDS.staffUser, "POST /api/content/stories/status", { id, status })).status).toBe(200)
+      // `reviewNote` rides both moves and only one of them reads it: a story
+      // cannot go to review without saying what was done (CHECKLIST 6.9). It is
+      // sent on the first move too because the door COALESCEs it — an
+      // explanation typed on Tuesday is still the explanation on Thursday.
+      const res = await call(IDS.staffUser, "POST /api/content/stories/status", {
+        id,
+        status,
+        reviewNote: "Walked it end to end and checked it on a phone.",
+      })
+      expect(res.status).toBe(200)
       expect(storyRow(id).status).toBe(status)
     }
     // A fifth state does not exist, and a typo must not become one.
@@ -118,6 +151,8 @@ describe("a story is what WE do", () => {
   it("refuses a made-up ticket rather than writing a story pointing at nothing", async () => {
     const res = await call(IDS.staffUser, "POST /api/content/stories", {
       title: "Answer a request that does not exist",
+      storyType: "Fix",
+      changesNoStep: true,
       ticketId: "01NOTATICKET",
     })
     expect(res.status).toBe(400)
@@ -134,7 +169,17 @@ describe("a story is what WE do", () => {
 // which is worse than an empty column because it looks like an answer.
 describe("a story cannot close without saying what it changed", () => {
   it("refuses `done` when the story names no step and does not say it changes none", async () => {
-    const id = await addStory({ title: "Change something, unspecified" })
+    // THE TWO RULES ARE ABOUT TWO THINGS, and this case is about the second.
+    // CHECKLIST 6.5 says a story must name the PROCESSES it changes or tick that
+    // it changes none, and that is checked when it is written. This rule is about
+    // the STEP inside one of those maps, and it is checked when it CLOSES. So the
+    // fixture names a map and no step: legal to write, refused to close.
+    const process = seedProcess()
+    const id = await addStory({
+      title: "Change something, unspecified",
+      processIds: [process],
+      changesNoStep: false,
+    })
     const res = await call(IDS.staffUser, "POST /api/content/stories/status", { id, status: "done" })
     expect(res.status).toBe(400)
     expect((await res.json()) as { error: string }).toMatchObject({ error: "step_required" })
@@ -383,7 +428,11 @@ describe("a client login cannot reach the work engine at all", () => {
   it("is refused the backlog, and refused the door that would write to it", async () => {
     const read = await call(IDS.clientUser, "GET /api/content/stories")
     expect(read.status).toBe(403)
-    const write = await call(IDS.clientUser, "POST /api/content/stories", { title: "Not yours to write" })
+    const write = await call(IDS.clientUser, "POST /api/content/stories", {
+      title: "Not yours to write",
+      storyType: "Fix",
+      changesNoStep: true,
+    })
     expect(write.status).toBe(403)
     expect(db().prepare(`SELECT COUNT(*) AS n FROM stories`).get()).toEqual({ n: 0 })
   })
@@ -439,7 +488,18 @@ describe("the Ready flip", () => {
   it("never drags a RESOLVED ticket back out of resolved", async () => {
     const ticket = await addTicket("Answered already")
     const straggler = await addStory({ title: "Tidy up afterwards", ticketId: ticket, changesNoStep: true })
-    await call(IDS.staffUser, "POST /api/content/help/status", { id: ticket, status: "resolved" })
+    // RESOLVING IS NOT A STATUS MOVE any more (CHECKLIST 5.6): `/help/status`
+    // refuses the word outright, because answering a client requires the words to
+    // send. The resolve door is the only way in, and it is the one a person uses.
+    const byStatus = await call(IDS.staffUser, "POST /api/content/help/status", {
+      id: ticket,
+      status: "resolved",
+    })
+    expect(byStatus.status, "a status move must not be able to resolve a ticket").toBe(400)
+    await call(IDS.staffUser, "POST /api/content/help/resolve", {
+      id: ticket,
+      resolution: "All done, here is what we changed.",
+    })
     await call(IDS.staffUser, "POST /api/content/stories/status", { id: straggler, status: "done" })
     // The client has been told. Un-answering their request because a loose end
     // was tidied up afterwards would be the worst kind of "helpful".

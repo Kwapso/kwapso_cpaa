@@ -65,8 +65,19 @@ const ticketRow = (id: string) =>
 
 /** A ticket raised for the victim's company — the only kind that has anybody to
  * email. */
-async function clientTicket(description: string): Promise<string> {
-  await call(IDS.staffUser, "POST /api/content/help", { description, accountId: IDS.victimAccount })
+/** A ticket raised BY US on the client's behalf, naming the person who asked.
+ *
+ * Naming the contact is what makes this the ordinary case rather than an edge:
+ * 220 of the 221 seeded historical requests are staff-typed (SCOPE ch.07), and
+ * CHECKLIST 5.9 is the field that finally lets the row say who actually asked.
+ * The resolution goes to THAT person and to the account's main stakeholder
+ * (5.7, Aurora's ts3) — not, as it used to, to everybody at the company. */
+async function clientTicket(description: string, raisedBy: string = IDS.victimPerson): Promise<string> {
+  await call(IDS.staffUser, "POST /api/content/help", {
+    description,
+    accountId: IDS.victimAccount,
+    raisedByContactId: raisedBy,
+  })
   return (db().prepare(`SELECT id FROM help WHERE description = ?`).get(description) as { id: string }).id
 }
 
@@ -146,13 +157,48 @@ describe("answering a ticket", () => {
 // THE CLOSED LIST, from the other end. §7: "nothing else emails the client;
 // everything else lives in the portal for them to look at."
 describe("nothing else reaches a client's inbox", () => {
-  it("a status move on its own emails nobody", async () => {
+  it("a status move on its own emails nobody — and cannot reach `resolved` at all", async () => {
     const id = await clientTicket("Moved along quietly")
-    for (const status of ["triaged", "in_progress", "ready", "resolved"]) {
+    for (const status of ["triaged", "scheduled", "in_progress", "ready"]) {
       await call(IDS.staffUser, "POST /api/content/help/status", { id, status })
     }
-    expect(ticketRow(id).status).toBe("resolved")
+    expect(ticketRow(id).status).toBe("ready")
+    // CHECKLIST 5.6, and this is the strongest form of "a status is not an
+    // answer": the word is not reachable through the status door, so there is no
+    // sequence of moves that emails a client without somebody writing the words.
+    const tried = await call(IDS.staffUser, "POST /api/content/help/status", { id, status: "resolved" })
+    expect(tried.status).toBe(400)
+    expect(ticketRow(id).status).toBe("ready")
     expect(sent.emails, "a status is not an answer").toHaveLength(0)
+  })
+
+  // CHECKLIST 5.7 is a NARROWING as much as it is a rule. It used to go to every
+  // live portal login at the company, which is right for a to-do (anybody can
+  // send us the file) and wrong for an answer: a resolution is a reply to
+  // somebody's question, and copying every colleague on it is how a client mutes
+  // us. Two named people, and this is the case that proves the third is left out.
+  it("reaches the raiser and the main stakeholder, and not the colleague who is neither", async () => {
+    // Marta is the main stakeholder; Nadia raised it; the contact under the
+    // company holds a login and is neither.
+    db().exec(
+      `UPDATE account_links SET is_main_stakeholder = 1 WHERE id = '${IDS.victimLink}';
+       -- Nadia is a contact AT the company and holds a login of her own. The link
+       -- is what the door checks: CHECKLIST 5.9 will not let a ticket name a
+       -- person who is not a contact there, which is the half that stops a
+       -- stranger's name landing on somebody else's record.
+       INSERT INTO account_links (id, account_id, person_account_id, relationship, created_at, creator_id)
+       VALUES ('L_NADIA', '${IDS.victimAccount}', '${IDS.clientPerson}', 'Finance', '2026-01-01', '${IDS.staffUser}');
+       INSERT INTO portal_users (id, account_id, user_id, created_at, creator_id)
+       VALUES ('P_NADIA', '${IDS.clientPerson}', '${IDS.clientUser}', '2026-01-01', '${IDS.staffUser}');`
+    )
+    const id = await clientTicket("Two people should hear about this", IDS.clientPerson)
+    sent.emails = []
+    await call(IDS.staffUser, "POST /api/content/help/resolve", { id, resolution: "Done." })
+    const to = sent.emails.map((e) => e.to).sort()
+    expect(to.length, "the answer reached nobody").toBeGreaterThan(0)
+    expect(to, "a colleague who is neither the raiser nor the main stakeholder was copied in").not.toContain(
+      "contact@bergman.example"
+    )
   })
 
   it("a staff reply reaches the RAISER, and a staff raiser is not a client", async () => {
