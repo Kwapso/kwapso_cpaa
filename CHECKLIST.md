@@ -146,44 +146,44 @@ longer duplicates a value.
 
 | # | The thing | Status |
 |---|---|---|
-| 8.1 | Apps become visual: icon and name, grouped by status | TO DO |
-| 8.2 | Active and Inactive tabs, sub-grouped by stage | TO DO |
-| 8.3 | Stage becomes a proper choice component | TO DO |
-| 8.4 | The context fields come back: about, client context, solution, key actors | TO DO |
-| 8.5 | Stakeholders inside an app, one of them the main one | TO DO |
-| 8.6 | A related tickets tab | TO DO |
-| 8.7 | A related deliverables tab | TO DO |
-| 8.8 | A meetings tab | TO DO |
-| 8.9 | A knowledge tab | TO DO |
-| 8.10 | Staff assigned on the add screen, with a team lead | TO DO |
-| 8.11 | Only assigned staff and admins open an app | TO DO — **CHANGED**: everyone still sees it in the overview list, Aurora's note |
-| 8.12 | Processes live under the app, with an add button | TO DO |
-| 8.13 | Hours and money given back, shown per app | TO DO — **CHANGED**: Aurora's model is the rate of the ROLE that does the process, times hours saved, before minus after. That needs a rate-per-role table that does not exist yet |
+| 8.1 | Apps become visual: icon and name, grouped by status | **DONE** — tiles with the app's own mark, name and client |
+| 8.2 | Active and Inactive tabs, sub-grouped by stage | **DONE** — Active and Inactive, sub-grouped by stage. And the real vocabulary turned out to be EIGHT stages, not the four in the brief: Not started, Blueprint, Development, Documentation, Iteration, Maintenance, Completed, Archived. Read off your legacy data rather than invented |
+| 8.3 | Stage becomes a proper choice component | **DONE** |
+| 8.4 | The context fields come back: about, client context, solution, key actors | **DONE** — about, client context, solution and key actors are back |
+| 8.5 | Stakeholders inside an app, one of them the main one | TO DO — stakeholders inside an app. Not reached |
+| 8.6 | A related tickets tab | TO DO — the tickets tab needs the ticket list to accept an app filter, and that file was locked by the lane running beside it |
+| 8.7 | A related deliverables tab | TO DO — **this is a whole new module, not a tab.** There is no deliverables table, module or permission anywhere in the app. Sizing it honestly rather than half-building it |
+| 8.8 | A meetings tab | **DONE** — and a meeting can now say which app it was about, which is what made the tab possible |
+| 8.9 | A knowledge tab | TO DO — knowledge tab. Not reached |
+| 8.10 | Staff assigned on the add screen, with a team lead | TO DO — staff and team lead on the add screen. Not reached |
+| 8.11 | Only assigned staff and admins open an app | TO DO — only assigned staff open the detail page. Not reached |
+| 8.12 | Processes live under the app, with an add button | **DONE** |
+| 8.13 | Hours and money given back, shown per app | TO DO — **left deliberately rather than half-built.** Aurora's model needs a rate per ROLE, which does not exist. It is an internal number, so it must never reach the portal, and the law forbids one screen reading both rate cards. Worth getting right |
 
 ## 9 · Meetings and sprints
 
 | # | The thing | Status |
 |---|---|---|
-| 9.1 | Meeting views: this week, calendar, all | TO DO |
-| 9.2 | A transcript creates a work log per participant | TO DO — **CHANGED**: our staff only, not the client's people, Aurora's answer. A client's hour is not our cost |
+| 9.1 | Meeting views: this week, calendar, all | TO DO — this week, calendar and all. Not reached |
+| 9.2 | A transcript creates a work log per participant | TO DO — a transcript creating a work log per staff member. Not reached |
 | 9.3 | Those logs are marked as meeting time and can be excluded from any figure | TO DO |
 | 9.4 | "Meeting held" ticks itself when a transcript arrives | TO DO |
-| 9.5 | "Add to my calendar" hides when it is already there | TO DO |
+| 9.5 | "Add to my calendar" hides when it is already there | **DONE** — it already was. "Add to my calendar" has been hiding itself when the meeting is already there |
 | 9.6 | Agenda edited from the edit page; notes open on the detail screen until the meeting closes | TO DO |
-| 9.7 | Recurring calendar meetings appear | TO DO — **CHANGED**: a real record is created four weeks ahead, shown read-only before that, Aurora's note |
-| 9.8 | Sprints get a calendar view | TO DO |
-| 9.9 | Sprints get an overview by type and status | TO DO |
-| 9.10 | Sprint types get their icon and colour | TO DO |
+| 9.7 | Recurring calendar meetings appear | TO DO |
+| 9.8 | Sprints get a calendar view | **DONE** — a calendar view |
+| 9.9 | Sprints get an overview by type and status | **DONE** — grouped by running, coming up and wrapped, then by kind |
+| 9.10 | Sprint types get their icon and colour | **DONE** — each type carries its mark, with one gap: the flat All tab has none, because the list renderer has no icon slot and putting a glyph inside the title is the one shape the law refuses |
 
 ## 10 · The Kwapso page and settings
 
 | # | The thing | Status |
 |---|---|---|
-| 10.1 | A new Kwapso section: brand library, the team, and the legal details | TO DO |
-| 10.2 | Brand library moves under it | TO DO |
-| 10.3 | A scale setting: text and spacing together, three steps | TO DO |
-| 10.4 | Dropdown values move under Settings | TO DO |
-| 10.5 | Users and roles move under Settings | TO DO |
+| 10.1 | A new Kwapso section: brand library, the team, and the legal details | **DONE** — /kwapso carries the legal details, the team and the brand library |
+| 10.2 | Brand library moves under it | **DONE** |
+| 10.3 | A scale setting: text and spacing together, three steps | **DONE** — three steps, text and spacing together |
+| 10.4 | Dropdown values move under Settings | **DONE** |
+| 10.5 | Users and roles move under Settings | **DONE** — and it fixed something nobody noticed: hiding the team switcher had quietly closed the only way into the roles screen |
 
 ## 11 · How it looks
 
