@@ -522,7 +522,7 @@ export function AccountDetailScreen({
                   canRetire={can("commercials", "delete")}
                   actions={actions}
                 />
-                <MarginPanel accountId={accountId} accountName={account.name} />
+                <MarginPanel teamId={teamId} accountId={accountId} accountName={account.name} />
               </div>
             )
 

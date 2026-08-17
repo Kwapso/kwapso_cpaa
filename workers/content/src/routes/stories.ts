@@ -34,6 +34,7 @@ import {
   setSprintComplete,
   setStoryRank,
   setStoryStatus,
+  updateSprint,
   updateStory,
   type StoryFilter,
   type StoryInput,
@@ -238,6 +239,32 @@ export async function postCreateSprint(request: Request, env: Env): Promise<Resp
   return json({
     sprints: await listSprints(cfg, guard, listFilter),
     total: await countSprints(cfg, guard, listFilter),
+  })
+}
+
+/** POST /api/content/sprints/update — edit a sprint (work:edit).
+ *
+ * The door a sprint's PRICE was missing: `sold_price_cents` could be set only at
+ * the moment the sprint was started, so a block of work agreed before its price
+ * was could never be given one — and the margin reading that column had nothing
+ * to read. The client and the app are not on this door (lib/stories updateSprint
+ * says why); everything descriptive and everything commercial is. */
+export async function postUpdateSprint(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<SprintInput & { id?: unknown }>(
+    request,
+    env,
+    "work",
+    "edit"
+  )
+  await refusePortalCaller(cfg, guard)
+  const id = requireText(body.id, "Sprint", TEXT_LIMITS.short)
+  requireText(body.name, "Name", TEXT_LIMITS.short)
+  const { accountId } = await updateSprint(cfg, guard, actor, id, body)
+  await publishChange(env, guard.teamId, "sprints", id, "edit", accountId ?? undefined)
+  const filter = sprintFilterFrom(new URL(request.url))
+  return json({
+    sprints: await listSprints(cfg, guard, filter),
+    total: await countSprints(cfg, guard, filter),
   })
 }
 

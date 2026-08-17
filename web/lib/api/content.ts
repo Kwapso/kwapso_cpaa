@@ -151,9 +151,16 @@ export const content = {
     api<{ tickets: HelpTicket[] }>(`/api/content/help?id=${enc(id)}`).then((r) => r.tickets[0] ?? null),
   helpThread: (id: string) =>
     api<{ replies: HelpMessage[]; total: number }>(`/api/content/help/thread?id=${enc(id)}`),
-  createHelp: (input: { description: string; helpType?: string; sourceScreen?: string }) =>
-    api<{ tickets: HelpTicket[] }>("/api/content/help", post(input)),
-  updateHelp: (input: { id: string; description: string; helpType?: string }) =>
+  // `accountId` names the CLIENT the ticket is raised for. Staff only, and the
+  // door decides that — a portal caller's account comes from the guard corridor
+  // and the body is never consulted (workers/content/src/lib/help.ts).
+  createHelp: (input: {
+    description: string
+    helpType?: string
+    sourceScreen?: string
+    accountId?: string
+  }) => api<{ tickets: HelpTicket[] }>("/api/content/help", post(input)),
+  updateHelp: (input: { id: string; description: string; helpType?: string; accountId?: string }) =>
     api<{ tickets: HelpTicket[] }>("/api/content/help/update", post(input)),
   setHelpStatus: (id: string, status: HelpTicket["status"]) =>
     api<{ tickets: HelpTicket[] }>("/api/content/help/status", post({ id, status })),
@@ -211,6 +218,18 @@ export const content = {
     soldPriceCents?: number
     currency?: string
   }) => api<{ sprints: Sprint[]; total: number }>("/api/content/sprints", post(input)),
+  /** Edit a sprint. No `accountId` / `appId`: the door will not move a sprint to
+   * another client or another app (workers/content/src/lib/stories.ts says why). */
+  updateSprint: (input: {
+    id: string
+    name: string
+    goal?: string
+    sprintType?: string
+    startsOn?: string
+    endsOn?: string
+    soldPriceCents?: number
+    currency?: string
+  }) => api<{ sprints: Sprint[]; total: number }>("/api/content/sprints/update", post(input)),
   setSprintComplete: (id: string, complete: boolean) =>
     api<{ sprints: Sprint[]; total: number }>("/api/content/sprints/complete", post({ id, complete })),
 

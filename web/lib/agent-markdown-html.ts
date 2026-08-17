@@ -1,4 +1,5 @@
-// Render the assistant's reply (a markdown STRING) as light, XSS-safe HTML.
+// Render a markdown STRING as light, XSS-safe HTML — the assistant's replies, and
+// any BODY that was written in markdown rather than in the Notes editor's HTML.
 // The agent's output is UNTRUSTED, so we ESCAPE the raw text first (escapeText),
 // THEN convert only a tiny, safe subset: inline code, links (each URL run through
 // safeHref — http/https/mailto only, and the href escaped as an ATTRIBUTE so a
@@ -27,9 +28,14 @@ function inline(escaped: string): string {
     .replace(/(^|[^*])\*([^*\n]+)\*/g, (_m, pre: string, i: string) => `${pre}<em>${i}</em>`)
 }
 
-// Group escaped lines into paragraphs and lists. Consecutive "- "/"* " lines
-// become one <ul>; "1." lines one <ol>; other runs become a <p> with soft
-// newlines as <br>. A blank line ends the current block.
+// Group escaped lines into paragraphs, HEADINGS and lists. Consecutive "- "/"* "
+// lines become one <ul>; "1." lines one <ol>; a "#"-prefixed line becomes a
+// heading; other runs become a <p> with soft newlines as <br>. A blank line ends
+// the current block.
+//
+// HEADINGS ARE CLAMPED to h3/h4 — the same two levels sanitizeRichHtml allows and
+// the same two the PROSE classes style. A body must not outrank the page title,
+// and the two renderers must not disagree about what a "## " looks like.
 export function toHtml(text: string): string {
   const lines = escapeText(text).replace(/\r\n?/g, "\n").split("\n")
   const out: string[] = []
@@ -48,7 +54,13 @@ export function toHtml(text: string): string {
   for (const line of lines) {
     const bullet = /^\s*[-*]\s+(.*)$/.exec(line)
     const numbered = /^\s*\d+\.\s+(.*)$/.exec(line)
-    if (bullet) {
+    const heading = /^(#{1,6})\s+(.*\S)\s*$/.exec(line)
+    if (heading) {
+      flushPara()
+      flushList()
+      const tag = heading[1].length <= 2 ? "h3" : "h4"
+      out.push(`<${tag}>${inline(heading[2])}</${tag}>`)
+    } else if (bullet) {
       flushPara()
       if (list?.tag !== "ul") {
         flushList()

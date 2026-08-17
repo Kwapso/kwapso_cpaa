@@ -20,8 +20,9 @@ import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
-import { CheckCheck, RotateCcw } from "lucide-react"
+import { CheckCheck, Pencil, RotateCcw } from "lucide-react"
 
+import { SprintFormDialog } from "@/components/sprint-form-dialog"
 import { StoryFormDialog } from "@/components/story-form-dialog"
 import { createStoryFrom, useStoryFormOptions } from "@/components/stories-screen"
 import { StoriesPanel, sliceKey } from "@/components/work-panels"
@@ -38,7 +39,7 @@ import { usePermissions } from "@/lib/perms"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import type { Sprint } from "@shared/types"
 import { moneyText } from "@shared/web/money"
-import { invalidate, useCached, useCachedValue } from "@shared/web/store"
+import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 
 /** Whole cents → what a person would say. The FORMATTING is the shared seam
  * (shared/web/money.ts) now that the two rate cards render prices of their own;
@@ -72,6 +73,7 @@ export function SprintDetailScreen({
 
   const [tab, setTab] = React.useState("overview")
   const [storyOpen, setStoryOpen] = React.useState(false)
+  const [editOpen, setEditOpen] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
   const options = useStoryFormOptions(teamId)
   const host = { base: basePath.replace(/\/sprints$/, "") }
@@ -183,6 +185,21 @@ export function SprintDetailScreen({
         </div>
         {/* ml-auto on the GROUP so a narrow phone reflows instead of clipping. */}
         <div className="flex flex-wrap gap-2 sm:ml-auto sm:shrink-0">
+          {/* EDIT — first, because it is the everyday one. Completing a sprint is
+              an event with consequences and sits to its right; neither is
+              destructive, so neither asks first (UI-CONVENTIONS §4). */}
+          {canEdit && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              onClick={() => setEditOpen(true)}
+              className="gap-1.5"
+            >
+              <Pencil className="size-3.5" />
+              Edit
+            </Button>
+          )}
           {canEdit && (
             <Button
               variant="outline"
@@ -247,6 +264,43 @@ export function SprintDetailScreen({
         onSubmit={async (v) => {
           await createStoryFrom(teamId, { ...v, sprintId })
           invalidate(sliceKey("stories-sprint", sprintId))
+        }}
+      />
+
+      {/* The edit form. The response is the whole (bounded) sprint list, which is
+          the same cache this screen reads its record out of — so priming it is
+          what makes the new price appear here and on the list behind it at once.
+          Everyone else gets the row-level live ping. */}
+      <SprintFormDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        apps={options.apps}
+        draftKey={`sprint:edit:${sprintId}`}
+        initial={{
+          name: sprint.name,
+          goal: sprint.goal,
+          sprintType: sprint.sprintType,
+          accountName: sprint.accountName,
+          appName: sprint.appName,
+          startsOn: sprint.startsOn,
+          endsOn: sprint.endsOn,
+          soldPriceCents: sprint.soldPriceCents,
+          currency: sprint.currency,
+        }}
+        onSubmit={async (v) => {
+          const { sprints } = await contentApi.updateSprint({
+            id: sprintId,
+            name: v.name,
+            goal: v.goal || undefined,
+            sprintType: v.sprintType || undefined,
+            startsOn: v.startsOn || undefined,
+            endsOn: v.endsOn || undefined,
+            soldPriceCents: v.soldPriceCents,
+            currency: v.currency || undefined,
+          })
+          primeCache(sprintsKey(teamId), sprints)
+          invalidate(`activity:record:sprints:${sprintId}`)
+          toast.success("Sprint updated.")
         }}
       />
     </div>

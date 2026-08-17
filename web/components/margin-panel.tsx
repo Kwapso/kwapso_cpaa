@@ -18,13 +18,23 @@
 //
 // It lives on the Rates tab, under the rate card, because "what do we charge
 // them" and "what do we keep" are one thought and nobody holds them apart.
+//
+// AND IT SAYS WHERE THE COST CARD IS. This panel is the one screen in the app
+// that spends the internal rate — every line of "our time" is an hour multiplied
+// by it — and it named the cost card in a sentence while giving no way to reach
+// it. The screen itself was never missing (Settings → Internal rates, with its
+// own edit action); the ROUTE to it from the number it explains was. Gated on
+// `commercials:edit`, the same right the door behind that screen opens with, so
+// nobody is offered a destination they would be refused at.
 
 import * as React from "react"
 
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
+import { Banknote } from "lucide-react"
 
 import { tenancy } from "@/lib/api"
 import { marginKey } from "@/lib/live-resources"
+import { usePermissions } from "@/lib/perms"
 import { moneyText } from "@shared/web/money"
 import { useCached } from "@shared/web/store"
 
@@ -67,7 +77,16 @@ function Line({
   )
 }
 
-export function MarginPanel({ accountId, accountName }: { accountId: string; accountName: string }) {
+export function MarginPanel({
+  teamId,
+  accountId,
+  accountName,
+}: {
+  teamId: string
+  accountId: string
+  accountName: string
+}) {
+  const { can } = usePermissions(teamId)
   // Cache-first, keyed by the ACCOUNT — the same key the `account_rates`
   // listener drops, so a colleague changing a price moves this figure without a
   // reload. The store revalidates on mount as well, which is what closes the one
@@ -115,6 +134,19 @@ export function MarginPanel({ accountId, accountName }: { accountId: string; acc
           Sold, minus our own time at the rates on our cost card, minus what the tools cost each
           month. Our time is priced at agreed rates, not measured cost.
         </p>
+        {/* …and this is the cost card that sentence means. Same shape as the
+            "Manage dropdowns" link under a dropdown: small, gated, and it takes
+            you to the screen that owns the number rather than explaining where
+            it is. */}
+        {can("commercials", "edit") && (
+          <a
+            href={`/t/${teamId}/internal-rates`}
+            className="text-muted-foreground hover:text-foreground mt-2 inline-flex w-fit items-center gap-1 text-xs underline-offset-2 hover:underline"
+          >
+            <Banknote className="size-3" aria-hidden />
+            Change what our hour costs
+          </a>
+        )}
         {down && (
           <p className="text-destructive mt-2 text-xs">
             This account is costing more than it brings in.

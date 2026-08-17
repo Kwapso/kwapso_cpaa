@@ -767,6 +767,77 @@ VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(accountId)}, ${sqlStrin
   return { id, accountId }
 }
 
+/** EDIT a sprint — what it is called, what kind it is, what it is for, when it
+ * runs, and WHAT IT WAS SOLD FOR.
+ *
+ * The price is the reason this exists. `sold_price_cents` is the revenue half of
+ * every margin the money lane computes (lib/work-engine.ts reads it against the
+ * hours logged), and it could be set only at the moment a sprint was started —
+ * so a sprint agreed before its price was, which is the ordinary order of a
+ * conversation with a client, could never be given one.
+ *
+ * WHAT THIS DOOR WILL NOT MOVE, deliberately: the CLIENT and the APP. Both are
+ * load-bearing rather than descriptive. The reference a client quotes was minted
+ * against the account (`nextRef`, counted per account), and completing this
+ * sprint cuts a version of every process map inside its app — so re-pointing
+ * either after the fact rewrites what an already-published number means. Same
+ * ruling as a ticket's account, and for the same reason: if we ever want to move
+ * one it is a deliberate feature with a confirm panel, not a quiet field on an
+ * edit form. Start a sprint under the right client; correct everything else here.
+ */
+export async function updateSprint(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor,
+  id: string,
+  input: SprintInput
+): Promise<{ accountId: string | null }> {
+  const rows = await d1Query<SprintRow>(
+    cfg,
+    guard.databaseId,
+    `SELECT ${SPRINT_COLS} FROM sprints sp WHERE sp.id = ? LIMIT 1`, // R14: one row by id
+    [id]
+  )
+  const before = rows[0]
+  if (!before) throw new GuardError(404, "sprint_not_found", "That sprint doesn't exist.")
+
+  const name = requireText(input.name, "Name", TEXT_LIMITS.short)
+  const goal = optionalText(input.goal, "Goal", TEXT_LIMITS.long) ?? null
+  const sprintType = optionalText(input.sprintType, "Sprint type", TEXT_LIMITS.short) ?? null
+  const startsOn = optionalText(input.startsOn, "Start date", TEXT_LIMITS.short) ?? null
+  const endsOn = optionalText(input.endsOn, "End date", TEXT_LIMITS.short) ?? null
+  const currency = optionalText(input.currency, "Currency", TEXT_LIMITS.short) ?? null
+  const cents = priceCents(input.soldPriceCents)
+
+  const now = new Date().toISOString()
+  await d1Query(
+    cfg,
+    guard.databaseId,
+    `UPDATE sprints SET name = ?, sprint_type = ?, goal = ?, starts_on = ?, ends_on = ?,
+       sold_price_cents = ?, currency = ?, updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ?
+     WHERE id = ?`,
+    [name, sprintType, goal, startsOn, endsOn, cents, currency, now, actor.id, actor.email, actor.name, id]
+  )
+
+  const changes = describeChanges([
+    { label: "Name", from: before.name, to: name },
+    { label: "Kind", from: before.sprint_type, to: sprintType },
+    { label: "Runs", from: before.starts_on, to: startsOn },
+    { label: "Ends", from: before.ends_on, to: endsOn },
+    // The FIGURE is deliberately hidden from the history line. A sprint's price
+    // is commercial, the activity feed is read by everyone who holds `work`, and
+    // "the price changed" is the fact that belongs in a log — not the number.
+    { label: "Price", from: String(before.sold_price_cents), to: String(cents), hideValues: true },
+  ])
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: "Sprint edited",
+    description: `${actor.name} edited ${before.ref ?? before.name}${changes ? ` — ${changes}` : ""}`,
+    relatedTable: "sprints",
+    relatedRowId: id,
+  })
+  return { accountId: before.account_id }
+}
+
 /** COMPLETE a sprint, or reopen it.
  *
  * R17: the current-state predicate rides the UPDATE (`completed_at IS NULL` /
