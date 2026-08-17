@@ -661,6 +661,36 @@ describe("without the contacts right, the collection is the companies", () => {
     const { rows } = await listAccountsForExport(cfg, guard, staff, BLIND)
     expect(rows.every((r) => r.accountType === "entity")).toBe(true)
   })
+
+  // THE PEOPLE TAB'S BADGE, and it is the same narrowing rather than a second
+  // one: the screen hides the tab, and the number behind it is zero anyway. A
+  // badge computed a different way is a badge that eventually disagrees with the
+  // list under it, which is exactly the shape of the bug this right exists for.
+  it("the People badge is zero, from the same clause the rows go through", async () => {
+    const blind = await listAccounts(cfg, guard, staff, BLIND)
+    expect(blind.individualTotal).toBe(0)
+    expect(blind.entityTotal).toBe(blind.total)
+  })
+})
+
+// THE ALL / COMPANIES / PEOPLE STRIP asks a different question from the list
+// under it — "how many of each are there", not "how many matched" — so the two
+// numbers are computed apart and must stay apart under a filter.
+describe("the two tab badges beside the accounts list", () => {
+  it("count the collection, and add up to it", async () => {
+    const page = await listAccounts(cfg, guard, staff, SEES_PEOPLE)
+    expect(page.entityTotal + page.individualTotal).toBe(page.total)
+    expect(page.individualTotal, "the harness has people to count").toBeGreaterThan(0)
+  })
+
+  it("do NOT move when the list is narrowed — a badge on a tab you have not pressed", async () => {
+    const whole = await listAccounts(cfg, guard, staff, SEES_PEOPLE)
+    const narrowed = await listAccounts(cfg, guard, staff, SEES_PEOPLE, { type: "entity" })
+    // `total` follows the question that was asked; the two badges do not.
+    expect(narrowed.total).toBe(whole.entityTotal)
+    expect(narrowed.entityTotal).toBe(whole.entityTotal)
+    expect(narrowed.individualTotal).toBe(whole.individualTotal)
+  })
 })
 
 // A CONTACT'S OWN SCREEN reads the link table from the PERSON's side. This is the

@@ -158,7 +158,15 @@ export async function getAccounts(request: Request, env: Env): Promise<Response>
     // megabyte of it is a bad request, not an atob + JSON.parse of a megabyte.
     cursor: queryText(url.searchParams.get("cursor"), "Cursor") ?? null,
   })
-  return pagedJson("accounts", page)
+  // The two extras are the tab strip's badges (R16): how many companies and how
+  // many people this caller may see. They ride the SAME response as the page so
+  // a screen cannot badge a tab from a number it fetched separately — and so a
+  // role without the contacts right gets `individualTotal: 0` beside a list with
+  // no people in it, which is one answer rather than two.
+  return pagedJson("accounts", page, {
+    entityTotal: page.entityTotal,
+    individualTotal: page.individualTotal,
+  })
 }
 
 /** The filters an accounts read accepts, parsed ONCE — the list door and the

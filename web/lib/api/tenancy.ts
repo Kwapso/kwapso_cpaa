@@ -267,7 +267,11 @@ export const tenancy = {
 
   /** R14: a PAGE of accounts (a GROWING collection) — hand `cursor` back from the
    * previous response for the next one; `total` is the exact server count of what
-   * this caller may see. `parentId` narrows to one account's children. */
+   * this caller may see. `parentId` narrows to one account's children.
+   *
+   * `entityTotal` / `individualTotal` are the All / Companies / People strip's two
+   * other badges: the COLLECTION's counts rather than this call's, so a badge on a
+   * tab nobody has pressed does not move while somebody types in the search box. */
   accounts: (
     opts: {
       q?: string
@@ -288,7 +292,9 @@ export const tenancy = {
     if (opts.parentId) p.set("parentId", opts.parentId)
     if (opts.cursor) p.set("cursor", opts.cursor)
     const qs = p.toString()
-    return api<PagedResponse<{ accounts: Account[] }>>(`/api/tenancy/accounts${qs ? `?${qs}` : ""}`)
+    return api<PagedResponse<{ accounts: Account[]; entityTotal: number; individualTotal: number }>>(
+      `/api/tenancy/accounts${qs ? `?${qs}` : ""}`
+    )
   },
 
   /** One account opened: the record, its parent, its people, its logins, and the

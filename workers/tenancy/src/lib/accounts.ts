@@ -245,12 +245,22 @@ export async function listAccounts(
   scope: AccountScope,
   sight: ContactSight,
   opts: AccountFilters & { cursor?: string | null } = {}
-): Promise<Page<Account> & { total: number }> {
+): Promise<Page<Account> & { total: number; entityTotal: number; individualTotal: number }> {
   const { sql: base, params } = accountsWhere(scope, opts, sight)
   const after = keysetAfter(decodeCursor(opts.cursor), "created_at")
   const pageWhere = after.sql ? `${base ? `${base} AND` : " WHERE"} ${after.sql}` : base
+  // THE TWO TAB BADGES, and they are a different question from `total` on
+  // purpose. `total` counts what was ASKED FOR (this search, this status, this
+  // type) so the rows and the number beside them agree. These two count the
+  // COLLECTION — how many companies and how many people there are — because they
+  // sit on a tab strip somebody has not pressed yet, and a badge that changed
+  // while you typed would be answering the question you are about to ask rather
+  // than the one you are looking at. Same shape as the ticket strip's All / My /
+  // Archived badges, and for the same reason.
+  const companies = accountsWhere(scope, { type: "entity" }, sight)
+  const people = accountsWhere(scope, { type: "individual" }, sight)
 
-  const [rows, counted] = await Promise.all([
+  const [rows, counted, entityTotal, individualTotal] = await Promise.all([
     // PAGE_SIZE + 1 is how hasMore is known without a second query.
     d1Query<AccountRow>(
       cfg,
@@ -263,10 +273,22 @@ export async function listAccounts(
     // badge can never count rows the list withholds — counted exactly to
     // TOTAL_COUNT_CAP and reported as "at least" beyond it.
     countCollection(cfg, guard.databaseId, `SELECT 1 FROM accounts${base}`, params),
+    countCollection(cfg, guard.databaseId, `SELECT 1 FROM accounts${companies.sql}`, companies.params),
+    // Without the contacts right this one is ZERO, and it is zero through the
+    // same `accountsWhere` the rows go through rather than by a special case: a
+    // People tab badged from a second code path is a People tab that eventually
+    // disagrees with the list under it.
+    countCollection(cfg, guard.databaseId, `SELECT 1 FROM accounts${people.sql}`, people.params),
   ])
 
   const page = toPage(rows, PAGE_SIZE, (r) => [r.created_at, r.id])
-  return { ...page, rows: page.rows.map((r) => toAccount(r, scope)), total: counted }
+  return {
+    ...page,
+    rows: page.rows.map((r) => toAccount(r, scope)),
+    total: counted,
+    entityTotal,
+    individualTotal,
+  }
 }
 
 /** Every account this caller may see — NARROWED the same way the list narrows —

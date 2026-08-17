@@ -96,6 +96,7 @@ export function PagedFind<T>({
   placeholder,
   noun,
   facets = [],
+  fixed,
   children,
 }: {
   /** the collection's OWN cache key (accountsKey(teamId), …) */
@@ -114,6 +115,16 @@ export function PagedFind<T>({
    * door cannot answer does not belong here at all, which is the defect this
    * whole file is about. */
   facets?: FilterFacet[]
+  /** WHAT THE SCREEN IS ALREADY ASKING, above whatever the person types — a tab
+   * strip's own narrowing (`{ type: "entity" }`), forwarded to the door as an
+   * ordinary query parameter.
+   *
+   * It exists so a tab and a search box are ONE question rather than two. A tab
+   * that filtered the loaded page would narrow fifty rows under a badge counting
+   * all of them, and would leave the CSV export and the paging answering a
+   * different question from the screen — the same defect this whole file was
+   * written for, committed one control along. */
+  fixed?: FindQuery
   children: (found: Found<T>) => React.ReactNode
 }) {
   // Debounced upstream by SearchInput (200ms), so a keystroke is not a request.
@@ -124,6 +135,12 @@ export function PagedFind<T>({
   for (const [field, value] of Object.entries(values)) if (value) query[field] = value
   const q = text.trim()
   if (q) query.q = q
+  // WHAT THE PERSON IS ASKING, kept apart from what the SCREEN is asking: the
+  // door is given both, but the "N accounts match" line belongs to the question
+  // somebody typed. A bare tab is not a search, and a match count under an
+  // untouched search box reads as one.
+  const asked = Object.keys(query).length > 0
+  for (const [field, value] of Object.entries(fixed ?? {})) if (value) query[field] = value
   const active = Object.keys(query).length > 0
   const findKey = active ? findKeyFor(listKey, query) : null
 
@@ -149,12 +166,13 @@ export function PagedFind<T>({
     setText("")
     setValues({})
   }
-  const canClear = active
+  const canClear = asked
   const showFilters = facets.length > 0
 
   // NOTHING FOUND is a sentence, not a blank. "No accounts yet." is the
-  // collection's empty state and it is simply untrue mid-search.
-  const emptyText = active ? `Nothing matched. Try fewer words, or clear the filters.` : undefined
+  // collection's empty state and it is simply untrue mid-search — but an empty
+  // TAB is not a failed search either, so the sentence follows what was asked.
+  const emptyText = asked ? `Nothing matched. Try fewer words, or clear the filters.` : undefined
 
   return (
     <div className="flex w-full flex-col gap-3">
@@ -185,7 +203,7 @@ export function PagedFind<T>({
             own count above is exact and never does). It appears only while
             something IS being asked, so an unfiltered screen looks exactly as it
             did before. */}
-        {active && !found.loading && (
+        {asked && !found.loading && (
           <span className="text-muted-foreground text-xs tabular-nums" aria-live="polite">
             {total ? `${formatSearchTotal(total)} ${noun} match` : `No ${noun} match`}
           </span>
