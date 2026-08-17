@@ -19,7 +19,7 @@ type CfResponse<T> = {
 import { D1_LIST_PAGE_CAP } from "./limits"
 
 const API = "https://api.cloudflare.com/client/v4"
-const RETRIES = 2 // total attempts = 1 + RETRIES, only on 5xx/network blips
+const RETRIES = 2 // total attempts = 1 + RETRIES — 5xx, network blips, and CF's 7500-in-a-200
 
 async function cf<T>(
   cfg: D1Rest,
@@ -58,6 +58,27 @@ async function cf<T>(
     }
     const data = (await res.json()) as CfResponse<T>
     if (!res.ok || !data.success) {
+      // A TRANSIENT FAILURE IN A success:false COSTUME. Cloudflare sometimes
+      // reports its own internal failure as HTTP 200 with `success:false` and
+      // "internal error; reference = …" instead of a 5xx — same failure as a
+      // 500, different dress. This branch used to classify it as "our request
+      // is wrong, fail loudly", so the retry loop above never fired for exactly
+      // the failure it exists for: 36 of the 67 open error rows on 2026-08-17
+      // were single-shot internal errors across nine different read doors.
+      //
+      // The MESSAGE is the discriminator, not the code — measured live, not
+      // assumed: D1 answers code 7500 for EVERYTHING ("no such table: x:
+      // SQLITE_ERROR" and "internal error; reference = …" both carry it), so a
+      // code check would retry bad SQL. Cloudflare's transient wording is the
+      // one thing that separates them. Retrying it is the SAME policy the 5xx
+      // branch already applies to the same statements — not a new stance on
+      // retrying writes.
+      if (data.errors?.some((e) => /^internal error/i.test(e.message))) {
+        lastError = new Error(
+          `Cloudflare D1 API failed: ${data.errors.map((e) => e.message).join("; ")}`
+        )
+        continue
+      }
       // 4xx = our request is wrong — retrying won't help, fail loudly.
       const msg = data.errors?.map((e) => e.message).join("; ") || res.statusText
       // A REFUSED KEY IS NOT A MALFORMED REQUEST, and until 2026-08-14 it read
