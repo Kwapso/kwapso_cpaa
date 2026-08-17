@@ -27,7 +27,7 @@ import {
   TAB_COUNT_EXCEPTIONS,
 } from "@shared/rules/registry"
 import { formatCount } from "@shared/web/format-count"
-import { SIMPLE_INVALIDATIONS, TEAM_RESOURCES } from "../lib/live-resources"
+import { SIMPLE_INVALIDATIONS, TEAM_RESOURCES, TIME_SLICE_PREFIX } from "../lib/live-resources"
 import { TEAM_SECTIONS } from "../lib/pages"
 import { BASE_RECIPES, tabCountKey, withTabCounts } from "../lib/screens"
 
@@ -589,6 +589,47 @@ describe("RULES — the laws of the base", () => {
     // Tripwire: the publisher set is scanned, so a scan that finds nothing would
     // report "all clear" exactly like a passing one.
     expect(published.size, "the publisher scan found no publishChange calls — it has gone blind").toBeGreaterThan(5)
+  })
+
+  // R15's OTHER HALF: a collection also cached in RECORD-SCOPED slices has to
+  // reach a listener in that shape too, and the resource name alone does not get
+  // there. A `work_logs` ping carries the work LOG's id; the story it sits
+  // against is on the row, which `deps` has not read and `patchRow` never reads
+  // at all when the team-wide list isn't loaded. So the registry declares the
+  // family by PREFIX and the shell drops it.
+  //
+  // This is the bug the tester found on staging: a timer stopped from the header
+  // bar went on reading "running" on the story's Time tab for ever — and because
+  // that screen only offers a correction on time that has FINISHED, a row stuck
+  // at "running" is also a row nobody can edit. One stale cache key, two
+  // findings.
+  it("live-collections: a record-scoped slice of a live collection reaches a listener too", () => {
+    const declared = Object.values(TEAM_RESOURCES)
+      .map((r) => r.slicePrefix)
+      .filter((p): p is string => !!p)
+    expect(
+      declared,
+      "the time slices are a live collection's record-scoped half — a resource must claim them (R15)"
+    ).toContain(TIME_SLICE_PREFIX)
+
+    // …and the SHELL performs the drop, rather than the registry describing one
+    // nothing does. A declared prefix nobody reads is R15's original failure
+    // mode wearing a new field name.
+    const shell = read(join(WEB, "components", "app-shell.tsx"))
+    expect(
+      shell.includes("invalidatePrefix(r.slicePrefix)"),
+      "app-shell must drop each resource's declared slice family on a ping (R15)"
+    ).toBe(true)
+
+    // …and no screen builds a per-record time key by hand. ONE builder, so the
+    // prefix the registry drops and the key the screen reads cannot drift apart
+    // — which is exactly how the story's Time tab ended up on a key
+    // (`time-story-of:<id>`) that nothing in the live layer had ever heard of.
+    const handRolled = componentFiles().filter((f) => /sliceKey\(\s*["'`]time-/.test(read(f)))
+    expect(
+      handRolled,
+      `a per-record time cache key must come from recordTimeKey, not sliceKey (R15): ${handRolled.join(", ")}`
+    ).toEqual([])
   })
 
   // R16 — every screen showing a collection shows its count exactly once: the

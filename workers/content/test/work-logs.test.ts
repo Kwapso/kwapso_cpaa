@@ -358,6 +358,64 @@ describe("auto-stop is the caller's own choice, and off by default", () => {
     expect(running).toHaveLength(1)
     expect(running[0].target_id).toBe(c)
   })
+
+  // R1: THE ROWS AUTO-STOP CLOSED ARE CHANGES, AND THEY WERE NOT ANNOUNCED.
+  // Starting a timer under this setting gives another row a finish and a
+  // duration, and only the NEW row was published — so every other screen, and
+  // every colleague's, went on showing a stopped timer as running. The publish
+  // seam's source scan cannot see this: the handler DID call publishChange, just
+  // not for every row it moved.
+  it("R1 — announces every timer it closed, under that timer's own client", async () => {
+    const a = await addStory("Bergman work")
+    const b = await addStory("Aurora work")
+    // TWO DIFFERENT CLIENTS, because that is the case a single `scope` gets
+    // wrong: a client login's socket is fenced by ACCOUNT and cannot check a row
+    // id, so a stopped timer announced under the new timer's client is a ping
+    // the wrong side hears and the right side doesn't.
+    db().exec(`
+      UPDATE stories SET account_id = '${IDS.victimAccount}' WHERE id = '${a}';
+      UPDATE stories SET account_id = '${IDS.burglarAccount}' WHERE id = '${b}';
+    `)
+    await call(IDS.staffUser, "POST /api/content/work-logs/auto-stop", { on: true })
+    await call(IDS.staffUser, "POST /api/content/work-logs/start", { targetTable: "stories", targetId: a })
+    const closed = logRows()[0].id as string
+
+    const pings: { resource: string; id?: string; op?: string; scope?: string }[] = []
+    const recording = {
+      ...(env(IDS.staffUser) as unknown as Record<string, unknown>),
+      REALTIME: {
+        fetch: async (_url: unknown, init: { body: string }) => {
+          pings.push((JSON.parse(init.body) as { event: typeof pings[number] }).event)
+          return new Response("{}")
+        },
+      },
+    }
+    const res = await worker.fetch(
+      new Request("https://content/api/content/work-logs/start", {
+        method: "POST",
+        headers: { Cookie: "session=x", "Content-Type": "application/json" },
+        body: JSON.stringify({ targetTable: "stories", targetId: b }),
+      }),
+      recording as never
+    )
+    expect(res.status).toBe(200)
+
+    const started = logRows().find((r) => r.target_id === b)?.id as string
+    // The row that STOPPED is announced, under ITS client — not the new one's.
+    expect(pings).toContainEqual({
+      resource: "work_logs",
+      id: closed,
+      op: "edit",
+      scope: IDS.victimAccount,
+    })
+    // …and so is the row that started.
+    expect(pings).toContainEqual({
+      resource: "work_logs",
+      id: started,
+      op: "add",
+      scope: IDS.burglarAccount,
+    })
+  })
 })
 
 describe("the list pages and totals what it is showing (R14 + R16)", () => {

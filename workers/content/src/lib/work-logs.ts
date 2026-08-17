@@ -298,18 +298,29 @@ export async function startTimer(
   guard: MemberGuard,
   actor: Actor,
   input: { targetTable: string; targetId: string; note?: string; kind?: string }
-): Promise<{ id: string; accountId: string | null; stopped: string[] }> {
+): Promise<{
+  id: string
+  accountId: string | null
+  /** The timers this start CLOSED, under the caller's own auto-stop-previous
+   * setting — each with the account it belongs to, which is not necessarily the
+   * new one's: stopping an hour on Bergman to start one on Aurora is the
+   * ordinary case. The door publishes one change per row (R1), and a ping
+   * carrying the wrong client would fan out to the wrong side. */
+  stopped: { id: string; accountId: string | null }[]
+}> {
   const { accountId } = await targetOrThrow(cfg, guard, input.targetTable, input.targetId)
   const now = new Date().toISOString()
 
   // Their own choice, honoured before the new one starts so the header never
   // shows two timers for a person who asked for one.
-  const stopped: string[] = []
+  const stopped: { id: string; accountId: string | null }[] = []
   if (await autoStops(cfg, guard)) {
     const running = await runningTimers(cfg, guard)
     for (const t of running) {
-      await stopTimer(cfg, guard, actor, t.id, null)
-      stopped.push(t.id)
+      const { moved, accountId: was } = await stopTimer(cfg, guard, actor, t.id, null)
+      // R17: a timer somebody else's tab stopped in the same instant moved zero
+      // rows here, and a row that did not move is not a change to announce.
+      if (moved) stopped.push({ id: t.id, accountId: was })
     }
   }
 

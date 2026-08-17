@@ -293,6 +293,24 @@ export function triageKey(teamId: string): string {
 export function runningTimersKey(teamId: string): string {
   return `running-timers:${teamId}`
 }
+
+/** THE TIME LOGGED AGAINST ONE RECORD — the Time tab on a story, and any record
+ * that grows one (a ticket and a task are the other two things time may sit
+ * against). Keyed by the record, because it is that record's own slice of a
+ * collection the whole team shares, read through the door's own target filter
+ * rather than sieved out of the team-wide page.
+ *
+ * They all share ONE PREFIX on purpose. A `work_logs` ping carries the work
+ * log's id and nothing else — the story it belongs to is on the row — so a
+ * listener cannot name the one slice that went stale. It drops the family and
+ * the slice on screen re-reads (see TEAM_RESOURCES.work_logs below). This is
+ * the bug the tester found: a timer stopped from the header stayed "running" on
+ * the story's Time tab for ever, because that key reached no listener at all —
+ * and a row that reads as running is a row the screen refuses to let you edit. */
+export const TIME_SLICE_PREFIX = "time-of:"
+export function recordTimeKey(targetTable: string, targetId: string): string {
+  return `${TIME_SLICE_PREFIX}${targetTable}:${targetId}`
+}
 /** The agency-internal collections' cache keys. Named functions rather than
  * inline templates for the same reason the accounts and ticket keys are: the
  * live registry, the screen read and the count sidecar all have to say the same
@@ -406,6 +424,12 @@ export const TEAM_RESOURCES: Record<
     fetchList: (teamId: string) => Promise<Record<string, unknown>[]>
     /** small dependent caches to coarse-invalidate (aggregations / feeds). */
     deps?: (teamId: string, id: string) => string[]
+    /** A cache-key PREFIX covering this collection's record-scoped slices, for
+     * the collections that have them. `deps` is given the ping's row id, which
+     * is enough to name a key derived from THAT row; it is not enough when the
+     * slice is keyed by a DIFFERENT record (the story a work log sits against).
+     * Everything under the prefix is dropped and re-read. */
+    slicePrefix?: string
     /** refresh the active-team context (e.g. the section member count). */
     refreshCtx?: boolean
   }
@@ -560,6 +584,9 @@ export const TEAM_RESOURCES: Record<
     fetchOne: (id) => contentApi.workLogOne(id),
     fetchList: (t) => listFetch.workLogs(t),
     deps: (t, id) => [runningTimersKey(t), storiesKey(t), `activity:record:work_logs:${id}`],
+    // …and the Time tab on whichever record this row was logged against, which
+    // the ping cannot name (recordTimeKey above says why it is a family drop).
+    slicePrefix: TIME_SLICE_PREFIX,
   },
   // TO-DOS — row-level live, and the one work-engine resource a CLIENT hears
   // about too (the portal has its own listener map). A contact completing one in
