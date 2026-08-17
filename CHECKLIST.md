@@ -103,7 +103,7 @@ longer duplicates a value.
 | 5.9 | A ticket must name the contact who raised it | **DONE** — narrowed to that company's own people; the door refuses anyone else |
 | 5.10 | Several files and several links on a ticket, from both front doors | **DONE** — files and links, from both front doors |
 | 5.11 | A dedicated triage screen showing whose week it is | **DONE** — the DOOR decides whose week it is, so an empty list comes back to everyone else rather than the screen hiding it |
-| 5.12 | No automation ever unassigns the triage person | **DONE** — a check across all six workers fails if anything ever starts writing to the rota |
+| 5.12 | No automation ever unassigns the triage person | **DONE** — a check across every worker fails if anything ever starts writing to the rota |
 | 5.13 | The main stakeholder validates tickets before triage | **DONE** — **CHANGED**: extras, requests and feedback wait. Questions and issues go straight in, Aurora's note |
 
 ## 6 · Stories
