@@ -42,6 +42,7 @@ import { useRouteTeam } from "@/components/deep-link/use-route-team"
 import { useTraceRing } from "@/components/deep-link/use-trace-ring"
 import { WritePanels } from "@/components/deep-link/write-panels"
 import { HomeScreen } from "@/components/screens/home-screen"
+import { ProfileScreen } from "@/components/screens/profile-screen"
 import { SettingsScreen } from "@/components/screens/settings-screen"
 import { InvitationsScreen } from "@/components/screens/invitations-screen"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
@@ -228,7 +229,7 @@ export function DeepLinkScreen() {
 
   if (active.loading || !active.ctx || !route) return <ShellLoading />
 
-  // Account screens (/home, /settings, /invitations) render DIRECTLY in the shell — they
+  // Account screens (/home, /settings, /invitations, /profile) render DIRECTLY in the shell — they
   // aren't team-scoped module content, so they skip the team tabs / queries / membership
   // gate below. Because they live inside this one never-unmounting shell, moving in and
   // out of them (and into /t) is soft History-API nav — no reload anywhere.
@@ -238,11 +239,14 @@ export function DeepLinkScreen() {
         ? [{ label: t("Settings") }]
         : module === "invitations"
           ? [{ label: t("Invitations") }]
-          : []
+          : module === "profile"
+            ? [{ label: t("Your profile") }]
+            : []
     return (
       <AppShell active={active} breadcrumbs={accountCrumbs} onNavigate={go} activePath={currentPath}>
         {module === "home" && <HomeScreen active={active} />}
         {module === "settings" && <SettingsScreen active={active} />}
+        {module === "profile" && <ProfileScreen active={active} />}
         {module === "invitations" && <InvitationsScreen active={active} />}
       </AppShell>
     )

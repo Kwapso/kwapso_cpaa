@@ -1,22 +1,32 @@
 "use client"
 
-// SETTINGS — one page with THREE TABS: Account, Teams, Access.
+// SETTINGS — the APP's own housekeeping, and nothing about a person.
 //
 // The owner's ruling folded the old system's separate Admin / System / Kwapso
 // sections in here rather than giving each a rail entry: they are all the same
-// kind of thing (the app's own housekeeping, opened rarely and on purpose) and a
-// nav rail that lists three of them reads as three destinations. What was a
-// stack of five headings you scrolled past is now a strip you choose from —
-// through the library TabsView, like every other tab strip in the app (R3).
+// kind of thing (opened rarely and on purpose) and a nav rail that lists three
+// of them reads as three destinations.
+//
+// TWO THINGS LEFT IT ON 17 AUG 2026, and the reason is the same for both.
+//   • YOUR PROFILE AND YOUR EMAIL moved to a page of their own
+//     (screens/profile-screen.tsx, reached from the profile menu). Everything
+//     here is about the APP; those are about a PERSON, and a tester looking for
+//     "change my name" should not have to guess which of three tabs holds it.
+//   • THE TEAMS LIST is hidden rather than removed — shared/product.ts explains
+//     at length why nothing underneath it was touched.
+//
+// What is left is one page rather than a tab strip, because a strip with one tab
+// in it is a control that decides nothing: the invitations waiting for you, the
+// tokens a machine holds, and the Google account kwapso may act through. All
+// three are the same sentence said three ways — something outside this app has
+// been given a way in, and this is where you take it back.
 //
 // The team's own admin (members, roles, invites, dropdown values) stays where it
-// was: a tab strip on the TEAM, reached by tapping the team here. That is one
-// level down, not a fourth tab — a team is a record, and its sections belong to
-// it.
+// was: a tab strip on the TEAM. That is one level down, not a fourth thing here
+// — a team is a record, and its sections belong to it.
 //
 // A content component rendered inside the one deep-link shell (the shell provides
-// AppShell chrome). Tapping a team makes it active and opens its detail;
-// team-switch navigation is soft (softNavigate), no reload.
+// the AppShell chrome).
 
 import * as React from "react"
 
@@ -26,39 +36,22 @@ import {
   AvatarImage,
 } from "@kwapso/ui/registry/primitives/avatar/avatar"
 import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { List } from "@kwapso/ui/registry/collections/list/list"
-import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
-import {
-  ActivityFeed,
-  defaultActivityFeedConfig,
-} from "@kwapso/ui/registry/collections/activity-feed/activity-feed"
-import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
-import { ChevronRight, Mail } from "lucide-react"
+import { ChevronRight } from "lucide-react"
 
 import { AccessTokensSection } from "@/components/access-tokens"
-import { EmailChangeDialog } from "@/components/email-change-dialog"
 import { GoogleConnectionsSection } from "@/components/google-connections"
 import { InvitationsPanel, useReceivedInvites } from "@/components/invitations"
-import { ProfileDialog } from "@/components/profile-dialog"
-import { auth } from "@/lib/api"
-import { formatDateTime } from "@shared/web/format"
-import { LanguageSection } from "@shared/web/language-section"
-import { personName, personInitials, letterMark } from "@/lib/identity"
+import { letterMark } from "@/lib/identity"
 import { softNavigate } from "@/lib/nav"
 import { TEAM_SCREENS_HIDDEN } from "@shared/product"
-import { useCached } from "@shared/web/store"
 import type { ActiveTeam } from "@/lib/use-active-team"
 import { useT } from "@shared/web/language"
 
 export function SettingsScreen({ active }: { active: ActiveTeam }) {
   const t = useT()
-  const [tab, setTab] = React.useState("account")
-  const [editing, setEditing] = React.useState(false)
-  const [changingEmail, setChangingEmail] = React.useState(false)
-  const { ctx, user } = active
+  const { ctx } = active
   const pendingInvites = useReceivedInvites().data ?? []
-  const accountActivityQ = useCached("account-activity", () => auth.activity().then((r) => r.activity))
 
   async function openTeam(teamId: string) {
     if (teamId !== ctx?.team?.id) await active.switchTeam(teamId)
@@ -66,219 +59,59 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
   }
 
   if (!ctx) return null
-  const name = personName({ firstName: user?.firstName, lastName: user?.lastName }) || "You"
-
-  // NO COUNT ON THE TEAMS TAB, and that is R16 doing its job rather than an
-  // omission. The only number available here is `ctx.teams.length` — the length
-  // of a list the session-bootstrap door returns with no COUNT(*) beside it —
-  // and a list's length is a ceiling, not a total. Badging it would be exactly
-  // the mistake that once had a 24,011-row catalogue advertising "1000". If this
-  // tab is ever to carry a number, the door has to answer with one first.
-  const tabsConfig = {
-    ...defaultTabsConfig,
-    variant: "line" as const,
-    tabs: [
-      { value: "account", label: t("Account"), icon: "user", badge: "", badgeVariant: "" as const },
-      // THE TEAMS TAB IS HIDDEN, not removed — shared/product.ts explains at
-      // length why the plumbing under it is untouched. One team, and a second
-      // would be an empty world, so the tab was a list with one row in it.
-      ...(TEAM_SCREENS_HIDDEN
-        ? []
-        : [{ value: "teams", label: t("Teams"), icon: "building", badge: "", badgeVariant: "" as const }]),
-      { value: "access", label: t("Access"), icon: "key-round", badge: "", badgeVariant: "" as const },
-    ],
-  }
-
-  const accountPanel = (
-    <div className="flex flex-col gap-8">
-      <section className="animate-rise flex flex-col gap-3">
-        <List
-          surface="none"
-          className="rounded-xl border"
-          items={[
-            {
-              id: "profile",
-              leading: (
-                <Avatar className="size-9">
-                  {user?.imageUrl && <AvatarImage src={user.imageUrl} alt={name} />}
-                  <AvatarFallback>{personInitials(user?.firstName, user?.lastName)}</AvatarFallback>
-                </Avatar>
-              ),
-              title: name,
-              trailing: (
-                <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-                  {t("Edit profile")}
-                </Button>
-              ),
-            },
-            {
-              id: "email",
-              leading: (
-                <div className="text-muted-foreground flex size-9 items-center justify-center">
-                  <Mail className="size-4" />
-                </div>
-              ),
-              title: user?.email,
-              trailing: (
-                <Button variant="outline" size="sm" onClick={() => setChangingEmail(true)}>
-                  {t("Change email")}
-                </Button>
-              ),
-            },
-          ]}
-        />
-      </section>
-
-      {/* Above account activity, below the profile: language is a setting
-       * somebody changes once and then forgets, but they have to be able to FIND
-       * it while reading a language they do not understand — so it sits high,
-       * and its own control shows the four flags rather than hiding them. */}
-      <LanguageSection save={(lang) => auth.setLanguage(lang)} />
-
-      <section className="animate-rise flex flex-col gap-3">
-        <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Account activity")}</h2>
-        {accountActivityQ.error ? (
-          <p className="text-destructive text-sm">{t("Couldn't load your activity.")}</p>
-        ) : accountActivityQ.data === undefined ? (
-          <Skeleton variant="list" lines={3} />
-        ) : (
-          <ActivityFeed
-            config={{ ...defaultActivityFeedConfig, newestFirst: false, emptyText: t("No account activity yet.") }}
-            items={accountActivityQ.data.map((a) => ({
-              id: a.id,
-              description: a.description,
-              timestamp: formatDateTime(a.createdAt),
-            }))}
-          />
-        )}
-      </section>
-    </div>
-  )
-
-  const teamsPanel = (
-    <List
-      surface="none"
-      className="rounded-xl border"
-      onItemClick={(item) => void openTeam(item.id)}
-      items={ctx.teams.map((team) => ({
-        id: team.id,
-        leading: (
-          <Avatar className="size-9">
-            {team.logoUrl && <AvatarImage src={team.logoUrl} alt={team.name} />}
-            <AvatarFallback className="text-xs">{letterMark(team.name)}</AvatarFallback>
-          </Avatar>
-        ),
-        title: (
-          <span className="flex items-center gap-2">
-            <span className="truncate">{team.name}</span>
-            {team.id === ctx.team?.id && (
-              <Badge variant="secondary" className="text-[10px]">
-                {t("Active")}
-              </Badge>
-            )}
-          </span>
-        ),
-        trailing: <ChevronRight className="text-muted-foreground size-4" />,
-      }))}
-    />
-  )
 
   return (
-    <>
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
-        {/* Invitations sit ABOVE the strip, not inside a tab: an invitation is
-            something waiting for you, and a thing waiting for you should not be
-            behind a tab you have to think to open. It disappears when there is
-            none, which is nearly always. */}
-        {pendingInvites.length > 0 && (
-          <section className="animate-rise flex flex-col gap-3">
-            <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Invitations")}</h2>
-            <InvitationsPanel active={active} />
-          </section>
-        )}
-
-        <TabsView
-          config={tabsConfig}
-          value={tab}
-          onValueChange={setTab}
-          renderPanel={(t) => {
-            if (t.value === "teams") return TEAM_SCREENS_HIDDEN ? null : teamsPanel
-            if (t.value === "access") return <AccessTokensSection teamName={ctx.team?.name ?? null} />
-            return accountPanel
-          }}
-        />
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-8">
+      {/* Invitations sit at the top: an invitation is something waiting for you,
+          and a thing waiting for you should not be below the housekeeping. It
+          disappears when there is none, which is nearly always. */}
+      {pendingInvites.length > 0 && (
         <section className="animate-rise flex flex-col gap-3">
-          <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Account")}</h2>
+          <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Invitations")}</h2>
+          <InvitationsPanel active={active} />
+        </section>
+      )}
+
+      <AccessTokensSection teamName={ctx.team?.name ?? null} />
+
+      {/* Beside Access tokens on purpose: both are things a PERSON connects to
+       * their own account, and both hand something the power to act as them. */}
+      <GoogleConnectionsSection teamId={ctx.team?.id ?? null} />
+
+      {/* THE TEAMS YOU ARE IN. Hidden, not deleted: the constant is the whole of
+          the switch, the list below is exactly what it was, and flipping
+          TEAM_SCREENS_HIDDEN to false in shared/product.ts brings it back whole.
+          web/test/one-team.test.ts holds both halves of that decision. */}
+      {!TEAM_SCREENS_HIDDEN && (
+        <section className="animate-rise flex flex-col gap-3">
+          <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Teams")}</h2>
           <List
             surface="none"
             className="rounded-xl border"
-            items={[
-              {
-                id: "profile",
-                leading: (
-                  <Avatar className="size-9">
-                    {user?.imageUrl && <AvatarImage src={user.imageUrl} alt={name} />}
-                    <AvatarFallback>{personInitials(user?.firstName, user?.lastName)}</AvatarFallback>
-                  </Avatar>
-                ),
-                title: name,
-                trailing: (
-                  <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-                    {t("Edit profile")}
-                  </Button>
-                ),
-              },
-              {
-                id: "email",
-                leading: (
-                  <div className="text-muted-foreground flex size-9 items-center justify-center">
-                    <Mail className="size-4" />
-                  </div>
-                ),
-                title: user?.email,
-                trailing: (
-                  <Button variant="outline" size="sm" onClick={() => setChangingEmail(true)}>
-                    {t("Change email")}
-                  </Button>
-                ),
-              },
-            ]}
+            onItemClick={(item) => void openTeam(item.id)}
+            items={ctx.teams.map((team) => ({
+              id: team.id,
+              leading: (
+                <Avatar className="size-9">
+                  {team.logoUrl && <AvatarImage src={team.logoUrl} alt={team.name} />}
+                  <AvatarFallback className="text-xs">{letterMark(team.name)}</AvatarFallback>
+                </Avatar>
+              ),
+              title: (
+                <span className="flex items-center gap-2">
+                  <span className="truncate">{team.name}</span>
+                  {team.id === ctx.team?.id && (
+                    <Badge variant="secondary" className="text-[10px]">
+                      {t("Active")}
+                    </Badge>
+                  )}
+                </span>
+              ),
+              trailing: <ChevronRight className="text-muted-foreground size-4" />,
+            }))}
           />
         </section>
-
-        <AccessTokensSection teamName={ctx.team?.name ?? null} />
-
-        {/* Beside Access tokens on purpose: both are things a PERSON connects to
-         * their own account, and both hand something the power to act as them. */}
-        <GoogleConnectionsSection teamId={ctx.team?.id ?? null} />
-
-        <section className="animate-rise flex flex-col gap-3">
-          <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Account activity")}</h2>
-          {accountActivityQ.error ? (
-            <p className="text-destructive text-sm">{t("Couldn't load your activity.")}</p>
-          ) : accountActivityQ.data === undefined ? (
-            <Skeleton variant="list" lines={3} />
-          ) : (
-            <ActivityFeed
-              config={{ ...defaultActivityFeedConfig, newestFirst: false, emptyText: t("No account activity yet.") }}
-              items={accountActivityQ.data.map((a) => ({
-                id: a.id,
-                description: a.description,
-                timestamp: formatDateTime(a.createdAt),
-              }))}
-            />
-          )}
-        </section>
-
-      </div>
-
-      <ProfileDialog open={editing} onOpenChange={setEditing} user={user} onSaved={active.refresh} />
-      <EmailChangeDialog
-        open={changingEmail}
-        onOpenChange={setChangingEmail}
-        currentEmail={user?.email ?? ""}
-        onSaved={active.refresh}
-      />
-    </>
+      )}
+    </div>
   )
 }

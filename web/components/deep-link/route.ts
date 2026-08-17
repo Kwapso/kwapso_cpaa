@@ -62,11 +62,11 @@ export const TOP_LEVEL_MODULES = [
   // The agency's own housekeeping — clean top-level URLs, like every other
   // sidebar page (`purposes` rides along because it has records of its own).
   "brand", "purposes",
-  "home", "settings", "invitations",
+  "home", "settings", "invitations", "profile",
 ]
 
 /** The account-level screens the shell renders directly (not team-scoped module content). */
-export const ACCOUNT_MODULES = ["home", "settings", "invitations"]
+export const ACCOUNT_MODULES = ["home", "settings", "invitations", "profile"]
 
 export function parseRoute(pathname: string, search: string): Route {
   const segs = pathname.split("/").filter(Boolean) // ["t", teamId, module?, id?] OR [module, id?]

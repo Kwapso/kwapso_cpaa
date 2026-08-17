@@ -19,7 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@kwapso/ui/registry/primitives/dropdown-menu/dropdown-menu"
-import { LogOut, UserRound } from "lucide-react"
+import { LogOut, Settings, UserRound } from "lucide-react"
 
 import { auth } from "@/lib/api"
 import { personName, personInitials } from "@/lib/identity"
@@ -54,9 +54,17 @@ export function ProfileMenu({ active }: { active: ActiveTeam }) {
           </span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => softNavigate("/settings")} className="gap-2">
+        {/* YOUR OWN PAGE, not Settings. Your name, your email address, the
+            language you read kwapso in and what you have done are about a
+            PERSON; Settings is about the app. They were one screen until 17 Aug
+            2026, and a tester looking for "change my name" had to guess. */}
+        <DropdownMenuItem onSelect={() => softNavigate("/profile")} className="gap-2">
           <UserRound className="size-4" />
-          {t("Account")}
+          {t("Your profile")}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => softNavigate("/settings")} className="gap-2">
+          <Settings className="size-4" />
+          {t("Settings")}
         </DropdownMenuItem>
         <DropdownMenuItem
           onSelect={() =>

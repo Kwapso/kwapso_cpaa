@@ -802,6 +802,7 @@ export const CATALOGUE: Catalogue = {
   "Your name and photo across the app.": {},
   "Your name goes on anything you send us, so we know who we're talking to.": {},
   "Your photo": {},
+  "Your profile": {},
   "Your teams": {},
   "a month": {},
   "a sprint and log some time against it, and what the work leaves us appears here.": {},
