@@ -53,6 +53,7 @@ import { listConnections } from "./google"
 import { hydrateText, readGoogleMaterial } from "./google-read"
 import {
   INGEST_SOURCES_PER_TICK,
+  listIngestState,
   sweepKinds,
   type IngestKind,
   type IngestRow,
@@ -316,15 +317,100 @@ export async function sweepGoogle(
   env: Env,
   cfg: D1Rest,
   guard: MemberGuard,
-  limit = INGEST_SOURCES_PER_TICK
-): Promise<SweepResult[]> {
+  options: {
+    /** true = don't ask Google when this person's kinds were all swept inside
+     * the five-minute floor; answer with the state as of that sweep instead. */
+    onlyIfStale?: boolean
+    limit?: number
+  } = {}
+): Promise<{ results: SweepResult[]; skipped: boolean }> {
   const connected = new Set(
     (await listConnections(cfg, guard)).filter((c) => c.active).map((c) => c.service)
   )
   const kinds = googleIngestKinds(env, cfg, guard).filter((k) =>
     connected.has(serviceOfStateKey(k.stateKey as string, guard.userId))
   )
-  return sweepKinds(env, cfg, guard, kinds, limit)
+  if (kinds.length === 0) return { results: [], skipped: false }
+
+  // THE FLOOR (14.12). This door now fires by itself when somebody opens the
+  // app, so "how often may it ask Google?" stopped being a question about a
+  // button somebody presses and became a question about a page load.
+  //
+  // IT IS ASKED FOR, AND THAT IS THE WHOLE DESIGN. A floor over EVERY call was
+  // written first and was wrong: re-shelving a Drive folder and pressing sync is
+  // a deliberate act with an expected result, and a door that answered "already
+  // did that four minutes ago" would have broken every proved path in §14 to add
+  // this one. So the AUTOMATIC caller opts in and the BUTTON does not — which
+  // also means the floor is not a security control and never has to survive a
+  // lying client: the cost it bounds is the cost the automatic caller
+  // introduced, and a person hammering the button spends their own Google quota
+  // exactly as they could before this lane existed. The rights on the door
+  // (R10) are what stop a stranger, and they are unchanged.
+  //
+  // IT IS READ, NOT STORED. `knowledge_ingest.last_run_at` already records when
+  // each kind last ran, per person — the row the sweep writes on every tick — so
+  // the floor is a comparison rather than a column. Adding a "last pinged"
+  // column beside a "last ran" column would have been two facts that must agree.
+  //
+  // ALL OR NOTHING, per person. A part-skipped sweep would answer with a `read`
+  // of 0 for the quiet kinds and look like an empty Drive, which is the exact
+  // confusion `sweepGoogle` already refuses to create for an unconnected service.
+  if (options.onlyIfStale) {
+    const recent = await sweptWithin(cfg, guard, kinds, GOOGLE_SWEEP_FLOOR_MS)
+    if (recent) return { results: recent, skipped: true }
+  }
+
+  return {
+    results: await sweepKinds(env, cfg, guard, kinds, options.limit ?? INGEST_SOURCES_PER_TICK),
+    skipped: false,
+  }
+}
+
+/** HOW LONG A PERSON'S GOOGLE STAYS "JUST CHECKED" — the floor above. Five
+ * minutes: long enough that opening the app repeatedly costs Google nothing,
+ * short enough that a document filed during a meeting is answerable by the end
+ * of it. */
+export const GOOGLE_SWEEP_FLOOR_MS = 5 * 60 * 1000
+
+/** Were ALL of this person's connected kinds swept inside the window? Returns
+ * the state as sweep results when they were — read straight off the rows the
+ * last real sweep wrote — and null when even one of them is due.
+ *
+ * `read` and `indexed` are 0 because nothing was read and nothing was indexed:
+ * this call did no work and says so. `caughtUp` is true for the same reason a
+ * clean tick's is — there is nothing more to bring in *right now*; the caller
+ * that wants to push a first fill along is told `skipped` and can come back.
+ * A kind that FAILED last time carries its error forward, so a floor can never
+ * turn "it has been failing since Tuesday" into a silent success. */
+async function sweptWithin(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  kinds: IngestKind[],
+  windowMs: number
+): Promise<SweepResult[] | null> {
+  const keys = kinds.map((k) => (k.stateKey ?? k.kind) as string)
+  // The ONE reader of this table (R14's cap is the length of the named list it
+  // carries), asked for this caller's own keys and nothing else.
+  const state = await listIngestState(cfg, guard, keys)
+  const byKind = new Map(state.map((s) => [s.kind, s]))
+  const floor = Date.now() - windowMs
+  const results: SweepResult[] = []
+  for (const key of keys) {
+    const row = byKind.get(key)
+    const ran = row?.lastRunAt ? Date.parse(row.lastRunAt) : NaN
+    // Never run, unreadable stamp, or older than the window → this is a real
+    // sweep. `Number.isFinite` rather than a truthiness test, because a stamp we
+    // cannot parse must mean "due", never "just now".
+    if (!Number.isFinite(ran) || ran < floor) return null
+    results.push({
+      kind: key,
+      read: 0,
+      indexed: 0,
+      caughtUp: true,
+      ...(row?.lastError ? { error: row.lastError } : {}),
+    })
+  }
+  return results
 }
 
 /** Which service a state key belongs to — the inverse of googleStateKey, so the

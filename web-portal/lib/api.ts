@@ -17,12 +17,14 @@
 
 import type {
   AccountDetail,
+  HelpAttachment,
   HelpMessage,
   HelpTicket,
   ProcessComment,
   SessionUser,
   Todo,
 } from "@shared/types"
+import type { Language } from "@shared/i18n"
 import type { SavingsView } from "@shared/workers/savings"
 // The plumbing — one fetch wrapper, one error class, one paged shape — is shared
 // with the agency app (shared/web/api.ts). Only the DOOR LIST below is the
@@ -55,6 +57,11 @@ export const auth = {
   /** First visit only: your name (and a photo if you'd like one). */
   updateProfile: (input: { firstName: string; lastName: string; imageDataUrl?: string }) =>
     api<{ user: SessionUser }>("/api/auth/profile", post(input)),
+  /** The language this contact reads their own portal in. On the gateway's
+   * allow-list: it touches one column on the caller's own user row and says
+   * nothing about the agency or about any other account. */
+  setLanguage: (language: Language) =>
+    api<{ user: SessionUser }>("/api/auth/language", post({ language })),
   logout: () => api<{ ok: true }>("/api/auth/logout", { method: "POST" }),
 }
 
@@ -145,6 +152,50 @@ export const support = {
     api<PagedResponse<{ tickets: HelpTicket[]; mineTotal: number }>>(
       "/api/content/help/rank",
       post({ id, afterId, beforeId })
+    ),
+
+  /** SHOW US WHAT YOU MEAN — the files and links on one ticket (CHECKLIST 5.10).
+   *
+   * R14: bounded by the door at TICKET_ATTACHMENT_CAP, so this is the whole list
+   * and there is no page two to walk. R16: `total` is the door's own COUNT(*),
+   * which is what the heading renders — never these rows' length. A `file` row's
+   * `url` is a /media/<key> path THIS gateway already serves, so it is read back
+   * as an ordinary link and nothing here signs anything. */
+  attachments: (id: string) =>
+    api<{ attachments: HelpAttachment[]; total: number }>(
+      `/api/content/help/attachments?id=${enc(id)}`
+    ),
+  /** Add one. TWO KINDS, ONE DOOR, because it is one act from where the client is
+   * standing: `kind: "file"` carries the picked file as a base64 data URL (the
+   * door caps it at 10 MB, parses it and stores it under a key nobody can guess),
+   * `kind: "link"` carries a URL and nothing else. */
+  attach: (
+    id: string,
+    input: { kind: "file"; label: string; fileDataUrl: string } | { kind: "link"; label: string; url: string }
+  ) =>
+    api<{ attachments: HelpAttachment[]; total: number }>(
+      "/api/content/help/attachments",
+      post({ id, ...input })
+    ),
+  /** Take one off. Deactivate, never delete: the row keeps its audit block. */
+  detach: (id: string, attachmentId: string) =>
+    api<{ attachments: HelpAttachment[]; total: number }>(
+      "/api/content/help/attachments/remove",
+      post({ id, attachmentId })
+    ),
+
+  /** YES, GO AHEAD (CHECKLIST 5.13) — the ONE lifecycle move a client ever makes,
+   * and the deliberate exception to "the portal never moves a ticket along".
+   *
+   * The door is narrow by construction rather than by this function being careful:
+   * the account fence rides its UPDATE, and R17's predicate means the only
+   * transition it can make is awaiting_validation → new. Sent at a ticket in any
+   * other state it moves zero rows. It answers with the ticket PAGE, the same
+   * shape `raise` and `edit` do. */
+  validate: (id: string) =>
+    api<PagedResponse<{ tickets: HelpTicket[]; mineTotal: number }>>(
+      "/api/content/help/validate",
+      post({ id })
     ),
 }
 

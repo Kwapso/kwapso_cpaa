@@ -54,7 +54,27 @@ export const WORK_LOG_TARGETS: Record<string, { label: string; account: string; 
   // costs us the same as forty minutes of delivery, so it is loggable — and it
   // is the difference between a task and a to-do, which is never.
   tasks: { label: "title", account: "account_id", noun: "task" },
+  // A MEETING IS TIME SOMEBODY SPENT (CHECKLIST 9.2). It was left off this list
+  // when the diary shipped, on the reasoning that a meeting is a conversation
+  // rather than a piece of work — which is true and is beside the point: an hour
+  // in a call is an hour off the day, and until it was loggable the margin
+  // counted the delivery and missed the meetings that produced it.
+  //
+  // Aurora's ruling narrows WHOSE hour, not whether: a log is written for OUR
+  // staff only, never for the client's people, because a client's hour is not
+  // our cost. That decision lives in the door that writes them, since it is
+  // about the participant rather than about the target.
+  meetings: { label: "title", account: "account_id", noun: "meeting" },
 }
+
+/** THE KIND EVERY MEETING LOG CARRIES (CHECKLIST 9.3) — "those logs are marked
+ * as meeting time, and any figure can be shown with or without them".
+ *
+ * `kind` is free text on purpose (a team names its own kinds of work), so this
+ * is a convention rather than an enum — but it is a convention with exactly one
+ * writer and one reader, both of which import this constant, which is what makes
+ * "with or without meeting time" a filter and not a guess about a string. */
+export const MEETING_LOG_KIND = "Meeting"
 
 /** How long a timer may run before Monday morning offers to do something about
  * it. Six of 2,940 real logs ran past eight hours, the longest 22.6 — rare but
@@ -132,7 +152,7 @@ async function targetOrThrow(
     throw new GuardError(
       400,
       "invalid_target",
-      `Time is logged against a ${Object.values(WORK_LOG_TARGETS).map((t) => t.noun).join(", a ")} — nothing else.`
+      `Time is logged against a ${Object.values(WORK_LOG_TARGETS).map((t) => t.noun).join(", a ")}, nothing else.`
     )
   const rows = await d1Query<{ account_id: string | null }>(
     cfg,
@@ -153,6 +173,11 @@ export type LogFilter = {
   userId?: string
   /** "mine" narrows to the caller — the everyday "what have I done today". */
   scope?: "mine" | "all"
+  /** WITH OR WITHOUT MEETING TIME (CHECKLIST 9.3). "exclude" drops every log
+   * marked as a meeting, "only" keeps nothing else, and absent means all of it.
+   * It rides the list AND the two totals beside it, so the hours under a
+   * filtered list are the hours OF that list (R16). */
+  meetingTime?: "exclude" | "only"
 }
 
 function logWhere(guard: MemberGuard, filter: LogFilter): { sql: string; params: string[] } {
@@ -160,6 +185,17 @@ function logWhere(guard: MemberGuard, filter: LogFilter): { sql: string; params:
   // audit — who binned a runaway timer, and when — and nothing else reads them.
   const parts = ["w.discarded_at IS NULL"]
   const params: string[] = []
+  // 9.3 — the one place the convention is read, matching the one place it is
+  // written. A log with no kind at all is not meeting time, which is why the
+  // "exclude" arm has to say so: `kind <> 'Meeting'` alone would silently drop
+  // every log whose kind is NULL, which is most of them.
+  if (filter.meetingTime === "exclude") {
+    parts.push("(w.kind IS NULL OR w.kind <> ?)")
+    params.push(MEETING_LOG_KIND)
+  } else if (filter.meetingTime === "only") {
+    parts.push("w.kind = ?")
+    params.push(MEETING_LOG_KIND)
+  }
   if (filter.scope === "mine") {
     parts.push("w.user_id = ?")
     params.push(guard.userId)
@@ -425,7 +461,7 @@ export async function logTime(
   const { accountId } = await targetOrThrow(cfg, guard, input.targetTable, input.targetId)
   const seconds = secondsBetween(input.startedAt, input.endedAt)
   if (seconds === 0)
-    throw new GuardError(400, "invalid_input", "That's no time at all — check the start and the finish.")
+    throw new GuardError(400, "invalid_input", "That's no time at all. Check the start and the finish.")
 
   const id = ulid()
   const now = new Date().toISOString()
@@ -565,7 +601,7 @@ export function requireTarget(
     throw new GuardError(
       400,
       "invalid_target",
-      `Time is logged against a ${Object.values(WORK_LOG_TARGETS).map((t) => t.noun).join(", a ")} — nothing else.`
+      `Time is logged against a ${Object.values(WORK_LOG_TARGETS).map((t) => t.noun).join(", a ")}, nothing else.`
     )
   return { targetTable, targetId }
 }

@@ -30,6 +30,7 @@ import { useEmailSignIn } from "@shared/web/use-email-sign-in"
 
 import { auth } from "@/lib/api"
 import { BrandMark } from "@/components/brand-mark"
+import { useT } from "@shared/web/language"
 
 const emailFieldConfig = {
   ...defaultFieldConfig,
@@ -38,6 +39,7 @@ const emailFieldConfig = {
 }
 
 export function AuthCard({ onSignedIn }: { onSignedIn: () => void }) {
+  const t = useT()
   const { step, email, setEmail, code, busy, error, sendCode, enterCode, useDifferentEmail } =
     useEmailSignIn({
       startEmail: auth.startEmail,
@@ -53,7 +55,7 @@ export function AuthCard({ onSignedIn }: { onSignedIn: () => void }) {
       <div className="flex flex-col items-center text-center">
         <BrandMark className="mb-1" />
         <h1 className="text-2xl font-semibold tracking-tight">
-          Welcome to {brand.name}
+          {t("Welcome to")} {brand.name}
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
           {step === "email" ? brand.motto : `Enter the 6-digit code sent to ${email}`}
@@ -81,7 +83,7 @@ export function AuthCard({ onSignedIn }: { onSignedIn: () => void }) {
             </Field>
             <Button type="submit" className="w-full" disabled={busy || !email}>
               {busy ? <Spinner /> : null}
-              Email me a code
+              {t("Email me a code")}
             </Button>
             {/* BESIDE the code, never instead of it. Both prove the same
                 identity and land on the same user record — a colleague who used
@@ -99,7 +101,7 @@ export function AuthCard({ onSignedIn }: { onSignedIn: () => void }) {
               onClick={() => window.location.assign(auth.googleStartUrl)}
             >
               <GoogleMark />
-              Continue with Google
+              {t("Continue with Google")}
             </Button>
             {googleError && (
               <p className="text-destructive text-center text-xs">{googleError}</p>
@@ -116,10 +118,10 @@ export function AuthCard({ onSignedIn }: { onSignedIn: () => void }) {
             )}
             <div className="flex justify-between">
               <Button variant="ghost" size="sm" disabled={busy} onClick={useDifferentEmail}>
-                Change email
+                {t("Change email")}
               </Button>
               <Button variant="ghost" size="sm" disabled={busy} onClick={() => void sendCode()}>
-                Resend code
+                {t("Resend code")}
               </Button>
             </div>
           </>

@@ -7,7 +7,6 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import {
   DialogDescription,
   DialogTitle,
@@ -22,7 +21,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Mail } from "lucide-react"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
@@ -31,6 +29,7 @@ import type { TeamRole } from "@shared/types"
 import { ApiFailure } from "@/lib/api"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { reportError } from "@shared/web/log"
+import { useT } from "@shared/web/language"
 
 const emailField = { ...defaultFieldConfig, label: "Email", required: true }
 const roleField = { ...defaultFieldConfig, label: "Role", required: true }
@@ -50,6 +49,7 @@ export function InviteDialog({
   /** stable id for per-session draft persistence (CACHING.md §11); omit to disable */
   draftKey?: string
 }) {
+  const t = useT()
   // Default the role to the first non-Admin; the hook seeds this on open.
   const initialValues = {
     email: "",
@@ -73,7 +73,7 @@ export function InviteDialog({
       // generic toast is never mistaken for a permission block.
       if (!(err instanceof ApiFailure)) reportError("invite:send", err)
       toast.error(
-        err instanceof ApiFailure ? err.message : "Couldn't send the invite — please try again."
+        err instanceof ApiFailure ? err.message : "Couldn't send the invite, please try again."
       )
     } finally {
       setBusy(false)
@@ -87,18 +87,17 @@ export function InviteDialog({
       busy={busy}
       clearDraft={clearDraft}
       onSubmit={submit}
-      title={<DialogTitle>Invite someone to the team</DialogTitle>}
+      title={<DialogTitle>{t("Invite someone to the team")}</DialogTitle>}
       subtitle={
         <DialogDescription>
-          We&apos;ll email them an invite to join in the role you pick.
+          {t("We'll email them an invite to join in the role you pick.")}
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !values.email.trim() || !values.roleId} className="gap-1.5">
-          {busy ? <Spinner /> : <Mail className="size-4" />}
-          {busy ? "Sending…" : "Send invite"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !values.email.trim() || !values.roleId,
+        icon: <Mail className="size-4" />,
+      }}
     >
       <Field config={emailField} htmlFor="invite-email" className={fieldSpacing}>
         <Input
@@ -118,7 +117,7 @@ export function InviteDialog({
           disabled={busy}
         >
           <SelectTrigger id="invite-role" className="w-full">
-            <SelectValue placeholder="Role" />
+            <SelectValue placeholder={t("Role")} />
           </SelectTrigger>
           <SelectContent>
             {roles.map((r) => (

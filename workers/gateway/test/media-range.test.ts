@@ -1,7 +1,7 @@
 // A 25 MB VIDEO IS NOT A SMALL IMAGE, AND /media/* USED TO SERVE BOTH THE SAME WAY.
 //
 // `serveMedia` read the whole object and answered 200, with no `Accept-Ranges` and
-// no handling of `Range:`. A learning attachment may be a 25 MB clip (the upload
+// no handling of `Range:`. A knowledge-base file may be a 25 MB clip (the upload
 // door's own cap), so dragging a player's scrub bar re-downloaded the file from
 // byte zero, every time, through the worker — and a download interrupted at 90%
 // started again at 0%. R2 has supported ranged reads all along; the door simply

@@ -1,6 +1,6 @@
-# Durable Objects — the live layer and the one lock (LOCKED 2026-06-15; ROW-LEVEL 2026-06-22)
+# Durable Objects, the live layer and the one lock (LOCKED 2026-06-15; ROW-LEVEL 2026-06-22)
 
-Brimba uses exactly one Durable Object class today — `TeamChannel`, the live
+Brimba uses exactly one Durable Object class today. `TeamChannel`, the live
 "switchboard" inside the **realtime** worker. This doc explains what it is, how
 its code is versioned and deployed, the end-to-end live-sync flow (a write →
 `publishChange` → the DO → the client patches **one** row), and the separate
@@ -20,19 +20,19 @@ write path.
 
 The confusion to retire first: **a worker count and a Durable-Object count are
 different things**, and a DO *class* and a DO *instance* are different again.
-This table is where that distinction is kept — ARCHITECTURE §2 rules on what gets
+This table is where that distinction is kept. ARCHITECTURE §2 rules on what gets
 an instance and points here for what an instance IS.
 
 | Thing | What it is | How many | Grows with teams? |
 |---|---|---|---|
 | **Worker** | Deployed code (auth, tenancy, realtime, content, data-ops, mcp, gateway, portal-gateway) | 8 built | No |
 | **DO class** | A class *inside* a worker (`TeamChannel` in realtime) | 1 today | No |
-| **DO instance** | A *runtime* entity addressed by name (`team:<id>`, `user:<id>`) | Unlimited | Yes — one per team **and** one per signed-in user |
+| **DO instance** | A *runtime* entity addressed by name (`team:<id>`, `user:<id>`) | Unlimited | Yes, one per team **and** one per signed-in user |
 
 An instance is **not** a worker. Addressing one by name conjures it; idle ones
 hibernate and cost ~nothing. Exactly like OOP: one `class` (code), millions of
 objects (runtime). 10,000 teams + their members is still 8 workers + one
-`TeamChannel` class, but that many instances — almost all asleep.
+`TeamChannel` class, but that many instances, almost all asleep.
 
 This doc uses "the DO" for the runtime instance and "`TeamChannel`" for the class.
 
@@ -45,13 +45,13 @@ and nothing else**:
 
 - **One instance per channel.** A team's data channel is addressed `team:<id>`;
   a person's identity channel is addressed `user:<id>`. `env.CHANNELS.getByName(
-  channel)` resolves the instance by name — creating it on first use.
+  channel)` resolves the instance by name, creating it on first use.
 - **It holds open WebSockets, not data.** The DO stores **no application data**;
   the databases (global core D1 + per-team D1) stay the single source of truth
   (`index.ts` header: *"Stores NO app data"*). It keeps a set of sockets and
   fans a message out to them.
 - **It relays opaque tags.** It knows nothing about what "members" or
-  "member_roles" mean — it just broadcasts whatever `{resource, id, op}` ping it
+  "member_roles" mean, it just broadcasts whatever `{resource, id, op}` ping it
   is handed. That is why it is reusable as-is by any app built on this base.
 - **It honours one fence.** The single exception to "opaque": a socket may carry
   a **scope stamp**, and an account-owned ping is only sent to a stamped socket
@@ -110,7 +110,7 @@ plain `server.accept()`. The difference is the whole cost model:
   **evicted from memory** while its members' sockets stay open.
 - A `broadcast` wakes the instance, calls `getWebSockets()`, sends, and lets it
   sleep again. `webSocketMessage` / `webSocketClose` / `webSocketError` are
-  handlers the *runtime* calls on the hibernatable object — they exist so the
+  handlers the *runtime* calls on the hibernatable object, they exist so the
   DO never has to hold a live JS closure per socket just to receive events.
 
 So 10,000 teams with quiet channels use ~no memory. That is the property that
@@ -127,12 +127,12 @@ makes "one instance per team **and** per user" affordable.
 | `/api/realtime/health` | GET | Ops | `{ ok: true }` |
 
 `/publish` is internal: it is reached only over the service binding
-(`env.REALTIME`), never the public gateway. It is **still keyed** — every caller
+(`env.REALTIME`), never the public gateway. It is **still keyed**, every caller
 presents `x-internal-key`, and an unset `INTERNAL_KEY` makes the door refuse
 everyone (fail-closed). One door that can reach ANY team's channel is not
 protected by network isolation alone.
 
-### The connection gate — the same rule as the API
+### The connection gate, the same rule as the API
 
 A socket is **gated at connect** exactly like an API request; a gate is an auth
 check, not a lock. `fetch` in `index.ts`:
@@ -142,7 +142,7 @@ check, not a lock. `fetch` in `index.ts`:
 2. `?user=<id>`: you may join **only your own** identity channel
    (`userId !== user.id` → `403`). Open for every signed-in user, even before
    they join a team.
-3. `?team=<id>`: you must be an **active member of that team** —
+3. `?team=<id>`: you must be an **active member of that team**,
    `requireMember(env, user.id, teamId)` (`shared/workers/gating.ts`), the very
    function every API door gates on. Not a member → `403`.
 
@@ -150,10 +150,10 @@ Because the socket is gated at connect, a listener never receives a ping it
 could not already have earned through the API. (CACHING.md rule 8, and
 CONCURRENCY.md's "What is NOT a lock".)
 
-### The listener's fence — membership is not the whole gate
+### The listener's fence, membership is not the whole gate
 
 Team membership answers "may you be on this channel?". It does **not** answer
-"may you hear about THAT row?" — and a client-portal login is a member of the
+"may you hear about THAT row?", and a client-portal login is a member of the
 agency's team (that is how their requests reach any door at all). So the channel
 was naming, by row id, every account in the agency as it changed, to a listener
 fenced out of all of them. A ping carries no row data, but **row ids are exactly
@@ -165,17 +165,17 @@ So the gate resolves the caller's account scope through the one guard corridor
 
 | Listener | Stamp | Hears |
 |---|---|---|
-| **Staff** (no `portal_users` row) | none | every ping on the team channel — unchanged |
-| **Client login** | `{ accountIds }` | account-owned pings (`accounts`, `account_links`, `portal_users`) whose **row id** is inside their fence, plus scope-stamped pings (`help`, `help_threads`) whose **named account** is — and nothing else |
+| **Staff** (no `portal_users` row) | none | every ping on the team channel, unchanged |
+| **Client login** | `{ accountIds }` | account-owned pings (`accounts`, `account_links`, `portal_users`) whose **row id** is inside their fence, plus scope-stamped pings (`help`, `help_threads`) whose **named account** is, and nothing else |
 
 `mayHearChange(stamp, event)` is the whole rule, and it lives beside the SQL
 fence so the two can never disagree. A client hears silence for the agency's
-members, roles, invites and articles — they have no screen in this app that
+members, roles, invites and articles, they have no screen in this app that
 reads any of them.
 
 **Tickets are the one resource that needed the promised extension, and it was
 made one line at a time.** A ping carries a row id, and a *ticket* id tells the
-fence nothing about whose ticket it is — so a help ping additionally NAMES the
+fence nothing about whose ticket it is, so a help ping additionally NAMES the
 account it belongs to (`ChangeEvent.scope`), and `SCOPE_STAMPED_RESOURCES` is
 the short, reviewed list of resources allowed to be heard that way. A publisher
 that forgets the stamp makes a screen stale; a fence that guessed would make it
@@ -186,18 +186,18 @@ than having been open to everything all along.
 ### An authorization has a deadline
 
 The gate above runs **once**, at the handshake: signed in, an active member of
-*this* team, and — for a client login — the fence they stand behind. The answer
+*this* team, and, for a client login, the fence they stand behind. The answer
 is stamped onto the socket so no later ping costs a database read. Nothing ever
 re-asked whether the answer was still true.
 
 A hibernatable socket outlives the object that accepted it, and a browser tab is
 patient, so "once" meant **for ever**. A member removed from the team, and a
-client login whose portal access was revoked, kept hearing that team's pings —
-resource, row id and account, live — for as long as they left the connection
+client login whose portal access was revoked, kept hearing that team's pings,
+resource, row id and account, live, for as long as they left the connection
 open. Signing out did not end it either: `destroySession` clears a cookie and a
 row and touches no socket, and `publishSignOut` is wired to the email-change
 flow on the `user:` channel alone. No row *data* travels on a ping and every
-door refuses an ex-member the moment they try to read one — but this file has
+door refuses an ex-member the moment they try to read one, but this file has
 already ruled that row ids are not nothing, which is why `mayHearChange` exists
 at all. A fence that is correct at the handshake and unexamined afterwards is
 the same sentence said about time instead of about accounts.
@@ -207,7 +207,7 @@ expiry is spent where the decision is: `broadcast` closes an over-age socket
 instead of sending to it. Both halves of that shape are deliberate.
 
 - **No alarm, and no list.** Nothing has to enumerate "the things that ought to
-  disconnect somebody" — a list is a thing the next module can be missing from,
+  disconnect somebody", a list is a thing the next module can be missing from,
   which is the failure the fence itself was written to avoid.
 - **It runs exactly when it matters.** A channel with nothing to say has nothing
   to leak; the first ping after the deadline is the one that does not go out.
@@ -215,20 +215,20 @@ instead of sending to it. Both halves of that shape are deliberate.
   backoff and calls `onReconnect`, so the socket comes back re-gated and the
   screen resyncs what it missed. Somebody who is no longer a member simply gets
   the 403 the API has been giving them all along.
-- **Fail-closed, like everything else here.** A socket carrying no issue time —
-  one accepted by an older build, or by anything that skipped `fetch()` — is
+- **Fail-closed, like everything else here.** A socket carrying no issue time,
+  one accepted by an older build, or by anything that skipped `fetch()`, is
   closed rather than trusted, and the deadline is checked **before** the fence,
   so a revoked login is disconnected rather than merely filtered.
 
 `workers/realtime/test/team-channel.test.ts` pins both sides of the window, the
 order of the two checks, the no-issue-time case, and the constant's own
-magnitude — a deadline widened to a session's lifetime would restore the hole
+magnitude, a deadline widened to a session's lifetime would restore the hole
 while leaving every other test green.
 
 Two consequences worth knowing:
 
 - **It costs one read per connect.** The team channel needs `CF_D1_TOKEN` on the
-  realtime worker (OPERATIONS.md § Secrets). With no token — or a failed lookup —
+  realtime worker (OPERATIONS.md § Secrets). With no token, or a failed lookup,
   the team channel **refuses the socket** (`503`): we cannot tell staff from a
   client login, so nobody joins. The `user:<id>` channel is unaffected, so
   identity events and a forced sign-out still reach every device.
@@ -236,14 +236,14 @@ Two consequences worth knowing:
   was written down once as a harmless caveat and it was not: the client re-opened
   only when `teamId` changed, and switching company does not change the team. So
   after a switch the socket carried the OLD company's account set and
-  `mayHearChange` dropped the NEW company's pings — the portal went **silently
+  `mayHearChange` dropped the NEW company's pings, the portal went **silently
   deaf**, which is the worst failure shape available (nothing looks broken; the
   data is just quietly stale). The fence is therefore part of the socket's
   IDENTITY: `useRealtime(teamId, …, currentAccountId)` puts it in the query
   string, so a switch is a different URL, a different socket, and a fresh stamp.
 
   **The realtime worker never reads that parameter, and must never start.** It is
-  a cache key on the client's side and nothing on ours — the stamp is always
+  a cache key on the client's side and nothing on ours, the stamp is always
   resolved server-side from the caller's session, so editing the value in the URL
   re-opens a socket and hands back exactly the same fence. Reading it would turn a
   string the client controls into the fence that decides what they may hear, which
@@ -252,7 +252,7 @@ Two consequences worth knowing:
   **What is still bounded by socket lifetime:** a REVOKED grant. Withdrawing a
   portal login does not close the sockets that person already holds, so until the
   link drops (or their next session read moves them out of `ready`, which closes
-  it) they keep hearing account-owned pings for the world they have just left —
+  it) they keep hearing account-owned pings for the world they have just left,
   row ids only, and every door refuses them from the first request. Closing that
   properly needs a server-initiated close or a user-channel listener on the
   portal, which is an ARCHITECTURE decision, not a quiet patch.
@@ -263,19 +263,19 @@ Defined in `shared/workers/realtime.ts` and consumed by `shared/web/realtime.ts`
 
 | Scope | Name | Members | Carries |
 |---|---|---|---|
-| **Team** | `team:<teamId>` | Every active member of that team | Team data pings (`members`, `member_roles`, `invites`, `learning`, `help`, `activity`, …) |
+| **Team** | `team:<teamId>` | Every active member of that team | Team data pings (`members`, `member_roles`, `invites`, `help`, `stories`, `activity`, …) |
 | **User** | `user:<userId>` | Every signed-in device of one person | Identity/cross-team events (`profile`, `account_activity`, `teams`) + a forced sign-out (`session`) |
 
 A browser opens **two** sockets: the active team's channel
 (`useRealtime(teamId, …)`) and its own user channel (`useUserRealtime(userId,
 …)`). The user channel exists so identity changes (name/photo), cross-team
 membership (joined / removed / new team), and a forced sign-out fan out across a
-person's devices without depending on any one team's socket — and work even when
+person's devices without depending on any one team's socket, and work even when
 the user is teamless.
 
 ---
 
-## 3 · The code-vs-runtime model — versioning, migrations, deploy order
+## 3 · The code-vs-runtime model, versioning, migrations, deploy order
 
 `TeamChannel` is code; it is deployed and versioned like any worker. The runtime
 instances are created on demand and never appear in config.
@@ -294,13 +294,13 @@ From `workers/realtime/wrangler.jsonc`:
 - **`bindings`** exposes the class to the worker as `env.CHANNELS`, a
   `DurableObjectNamespace<TeamChannel>`. Code addresses instances through it:
   `env.CHANNELS.getByName("team:…")`.
-- **`migrations`** is the DO *class* lifecycle — not a D1 table migration. `v1`
+- **`migrations`** is the DO *class* lifecycle, not a D1 table migration. `v1`
   with `new_sqlite_classes: ["TeamChannel"]` registers the class on first
   deploy. `new_sqlite_classes` (rather than `new_classes`) gives each instance a
   SQLite-backed storage tier; `TeamChannel` never writes to it (it holds no
   data), but the base is registered SQLite-backed so a future stateful DO uses
   the same tier without a class rename. You only add another migration entry
-  (`v2`, …) when you **rename**, **delete**, or **transfer** a DO class — not for
+  (`v2`, …) when you **rename**, **delete**, or **transfer** a DO class, not for
   ordinary code edits, which ship as a normal worker version.
 - **Staging repeats everything.** Wrangler envs don't inherit, so the
   `env.staging` block repeats the DO binding, the migration, its own `DB`, and
@@ -320,13 +320,13 @@ direction:
 - A DO **class migration** (a rename/transfer) must be live before code that
   addresses the new class runs. Shipping realtime first means the channel layer
   is always at least as new as the workers that publish to it.
-- Failure is **best-effort by design** (see §4) — a publish that lands on a
-  not-yet-updated realtime can't corrupt a write — but deploying realtime first
+- Failure is **best-effort by design** (see §4), a publish that lands on a
+  not-yet-updated realtime can't corrupt a write, but deploying realtime first
   removes the window entirely rather than relying on the safety net.
 
 The two gateways deploy **last** because they are the only public doors: nothing is
-reachable by users — agency staff through `gateway`, clients through
-`portal-gateway` — until every worker behind them is already updated.
+reachable by users, agency staff through `gateway`, clients through
+`portal-gateway`, until every worker behind them is already updated.
 
 ---
 
@@ -334,13 +334,13 @@ reachable by users — agency staff through `gateway`, clients through
 
 The rule (a Law of the Base): **every mutation publishes a live change**, and the
 client **patches exactly one row, cache-first, never refetching the list**. Here
-is one real write — an admin changing a member's role — from commit to the other
+is one real write, an admin changing a member's role, from commit to the other
 admin's screen.
 
-### Step 1 — the write commits (worker)
+### Step 1, the write commits (worker)
 
 `changeMemberRole` in `workers/tenancy/src/lib/members.ts` does the gated,
-race-safe D1 write (the atomic last-admin `UPDATE … WHERE … COUNT(*) > 1` — §5),
+race-safe D1 write (the atomic last-admin `UPDATE … WHERE … COUNT(*) > 1`, §5),
 logs activity, then the route publishes:
 
 ```ts
@@ -348,7 +348,7 @@ logs activity, then the route publishes:
 await publishChange(env.REALTIME, guard.teamId, "members", targetUserId, "edit")
 ```
 
-### Step 2 — `publishChange` → `/publish` (shared seam)
+### Step 2, `publishChange` → `/publish` (shared seam)
 
 `shared/workers/realtime.ts` turns that into a channel post. The payload is
 `{resource, id, op}` and **never row data**:
@@ -373,17 +373,17 @@ async function publish(realtime, channel, event) {
 ```
 
 **Best-effort is load-bearing.** `publish` swallows its error. A live-layer
-hiccup must never break the write it describes — the D1 write is already
+hiccup must never break the write it describes, the D1 write is already
 committed and is the authority; a dropped ping only means someone's screen
 revalidates a moment later (or on reconnect catch-up, §6). The realtime test
-asserts this: `publishChange` *"never throws — a live-layer hiccup can't break
+asserts this: `publishChange` *"never throws, a live-layer hiccup can't break
 the write it describes"*.
 
 Sibling helpers: `publishUserChange(userId, resource, id?, op?)` posts to
 `user:<userId>`; `publishSignOut(userId)` posts a `{resource:"session",
 op:"session"}` event with no id.
 
-### Step 3 — the DO fans it out (realtime worker)
+### Step 3, the DO fans it out (realtime worker)
 
 `/publish` resolves the instance by name and broadcasts:
 
@@ -393,15 +393,15 @@ await env.CHANNELS.getByName(channel).broadcast(JSON.stringify(event))
 
 `broadcast` loops `this.ctx.getWebSockets()` and `ws.send`s the JSON to every
 socket on that one channel that MAY HEAR IT (staff: all of them; a client login:
-its own accounts only — "The listener's fence", §2). The DO is single-threaded,
+its own accounts only. "The listener's fence", §2). The DO is single-threaded,
 so this is a clean fan-out; a dead socket throws on `send` and is ignored (the
 runtime drops it on close).
 
-### Step 4 — the client patches ONE row (browser)
+### Step 4, the client patches ONE row (browser)
 
 `shared/web/realtime.ts` receives the frame and calls the host's `onEvent`; the
 registry-driven handler in `web/components/app-shell.tsx` decides what to do. It
-is **not** a per-resource `switch` — every module is one entry in
+is **not** a per-resource `switch`, every module is one entry in
 `TEAM_RESOURCES`:
 
 ```ts
@@ -432,18 +432,18 @@ for (const k of r.deps?.(teamId, id) ?? []) invalidate(k)
 - **`op` is advisory.** The client re-pulls and decides keep-or-drop, so `add`
   vs `edit` vs `remove` need not be exact (`ChangeEvent` docstring). The
   single-row read passes the **same server filter** as the list, so a row that
-  no longer belongs (a deactivated member) comes back `null` and is dropped —
+  no longer belongs (a deactivated member) comes back `null` and is dropped,
   one mechanism for add / edit / remove / soft-delete.
 - **Never trust the ping for data.** The re-pull goes through the
   permission-checked endpoint, so a cache can never hold something the viewer
   isn't allowed to see (a viewer with no rights just gets nothing back).
 - **Derived numbers recompute client-side** ("N members", badges) from the
-  patched rows — never refetch a collection for a count.
+  patched rows. Never refetch a collection for a count.
 - **A full-collection refetch happens only on first load and team switch.**
 
 The identity channel is handled by a parallel `useUserRealtime` block: a
-`session` event re-checks auth (`auth.me().catch(() => location.assign("/login"))`
-— the acting device keeps its still-valid session, only truly-dead ones bounce);
+`session` event re-checks auth (`auth.me().catch(() => location.assign("/login"))`,
+the acting device keeps its still-valid session, only truly-dead ones bounce);
 `profile` / `teams` call `active.refresh()`; `account_activity` invalidates the
 small own-account feed.
 
@@ -463,10 +463,10 @@ changed; the client earns the *content* through the same door it always uses.
 
 ---
 
-## 5 · When a Durable Object is the right lock — and when it is NOT
+## 5 · When a Durable Object is the right lock, and when it is NOT
 
 `TeamChannel` is pub/sub; it is **not** in any write path and serializes nothing.
-The *other* use of a DO — as a **lock** for contended, atomic writes — is a
+The *other* use of a DO, as a **lock** for contended, atomic writes, is a
 separate decision governed by [CONCURRENCY.md](CONCURRENCY.md). Brimba's base
 modules use **zero** DO locks today; here is the rule for when a future module
 would need one.
@@ -475,11 +475,11 @@ A write that protects an **invariant** (a count, a balance, "keep ≥1 admin",
 stock-on-hand, uniqueness) must be race-safe by **one** of three tools, in
 order of preference:
 
-### 1 · Atomic conditional SQL — the default
+### 1 · Atomic conditional SQL, the default
 
 Re-check the invariant *inside* the write's `WHERE`, and treat "0 rows changed"
 as "refused". D1/SQLite runs a single statement atomically and serializes writes
-per database, so two concurrent statements can't both win — **no DO needed**.
+per database, so two concurrent statements can't both win, **no DO needed**.
 This is the last-admin rule (`workers/tenancy/src/lib/members.ts`):
 
 ```ts
@@ -499,21 +499,21 @@ The friendly `countRole(...) <= 1` pre-check above it is the fast path; the
 can't both zero out the team's admins because D1 serializes the two `UPDATE`s and
 the second one sees `changes === 0`. `removeMember` uses the identical backstop.
 
-### 2 · A unique index — for uniqueness invariants
+### 2 · A unique index, for uniqueness invariants
 
 Let the database reject the duplicate; use a partial index when only some rows
-are constrained. Example: at most one **pending** invite per (team, email) —
+are constrained. Example: at most one **pending** invite per (team, email),
 `db/core/0006_invite_pending_unique.sql`; `createInvite` catches the violation
 and reports it kindly. No DO.
 
-### 3 · A per-entity Durable Object — the rare hot counter
+### 3 · A per-entity Durable Object, the rare hot counter
 
 **Only** for a **hot, multi-step, contended** entity where many writers hammer
 one thing (an inventory cell, a ledger account, a booking slot) and a serialized
 read-modify-write genuinely matters. The DO handles its requests one at a time
 (single-threaded); apply the **operation** inside it ("decrement by 2", not "set
 to 7") and **persist before you ack**. Cross-entity transactions use a
-coordinator + idempotency keys. This is reserved for genuine hot counters — most
+coordinator + idempotency keys. This is reserved for genuine hot counters, most
 writes never need it, and Brimba's base has none.
 
 ### The decision table
@@ -526,7 +526,7 @@ writes never need it, and Brimba's base has none.
 | Team name, member list, roles, a record's descriptive fields | Plain D1 write + a channel ping | No |
 
 **Don't reach for a DO just because a write touches shared data.** Renaming a
-team is a D1 write + a `publishChange(…, "team")` ping — it does not get its own
+team is a D1 write + a `publishChange(…, "team")` ping, it does not get its own
 DO. DO instances scale by key independent of D1 sharding; the two are orthogonal.
 
 ---
@@ -543,46 +543,46 @@ don't `await`-throw it. The committed D1 write is the authority; a lost ping is
 recovered by revalidation or reconnect catch-up. Never make a write's success
 depend on the live layer.
 
-**Reconnect re-syncs — pings can be missed.** A backoff-reconnecting socket
+**Reconnect re-syncs, pings can be missed.** A backoff-reconnecting socket
 (`shared/web/realtime.ts`: 1s, 2s, 4s … capped at 15s) can't prove it saw every
 ping while it was down. `onReconnect` fires only on a **re**-connect (not the
-first open) and the host `reconcile`s each on-screen list — diff-patching changed
-rows in, new rows in order, gone rows out — plus refreshes the small derived
+first open) and the host `reconcile`s each on-screen list, diff-patching changed
+rows in, new rows in order, gone rows out, plus refreshes the small derived
 caches. No page reload. So the live layer is *eventually* correct even across a
 drop; don't design as if every ping is guaranteed.
 
-**The socket rides the same worker path as any request — SSE/streaming caveat.**
+**The socket rides the same worker path as any request. SSE/streaming caveat.**
 The WebSocket upgrade is a normal `fetch` through the gateway to the realtime
 worker to the DO. A DO is single-threaded: a long-lived connection is fine
 (that's what Hibernation is for), but any *streaming* response is bounded by the
 isolate/request lifetime of the worker carrying it, not the DO's lifetime.
 Long-lived PUSH (hours-open, server-initiated) belongs on the hibernatable
-WebSocket path, never a held-open HTTP stream. The agent chat DOES stream —
+WebSocket path, never a held-open HTTP stream. The agent chat DOES stream,
 turn-length SSE straight from `data-ops` (seconds, one request's lifetime, the
-DO never involved; see EDGE-CASES §6) — which is fine precisely because it ends
+DO never involved; see EDGE-CASES §6), which is fine precisely because it ends
 with the turn; it is not a long-lived channel.
 
 **`user:<id>` and `team:<id>` are both gated, neither is a lock.** Both scopes
 are auth-checked at connect (your own id / active membership of that team) and
 neither serializes anything. If you ever need to serialize a contended write,
-that's a *different* DO instance chosen by CONCURRENCY.md rule 3 — never
+that's a *different* DO instance chosen by CONCURRENCY.md rule 3. Never
 `TeamChannel`.
 
 **Idle is free, but a busy channel wakes the isolate.** Hibernation makes an
 idle channel ~free; a burst of writes to one very hot team wakes its DO for each
 `broadcast`. Pings are tiny (`{resource,id,op}`) and the client coalesces work
-(one row re-pull), so this is cheap — but it is a real cost axis if a single
+(one row re-pull), so this is cheap, but it is a real cost axis if a single
 team fans out thousands of writes a second. That is a workload for the row-level
 design (one ping, one row patched), which is exactly why the ping never carries
 list-sized payloads.
 
 **Bulk writes are the coarse exception.** (The full list of sanctioned coarse
-pings — import per table + the `agent_usage` quota meter — is in CACHING.md.)
+pings, import per table + the `agent_usage` quota meter, is in CACHING.md.)
 CSV import (`data-ops`) writes many
 rows then publishes **one id-less** ping on the target table (`member_roles` /
-`learning`); the client refetches that one list via reconnect-style `reconcile`
+`selectable_data`); the client refetches that one list via reconnect-style `reconcile`
 rather than patching N rows. An id-less ping means "refetch this collection", not
-"patch a row" — see the `if (!event.id)` branch in the app-shell handler.
+"patch a row". See the `if (!event.id)` branch in the app-shell handler.
 
 ---
 
@@ -590,25 +590,25 @@ rather than patching N rows. An id-less ping means "refetch this collection", no
 
 To add the live layer to a new app on this base:
 
-1. **The DO class** — a `TeamChannel` extending `DurableObject`, accepting
+1. **The DO class**, a `TeamChannel` extending `DurableObject`, accepting
    sockets via `this.ctx.acceptWebSocket` (Hibernation) and a `broadcast` that
    loops `getWebSockets()`. Holds no data. (`workers/realtime/src/index.ts`.)
-2. **The wrangler binding + migration** — `durable_objects.bindings`
+2. **The wrangler binding + migration**, `durable_objects.bindings`
    (`CHANNELS` → `TeamChannel`) and `migrations` (`new_sqlite_classes:
    ["TeamChannel"]`); repeat the block under `env.staging`.
-3. **The gate** — `whoAmI` via the auth service binding, then `isActiveMember`
+3. **The gate**, `whoAmI` via the auth service binding, then `isActiveMember`
    for `team:` / own-id for `user:` before handing the request to the instance.
-4. **The publish seam** — `shared/workers/realtime.ts`
+4. **The publish seam**, `shared/workers/realtime.ts`
    (`publishChange` / `publishUserChange` / `publishSignOut`), best-effort,
    posting `{resource, id, op}` to `/publish`.
 5. **Classify every route** `read` / `mutation` / `housekeeping` in the worker's
    `ROUTES` table; the `publish-seam.test.ts` guard turns the build red if a
    `mutation` doesn't publish. (CACHING.md rule 4.)
-6. **The client** — `shared/web/realtime.ts` (two sockets, backoff, reconnect) plus
+6. **The client**, `shared/web/realtime.ts` (two sockets, backoff, reconnect) plus
    one `TEAM_RESOURCES` entry per module (`key` / `idField` / `fetchOne` /
    `fetchList` / `deps`); the generic handler does row-level `patchRow` +
    reconnect `reconcile`. No bespoke per-module code. (CACHING.md rule 3.)
 7. **Deploy realtime first.**
 
-For a contended write, do **not** touch any of the above — pick the lock from
+For a contended write, do **not** touch any of the above. Pick the lock from
 CONCURRENCY.md (atomic SQL → unique index → per-entity DO, in that order).

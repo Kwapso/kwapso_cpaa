@@ -19,6 +19,7 @@
 import * as React from "react"
 
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
+import { useT } from "@shared/web/language"
 
 // Reload-loop guard: set just before the chunk-error reload, cleared once a
 // fresh load runs this module again. If it's still set, the reload didn't fix
@@ -48,6 +49,7 @@ function isChunkError(err: unknown, message?: string): boolean {
 }
 
 export function VersionWatch() {
+  const t = useT()
   React.useEffect(() => {
     // A fresh load got here — the previous reload (if any) succeeded.
     sessionStorage.removeItem(RELOAD_GUARD)
@@ -81,7 +83,7 @@ export function VersionWatch() {
           notified = true
           toast("A new version is available.", {
             duration: Infinity,
-            action: { label: "Reload", onClick: () => location.reload() },
+            action: { label: t("Reload"), onClick: () => location.reload() },
           })
         }
       } catch {
@@ -103,7 +105,7 @@ export function VersionWatch() {
       window.removeEventListener("focus", checkForUpdate)
       document.removeEventListener("visibilitychange", onVisibility)
     }
-  }, [])
+  }, [t])
 
   return null
 }

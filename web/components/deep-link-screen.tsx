@@ -42,6 +42,8 @@ import { useRouteTeam } from "@/components/deep-link/use-route-team"
 import { useTraceRing } from "@/components/deep-link/use-trace-ring"
 import { WritePanels } from "@/components/deep-link/write-panels"
 import { HomeScreen } from "@/components/screens/home-screen"
+import { ProfileScreen } from "@/components/screens/profile-screen"
+import { KwapsoScreen } from "@/components/screens/kwapso-screen"
 import { SettingsScreen } from "@/components/screens/settings-screen"
 import { InvitationsScreen } from "@/components/screens/invitations-screen"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
@@ -54,9 +56,11 @@ import { useScreenData } from "@/lib/use-screen-data"
 import { useScreenActions } from "@/lib/use-screen-actions"
 import { useActiveTeam } from "@/lib/use-active-team"
 import { TEAM_SECTIONS, type Crumb } from "@/lib/pages"
+import { useT } from "@shared/web/language"
 
 export function DeepLinkScreen() {
   const active = useActiveTeam()
+  const t = useT()
   const router = useRouter()
 
   /* -------------------------------- where am I ------------------------------- */
@@ -68,7 +72,7 @@ export function DeepLinkScreen() {
   const query = route?.query ?? {}
   const topLevel = route?.topLevel ?? false
 
-  // Top-level pages (/learning, /tickets) run against the ACTIVE team (like /home);
+  // Top-level pages (/tickets, /accounts) run against the ACTIVE team (like /home);
   // /t/<id> URLs name their team explicitly, so only those switch teams.
   const { teamId, onTeam, enabled, isMemberOfUrlTeam, teamCount, noAccess } = useRouteTeam({
     active,
@@ -99,13 +103,10 @@ export function DeepLinkScreen() {
     rolesQ,
     invitesQ,
     metaQ,
-    learningQ,
     helpQ,
     helpMineQ,
     helpArchivedQ,
-    marketingQ,
     brandQ,
-    programmesQ,
     purposesQ,
     storiesQ,
     sprintsQ,
@@ -114,15 +115,11 @@ export function DeepLinkScreen() {
     tasksAllQ,
     workLogsQ,
     meetingsQ,
-    marketingChannelOptions,
-    marketingStatusOptions,
     brandCategoryOptions,
     departmentOptions,
     internalActivity,
     totals,
     helpTypeOptions,
-    learningCategoryOptions,
-    contentTypeOptions,
     activityScope,
     activityKey,
     activityQ,
@@ -136,7 +133,7 @@ export function DeepLinkScreen() {
 
   /* ------------------------------- navigation ------------------------------- */
 
-  // The base URL for the current screen — a clean top-level path (/learning) or the
+  // The base URL for the current screen — a clean top-level path (/tickets) or the
   // team-scoped form (/t/<teamId>/<module>). go() / breadcrumbs / closePanel build
   // off these, so intra-screen nav stays in whichever form you arrived through.
   const teamPath = teamId ? `/t/${teamId}` : "/"
@@ -165,7 +162,6 @@ export function DeepLinkScreen() {
   // failure so the calling dialog / confirm surfaces it.
   const {
     runAction,
-    createLearning,
     createHelp,
     createAccount,
     createKnowledge,
@@ -204,13 +200,11 @@ export function DeepLinkScreen() {
       case "team.edit":
         go(currentPath, { panel: "edit", module: "team" })
         break
-      // The agency's own housekeeping. Four modules, two actions each, and the
+      // The agency's own housekeeping. Two modules, two actions each, and the
       // same routing every other write in this host uses: the action opens a
       // URL (?panel / ?confirm) and the dialog behind it does the mutation, so
       // Back closes it and the link is shareable.
-      case "marketing.edit":
       case "brand.edit":
-      case "programme.edit":
       case "purpose.edit":
         go(currentPath, { panel: "edit", module: module as string, id })
         break
@@ -225,9 +219,7 @@ export function DeepLinkScreen() {
         })
         break
       }
-      case "marketing.archive":
       case "brand.archive":
-      case "programme.archive":
       case "purpose.archive":
         go(currentPath, { confirm: `${module}.archive`, id })
         break
@@ -238,21 +230,27 @@ export function DeepLinkScreen() {
 
   if (active.loading || !active.ctx || !route) return <ShellLoading />
 
-  // Account screens (/home, /settings, /invitations) render DIRECTLY in the shell — they
+  // Account screens (/home, /settings, /invitations, /profile) render DIRECTLY in the shell — they
   // aren't team-scoped module content, so they skip the team tabs / queries / membership
   // gate below. Because they live inside this one never-unmounting shell, moving in and
   // out of them (and into /t) is soft History-API nav — no reload anywhere.
   if (ACCOUNT_MODULES.includes(module ?? "")) {
     const accountCrumbs: Crumb[] =
       module === "settings"
-        ? [{ label: "Settings" }]
-        : module === "invitations"
-          ? [{ label: "Invitations" }]
-          : []
+        ? [{ label: t("Settings") }]
+        : module === "kwapso"
+          ? [{ label: t("Kwapso") }]
+          : module === "invitations"
+          ? [{ label: t("Invitations") }]
+          : module === "profile"
+            ? [{ label: t("Your profile") }]
+            : []
     return (
       <AppShell active={active} breadcrumbs={accountCrumbs} onNavigate={go} activePath={currentPath}>
         {module === "home" && <HomeScreen active={active} />}
+        {module === "kwapso" && <KwapsoScreen active={active} />}
         {module === "settings" && <SettingsScreen active={active} />}
+        {module === "profile" && <ProfileScreen active={active} />}
         {module === "invitations" && <InvitationsScreen active={active} />}
       </AppShell>
     )
@@ -267,9 +265,10 @@ export function DeepLinkScreen() {
   const teamName = active.ctx.team?.name ?? "Team"
   const myUserId = active.user?.id ?? null
   // Import has no read-right of its own — it's gated per-target. You can reach it
-  // if you can CREATE into any supported target (member roles, learning, accounts).
+  // if you can CREATE into any supported target (member roles, dropdown values,
+  // accounts).
   const canImport =
-    can("member_roles", "create") || can("learning", "create") || can("accounts", "create")
+    can("member_roles", "create") || can("selectable_data", "create") || can("accounts", "create")
 
   // The team tab strip. The NUMBER on each badge is an exact server total (LAW
   // R16): members from the active context's COUNT(*), everything else from the
@@ -281,7 +280,6 @@ export function DeepLinkScreen() {
     invites: totals.invites,
     selectable: totals.selectable,
     internal_rates: totals.internal_rates,
-    learning: totals.learning,
     help: totals.help,
     accounts: totals.accounts,
     knowledge: totals.knowledge,
@@ -290,13 +288,12 @@ export function DeepLinkScreen() {
     apps: totals.apps,
     tasks: totals.tasks,
     meetings: totals.meetings,
-    marketing: totals.marketing,
     brand_assets: totals.brand_assets,
-    programmes: totals.programmes,
     purposes: totals.purposes,
   })
 
   const crumbs = buildCrumbs({
+    t,
     topLevel,
     module,
     recordId,
@@ -308,7 +305,6 @@ export function DeepLinkScreen() {
       members: membersQ.data,
       roles,
       invites: invitesQ.data,
-      learning: learningQ.data,
       knowledge: knowledgeQ.data,
       apps: appsQ.data,
       sprints: sprintsQ.data,
@@ -325,10 +321,20 @@ export function DeepLinkScreen() {
       {/* data-trace marks the screen the agent just drove; the ring is a short-lived
        * glance cue (auto-cleared) so the user sees WHERE a traced change landed. It
        * rings the content region — a just-opened dialog draws the eye on its own. */}
+      {/* ONE PAGE CONTAINER, ONE CAP (UI-RULEBOOK L1). This was `max-w-3xl`, 768px
+       * — and it was the ONLY width cap in the agency app, so it governed every
+       * module screen. On the 1283px laptop the feedback screenshots were taken
+       * at, that left a 138px gutter each side; on a 2560px display, over 700px.
+       * 1600px keeps a comfortable measure on a large display while the shell's
+       * own `px-4 sm:px-6 lg:px-10` gutters (S2, and exactly the brand site's own
+       * 40px `--margin--m`) do the work at every width below it.
+       *
+       * `rounded-xl transition-shadow` went with it: it rounded and animated a
+       * container that has no surface of its own. */}
       <div
         data-trace={traceHighlight ?? undefined}
-        className={`mx-auto flex w-full max-w-3xl flex-col gap-6 rounded-xl transition-shadow ${
-          traceHighlight ? "ring-primary/60 ring-2 ring-offset-2 ring-offset-background" : ""
+        className={`mx-auto flex w-full max-w-[1600px] flex-col gap-6 ${
+          traceHighlight ? "ring-primary/60 rounded-xl ring-2 ring-offset-2 ring-offset-background" : ""
         }`}
       >
         {showTabs && (
@@ -347,13 +353,17 @@ export function DeepLinkScreen() {
         <CountedTabs badged={showTabs && sectionCounts[section] !== undefined}>
           {renderModuleContent({
             noAccess, enabled, perms, can, module, recordId, teamId, canImport, go,
-            overridesQ, metaQ, membersQ, rolesQ, roles, invitesQ, learningQ, helpQ, accountsQ, knowledgeQ, totals,
-            marketingQ, brandQ, programmesQ, purposesQ, internalActivity,
+            overridesQ, metaQ, membersQ, rolesQ, roles, invitesQ, helpQ, accountsQ, knowledgeQ, totals,
+            brandQ, purposesQ, internalActivity,
             storiesQ, sprintsQ, appsQ, tasksOpenQ, tasksAllQ, workLogsQ, meetingsQ,
             activityQ, activityTotal, activityKey, activityScope, inviteAuditQ, teamName, active,
             rights, onAction, onIntent,
             sectionPath, helpScope, setHelpScope, myUserId, query, helpMineQ, helpArchivedQ,
-            taskView, setTaskView,
+            // The tickets screen's sub-tab strip is built from the team's own
+            // ticket types (CHECKLIST 5.1) — the same list the ticket form's
+            // picker reads, so the words agree wherever they appear.
+            helpTypeOptions,
+            taskView, setTaskView, t,
           })}
         </CountedTabs>
       </div>
@@ -366,19 +376,12 @@ export function DeepLinkScreen() {
         active={active}
         membersQ={membersQ}
         accountsQ={accountsQ}
-        learningCategoryOptions={learningCategoryOptions}
-        contentTypeOptions={contentTypeOptions}
-        marketingChannelOptions={marketingChannelOptions}
-        marketingStatusOptions={marketingStatusOptions}
         brandCategoryOptions={brandCategoryOptions}
         departmentOptions={departmentOptions}
-        marketingQ={marketingQ}
         brandQ={brandQ}
-        programmesQ={programmesQ}
         purposesQ={purposesQ}
         helpTypeOptions={helpTypeOptions}
         runAction={runAction}
-        createLearning={createLearning}
         createHelp={createHelp}
         createAccount={createAccount}
         createKnowledge={createKnowledge}
@@ -409,7 +412,6 @@ function teamTabStrip(
     module === "dropdowns" ||
     module === "internal-rates" ||
     module === "accounts" ||
-    module === "learning" ||
     module === "tickets" ||
     module === "knowledge" ||
     module === "processes" ||
@@ -418,9 +420,7 @@ function teamTabStrip(
     module === "apps" ||
     module === "tasks" ||
     module === "meetings" ||
-    module === "marketing" ||
     module === "brand" ||
-    module === "delivery" ||
     module === "purposes" ||
     module === "import"
       ? module

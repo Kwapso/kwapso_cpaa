@@ -26,7 +26,6 @@ import { type ScreenQuery, type ScreenRecipe, type ScreenRights } from "@kwapso/
 
 import { AccountDetailScreen } from "@/components/account-detail"
 import { RoleDetailScreen } from "@/components/role-detail"
-import { LearningDetailScreen } from "@/components/learning-detail"
 import { KnowledgeDetailScreen } from "@/components/knowledge-detail"
 import { HelpDetailScreen } from "@/components/help-detail"
 import { ProcessDetailScreen } from "@/components/process-detail"
@@ -34,6 +33,7 @@ import { AppDetailScreen } from "@/components/app-detail"
 import { SprintDetailScreen } from "@/components/sprint-detail"
 import { StoryDetailScreen } from "@/components/story-detail"
 import { MeetingDetailScreen } from "@/components/meeting-detail"
+import { RecordTimerButton } from "@/components/timer-bar"
 import { ImportScreen } from "@/components/import-screen"
 import { InternalRateCardScreen } from "@/components/internal-rate-card"
 import { StaffPanel } from "@/components/staff-panel"
@@ -45,9 +45,7 @@ import type { HelpScope, TaskView } from "@/lib/live-resources"
 import {
   shapeBrandDetail,
   shapeInviteDetail,
-  shapeMarketingDetail,
   shapeMemberDetail,
-  shapeProgrammeDetail,
   shapePurposeDetail,
   shapeTaskDetail,
   shapeTeamDetail,
@@ -74,9 +72,13 @@ type ScreenData = ReturnType<typeof useScreenData>
  * The host owns all of it; this bundle is how it hands the render half a snapshot. */
 export type ModuleContentCtx = Pick<
   ScreenData,
-  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "learningQ" | "helpQ" | "helpMineQ" | "helpArchivedQ" | "accountsQ" | "knowledgeQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "inviteAuditQ"
-  | "marketingQ" | "brandQ" | "programmesQ" | "purposesQ" | "internalActivity"
+  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "helpQ" | "helpMineQ" | "helpArchivedQ" | "accountsQ" | "knowledgeQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "inviteAuditQ"
+  | "brandQ" | "purposesQ" | "internalActivity"
   | "storiesQ" | "sprintsQ" | "appsQ" | "tasksOpenQ" | "tasksAllQ" | "workLogsQ" | "meetingsQ"
+  // The team's live `Ticket type` values. The tickets screen's sub-tab strip is
+  // DERIVED from them (CHECKLIST 5.1), so it has to travel with the bundle —
+  // the host already reads them for the ticket form's own picker.
+  | "helpTypeOptions"
 > & {
   noAccess: boolean
   enabled: boolean
@@ -100,16 +102,21 @@ export type ModuleContentCtx = Pick<
   query: ScreenQuery
   taskView: TaskView
   setTaskView: (v: TaskView) => void
+  /** The reader's language, as `t`. It rides the ctx rather than a hook because
+   * these two render halves are plain functions, not components — the host
+   * calls `useT()` once and hands the result down with everything else. Every
+   * recipe on screen is translated by passing it to `resolveRecipe`. */
+  t: (english: string) => string
 }
 
 /** The row is whichever record kind a segment holds; each shaper takes its own
- * type, so the four call sites erase it through this one alias rather than four
- * inline casts. */
-type InternalShaper = (row: { id: string }, activity: ActivityItem[]) => ReturnType<typeof shapeMarketingDetail>
+ * type, so the three call sites erase it through this one alias rather than
+ * three inline casts. */
+type InternalShaper = (row: { id: string }, activity: ActivityItem[]) => ReturnType<typeof shapeBrandDetail>
 
 /** The BODY of an agency-internal record detail, once: find the row in its
  * loaded collection, render it through the engine, and hang the paged history
- * under it. The four branches above each own the two things a law reads off
+ * under it. The three branches above each own the two things a law reads off
  * them — which recipe, and that it went through withTabCounts — and share
  * everything that is genuinely identical. */
 function internalDetail(
@@ -130,6 +137,11 @@ function internalDetail(
      * label deciding from a different spelling of the same field is how a button
      * ends up disagreeing with the write behind it. */
     adapt?: (recipe: ScreenRecipe, record: Record<string, unknown>) => ScreenRecipe
+    /** One control above the engine's blocks, for the thing a recipe cannot draw
+     * at all. Today that is exactly one thing — the timer on a task — and it is
+     * a slot rather than a fifth branch because the alternative was to stop
+     * using the engine for a record the engine draws perfectly well. */
+    above?: React.ReactNode
   }
 ): React.ReactNode {
   if (spec.query.error) return <LoadError what={spec.what} />
@@ -139,6 +151,7 @@ function internalDetail(
   const data = spec.shape(row, ctx.internalActivity.rows)
   return (
     <div className="flex flex-col gap-4">
+      {spec.above && <div className="flex flex-wrap justify-end gap-2">{spec.above}</div>}
       <ScreenRenderer
         recipe={spec.adapt ? spec.adapt(recipe, data.record ?? {}) : recipe}
         data={data}
@@ -159,6 +172,7 @@ function internalDetail(
 
 export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
   const {
+    t,
     noAccess,
     enabled,
     perms,
@@ -220,7 +234,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
 
     // Team overview ----------------------------------------------------------
     if (module === "team") {
-      const base = resolveRecipe("team.detail", overridesQ.data)
+      const base = resolveRecipe("team.detail", overridesQ.data, t)
       if (!base) return <NotFound />
       if (metaQ.data === undefined) return <Skeleton variant="list" lines={3} />
       // R8: the Activity tab badges the feed's EXACT server total (R16's seam),
@@ -240,7 +254,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
               every mutation writes a row — so it pages instead of stopping at 50. */}
           <LoadMore
             listKey={`activity:team:${teamId}`}
-            label="Load more activity"
+            label={t("Load more activity")}
             fetchPage={(c: string) =>
               tenancy.activity("team", undefined, c).then((r) => ({ rows: r.activity, nextCursor: r.nextCursor }))
             }
@@ -263,7 +277,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     const activityMore = (
       <LoadMore
         listKey={activityKey as string}
-        label="Load more activity"
+        label={t("Load more activity")}
         fetchPage={(c: string) =>
           tenancy
             .activity(activityScope ?? "team", recordId ?? undefined, c)
@@ -275,8 +289,8 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       if (membersQ.error) return <LoadError what="members" />
       if (membersQ.data === undefined) return <Skeleton variant="list" lines={4} />
       const member = membersQ.data.find((m) => m.userId === recordId) ?? null
-      if (!member) return <p className="text-muted-foreground text-sm">That member isn&apos;t on this team.</p>
-      const base = resolveRecipe("members.detail", overridesQ.data)
+      if (!member) return <p className="text-muted-foreground text-sm">{t("That member isn't on this team.")}</p>
+      const base = resolveRecipe("members.detail", overridesQ.data, t)
       if (!base) return <NotFound />
       // R8/R16: the Activity tab badges this member's exact history total.
       let recipe = withTabCounts(base, { activity: activityTotal })
@@ -299,8 +313,8 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       if (invitesQ.error) return <LoadError what="invites" />
       if (invitesQ.data === undefined) return <Skeleton variant="list" lines={4} />
       const invite = invitesQ.data.find((i) => i.id === recordId) ?? null
-      if (!invite) return <p className="text-muted-foreground text-sm">That invite no longer exists.</p>
-      const base = resolveRecipe("invites.detail", overridesQ.data)
+      if (!invite) return <p className="text-muted-foreground text-sm">{t("That invite no longer exists.")}</p>
+      const base = resolveRecipe("invites.detail", overridesQ.data, t)
       if (!base) return <NotFound />
       // R8/R16: the Activity tab badges this invite's exact history total.
       let recipe = withTabCounts(base, { activity: activityTotal })
@@ -326,9 +340,6 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     if (module === "roles") {
       return <RoleDetailScreen teamId={teamId as string} roleId={recordId} />
     }
-    if (module === "learning") {
-      return <LearningDetailScreen teamId={teamId as string} learningId={recordId} />
-    }
     if (module === "knowledge") {
       return <KnowledgeDetailScreen teamId={teamId as string} sourceId={recordId} />
     }
@@ -351,7 +362,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     // collection tab with its own create action (or, on the story, a status
     // stepper and the time logged against it) — controls no engine block draws.
     // The TASK carries none of that: it is a title, a date and a tick, so its
-    // detail is the recipe below with the four housekeeping ones.
+    // detail is the recipe below with the housekeeping ones.
     if (module === "apps") {
       return <AppDetailScreen teamId={teamId as string} appId={recordId} basePath={sectionPath} />
     }
@@ -372,7 +383,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       return <MeetingDetailScreen teamId={teamId as string} meetingId={recordId} />
     }
     if (module === "tasks") {
-      const base = resolveRecipe("tasks.detail", overridesQ.data)
+      const base = resolveRecipe("tasks.detail", overridesQ.data, t)
       if (!base) return <NotFound />
       // R8/R16: the Activity tab badges this record's exact history total.
       return internalDetail(ctx, withTabCounts(base, { activity: ctx.internalActivity.total }), {
@@ -382,6 +393,21 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
         // no longer exists" the instant you used the button on it.
         query: ctx.tasksAllQ,
         shape: shapeTaskDetail as InternalShaper,
+        // THE CLOCK ON OUR OWN ADMIN. Forty minutes on the quarterly VAT return
+        // costs the agency what forty minutes of delivery costs, which is why
+        // `tasks` has been a work-log target since work logs shipped — and why
+        // the absence of any control to start one was a capability the code had
+        // and no screen offered. A task that is already ticked off has nothing
+        // left to time.
+        above: (
+          <RecordTimerButton
+            teamId={teamId as string}
+            targetTable="tasks"
+            targetId={recordId}
+            canLog={can("work", "create")}
+            disabled={ctx.tasksAllQ.data?.find((r) => r.id === recordId)?.status === "done"}
+          />
+        ),
         // THE TICK SAYS WHAT IT WILL DO NEXT. Same door, two directions — the
         // host already toggles on the record's status, and the label has to
         // agree with it or a finished task offers to be finished again.
@@ -397,31 +423,21 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     // the record's own fields plus its history, which is exactly the pair of
     // blocks the engine draws. The bespoke details beside them exist because no
     // engine block draws a ticket's conversation or a map's arithmetic; none of
-    // these four has that problem, so none of them is a component.
+    // these three has that problem, so none of them is a component.
     //
     // The history comes through the GENERIC (table, id) path (R5) — the same
     // hook every bespoke detail uses, resolved once in use-screen-data because a
     // render switch full of early returns cannot call a hook.
     //
-    // FOUR BRANCHES, NOT A TABLE, and that is the law's doing rather than a
+    // SEPARATE BRANCHES, NOT A TABLE, and that is the law's doing rather than a
     // preference. R8's check counts `resolveRecipe("<x>.detail"` literals and
     // demands one `withTabCounts` per rendered detail — a table that resolved
     // its recipe from a variable was invisible to the count, which means the law
-    // could no longer see whether these four tabs carried their badge. Code a
+    // could no longer see whether these tabs carried their badge. Code a
     // law cannot read is a law quietly switched off, so the shape it measures is
     // the shape they are written in.
-    if (module === "marketing") {
-      const base = resolveRecipe("marketing.detail", overridesQ.data)
-      if (!base) return <NotFound />
-      // R8/R16: the Activity tab badges this record's exact history total.
-      return internalDetail(ctx, withTabCounts(base, { activity: ctx.internalActivity.total }), {
-        what: "marketing posts",
-        query: ctx.marketingQ,
-        shape: shapeMarketingDetail as InternalShaper,
-      })
-    }
     if (module === "brand") {
-      const base = resolveRecipe("brand.detail", overridesQ.data)
+      const base = resolveRecipe("brand.detail", overridesQ.data, t)
       if (!base) return <NotFound />
       return internalDetail(ctx, withTabCounts(base, { activity: ctx.internalActivity.total }), {
         what: "the brand library",
@@ -429,17 +445,8 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
         shape: shapeBrandDetail as InternalShaper,
       })
     }
-    if (module === "delivery") {
-      const base = resolveRecipe("delivery.detail", overridesQ.data)
-      if (!base) return <NotFound />
-      return internalDetail(ctx, withTabCounts(base, { activity: ctx.internalActivity.total }), {
-        what: "the delivery programmes",
-        query: ctx.programmesQ,
-        shape: shapeProgrammeDetail as InternalShaper,
-      })
-    }
     if (module === "purposes") {
-      const base = resolveRecipe("purposes.detail", overridesQ.data)
+      const base = resolveRecipe("purposes.detail", overridesQ.data, t)
       if (!base) return <NotFound />
       return internalDetail(ctx, withTabCounts(base, { activity: ctx.internalActivity.total }), {
         what: "the meeting purposes",

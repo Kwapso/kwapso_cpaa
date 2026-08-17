@@ -137,12 +137,10 @@ describe("the agency's own housekeeping never reaches the client's side", () => 
     // a door opened and even if a gate were inverted, nothing in the client app
     // knows these rows exist. An import cannot be forgotten.
     const forbidden = [
-      "marketing_posts",
       "brand_assets",
       "staff_profiles",
       "staff_certificates",
       "meeting_purposes",
-      "/api/content/marketing",
       "/api/content/brand-assets",
       "/api/content/delivery",
       "/api/content/staff",

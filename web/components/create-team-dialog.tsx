@@ -22,6 +22,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 const nameField = { ...defaultFieldConfig, label: "Team name", required: true }
 
@@ -37,6 +38,7 @@ export function CreateTeamDialog({
   /** stable id for per-session draft persistence (CACHING.md §11); omit to disable */
   draftKey?: string
 }) {
+  const t = useT()
   const initialValues = { name: "" }
   // Per-session draft: restores what you typed if you navigate away and reopen.
   const [values, setValues, clearDraft] = useFormDraft(draftKey, initialValues, open)
@@ -70,9 +72,9 @@ export function CreateTeamDialog({
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create a team</DialogTitle>
+          <DialogTitle>{t("Create a team")}</DialogTitle>
           <DialogDescription>
-            It gets its own private space. You&apos;ll be its admin.
+            {t("It gets its own private space. You'll be its admin.")}
           </DialogDescription>
         </DialogHeader>
         <form className="flex flex-col gap-4" onSubmit={submit}>
@@ -81,7 +83,7 @@ export function CreateTeamDialog({
               id="team-name"
               value={name}
               onChange={(e) => setValues((v) => ({ ...v, name: e.target.value }))}
-              placeholder="Acme Inc."
+              placeholder={t("Acme Inc.")}
               disabled={busy}
               autoFocus
             />

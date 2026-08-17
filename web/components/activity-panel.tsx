@@ -18,6 +18,7 @@ import { ActivityFeed, defaultActivityFeedConfig } from "@kwapso/ui/registry/col
 
 import { LoadMore } from "@/components/load-more"
 import type { ActivityFeedRow } from "@/lib/use-record-activity"
+import { useT } from "@shared/web/language"
 
 /** Structurally typed rather than importing the hook's return: the panel needs
  * three fields and no knowledge of how they were fetched. */
@@ -30,13 +31,14 @@ export function ActivityPanel({
     fetchPage: (cursor: string) => Promise<{ rows: unknown[]; nextCursor: string | null }>
   }
 }) {
+  const t = useT()
   return (
     <div className="flex flex-col gap-4">
       <ActivityFeed
-        config={{ ...defaultActivityFeedConfig, emptyText: "No activity yet." }}
+        config={{ ...defaultActivityFeedConfig, emptyText: t("No activity yet.") }}
         items={activity.items}
       />
-      <LoadMore listKey={activity.listKey} fetchPage={activity.fetchPage} label="Load more activity" />
+      <LoadMore listKey={activity.listKey} fetchPage={activity.fetchPage} label={t("Load more activity")} />
     </div>
   )
 }

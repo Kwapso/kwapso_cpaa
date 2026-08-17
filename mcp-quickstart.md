@@ -1,25 +1,25 @@
-# Connect to Brimba over MCP — quickstart
+# Connect to Brimba over MCP, quickstart
 
 Hand this one file to a developer. It's the short version of [MCP.md](MCP.md).
 
 A machine (an AI agent, a script, an automation) can do the same things you can do in
-Brimba — over the **Model Context Protocol (MCP)**. It acts **as you, in one team,
-capped by your role** — never more. There's no separate "API key with god powers."
+Brimba, over the **Model Context Protocol (MCP)**. It acts **as you, in one team,
+capped by your role**. Never more. There's no separate "API key with god powers."
 
 ---
 
 ## 1 · Get in
 
-1. **Sign in** to the app (email + a 6-digit code — no passwords):
+1. **Sign in** to the app (email + a 6-digit code, no passwords):
    - Production: `https://agency.kwapso.app`
    - Staging: `https://agency-staging.kwapso.app`
    (If you're not on the team yet, ask the owner to invite you.)
-2. **Settings → Access tokens → New token.** Name it, then **copy the secret now** —
+2. **Settings → Access tokens → New token.** Name it, then **copy the secret now**,
    it's shown once and looks like `kwapso_mcp_…`. Treat it like a password.
 
 ## 2 · The endpoint
 
-`POST https://agency.kwapso.app/mcp` — JSON-RPC 2.0, authenticated with
+`POST https://agency.kwapso.app/mcp`. JSON-RPC 2.0, authenticated with
 `Authorization: Bearer <your token>`. (Staging: same path on the staging host.)
 
 ## 3 · Connect
@@ -27,7 +27,7 @@ capped by your role** — never more. There's no separate "API key with god powe
 **Any HTTP MCP client** (agent framework, custom client): point it at that URL with the
 `Authorization: Bearer …` header.
 
-**Claude Desktop** (or any stdio-only client) — add this to its MCP config:
+**Claude Desktop** (or any stdio-only client). Add this to its MCP config:
 
 ```json
 {
@@ -44,7 +44,7 @@ capped by your role** — never more. There's no separate "API key with god powe
 }
 ```
 
-**Any AI (Claude / Gemini / GPT)** — paste this prompt (the app's "Copy setup prompt for
+**Any AI (Claude / Gemini / GPT)**. Paste this prompt (the app's "Copy setup prompt for
 any AI" button gives you this with your host + token already filled in):
 
 ```
@@ -70,16 +70,16 @@ curl -s https://agency.kwapso.app/mcp \
 
 ## 4 · What it costs
 
-Reads, CSV exports, and imports are **free** — just endpoint calls. Only the assistant
+Reads, CSV exports, and imports are **free**, just endpoint calls. Only the assistant
 tools (`agent_chat`, `agent_confirm`, and the `plan_import` step) use the **team's AI
 quota**, and only if your role has the AI-agent right. A role without it can't spend any
-AI budget — reads/exports still work.
+AI budget, reads/exports still work.
 
 ## 5 · Good to know
 
-- **Revoke any time** from the same screen — it stops the next call instantly.
+- **Revoke any time** from the same screen, it stops the next call instantly.
 - **One team only.** The token is pinned to the team you made it in.
-- **Your live role is the cap.** Change the role and the token's power changes with it —
+- **Your live role is the cap.** Change the role and the token's power changes with it,
   you never touch the token.
 
 Full detail (tool list, security posture, cost table): [MCP.md](MCP.md).

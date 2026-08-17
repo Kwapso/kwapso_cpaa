@@ -1,5 +1,5 @@
-// kwapso CONTENT worker — team-DB content modules (Learning + Tickets +
-// the Knowledge base). This file is just the SWITCHBOARD: it maps each route to
+// kwapso CONTENT worker — team-DB content modules (Tickets, the work engine
+// and the Knowledge base). This file is just the SWITCHBOARD: it maps each route to
 // a handler (grouped by domain under ./routes/*) and centrally maps thrown
 // GuardErrors to clean HTTP responses. The shared opening (whoAmI / teamContext
 // / requireRight) lives in the shared gating seam.
@@ -12,15 +12,6 @@
 //     the person whose week it is, and never to a client.
 // Both record their failures (R12): unattended work has nobody watching.
 //
-//   GET  /api/content/learning            -> the team's learning items (?id → one)
-//   POST /api/content/learning            -> create a learning item
-//   POST /api/content/learning/update     -> edit a learning item
-//   POST /api/content/learning/active     -> deactivate / reactivate an item (never deleted)
-//   POST /api/content/learning/bulk-active -> (de)activate MANY items at once → {updated,skipped}
-//   POST /api/content/learning/done       -> mark an item done / not-done (your own progress)
-//   POST /api/content/learning/upload      -> upload a local file (image/clip) to team R2 → URL
-//   POST /api/content/learning/upload-stream -> the same, file as the raw body
-//   GET  /api/content/learning/progress   -> curator dashboard (every member's done state)
 //   GET  /api/content/help                -> the team's tickets (?scope=mine|all, ?id → one)
 //   GET  /api/content/help/thread         -> one ticket's replies (?id=<ticketId>)
 //   POST /api/content/help                -> raise a ticket
@@ -38,7 +29,6 @@
 //   POST /api/content/stories             -> write one piece of work down
 //   POST /api/content/stories/update      -> edit a story
 //   POST /api/content/stories/status      -> move a story along its four states
-//   POST /api/content/stories/rank        -> drag-rank a story between two others
 //   GET  /api/content/sprints             -> the blocks of work sold (?accountId → one client's)
 //   POST /api/content/sprints             -> start a sprint
 //   POST /api/content/sprints/update      -> edit one (name, kind, dates, PRICE)
@@ -76,11 +66,8 @@
 //   POST /api/content/meetings/update     -> correct it / write the notes up
 //   POST /api/content/meetings/held       -> it happened / it hasn't yet
 //   POST /api/content/meetings/active     -> cancel it / put it back
-//   GET  /api/content/marketing           -> the agency's own posts (?id → one)
-//   POST /api/content/marketing[/update|/active] -> write / edit / archive a post
 //   GET  /api/content/brand-assets        -> the brand library (?id → one)
 //   POST /api/content/brand-assets[/update|/active|/upload] -> write / edit / archive / store bytes
-//   GET  /api/content/delivery/programs   -> the delivery programmes (?id → one)
 //   GET  /api/content/delivery/purposes   -> why we meet (?id → one)
 //   GET  /api/content/staff/profiles      -> the team's own profiles (?userId → one)
 //   GET  /api/content/staff/certificates  -> what people hold (?userId → one person's)
@@ -92,18 +79,6 @@ import { GuardError } from "@shared/workers/gating"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { requestId } from "@shared/workers/trace"
 import type { Env } from "./env"
-import {
-  getLearning,
-  getLearningProgress,
-  postBulkSetLearningActive,
-  postCreateLearning,
-  postLearningDone,
-  postSetLearningActive,
-  postUpdateLearning,
-  postStreamLearningFile,
-  postUploadLearningFile,
-  getLearningExport,
-} from "./routes/learning"
 import {
   getHelp,
   getHelpStakeholders,
@@ -118,6 +93,11 @@ import {
   postUpdateHelp,
   postBulkHelpStatusByFilter,
   postResolveHelp,
+  getHelpAttachments,
+  postHelpAttachment,
+  postRemoveHelpAttachment,
+  postHelpTriageRead,
+  postValidateHelp,
 } from "./routes/help"
 import {
   getSprints,
@@ -125,7 +105,6 @@ import {
   postCreateSprint,
   postCreateStory,
   postSprintComplete,
-  postStoryRank,
   postStoryStatus,
   postUpdateSprint,
   postUpdateStory,
@@ -167,16 +146,11 @@ import {
   getMeetings,
   postCreateMeeting,
   postMeetingHeld,
+  postMeetingTranscript,
+  postSyncCalendarSeries,
   postSetMeetingActive,
   postUpdateMeeting,
 } from "./routes/meetings"
-import {
-  getMarketing,
-  getMarketingExport,
-  postCreateMarketing,
-  postSetMarketingActive,
-  postUpdateMarketing,
-} from "./routes/marketing"
 import {
   getBrandAssets,
   getBrandAssetsExport,
@@ -189,14 +163,9 @@ import {
 import {
   getMeetingPurposes,
   getMeetingPurposesExport,
-  getPrograms,
-  getProgramsExport,
   postCreateMeetingPurpose,
-  postCreateProgram,
   postSetMeetingPurposeActive,
-  postSetProgramActive,
   postUpdateMeetingPurpose,
-  postUpdateProgram,
 } from "./routes/delivery"
 import {
   getStaffCertificates,
@@ -213,20 +182,33 @@ import {
 import {
   getGoogleCallback,
   getGoogleChat,
+  getGoogleChatSpaces,
   getGoogleConnections,
   getGoogleDriveFile,
   getGoogleDriveFiles,
   getGoogleEvents,
+  getGoogleEventTranscript,
   getGoogleMail,
   getGoogleMailMessage,
   getGooglePick,
   getGoogleStart,
   postGoogleChat,
+  postGoogleChatDelete,
   postGoogleConnect,
   postGoogleDisconnect,
+  postGoogleDriveFolder,
+  postGoogleDriveSaveMail,
+  postGoogleDriveTrash,
+  postGoogleDriveUpdate,
   postGoogleDriveUpload,
   postGoogleEvent,
+  postGoogleEventCancel,
+  postGoogleEventGuests,
+  postGoogleEventLocation,
+  postGoogleEventUpdate,
   postGoogleMailDraft,
+  postGoogleMailLabel,
+  postGoogleMailReply,
   postGoogleMailSend,
   postGoogleSource,
   postGoogleSourceActive,
@@ -299,7 +281,7 @@ export async function teamSlice(
   const window = windows <= 1 ? 0 : Math.floor(scheduledTime / everyMs) % windows
   if (windows > 1)
     console.warn(
-      `${job}: ${total} teams needs ${windows} ticks per lap — this tick takes window ${window + 1}/${windows}. ` +
+      `${job}: ${total} teams needs ${windows} ticks per lap, this tick takes window ${window + 1}/${windows}. ` +
         `A team is now visited once every ${windows} ticks; past a few windows this wants a work queue, not a bigger cap.`
     )
   const rows = await env.DB.prepare(
@@ -324,17 +306,7 @@ export async function teamSlice(
 type RouteKind = "read" | "mutation" | "housekeeping"
 type Handler = (request: Request, env: Env) => Promise<Response>
 export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
-  "GET /api/content/learning": { handler: getLearning, kind: "read" },
-  "GET /api/content/learning/export": { handler: getLearningExport, kind: "read" },
-  "POST /api/content/learning": { handler: postCreateLearning, kind: "mutation" },
-  "POST /api/content/learning/update": { handler: postUpdateLearning, kind: "mutation" },
-  "POST /api/content/learning/active": { handler: postSetLearningActive, kind: "mutation" },
-  "POST /api/content/learning/bulk-active": { handler: postBulkSetLearningActive, kind: "mutation" },
-  "POST /api/content/learning/done": { handler: postLearningDone, kind: "mutation" },
   // Stores a file in R2 but changes NO record (no row to patch) → housekeeping.
-  "POST /api/content/learning/upload": { handler: postUploadLearningFile, kind: "housekeeping" },
-  "POST /api/content/learning/upload-stream": { handler: postStreamLearningFile, kind: "housekeeping" },
-  "GET /api/content/learning/progress": { handler: getLearningProgress, kind: "read" },
   "GET /api/content/help": { handler: getHelp, kind: "read" },
   "GET /api/content/help/thread": { handler: getHelpThread, kind: "read" },
   "POST /api/content/help": { handler: postCreateHelp, kind: "mutation" },
@@ -349,6 +321,16 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/content/help/reply": { handler: postHelpReply, kind: "mutation" },
   // COME BACK TO THE CLIENT — the second and last thing that emails one.
   "POST /api/content/help/resolve": { handler: postResolveHelp, kind: "mutation" },
+  // THE TWO ACTS ON THE LADDER A MACHINE CANNOT INFER (CHECKLIST 5.11, 5.13).
+  // Everything else about a ticket's status now happens by itself — a timer
+  // starts, a sprint is picked, the last story closes — so these two are doors
+  // with their own words rather than values in a dropdown of seven.
+  "POST /api/content/help/validate": { handler: postValidateHelp, kind: "mutation" },
+  "POST /api/content/help/triage-read": { handler: postHelpTriageRead, kind: "mutation" },
+  // Several files and several links on one ticket, from BOTH front doors.
+  "GET /api/content/help/attachments": { handler: getHelpAttachments, kind: "read" },
+  "POST /api/content/help/attachments": { handler: postHelpAttachment, kind: "mutation" },
+  "POST /api/content/help/attachments/remove": { handler: postRemoveHelpAttachment, kind: "mutation" },
   "GET /api/content/help/stakeholders": { handler: getHelpStakeholders, kind: "read" },
   "POST /api/content/help/stakeholders": { handler: postAddStakeholder, kind: "mutation" },
   // THE WORK ENGINE — what we DO about a request, and the block of work it was
@@ -359,7 +341,6 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/content/stories": { handler: postCreateStory, kind: "mutation" },
   "POST /api/content/stories/update": { handler: postUpdateStory, kind: "mutation" },
   "POST /api/content/stories/status": { handler: postStoryStatus, kind: "mutation" },
-  "POST /api/content/stories/rank": { handler: postStoryRank, kind: "mutation" },
   "GET /api/content/sprints": { handler: getSprints, kind: "read" },
   "POST /api/content/sprints": { handler: postCreateSprint, kind: "mutation" },
   "POST /api/content/sprints/update": { handler: postUpdateSprint, kind: "mutation" },
@@ -399,8 +380,8 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "GET /api/content/knowledge/sync": { handler: getKnowledgeSync, kind: "read" },
   "POST /api/content/knowledge": { handler: postCreateKnowledge, kind: "mutation" },
   // A file becomes a source: stored whole, read where we can, and honest about
-  // it where we cannot. A MUTATION, not housekeeping — unlike the learning
-  // upload door beside it, this one writes the record as well as the bytes.
+  // it where we cannot. A MUTATION, not housekeeping — unlike the brand-library
+  // upload door below, this one writes the record as well as the bytes.
   "POST /api/content/knowledge/upload": { handler: postUploadKnowledgeFile, kind: "mutation" },
   "POST /api/content/knowledge/upload-stream": { handler: postStreamKnowledgeFile, kind: "mutation" },
   "POST /api/content/knowledge/update": { handler: postUpdateKnowledge, kind: "mutation" },
@@ -421,31 +402,28 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/content/meetings": { handler: postCreateMeeting, kind: "mutation" },
   "POST /api/content/meetings/update": { handler: postUpdateMeeting, kind: "mutation" },
   "POST /api/content/meetings/held": { handler: postMeetingHeld, kind: "mutation" },
+  // The transcript arriving is what tells the app the conversation happened: it
+  // ticks "held" and writes a work log for every one of OUR people who was in
+  // the room (9.4 + 9.2). One door, because it is one moment.
+  "POST /api/content/meetings/transcript": { handler: postMeetingTranscript, kind: "mutation" },
+  // A repeating calendar entry becomes a real record four weeks ahead, and the
+  // instances beyond that come back read-only (9.7).
+  "POST /api/content/meetings/sync-calendar": { handler: postSyncCalendarSeries, kind: "mutation" },
   "POST /api/content/meetings/active": { handler: postSetMeetingActive, kind: "mutation" },
 
   // ── THE AGENCY'S OWN HOUSEKEEPING ──────────────────────────────────────────
-  // Four modules, six tables, and one thing every door below has in common: it
+  // Three modules, four tables, and one thing every door below has in common: it
   // opens with `refusePortalCaller`. None of this material is a client's, so
   // there is no fenced slice of it to serve one — only a refusal (R21).
-  "GET /api/content/marketing": { handler: getMarketing, kind: "read" },
-  "GET /api/content/marketing/export": { handler: getMarketingExport, kind: "read" },
-  "POST /api/content/marketing": { handler: postCreateMarketing, kind: "mutation" },
-  "POST /api/content/marketing/update": { handler: postUpdateMarketing, kind: "mutation" },
-  "POST /api/content/marketing/active": { handler: postSetMarketingActive, kind: "mutation" },
   "GET /api/content/brand-assets": { handler: getBrandAssets, kind: "read" },
   "GET /api/content/brand-assets/export": { handler: getBrandAssetsExport, kind: "read" },
   "POST /api/content/brand-assets": { handler: postCreateBrandAsset, kind: "mutation" },
   "POST /api/content/brand-assets/update": { handler: postUpdateBrandAsset, kind: "mutation" },
   "POST /api/content/brand-assets/active": { handler: postSetBrandAssetActive, kind: "mutation" },
   // Stores a file in R2 but changes NO record (no row to patch) → housekeeping,
-  // the same classification the learning upload carries.
+  // which is what separates it from the knowledge upload door above.
   "POST /api/content/brand-assets/upload": { handler: postUploadBrandAsset, kind: "housekeeping" },
   "POST /api/content/brand-assets/upload-stream": { handler: postStreamBrandAsset, kind: "housekeeping" },
-  "GET /api/content/delivery/programs": { handler: getPrograms, kind: "read" },
-  "GET /api/content/delivery/programs/export": { handler: getProgramsExport, kind: "read" },
-  "POST /api/content/delivery/programs": { handler: postCreateProgram, kind: "mutation" },
-  "POST /api/content/delivery/programs/update": { handler: postUpdateProgram, kind: "mutation" },
-  "POST /api/content/delivery/programs/active": { handler: postSetProgramActive, kind: "mutation" },
   "GET /api/content/delivery/purposes": { handler: getMeetingPurposes, kind: "read" },
   "GET /api/content/delivery/purposes/export": { handler: getMeetingPurposesExport, kind: "read" },
   "POST /api/content/delivery/purposes": { handler: postCreateMeetingPurpose, kind: "mutation" },
@@ -492,12 +470,37 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "GET /api/content/google/drive/files": { handler: getGoogleDriveFiles, kind: "read" },
   "GET /api/content/google/drive/file": { handler: getGoogleDriveFile, kind: "read" },
   "POST /api/content/google/drive/upload": { handler: postGoogleDriveUpload, kind: "mutation" },
+  // WRITING is not just putting a file in. Rewriting one, making a folder to put
+  // it in, filing a conversation as a document — and the bin, without which the
+  // other three are three ways to make a mess nobody can tidy.
+  "POST /api/content/google/drive/update": { handler: postGoogleDriveUpdate, kind: "mutation" },
+  "POST /api/content/google/drive/folder": { handler: postGoogleDriveFolder, kind: "mutation" },
+  "POST /api/content/google/drive/save-mail": { handler: postGoogleDriveSaveMail, kind: "mutation" },
+  "POST /api/content/google/drive/trash": { handler: postGoogleDriveTrash, kind: "mutation" },
   "GET /api/content/google/gmail/messages": { handler: getGoogleMail, kind: "read" },
   "GET /api/content/google/gmail/message": { handler: getGoogleMailMessage, kind: "read" },
   "POST /api/content/google/gmail/draft": { handler: postGoogleMailDraft, kind: "mutation" },
   "POST /api/content/google/gmail/send": { handler: postGoogleMailSend, kind: "mutation" },
+  // Answering INSIDE a conversation, and filing one under a label. The reply
+  // door demands the mail switch exactly as the send door does — it sends.
+  "POST /api/content/google/gmail/reply": { handler: postGoogleMailReply, kind: "mutation" },
+  "POST /api/content/google/gmail/label": { handler: postGoogleMailLabel, kind: "mutation" },
   "GET /api/content/google/calendar/events": { handler: getGoogleEvents, kind: "read" },
   "POST /api/content/google/calendar/events": { handler: postGoogleEvent, kind: "mutation" },
+  // The four questions a person asks about an entry that already exists — what it
+  // says and when, who is coming, where it is, and whether it is happening at all.
+  // Four doors because a person changes one at a time, and because only one of
+  // them puts something in a third party's inbox (routes/google.ts says more).
+  "POST /api/content/google/calendar/event/update": { handler: postGoogleEventUpdate, kind: "mutation" },
+  "POST /api/content/google/calendar/event/guests": { handler: postGoogleEventGuests, kind: "mutation" },
+  "POST /api/content/google/calendar/event/location": { handler: postGoogleEventLocation, kind: "mutation" },
+  "POST /api/content/google/calendar/event/cancel": { handler: postGoogleEventCancel, kind: "mutation" },
+  // What was SAID in the meeting, reached from the meeting — Meet files its
+  // transcript as an ordinary Doc, so until now you had to already know which one.
+  "GET /api/content/google/calendar/event/transcript": {
+    handler: getGoogleEventTranscript,
+    kind: "read",
+  },
   // FROM kwapso TO Google: a sprint's dates as a calendar entry, and the meeting
   // door beside it — the two halves of "what we book here shows up there".
   "POST /api/content/google/calendar/sprint": { handler: postGoogleSprintEvent, kind: "mutation" },
@@ -505,8 +508,14 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // the MEETING (it remembers the entry it became) as well as the connection, so
   // it publishes twice — once for each screen that just went stale.
   "POST /api/content/google/calendar/meeting": { handler: postGoogleMeetingEvent, kind: "mutation" },
+  // Which spaces are there at all — the question that had no answer while a space
+  // could only be read by naming one you already knew. Reading the LIST is not
+  // reading what is in them; the messages door still refuses an unnamed space.
+  "GET /api/content/google/chat/spaces": { handler: getGoogleChatSpaces, kind: "read" },
   "GET /api/content/google/chat/messages": { handler: getGoogleChat, kind: "read" },
   "POST /api/content/google/chat/messages": { handler: postGoogleChat, kind: "mutation" },
+  // …and taking one back, for the same reason the Drive bin exists.
+  "POST /api/content/google/chat/delete": { handler: postGoogleChatDelete, kind: "mutation" },
 }
 
 export default {
@@ -527,10 +536,10 @@ export default {
       await recordWorkerError(env.DB, "content", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request))
       const message = e instanceof Error ? e.message : ""
       if (message.startsWith("cloud_key_missing:"))
-        return fail(503, "cloud_key_missing", `${brand.name}'s cloud key isn't set up yet — content is paused.`)
+        return fail(503, "cloud_key_missing", `${brand.name}'s cloud key isn't set up yet, content is paused.`)
       // Set, but no longer ours — see d1-rest.ts.
       if (message.startsWith("cloud_key_rejected:"))
-        return fail(503, "cloud_key_rejected", `${brand.name} can't reach its databases right now. You're still signed in — this is our end, and we're on it.`)
+        return fail(503, "cloud_key_rejected", `${brand.name} can't reach its databases right now. You're still signed in, this is our end, and we're on it.`)
       return fail(500, "internal", "Something went wrong on our side. Try again.")
     }
   },

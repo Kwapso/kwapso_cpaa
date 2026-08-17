@@ -216,6 +216,14 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "described-contracts",
     status: "enforced",
   },
+  {
+    id: "R28",
+    dimension: "ui",
+    law: "A STRING THE APP SAYS IS IN THE CATALOGUE, AND THE CATALOGUE SAYS NOTHING THE APP DOESN'T. `shared/i18n-strings.json` must be exactly the set of user-visible English sentences in `web/` and `web-portal/`, derived by re-running the ONE shared definition of what a person reads (`scripts/lib/i18n-source.mjs` — the same walk the extractor writes from and the adoption codemod wraps). A sentence in the source that is MISSING from the catalogue fails the build: English is the key, so an uncatalogued string is translated nowhere and ships in English to a reader who chose German. A catalogue entry that matches no string in the app is an ORPHAN and fails too — a ratchet, the same shape as R20's exemption list and R27's vocabulary: nothing breaks today, which is precisely why it rots into a record of what the app used to say while being paid for on every build.",
+    why: "The translation pipeline is BUILD-TIME (13.5): 29 languages produced once per deploy, costing nothing at runtime. That design's whole load-bearing assumption is that the catalogue is current, and its only enforcement was a person remembering to re-run a script — the weakest kind of rule in a codebase whose other twenty-seven are machine-checked. The extractor already had a `--check` mode and it was never wired to anything; this law is that mode with a test in front of it, plus the second half `--check` could only report as one byte-diff. It re-runs the real walker rather than describing it: a check with its own idea of 'a string a person reads' would be a second definition, and the day the two drifted the build would stay green while the app spoke English.",
+    checkId: "catalogued-strings",
+    status: "enforced",
+  },
 ]
 
 /** R13 — reviewed exemptions: modules that are deliberately NOT import targets,
@@ -226,8 +234,12 @@ export const CATALOG_EXEMPT: Record<string, string> = {
   help: "tickets are conversations raised in-app; importing them would forge authorship and timelines",
   screens: "screen recipes are app furniture (config), not team data",
   agent: "the assistant's threads/usage are system records, not importable content",
+  contacts:
+    "not a table — the module is a SWITCH over rows the `accounts` target already imports. A company and a person are one row shape (SCOPE ch.03), so a file of people is a file of accounts with the Type column set to person, and the link between a person and a company is set on the account afterwards for the same reason the parent pointer is: a file's own rows cannot be resolved to ids until the file has been written. Giving this module a second import target would be two ways to load one table, and the second one would be the one nobody keeps in step.",
   portal_users:
     "a login is a granted identity, not importable content — a CSV cannot consent for a person (the same reason team_members is exempt)",
+  all_tasks:
+    "not a table — the module is a SWITCH over whose tasks a list answers about (4.9). The rows themselves are `tasks`, which the work engine's own target already imports; giving this module a second target would be two ways to load one table, and the second one would be the one nobody keeps in step. The same shape as `contacts`, one spine along.",
   knowledge:
     "a source is either TYPED here — and indexed in the same call, because the owner asked for instant syncing, which costs one embedding per chunk — or MIRRORED from a row the app already owns and kept in step by the sweep. A CSV would be a third way in with the first one's cost and neither one's upkeep: the importer writes row by row through the module's own gated create door, so a 5,000-row file would be 5,000 chunkings and 5,000 model calls inside one request, against a €50/month ceiling. The in-rule answer to 'we have a spreadsheet of process notes' is to point the sweep at where they already live, or to import them into the module they belong to and let the mirror do it.",
   processes:
@@ -331,6 +343,10 @@ export const PORTAL_VISIBLE_READS: Record<string, { fence: string | null; why: s
     fence: "ticketFence",
     why: "a client raises tickets; the team-wide default handed them every other client's — the thread doors, one table along, had to be taught the same sentence, and the door that RAISES a ticket answered with the whole list until the check learned that a POST can be a read. It is called ticketFence and no longer authorScope because it no longer fences by AUTHOR: the owner ruled on 11 Aug 2026 that a contact sees their COMPANY's questions, so the ticket carries the account it was raised for and this is accountScopeClause over that column — the same fence as the accounts list, reading a ticket.",
   },
+  "workers/content/src/lib/help-attachments.ts": {
+    fence: "attachmentFence",
+    why: "the files and links on a ticket (CHECKLIST 5.10), and the fence is the TICKET's fence one table along — `attachmentFence` wraps `ticketFence` as a subquery so it rides the same WHERE as the rows AND the count, exactly as `threadFence` does for a reply. It has to be here rather than merely be safe by accident: an attachment is the one thing on a ticket a CLIENT uploads, so it is the one place where the rows a caller may read and the rows a caller may write are being decided about the same table from two directions.",
+  },
   "workers/content/src/lib/notify.ts": {
     fence: null,
     why: "it sends email and returns no rows to the caller: the only ids it resolves are the ticket's own raiser (read through the fence) and the mentions the route already refused from a client login, and the lookup joins team_members so an address outside the team can never be reached.",
@@ -392,9 +408,27 @@ export const PORTAL_VISIBLE_WRITES: Record<string, { fence: string | null; why: 
     fence: null,
     why: "writes the caller's own name and photo on the GLOBAL user row — their own record, reached through no id but their session's.",
   },
+  "POST /api/auth/language": {
+    fence: null,
+    why: "writes ONE column on the caller's own global user row — which language they read kwapso in — reached through no id but their session's, exactly as the profile door above. There is no account in the question at all: a language is a fact about a reader, not about a company, so there is no fence for it to resolve and nothing another account could learn from it. The value it accepts is one of four the code declares (shared/i18n.ts), so the body cannot carry a surprise either.",
+  },
   "POST /api/auth/logout": {
     fence: null,
     why: "ends the caller's own session; there is no record to be fenced from.",
+  },
+
+  // ── showing us what they mean, and saying yes ──────────────────────────────
+  "POST /api/content/help/attachments": {
+    fence: "callerScope",
+    why: "a client attaches the screenshot of the thing that is wrong (CHECKLIST 5.10). The ticket is resolved through `getTicket` under the caller's own scope BEFORE a byte is stored — bytes in a bucket cannot be un-put — and a miss answers 404 rather than 403, so 'not yours' never confirms the ticket exists. The file lands under a ULID key in the shared media bucket, which is a capability URL: unguessable, and the fence is what decides who is ever told it.",
+  },
+  "POST /api/content/help/attachments/remove": {
+    fence: "callerScope",
+    why: "the same door in reverse, and the same resolution first. Deactivate-never-delete: the row keeps its audit block and the object stays in the bucket, so taking a file off is reversible in the only sense that matters — nothing is destroyed.",
+  },
+  "POST /api/content/help/validate": {
+    fence: "callerScope",
+    why: "THE ONE LIFECYCLE DOOR A CLIENT MAY PUSH (CHECKLIST 5.13, Aurora's ap2), and the deliberate exception to this module's every-other-status-move-refuses-a-portal-caller rule. It is narrow by CONSTRUCTION rather than by a condition somebody could invert: the account fence rides the UPDATE, so it can only reach a ticket their own company raised, and R17's predicate is `status = 'awaiting_validation'`, so the only transition in it is into `new`. It cannot reopen, cannot resolve, and moves zero rows against a request somebody here has already started.",
   },
 
   // ── the client's own world ─────────────────────────────────────────────────
@@ -464,7 +498,6 @@ export const PORTAL_ACTIVITY_FENCE: Record<string, { fence: "account" | null; wh
     fence: null,
     why: "a ticket's history names the staff who moved it and quotes the problem statement — the client is shown the STATUS instead (PORTAL_ACTIVITY_EXEMPT says the same thing about the screen). THE LEAK: help sat outside the deciding list, so another client's support history came back by ticket id. STILL null after the 11 Aug 2026 widening: a contact now sees their whole company's TICKETS, which is a decision about the rows; their HISTORY is a different question, and its answer is the one SCOPE ch.06 gives — the portal never says which staff member is doing the work.",
   },
-  learning: { fence: null, why: "the agency's own how-to library — a client has no screen on it" },
   knowledge_sources: {
     fence: null,
     why: "the knowledge base is the agency's own material — its process notes, its internal tickets, what it knows about each client — and a client login cannot reach a single door on it (every knowledge handler opens with refusePortalCaller). Its HISTORY would name what was filed under whom, which is a worse disclosure than the sources themselves: 'X filed \"the Delaval renewal\" under Delaval' tells a reader at another company that Delaval is a client. Silence, in the same fail-closed direction as everything else here.",
@@ -489,6 +522,7 @@ export const PORTAL_ACTIVITY_FENCE: Record<string, { fence: "account" | null; wh
   process_comments: { fence: null, why: "the conversation itself is fenced and readable; its history would name the staff author of every line, which the ticket thread already withholds" },
   account_rates: { fence: null, why: "who set a client's price, and what it was before — the agency's own commercial record, even about their own rate" },
   internal_rates: { fence: null, why: "what our own hour costs. The one figure SCOPE says a client must never see under any flag, ever — its history least of all (R24)" },
+  internal_role_rates: { fence: null, why: "what an hour of a ROLE is worth — the second internal rate card, and the number an app's money figure is computed from. The same ruling as the line above it, for the same reason: a client may not see what we think an hour of anybody's time costs, and a history line saying we re-priced it is the same disclosure spread over time (R24)" },
 
   // THE WORK ENGINE. Not "a client may not see enough of this" — a client may
   // not see ANY of it, and the rows themselves are already refused at every door
@@ -505,16 +539,14 @@ export const PORTAL_ACTIVITY_FENCE: Record<string, { fence: "account" | null; wh
   },
   work_logs: { fence: null, why: "how long one of our people took over a piece of work, and who corrected the figure afterwards. It is the input to the agency's own margin, and the hours behind a price are never the client's to read — they see the VALUE the work produced (the savings drilled through their process map) and not what it cost us to produce it" },
   sprints: { fence: null, why: "a sprint's history names who priced it and what the price was before. The client is shown the sprint as a NAMED BLOCK WITH DATES because it is what they bought (BUILD-1 §7); the record of us changing our minds about it is ours" },
-  // THE AGENCY'S OWN HOUSEKEEPING — six tables, one answer, and it is the
-  // EASIEST six entries in this table rather than the hardest. Everywhere else
-  // here the question is genuinely difficult ("the rows are theirs but the
-  // history names us"). Not here: the ROWS are not theirs either. A client login
-  // cannot reach a single door on any of these four modules (every handler opens
-  // with refusePortalCaller), so `null` is not a withholding — it is the same
+  // THE AGENCY'S OWN HOUSEKEEPING — four tables, one answer, and they are the
+  // EASIEST entries in this table rather than the hardest. Everywhere else here
+  // the question is genuinely difficult ("the rows are theirs but the history
+  // names us"). Not here: the ROWS are not theirs either. A client login cannot
+  // reach a single door on any of these three modules (every handler opens with
+  // refusePortalCaller), so `null` is not a withholding — it is the same
   // sentence the door already said, repeated where the feed can hear it.
-  marketing_posts: { fence: null, why: "what the agency publishes about ITSELF, and the record of editing it — the client is not the audience for the post, let alone for its drafts" },
   brand_assets: { fence: null, why: "the agency's own brand material and who changed it — a client sees the work, never our library" },
-  programs: { fence: null, why: "how the agency runs an engagement, and every revision of it — our method, which is ours whoever it is applied to" },
   meeting_purposes: { fence: null, why: "why the agency meets and which department owns it — a description of our own organisation" },
   staff_profiles: { fence: null, why: "what a colleague is like and what they are bad at. The sharpest case of agency-only material in the app, and its HISTORY names both the subject and the person who wrote it down" },
   staff_certificates: { fence: null, why: "what our people are qualified in, and when a qualification was corrected — the agency's own credential register" },
@@ -566,14 +598,21 @@ export const PORTAL_ACTIVITY_EXEMPT: Record<string, string> = {
  * table a worker writes that is neither here nor exempt turns the build red —
  * a table the feed cannot NAME is a table it cannot withhold. */
 export const ACTIVITY_GATE_MAP: Record<string, string> = {
+  // What an hour of a ROLE costs (8.13). The same module as the two rate cards
+  // it sits beside: `commercials` is the right that decides whether a person may
+  // see money at all, and a role's price is money about us.
+  internal_role_rates: "commercials",
   help: "help",
-  learning: "learning",
   selectable_data: "selectable_data",
   member_roles: "member_roles",
   users: "team_members",
   invite_logs: "team_members",
   accounts: "accounts",
-  account_links: "accounts",
+  // WHO IS LINKED TO WHOM is the contacts module's own history, not the
+  // account's. A role that may see a client but not its address book must not
+  // read "Ana linked Marta to Bergman" out of the feed either — the sentence
+  // names the person the right exists to withhold.
+  account_links: "contacts",
   portal_users: "portal_users",
   knowledge_sources: "knowledge",
   // The map and the money. Five tables gate on `processes` because they are one
@@ -607,14 +646,10 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
   // notes are the thing being permissioned, and why `delivery` (the taxonomy of
   // why we meet) is not the same question.
   meetings: "meetings",
-  // THE AGENCY'S OWN HOUSEKEEPING. Six tables, four modules — grouped the way a
-  // reader meets them: two tables gate on `delivery` because a programme and a
-  // meeting purpose are one taxonomy, and two on `staff_profiles` because a
-  // person's profile and their certificates are one record from the member
-  // page's point of view.
-  marketing_posts: "marketing",
+  // THE AGENCY'S OWN HOUSEKEEPING. Four tables, three modules — grouped the way
+  // a reader meets them: two gate on `staff_profiles` because a person's profile
+  // and their certificates are one record from the member page's point of view.
   brand_assets: "brand_assets",
-  programs: "delivery",
   meeting_purposes: "delivery",
   staff_profiles: "staff_profiles",
   staff_certificates: "staff_profiles",
@@ -768,9 +803,13 @@ export const MUTATING_WORKERS = ["tenancy", "content", "data-ops"] as const
  * Overview + Activity tabs themselves (the engine-recipe details get them for free). */
 export const RECORD_DETAIL_COMPONENTS = [
   "help-detail",
-  "learning-detail",
   "role-detail",
   "account-detail",
+  // A CONTACT'S OWN SCREEN. One table underneath (a company and a person are one
+  // row shape), two screens on top: a person has no sprints, no rate card and no
+  // contacts of their own, and drawing them with a company's tabs is what the
+  // split was asked for.
+  "contact-detail",
   "knowledge-detail",
   // A meeting's detail is a component rather than a recipe because two of its
   // three tabs are PROSE somebody wrote (the agenda, and the notes afterwards)
@@ -787,6 +826,15 @@ export const RECORD_DETAIL_COMPONENTS = [
   // tabs, but no law was walking it, so nothing would have caught the Steps badge
   // counting today's steps over an older version's list.
   "process-detail",
+  // An APP's detail is a component because five of its seven tabs are the work
+  // hanging off the system — sprints, stories, maps, meetings, tickets — each a
+  // collection with its own actions that no engine block draws, and because the
+  // record is the first in this codebase with RECORD-LEVEL visibility: only the
+  // staff on it and an admin open it at all (CHECKLIST 8.11).
+  //
+  // Listed here on 17 Aug 2026, when it grew the people, the tickets tab and the
+  // knowledge tab. It had a detail screen for a day without a law walking it.
+  "app-detail",
 ] as const
 
 /** R2 — reviewed bypasses. Each MUST get tabs over time; the reason is mandatory.
@@ -823,20 +871,20 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
   "role-detail.permissions":
     "the permission matrix is a fixed grid of the app's modules × four rights — app furniture that ships with the code, not a team collection that grows.",
   "role-detail.overview": "one role's description, member count and audit block — one record, not a collection.",
-  "learning-detail.article": "the article's own prose + linked media — one record's body, not a collection.",
-  "learning-detail.overview": "one article's category, type and audit block — one record, not a collection.",
   "help-detail.overview": "one ticket's type, source and audit block — one record, not a collection.",
   "account-detail.overview":
-    "one account's own fields (type, reference, contact details, where it sits) — one record, not a collection. Its four collection tabs — contacts, children, portal access, activity — each carry a server count.",
+    "one company's own fields — its reference, its industry, its postal address, its language, where it sits, the paragraph about it, and the hours its apps have given back. One record, not a collection. Every collection tab beside it — contacts, children, apps, sprints, to-dos, rates, activity — carries a server count.",
+  "account-detail.knowledge":
+    "the knowledge base asked IN CONTEXT (12.1): a question box that already knows which client it is about, and the passages that answer it. Retrieval, not a collection — there is no set of rows to count.",
+  "contact-detail.overview":
+    "one person's own fields (their company, how to reach them, where they are, their language, their reference) — one record, not a collection. Its five collection tabs — companies, to-dos, tickets, meetings, portal login, activity — each carry a server count.",
   "knowledge-detail.source":
     "the source's own text — the exact words the assistant reads out of it, plus where they came from. One record's body, not a collection. (How many searchable pieces that text became is a FIELD on the Overview, not a tab: the pieces are derived from the text on this same panel, so a tab over them would be the same thing twice.)",
   // The agency's own housekeeping. Four engine-recipe details, each leading with
   // a `description` block of the record's own fields — so there is no collection
   // on the Overview tab to count, and its sibling Activity tab carries the exact
   // server total like every other record in the app.
-  "marketing.detail.overview": "one post's channel, status, link and audit block — one record, not a collection.",
   "brand.detail.overview": "one asset's category, description, file and audit block — one record, not a collection.",
-  "delivery.detail.overview": "one programme's description, order and audit block — one record, not a collection.",
   "purposes.detail.overview": "one meeting purpose's department, description and audit block — one record, not a collection.",
   // The work engine's one recipe detail. Its three siblings (an app, a sprint, a
   // story) are components because each carries a collection tab or a status
@@ -850,6 +898,12 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
     "the agenda we set and the notes we took — the two pieces of prose this module exists to keep. One record's body, not a collection.",
   "knowledge-detail.overview":
     "one source's kind, compartment, who may read it, how many pieces it was cut into and when it was last indexed — one record, not a collection.",
+  "app-detail.overview":
+    "one system's own fields — whose it is, its stage, the four paragraphs of context, who is on it from both sides, and its address. One record, not a collection. Its five collection tabs (sprints, stories, process maps, meetings, tickets) and its activity tab each carry a server count.",
+  "app-detail.value":
+    "the hours this app gives back every month and what they are worth at the rate of the role that used to spend them (8.13). An arithmetic over the app's process maps, drilled process by process — the lines are the sum's own working, not a collection of records, and a badge over them would be counting the number of terms in an addition.",
+  "app-detail.knowledge":
+    "the knowledge base asked IN CONTEXT (8.9): a question box that already knows which system it is about, and the passages that answer it. Retrieval, not a collection — there is no set of rows to count, and a badge over it would be counting the whole base.",
   "process-detail.overview":
     "the map's own description — including the caveat saying whether its times have been agreed yet — plus its app, its current version, its baseline and its audit block. One record, not a collection. Its four siblings each carry a server count, and the Steps badge counts the VERSION being shown rather than always the current one.",
 }
@@ -857,7 +911,6 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
 /** R4 — the form dialogs that MUST use FormShell. */
 export const FORM_DIALOGS = [
   "help-form-dialog",
-  "learning-form-dialog",
   "role-form-dialog",
   "invite-dialog",
   "team-edit-dialog",
@@ -928,4 +981,12 @@ export const FORM_DIALOGS = [
   // does: the agenda is typed while somebody is still on the phone agreeing it,
   // and a mis-tap that loses it loses a conversation rather than a field.
   "meeting-form-dialog",
+  // The agency's own details, on the Kwapso page. A separate dialog from
+  // team-edit and the difference is the audience rather than the fields: one is
+  // what the app calls itself in the rail, the other is what the company is
+  // called on an invoice. Its draft earns its keep the way the staff profile's
+  // does — a registered address and a pair of tax numbers are copied out of
+  // somewhere else, and losing them to a mis-tap means going and finding them
+  // again.
+  "legal-details-dialog",
 ] as const

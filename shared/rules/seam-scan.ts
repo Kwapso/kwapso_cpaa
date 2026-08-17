@@ -178,13 +178,13 @@ export function gatingSeam(worker: Worker & { identityGated?: Record<string, str
         if (identityGated[route]) {
           expect(
             WHOAMI_RE.test(code),
-            `${route} is a reviewed identity-gated write (${identityGated[route]}) — it must still verify WHO the caller is via whoAmI`
+            `${route} is a reviewed identity-gated write (${identityGated[route]}), it must still verify WHO the caller is via whoAmI`
           ).toBe(true)
           continue
         }
         expect(
           GATE_RE.test(code),
-          `${route} (${handler}) changes state with no permission gate — open it with requireRight / gated / gatedBody / requireAnyImportRight / adminGuard, or add it to identityGated with a reason`
+          `${route} (${handler}) changes state with no permission gate. Open it with requireRight / gated / gatedBody / requireAnyImportRight / adminGuard, or add it to identityGated with a reason`
         ).toBe(true)
       }
     })
@@ -196,7 +196,7 @@ export function gatingSeam(worker: Worker & { identityGated?: Record<string, str
 
     it("every identity-gated exception states a real reason", () => {
       for (const [route, why] of Object.entries(identityGated))
-        expect(why.length, `${route} is an exception to R10 — that needs a real reason`).toBeGreaterThan(20)
+        expect(why.length, `${route} is an exception to R10, that needs a real reason`).toBeGreaterThan(20)
     })
   })
 }

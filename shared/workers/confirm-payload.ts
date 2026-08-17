@@ -46,8 +46,21 @@ const MAX_VALUE = 160
  * (Two lanes found this independently and fixed it two ways. The other derived
  * the cap from the module catalogue, which also never rots; it is gone because
  * once a grid is exempt outright the cap governs only payloads that are NOT
- * sheets, and for those a plain 16 says what it means.) */
-const MAX_LINES = 16
+ * sheets, and for those a plain 16 says what it means.)
+ *
+ * AND THEN IT ROTTED ANYWAY, from the other direction, exactly as that comment
+ * predicted for the number it had just replaced. Nothing to do with modules this
+ * time: an ACCOUNT grew. A company record gained a split postal address, an
+ * industry, a paragraph, a logo and a cover, which took `create_account`'s body
+ * past sixteen named fields — and the seventeenth to fall off the panel was the
+ * language the client is written to. The admin was still asked to approve it.
+ *
+ * So the number says what it is now: a ceiling on lines a payload can produce
+ * VARIABLY (a nested object, an array of ids), sized so that no tool's own
+ * declared fields can reach it. A schema is written by hand, one field at a
+ * time, by somebody who meant each one; there is no honest reason to hide one
+ * from the person being asked to say yes. */
+const MAX_LINES = 32
 /** Ids listed from a bulk array before the count carries the rest. */
 const MAX_ITEMS = 3
 
@@ -126,7 +139,7 @@ function renderValue(key: string, value: unknown, names?: Record<string, string>
       .slice(0, MAX_ITEMS)
       .map((v) => (typeof v === "string" ? (names?.[v] ?? v) : String(v)))
       .join(", ")
-    return clip(value.length > MAX_ITEMS ? `${value.length} in total — ${shown}, …` : shown)
+    return clip(value.length > MAX_ITEMS ? `${value.length} in total, ${shown}, …` : shown)
   }
   return null
 }
@@ -161,7 +174,7 @@ function renderGrid(grid: Record<string, unknown>): string[] {
  *
  * Keyed by the TOOL, never inferred from the payload. The payload is written by
  * the model, so any shape test on it is a test the model can fail on purpose: an
- * earlier version asked "do all the keys hold objects?", and `{ learning: {…},
+ * earlier version asked "do all the keys hold objects?", and `{ knowledge: {…},
  * note: "" }` answered no — which sent the whole sheet down the generic path and
  * silently dropped the nine modules being set to no access, while the door wrote
  * them anyway. The tool declares what a field means; the data does not get a
@@ -172,7 +185,7 @@ const PERMISSION_GRID_FIELDS = new Set([
   // `setRolePermissions` through the same door, writing every module, so the
   // panel owes the reader the same module-by-module sheet. (R21 put this field
   // on the tool; the panel had to learn it in the same breath, or an admin would
-  // have approved "Permissions — Learning — Read: Yes" and never been shown the
+  // have approved "Permissions — Knowledge base — Read: Yes" and never been shown the
   // nine modules the same call sets to no access.)
   "create_role.permissions",
 ])
@@ -201,7 +214,7 @@ export function describePayload(
       else if (isPermissionGrid(tool, key)) {
         hasGrid = true
         lines.push(...renderGrid(value))
-      } else lines.push(...describePayload(tool, value, names).map((l) => `${fieldLabel(tool, key)} — ${l}`))
+      } else lines.push(...describePayload(tool, value, names).map((l) => `${fieldLabel(tool, key)}, ${l}`))
       continue
     }
     const shown = renderValue(key, value, names)

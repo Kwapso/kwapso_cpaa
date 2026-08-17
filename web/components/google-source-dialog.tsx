@@ -48,6 +48,7 @@ import type { GoogleShelf } from "@shared/types"
 import { ApiFailure, content } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 export type GoogleSourceValues = {
   externalId: string
@@ -73,7 +74,7 @@ const SHELVES: { value: GoogleShelf; title: string; detail: string }[] = [
   {
     value: "private",
     title: "Just me",
-    detail: "Only you — and the assistant when it is answering you.",
+    detail: "Only you, and the assistant when it is answering you.",
   },
   {
     value: "team",
@@ -99,6 +100,7 @@ export function GoogleSourceDialog({
   accountOptions: { id: string; name: string }[]
   onSubmit: (values: GoogleSourceValues) => Promise<void>
 }) {
+  const t = useT()
   const [values, setValues, clearDraft] = useFormDraft<GoogleSourceValues & { search: string }>(
     draftKey,
     { externalId: "", name: "", shelf: "private", accountId: AGENCY, search: "" },
@@ -151,18 +153,17 @@ export function GoogleSourceDialog({
       busy={busy}
       clearDraft={clearDraft}
       onSubmit={submit}
-      title={<DialogTitle>Share a {noun}</DialogTitle>}
+      title={<DialogTitle>{t("Share a")} {noun}</DialogTitle>}
       subtitle={
         <DialogDescription>
-          Nothing outside the {noun}s you share here is ever read.
+          {t("Nothing outside the")} {noun}{t("s you share here is ever read.")}
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !ready} className="gap-1.5">
-          {busy ? <Spinner /> : <Plus className="size-4" />}
-          {busy ? "Sharing…" : "Share it"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !ready,
+        icon: <Plus className="size-4" />,
+      }}
     >
       <Field config={searchField} htmlFor="google-source-search" className={fieldSpacing}>
         {/* Stacked on narrow screens: an input and a button side by side is how a
@@ -186,7 +187,7 @@ export function GoogleSourceDialog({
       {options !== null && (
         <div className="flex max-h-56 flex-col overflow-y-auto rounded-xl border">
           {options.length === 0 ? (
-            <p className="text-muted-foreground p-3 text-sm">Nothing found in your Google account.</p>
+            <p className="text-muted-foreground p-3 text-sm">{t("Nothing found in your Google account.")}</p>
           ) : (
             options.map((o) => (
               <button
@@ -244,10 +245,10 @@ export function GoogleSourceDialog({
           disabled={busy}
         >
           <SelectTrigger id="google-source-client">
-            <SelectValue placeholder="Ours — not a client's" />
+            <SelectValue placeholder={t("Ours, not a client's")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={AGENCY}>Ours — not a client's</SelectItem>
+            <SelectItem value={AGENCY}>{t("Ours, not a client's")}</SelectItem>
             {accountOptions.map((a) => (
               <SelectItem key={a.id} value={a.id}>
                 {a.name}
@@ -256,8 +257,7 @@ export function GoogleSourceDialog({
           </SelectContent>
         </Select>
         <p className="text-muted-foreground mt-1.5 text-xs">
-          Questions about that client are answered from what is in here. Leave it as ours if the {noun} is
-          not about one.
+          {t("Questions about that client are answered from what is in here. Leave it as ours if the")} {noun} {t("is not about one.")}
         </p>
       </Field>
     </FormShellDialog>

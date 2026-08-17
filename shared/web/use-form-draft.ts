@@ -7,7 +7,7 @@
 //
 // We persist each form's values to sessionStorage (survives navigation AND reload
 // within the tab session; gone when the tab closes), keyed by a stable draft id the
-// caller supplies (e.g. "learning:new:<teamId>" or "learning:edit:<recordId>").
+// caller supplies (e.g. "brand:new:<teamId>" or "brand:edit:<recordId>").
 //
 // Lifetime: a draft is CLEARED on submit (the record now exists) and on an explicit
 // dismiss (Esc / backdrop / the close button) — dismissing a form discards it. It is

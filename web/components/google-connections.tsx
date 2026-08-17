@@ -46,15 +46,16 @@ import { googleKey } from "@/lib/live-resources"
 import { usePermissions } from "@/lib/perms"
 import { primeCache, useCached } from "@shared/web/store"
 import { GoogleSourceDialog } from "@/components/google-source-dialog"
+import { useT } from "@shared/web/language"
 
 /** The word a person reads for each service, and the sentence saying what
  * connecting it actually lets kwapso see. The second half matters more than the
  * first: "Gmail" tells somebody nothing about what they are agreeing to. */
 const SERVICE_COPY: Record<GoogleService, { label: string; scope: string }> = {
-  drive: { label: "Drive", scope: "Only the folders you share below — nothing else in your Drive." },
+  drive: { label: "Drive", scope: "Only the folders you share below, nothing else in your Drive." },
   gmail: { label: "Gmail", scope: "Only mail to or from someone on one of your accounts." },
   calendar: { label: "Calendar", scope: "Your own calendar, so meetings and sprints can be read and added." },
-  chat: { label: "Google Chat", scope: "Only the spaces you share below — nothing else in Chat." },
+  chat: { label: "Google Chat", scope: "Only the spaces you share below, nothing else in Chat." },
 }
 
 /** Which services are shared through NAMED folders or spaces. */
@@ -68,6 +69,7 @@ const NAMED: GoogleService[] = ["drive", "chat"]
 const MAX_SYNC_PASSES = 12
 
 export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) {
+  const t = useT()
   const key = googleKey(teamId ?? "none")
   const q = useCached<{ connections: GoogleConnection[]; sources: GoogleSource[]; ready: boolean }>(
     key,
@@ -98,17 +100,17 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
     // handshake and show a confusing second failure.
     window.history.replaceState({}, "", window.location.pathname)
     if (outcome !== "connected") {
-      toast.error("That Google connection didn't finish. Try again.")
+      toast.error(t("That Google connection didn't finish. Try again."))
       return
     }
     void content
       .googleConnect()
       .then((r) => {
         primeCache(key, { ...r, ready: true })
-        toast.success("Connected.")
+        toast.success(t("Connected."))
       })
       .catch((err) => toast.error(err instanceof ApiFailure ? err.message : "Couldn't finish that connection."))
-  }, [key])
+  }, [key, t])
 
   const connections = q.data?.connections.filter((c) => c.active) ?? []
   const sources = q.data?.sources.filter((s) => s.active) ?? []
@@ -173,7 +175,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
       toast.success(
         r.revokedAtGoogle
           ? "Disconnected."
-          : "Disconnected here — remove kwapso in your Google account too."
+          : "Disconnected here. Remove kwapso in your Google account too."
       )
       setDisconnecting(null)
     } catch (err) {
@@ -185,19 +187,18 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
 
   return (
     <section className="animate-rise flex flex-col gap-3">
-      <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Google</h2>
+      <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Google")}</h2>
       <p className="text-muted-foreground text-sm">
-        Connect your own Google account, one service at a time. kwapso never uses anyone else&apos;s —
-        the assistant working for you sees exactly what you can see, and nothing more.
+        {t("Connect your own Google account, one service at a time. kwapso never uses anyone else's, the assistant working for you sees exactly what you can see, and nothing more.")}
       </p>
 
       {q.error ? (
-        <p className="text-destructive text-sm">Couldn&apos;t load your Google connections.</p>
+        <p className="text-destructive text-sm">{t("Couldn't load your Google connections.")}</p>
       ) : q.data === undefined ? (
         <Skeleton variant="list" lines={4} />
       ) : !q.data.ready ? (
         <p className="text-muted-foreground text-sm">
-          Google connections aren&apos;t set up on this environment yet.
+          {t("Google connections aren't set up on this environment yet.")}
         </p>
       ) : (
         <div className="flex flex-col rounded-xl border">
@@ -214,7 +215,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                     </Badge>
                   ) : (
                     <Badge variant="outline" className="text-muted-foreground text-[10px]">
-                      Not connected
+                      {t("Not connected")}
                     </Badge>
                   )}
                   <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs">
@@ -234,7 +235,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                         title={service === "drive" ? "Share a folder" : "Share a space"}
                       >
                         <Plus className="size-3.5" aria-hidden />
-                        <span className="hidden sm:inline">Share a {service === "drive" ? "folder" : "space"}</span>
+                        <span className="hidden sm:inline">{t("Share a")} {service === "drive" ? "folder" : "space"}</span>
                       </Button>
                     )}
                     {live ? (
@@ -243,10 +244,10 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                         size="sm"
                         onClick={() => setDisconnecting(service)}
                         className="text-destructive gap-1.5"
-                        title="Disconnect"
+                        title={t("Disconnect")}
                       >
                         <Power className="size-3.5" aria-hidden />
-                        <span className="hidden sm:inline">Disconnect</span>
+                        <span className="hidden sm:inline">{t("Disconnect")}</span>
                       </Button>
                     ) : (
                       /* A plain navigation, not a fetch: this door answers with a
@@ -260,7 +261,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                         }}
                         className="gap-1.5"
                       >
-                        <Plus className="size-3.5" aria-hidden /> Connect
+                        <Plus className="size-3.5" aria-hidden /> {t("Connect")}
                       </Button>
                     )}
                   </div>
@@ -271,7 +272,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                  * that turns it into something a person can act on. */}
                 {live?.lastError && (
                   <p className="text-destructive text-xs">
-                    Google refused the last request. Disconnect and connect again.
+                    {t("Google refused the last request. Disconnect and connect again.")}
                   </p>
                 )}
 
@@ -279,7 +280,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                   <div className="flex flex-col gap-1 pl-1">
                     {named.length === 0 ? (
                       <p className="text-muted-foreground text-xs">
-                        Nothing shared yet — {SERVICE_COPY[service].scope}
+                        {t("Nothing shared yet —")} {SERVICE_COPY[service].scope}
                       </p>
                     ) : (
                       named.map((s) => (
@@ -318,7 +319,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                               try {
                                 const r = await content.googleSetSourceActive(s.id, false)
                                 primeCache(key, { ...(q.data as object), sources: r.sources } as typeof q.data)
-                                toast.success("Stopped sharing that.")
+                                toast.success(t("Stopped sharing that."))
                               } catch (err) {
                                 toast.error(
                                   err instanceof ApiFailure ? err.message : "Couldn't stop sharing that."
@@ -328,7 +329,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                               }
                             }}
                           >
-                            <Ban className="size-3" aria-hidden /> Stop sharing
+                            <Ban className="size-3" aria-hidden /> {t("Stop sharing")}
                           </Button>
                         </div>
                       ))
@@ -356,7 +357,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
       {q.data?.ready && connections.length > 0 && can("knowledge", "create") && can("google", "read") && (
         <div className="flex flex-col gap-1.5 rounded-xl border p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-sm font-medium">Let the assistant read what you have shared</span>
+            <span className="text-sm font-medium">{t("Let the assistant read what you have shared")}</span>
             <Button
               variant="outline"
               size="sm"
@@ -369,8 +370,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
             </Button>
           </div>
           <p className="text-muted-foreground text-xs">
-            Reads through YOUR connection only, so it has to be you who asks. Anything you shared with just
-            yourself stays answerable to you alone.
+            {t("Reads through YOUR connection only, so it has to be you who asks. Anything you shared with just yourself stays answerable to you alone.")}
           </p>
         </div>
       )}
@@ -386,7 +386,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
             await content.googleAddSource({ service: sharing, ...values })
             await refresh()
             toast.success(
-              values.shelf === "team" ? "Shared — the team can read it." : "Shared — only you can read it."
+              values.shelf === "team" ? "Shared, the team can read it." : "Shared, only you can read it."
             )
           }}
         />
@@ -396,15 +396,14 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Disconnect {disconnecting ? SERVICE_COPY[disconnecting].label : ""}?
+              {t("Disconnect")} {disconnecting ? SERVICE_COPY[disconnecting].label : ""}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              kwapso stops reading and writing there straight away, and anything you shared through it
-              stops being shared. We&apos;ll ask Google to drop the connection too.
+              {t("kwapso stops reading and writing there straight away, and anything you shared through it stops being shared. We'll ask Google to drop the connection too.")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>Keep it</AlertDialogCancel>
+            <AlertDialogCancel disabled={busy}>{t("Keep it")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
                 e.preventDefault()
@@ -413,7 +412,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
               disabled={busy}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-1.5"
             >
-              <Power className="size-3.5" aria-hidden /> Disconnect
+              <Power className="size-3.5" aria-hidden /> {t("Disconnect")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

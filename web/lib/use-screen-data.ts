@@ -9,7 +9,7 @@
 // the prefixes in pages.ts (LAW R8) and app-shell's realtime registry — don't
 // rename one without the others. Roles / invites / dropdown values load across the
 // whole team area (they back list + breadcrumb + a tab-count badge); members /
-// learning / tickets / team-meta load only on their own module.
+// tickets / accounts / team-meta load only on their own module.
 
 import { tenancy } from "@/lib/api"
 import type { HelpScope, TaskView } from "@/lib/live-resources"
@@ -22,8 +22,6 @@ import {
   knowledgeKey,
   listFetch,
   meetingsKey,
-  marketingKey,
-  programmesKey,
   purposesKey,
   sprintsKey,
   storiesKey,
@@ -53,7 +51,6 @@ export type ScreenDataInput = {
  * one place that translation is written down, so the record feed, the live
  * registry's `deps` and the activity gate map all name the same string. */
 const INTERNAL_ACTIVITY_TABLE: Record<string, string> = {
-  marketing: "marketing_posts",
   brand: "brand_assets",
   delivery: "programs",
   purposes: "meeting_purposes",
@@ -93,11 +90,6 @@ export function useScreenData({
   )
   const metaQ = useCached(enabled && module === "team" ? `team-meta:${teamId}` : null, () =>
     tenancy.teamMeta()
-  )
-  // Learning backs its list, the breadcrumb label and the article detail; load it
-  // for the whole learning area (cache-first + row-level live, decision below).
-  const learningQ = useCached(enabled && module === "learning" ? `learning:${teamId}` : null, () =>
-    listFetch.learning(teamId as string)
   )
   // Tickets backs its list, the breadcrumb label and the ticket thread. R14: the
   // list is a PAGE, so My/All is a SERVER scope with its own cache — filtering a
@@ -146,16 +138,20 @@ export function useScreenData({
   const appsQ = useCached(enabled && module === "apps" ? appsKey(teamId as string) : null, () =>
     listFetch.apps(teamId as string)
   )
-  // OUR OWN ADMIN, in two SERVER views. Open is the everyday one and the only
-  // one the app could show for months — the door has parsed `?view=all` since it
-  // shipped and nothing ever sent it.
+  // OUR OWN ADMIN, in SIX SERVER views — overdue, the everyday list, the
+  // calendar, the completed, the upcoming, and everything. Two of them shipped
+  // with the door and the screen sent neither, so the app could show one pile of
+  // a six-pile collection.
   //
-  // The ALL list is also what the RECORD screen reads, and that is not an
+  // WHICHEVER TAB IS OPEN is fetched by the SCREEN, on its own view's key, and
+  // every other view's count comes back with it (R16) — six fetches to badge six
+  // tabs would be six answers to one question. What is read here is the everyday
+  // list the live registry patches row-by-row, plus the whole pile behind it.
+  //
+  // The ALL list is what the RECORD screen reads, and that is not an
   // optimisation: ticking a task off the open list removes it from the open
   // list, so a detail screen sourced from that collection would answer "that
-  // record no longer exists" the moment you used the button on it. It loads when
-  // the strip asks for it, or when a record is open — never both fetches just to
-  // show the open list.
+  // record no longer exists" the moment you used the button on it.
   const tasksOpenQ = useCached(
     enabled && module === "tasks" ? tasksKey(teamId as string, "open") : null,
     () => listFetch.tasks(teamId as string, "open")
@@ -182,28 +178,22 @@ export function useScreenData({
     listFetch.meetings(teamId as string)
   )
   // ── THE AGENCY'S OWN HOUSEKEEPING ────────────────────────────────────────
-  // Four capped collections, each loaded only on its own module (cache-first +
-  // row-level live). The Delivery method screen shows BOTH of its collections at
-  // once, so both load on either of its two segments — a screen that offers a
-  // "meeting purposes" button has to know how many there are before you press it.
-  const marketingQ = useCached(enabled && module === "marketing" ? marketingKey(teamId as string) : null, () =>
-    listFetch.marketing(teamId as string)
-  )
+  // Two capped collections, each loaded only on its own module (cache-first +
+  // row-level live). Meeting purposes also load on the Meetings section, because
+  // the screen that offers the "meeting purposes" button has to know how many
+  // there are before you press it.
   const brandQ = useCached(enabled && module === "brand" ? brandAssetsKey(teamId as string) : null, () =>
     listFetch.brandAssets(teamId as string)
   )
-  const onDelivery = module === "delivery" || module === "purposes"
-  const programmesQ = useCached(enabled && onDelivery ? programmesKey(teamId as string) : null, () =>
-    listFetch.programmes(teamId as string)
-  )
-  const purposesQ = useCached(enabled && onDelivery ? purposesKey(teamId as string) : null, () =>
+  const onPurposes = module === "purposes" || module === "meetings"
+  const purposesQ = useCached(enabled && onPurposes ? purposesKey(teamId as string) : null, () =>
     listFetch.purposes(teamId as string)
   )
   // Staff profiles + certificates are NOT read here. They are read by the panel
   // on the member's own page (staff-panel.tsx), cache-first on the same keys the
   // live registry patches — the same shape every bespoke record screen uses, and
   // the right one for a collection that only ever appears on one screen.
-  // The team's dropdown values — feed the ticket/learning forms' Type/Category pickers
+  // The team's dropdown values — feed the ticket and sprint forms' Type pickers
   // AND the Dropdown-values tab's count badge, so load them across the team area
   // (cache-first + live, like roles/invites, so the count stays honest).
   const formSelectableQ = useCached(
@@ -216,11 +206,17 @@ export function useScreenData({
     member_roles: useCachedValue<number>(enabled ? totalKey("member_roles", teamId as string) : null),
     invites: useCachedValue<number>(enabled ? totalKey("invites", teamId as string) : null),
     selectable: useCachedValue<number>(enabled ? totalKey("selectable", teamId as string) : null),
-    learning: useCachedValue<number>(enabled ? totalKey("learning", teamId as string) : null),
     help: useCachedValue<number>(enabled ? totalKey("help", teamId as string) : null),
     helpMine: useCachedValue<number>(enabled ? totalKey("help-mine", teamId as string) : null),
     helpArchived: useCachedValue<number>(enabled ? totalKey("help-archived", teamId as string) : null),
     accounts: useCachedValue<number>(enabled ? totalKey("accounts", teamId as string) : null),
+    // The All / Companies / People strip's other two badges — exact, from the
+    // same read as the rows, and both zero-safe: without the contacts right the
+    // people count comes back 0 beside a list with no people in it.
+    accountsEntity: useCachedValue<number>(enabled ? totalKey("accounts-entity", teamId as string) : null),
+    accountsIndividual: useCachedValue<number>(
+      enabled ? totalKey("accounts-individual", teamId as string) : null
+    ),
     knowledge: useCachedValue<number>(enabled ? totalKey("knowledge", teamId as string) : null),
     // R16: the exact server total the process-maps heading badges. Primed by the
     // same fetcher that loads page one, so the number and the rows agree.
@@ -233,8 +229,19 @@ export function useScreenData({
     stories: useCachedValue<number>(enabled ? totalKey("stories", teamId as string) : null),
     sprints: useCachedValue<number>(enabled ? totalKey("sprints", teamId as string) : null),
     apps: useCachedValue<number>(enabled ? totalKey("apps", teamId as string) : null),
+    // OUR OWN ADMIN, six views and one progress pair — every number exact, every
+    // one primed by whichever view's fetch landed, so the badge on a tab nobody
+    // has opened is still the server's answer rather than a guess.
     tasks: useCachedValue<number>(enabled ? totalKey("tasks", teamId as string) : null),
     tasksAll: useCachedValue<number>(enabled ? totalKey("tasks-all", teamId as string) : null),
+    tasksOverdue: useCachedValue<number>(enabled ? totalKey("tasks-overdue", teamId as string) : null),
+    tasksUpcoming: useCachedValue<number>(enabled ? totalKey("tasks-upcoming", teamId as string) : null),
+    tasksCompleted: useCachedValue<number>(enabled ? totalKey("tasks-completed", teamId as string) : null),
+    tasksCalendar: useCachedValue<number>(enabled ? totalKey("tasks-calendar", teamId as string) : null),
+    tasksDueToday: useCachedValue<number>(enabled ? totalKey("tasks-due-today", teamId as string) : null),
+    tasksDueTodayDone: useCachedValue<number>(
+      enabled ? totalKey("tasks-due-today-done", teamId as string) : null
+    ),
     // The exact ROW count of the time list, which is what the sidebar badges and
     // what the Time page's heading says. The HOURS are a different number and
     // live in their own sidecar (`work-seconds`), read by the panel itself.
@@ -242,9 +249,7 @@ export function useScreenData({
     meetings: useCachedValue<number>(enabled ? totalKey("meetings", teamId as string) : null),
     // The agency's own housekeeping — the exact server totals the sidebar badges
     // and the collection headings show, primed by the fetchers above.
-    marketing: useCachedValue<number>(enabled ? totalKey("marketing", teamId as string) : null),
     brand_assets: useCachedValue<number>(enabled ? totalKey("brand_assets", teamId as string) : null),
-    programmes: useCachedValue<number>(enabled ? totalKey("programmes", teamId as string) : null),
     purposes: useCachedValue<number>(enabled ? totalKey("purposes", teamId as string) : null),
     staff_certificates: useCachedValue<number>(enabled ? totalKey("staff_certificates", teamId as string) : null),
     // Our own cost card. Like the staff certificates above, its rows are read by
@@ -260,13 +265,8 @@ export function useScreenData({
   const activeSelectable = selectableValues.filter((v) => v.active)
   // The pickers on the agency-internal forms. Every one is a PICK-OR-CREATE
   // field, so these options are a convenience and never a constraint: typing a
-  // channel nobody has used adds it to the vocabulary rather than being refused.
-  const marketingChannelOptions = activeSelectable
-    .filter((v) => v.type === SELECTABLE_GROUPS.channel)
-    .map((v) => v.value)
-  const marketingStatusOptions = activeSelectable
-    .filter((v) => v.type === SELECTABLE_GROUPS.marketingStatus)
-    .map((v) => v.value)
+  // department nobody has used adds it to the vocabulary rather than being
+  // refused.
   const brandCategoryOptions = activeSelectable
     .filter((v) => v.type === SELECTABLE_GROUPS.brandCategory)
     .map((v) => v.value)
@@ -274,10 +274,6 @@ export function useScreenData({
     .filter((v) => v.type === SELECTABLE_GROUPS.department)
     .map((v) => v.value)
   const helpTypeOptions = activeSelectable.filter((v) => v.type === "Ticket type").map((v) => v.value)
-  const learningCategoryOptions = activeSelectable
-    .filter((v) => v.type === "Learning category")
-    .map((v) => v.value)
-  const contentTypeOptions = activeSelectable.filter((v) => v.type === "File type").map((v) => v.value)
 
   // Activity is one read path over three scopes (team / a member / an invite) — the
   // scope is derived from what's in view, and its cache key mirrors the scope so a
@@ -343,7 +339,6 @@ export function useScreenData({
     rolesQ,
     invitesQ,
     metaQ,
-    learningQ,
     helpQ,
     helpMineQ,
     helpArchivedQ,
@@ -351,14 +346,8 @@ export function useScreenData({
     formSelectableQ,
     selectableValues,
     helpTypeOptions,
-    learningCategoryOptions,
-    contentTypeOptions,
-    marketingQ,
     brandQ,
-    programmesQ,
     purposesQ,
-    marketingChannelOptions,
-    marketingStatusOptions,
     brandCategoryOptions,
     departmentOptions,
     activityScope,

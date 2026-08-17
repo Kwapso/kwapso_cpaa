@@ -42,7 +42,9 @@ import {
   verifyGoogleIdToken,
 } from "./lib/google"
 import { listAccountActivity } from "./lib/account-activity"
-import { updateProfile, type ProfileInput } from "./lib/profile"
+import { setLanguage, setScale, updateProfile, type ProfileInput } from "./lib/profile"
+import { isLanguage } from "@shared/i18n"
+import { isScale } from "@shared/scale"
 import {
   findOrCreateUserByEmail,
   toSessionUser,
@@ -83,6 +85,10 @@ export default {
           return await activity(request, env)
         case "POST /api/auth/profile":
           return await profile(request, env)
+        case "POST /api/auth/language":
+          return await language(request, env)
+        case "POST /api/auth/scale":
+          return await scale(request, env)
         case "POST /api/auth/logout":
           return await logout(request, env)
         case "GET /api/auth/health":
@@ -480,6 +486,59 @@ async function profile(request: Request, env: Env): Promise<Response> {
   const result = await updateProfile(env, user, input)
   if ("error" in result) return fail(400, result.error, result.message)
   return json(result)
+}
+
+/** The language this person reads kwapso in. Reached from BOTH front doors —
+ * this route is on the portal gateway's allow-list, because a client choosing
+ * German in their own portal is the whole point of the feature.
+ *
+ * R20, positionally: `body.language` sits as `isLanguage`'s only argument, and
+ * `isLanguage` is a real type check against the LANGUAGES list rather than a
+ * truthiness guard. An unknown code is a clean 400 here, never a value that
+ * reaches the database and turns somebody's screen into fallback English
+ * forever. The body is read field by field and never destructured. */
+async function language(request: Request, env: Env): Promise<Response> {
+  const user = await getSessionUser(env, request)
+  if (!user) return fail(401, "signed_out", "Not signed in.")
+
+  // TWO CHECKS, AND THE FIRST ONE IS NOT REDUNDANT. `requireText` is auth's own
+  // boundary rule (test/boundary.test.ts), which is stricter than R20's and
+  // admits only the three shared validators — because a cast walked past its
+  // first version, and the fix for that must not be loosened by the next door
+  // that finds it inconvenient. So the field passes through the seam every other
+  // auth door uses, which also buys the NUL strip and the clean 400 mapping.
+  // `isLanguage` then decides the only question that matters: is this string one
+  // of the four we actually speak. An unrecognised code stops here rather than
+  // living on a user row for ever, matching no catalogue entry, leaving somebody
+  // reading fallback English with no way to explain why.
+  const body = (await request.json().catch(() => ({}))) as { language?: unknown }
+  const chosen = requireText(body.language, "Language", 8)
+  if (!isLanguage(chosen))
+    return fail(400, "bad_language", "That is not a language kwapso speaks.")
+
+  return json(await setLanguage(env, user, chosen))
+}
+
+/** HOW BIG THIS PERSON WANTS THE APP. The same door as `language`, one field
+ * along, and deliberately its twin rather than a second preferences endpoint
+ * with a shape of its own: both are one word about one reader, both are read off
+ * `SessionUser` by both front doors, and both must survive a device change.
+ *
+ * R20, positionally: `body.scale` sits as `requireText`'s first argument and
+ * then as `isScale`'s only argument, and `isScale` is a real check against
+ * SCALE_STEPS rather than a truthiness guard. An unknown step is a clean 400
+ * here, never a value that lands on a user row and leaves somebody reading the
+ * fallback size for ever with no way to explain why. The body is read field by
+ * field and never destructured. */
+async function scale(request: Request, env: Env): Promise<Response> {
+  const user = await getSessionUser(env, request)
+  if (!user) return fail(401, "signed_out", "Not signed in.")
+
+  const body = (await request.json().catch(() => ({}))) as { scale?: unknown }
+  const chosen = requireText(body.scale, "Size", 16)
+  if (!isScale(chosen)) return fail(400, "bad_scale", "That is not a size kwapso offers.")
+
+  return json(await setScale(env, user, chosen))
 }
 
 async function logout(request: Request, env: Env): Promise<Response> {

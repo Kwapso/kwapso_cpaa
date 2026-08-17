@@ -49,6 +49,11 @@ function env(userId: string) {
     PUBLIC_APP_URL: "https://kwapso.example",
     REALTIME: { fetch: async () => new Response("{}") },
     MEDIA: { put: async () => undefined },
+    // A task's attachment goes in the AGENCY's bucket, not the shared one — the
+    // agency gateway alone serves /media/internal/, so a client hostname has
+    // nowhere to redeem the key (R21). Two buckets here because a test that
+    // mocked one would prove nothing about which one the door reached for.
+    INTERNAL_MEDIA: { put: async () => undefined },
   } as never
 }
 
@@ -199,6 +204,81 @@ describe("the fence rides the WRITE, not only the read in front of it", () => {
   })
 })
 
+describe("who sees everyone else's tasks is a permission (4.9)", () => {
+  /** A second staff member on a role that holds `work` but NOT `all_tasks` —
+   * which is what "off by default for every role except Admin" means in
+   * practice. Everything else about them is ordinary. */
+  const NARROW_USER = "U_NARROW"
+  const NARROW_ROLE = "R_NARROW"
+  beforeEach(() => {
+    db().exec(`
+      INSERT INTO users (id, email, first_name, current_team_id)
+        VALUES ('${NARROW_USER}', 'narrow@kwapso.app', 'Nadia', '${IDS.team}');
+      INSERT INTO team_members (id, team_id, user_id, role_id, created_at)
+        VALUES ('m_narrow', '${IDS.team}', '${NARROW_USER}', '${NARROW_ROLE}', '2026-01-01');
+      INSERT INTO member_roles (id, title, is_default, created_at)
+        VALUES ('${NARROW_ROLE}', 'Developer', 0, '2026-01-01');
+      INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+        VALUES ('rp_narrow_work', '${NARROW_ROLE}', 'work', 1, 1, 1, 1);
+    `)
+  })
+
+  const titles = async (userId: string, query = "") =>
+    ((await (await call(userId, "GET /api/content/tasks", undefined, query)).json()) as {
+      tasks: { title: string }[]
+    }).tasks.map((t) => t.title)
+
+  it("without the right, the list is YOUR tasks — not a refusal, and not everyone's", async () => {
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Somebody else's job" })
+    await call(IDS.staffUser, "POST /api/content/tasks", {
+      title: "Mine to do",
+      assigneeId: NARROW_USER,
+    })
+
+    // The door OPENS — `work:read` is what gets you the screen — and answers
+    // about you. A 403 here would teach a screen to hide a tab instead of
+    // showing the right rows.
+    const res = await call(NARROW_USER, "GET /api/content/tasks")
+    expect(res.status).toBe(200)
+    expect(await titles(NARROW_USER)).toEqual(["Mine to do"])
+
+    // …and the same caller cannot ask about somebody else by naming them: the
+    // door REPLACES the filter rather than trusting it.
+    expect(await titles(NARROW_USER, `?assigneeId=${IDS.staffUser}`)).toEqual(["Mine to do"])
+  })
+
+  it("every count comes back narrowed too — the badge can't advertise rows the list withholds (R16)", async () => {
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Somebody else's job" })
+    await call(IDS.staffUser, "POST /api/content/tasks", {
+      title: "Mine to do",
+      assigneeId: NARROW_USER,
+    })
+    const body = (await (await call(NARROW_USER, "GET /api/content/tasks")).json()) as {
+      total: number
+      openTotal: number
+      allTotal: number
+    }
+    expect({ total: body.total, openTotal: body.openTotal, allTotal: body.allTotal }).toEqual({
+      total: 1,
+      openTotal: 1,
+      allTotal: 1,
+    })
+  })
+
+  it("with the right, the same door answers about the whole team", async () => {
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Somebody else's job" })
+    await call(IDS.staffUser, "POST /api/content/tasks", {
+      title: "Mine to do",
+      assigneeId: NARROW_USER,
+    })
+    db().exec(
+      `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+         VALUES ('rp_narrow_all', '${NARROW_ROLE}', 'all_tasks', 1, 0, 0, 0);`
+    )
+    expect((await titles(NARROW_USER)).sort()).toEqual(["Mine to do", "Somebody else's job"])
+  })
+})
+
 describe("a task is ours, and a client never learns one exists", () => {
   it("is written down with no client, and no reference to quote", async () => {
     const res = await call(IDS.staffUser, "POST /api/content/tasks", {
@@ -285,6 +365,170 @@ describe("a task is ours, and a client never learns one exists", () => {
     expect(
       (await call(IDS.contactUser, "POST /api/content/tasks", { title: "Not yours to write" })).status
     ).toBe(403)
+    expect(db().prepare(`SELECT COUNT(*) AS n FROM tasks`).get()).toEqual({ n: 0 })
+  })
+})
+
+// ── THE SIX VIEWS, THE TWO TICKS, AND THE SECOND FIELD ────────────────────────
+//
+// What the tester asked for, held at the DOOR rather than on the screen: a tab
+// that sieved the loaded page would answer "the overdue among the newest N", and
+// a department rule only the form knew would be a rule a machine caller never
+// meets. Each case below drives the shipped handler.
+
+/** A deadline `n` days from now, as the ISO moment the door stores. */
+const deadline = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString()
+
+/** The rows one view answers with, by title. */
+async function titlesIn(view: string): Promise<string[]> {
+  const res = await call(IDS.staffUser, "GET /api/content/tasks", undefined, `?view=${view}`)
+  const body = (await res.json()) as { tasks: { title: string }[] }
+  return body.tasks.map((t) => t.title).sort()
+}
+
+describe("our own admin comes in six piles, counted once", () => {
+  beforeEach(async () => {
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Late", dueOn: deadline(-3) })
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Soon", dueOn: deadline(5) })
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Undated" })
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Finished", dueOn: deadline(-1) })
+    const done = (db().prepare(`SELECT id FROM tasks WHERE title = 'Finished'`).get() as { id: string }).id
+    await call(IDS.staffUser, "POST /api/content/tasks/done", { id: done, done: true })
+  })
+
+  it("each view answers a different question, and none of them is a filter over the others", async () => {
+    // Overdue is what is PAST its deadline and not done — the finished one is
+    // not overdue, which is the distinction a client-side filter kept losing.
+    expect(await titlesIn("overdue")).toEqual(["Late"])
+    expect(await titlesIn("upcoming")).toEqual(["Soon"])
+    expect(await titlesIn("completed")).toEqual(["Finished"])
+    // The calendar shows what has a date on it, finished or not: a month grid
+    // with last week's completed work missing is a month grid that lies.
+    expect(await titlesIn("calendar")).toEqual(["Finished", "Late", "Soon"])
+    expect(await titlesIn("open")).toEqual(["Late", "Soon", "Undated"])
+    expect(await titlesIn("all")).toEqual(["Finished", "Late", "Soon", "Undated"])
+  })
+
+  it("R16 — every badge and the progress pair come back from whichever view was asked", async () => {
+    const body = (await (
+      await call(IDS.staffUser, "GET /api/content/tasks", undefined, "?view=overdue")
+    ).json()) as Record<string, number>
+    // The count over what was LISTED, plus the other five, plus today's pair —
+    // all eight out of one read, so no two of them can disagree.
+    expect(body).toMatchObject({
+      total: 1,
+      openTotal: 3,
+      allTotal: 4,
+      overdueTotal: 1,
+      upcomingTotal: 1,
+      completedTotal: 1,
+      calendarTotal: 3,
+      // Everything due today or earlier: the late one and the finished one.
+      dueTodayTotal: 2,
+      dueTodayDone: 1,
+    })
+  })
+
+  it("a made-up view is the everyday pile, not a SQL fragment (R20)", async () => {
+    expect(await titlesIn("'; DROP TABLE tasks;--")).toEqual(["Late", "Soon", "Undated"])
+    expect(db().prepare(`SELECT COUNT(*) AS n FROM tasks`).get()).toEqual({ n: 4 })
+  })
+})
+
+describe("a task carries the two ticks, a department, and whatever that department asks for", () => {
+  it("scores the Eisenhower pair (important × 2) + urgent + 1, and stores neither the score nor a guess", async () => {
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Neither" })
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Urgent only", urgent: true })
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Important only", important: true })
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Both", important: true, urgent: true })
+    const body = (await (
+      await call(IDS.staffUser, "GET /api/content/tasks", undefined, "?view=all")
+    ).json()) as { tasks: { title: string; priority: number }[] }
+    const score = Object.fromEntries(body.tasks.map((t) => [t.title, t.priority]))
+    expect(score).toEqual({ Neither: 1, "Urgent only": 2, "Important only": 3, Both: 4 })
+  })
+
+  it("a non-boolean tick is not a tick — it is false, never a truthy string (R20)", async () => {
+    await call(IDS.staffUser, "POST /api/content/tasks", { title: "Typed wrong", important: "false" })
+    const row = db().prepare(`SELECT important, urgent FROM tasks`).get() as Record<string, number>
+    expect(row).toEqual({ important: 0, urgent: 0 })
+  })
+
+  it("refuses a Production task with no app, and a Sales task with no client", async () => {
+    const noApp = await call(IDS.staffUser, "POST /api/content/tasks", {
+      title: "Ship the dispatch change",
+      department: "Production",
+    })
+    expect(noApp.status).toBe(400)
+    const noClient = await call(IDS.staffUser, "POST /api/content/tasks", {
+      title: "Chase the renewal",
+      department: "Sales",
+    })
+    expect(noClient.status).toBe(400)
+    // Nothing half-written: the rule runs before the insert.
+    expect(db().prepare(`SELECT COUNT(*) AS n FROM tasks`).get()).toEqual({ n: 0 })
+  })
+
+  it("takes a Production task that names its app, and an Admin task with no client at all", async () => {
+    expect(
+      (
+        await call(IDS.staffUser, "POST /api/content/tasks", {
+          title: "Ship the dispatch change",
+          department: "Production",
+          appId: IDS.victimApp,
+        })
+      ).status
+    ).toBe(200)
+    expect(
+      (
+        await call(IDS.staffUser, "POST /api/content/tasks", {
+          title: "File the VAT return",
+          department: "Admin",
+        })
+      ).status
+    ).toBe(200)
+    const rows = db()
+      .prepare(`SELECT department, app_id FROM tasks ORDER BY title`)
+      .all() as Record<string, string | null>[]
+    expect(rows).toEqual([
+      { department: "Admin", app_id: null },
+      { department: "Production", app_id: IDS.victimApp },
+    ])
+  })
+
+  it("refuses an app that is not ours, the same way it refuses a client that is not", async () => {
+    const res = await call(IDS.staffUser, "POST /api/content/tasks", {
+      title: "Work on somebody else's system",
+      department: "Production",
+      appId: "A_MADE_UP_APP",
+    })
+    expect(res.status).toBe(400)
+    expect(db().prepare(`SELECT COUNT(*) AS n FROM tasks`).get()).toEqual({ n: 0 })
+  })
+
+  // THE NAME ON THE ROW IS THE ASSIGNEE'S. It used to be the CREATOR's, whoever
+  // the task was for, because the insert reached for `actor.name` — so every task
+  // in the list said the name of the person who wrote it down.
+  it("writes the assignee's own name beside their id, not the writer's", async () => {
+    await call(IDS.staffUser, "POST /api/content/tasks", {
+      title: "Somebody else's job",
+      assigneeId: IDS.contactUser,
+    })
+    const row = db().prepare(`SELECT assignee_id, assignee_name FROM tasks`).get() as Record<
+      string,
+      string | null
+    >
+    expect(row.assignee_id).toBe(IDS.contactUser)
+    expect(row.assignee_name).not.toBe("Staff Member")
+    expect(row.assignee_name).toBeTruthy()
+  })
+
+  it("refuses an assignee who is not on the team", async () => {
+    const res = await call(IDS.staffUser, "POST /api/content/tasks", {
+      title: "For a stranger",
+      assigneeId: "U_NOBODY",
+    })
+    expect(res.status).toBe(400)
     expect(db().prepare(`SELECT COUNT(*) AS n FROM tasks`).get()).toEqual({ n: 0 })
   })
 })

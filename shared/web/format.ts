@@ -81,3 +81,27 @@ export function toMoment(local: string): string {
   const ms = Date.parse(local)
   return Number.isFinite(ms) ? new Date(ms).toISOString() : ""
 }
+
+/** THE POSTAL ADDRESS AS ONE LINE, from the four fields it is stored in.
+ *
+ * It lives here for the reason `hoursText` lives beside the savings arithmetic:
+ * both front doors render this, and two copies of a formatter are the drift the
+ * money seam had to be written to stop. A formatter knows no table, no door and
+ * no audience, so it is safe on both sides of the fence.
+ *
+ * The address is FOUR fields in the database on purpose — a country typed free
+ * is a country spelled five ways, and "which of our clients are in Berlin?" is a
+ * question one text column cannot answer. It is one LINE on a screen just as
+ * often, and this is that line. Empty parts drop out, so a record with only a
+ * city reads "Madrid" rather than ", , Madrid, ". */
+export function postalAddress(parts: {
+  street?: string | null
+  postalCode?: string | null
+  city?: string | null
+  country?: string | null
+}): string {
+  return [parts.street, [parts.postalCode, parts.city].filter(Boolean).join(" "), parts.country]
+    .map((p) => (p ?? "").trim())
+    .filter(Boolean)
+    .join(", ")
+}

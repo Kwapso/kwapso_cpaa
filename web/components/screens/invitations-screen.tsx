@@ -5,12 +5,14 @@
 
 import { InvitationsPanel } from "@/components/invitations"
 import type { ActiveTeam } from "@/lib/use-active-team"
+import { useT } from "@shared/web/language"
 
 export function InvitationsScreen({ active }: { active: ActiveTeam }) {
+  const t = useT()
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-3">
       <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-        Invitations
+        {t("Invitations")}
       </h2>
       <InvitationsPanel active={active} />
     </div>

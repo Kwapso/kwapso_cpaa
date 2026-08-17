@@ -125,7 +125,13 @@ const call = (userId: string, route: string, body?: unknown, query = "", opts = 
 /** Add a source through the DOOR (never a raw insert) and hand back its id. */
 async function addSource(
   userId: string,
-  input: { title: string; body?: string; accountId?: string; visibility?: string }
+  input: {
+    title: string
+    body?: string
+    accountId?: string
+    visibility?: string
+    visibleToAppId?: string
+  }
 ): Promise<string> {
   const res = await call(userId, "POST /api/content/knowledge", input)
   expect(res.status, `adding "${input.title}"`).toBe(200)
@@ -420,6 +426,98 @@ describe("the personal fence — material that came through one person's own sig
   })
 })
 
+describe("the app fence — material kept to the people on one app (12.3)", () => {
+  /** The shared fixture already has an app (`IDS.victimApp`). Staffing is what
+   * decides who may open it (8.11), so it is staffing — not a role — that this
+   * suite moves: BOTH staff hold every knowledge right throughout, which is the
+   * only way a refusal proves the fence rather than the permission sheet. */
+  const staffOnApp = (userId: string) =>
+    db().exec(
+      "INSERT INTO app_staff (id, app_id, user_id, is_lead, created_at, creator_id) VALUES ('as_" +
+        userId +
+        "', '" +
+        IDS.victimApp +
+        "', '" +
+        userId +
+        "', 0, '2026-03-01', '" +
+        userId +
+        "');"
+    )
+
+  it("answers its app's staff and nobody else, in the search AND in the list", async () => {
+    staffOnApp(IDS.staffUser)
+    await addSource(IDS.staffUser, {
+      title: "Dispatch rollout postmortem",
+      body: "The dispatch rollout was paused because the invoice run kept timing out.",
+      visibleToAppId: IDS.victimApp,
+    })
+
+    const mine = await ask(IDS.staffUser, "why was the dispatch rollout paused?")
+    expect(titles(mine)).toContain("Dispatch rollout postmortem")
+
+    // A COLLEAGUE with every knowledge right, who is simply not on this app.
+    const theirs = await ask(OTHER_STAFF, "why was the dispatch rollout paused?")
+    expect(theirs.found).toBe(false)
+    const list = await call(OTHER_STAFF, "GET /api/content/knowledge")
+    const { sources, total } = (await list.json()) as { sources: KnowledgeSource[]; total: number }
+    expect(sources.map((s) => s.title)).not.toContain("Dispatch rollout postmortem")
+    // R16: the badge counts the same question the rows answered. A count that
+    // included a row the list withheld would advertise the existence of the very
+    // thing the fence exists to hide.
+    expect(total).toBe(sources.length)
+  })
+
+  it("lets them in the moment they are put on the app, with no re-index", async () => {
+    staffOnApp(IDS.staffUser)
+    await addSource(IDS.staffUser, {
+      title: "Dispatch rollout postmortem",
+      body: "The dispatch rollout was paused because the invoice run kept timing out.",
+      visibleToAppId: IDS.victimApp,
+    })
+    expect((await ask(OTHER_STAFF, "why was the dispatch rollout paused?")).found).toBe(false)
+
+    // The fence is a JOIN to `app_staff`, read at question time — so staffing
+    // somebody is the whole of granting them sight of it. Nothing is rewritten,
+    // nothing is re-embedded, and there is no window in which the two disagree.
+    staffOnApp(OTHER_STAFF)
+    expect(titles(await ask(OTHER_STAFF, "why was the dispatch rollout paused?"))).toContain(
+      "Dispatch rollout postmortem"
+    )
+  })
+
+  it("refuses an app the author is not on, rather than filing something they'd be locked out of", async () => {
+    const res = await call(IDS.staffUser, "POST /api/content/knowledge", {
+      title: "A note about somebody else's system",
+      body: "…",
+      visibleToAppId: IDS.victimApp,
+    })
+    expect(res.status).toBe(400)
+    expect(((await res.json()) as { message: string }).message).toMatch(/only limit a source to an app you are on/i)
+    expect((db().prepare("SELECT COUNT(*) n FROM knowledge_sources").get() as { n: number }).n).toBe(0)
+  })
+
+  it("private beats app — a source that says both is answerable to one person", async () => {
+    staffOnApp(IDS.staffUser)
+    staffOnApp(OTHER_STAFF)
+    await addSource(IDS.staffUser, {
+      title: "My own read on the rollout",
+      body: "The dispatch rollout was paused because the invoice run kept timing out.",
+      visibility: "private",
+      visibleToAppId: IDS.victimApp,
+    })
+    // Both are on the app; only the owner is answered from it. The row stores
+    // one answer, so no reader has to work out which of two settings wins.
+    expect(titles(await ask(IDS.staffUser, "why was the dispatch rollout paused?"))).toContain(
+      "My own read on the rollout"
+    )
+    expect((await ask(OTHER_STAFF, "why was the dispatch rollout paused?")).found).toBe(false)
+    const row = db()
+      .prepare("SELECT owner_user_id AS o, visible_to_app_id AS a FROM knowledge_sources")
+      .get() as { o: string | null; a: string | null }
+    expect({ owner: row.o, app: row.a }).toEqual({ owner: IDS.staffUser, app: null })
+  })
+})
+
 describe("taking a source away really takes it away", () => {
   it("stops answering from it, keeps the row, and does not resurrect it", async () => {
     const id = await addSource(IDS.staffUser, {
@@ -539,7 +637,7 @@ describe("the sweep — the app's own rows become material, and stay in step", (
     const { ingest } = (await res.json()) as {
       ingest: { kind: string; lastOkAt: string | null; lastError: string | null; sourcesIndexed: number }[]
     }
-    expect(ingest.map((i) => i.kind).sort()).toEqual(["account", "app", "article", "sprint", "story", "ticket"])
+    expect(ingest.map((i) => i.kind).sort()).toEqual(["account", "app", "sprint", "story", "ticket"])
     for (const row of ingest) {
       expect(row.lastOkAt).not.toBeNull()
       expect(row.lastError).toBeNull()

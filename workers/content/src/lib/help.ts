@@ -21,10 +21,16 @@ import { describeChanges, logActivity, type Actor } from "@shared/workers/activi
 import { countCollectionWith, reportedTotal } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
-import { HELP_STATUSES, type HelpMessage, type HelpStatus, type HelpTicket } from "@shared/types"
+import {
+  HELP_STATUSES,
+  ticketTypeWaitsForValidation,
+  type HelpMessage,
+  type HelpStatus,
+  type HelpTicket,
+} from "@shared/types"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { optionalText, parseStringArray, requireText, TEXT_LIMITS } from "@shared/workers/validate"
-import { BULK_IDS_LIMIT, THREAD_HARD_CAP } from "@shared/workers/limits"
+import { BULK_IDS_LIMIT, THREAD_HARD_CAP, TICKET_FACET_CAP } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { rankAtTop, rankBetween } from "@shared/workers/rank"
 // The reference number moved out to its own file the moment a second noun needed
@@ -48,6 +54,11 @@ type TicketRow = {
   resolved: number
   resolved_at: string | null
   account_id: string | null
+  app_id: string | null
+  app_name: string | null
+  raised_by_contact_id: string | null
+  raised_by_contact_name: string | null
+  validated_at: string | null
   ref: string | null
   rank: string | null
   locked_at: string | null
@@ -147,6 +158,14 @@ function toTicket(r: TicketRow, scope: AccountScope): HelpTicket {
     archivedAt: r.archived_at,
     titleDe: r.title_de,
     titleEn: r.title_en,
+    // WHICH SYSTEM, AND WHO ASKED. Neither is redacted: a client already knows
+    // their own apps and their own colleagues — those are the two facts on this
+    // row that are THEIRS. The redaction above is about our side of the fence.
+    appId: r.app_id,
+    appName: r.app_name,
+    raisedByContactId: r.raised_by_contact_id,
+    raisedByContactName: r.raised_by_contact_name,
+    validatedAt: r.validated_at,
   }
 }
 
@@ -180,8 +199,11 @@ function toMessage(r: ReplyRow): HelpMessage {
 // uses on an author, and it rides the SAME read as the row so a name and the
 // answer about that name can never come from two different moments.
 const TICKET_COLS = `id, help_type, description, screen_recording_link, source_screen, status, resolved, resolved_at,
-  account_id, ref, rank, locked_at, archived_at, draft_resolution, title_de, title_en,
+  account_id, app_id, raised_by_contact_id, validated_at,
+  ref, rank, locked_at, archived_at, draft_resolution, title_de, title_en,
   creator_id, creator_name, editor_name, created_at, updated_at,
+  (SELECT ap.name FROM apps ap WHERE ap.id = help.app_id) AS app_name,
+  (SELECT a.name FROM accounts a WHERE a.id = help.raised_by_contact_id) AS raised_by_contact_name,
   EXISTS (SELECT 1 FROM portal_users pu WHERE pu.user_id = help.creator_id) AS raiser_is_client,
   EXISTS (SELECT 1 FROM portal_users pu WHERE pu.user_id = help.editor_id) AS editor_is_client,
   (SELECT COUNT(*) FROM stories s WHERE s.ticket_id = help.id) AS story_count,
@@ -273,9 +295,40 @@ export function ticketFence(
   const col = (name: string) => (table ? `${table}.${name}` : name)
   const parts = [
     accountScopeClause(scope, col("account_id")),
-    tab === "mine" ? { sql: `${col("creator_id")} = ?`, params: [guard.userId] } : { sql: "", params: [] },
+    tab === "mine" ? mineClause(guard, scope, col) : { sql: "", params: [] },
   ].filter((p) => p.sql)
   return { sql: parts.map((p) => p.sql).join(" AND "), params: parts.flatMap((p) => p.params) }
+}
+
+/** WHAT "MY TICKETS" MEANS, and it changed on 17 Aug 2026 (CHECKLIST 2.3).
+ *
+ * It used to mean "tickets I typed", which was the wrong question in an agency
+ * where 220 of 221 requests were typed by staff on a client's behalf: the person
+ * who typed it is rarely the person who has to do anything about it. Aurora's
+ * answer, taken over the owner's, is **tickets on the apps I am staffed to** —
+ * the systems I am actually responsible for. That is a real inbox.
+ *
+ * A CLIENT LOGIN KEEPS THE OLD MEANING, deliberately: staffing is our rota, a
+ * contact is on nobody's, and "tickets on the apps you are staffed to" would
+ * hand every client an empty tab forever. For them "mine" is still what they
+ * raised, which is the only version of the word that means anything on their
+ * side.
+ *
+ * A SUBQUERY rather than a resolved list of ids: the staffed set is read INSIDE
+ * the statement, so the list and its count (which share this clause) can never
+ * be asked about two different moments — and an id list would be one more
+ * unbounded `IN (…)` to cap. A member staffed to nothing matches no ticket,
+ * which is the honest empty answer rather than an error. */
+function mineClause(
+  guard: MemberGuard,
+  scope: AccountScope,
+  col: (name: string) => string
+): { sql: string; params: string[] } {
+  if (scope.kind === "portal") return { sql: `${col("creator_id")} = ?`, params: [guard.userId] }
+  return {
+    sql: `${col("app_id")} IN (SELECT app_id FROM app_staff WHERE user_id = ? AND deactivated_at IS NULL)`,
+    params: [guard.userId],
+  }
 }
 
 /** LIVE OR PUT AWAY — the everyday list against the archive drawer.
@@ -299,6 +352,47 @@ function archiveClause(view: "live" | "archived"): string {
  * two reasons the accounts search is (`workers/tenancy/src/lib/accounts.ts`): a
  * search box is not a pattern box, and an alternating `%a%a%…` needle is a
  * handful of bytes that costs the worker exponential time over the whole table. */
+/** WHOSE TICKETS — narrowed to one account (a client's own company, or one
+ * person's own row). A FILTER, not a fence: the fence has already decided which
+ * accounts this caller may see at all, and this only says which of them they are
+ * looking at. It rides the list AND its count, or the badge would answer a
+ * different question from the rows (R16). */
+function accountClause(accountId: string | undefined): { sql: string; params: string[] } {
+  return accountId ? { sql: "account_id = ?", params: [accountId] } : { sql: "", params: [] }
+}
+
+/** WHICH SYSTEM — the app record's own Tickets tab (CHECKLIST 8.6). The same
+ * shape as the account narrowing above and for the same reason: a filter on top
+ * of the fence, riding the list AND its count so the badge and the rows answer
+ * one question (R16). A ticket that names no app never matches, which is right —
+ * "tickets about this system" cannot include the ones nobody said were. */
+function appClause(appId: string | undefined): { sql: string; params: string[] } {
+  return appId ? { sql: "app_id = ?", params: [appId] } : { sql: "", params: [] }
+}
+
+/** WHICH KIND, AND WHICH STAGE — the sub-tabs under All / My / Archived
+ * (CHECKLIST 5.1: Ready, Issues, Questions, Requests, Extra, Closed, All).
+ *
+ * Two facets rather than one, because that strip is genuinely two questions
+ * wearing one row of tabs: four of its tabs name a TYPE (the team's own editable
+ * `Ticket type` vocabulary, so the strip is DERIVED from the team's values and
+ * not hard-coded — retiring "Bug" on the Dropdown values screen retires its tab),
+ * and two name a STATUS. "All" sends neither.
+ *
+ * The status one is deliberately a single value and not a list: every tab in the
+ * strip that names a stage names exactly one, and a door that accepted several
+ * would be a filter language nobody asked for.
+ *
+ * Both ride the list AND the count, or the badge answers a different question
+ * from the rows beneath it (R16). */
+function typeClause(helpType: string | undefined): { sql: string; params: string[] } {
+  return helpType ? { sql: "help_type = ?", params: [helpType] } : { sql: "", params: [] }
+}
+
+function statusClause(status: HelpStatus | undefined): { sql: string; params: string[] } {
+  return status ? { sql: "status = ?", params: [status] } : { sql: "", params: [] }
+}
+
 function searchClause(q: string | undefined): { sql: string; params: string[] } {
   if (!q) return { sql: "", params: [] }
   const needle = `%${likeLiteral(q.toLowerCase())}%`
@@ -308,26 +402,60 @@ function searchClause(q: string | undefined): { sql: string; params: string[] } 
   }
 }
 
+/** THE FACETS THE TICKET DOOR PARSES. Declared as a type so the door, the count,
+ * the machine surface and this file cannot drift about what a filter IS (R19) —
+ * the same shape `StoryFilter` has had since the work engine landed, adopted here
+ * the day the list grew a second row of tabs. */
+export type TicketFilter = {
+  /** the My/All choice — a raiser filter on top of the fence, never instead */
+  tab: "mine" | "all"
+  /** the everyday list, or the archive drawer */
+  view: "live" | "archived"
+  /** the search box, answered by the door (R14: the list pages) */
+  q?: string
+  /** one client's tickets — a FILTER on top of the fence */
+  accountId?: string
+  /** one system's tickets — the app record's Tickets tab (8.6) */
+  appId?: string
+  /** one kind — the sub-tab strip's four type tabs */
+  helpType?: string
+  /** one stage — the sub-tab strip's Ready and Closed tabs */
+  status?: HelpStatus
+}
+
+/** Everything except the keyset cursor, written once so the page and its count
+ * are asked the one question (R16). */
+function ticketWhere(
+  guard: MemberGuard,
+  scope: AccountScope,
+  filter: TicketFilter
+): { sql: string[]; params: string[] } {
+  const fence = ticketFence(guard, scope, filter.tab)
+  const parts = [
+    accountClause(filter.accountId),
+    appClause(filter.appId),
+    typeClause(filter.helpType),
+    statusClause(filter.status),
+    searchClause(filter.q),
+  ].filter((p) => p.sql)
+  return {
+    sql: [archiveClause(filter.view), ...(fence.sql ? [fence.sql] : []), ...parts.map((p) => p.sql)],
+    params: [...fence.params, ...parts.flatMap((p) => p.params)],
+  }
+}
+
 export async function listTickets(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
-  tab: "mine" | "all",
-  view: "live" | "archived",
-  cursor: string | null,
-  q?: string
+  filter: TicketFilter,
+  cursor: string | null
 ): Promise<Page<HelpTicket>> {
   const pos = decodeCursor(cursor)
   const after = keysetAfter(pos, TICKET_ORDER)
-  const fence = ticketFence(guard, scope, tab)
-  const find = searchClause(q)
-  const clauses = [
-    archiveClause(view),
-    ...(fence.sql ? [fence.sql] : []),
-    ...(find.sql ? [find.sql] : []),
-    ...(after.sql ? [after.sql] : []),
-  ]
-  const params = [...fence.params, ...find.params, ...after.params]
+  const where = ticketWhere(guard, scope, filter)
+  const clauses = [...where.sql, ...(after.sql ? [after.sql] : [])]
+  const params = [...where.params, ...after.params]
   const rows = await d1Query<TicketRow>(
     cfg,
     guard.databaseId,
@@ -348,8 +476,7 @@ export async function countTickets(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
-  view: "live" | "archived",
-  q?: string
+  filter: TicketFilter
 ): Promise<{ total: number; mineTotal: number }> {
   // R16 says the count is exact; the fence says exact ABOUT WHAT THEY MAY SEE.
   // An unfenced total would tell a client how many tickets exist that it is
@@ -362,24 +489,80 @@ export async function countTickets(
   // rows on screen.
   // …and it counts the SAME SEARCH, when there is one: a filtered list showing an
   // unfiltered total is the R16 failure the other way round.
-  const fence = ticketFence(guard, scope, "all")
-  const find = searchClause(q)
-  const where = [archiveClause(view), ...(fence.sql ? [fence.sql] : []), ...(find.sql ? [find.sql] : [])].join(
-    " AND "
-  )
+  // …and the SAME account narrowing, the SAME kind and the SAME stage, for the
+  // same reason: a tab badging one client's Questions over a total counting
+  // everybody's everything is the R16 failure again, four times over.
+  //
+  // ONE `ticketWhere` CALL, shared with the list above, and that is the fix as
+  // much as it is the tidying: this function used to rebuild the clause by hand
+  // and had ALREADY drifted — it appended the account clause to the SQL and left
+  // its parameter out of the array, so a tab narrowed to one client bound the
+  // search needle into the account slot. The two questions are now literally the
+  // same expression, so they cannot be asked differently.
+  //
+  // The count always reads the "all" tab: `mineTotal` is computed beside it from
+  // the same rows, so narrowing to the caller's own first would make "my" the
+  // denominator of itself.
+  const where = ticketWhere(guard, scope, { ...filter, tab: "all" })
   // R16 (amended): counted exactly to TOTAL_COUNT_CAP through the one bounded
   // seam. Both numbers are BADGES, so both are clamped — "my" tickets cannot
   // exceed all tickets, and a partial tally beside a partial total tells the same
-  // story at the same ceiling. The SEARCH clause rides the same WHERE, so a
-  // filtered list's total answers the filtered question (and is bounded too).
+  // story at the same ceiling.
+  //
+  // The "mine" tally is the SAME expression the My tab filters by (mineClause),
+  // not a second idea of the word — R16's whole point. When that sentence
+  // changed from "tickets I typed" to "tickets on my apps", the badge changed
+  // with it because there is only one place it is written.
+  const mine = mineClause(guard, scope, (n) => n)
   const row = await countCollectionWith<{ total: number; mine: number }>(
     cfg,
     guard.databaseId,
-    `SELECT (creator_id = ?) AS is_mine FROM help WHERE ${where}`,
+    `SELECT (${mine.sql}) AS is_mine FROM help WHERE ${where.sql.join(" AND ")}`,
     "COUNT(*) AS total, SUM(is_mine) AS mine",
-    [guard.userId, ...fence.params, ...find.params]
+    [...mine.params, ...where.params]
   )
   return { total: reportedTotal(row?.total ?? 0), mineTotal: reportedTotal(row?.mine ?? 0) }
+}
+
+/** THE SUB-TAB BADGES, IN ONE READ (R16 + CHECKLIST 5.1).
+ *
+ * A tab strip of seven cannot cost seven counts: the strip is on the screen a
+ * team lives in, and six extra bounded scans per page load is exactly the sort of
+ * cost the count seam was capped to avoid. So this is ONE grouped read — the
+ * server's own tally per type and per status over the same WHERE the list uses,
+ * minus the type and status facets themselves (a strip whose Questions badge was
+ * counted while narrowed to Questions would read "N" on every tab).
+ *
+ * BOUNDED like every other count here: the inner select carries the same ceiling,
+ * so a team with a million tickets pays the same worst case as everywhere else. */
+export async function countTicketFacets(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  filter: TicketFilter
+): Promise<{ byType: Record<string, number>; byStatus: Record<string, number> }> {
+  const where = ticketWhere(guard, scope, {
+    ...filter,
+    tab: "all",
+    helpType: undefined,
+    status: undefined,
+  })
+  const rows = await d1Query<{ help_type: string | null; status: string; n: number }>(
+    cfg,
+    guard.databaseId,
+    // R14: bounded by GROUPING — at most (types × statuses) rows come back, and
+    // both vocabularies are collections that cannot run away.
+    `SELECT help_type, status, COUNT(*) AS n FROM help
+      WHERE ${where.sql.join(" AND ")} GROUP BY help_type, status LIMIT ${TICKET_FACET_CAP}`,
+    where.params
+  )
+  const byType: Record<string, number> = {}
+  const byStatus: Record<string, number> = {}
+  for (const r of rows) {
+    if (r.help_type) byType[r.help_type] = (byType[r.help_type] ?? 0) + r.n
+    byStatus[r.status] = (byStatus[r.status] ?? 0) + r.n
+  }
+  return { byType, byStatus }
 }
 
 /** The rank a new ticket takes: above every one the caller can already see.
@@ -524,6 +707,68 @@ export type TicketInput = {
    * portal caller, whose account is never taken from the body. See
    * `accountForStaffTicket`. */
   accountId?: string
+  /** WHICH SYSTEM IT IS ABOUT (CHECKLIST 5.8). Proved to be a live app before it
+   * is written, exactly as the client is — an unchecked id here would route a
+   * request at a system that does not exist. */
+  appId?: string
+  /** WHO ASKED (CHECKLIST 5.9) — a contact, meaning a person's own account row
+   * linked to the client this ticket belongs to. Proved to be exactly that, so
+   * "raised by" can never name a stranger. */
+  raisedByContactId?: string
+}
+
+/** WHICH APP IS THIS REQUEST ABOUT? Null is allowed and common (the agency's own
+ * housekeeping questions are about no system at all), but a NAMED app must be a
+ * live row in the caller's own team database — the same proof the client gets,
+ * for the same reason: a ticket pointed at an id that does not exist is a ticket
+ * whose sub-tab, whose sprint and whose stakeholder can never be resolved. */
+async function appForTicket(cfg: D1Rest, guard: MemberGuard, raw: unknown): Promise<string | null> {
+  const id = optionalText(raw, "App", TEXT_LIMITS.short)
+  if (!id) return null
+  const rows = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    `SELECT id FROM apps WHERE id = ${sqlString(id)} AND deactivated_at IS NULL LIMIT 1`
+  )
+  if (!rows[0]) throw new GuardError(400, "invalid_input", "That app isn't one of ours any more.")
+  return rows[0].id
+}
+
+/** WHO RAISED IT — a contact ON THIS ACCOUNT, and the fence is the whole point.
+ *
+ * A contact is a person's own `accounts` row linked to a company through
+ * `account_links` (there is no contacts table — CHECKLIST 15.1 says why: Marta is
+ * a contact at two companies). So "a contact of this client" is a live link, and
+ * checking it is what stops a ticket naming somebody at another company as the
+ * person who asked — which would put a stranger's name on a record their own
+ * portal will never show them, and ours will.
+ *
+ * A person may also raise a ticket on their OWN account (a freelancer with no
+ * parent company), so the row itself counts as its own contact. */
+async function contactForTicket(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  raw: unknown,
+  accountId: string | null
+): Promise<string | null> {
+  const id = optionalText(raw, "Raised by", TEXT_LIMITS.short)
+  if (!id) return null
+  if (!accountId)
+    throw new GuardError(400, "invalid_input", "Name the client first, a contact belongs to one.")
+  const rows = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    `SELECT p.id FROM accounts p
+      WHERE p.id = ? AND p.deactivated_at IS NULL
+        AND (p.id = ? OR EXISTS (
+              SELECT 1 FROM account_links l
+               WHERE l.person_account_id = p.id AND l.account_id = ? AND l.deactivated_at IS NULL))
+      LIMIT 1`,
+    [id, accountId, accountId]
+  )
+  if (!rows[0])
+    throw new GuardError(400, "invalid_input", "That person isn't a contact at this client.")
+  return rows[0].id
 }
 
 /** WHICH CLIENT IS THIS TICKET FOR, when the agency raises it?
@@ -579,7 +824,23 @@ export async function createTicket(
   // client it names, or to nobody when it is our own internal question.
   const accountId =
     scope.kind === "portal" ? scope.currentAccountId : await accountForStaffTicket(cfg, guard, input.accountId)
+  const appId = await appForTicket(cfg, guard, input.appId)
+  const raisedBy = await contactForTicket(cfg, guard, input.raisedByContactId, accountId)
+  const helpType = optionalText(input.helpType, "Type", TEXT_LIMITS.short) ?? null
   const now = new Date().toISOString()
+  // WHERE IT STARTS, and it is a FACT about the kind of thing being asked rather
+  // than a choice anybody makes (CHECKLIST 5.13, Aurora's ap2).
+  //
+  // An EXTRA, a REQUEST or a piece of FEEDBACK is somebody asking for more work,
+  // so the person who pays for it confirms they want it before we spend a day on
+  // triage. A QUESTION or an ISSUE is somebody stuck, and making them ask their
+  // own colleague for permission first is the version of this rule that gets the
+  // feature switched off — Aurora's note, and it is the load-bearing half.
+  //
+  // The agency's own tickets never wait: there is no client-side stakeholder to
+  // ask, so a ticket with no account would sit in `awaiting_validation` for ever
+  // waiting on somebody who does not exist.
+  const status = accountId && ticketTypeWaitsForValidation(helpType) ? "awaiting_validation" : "new"
   // The reference the client will quote, and the place in the list. Both are
   // resolved BEFORE the insert so the row is complete the first time anybody
   // reads it — a ticket that exists for a moment with no number is a ticket
@@ -594,8 +855,8 @@ export async function createTicket(
   await d1ExecScript(
     cfg,
     guard.databaseId,
-    `INSERT INTO help (id, help_type, description, screen_recording_link, source_screen, source_related_table, source_related_row_id, status, resolved, account_id, ref, rank, locked_at, title_de, title_en, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString((optionalText(input.helpType, "Type", TEXT_LIMITS.short) ?? null))}, ${sqlString(description)}, ${sqlString((optionalText(input.screenRecordingLink, "Screen recording link", TEXT_LIMITS.link) ?? null))}, ${sqlString((optionalText(input.sourceScreen, "Source", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedTable, "Source table", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedRowId, "Source row", TEXT_LIMITS.short) ?? null))}, 'new', 0, ${sqlString(accountId)}, ${sqlString(ref)}, ${sqlString(rank)}, ${sqlString(lockedAt)}, ${sqlString((optionalText(input.titleDe, "German title", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.titleEn, "English title", TEXT_LIMITS.short) ?? null))}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+    `INSERT INTO help (id, help_type, description, screen_recording_link, source_screen, source_related_table, source_related_row_id, status, resolved, account_id, app_id, raised_by_contact_id, ref, rank, locked_at, title_de, title_en, created_at, creator_id, creator_email, creator_name)
+VALUES (${sqlString(id)}, ${sqlString(helpType)}, ${sqlString(description)}, ${sqlString((optionalText(input.screenRecordingLink, "Screen recording link", TEXT_LIMITS.link) ?? null))}, ${sqlString((optionalText(input.sourceScreen, "Source", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedTable, "Source table", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedRowId, "Source row", TEXT_LIMITS.short) ?? null))}, ${sqlString(status)}, 0, ${sqlString(accountId)}, ${sqlString(appId)}, ${sqlString(raisedBy)}, ${sqlString(ref)}, ${sqlString(rank)}, ${sqlString(lockedAt)}, ${sqlString((optionalText(input.titleDe, "German title", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.titleEn, "English title", TEXT_LIMITS.short) ?? null))}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
   )
 
   await logActivity(cfg, guard.databaseId, actor, {
@@ -627,7 +888,7 @@ function refuseIfLocked(scope: AccountScope, row: TicketRow, what: string): void
     throw new GuardError(
       409,
       "ticket_locked",
-      `We've already picked this one up, so ${what} is fixed now — add a comment and we'll pick it up from there.`
+      `We've already picked this one up, so ${what} is fixed now. Add a comment and we'll pick it up from there.`
     )
 }
 
@@ -650,7 +911,7 @@ export async function updateTicket(
   // a colleague's question is not being allowed to rewrite it.
   refuseIfLocked(scope, before, "the wording")
   if (scope.kind === "portal" && before.creator_id !== guard.userId)
-    throw new GuardError(403, "not_yours", "This one was raised by a colleague — add a comment instead.")
+    throw new GuardError(403, "not_yours", "This one was raised by a colleague. Add a comment instead.")
 
   // NAMING THE CLIENT ON A TICKET THAT HAS NONE — set once, never moved.
   //
@@ -667,6 +928,15 @@ export async function updateTicket(
     throw new GuardError(409, "account_fixed", "This ticket already belongs to another client, and can't be moved.")
   }
   const accountAfter = before.account_id ?? namedAccount
+  // The app and the contact are ordinary editable facts — unlike the client, both
+  // can legitimately be corrected (a request filed against the wrong system, a
+  // colleague who actually raised it). An absent value means "leave it alone",
+  // the same rule the two titles follow: a portal form that does not offer the
+  // field must not blank ours.
+  const appId = (await appForTicket(cfg, guard, input.appId)) ?? before.app_id
+  const raisedBy =
+    (await contactForTicket(cfg, guard, input.raisedByContactId, accountAfter)) ??
+    before.raised_by_contact_id
 
   const now = new Date().toISOString()
   // The fence rides the UPDATE as well as the read above — same sentence, same
@@ -692,7 +962,7 @@ export async function updateTicket(
     cfg,
     guard.databaseId,
     `UPDATE help SET help_type = ?, description = ?, screen_recording_link = ?, source_screen = ?,
-       title_de = ?, title_en = ?,
+       title_de = ?, title_en = ?, app_id = ?, raised_by_contact_id = ?,
        account_id = ?, updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ?${lockSet}
      WHERE id = ?${fence.sql ? ` AND ${fence.sql}` : ""}${ownership} RETURNING id`,
     [
@@ -705,6 +975,8 @@ export async function updateTicket(
       // form that only knows about its own language must not delete ours.
       optionalText(input.titleDe, "German title", TEXT_LIMITS.short) ?? before.title_de,
       optionalText(input.titleEn, "English title", TEXT_LIMITS.short) ?? before.title_en,
+      appId,
+      raisedBy,
       accountAfter,
       now,
       actor.id,
@@ -722,7 +994,7 @@ export async function updateTicket(
     throw new GuardError(
       409,
       "ticket_locked",
-      "We've already picked this one up, so the wording is fixed now — add a comment and we'll pick it up from there."
+      "We've already picked this one up, so the wording is fixed now. Add a comment and we'll pick it up from there."
     )
 
   const changes = describeChanges([
@@ -738,7 +1010,7 @@ export async function updateTicket(
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Ticket edited",
-    description: `${actor.name} edited ${before.ref ?? "a ticket"}${changes ? ` — ${changes}` : ""}`,
+    description: `${actor.name} edited ${before.ref ?? "a ticket"}${changes ? `, ${changes}` : ""}`,
     relatedTable: "help",
     relatedRowId: id,
   })
@@ -786,6 +1058,108 @@ export async function setStatus(
   await logActivity(cfg, guard.databaseId, actor, {
     type: `Ticket ${status === "resolved" ? "resolved" : status === "ready" ? "ready" : "updated"}`,
     description: `${actor.name} set ${before.ref ?? "a ticket"} to ${status.replace("_", " ")}`,
+    relatedTable: "help",
+    relatedRowId: id,
+  })
+  return { moved: true, accountId: before.account_id }
+}
+
+/** RESOLVING IS NOT A STATUS MOVE (CHECKLIST 5.6 + 5.7).
+ *
+ * "Resolve is refused until a resolution has been written", and resolving emails
+ * the client — so it cannot be reachable as one value in a dropdown of seven. It
+ * has a door of its own (`/help/resolve`) which requires the words and sends
+ * them; every other way to the word `resolved` is refused here, in one sentence,
+ * called by all three status doors (single, bulk-by-id, bulk-by-filter).
+ *
+ * A FUNCTION AND NOT A CONDITION AT EACH DOOR, for R24's reason in miniature: a
+ * condition can be forgotten by the next door somebody writes, and there are
+ * already three of them. */
+export function refuseDirectResolve(status: HelpStatus): void {
+  if (status !== "resolved") return
+  throw new GuardError(
+    400,
+    "resolution_required",
+    "A ticket is resolved by sending the answer, not by setting a status. Write the resolution and send it."
+  )
+}
+
+/** THE CLIENT SAYS YES (CHECKLIST 5.13). Moves a waiting ticket into the ordinary
+ * queue and stamps WHEN they said so.
+ *
+ * R17: `status = 'awaiting_validation'` rides the UPDATE, so a second press moves
+ * zero rows — no duplicate history, no second ping. Validating a ticket that was
+ * never waiting is not an error and not an event: it moves nothing.
+ *
+ * It does NOT close the wording lock. The client is confirming they want the
+ * thing, not handing it over — and until somebody here reads it, the account
+ * still owns what it says (SCOPE ch.07). */
+export async function validateTicket(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  actor: Actor,
+  id: string
+): Promise<{ moved: boolean; accountId: string | null }> {
+  const before = await ticketOrThrow(cfg, guard, scope, id)
+  const now = new Date().toISOString()
+  const fence = ticketFence(guard, scope, "all")
+  const changed = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    // R17: `status IN (…)` rather than `status = …`, which is the same sentence
+    // and the spelling the rest of this module uses — the states a move is
+    // allowed OUT OF, named in the statement rather than checked before it.
+    `UPDATE help SET status = 'new', validated_at = ?, updated_at = ?
+      WHERE id = ? AND status IN ('awaiting_validation')${fence.sql ? ` AND ${fence.sql}` : ""} RETURNING id`,
+    [now, now, id, ...fence.params]
+  )
+  if (!changed[0]) return { moved: false, accountId: before.account_id }
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: "Ticket validated",
+    description: `${actor.name} confirmed ${before.ref ?? "a ticket"} should go ahead`,
+    relatedTable: "help",
+    relatedRowId: id,
+  })
+  return { moved: true, accountId: before.account_id }
+}
+
+/** SOMEBODY READ IT (CHECKLIST 5.11) — the one act the triage screen performs.
+ *
+ * Triage is the only stage of the ladder a person genuinely does and a machine
+ * cannot infer: "I have read this and it is a real piece of work" is a judgement.
+ * So it is a door with its own word rather than a value in a status picker, and
+ * the strip's waiting list is what it is pressed from.
+ *
+ * R17: `status = 'new'` rides the UPDATE. A ticket already triaged, already
+ * scheduled or already in progress moves zero rows — reading it a second time is
+ * not an event, and this must never drag a started ticket backwards. */
+export async function markTriaged(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  actor: Actor,
+  id: string
+): Promise<{ moved: boolean; accountId: string | null }> {
+  const before = await ticketOrThrow(cfg, guard, scope, id)
+  const now = new Date().toISOString()
+  const changed = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    // The lock closes here: reading a request IS the first staff touch, which is
+    // the sentence SCOPE ch.07 defines the lock by.
+    // R17, same spelling: reading a request that has already been read, or one
+    // somebody has since started, moves zero rows — it must never drag a started
+    // ticket backwards.
+    `UPDATE help SET status = 'triaged', locked_at = COALESCE(locked_at, ?), updated_at = ?,
+       editor_id = ?, editor_email = ?, editor_name = ?
+     WHERE id = ? AND status IN ('new') RETURNING id`,
+    [now, now, actor.id, actor.email, actor.name, id]
+  )
+  if (!changed[0]) return { moved: false, accountId: before.account_id }
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: "Ticket triaged",
+    description: `${actor.name} read ${before.ref ?? "a ticket"}`,
     relatedTable: "help",
     relatedRowId: id,
   })
@@ -976,7 +1350,7 @@ export async function bulkSetStatusByFilter(
     throw new GuardError(
       400,
       "too_many",
-      `That filter matches ${matched} tickets — the bulk ceiling is ${BULK_IDS_LIMIT}. Narrow the filter.`
+      `That filter matches ${matched} tickets, the bulk ceiling is ${BULK_IDS_LIMIT}. Narrow the filter.`
     )
 
   const now = new Date().toISOString()

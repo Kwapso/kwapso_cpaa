@@ -13,6 +13,7 @@ import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs
 import type { PermissionValue } from "@shared/types"
 import { CONCEPT_ICON, TEAM_SECTIONS, type TeamSection } from "@/lib/pages"
 import { formatCount } from "@shared/web/format-count"
+import { useT } from "@shared/web/language"
 
 export function TeamSectionNav({
   teamId,
@@ -28,6 +29,7 @@ export function TeamSectionNav({
   counts: Partial<Record<TeamSection["key"], number>>
   onNavigate: (href: string) => void
 }) {
+  const t = useT()
   if (!perms) return null
   // Only "tab" sections live in this strip — Learning/Tickets are sidebar pages and
   // Import is reached contextually. Each tab is gated by its own read right.
@@ -45,7 +47,7 @@ export function TeamSectionNav({
           const count = counts[s.key]
           return {
             value: s.key,
-            label: s.title,
+            label: t(s.title),
             icon: CONCEPT_ICON[s.key],
             // Hide the chip when empty (0) or still loading (undefined) — a "0"
             // badge is noise; show it only once there's a real count.

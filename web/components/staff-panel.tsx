@@ -22,7 +22,7 @@ import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Card, CardContent } from "@kwapso/ui/registry/primitives/card/card"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { Pencil, Plus, Power } from "lucide-react"
+import { Pencil, Power } from "lucide-react"
 
 import { CertificateFormDialog, type CertificateValues } from "@/components/certificate-form-dialog"
 import { StaffProfileDialog, type StaffProfileValues } from "@/components/staff-profile-dialog"
@@ -35,6 +35,8 @@ import { formatDate } from "@shared/web/format"
 import { safeHref } from "@/lib/rich-text"
 import { primeCache, useCached, useCachedValue } from "@shared/web/store"
 import type { StaffCertificate, StaffProfile } from "@shared/types"
+import { useT } from "@shared/web/language"
+import { AddButton } from "@/components/deep-link/screen-bits"
 
 export function StaffPanel({
   teamId,
@@ -45,6 +47,7 @@ export function StaffPanel({
   userId: string
   memberName: string
 }) {
+  const t = useT()
   const { can } = usePermissions(teamId)
   const mayRead = can("staff_profiles", "read")
   const mayWrite = can("staff_profiles", "edit")
@@ -88,7 +91,7 @@ export function StaffPanel({
   async function saveProfile(values: StaffProfileValues) {
     const { profiles } = await content.saveStaffProfile({ userId, ...values })
     primeCache(staffProfilesKey(teamId), profiles)
-    toast.success("Profile saved.")
+    toast.success(t("Profile saved."))
   }
 
   async function saveCertificate(values: CertificateValues) {
@@ -129,12 +132,12 @@ export function StaffPanel({
   // this person" rather than "nobody has written this bit yet".
   const profileItems = profile
     ? [
-        { label: "In one line", value: profile.headline },
-        { label: "Personality type", value: profile.personalityType },
-        { label: "Best at", value: profile.strengths },
-        { label: "Finds hard", value: profile.weaknesses },
-        { label: "Looks up to", value: profile.roleModels },
-        { label: "More", value: profile.about },
+        { label: t("In one line"), value: profile.headline },
+        { label: t("Personality type"), value: profile.personalityType },
+        { label: t("Best at"), value: profile.strengths },
+        { label: t("Finds hard"), value: profile.weaknesses },
+        { label: t("Looks up to"), value: profile.roleModels },
+        { label: t("More"), value: profile.about },
       ].filter((i): i is { label: string; value: string } => !!i.value)
     : []
 
@@ -142,10 +145,10 @@ export function StaffPanel({
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-          Profile
+          {t("Profile")}
           {profile && !profile.active && (
             <Badge variant="outline" className="text-muted-foreground text-[10px]">
-              Retired
+              {t("Retired")}
             </Badge>
           )}
         </h2>
@@ -170,7 +173,7 @@ export function StaffPanel({
                 className="text-destructive hover:text-destructive gap-1.5"
               >
                 <Power className="size-3.5" />
-                Retire profile
+                {t("Retire profile")}
               </Button>
             ) : (
               <Button
@@ -180,7 +183,7 @@ export function StaffPanel({
                 className="gap-1.5"
               >
                 <Power className="size-3.5" />
-                Restore profile
+                {t("Restore profile")}
               </Button>
             ))}
         </div>
@@ -191,8 +194,7 @@ export function StaffPanel({
             <OverviewList items={profileItems} />
           ) : (
             <p className="text-muted-foreground text-sm">
-              Nothing written about {memberName} yet. The team can read what goes here; no client
-              ever can.
+              {t("Nothing written about")} {memberName} {t("yet. The team can read what goes here; no client ever can.")}
             </p>
           )}
         </CardContent>
@@ -200,7 +202,7 @@ export function StaffPanel({
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-          Certificates
+          {t("Certificates")}
           {/* R16: the number is the door's exact total through the ONE seam. This
               one counts the TEAM's register, which is what the door counts — a
               per-person figure would need its own COUNT(*) and this panel is not
@@ -212,24 +214,19 @@ export function StaffPanel({
           ) : null}
         </h2>
         {mayAdd && (
-          <Button
-            variant="outline"
-            size="sm"
+          <AddButton
+            label={t("Record one")}
             onClick={() => {
               setEditingCert(null)
               setCertOpen(true)
             }}
-            className="gap-1.5"
-          >
-            <Plus className="size-3.5" />
-            Record one
-          </Button>
+          />
         )}
       </div>
       <Card>
         <CardContent className="flex flex-col gap-3 p-4">
           {certificates.length === 0 ? (
-            <p className="text-muted-foreground text-sm">Nothing recorded for {memberName} yet.</p>
+            <p className="text-muted-foreground text-sm">{t("Nothing recorded for")} {memberName} {t("yet.")}</p>
           ) : (
             certificates.map((c) => {
               const link = safeHref(c.fileUrl)
@@ -251,7 +248,7 @@ export function StaffPanel({
                       )}
                       {!c.active && (
                         <Badge variant="outline" className="text-muted-foreground text-[10px]">
-                          Archived
+                          {t("Archived")}
                         </Badge>
                       )}
                     </p>
@@ -277,7 +274,7 @@ export function StaffPanel({
                         className="gap-1.5"
                       >
                         <Pencil className="size-3.5" />
-                        Edit
+                        {t("Edit")}
                       </Button>
                     )}
                     {mayArchive && (

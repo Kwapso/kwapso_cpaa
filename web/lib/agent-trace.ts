@@ -80,17 +80,6 @@ export function traceFor(
     case "set_dropdown_active":
       return { path: seg(teamId, "dropdowns"), highlight: "main" }
 
-    /* ------------------------------- learning ------------------------------ */
-    // Create → the learning list (the "New article" form is a rich dialog; land on the
-    // list where the new row appears live). Edit / (de)activate / mark-done → the
-    // article's detail.
-    case "create_learning":
-      return { path: seg(teamId, "learning"), highlight: "main" }
-    case "update_learning":
-    case "set_learning_active":
-    case "mark_learning_done":
-      return { path: `${seg(teamId, "learning")}/${str(input, "id")}`, highlight: "main" }
-
     /* -------------------------------- tickets ------------------------------- */
     // Raise → the Tickets list (the new ticket appears live). Reply / edit / status
     // → that ticket's detail thread.
@@ -100,6 +89,15 @@ export function traceFor(
       return { path: `${seg(teamId, "tickets")}/${str(input, "helpId")}`, highlight: "main" }
     case "update_help_ticket":
     case "set_help_status":
+    // The two acts on the ladder a person still performs (CHECKLIST 5.11, 5.13).
+    // Both land on the ticket, because both are statements ABOUT that request and
+    // the record is where the new stage is now written.
+    case "validate_help_ticket":
+    case "triage_help_ticket":
+    // Attaching or taking off a file or a link lands on the ticket too — its
+    // Files and links tab is where the change is.
+    case "add_help_link":
+    case "remove_help_attachment":
     // Answering lands on the ticket, where the words that were sent are now the
     // last thing in the conversation.
     case "resolve_help_ticket":
@@ -157,17 +155,19 @@ export function traceFor(
     case "bulk_set_help_status":
     case "set_help_status_by_filter":
       return { path: seg(teamId, "tickets"), highlight: "main" }
-    case "bulk_set_learning_active":
-      return { path: seg(teamId, "learning"), highlight: "main" }
 
     /* ----------------------------- process maps ----------------------------- */
-    // An APP has no screen of its own — it is the heading a map sits under, and
-    // the filter above the list — so every app write lands on the maps page,
-    // where the new or changed app shows on the rows beneath it.
+    // AN APP HAS ITS OWN SCREEN NOW — it got one on 17 Aug 2026, the same day
+    // process maps stopped being a nav destination, so the old note here ("an
+    // app is the heading a map sits under") sent people to a page that no longer
+    // leads with what they had just changed. A create lands on the list, where
+    // the new tile appears live; an edit lands on the record, because its
+    // people, its context and its work are all on that one screen.
     case "create_app":
+      return { path: seg(teamId, "apps"), highlight: "main" }
     case "update_app":
     case "set_app_active":
-      return { path: seg(teamId, "processes"), highlight: "main" }
+      return { path: `${seg(teamId, "apps")}/${str(input, "id")}`, highlight: "main" }
     // Create → the maps list, where the new map appears live. Everything else →
     // that map's own detail, because its steps, its versions and its
     // conversation are all on one screen, so a change is visible wherever it
@@ -200,6 +200,9 @@ export function traceFor(
     case "create_internal_rate":
     case "update_internal_rate":
     case "set_internal_rate_active":
+    // A ROLE'S price sits on the same card, on the same settings screen, for the
+    // same reason: it is a handful of lines read whole, with no per-row URL.
+    case "set_role_rate":
       return { path: `/t/${teamId}`, highlight: "main" }
 
     /* ----------------------------- the work engine -------------------------- */
@@ -216,7 +219,6 @@ export function traceFor(
       return { path: seg(teamId, "stories"), highlight: "main" }
     case "update_story":
     case "set_story_status":
-    case "rank_story":
       return { path: `${seg(teamId, "stories")}/${str(input, "id")}`, highlight: "main" }
     case "create_sprint":
       return { path: seg(teamId, "sprints"), highlight: "main" }
@@ -250,10 +252,16 @@ export function traceFor(
     // meeting's own "it is in your calendar" line. The entry it made is in
     // Google, which is not a screen this app can ring.
     case "create_meeting":
+    // Bringing a series in makes many records and no one of them is the change,
+    // so it lands on the diary rather than on a record.
+    case "sync_calendar_series":
       return { path: seg(teamId, "meetings"), highlight: "main" }
     case "update_meeting":
     case "set_meeting_held":
     case "set_meeting_active":
+    // Reading the transcript changes the meeting's own status line and its work
+    // logs tab, both of which are on the record — so the record is where to land.
+    case "read_meeting_transcript":
       return { path: `${seg(teamId, "meetings")}/${str(input, "id")}`, highlight: "main" }
     case "add_meeting_to_calendar":
       return { path: `${seg(teamId, "meetings")}/${str(input, "meetingId")}`, highlight: "main" }
@@ -272,21 +280,11 @@ export function traceFor(
     // owner's own reason: a profile and a certificate live on the MEMBER's page,
     // so that is where a trace has to go — `/t/<team>/staff/<id>` would be a URL
     // this app deliberately does not have.
-    case "create_marketing_post":
-      return { path: seg(teamId, "marketing"), highlight: "main" }
-    case "update_marketing_post":
-    case "set_marketing_post_active":
-      return { path: `${seg(teamId, "marketing")}/${str(input, "id")}`, highlight: "main" }
     case "create_brand_asset":
       return { path: seg(teamId, "brand"), highlight: "main" }
     case "update_brand_asset":
     case "set_brand_asset_active":
       return { path: `${seg(teamId, "brand")}/${str(input, "id")}`, highlight: "main" }
-    case "create_programme":
-      return { path: seg(teamId, "delivery"), highlight: "main" }
-    case "update_programme":
-    case "set_programme_active":
-      return { path: `${seg(teamId, "delivery")}/${str(input, "id")}`, highlight: "main" }
     case "create_meeting_purpose":
       return { path: seg(teamId, "purposes"), highlight: "main" }
     case "update_meeting_purpose":
@@ -323,8 +321,8 @@ export const SCREENLESS_WRITE_TOOLS: string[] = [
   "update_staff_certificate",
   "set_staff_certificate_active",
   "set_staff_profile_active",
-  // THE SIX GOOGLE WRITES. Every one of them changes something in GOOGLE — a
-  // file in a Drive folder, a draft in a mailbox, an event in a diary, a message
+  // EVERY GOOGLE WRITE. All of them change something in GOOGLE — a file in a
+  // Drive folder, a draft or a label in a mailbox, an event in a diary, a message
   // in a space — and kwapso has no screen showing any of those, deliberately: a
   // card that re-implemented Gmail beside Gmail would be the wrong kind of
   // ambitious, and driving somebody to a page that shows nothing they just did is
@@ -335,11 +333,23 @@ export const SCREENLESS_WRITE_TOOLS: string[] = [
   // Settings. That is not a trace target either: `/settings` is not under
   // `/t/<team>/`, and the check rightly insists a trace lands on the team host.
   // The mail tools carry the better answer anyway — the draft's own Gmail link,
-  // which the assistant is told to hand over every time.
+  // which the assistant is told to hand over every time; the Drive tools carry
+  // the file's own Drive link, and the calendar tools the entry's.
   "google_drive_upload",
+  "google_drive_update",
+  "google_drive_folder",
+  "google_mail_to_drive",
+  "google_drive_trash",
   "google_draft_reply",
   "google_send_mail",
+  "google_reply_mail",
+  "google_label_mail",
   "google_create_event",
   "google_sprint_to_calendar",
+  "google_update_event",
+  "google_event_guests",
+  "google_event_location",
+  "google_cancel_event",
   "google_chat_post",
+  "google_chat_delete",
 ]

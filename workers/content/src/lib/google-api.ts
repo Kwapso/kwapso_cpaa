@@ -62,13 +62,32 @@ async function googleFetch(
     },
     ...(init?.body ? { body: init.body } : {}),
   })
-  if (res.status === 401 || res.status === 403)
-    throw new GuardError(
-      409,
-      "google_access_lost",
-      "Google wouldn't allow that any more — the connection may have been removed in your Google account. Connect it again in Settings."
+  // WHAT GOOGLE ACTUALLY SAID, in the log and nowhere else.
+  //
+  // These two refusals are clean GuardErrors, so they never reach the worker's
+  // central catch and never wrote a line anywhere — which made "Google couldn't
+  // answer that just now" the least diagnosable sentence in the product. It cost
+  // a live sweep an afternoon: a door failed, the caller was told to try again,
+  // and there was no way for anyone — owner or developer — to learn that Google
+  // had said `PERMISSION_DENIED` about a scope nobody had granted.
+  //
+  // The CALLER's answer does not change (Google's own wording is about a request
+  // they did not write). What changes is that the tail now says which call, what
+  // status, and Google's reason — with the URL's query string dropped, because
+  // that is where a person's search words live, and never the token.
+  if (!res.ok) {
+    const said = await res.text().catch(() => "")
+    console.error(
+      `google ${init?.method ?? "GET"} ${new URL(url).origin}${new URL(url).pathname} → ${res.status}: ${said.slice(0, 400)}`
     )
-  if (!res.ok) throw new GuardError(502, "google_refused", "Google couldn't answer that just now. Try again.")
+    if (res.status === 401 || res.status === 403)
+      throw new GuardError(
+        409,
+        "google_access_lost",
+        "Google wouldn't allow that any more, the connection may have been removed in your Google account. Connect it again in Settings."
+      )
+    throw new GuardError(502, "google_refused", "Google couldn't answer that just now. Try again.")
+  }
   return res.json()
 }
 
@@ -88,6 +107,11 @@ export type DriveFile = {
    * guess which shelf a file sits on. */
   folderId: string
 }
+
+/** Google's own mime type for a folder. Named once because it is spelled in two
+ * places — the picker's query and the folder create below — and a typo in either
+ * is a silently wrong answer rather than an error. */
+const DRIVE_FOLDER_MIME = "application/vnd.google-apps.folder"
 
 /**
  * Files inside the folders the caller NAMED, and nowhere else.
@@ -144,7 +168,7 @@ export async function driveList(
  * only: it lists folder NAMES and ids so somebody can choose one, and choosing
  * one is what makes its contents reachable. */
 export async function driveFolders(token: string, search?: string): Promise<DriveFile[]> {
-  const clauses = ["mimeType = 'application/vnd.google-apps.folder'", "trashed = false"]
+  const clauses = [`mimeType = '${DRIVE_FOLDER_MIME}'`, "trashed = false"]
   if (search) clauses.push(`name contains '${escapeDriveLiteral(search)}'`)
   const url = new URL("https://www.googleapis.com/drive/v3/files")
   url.searchParams.set("q", clauses.join(" and "))
@@ -190,17 +214,31 @@ export async function driveFileText(token: string, fileId: string): Promise<stri
   const mime = str(meta.mimeType)
   const isGoogleDoc = mime.startsWith("application/vnd.google-apps")
   const url = isGoogleDoc
-    ? `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/export?mimeType=text/plain`
+    ? `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/export?mimeType=text/plain&supportsAllDrives=true`
     : `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`
   const res = await fetch(url, {
     // R11.
     signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS),
     headers: { Authorization: `Bearer ${token}` },
   })
-  if (res.status === 401 || res.status === 403)
-    throw new GuardError(409, "google_access_lost", "Google wouldn't allow that any more — connect it again in Settings.")
-  // A file with no text representation (an image, a zip) is not an error: it is
-  // a file with nothing to read, and the caller gets an empty string.
+  // A 401 IS about the grant: the token stopped being accepted between the
+  // metadata call above and this one, and the caller has to hear that rather
+  // than watch the rest of the folder quietly become empty strings.
+  if (res.status === 401)
+    throw new GuardError(409, "google_access_lost", "Google wouldn't allow that any more. Connect it again in Settings.")
+  // A 403 IS NOT, and this line used to treat them alike. The metadata call
+  // ahead of this one goes through googleFetch, which throws on 401/403 — so the
+  // token is already proven good ON THIS FILE, and a refusal here is about the
+  // FILE: downloading switched off by its owner, a Shared Drive retention rule,
+  // Google's abusive-file flag. It belongs with the image and the zip below — a
+  // file with nothing we can read — not with a broken connection.
+  //
+  // Why it matters more than one file's text: the caller in google-read.ts reads
+  // a whole named folder in an uncaught loop. On 2026-08-17 one such file made
+  // that sweep index NOTHING out of a live folder and record "connect it again
+  // in Settings" against a grant that was never broken, while Gmail, Calendar
+  // and Chat indexed 25, 25 and 2 the same minute. A dead token still stops the
+  // loop, which is right; one awkward file no longer does.
   if (!res.ok) return ""
   return (await res.text()).slice(0, DRIVE_TEXT_CAP)
 }
@@ -231,6 +269,105 @@ export async function driveUpload(
     webViewLink: str(data.webViewLink) || null,
     folderId: input.folderId,
   }
+}
+
+/**
+ * REWRITE A FILE THAT IS ALREADY THERE — the other half of "put a file in".
+ *
+ * The FENCE HERE IS GOOGLE'S, not a clause of ours, and that is the strongest
+ * shape available: the connection asks for `drive.file` alongside `drive.readonly`,
+ * and `drive.file` grants writing only to files this app created or the person
+ * explicitly opened to it. So a file id naming somebody's tax return is refused
+ * at Google with a 403 — which arrives here as "Google wouldn't allow that any
+ * more" — rather than by a check we could forget to write. The same reasoning the
+ * scope list itself gives: a promise kept at Google beats a promise kept in a
+ * line of our code.
+ *
+ * `name` renames it in the same call, because a document whose contents changed
+ * completely and whose title still says "draft" is a small lie the next reader
+ * has to discover.
+ */
+export async function driveUpdate(
+  token: string,
+  input: { fileId: string; name?: string; mimeType: string; text: string }
+): Promise<DriveFile> {
+  const boundary = `kwapso${crypto.randomUUID().replaceAll("-", "")}`
+  const metadata = JSON.stringify(input.name ? { name: input.name } : {})
+  const body =
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n` +
+    `--${boundary}\r\nContent-Type: ${input.mimeType}\r\n\r\n${input.text}\r\n` +
+    `--${boundary}--`
+  const data = (await googleFetch(
+    `https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(input.fileId)}?uploadType=multipart&supportsAllDrives=true&fields=id,name,mimeType,modifiedTime,webViewLink,parents`,
+    token,
+    { method: "PATCH", body, contentType: `multipart/related; boundary=${boundary}` }
+  )) as Record<string, unknown>
+  return {
+    id: str(data.id),
+    name: str(data.name),
+    mimeType: str(data.mimeType),
+    modifiedTime: str(data.modifiedTime) || null,
+    webViewLink: str(data.webViewLink) || null,
+    // Whichever folder it was already in — a rewrite never moves a file, and
+    // saying which shelf it sits on is the one thing the caller cannot see.
+    folderId: str((Array.isArray(data.parents) ? data.parents[0] : "") as string),
+  }
+}
+
+/** A NEW FOLDER inside one the caller named. A folder is an ordinary Drive file
+ * with Google's folder mime type — there is no separate endpoint — so this is the
+ * upload's metadata half with no bytes at all. */
+export async function driveCreateFolder(
+  token: string,
+  input: { parentId: string; name: string }
+): Promise<DriveFile> {
+  const data = (await googleFetch(
+    "https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id,name,mimeType,modifiedTime,webViewLink",
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        name: input.name,
+        mimeType: DRIVE_FOLDER_MIME,
+        parents: [input.parentId],
+      }),
+    }
+  )) as Record<string, unknown>
+  return {
+    id: str(data.id),
+    name: str(data.name),
+    mimeType: str(data.mimeType),
+    modifiedTime: str(data.modifiedTime) || null,
+    webViewLink: str(data.webViewLink) || null,
+    folderId: input.parentId,
+  }
+}
+
+/**
+ * TAKE IT BACK — the bin, never a permanent delete.
+ *
+ * The base's own rule is deactivate-never-delete, and Drive's trash IS that
+ * rule in Google's words: the file keeps its name, its history and its sharing
+ * for thirty days, and the person can put it back with one click. A permanent
+ * delete would be the one act in this module nobody could undo, so it is not
+ * written here and there is nowhere to ask for it.
+ *
+ * It answers whether anything MOVED (R17): trashing a file that is already in
+ * the bin changes nothing, and a door that recorded an act for it would put a
+ * line in somebody's history describing something that did not happen.
+ */
+export async function driveTrash(token: string, fileId: string): Promise<{ changed: boolean; name: string }> {
+  const meta = (await googleFetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=name,trashed&supportsAllDrives=true`,
+    token
+  )) as { name?: unknown; trashed?: unknown }
+  if (meta.trashed === true) return { changed: false, name: str(meta.name) }
+  const data = (await googleFetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?supportsAllDrives=true&fields=id,name`,
+    token,
+    { method: "PATCH", body: JSON.stringify({ trashed: true }) }
+  )) as Record<string, unknown>
+  return { changed: true, name: str(data.name) || str(meta.name) }
 }
 
 // ── GMAIL ────────────────────────────────────────────────────────────────────
@@ -299,13 +436,16 @@ export async function gmailMessage(
   const url = new URL(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(id)}`)
   url.searchParams.set("format", withBody ? "full" : "metadata")
   if (!withBody) for (const h of ["From", "To", "Subject", "Date"]) url.searchParams.append("metadataHeaders", h)
-  const data = (await googleFetch(url.toString(), token)) as Record<string, unknown>
+  return toMailMessage((await googleFetch(url.toString(), token)) as Record<string, unknown>, withBody)
+}
+
+/** One Gmail message object → the product's shape. Extracted from the single
+ * read the day the thread read needed the same parser: two copies of a MIME
+ * walker is two places for the same bug, and the second copy is always the one
+ * that forgets the depth bound. */
+function toMailMessage(data: Record<string, unknown>, withBody: boolean): MailMessage {
   const payload = (data.payload ?? {}) as Record<string, unknown>
-  const headers = new Map<string, string>()
-  for (const raw of Array.isArray(payload.headers) ? payload.headers : []) {
-    const h = raw as Record<string, unknown>
-    headers.set(str(h.name).toLowerCase(), str(h.value))
-  }
+  const headers = headerMap(payload)
   return {
     id: str(data.id),
     threadId: str(data.threadId),
@@ -317,6 +457,18 @@ export async function gmailMessage(
     url: `https://mail.google.com/mail/u/0/#all/${encodeURIComponent(str(data.id))}`,
     text: withBody ? readMailText(payload).slice(0, DRIVE_TEXT_CAP) : "",
   }
+}
+
+/** A message's headers, lower-cased by name. Header names are case-insensitive
+ * by the spec and Google is inconsistent about them (`Message-ID` and
+ * `Message-Id` both arrive), so the lookup key is decided once, here. */
+function headerMap(payload: Record<string, unknown>): Map<string, string> {
+  const out = new Map<string, string>()
+  for (const raw of Array.isArray(payload.headers) ? payload.headers : []) {
+    const h = raw as Record<string, unknown>
+    out.set(str(h.name).toLowerCase(), str(h.value))
+  }
+  return out
 }
 
 /** Walk a MIME tree for the first text part. Gmail nests alternatives
@@ -415,12 +567,26 @@ export async function gmailSendDraft(
 
 /** RFC-2822 bytes, base64url, as Gmail wants them. The header values have their
  * line breaks stripped: a newline inside a subject is header injection, and the
- * extra header it would smuggle in is `Bcc:`. */
-function encodeMessage(input: { to: string; subject: string; body: string }): string {
+ * extra header it would smuggle in is `Bcc:`.
+ *
+ * `inReplyTo` / `references` are what make a reply a REPLY rather than a new
+ * message that happens to share a subject line. Gmail's own `threadId` keeps it
+ * in the sender's thread; these two headers are what every OTHER mail client on
+ * the receiving side reads, and without them the answer lands in the recipient's
+ * inbox as a separate conversation. */
+function encodeMessage(input: {
+  to: string
+  subject: string
+  body: string
+  inReplyTo?: string
+  references?: string
+}): string {
   const header = (v: string) => v.replaceAll(/[\r\n]+/g, " ").trim()
   const text =
     `To: ${header(input.to)}\r\n` +
     `Subject: ${header(input.subject)}\r\n` +
+    (input.inReplyTo ? `In-Reply-To: ${header(input.inReplyTo)}\r\n` : "") +
+    (input.references ? `References: ${header(input.references)}\r\n` : "") +
     "Content-Type: text/plain; charset=UTF-8\r\n" +
     "MIME-Version: 1.0\r\n\r\n" +
     input.body
@@ -428,6 +594,174 @@ function encodeMessage(input: { to: string; subject: string; body: string }): st
   let binary = ""
   for (const b of bytes) binary += String.fromCharCode(b)
   return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "")
+}
+
+/** Messages a whole conversation will be read as. R14's spirit again: a thread
+ * with a hundred replies is one somebody has been arguing in for a month, and
+ * copying all of it into a document is a cost set by how much other people
+ * wrote. The newest are what a person filing a conversation actually wants. */
+const THREAD_MESSAGE_CAP = 25
+
+/**
+ * A WHOLE CONVERSATION, oldest first — what "file this exchange" means.
+ *
+ * Gmail's thread read hands back the same message objects the single read does,
+ * so this is `gmailMessage`'s parser over a list rather than a second one. The
+ * order is Gmail's own (oldest first), which is the order a person reads a
+ * conversation in and therefore the order it belongs in a document.
+ */
+export async function gmailThread(token: string, threadId: string): Promise<MailMessage[]> {
+  const url = new URL(
+    `https://gmail.googleapis.com/gmail/v1/users/me/threads/${encodeURIComponent(threadId)}`
+  )
+  url.searchParams.set("format", "full")
+  const data = (await googleFetch(url.toString(), token)) as { messages?: unknown }
+  return (Array.isArray(data.messages) ? data.messages : [])
+    .slice(0, THREAD_MESSAGE_CAP)
+    .map((raw) => toMailMessage(raw as Record<string, unknown>, true))
+}
+
+/**
+ * REPLY INSIDE THE CONVERSATION — and the reason it takes a MESSAGE id rather
+ * than a to/subject/threadId triple.
+ *
+ * Everything a reply needs is already written on the message being answered: who
+ * to send it to (its `From`), what to call it (its `Subject`, with one `Re:`),
+ * which conversation it belongs to (its `threadId`), and the two headers that
+ * make other mail clients thread it (`Message-ID` → `In-Reply-To`, plus the
+ * chain in `References`). A door that asked a caller for those would be a door
+ * that lets a caller get them wrong — and the way they go wrong is a reply that
+ * arrives as a brand-new conversation, or worse, addressed to the wrong person
+ * because somebody pasted the To of the message they were looking at.
+ *
+ * So the ONLY thing this takes is which message, and what to say.
+ */
+export async function gmailReply(
+  token: string,
+  input: { messageId: string; body: string }
+): Promise<{ messageId: string; threadId: string; to: string; subject: string }> {
+  const url = new URL(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(input.messageId)}`
+  )
+  url.searchParams.set("format", "metadata")
+  for (const h of ["From", "Reply-To", "Subject", "Message-ID", "References"])
+    url.searchParams.append("metadataHeaders", h)
+  const data = (await googleFetch(url.toString(), token)) as Record<string, unknown>
+  const headers = headerMap((data.payload ?? {}) as Record<string, unknown>)
+  // `Reply-To` wins where the sender asked for it — that header exists precisely
+  // to say "answer me here", and ignoring it sends the answer somewhere the
+  // person who wrote it said not to.
+  const to = headers.get("reply-to") || headers.get("from")
+  if (!to) throw new GuardError(409, "google_no_sender", "That message doesn't say who to reply to.")
+  const subject = headers.get("subject") ?? ""
+  const messageId = headers.get("message-id") ?? ""
+  const sent = (await googleFetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", token, {
+    method: "POST",
+    body: JSON.stringify({
+      raw: encodeMessage({
+        to,
+        subject: /^re:/i.test(subject) ? subject : `Re: ${subject}`,
+        body: input.body,
+        inReplyTo: messageId,
+        references: [headers.get("references") ?? "", messageId].filter(Boolean).join(" "),
+      }),
+      threadId: str(data.threadId),
+    }),
+  })) as Record<string, unknown>
+  return {
+    messageId: str(sent.id),
+    threadId: str(sent.threadId),
+    to,
+    subject: /^re:/i.test(subject) ? subject : `Re: ${subject}`,
+  }
+}
+
+// ── GMAIL LABELS ─────────────────────────────────────────────────────────────
+
+export type MailLabel = { id: string; name: string }
+
+/** Every label on the mailbox — the person's own, and Gmail's built-in ones.
+ * R14's spirit: one page, and a mailbox with more labels than this has a
+ * filing problem no list length will fix. */
+export async function gmailLabels(token: string): Promise<MailLabel[]> {
+  const data = (await googleFetch("https://gmail.googleapis.com/gmail/v1/users/me/labels", token)) as {
+    labels?: unknown
+  }
+  return (Array.isArray(data.labels) ? data.labels : [])
+    .slice(0, GMAIL_LABEL_CAP)
+    .map((raw) => {
+      const l = raw as Record<string, unknown>
+      return { id: str(l.id), name: str(l.name) }
+    })
+    .filter((l) => l.id && l.name)
+}
+
+/** Labels one read will carry back. See GOOGLE_PAGE_SIZE — same reasoning, a
+ * larger number because labels are cheap and a person really can have eighty. */
+const GMAIL_LABEL_CAP = 200
+
+/**
+ * FIND A LABEL BY THE NAME A PERSON SAYS, and make it if it isn't there.
+ *
+ * Gmail's API speaks label IDs (`Label_47`); people speak label names
+ * ("Contracts"). The match is case-insensitive because that is how a person
+ * believes labels work — somebody who types "contracts" and gets a SECOND label
+ * beside their existing "Contracts" has been given a filing system with two
+ * drawers for one thing, which is worse than an error.
+ *
+ * `create` is false when REMOVING: making a label in order to take it off a
+ * message is a write nobody asked for, and the honest answer to "remove a label
+ * that doesn't exist" is that nothing changed.
+ */
+export async function gmailLabelId(
+  token: string,
+  name: string,
+  create: boolean
+): Promise<string | null> {
+  const wanted = name.trim().toLowerCase()
+  const existing = (await gmailLabels(token)).find((l) => l.name.toLowerCase() === wanted)
+  if (existing) return existing.id
+  if (!create) return null
+  const data = (await googleFetch("https://gmail.googleapis.com/gmail/v1/users/me/labels", token, {
+    method: "POST",
+    body: JSON.stringify({
+      name: name.trim(),
+      labelListVisibility: "labelShow",
+      messageListVisibility: "show",
+    }),
+  })) as Record<string, unknown>
+  return str(data.id) || null
+}
+
+/** Which labels are on one message right now. Read before a write so the door
+ * can answer "nothing moved" honestly (R17) instead of asking Gmail to apply a
+ * label that is already there and calling it a change. */
+export async function gmailMessageLabelIds(token: string, messageId: string): Promise<string[]> {
+  const url = new URL(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}`
+  )
+  url.searchParams.set("format", "minimal")
+  const data = (await googleFetch(url.toString(), token)) as { labelIds?: unknown }
+  return (Array.isArray(data.labelIds) ? data.labelIds : []).map((v) => str(v)).filter(Boolean)
+}
+
+/** Put a label on one message, or take it off. One call either way — Gmail's
+ * modify endpoint takes both lists, and writing two functions for one endpoint
+ * would be two places for the same mistake. */
+export async function gmailLabelMessage(
+  token: string,
+  messageId: string,
+  labelId: string,
+  on: boolean
+): Promise<void> {
+  await googleFetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}/modify`,
+    token,
+    {
+      method: "POST",
+      body: JSON.stringify(on ? { addLabelIds: [labelId] } : { removeLabelIds: [labelId] }),
+    }
+  )
 }
 
 // ── CALENDAR ─────────────────────────────────────────────────────────────────
@@ -446,7 +780,32 @@ export type CalendarEvent = {
    * knowledge base would have to guess a client out of a meeting's title, which
    * is the guess the compartment idea exists to avoid. */
   attendees: string[]
+  /** WHERE — a room, an address, or nothing. Free text at Google, because that
+   * is what a person types. */
+  location: string
+  /** Google's own word: `confirmed`, `tentative` or `cancelled`. Carried so a
+   * cancelled entry can be recognised as cancelled rather than as missing —
+   * which is the difference between "the meeting is off" and "I can't find it". */
+  status: string
+  /** The Google Meet code on the entry (`abc-defg-hij`), or "". It is how a
+   * meeting's own recordings and transcripts are named, so it is the thread from
+   * a diary entry to what was said in the room. */
+  meetingCode: string
+  /** THE SERIES THIS INSTANCE BELONGS TO, or "" for a one-off (CHECKLIST 9.7).
+   *
+   * The calendar read asks for `singleEvents=true`, which expands a repeating
+   * entry into its instances and puts the PARENT's id on every one of them. That
+   * id was being thrown away here, which is why nothing in the app could tell
+   * the eleventh Monday stand-up from a one-off — and why "recurring meetings
+   * appear" had no fact to stand on. */
+  recurringEventId: string
 }
+
+/** Guests read off one event — and the most this app will REWRITE in one go.
+ * R14's spirit on the other axis (see toEvent), doing double duty: a read that
+ * stops at fifty is a bounded cost, and a guest-list write that stops at fifty
+ * is a refusal rather than a silent uninvitation (see calendarGuests). */
+const EVENT_ATTENDEE_CAP = 50
 
 export async function calendarList(
   token: string,
@@ -486,10 +845,140 @@ export async function calendarCreate(
   return toEvent(data)
 }
 
+/** ONE event, by its id. The read behind every calendar WRITE below: each of
+ * them has to know what is there before it can say what changed, and a door that
+ * patches without looking is a door that cannot answer "nothing moved" (R17). */
+export async function calendarGet(token: string, eventId: string): Promise<CalendarEvent> {
+  return toEvent(
+    await googleFetch(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`,
+      token
+    )
+  )
+}
+
+/**
+ * THE ONE WRITE ON AN EXISTING EVENT — everything above it is a caller deciding
+ * WHICH fields to hand over.
+ *
+ * A PATCH rather than a PUT, and that is the whole safety of this family: Google's
+ * update replaces the event with what you send, so a door that only wanted to fix
+ * a title would silently drop the guest list, the location and the conference
+ * link somebody spent a morning arranging. Sending only the changed fields makes
+ * "edit the time" mean the time.
+ *
+ * `sendUpdates` decides whether the guests hear about it. Google's default is to
+ * tell nobody, which is wrong for every change a person makes on purpose: an
+ * appointment moved without a word is an appointment two people turn up to at
+ * different hours.
+ */
+async function calendarPatch(
+  token: string,
+  eventId: string,
+  patch: Record<string, unknown>,
+  sendUpdates: "all" | "none" = "all"
+): Promise<CalendarEvent> {
+  const url = new URL(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`
+  )
+  url.searchParams.set("sendUpdates", sendUpdates)
+  return toEvent(
+    await googleFetch(url.toString(), token, { method: "PATCH", body: JSON.stringify(patch) })
+  )
+}
+
+/** Change what an entry SAYS and WHEN it is. Every field is optional and an
+ * absent one is left exactly as it was — see calendarPatch for why that is the
+ * difference between an edit and an overwrite. */
+export async function calendarUpdate(
+  token: string,
+  eventId: string,
+  input: {
+    summary?: string
+    description?: string
+    location?: string
+    start?: string
+    end?: string
+    allDay?: boolean
+  }
+): Promise<CalendarEvent> {
+  const when = (value: string) => (input.allDay ? { date: value.slice(0, 10) } : { dateTime: value })
+  return calendarPatch(token, eventId, {
+    ...(input.summary === undefined ? {} : { summary: input.summary }),
+    ...(input.description === undefined ? {} : { description: input.description }),
+    ...(input.location === undefined ? {} : { location: input.location }),
+    ...(input.start === undefined ? {} : { start: when(input.start) }),
+    ...(input.end === undefined ? {} : { end: when(input.end) }),
+  })
+}
+
+/**
+ * WHO IS COMING — added and removed in one call, against the list Google
+ * currently holds.
+ *
+ * READ-MODIFY-WRITE, because Google has no "add one guest" operation: the
+ * attendee list is a field, and writing it means writing all of it. Which is
+ * exactly why this reads the RAW list rather than the one `toEvent` carries —
+ * that one is capped at fifty for the sake of a bounded read, and rewriting a
+ * capped list would silently uninvite everybody past the cap. An event with more
+ * guests than we will rewrite is REFUSED, in words, rather than quietly trimmed.
+ *
+ * Matching is by address, lower-cased: `Ana <ana@x.de>` and `ana@x.de` are one
+ * person, and a remove that missed because of a capital letter would leave
+ * somebody invited to a meeting they were told they were off.
+ */
+export async function calendarGuests(
+  token: string,
+  eventId: string,
+  input: { add: string[]; remove: string[] }
+): Promise<{ event: CalendarEvent; changed: boolean }> {
+  const current = (await googleFetch(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}?fields=attendees`,
+    token
+  )) as { attendees?: unknown }
+  const rows = Array.isArray(current.attendees) ? current.attendees : []
+  if (rows.length > EVENT_ATTENDEE_CAP)
+    throw new GuardError(
+      409,
+      "google_too_many_guests",
+      `That event has more than ${EVENT_ATTENDEE_CAP} guests, change the guest list in Google Calendar itself.`
+    )
+  const drop = new Set(input.remove.map((e) => e.trim().toLowerCase()).filter(Boolean))
+  const kept = rows.filter((raw) => !drop.has(str((raw as Record<string, unknown>).email).toLowerCase()))
+  const have = new Set(kept.map((raw) => str((raw as Record<string, unknown>).email).toLowerCase()))
+  const added = input.add
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => e && !have.has(e))
+    .map((email) => ({ email }))
+  // NOTHING MOVED (R17): nobody was on the list to drop and nobody new to add.
+  // The door answers that honestly instead of writing the same list back and
+  // mailing every guest a change notification about it.
+  if (added.length === 0 && kept.length === rows.length)
+    return { event: await calendarGet(token, eventId), changed: false }
+  return {
+    event: await calendarPatch(token, eventId, { attendees: [...kept, ...added] }),
+    changed: true,
+  }
+}
+
+/** Call it off. `cancelled` rather than a delete, which is Google's own version
+ * of the house rule: the entry stays in everybody's calendar marked cancelled,
+ * the guests are told, and nobody is left holding an appointment that silently
+ * evaporated. A second call moves nothing and says so (R17). */
+export async function calendarCancel(
+  token: string,
+  eventId: string
+): Promise<{ event: CalendarEvent; changed: boolean }> {
+  const before = await calendarGet(token, eventId)
+  if (before.status === "cancelled") return { event: before, changed: false }
+  return { event: await calendarPatch(token, eventId, { status: "cancelled" }), changed: true }
+}
+
 function toEvent(raw: unknown): CalendarEvent {
   const e = raw as Record<string, unknown>
   const start = (e.start ?? {}) as Record<string, unknown>
   const end = (e.end ?? {}) as Record<string, unknown>
+  const conference = (e.conferenceData ?? {}) as Record<string, unknown>
   return {
     id: str(e.id),
     summary: str(e.summary),
@@ -497,6 +986,10 @@ function toEvent(raw: unknown): CalendarEvent {
     start: str(start.dateTime) || str(start.date),
     end: str(end.dateTime) || str(end.date),
     url: str(e.htmlLink) || null,
+    location: str(e.location),
+    status: str(e.status),
+    meetingCode: str(conference.conferenceId),
+    recurringEventId: str(e.recurringEventId),
     // Bounded like every other list here: an event with two hundred guests is
     // one somebody was BCC'd on, and reading all of them would make the cost of
     // one calendar read a number a stranger sets.
@@ -506,9 +999,6 @@ function toEvent(raw: unknown): CalendarEvent {
       .filter(Boolean),
   }
 }
-
-/** Guests read off one event. R14's spirit on the other axis — see toEvent. */
-const EVENT_ATTENDEE_CAP = 50
 
 // ── GOOGLE CHAT ──────────────────────────────────────────────────────────────
 
@@ -550,6 +1040,26 @@ export async function chatMessages(token: string, spaceName: string): Promise<Ch
       text: str(m.text),
       createdAt: str(m.createTime) || null,
     }
+  })
+}
+
+/**
+ * TAKE A MESSAGE BACK. The counterpart to chatPost, and the reason it exists is
+ * not symmetry: a message posted into a space somebody else reads is the one act
+ * in this module with no undo, and giving an assistant the power to post without
+ * the power to retract is how a wrong message stays wrong.
+ *
+ * `messageName` is Google's own full name (`spaces/AAA/messages/BBB`), which
+ * only ever comes back from a post or a read of that same space — so a message
+ * in a space this person never named cannot be spelled here.
+ *
+ * Google refuses to delete a message this app did not send (the `chat.messages`
+ * grant is per-app), which is the fence: kwapso can take back what kwapso said
+ * and nothing else.
+ */
+export async function chatDelete(token: string, messageName: string): Promise<void> {
+  await googleFetch(`https://chat.googleapis.com/v1/${encodeURI(messageName)}`, token, {
+    method: "DELETE",
   })
 }
 

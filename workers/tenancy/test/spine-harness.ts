@@ -103,7 +103,7 @@ export function buildSpineDb(): DatabaseSync {
   // The GLOBAL core tables the gating seam reads natively.
   db.exec(`
     CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT, first_name TEXT, last_name TEXT, current_team_id TEXT, updated_at TEXT, deactivated_at TEXT);
-    CREATE TABLE teams (id TEXT PRIMARY KEY, name TEXT, logo_url TEXT, database_id TEXT, db_status TEXT NOT NULL DEFAULT 'ready', created_at TEXT, creator_name TEXT, creator_email TEXT, updated_at TEXT, deactivated_at TEXT);
+    CREATE TABLE teams (id TEXT PRIMARY KEY, name TEXT, logo_url TEXT, database_id TEXT, db_status TEXT NOT NULL DEFAULT 'ready', created_at TEXT, creator_name TEXT, creator_email TEXT, updated_at TEXT, deactivated_at TEXT, legal_name TEXT, legal_address TEXT, legal_numbers TEXT, phone TEXT);
     CREATE TABLE team_members (id TEXT PRIMARY KEY, team_id TEXT, user_id TEXT, role_id TEXT, created_at TEXT, deactivated_at TEXT);
     INSERT INTO teams (id, name, database_id, created_at, creator_name, creator_email)
       VALUES ('${IDS.team}', 'Kwapso', 'db_team', '2026-01-01', 'Staff', 'staff@kwapso.app');
@@ -137,19 +137,33 @@ export function buildSpineDb(): DatabaseSync {
   // burglar holding it is not a worst case at all — it is the ordinary case, and
   // what stops them reading Bergman's homework is the account fence rather than
   // a refusal.
+  // `contacts` is on the list for the burglar's sake, most of all: the address
+  // book is now its own module, and a burglar refused by their ROLE would prove
+  // nothing about whether the FENCE holds. Holding it is the worst case, which
+  // is what this harness is for.
   // `work` is here for exactly that reason and no other. No real Client role
   // would ever hold it — every work-engine door refuses a portal caller outright
   // — which is precisely why the burglar must: a refusal proved against a caller
   // whose ROLE already stopped them proves nothing about the door.
+  // `all_tasks` (4.9) is on the list for BOTH reasons at once. For the staff
+  // caller it is the ordinary case — this harness's suites are about what the
+  // task doors DO, and a role missing the right would narrow every one of them
+  // to one person's list and quietly turn six view tests into assertions about
+  // an empty array. For the burglar it is the worst case: the widest sight of
+  // our own admin a role can be given, so a refusal proved with it held is a
+  // refusal proved by the DOOR. The narrowing itself is proved separately, by a
+  // caller who deliberately does not hold it (todos-tasks.test.ts).
   const grantAll = (roleId: string) =>
     db.exec(`
       INSERT INTO member_roles (id, title, is_default, created_at) VALUES ('${roleId}', '${roleId}', 0, '2026-01-01');
       INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
       SELECT '${roleId}_' || m.module, '${roleId}', m.module, 1, 1, 1, 1
-        FROM (SELECT 'accounts' AS module UNION ALL SELECT 'portal_users'
+        FROM (SELECT 'accounts' AS module UNION ALL SELECT 'contacts'
+              UNION ALL SELECT 'portal_users'
               UNION ALL SELECT 'team_members' UNION ALL SELECT 'member_roles'
               UNION ALL SELECT 'help' UNION ALL SELECT 'processes'
-              UNION ALL SELECT 'work' UNION ALL SELECT 'todos') m;`)
+              UNION ALL SELECT 'work' UNION ALL SELECT 'all_tasks'
+              UNION ALL SELECT 'todos') m;`)
   grantAll(IDS.adminRole)
   grantAll(IDS.clientRole)
 

@@ -11,10 +11,24 @@
 // The heading carries the exact server COUNT(*) (R16) because a sidebar page has
 // no tab strip to badge; the arbitration context makes sure only one of the two
 // ever renders it.
+//
+// AND IT IS WHERE MEETING PURPOSES ARE REACHED FROM. The taxonomy of why we meet
+// used to sit under the Delivery method page; that page went on 17 Aug 2026 with
+// its programmes folded onto the sprint type, and a purpose belongs beside the
+// diary rather than on a rail of its own — it is the vocabulary behind this
+// screen, not a second destination.
 
 import * as React from "react"
 
+import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
+import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
+import { CalendarSync } from "lucide-react"
+import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
+import {
+  CalendarView,
+  defaultCalendarViewConfig,
+} from "@kwapso/ui/registry/collections/calendar-view/calendar-view"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import {
   ScreenRenderer,
@@ -24,23 +38,58 @@ import {
 import type { ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
 
 import { CollectionHeading } from "@/components/collection-heading"
+import { CountedAbove } from "@/components/counted-tabs"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
 import { MeetingFormDialog, type MeetingFormValues } from "@/components/meeting-form-dialog"
 import { shapeMeetingsList } from "@/components/deep-link/shape"
-import { content as contentApi, tenancy } from "@/lib/api"
-import { listFetch, meetingsKey } from "@/lib/live-resources"
-import { withDataDrivenCollection } from "@/lib/screens"
-import type { Account, Meeting, MeetingPurpose } from "@shared/types"
-import { invalidate, useCached } from "@shared/web/store"
+import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
+import { appsKey, listFetch, meetingsKey, totalKey } from "@/lib/live-resources"
+import { field, withDataDrivenCollection } from "@/lib/screens"
+import type { Account, AppRow, Meeting, MeetingPurpose } from "@shared/types"
+import { invalidate, useCached, useCachedValue } from "@shared/web/store"
+import { formatCount } from "@shared/web/format-count"
+import { formatDate } from "@shared/web/format"
+import { useT } from "@shared/web/language"
+
+/** THE WEEK WE ARE IN, Monday to Sunday, in UTC — the same boundary
+ * workers/content/src/lib/meetings.ts computes for the badge above the list, so
+ * the number and the rows mean one week. */
+function inThisWeek(startsAt: string): boolean {
+  const now = new Date()
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  start.setUTCDate(start.getUTCDate() - ((start.getUTCDay() + 6) % 7))
+  const end = new Date(start)
+  end.setUTCDate(end.getUTCDate() + 7)
+  const at = Date.parse(startsAt)
+  return at >= start.getTime() && at < end.getTime()
+}
+
+/** WHAT "ALL" SHOWS (CHECKLIST 9.1: "all, with far more columns"). The two-field
+ * list is for scanning; this is the one somebody reads across, so it carries
+ * every fact a meeting row can state without opening it. */
+const ALL_COLUMNS = [
+  field("name", "Meeting"),
+  field("when", "When"),
+  field("client", "Client"),
+  field("app", "App"),
+  field("purpose", "Why we met"),
+  field("where", "Where"),
+  field("state", "Status"),
+  field("written", "Notes"),
+  field("reference", "Reference"),
+]
 
 export function MeetingsScreen({
   teamId,
   recipe,
   rights,
   total,
+  purposeCount,
   canCreate,
+  canReadPurposes,
+  onPurposes,
   onAction,
   onIntent,
 }: {
@@ -49,20 +98,61 @@ export function MeetingsScreen({
   rights: ScreenRights
   /** the exact server total (R16) — never the loaded page's length */
   total: number | undefined
+  /** the exact server total of the MEETING PURPOSES, for the link below */
+  purposeCount: number | undefined
   canCreate: boolean
+  /** `delivery:read` — the right the purposes screen itself gates on. */
+  canReadPurposes: boolean
+  onPurposes: () => void
   onAction: (actionId: string, ctx: ScreenActionContext) => void
   onIntent: (intent: ScreenIntent) => void
 }) {
+  const t = useT()
   const meetingsQ = useCached<Meeting[]>(meetingsKey(teamId), () => listFetch.meetings(teamId))
   // The two pickers the form needs. Both are read only when the dialog can be
   // opened at all — a person who cannot create a meeting has no use for either.
   const accountsQ = useCached<Account[]>(canCreate ? `accounts:${teamId}` : null, () =>
     tenancy.accounts().then((r) => r.accounts)
   )
-  const purposesQ = useCached<MeetingPurpose[]>(canCreate ? `purposes:${teamId}` : null, () =>
+  // WHICH SYSTEM A MEETING WAS ABOUT. Same condition as the accounts above, and
+  // out of the SAME bounded cache the apps page holds — an agency has tens of
+  // apps, so the picker costs nothing anybody has not already paid.
+  const appsQ = useCached<AppRow[]>(canCreate ? appsKey(teamId) : null, () => listFetch.apps(teamId))
+  // The purposes are read whenever this screen can offer them at all — the form
+  // picker needs them, and so does the count on the link below.
+  const purposesQ = useCached<MeetingPurpose[]>(canCreate || canReadPurposes ? `purposes:${teamId}` : null, () =>
     listFetch.purposes(teamId)
   )
   const [open, setOpen] = React.useState(false)
+  // THE THREE VIEWS (CHECKLIST 9.1). This week is past AND upcoming, because
+  // "this week" is the week somebody is in rather than the days left of it; the
+  // calendar is the library's month grid over the same rows; and All shows far
+  // more columns, which is what makes it worth being a separate view at all.
+  const [view, setView] = React.useState<"week" | "calendar" | "all">("week")
+  const weekTotal = useCachedValue<number>(totalKey("meetings-week", teamId))
+  // 9.7 — the repeating entries. `ahead` is the instances beyond the four-week
+  // horizon: shown, never stored, because one that far out can still be moved or
+  // called off in Google before it happens.
+  const [syncing, setSyncing] = React.useState(false)
+  const [ahead, setAhead] = React.useState<{ eventId: string; title: string; startsAt: string }[]>([])
+
+  async function bringInSeries() {
+    setSyncing(true)
+    try {
+      const r = await contentApi.syncCalendarSeries()
+      setAhead(r.ahead)
+      invalidate(meetingsKey(teamId))
+      toast.success(
+        r.created > 0
+          ? `${r.created} repeating ${r.created === 1 ? "meeting is" : "meetings are"} in the diary.`
+          : "Nothing new to bring in."
+      )
+    } catch (err) {
+      toast.error(err instanceof ApiFailure ? err.message : "Couldn't read your calendar.")
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   async function add(values: MeetingFormValues) {
     await contentApi.createMeeting({
@@ -70,31 +160,66 @@ export function MeetingsScreen({
       startsAt: values.startsAt,
       endsAt: values.endsAt || undefined,
       accountId: values.accountId || undefined,
+      appId: values.appId || undefined,
       purposeId: values.purposeId || undefined,
       location: values.location || undefined,
       agenda: values.agenda || undefined,
       notes: values.notes || undefined,
     })
     invalidate(meetingsKey(teamId))
-    toast.success("It's in the diary.")
+    toast.success(t("It's in the diary."))
   }
 
-  if (meetingsQ.error) return <p className="text-destructive text-sm">Couldn&apos;t load the meetings.</p>
+  if (meetingsQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the meetings.")}</p>
   if (meetingsQ.data === undefined) return <Skeleton variant="list" lines={4} />
   const loaded = meetingsQ.data
 
   return (
+    <CountedAbove active>
     <div className="flex flex-col gap-4">
-      {/* R16: a sidebar page has no tab strip to badge, so the count lives in the
-          heading — and it is the door's exact COUNT(*). */}
+      {/* R16: the strip below badges two exact server counts, so the heading
+          stands down through the arbitration context rather than saying a
+          number twice. */}
       <CollectionHeading sectionKey="meetings" total={total} />
+
+      <TabsView
+        config={{
+          ...defaultTabsConfig,
+          variant: "line",
+          tabs: [
+            {
+              value: "week",
+              label: t("This week"),
+              icon: "calendar-clock",
+              badge: formatCount(weekTotal),
+              badgeVariant: "" as const,
+            },
+            {
+              value: "calendar",
+              label: t("Calendar"),
+              icon: "calendar",
+              badge: formatCount(total),
+              badgeVariant: "" as const,
+            },
+            {
+              value: "all",
+              label: t("All"),
+              icon: "list",
+              badge: formatCount(total),
+              badgeVariant: "" as const,
+            },
+          ],
+        }}
+        value={view}
+        onValueChange={(v) => setView(v as "week" | "calendar" | "all")}
+      />
 
       {/* R14's other half: the diary pages, and the meeting somebody digs for is
           the OLD one — so the search box is answered by the door, over the whole
           diary rather than the page in the browser. */}
       <PagedFind<Meeting>
         listKey={meetingsKey(teamId)}
-        placeholder="Search meetings…"
+        placeholder={t("Search meetings…")}
         noun="meetings"
         fetchPage={(query, cursor) =>
           contentApi
@@ -105,18 +230,52 @@ export function MeetingsScreen({
         {(found) => {
           const rows = found.active ? found.rows : loaded
           if (rows === null) return <Skeleton variant="list" lines={4} />
-          const data = shapeMeetingsList(rows)
-          const listRecipe = withDataDrivenCollection(recipe, data.rows ?? [], found.emptyText)
+          // THIS WEEK is narrowed HERE and not by a second read, deliberately:
+          // the door has already told us how many there are (the badge above is
+          // its exact count), and the week sits inside the newest page for any
+          // agency that has not held fifty meetings since Monday. The date
+          // boundary is the same one the door computes — Monday, in UTC.
+          const shown = view === "week" ? rows.filter((m) => inThisWeek(m.startsAt)) : rows
+          const data = shapeMeetingsList(shown)
+          // ALL shows far more columns (9.1). The other two views stay the
+          // two-line list a person scans, which is the rulebook's own rule about
+          // a table being for scanning and a list for reading.
+          const listRecipe =
+            view === "all"
+              ? {
+                  ...withDataDrivenCollection(recipe, data.rows ?? [], found.emptyText),
+                  display: "table" as const,
+                  fields: ALL_COLUMNS,
+                }
+              : withDataDrivenCollection(recipe, data.rows ?? [], found.emptyText)
           return (
             <>
-              <SectionWithCreate show={canCreate} label="New meeting" icon="plus" onCreate={() => setOpen(true)}>
-                <ScreenRenderer
-                  recipe={listRecipe}
-                  data={data}
-                  rights={rights}
-                  onAction={onAction}
-                  onIntent={onIntent}
-                />
+              <SectionWithCreate show={canCreate} label={t("New meeting")} icon="plus" onCreate={() => setOpen(true)}>
+                {view === "calendar" ? (
+                  <CalendarView
+                    data={(data.rows ?? []).map((r) => ({
+                      id: String(r.id),
+                      date: String(r.startsOn ?? ""),
+                      title: String(r.name ?? ""),
+                      accent: String(r.state ?? ""),
+                    }))}
+                    config={{
+                      ...defaultCalendarViewConfig,
+                      dateField: "date",
+                      titleField: "title",
+                      accentField: "accent",
+                      weekStartsOn: "monday",
+                    }}
+                  />
+                ) : (
+                  <ScreenRenderer
+                    recipe={listRecipe}
+                    data={data}
+                    rights={rights}
+                    onAction={onAction}
+                    onIntent={onIntent}
+                  />
+                )}
               </SectionWithCreate>
 
               {/* R14: the heading counts the WHOLE diary, so the list under it has to be
@@ -124,21 +283,76 @@ export function MeetingsScreen({
               <LoadMore
                 listKey={found.listKey ?? meetingsKey(teamId)}
                 fetchPage={found.fetchPage}
-                label="Load more meetings"
+                label={t("Load more meetings")}
               />
             </>
           )
         }}
       </PagedFind>
 
+      {/* THE REPEATING ENTRIES (9.7). A button rather than something that happens
+          on every page load: it reads a person's own Google calendar with their
+          own token, and a read that costs somebody else's quota should be one
+          they asked for. */}
+      {canCreate && (
+        <div className="flex flex-col gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={syncing}
+            onClick={() => void bringInSeries()}
+            className="w-fit gap-1.5"
+          >
+            {syncing ? <Spinner /> : <CalendarSync className="size-3.5" />}
+            {t("Bring in repeating meetings")}
+          </Button>
+          {ahead.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              {/* READ-ONLY, AND SAID SO. These are not records: they become one
+                  four weeks before they happen, which is when there is somewhere
+                  to write the notes. */}
+              <p className="text-muted-foreground text-xs">
+                {t("Further out, and not records yet, each becomes one four weeks before it happens.")}
+              </p>
+              <ul className="flex flex-col gap-1">
+                {ahead.map((a) => (
+                  <li key={a.eventId} className="text-muted-foreground flex flex-wrap gap-2 text-sm">
+                    <span className="min-w-0 truncate">{a.title}</span>
+                    <span className="tabular-nums">{formatDate(a.startsAt)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* WHY WE MEET, one level down. A link rather than a nav line: the purposes
+          are the vocabulary this screen picks from, and a rail that lists both a
+          page and the words behind it reads as two ideas. R16: the number is the
+          door's exact total through the ONE seam, and an unloaded total renders
+          nothing rather than a "0" that reads as "there are none". */}
+      {canReadPurposes ? (
+        <button
+          type="button"
+          onClick={onPurposes}
+          className="text-muted-foreground hover:text-foreground w-fit text-sm underline-offset-4 hover:underline"
+        >
+          {t("Meeting purposes")}
+          {formatCount(purposeCount) ? ` (${formatCount(purposeCount)})` : ""}
+        </button>
+      ) : null}
+
       <MeetingFormDialog
         open={open}
         onOpenChange={setOpen}
         draftKey={`meeting:add:${teamId}`}
         accountOptions={(accountsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
+        appOptions={(appsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
         purposeOptions={(purposesQ.data ?? []).filter((p) => p.active).map((p) => ({ id: p.id, name: p.name }))}
         onSubmit={add}
       />
     </div>
+    </CountedAbove>
   )
 }

@@ -102,7 +102,7 @@ async function sendToMany(
   const list = people.slice(0, SEND_FAN_CAP)
   if (people.length > list.length)
     console.error(
-      `${who}: ${people.length} recipients is past the ${SEND_FAN_CAP} one send may fan out to — ` +
+      `${who}: ${people.length} recipients is past the ${SEND_FAN_CAP} one send may fan out to, ` +
         `${people.length - list.length} were NOT emailed. This wants a queue, not a bigger number.`
     )
   for (let i = 0; i < list.length; i += SEND_CONCURRENCY)
@@ -248,6 +248,104 @@ async function accountInboxes(
     }))
 }
 
+/** WHO IS TOLD THE ANSWER (CHECKLIST 5.7) — "the RAISER and the app's main
+ * stakeholder", Aurora's ts3 over the owner's "raiser only".
+ *
+ * TWO NAMED PEOPLE, NOT THE WHOLE COMPANY, and that narrowing is the change. This
+ * used to mail every live portal login at the account, which is right for a to-do
+ * (anybody can send us the file) and wrong for an answer: a resolution is a reply
+ * to somebody's question, and copying eleven colleagues on it is how a client
+ * mutes us.
+ *
+ * WHO THE RAISER IS. The CONTACT the ticket names, when it names one — that is
+ * the person who asked, and it is not always the person who typed: 220 of the 221
+ * seeded requests were typed by staff on a client's behalf. When no contact is
+ * named we fall back to whoever created the row, which is only ever an address if
+ * they were a client login in the first place.
+ *
+ * WHO THE MAIN STAKEHOLDER IS — and this is the sentence that changed when
+ * CHECKLIST 8.5 landed. The APP's main stakeholder when the ticket names an app
+ * that has one (`app_stakeholders.is_main`), and the ACCOUNT's
+ * (`account_links.is_main_stakeholder`) otherwise. In that order and not both:
+ * the person who owns the dispatch system is the person who wants to hear that
+ * a dispatch question was answered, and the account's relationship owner is the
+ * fallback for the tickets that name no system. It is one function and one
+ * sentence, exactly as the note that stood here predicted.
+ *
+ * DE-DUPED BY ADDRESS, because the raiser very often IS the main stakeholder at a
+ * small client, and two copies of one answer reads as a system that is not paying
+ * attention. Only LIVE portal grants: a revoked login is a person we stopped
+ * telling things. */
+async function resolutionInboxes(
+  env: Env,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  accountId: string,
+  ticket: { raised_by_contact_id: string | null; creator_id: string | null; app_id: string | null }
+): Promise<{ email: string; name: string }[]> {
+  // THE APP'S OWN MAIN STAKEHOLDER FIRST (8.5). One row at most — the partial
+  // unique index says so — and it is read before the account's so the narrower,
+  // truer answer wins when there is one.
+  const appMain = ticket.app_id
+    ? await d1Query<{ contact_id: string }>(
+        cfg,
+        guard.databaseId,
+        // R14: at most one live main stakeholder exists per app, by index.
+        `SELECT contact_id FROM app_stakeholders
+          WHERE app_id = ? AND is_main = 1 AND deactivated_at IS NULL LIMIT 1`,
+        [ticket.app_id]
+      )
+    : []
+  const mainContactId = appMain[0]?.contact_id ?? null
+  // The two PEOPLE, as account rows: whoever asked, and whoever owns the
+  // relationship. One read, because they are one question about one company.
+  //
+  // The account-level clause is asked ONLY when the app named nobody — an app
+  // with its own stakeholder is a deliberate answer to "who cares about this
+  // system?", and quietly copying the account's relationship owner as well
+  // would put the narrowing back where it was.
+  const rows = await d1Query<{ user_id: string }>(
+    cfg,
+    guard.databaseId,
+    `SELECT pu.user_id FROM portal_users pu
+      WHERE pu.deactivated_at IS NULL
+        AND (pu.account_id = ?
+             OR pu.account_id = ?
+             OR (? = '' AND EXISTS (SELECT 1 FROM account_links l
+                         WHERE l.person_account_id = pu.account_id AND l.account_id = ?
+                           AND l.deactivated_at IS NULL AND l.is_main_stakeholder = 1)))
+      LIMIT 100`, // R14 bound
+    [ticket.raised_by_contact_id ?? "", mainContactId ?? "", mainContactId ?? "", accountId]
+  )
+  const ids = new Set(rows.map((r) => r.user_id).filter(Boolean))
+  // …and the person who TYPED it, when that was a client login. A contact who
+  // raises their own question through the portal names no contact on the row, so
+  // this is the ordinary path for a ticket a client raised themselves.
+  if (ticket.creator_id) {
+    const own = await d1Query<{ user_id: string }>(
+      cfg,
+      guard.databaseId,
+      `SELECT user_id FROM portal_users WHERE user_id = ? AND deactivated_at IS NULL LIMIT 1`,
+      [ticket.creator_id]
+    )
+    if (own[0]) ids.add(own[0].user_id)
+  }
+  if (!ids.size) return []
+  const list = [...ids]
+  const { results } = await env.DB.prepare(
+    `SELECT email, first_name, last_name FROM users WHERE id IN (${list.map(() => "?").join(", ")})`
+  )
+    .bind(...list)
+    .all<{ email: string; first_name: string | null; last_name: string | null }>()
+  const seen = new Set<string>()
+  return (results ?? [])
+    .filter((r) => r.email && !seen.has(r.email) && seen.add(r.email))
+    .map((r) => ({
+      email: r.email,
+      name: [r.first_name, r.last_name].filter(Boolean).join(" ") || r.email,
+    }))
+}
+
 /** EMAIL ONE: we need something from you.
  *
  * A to-do is the only thing in the product where the next move is the client's
@@ -284,7 +382,7 @@ export async function notifyTodoRaised(
     await sendToMany("to-do notice", people, (p) =>
       send(env, p.email, `${brand.name}: we need something from you`, {
         heading: "One thing from you",
-        intro: `${todo.title}${todo.due_on ? ` — by ${todo.due_on.slice(0, 10)}` : ""}.`,
+        intro: `${todo.title}${todo.due_on ? `, by ${todo.due_on.slice(0, 10)}` : ""}.`,
         footnote: `Open ${todo.ref ? `${todo.ref} ` : ""}in your ${name} portal to mark it done, and send the file with it if there is one.`,
       }).catch((e) => console.error("to-do notice failed:", e))
     )
@@ -350,7 +448,7 @@ export async function sendTriageDigest(
     const lines: string[] = []
     if (digest.waiting > 0)
       lines.push(
-        `${digest.waiting} ${digest.waiting === 1 ? "request has" : "requests have"} been waiting to be read — the oldest for ${digest.oldestDays} days.`
+        `${digest.waiting} ${digest.waiting === 1 ? "request has" : "requests have"} been waiting to be read, the oldest for ${digest.oldestDays} days.`
       )
     if (digest.missingTime.length > 0)
       lines.push(
@@ -362,7 +460,7 @@ export async function sendTriageDigest(
           intro: lines.join(" "),
           footnote: digest.onDutyName
             ? "Open Tickets to read them."
-          : "Put somebody on triage duty in Tickets — a backlog with no owner is the one nobody clears.",
+          : "Put somebody on triage duty in Tickets, a backlog with no owner is the one nobody clears.",
       }).catch((e) => console.error("triage digest failed:", e))
     )
   } catch (e) {
@@ -390,28 +488,35 @@ export async function notifyTicketResolved(
   resolution: string
 ): Promise<void> {
   try {
-    const rows = await d1Query<{ ref: string | null; description: string; account_id: string | null }>(
+    const rows = await d1Query<{
+      ref: string | null
+      description: string
+      account_id: string | null
+      raised_by_contact_id: string | null
+      creator_id: string | null
+      app_id: string | null
+    }>(
       cfg,
       guard.databaseId,
-      `SELECT ref, description, account_id FROM help WHERE id = ? LIMIT 1`,
+      `SELECT ref, description, account_id, raised_by_contact_id, creator_id, app_id FROM help WHERE id = ? LIMIT 1`,
       [ticketId]
     )
     const ticket = rows[0]
     // No account means the agency's own question, asked and answered inside the
     // building. There is nobody outside it to tell.
     if (!ticket?.account_id) return
-    const people = await accountInboxes(env, cfg, guard, ticket.account_id)
+    const people = await resolutionInboxes(env, cfg, guard, ticket.account_id, ticket)
     if (!people.length) return
     const name = await teamName(env, guard.teamId)
     const asked = snippet(ticket.description)
     await sendToMany("resolution notice", people, (p) =>
-      send(env, p.email, `${name}: ${ticket.ref ? `${ticket.ref} — ` : ""}answered`, {
+      send(env, p.email, `${name}: ${ticket.ref ? `${ticket.ref}, ` : ""}answered`, {
         heading: "We've come back to you",
         // The ANSWER in full, and what they asked in one line above it, because
         // a resolution arriving with no reminder of the question is a paragraph
         // people have to go and look something up to understand.
         intro: `You asked: "${asked}"\n\n${resolution}`,
-        footnote: "Open the ticket if you want to reply — the whole conversation is there.",
+        footnote: "Open the ticket if you want to reply, the whole conversation is there.",
       }).catch((e) => console.error("resolution notice failed:", e))
     )
   } catch (e) {

@@ -13,6 +13,7 @@ import { pendingCall } from "@shared/workers/confirm-payload"
 import { capabilityBrief } from "./app-brief"
 import { blockBrief } from "@shared/agent-blocks"
 import { GLOSSARY } from "@shared/glossary"
+import { DEFAULT_LANGUAGE, LANGUAGES, toLanguage, type Language } from "@shared/i18n"
 import { consumeAiUnit, foldUsageIntoLatest, getQuota, logUsage, refundAiUnits, type ConsumeResult, type UsageSource } from "./credits"
 import type { Actor, MemberGuard } from "@shared/workers/gating"
 import type { D1Rest } from "@shared/workers/d1-rest"
@@ -54,15 +55,47 @@ export const KNOWLEDGE_CITATION_RULE =
 // the DB — audit + the panel rehydrates from all of it). Bounds long-thread context/cost.
 const MAX_HISTORY = 24
 
+/** WHAT THE ASSISTANT SAYS, IN THE READER'S LANGUAGE — and, far more important,
+ * what it must leave exactly as it found it.
+ *
+ * The danger here is not a clumsy translation. It is that a model told "answer
+ * in German" starts translating EVERYTHING it touches: a ticket's title on the
+ * way into a tool call, a status value in a filter, an account's name in a
+ * search. Those are keys and identifiers. `Frage` is not a value `help_type`
+ * accepts; `Bergman AB` is not `Bergman AG`. A tool call built from translated
+ * arguments does not fail loudly — it matches nothing and answers "no results",
+ * which reads as the app being broken rather than the assistant being wrong.
+ *
+ * So the instruction is two sentences and the second one is the load-bearing
+ * one, stated in terms of things rather than of grammar: PROSE YOU WRITE is
+ * translated; ANYTHING THAT CAME OUT OF THE DATA, OR IS GOING BACK INTO IT, is
+ * reproduced character for character. It is the same distinction the whole
+ * feature rests on (shared/i18n.ts), said to a model instead of to a developer. */
+function languageRule(language: Language): string {
+  const name = LANGUAGES.find((l) => l.code === language)?.english ?? "English"
+  return [
+    `Write your replies to the user in ${name}. That is the language they read kwapso in.`,
+    "But NEVER translate the team's own data. Titles, names, descriptions, ticket and story text, statuses, types, dropdown values, reference codes and email addresses are reproduced EXACTLY as they appear — in whatever language they were written — both when you quote them back to the user and, above all, when you pass them to a tool. A translated argument matches no record and returns nothing, which looks to the user like the app failing. Translate your own sentences around them; never the values themselves.",
+  ].join(" ")
+}
+
+/** The system prompt for one caller. English is the base prompt unchanged, so
+ * the parity suites that read SYSTEM keep reading exactly what they always did
+ * and the common path costs nothing. */
+export function systemFor(language?: string | null): string {
+  const lang = toLanguage(language)
+  return lang === DEFAULT_LANGUAGE ? SYSTEM : [SYSTEM, languageRule(lang)].join("\n")
+}
+
 export const SYSTEM = [
   "You are kwapso's assistant — a calm, friendly helper for the user's team, like a colleague who has worked alongside them for years.",
   "Chat naturally. When the user greets you or asks what you can do, reply warmly in a sentence or two.",
-  "IMPORTANT: to answer ANY question about THIS team's real data — its members, roles, learning articles, or support tickets — you MUST first call the matching tool to look it up (for example list_roles, list_members, list_learning, list_help_tickets). Never guess, never invent data, and never tell the user you can't check — just call the tool, then answer plainly from what it returns.",
-  "You can also DO anything the user can do through the tools — invite and manage members and roles, manage dropdown values, raise, reply to, edit and change the status of support tickets, create, edit and activate or deactivate learning articles, and edit the team's details. You always act AS the signed-in user, capped by their permissions; the system enforces this on every call, so you never exceed what they could do by hand.",
+  "IMPORTANT: to answer ANY question about THIS team's real data — its members, roles, accounts, or support tickets — you MUST first call the matching tool to look it up (for example list_roles, list_members, list_accounts, list_help_tickets). Never guess, never invent data, and never tell the user you can't check — just call the tool, then answer plainly from what it returns.",
+  "You can also DO anything the user can do through the tools — invite and manage members and roles, manage dropdown values, raise, reply to, edit and change the status of support tickets, create and edit the delivery work behind them, and edit the team's details. You always act AS the signed-in user, capped by their permissions; the system enforces this on every call, so you never exceed what they could do by hand.",
   "You work ONLY within the user's current team. You cannot create a team, switch teams, or act in a different team — if asked, say so plainly and SKIP any steps meant for that other team (don't run them in this one by mistake); the user can create or switch teams themselves from the team switcher, then ask you again there.",
   "If an action is refused because the user's role doesn't have the permission for it on this team, tell them plainly which action was refused and that a team admin can grant the right or do it for them.",
   "When inviting someone to the team: if the email is the user's OWN address, or you can already tell they're a member (use list_members to check when unsure), do NOT ask for a role or send an invite — just say plainly that person is already on the team. After an invite runs, report the outcome HONESTLY from the tool result: it includes `emailSent` — if that's false, say the invite was created but the email couldn't be sent and the person can still accept it from their Invitations inbox. Never say an email was sent when it wasn't.",
-  "For a change across many records, prefer the FILTER over the rows: a set-shaped job like 'set every billing ticket to resolved' is set_help_status_by_filter — call it FIRST with dryRun true to learn the TRUE count, then for real, and the number you state to the user must be that dry-run count. It refuses past the bulk ceiling and accepts only the screen's facets, never free text. Where no filter tool fits, list the records (a read) for their ids, then call the matching bulk tool (bulk_set_help_status, bulk_set_learning_active) — each takes at most the id cap its schema declares. A bulk change is confirmed with a count before it runs.",
+  "For a change across many records, prefer the FILTER over the rows: a set-shaped job like 'set every billing ticket to resolved' is set_help_status_by_filter — call it FIRST with dryRun true to learn the TRUE count, then for real, and the number you state to the user must be that dry-run count. It refuses past the bulk ceiling and accepts only the screen's facets, never free text. Where no filter tool fits, list the records (a read) for their ids, then call the matching bulk tool (bulk_set_help_status) — it takes at most the id cap its schema declares. A bulk change is confirmed with a count before it runs.",
   DROPDOWN_ORDER_RULE,
   KNOWLEDGE_CITATION_RULE,
   "When you decide to do something, just call the matching tool — don't ask for confirmation in chat. For the destructive actions (removing a member, revoking an invite, or deactivating a role, article or dropdown value) the app shows a single yes/no panel of its own, so never ask the user to confirm in your reply as well — that would double-check them. Constructive actions (creating, editing, inviting, granting a role, setting permissions, reactivating) just run.",
@@ -236,7 +269,7 @@ export function repeatGuard() {
 
 /** The id-ish fields of a tool call (id, roleId, userId, …) — slim enough to ride
  * the step_start event so the panel's screen trace can land on the RECORD, never
- * the whole input (a create_learning body doesn't belong in a UI event). */
+ * the whole input (a create_story body doesn't belong in a UI event). */
 function traceIds(input: Record<string, unknown>): Record<string, string> | undefined {
   const out: Record<string, string> = {}
   for (const [k, v] of Object.entries(input)) {
@@ -585,7 +618,14 @@ export async function runChat(
   cfg: D1Rest,
   guard: MemberGuard,
   actor: Actor,
-  opts: { threadId?: string; message: string; source: string; files?: { name: string; csv: string }[] },
+  opts: {
+    threadId?: string
+    message: string
+    source: string
+    files?: { name: string; csv: string }[]
+    /** The caller's own language, off their session. Undefined reads as English. */
+    language?: string | null
+  },
   emit?: Emit
 ): Promise<ChatOutcome> {
   // Prove the thread is the caller's BEFORE the first append — a message written
@@ -602,7 +642,10 @@ export async function runChat(
   const history = await listMessages(cfg, guard, threadId)
   // Window to the last MAX_HISTORY messages before seeding — the model only sees recent
   // context; the full thread stays in the DB.
-  const convo: ChatMessage[] = [{ role: "system", content: SYSTEM }, ...replayable(history.slice(-MAX_HISTORY))]
+  const convo: ChatMessage[] = [
+    { role: "system", content: systemFor(opts.language) },
+    ...replayable(history.slice(-MAX_HISTORY)),
+  ]
   // The attached-files plan rides as one more user-turn block (the wire format
   // coalesces it with the message) — never persisted, rebuilt fresh per attach.
   if (planBlock) convo.push({ role: "user", content: planBlock })
@@ -875,7 +918,14 @@ export async function confirmAndRun(
   cfg: D1Rest,
   guard: MemberGuard,
   actor: Actor,
-  opts: { threadId: string; approve: boolean; source: string },
+  opts: {
+    threadId: string
+    approve: boolean
+    source: string
+    /** The caller's own language — the same person who was asked to confirm, so
+     * the answer they get back must be in the language they were asked in. */
+    language?: string | null
+  },
   emit?: Emit
 ): Promise<ChatOutcome> {
   const history = await listMessages(cfg, guard, opts.threadId) // also asserts ownership
@@ -958,7 +1008,7 @@ export async function confirmAndRun(
   // (below) or to resume the plan. Window the replayed history to the last MAX_HISTORY
   // (the proposing turn is split off above, so it's re-attached regardless of the window).
   const convo: ChatMessage[] = [
-    { role: "system", content: SYSTEM },
+    { role: "system", content: systemFor(opts.language) },
     ...replayable(replayHistory.slice(-MAX_HISTORY)),
     { role: "assistant", content: proposingText, toolCalls: calls },
     ...toolMsgs,

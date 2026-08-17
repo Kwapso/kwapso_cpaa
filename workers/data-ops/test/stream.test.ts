@@ -27,12 +27,12 @@ describe("toAnthropicMessages: canonical wire shape (coalescing is API-safe)", (
         content: "on it",
         toolCalls: [
           { id: "t1", name: "create_role", input: {} },
-          { id: "t2", name: "create_learning", input: {} },
+          { id: "t2", name: "create_brand_asset", input: {} },
           { id: "t3", name: "raise_help_ticket", input: {} },
         ],
       },
       { role: "tool", content: "FAILED: no permission", toolCallId: "t1", toolName: "create_role" },
-      { role: "tool", content: "FAILED: no permission", toolCallId: "t2", toolName: "create_learning" },
+      { role: "tool", content: "FAILED: no permission", toolCallId: "t2", toolName: "create_brand_asset" },
       { role: "tool", content: "OK", toolCallId: "t3", toolName: "raise_help_ticket" },
       { role: "user", content: "explain what failed" },
     ]
@@ -45,7 +45,7 @@ describe("toAnthropicMessages: canonical wire shape (coalescing is API-safe)", (
     expect(msgs[1].content).toEqual([
       { type: "text", text: "on it" },
       { type: "tool_use", id: "t1", name: "create_role", input: {} },
-      { type: "tool_use", id: "t2", name: "create_learning", input: {} },
+      { type: "tool_use", id: "t2", name: "create_brand_asset", input: {} },
       { type: "tool_use", id: "t3", name: "raise_help_ticket", input: {} },
     ])
 

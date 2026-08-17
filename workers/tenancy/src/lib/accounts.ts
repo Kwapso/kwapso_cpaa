@@ -35,7 +35,14 @@ type AccountRow = {
   name: string
   email: string | null
   phone: string | null
-  address: string | null
+  street: string | null
+  postal_code: string | null
+  city: string | null
+  country: string | null
+  industry: string | null
+  about: string | null
+  logo_url: string | null
+  cover_url: string | null
   code: string | null
   currency: string | null
   locale: string | null
@@ -52,9 +59,16 @@ type AccountRow = {
 /** The audit names ride along on every read: every record's Overview tab shows
  * the same block (who made it, who touched it last), and the list's keyset pages
  * on created_at, so it is selected once here rather than twice at the call site. */
-const ACCOUNT_COLUMNS = `id, account_type, parent_account_id, name, email, phone, address, code,
+const ACCOUNT_COLUMNS = `id, account_type, parent_account_id, name, email, phone,
+  street, postal_code, city, country, industry, about, logo_url, cover_url, code,
   currency, locale, timezone, commercials_visible, status, deactivated_at,
   created_at, creator_name, updated_at, editor_name`
+
+// THE ADDRESS IS FOUR FIELDS NOW, and `address` is not one of them. The column
+// still exists — 0024 backfilled `street` from it and left it alone, because
+// dropping a column is the one migration you cannot take back — but nothing
+// reads it and nothing writes it, on purpose: two ways to say where somebody is
+// is how a screen ends up showing one of them and a CSV the other.
 
 /** WHAT AN ACCOUNT ROW SAYS, AND TO WHOM.
  *
@@ -96,7 +110,14 @@ function toAccount(r: AccountRow, scope: AccountScope): Account {
     name: r.name,
     email: r.email,
     phone: r.phone,
-    address: r.address,
+    street: r.street,
+    postalCode: r.postal_code,
+    city: r.city,
+    country: r.country,
+    industry: r.industry,
+    about: r.about,
+    logoUrl: r.logo_url,
+    coverUrl: r.cover_url,
     code: r.code,
     currency: r.currency,
     locale: r.locale,
@@ -156,10 +177,35 @@ export type AccountFilters = {
   parentId?: string
 }
 
-function accountsWhere(scope: AccountScope, opts: AccountFilters): { sql: string; params: string[] } {
+/** MAY THIS CALLER LIST PEOPLE? — the `contacts` right, arriving as a boolean
+ * rather than as a filter, because it is not one.
+ *
+ * A filter is something a caller asks for and can un-ask. This is a NARROWING
+ * the caller cannot see the edge of: without `contacts:read` the accounts
+ * collection is the COMPANIES, full stop — the rows, the exact total beside
+ * them (R16 counts the same question the rows answer) and the CSV export all
+ * agree, because all three go through `accountsWhere` and it is applied here
+ * rather than at the three call sites. "People of the development team does not
+ * need to know who are the contacts" (Aurora, 17 Aug 2026).
+ *
+ * It is deliberately NOT a fence on the individual row itself. A contact still
+ * has to be nameable where a record already points at one — the person a to-do
+ * is aimed at, the contact who raised a ticket — and the owner asked for exactly
+ * that. What this right governs is ENUMERATION: you cannot read the address
+ * book, but a name already on a record in front of you is still a name. */
+export type ContactSight = { mayListPeople: boolean }
+
+function accountsWhere(
+  scope: AccountScope,
+  opts: AccountFilters,
+  sight: ContactSight
+): { sql: string; params: string[] } {
   const fence = accountScopeClause(scope, "id")
   const filters: string[] = []
   const params: string[] = [...fence.params]
+
+  // The narrowing, first, so nothing below can widen past it.
+  if (!sight.mayListPeople) filters.push("account_type = 'entity'")
 
   if (opts.q) {
     // ESCAPED, because a search box is not a pattern box. `%` and `_` are LIKE's
@@ -197,13 +243,24 @@ export async function listAccounts(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
+  sight: ContactSight,
   opts: AccountFilters & { cursor?: string | null } = {}
-): Promise<Page<Account> & { total: number }> {
-  const { sql: base, params } = accountsWhere(scope, opts)
+): Promise<Page<Account> & { total: number; entityTotal: number; individualTotal: number }> {
+  const { sql: base, params } = accountsWhere(scope, opts, sight)
   const after = keysetAfter(decodeCursor(opts.cursor), "created_at")
   const pageWhere = after.sql ? `${base ? `${base} AND` : " WHERE"} ${after.sql}` : base
+  // THE TWO TAB BADGES, and they are a different question from `total` on
+  // purpose. `total` counts what was ASKED FOR (this search, this status, this
+  // type) so the rows and the number beside them agree. These two count the
+  // COLLECTION — how many companies and how many people there are — because they
+  // sit on a tab strip somebody has not pressed yet, and a badge that changed
+  // while you typed would be answering the question you are about to ask rather
+  // than the one you are looking at. Same shape as the ticket strip's All / My /
+  // Archived badges, and for the same reason.
+  const companies = accountsWhere(scope, { type: "entity" }, sight)
+  const people = accountsWhere(scope, { type: "individual" }, sight)
 
-  const [rows, counted] = await Promise.all([
+  const [rows, counted, entityTotal, individualTotal] = await Promise.all([
     // PAGE_SIZE + 1 is how hasMore is known without a second query.
     d1Query<AccountRow>(
       cfg,
@@ -216,10 +273,22 @@ export async function listAccounts(
     // badge can never count rows the list withholds — counted exactly to
     // TOTAL_COUNT_CAP and reported as "at least" beyond it.
     countCollection(cfg, guard.databaseId, `SELECT 1 FROM accounts${base}`, params),
+    countCollection(cfg, guard.databaseId, `SELECT 1 FROM accounts${companies.sql}`, companies.params),
+    // Without the contacts right this one is ZERO, and it is zero through the
+    // same `accountsWhere` the rows go through rather than by a special case: a
+    // People tab badged from a second code path is a People tab that eventually
+    // disagrees with the list under it.
+    countCollection(cfg, guard.databaseId, `SELECT 1 FROM accounts${people.sql}`, people.params),
   ])
 
   const page = toPage(rows, PAGE_SIZE, (r) => [r.created_at, r.id])
-  return { ...page, rows: page.rows.map((r) => toAccount(r, scope)), total: counted }
+  return {
+    ...page,
+    rows: page.rows.map((r) => toAccount(r, scope)),
+    total: counted,
+    entityTotal,
+    individualTotal,
+  }
 }
 
 /** Every account this caller may see — NARROWED the same way the list narrows —
@@ -244,9 +313,10 @@ export async function listAccountsForExport(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,
+  sight: ContactSight,
   opts: AccountFilters = {}
 ): Promise<{ rows: Account[]; complete: boolean }> {
-  const { sql, params } = accountsWhere(scope, opts)
+  const { sql, params } = accountsWhere(scope, opts, sight)
   const rows = await d1Query<AccountRow>(
     cfg,
     guard.databaseId,
@@ -283,7 +353,8 @@ export async function getAccount(
 
   // The parent is read through the SAME fence: a pinned caller who can see a
   // subsidiary must not learn its holding company's name by opening the child.
-  const [parentRows, links, portalUsers, linksTotal, portalUsersTotal] = await Promise.all([
+  const [parentRows, links, companies, portalUsers, linksTotal, companiesTotal, portalUsersTotal] =
+    await Promise.all([
     account.parentAccountId
       ? d1Query<AccountRow>(
           cfg,
@@ -293,8 +364,18 @@ export async function getAccount(
         )
       : Promise.resolve([] as AccountRow[]),
     listAccountLinks(cfg, guard, scope, id),
+    // A PERSON has no contacts of their own — they ARE somebody's contact — so
+    // the link table is read from the other side for them. Asked only for a
+    // person, because for a company the answer is always empty and a round trip
+    // that can only say "none" is a round trip nobody should pay for.
+    account.accountType === "individual"
+      ? listPersonCompanies(cfg, guard, scope, id)
+      : Promise.resolve([] as AccountLink[]),
     listPortalUsers(cfg, guard, scope, id),
     countAccountLinks(cfg, guard, scope, id),
+    account.accountType === "individual"
+      ? countPersonCompanies(cfg, guard, scope, id)
+      : Promise.resolve(0),
     countPortalUsers(cfg, guard, scope, id),
   ])
 
@@ -302,8 +383,10 @@ export async function getAccount(
     account,
     parent: parentRows[0] ? toAccount(parentRows[0], scope) : null,
     links,
+    companies,
     portalUsers,
     linksTotal,
+    companiesTotal,
     portalUsersTotal,
   }
 }
@@ -353,6 +436,33 @@ export async function pricesVisibleFor(
   return rows[0]?.commercials_visible === 1
 }
 
+/** THE REFERENCE IS MINTED, NOT TYPED — the first four letters of the name,
+ * uppercased. "Bergman S.A." becomes BERG.
+ *
+ * The owner's ruling is one sentence: "the reference is generated by the system,
+ * not staff, therefore no-one would type" — so there is no field on the form and
+ * no conflict dialog to design, because nobody is ever standing in front of one.
+ * Letters and digits only: a reference is a label people read out on the phone,
+ * and a stray apostrophe or accent in one is a support call.
+ *
+ * A name with fewer than four usable characters gets what it has ("X S.L." → X);
+ * a name with none at all gets nothing, and the account simply carries no
+ * reference, which is what most rows have always done. */
+function referenceFrom(name: string): string {
+  const letters = name
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^A-Za-z0-9]/g, "")
+    .toUpperCase()
+  return letters.slice(0, 4)
+}
+
+/** How many times a mint may be refused before we stop trying. The suffix walks
+ * BERG → BERG2 → BERG3 …, so this is the fifty-first company whose name starts
+ * with the same four letters — a ceiling nobody reaches, and a loop that has to
+ * end somewhere or a poisoned index becomes a hung request. */
+const REFERENCE_ATTEMPTS = 50
+
 /** Create an account. A portal caller may only add people INSIDE their own
  * account set (a main stakeholder adding a colleague); staff may create a root. */
 export async function createAccount(
@@ -366,7 +476,14 @@ export async function createAccount(
     parentAccountId?: string
     email?: string
     phone?: string
-    address?: string
+    street?: string
+    postalCode?: string
+    city?: string
+    country?: string
+    industry?: string
+    about?: string
+    logoUrl?: string
+    coverUrl?: string
     code?: string
     currency?: string
     locale?: string
@@ -385,26 +502,41 @@ export async function createAccount(
 
   const id = ulid()
   const now = new Date().toISOString()
-  await refusingDuplicate(REFERENCE_TAKEN, () =>
-    insertRow(cfg, guard, "accounts", {
-      id,
-      account_type: input.accountType,
-      parent_account_id: input.parentAccountId ?? null,
-      name: input.name,
-      email: input.email ?? null,
-      phone: input.phone ?? null,
-      address: input.address ?? null,
-      code: input.code ?? null,
-      currency: input.currency ?? null,
-      locale: input.locale ?? null,
-      timezone: input.timezone ?? null,
-      status: input.status ?? "active",
-      created_at: now,
-      creator_id: actor.id,
-      creator_email: actor.email,
-      creator_name: actor.name,
-    })
-  )
+  const row = {
+    id,
+    account_type: input.accountType,
+    parent_account_id: input.parentAccountId ?? null,
+    name: input.name,
+    email: input.email ?? null,
+    phone: input.phone ?? null,
+    street: input.street ?? null,
+    postal_code: input.postalCode ?? null,
+    city: input.city ?? null,
+    country: input.country ?? null,
+    industry: input.industry ?? null,
+    about: input.about ?? null,
+    logo_url: input.logoUrl ?? null,
+    cover_url: input.coverUrl ?? null,
+    currency: input.currency ?? null,
+    locale: input.locale ?? null,
+    timezone: input.timezone ?? null,
+    status: input.status ?? "active",
+    created_at: now,
+    creator_id: actor.id,
+    creator_email: actor.email,
+    creator_name: actor.name,
+  }
+
+  // A CALLER-SUPPLIED reference is still honoured — the importer carries the
+  // agency's legacy codes, and the machine surface may set one — and it is still
+  // refused as bad input when it is taken. Absent, one is minted.
+  if (input.code) {
+    await refusingDuplicate(REFERENCE_TAKEN, () =>
+      insertRow(cfg, guard, "accounts", { ...row, code: input.code as string })
+    )
+  } else {
+    await insertWithMintedReference(cfg, guard, row, referenceFrom(input.name))
+  }
 
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Account created",
@@ -413,6 +545,43 @@ export async function createAccount(
     relatedRowId: id,
   })
   return id
+}
+
+/** INSERT THE ROW, LETTING THE INDEX PICK THE REFERENCE.
+ *
+ * BERG, then BERG2, then BERG3, until one lands. There is deliberately no
+ * "SELECT to see what's taken" first: that is two steps a concurrent create
+ * slips between, and the partial unique index on `accounts(code)` is already the
+ * authority — two people adding a Bergman at the same instant get BERG and
+ * BERG2, in whichever order D1 serialises them, rather than both getting BERG or
+ * one getting a 500. The same argument `setAccountParent` makes about its ring
+ * test, and CONCURRENCY rule 2 in general: the write IS the check.
+ *
+ * A name with no usable letters mints nothing at all — the row goes in with a
+ * null reference, which is what most rows have always carried and what the
+ * partial index exists to allow. */
+async function insertWithMintedReference(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  row: Record<string, string | number | null>,
+  base: string
+): Promise<void> {
+  if (!base) {
+    await insertRow(cfg, guard, "accounts", { ...row, code: null })
+    return
+  }
+  for (let attempt = 1; attempt <= REFERENCE_ATTEMPTS; attempt++) {
+    const code = attempt === 1 ? base : `${base}${attempt}`
+    try {
+      await insertRow(cfg, guard, "accounts", { ...row, code })
+      return
+    } catch (e) {
+      if (!/UNIQUE constraint/i.test(String((e as Error)?.message ?? ""))) throw e
+    }
+  }
+  // Fifty companies whose names start with the same four letters. The account is
+  // worth more than its label, so it goes in without one rather than failing.
+  await insertRow(cfg, guard, "accounts", { ...row, code: null })
 }
 
 /** A field the caller may have left out entirely. `undefined` = "say nothing
@@ -446,7 +615,14 @@ export async function updateAccount(
     name: string
     email?: Patch
     phone?: Patch
-    address?: Patch
+    street?: Patch
+    postalCode?: Patch
+    city?: Patch
+    country?: Patch
+    industry?: Patch
+    about?: Patch
+    logoUrl?: Patch
+    coverUrl?: Patch
     code?: Patch
     currency?: Patch
     locale?: Patch
@@ -468,7 +644,14 @@ export async function updateAccount(
   const next = {
     email: keep(input.email, before.email),
     phone: keep(input.phone, before.phone),
-    address: keep(input.address, before.address),
+    street: keep(input.street, before.street),
+    postalCode: keep(input.postalCode, before.postal_code),
+    city: keep(input.city, before.city),
+    country: keep(input.country, before.country),
+    industry: keep(input.industry, before.industry),
+    about: keep(input.about, before.about),
+    logoUrl: keep(input.logoUrl, before.logo_url),
+    coverUrl: keep(input.coverUrl, before.cover_url),
     code: keep(input.code, before.code),
     currency: keep(input.currency, before.currency),
     locale: keep(input.locale, before.locale),
@@ -484,14 +667,22 @@ export async function updateAccount(
     d1Query<{ id: string }>(
       cfg,
       guard.databaseId,
-      `UPDATE accounts SET name = ?, email = ?, phone = ?, address = ?, code = ?, currency = ?,
+      `UPDATE accounts SET name = ?, email = ?, phone = ?, street = ?, postal_code = ?, city = ?,
+         country = ?, industry = ?, about = ?, logo_url = ?, cover_url = ?, code = ?, currency = ?,
          locale = ?, timezone = ?, status = ?, commercials_visible = ?, ${audit.sql}
        ${where([fence.sql, "id = ?"])} RETURNING id`,
       [
         input.name,
         next.email,
         next.phone,
-        next.address,
+        next.street,
+        next.postalCode,
+        next.city,
+        next.country,
+        next.industry,
+        next.about,
+        next.logoUrl,
+        next.coverUrl,
         next.code,
         next.currency,
         next.locale,
@@ -515,7 +706,7 @@ export async function updateAccount(
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Account edited",
-    description: `${actor.name} edited ${input.name}${changes ? ` — ${changes}` : ""}`,
+    description: `${actor.name} edited ${input.name}${changes ? `, ${changes}` : ""}`,
     relatedTable: "accounts",
     relatedRowId: id,
   })
@@ -592,7 +783,7 @@ export async function setAccountParent(
     throw new GuardError(
       409,
       "would_loop",
-      "That would put the account inside itself — pick a parent that isn't already underneath it."
+      "That would put the account inside itself. Pick a parent that isn't already underneath it."
     )
 
   await logActivity(cfg, guard.databaseId, actor, {
@@ -683,6 +874,81 @@ export async function listAccountLinks(
     isMainStakeholder: r.is_main_stakeholder === 1,
     active: r.deactivated_at == null,
   }))
+}
+
+/** THE SAME TABLE, READ FROM THE PERSON'S SIDE — the companies one contact
+ * belongs to.
+ *
+ * This is the read a contact's own screen is built on, and it is why companies
+ * and people stayed ONE table: Marta is a contact of Bergman AND of Delaval, and
+ * a parent pointer has room for one of them. `listAccountLinks` answers "who is
+ * inside this company?"; this answers "which companies is this person inside?".
+ * One row shape, two directions.
+ *
+ * Fenced on the COMPANY side (`l.account_id`), which is the same clause the
+ * forward read uses — a link is only ever readable through the company it hangs
+ * off, whichever end you start from. Bounded (R14): a person belongs to a
+ * handful of companies, never a growing list.
+ *
+ * `personName` carries the COMPANY's name here, because the row is being read
+ * about the person: the shape is shared with the forward list so one screen
+ * component can draw either, and the name is always "the other end". */
+export async function listPersonCompanies(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  personAccountId: string
+): Promise<AccountLink[]> {
+  const fence = accountScopeClause(scope, "l.account_id")
+  const rows = await d1Query<{
+    id: string
+    account_id: string
+    person_account_id: string
+    company_name: string
+    relationship: string | null
+    is_main_stakeholder: number
+    deactivated_at: string | null
+  }>(
+    cfg,
+    guard.databaseId,
+    // R14 hard cap — a person belongs to a handful of companies.
+    `SELECT l.id, l.account_id, l.person_account_id, c.name AS company_name, l.relationship,
+            l.is_main_stakeholder, l.deactivated_at
+       FROM account_links l JOIN accounts c ON c.id = l.account_id
+       ${where([fence.sql, "l.person_account_id = ?"])}
+      ORDER BY (l.deactivated_at IS NULL) DESC, c.name ASC
+      LIMIT ${LIST_HARD_CAP}`,
+    [...fence.params, personAccountId]
+  )
+  return rows.map((r) => ({
+    id: r.id,
+    accountId: r.account_id,
+    personAccountId: r.person_account_id,
+    personName: r.company_name,
+    relationship: r.relationship,
+    isMainStakeholder: r.is_main_stakeholder === 1,
+    active: r.deactivated_at == null,
+  }))
+}
+
+/** R16 — the exact server total behind the companies list above, through the
+ * SAME fence, so a contact's Companies tab badges the number its own list can
+ * reach. Never `companies.length`: that is a capped read's ceiling wearing a
+ * total's clothes. */
+export async function countPersonCompanies(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  personAccountId: string
+): Promise<number> {
+  const fence = accountScopeClause(scope, "account_id")
+  const rows = await d1Query<{ n: number }>(
+    cfg,
+    guard.databaseId,
+    `SELECT COUNT(*) AS n FROM account_links${where([fence.sql, "person_account_id = ?"])}`,
+    [...fence.params, personAccountId]
+  )
+  return rows[0]?.n ?? 0
 }
 
 /** R16 — the exact server total behind the contacts list above, through the SAME

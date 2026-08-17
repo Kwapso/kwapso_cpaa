@@ -1,8 +1,8 @@
-# Concurrency — the race-safety ruleset (LOCKED 2026-06-17)
+# Concurrency, the race-safety ruleset (LOCKED 2026-06-17)
 
 How Brimba (and every app on this base) stays correct when two people act at the
 **same instant**. The trap: a check and the write that depends on it run as
-separate steps, so two requests both pass the check and both write — e.g. two
+separate steps, so two requests both pass the check and both write, e.g. two
 admins demoted at once leaving the team with **zero** admins.
 
 ## The rule
@@ -10,36 +10,36 @@ admins demoted at once leaving the team with **zero** admins.
 A write that protects an **invariant** (a count, a balance, "keep ≥1 admin",
 stock-on-hand, a uniqueness rule) must be made race-safe by ONE of:
 
-1. **Atomic conditional SQL** — re-check the invariant *inside* the write's
+1. **Atomic conditional SQL**, re-check the invariant *inside* the write's
    `WHERE`, then treat "0 rows changed" as "refused". D1/SQLite runs a single
    statement atomically and serializes writes per database, so two concurrent
-   statements can't both win. **This is the default** — no extra moving parts.
+   statements can't both win. **This is the default**, no extra moving parts.
    - Example: the last-admin rule. `removeMember` / `changeMemberRole`
      (`workers/tenancy/src/lib/members.ts`) keep a friendly pre-check for the
      fast path, then the actual `UPDATE … WHERE … (SELECT COUNT(*) admins) > 1`
      is the authority; `meta.changes === 0` → reject.
 
-2. **A unique index** — for *uniqueness* invariants, let the database reject the
+2. **A unique index**, for *uniqueness* invariants, let the database reject the
    duplicate. Use a partial index when only some rows are constrained.
-   - Example: at most one **pending** invite per (team, email) —
+   - Example: at most one **pending** invite per (team, email),
      `db/core/0006_invite_pending_unique.sql`; `createInvite` catches the
      violation and reports it kindly.
 
-3. **A per-entity Durable Object** (serialized read-modify-write) — ONLY for
+3. **A per-entity Durable Object** (serialized read-modify-write). ONLY for
    **hot, multi-step, contended** entities where many writers hammer one thing
    (an inventory cell, a ledger account, a booking slot). The DO handles its
    requests one at a time; apply the *operation* inside it ("decrement by 2")
-   and persist before you ack. Reserved for genuine hot counters — most writes
+   and persist before you ack. Reserved for genuine hot counters, most writes
    don't need it.
 
 ## What is NOT a lock
 
-The **realtime `TeamChannel` Durable Object is pub/sub only** — it broadcasts
+The **realtime `TeamChannel` Durable Object is pub/sub only**, it broadcasts
 row-level "X changed" pings and holds no data. This is true for **both** channel
 scopes (`team:<id>` and the per-user `user:<id>`): neither is in any write path
 and neither serializes anything. Each is just **gated** at connect time the same
-way the API is — a `team:` socket requires active membership of THAT team, a
-`user:` socket must be your OWN id — but a gate is an auth check, not a lock.
+way the API is, a `team:` socket requires active membership of THAT team, a
+`user:` socket must be your OWN id, but a gate is an auth check, not a lock.
 Don't reach for a DO just because a write touches shared data: plain D1 rows +
 (1) or (2) above cover almost everything (team name, member list, roles…). A DO
 instance is for the rare contended hot entity.
@@ -53,12 +53,12 @@ instance is for the rare contended hot entity.
   conditional UPDATE (`SET status='running' WHERE id=? AND status='planned' RETURNING
   id`) *before* doing the work; only the request that wins the flip proceeds, so a retry
   or a double-click can't run it twice and duplicate every row. A crash mid-run leaves it
-  `running` (safe — no duplicates); re-create to retry. Guarded for the CSV importer by
+  `running` (safe, no duplicates); re-create to retry. Guarded for the CSV importer by
   `workers/data-ops/test/import-idempotency.test.ts`. **The rule: a write a client can
   retry must be idempotent.**
 
 ## While a write is in flight
-Serialized or not, the user should never see a dead UI — show feedback
+Serialized or not, the user should never see a dead UI, show feedback
 (button spinner + disabled, optimistic update, toast). See the **Loading &
 feedback** section of [CACHING.md](CACHING.md).
 
@@ -69,7 +69,7 @@ model that powers tool (3).
 A "5 tries" limit written as *read the count, then check, then increment* is
 **burstable**: under concurrency N wrong guesses all read `attempts = 4` and each
 gets a free try. The fix (LAW-adjacent, B3) is to make the check and the increment
-**one statement** — consume a slot in the same UPDATE that enforces the cap, and
+**one statement**, consume a slot in the same UPDATE that enforces the cap, and
 read the changed-row count back:
 
 ```sql
@@ -78,7 +78,7 @@ UPDATE login_codes SET attempts = attempts + 1
 ```
 
 Zero rows changed = the cap is spent (a correct code consumes a slot too, then
-succeeds — the cap counts *tries*, not failures). The login flow and the
+succeeds, the cap counts *tries*, not failures). The login flow and the
 email-change flow both use this shape (`workers/auth/src/index.ts`,
 `lib/email-change.ts`). Same principle as the never-negative credit decrement
 (`WHERE balance > 0`) and the last-admin guard: the invariant rides the WHERE, so

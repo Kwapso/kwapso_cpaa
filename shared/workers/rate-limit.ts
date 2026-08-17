@@ -57,7 +57,7 @@ export type RateLimitEnv = { CALLER_LIMIT?: RateLimiter }
  * this seam decides, and the seam that already owns every other refusal in the
  * request path is the one that refuses. */
 export const TOO_FAST =
-  "That's a lot of requests at once — give it a few seconds and try again. Nothing was lost."
+  "That's a lot of requests at once. Give it a few seconds and try again. Nothing was lost."
 
 /** Has this caller got budget left? TRUE means carry on.
  *
@@ -98,7 +98,7 @@ export async function callerHasBudget(
     // refuse: the request it would have blocked is a hypothetical, and the
     // requests it would block by failing closed are everybody's.
     console.error(
-      `rate limiter unavailable — request allowed through (fail open): ${e instanceof Error ? e.message : String(e)}`
+      `rate limiter unavailable, request allowed through (fail open): ${e instanceof Error ? e.message : String(e)}`
     )
     return true
   }

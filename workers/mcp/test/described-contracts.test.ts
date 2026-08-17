@@ -68,6 +68,11 @@ import {
 const DESCRIPTION_VOCABULARY: Record<string, string> = {
   runaway:
     "the flag on a running timer that has been going longer than RUNAWAY_HOURS — computed at read time in workers/content/src/lib/work-logs.ts (`runaway: elapsed > …`), so it is a real row field the row-mapper derivation cannot see: no column is copied, the value is arithmetic over one.",
+  awaiting_validation:
+    "the stage a ticket OPENS in when its kind is one that waits for the client (CHECKLIST 5.13). It is a VALUE of the `status` column, not a field: `createTicket` computes it and no door reads it off a body, so neither the schema census nor the response-key derivation can see it. The list it belongs to is HELP_STATUSES in shared/types.ts.",
+  new: "the other stage `createTicket` may open a ticket in — the same HELP_STATUSES value, and named beside its sibling for the same reason: a description that said one and not the other would describe half a decision.",
+  yours:
+    "the triage door's answer to 'is this caller the one on duty?' (CHECKLIST 5.11). It is a real key on the response and it is written as a SHORTHAND property (`json({ onDuty, yours, … })`), which the json-literal derivation reads as a variable rather than a field name. Named here rather than spelled out longhand at the door, because the shorthand is what a reader of that handler should see.",
   export_too_large:
     "the refusal code a too-big export answers with, thrown by the one CSV seam (shared/workers/csv.ts) — R14's posture applied to files: the export is whole or it is an error, never a silently short CSV. An error VALUE rather than a response key, so no door's own source names it.",
 }
@@ -203,7 +208,9 @@ const offendersOf = (t: Judged): string[] =>
 describe("described-contracts (R27): a description may only name what is real", () => {
   it("finds the whole surface to judge (the census must not silently go blind)", () => {
     // All three catalogues are in the universe…
-    expect(JUDGED.filter((t) => t.surface === "shared").length).toBeGreaterThanOrEqual(120)
+    // The floor moved from 120 to 115 on 17 Aug 2026: Marketing, Learning and
+    // the delivery programmes were purged, taking eleven shared tools with them.
+    expect(JUDGED.filter((t) => t.surface === "shared").length).toBeGreaterThanOrEqual(115)
     expect(JUDGED.filter((t) => t.surface === "mcp").length).toBeGreaterThanOrEqual(20)
     expect(JUDGED.filter((t) => t.surface === "agent").length).toBeGreaterThanOrEqual(15)
     // …and the descriptions really carry identifiers to judge (150+ today; a
@@ -225,7 +232,7 @@ describe("described-contracts (R27): a description may only name what is real", 
     expect(allowedFor(by("ask_knowledge")).has("found")).toBe(true)
     // And the allow-set has NOT degenerated into "everything": a word that is
     // real elsewhere is still refused where it names nothing.
-    expect(allowedFor(by("list_learning")).has("parentId")).toBe(false)
+    expect(allowedFor(by("list_dropdown_values")).has("parentId")).toBe(false)
     expect(allowedFor(by("list_help_tickets")).has("stepKey")).toBe(false)
   })
 

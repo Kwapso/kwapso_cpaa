@@ -28,7 +28,7 @@ import { CollectionHeading } from "@/components/collection-heading"
 import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
-import { AppFormDialog, type AppFormValues } from "@/components/app-form-dialog"
+import { AppFormDialog, useTeamMembers, type AppFormValues } from "@/components/app-form-dialog"
 import { ProcessFormDialog, type ProcessFormValues } from "@/components/process-form-dialog"
 import { ValuePanel } from "@/components/value-panel"
 import { ApiFailure, tenancy } from "@/lib/api"
@@ -37,6 +37,7 @@ import { withDataDrivenCollection } from "@/lib/screens"
 import type { Account, AppRow, ProcessSummary } from "@shared/types"
 import type { SavingsView } from "@shared/workers/savings"
 import { invalidate, useCached } from "@shared/web/store"
+import { useT } from "@shared/web/language"
 
 /** One map, as a row. The summary line is what you'd read out loud: which app it
  * belongs to, how many steps it has now, and how many versions it has been
@@ -81,6 +82,9 @@ export function ProcessesScreen({
   onAction: (actionId: string, ctx: ScreenActionContext) => void
   onIntent: (intent: ScreenIntent) => void
 }) {
+  const t = useT()
+  // Who can be put on an app (8.10), for the record-an-app dialog below.
+  const members = useTeamMembers(teamId)
   // Page one, and its next cursor parked in the sidecar <LoadMore> reads (R14).
   // The same fetcher primes the exact `total:` sidecar the heading badges (R16).
   const processesQ = useCached<ProcessSummary[]>(processesKey(teamId), () =>
@@ -107,7 +111,7 @@ export function ProcessesScreen({
       })
       invalidate(processesKey(teamId))
       invalidate(valueKey(teamId))
-      toast.success("Process mapped.")
+      toast.success(t("Process mapped."))
     } catch (err) {
       throw err instanceof ApiFailure ? err : new Error("Couldn't map that process.")
     }
@@ -123,11 +127,11 @@ export function ProcessesScreen({
     })
     invalidate(appsKey(teamId))
     invalidate(valueKey(teamId))
-    toast.success("App recorded.")
+    toast.success(t("App recorded."))
   }
 
   if (processesQ.error)
-    return <p className="text-destructive text-sm">Couldn&apos;t load the process maps.</p>
+    return <p className="text-destructive text-sm">{t("Couldn't load the processes.")}</p>
   if (processesQ.data === undefined) return <Skeleton variant="list" lines={4} />
 
   const loaded = processesQ.data
@@ -147,7 +151,7 @@ export function ProcessesScreen({
           rather than by filtering the page the browser happens to hold. */}
       <PagedFind<ProcessSummary>
         listKey={processesKey(teamId)}
-        placeholder="Search process maps…"
+        placeholder={t("Search processes…")}
         noun="maps"
         fetchPage={(query, cursor) =>
           tenancy
@@ -167,9 +171,9 @@ export function ProcessesScreen({
                   create button that cannot be pressed. */}
               <SectionWithCreate
                 show={canCreate && apps.length > 0}
-                label="Map a process"
+                label={t("Map a process")}
                 icon="plus"
-                secondary={{ show: canCreate, label: "Record an app", onClick: () => setAppOpen(true) }}
+                secondary={{ show: canCreate, label: t("Record an app"), onClick: () => setAppOpen(true) }}
                 onCreate={() => setAddOpen(true)}
               >
                 <ScreenRenderer
@@ -185,7 +189,7 @@ export function ProcessesScreen({
                   the list pages. */}
               <LoadMore
                 listKey={found.listKey ?? processesKey(teamId)}
-                label="Load more process maps"
+                label={t("Load more processes")}
                 fetchPage={found.fetchPage}
               />
             </>
@@ -194,8 +198,10 @@ export function ProcessesScreen({
       </PagedFind>
 
       <AppFormDialog
+        members={members}
         open={appOpen}
         onOpenChange={setAppOpen}
+        teamId={teamId}
         accounts={(accountsQ.data ?? [])
           .filter((a) => a.active && a.accountType === "entity")
           .map((a) => ({ id: a.id, name: a.name }))}

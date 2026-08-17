@@ -1,19 +1,28 @@
 // STORIES AND SPRINTS — what WE DO about a request, and the block of work it was
 // sold inside (.plans/BUILD-1 §2 and §3). Locked model rules enforced HERE, on
 // the server:
-//   • a story has NO TYPE. The owner settled it: the ticket carries the type and
-//     the process step carries the classification that matters. There is no
-//     column for one and no door that accepts one;
-//   • a story is the ONLY place an assignee and a due date live. A ticket
-//     deliberately has neither;
-//   • A STORY CANNOT CLOSE WITHOUT NAMING THE PROCESS STEP IT CHANGES, or
-//     explicitly saying it changes none (`changes_no_step`). Required, not
-//     "optional for now" — it is the hook every savings figure later hangs off,
+//   • a story HAS a type — Fix, Feature or Change, required on the way in and
+//     editable on the Dropdown values screen (CHECKLIST 6.2). This file said the
+//     opposite until 17 Aug 2026 ("the ticket carries the type"), and the owner
+//     reversed it: the ticket's type says what a CLIENT asked for, and this says
+//     what WE are doing about it, which is a different sentence. Nullable in the
+//     column and only in the column, because 3,677 stories arrived from the
+//     previous system without one;
+//   • a story is the ONLY place an assignee lives. A ticket deliberately has
+//     none, and the DATE is the sprint's (CHECKLIST 3.15);
+//   • A STORY NAMES THE PROCESSES IT CHANGES, or explicitly says it changes none
+//     (`changes_no_step`) — checked when it is WRITTEN (CHECKLIST 6.5, Aurora's
+//     ts4: the "no process" answer has to be chosen, not left blank). And it
+//     cannot CLOSE without naming the step inside one of those maps, or the same
+//     tick. Two rules, two moments, one hook: every savings figure hangs off it,
 //     and a nullable column filled in retrospectively is a column full of
 //     guesses;
-//   • the four states are FIXED (open → in progress → in review → done). The
-//     review step is deliberate. The team-editable "Story status" vocabulary is
-//     display-only, exactly as it is for a ticket;
+//   • the four states are FIXED (open → in progress → in review → done) and two
+//     of them are FACTS rather than choices: a timer start moves a story to `in
+//     progress` (routes/work-logs.ts), and `in review` is refused while any timer
+//     on it is still running or until an explanation is written. The review step
+//     is deliberate. The team-editable "Story status" vocabulary is display-only,
+//     exactly as it is for a ticket;
 //   • drag-rank is the order, as it is on a ticket. There is no priority field
 //     and there will not be one.
 //
@@ -31,9 +40,9 @@ import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@sha
 import { ulid } from "@shared/workers/id"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { optionalText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
-import { LIST_HARD_CAP } from "@shared/workers/limits"
+import { LIST_HARD_CAP, STORY_PROCESS_CAP } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
-import { rankAtTop, rankBetween } from "@shared/workers/rank"
+import { rankAtTop } from "@shared/workers/rank"
 import { STORY_STATUSES, type Sprint, type Story, type StoryStatus } from "@shared/types"
 
 import { nextRef, REF_KINDS } from "./refs"
@@ -60,8 +69,14 @@ type StoryRow = {
   reviewer_name: string | null
   starts_on: string | null
   due_on: string | null
+  sprint_ends_on?: string | null
   closed_at: string | null
   closing_note: string | null
+  story_type: string | null
+  review_note: string | null
+  review_file_url: string | null
+  review_file_name: string | null
+  process_ids: string | null
   rank: string | null
   account_id: string | null
   created_at: string
@@ -75,9 +90,26 @@ type StoryRow = {
 const STORY_COLS = `s.id, s.ref, s.title, s.detail, s.status, s.ticket_id, s.sprint_id, s.app_id,
   s.process_id, s.step_key, s.changes_no_step, s.assignee_id, s.assignee_name, s.reviewer_id,
   s.reviewer_name, s.starts_on, s.due_on, s.closed_at, s.closing_note, s.rank, s.account_id,
+  s.story_type, s.review_note, s.review_file_url, s.review_file_name,
   s.created_at, s.updated_at, s.creator_name, s.editor_name,
+  -- EVERY MAP THIS WORK TOUCHES, as one string rather than a second round trip.
+  -- A story list that made a query per story to learn its processes would be
+  -- fifty queries a page, which is the objection the two joined names above
+  -- already answer. Split on the comma in \`toStory\`; the ids are ULIDs, so a
+  -- comma can never appear inside one.
+  (SELECT GROUP_CONCAT(sp2.process_id) FROM story_processes sp2 WHERE sp2.story_id = s.id) AS process_ids,
   (SELECT h.ref FROM help h WHERE h.id = s.ticket_id) AS ticket_ref,
-  (SELECT sp.name FROM sprints sp WHERE sp.id = s.sprint_id) AS sprint_name`
+  (SELECT sp.name FROM sprints sp WHERE sp.id = s.sprint_id) AS sprint_name,
+  -- WHEN THIS IS DUE, AND WHY IT IS NOT A COLUMN ON THIS TABLE ANY MORE.
+  -- A story is one piece of work inside a block that was sold with an end date
+  -- on it, so the block's end date IS the story's deadline: two dates for one
+  -- promise is two dates that disagree the first time a sprint moves. The owner
+  -- retired the story's own due date on 17 Aug 2026 and it is inherited from the
+  -- sprint instead. \`s.due_on\` is still selected above and still answered as
+  -- \`dueOn\` — the column keeps what anybody typed before the change (a column
+  -- dropped is the one migration you cannot take back) — and every screen reads
+  -- the inherited date beside it.
+  (SELECT sp.ends_on FROM sprints sp WHERE sp.id = s.sprint_id) AS sprint_ends_on`
 
 function toStory(r: StoryRow): Story {
   return {
@@ -105,8 +137,16 @@ function toStory(r: StoryRow): Story {
     reviewerName: r.reviewer_name,
     startsOn: r.starts_on,
     dueOn: r.due_on,
+    sprintEndsOn: r.sprint_ends_on ?? null,
     closedAt: r.closed_at,
     closingNote: r.closing_note,
+    storyType: r.story_type,
+    reviewNote: r.review_note,
+    reviewFileUrl: r.review_file_url,
+    reviewFileName: r.review_file_name,
+    // The FIRST of these is still `processId` above — the savings maths and the
+    // import both address a story's map by one id, and this is the full set.
+    processIds: r.process_ids ? r.process_ids.split(",").filter(Boolean) : [],
     rank: r.rank,
     accountId: r.account_id,
     createdAt: r.created_at,
@@ -262,6 +302,11 @@ export type StoryInput = {
   sprintId?: unknown
   appId?: unknown
   processId?: unknown
+  /** EVERY map this work touches (CHECKLIST 6.5). One piece of work commonly
+   * changes two, so the relation is many — and an EMPTY list is only allowed when
+   * `changesNoStep` is ticked, which is Aurora's ruling that "no process" must be
+   * CHOSEN rather than left blank. */
+  processIds?: unknown
   stepKey?: unknown
   changesNoStep?: unknown
   assigneeId?: unknown
@@ -269,6 +314,82 @@ export type StoryInput = {
   startsOn?: unknown
   dueOn?: unknown
   accountId?: unknown
+  /** Fix / Feature / Change — REQUIRED (CHECKLIST 6.2), and drawn from the team's
+   * own `Story type` dropdown values so it stays theirs to rename. */
+  storyType?: unknown
+}
+
+/** WHICH MAPS — proved to be live processes in the caller's own team database,
+ * and refused when there are none and nobody said there were none.
+ *
+ * "An explicit 'no process' choice that must be CHOSEN rather than left blank"
+ * (Aurora's ts4, over the owner's "truly required"). The tick is `changesNoStep`,
+ * which this table already had for the STEP half of the same sentence — so the
+ * two are one decision rather than two switches that can disagree.
+ *
+ * Bounded by construction: the list is capped before it is read, so a body
+ * carrying ten thousand ids is a clean 400 rather than a statement with ten
+ * thousand placeholders. */
+async function resolveProcesses(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  raw: unknown,
+  changesNoStep: boolean
+): Promise<string[]> {
+  // R20 positional: `Array.isArray` is the check, and every element goes through
+  // `requireText` below. Untrusted, so a non-array reads as "none said" rather
+  // than as an error — the refusal that follows is the one a person understands.
+  const ids = Array.isArray(raw) ? raw.filter((x): x is string => typeof x === "string") : []
+  if (!ids.length) {
+    if (changesNoStep) return []
+    throw new GuardError(
+      400,
+      "process_required",
+      "Say which process this work changes, or tick that it changes none."
+    )
+  }
+  if (ids.length > STORY_PROCESS_CAP)
+    throw new GuardError(400, "too_many", `One piece of work links to at most ${STORY_PROCESS_CAP} processes.`)
+  for (const id of ids) requireText(id, "Process", TEXT_LIMITS.short)
+  const unique = [...new Set(ids)]
+  const rows = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    `SELECT id FROM processes WHERE deactivated_at IS NULL AND id IN (${unique.map(() => "?").join(", ")})`,
+    unique
+  )
+  if (rows.length !== unique.length)
+    throw new GuardError(400, "invalid_input", "One of those processes isn't there any more.")
+  return unique
+}
+
+/** Write the story↔process links, replacing whatever was there. Delete-then-insert
+ * rather than a diff: the set is at most a handful, and a diff is three statements
+ * where one pair does the same thing with no order to get wrong. This is the ONE
+ * place in the codebase that deletes rather than deactivates, and it is right:
+ * a link row carries no history of its own — the story's activity feed already
+ * records that its processes changed, and a deactivated link would make
+ * `GROUP_CONCAT` above need a clause it can silently lose. */
+async function setProcesses(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor,
+  storyId: string,
+  processIds: string[]
+): Promise<void> {
+  const now = new Date().toISOString()
+  const inserts = processIds
+    .map(
+      (pid) =>
+        `INSERT INTO story_processes (id, story_id, process_id, created_at, creator_id, creator_email, creator_name)
+VALUES (${sqlString(ulid())}, ${sqlString(storyId)}, ${sqlString(pid)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+    )
+    .join("\n")
+  await d1ExecScript(
+    cfg,
+    guard.databaseId,
+    `DELETE FROM story_processes WHERE story_id = ${sqlString(storyId)};\n${inserts}`
+  )
 }
 
 /** WHICH ACCOUNT DOES THIS WORK BELONG TO?
@@ -348,6 +469,81 @@ async function memberOrThrow(
   return { id: userId, name: rows[0]?.name ?? what }
 }
 
+/* ------------------- the app's own people decide two things ---------------- */
+
+/** WHO IS ON THIS APP, and which of them leads it. Read out of the tenancy
+ * build's `app_staff` table, which lives in the SAME team database — the two
+ * workers are two brains over one set of books, and a story asking "who is on
+ * the system this work is about?" is a read, not a reach.
+ *
+ * Returns an empty set for a story with no app, which is what makes both rules
+ * below fail OPEN in exactly the case where they have nothing to say. */
+async function appStaff(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  appId: string | null
+): Promise<{ userIds: Set<string>; leadUserId: string | null }> {
+  if (!appId) return { userIds: new Set(), leadUserId: null }
+  const rows = await d1Query<{ user_id: string; is_lead: number }>(
+    cfg,
+    guard.databaseId,
+    // R14 hard cap — one app's staff is bounded by the size of the team.
+    `SELECT user_id, is_lead FROM app_staff WHERE app_id = ? AND deactivated_at IS NULL LIMIT ${LIST_HARD_CAP}`,
+    [appId]
+  )
+  return {
+    userIds: new Set(rows.map((r) => r.user_id)),
+    leadUserId: rows.find((r) => r.is_lead === 1)?.user_id ?? null,
+  }
+}
+
+/** CHECKLIST 6.6: "who's doing it" limits to the staff on that app.
+ *
+ * At the DOOR and not only in the picker, because a narrowed dropdown is a
+ * suggestion and this is a rule. It is deliberately silent when the app has NO
+ * staff yet: an app nobody has been assigned to would otherwise refuse every
+ * assignee on it, which would make recording who is doing the work impossible
+ * on precisely the apps that most need it. Somebody being staffed is what turns
+ * the rule on. */
+async function refuseOffAppAssignee(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  appId: string | null,
+  assigneeId: string | null,
+  what: string
+): Promise<void> {
+  if (!assigneeId) return
+  const { userIds } = await appStaff(cfg, guard, appId)
+  if (userIds.size === 0 || userIds.has(assigneeId)) return
+  throw new GuardError(
+    400,
+    "not_on_app",
+    `${what} isn't on this app. Add them to the app's team first, then give them the work.`
+  )
+}
+
+/** CHECKLIST 6.10: the reviewer's one Done button belongs to the app's TEAM LEAD.
+ *
+ * Aurora's answer over the owner's "anyone with the right". Silent when the app
+ * has no lead — and that is not a loophole, it is the migration path: 3,677
+ * stories arrived from the previous system on apps nobody has staffed, and a
+ * rule that locked all of them behind a person who does not exist would have
+ * frozen the backlog on the day it shipped. Name a lead and the button becomes
+ * theirs. */
+async function refuseDoneByAnybodyElse(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  appId: string | null
+): Promise<void> {
+  const { leadUserId } = await appStaff(cfg, guard, appId)
+  if (!leadUserId || leadUserId === guard.userId) return
+  throw new GuardError(
+    403,
+    "not_team_lead",
+    "Only this app's team lead can mark the work done. Ask them to take a look."
+  )
+}
+
 /** The rank a new story takes: above every one already there. Read-then-write,
  * deliberately, and safe for the same reason a ticket's is — two stories written
  * in the same instant can land on the same rank, both are "newest", the `id DESC`
@@ -381,8 +577,15 @@ export async function createStory(
   const startsOn = optionalText(input.startsOn, "Start date", TEXT_LIMITS.short) ?? null
   const dueOn = optionalText(input.dueOn, "Due date", TEXT_LIMITS.short) ?? null
   const changesNoStep = input.changesNoStep === true
+  // REQUIRED (CHECKLIST 6.2). Not checked against the team's list: the words are
+  // theirs to rename on the Dropdown values screen, and a door that validated
+  // against today's three would refuse a fourth the moment somebody added one.
+  const storyType = requireText(input.storyType, "Story type", TEXT_LIMITS.short)
 
   const accountId = await resolveAccount(cfg, guard, named, ticketId, appId)
+  const processIds = await resolveProcesses(cfg, guard, input.processIds, changesNoStep)
+  // 6.6 — the work goes to somebody who is on this app, or nowhere.
+  await refuseOffAppAssignee(cfg, guard, appId ?? null, assigneeId ?? null, "That person")
   const assignee = assigneeId ? await memberOrThrow(cfg, guard, assigneeId, "Assignee") : null
   const reviewer = reviewerId ? await memberOrThrow(cfg, guard, reviewerId, "Reviewer") : null
 
@@ -398,14 +601,15 @@ export async function createStory(
     cfg,
     guard.databaseId,
     `INSERT INTO stories (id, ref, account_id, ticket_id, app_id, process_id, step_key, changes_no_step,
-       sprint_id, title, detail, assignee_id, assignee_name, reviewer_id, reviewer_name,
+       sprint_id, title, detail, story_type, assignee_id, assignee_name, reviewer_id, reviewer_name,
        starts_on, due_on, status, rank, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(accountId)}, ${sqlString(ticketId ?? null)}, ${sqlString(appId ?? null)}, ${sqlString(processId ?? null)}, ${sqlString(stepKey)}, ${changesNoStep ? 1 : 0}, ${sqlString(sprintId)}, ${sqlString(title)}, ${sqlString(detail)}, ${sqlString(assignee?.id ?? null)}, ${sqlString(assignee?.name ?? null)}, ${sqlString(reviewer?.id ?? null)}, ${sqlString(reviewer?.name ?? null)}, ${sqlString(startsOn)}, ${sqlString(dueOn)}, 'open', ${sqlString(rank)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(accountId)}, ${sqlString(ticketId ?? null)}, ${sqlString(appId ?? null)}, ${sqlString(processId ?? processIds[0] ?? null)}, ${sqlString(stepKey)}, ${changesNoStep ? 1 : 0}, ${sqlString(sprintId)}, ${sqlString(title)}, ${sqlString(detail)}, ${sqlString(storyType)}, ${sqlString(assignee?.id ?? null)}, ${sqlString(assignee?.name ?? null)}, ${sqlString(reviewer?.id ?? null)}, ${sqlString(reviewer?.name ?? null)}, ${sqlString(startsOn)}, ${sqlString(dueOn)}, 'open', ${sqlString(rank)}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
   )
+  await setProcesses(cfg, guard, actor, id, processIds)
 
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Story created",
-    description: `${actor.name} created ${ref ? `story ${ref}` : "a story"} — ${title}`,
+    description: `${actor.name} created ${ref ? `story ${ref}` : "a story"}, ${title}`,
     relatedTable: "stories",
     relatedRowId: id,
   })
@@ -435,12 +639,18 @@ export async function updateStory(
   const startsOn = optionalText(input.startsOn, "Start date", TEXT_LIMITS.short) ?? null
   const dueOn = optionalText(input.dueOn, "Due date", TEXT_LIMITS.short) ?? null
   const changesNoStep = input.changesNoStep === true
+  const storyType = requireText(input.storyType, "Story type", TEXT_LIMITS.short)
 
   // The account is re-derived rather than carried: re-pointing a story at another
   // ticket moves the work to that client's books, and the margin has to follow it.
   // The reference number does NOT follow — it was minted against the old account
   // and a client may already be quoting it.
   const accountId = (await resolveAccount(cfg, guard, named, ticketId, appId)) ?? before.account_id
+  const processIds = await resolveProcesses(cfg, guard, input.processIds, changesNoStep)
+  // 6.6 — asked of the app this edit is LEAVING the story on, so moving work to
+  // another system and handing it to somebody who is not on that system is one
+  // refusal rather than two edits that each looked fine.
+  await refuseOffAppAssignee(cfg, guard, appId ?? before.app_id, assigneeId ?? null, "That person")
   const assignee = assigneeId ? await memberOrThrow(cfg, guard, assigneeId, "Assignee") : null
   const reviewer = reviewerId ? await memberOrThrow(cfg, guard, reviewerId, "Reviewer") : null
 
@@ -449,7 +659,7 @@ export async function updateStory(
     cfg,
     guard.databaseId,
     `UPDATE stories SET title = ?, detail = ?, ticket_id = ?, app_id = ?, process_id = ?, step_key = ?,
-       changes_no_step = ?, sprint_id = ?, assignee_id = ?, assignee_name = ?, reviewer_id = ?,
+       changes_no_step = ?, sprint_id = ?, story_type = ?, assignee_id = ?, assignee_name = ?, reviewer_id = ?,
        reviewer_name = ?, starts_on = ?, due_on = ?, account_id = ?, updated_at = ?,
        editor_id = ?, editor_email = ?, editor_name = ?
      WHERE id = ?`,
@@ -458,10 +668,13 @@ export async function updateStory(
       detail,
       ticketId ?? null,
       appId ?? null,
-      processId,
+      // The single `process_id` column follows the FIRST of the many, so the two
+      // can never disagree about which map this work is filed under.
+      processId ?? processIds[0] ?? null,
       stepKey,
       changesNoStep ? 1 : 0,
       sprintId,
+      storyType,
       assignee?.id ?? null,
       assignee?.name ?? null,
       reviewer?.id ?? null,
@@ -476,9 +689,11 @@ export async function updateStory(
       id,
     ]
   )
+  await setProcesses(cfg, guard, actor, id, processIds)
 
   const changes = describeChanges([
     { label: "Title", from: before.title, to: title },
+    { label: "Kind", from: before.story_type, to: storyType },
     { label: "Assignee", from: before.assignee_name, to: assignee?.name ?? null },
     { label: "Due", from: before.due_on, to: dueOn },
     { label: "Sprint", from: before.sprint_id, to: sprintId, hideValues: true },
@@ -486,7 +701,7 @@ export async function updateStory(
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Story edited",
-    description: `${actor.name} edited ${before.ref ?? "a story"}${changes ? ` — ${changes}` : ""}`,
+    description: `${actor.name} edited ${before.ref ?? "a story"}${changes ? `, ${changes}` : ""}`,
     relatedTable: "stories",
     relatedRowId: id,
   })
@@ -507,7 +722,7 @@ export function refuseUnstepped(row: { step_key: string | null; changes_no_step:
   throw new GuardError(
     400,
     "step_required",
-    "Before this can be done, say which process step it changed — or tick that it changed none."
+    "Before this can be done, say which process step it changed, or tick that it changed none."
   )
 }
 
@@ -516,29 +731,90 @@ export function refuseUnstepped(row: { step_key: string | null; changes_no_step:
  * R17: the `status <> ?` predicate rides the UPDATE, so re-marking a done story
  * done moves zero rows — no duplicate history, no second ping, and (the one that
  * matters here) no second attempt at the ticket's Ready flip. */
+/** THE REVIEW RULE (CHECKLIST 6.9): a story cannot go to review while a timer is
+ * still running on it, and not without a sentence saying what was done.
+ *
+ * WHY THE TIMER HALF IS THE IMPORTANT HALF. "Review" means "I have stopped, come
+ * and look" — a clock still ticking says the opposite, and the hours that land
+ * after somebody else has signed the work off are hours nobody reviewed. It is
+ * also the exact inversion the tester asked for: a status used to START a timer,
+ * and now a timer is what a status has to wait for.
+ *
+ * THE FILE IS NOT REQUIRED, and that is Aurora's ruling over the owner's "all
+ * three always": plenty of real work has nothing to show, and a required upload
+ * on work with no screenshot is a rule people satisfy with a blank image.
+ *
+ * Checked HERE rather than at the door, for `refuseUnstepped`'s reason: there is
+ * more than one way to move a story, and one of them will be written by somebody
+ * who has never read this file. */
+async function refuseUnreviewable(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  id: string,
+  reviewNote: string | null,
+  existingNote: string | null
+): Promise<void> {
+  if (!reviewNote && !existingNote)
+    throw new GuardError(
+      400,
+      "review_note_required",
+      "Before this goes for review, say what you did, a line or two is plenty."
+    )
+  const running = await d1Query<{ n: number }>(
+    cfg,
+    guard.databaseId,
+    // ANY running timer, not just the caller's: two people can be on one piece of
+    // work, and "come and look at it" is false while either of them is still on it.
+    `SELECT COUNT(*) AS n FROM work_logs
+      WHERE target_table = 'stories' AND target_id = ? AND ended_at IS NULL AND discarded_at IS NULL`, // R14: one aggregate row
+    [id]
+  )
+  if ((running[0]?.n ?? 0) > 0)
+    throw new GuardError(
+      409,
+      "timer_running",
+      "Stop the timer on this first, work still being clocked isn't finished work."
+    )
+}
+
 export async function setStoryStatus(
   cfg: D1Rest,
   guard: MemberGuard,
   actor: Actor,
   id: string,
   status: StoryStatus,
-  closingNote: string | null
+  closingNote: string | null,
+  review?: { note?: string | null; fileUrl?: string | null; fileName?: string | null }
 ): Promise<{ moved: boolean; story: Story; ticketId: string | null; accountId: string | null }> {
   const before = await storyOrThrow(cfg, guard, id)
+  // 6.10 — one Done button, and it belongs to the app's team lead.
+  if (status === "done") await refuseDoneByAnybodyElse(cfg, guard, before.app_id)
   if (status === "done") refuseUnstepped(before)
+  const reviewNote = review?.note ?? null
+  if (status === "in_review")
+    await refuseUnreviewable(cfg, guard, id, reviewNote, before.review_note)
 
   const now = new Date().toISOString()
   const done = status === "done"
   const changed = await d1Query<{ id: string }>(
     cfg,
     guard.databaseId,
+    // The review block is COALESCEd like the closing note, and for the same
+    // reason: an explanation typed on Tuesday is still the explanation on
+    // Thursday, and a move that did not re-type it must not erase it.
     `UPDATE stories SET status = ?, closed_at = ?, closing_note = COALESCE(?, closing_note),
+       review_note = COALESCE(?, review_note),
+       review_file_url = COALESCE(?, review_file_url),
+       review_file_name = COALESCE(?, review_file_name),
        updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ?
      WHERE id = ? AND status <> ? RETURNING id`,
     [
       status,
       done ? now : null,
       closingNote,
+      reviewNote,
+      review?.fileUrl ?? null,
+      review?.fileName ?? null,
       now,
       actor.id,
       actor.email,
@@ -560,40 +836,37 @@ export async function setStoryStatus(
   return { moved: true, story: toStory(story), ticketId: before.ticket_id, accountId: before.account_id }
 }
 
-/** DRAG-RANK — put a story between two others, exactly as a ticket does. The
- * caller names its NEIGHBOURS, never a position: a position is arithmetic over a
- * list the browser loaded seconds ago, and the list has moved since.
+/** THE STORY'S OWN AUTOMATIC FLIP (CHECKLIST 6.7: "the status is a label; a timer
+ * moves it. Today it is backwards.").
  *
- * R17: dropped back where it started → zero rows → no history, no ping. */
-export async function setStoryRank(
+ * Shaped exactly like the ticket's (lib/ready-flip): the states a start may claim
+ * are named IN the statement rather than checked beforehand, so "this never drags
+ * work backwards" is readable in the SQL. A story already in progress moves zero
+ * rows; one in review or done is not somewhere a clock can pull it out of —
+ * putting a story back to `in_progress` because somebody re-read the timesheet
+ * would un-review reviewed work. */
+export async function storyProgressFlip(
   cfg: D1Rest,
   guard: MemberGuard,
   actor: Actor,
-  id: string,
-  afterId: string | null,
-  beforeId: string | null
-): Promise<{ moved: boolean; accountId: string | null }> {
-  const row = await storyOrThrow(cfg, guard, id)
-  const neighbour = async (nid: string | null): Promise<string | null> => {
-    if (!nid) return null
-    const found = await storyOrThrow(cfg, guard, nid)
-    return found.rank ?? found.id
-  }
-  const rank = rankBetween(await neighbour(beforeId), await neighbour(afterId))
+  storyId: string
+): Promise<{ moved: boolean }> {
+  const now = new Date().toISOString()
   const changed = await d1Query<{ id: string }>(
     cfg,
     guard.databaseId,
-    `UPDATE stories SET rank = ? WHERE id = ? AND COALESCE(rank, id) <> ? RETURNING id`,
-    [rank, id, rank]
+    `UPDATE stories SET status = 'in_progress', updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ?
+      WHERE id = ? AND status IN ('open') RETURNING id`,
+    [now, actor.id, actor.email, actor.name, storyId]
   )
-  if (!changed[0]) return { moved: false, accountId: row.account_id }
+  if (!changed[0]) return { moved: false }
   await logActivity(cfg, guard.databaseId, actor, {
-    type: "Story reordered",
-    description: `${actor.name} moved ${row.ref ?? "a story"} in the list`,
+    type: "Story in progress",
+    description: `${actor.name} started working on this`,
     relatedTable: "stories",
-    relatedRowId: id,
+    relatedRowId: storyId,
   })
-  return { moved: true, accountId: row.account_id }
+  return { moved: true }
 }
 
 /* ---------------------------------- sprints --------------------------------- */
@@ -656,7 +929,15 @@ function toSprint(r: SprintRow): Sprint {
  * the list and its count are asked the SAME question (R16): a badge computed
  * over a different WHERE than the rows beneath it is a number nobody can
  * reconcile, and the two calls sit in different functions. */
-export type SprintFilter = { accountId?: string | null; appId?: string | null }
+export type SprintFilter = {
+  accountId?: string | null
+  appId?: string | null
+  /** WHICH BLOCKS ARE STILL WORTH PUTTING WORK IN (CHECKLIST 6.3): "current or
+   * future only". `open` hides the ones that have finished — a sprint that has
+   * been completed, or whose end date is behind us. Anything else is `all`, which
+   * is what the sprints page itself shows. */
+  when?: "open" | "all"
+}
 
 function sprintWhere(filter: SprintFilter): { sql: string; params: string[] } {
   const parts: string[] = []
@@ -670,6 +951,19 @@ function sprintWhere(filter: SprintFilter): { sql: string; params: string[] } {
   if (filter.appId) {
     parts.push("sp.app_id = ?")
     params.push(filter.appId)
+  }
+  // CURRENT OR FUTURE. Two facts, not one: a sprint somebody marked complete is
+  // finished whatever its dates say, and a sprint whose end date has passed is
+  // finished whether or not anyone got round to marking it. A sprint with NO end
+  // date has not ended — `ends_on IS NULL` survives, which is the honest reading
+  // of a block nobody has dated yet.
+  //
+  // ANSWERED HERE rather than in the browser, for R14's reason: the picker offers
+  // what the door returns, and a page filtered after the fact offers "the open
+  // sprints among the newest thousand".
+  if (filter.when === "open") {
+    parts.push("sp.completed_at IS NULL AND sp.deactivated_at IS NULL AND (sp.ends_on IS NULL OR sp.ends_on >= ?)")
+    params.push(new Date().toISOString().slice(0, 10))
   }
   return { sql: parts.length ? ` WHERE ${parts.join(" AND ")}` : "", params }
 }
@@ -779,7 +1073,7 @@ VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(accountId)}, ${sqlStrin
   )
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Sprint created",
-    description: `${actor.name} started ${ref ? `sprint ${ref}` : "a sprint"} — ${name}`,
+    description: `${actor.name} started ${ref ? `sprint ${ref}` : "a sprint"}, ${name}`,
     relatedTable: "sprints",
     relatedRowId: id,
   })
@@ -850,7 +1144,7 @@ export async function updateSprint(
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Sprint edited",
-    description: `${actor.name} edited ${before.ref ?? before.name}${changes ? ` — ${changes}` : ""}`,
+    description: `${actor.name} edited ${before.ref ?? before.name}${changes ? `, ${changes}` : ""}`,
     relatedTable: "sprints",
     relatedRowId: id,
   })

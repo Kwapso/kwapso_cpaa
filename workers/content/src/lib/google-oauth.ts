@@ -57,9 +57,16 @@ export const GOOGLE_TIMEOUT_MS = 15_000
  *                 decision was NAMED FOLDERS, not the whole drive, and asking
  *                 for the whole drive and then filtering would make the promise
  *                 a line of our code rather than a fact at Google.)
- *   • gmail     — read, compose (a DRAFT), and send. Send is a separate scope
- *                 from compose at Google too, which is convenient: the switch the
- *                 owner asked for has a matching seam on the other side.
+ *   • gmail     — read, compose (a DRAFT), send, and FILE (labels). Send is a
+ *                 separate scope from compose at Google too, which is convenient:
+ *                 the switch the owner asked for has a matching seam on the other
+ *                 side. `gmail.modify` is the one that costs something and it is
+ *                 asked for with open eyes: Gmail has no scope for "labels on a
+ *                 message" alone — `gmail.labels` creates and renames labels but
+ *                 cannot put one ON anything — so filing a message is `modify` or
+ *                 it is nothing. What `modify` adds beyond what we already had is
+ *                 the power to move and archive; what it still cannot do is
+ *                 delete, which is the line worth keeping.
  *   • calendar  — events read and write. Not `calendar` full: we add and read
  *                 events, we do not manage somebody's calendars.
  *   • chat      — messages in named spaces, and the space list to name them from.
@@ -80,6 +87,7 @@ const GOOGLE_SCOPES: Record<GoogleService, string[]> = {
     "https://www.googleapis.com/auth/gmail.readonly",
     "https://www.googleapis.com/auth/gmail.compose",
     "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/gmail.modify",
   ],
   calendar: ["openid", "email", "https://www.googleapis.com/auth/calendar.events"],
   chat: [
@@ -241,7 +249,7 @@ async function redeem(
       // grant that has been revoked at Google's end, and the sentence says so.
       502,
       "google_refused",
-      "Google wouldn't complete that connection. It may have been removed from your Google account — connect it again."
+      "Google wouldn't complete that connection. It may have been removed from your Google account. Connect it again."
     )
   const data = (await res.json()) as {
     access_token?: unknown

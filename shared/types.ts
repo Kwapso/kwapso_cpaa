@@ -26,6 +26,23 @@ export type SessionUser = {
    * with `/api/auth/me`, which is how a downstream worker can tell a token's call
    * from a person's without inventing a header a browser could also send. */
   pinnedTeamId: string | null
+  /** The language this person reads kwapso in, or null if they never chose.
+   *
+   * It rides on the session for the same reason `currentTeamId` does: every
+   * worker already resolves the caller through `whoAmI`, so a refusal message,
+   * an email and the assistant's prose can all be composed in the reader's own
+   * language without a single door looking it up — and none of them can disagree
+   * about it. Null means English (shared/i18n.ts `toLanguage`), kept distinct
+   * from a deliberate choice of English so that only the un-chosen could ever be
+   * guessed at from a browser header. */
+  language: string | null
+  /** HOW BIG THIS PERSON WANTS THE APP. One of SCALE_STEPS (shared/scale.ts).
+   * Null means never chosen, which reads as comfortable — kept distinct from a
+   * deliberate choice of comfortable for the same reason `language` is. It sits
+   * on the session rather than in one browser's storage so it follows the person
+   * between devices, and because the viewport is locked against pinch-zoom this
+   * is the only way anybody can make the app bigger (UI-RULEBOOK S4, S5). */
+  scale: string | null
 }
 
 /** One team as the tenancy worker lists them for the signed-in person. */
@@ -37,6 +54,16 @@ export type TeamSummary = {
   roleId: string
   /** creating | ready | failed — a team is usable once 'ready' */
   dbStatus: string
+  /** THE AGENCY'S OWN DETAILS (db/core/0025) — the four facts a business owner
+   * reaches for when an invoice, a contract or a client's supplier form asks.
+   * `legalName` is what goes on a contract, which is often not the short name in
+   * the rail; `legalNumbers` is one block of text on purpose, because which
+   * numbers a business carries is a fact about its country. All four null until
+   * somebody fills them in. */
+  legalName?: string | null
+  legalAddress?: string | null
+  legalNumbers?: string | null
+  phone?: string | null
 }
 
 /** One member of a team — membership (per-team) joined with identity (global,
@@ -70,7 +97,7 @@ export type PermissionValue = Record<string, RightSet>
 
 /** A per-team dropdown value ("selectable data"): a `value` inside a `type` group
  * (e.g. "Video link" in "File type"). Managed on the team Settings page; powers
- * the Learning-category / Ticket-type pickers. */
+ * the Ticket-type / Sprint-type pickers. */
 export type SelectableValue = {
   id: string
   type: string
@@ -79,6 +106,24 @@ export type SelectableValue = {
   /** false = deactivated (retired). The manager shows these greyed with an Activate
    * button; form pickers filter to active. Always present. */
   active: boolean
+  /** WHAT A VALUE CARRIES BESIDES ITS WORD — all four optional, all four null on
+   * most rows, and that is the point: a dropdown value is a label first.
+   *
+   * They arrived with the delivery catalogue (team-schema 0025), which had ten
+   * rows describing how the agency runs an engagement and nowhere to put them
+   * once the Delivery method page went. A sprint type was already the same idea
+   * wearing a different name, so the enrichment moved onto it rather than into a
+   * table of its own.
+   *
+   * `mark` is the type mark UI-RULEBOOK defines — one glyph where an icon sits,
+   * never in a sentence. `nameDe` is a curated label for readers of German, not
+   * a translation seam: everything else the app says is translated at build time
+   * from the string catalogue. `standardDays` is a suggested length, never a
+   * rule — a sprint's dates are the ones somebody agreed with the client. */
+  mark: string | null
+  nameDe: string | null
+  description: string | null
+  standardDays: number | null
 }
 
 /** A role's permission matrix as the tenancy worker returns it: the module rows
@@ -194,40 +239,57 @@ export type ApiError = {
 
 /* ----------------------------- next-build modules ----------------------------- */
 
-/** A learning (how-to) item. `body` is the in-app text the agent reads to answer
- * help; `done` is the viewing user's own progress (merged in by the read). */
-export type Learning = {
-  id: string
-  category: string | null
-  title: string
-  description: string | null
-  contentType: string | null
-  contentLink: string | null
-  body: string | null
-  sequence: number
-  required: boolean
-  active: boolean
-  createdAt: string
-  creatorName: string | null
-  editorName: string | null
-  updatedAt: string | null
-  done?: boolean
-}
-
-/** One member's completion of one learning item (for the curator progress view). */
-export type LearningProgressEntry = {
-  learningId: string
-  userId: string
-  done: boolean
-  doneAt: string | null
-}
-
 /** THE ticket lifecycle — the one list, for every side of the app. The server
  * validates against it, the stepper renders from it, and the agent's tool
  * descriptions name it. It was written out four times over; a fifth status was
- * four edits and TypeScript caught none of them. Now it's one edit. */
-export const HELP_STATUSES = ["new", "triaged", "in_progress", "ready", "resolved"] as const
+ * four edits and TypeScript caught none of them. Now it's one edit.
+ *
+ * A STATUS IS A FACT, NOT A BUTTON (the tester's sentence, 17 Aug 2026). Five of
+ * these seven are now reached by something HAPPENING rather than by somebody
+ * choosing them, and the two that a person does reach are doors of their own
+ * with their own words, not a dropdown:
+ *
+ *   awaiting_validation  the client's main stakeholder has not said yes yet, and
+ *                        only for the kinds that wait (Aurora's ap2: extras,
+ *                        requests and feedback wait; questions and issues go
+ *                        straight in). Set by `createTicket`, cleared by
+ *                        `/help/validate`;
+ *   new                  raised, nobody here has read it;
+ *   triaged              somebody on duty read it (`/help/triage-read`);
+ *   scheduled            work exists AND some of it is in a sprint — flipped by
+ *                        lib/ready-flip `scheduledFlip`;
+ *   in_progress          a timer started on the ticket or on one of its stories
+ *                        — flipped by lib/ready-flip `progressFlip`;
+ *   ready                every story closed — flipped by `readyFlipForTicket`;
+ *   resolved             a PERSON sent the answer (`/help/resolve`), which is
+ *                        refused until a resolution is written.
+ */
+export const HELP_STATUSES = [
+  "awaiting_validation",
+  "new",
+  "triaged",
+  "scheduled",
+  "in_progress",
+  "ready",
+  "resolved",
+] as const
 export type HelpStatus = (typeof HELP_STATUSES)[number]
+
+/** THE KINDS THAT WAIT FOR THE CLIENT TO CONFIRM (Aurora's ap2, over the owner's
+ * "everything waits"). Matched case-insensitively against the team's OWN editable
+ * `Ticket type` vocabulary — the words are a team's to rename, and a rule that
+ * hard-matched the seeded spelling would silently stop waiting the day somebody
+ * typed "Requests". A question or an issue is somebody stuck; making them ask
+ * their own colleague for permission first is the version of this rule that gets
+ * the feature switched off. */
+export const VALIDATED_TICKET_TYPES = ["extra", "request", "feedback"] as const
+
+/** Does a ticket of this type wait for the account's main stakeholder? */
+export function ticketTypeWaitsForValidation(helpType: string | null | undefined): boolean {
+  if (!helpType) return false
+  const word = helpType.trim().toLowerCase().replace(/s$/, "")
+  return (VALIDATED_TICKET_TYPES as readonly string[]).includes(word)
+}
 
 /** The states a ticket is NOT yet finished in — "still ours to do something
  * about". Derived from the one list above rather than retyped, so a sixth state
@@ -297,6 +359,42 @@ export type HelpTicket = {
    * the account fence reads, and what a live ping carries so a colleague's
    * question can reach their screen without reaching anyone else's. */
   accountId: string | null
+  /** WHICH SYSTEM IT IS ABOUT (CHECKLIST 5.8). A request that names no app is a
+   * request nobody can route: the app is what says whose work it is, which
+   * sprint it could be scheduled into, and who the stakeholder to tell is. */
+  appId: string | null
+  appName: string | null
+  /** WHO ASKED (CHECKLIST 5.9) — the CONTACT, a person row on the account, not
+   * the login that typed it. Staff raise most of a client's history on their
+   * behalf, so "who raised it" and "who typed it" are different people and the
+   * record has to be able to say both. */
+  raisedByContactId: string | null
+  raisedByContactName: string | null
+  /** WHEN THE CLIENT'S MAIN STAKEHOLDER CONFIRMED THEY WANT IT. Only the kinds
+   * that wait ever carry one (see `ticketTypeWaitsForValidation`); null on a
+   * ticket that never had to wait, which is why the STATUS and not this column
+   * is what a screen reads. */
+  validatedAt: string | null
+}
+
+/** A FILE OR A LINK ON A TICKET (CHECKLIST 5.10) — several of each, from either
+ * front door. One row shape for both, because "here is the thing I mean" is one
+ * act: a `file` carries the R2 key we stored it under, a `link` carries only a
+ * URL. Deactivate-never-delete, like everything else here. */
+export type HelpAttachment = {
+  id: string
+  ticketId: string
+  kind: "file" | "link"
+  /** what a person reads in the list — the file's name, or the link's label */
+  label: string
+  /** the file's key inside the tickets bucket, or the link's URL */
+  url: string
+  contentType: string | null
+  sizeBytes: number | null
+  createdAt: string
+  /** null on the way OUT to a client login when the person is on the agency's
+   * side of the fence — the same redaction `toTicket` makes about a raiser. */
+  addedByName: string | null
 }
 
 /** One reply on a ticket. `isAgent` marks the AI-drafted first reply; a mention
@@ -545,10 +643,29 @@ export type Account = {
   name: string
   email: string | null
   phone: string | null
-  address: string | null
-  /** the human reference staff assign when work starts (BERG). Display only. */
+  /** THE POSTAL ADDRESS, in four fields rather than one free-text line. A
+   * country typed free is a country spelled five ways, and "which city are our
+   * German clients in?" is a question one text column cannot answer. `country`
+   * is picked from the Country dropdown group; the other three are typed. */
+  street: string | null
+  postalCode: string | null
+  city: string | null
+  country: string | null
+  /** what this company does, from the Industry dropdown group */
+  industry: string | null
+  /** a paragraph about them, authored as rich text (HTML) */
+  about: string | null
+  /** their mark, and the wide image their record leads with */
+  logoUrl: string | null
+  coverUrl: string | null
+  /** the human reference staff assign when work starts (BERG). GENERATED, not
+   * typed: the first four letters of the name, uppercased, with a numeric suffix
+   * when that is already taken. Display only — every route addresses a row by
+   * its ULID `id`, so re-coding an account never re-points its records. */
   code: string | null
   currency: string | null
+  /** the language this account is written to. The account's own default; a
+   * contact may override it, and staff switch their own. */
   locale: string | null
   timezone: string | null
   /** may this account see money figures on its own work? `null` on the way OUT
@@ -585,9 +702,19 @@ export type AccountLink = {
 export type AccountDetail = {
   account: Account
   parent: Account | null
+  /** the PEOPLE inside this company. Empty for a person (they are somebody's
+   * contact, not somebody with contacts) and empty for any caller without
+   * `contacts:read` — the address book is its own grant. */
   links: AccountLink[]
+  /** the COMPANIES this person is a contact of — the same link table read from
+   * the other end, which is why companies and people stayed one table: a person
+   * can be a contact at two companies and a parent pointer has room for one.
+   * Empty for a company. `personName` on each row carries the COMPANY's name. */
+  companies: AccountLink[]
   portalUsers: PortalUser[]
   linksTotal: number
+  /** the exact server COUNT(*) behind `companies` (R16) */
+  companiesTotal: number
   portalUsersTotal: number
 }
 
@@ -609,7 +736,7 @@ export type PortalUser = {
 
 /** ONE SOURCE — a piece of material the assistant may read. Two families in one
  * shape: a `note` a person typed here (the body is the truth), and a MIRROR of a
- * row the app already owns (`ticket` / `article` / `account` — the row is the
+ * row the app already owns (`ticket` / `account` / `app` — the row is the
  * truth and the sweep keeps the body in step). `compartment` is which slice of
  * the knowledge base it belongs to: "agency", or "account:<id>". */
 export type KnowledgeSource = {
@@ -657,9 +784,21 @@ export type KnowledgeSource = {
   fileType: string | null
   fileBytes: number
   fileNote: string | null
-  /** "team" = anyone who may read the knowledge base; "private" = only its owner */
-  visibility: "team" | "private"
+  /** WHO MAY READ THIS SOURCE, in narrowing order (12.3):
+   *   "team"    — anyone who may read the knowledge base;
+   *   "app"     — only the people staffed to `visibleToAppId` (plus an admin),
+   *               which is the same sentence the app record itself says (8.11);
+   *   "private" — only its owner.
+   * Derived from the two id columns, never stored twice: "private" wins over
+   * "app" when both are set, so no row can be in a state a reader has to guess. */
+  visibility: "team" | "app" | "private"
   ownerUserId: string | null
+  /** the app whose people may read it, or null for the whole team. NOT `appId`
+   * above — that one says what a mirrored source is ABOUT and belongs to the
+   * sweep, which rewrites it on every pass. */
+  visibleToAppId: string | null
+  /** that app's name, so a list can say whose it is without a second read */
+  visibleToAppName: string | null
   indexedAt: string | null
   chunkCount: number
   /** how far through this source the indexer has got. Below `chunkCount` means
@@ -732,6 +871,52 @@ export type KnowledgeAnswer = {
 // us to run, what a margin is) is a separate type from anything the client side
 // can ask for — never an optional field on a shared one. See R24.
 
+/** WHAT AN HOUR OF A ROLE COSTS (CHECKLIST 8.13). The third rate card, and the
+ * second INTERNAL one: `AccountRate` is what a client is charged, `InternalRate`
+ * is what a kind of our own work costs us, and this is what an hour of a KIND OF
+ * PERSON is worth — the number Aurora's savings model multiplies hours by.
+ *
+ * Its own type rather than a flag on `InternalRate`, for the reason those two are
+ * already two types: one shape with a discriminator is one wrong filter away
+ * from showing a client a number about us. */
+export type RoleRate = {
+  id: string
+  /** the role, in the team's own words. Free text: the person who does a
+   * client's invoicing is THEIR bookkeeper, not one of our logins. */
+  roleName: string
+  centsPerHour: number
+  active: boolean
+  createdAt: string
+  createdByName: string | null
+  updatedAt: string | null
+  editedByName: string | null
+}
+
+/** WHAT ONE APP HAS GIVEN BACK — hours, and what those hours are worth (8.13).
+ * INTERNAL, always: it is computed from the role rate card, so no client-
+ * reachable path may read it (R24). */
+export type AppMoneyBack = {
+  appId: string
+  savedSecondsPerMonth: number
+  /** the sum of the priced lines only — see `unpricedProcesses`. */
+  moneyCentsPerMonth: number
+  /** how many processes could not be priced, because they name no role or the
+   * role has no live rate. Shown, never hidden: a total that silently left work
+   * out is the sort of number that costs the screen its credit. */
+  unpricedProcesses: number
+  lines: {
+    processId: string
+    name: string
+    roleName: string | null
+    savedSecondsPerMonth: number
+    centsPerHour: number | null
+    moneyCentsPerMonth: number | null
+  }[]
+  /** R25 — the sentence the figure may not be shown without, carried on the
+   * payload so the screen never assembles it. */
+  caption: string
+}
+
 /** An App: the built system, the thing with its own address (SCOPE ch.02). */
 export type AppRow = {
   id: string
@@ -743,6 +928,27 @@ export type AppRow = {
   /** what it costs US to run each month, in cents. `null` on the way OUT to a
    * client login — an internal number, withheld on the row (see listApps). */
   toolCostCentsPerMonth: number | null
+  // ── THE FOUR CONTEXT FIELDS ────────────────────────────────────────────────
+  // What the system is, the situation it was built into, what we did about it,
+  // and who actually uses it. Prose, all four — they are what somebody joining
+  // the account reads first, and what the assistant answers "what is this app
+  // for?" out of. They ride on the LIST row rather than a detail door because
+  // the apps set is bounded and read whole: the record is the list's own row.
+  about: string | null
+  clientContext: string | null
+  solution: string | null
+  keyActors: string | null
+  /** WHETHER THIS READER MAY OPEN IT (8.11). Everyone sees an app in the
+   * overview; only the staff on it and an admin open its detail. False means the
+   * four context fields and the address above arrived NULL because the door
+   * withheld them, not because nobody has filled them in. */
+  canOpen: boolean
+  /** OUR people on this app, the lead first. Empty when `canOpen` is false. */
+  staff: { userId: string; isLead: boolean }[]
+  /** THE CLIENT's people on this app, the main one first. Each `contactId` is an
+   * `accounts` row of type individual — a contact is a person's own account row
+   * (there is no contacts table, and CHECKLIST 15.1 says why). */
+  stakeholders: { contactId: string; isMain: boolean }[]
   active: boolean
   createdAt?: string | null
   createdByName?: string | null
@@ -758,6 +964,12 @@ export type ProcessSummary = {
   accountId: string | null
   name: string
   description: string | null
+  /** WHO DOES THIS WORK — the role whose hours the saving is measured in
+   * (CHECKLIST 8.13). Free text against the team's own words: the person who
+   * does a client's invoicing is THEIR bookkeeper, not one of our logins. Null
+   * until somebody says, and an app's money figure then reports this process's
+   * hours with no price beside them rather than inventing one. */
+  roleName: string | null
   /** how many versions have been cut (1 = the baseline alone) */
   versionCount: number
   /** steps in the CURRENT version */
@@ -890,6 +1102,19 @@ export type Story = {
   title: string
   detail: string | null
   status: StoryStatus
+  /** WHAT KIND OF WORK IT IS (CHECKLIST 6.2) — Fix, Feature or Change, and
+   * editable on the Dropdown values screen like every other vocabulary here.
+   * REQUIRED on the way in; nullable on the way out because 3,677 stories
+   * arrived from the previous system without one, and a column that refused to
+   * describe them would be a column that lied about what is in the table. */
+  storyType: string | null
+  /** WHY IT MAY BE REVIEWED. Written before a story can move to `in_review`
+   * (CHECKLIST 6.9): the timers have to be stopped and this has to say what was
+   * done. The FILE is optional — Aurora's ruling, over "all three always" —
+   * because plenty of work has nothing to show. */
+  reviewNote: string | null
+  reviewFileUrl: string | null
+  reviewFileName: string | null
   /** the request this work answers, when there is one. Four out of five stories
    * in the real history stand on their own. */
   ticketId: string | null
@@ -903,12 +1128,25 @@ export type Story = {
    * `changesNoStep`; that pair is the hook the savings maths hangs off. */
   stepKey: string | null
   changesNoStep: boolean
+  /** EVERY PROCESS THIS WORK TOUCHES (CHECKLIST 6.5). `processId` above is the
+   * FIRST of these, kept because the savings maths and the import both address a
+   * story's map by one id; this is the full set, and one piece of work commonly
+   * changes two. An EMPTY list is only allowed when `changesNoStep` is ticked —
+   * Aurora's ruling that "no process" must be CHOSEN rather than left blank. */
+  processIds: string[]
   assigneeId: string | null
   assigneeName: string | null
   reviewerId: string | null
   reviewerName: string | null
   startsOn: string | null
+  /** THE STORY'S OWN due date, kept for the rows that already carry one and
+   * never asked for again — the form stopped offering it on 17 Aug 2026. */
   dueOn: string | null
+  /** WHEN IT IS ACTUALLY DUE: the end date of the sprint this work sits in. A
+   * story is one piece of a block that was sold with an end date on it, so the
+   * block's date is the promise; two dates for one promise is two dates that
+   * disagree the first time a sprint moves. Null on a story with no sprint. */
+  sprintEndsOn: string | null
   closedAt: string | null
   /** what we will tell the client. Closing a story appends this to the ticket's
    * DRAFT resolution — a draft, never a sent message. */
@@ -1028,6 +1266,8 @@ export type Task = {
   detail: string | null
   assigneeId: string | null
   assigneeName: string | null
+  /** WHEN IT HAS TO BE DONE. The field is `due_on` in the table and the word on
+   * every screen is "Deadline" — the tester's, and the one this build uses. */
   dueOn: string | null
   status: "open" | "done"
   completedAt: string | null
@@ -1035,9 +1275,39 @@ export type Task = {
    * (chasing an invoice, preparing a review) may name it, which is what puts its
    * time in the right margin. */
   accountId: string | null
+  accountName: string | null
+  /** THE EISENHOWER PAIR, which replaced a high/medium/low word. `priority` is
+   * `(important × 2) + urgent + 1`, 1 to 4, computed from the two rather than
+   * stored — a derived column is a column that can disagree with its inputs. */
+  important: boolean
+  urgent: boolean
+  priority: 1 | 2 | 3 | 4
+  /** which of the agency's five departments it belongs to — a word from the
+   * `Department` dropdown group, editable on that screen. It is also what decides
+   * the SECOND field: Production names an app, Sales a client, Admin may. */
+  department: string | null
+  appId: string | null
+  appName: string | null
+  /** the one thing attached to it — a photo of the letter, the form to file. It
+   * lives in the agency's own bucket, served at /media/internal/ by the agency
+   * gateway alone (R21): a task is ours, and so is its evidence. */
+  fileUrl: string | null
+  fileName: string | null
   createdAt: string
   createdByName: string | null
 }
+
+/** THE SIX PILES of our own admin, as SERVER views — the tab strip's own words.
+ *
+ * Not client filters, for the reason the ticket strip is a server scope: the list
+ * is capped (R14), so sieving the loaded rows for the overdue ones would show
+ * "the overdue among the newest N" under a badge counting all of them (R16).
+ *
+ * `open` is the everyday one and keeps its old name on the wire — the door has
+ * answered to `?view=open` and `?view=all` since it shipped, and a rename would
+ * be a contract change to relabel a tab. */
+export const TASK_VIEWS = ["open", "overdue", "upcoming", "completed", "calendar", "all"] as const
+export type TaskViewName = (typeof TASK_VIEWS)[number]
 
 /** The two states a meeting has. Cancelling is not a third one — it is the
  * module's `delete`, and the row survives it. */
@@ -1055,6 +1325,11 @@ export type Meeting = {
   /** which client it is with. Null = an internal meeting of our own. */
   accountId: string | null
   accountName: string | null
+  /** WHICH SYSTEM IT WAS ABOUT, and the app's name so a row can say it without a
+   * second lookup. Nullable: plenty of meetings are about the account rather
+   * than one of its systems, and the first kickoff call is one of them. */
+  appId: string | null
+  appName: string | null
   /** why we meet, out of the settled taxonomy under Delivery method. */
   purposeId: string | null
   purposeName: string | null
@@ -1071,6 +1346,15 @@ export type Meeting = {
    * pressing the button twice cannot make a second entry. */
   googleEventId: string | null
   googleEventUrl: string | null
+  /** WHICH TRANSCRIPT WAS READ, and WHEN (CHECKLIST 9.2 + 9.4). The timestamp is
+   * the idempotence predicate as much as it is a fact: reading a transcript
+   * ticks the meeting held and writes a work log for every one of OUR people who
+   * was in the room, and both of those must happen exactly once. */
+  transcriptFileId: string | null
+  transcriptCapturedAt: string | null
+  /** THE GOOGLE SERIES this entry belongs to, when it is one of a repeating set
+   * (9.7). Null on a one-off. */
+  recurringEventId: string | null
   active: boolean
   createdAt: string
   creatorName: string | null
@@ -1087,27 +1371,8 @@ export type Meeting = {
  *
  * None of them carries an `accountId`. That is not an omission: these rows
  * belong to no client, so there is nothing for the account fence to fence, and
- * every door on all four refuses a client login outright instead (R21).
+ * every door on all three refuses a client login outright instead (R21).
  * ────────────────────────────────────────────────────────────────────────── */
-
-/** Something the agency published about itself — the legacy `content` table. */
-export type MarketingPost = {
-  id: string
-  title: string
-  /** pick-or-created into the "Marketing channel" dropdown group. */
-  channel: string | null
-  status: string | null
-  summary: string | null
-  body: string | null
-  link: string | null
-  /** the DAY it went out (YYYY-MM-DD), or null while it hasn't. */
-  publishedOn: string | null
-  active: boolean
-  createdAt: string
-  creatorName: string | null
-  updatedAt: string | null
-  editorName: string | null
-}
 
 /** One piece of the agency's brand material — the legacy `branding` table. */
 export type BrandAsset = {
@@ -1117,20 +1382,6 @@ export type BrandAsset = {
   description: string | null
   /** an object we host (/media/internal/…) or a link somewhere else. */
   fileUrl: string | null
-  active: boolean
-  createdAt: string
-  creatorName: string | null
-  updatedAt: string | null
-  editorName: string | null
-}
-
-/** A way the agency runs an engagement — the legacy `program` table. */
-export type Program = {
-  id: string
-  name: string
-  description: string | null
-  /** display order only — nothing is locked to it. */
-  sequence: number
   active: boolean
   createdAt: string
   creatorName: string | null

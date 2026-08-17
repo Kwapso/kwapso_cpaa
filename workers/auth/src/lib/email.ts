@@ -131,7 +131,7 @@ export async function sendEmailChangedNotice(
     heading: "Your email was changed",
     intro: `The email address for your ${brand.name} account was just changed to ${maskEmail(newEmail)}. Sign in with the new address from now on.`,
     footnote:
-      "If you didn't make this change, contact us right away — someone else may have access to your account.",
+      "If you didn't make this change, contact us right away, someone else may have access to your account.",
   })
   return sendEmail(env, {
     to: oldEmail,

@@ -9,7 +9,7 @@ export type NavItem = {
   slug: string
   path: string
   title: string
-  icon: "home" | "settings"
+  icon: "home" | "settings" | "kwapso"
   need?: { module: string; right: "read" }
   /** Which half of the rail it sits in — see NavGroup below. */
   group: NavGroup
@@ -31,12 +31,27 @@ export type NavGroup = "daily" | "occasional"
 
 export const NAV: NavItem[] = [
   { slug: "home", path: "/home", title: "Home", icon: "home", group: "daily" },
+  // THE AGENCY ITSELF, as a destination (CHECKLIST 10.1, 17 Aug 2026). Who we
+  // are: the material we make our own work with, the people who make it, and the
+  // details that go on a contract. "As a business owner you use this all the
+  // time" is the whole case for it being a page rather than a corner of
+  // Settings — Settings is where you change how the app behaves, and none of
+  // this is a setting.
+  //
+  // A NAV ENTRY RATHER THAN A TEAM SECTION, deliberately. It is gated by no
+  // module of its own: every person in the team may look up the company's phone
+  // number. What is INSIDE it is gated panel by panel — the brand library on
+  // `brand_assets:read`, the people on `team_members:read`, and editing the
+  // legal details on `teams:edit` — so a role sees exactly the parts it holds
+  // and the page never becomes a permission of its own that somebody has to
+  // remember to grant.
+  { slug: "kwapso", path: "/kwapso", title: "Kwapso", icon: "kwapso", group: "occasional" },
   { slug: "settings", path: "/settings", title: "Settings", icon: "settings", group: "occasional" },
 ]
 
 /** The mobile bottom-bar set: only destinations the user can reach, capped at 5
- * (extras would fold into a "More" entry), in the SAME order as the desktop rail —
- * Home, Learning, Tickets, Settings (the owner's locked order; no centre-pinning).
+ * (extras would fold into a "More" entry), in the SAME order as the desktop rail
+ * (the owner's locked order; no centre-pinning).
  * Generic over the link shape so the shell can pass its composed Home + team
  * sidebar pages + Settings list, not just the bare NAV. */
 export function bottomNavItems<T extends { slug: string }>(items: T[]): T[] {
@@ -62,7 +77,6 @@ export type TeamSection = {
     // record, because the question is always about one client (R24 · SCOPE).
     | "internal-rates"
     | "accounts"
-    | "learning"
     | "tickets"
     | "knowledge"
     | "processes"
@@ -82,14 +96,14 @@ export type TeamSection = {
     // in `daily` beside Stories and Tasks: a diary is something somebody opens
     // before their first call, not an inventory they consult twice a year.
     | "meetings"
-    // The agency's own housekeeping. Four sidebar pages rather than admin tabs:
-    // a marketing calendar and a brand library are somebody's actual work, not a
-    // setting. Staff profiles has NO section of its own — the owner's ruling is
-    // that a profile lives on the member's own page, so its screens hang off
-    // Members instead and its module never appears in this table.
-    | "marketing"
+    // The agency's own housekeeping. The brand library is a sidebar page rather
+    // than an admin tab: it is somebody's actual work, not a setting. Meeting
+    // purposes is CONTEXTUAL, reached from the Meetings screen — it is the
+    // taxonomy behind that page, not a destination of its own. Staff profiles
+    // has NO section at all: the owner's ruling is that a profile lives on the
+    // member's own page, so its screens hang off Members instead and its module
+    // never appears in this table.
     | "brand"
-    | "delivery"
     | "purposes"
     | "import"
   title: string
@@ -141,15 +155,19 @@ export const TEAM_SECTIONS: TeamSection[] = [
   //
   // The owner's sequence, fixed 13 Aug 2026:
   //   daily       Home · Accounts · Knowledge base · Tickets · Stories · Tasks
-  //   occasional  Meetings · Apps · Process maps · Sprints · Marketing ·
-  //               Brand library · Delivery method · Learning · Settings
+  //   occasional  Meetings · Apps · Sprints · Brand library · Settings
   //
   // Two pages changed halves with it. KNOWLEDGE BASE moved up into the daily
   // set — it stopped being a library somebody consults and became the thing the
   // team asks first, which is a different habit and belongs above the fold.
   // MEETINGS moved down out of it: the diary is read when there is a meeting,
-  // not every morning. LEARNING moved to the end of the occasional half, next
-  // to Settings, which is where a how-to library is looked for.
+  // not every morning.
+  //
+  // FOUR PAGES LEFT THE RAIL on 17 Aug 2026 and only one of them lost anything.
+  // Marketing and Learning were purged outright (the owner's ruling), Delivery
+  // method's programmes were folded onto the sprint type, and PROCESS MAPS
+  // stopped being a destination because a map is read inside the app it belongs
+  // to — its screens and its records are all still here, reached from the app.
   //
   // Accounts — the companies and people the team works with (the customer spine,
   // SCOPE ch.03). A first-class SIDEBAR page: it's the day's work, not an admin
@@ -199,47 +217,53 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // belong on the story — and neither is a place a person goes to find "the time
   // I logged". A tester with 115 entries reported she could not find any of it.
   //
-  // "Time" rather than "Work logs": the glossary defines a work log as "one row
-  // of time", and the two screens that already show them are both headed Time.
+  // "WORK LOGS", not "Time" (CHECKLIST 2.6). It was headed Time on the argument
+  // that the glossary defines a work log as "one row of time" — but the glossary
+  // TERM is `Work log`, and the story record's own tab had already moved to that
+  // word, so the rail was the last screen calling one thing two names (Law R6).
+  // The URL segment is deliberately left alone: `/time` is a link people have
+  // already sent each other, and a slug is not a word anybody reads.
   // The count is the exact number of ROWS (R16), keyed off the same cache the
   // list reads; the hours are a second, different number the screen says itself.
-  { key: "time", title: "Time", module: "work", segment: "time", placement: "sidebar", countCacheKey: "work-logs", group: "daily" },
+  { key: "time", title: "Work logs", module: "work", segment: "time", placement: "sidebar", countCacheKey: "work-logs", group: "daily" },
   // ── and below the divider ────────────────────────────────────────────────
   { key: "meetings", title: "Meetings", module: "meetings", segment: "meetings", placement: "sidebar", countCacheKey: "meetings", group: "occasional" },
-  // Apps gate on `processes`, not `work`: an app is the thing a process map
+  // Apps gate on `processes`, not `work`: an app is the thing a process
   // hangs off, and the module that owns the App → Process → Step chain is the
   // one whose right a person needs to see any of it.
   { key: "apps", title: "Apps", module: "processes", segment: "apps", placement: "sidebar", countCacheKey: "apps", group: "occasional" },
-  // Process maps — App → Process → Step, and the value drilled through them. Its
-  // count is the exact server total of the PROCESSES (the collection the screen
-  // leads with and the one that grows), keyed off the same `processes:<teamId>`
-  // cache the list reads.
-  { key: "processes", title: "Process maps", module: "processes", segment: "processes", placement: "sidebar", countCacheKey: "processes", group: "occasional" },
-  { key: "sprints", title: "Sprints", module: "work", segment: "sprints", placement: "sidebar", countCacheKey: "sprints", group: "occasional" },
-  // THE AGENCY'S OWN HOUSEKEEPING — three sidebar pages, each gated by its own
-  // read right so a role without it never sees the destination at all. Their
-  // counts are exact server totals (R16) keyed off the same caches the lists
-  // read, so the badge and the rows can never disagree.
+  // PROCESSES — App → Process → Step, and the value drilled through them.
+  // CONTEXTUAL since 17 Aug 2026: the owner's ruling is that a process lives under
+  // the APP it belongs to, and it is reached from that app's own screen. Nothing
+  // under it changed — the list, the record, the versions, the steps and the
+  // arithmetic are all still here, and `/t/<team>/processes/<id>` still opens a
+  // process. What went is the line on the nav rail, because "which app is this
+  // a process of?" is a question a rail full of them makes somebody ask every time.
   //
-  // `delivery` leads with the PROGRAMMES: a screen with two collections has to
-  // badge one of them, and the programme is the thing somebody arrives looking
-  // for (the meeting purposes sit under it on the same screen, with their own
-  // heading and their own count).
-  { key: "marketing", title: "Marketing", module: "marketing", segment: "marketing", placement: "sidebar", countCacheKey: "marketing", group: "occasional" },
-  { key: "brand", title: "Brand library", module: "brand_assets", segment: "brand", placement: "sidebar", countCacheKey: "brand_assets", group: "occasional" },
-  { key: "delivery", title: "Delivery method", module: "delivery", segment: "delivery", placement: "sidebar", countCacheKey: "programmes", group: "occasional" },
-  // Learning STAYS VISIBLE — the owner was asked whether it could fold away and
-  // said no. Last of the occasional half, beside Settings: nobody reads the
-  // how-to library every morning, but the day they need it they must find it.
-  { key: "learning", title: "Learning", module: "learning", segment: "learning", placement: "sidebar", countCacheKey: "learning", group: "occasional" },
-  // Meeting purposes: the SAME module, its own segment, reached CONTEXTUALLY
-  // from a button on the Delivery method screen. It is not a second sidebar page
-  // because it is not a second destination — it is the other half of one, and a
-  // nav rail that lists both halves of one idea reads as two ideas.
+  // It keeps its count key: the heading on the screen still badges the exact
+  // server total of the PROCESSES, keyed off the same `processes:<teamId>` cache
+  // the list reads.
+  { key: "processes", title: "Processes", module: "processes", segment: "processes", placement: "contextual", countCacheKey: "processes" },
+  { key: "sprints", title: "Sprints", module: "work", segment: "sprints", placement: "sidebar", countCacheKey: "sprints", group: "occasional" },
+  // THE AGENCY'S OWN HOUSEKEEPING — one sidebar page, gated by its own read
+  // right so a role without it never sees the destination at all. Its count is
+  // an exact server total (R16) keyed off the same cache the list reads, so the
+  // badge and the rows can never disagree.
+  // BRAND LIBRARY — CONTEXTUAL since 17 Aug 2026 (CHECKLIST 10.2). Nothing
+  // under it changed: the screen, the records and `/brand/<id>` are all still
+  // here. What went is the line on the rail, because the brand library is one of
+  // the three things the Kwapso page is FOR, and a rail that lists both the
+  // section and the page it lives on reads as two ideas. It keeps its count key:
+  // the heading on the screen still badges the exact server total.
+  { key: "brand", title: "Brand library", module: "brand_assets", segment: "brand", placement: "contextual", countCacheKey: "brand_assets" },
+  // Meeting purposes: its own segment, reached CONTEXTUALLY from a button on the
+  // Meetings screen. It is not a sidebar page because it is not a destination —
+  // it is the taxonomy behind one, and a nav rail that lists a page and the
+  // vocabulary behind it reads as two ideas.
   { key: "purposes", title: "Meeting purposes", module: "delivery", segment: "purposes", placement: "contextual", countCacheKey: "purposes" },
   // Import has NO read-right of its own — it's gated per-target (create on
-  // member_roles or learning). Reached CONTEXTUALLY from an "Import CSV" button on
-  // those pages (which land on /t/<team>/import/<tableKey>), never a tab.
+  // member_roles or dropdown values). Reached CONTEXTUALLY from an "Import CSV"
+  // button on those pages (which land on /t/<team>/import/<tableKey>), never a tab.
   { key: "import", title: "Import", module: "import", segment: "import", placement: "contextual" },
 ]
 
@@ -250,6 +274,9 @@ export const TEAM_SECTIONS: TeamSection[] = [
 export const CONCEPT_ICON = {
   home: "home",
   settings: "settings",
+  // The agency itself — a building would be the team, so this is the badge on
+  // the door: who we are, said once.
+  kwapso: "badge-check",
   team: "building",
   overview: "layout-dashboard",
   members: "users",
@@ -264,7 +291,6 @@ export const CONCEPT_ICON = {
   accounts: "building-2",
   contacts: "contact",
   portal: "key-round",
-  learning: "graduation-cap",
   knowledge: "library-big",
   tickets: "life-buoy",
   // The map and the numbers drilled through it: a process is a route someone
@@ -295,11 +321,9 @@ export const CONCEPT_ICON = {
   time: "timer",
   import: "upload",
   activity: "history",
-  // The agency's own housekeeping: what we send out, the material we send it
-  // with, how we run delivery, and who our people are.
-  marketing: "megaphone",
+  // The agency's own housekeeping: the material we make our own work with, why
+  // we meet, and who our people are.
   brand: "palette",
-  delivery: "workflow",
   purposes: "calendar-check",
   staff: "id-card",
 } as const

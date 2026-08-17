@@ -155,10 +155,11 @@ await api("/api/tenancy/bootstrap", { method: "POST" }, ownerCookie)
 
 section("the under-privileged role")
 
-/** The full 8-module matrix with only the named rights on — the door normalises
- * anything absent to false, so this SETS the role's whole sheet every run
- * (a previous run can never leave a stray right switched on). */
-const MODULES = ["teams", "team_members", "member_roles", "learning", "help", "selectable_data", "screens", "agent"]
+/** The modules this probe names, with only the named rights on. The door writes
+ * the role's WHOLE sheet from TEAM_MODULES and normalises anything absent to
+ * false, so naming a handful still resets every one of them — a previous run can
+ * never leave a stray right switched on. */
+const MODULES = ["teams", "team_members", "member_roles", "knowledge", "help", "selectable_data", "screens", "agent"]
 const matrix = (grants) =>
   Object.fromEntries(
     MODULES.map((m) => [
@@ -167,8 +168,15 @@ const matrix = (grants) =>
     ])
   )
 
-const BASELINE = { learning: ["read"] }
-const GRANTED = { learning: ["read"], member_roles: ["read"], team_members: ["read"], help: ["read"] }
+/** THE PROBE MODULE IS `knowledge`, and the choice is not arbitrary. It has to be
+ * a module that still exists, that still has a READ tool on the deployed MCP
+ * catalogue (`list_knowledge_sources`), and that is NOT one of the rights this
+ * script hands out and takes away below — the whole proof is "the one right the
+ * role kept still works while the granted ones come and go", and a module on both
+ * lists could not tell those two apart. It used to be `learning`, until that
+ * module was purged on 17 Aug 2026. */
+const BASELINE = { knowledge: ["read"] }
+const GRANTED = { knowledge: ["read"], member_roles: ["read"], team_members: ["read"], help: ["read"] }
 
 async function setProbeRights(grants) {
   const { res, body } = await api(
@@ -192,7 +200,7 @@ if (probe.active === false)
   await api("/api/tenancy/roles/active", { method: "POST", body: JSON.stringify({ roleId: probeRoleId, active: true }) }, adminCookie)
 
 await setProbeRights(BASELINE)
-ok("probe role exists, reset to learning:read only", true)
+ok("probe role exists, reset to knowledge:read only", true)
 
 // Make sure the machine owner is a member of the admin's team holding that role.
 const membersNow = await api("/api/tenancy/members", {}, adminCookie)
@@ -304,7 +312,10 @@ ok("no tool can mint or read access tokens", !TOOLS.some((t) => /token/i.test(t.
 
 // The reasoned exclusions (MCP.md): the agent's multi-row mutation tools are
 // built around the app's confirm panel, which a headless client does not have.
-for (const name of ["bulk_set_help_status", "bulk_set_learning_active", "set_help_status_by_filter"])
+// Both of the ones that exist, read off workers/data-ops/src/lib/tools.ts —
+// there was a third, bulk_set_learning_active, until the learning library was
+// purged. A name that no longer exists proves nothing when it fails to appear.
+for (const name of ["bulk_set_help_status", "set_help_status_by_filter"])
   ok(`the blind mass-write tool ${name} is not exposed`, !TOOLS.some((t) => t.name === name))
 
 /* ============================================================================ *
@@ -316,8 +327,8 @@ section("acting as the owner, capped by their role")
   const who = await callTool(SECRET, "whoami")
   ok("whoami is the token's owner, not the admin who owns the team", who.data?.user?.email === OWNER_EMAIL, who.text.slice(0, 160))
 
-  const allowed = await callTool(SECRET, "list_learning")
-  ok("a tool the role DOES allow works (learning:read)", !allowed.isError && Array.isArray(allowed.data?.learning), allowed.text.slice(0, 160))
+  const allowed = await callTool(SECRET, "list_knowledge_sources")
+  ok("a tool the role DOES allow works (knowledge:read)", !allowed.isError && Array.isArray(allowed.data?.sources), allowed.text.slice(0, 160))
 
   const readDenied = await callTool(SECRET, "list_roles")
   ok("a read the role does NOT allow is refused (member_roles:read)", refused(readDenied), readDenied.text.slice(0, 160))
@@ -495,8 +506,8 @@ await setProbeRights(BASELINE)
   const membersAgain = await callTool(SECRET, "list_members")
   ok("…and so is the members read", refused(membersAgain), membersAgain.text.slice(0, 160))
 
-  const stillWorks = await callTool(SECRET, "list_learning")
-  ok("the right the role kept still works (no over-revoking)", !stillWorks.isError && Array.isArray(stillWorks.data?.learning), stillWorks.text.slice(0, 160))
+  const stillWorks = await callTool(SECRET, "list_knowledge_sources")
+  ok("the right the role kept still works (no over-revoking)", !stillWorks.isError && Array.isArray(stillWorks.data?.sources), stillWorks.text.slice(0, 160))
 }
 
 /* ============================================================================ *

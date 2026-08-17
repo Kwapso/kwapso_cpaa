@@ -1,0 +1,241 @@
+// THE LANGUAGE ENGINE, AND THE DOOR THAT SETS IT.
+//
+// Four things are being locked here, and each one is a way this feature could
+// fail QUIETLY — which is the only way a translation layer ever fails.
+//
+//  1. AN UNKNOWN LANGUAGE NEVER REACHES THE DATABASE. The door type-checks
+//     against the LANGUAGES list rather than accepting any string (R20). A value
+//     that got past it would sit on a user row for ever, matching no catalogue
+//     entry, and that person would read fallback English with no way to explain
+//     why. A clean 400 is recoverable; a stored "en-GB" is not.
+//
+//  2. EVERY UNKNOWN ANSWERS ENGLISH. A missing translation, a language we
+//     retired, a null preference, a value somebody wrote straight into the
+//     database — all of them render a sentence. The one thing this seam must
+//     never do is put a key on screen or throw during a render.
+//
+//  3. THE ENGLISH PATH IS BYTE-IDENTICAL. `systemFor(null)` must be the SYSTEM
+//     prompt exactly, not SYSTEM plus a paragraph saying "answer in English".
+//     Every existing agent suite reads that constant, and the common case must
+//     cost nothing.
+//
+//  4. THE ASSISTANT IS TOLD NOT TO TRANSLATE THE DATA. This is the one that
+//     would be expensive to discover in production: a model told "answer in
+//     German" will happily send `Frage` as a `help_type` filter, match zero
+//     rows, and report "no tickets" — which reads as the app being broken. The
+//     rule has to be IN the prompt, so the test asserts it is.
+
+import { DatabaseSync } from "node:sqlite"
+import { beforeEach, describe, expect, it } from "vitest"
+
+import {
+  DEFAULT_LANGUAGE,
+  LANGUAGES,
+  coverage,
+  fill,
+  isLanguage,
+  toLanguage,
+  translate,
+  translator,
+  type Catalogue,
+  type Language,
+} from "@shared/i18n"
+import { SYSTEM, systemFor } from "../../data-ops/src/lib/agent"
+import { d1, migration } from "./core-sqlite"
+
+describe("what counts as a language (R20, at the door)", () => {
+  it("accepts every language we speak, and English is one of them", () => {
+    for (const l of LANGUAGES) expect(isLanguage(l.code), l.code).toBe(true)
+    expect(isLanguage(DEFAULT_LANGUAGE)).toBe(true)
+  })
+
+  it("refuses everything else, including the near misses", () => {
+    // The near misses are the point. A locale string, a case variant and a
+    // language we do not have are all things a real client would send.
+    //
+    // `xx` rather than `fr` since the list grew past the agency's own four: a
+    // fixture naming a real language would have started passing for the wrong
+    // reason the day we added it, which is a green test asserting nothing.
+    for (const bad of ["en-GB", "EN", "de-DE", "xx", "", " ", "english", null, 7, {}, ["de"]])
+      expect(isLanguage(bad), JSON.stringify(bad)).toBe(false)
+  })
+
+  it("never throws on a stored value, however wrong", () => {
+    expect(toLanguage(null)).toBe(DEFAULT_LANGUAGE)
+    expect(toLanguage(undefined)).toBe(DEFAULT_LANGUAGE)
+    expect(toLanguage("xx")).toBe(DEFAULT_LANGUAGE)
+    expect(toLanguage(42)).toBe(DEFAULT_LANGUAGE)
+    expect(toLanguage("de")).toBe("de")
+  })
+})
+
+describe("every unknown reads as English", () => {
+  const CAT: Catalogue = { Save: { de: "Speichern" }, Cancel: {} }
+
+  it("translates what it has", () => {
+    expect(translate("Save", "de", undefined, CAT)).toBe("Speichern")
+  })
+
+  it("falls back to the English for a language with no entry", () => {
+    // Spanish is missing from this catalogue entirely. The screen must say
+    // "Save", never "Save.es" and never an empty string.
+    expect(translate("Save", "es", undefined, CAT)).toBe("Save")
+  })
+
+  it("falls back for an entry that exists but is empty", () => {
+    expect(translate("Cancel", "de", undefined, CAT)).toBe("Cancel")
+  })
+
+  it("falls back for a string nobody has catalogued at all", () => {
+    expect(translate("Something nobody wrote down", "de", undefined, CAT)).toBe(
+      "Something nobody wrote down"
+    )
+  })
+
+  it("does not consult the catalogue for English at all", () => {
+    // English IS the key, so the English path is a pure passthrough. Proven with
+    // a catalogue that would give a different answer if it were consulted.
+    expect(translate("Save", "en", undefined, { Save: { de: "WRONG" } })).toBe("Save")
+  })
+})
+
+describe("interpolation", () => {
+  it("fills named holes", () => {
+    expect(fill("Invited {email}.", { email: "a@b.com" })).toBe("Invited a@b.com.")
+  })
+
+  it("leaves a hole it has no value for VISIBLE rather than blank", () => {
+    // A visible {email} tells somebody what went wrong. A silent gap does not,
+    // and reads as a typo in the copy.
+    expect(fill("Invited {email}.", { other: "x" })).toBe("Invited {email}.")
+  })
+
+  it("interpolates through a translation", () => {
+    const CAT: Catalogue = { "Invited {email}.": { de: "{email} wurde eingeladen." } }
+    expect(translate("Invited {email}.", "de", { email: "a@b.com" }, CAT)).toBe(
+      "a@b.com wurde eingeladen."
+    )
+  })
+
+  it("a bound translator behaves the same as the free function", () => {
+    const CAT: Catalogue = { Save: { de: "Speichern" } }
+    expect(translator("de", CAT)("Save")).toBe(translate("Save", "de", undefined, CAT))
+  })
+})
+
+describe("coverage, as the switcher reports it", () => {
+  it("is a fraction of the catalogue, per language", () => {
+    const CAT: Catalogue = {
+      a: { de: "A", es: "A", ca: "A" },
+      b: { de: "B" },
+      c: {},
+      d: { de: "D", es: "" },
+    }
+    const c = coverage(CAT)
+    expect(c.de).toBeCloseTo(3 / 4)
+    expect(c.es).toBeCloseTo(1 / 4) // the "" does not count as translated
+    expect(c.ca).toBeCloseTo(1 / 4)
+  })
+
+  it("an empty catalogue is zero rather than a division by nothing", () => {
+    const empty = coverage({})
+    // Every language that needs writing reports zero, and English — which IS the
+    // key and therefore always complete — is not in the report at all.
+    for (const l of LANGUAGES) {
+      if (l.code === DEFAULT_LANGUAGE) expect(l.code in empty, l.code).toBe(false)
+      else expect(empty[l.code as Exclude<Language, "en">], l.code).toBe(0)
+    }
+    expect(Object.keys(empty)).toHaveLength(LANGUAGES.length - 1)
+  })
+})
+
+describe("what the assistant is told", () => {
+  it("English is the base prompt, byte for byte", () => {
+    // Every agent suite reads SYSTEM. If this drifts, they are all testing a
+    // prompt the product does not send.
+    expect(systemFor(null)).toBe(SYSTEM)
+    expect(systemFor("en")).toBe(SYSTEM)
+    expect(systemFor("not-a-language")).toBe(SYSTEM)
+  })
+
+  it("another language ADDS to the prompt rather than replacing it", () => {
+    const de = systemFor("de")
+    expect(de.startsWith(SYSTEM)).toBe(true)
+    expect(de.length).toBeGreaterThan(SYSTEM.length)
+  })
+
+  it("names the language in words the model will recognise", () => {
+    expect(systemFor("de")).toContain("German")
+    expect(systemFor("es")).toContain("Spanish")
+    expect(systemFor("ca")).toContain("Catalan")
+  })
+
+  it("FORBIDS translating the team's own data, and says why", () => {
+    // The expensive failure: a translated argument matches no record and the
+    // user is told there are none. The prompt must say so explicitly, not imply
+    // it — so this asserts the substance, not one phrasing.
+    const de = systemFor("de")
+    expect(de).toMatch(/NEVER translate the team's own data/i)
+    expect(de).toMatch(/tool/i)
+    expect(de).toMatch(/exactly/i)
+  })
+})
+
+describe("the door's write (R17: idempotent)", () => {
+  let db: DatabaseSync
+
+  beforeEach(() => {
+    db = new DatabaseSync(":memory:")
+    db.exec(migration("0001_core_auth.sql"))
+    db.exec(migration("0002_teams.sql"))
+    db.exec(migration("0024_user_language.sql"))
+    db.exec(
+      `INSERT INTO users (id, email, created_at, updated_at) VALUES ('u1', 'a@b.com', 'now', 'now')`
+    )
+  })
+
+  /** Exactly the statement setLanguage runs (workers/auth/src/lib/profile.ts). */
+  async function setLang(next: string): Promise<number> {
+    const res = await d1(db)
+      .prepare(
+        "UPDATE users SET language = ?, updated_at = ? WHERE id = ? AND COALESCE(language, '') <> ?"
+      )
+      .bind(next, "now", "u1", next)
+      .run()
+    return res.meta.changes ?? 0
+  }
+
+  it("a new column starts null, which reads as English", () => {
+    const row = db.prepare("SELECT language FROM users WHERE id = 'u1'").get() as {
+      language: string | null
+    }
+    expect(row.language).toBe(null)
+    expect(toLanguage(row.language)).toBe("en")
+  })
+
+  it("the first choice moves one row", async () => {
+    expect(await setLang("de")).toBe(1)
+  })
+
+  it("choosing the SAME language again moves zero rows, so nothing is published", async () => {
+    // R17. A switcher somebody taps twice must be silent the second time —
+    // otherwise every double-tap pings every one of that person's devices.
+    await setLang("de")
+    expect(await setLang("de")).toBe(0)
+  })
+
+  it("choosing a different one moves a row again", async () => {
+    await setLang("de")
+    expect(await setLang("es")).toBe(1)
+  })
+
+  it("English is a real CHOICE, distinguishable from never having chosen", async () => {
+    // The null stays available for a future browser-language guess: only people
+    // who never chose may be guessed at.
+    expect(await setLang("en")).toBe(1)
+    const row = db.prepare("SELECT language FROM users WHERE id = 'u1'").get() as {
+      language: string | null
+    }
+    expect(row.language).toBe("en")
+  })
+})

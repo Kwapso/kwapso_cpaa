@@ -7,7 +7,7 @@ import { refusePortalCaller } from "@shared/workers/account-scope"
 import { fail, json } from "@shared/workers/http"
 import { csvResponse, exportTooLarge, toCsv } from "@shared/workers/csv"
 import { EXPORT_HARD_CAP } from "@shared/workers/limits"
-import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { gated, gatedBody } from "@shared/workers/route"
 import {
@@ -46,7 +46,7 @@ export async function getSelectableExport(request: Request, env: Env): Promise<R
 }
 
 export async function postCreateSelectable(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{ type?: string; value?: string }>(request, env, "selectable_data", "create")
+  const { actor, cfg, guard, body } = await gatedBody<{ type?: string; value?: string; mark?: string }>(request, env, "selectable_data", "create")
   // R21 AT THE DOOR, ON THE WRITE HALF TOO. Every READ door on this module already
   // refuses a client login; not one WRITE door did, so the refusal existed on the
   // module and was missing on exactly the half that changes things. It held only
@@ -56,14 +56,18 @@ export async function postCreateSelectable(request: Request, env: Env): Promise<
   await refusePortalCaller(cfg, guard)
   const type = requireText(body.type, "Group", TEXT_LIMITS.short)
   const value = requireText(body.value, "Option", TEXT_LIMITS.short)
-  const id = await createSelectable(cfg, guard, actor, type, value)
+  // R20: the glyph goes through the same seam as the words. `TEXT_LIMITS.tiny`
+  // because a type mark is one pictograph, not a sentence — and a pictograph is
+  // several code units, so it is a character cap rather than a length of one.
+  const mark = optionalText(body.mark, "Mark", TEXT_LIMITS.tiny)
+  const id = await createSelectable(cfg, guard, actor, type, value, mark)
   // Row-level: carry the new value's id so open lists can patch just that row.
   await publishChange(env, guard.teamId, "selectable_data", id, "add")
   return json({ values: await listSelectable(cfg, guard), total: await countSelectable(cfg, guard) })
 }
 
 export async function postUpdateSelectable(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{ id?: string; value?: string }>(request, env, "selectable_data", "edit")
+  const { actor, cfg, guard, body } = await gatedBody<{ id?: string; value?: string; mark?: string }>(request, env, "selectable_data", "edit")
   // R21 AT THE DOOR, ON THE WRITE HALF TOO. Every READ door on this module already
   // refuses a client login; not one WRITE door did, so the refusal existed on the
   // module and was missing on exactly the half that changes things. It held only
@@ -73,7 +77,8 @@ export async function postUpdateSelectable(request: Request, env: Env): Promise<
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Option", TEXT_LIMITS.short)
   const value = requireText(body.value, "Option", TEXT_LIMITS.short)
-  await updateSelectable(cfg, guard, actor, id, value)
+  const mark = optionalText(body.mark, "Mark", TEXT_LIMITS.tiny)
+  await updateSelectable(cfg, guard, actor, id, value, mark)
   await publishChange(env, guard.teamId, "selectable_data", id)
   return json({ values: await listSelectable(cfg, guard), total: await countSelectable(cfg, guard) })
 }

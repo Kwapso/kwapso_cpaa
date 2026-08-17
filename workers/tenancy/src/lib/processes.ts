@@ -54,7 +54,14 @@ function editedBy(actor: Actor, now: string): { sql: string; params: string[] } 
 async function insertRow(
   cfg: D1Rest,
   guard: MemberGuard,
-  table: "apps" | "processes" | "process_versions" | "process_steps" | "process_comments",
+  table:
+    | "apps"
+    | "app_staff"
+    | "app_stakeholders"
+    | "processes"
+    | "process_versions"
+    | "process_steps"
+    | "process_comments",
   row: Record<string, string | number | null>
 ): Promise<void> {
   const cols = Object.keys(row)
@@ -88,6 +95,10 @@ export async function listApps(
       url: string | null
       stage: string | null
       tool_cost_cents_per_month: number
+      about: string | null
+      client_context: string | null
+      solution: string | null
+      key_actors: string | null
       deactivated_at: string | null
       created_at: string
       creator_name: string | null
@@ -97,7 +108,13 @@ export async function listApps(
       cfg,
       guard.databaseId,
       // R14 hard cap — an app list is bounded by how many systems exist.
-      `SELECT id, account_id, name, url, stage, tool_cost_cents_per_month, deactivated_at,
+      //
+      // THE FOUR CONTEXT FIELDS RIDE THE LIST, and that is a decision rather than
+      // laziness: the apps set is bounded and read whole, the detail screen reads
+      // the record out of the same cache the list filled, and a second door for
+      // four columns would be a round trip that buys a page nothing.
+      `SELECT id, account_id, name, url, stage, tool_cost_cents_per_month,
+              about, client_context, solution, key_actors, deactivated_at,
               created_at, creator_name, updated_at, editor_name
          FROM apps${sql} ORDER BY (deactivated_at IS NULL) DESC, name ASC LIMIT ${LIST_HARD_CAP}`,
       params
@@ -106,26 +123,309 @@ export async function listApps(
     // badge can never count rows the list withholds.
     d1Query<{ n: number }>(cfg, guard.databaseId, `SELECT COUNT(*) AS n FROM apps${sql}`, params),
   ])
+  // WHO MAY OPEN WHAT (8.11). Aurora's ruling: everyone still SEES an app in the
+  // overview, and only the staff on it (plus an admin) open its detail. That is
+  // record-level visibility, which this codebase had never done — so it is
+  // decided HERE, on the row, and the material a non-staffed reader may not have
+  // is left out of the payload rather than hidden by the screen. A withheld
+  // field cannot be read out of the network tab, and "the screen doesn't render
+  // it" is not a permission.
+  //
+  // A CLIENT LOGIN IS NOT SUBJECT TO IT, deliberately. The account fence has
+  // already decided which apps they may see at all, and every one of those is
+  // their own system; staffing is OUR rota, and applying it to them would hide a
+  // client's own app from them because none of our people had been assigned yet.
+  const [openAll, staffedIds, people] = await Promise.all([
+    scope.kind === "portal" ? Promise.resolve(true) : isAdmin(cfg, guard),
+    scope.kind === "portal" ? Promise.resolve(new Set<string>()) : staffedAppIds(cfg, guard),
+    appPeople(cfg, guard),
+  ])
   return {
-    rows: rows.map((r) => ({
-      id: r.id,
-      accountId: r.account_id,
-      name: r.name,
-      url: r.url,
-      stage: r.stage,
-      // WHAT AN APP COSTS US is an internal number and never crosses to a client.
-      // It is withheld HERE, on the row, rather than at the three call sites — a
-      // redaction you have to remember is one somebody forgets (the same argument
-      // toAccount makes one table over, and the reason R24 exists).
-      toolCostCentsPerMonth: scope.kind === "portal" ? null : r.tool_cost_cents_per_month,
-      active: r.deactivated_at == null,
-      createdAt: r.created_at,
-      createdByName: scope.kind === "portal" ? null : r.creator_name,
-      updatedAt: r.updated_at,
-      editedByName: scope.kind === "portal" ? null : r.editor_name,
-    })),
+    rows: rows.map((r) => {
+      const canOpen = openAll || staffedIds.has(r.id)
+      return {
+        id: r.id,
+        accountId: r.account_id,
+        name: r.name,
+        url: canOpen ? r.url : null,
+        stage: r.stage,
+        // WHAT AN APP COSTS US is an internal number and never crosses to a client.
+        // It is withheld HERE, on the row, rather than at the three call sites — a
+        // redaction you have to remember is one somebody forgets (the same argument
+        // toAccount makes one table over, and the reason R24 exists).
+        toolCostCentsPerMonth: scope.kind === "portal" ? null : r.tool_cost_cents_per_month,
+        // The four context fields go to a client login as well. They are the
+        // agency's description of the client's OWN system and the situation it was
+        // built into — the same material the portal's value screen already names
+        // the app on. Nothing here is a number about us.
+        //
+        // They are the DETAIL, though, so they are also the thing 8.11 withholds
+        // from one of our own people who is not on this app.
+        about: canOpen ? r.about : null,
+        clientContext: canOpen ? r.client_context : null,
+        solution: canOpen ? r.solution : null,
+        keyActors: canOpen ? r.key_actors : null,
+        canOpen,
+        staff: canOpen ? (people.staff.get(r.id) ?? []) : [],
+        stakeholders: canOpen ? (people.stakeholders.get(r.id) ?? []) : [],
+        active: r.deactivated_at == null,
+        createdAt: r.created_at,
+        createdByName: scope.kind === "portal" ? null : r.creator_name,
+        updatedAt: r.updated_at,
+        editedByName: scope.kind === "portal" ? null : r.editor_name,
+      }
+    }),
     total: counted[0]?.n ?? 0,
   }
+}
+
+/* ------------------------- who is on an app (8.10 + 8.5) ------------------- */
+
+/** The team's locked Admin role (member_roles WHERE is_default = 1). An admin
+ * opens every app whether they are staffed to it or not — 8.11's own sentence. */
+async function isAdmin(cfg: D1Rest, guard: MemberGuard): Promise<boolean> {
+  const rows = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    "SELECT id FROM member_roles WHERE is_default = 1 LIMIT 1" // R14: one row
+  )
+  return rows[0]?.id === guard.roleId
+}
+
+/** EVERY APP THE CALLER IS STAFFED TO. Read whole rather than per app: the set is
+ * one person's assignments, which is bounded by how many systems exist. */
+export async function staffedAppIds(cfg: D1Rest, guard: MemberGuard): Promise<Set<string>> {
+  const rows = await d1Query<{ app_id: string }>(
+    cfg,
+    guard.databaseId,
+    // R14 hard cap — one person cannot be staffed to more apps than exist.
+    `SELECT app_id FROM app_staff WHERE user_id = ? AND deactivated_at IS NULL LIMIT ${LIST_HARD_CAP}`,
+    [guard.userId]
+  )
+  return new Set(rows.map((r) => r.app_id))
+}
+
+/** The live staff and stakeholder rows of every app in one read each, grouped by
+ * app. Two statements for a whole page of apps, never one per row. */
+async function appPeople(
+  cfg: D1Rest,
+  guard: MemberGuard
+): Promise<{
+  staff: Map<string, { userId: string; isLead: boolean }[]>
+  stakeholders: Map<string, { contactId: string; isMain: boolean }[]>
+}> {
+  const [staffRows, holderRows] = await Promise.all([
+    d1Query<{ app_id: string; user_id: string; is_lead: number }>(
+      cfg,
+      guard.databaseId,
+      // R14 hard cap — staff rows are (apps × the team), both bounded sets.
+      `SELECT app_id, user_id, is_lead FROM app_staff WHERE deactivated_at IS NULL
+        ORDER BY is_lead DESC, id ASC LIMIT ${LIST_HARD_CAP}`
+    ),
+    d1Query<{ app_id: string; contact_id: string; is_main: number }>(
+      cfg,
+      guard.databaseId,
+      // R14 hard cap — the same shape, over the client's own people.
+      `SELECT app_id, contact_id, is_main FROM app_stakeholders WHERE deactivated_at IS NULL
+        ORDER BY is_main DESC, id ASC LIMIT ${LIST_HARD_CAP}`
+    ),
+  ])
+  const staff = new Map<string, { userId: string; isLead: boolean }[]>()
+  for (const r of staffRows)
+    staff.set(r.app_id, [...(staff.get(r.app_id) ?? []), { userId: r.user_id, isLead: r.is_lead === 1 }])
+  const stakeholders = new Map<string, { contactId: string; isMain: boolean }[]>()
+  for (const r of holderRows)
+    stakeholders.set(r.app_id, [
+      ...(stakeholders.get(r.app_id) ?? []),
+      { contactId: r.contact_id, isMain: r.is_main === 1 },
+    ])
+  return { staff, stakeholders }
+}
+
+/** WHO IS ON THIS APP — the whole set, replaced in one go (8.10).
+ *
+ * The form asks the question once, so the door answers it once: the set you send
+ * IS the set the app has afterwards. Anybody dropped is DEACTIVATED rather than
+ * deleted, and anybody re-added re-activates the row they already had — which is
+ * why the membership index is unique across both states. The lead is cleared
+ * before it is set, because "exactly one" is a partial unique index and two
+ * UPDATEs in the wrong order would collide with it rather than replace it.
+ *
+ * Idempotent by construction (R17): sending the same set twice moves rows to the
+ * state they are already in, and the caller gets the same answer. */
+export async function setAppStaff(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor,
+  appId: string,
+  userIds: string[],
+  leadUserId: string | null
+): Promise<void> {
+  const now = new Date().toISOString()
+  const wanted = [...new Set(userIds)]
+  // The lead has to be ON the app — a lead nobody staffed is a Done button
+  // nobody can press (6.10), which is the failure this refuses out loud.
+  if (leadUserId && !wanted.includes(leadUserId))
+    throw new GuardError(400, "invalid_input", "The team lead has to be one of the people on this app.")
+  const existing = await d1Query<{ id: string; user_id: string }>(
+    cfg,
+    guard.databaseId,
+    `SELECT id, user_id FROM app_staff WHERE app_id = ? LIMIT ${LIST_HARD_CAP}`, // R14 hard cap
+    [appId]
+  )
+  const known = new Map(existing.map((r) => [r.user_id, r.id]))
+  // Off the app first, and the lead flag with them: a retired row that kept
+  // is_lead = 1 would hold the one live lead slot against everybody else.
+  await d1Query(
+    cfg,
+    guard.databaseId,
+    `UPDATE app_staff SET is_lead = 0, deactivated_at = ?, deactivator_id = ?, deactivator_email = ?,
+        deactivator_name = ?, ${editedBy(actor, now).sql}
+      WHERE app_id = ? AND deactivated_at IS NULL${
+        wanted.length ? ` AND user_id NOT IN (${wanted.map(() => "?").join(", ")})` : ""
+      }`,
+    [now, actor.id, actor.email, actor.name, ...editedBy(actor, now).params, appId, ...wanted]
+  )
+  for (const userId of wanted) {
+    const rowId = known.get(userId)
+    if (rowId)
+      await d1Query(
+        cfg,
+        guard.databaseId,
+        `UPDATE app_staff SET is_lead = 0, deactivated_at = NULL, deactivator_id = NULL,
+            deactivator_email = NULL, deactivator_name = NULL, ${editedBy(actor, now).sql}
+          WHERE id = ?`,
+        [...editedBy(actor, now).params, rowId]
+      )
+    else
+      await insertRow(cfg, guard, "app_staff", {
+        id: ulid(),
+        app_id: appId,
+        user_id: userId,
+        is_lead: 0,
+        created_at: now,
+        creator_id: actor.id,
+        creator_email: actor.email,
+        creator_name: actor.name,
+      })
+  }
+  if (leadUserId)
+    await d1Query(
+      cfg,
+      guard.databaseId,
+      `UPDATE app_staff SET is_lead = 1, ${editedBy(actor, now).sql}
+        WHERE app_id = ? AND user_id = ? AND deactivated_at IS NULL`,
+      [...editedBy(actor, now).params, appId, leadUserId]
+    )
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: "App staffed",
+    description: `${actor.name} set who is on this app, ${wanted.length} ${
+      wanted.length === 1 ? "person" : "people"
+    }${leadUserId ? ", with a team lead" : ""}`,
+    relatedTable: "apps",
+    relatedRowId: appId,
+  })
+}
+
+/** THE CLIENT'S PEOPLE ON THIS APP, one of them the main one (8.5). The same
+ * replace-the-whole-set shape as the staff above, over the client's contacts
+ * instead of our own logins — and every id is proved to be an account inside the
+ * caller's own fence before it is written, so a stakeholder from another
+ * company's books is a refusal rather than a row. */
+export async function setAppStakeholders(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  actor: Actor,
+  appId: string,
+  contactIds: string[],
+  mainContactId: string | null
+): Promise<void> {
+  const now = new Date().toISOString()
+  const wanted = [...new Set(contactIds)]
+  if (mainContactId && !wanted.includes(mainContactId))
+    throw new GuardError(400, "invalid_input", "The main stakeholder has to be one of the people on this app.")
+  // The ids were proved to be real accounts INSIDE THE CALLER'S FENCE by the
+  // door, through lib/accounts.ts — the one file in this worker that writes SQL
+  // against the customer spine. This file deliberately does not look them up
+  // itself: two files reading `accounts` is two places to forget the stamp, and
+  // workers/tenancy/test/account-leak.test.ts fails the build for exactly that.
+  for (const id of wanted) requireAccountInScope(scope, id)
+  const existing = await d1Query<{ id: string; contact_id: string }>(
+    cfg,
+    guard.databaseId,
+    `SELECT id, contact_id FROM app_stakeholders WHERE app_id = ? LIMIT ${LIST_HARD_CAP}`, // R14 hard cap
+    [appId]
+  )
+  const known = new Map(existing.map((r) => [r.contact_id, r.id]))
+  await d1Query(
+    cfg,
+    guard.databaseId,
+    `UPDATE app_stakeholders SET is_main = 0, deactivated_at = ?, deactivator_id = ?, deactivator_email = ?,
+        deactivator_name = ?, ${editedBy(actor, now).sql}
+      WHERE app_id = ? AND deactivated_at IS NULL${
+        wanted.length ? ` AND contact_id NOT IN (${wanted.map(() => "?").join(", ")})` : ""
+      }`,
+    [now, actor.id, actor.email, actor.name, ...editedBy(actor, now).params, appId, ...wanted]
+  )
+  for (const contactId of wanted) {
+    const rowId = known.get(contactId)
+    if (rowId)
+      await d1Query(
+        cfg,
+        guard.databaseId,
+        `UPDATE app_stakeholders SET is_main = 0, deactivated_at = NULL, deactivator_id = NULL,
+            deactivator_email = NULL, deactivator_name = NULL, ${editedBy(actor, now).sql}
+          WHERE id = ?`,
+        [...editedBy(actor, now).params, rowId]
+      )
+    else
+      await insertRow(cfg, guard, "app_stakeholders", {
+        id: ulid(),
+        app_id: appId,
+        contact_id: contactId,
+        is_main: 0,
+        created_at: now,
+        creator_id: actor.id,
+        creator_email: actor.email,
+        creator_name: actor.name,
+      })
+  }
+  if (mainContactId)
+    await d1Query(
+      cfg,
+      guard.databaseId,
+      `UPDATE app_stakeholders SET is_main = 1, ${editedBy(actor, now).sql}
+        WHERE app_id = ? AND contact_id = ? AND deactivated_at IS NULL`,
+      [...editedBy(actor, now).params, appId, mainContactId]
+    )
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: "App stakeholders set",
+    description: `${actor.name} set the client's people on this app, ${wanted.length} named${
+      mainContactId ? ", one of them the main one" : ""
+    }`,
+    relatedTable: "apps",
+    relatedRowId: appId,
+  })
+}
+
+/** THE APP'S MAIN STAKEHOLDER, or nothing (8.5 → 5.7). One row, read by the
+ * ticket resolution email so the person told is the person who owns THAT system
+ * rather than whoever the account named years ago. */
+export async function mainStakeholderOf(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  appId: string
+): Promise<string | null> {
+  const rows = await d1Query<{ contact_id: string }>(
+    cfg,
+    guard.databaseId,
+    // R14: at most one row can be live, by the partial unique index.
+    `SELECT contact_id FROM app_stakeholders
+      WHERE app_id = ? AND is_main = 1 AND deactivated_at IS NULL LIMIT 1`,
+    [appId]
+  )
+  return rows[0]?.contact_id ?? null
 }
 
 export async function createApp(
@@ -133,7 +433,17 @@ export async function createApp(
   guard: MemberGuard,
   scope: AccountScope,
   actor: Actor,
-  input: { name: string; accountId?: string; url?: string; stage?: string; toolCostCentsPerMonth?: number }
+  input: {
+    name: string
+    accountId?: string
+    url?: string
+    stage?: string
+    toolCostCentsPerMonth?: number
+    about?: string
+    clientContext?: string
+    solution?: string
+    keyActors?: string
+  }
 ): Promise<string> {
   if (input.accountId) requireAccountInScope(scope, input.accountId)
   const id = ulid()
@@ -144,6 +454,10 @@ export async function createApp(
     url: input.url ?? null,
     stage: input.stage ?? null,
     tool_cost_cents_per_month: input.toolCostCentsPerMonth ?? 0,
+    about: input.about ?? null,
+    client_context: input.clientContext ?? null,
+    solution: input.solution ?? null,
+    key_actors: input.keyActors ?? null,
     created_at: new Date().toISOString(),
     creator_id: actor.id,
     creator_email: actor.email,
@@ -166,35 +480,64 @@ export async function updateApp(
   scope: AccountScope,
   actor: Actor,
   id: string,
-  input: { name: string; url?: string | null; stage?: string | null; toolCostCentsPerMonth?: number }
+  input: {
+    name: string
+    url?: string | null
+    stage?: string | null
+    toolCostCentsPerMonth?: number
+    about?: string | null
+    clientContext?: string | null
+    solution?: string | null
+    keyActors?: string | null
+  }
 ): Promise<void> {
   const before = await appOrThrow(cfg, guard, scope, id)
   const fence = accountScopeClause(scope, "account_id")
   const audit = editedBy(actor, new Date().toISOString())
+  // Absent means "say nothing", the patch rule this door already keeps for the
+  // address and the stage — an edit that erased what it was not asked about is
+  // the mistake the accounts door made once and nothing here repeats.
+  const keep = <T,>(sent: T | undefined, existing: T): T => (sent === undefined ? existing : sent)
   const changed = await d1Query<{ id: string }>(
     cfg,
     guard.databaseId,
-    `UPDATE apps SET name = ?, url = ?, stage = ?, tool_cost_cents_per_month = ?, ${audit.sql}
+    `UPDATE apps SET name = ?, url = ?, stage = ?, tool_cost_cents_per_month = ?,
+            about = ?, client_context = ?, solution = ?, key_actors = ?, ${audit.sql}
      ${where([fence.sql, "id = ?"])} RETURNING id`,
     [
       input.name,
-      input.url === undefined ? before.url : input.url,
-      input.stage === undefined ? before.stage : input.stage,
-      input.toolCostCentsPerMonth === undefined ? before.toolCost : input.toolCostCentsPerMonth,
+      keep(input.url, before.url),
+      keep(input.stage, before.stage),
+      keep(input.toolCostCentsPerMonth, before.toolCost),
+      keep(input.about, before.about),
+      keep(input.clientContext, before.clientContext),
+      keep(input.solution, before.solution),
+      keep(input.keyActors, before.keyActors),
       ...audit.params,
       ...fence.params,
       id,
     ]
   )
   if (!changed[0]) throw new GuardError(404, "not_found", "That app doesn't exist.")
+  // The four context fields are reported as CHANGED and never quoted: they are
+  // paragraphs, and an activity line that pastes one is a feed nobody can read.
   const changes = describeChanges([
     { label: "Name", from: before.name, to: input.name },
-    { label: "Address", from: before.url, to: input.url === undefined ? before.url : input.url },
-    { label: "Stage", from: before.stage, to: input.stage === undefined ? before.stage : input.stage },
+    { label: "Address", from: before.url, to: keep(input.url, before.url) },
+    { label: "Stage", from: before.stage, to: keep(input.stage, before.stage) },
+    { label: "About", from: before.about, to: keep(input.about, before.about), hideValues: true },
+    {
+      label: "Client context",
+      from: before.clientContext,
+      to: keep(input.clientContext, before.clientContext),
+      hideValues: true,
+    },
+    { label: "Solution", from: before.solution, to: keep(input.solution, before.solution), hideValues: true },
+    { label: "Key actors", from: before.keyActors, to: keep(input.keyActors, before.keyActors), hideValues: true },
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "App edited",
-    description: `${actor.name} edited ${input.name}${changes ? ` — ${changes}` : ""}`,
+    description: `${actor.name} edited ${input.name}${changes ? `, ${changes}` : ""}`,
     relatedTable: "apps",
     relatedRowId: id,
   })
@@ -289,6 +632,7 @@ export async function listProcesses(
       account_id: string | null
       name: string
       description: string | null
+      role_name: string | null
       deactivated_at: string | null
       created_at: string
       version_count: number
@@ -296,7 +640,7 @@ export async function listProcesses(
     }>(
       cfg,
       guard.databaseId,
-      `SELECT p.id, p.app_id, a.name AS app_name, p.account_id, p.name, p.description,
+      `SELECT p.id, p.app_id, a.name AS app_name, p.account_id, p.name, p.description, p.role_name,
               p.deactivated_at, p.created_at,
               (SELECT COUNT(*) FROM process_versions v WHERE v.process_id = p.id) AS version_count,
               (SELECT COUNT(*) FROM process_steps s WHERE s.process_id = p.id
@@ -327,6 +671,7 @@ export async function listProcesses(
       accountId: r.account_id,
       name: r.name,
       description: r.description,
+      roleName: r.role_name,
       versionCount: r.version_count,
       stepCount: r.step_count,
       active: r.deactivated_at == null,
@@ -570,27 +915,34 @@ export async function updateProcess(
   scope: AccountScope,
   actor: Actor,
   id: string,
-  input: { name: string; description?: string | null }
+  input: { name: string; description?: string | null; roleName?: string | null }
 ): Promise<void> {
   const before = await processOrThrow(cfg, guard, scope, id)
   const fence = accountScopeClause(scope, "account_id")
   const audit = editedBy(actor, new Date().toISOString())
   const description = input.description === undefined ? before.description : input.description
+  // WHO DOES THIS WORK (CHECKLIST 8.13). Absent means "say nothing", the same
+  // patch rule every other field on this door keeps. The word itself is not
+  // checked against the rate card: naming a role nobody has priced is a legal,
+  // useful answer — the app's money figure reports its hours and says the
+  // process could not be priced, which is the honest half-answer.
+  const roleName = input.roleName === undefined ? before.roleName : input.roleName
   const changed = await d1Query<{ id: string }>(
     cfg,
     guard.databaseId,
-    `UPDATE processes SET name = ?, description = ?, ${audit.sql}
+    `UPDATE processes SET name = ?, description = ?, role_name = ?, ${audit.sql}
      ${where([fence.sql, "id = ?"])} RETURNING id`,
-    [input.name, description, ...audit.params, ...fence.params, id]
+    [input.name, description, roleName, ...audit.params, ...fence.params, id]
   )
   if (!changed[0]) throw new GuardError(404, "not_found", "That process doesn't exist.")
   const changes = describeChanges([
     { label: "Name", from: before.name, to: input.name },
     { label: "Description", from: before.description, to: description, hideValues: true },
+    { label: "Who does it", from: before.roleName, to: roleName },
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Process edited",
-    description: `${actor.name} edited ${input.name}${changes ? ` — ${changes}` : ""}`,
+    description: `${actor.name} edited ${input.name}${changes ? `, ${changes}` : ""}`,
     relatedTable: "processes",
     relatedRowId: id,
   })
@@ -735,7 +1087,7 @@ export async function updateStep(
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Step edited",
-    description: `${actor.name} edited the step "${input.name}"${changes ? ` — ${changes}` : ""}`,
+    description: `${actor.name} edited the step "${input.name}"${changes ? `, ${changes}` : ""}`,
     relatedTable: "process_steps",
     relatedRowId: id,
   })
@@ -1138,7 +1490,18 @@ async function appOrThrow(
   guard: MemberGuard,
   scope: AccountScope,
   id: string
-): Promise<{ id: string; accountId: string | null; name: string; url: string | null; stage: string | null; toolCost: number }> {
+): Promise<{
+  id: string
+  accountId: string | null
+  name: string
+  url: string | null
+  stage: string | null
+  toolCost: number
+  about: string | null
+  clientContext: string | null
+  solution: string | null
+  keyActors: string | null
+}> {
   const fence = accountScopeClause(scope, "account_id")
   const rows = await d1Query<{
     id: string
@@ -1147,10 +1510,15 @@ async function appOrThrow(
     url: string | null
     stage: string | null
     tool_cost_cents_per_month: number
+    about: string | null
+    client_context: string | null
+    solution: string | null
+    key_actors: string | null
   }>(
     cfg,
     guard.databaseId,
-    `SELECT id, account_id, name, url, stage, tool_cost_cents_per_month
+    `SELECT id, account_id, name, url, stage, tool_cost_cents_per_month,
+            about, client_context, solution, key_actors
        FROM apps${where([fence.sql, "id = ?"])} LIMIT 1`,
     [...fence.params, id]
   )
@@ -1162,6 +1530,10 @@ async function appOrThrow(
     url: rows[0].url,
     stage: rows[0].stage,
     toolCost: rows[0].tool_cost_cents_per_month,
+    about: rows[0].about,
+    clientContext: rows[0].client_context,
+    solution: rows[0].solution,
+    keyActors: rows[0].key_actors,
   }
 }
 
@@ -1180,6 +1552,7 @@ async function processOrThrow(
     account_id: string | null
     name: string
     description: string | null
+    role_name: string | null
     deactivated_at: string | null
     created_at: string
     version_count: number
@@ -1187,7 +1560,7 @@ async function processOrThrow(
   }>(
     cfg,
     guard.databaseId,
-    `SELECT p.id, p.app_id, a.name AS app_name, p.account_id, p.name, p.description,
+    `SELECT p.id, p.app_id, a.name AS app_name, p.account_id, p.name, p.description, p.role_name,
             p.deactivated_at, p.created_at,
             (SELECT COUNT(*) FROM process_versions v WHERE v.process_id = p.id) AS version_count,
             (SELECT COUNT(*) FROM process_steps s WHERE s.process_id = p.id
@@ -1205,6 +1578,7 @@ async function processOrThrow(
     accountId: r.account_id,
     name: r.name,
     description: r.description,
+    roleName: r.role_name,
     versionCount: r.version_count,
     stepCount: r.step_count,
     active: r.deactivated_at == null,
@@ -1230,7 +1604,7 @@ async function latestVersionOrThrow(
     [...fence.params, processId]
   )
   if (!rows[0])
-    throw new GuardError(409, "no_baseline", "That process has no version 1 yet — it can't be measured from.")
+    throw new GuardError(409, "no_baseline", "That process has no version 1 yet, it can't be measured from.")
   return { id: rows[0].id, versionNo: rows[0].version_no }
 }
 

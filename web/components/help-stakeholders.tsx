@@ -9,7 +9,6 @@ import * as React from "react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@kwapso/ui/registry/primitives/avatar/avatar"
 import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import {
   Select,
   SelectContent,
@@ -23,6 +22,8 @@ import { UserPlus } from "lucide-react"
 import type { HelpStakeholder, TeamMember } from "@shared/types"
 import { ApiFailure } from "@/lib/api"
 import { letterMark, personName } from "@/lib/identity"
+import { useT } from "@shared/web/language"
+import { AddButton } from "@/components/deep-link/screen-bits"
 
 const ORIGIN_LABEL: Record<HelpStakeholder["origin"], string> = {
   raiser: "Raiser",
@@ -42,6 +43,7 @@ export function HelpStakeholders({
   canAdd: boolean
   onAdd: (userId: string) => Promise<void>
 }) {
+  const t = useT()
   const [picked, setPicked] = React.useState("")
   const [busy, setBusy] = React.useState(false)
 
@@ -63,10 +65,10 @@ export function HelpStakeholders({
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-muted-foreground text-sm">Everyone kept in the loop on this ticket — the person who raised it, your admins, and anyone mentioned.</p>
+      <p className="text-muted-foreground text-sm">{t("Everyone kept in the loop on this ticket, the person who raised it, your admins, and anyone mentioned.")}</p>
 
       {stakeholders.length === 0 ? (
-        <p className="text-muted-foreground text-sm">Just the person who raised it and your admins so far.</p>
+        <p className="text-muted-foreground text-sm">{t("Just the person who raised it and your admins so far.")}</p>
       ) : (
         <ul className="flex flex-col gap-1.5">
           {stakeholders.map((s) => (
@@ -94,7 +96,7 @@ export function HelpStakeholders({
         <div className="flex flex-col gap-2 sm:flex-row">
           <Select value={picked} onValueChange={setPicked} disabled={busy}>
             <SelectTrigger className="w-full sm:w-64">
-              <SelectValue placeholder="Pick someone to keep in the loop" />
+              <SelectValue placeholder={t("Pick someone to keep in the loop")} />
             </SelectTrigger>
             <SelectContent>
               {addable.map((m) => (
@@ -104,15 +106,12 @@ export function HelpStakeholders({
               ))}
             </SelectContent>
           </Select>
-          <Button onClick={() => void add()} disabled={busy || !picked} className="gap-1.5">
-            <UserPlus className="size-4" />
-            Add stakeholder
-          </Button>
+          <AddButton label={t("Add stakeholder")} onClick={() => void add()} icon={<UserPlus className="size-4" />} />
         </div>
       )}
 
       <p className="text-muted-foreground text-xs">
-        You can add people, but no one is ever removed.
+        {t("You can add people, but no one is ever removed.")}
       </p>
     </div>
   )

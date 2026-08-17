@@ -15,18 +15,17 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure, content } from "@/lib/api"
 import { FilePicker } from "@/components/file-picker"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 export type CertificateValues = {
   title: string
@@ -54,6 +53,7 @@ export function CertificateFormDialog({
   initial?: Partial<CertificateValues>
   draftKey?: string
 }) {
+  const t = useT()
   const isEdit = !!initial
   const [values, setValues, clearDraft] = useFormDraft(draftKey, { ...EMPTY, ...initial }, open)
   const [busy, setBusy] = React.useState(false)
@@ -106,15 +106,13 @@ export function CertificateFormDialog({
       title={<DialogTitle>{isEdit ? "Edit certificate" : `Record a certificate for ${subjectName}`}</DialogTitle>}
       subtitle={
         <DialogDescription>
-          What they hold, who issued it, and when it lapses. The team can see this; no client can.
+          {t("What they hold, who issued it, and when it lapses. The team can see this; no client can.")}
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !values.title.trim()}>
-          {busy ? <Spinner /> : null}
-          {busy ? "Saving…" : isEdit ? "Save changes" : "Record it"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !values.title.trim(),
+      }}
     >
       {input("title", "What is it?", "text", "e.g. Cloudflare Workers certified", true)}
       {input("issuer", "Who issued it?", "text", "e.g. Cloudflare")}
@@ -124,7 +122,7 @@ export function CertificateFormDialog({
           word for it — and until now that was the only thing this form could
           hold, because the upload door had no control anywhere. */}
       <Field
-        config={{ ...defaultFieldConfig, label: "The certificate itself", required: false }}
+        config={{ ...defaultFieldConfig, label: t("The certificate itself"), required: false }}
         htmlFor="cert-file"
         className={fieldSpacing}
       >

@@ -142,7 +142,7 @@ export async function createInvite(
   // You can't invite yourself — you're already on the team. (Blocked transitively by the
   // already-member check below too, but caught here first for a clear, self-specific message.)
   if (to === actor.email.trim().toLowerCase())
-    throw new GuardError(409, "self_invite", "You can't invite yourself — you're already on the team.")
+    throw new GuardError(409, "self_invite", "You can't invite yourself, you're already on the team.")
 
   const roles = await d1Query<{ id: string; title: string }>(
     cfg,

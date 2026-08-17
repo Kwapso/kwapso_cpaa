@@ -1,0 +1,28 @@
+-- THE LANGUAGE A PERSON READS kwapso IN.
+--
+-- WHY IT SITS ON THE USER AND NOT ON THE TEAM OR THE ACCOUNT. A language is a
+-- fact about a reader, not about the company they work for. Aurora reads Spanish
+-- while Alaap reads English inside the same team, and a German client's contact
+-- reads German while their colleague at the same company reads English. Anything
+-- coarser than one row per person gets one of those four people wrong.
+--
+-- It is on the CORE users table rather than a per-team one for the same reason
+-- `current_team_id` is: a person is one person across every team they belong to
+-- and across both front doors, and their language should not change because they
+-- switched context. It also means the preference is already in `SessionUser`,
+-- which `/api/auth/me` hands to every worker and to both web apps — so no door
+-- has to look it up and none of them can disagree about it.
+--
+-- NULL IS A REAL ANSWER, and it is the default: "this person has never chosen".
+-- It reads as English (shared/i18n.ts `toLanguage`), and it is deliberately
+-- distinguishable from somebody who actively picked English, because the day
+-- there is a browser-language guess to make, only the NULLs may be guessed at.
+--
+-- No CHECK constraint, and that is a decision. The allow-list is LANGUAGES in
+-- shared/i18n.ts, which is also where the door validates against it and where
+-- `toLanguage` makes an unrecognised value fall back rather than throw. A CHECK
+-- would be a second copy of that list that only SQLite can see, and in SQLite a
+-- CHECK cannot be altered — so the day a fifth language is added, the migration
+-- would be a full rebuild of the users table. A bad value here costs a person
+-- English; it cannot cost anybody a screen.
+ALTER TABLE users ADD COLUMN language TEXT;

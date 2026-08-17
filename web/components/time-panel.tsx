@@ -25,7 +25,7 @@ import * as React from "react"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { AlarmClockOff, CircleStop, Clock, Pencil, Play, Plus, Trash2 } from "lucide-react"
+import { AlarmClockOff, CircleStop, Clock, Pencil, Play, Trash2 } from "lucide-react"
 
 import { LoadMore } from "@/components/load-more"
 import { clockFrom } from "@/components/timer-bar"
@@ -42,6 +42,8 @@ import {
 import { useActiveTeam } from "@/lib/use-active-team"
 import type { RunningTimer, Story, WorkLog } from "@shared/types"
 import { invalidate, invalidatePrefix, useCached, useCachedValue } from "@shared/web/store"
+import { useT } from "@shared/web/language"
+import { AddButton } from "@/components/deep-link/screen-bits"
 
 /** One row of time, in a sentence: what it was on, who, how long, and whether we
  * are charging for it. */
@@ -75,6 +77,7 @@ function refreshTime(teamId: string): void {
  * being the only way in. Their own, because a list of everybody's work would
  * need reading before it could be clicked. */
 export function StartTimerStrip({ teamId, canCreate }: { teamId: string; canCreate: boolean }) {
+  const t = useT()
   const timersQ = useCached<RunningTimer[]>(runningTimersKey(teamId), () =>
     contentApi.runningTimers().then((r) => r.timers)
   )
@@ -90,7 +93,7 @@ export function StartTimerStrip({ teamId, canCreate }: { teamId: string; canCrea
     try {
       await contentApi.startTimer("stories", storyId)
       refreshTime(teamId)
-      toast.success("Timer started.")
+      toast.success(t("Timer started."))
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't start that timer.")
     }
@@ -100,7 +103,7 @@ export function StartTimerStrip({ teamId, canCreate }: { teamId: string; canCrea
     try {
       await contentApi.resolveRunaway(id, answer)
       refreshTime(teamId)
-      toast.success(answer === "discard" ? "Binned — nothing was counted." : "Stopped, kept in full.")
+      toast.success(answer === "discard" ? "Binned, nothing was counted." : "Stopped, kept in full.")
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't do that.")
     }
@@ -187,6 +190,7 @@ export function TimePanel({
    * time changes a number somebody else may already have read. */
   canEdit: boolean
 }) {
+  const t = useT()
   const logsQ = useCached<WorkLog[]>(workLogsKey(teamId), () => listFetch.workLogs(teamId))
   const timersQ = useCached<RunningTimer[]>(runningTimersKey(teamId), () =>
     contentApi.runningTimers().then((r) => r.timers)
@@ -211,7 +215,7 @@ export function TimePanel({
       billable: values.billable,
     })
     refreshTime(teamId)
-    toast.success("Time logged.")
+    toast.success(t("Time logged."))
   }
 
   /** CORRECT A ROW. Every figure this app shows about how long something took is
@@ -229,14 +233,14 @@ export function TimePanel({
       billable: values.billable,
     })
     refreshTime(teamId)
-    toast.success("Time corrected.")
+    toast.success(t("Time corrected."))
   }
 
   async function answerRunaway(id: string, answer: "keep" | "discard") {
     try {
       await contentApi.resolveRunaway(id, answer)
       refreshTime(teamId)
-      toast.success(answer === "discard" ? "Binned — nothing was counted." : "Stopped, kept in full.")
+      toast.success(answer === "discard" ? "Binned, nothing was counted." : "Stopped, kept in full.")
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't do that.")
     }
@@ -256,17 +260,14 @@ export function TimePanel({
           {totalSeconds ? `${clockFrom(totalSeconds)} logged` : "Nothing logged yet"}
         </p>
         {canCreate && (
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setAddOpen(true)}>
-            <Plus className="size-3.5" />
-            Log time
-          </Button>
+          <AddButton label={t("Log time")} onClick={() => setAddOpen(true)} />
         )}
       </div>
 
       <RunawayPrompts runaways={runaways} onAnswer={answerRunaway} />
 
       {logs.length === 0 ? (
-        <p className="text-muted-foreground text-sm">No time logged yet.</p>
+        <p className="text-muted-foreground text-sm">{t("No time logged yet.")}</p>
       ) : (
         <ul className="divide-border divide-y rounded-md border">
           {logs.map((l) => (
@@ -290,7 +291,7 @@ export function TimePanel({
                   className="shrink-0 gap-1.5"
                 >
                   <Pencil className="size-3.5" />
-                  Edit
+                  {t("Edit")}
                 </Button>
               )}
             </li>
@@ -302,7 +303,7 @@ export function TimePanel({
           piece of work produces several more. */}
       <LoadMore
         listKey={workLogsKey(teamId)}
-        label="Load more time"
+        label={t("Load more time")}
         fetchPage={(c: string) =>
           contentApi.workLogs({ cursor: c }).then((r) => ({ rows: r.logs, nextCursor: r.nextCursor }))
         }

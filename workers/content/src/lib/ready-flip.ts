@@ -139,9 +139,168 @@ export async function readyFlipForTicket(
 
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Ticket ready",
-    description: `Every piece of work on this ticket is done — ${total} ${total === 1 ? "story" : "stories"}`,
+    description: `Every piece of work on this ticket is done, ${total} ${total === 1 ? "story" : "stories"}`,
     relatedTable: "help",
     relatedRowId: ticketId,
   })
   return { moved: true, accountId, outstanding: 0 }
+}
+
+/* ────────────────── the other two automatic flips ────────────────────────── */
+// A STATUS IS A FACT, NOT A BUTTON (the tester, 17 Aug 2026). `readyFlipForTicket`
+// above has said that about the END of a request since the work engine landed;
+// these two say it about the MIDDLE, which is where she was actually clicking.
+//
+// Both are shaped exactly like the flip above and for the same reasons: the
+// current-status predicate rides the UPDATE (R17), so a second trigger moves zero
+// rows, writes no activity and lets the route publish nothing; and the states a
+// flip may move a ticket OUT OF are named in the statement rather than checked
+// beforehand, so the sentence "this never drags a request backwards" is readable
+// in the SQL instead of being a property of the code around it.
+
+/** What an automatic flip did, for the route to publish (or not). */
+export type StatusFlip = { moved: boolean; accountId: string | null }
+
+/** The states SCHEDULED may claim: a request nobody has read yet, one somebody
+ * has, and one already scheduled (which moves zero rows). Never `in_progress`,
+ * `ready` or `resolved` — work that has started is a stronger fact than work that
+ * is merely booked in, and re-announcing the weaker one would walk the ticket
+ * backwards in front of the client watching it. */
+const SCHEDULABLE = ["awaiting_validation", "new", "triaged"] as const
+
+/** The states IN PROGRESS may claim: everything that is not already in progress,
+ * finished or answered. `ready` is excluded for the same reason — every story
+ * being done is downstream of somebody having started. */
+const STARTABLE = OPEN_HELP_STATUSES.filter((s) => s !== "in_progress" && s !== "ready")
+
+/** The ticket's account and current status in one read — every flip needs both
+ * (the account to aim the ping, the status to decide whether to try at all). */
+async function ticketState(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  ticketId: string
+): Promise<{ accountId: string | null; status: string } | null> {
+  const rows = await d1Query<{ account_id: string | null; status: string }>(
+    cfg,
+    guard.databaseId,
+    `SELECT account_id, status FROM help WHERE id = ? LIMIT 1`, // R14: one row by id
+    [ticketId]
+  )
+  return rows[0] ? { accountId: rows[0].account_id, status: rows[0].status } : null
+}
+
+/** Move a ticket to `status`, but only OUT OF one of `from`. The one statement
+ * every flip below shares — R17 lives here, once, rather than three times. */
+async function flip(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor,
+  ticketId: string,
+  status: string,
+  from: readonly string[]
+): Promise<boolean> {
+  const now = new Date().toISOString()
+  // The lock closes on the way past, as it does on every other staff touch: work
+  // being scheduled or started is about as read as a request gets.
+  const changed = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    `UPDATE help SET status = ?, locked_at = COALESCE(locked_at, ?), updated_at = ?,
+       editor_id = ?, editor_email = ?, editor_name = ?
+     WHERE id = ? AND status IN (${from.map(() => "?").join(", ")}) RETURNING id`,
+    [status, now, now, actor.id, actor.email, actor.name, ticketId, ...from]
+  )
+  return Boolean(changed[0])
+}
+
+/** SCHEDULED — "stories exist AND are in a sprint" (CHECKLIST 5.3).
+ *
+ * Both halves are asked in ONE read, because either alone is a different and
+ * wrong sentence: a ticket with stories nobody has booked in is triaged, not
+ * scheduled, and a sprint with no story on this request says nothing about it.
+ *
+ * Called after every write that could change either half — a story created,
+ * edited (which is where a sprint gets attached) or moved. */
+export async function scheduledFlip(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor,
+  ticketId: string
+): Promise<StatusFlip> {
+  const state = await ticketState(cfg, guard, ticketId)
+  if (!state) return { moved: false, accountId: null }
+  if (!(SCHEDULABLE as readonly string[]).includes(state.status))
+    return { moved: false, accountId: state.accountId }
+
+  const rows = await d1Query<{ sprinted: number }>(
+    cfg,
+    guard.databaseId,
+    `SELECT COUNT(*) AS sprinted FROM stories
+      WHERE ticket_id = ? AND sprint_id IS NOT NULL AND status <> 'done'`, // R14: one aggregate row
+    [ticketId]
+  )
+  if ((rows[0]?.sprinted ?? 0) === 0) return { moved: false, accountId: state.accountId }
+
+  if (!(await flip(cfg, guard, actor, ticketId, "scheduled", SCHEDULABLE)))
+    return { moved: false, accountId: state.accountId }
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: "Ticket scheduled",
+    description: "The work on this ticket is booked into a sprint",
+    relatedTable: "help",
+    relatedRowId: ticketId,
+  })
+  return { moved: true, accountId: state.accountId }
+}
+
+/** IN PROGRESS — "a timer started on the ticket, or on any related story"
+ * (CHECKLIST 5.4). This is the inversion the tester asked for in its purest
+ * form: today marking a story in progress starts a timer, and she wants starting
+ * a timer to be what marks it.
+ *
+ * `ticketId` may be the ticket itself or reached through the story the clock was
+ * started on — the caller resolves which, because only the caller knows what the
+ * timer was pointed at. */
+export async function progressFlip(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor,
+  ticketId: string
+): Promise<StatusFlip> {
+  const state = await ticketState(cfg, guard, ticketId)
+  if (!state) return { moved: false, accountId: null }
+  if (!STARTABLE.includes(state.status as (typeof STARTABLE)[number]))
+    return { moved: false, accountId: state.accountId }
+
+  if (!(await flip(cfg, guard, actor, ticketId, "in_progress", STARTABLE)))
+    return { moved: false, accountId: state.accountId }
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: "Ticket in progress",
+    description: `${actor.name} started working on this ticket`,
+    relatedTable: "help",
+    relatedRowId: ticketId,
+  })
+  return { moved: true, accountId: state.accountId }
+}
+
+/** WHICH TICKET A TIMER TOUCHES. A clock started on a `help` row is that ticket;
+ * one started on a `stories` row is the request that story answers, if it answers
+ * one. Anything else touches no ticket, which is the ordinary case.
+ *
+ * Here rather than in lib/work-logs because it is a fact about the ticket
+ * lifecycle, and lib/work-logs deliberately knows nothing about it. */
+export async function ticketBehind(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  targetTable: string,
+  targetId: string
+): Promise<string | null> {
+  if (targetTable === "help") return targetId
+  if (targetTable !== "stories") return null
+  const rows = await d1Query<{ ticket_id: string | null }>(
+    cfg,
+    guard.databaseId,
+    `SELECT ticket_id FROM stories WHERE id = ? LIMIT 1`, // R14: one row by id
+    [targetId]
+  )
+  return rows[0]?.ticket_id ?? null
 }

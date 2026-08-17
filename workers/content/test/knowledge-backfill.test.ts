@@ -1,7 +1,12 @@
 // THE BACKFILL, MEASURED — the knowledge base built over the agency's OWN
-// history (1,820 tickets, 223 articles, 123 accounts out of the two Glide apps
-// this product replaces), through the shipped sweep door, against a real SQLite
-// database running the real team migrations.
+// history (1,820 tickets and 123 accounts out of the two Glide apps this product
+// replaces), through the shipped sweep door, against a real SQLite database
+// running the real team migrations.
+//
+// The 223 legacy ARTICLES are no longer part of this fixture. Learning was
+// purged on 17 Aug 2026 and its table with it; the articles that had already
+// been indexed live on as sources with kind `article`, which is why lib
+// knowledge.ts keeps that kind with no sweep behind it.
 //
 // WHY THIS IS A TEST AND NOT A SCRIPT. Two jobs, one fixture:
 //   • it MEASURES — chunks, index size, time, embedding tokens, and a real
@@ -61,7 +66,6 @@ const MONTHLY_CEILING_EUR = 50
 
 type Normalised = {
   accounts: { glideId: string; kind: string; name: string; code: string | null; email: string | null; phone: string | null; address: string | null; status: string | null }[]
-  learning: { glideId: string; title: string; category: string | null; contentType: string | null; contentLink: string | null; body: string | null; createdAt: string | null }[]
   helpRequests: {
     glideId: string
     number: string | null
@@ -83,18 +87,13 @@ const q = (v: unknown) => (v === null || v === undefined ? "NULL" : `'${String(v
 /** Load the agency's real history into a fresh team database, in the shape the
  * app itself holds it (this is the state AFTER the Glide migration lane's seed —
  * the rows are the INPUT to what is being measured, never the thing measured). */
-function loadHistory(): { accounts: number; articles: number; tickets: number; replies: number } {
+function loadHistory(): { accounts: number; tickets: number; replies: number } {
   const data = JSON.parse(readFileSync(HISTORY, "utf8")) as Normalised
   const sql: string[] = []
   for (const a of data.accounts)
     sql.push(
       `INSERT INTO accounts (id, account_type, name, email, phone, address, code, status, created_at, creator_name)
        VALUES (${q(a.glideId)}, ${q(a.kind === "entity" ? "entity" : "individual")}, ${q(a.name)}, ${q(a.email)}, ${q(a.phone)}, ${q(a.address)}, ${q(a.code)}, ${q(a.status ?? "client")}, '2025-01-01', 'kwapso');`
-    )
-  for (const l of data.learning)
-    sql.push(
-      `INSERT INTO learning (id, content_title, category, content_type, content_link, content_body, created_at, creator_name)
-       VALUES (${q(l.glideId)}, ${q(l.title)}, ${q(l.category)}, ${q(l.contentType)}, ${q(l.contentLink)}, ${q(l.body)}, ${q(l.createdAt ?? "2025-01-01")}, 'kwapso');`
     )
   let replies = 0
   const known = new Set(data.accounts.map((a) => a.glideId))
@@ -127,7 +126,7 @@ function loadHistory(): { accounts: number; articles: number; tickets: number; r
   }
   // In batches: one statement string of this size is a needless spike.
   for (let i = 0; i < sql.length; i += 500) db().exec(sql.slice(i, i + 500).join("\n"))
-  return { accounts: data.accounts.length, articles: data.learning.length, tickets: data.helpRequests.length, replies }
+  return { accounts: data.accounts.length, tickets: data.helpRequests.length, replies }
 }
 
 /** Embedding is OFF (see the header) — the model answers with nothing, which is
@@ -158,7 +157,7 @@ const one = (sql: string): Record<string, number> => db().prepare(sql).get() as 
 
 describe.skipIf(!present)("the backfill, over the agency's own history", () => {
   const stats = {
-    loaded: { accounts: 0, articles: 0, tickets: 0, replies: 0 },
+    loaded: { accounts: 0, tickets: 0, replies: 0 },
     ticks: 0,
     sweepMs: 0,
     sources: 0,
@@ -253,10 +252,10 @@ describe.skipIf(!present)("the backfill, over the agency's own history", () => {
   it("files each client's material in that client's own compartment", () => {
     const agency = one(`SELECT COUNT(*) AS n FROM knowledge_sources WHERE compartment = 'agency'`).n
     const client = one(`SELECT COUNT(*) AS n FROM knowledge_sources WHERE compartment LIKE 'account:%'`).n
-    // Every article is the agency's; every account IS its own compartment; a
-    // ticket goes wherever its client is, and the eleven with no client stay ours.
+    // Every account IS its own compartment; a ticket goes wherever its client
+    // is, and the eleven with no client stay ours.
     expect(client).toBeGreaterThan(stats.loaded.accounts)
-    expect(agency).toBeGreaterThanOrEqual(stats.loaded.articles)
+    expect(agency).toBeGreaterThan(0)
     expect(agency + client).toBe(stats.sources)
   })
 
@@ -311,7 +310,7 @@ describe.skipIf(!present)("the backfill, over the agency's own history", () => {
       [
         "",
         "──────── THE BACKFILL, MEASURED ────────",
-        `history loaded      ${stats.loaded.tickets} tickets (+${stats.loaded.replies} replies), ${stats.loaded.articles} articles, ${stats.loaded.accounts} accounts`,
+        `history loaded      ${stats.loaded.tickets} tickets (+${stats.loaded.replies} replies), ${stats.loaded.accounts} accounts`,
         `sweep               ${stats.ticks} ticks × ${25} rows, ${(stats.sweepMs / 1000).toFixed(1)}s in-process (no network, no model)`,
         `index built         ${stats.sources} sources · ${stats.chunks} chunks · ${stats.terms.toLocaleString()} postings · ${(stats.chars / 1e6).toFixed(2)} MB of text`,
         `embedding cost      ~${tokens.toLocaleString()} tokens → ~$${usd.toFixed(2)} (~€${eur.toFixed(2)}) ONE-OFF, against the €${MONTHLY_CEILING_EUR}/mo ceiling`,

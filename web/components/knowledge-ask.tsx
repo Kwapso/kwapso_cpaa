@@ -49,16 +49,35 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { FileText, Search } from "lucide-react"
 
 import type { KnowledgeAnswer } from "@shared/types"
+import { useT } from "@shared/web/language"
 import { AgentMarkdown } from "@/components/agent-markdown"
 import { ApiFailure, content } from "@/lib/api"
 
-export function KnowledgeAsk({ onOpenSource }: { onOpenSource: (sourceId: string) => void }) {
+export function KnowledgeAsk({
+  onOpenSource,
+  accountId,
+  context,
+}: {
+  onOpenSource: (sourceId: string) => void
+  /** WHICH CLIENT'S COMPARTMENT to search, when the screen already knows (R23:
+   * `reason` says which one it chose, and naming it here is what stops a
+   * question about one client being answered out of another's material). Null on
+   * the knowledge page itself, where the question's own words decide. */
+  accountId?: string | null
+  /** THE RECORD'S OWN DETAILS, fed into the question automatically (CHECKLIST
+   * 8.9 and 12.1 — Aurora asked for the base "in context"). It is prepended to
+   * what the person types and it is SHOWN to them, because a question that was
+   * quietly changed on the way to the server is an answer nobody can account
+   * for. Absent on the knowledge page, which is about nothing in particular. */
+  context?: string
+}) {
   const [question, setQuestion] = React.useState("")
   const [busy, setBusy] = React.useState(false)
   // The question the ANSWER is about, kept separately from the box — otherwise
   // editing the box would silently re-label an answer that is still about the
   // old question.
   const [answer, setAnswer] = React.useState<KnowledgeAnswer | null>(null)
+  const t = useT()
 
   async function ask(e: React.FormEvent) {
     e.preventDefault()
@@ -66,7 +85,10 @@ export function KnowledgeAsk({ onOpenSource }: { onOpenSource: (sourceId: string
     if (!q || busy) return
     setBusy(true)
     try {
-      setAnswer(await content.askKnowledge(q))
+      // In context, the record's own details lead the question — so "when is it
+      // due?" asked on an app's page is "About the app Dispatch, built for
+      // Bergman GmbH: when is it due?" by the time it reaches retrieval.
+      setAnswer(await content.askKnowledge(context ? `About ${context}: ${q}` : q, accountId))
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't ask the knowledge base.")
     } finally {
@@ -80,9 +102,13 @@ export function KnowledgeAsk({ onOpenSource }: { onOpenSource: (sourceId: string
         <Input
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Ask the knowledge base — e.g. what did we agree about Bergman's dispatch window?"
+          placeholder={
+            context
+              ? t("Ask about this record, e.g. what did we agree the last time?")
+              : t("Ask the knowledge base, e.g. what did we agree about Bergman's dispatch window?")
+          }
           disabled={busy}
-          aria-label="Ask the knowledge base"
+          aria-label={t("Ask the knowledge base")}
         />
         <Button type="submit" disabled={busy || !question.trim()} className="shrink-0 gap-1.5">
           {busy ? <Spinner /> : <Search className="size-4" />}
@@ -93,10 +119,15 @@ export function KnowledgeAsk({ onOpenSource }: { onOpenSource: (sourceId: string
           the box rather than a tooltip because the whole point is that nobody
           should have to go looking for it. */}
       <p className="text-muted-foreground text-xs">
-        This looks through what the assistant can read and shows you the passages and their
-        sources. It doesn&apos;t use the team&apos;s assistant allowance — open the assistant if
-        you want the answer written out.
+        {t("This looks through what the assistant can read and shows you the passages and their sources. It doesn't use the team's assistant allowance. Open the assistant if you want the answer written out.")}
       </p>
+      {/* SAID OUT LOUD, because the question that gets asked is not the question
+          that was typed. A person has to be able to see what was added. */}
+      {context && (
+        <p className="text-muted-foreground text-xs">
+          {t("Your question is asked about")} {context}.
+        </p>
+      )}
 
       {answer && (
         <div className="flex flex-col gap-4 border-t pt-4">
@@ -107,9 +138,18 @@ export function KnowledgeAsk({ onOpenSource }: { onOpenSource: (sourceId: string
           <p className="text-muted-foreground text-xs">{answer.reason}</p>
 
           {!answer.found ? (
-            // The seam's own sentence, word for word. Not softened, not
-            // supplemented, and above all not replaced by a guess (R23).
-            <p className="text-sm">{answer.message}</p>
+            // R23's decision, unchanged: `found` is false, so nothing is shown
+            // that could be mistaken for an answer and nothing is guessed.
+            //
+            // But the seam's `message` is written for the ASSISTANT — "Say so
+            // plainly, do not answer from memory" is an instruction to a model,
+            // and it has been rendered to a person on this screen since the
+            // screen was built. Nobody noticed while it was English and everyone
+            // would notice in German. So the seam keeps its sentence for the
+            // model, and the human reading this gets a human one, in their own
+            // language. The FACT both report is identical and comes from the
+            // same `found`.
+            <p className="text-sm">{t("The knowledge base has nothing on this.")}</p>
           ) : (
             <>
               <div className="flex flex-col gap-4">
@@ -149,7 +189,7 @@ export function KnowledgeAsk({ onOpenSource }: { onOpenSource: (sourceId: string
                   somebody straight to the origin row instead would skip the
                   screen that says WHY the assistant knows this. */}
               <div className="flex flex-col gap-2 border-t pt-3">
-                <p className="text-xs font-medium">Where this came from</p>
+                <p className="text-xs font-medium">{t("Where this came from")}</p>
                 <ul className="flex flex-col gap-1">
                   {answer.citations.map((c) => (
                     <li key={c.sourceId} className="text-sm">
@@ -167,7 +207,7 @@ export function KnowledgeAsk({ onOpenSource }: { onOpenSource: (sourceId: string
                       {c.liveStatus && (
                         <span className="text-muted-foreground text-xs">
                           {" "}
-                          — that record says &ldquo;{c.liveStatus}&rdquo; right now
+                         , that record says &ldquo;{c.liveStatus}{t("” right now")}
                         </span>
                       )}
                     </li>

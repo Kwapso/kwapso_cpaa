@@ -17,7 +17,7 @@
 //      gateway forwarding its sub-paths (or a deep link to a record 404s).
 //      Every one of those four was broken for at least one live section when
 //      this check was written: Knowledge base and Work were missing from
-//      TOP_LEVEL_MODULES, and Marketing, Brand library, Delivery method and
+//      TOP_LEVEL_MODULES, and the Brand library and
 //      Meeting purposes had no page shell at all — four sidebar links that
 //      404'd on reload, in a green build.
 //
@@ -303,18 +303,20 @@ describe("the screens are reachable", () => {
  * a screen that now exists. */
 const NO_CONTROL: Record<string, string> = {
   /* ── for a client that is already out there ───────────────────────────── */
-  "POST /api/content/learning/upload":
-    "FOR AN OLDER BUILD OF THIS APP. The buffered half of the learning-media upload pair — a base64 data URL in a JSON body — replaced on 17 Aug 2026 by /upload-stream, which hands the file to R2 as it arrives. No screen in THIS build calls it, and that is deliberate: a browser holds its own copy of the app for as long as the tab is open, so somebody who loaded a page before the deploy is still running the old JavaScript and still posting here. An upload contract is the one change where the server must be ready before the client and outlast it afterwards. All four of these lines go when no build in the wild uses them.",
   "POST /api/content/brand-assets/upload":
-    "FOR AN OLDER BUILD OF THIS APP — the buffered half of the brand-asset upload pair, kept for tabs opened before the 17 Aug 2026 deploy for the reason written on the learning line above.",
+    "FOR AN OLDER BUILD OF THIS APP. The buffered half of the brand-asset upload pair — a base64 data URL in a JSON body — replaced on 17 Aug 2026 by /upload-stream, which hands the file to R2 as it arrives. No screen in THIS build calls it, and that is deliberate: a browser holds its own copy of the app for as long as the tab is open, so somebody who loaded a page before the deploy is still running the old JavaScript and still posting here. An upload contract is the one change where the server must be ready before the client and outlast it afterwards. All of these lines go when no build in the wild uses them.",
   "POST /api/content/staff/upload":
-    "FOR AN OLDER BUILD OF THIS APP — the buffered half of the staff-file upload pair, kept for tabs opened before the 17 Aug 2026 deploy for the reason written on the learning line above.",
+    "FOR AN OLDER BUILD OF THIS APP — the buffered half of the staff-file upload pair, kept for tabs opened before the 17 Aug 2026 deploy for the reason written on the brand-asset line above.",
   "POST /api/content/knowledge/upload":
     "FOR AN OLDER BUILD OF THIS APP. The buffered upload door — a base64 data URL in a JSON body — replaced on 17 Aug 2026 by /upload-stream, which takes the file as the request body and never materialises it. No screen in THIS build calls it, and that is the point rather than a gap: a browser holds its own copy of the app for as long as the tab is open, so a person who loaded the app before the deploy is still running the old JavaScript and still posting here. The door stays until no build in the wild uses it; deleting it then is a separate, boring change. An upload contract is the one kind of change where the server must be ready before the client is, and outlast it afterwards.",
 
+  /* ── the control left the screen, the door did not ──────────────────────── */
+  "POST /api/content/help/rank":
+    "THE ORDER IS STILL THE PRIORITY, and it is still set — just not from the ticket's own screen. Drag-rank is the one priority signal SCOPE ch.07 allows, and Move up / Move down sat on the ticket detail until 17 Aug 2026, when the owner took them off it: a person reading ONE request is not deciding where it sits among forty, and two buttons that move a row you cannot see are a control with no feedback. The door stays because the machine surface still ranks (`rank_help_ticket`), and because the day this app grows a drag handle on the LIST is the day it is wanted back.",
+  "POST /api/content/help/status":
+    "FOR A MACHINE, and it became one on 17 Aug 2026 when the ticket lifecycle stopped being a control. Five of the seven stages are now reached by something HAPPENING — the work lands in a sprint, a timer starts, the last story closes, a person sends the answer, an extra is raised and waits — so a picker offering all seven is precisely the thing the tester asked us to take away ('a status is a fact, not a button', CHECKLIST 5.2). The two stages a person still decides have doors and words of their own, and both have controls: 'Mark it read' on the triage queue and 'They've confirmed it' on the ticket. What is left here is a CORRECTION, which is a sentence somebody says to the assistant ('put BERG-T0412 back to triaged') rather than a control on a screen. It refuses `resolved` outright, so the one move that leaves the building is not reachable through it at all.",
+
   /* ── for a machine ─────────────────────────────────────────────────────── */
-  "POST /api/content/learning/bulk-active":
-    "FOR A MACHINE. The SET-shaped write — 'switch these forty articles off'. It exists for the assistant and the machine surface, where a caller names a set; a person switches one article off on its own screen, which is the door beside this one.",
   "POST /api/content/help/bulk-status":
     "FOR A MACHINE. The same shape for tickets: a set of ids moved together. A person moves one ticket with the stepper on its own screen.",
   "POST /api/content/help/bulk-status-by-filter":
@@ -334,6 +336,42 @@ const NO_CONTROL: Record<string, string> = {
     "FOR A MACHINE. Putting a file INTO Drive is the assistant answering 'save that to the Bergman folder'. A person with a folder open drags it there, and the app's own upload doors are the ones on the record it belongs to.",
   "POST /api/content/google/chat/messages":
     "FOR A MACHINE. Posting into a named space is an act the assistant performs on request; a person is already in the space. The owner asked for read AND post, and the post half is the assistant's.",
+
+  // THE THIRTEEN THAT FINISH THAT SENTENCE, and they are one decision, not
+  // thirteen. Every door on this module acts INSIDE Google — a file in a Drive
+  // folder, a label in a mailbox, a guest on a diary entry — and kwapso
+  // deliberately has no screen for any of it. That is the same ruling the four
+  // lines above already stand on, and it is the reason the module exists: a
+  // person who wants to rename a file opens Drive, which is better at it than a
+  // card we could build beside it would ever be. What kwapso adds is the
+  // ASSISTANT doing it on request, and a history row on the connection so "what
+  // has kwapso done as me?" has an answer in Settings.
+  //
+  // Read the two `take it back` doors as part of the same decision rather than as
+  // an oversight: they exist so the assistant's own writes are undoable, and the
+  // person's undo is Drive's bin and Chat's own delete, which they already have.
+  "POST /api/content/google/drive/update":
+    "FOR A MACHINE. Rewriting a file is the assistant answering 'update the scope doc with what we agreed'. A person with the document open edits it in Google Docs, which is better at editing documents than anything we would put beside it.",
+  "POST /api/content/google/drive/folder":
+    "FOR A MACHINE. Making a folder inside a shared one is the assistant tidying as it files — 'put these under a Bergman folder'. A person makes a folder in Drive, in one click, where the folders are.",
+  "POST /api/content/google/drive/save-mail":
+    "FOR A MACHINE. 'Put that exchange in the client folder' is a sentence somebody says to an assistant; the person's own version is forwarding the thread, which Gmail already does. It is also the one door here that reads one service and writes another, which is exactly the kind of errand a machine is for.",
+  "POST /api/content/google/drive/trash":
+    "FOR A MACHINE, and specifically to undo a machine. It exists so the assistant can take back a file it wrote; a person uses Drive's own bin, which is the same act on the same file with a shorter path to it.",
+  "POST /api/content/google/gmail/reply":
+    "FOR A MACHINE. The person's control is the mail reply dialog, which DRAFTS — the owner's ruling that a drafted reply is the normal way to answer mail. This door sends inside the thread, which is the assistant's half of the same sentence and carries the same always-ask confirm.",
+  "POST /api/content/google/gmail/label":
+    "FOR A MACHINE. Filing a message under a label is the assistant tidying a mailbox on request. A person clicks the label button in Gmail, where the message already is.",
+  "POST /api/content/google/calendar/event/update":
+    "FOR A MACHINE, on the owner's calendar ruling: the assistant may change a diary entry without asking, because its owner can change it back in one click. A person edits the entry in Google Calendar.",
+  "POST /api/content/google/calendar/event/guests":
+    "FOR A MACHINE. 'Add Marta to Thursday's call' is an errand; the person's version is the guest field in Google Calendar. It is the one calendar write that asks first, because an invitation lands in somebody else's inbox and cannot be recalled.",
+  "POST /api/content/google/calendar/event/location":
+    "FOR A MACHINE. Where a meeting happens is one field, and the assistant sets it when a room changes. A person types it in Google Calendar — and the meeting record's own location field is the kwapso-side control this door exists to push.",
+  "POST /api/content/google/calendar/event/cancel":
+    "FOR A MACHINE. Calling a meeting off is the assistant answering 'cancel Thursday'; a person cancels it in Google Calendar, where the guests and the notification live.",
+  "POST /api/content/google/chat/delete":
+    "FOR A MACHINE, and specifically to undo a machine — the counterpart of the post door above. It takes back a message kwapso itself sent; a person deletes their own message in Chat.",
 
   /* ── a gap, owned by another lane ──────────────────────────────────────── */
   // EMPTY, and that is the point of the two headings staying here. Twelve doors

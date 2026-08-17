@@ -33,23 +33,23 @@ describe("the interest registry answers which shards care", () => {
   it("narrows to the shards that declared the resource", () => {
     const r = interest({
       s0: fresh(["accounts"]),
-      s1: fresh(["learning"]),
+      s1: fresh(["help"]),
       s2: fresh(["accounts", "help"]),
-      s3: fresh(["learning"]),
+      s3: fresh(["help"]),
     })
     expect(r.shardsFor("accounts")).toEqual([0, 2])
-    expect(r.shardsFor("learning")).toEqual([1, 3])
+    expect(r.shardsFor("help")).toEqual([1, 2, 3])
   })
 
   it("answers NOBODY when genuinely nobody is listening — the whole point", () => {
     const r = interest({ s0: fresh(["accounts"]), s1: fresh(["accounts"]), s2: fresh(["accounts"]), s3: fresh(["accounts"]) })
-    expect(r.shardsFor("marketing")).toEqual([])
+    expect(r.shardsFor("brand_assets")).toEqual([])
   })
 
   describe("every unknown answers YES", () => {
     it("a shard that has NEVER reported — its first listener is mid-handshake", () => {
       const r = interest({ s0: fresh(["accounts"]) })
-      expect(r.shardsFor("marketing"), "shards 1-3 never reported").toEqual([1, 2, 3])
+      expect(r.shardsFor("brand_assets"), "shards 1-3 never reported").toEqual([1, 2, 3])
     })
 
     it("an entry older than a listener's own deadline", () => {
@@ -57,7 +57,7 @@ describe("the interest registry answers which shards care", () => {
       const r = interest({ s0: stale, s1: fresh(["accounts"]), s2: fresh(["accounts"]), s3: fresh(["accounts"]) })
       // Past the window every socket has reconnected and re-reported, so a stale
       // entry describes nobody — and is believed about nothing.
-      expect(r.shardsFor("marketing")).toEqual([0])
+      expect(r.shardsFor("brand_assets")).toEqual([0])
     })
 
     it("a shard holding a PRE-SUBSCRIPTION client (all:true)", () => {
@@ -72,7 +72,7 @@ describe("the interest registry answers which shards care", () => {
 
     it("a malformed entry with no timestamp", () => {
       const r = interest({ s0: { resources: ["accounts"], all: false } })
-      expect(r.shardsFor("marketing")).toEqual(ALL_SHARDS)
+      expect(r.shardsFor("brand_assets")).toEqual(ALL_SHARDS)
     })
   })
 

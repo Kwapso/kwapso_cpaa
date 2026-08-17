@@ -521,7 +521,7 @@ export async function accessTokenFor(
     throw new GuardError(
       409,
       "google_not_connected",
-      `Connect ${serviceLabel(service)} in Settings first — kwapso only ever uses your own account.`
+      `Connect ${serviceLabel(service)} in Settings first, kwapso only ever uses your own account.`
     )
   const fresh =
     row.access_token &&

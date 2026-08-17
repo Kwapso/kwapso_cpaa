@@ -516,15 +516,21 @@ describe("a contact sees their company's questions, and no further", () => {
 //
 // The account fence answers "which of these rows are theirs". Some doors have no
 // such answer, because nothing behind them belongs to any client: the agency's
-// internal how-to articles, and its dropdown vocabulary. The client portal's
-// gateway already refuses them by not naming them — and its own comment says why
-// ("publishing them here would be a disclosure, not a feature"). But the AGENCY
-// origin serves the same doors to the same person, and a client login is an
-// ordinary team member by construction, so the module right alone let them
+// own brand material, why it meets, and its dropdown vocabulary. The client
+// portal's gateway already refuses them by not naming them — and its own comment
+// says why ("publishing them here would be a disclosure, not a feature"). But the
+// AGENCY origin serves the same doors to the same person, and a client login is
+// an ordinary team member by construction, so the module right alone let them
 // through: the whole library, and a full-field CSV export of it.
+//
+// EARNED ON THE LEARNING LIBRARY, which is no longer in the app. The module was
+// purged on 17 Aug 2026 and the doors named below are its successors on the same
+// footing — the finding was never about articles, it was about a door with no
+// fence and no refusal.
 describe("the agency's internal material refuses a client login", () => {
   const READS = [
-    { file: "workers/content/src/routes/learning.ts", fns: ["getLearning", "getLearningExport", "getLearningProgress"] },
+    { file: "workers/content/src/routes/brand-assets.ts", fns: ["getBrandAssets", "getBrandAssetsExport"] },
+    { file: "workers/content/src/routes/delivery.ts", fns: ["getMeetingPurposes", "getMeetingPurposesExport"] },
     { file: "workers/tenancy/src/routes/selectable.ts", fns: ["getSelectable", "getSelectableExport"] },
   ]
 

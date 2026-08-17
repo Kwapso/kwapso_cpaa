@@ -12,7 +12,6 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
@@ -23,26 +22,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { Pencil, Plus } from "lucide-react"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 export type ProcessFormValues = {
   appId: string
   name: string
   description: string
+  /** WHO DOES THIS WORK (CHECKLIST 8.13) — the role whose hours the saving is
+   * measured in. Free text in the team's own words: the person who does a
+   * client's invoicing is THEIR bookkeeper, not one of our logins. */
+  roleName: string
   baselineLabel: string
 }
 
 const appField = { ...defaultFieldConfig, label: "App", required: true }
 const nameField = { ...defaultFieldConfig, label: "Process name", required: true }
 const descField = { ...defaultFieldConfig, label: "What it is", required: false }
+const roleField = {
+  ...defaultFieldConfig,
+  label: "Who does it",
+  required: false,
+  hint: "The role whose hours this takes. It is what prices the saving.",
+}
 const baselineField = {
   ...defaultFieldConfig,
   label: "Name for how it worked before",
@@ -54,6 +62,7 @@ export function ProcessFormDialog({
   open,
   onOpenChange,
   apps,
+  fixedApp,
   initial,
   draftKey,
   onSubmit,
@@ -62,18 +71,24 @@ export function ProcessFormDialog({
   onOpenChange: (open: boolean) => void
   /** The systems we've built — a process lives inside one. */
   apps: { id: string; name: string }[]
+  /** Opened FROM an app, so which app is a fact rather than a question
+   * (CHECKLIST 8.12). The picker disappears and a sentence takes its place —
+   * the same shape the sprint and story forms already use. */
+  fixedApp?: { id: string; name: string }
   /** Present = editing an existing map (the app and the baseline are settled). */
-  initial?: { name: string; description: string }
+  initial?: { name: string; description: string; roleName: string }
   draftKey?: string
   onSubmit: (values: ProcessFormValues) => Promise<void>
 }) {
+  const t = useT()
   const editing = initial !== undefined
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
     {
-      appId: "",
+      appId: fixedApp?.id ?? "",
       name: initial?.name ?? "",
       description: initial?.description ?? "",
+      roleName: initial?.roleName ?? "",
       baselineLabel: "",
     },
     open
@@ -91,12 +106,13 @@ export function ProcessFormDialog({
         appId: values.appId,
         name: values.name.trim(),
         description: values.description.trim(),
+        roleName: values.roleName.trim(),
         baselineLabel: values.baselineLabel.trim(),
       })
       clearDraft()
       onOpenChange(false)
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't save the process map.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't save the process."))
     } finally {
       setBusy(false)
     }
@@ -117,14 +133,17 @@ export function ProcessFormDialog({
             : "A way of working inside one of your apps. You'll add its steps next."}
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !ready} className="gap-1.5">
-          {busy ? <Spinner /> : editing ? <Pencil className="size-4" /> : <Plus className="size-4" />}
-          {busy ? "Saving…" : editing ? "Save changes" : "Map it"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !ready,
+      }}
     >
-      {!editing && (
+      {!editing && fixedApp && (
+        <p className="text-muted-foreground text-sm">
+          {t("Inside")} <span className="text-foreground font-medium">{fixedApp.name}</span>
+        </p>
+      )}
+      {!editing && !fixedApp && (
         <Field config={appField} htmlFor="process-app" className={fieldSpacing}>
           <Select
             value={values.appId}
@@ -132,7 +151,7 @@ export function ProcessFormDialog({
             disabled={busy}
           >
             <SelectTrigger id="process-app">
-              <SelectValue placeholder="Pick the app" />
+              <SelectValue placeholder={t("Pick the app")} />
             </SelectTrigger>
             <SelectContent>
               {apps.map((a) => (
@@ -149,9 +168,23 @@ export function ProcessFormDialog({
           id="process-name"
           value={values.name}
           onChange={(e) => setValues((s) => ({ ...s, name: e.target.value }))}
-          placeholder="e.g. Approving a supplier invoice"
+          placeholder={t("e.g. Approving a supplier invoice")}
           disabled={busy}
           autoFocus
+        />
+      </Field>
+      {/* WHOSE HOURS THESE ARE (8.13). It is what turns the time this map gives
+          back into money: the saving is priced at the rate of the role that used
+          to spend it. Free text against the team's own words, and an unpriced
+          role is a legal answer — the hours still count and the money says it
+          could not be worked out, rather than being invented. */}
+      <Field config={roleField} htmlFor="process-role" className={fieldSpacing}>
+        <Input
+          id="process-role"
+          value={values.roleName}
+          onChange={(e) => setValues((s) => ({ ...s, roleName: e.target.value }))}
+          placeholder={t("e.g. Bookkeeper")}
+          disabled={busy}
         />
       </Field>
       <Field config={descField} htmlFor="process-description" className={fieldSpacing}>
@@ -159,7 +192,7 @@ export function ProcessFormDialog({
           id="process-description"
           value={values.description}
           onChange={(e) => setValues((s) => ({ ...s, description: e.target.value }))}
-          placeholder="Who does it, when, and what it's for."
+          placeholder={t("Who does it, when, and what it's for.")}
           disabled={busy}
           rows={3}
         />
@@ -170,7 +203,7 @@ export function ProcessFormDialog({
             id="process-baseline"
             value={values.baselineLabel}
             onChange={(e) => setValues((s) => ({ ...s, baselineLabel: e.target.value }))}
-            placeholder="How it worked before"
+            placeholder={t("How it worked before")}
             disabled={busy}
           />
         </Field>

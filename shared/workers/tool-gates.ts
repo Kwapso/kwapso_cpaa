@@ -47,15 +47,9 @@ export const TOOL_GATES: Record<string, string> = {
   create_dropdown_value: "selectable_data:create",
   update_dropdown_value: "selectable_data:edit",
   set_dropdown_active: "selectable_data:delete",
-  create_marketing_post: "marketing:create",
-  update_marketing_post: "marketing:edit",
-  set_marketing_post_active: "marketing:delete",
   create_brand_asset: "brand_assets:create",
   update_brand_asset: "brand_assets:edit",
   set_brand_asset_active: "brand_assets:delete",
-  create_programme: "delivery:create",
-  update_programme: "delivery:edit",
-  set_programme_active: "delivery:delete",
   create_meeting_purpose: "delivery:create",
   update_meeting_purpose: "delivery:edit",
   set_meeting_purpose_active: "delivery:delete",
@@ -68,10 +62,6 @@ export const TOOL_GATES: Record<string, string> = {
   create_staff_certificate: "staff_profiles:create",
   update_staff_certificate: "staff_profiles:edit",
   set_staff_certificate_active: "staff_profiles:delete",
-  create_learning: "learning:create",
-  update_learning: "learning:edit",
-  set_learning_active: "learning:delete",
-  mark_learning_done: "learning:read",
   add_knowledge_source: "knowledge:create",
   update_knowledge_source: "knowledge:edit",
   set_knowledge_source_active: "knowledge:delete",
@@ -90,6 +80,19 @@ export const TOOL_GATES: Record<string, string> = {
   // this line.
   rank_help_ticket: "help:edit",
   archive_help_ticket: "help:edit",
+  // THE TWO ACTS ON THE LADDER A PERSON STILL PERFORMS (CHECKLIST 5.11, 5.13),
+  // and they are gated differently on purpose. Reading a request is OUR queue, so
+  // it needs the right every other move needs. CONFIRMING one is the CLIENT's
+  // answer — `help:edit` is a right the seeded Client role deliberately does not
+  // hold, so gating the confirm on it would make the door unreachable by the only
+  // people it exists for. It is narrow by construction instead: the account fence
+  // rides its UPDATE and R17's predicate limits it to awaiting_validation → new.
+  validate_help_ticket: "help:read",
+  triage_help_ticket: "help:edit",
+  // Showing somebody what you mean is the same bar as saying it — a person who
+  // can see a ticket can attach to it, exactly as they can reply to it.
+  add_help_link: "help:read",
+  remove_help_attachment: "help:read",
   reply_help_ticket: "help:read",
   // Answering is a status move, so it sits on the same right every other move
   // does — and the door refuses a portal caller, because "resolved" is our word.
@@ -101,7 +104,6 @@ export const TOOL_GATES: Record<string, string> = {
   create_story: "work:create",
   update_story: "work:edit",
   set_story_status: "work:edit",
-  rank_story: "work:edit",
   create_sprint: "work:create",
   update_sprint: "work:edit",
   complete_sprint: "work:edit",
@@ -141,7 +143,6 @@ export const TOOL_GATES: Record<string, string> = {
   // REGEX decides for.
   bulk_set_help_status: "help:edit",
   set_help_status_by_filter: "help:edit",
-  bulk_set_learning_active: "learning:delete",
   // The map: one module, four rights, and the same three-way split every other
   // module has — create maps and steps, edit them, and `delete` for the two acts
   // that take something out of the picture (archiving, and recording that a step
@@ -165,29 +166,61 @@ export const TOOL_GATES: Record<string, string> = {
   set_account_rate_active: "commercials:delete",
   create_internal_rate: "commercials:create",
   update_internal_rate: "commercials:edit",
+  // One tool for add / re-price / retire, so one gate: setting a price IS an
+  // edit of the card whichever of the three it turns out to be.
+  set_role_rate: "commercials:edit",
+  // Reading a transcript MOVES the meeting to held and writes time against it,
+  // so it is an edit of the meeting — and `google:read` besides, which the door
+  // asks for itself because it reaches the caller's own Drive.
+  read_meeting_transcript: "meetings:edit",
+  // It MAKES meetings, so it is a create — and `google:read` besides, which the
+  // door asks for itself.
+  sync_calendar_series: "meetings:create",
   set_internal_rate_active: "commercials:delete",
   // GOOGLE. Every write through somebody's own connection is `google:edit` —
   // "change something in the world you connected" — because `create` on this
   // module means CONNECT AN ACCOUNT, which is the switch an owner grants
   // separately and which no tool here holds.
   //
-  // The two doors that reach OUTSIDE that world demand a second right on top,
-  // and this map names only ONE gate per tool — so it names the one an owner
-  // would look for. Both are recorded here so a reader does not have to open the
-  // handler to learn that the send switch exists:
+  // The doors that reach OUTSIDE that world demand a second right on top, and
+  // this map names only ONE gate per tool — so it names the one an owner would
+  // look for. Every one is recorded here so a reader does not have to open the
+  // handler to learn that the switches exist:
   //   google_send_mail          — also google_mail:create
+  //   google_reply_mail         — also google_mail:create (a reply IS a message)
   //   google_create_event       — also google_events:create
   //   google_sprint_to_calendar — also google_events:create (and work:read, to
   //                               read the sprint it is pushing)
+  //   google_update_event       — also google_events:create
+  //   google_event_guests       — also google_events:create
+  //   google_event_location     — also google_events:create
+  //   google_cancel_event       — also google_events:create
   // None of them is a PRIVILEGE write: they change what is in a person's own
   // Drive, mailbox or diary, never who may do what, and never who can see whose.
   // The confirm rule they DO get is the owner's own, written on each tool.
+  //
+  // TAKING SOMETHING BACK is `google:delete`, which is the same reading this
+  // module already applies to withdrawing a shared folder: the row survives (a
+  // binned file keeps its history for thirty days), what ends is kwapso's own
+  // handiwork. It is a separate right so an owner can grant an assistant that
+  // writes without granting one that un-writes.
   google_drive_upload: "google:edit",
+  google_drive_update: "google:edit",
+  google_drive_folder: "google:edit",
+  google_mail_to_drive: "google:edit",
+  google_drive_trash: "google:delete",
   google_draft_reply: "google:edit",
   google_send_mail: "google:edit",
+  google_reply_mail: "google:edit",
+  google_label_mail: "google:edit",
   google_create_event: "google:edit",
   google_sprint_to_calendar: "google:edit",
+  google_update_event: "google:edit",
+  google_event_guests: "google:edit",
+  google_event_location: "google:edit",
+  google_cancel_event: "google:edit",
   google_chat_post: "google:edit",
+  google_chat_delete: "google:delete",
 }
 
 /** Writes that genuinely have no single `module:right` to name, each with its reason.
@@ -196,7 +229,7 @@ export const TOOL_GATES: Record<string, string> = {
  * the list can only shrink. */
 export const GATELESS_WRITES: Record<string, string> = {
   run_import_batch:
-    "binding:'SELF' — it runs the attached-in-chat batch INSIDE data-ops rather than posting to a door, and the rows it writes go through each target module's OWN gated door one at a time (the batch doors themselves open with requireAnyImportRight, which is an ANY-of set, not one module:right). So there is no single gate to name, and isPrivilegeWrite is answered by what it does: an import writes records, never who may do what.",
+    "binding:'SELF', it runs the attached-in-chat batch INSIDE data-ops rather than posting to a door, and the rows it writes go through each target module's OWN gated door one at a time (the batch doors themselves open with requireAnyImportRight, which is an ANY-of set, not one module:right). So there is no single gate to name, and isPrivilegeWrite is answered by what it does: an import writes records, never who may do what.",
 }
 
 /** Lookup by canonical name (the agent's name). */

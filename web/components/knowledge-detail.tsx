@@ -25,20 +25,21 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import { Paperclip, Pencil, Power } from "lucide-react"
 
-import type { Account, KnowledgeSource } from "@shared/types"
+import type { Account, AppRow, KnowledgeSource } from "@shared/types"
 import { KnowledgeFormDialog, type KnowledgeFormValues } from "@/components/knowledge-form-dialog"
 import { KNOWLEDGE_KIND } from "@/components/deep-link/shape"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, content, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
-import { knowledgeKey } from "@/lib/live-resources"
+import { appsKey, knowledgeKey, listFetch } from "@/lib/live-resources"
 import { formatCount } from "@shared/web/format-count"
 import { formatDateTime } from "@shared/web/format"
 import { safeHref } from "@/lib/rich-text"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
+import { useT } from "@shared/web/language"
 
 export function KnowledgeDetailScreen({
   teamId,
@@ -47,6 +48,7 @@ export function KnowledgeDetailScreen({
   teamId: string
   sourceId: string
 }) {
+  const t = useT()
   const sourcesQ = useCached<KnowledgeSource[]>(knowledgeKey(teamId), () =>
     content.knowledge().then((r) => r.sources)
   )
@@ -76,6 +78,9 @@ export function KnowledgeDetailScreen({
     tenancy.accounts().then((r) => r.accounts)
   )
   const accountNames = new Map((accountsQ.data ?? []).map((a) => [a.id, a.name]))
+  // The apps a source may be LIMITED TO (12.3). `canOpen` is the door's own
+  // answer to 8.11, so this list is the server's and not a second opinion.
+  const appsQ = useCached<AppRow[]>(appsKey(teamId), () => listFetch.apps(teamId))
 
   const { can } = usePermissions(teamId)
   const canEdit = can("knowledge", "edit")
@@ -104,9 +109,10 @@ export function KnowledgeDetailScreen({
       sourceUrl: values.sourceUrl || null,
       accountId: values.accountId || null,
       visibility: values.visibility,
+      visibleToAppId: values.visibleToAppId || null,
     })
     patchLists(source)
-    toast.success("Source updated.")
+    toast.success(t("Source updated."))
   }
 
   async function setActive(activeNext: boolean) {
@@ -124,10 +130,10 @@ export function KnowledgeDetailScreen({
     }
   }
 
-  if (sourcesQ.error) return <p className="text-destructive text-sm">Couldn&apos;t load the source.</p>
+  if (sourcesQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the source.")}</p>
   if (sourcesQ.data === undefined) return <Skeleton variant="list" lines={4} />
   if (!item && oneQ.data === undefined && !inPage) return <Skeleton variant="list" lines={4} />
-  if (!item) return <p className="text-muted-foreground text-sm">That source doesn&apos;t exist.</p>
+  if (!item) return <p className="text-muted-foreground text-sm">{t("That source doesn't exist.")}</p>
 
   const mirrored = item.originRowId !== null
   // A FILE's words belong to the file, exactly as a mirrored source's belong to
@@ -138,35 +144,43 @@ export function KnowledgeDetailScreen({
   const textOwnedElsewhere = mirrored || item.fileUrl !== null
   const filedUnder = item.accountId ? (accountNames.get(item.accountId) ?? "A client") : "The agency"
   const overviewItems = [
-    { label: "Kind", value: KNOWLEDGE_KIND[item.kind] ?? item.kind },
-    { label: "Filed under", value: filedUnder },
+    { label: t("Kind"), value: KNOWLEDGE_KIND[item.kind] ?? item.kind },
+    { label: t("Filed under"), value: filedUnder },
     {
-      label: "Who can use it",
-      value: item.visibility === "private" ? "Only you" : "Anyone who can read the knowledge base",
+      label: t("Who can use it"),
+      // The three settings, said as a sentence rather than as a word a reader has
+      // to map back (12.3). The app's own NAME rides the row, so the middle one
+      // names the room instead of an id.
+      value:
+        item.visibility === "private"
+          ? "Only you"
+          : item.visibility === "app"
+            ? `Only the people on ${item.visibleToAppName ?? "one app"}`
+            : "Anyone who can read the knowledge base",
     },
     {
-      label: "Searchable pieces",
+      label: t("Searchable pieces"),
       // An indexed source with no pieces is a real state (its text was empty),
       // and saying "0" is the honest reading of it. For an UPLOADED file that is
       // also the commonest honest state — a deck or an archive is kept and not
       // read — so it is said in words rather than as a zero somebody has to
       // interpret.
       value: item.fileUrl && !item.chunkCount
-        ? "None — stored, not searchable"
+        ? "None, stored, not searchable"
         : item.indexedAt
           ? String(item.chunkCount)
           : "Not indexed yet",
     },
     ...(item.fileUrl
       ? [
-          { label: "File", value: item.fileName ?? "Uploaded file" },
+          { label: t("File"), value: item.fileName ?? "Uploaded file" },
           {
-            label: "Size",
+            label: t("Size"),
             value: `${Math.max(1, Math.round(item.fileBytes / 1000)).toLocaleString()} KB`,
           },
         ]
       : []),
-    { label: "Last indexed", value: item.indexedAt ? formatDateTime(item.indexedAt) : "—" },
+    { label: t("Last indexed"), value: item.indexedAt ? formatDateTime(item.indexedAt) : "—" },
     ...auditItems({
       createdByName: item.creatorName,
       createdAt: item.createdAt,
@@ -182,11 +196,11 @@ export function KnowledgeDetailScreen({
     ...defaultTabsConfig,
     variant: "line" as const,
     tabs: [
-      { value: "source", label: "Source", icon: "file-text", badge: "", badgeVariant: "" as const },
-      { value: "overview", label: "Overview", icon: "info", badge: "", badgeVariant: "" as const },
+      { value: "source", label: t("Source"), icon: "file-text", badge: "", badgeVariant: "" as const },
+      { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       {
         value: "activity",
-        label: "Activity",
+        label: t("Activity"),
         icon: "history",
         badge: formatCount(activity.total),
         badgeVariant: "" as const,
@@ -202,12 +216,17 @@ export function KnowledgeDetailScreen({
             <span className="truncate">{item.title}</span>
             {!item.active && (
               <Badge variant="outline" className="text-muted-foreground text-[10px]">
-                Not in use
+                {t("Not in use")}
               </Badge>
             )}
             {item.visibility === "private" && (
               <Badge variant="secondary" className="text-[10px]">
-                Private to you
+                {t("Private to you")}
+              </Badge>
+            )}
+            {item.visibility === "app" && (
+              <Badge variant="secondary" className="text-[10px]">
+                {item.visibleToAppName ?? t("Limited to one app")}
               </Badge>
             )}
           </h1>
@@ -223,7 +242,7 @@ export function KnowledgeDetailScreen({
             className="shrink-0 gap-1.5"
           >
             <Pencil className="size-3.5" />
-            Edit
+            {t("Edit")}
           </Button>
         )}
       </div>
@@ -241,7 +260,7 @@ export function KnowledgeDetailScreen({
             <div className="flex flex-col gap-6">
               {mirrored && (
                 <p className="text-muted-foreground text-sm">
-                  Kept in step with the record it came from — its words change when that record does.
+                  Kept in step with the record it came from, its words change when that record does.
                 </p>
               )}
               {/* THE FILE THIS WAS READ FROM, and — when there was nothing to
@@ -275,7 +294,7 @@ export function KnowledgeDetailScreen({
               {item.bodyTruncated ? (
                 <p className="text-muted-foreground text-sm">
                   Showing the first part of {Math.round(item.bodyBytes / 1000).toLocaleString()} KB of
-                  material. Every word of it is searchable — this is the screen being kind to itself.
+                  material. Every word of it is searchable, this is the screen being kind to itself.
                 </p>
               ) : null}
               {item.body ? (
@@ -323,7 +342,7 @@ export function KnowledgeDetailScreen({
                   <span className="text-muted-foreground text-xs">
                     {item.active
                       ? "The assistant stops reading it. Nothing is deleted, and the sweep won't put it back."
-                      : "Nothing was deleted — this puts it back in front of the assistant."}
+                      : "Nothing was deleted, this puts it back in front of the assistant."}
                   </span>
                 </div>
               )}
@@ -337,6 +356,11 @@ export function KnowledgeDetailScreen({
         onOpenChange={setEditingOpen}
         draftKey={`knowledge:edit:${sourceId}`}
         accountOptions={(accountsQ.data ?? []).map((a) => ({ id: a.id, name: a.name }))}
+        // Only the apps this caller may OPEN (8.11) — the door refuses any other,
+        // so offering one would be offering a refusal.
+        appOptions={(appsQ.data ?? [])
+          .filter((a) => a.canOpen && a.active)
+          .map((a) => ({ id: a.id, name: a.name }))}
         textOwnedElsewhere={textOwnedElsewhere}
         titleOwnedElsewhere={mirrored}
         textOwnedNote={
@@ -350,6 +374,7 @@ export function KnowledgeDetailScreen({
           sourceUrl: item.sourceUrl ?? "",
           accountId: item.accountId ?? "",
           visibility: item.visibility,
+          visibleToAppId: item.visibleToAppId ?? "",
         }}
         onSubmit={saveDetails}
       />

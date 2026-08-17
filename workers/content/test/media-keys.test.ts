@@ -66,7 +66,7 @@ describe("mediaKey — an uploaded object's URL is a capability, not a guess", (
         ).toBe(true)
       }
     }
-    // The derivation must actually be finding the uploads (photos, logos, learning).
+    // The derivation must actually be finding the uploads (photos, logos, files).
     expect(writes.length, `expected to find the R2 uploads, found: ${writes.join(", ")}`).toBeGreaterThanOrEqual(3)
   })
 })
@@ -100,8 +100,8 @@ describe("a delete may only ever name an object the caller owns", () => {
     // The tripwire: a scan that finds no reclaims would report "all clear".
     expect(
       reclaimers,
-      "expected the three reclaims (profile photo, team logo, learning attachment)"
-    ).toBeGreaterThanOrEqual(3)
+      "expected the two reclaims (profile photo, team logo)"
+    ).toBeGreaterThanOrEqual(2)
   })
 })
 

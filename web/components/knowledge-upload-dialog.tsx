@@ -36,7 +36,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { Paperclip, Upload } from "lucide-react"
@@ -44,6 +43,7 @@ import { Paperclip, Upload } from "lucide-react"
 import { ApiFailure } from "@/lib/api"
 import { readFileAsDataUrl } from "@shared/web/file"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 /** The client-side cap, matching the door's `KNOWLEDGE_FILE_MAX_BYTES`. It is
  * here so that a person who picked a 400 MB video is told before they spend two
@@ -55,6 +55,7 @@ const fileField = { ...defaultFieldConfig, label: "Which file?", required: true 
 const titleField = { ...defaultFieldConfig, label: "What should we call it?", required: false }
 const filedField = { ...defaultFieldConfig, label: "Filed under", required: false }
 const visibilityField = { ...defaultFieldConfig, label: "Who can use it", required: false }
+const appField = { ...defaultFieldConfig, label: "Which app's people", required: true }
 
 /** Radix Select can't hold an empty value, so "the agency's own" uses a sentinel
  * — the same one the typed-note form uses, for the same reason. */
@@ -65,6 +66,7 @@ export function KnowledgeUploadDialog({
   onOpenChange,
   onSubmit,
   accountOptions,
+  appOptions,
   draftKey,
 }: {
   open: boolean
@@ -75,16 +77,26 @@ export function KnowledgeUploadDialog({
     fileDataUrl: string
     title: string
     accountId: string
-    visibility: "team" | "private"
+    visibility: "team" | "app" | "private"
+    visibleToAppId: string
   }) => Promise<void>
   /** the accounts this caller may file under — already fenced by their own read */
   accountOptions: { id: string; name: string }[]
+  /** the apps this caller may OPEN (8.11) — the only ones the door will accept
+   * as a visibility limit, so the only ones worth offering (12.3) */
+  appOptions: { id: string; name: string }[]
   /** stable id for per-session draft persistence (CACHING.md §11) */
   draftKey?: string
 }) {
+  const t = useT()
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
-    { title: "", accountId: AGENCY, visibility: "team" as "team" | "private" },
+    {
+      title: "",
+      accountId: AGENCY,
+      visibility: "team" as "team" | "app" | "private",
+      visibleToAppId: "",
+    },
     open
   )
   // The FILE lives outside the draft — see the header. It is cleared whenever the
@@ -102,7 +114,7 @@ export function KnowledgeUploadDialog({
   function take(picked: File | null | undefined) {
     if (!picked) return
     if (picked.size > MAX_FILE_BYTES) {
-      toast.error("That file is over 25 MB — please pick a smaller one.")
+      toast.error(t("That file is over 25 MB, please pick a smaller one."))
       return
     }
     setFile(picked)
@@ -119,6 +131,9 @@ export function KnowledgeUploadDialog({
         title: values.title.trim(),
         accountId: values.accountId === AGENCY ? "" : values.accountId,
         visibility: values.visibility,
+        // Sent only when it IS the answer — "the team" and "only me" both mean
+        // no app, and one sent beside them would store a limit nobody chose.
+        visibleToAppId: values.visibility === "app" ? values.visibleToAppId : "",
       })
       clearDraft()
       setFile(null)
@@ -137,20 +152,16 @@ export function KnowledgeUploadDialog({
       busy={busy}
       clearDraft={clearDraft}
       onSubmit={submit}
-      title={<DialogTitle>Add a file to the knowledge base</DialogTitle>}
+      title={<DialogTitle>{t("Add a file to the knowledge base")}</DialogTitle>}
       subtitle={
         <DialogDescription>
-          Any file from your computer. We read the words out of documents, spreadsheets,
-          PDFs and pictures so the assistant can answer from them and name the file when
-          it does. Anything we can&apos;t read is still kept here, and we&apos;ll say so.
+          {t("Any file from your computer. We read the words out of documents, spreadsheets, PDFs and pictures so the assistant can answer from them and name the file when it does. Anything we can't read is still kept here, and we'll say so.")}
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !file}>
-          {busy ? <Spinner /> : null}
-          {busy ? "Reading it…" : "Add file"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !file,
+      }}
     >
       <Field config={fileField} htmlFor="knowledge-file" className={fieldSpacing}>
         {/* The drop zone IS the picker: dropping and clicking land in the same
@@ -187,7 +198,7 @@ export function KnowledgeUploadDialog({
               <Paperclip className="text-muted-foreground size-4 shrink-0" />
               <span className="min-w-0 flex-1 truncate text-left">{file.name}</span>
               <span className="text-muted-foreground shrink-0 text-xs">
-                {Math.max(1, Math.round(file.size / 1000)).toLocaleString()} KB
+                {Math.max(1, Math.round(file.size / 1000)).toLocaleString()} {t("KB")}
               </span>
               <Button
                 type="button"
@@ -197,13 +208,13 @@ export function KnowledgeUploadDialog({
                 disabled={busy}
                 className="text-muted-foreground h-auto shrink-0 px-2 py-1"
               >
-                Remove
+                {t("Remove")}
               </Button>
             </div>
           ) : (
             <>
               <Upload className="text-muted-foreground size-5" aria-hidden />
-              <p className="text-muted-foreground text-sm">Drop a file here, or</p>
+              <p className="text-muted-foreground text-sm">{t("Drop a file here, or")}</p>
               <Button
                 type="button"
                 variant="outline"
@@ -213,7 +224,7 @@ export function KnowledgeUploadDialog({
                 className="gap-1.5"
               >
                 <Paperclip className="size-3.5" />
-                Choose a file
+                {t("Choose a file")}
               </Button>
             </>
           )}
@@ -235,10 +246,10 @@ export function KnowledgeUploadDialog({
           disabled={busy}
         >
           <SelectTrigger id="knowledge-file-filed">
-            <SelectValue placeholder="The agency's own" />
+            <SelectValue placeholder={t("The agency's own")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={AGENCY}>The agency&apos;s own</SelectItem>
+            <SelectItem value={AGENCY}>{t("The agency's own")}</SelectItem>
             {accountOptions.map((a) => (
               <SelectItem key={a.id} value={a.id}>
                 {a.name}
@@ -247,14 +258,18 @@ export function KnowledgeUploadDialog({
           </SelectContent>
         </Select>
         <p className="text-muted-foreground mt-1 text-xs">
-          Filing it under a client is how a question about them finds it first.
+          {t("Filing it under a client is how a question about them finds it first.")}
         </p>
       </Field>
       <Field config={visibilityField} htmlFor="knowledge-file-visibility" className={fieldSpacing}>
         <Select
           value={values.visibility}
           onValueChange={(visibility) =>
-            setValues((v) => ({ ...v, visibility: visibility === "private" ? "private" : "team" }))
+            setValues((v) => ({
+              ...v,
+              visibility:
+                visibility === "private" ? "private" : visibility === "app" ? "app" : "team",
+            }))
           }
           disabled={busy}
         >
@@ -262,11 +277,37 @@ export function KnowledgeUploadDialog({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="team">Anyone who can read the knowledge base</SelectItem>
-            <SelectItem value="private">Only me</SelectItem>
+            <SelectItem value="team">{t("Anyone who can read the knowledge base")}</SelectItem>
+            {appOptions.length > 0 && (
+              <SelectItem value="app">{t("Only the people on one app")}</SelectItem>
+            )}
+            <SelectItem value="private">{t("Only me")}</SelectItem>
           </SelectContent>
         </Select>
       </Field>
+      {values.visibility === "app" && (
+        <Field config={appField} htmlFor="knowledge-file-app" className={fieldSpacing}>
+          <Select
+            value={values.visibleToAppId}
+            onValueChange={(visibleToAppId) => setValues((v) => ({ ...v, visibleToAppId }))}
+            disabled={busy}
+          >
+            <SelectTrigger id="knowledge-file-app">
+              <SelectValue placeholder={t("Pick the app")} />
+            </SelectTrigger>
+            <SelectContent>
+              {appOptions.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {a.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-muted-foreground mt-1 text-xs">
+            {t("The staff on that app can read it, and so can an admin. Nobody else will see it, and the assistant will not answer anyone else from it.")}
+          </p>
+        </Field>
+      )}
     </FormShellDialog>
   )
 }

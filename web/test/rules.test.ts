@@ -502,7 +502,7 @@ describe("RULES — the laws of the base", () => {
     for (const [file, fn] of [
       ["workers/tenancy/src/lib/roles.ts", "setRoleActive"],
       ["workers/tenancy/src/lib/selectable.ts", "setSelectableActive"],
-      ["workers/content/src/lib/learning.ts", "setLearningActive"],
+      ["workers/content/src/lib/brand-assets.ts", "setBrandAssetActive"],
       ["workers/content/src/lib/help.ts", "setStatus"],
       // The Ready flip is a status writer like any other, and the one with the
       // most to lose from a double: it fires off the back of a story closing, and
@@ -756,7 +756,7 @@ describe("RULES — the laws of the base", () => {
     // truncated file. These three doors are the whole of that path.
     for (const f of [
       join(ROOT, "workers", "tenancy", "src", "lib", "accounts.ts"),
-      join(ROOT, "workers", "content", "src", "lib", "learning.ts"),
+      join(ROOT, "workers", "content", "src", "lib", "delivery.ts"),
       join(ROOT, "workers", "content", "src", "lib", "brand-assets.ts"),
     ]) {
       const src = stripComments(read(f))
@@ -985,7 +985,7 @@ describe("RULES — the laws of the base", () => {
   // saying why. The AGENCY gateway forwards by PREFIX, and a client login is an
   // ordinary team member holding an ordinary role — so every door the portal
   // deliberately withheld was served to the same person at the other hostname.
-  // First the learning library and the dropdown vocabulary; then, because the
+  // First the (since-purged) learning library and the dropdown vocabulary; then, because the
   // enumeration that followed listed "what the accounts module owns" instead of
   // "what a client can reach", the help STAKEHOLDER list — a door that names the
   // agency's staff admins, with their email addresses, and answers on a POST as
@@ -1362,6 +1362,7 @@ describe("RULES — the laws of the base", () => {
       "savings-caption", // R25: the derived-screens scan above
       "vector-fence", // R26: workers/content/test/vector-fence.test.ts
       "described-contracts", // R27: workers/mcp/test/described-contracts.test.ts, beside R19/R22 on the same door census
+      "catalogued-strings", // R28: web/test/catalogued-strings.test.ts — re-runs the real extractor over both front doors
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

@@ -17,6 +17,41 @@ import {
 import { fail } from "@shared/workers/http"
 import { requestId, stampTrace } from "@shared/workers/trace"
 
+/** The top-level module pages that are CLIENT-RESOLVED SHELLS: /stories is a real
+ * static file, but /stories/<id> is the same shell with the id read off
+ * window.location, so any depth under one of these must be served the module's
+ * own shell instead of the 404 page.
+ *
+ * IT IS EXPORTED BECAUSE IT IS HALF A CONTRACT. The other half is
+ * `assets.run_worker_first` in wrangler.jsonc: that field is an ARRAY, and an
+ * array means every path NOT listed skips this Worker entirely and is answered by
+ * the asset layer. So a module named here but missing there never reaches the
+ * loop below — the asset layer 404s /tickets/<id> before we see it, which is
+ * exactly what a tester hit when they shared a ticket link. The list stood at two
+ * prefixes, one of them a `/help/*` that is not even a URL segment in this app,
+ * while this loop had grown to fifteen modules. test/shell-routing.test.ts reads
+ * both off disk and holds them together. */
+export const SHELL_MODULES = [
+  "accounts", "tickets", "knowledge", "processes",
+  // THE WORK ENGINE'S FOUR. `work` became `stories` when the sprints moved
+  // out to a page of their own — the segment follows the heading, because a
+  // URL that disagrees with the title on the page is a cost paid for ever.
+  "stories", "sprints", "apps", "tasks",
+  // TIME — the destination a work log never had. No records of its own (a
+  // row of time is only ever read in a list of its neighbours), but it is
+  // forwarded like the rest so the shell survives a reload at any depth.
+  "time",
+  // The diary. A sidebar page with records of its own, so it needs the shell
+  // at every depth for the same reason the four above it do.
+  "meetings",
+  // The agency's own housekeeping. `purposes` is here even though it is a
+  // CONTEXTUAL section rather than a sidebar one: it still has records with
+  // their own URLs, and a deep link that 404s on reload is a deep link whether
+  // or not the nav rail offers it. `processes` above is here for exactly the
+  // same reason, and became contextual on the same day.
+  "brand", "purposes",
+]
+
 type Env = {
   ASSETS: Fetcher
   AUTH: Fetcher
@@ -91,15 +126,19 @@ async function handle(request: Request, env: Env): Promise<Response> {
     // reasoning (and the fork warning that goes with it) lives on serveMedia in
     // shared/workers/front-door.ts, which also validates the key at the boundary.
 
-    // Learning attachments (images + short clips uploaded to a how-to article)
-    // live in their own per-team bucket. Same serving shape as /media/* below;
-    // just a different bucket, matched first since it's a more specific prefix.
+    // THE BYTES THAT OUTLIVED THEIR MODULE. Learning was purged on 17 Aug 2026,
+    // but its 41 articles had already been indexed into the knowledge base and
+    // their bodies still name the images and clips that were uploaded with them.
+    // Nothing writes to this bucket any more — the upload doors went with the
+    // module — and this route stays so that what was written before it can still
+    // be read. Same serving shape as /media/* below; just a different bucket,
+    // matched first since it's a more specific prefix.
     if (pathname.startsWith("/media/learning/") && request.method === "GET")
       return serveMedia(env.LEARNING_MEDIA, pathname, "/media/learning/", range)
 
     // The agency's own files — brand assets, staff photos, certificate PDFs.
-    // Its own bucket, matched before the generic prefix for the same reason
-    // learning's is: a more specific prefix has to win, or every internal URL
+    // Its own bucket, matched before the generic prefix for the same reason the
+    // one above is: a more specific prefix has to win, or every internal URL
     // would be looked up in the wrong bucket and 404.
     //
     // ON THE AGENCY DOOR ONLY. The client portal serves no /media/internal/ path
@@ -127,29 +166,11 @@ async function handle(request: Request, env: Env): Promise<Response> {
       return env.ASSETS.fetch(new Request(shell, request))
     }
 
-    // Top-level module pages (/accounts, /learning, /tickets) are ALSO client-resolved
+    // Top-level module pages (/accounts, /tickets, /knowledge) are ALSO client-resolved
     // deep-link shells (their own clean URLs, active team from context). Serve the
     // module's shell for any sub-path (e.g. /accounts/<id>); the bare /accounts is a
     // real static file served below.
-    for (const mod of [
-      "accounts", "learning", "tickets", "knowledge", "processes",
-      // THE WORK ENGINE'S FOUR. `work` became `stories` when the sprints moved
-      // out to a page of their own — the segment follows the heading, because a
-      // URL that disagrees with the title on the page is a cost paid for ever.
-      "stories", "sprints", "apps", "tasks",
-      // TIME — the destination a work log never had. No records of its own (a
-      // row of time is only ever read in a list of its neighbours), but it is
-      // forwarded like the rest so the shell survives a reload at any depth.
-      "time",
-      // The diary. A sidebar page with records of its own, so it needs the shell
-      // at every depth for the same reason the four above it do.
-      "meetings",
-      // The agency's own housekeeping. `purposes` is here too even though it is
-      // a CONTEXTUAL section rather than a sidebar one: it still has records
-      // with their own URLs, and a deep link that 404s on reload is a deep link
-      // whether or not the nav rail offers it.
-      "marketing", "brand", "delivery", "purposes",
-    ]) {
+    for (const mod of SHELL_MODULES) {
       if (pathname.startsWith(`/${mod}/`)) {
         const shell = new URL(request.url)
         shell.pathname = `/${mod}`

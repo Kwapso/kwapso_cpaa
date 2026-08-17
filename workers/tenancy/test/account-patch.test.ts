@@ -37,7 +37,8 @@ import { buildSpineDb, IDS, makeEnv, req } from "./spine-harness"
 const FULL = {
   email: "hello@bergman.example",
   phone: "+27 21 000 0000",
-  address: "1 Long Street, Cape Town",
+  street: "1 Long Street",
+  city: "Cape Town",
   code: "BERG",
   currency: "ZAR",
   locale: "en-ZA",
@@ -61,11 +62,11 @@ beforeEach(() => {
   // Start from a fully-filled record, so anything missing afterwards was taken.
   holder.db
     .prepare(
-      `UPDATE accounts SET email = ?, phone = ?, address = ?, code = ?, currency = ?,
+      `UPDATE accounts SET email = ?, phone = ?, street = ?, city = ?, code = ?, currency = ?,
          locale = ?, timezone = ?, status = 'client' WHERE id = ?`
     )
     .run(
-      FULL.email, FULL.phone, FULL.address, FULL.code, FULL.currency,
+      FULL.email, FULL.phone, FULL.street, FULL.city, FULL.code, FULL.currency,
       FULL.locale, FULL.timezone, IDS.victimAccount
     )
 })
@@ -81,7 +82,8 @@ describe("a field the caller never mentioned is left alone", () => {
     // and leave whoever reads the failure guessing which column went.
     expect(row.email, "email survived a rename").toBe(FULL.email)
     expect(row.phone, "phone survived a rename").toBe(FULL.phone)
-    expect(row.address, "address survived a rename").toBe(FULL.address)
+    expect(row.street, "street survived a rename").toBe(FULL.street)
+    expect(row.city, "city survived a rename").toBe(FULL.city)
     expect(row.code, "reference survived a rename").toBe(FULL.code)
     expect(row.currency, "currency survived a rename").toBe(FULL.currency)
     expect(row.locale, "language survived a rename").toBe(FULL.locale)
@@ -98,7 +100,8 @@ describe("a field the caller never mentioned is left alone", () => {
       code: FULL.code,
       email: FULL.email,
       phone: FULL.phone,
-      address: FULL.address,
+      street: FULL.street,
+      city: FULL.city,
       status: "client",
     })
     expect(res.status).toBe(200)
@@ -122,12 +125,12 @@ describe("clearing a field is something the caller has to say", () => {
   })
 
   it("an explicit null empties it too — that is what the form sends", async () => {
-    const res = await post({ id: IDS.victimAccount, name: "Bergman", phone: null, address: null })
+    const res = await post({ id: IDS.victimAccount, name: "Bergman", phone: null, street: null })
     expect(res.status).toBe(200)
 
     const row = account()
     expect(row.phone).toBeNull()
-    expect(row.address).toBeNull()
+    expect(row.street).toBeNull()
     expect(row.email, "and still takes nothing it wasn't asked to take").toBe(FULL.email)
   })
 

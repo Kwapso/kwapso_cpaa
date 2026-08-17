@@ -1,0 +1,30 @@
+-- HOW BIG A PERSON WANTS THE APP TO BE.
+--
+-- Three steps, and they move TEXT AND SPACING TOGETHER, which is the thing the
+-- owner actually asked for and the reason this is one number rather than a font
+-- setting. Every size token in the theme is in `rem` and every spacing class is
+-- a Tailwind `rem` step, so one root font size on `<html>` moves the whole
+-- interface the way the iPhone's own setting does. No component takes a size
+-- prop and no component needs one (UI-RULEBOOK S4).
+--
+-- IT SITS BESIDE `language` FOR THE SAME REASON. A reading size is a fact about
+-- a reader, not about a team: one person wants it larger on a laptop they use at
+-- arm's length while their colleague does not, and the preference should follow
+-- them between devices rather than living in one browser's local storage. It is
+-- already carried on `SessionUser`, which `/api/auth/me` hands to both front
+-- doors, so no screen has to look it up and none of them can disagree.
+--
+-- IT IS ALSO WHAT MAKES THE LOCKED VIEWPORT HONEST (UI-RULEBOOK S5).
+-- `web/app/layout.tsx` sets `maximumScale: 1, userScalable: false`, so pinch to
+-- zoom is off. With the viewport locked this setting is the ONLY way a person
+-- can make the app bigger, which is why it is a stored preference rather than a
+-- nice-to-have.
+--
+-- NULL IS A REAL ANSWER and it is the default: "this person has never chosen",
+-- which reads as comfortable. Kept distinct from a deliberate choice of
+-- comfortable for the same reason the language column is, and no CHECK
+-- constraint for the same reason too: the allow-list is `SCALE_STEPS` in
+-- shared/scale.ts, where the door validates against it and where an unrecognised
+-- value falls back rather than throws. A CHECK would be a second copy of that
+-- list that only SQLite can see, and in SQLite a CHECK cannot be altered.
+ALTER TABLE users ADD COLUMN scale TEXT;

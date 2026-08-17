@@ -30,6 +30,7 @@ import { TicketRow } from "@/components/ticket-row"
 import { WaitingOnYou } from "@/components/waiting-on-you"
 import { DeliveryBlock } from "@/components/delivery-block"
 import type { PortalReady } from "@/components/portal-shell"
+import { useT } from "@shared/web/language"
 
 /** How many tickets Home shows before handing over to Tickets. Three is enough
  * to recognise "yes, that's mine" and short enough to read without scrolling. */
@@ -43,6 +44,7 @@ function greeting(): string {
 }
 
 export function HomeScreen({ ready }: { ready: PortalReady }) {
+  const t = useT()
   const { tickets, total, loading } = useTickets()
   const [raising, setRaising] = React.useState(false)
   const company = ready.accounts.find((a) => a.id === ready.currentAccountId)?.name ?? ""
@@ -75,7 +77,7 @@ export function HomeScreen({ ready }: { ready: PortalReady }) {
 
       <Button size="lg" className="w-full" onClick={() => setRaising(true)}>
         <Plus className="size-3.5" />
-        Ask us something
+        {t("Ask us something")}
       </Button>
 
       <section>
@@ -83,7 +85,7 @@ export function HomeScreen({ ready }: { ready: PortalReady }) {
          * the portal renders a count — not the length of the three rows below. */}
         {/* "Your company's", for the reason tickets-screen.tsx gives at its own
          * heading: this list holds colleagues' tickets too, now. */}
-        <CollectionHeading label="Your company's tickets" total={total} />
+        <CollectionHeading label={t("Your company's tickets")} total={total} />
 
         {loading && !tickets ? (
           <div className="flex flex-col gap-3">
@@ -92,8 +94,8 @@ export function HomeScreen({ ready }: { ready: PortalReady }) {
           </div>
         ) : newest.length === 0 ? (
           <div className="text-muted-foreground rounded-xl border border-dashed p-8 text-center">
-            <p>You haven&apos;t asked us for anything yet.</p>
-            <p className="mt-1 text-sm">When you do, it&apos;ll live here — and so will our reply.</p>
+            <p>{t("You haven't asked us for anything yet.")}</p>
+            <p className="mt-1 text-sm">{t("When you do, it'll live here, and so will our reply.")}</p>
           </div>
         ) : (
           <div className="flex flex-col gap-3">
@@ -105,7 +107,7 @@ export function HomeScreen({ ready }: { ready: PortalReady }) {
                 href="/tickets"
                 className="text-muted-foreground hover:text-foreground flex items-center justify-center gap-1.5 py-2 text-sm"
               >
-                See all of them
+                {t("See all of them")}
                 <ArrowRight className="size-3.5" />
               </Link>
             ) : null}

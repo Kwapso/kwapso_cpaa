@@ -72,6 +72,16 @@ vi.mock("@/lib/api", () => ({
     ticket: () => Promise.resolve(fixture.ticket),
     thread: () => Promise.resolve({ replies: fixture.replies, total: fixture.replies.length }),
     reply: () => Promise.resolve({ replies: fixture.replies, total: fixture.replies.length }),
+    // The screen also mounts its files-and-links section (CHECKLIST 5.10), which
+    // reads on mount. Answered with an empty list rather than left off the mock:
+    // a missing function would throw inside the fetcher, land in `useCached`'s
+    // error state, and this suite would go on passing while the screen under test
+    // rendered half of itself.
+    attachments: () => Promise.resolve({ attachments: [], total: 0 }),
+    attach: () => Promise.resolve({ attachments: [], total: 0 }),
+    detach: () => Promise.resolve({ attachments: [], total: 0 }),
+    validate: () =>
+      Promise.resolve({ tickets: [fixture.ticket], total: 1, nextCursor: null }),
   },
 }))
 
@@ -113,6 +123,10 @@ describe("the side never becomes a fingerprint", () => {
       onboardingComplete: true,
       currentTeamId: "team_1",
       pinnedTeamId: null,
+      // Never chose one, which is the common case and reads as English.
+      language: null,
+      // …and never chose a size either, which reads as comfortable.
+      scale: null,
     },
     teamId: "team_1",
     accounts: [{ id: "acc_1", name: "Northwind" }],

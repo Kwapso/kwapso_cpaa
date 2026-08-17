@@ -24,6 +24,7 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 
 import type { TeamRole } from "@shared/types"
 import { ApiFailure } from "@/lib/api"
+import { useT } from "@shared/web/language"
 
 export function RolePickerDialog({
   open,
@@ -43,6 +44,7 @@ export function RolePickerDialog({
   subjectName: string | null
   onPick: (roleId: string) => Promise<void>
 }) {
+  const t = useT()
   // No preselection: the current role isn't in the list, so start empty and let
   // the person pick a *different* role.
   const [selected, setSelected] = React.useState<string | null>(null)
@@ -81,7 +83,7 @@ export function RolePickerDialog({
     <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Change role</DialogTitle>
+          <DialogTitle>{t("Change role")}</DialogTitle>
           <DialogDescription>
             {subjectName
               ? `Pick the role for ${subjectName}.`
@@ -91,7 +93,7 @@ export function RolePickerDialog({
 
         {currentTitle && (
           <p className="text-muted-foreground text-sm">
-            Current role: <span className="text-foreground font-medium">{currentTitle}</span>
+            {t("Current role:")} <span className="text-foreground font-medium">{currentTitle}</span>
           </p>
         )}
 
@@ -121,7 +123,7 @@ export function RolePickerDialog({
                 )}
               </div>
               <span className="text-muted-foreground shrink-0 text-xs">
-                {r.memberCount} member{r.memberCount === 1 ? "" : "s"}
+                {r.memberCount} {t("member")}{r.memberCount === 1 ? "" : "s"}
               </span>
             </label>
           ))}

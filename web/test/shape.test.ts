@@ -4,7 +4,6 @@ import type {
   HelpTicket,
   Invite,
   InviteAudit,
-  Learning,
   TeamMember,
   TeamMeta,
   TeamRole,
@@ -21,7 +20,6 @@ import {
   shapeHelpList,
   shapeInviteDetail,
   shapeInvitesList,
-  shapeLearningList,
   shapeMemberDetail,
   shapeMembersList,
   shapeRolesList,
@@ -72,23 +70,6 @@ const audit: InviteAudit = {
   shelfLifeHours: 168,
 }
 
-const learning: Learning = {
-  id: "l1",
-  category: "Onboarding",
-  title: "How to onboard a client",
-  description: "A quick guide",
-  contentType: "Guide",
-  contentLink: null,
-  body: "# Steps\n- one\n- two",
-  sequence: 0,
-  required: false,
-  active: true,
-  createdAt: "2026-06-13T10:00:00.000Z",
-  creatorName: "Alaap Kanchwala",
-  editorName: null,
-  updatedAt: null,
-}
-
 const ticket: HelpTicket = {
   id: "h1",
   helpType: "Bug",
@@ -108,6 +89,15 @@ const ticket: HelpTicket = {
   raiserId: "u1",
   raiserName: "Alaap",
   editorName: null,
+  // Which system it is about and who asked (CHECKLIST 5.8 + 5.9). The agency's
+  // own question is about no app and was asked by nobody outside the building,
+  // so both are null here — which is the case the row shape has to survive.
+  appId: null,
+  appName: null,
+  raisedByContactId: null,
+  raisedByContactName: null,
+  // Only a ticket that WAITED ever carries one, and this one never did.
+  validatedAt: null,
   createdAt: "2026-06-13T10:00:00.000Z",
   updatedAt: null,
   // The agency's own question belongs to no client, so it names no account —
@@ -208,27 +198,6 @@ describe("shapeInvitesList", () => {
   })
 })
 
-describe("shapeLearningList", () => {
-  it("maps id, title→name, and category→detail", () => {
-    const { rows } = shapeLearningList([learning])
-    expect(rows?.[0].id).toBe("l1")
-    expect(rows?.[0].name).toBe("How to onboard a client")
-    expect(rows?.[0].detail).toBe("Onboarding")
-  })
-
-  it('adds the "(inactive)" suffix when !active', () => {
-    const { rows } = shapeLearningList([{ ...learning, active: false }])
-    expect(rows?.[0].name).toBe("How to onboard a client (inactive)")
-  })
-
-  it("falls back the detail to the description, then to a dash", () => {
-    expect(shapeLearningList([{ ...learning, category: null }]).rows?.[0].detail).toBe("A quick guide")
-    expect(
-      shapeLearningList([{ ...learning, category: null, description: null }]).rows?.[0].detail
-    ).toBe("—")
-  })
-})
-
 describe("HELP_STATUS", () => {
   it("maps every status (underscore form) to a friendly label", () => {
     expect(HELP_STATUS).toMatchObject({
@@ -242,11 +211,15 @@ describe("HELP_STATUS", () => {
 })
 
 describe("shapeHelpList", () => {
-  it("maps id, a truncated description→name, and a 'type · status' detail", () => {
+  // K1 / CHECKLIST 11.9: the title alone, then ONE line of two facts. The
+  // reference used to be prefixed into the name and the line used to carry four
+  // things; both are what made a page of tickets read as a wall of text.
+  it("maps id, a truncated description→name, and a 'status · type' detail", () => {
     const { rows } = shapeHelpList([ticket])
     expect(rows?.[0].id).toBe("h1")
     expect(String(rows?.[0].name).length).toBeLessThanOrEqual(80)
-    expect(rows?.[0].detail).toBe(`Bug · ${HELP_STATUS.in_progress}`)
+    expect(rows?.[0].name).not.toContain(ticket.ref as string)
+    expect(rows?.[0].detail).toBe(`${HELP_STATUS.in_progress} · Bug`)
   })
 
   it("ends a long description with an ellipsis", () => {
@@ -259,7 +232,7 @@ describe("shapeHelpList", () => {
   // to say "Help", which was the section's old name doing duty as a type.
   it('falls back the type to "General" when helpType is null', () => {
     const { rows } = shapeHelpList([{ ...ticket, helpType: null }])
-    expect(String(rows?.[0].detail).startsWith("General · ")).toBe(true)
+    expect(String(rows?.[0].detail).endsWith(" · General")).toBe(true)
   })
 })
 
@@ -322,7 +295,14 @@ const account = (over: Partial<Account> & { id: string; name: string }): Account
   parentAccountId: null,
   email: null,
   phone: null,
-  address: null,
+  street: null,
+  postalCode: null,
+  city: null,
+  country: null,
+  industry: null,
+  about: null,
+  logoUrl: null,
+  coverUrl: null,
   code: null,
   currency: null,
   locale: null,
@@ -334,12 +314,15 @@ const account = (over: Partial<Account> & { id: string; name: string }): Account
 })
 
 describe("shapeAccountsList", () => {
-  it("says what a row IS on one line — kind, reference, status", () => {
+  // K1: three facts at most. The reference CODE left the line on 17 Aug 2026 —
+  // it is a lookup key, not something anybody scans a list for — and it leads
+  // the eyebrow on the account's own screen instead.
+  it("says what a row IS on one line — kind and status, never the code", () => {
     const rows = shapeAccountsList([
       account({ id: "a1", name: "Bergman S.A.", code: "BERG", status: "past_client" }),
     ]).rows
     expect(rows?.[0].name).toBe("Bergman S.A.")
-    expect(rows?.[0].detail).toBe("Company · BERG · Past client")
+    expect(rows?.[0].detail).toBe("Company · Past client")
     // Facet columns the filter bar reads.
     expect(rows?.[0].type).toBe(ACCOUNT_TYPE.entity)
     expect(rows?.[0].status).toBe("Past client")

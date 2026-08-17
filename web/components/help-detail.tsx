@@ -18,10 +18,9 @@ import {
   type TicketMember,
   type TicketStatus,
 } from "@kwapso/ui/registry/collections/ticket-thread/ticket-thread"
-import { ArchiveRestore, ArrowDown, ArrowUp, Archive, Hammer, Languages, Mail, Pencil, Send } from "lucide-react"
+import { ArchiveRestore, Archive, CheckCheck, Languages, Pencil, Send } from "lucide-react"
 
 import type {
-  Account,
   HelpMessage,
   HelpStakeholder,
   HelpTicket,
@@ -29,7 +28,14 @@ import type {
   TeamMember,
 } from "@shared/types"
 import { ApiFailure, content, dataOps, tenancy } from "@/lib/api"
-import { auditItems } from "@/lib/audit-overview"
+import {
+  RecordActionsMenu,
+  RecordFooter,
+  RecordScreen,
+  STICKY_TABS,
+  type RecordAction,
+} from "@/components/record-chrome"
+import { MARK_GROUP, typeMark } from "@/lib/type-marks"
 import { useFollowNewest } from "@shared/web/follow-newest"
 import { formatRelative } from "@shared/web/format"
 import { personName } from "@/lib/identity"
@@ -37,18 +43,19 @@ import { usePermissions } from "@/lib/perms"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { formatCount } from "@shared/web/format-count"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
+import { HelpAttachmentsPanel, helpAttachmentsKey } from "@/components/help-attachments"
 import { HelpFormDialog } from "@/components/help-form-dialog"
-import { MailReplyDialog } from "@/components/mail-reply-dialog"
 import { HelpStakeholders } from "@/components/help-stakeholders"
-import { HelpStatusStepper, type HelpStatusValue } from "@/components/help-status-stepper"
+import { HelpStatusStepper } from "@/components/help-status-stepper"
+import { HELP_STATUS } from "@/components/deep-link/shape"
 import { ResolveDialog, type ResolveFormValues } from "@/components/resolve-dialog"
-import { StoryFormDialog } from "@/components/story-form-dialog"
-import { createStoryFrom, useStoryFormOptions } from "@/components/stories-screen"
-import { StoriesPanel, sliceKey } from "@/components/work-panels"
+import { StoriesPanel } from "@/components/work-panels"
+import { RecordTimerButton } from "@/components/timer-bar"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
-import { accountsKey, totalKey } from "@/lib/live-resources"
+import { totalKey } from "@/lib/live-resources"
 import { CONCEPT_ICON } from "@/lib/pages"
+import { useT } from "@shared/web/language"
 
 // LIBRARY ⇄ SERVER status. These were one-to-one until the work engine gave the
 // ticket its five states (SCOPE ch.07); the library's `TicketStatus` has four,
@@ -57,30 +64,24 @@ import { CONCEPT_ICON } from "@/lib/pages"
 // narrowing only reaches the library's own badge, because the real control is
 // HelpStatusStepper below, which speaks all five.
 const TO_LIBRARY: Record<HelpTicket["status"], TicketStatus> = {
-  // Read but not started, and read and triaged, are both "with us, not begun".
+  // Waiting on the client, raised and unread, and read but not begun are all
+  // "with us, nothing has started".
+  awaiting_validation: "open",
   new: "open",
   triaged: "open",
+  // Booked into a sprint IS in motion as far as the library's four words go:
+  // there is a date on it now, which is the fact "open" would hide.
+  scheduled: "in-progress",
   in_progress: "in-progress",
   // Every story is done and the client has not been told yet — still in motion,
   // because the telling is the part that finishes it.
   ready: "in-progress",
   resolved: "resolved",
 }
-const TO_SERVER: Record<TicketStatus, HelpTicket["status"]> = {
-  open: "new",
-  "in-progress": "in_progress",
-  resolved: "resolved",
-  // The library's "reopened" is a staff member pulling a ticket back into play,
-  // which in our five states is exactly `triaged`: read, and not yet started.
-  reopened: "triaged",
-}
-const STATUS_LABEL: Record<HelpTicket["status"], string> = {
-  new: "New",
-  triaged: "Triaged",
-  in_progress: "In progress",
-  ready: "Ready",
-  resolved: "Resolved",
-}
+/** The one map every ticket screen reads. Imported rather than retyped here: this
+ * file used to keep its own copy, and a copy is how the list and the record end
+ * up calling the same fact two different things. */
+const STATUS_LABEL = HELP_STATUS
 
 export function HelpDetailScreen({
   teamId,
@@ -95,6 +96,7 @@ export function HelpDetailScreen({
    * /t/<team>/tickets) — a cross-link off this record stays in that shape. */
   basePath: string
 }) {
+  const t = useT()
   const ticketsQ = useCached<HelpTicket[]>(`help:${teamId}`, () =>
     content.help("all").then((r) => r.tickets)
   )
@@ -124,43 +126,24 @@ export function HelpDetailScreen({
   const stakeholderBadge = formatCount(stakeholdersQ.data?.length)
   const { can } = usePermissions(teamId)
   const canEdit = can("help", "edit") // single source — gates Edit, the stepper, and the thread's resolve
-  // Writing work down is the WORK module's right, not the ticket's: a person who
-  // may read and answer requests is not necessarily a person who may put things
-  // on the team's backlog, and all three routes to a story respect that.
-  const canWriteWork = can("work", "create")
-  // REPLYING FROM YOUR OWN MAILBOX. `google:edit` is "you may use your own
-  // connection"; the send half needs the owner's second switch as well, and the
-  // dialog asks for it separately — writing a draft changes nothing outside the
-  // building, sending it does.
-  const canMail = can("google", "edit")
-  const canSendMail = can("google_mail", "create")
+  // Logging time is `work:create` — the right the start/stop door itself gates
+  // on, so the button offers exactly what the server would accept. It is WORK's
+  // right and not the ticket's: answering a request and putting hours on the
+  // team's timesheet are two different things a role may grant separately.
+  const canLogTime = can("work", "create")
 
   const [tab, setTab] = React.useState("conversation")
   const [editing, setEditing] = React.useState(false)
   const [resolving, setResolving] = React.useState(false)
   const [translating, setTranslating] = React.useState(false)
   const [statusBusy, setStatusBusy] = React.useState(false)
+  // R16: the Files and links tab badges the door's exact COUNT(*).
+  const attachmentsTotal = useCachedValue<number>(`total:${helpAttachmentsKey(helpId)}`)
   // THE WORK ANSWERING THIS REQUEST. One story may answer many tickets and one
   // ticket may need many stories (the owner's ruling), so this is a collection
   // on the record rather than a field on it. Its exact total badges the tab.
   const storiesTotal = useCachedValue<number>(totalKey("stories-ticket", helpId))
-  const [storyOpen, setStoryOpen] = React.useState(false)
-  // THE TRIAGE PROMPT — the third of the three ways a ticket becomes a story.
-  // Set the moment a status move lands on `triaged`, which is exactly when a
-  // person has decided the request is real and not yet decided what to do about
-  // it. Held in state rather than the URL because it is a suggestion, not a
-  // destination: dismissing it should not be a page in the back history.
-  const [promptStory, setPromptStory] = React.useState(false)
-  const [mailing, setMailing] = React.useState(false)
-  const [ranking, setRanking] = React.useState(false)
-  const options = useStoryFormOptions(teamId)
   const host = { base: basePath.replace(/\/tickets$/, "") }
-  // WHO TO WRITE TO, when we already know. A cache READ, never a fetch: if the
-  // accounts list is warm (you came through it, or the assistant loaded it) the
-  // client's address fills itself in; if it is cold, or their account sits past
-  // page one, the box is simply empty and a person types it. Costing every
-  // ticket screen a round-trip to save one line of typing is the wrong trade.
-  const accounts = useCachedValue<Account[]>(accountsKey(teamId))
 
   // Land on the newest reply, and follow the one you just sent — the same
   // behaviour the client gets on their side of this same conversation, from the
@@ -178,26 +161,50 @@ export function HelpDetailScreen({
     .filter((v) => v.type === "Ticket type")
     .map((v) => v.value)
 
-  async function changeStatus(next: HelpStatusValue) {
+  /** THE THREE ACTS THAT ARE LEFT. Everything else about this ticket's stage now
+   * happens by itself — a sprint is picked, a timer starts, the last story
+   * closes — so what a person can still DO is named rather than picked from a
+   * dropdown of seven (CHECKLIST 5.2).
+   *
+   * `run` is the shape all three share: do it, say plainly if it was refused,
+   * re-prime the list cache and the record's own history. */
+  async function run(what: () => Promise<{ tickets: HelpTicket[] } | void>, done: string, fallback: string) {
     setStatusBusy(true)
     try {
-      const { tickets } = await content.setHelpStatus(helpId, next)
-      primeCache(`help:${teamId}`, tickets)
+      const r = await what()
+      if (r && "tickets" in r) primeCache(`help:${teamId}`, r.tickets)
+      invalidate(`help:${teamId}`)
       invalidate(recordActivityKey("help", helpId))
-      toast.success("Status updated.")
-      // Triaged means "we have read it and it is real". That is the moment to
-      // ask what we are going to DO about it — and only when nothing has been
-      // written down yet, because a ticket that already has work on it has been
-      // answered and the prompt would be noise.
-      if (next === "triaged" && (ticket?.storyCount ?? 0) === 0) setPromptStory(true)
+      toast.success(done)
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't update the status.")
+      toast.error(err instanceof ApiFailure ? err.message : fallback)
     } finally {
       setStatusBusy(false)
     }
   }
 
-  async function editTicket(input: { description: string; helpType?: string; accountId?: string }) {
+  /** ANSWER IT AND TELL THEM (CHECKLIST 5.6 + 5.7). The door refuses without the
+   * words, which is 5.6 stated where it can be enforced; the send goes to the
+   * person who raised it and that client's main stakeholder, which is 5.7 and
+   * Aurora's ts3 over the owner's "raiser only".
+   *
+   * A ticket already answered comes back `alreadyResolved` and emails nobody —
+   * R17 is the send guard, so a second press is not a second answer. */
+  async function resolve(values: ResolveFormValues) {
+    const r = await content.resolveHelp(helpId, values.resolution)
+    invalidate(`help:${teamId}`)
+    invalidate(`help-thread:${helpId}`)
+    invalidate(recordActivityKey("help", helpId))
+    toast.success(r.alreadyResolved ? "Already answered." : "Answered, and they've been told.")
+  }
+
+  async function editTicket(input: {
+    description: string
+    helpType?: string
+    accountId?: string
+    appId?: string
+    raisedByContactId?: string
+  }) {
     const { tickets } = await content.updateHelp({
       id: helpId,
       description: input.description,
@@ -206,10 +213,14 @@ export function HelpDetailScreen({
       // sends the SAME id back and the door leaves it where it is; it refuses a
       // DIFFERENT one, which is the case this field must never quietly cause.
       accountId: input.accountId,
+      // Both correctable, unlike the client: a request filed against the wrong
+      // system, or a colleague who actually raised it, are ordinary mistakes.
+      appId: input.appId,
+      raisedByContactId: input.raisedByContactId,
     })
     primeCache(`help:${teamId}`, tickets)
     invalidate(recordActivityKey("help", helpId))
-    toast.success("Ticket updated.")
+    toast.success(t("Ticket updated."))
   }
 
   async function addStakeholder(userId: string) {
@@ -263,43 +274,6 @@ export function HelpDetailScreen({
     }
   }
 
-  /** WHERE THE PERSON PUT IT. Drag-rank is the only priority signal in the
-   * product (SCOPE ch.07 — there is no priority dropdown and there will not be
-   * one) and it had no control on any screen: the door shipped, the sparse-key
-   * algorithm shipped, and the order could only ever be the order rows arrived
-   * in. The door takes NEIGHBOURS rather than a position, which is what lets two
-   * people reorder at once without fighting over a number. */
-  async function move(delta: -1 | 1) {
-    const order = ticketsQ.data ?? []
-    const at = order.findIndex((t) => t.id === helpId)
-    if (at < 0) return
-    const target = at + delta
-    // The list reads highest-rank-first, so moving UP means landing between the
-    // two rows above this one.
-    const below = delta === -1 ? order[target - 1] : order[target]
-    const above = delta === -1 ? order[target] : order[target + 1]
-    setRanking(true)
-    try {
-      const { tickets } = await content.rankHelp(helpId, below?.id ?? null, above?.id ?? null)
-      primeCache(`help:${teamId}`, tickets)
-      toast.success("Moved.")
-    } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't move that.")
-    } finally {
-      setRanking(false)
-    }
-  }
-
-  /** ANSWER IT: resolve, append to the conversation, email the client — one call,
-   * because they are one act and a half-done answer is the worst of the three. */
-  async function resolve(values: ResolveFormValues) {
-    await content.resolveHelp(helpId, values.resolution)
-    invalidate(`help:${teamId}`)
-    invalidate(`help-thread:${helpId}`)
-    invalidate(recordActivityKey("help", helpId))
-    toast.success("Answered — and emailed to them.")
-  }
-
   /** TRANSLATE AND SET IT. The door spends one unit of the team's AI allowance
    * and refunds it if nothing usable came back, so a failure here costs nothing
    * but the second it took. */
@@ -308,7 +282,7 @@ export function HelpDetailScreen({
     try {
       await dataOps.translateTicket(helpId)
       invalidate(`help:${teamId}`)
-      toast.success("Translated.")
+      toast.success(t("Translated."))
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't translate that.")
     } finally {
@@ -316,9 +290,9 @@ export function HelpDetailScreen({
     }
   }
 
-  if (ticketsQ.error) return <p className="text-destructive text-sm">Couldn&apos;t load the ticket.</p>
+  if (ticketsQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the ticket.")}</p>
   if (ticketsQ.data === undefined) return <Skeleton variant="list" lines={4} />
-  if (!ticket) return <p className="text-muted-foreground text-sm">That ticket no longer exists.</p>
+  if (!ticket) return <p className="text-muted-foreground text-sm">{t("That ticket no longer exists.")}</p>
 
   // self-tag fix: you can't @mention yourself
   const mentionableMembers: TicketMember[] = (membersQ.data ?? [])
@@ -334,22 +308,25 @@ export function HelpDetailScreen({
   }))
 
   const overviewItems = [
-    { label: "Type", value: ticket.helpType || "General" },
+    { label: t("Type"), value: ticket.helpType || "General" },
+    // WHICH SYSTEM, AND WHO ASKED (CHECKLIST 5.8 + 5.9). "Who asked" is not "who
+    // typed": most of a client's history is written down on their behalf, so the
+    // contact and the audit line below are two different people more often than
+    // they are one.
+    { label: t("App"), value: ticket.appName || "" },
+    { label: t("Raised by"), value: ticket.raisedByContactName || "" },
     // BOTH TITLES, and the German one first when it is the original. 788 of the
     // requests arriving from the previous system exist ONLY in German (BUILD-1
     // §8), so "the title" is two fields here and the screen says so rather than
     // picking one and hoping.
-    { label: "Title", value: ticket.titleDe || "" },
-    { label: "Title (English)", value: ticket.titleEn || "" },
-    { label: "Raised from", value: ticket.sourceScreen || "" },
-    ...auditItems({
-      createdByName: ticket.raiserName,
-      createdAt: ticket.createdAt,
-      editedByName: ticket.editorName,
-      updatedAt: ticket.updatedAt,
-      status: STATUS_LABEL[ticket.status],
-    }),
-    { label: "Resolved", value: ticket.resolvedAt ? formatRelative(ticket.resolvedAt) : "" },
+    { label: t("Title"), value: ticket.titleDe || "" },
+    { label: t("Title (English)"), value: ticket.titleEn || "" },
+    { label: t("Raised from"), value: ticket.sourceScreen || "" },
+    // The audit rows are NOT here any more: created-by and last-edited-by moved
+    // to the footer at the foot of the record (D7 / CHECKLIST 11.3), where they
+    // stop pushing the ticket's own facts below the fold. The status is on the
+    // header band's own line.
+    { label: t("Resolved"), value: ticket.resolvedAt ? formatRelative(ticket.resolvedAt) : "" },
   ]
 
 
@@ -359,29 +336,36 @@ export function HelpDetailScreen({
     tabs: [
       {
         value: "conversation",
-        label: "Conversation",
+        label: t("Conversation"),
         icon: "messages-square",
         badge: formatCount(threadTotal),
         badgeVariant: "" as const,
       },
-      { value: "overview", label: "Overview", icon: "info", badge: "", badgeVariant: "" as const },
+      { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       {
         value: "activity",
-        label: "Activity",
+        label: t("Activity"),
         icon: "history",
         badge: formatCount(activity.total),
         badgeVariant: "" as const,
       },
       {
         value: "stories",
-        label: "Related stories",
+        label: t("Related stories"),
         icon: CONCEPT_ICON.stories,
         badge: formatCount(storiesTotal),
         badgeVariant: "" as const,
       },
       {
+        value: "files",
+        label: t("Files and links"),
+        icon: "paperclip",
+        badge: formatCount(attachmentsTotal),
+        badgeVariant: "" as const,
+      },
+      {
         value: "stakeholders",
-        label: "Stakeholders",
+        label: t("Stakeholders"),
         icon: "users",
         // The stakeholder set is COMPUTED in full (raiser + admins + mentions + adds),
         // not a capped table read — its size IS the true total, shown via the one seam.
@@ -391,175 +375,140 @@ export function HelpDetailScreen({
     ],
   }
 
-  return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-start gap-3">
-          <div className="min-w-0 flex-1">
-            {/* THE NUMBER THE CLIENT QUOTES. It has existed on this record since
-                the work engine landed and appeared on no screen — the one thing
-                a person needs when a client rings up saying "about BERG-T0412". */}
-            {(ticket.ref || ticket.archivedAt) && (
-              <p className="text-muted-foreground mb-0.5 flex flex-wrap items-center gap-2 text-xs">
-                {ticket.ref && <span>{ticket.ref}</span>}
-                {ticket.archivedAt && (
-                  <span className="text-muted-foreground">Archived</span>
-                )}
-              </p>
-            )}
-            <p className="truncate text-sm font-medium">{ticket.description}</p>
-          </div>
-          {/* TRANSLATE, on a ticket that has a German title and no English one
-              yet. It SETS the field rather than showing a preview (BUILD-1 §8):
-              a preview is a thing one person reads once, and a set field is a
-              thing the whole team, the search and the assistant read afterwards.
-              It disappears the moment there is an English title, because there
-              is then nothing to ask for. */}
-          {canEdit && ticket.titleDe && !ticket.titleEn && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void translate()}
-              disabled={translating}
-              className="shrink-0 gap-1.5"
-            >
-              <Languages className="size-3.5" />
-              {translating ? "Translating…" : "Translate"}
-            </Button>
-          )}
-          {/* ANSWER IT — the second and last thing in the product that emails a
-              client, so it is a deliberate button with a dialog behind it and
-              never a side effect of the stepper. Gone once it is answered. */}
-          {canEdit && ticket.status !== "resolved" && (
-            <Button size="sm" onClick={() => setResolving(true)} className="shrink-0 gap-1.5">
-              <Send className="size-3.5" />
-              Answer
-            </Button>
-          )}
-          {/* REPLY BY EMAIL — the owner's own sentence, as a control: write it
-              into your Gmail drafts and click through to it there, or send it
-              from here. It is beside Answer rather than replacing it, because
-              they are different acts: Answer resolves the request and emails the
-              resolution; this is one letter to one person, out of your own
-              mailbox, leaving the ticket exactly where it is. */}
-          {canMail && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setMailing(true)}
-              className="shrink-0 gap-1.5"
-            >
-              <Mail className="size-3.5" />
-              Reply by email
-            </Button>
-          )}
-          {/* MAKE IT A STORY — the first of the three ways (the owner asked for
-              all three): a button on the ticket. It opens the story form with
-              THIS request already filled in, so the link cannot be mistyped. */}
-          {canWriteWork && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setStoryOpen(true)}
-              className="shrink-0 gap-1.5"
-            >
-              <Hammer className="size-3.5" />
-              Make it a story
-            </Button>
-          )}
-          {canEdit && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setEditing(true)}
-              className="shrink-0 gap-1.5"
-            >
-              <Pencil className="size-3.5" />
-              Edit
-            </Button>
-          )}
-          {/* PUT IT AWAY. Available from any state (SCOPE ch.07), destructive in
-              colour because it takes the request out of the everyday lists —
-              and reversible, which the confirm-free restore says out loud. */}
-          {canEdit &&
-            (ticket.archivedAt ? (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={statusBusy}
-                onClick={() => void setArchived(false)}
-                className="shrink-0 gap-1.5"
-              >
-                <ArchiveRestore className="size-3.5" />
-                Take it back out
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={statusBusy}
-                onClick={() => void setArchived(true)}
-                className="text-destructive hover:text-destructive shrink-0 gap-1.5"
-              >
-                <Archive className="size-3.5" />
-                Archive
-              </Button>
-            ))}
-        </div>
-        <HelpStatusStepper
-          status={ticket.status}
-          canEdit={canEdit}
-          onChange={(n) => void changeStatus(n)}
-          busy={statusBusy}
-        />
-        {/* WHERE IT SITS IN THE ORDER — the only priority signal in the product,
-            and until now the only one with no control anywhere. */}
-        {canEdit && (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-muted-foreground text-sm">Order in the list</span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={ranking}
-              onClick={() => void move(-1)}
-              className="gap-1.5"
-            >
-              <ArrowUp className="size-3.5" />
-              Move up
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={ranking}
-              onClick={() => void move(1)}
-              className="gap-1.5"
-            >
-              <ArrowDown className="size-3.5" />
-              Move down
-            </Button>
-          </div>
-        )}
-      </div>
+  /* ONE PRIMARY, ONE SECONDARY, AND A MENU (UI-RULEBOOK B1, CHECKLIST 11.2).
+   *
+   * This title carried six controls and was the worst case in the app. The
+   * ranking picks the two that stay: the act that MOVES THE TICKET FORWARD is
+   * the primary (confirming it, or answering it — only ever one of the two is
+   * offered, because they belong to different stages), and the clock is the
+   * secondary, because logging time is the thing somebody does on a ticket most
+   * often that is not destructive.
+   *
+   * Translate, Edit and Archive go into the three-dot menu. None of them loses
+   * its confirm or its colour by moving. */
+  const overflow: RecordAction[] = [
+    // TRANSLATE, on a ticket that has a German title and no English one yet. It
+    // SETS the field rather than showing a preview (BUILD-1 §8): a preview is a
+    // thing one person reads once, and a set field is a thing the whole team,
+    // the search and the assistant read afterwards. It disappears the moment
+    // there is an English title, because there is then nothing to ask for.
+    ...(canEdit && ticket.titleDe && !ticket.titleEn
+      ? [
+          {
+            key: "translate",
+            label: translating ? t("Translating…") : t("Translate"),
+            icon: <Languages className="size-3.5" />,
+            disabled: translating,
+            onSelect: () => void translate(),
+          },
+        ]
+      : []),
+    ...(canEdit
+      ? [
+          {
+            key: "edit",
+            label: t("Edit"),
+            icon: <Pencil className="size-3.5" />,
+            onSelect: () => setEditing(true),
+          },
+        ]
+      : []),
+    // PUT IT AWAY. Available from any state (SCOPE ch.07), destructive in colour
+    // because it takes the request out of the everyday lists, and reversible,
+    // which the confirm-free restore says out loud.
+    ...(canEdit
+      ? [
+          ticket.archivedAt
+            ? {
+                key: "unarchive",
+                label: t("Take it back out"),
+                icon: <ArchiveRestore className="size-3.5" />,
+                disabled: statusBusy,
+                onSelect: () => void setArchived(false),
+              }
+            : {
+                key: "archive",
+                label: t("Archive"),
+                icon: <Archive className="size-3.5" />,
+                disabled: statusBusy,
+                destructive: true,
+                onSelect: () => void setArchived(true),
+              },
+        ]
+      : []),
+  ]
 
-      {/* THE TRIAGE PROMPT — the third way in. It appears the moment somebody
-          moves this request to triaged with no work written down against it,
-          which is precisely the moment the question is live. */}
-      {promptStory && canWriteWork && (
-        <div className="border-border/60 flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2">
-          <p className="min-w-0 flex-1 text-sm">
-            Read and real. What are we going to do about it?
-          </p>
-          <Button size="sm" onClick={() => setStoryOpen(true)} className="gap-1.5">
-            <Hammer className="size-3.5" />
-            Write the first story
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => setPromptStory(false)}>
-            Not yet
-          </Button>
-        </div>
+  const actions = (
+    <>
+      {/* THE CLIENT SAYS YES (CHECKLIST 5.13). Staff press it for the answer that
+          arrives by phone; the client presses the same door in their own portal.
+          It appears only while the request is actually waiting, and disappears
+          the moment it is not, a control that can only be refused should not be
+          a control. */}
+      {ticket.status === "awaiting_validation" && (
+        <Button
+          disabled={statusBusy}
+          onClick={() =>
+            void run(
+              () => content.validateHelp(helpId),
+              "Confirmed, it's in the queue.",
+              "Couldn't confirm that."
+            )
+          }
+          className="shrink-0 gap-1.5"
+        >
+          <CheckCheck className="size-3.5" />
+          {t("They've confirmed it")}
+        </Button>
       )}
+      {/* ANSWER IT AND TELL THEM. Offered from READY onward, the stage that means
+          every piece of work is done and only the telling is left, and never on a
+          ticket already answered. The panel is where the words are written,
+          because the door refuses without them (5.6). */}
+      {canEdit && ticket.status === "ready" && (
+        <Button disabled={statusBusy} onClick={() => setResolving(true)} className="shrink-0 gap-1.5">
+          <Send className="size-3.5" />
+          {t("Answer and close")}
+        </Button>
+      )}
+      {/* THE CLOCK ON A REQUEST. Reading, triaging and resolving one is real work
+          and BUILD-1 §5 is explicit that it is loggable against the request. */}
+      <RecordTimerButton
+        teamId={teamId}
+        targetTable="help"
+        targetId={helpId}
+        canLog={canLogTime}
+        disabled={ticket.status === "resolved"}
+      />
+      <RecordActionsMenu actions={overflow} />
+    </>
+  )
 
+  return (
+    <RecordScreen
+      // The glyph the team set beside this ticket type on the Dropdown values
+      // screen, in the square the header band keeps for it (G3).
+      mark={typeMark(selectableQ.data, MARK_GROUP.ticket, ticket.helpType)}
+      // D4: the type word and THE NUMBER THE CLIENT QUOTES, above the title. The
+      // reference had existed on this record since the work engine landed and
+      // appeared on no screen — the one thing a person needs when a client rings
+      // up saying "about BERG-T0412".
+      eyebrow={[ticket.helpType || t("Ticket"), ticket.ref, ticket.archivedAt ? t("Archived") : null]
+        .filter(Boolean)
+        .join(" · ")}
+      title={ticket.description}
+      // D5: one line, three facts at most.
+      status={[STATUS_LABEL[ticket.status], ticket.appName, ticket.raisedByContactName]
+        .filter(Boolean)
+        .join(" · ")}
+      actions={actions}
+      /* A STATUS IS A FACT, NOT A BUTTON. The track still says how far along the
+         request is, because that is what a track is for — it simply is not
+         something anybody can press (CHECKLIST 5.2). */
+      headerExtra={<HelpStatusStepper status={ticket.status} />}
+    >
       <TabsView
+        className={STICKY_TABS}
         config={tabsConfig}
         value={tab}
         onValueChange={setTab}
@@ -578,10 +527,11 @@ export function HelpDetailScreen({
                 ownerId={helpId}
                 filter={{ ticketId: helpId }}
                 host={host}
-                onNew={canWriteWork ? () => setStoryOpen(true) : undefined}
                 emptyText="No work written down against this request yet."
               />
             )
+          if (t.value === "files")
+            return <HelpAttachmentsPanel ticketId={helpId} canEdit={can("help", "read")} />
           if (t.value === "stakeholders")
             return (
               <HelpStakeholders
@@ -601,12 +551,27 @@ export function HelpDetailScreen({
               }}
               replies={replies}
               members={mentionableMembers}
-              canResolve={canEdit}
+              // NEITHER CONTROL. `showStatusControl` was already off; `canResolve`
+              // is off now too, because the library's resolve button moves a
+              // status with no words attached and CHECKLIST 5.6 says resolving is
+              // refused until a resolution is written. The one way to answer this
+              // ticket is the panel on the title, which sends what a person typed.
+              canResolve={false}
               showStatusControl={false}
               onReply={onReply}
-              onStatusChange={(s) => void changeStatus(TO_SERVER[s])}
             />
           )
+        }}
+      />
+
+      {/* D7 / CHECKLIST 11.3: who made it and who last touched it, grey, at the
+          foot of the record rather than five rows in the middle of Overview. */}
+      <RecordFooter
+        audit={{
+          createdByName: ticket.raiserName,
+          createdAt: ticket.createdAt,
+          editedByName: ticket.editorName,
+          updatedAt: ticket.updatedAt,
         }}
       />
 
@@ -616,44 +581,6 @@ export function HelpDetailScreen({
         draft={ticket.draftResolution}
         draftKey={`help:resolve:${helpId}`}
         onSubmit={resolve}
-      />
-
-      {/* All three ways in open this ONE form, with the request already filled
-          in and unchangeable — three doors into one room, which is the point. */}
-      <StoryFormDialog
-        open={storyOpen}
-        onOpenChange={setStoryOpen}
-        sprints={options.sprints}
-        apps={options.apps}
-        tickets={options.tickets}
-        fixedTicket={{
-          id: helpId,
-          label: ticket.ref ? `${ticket.ref} · ${ticket.description}` : ticket.description,
-        }}
-        members={options.members}
-        draftKey={`story:add:ticket:${helpId}`}
-        onSubmit={async (v) => {
-          await createStoryFrom(teamId, v)
-          invalidate(sliceKey("stories-ticket", helpId))
-          invalidate(`help:${teamId}`)
-          setPromptStory(false)
-        }}
-      />
-
-      {/* The subject carries the reference number the client quotes, when the
-          ticket has one — it is the whole reason that number exists. The body
-          starts from our own working text if there is any, because the alternative
-          is somebody retyping what the app already wrote down. */}
-      <MailReplyDialog
-        open={mailing}
-        onOpenChange={setMailing}
-        draftKey={`help:mail:${helpId}`}
-        defaultTo={
-          (accounts ?? []).find((a) => a.id === ticket.accountId)?.email ?? ""
-        }
-        defaultSubject={ticket.ref ? `${ticket.ref} · ${ticket.description}` : ticket.description}
-        defaultBody={ticket.draftResolution ?? ""}
-        canSend={canSendMail}
       />
 
       <HelpFormDialog
@@ -666,9 +593,11 @@ export function HelpDetailScreen({
           description: ticket.description,
           helpType: ticket.helpType,
           accountId: ticket.accountId,
+          appId: ticket.appId,
+          raisedByContactId: ticket.raisedByContactId,
         }}
         onSubmit={editTicket}
       />
-    </div>
+    </RecordScreen>
   )
 }

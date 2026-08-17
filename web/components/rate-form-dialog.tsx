@@ -25,11 +25,9 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { Switch } from "@kwapso/ui/registry/primitives/switch/switch"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
@@ -37,6 +35,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { ApiFailure } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 /** What the form hands back. Cents, never a float: money in floats is how a
  * total disagrees with the sum of its own rows (the worker says the same thing
@@ -70,7 +69,6 @@ export function RateFormDialog({
   draftKey,
   title,
   subtitle,
-  submitLabel,
   initial,
   showDefault = false,
 }: {
@@ -81,12 +79,12 @@ export function RateFormDialog({
   draftKey?: string
   title: string
   subtitle: string
-  submitLabel: string
   /** present = EDIT mode (prefilled); absent = add mode */
   initial?: { label: string; centsPerHour: number; currency: string | null; isDefault?: boolean }
   /** the internal card's fallback switch — see the note at the top of the file */
   showDefault?: boolean
 }) {
+  const t = useT()
   // MAJOR UNITS IN THE BOX, CENTS ON THE WIRE. A person types what they would
   // say out loud; the arithmetic keeps the unit it can add up. Same trade the
   // sprint's price and an app's tool cost already make.
@@ -136,19 +134,17 @@ export function RateFormDialog({
       onSubmit={submit}
       title={<DialogTitle>{title}</DialogTitle>}
       subtitle={<DialogDescription>{subtitle}</DialogDescription>}
-      footer={
-        <Button type="submit" disabled={busy || !ready}>
-          {busy ? <Spinner /> : null}
-          {busy ? "Saving…" : submitLabel}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !ready,
+      }}
     >
       <Field config={labelField} htmlFor="rate-label" className={fieldSpacing}>
         <Input
           id="rate-label"
           value={values.label}
           onChange={(e) => setValues((v) => ({ ...v, label: e.target.value }))}
-          placeholder="Development, design, project management…"
+          placeholder={t("Development, design, project management…")}
           disabled={busy}
           autoFocus
         />
@@ -175,7 +171,7 @@ export function RateFormDialog({
             id="rate-currency"
             value={values.currency}
             onChange={(e) => setValues((v) => ({ ...v, currency: e.target.value }))}
-            placeholder="EUR"
+            placeholder={t("EUR")}
             disabled={busy}
           />
         </Field>

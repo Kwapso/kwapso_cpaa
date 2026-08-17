@@ -16,14 +16,16 @@ import { Users, Settings, ChevronRight } from "lucide-react"
 import { letterMark } from "@/lib/identity"
 import { softNavigate } from "@/lib/nav"
 import type { ActiveTeam } from "@/lib/use-active-team"
+import { useT } from "@shared/web/language"
 
 export function HomeScreen({ active }: { active: ActiveTeam }) {
+  const t = useT()
   const ctx = active.ctx
   if (!ctx) return null
 
   const LINKS = [
-    { title: "Team", desc: "Members, roles and invites", icon: Users, href: ctx.team ? `/t/${ctx.team.id}` : "/settings" },
-    { title: "Settings", desc: "Your account and teams", icon: Settings, href: "/settings" },
+    { title: t("Team"), desc: "Members, roles and invites", icon: Users, href: ctx.team ? `/t/${ctx.team.id}` : "/settings" },
+    { title: t("Settings"), desc: "Your account and teams", icon: Settings, href: "/settings" },
   ]
 
   return (
@@ -38,7 +40,7 @@ export function HomeScreen({ active }: { active: ActiveTeam }) {
           <div className="text-muted-foreground mt-1 flex items-center gap-2 text-sm">
             {ctx.role && <Badge variant="secondary">{ctx.role.title}</Badge>}
             <span>
-              {ctx.memberCount} member{ctx.memberCount === 1 ? "" : "s"}
+              {ctx.memberCount} {t("member")}{ctx.memberCount === 1 ? "" : "s"}
             </span>
           </div>
         </div>

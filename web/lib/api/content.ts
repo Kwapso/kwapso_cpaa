@@ -1,4 +1,4 @@
-// CONTENT — learning articles and tickets.
+// CONTENT — tickets, the work engine and the knowledge base.
 //
 // One of the five door lists behind `@/lib/api`. They are split by WORKER,
 // because that is the boundary the doors already have: a path under
@@ -17,23 +17,21 @@ import type {
   GoogleService,
   GoogleShelf,
   GoogleSource,
+  HelpAttachment,
   HelpMessage,
   HelpStakeholder,
   HelpTicket,
   KnowledgeAnswer,
   KnowledgeSource,
-  Learning,
-  LearningProgressEntry,
   RunningTimer,
   Sprint,
   Story,
   Task,
+  TaskViewName,
   Todo,
   WorkLog,
-  MarketingPost,
   Meeting,
   MeetingPurpose,
-  Program,
   StaffCertificate,
   StaffProfile,
 } from "@shared/types"
@@ -88,6 +86,11 @@ export type StoryWrite = {
   sprintId?: string
   appId?: string
   processId?: string
+  /** EVERY map this work touches (CHECKLIST 6.5) — sent WHOLE, because the set
+   * replaces the one the story carries. An empty list is only accepted when
+   * `changesNoStep` is ticked: "no process" is Aurora's explicit CHOICE, not a
+   * field somebody left blank. */
+  processIds?: string[]
   stepKey?: string
   changesNoStep?: boolean
   assigneeId?: string
@@ -95,16 +98,28 @@ export type StoryWrite = {
   startsOn?: string
   dueOn?: string
   accountId?: string
+  /** Fix / Feature / Change — REQUIRED (CHECKLIST 6.2), and editable on the
+   * Dropdown values screen like every other vocabulary in the app. */
+  storyType: string
 }
 
 /** The facets the work-log list door parses. */
 /** What every tasks door answers with: the rows for the view asked for, the
- * count over that view, and BOTH view counts for the strip's two badges (R16). */
+ * count over that view, and EVERY view's count for the strip's six badges (R16)
+ * — plus the pair the progress bar at the top of every tab is made of. All of
+ * them come out of one server read, so no two can disagree. */
 export type TaskListResponse = {
   tasks: Task[]
   total: number
   openTotal: number
   allTotal: number
+  overdueTotal: number
+  upcomingTotal: number
+  completedTotal: number
+  calendarTotal: number
+  /** everything due today or earlier, and how many of those are done */
+  dueTodayTotal: number
+  dueTodayDone: number
 }
 
 export type LogQuery = {
@@ -139,31 +154,8 @@ function storyQuery(filter: StoryQuery | undefined, cursor: string | null | unde
   return s ? `?${s}` : ""
 }
 
-/** Content worker — Learning + Tickets (team-DB content modules). */
+/** Content worker — Tickets, the work engine and the knowledge base. */
 export const content = {
-  learning: () => api<{ learning: Learning[]; total: number }>("/api/content/learning"),
-  learningOne: (id: string) =>
-    api<{ learning: Learning[] }>(`/api/content/learning?id=${enc(id)}`).then((r) => r.learning[0] ?? null),
-  createLearning: (input: Partial<Learning>) =>
-    api<{ learning: Learning[] }>("/api/content/learning", post(input)),
-  updateLearning: (input: Partial<Learning> & { id: string }) =>
-    api<{ learning: Learning[] }>("/api/content/learning/update", post(input)),
-  setLearningActive: (id: string, active: boolean) =>
-    api<{ learning: Learning[] }>("/api/content/learning/active", post({ id, active })),
-  /** Upload a file for an article (gated by learning:create). Streams the bytes
-   * as the request body; get back the served /media URL + its content type.
-   *
-   * `filename` is gone, not forgotten: the buffered door accepted it and never
-   * read it — the key is minted server-side from the team id and a ULID, and a
-   * learning URL is pasted into an article rather than downloaded by name. A
-   * parameter nothing reads is a contract nobody can rely on. */
-  uploadLearningFile: (dataUrl: string) =>
-    sendFile<{ url: string; contentType: string }>("/api/content/learning/upload-stream", dataUrl),
-  markLearningDone: (id: string, done: boolean) =>
-    api<{ ok: true }>("/api/content/learning/done", post({ id, done })),
-  learningProgress: () =>
-    api<{ progress: LearningProgressEntry[] }>("/api/content/learning/progress"),
-
   /** R14: a PAGE of tickets (a GROWING collection) — hand back `nextCursor` from
    * the previous response to get the next one. `total`/`mineTotal` are exact. */
   help: (
@@ -172,12 +164,35 @@ export const content = {
     view: "live" | "archived" = "live",
     /** the search box, answered by the DOOR — the list pages, so a browser could
      * only ever search the page it had loaded. `total` counts the same question. */
-    q?: string
+    q?: string,
+    /** one client's tickets — the door narrows, so the rows and the exact total
+     * beside them answer the same question (R16). */
+    accountId?: string,
+    /** THE SUB-TAB STRIP (CHECKLIST 5.1), and both halves are the DOOR's filters
+     * rather than the browser's: the list pages, so narrowing a loaded page to
+     * "Questions" would answer "the questions among the newest fifty" while the
+     * badge above it counted them all. `byType` / `byStatus` come back with every
+     * page and are what the badges read. */
+    helpType?: string,
+    status?: HelpTicket["status"],
+    /** ONE SYSTEM'S tickets — the app record's Tickets tab (CHECKLIST 8.6). The
+     * door narrows and counts the same narrowed question, so the tab badge and
+     * the rows under it are one answer (R16). */
+    appId?: string
   ) =>
-    api<PagedResponse<{ tickets: HelpTicket[]; mineTotal: number }>>(
+    api<
+      PagedResponse<{
+        tickets: HelpTicket[]
+        mineTotal: number
+        byType: Record<string, number>
+        byStatus: Record<string, number>
+      }>
+    >(
       `/api/content/help?scope=${scope}&view=${view}${q ? `&q=${enc(q)}` : ""}${
-        cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""
-      }`
+        accountId ? `&accountId=${enc(accountId)}` : ""
+      }${appId ? `&appId=${enc(appId)}` : ""}${helpType ? `&helpType=${enc(helpType)}` : ""}${
+        status ? `&status=${enc(status)}` : ""
+      }${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`
     ),
   /** PUT IT AWAY, or take it back out. The door has answered this since archive
    * shipped; nothing on any screen called it, so a ticket could be archived by
@@ -186,13 +201,6 @@ export const content = {
     api<PagedResponse<{ tickets: HelpTicket[]; mineTotal: number }>>(
       "/api/content/help/archive",
       post({ id, archived })
-    ),
-  /** WHERE THE PERSON PUT IT — the body names NEIGHBOURS, never a position, so two
-   * people reordering at once cannot fight over a number (shared/workers/rank.ts). */
-  rankHelp: (id: string, afterId: string | null, beforeId: string | null) =>
-    api<PagedResponse<{ tickets: HelpTicket[]; mineTotal: number }>>(
-      "/api/content/help/rank",
-      post({ id, afterId, beforeId })
     ),
   helpOne: (id: string) =>
     api<{ tickets: HelpTicket[] }>(`/api/content/help?id=${enc(id)}`).then((r) => r.tickets[0] ?? null),
@@ -206,18 +214,53 @@ export const content = {
     helpType?: string
     sourceScreen?: string
     accountId?: string
+    /** WHICH SYSTEM (5.8) and WHO ASKED (5.9). The contact is checked against the
+     * account's own live links, so a ticket can never name a stranger. */
+    appId?: string
+    raisedByContactId?: string
   }) => api<{ tickets: HelpTicket[] }>("/api/content/help", post(input)),
-  updateHelp: (input: { id: string; description: string; helpType?: string; accountId?: string }) =>
-    api<{ tickets: HelpTicket[] }>("/api/content/help/update", post(input)),
+  updateHelp: (input: {
+    id: string
+    description: string
+    helpType?: string
+    accountId?: string
+    appId?: string
+    raisedByContactId?: string
+  }) => api<{ tickets: HelpTicket[] }>("/api/content/help/update", post(input)),
   setHelpStatus: (id: string, status: HelpTicket["status"]) =>
     api<{ tickets: HelpTicket[] }>("/api/content/help/status", post({ id, status })),
-  replyHelp: (helpId: string, body: string, taggedUserIds?: string[]) =>
-    api<{ replies: HelpMessage[]; total: number }>("/api/content/help/reply", post({ helpId, body, taggedUserIds })),
-  /** ANSWER IT: resolve the ticket, add the words to its conversation, and email
-   * the client. One call, because they are one act — and `alreadyResolved` comes
-   * back rather than a second email when the answer has already gone. */
+  /** SOMEBODY HAS READ IT — the one judgement in the ticket lifecycle nothing can
+   * infer, and the only act the triage screen performs (5.11). Everything after
+   * it happens by itself. */
+  triageRead: (id: string) =>
+    api<{ tickets: HelpTicket[] }>("/api/content/help/triage-read", post({ id })),
+  /** THE CLIENT SAYS YES (5.13). Staff press it too, for the answer that arrives
+   * by phone; a client presses it in their own portal. */
+  validateHelp: (id: string) =>
+    api<{ tickets: HelpTicket[] }>("/api/content/help/validate", post({ id })),
+  /** ANSWER IT AND TELL THEM (5.6 + 5.7). The resolution is REQUIRED — the door
+   * refuses without it, which is the whole of 5.6 — and the send goes to whoever
+   * raised it and that client's main stakeholder. */
   resolveHelp: (id: string, resolution: string) =>
     api<{ sent: boolean; alreadyResolved: boolean }>("/api/content/help/resolve", post({ id, resolution })),
+  /** Several files and several links on one ticket (5.10). The same three doors
+   * the client portal calls — this is one record with one list, not two. */
+  helpAttachments: (id: string) =>
+    api<{ attachments: HelpAttachment[]; total: number }>(`/api/content/help/attachments?id=${enc(id)}`),
+  addHelpAttachment: (input: {
+    id: string
+    kind: "file" | "link"
+    label: string
+    url?: string
+    fileDataUrl?: string
+  }) => api<{ attachments: HelpAttachment[]; total: number }>("/api/content/help/attachments", post(input)),
+  removeHelpAttachment: (id: string, attachmentId: string) =>
+    api<{ attachments: HelpAttachment[]; total: number }>(
+      "/api/content/help/attachments/remove",
+      post({ id, attachmentId })
+    ),
+  replyHelp: (helpId: string, body: string, taggedUserIds?: string[]) =>
+    api<{ replies: HelpMessage[]; total: number }>("/api/content/help/reply", post({ helpId, body, taggedUserIds })),
   helpStakeholders: (id: string) =>
     api<{ stakeholders: HelpStakeholder[] }>(`/api/content/help/stakeholders?id=${enc(id)}`),
   addStakeholder: (id: string, userId: string) =>
@@ -236,17 +279,27 @@ export const content = {
   createStory: (input: StoryWrite) => api<{ stories: Story[] }>("/api/content/stories", post(input)),
   updateStory: (input: StoryWrite & { id: string }) =>
     api<{ stories: Story[] }>("/api/content/stories/update", post(input)),
-  setStoryStatus: (id: string, status: Story["status"], closingNote?: string) =>
-    api<{ stories: Story[] }>("/api/content/stories/status", post({ id, status, closingNote })),
-  rankStory: (id: string, afterId: string | null, beforeId: string | null) =>
-    api<{ stories: Story[] }>("/api/content/stories/rank", post({ id, afterId, beforeId })),
-  /** The blocks of sold work. `accountId` narrows to one client, `appId` to one
-   * system — the same two questions the door parses, so a caller cannot invent a
-   * third the server ignores in silence. */
-  sprints: (filter: { accountId?: string; appId?: string } = {}) => {
+  /** Move a story. `review` carries what 6.9 requires before `in_review`: the
+   * explanation, and optionally something to show for it. The door refuses the
+   * move while a timer on the story is still running. */
+  setStoryStatus: (
+    id: string,
+    status: Story["status"],
+    closingNote?: string,
+    review?: { reviewNote?: string; reviewFileUrl?: string; reviewFileName?: string }
+  ) =>
+    api<{ stories: Story[] }>(
+      "/api/content/stories/status",
+      post({ id, status, closingNote, ...review })
+    ),
+  sprints: (filter: { accountId?: string; appId?: string; when?: "open" | "all" } = {}) => {
     const q = new URLSearchParams()
     if (filter.accountId) q.set("accountId", filter.accountId)
     if (filter.appId) q.set("appId", filter.appId)
+    // CHECKLIST 6.3: the story form asks for current-or-future blocks only, and
+    // the DOOR decides which those are — a browser filtering on `completedAt`
+    // alone would keep offering a sprint that ended in March.
+    if (filter.when) q.set("when", filter.when)
     const qs = q.toString()
     return api<{ sprints: Sprint[]; total: number }>(`/api/content/sprints${qs ? `?${qs}` : ""}`)
   },
@@ -287,6 +340,10 @@ export const content = {
   triage: (week?: string) =>
     api<{
       onDuty: { userId: string; userName: string | null; weekStart: string } | null
+      /** CHECKLIST 5.11 — is this caller the one on duty? The DOOR decides, and
+       * `waiting` is empty when they are not. A screen that hid a list it had
+       * already been handed would be a curtain rather than a rule. */
+      yours: boolean
       waiting: { id: string; ref: string | null; description: string; createdAt: string; days: number }[]
       total: number
     }>(`/api/content/triage${week ? `?week=${enc(week)}` : ""}`),
@@ -315,16 +372,29 @@ export const content = {
       post({ id, fileDataUrl: file?.dataUrl, fileName: file?.name })
     ),
   cancelTodo: (id: string) => api<{ todos: Todo[]; total: number }>("/api/content/todos/cancel", post({ id })),
-  /** Our own admin. `openTotal` and `allTotal` are the two exact server counts
-   * the view strip badges (R16) — both come back whichever view was asked for,
-   * because the count on the tab you are not looking at cannot be derived from
-   * the rows on the one you are. `total` is the count over what was listed. */
-  tasks: (view?: "open" | "all") =>
+  /** Our own admin, in one of six views. Every view's count comes back whichever
+   * one was asked for (R16) — the badge on a tab you are not looking at cannot be
+   * derived from the rows on the one you are. `total` is the count over what was
+   * listed. */
+  tasks: (view?: TaskViewName) =>
     api<TaskListResponse>(`/api/content/tasks${view ? `?view=${view}` : ""}`),
   taskOne: (id: string) =>
     api<{ tasks: Task[] }>("/api/content/tasks?view=all").then((r) => r.tasks.find((t) => t.id === id) ?? null),
-  createTask: (input: { title: string; detail?: string; dueOn?: string; assigneeId?: string; accountId?: string }) =>
-    api<TaskListResponse>("/api/content/tasks", post(input)),
+  /** `fileDataUrl` is a base64 data URL — the door caps it, parses it and puts
+   * the bytes in the agency's own bucket, exactly as a to-do's attachment is. */
+  createTask: (input: {
+    title: string
+    detail?: string
+    dueOn?: string
+    assigneeId?: string
+    accountId?: string
+    appId?: string
+    department?: string
+    important?: boolean
+    urgent?: boolean
+    fileDataUrl?: string
+    fileName?: string
+  }) => api<TaskListResponse>("/api/content/tasks", post(input)),
   setTaskDone: (id: string, done: boolean) =>
     api<TaskListResponse>("/api/content/tasks/done", post({ id, done })),
 
@@ -417,6 +487,9 @@ export const content = {
     sourceUrl?: string | null
     accountId?: string | null
     visibility?: string
+    /** 12.3: limit it to the people staffed to one app. The door refuses an app
+     * the caller is not on, so this can never lock somebody out of their own. */
+    visibleToAppId?: string | null
   }) => api<{ source: KnowledgeSource | null; total: number }>("/api/content/knowledge", post(input)),
   /** Hand the knowledge base a FILE. One call, one record: the bytes and the row
    * are written together, so closing the tab halfway can never leave a stored
@@ -445,12 +518,14 @@ export const content = {
     title?: string
     accountId?: string | null
     visibility?: string
+    visibleToAppId?: string | null
   }) => {
     const blob = await (await fetch(input.fileDataUrl)).blob()
     const q = new URLSearchParams({ fileName: input.fileName })
     if (input.title) q.set("title", input.title)
     if (input.accountId) q.set("accountId", input.accountId)
     if (input.visibility) q.set("visibility", input.visibility)
+    if (input.visibleToAppId) q.set("visibleToAppId", input.visibleToAppId)
     return api<{ source: KnowledgeSource | null; total: number }>(
       `/api/content/knowledge/upload-stream?${q}`,
       {
@@ -469,6 +544,7 @@ export const content = {
     sourceUrl?: string | null
     accountId?: string | null
     visibility?: string
+    visibleToAppId?: string | null
   }) =>
     api<{ source: KnowledgeSource | null; total: number }>("/api/content/knowledge/update", post(input)),
   setKnowledgeActive: (id: string, active: boolean) =>
@@ -488,12 +564,19 @@ export const content = {
    * diary, read through MY connection. Empty results mean I have connected
    * nothing yet — the consent screen is a browser round-trip nobody can do for
    * me. */
-  syncGoogleKnowledge: () =>
+  /** `onlyIfStale` is what the app-open catch-up sends (14.12): don't ask Google
+   * when this person's kinds were swept inside the door's five-minute floor.
+   * The Settings BUTTON leaves it off — a deliberate press always asks. */
+  syncGoogleKnowledge: (onlyIfStale = false) =>
     api<{
       results: { kind: string; read: number; indexed: number; caughtUp: boolean; error?: string }[]
+      /** true = we did NOT ask Google, because this person's kinds were already
+       * brought into step inside the door's five-minute floor (14.12). The
+       * results are then the state as of that last real sweep. */
+      skipped: boolean
       caughtUp: boolean
       total: number
-    }>("/api/content/knowledge/sync-google", post({})),
+    }>("/api/content/knowledge/sync-google", post({ onlyIfStale })),
 
   /* -------------------------------- meetings -------------------------------- */
   /** R14: a PAGE of meetings (a GROWING collection — an event is never curated
@@ -501,15 +584,28 @@ export const content = {
    * count the heading shows. `view` is 'upcoming' by default. */
   meetings: (
     cursor?: string | null,
-    view?: "upcoming" | "all",
+    view?: "upcoming" | "week" | "all",
     /** the diary's search box, answered by the DOOR — the list pages, and the
      * meeting somebody digs for is the OLD one. */
-    q?: string
+    q?: string,
+    /** one client's diary — the door already parses it; this is the web half. */
+    accountId?: string,
+    /** ONE SYSTEM'S diary, for the app record's own Meetings tab. Asked of the
+     * SERVER rather than filtered in the browser: the diary pages, so "this
+     * app's meetings among the newest fifty" is an answer that looks like one. */
+    appId?: string
   ) =>
-    api<PagedResponse<{ meetings: Meeting[] }>>(
+    api<PagedResponse<{ meetings: Meeting[]; weekTotal: number }>>(
       `/api/content/meetings?view=${enc(view ?? "all")}${q ? `&q=${enc(q)}` : ""}${
-        cursor ? `&cursor=${enc(cursor)}` : ""
-      }`
+        accountId ? `&accountId=${enc(accountId)}` : ""
+      }${appId ? `&appId=${enc(appId)}` : ""}${cursor ? `&cursor=${enc(cursor)}` : ""}`
+    ),
+  /** BRING IN THE REPEATING CALENDAR ENTRIES (9.7). The next four weeks become
+   * real records; `ahead` is the instances beyond that, read-only. */
+  syncCalendarSeries: () =>
+    api<{ created: number; ahead: { eventId: string; title: string; startsAt: string; url: string | null }[] }>(
+      "/api/content/meetings/sync-calendar",
+      post({})
     ),
   meetingOne: (id: string) =>
     api<{ meetings: Meeting[] }>(`/api/content/meetings?id=${enc(id)}`).then((r) => r.meetings[0] ?? null),
@@ -518,6 +614,7 @@ export const content = {
     startsAt: string
     endsAt?: string | null
     accountId?: string | null
+    appId?: string | null
     purposeId?: string | null
     agenda?: string | null
     notes?: string | null
@@ -529,21 +626,23 @@ export const content = {
     api<{ meeting: Meeting | null; total: number }>("/api/content/meetings/held", post({ id, held })),
   setMeetingActive: (id: string, active: boolean) =>
     api<{ meeting: Meeting | null; total: number }>("/api/content/meetings/active", post({ id, active })),
+  /** READ THE TRANSCRIPT and do what its arrival means (9.4 + 9.2): the meeting
+   * is ticked held and a row of time is written for each of OUR people who was
+   * in the room. Idempotent — a second press does nothing. */
+  readMeetingTranscript: (id: string) =>
+    api<{
+      captured: boolean
+      fileId: string | null
+      fileName: string | null
+      logsWritten: number
+      note: string | null
+      meeting: Meeting | null
+    }>("/api/content/meetings/transcript", post({ id })),
 
   /* ------------------- the agency's own housekeeping ------------------------
-   * Four modules, all CAPPED rather than paged (R14) — authored libraries and
-   * settled taxonomies, the same shape Learning is, so each door answers with
-   * the whole collection plus its exact `total` for the badge (R16). */
-  marketing: () => api<{ posts: MarketingPost[]; total: number }>("/api/content/marketing"),
-  marketingOne: (id: string) =>
-    api<{ posts: MarketingPost[] }>(`/api/content/marketing?id=${enc(id)}`).then((r) => r.posts[0] ?? null),
-  createMarketingPost: (input: Partial<MarketingPost>) =>
-    api<{ posts: MarketingPost[]; total: number }>("/api/content/marketing", post(input)),
-  updateMarketingPost: (input: Partial<MarketingPost> & { id: string }) =>
-    api<{ posts: MarketingPost[]; total: number }>("/api/content/marketing/update", post(input)),
-  setMarketingPostActive: (id: string, active: boolean) =>
-    api<{ posts: MarketingPost[]; total: number }>("/api/content/marketing/active", post({ id, active })),
-
+   * Two modules, both CAPPED rather than paged (R14) — an authored library and a
+   * settled taxonomy, so each door answers with the whole collection plus its
+   * exact `total` for the badge (R16). */
   brandAssets: () => api<{ assets: BrandAsset[]; total: number }>("/api/content/brand-assets"),
   brandAssetOne: (id: string) =>
     api<{ assets: BrandAsset[] }>(`/api/content/brand-assets?id=${enc(id)}`).then((r) => r.assets[0] ?? null),
@@ -557,16 +656,6 @@ export const content = {
    * bytes as the request body; get back the served /media/internal URL. */
   uploadBrandAssetFile: (dataUrl: string) =>
     sendFile<{ url: string; contentType: string }>("/api/content/brand-assets/upload-stream", dataUrl),
-
-  programmes: () => api<{ programs: Program[]; total: number }>("/api/content/delivery/programs"),
-  programmeOne: (id: string) =>
-    api<{ programs: Program[] }>(`/api/content/delivery/programs?id=${enc(id)}`).then((r) => r.programs[0] ?? null),
-  createProgramme: (input: Partial<Program>) =>
-    api<{ programs: Program[]; total: number }>("/api/content/delivery/programs", post(input)),
-  updateProgramme: (input: Partial<Program> & { id: string }) =>
-    api<{ programs: Program[]; total: number }>("/api/content/delivery/programs/update", post(input)),
-  setProgrammeActive: (id: string, active: boolean) =>
-    api<{ programs: Program[]; total: number }>("/api/content/delivery/programs/active", post({ id, active })),
 
   meetingPurposes: () => api<{ purposes: MeetingPurpose[]; total: number }>("/api/content/delivery/purposes"),
   meetingPurposeOne: (id: string) =>

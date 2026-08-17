@@ -12,7 +12,6 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import {
   DialogDescription,
   DialogTitle,
@@ -25,7 +24,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { KeyRound } from "lucide-react"
@@ -33,6 +31,7 @@ import { KeyRound } from "lucide-react"
 import { ApiFailure } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 const personField = { ...defaultFieldConfig, label: "Person", required: true }
 
@@ -53,6 +52,7 @@ export function PortalAccessDialog({
   onSubmit: (personAccountId: string) => Promise<void>
   draftKey?: string
 }) {
+  const t = useT()
   const [values, setValues, clearDraft] = useFormDraft(draftKey, { personAccountId: "" }, open)
   const [busy, setBusy] = React.useState(false)
 
@@ -80,19 +80,18 @@ export function PortalAccessDialog({
       busy={busy}
       clearDraft={clearDraft}
       onSubmit={submit}
-      title={<DialogTitle>Give someone access</DialogTitle>}
+      title={<DialogTitle>{t("Give someone access")}</DialogTitle>}
       subtitle={
         <DialogDescription>
-          They&apos;ll be able to sign in and see {accountName}&apos;s own work. You can take
+          {t("They'll be able to sign in and see")} {accountName}&apos;s own work. You can take
           it away again at any time, and nothing they&apos;re attached to is lost.
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !values.personAccountId} className="gap-1.5">
-          {busy ? <Spinner /> : <KeyRound className="size-4" />}
-          {busy ? "Switching on…" : "Give access"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !values.personAccountId,
+        icon: <KeyRound className="size-4" />,
+      }}
     >
       <Field config={personField} htmlFor="portal-person" className={fieldSpacing}>
         <Select

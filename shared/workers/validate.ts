@@ -10,6 +10,11 @@ import { GuardError } from "./gating"
 
 // Sane per-kind caps — generous for prose, tight for short labels.
 export const TEXT_LIMITS = {
+  // A TYPE MARK — one pictograph in the slot an icon would take (UI-RULEBOOK
+  // G2). Not one CHARACTER: an emoji with a variation selector or a skin-tone
+  // modifier is several code units, and a cap of one would refuse half of them.
+  // Eight is generous for a single glyph and nowhere near a word.
+  tiny: 8,
   short: 200, // titles, names, categories, type/value labels
   link: 2_048, // URLs
   long: 20_000, // descriptions, article bodies, replies
@@ -126,7 +131,7 @@ export function optionalDocument(
     throw new GuardError(
       400,
       "too_large",
-      `${field} is ${mb(bytes)} of text and the most we can take in one piece is ${mb(maxBytes)}. Nothing was saved — split it and add the parts separately, and every part will be searchable.`
+      `${field} is ${mb(bytes)} of text and the most we can take in one piece is ${mb(maxBytes)}. Nothing was saved. Split it and add the parts separately, and every part will be searchable.`
     )
   return clean
 }
@@ -150,10 +155,11 @@ export function optionalMoment(value: unknown, field: string): string | undefine
  * and is not one until something says so. `Number.isFinite` refuses NaN and both
  * infinities; `Math.trunc` refuses a float where a row order is expected.
  *
- * It lives in the seam rather than beside a module because it was written twice —
- * Learning and Delivery each carried a copy, and Delivery's comment said so
- * ("the same guard Learning carries, and for the same reason"). A guard that has
- * to be remembered twice is a guard the third module ships without. */
+ * It lives in the seam rather than beside a module because it was written twice,
+ * in two modules that have both since been retired, and the second one's comment
+ * said as much ("the same guard the other carries, and for the same reason"). A
+ * guard that has to be remembered twice is a guard the third module ships
+ * without. */
 export function intOr(value: unknown, fallback: number): number {
   const n = Number(value)
   return Number.isFinite(n) ? Math.trunc(n) : fallback

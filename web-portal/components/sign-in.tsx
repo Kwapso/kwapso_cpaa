@@ -36,10 +36,12 @@ import { invalidate } from "@shared/web/store"
 import { useEmailSignIn } from "@shared/web/use-email-sign-in"
 import { auth } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
+import { useT } from "@shared/web/language"
 
 const emailConfig = { ...defaultFieldConfig, label: "Your email", required: true }
 
 export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
+  const t = useT()
   const { step, email, setEmail, code, busy, error, sendCode, enterCode, useDifferentEmail } =
     useEmailSignIn({
       startEmail: auth.startEmail,
@@ -60,7 +62,7 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
       <div className="flex flex-col items-center gap-2 text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={brand.logoUrl ?? "/icons/icon.svg"} alt="" className="size-12 rounded-xl" />
-        <h1 className="text-2xl font-semibold tracking-tight">Sign in to {brand.name}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{t("Sign in to")} {brand.name}</h1>
         <p className="text-muted-foreground">
           {step === "email"
             ? "We'll email you a six-digit code, or you can use Google. No password to remember."
@@ -92,7 +94,7 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
             </Field>
             <Button type="submit" size="lg" className="w-full" disabled={busy || !email}>
               {busy ? <Spinner /> : null}
-              Email me a code
+              {t("Email me a code")}
             </Button>
             {/* BESIDE the code, never instead of it — the same two ways in that
                 the agency door offers, landing on the same person either way. */}
@@ -110,7 +112,7 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
               onClick={() => window.location.assign(auth.googleStartUrl)}
             >
               <GoogleMark />
-              Continue with Google
+              {t("Continue with Google")}
             </Button>
             {googleError ? (
               <p className="text-destructive text-center text-sm">{googleError}</p>
@@ -126,7 +128,7 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
               </div>
             ) : null}
             <Button variant="ghost" className="w-full" disabled={busy} onClick={useDifferentEmail}>
-              Use a different email
+              {t("Use a different email")}
             </Button>
           </>
         )}

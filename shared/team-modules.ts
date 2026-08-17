@@ -10,8 +10,15 @@ export const TEAM_MODULES = [
   "team_members",
   "member_roles",
   "accounts",
+  // CONTACTS — the PEOPLE on an account, as their own switch. A company record
+  // and the list of humans inside it are two different sights: "people of the
+  // development team does not need to know who are the contacts" (Aurora, 17 Aug
+  // 2026), and a developer opening a client should see the company and its apps
+  // without the address book. The rows are the same `accounts` table (companies
+  // and people are one table — SCOPE ch.03), so this is a permission over a
+  // SHAPE of that table, never a second spine.
+  "contacts",
   "portal_users",
-  "learning",
   "help",
   "knowledge",
   "selectable_data",
@@ -20,16 +27,22 @@ export const TEAM_MODULES = [
   "processes",
   "commercials",
   "work",
+  // EVERYONE ELSE'S TASKS — a switch over a SIGHT, not over a record. `work`
+  // already decides whether a person reaches the tasks screen at all; this
+  // decides whether the list they get is the whole team's or their own. It is a
+  // module row because that is what a right IS in this base (one row per role ×
+  // module on the tall sheet), and Aurora's ruling was that this particular
+  // question must be configurable rather than settled once for everybody.
+  "all_tasks",
   "todos",
   // MEETINGS — its own switch, because a meeting's NOTES are the thing being
   // permissioned. The taxonomy of why we meet lives under `delivery`; what was
   // said in the room is a different question to ask a role about.
   "meetings",
-  // THE AGENCY'S OWN HOUSEKEEPING — four modules carrying the seven Glide tables
-  // that describe how the agency runs ITSELF rather than what it does for a
-  // client. None of them is customer material, so every door on all four refuses
-  // a client login outright (R21) rather than fencing.
-  "marketing",
+  // THE AGENCY'S OWN HOUSEKEEPING — three modules carrying the Glide tables that
+  // describe how the agency runs ITSELF rather than what it does for a client.
+  // None of them is customer material, so every door on all three refuses a
+  // client login outright (R21) rather than fencing.
   "brand_assets",
   "delivery",
   "staff_profiles",
@@ -59,8 +72,14 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   // granting someone a login is separately gated because it hands out sight of
   // customer data, which is a bigger decision than editing a phone number.
   accounts: "Accounts",
+  // The PEOPLE on an account. Off by default for every role but Admin, because
+  // an address book is the one part of a client record that is somebody's
+  // personal data rather than the company's: seeing who we work with is a
+  // separate grant from seeing that we work with them. A contact still SURFACES
+  // by name where a record already points at one (a to-do's dropdown, a ticket's
+  // raiser) — this right is about being able to LIST them.
+  contacts: "Contacts",
   portal_users: "Portal access",
-  learning: "Learning",
   // The module KEY stays `help` — it is the permission string every role's sheet
   // already carries, the table the rows live in, and the path the API answers on.
   // The LABEL is what a person reads, and the word for this is Tickets.
@@ -85,7 +104,7 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   // `commercials` covers the two rate cards and the margin. It is AGENCY
   // material, and no client login ever passes one of its doors — which is why
   // it is a second module and not four more rights on the first.
-  processes: "Process maps",
+  processes: "Processes",
   commercials: "Rates & margin",
   // THE WORK ENGINE — what we DO, as opposed to what an account asks for. One
   // module covers stories, the sprints they sit in and the time logged against
@@ -98,6 +117,13 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   // To-dos are deliberately NOT here: a to-do is aimed at the client and they
   // must be able to complete one, so it is its own module with its own right.
   work: "Work",
+  // WHOSE TASKS YOU SEE. Read the row as a sentence: "this role may see
+  // everyone's tasks". Without it the tasks screen is still there and still
+  // works — it shows the ones assigned to you, and every count above it counts
+  // the same narrowed question. Only `read` is meaningful here, like `google`
+  // and `agent`: the module IS the switch, and creating or editing a task is
+  // still `work`'s decision.
+  all_tasks: "Everyone's tasks",
   // TO-DOS — the one part of the work engine a client login can WRITE to, which
   // is exactly why it is its own module and not four more rights on `work`. A
   // contact completes theirs and uploads a file against it from the portal
@@ -113,25 +139,27 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   meetings: "Meetings",
 
   // ── THE AGENCY'S OWN HOUSEKEEPING ──────────────────────────────────────────
-  // Four modules, seven legacy tables, and one sentence that decides all of it:
-  // none of this is any client's. It is what WE publish, the material we publish
-  // it with, how we run our own delivery, and who our people are — so these
-  // modules never appear in a portal, never carry an account fence, and every
-  // door on them refuses a client login the way `learning` and `knowledge` do.
+  // Three modules and one sentence that decides all of it: none of this is any
+  // client's. It is the material we make our own work with, why we meet, and who
+  // our people are — so these modules never appear in a portal, never carry an
+  // account fence, and every door on them refuses a client login the way
+  // `knowledge` does.
   //
-  // Two of the seven legacy tables are NOT here, on purpose. `departments` (8
-  // rows) and `channels` (6) are bare labels with no fields of their own, and the
-  // base already has exactly one home for a team's editable vocabulary — the
-  // dropdown values module, which carries its own permissions, screen, import,
-  // export and machine tools. Giving each of them a table, a screen and a
-  // permission row would be a module built to hold a word.
-  marketing: "Marketing",
+  // Several of the legacy tables are NOT here, on purpose. `departments` (8 rows)
+  // and `channels` (6) are bare labels with no fields of their own, and the base
+  // already has exactly one home for a team's editable vocabulary — the dropdown
+  // values module, which carries its own permissions, screen, import, export and
+  // machine tools. Giving each of them a table, a screen and a permission row
+  // would be a module built to hold a word. `content` (marketing posts) and the
+  // learning library were purged outright on 17 Aug 2026, and `program` went the
+  // same day with its ten rows folded onto the sprint type, which had always been
+  // the same idea under a second name (team-schema 0025).
   brand_assets: "Brand library",
-  // Programmes and meeting purposes: two thin tables, one area. The legacy
-  // reconciliation groups them in a single sentence ("`program` and `purposes`
-  // support meetings and the delivery method"), and they are read together, so
-  // they are one module the same way apps, processes and steps are one.
-  delivery: "Delivery method",
+  // WHY WE MEET. One thin table, and a module of its own rather than four more
+  // rights on `meetings`: the taxonomy of why an agency meets is a settled list
+  // somebody sets and leaves, and what was SAID in the room is a different
+  // question to ask a role about.
+  delivery: "Meeting purposes",
   // The person behind the member row: their profile and the certificates they
   // hold. Visible to the team, never to a client — which is why it is its own
   // permission row and not four more rights on `team_members`: an agency can

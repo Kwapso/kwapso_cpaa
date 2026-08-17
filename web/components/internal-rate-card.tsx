@@ -29,6 +29,7 @@ import * as React from "react"
 
 import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
+import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
@@ -44,15 +45,18 @@ import {
 } from "@kwapso/ui/registry/primitives/alert-dialog/alert-dialog"
 import { Pencil, Plus, Power } from "lucide-react"
 
-import type { InternalRate } from "@shared/types"
+import type { InternalRate, RoleRate } from "@shared/types"
 import { RateFormDialog, type RateFormValues } from "@/components/rate-form-dialog"
 import { ApiFailure, tenancy } from "@/lib/api"
-import { internalRatesKey, totalKey } from "@/lib/live-resources"
+import { internalRatesKey, roleRatesKey, totalKey } from "@/lib/live-resources"
 import { usePermissions } from "@/lib/perms"
 import { rateText } from "@shared/web/money"
 import { primeCache, useCached } from "@shared/web/store"
+import { useT } from "@shared/web/language"
+import { AddButton } from "@/components/deep-link/screen-bits"
 
 export function InternalRateCardScreen({ teamId }: { teamId: string }) {
+  const t = useT()
   const ratesQ = useCached<InternalRate[]>(internalRatesKey(teamId), () =>
     tenancy.internalRates().then((r) => {
       // R16: the door's exact COUNT(*), primed by the same fetch that loaded the
@@ -125,7 +129,7 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
   }
 
   if (ratesQ.error)
-    return <p className="text-destructive text-sm">Couldn&apos;t load the internal rates.</p>
+    return <p className="text-destructive text-sm">{t("Couldn't load the internal rates.")}</p>
   if (ratesQ.data === undefined) return <Skeleton variant="list" lines={4} />
   const rates = ratesQ.data
 
@@ -133,28 +137,24 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight">Internal rates</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("Internal rates")}</h1>
           {/* The sentence that says who may read this, on the screen rather than
               in a doc. Somebody setting these numbers should know before they
               type them, not after. */}
           <p className="text-muted-foreground mt-1 text-sm">
-            What an hour of our own work costs us, by kind of work. Ours alone — it never appears in
-            a client&apos;s portal, and no client login can reach it.
+            {t("What an hour of our own work costs us, by kind of work. Ours alone, it never appears in a client's portal, and no client login can reach it.")}
           </p>
         </div>
         {canCreate && (
           <div className="flex flex-wrap gap-2 sm:ml-auto sm:shrink-0">
-            <Button size="sm" onClick={() => setAdding(true)} className="gap-1.5">
-              <Plus className="size-4" />
-              New internal rate
-            </Button>
+            <AddButton label={t("New internal rate")} onClick={() => setAdding(true)} />
           </div>
         )}
       </div>
 
       {rates.length === 0 ? (
         <p className="text-muted-foreground text-sm">
-          No internal rates yet. Until one is set, an hour of our time counts as costing nothing.
+          {t("No internal rates yet. Until one is set, an hour of our time counts as costing nothing.")}
         </p>
       ) : (
         <ul className="flex flex-col gap-1.5">
@@ -169,12 +169,12 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
               <span className="text-sm tabular-nums">{rateText(r.centsPerHour, r.currency)}</span>
               {r.isDefault && (
                 <Badge variant="secondary" className="text-[10px]">
-                  Used when unnamed
+                  {t("Used when unnamed")}
                 </Badge>
               )}
               {!r.active && (
                 <Badge variant="outline" className="text-muted-foreground text-[10px]">
-                  Retired
+                  {t("Retired")}
                 </Badge>
               )}
               <span className="ml-auto flex shrink-0 gap-1">
@@ -187,7 +187,7 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
                     className="gap-1.5"
                   >
                     <Pencil className="size-3.5" />
-                    Edit
+                    {t("Edit")}
                   </Button>
                 )}
                 {canRetire &&
@@ -200,7 +200,7 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
                       className="text-destructive hover:text-destructive gap-1.5"
                     >
                       <Power className="size-3.5" />
-                      Retire
+                      {t("Retire")}
                     </Button>
                   ) : (
                     <Button
@@ -217,7 +217,7 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
                       className="gap-1.5"
                     >
                       <Power className="size-3.5" />
-                      Restore
+                      {t("Restore")}
                     </Button>
                   ))}
               </span>
@@ -230,9 +230,8 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
         open={adding}
         onOpenChange={setAdding}
         draftKey={`internal-rate:add:${teamId}`}
-        title="New internal rate"
+        title={t("New internal rate")}
         subtitle="What this kind of work costs us for an hour of somebody's time."
-        submitLabel="Add it"
         showDefault
         onSubmit={add}
       />
@@ -240,9 +239,8 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
         open={!!editing}
         onOpenChange={(o) => !o && setEditing(null)}
         draftKey={editing ? `internal-rate:edit:${editing.id}` : undefined}
-        title="Edit internal rate"
+        title={t("Edit internal rate")}
         subtitle="It applies from now on. Figures already worked out keep the rate they were worked out with."
-        submitLabel="Save"
         showDefault
         initial={
           editing
@@ -262,14 +260,13 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
       <AlertDialog open={!!retiring} onOpenChange={(o) => !busy && !o && setRetiring(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Retire the {retiring?.label} rate?</AlertDialogTitle>
+            <AlertDialogTitle>{t("Retire the")} {retiring?.label} {t("rate?")}</AlertDialogTitle>
             <AlertDialogDescription>
-              It stops being applied to time from now on. Everything already worked out with it
-              stays exactly as it is, and you can bring it back any time.
+              {t("It stops being applied to time from now on. Everything already worked out with it stays exactly as it is, and you can bring it back any time.")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={busy}>{t("Cancel")}</AlertDialogCancel>
             <AlertDialogAction
               disabled={busy}
               onClick={(e) => {
@@ -289,6 +286,182 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* THE ROLE RATE CARD, on the same screen (8.13) — see its own header. */}
+      <RoleRateCard teamId={teamId} />
+    </div>
+  )
+}
+
+/* ------------------------- what a ROLE's hour is worth --------------------- */
+
+/** THE THIRD RATE CARD (CHECKLIST 8.13) — what an hour of a KIND OF PERSON is
+ * worth, which is what Aurora's savings model multiplies the hours saved by.
+ *
+ * It sits on this screen and not its own, beside the card it is a sibling of:
+ * both are INTERNAL and both are one small settled list. R24's fourth clause
+ * forbids one component from reading the internal card AND the account card,
+ * and it is right to — but two internal cards are one screen's worth of the
+ * agency's own housekeeping, and splitting them would have made "what do we pay
+ * for an hour?" two destinations.
+ *
+ * ONE FORM, ONE DOOR, ALL THREE MOVES. The ROLE is the key, so typing a role
+ * that already has a price re-prices it, a new one adds it, and Retire turns it
+ * off. There is no edit dialog because there is nothing to edit that is not the
+ * two fields already on the screen.
+ */
+export function RoleRateCard({ teamId }: { teamId: string }) {
+  const t = useT()
+  const ratesQ = useCached<RoleRate[]>(roleRatesKey(teamId), () =>
+    tenancy.roleRates().then((r) => {
+      // R16: the door's exact COUNT(*), primed by the fetch that loaded the rows.
+      primeCache(totalKey("role_rates", teamId), r.total)
+      return r.roleRates
+    })
+  )
+  const { can } = usePermissions(teamId)
+  const canEdit = can("commercials", "edit")
+
+  const [role, setRole] = React.useState("")
+  const [amount, setAmount] = React.useState("")
+  const [busy, setBusy] = React.useState(false)
+
+  const refresh = React.useCallback(async () => {
+    const r = await tenancy.roleRates()
+    primeCache(totalKey("role_rates", teamId), r.total)
+    primeCache(roleRatesKey(teamId), r.roleRates)
+  }, [teamId])
+
+  async function set(roleName: string, centsPerHour: number, active: boolean, done: string) {
+    setBusy(true)
+    try {
+      await tenancy.setRoleRate({ roleName, centsPerHour, active })
+      await refresh()
+      toast.success(done)
+      return true
+    } catch (err) {
+      toast.error(err instanceof ApiFailure ? err.message : "Couldn't save that rate.")
+      return false
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (ratesQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the role rates.")}</p>
+  if (ratesQ.data === undefined) return <Skeleton variant="list" lines={3} />
+  const rates = ratesQ.data
+  // Whole units in, whole cents out — the same conversion every price on this
+  // screen makes, so nothing can be a hundred times wrong in one place only.
+  const cents = Math.round(Number(amount.trim()) * 100)
+  const ready = role.trim() !== "" && Number.isFinite(cents) && cents >= 0
+
+  return (
+    <div className="flex flex-col gap-4 border-t pt-6">
+      <div className="min-w-0">
+        <h2 className="text-lg font-semibold tracking-tight">{t("Role rates")}</h2>
+        <p className="text-muted-foreground mt-1 text-sm">
+          {t("What an hour of each role is worth, the bookkeeper, the dispatcher, whoever actually does the work a process describes. This is what turns hours given back into money given back. Ours alone: it never appears in a client's portal.")}
+        </p>
+      </div>
+
+      {rates.length === 0 ? (
+        <p className="text-muted-foreground text-sm">
+          {t("No role rates yet. Until one is set, an app's hours are reported without a money figure beside them.")}
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-1.5">
+          {rates.map((r) => (
+            <li
+              key={r.id}
+              className={`border-border/60 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 ${
+                r.active ? "" : "opacity-60"
+              }`}
+            >
+              <span className="min-w-0 flex-1 truncate text-sm font-medium">{r.roleName}</span>
+              <span className="text-sm tabular-nums">{rateText(r.centsPerHour, null)}</span>
+              {!r.active && (
+                <Badge variant="outline" className="text-muted-foreground text-[10px]">
+                  {t("Retired")}
+                </Badge>
+              )}
+              {canEdit && (
+                <span className="ml-auto flex shrink-0 gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => {
+                      setRole(r.roleName)
+                      setAmount(String(r.centsPerHour / 100))
+                    }}
+                    className="gap-1.5"
+                  >
+                    <Pencil className="size-3.5" />
+                    {t("Edit")}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() =>
+                      void set(
+                        r.roleName,
+                        r.centsPerHour,
+                        !r.active,
+                        r.active ? "Rate retired." : "Rate restored."
+                      )
+                    }
+                    className={r.active ? "text-destructive hover:text-destructive gap-1.5" : "gap-1.5"}
+                  >
+                    <Power className="size-3.5" />
+                    {r.active ? t("Retire") : t("Restore")}
+                  </Button>
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {canEdit && (
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex min-w-40 flex-1 flex-col gap-1 text-sm">
+            {t("Role")}
+            <Input
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              placeholder={t("e.g. Bookkeeper")}
+              disabled={busy}
+            />
+          </label>
+          <label className="flex w-32 flex-col gap-1 text-sm">
+            {t("An hour")}
+            <Input
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              inputMode="decimal"
+              placeholder="45"
+              disabled={busy}
+            />
+          </label>
+          <Button
+            size="sm"
+            disabled={busy || !ready}
+            onClick={() =>
+              void set(role.trim(), cents, true, "Rate saved.").then((ok) => {
+                if (ok) {
+                  setRole("")
+                  setAmount("")
+                }
+              })
+            }
+            className="gap-1.5"
+          >
+            {busy ? <Spinner /> : <Plus className="size-4" />}
+            {t("Save")}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

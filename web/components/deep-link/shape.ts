@@ -15,12 +15,9 @@ import type {
   Invite,
   InviteAudit,
   KnowledgeSource,
-  Learning,
-  MarketingPost,
   Meeting,
   MeetingPurpose,
   Task,
-  Program,
   TeamMeta,
   TeamMember,
   TeamRole,
@@ -102,10 +99,17 @@ export function shapeInvitesList(invites: Invite[]): ScreenData {
 
 /** Display label per ticket status (server's underscore form → friendly text).
  * One source for the list detail line; the thread's own status badge uses the
- * library's hyphen labels. */
+ * library's hyphen labels.
+ *
+ * SEVEN NOW, and every one of them is a FACT rather than a choice: two arrived on
+ * 17 Aug 2026 for the two things a person could previously only assert by hand.
+ * "Waiting on you" is deliberately not "Awaiting validation" — the client reads
+ * the same word we do, and the plain sentence is the one that gets answered. */
 export const HELP_STATUS: Record<HelpTicket["status"], string> = {
+  awaiting_validation: "Waiting on you",
   new: "New",
   triaged: "Triaged",
+  scheduled: "Scheduled",
   in_progress: "In progress",
   ready: "Ready",
   resolved: "Resolved",
@@ -121,38 +125,18 @@ export function shapeHelpList(tickets: HelpTicket[]): ScreenData {
   return {
     rows: tickets.map((t) => ({
       id: t.id,
-      // THE NUMBER THE CLIENT QUOTES, first (SCOPE ch.02 — "BERG-T0412"). The
-      // whole point of a reference is that somebody can say it out loud, and it
-      // was rendered on no screen at all: the column shipped, the sequence
-      // shipped, the machine surface returned it, and a person could not see it.
-      name: t.ref ? `${t.ref} · ${truncate(t.description)}` : truncate(t.description),
-      detail: [
-        t.helpType || "General",
-        HELP_STATUS[t.status],
-        // How much work is on it, and nothing else about that work — the same
-        // two numbers a client is shown on their own side of the fence.
-        t.storyCount > 0 ? `${t.doneStoryCount} of ${t.storyCount} done` : null,
-        t.archivedAt ? "archived" : null,
-      ]
-        .filter(Boolean)
-        .join(" · "),
+      // THE TITLE, AND ONLY THE TITLE (UI-RULEBOOK K1, CHECKLIST 11.9). The
+      // reference used to be prefixed into it — `BERG-T0412 · Can you check…` —
+      // which is why a page of tickets read as a wall of text with no shape. It
+      // has not been lost: it leads the eyebrow on the record's own screen (D4),
+      // where a person looks when a client rings up saying it out loud.
+      name: truncate(t.description),
+      // ONE LINE, TWO FACTS. How far along, and what kind. The story counts and
+      // the archived flag went with the same edit: a subtitle carrying four
+      // facts is table content smuggled into a list (K2).
+      detail: [HELP_STATUS[t.status], t.helpType || "General"].filter(Boolean).join(" · "),
       // Facet column (read by the filter engine, not the renderer).
       status: HELP_STATUS[t.status],
-    })),
-  }
-}
-
-export function shapeLearningList(items: Learning[]): ScreenData {
-  return {
-    rows: items.map((l) => ({
-      id: l.id,
-      // Inactive items stay visible to curators (deactivate-not-delete) — flag it
-      // in the title, matching how roles show "(inactive)".
-      name: l.active ? l.title : `${l.title} (inactive)`,
-      detail: l.category || l.description || "—",
-      // Facet columns (read by the filter engine, not the renderer).
-      category: l.category || "—",
-      state: l.active ? "Active" : "Inactive",
     })),
   }
 }
@@ -166,6 +150,9 @@ export const KNOWLEDGE_KIND: Record<string, string> = {
   note: "Note",
   file: "From a file",
   ticket: "From a ticket",
+  // A KIND WITH NO MODULE BEHIND IT ANY MORE. Learning went on 17 Aug 2026 and
+  // its 41 articles stayed, already indexed — so this word still names what a
+  // source IS even though nothing writes a new one.
   article: "From an article",
   account: "From an account",
 }
@@ -214,19 +201,25 @@ export function shapeMeetingsList(meetings: Meeting[]): ScreenData {
       // so — "didn't we have a call in March?" is answered either way, and the
       // answer "yes, and we called it off" is a different one from silence.
       name: m.active ? m.title : `${m.title} (cancelled)`,
-      detail:
-        [
-          formatDate(m.startsAt),
-          m.accountName ?? "ours",
-          m.purposeName,
-          !m.active ? "cancelled" : m.status === "held" ? "held" : null,
-        ]
-          .filter(Boolean)
-          .join(" · ") || "—",
+      // K1: when, and who with. The purpose and the held flag are columns on the
+      // "all" view, which is where a person compares meetings on them (K2).
+      detail: [formatDate(m.startsAt), m.accountName ?? "ours"].filter(Boolean).join(" · ") || "—",
       // Facet columns (read by the filter engine, not the renderer).
       client: m.accountName ?? "Ours",
       purpose: m.purposeName ?? "Not said",
       state: !m.active ? "Cancelled" : m.status === "held" ? "Held" : "Scheduled",
+      // THE COLUMNS THE "ALL" VIEW SHOWS (CHECKLIST 9.1: "all, with far more
+      // columns"). They ride every row rather than a second shaper, because the
+      // three views are three renderings of ONE list — a second shaper is a
+      // second idea of what a meeting row is, and the two drift.
+      when: formatDate(m.startsAt),
+      // The bare day the calendar view keys entries on — it wants a date, not a
+      // moment, and formatting it for the grid is the grid's job.
+      startsOn: m.startsAt.slice(0, 10),
+      app: m.appName ?? "—",
+      where: m.location ?? "—",
+      written: m.notes ? "Yes" : "—",
+      reference: m.ref ?? "—",
     })),
   }
 }
@@ -265,10 +258,14 @@ export function shapeAccountsList(accounts: Account[]): ScreenData {
         // Archived rows stay visible (archive-never-delete), flagged like retired
         // roles and articles are.
         name: a.active ? a.name : `${a.name} (archived)`,
+        // K1: three facts, no more. What it is, where it stands, and where it
+        // sits in the tree. The CODE left the line — it is a lookup key, not
+        // something anybody scans a list for, and it leads the eyebrow on the
+        // record's own screen. The parent stayed, because "under Bergman S.A."
+        // is a fact about this row that no other row carries.
         detail:
-          [ACCOUNT_TYPE[a.accountType], a.code, accountStatus(a.status), parent]
-            .filter(Boolean)
-            .join(" · ") || "—",
+          [ACCOUNT_TYPE[a.accountType], accountStatus(a.status), parent].filter(Boolean).join(" · ") ||
+          "—",
         // Facet columns (read by the filter engine, not the renderer).
         type: ACCOUNT_TYPE[a.accountType],
         status: accountStatus(a.status) || "—",
@@ -313,49 +310,14 @@ export function shapeInviteDetail(
 }
 
 /* ------------------- the agency's own housekeeping ------------------------ */
-// Four modules, one shaping pattern, and one thing to keep in view while reading
+// Two modules, one shaping pattern, and one thing to keep in view while reading
 // them: an ARCHIVED row stays in the list. That is deactivate-not-delete showing
 // through to the screen — the row is retired, not removed, so it is still there
 // to restore — and the `(archived)` suffix plus the `state` facet are how a
-// person tells the two apart at a glance. Roles and learning articles have said
-// "(inactive)" for the same reason since the base's first commit; these say
-// "(archived)" because that is the word this app's glossary uses for putting a
-// record away without losing it.
-
-export function shapeMarketingList(items: MarketingPost[]): ScreenData {
-  return {
-    rows: items.map((p) => ({
-      id: p.id,
-      name: p.active ? p.title : `${p.title} (archived)`,
-      detail: [p.channel, p.publishedOn ? formatDate(p.publishedOn) : "Not published"]
-        .filter(Boolean)
-        .join(" · ") || "—",
-      // Facet columns (read by the filter engine, not the renderer).
-      channel: p.channel || "—",
-      status: p.status || "—",
-      state: p.active ? "Live" : "Archived",
-    })),
-  }
-}
-
-export function shapeMarketingDetail(post: MarketingPost, activity: ActivityItem[]): ScreenData {
-  return {
-    record: {
-      id: post.id,
-      name: post.title,
-      detail: post.channel || "No channel",
-      channel: post.channel || "—",
-      status: post.status || "—",
-      published: post.publishedOn ? formatDate(post.publishedOn) : "Not published yet",
-      summary: post.summary || "—",
-      link: post.link || "—",
-      created: formatDateTime(post.createdAt),
-      createdBy: post.creatorName || "—",
-      updated: post.updatedAt ? formatDateTime(post.updatedAt) : "—",
-    },
-    sets: { activity: shapeActivity(activity) },
-  }
-}
+// person tells the two apart at a glance. Roles have said "(inactive)" for the
+// same reason since the base's first commit; these say "(archived)" because that
+// is the word this app's glossary uses for putting a record away without losing
+// it.
 
 export function shapeBrandList(items: BrandAsset[]): ScreenData {
   return {
@@ -381,33 +343,6 @@ export function shapeBrandDetail(asset: BrandAsset, activity: ActivityItem[]): S
       created: formatDateTime(asset.createdAt),
       createdBy: asset.creatorName || "—",
       updated: asset.updatedAt ? formatDateTime(asset.updatedAt) : "—",
-    },
-    sets: { activity: shapeActivity(activity) },
-  }
-}
-
-export function shapeProgrammesList(items: Program[]): ScreenData {
-  return {
-    rows: items.map((p) => ({
-      id: p.id,
-      name: p.active ? p.name : `${p.name} (archived)`,
-      detail: p.description || "—",
-      state: p.active ? "Live" : "Archived",
-    })),
-  }
-}
-
-export function shapeProgrammeDetail(programme: Program, activity: ActivityItem[]): ScreenData {
-  return {
-    record: {
-      id: programme.id,
-      name: programme.name,
-      detail: programme.description || "No description",
-      description: programme.description || "—",
-      order: String(programme.sequence),
-      created: formatDateTime(programme.createdAt),
-      createdBy: programme.creatorName || "—",
-      updated: programme.updatedAt ? formatDateTime(programme.updatedAt) : "—",
     },
     sets: { activity: shapeActivity(activity) },
   }

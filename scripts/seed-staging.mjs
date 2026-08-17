@@ -12,7 +12,7 @@
 //    work, exercises the permission spine, and leaves genuine activity rows and
 //    live pings behind, exactly as a person clicking would.
 // 2. IT IS IDEMPOTENT. Every record is matched on a stable natural key first
-//    (a company's name, a person's email, an article's title, a request's
+//    (a company's name, a person's email, a story's title, a request's
 //    description) and skipped when it is already there. Run it twice and the
 //    second run creates nothing.
 // 3. IT CHECKS THE FENCE FROM THE OUTSIDE. A seed that writes rows the fence
@@ -139,10 +139,6 @@ const HELP_LIMIT = 220
  * conversation here is two or three messages. */
 const REPLIES_PER_REQUEST = 6
 
-/** Articles. 223 in the history, most of them a title and a hashtag list; the 40
- * newest with a body are what makes the learning screen look written-in. */
-const ARTICLE_LIMIT = 40
-
 // ── the work engine's own cuts ───────────────────────────────────────────────
 //
 // Every write below is one HTTP round trip, so the whole history — 28 apps, 106
@@ -222,14 +218,20 @@ const CLIENT_ROLE = {
   // point of the list.
   //
   // THIS ROLE IS THE WORST CASE ON PURPOSE, NOT A DESCRIPTION OF A GOOD ONE.
-  // `learning` and `selectable_data` are DELIBERATELY still granted even though
-  // every one of those doors now refuses a client login outright (d7512f1). They
-  // are not a leftover: a real owner building their own client role would plausibly
-  // tick them, so leaving them on makes this seeded client the WORST CASE — a
-  // caller holding rights the doors must refuse on grounds other than the role.
-  // R21's enumeration reads these rights to decide which doors to walk, so taking
-  // them away would quietly stop the check testing the very doors that were leaking
-  // a week ago. The defence must not depend on how carefully the role was built.
+  // `selectable_data` is DELIBERATELY still granted even though every one of its
+  // doors now refuses a client login outright (d7512f1). It is not a leftover: a
+  // real owner building their own client role would plausibly tick it, so leaving
+  // it on makes this seeded client the WORST CASE — a caller holding rights the
+  // doors must refuse on grounds other than the role. R21's enumeration reads
+  // these rights to decide which doors to walk, so taking them away would quietly
+  // stop the check testing the very doors that were leaking a week ago. The
+  // defence must not depend on how carefully the role was built.
+  //
+  // `learning` sat beside it and made the same point until 17 Aug 2026, when the
+  // learning library was purged outright. A right on a module that no longer
+  // exists walks no doors — the permission writer builds the sheet from
+  // TEAM_MODULES — so it went with the module rather than lingering as a word
+  // nobody could trace.
   //
   // `agent` is here for the same reason, and it is the sharpest case of it. An
   // owner does not have to be careless to grant it: the DEFAULT Viewer template
@@ -260,7 +262,6 @@ const CLIENT_ROLE = {
     teams: { read: true },
     accounts: { read: true },
     portal_users: { read: true },
-    learning: { read: true },
     // EDIT joined read + create when the work engine shipped, and it is the one
     // right on this list that changes what a client can DO rather than what R21
     // walks. SCOPE ch.07 gives the account two powers over its own requests —
@@ -503,10 +504,6 @@ const requests = spreadAcrossCompanies(
   history.helpRequests.filter((r) => r.description),
   HELP_LIMIT
 )
-const articles = history.learning
-  .filter((a) => a.body)
-  .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
-  .slice(0, ARTICLE_LIMIT)
 
 // ── would any of this be refused? ask BEFORE writing a single row ────────────
 //
@@ -569,7 +566,6 @@ if (dryRun) {
   console.log(`  ${String(links.length).padStart(4)} contact links`)
   console.log(`  ${String(PORTAL_TESTERS.length).padStart(4)} client logins, on ${[...new Set(PORTAL_TESTERS.flatMap((p) => p.companies))].join(", ")}`)
   console.log(`  ${String(history.selectableData.length).padStart(4)} dropdown values`)
-  console.log(`  ${String(articles.length).padStart(4)} learning articles (of ${history.learning.length} in the history, ${history.learning.filter((a) => a.body).length} with a body)`)
   console.log(`  ${String(requests.length + 1).padStart(4)} help requests (of ${history.helpRequests.length}), including one of our own`)
   console.log(`  ${String(requests.reduce((n, r) => n + Math.min(r.replies.length, REPLIES_PER_REQUEST), 0)).padStart(4)} replies on them`)
   console.log(`  ${String(requests.filter((r) => r.resolved).length).padStart(4)} of those requests then moved to resolved`)
@@ -690,38 +686,7 @@ for (const d of history.selectableData) {
   say("created", `${d.type} → ${d.value}`, "dropdown values")
 }
 
-// ── 4 · learning articles ────────────────────────────────────────────────────
-
-step("Learning")
-let existingArticles = must(await api("/api/content/learning", {}, staff.cookie), "reading learning").learning ?? []
-const articleTitles = new Set(existingArticles.map((l) => l.title))
-for (const a of articles) {
-  if (articleTitles.has(a.title)) {
-    say("reused", `article "${a.title}"`, "learning articles")
-    continue
-  }
-  must(
-    await post(
-      "/api/content/learning",
-      {
-        title: a.title,
-        // Pick-or-create: the door adds the category as a Learning category
-        // value the first time it meets one, so the vocabulary follows the
-        // content instead of being typed in ahead of it.
-        category: a.category ?? undefined,
-        contentType: a.contentType ?? undefined,
-        contentLink: a.contentLink ?? undefined,
-        body: a.body ?? undefined,
-      },
-      staff.cookie
-    ),
-    `adding "${a.title}"`
-  )
-  articleTitles.add(a.title)
-  say("created", `article "${a.title}"`, "learning articles")
-}
-
-// ── 5 · accounts: the companies, their people, and who is a contact of whom ──
+// ── 4 · accounts: the companies, their people, and who is a contact of whom ──
 
 step("Accounts")
 /** Every account this team holds, keyed the three ways the seed matches on.
@@ -863,7 +828,7 @@ for (const [companyGlideId, companyLinks] of linksByCompany) {
   }
 }
 
-// ── 6 · client logins, then team membership — in that order ──────────────────
+// ── 5 · client logins, then team membership — in that order ──────────────────
 //
 // The order is not a preference. A login is granted to somebody who is NOT yet a
 // team member (the grant door refuses to turn staff into a client), and the
@@ -973,7 +938,7 @@ for (const t of PORTAL_TESTERS) {
   say("created", `${t.name} joined the team as ${CLIENT_ROLE.title}`)
 }
 
-// ── 7 · the requests, and what happened to each of them ──────────────────────
+// ── 6 · the requests, and what happened to each of them ──────────────────────
 //
 // Raised, then answered, then closed — in that order, through the doors that do
 // each of those things. The activity trail is what FOLLOWS from that; no row is
@@ -1108,7 +1073,7 @@ for (const r of all) {
   }
 }
 
-// ── 7b · the work engine: what we built, sold, did and spent time on ─────────
+// ── 6b · the work engine: what we built, sold, did and spent time on ─────────
 //
 // THE ORDER IS THE DEPENDENCY, and it is not negotiable: an app before the
 // sprints under it, a sprint before the stories in it, a task before the time
@@ -1408,7 +1373,7 @@ step("Logged time")
   if (skipped) console.log(`  (${skipped} logs skipped — what they were against is outside this seed's cut)`)
 }
 
-// ── 7c · the money, and the arithmetic checked out loud ──────────────────────
+// ── 6c · the money, and the arithmetic checked out loud ──────────────────────
 //
 // THE ONE THING THE HISTORY COULD NOT SUPPLY. Glide's sprint has six columns and
 // none of them is a price; there was no rate card in the old app at all. So the
@@ -1569,7 +1534,7 @@ step("The diary")
   }
 }
 
-// ── 8 · the fence, checked from the outside ──────────────────────────────────
+// ── 7 · the fence, checked from the outside ──────────────────────────────────
 //
 // Everything above ran as somebody with the right to write it. This last part
 // asks the only question that matters afterwards: standing inside one client's
@@ -1705,7 +1670,7 @@ check("a contact of one company stands in one", (bStanding.accounts ?? []).lengt
 check("neither client login is treated as staff", aStanding.kind === "portal" && bStanding.kind === "portal")
 if (aSecond) check("the second company is one they can stand in", (aStanding.accounts ?? []).some((x) => x.id === aSecond))
 
-// ── 8b · the fence around the WORK, and around the money ─────────────────────
+// ── 7b · the fence around the WORK, and around the money ─────────────────────
 //
 // Everything above was written before the work engine had any rows in it, so it
 // asks about companies, contacts and requests — and every check passed while the
@@ -1792,7 +1757,7 @@ for (const [what, path] of [
   check(`but we can read ${what}`, res.status === 200, `got ${res.status}`)
 }
 
-// ── 9 · what happened, and where to look ─────────────────────────────────────
+// ── 8 · what happened, and where to look ─────────────────────────────────────
 
 for (const s of [staff, ...sessions.values()]) await post("/api/auth/logout", {}, s.cookie)
 
@@ -1818,7 +1783,6 @@ console.log(`  ${BASE}/accounts            the companies and their people`)
 console.log(`  ${BASE}/t/${TEAM_ID}/accounts/${aHome}`)
 console.log(`                              ${testerA.companies[0]} — contacts, logins, activity`)
 console.log(`  ${BASE}/tickets             the tickets, ours and the clients'`)
-console.log(`  ${BASE}/learning            the articles`)
 console.log(`  ${BASE}/members             the team, including the client logins`)
 console.log(`\nSign in as a client with ${PORTAL_TESTERS.map((t) => t.email).join(" or ")}`)
 console.log("(the code lands in your own inbox; the first is the one with two companies to switch between).")

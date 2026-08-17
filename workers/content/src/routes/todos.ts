@@ -14,12 +14,14 @@
 import { fail, json } from "@shared/workers/http"
 import { optionalMoment, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
+import { hasRight } from "@shared/workers/gating"
 import { accountScope, refusePortalCaller, type AccountScope } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
 import { mediaKey, parseUploadDataUrl } from "@shared/workers/image"
 import { cancelTodo, clientSprints, completeTodo, countTodos, createTodo, listTodos } from "../lib/todos"
-import { countTasks, createTask, listTasks, setTaskDone } from "../lib/tasks"
-import { notifyTodoRaised } from "../lib/notify"
+import { countTasks, createTask, listTasks, setTaskDone, type TaskFilter } from "../lib/tasks"
+import { notifyTodoRaised, teamMemberNames } from "../lib/notify"
+import { TASK_VIEWS, type TaskViewName } from "@shared/types"
 import type { Env } from "../env"
 
 /** WHOSE WORLD IS THIS CALLER STANDING IN? Resolved once per request, the same
@@ -167,49 +169,94 @@ export async function getPortalDelivery(request: Request, env: Env): Promise<Res
 
 /* ----------------------------------- tasks ---------------------------------- */
 
+/** What a piece of our own admin may arrive with. Generous for a photo of a
+ * letter, small enough that one door cannot be used as free storage — the same
+ * ceiling a to-do's attachment carries, for the same reason. */
+const MAX_TASK_FILE_BYTES = 10 * 1024 * 1024
+
 /** The filters this door parses — one place, so the list and its counts can never
  * be asked different questions (R16) and the machine surface has one thing to
- * mirror (R19). */
-function taskFilterFrom(url: URL): { view: "open" | "all"; assigneeId?: string } {
+ * mirror (R19).
+ *
+ * `view` is matched against the SIX the app knows through the shared list, which
+ * is a positional allow-list check (R20) and not a cast: anything else falls back
+ * to the everyday pile rather than reaching SQL. */
+function taskFilterFrom(url: URL): TaskFilter {
+  const asked = queryText(url.searchParams.get("view"), "View")
   return {
-    view: queryText(url.searchParams.get("view"), "View") === "all" ? ("all" as const) : ("open" as const),
+    view: (TASK_VIEWS as readonly string[]).includes(asked ?? "") ? (asked as TaskViewName) : "open",
     assigneeId: queryText(url.searchParams.get("assigneeId"), "Assignee"),
   }
 }
 
-/** Every task response carries BOTH view counts (R16).
+/** Every task response carries EVERY view's count (R16) and the progress pair.
  *
- * The screen has an open/all strip on it, and the badge on the view you are NOT
- * looking at cannot be counted from the rows you ARE — the open list has no idea
- * how many finished ones are behind it. `total` stays the count over what was
- * listed, so the sidebar badge goes on meaning "what is still on our list". */
+ * The screen has a six-tab strip on it, and the badge on a view you are NOT
+ * looking at cannot be counted from the rows you ARE — an open list has no idea
+ * how many finished ones are behind it. All eight numbers come out of ONE read
+ * (see countTasks), so they are exact and consistent with each other.
+ *
+ * `total` stays the count over what was LISTED, so the sidebar badge goes on
+ * meaning "what is still on our list". */
 async function taskPage(
   cfg: Parameters<typeof listTasks>[0],
   guard: Parameters<typeof listTasks>[1],
-  filter: { view: "open" | "all"; assigneeId?: string }
+  filter: TaskFilter
 ): Promise<Response> {
-  const [tasks, openTotal, allTotal] = await Promise.all([
+  const [tasks, counts] = await Promise.all([
     listTasks(cfg, guard, filter),
-    countTasks(cfg, guard, { ...filter, view: "open" }),
-    countTasks(cfg, guard, { ...filter, view: "all" }),
+    countTasks(cfg, guard, { assigneeId: filter.assigneeId }),
   ])
-  return json({ tasks, total: filter.view === "all" ? allTotal : openTotal, openTotal, allTotal })
+  const view = filter.view ?? "open"
+  return json({
+    tasks,
+    total: counts[view],
+    openTotal: counts.open,
+    allTotal: counts.all,
+    overdueTotal: counts.overdue,
+    upcomingTotal: counts.upcoming,
+    completedTotal: counts.completed,
+    calendarTotal: counts.calendar,
+    // THE PROGRESS BAR at the top of every tab: how many of the things due today
+    // or earlier are done, out of how many there are.
+    dueTodayTotal: counts.dueToday,
+    dueTodayDone: counts.dueTodayDone,
+  })
 }
 
 /** GET /api/content/tasks — our own admin (work:read). Refused to a client login:
  * a task is the agency's, and its list is a list of what we are behind on.
  *
- * `?view=all` is how the finished ones are seen. It has been parsed here since
- * the door shipped and nothing on any screen ever sent it, so the app had one
- * view of a two-view collection and no way to say so — the tester's "cannot
- * switch the view, I only see open ones". */
+ * `?view=` is how the other five piles are seen — overdue, upcoming, completed,
+ * calendar, all. Two of the six shipped with the door and the screen sent
+ * neither, so the app had one view of a six-view collection and no way to say so
+ * — the tester's "cannot switch the view, I only see open ones".
+ *
+ * WHOSE TASKS COME BACK IS NOW A PERMISSION (4.9). `work:read` opens the screen;
+ * `all_tasks:read` decides whether the screen is the whole team's list or your
+ * own. Without it the caller's own user id REPLACES whatever `assigneeId` the
+ * request asked for — narrowed rather than refused, because "show me Ana's
+ * tasks" from somebody who may not see them is a question with a perfectly good
+ * answer (yours), and a 403 on a list door teaches a screen to hide a tab
+ * instead of showing the right rows.
+ *
+ * It rides the filter the door ALREADY parses, so the list, all eight counts and
+ * the progress bar are narrowed by construction — they are all built from this
+ * one object (see `taskPage`), and there is no second place to forget. */
 export async function getTasks(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "work", "read")
   await refusePortalCaller(cfg, guard)
-  return taskPage(cfg, guard, taskFilterFrom(new URL(request.url)))
+  const filter = taskFilterFrom(new URL(request.url))
+  const everyones = await hasRight(cfg, guard, "all_tasks", "read")
+  return taskPage(cfg, guard, everyones ? filter : { ...filter, assigneeId: guard.userId })
 }
 
-/** POST /api/content/tasks — write down a piece of admin (work:create). */
+/** POST /api/content/tasks — write down a piece of admin (work:create).
+ *
+ * THE DEPARTMENT DECIDES THE SECOND FIELD, and the door decides whether it is
+ * there: `createTask` refuses a Production task with no app and a Sales task
+ * with no client, out of the one sentence in shared/departments.ts the form also
+ * reads. A rule only the form knows is a rule a machine caller never meets. */
 export async function postCreateTask(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<{
     title?: unknown
@@ -217,14 +264,58 @@ export async function postCreateTask(request: Request, env: Env): Promise<Respon
     dueOn?: unknown
     assigneeId?: unknown
     accountId?: unknown
+    appId?: unknown
+    department?: unknown
+    important?: unknown
+    urgent?: unknown
+    fileDataUrl?: unknown
+    fileName?: unknown
   }>(request, env, "work", "create")
   await refusePortalCaller(cfg, guard)
+
+  const assigneeId = optionalText(body.assigneeId, "Assignee", TEXT_LIMITS.short)
+  // WHOSE NAME GOES ON IT. The row keeps a name beside the id so a list does not
+  // need the core database to render — and it used to keep the CREATOR's name
+  // whoever the task was for, because the insert reached for `actor.name`. The
+  // members read is the one place that name honestly exists.
+  const assigneeName = assigneeId
+    ? ((await teamMemberNames(env, guard.teamId)).find((m) => m.userId === assigneeId)?.name ?? null)
+    : null
+  if (assigneeId && !assigneeName)
+    return fail(400, "invalid_input", "That person isn't on the team any more.")
+
+  // ONE FILE, taken at the boundary through the same seam every upload uses, and
+  // put in the AGENCY's own bucket: /media/internal/ is served by the agency
+  // gateway alone, so a task's evidence has nowhere to be redeemed at the
+  // client's hostname (R21). The KEY is the credential — the door has no session
+  // — so every object carries a random ULID segment.
+  let file: { url: string; name: string } | null = null
+  if (body.fileDataUrl !== undefined && body.fileDataUrl !== null) {
+    const parsed = parseUploadDataUrl(body.fileDataUrl, MAX_TASK_FILE_BYTES)
+    if (!parsed) return fail(400, "invalid_input", "That file isn't one we can take (max 10 MB).")
+    const key = mediaKey(guard.teamId, "tasks")
+    await env.INTERNAL_MEDIA.put(key, parsed.bytes, { httpMetadata: { contentType: parsed.contentType } })
+    file = {
+      url: `/media/internal/${key}`,
+      name: optionalText(body.fileName, "File name", TEXT_LIMITS.short) ?? "attachment",
+    }
+  }
+
   const { id, accountId } = await createTask(cfg, guard, actor, {
     title: requireText(body.title, "What needs doing", TEXT_LIMITS.short),
     detail: optionalText(body.detail, "Detail", TEXT_LIMITS.long),
-    dueOn: optionalMoment(body.dueOn, "Due"),
-    assigneeId: optionalText(body.assigneeId, "Assignee", TEXT_LIMITS.short),
+    dueOn: optionalMoment(body.dueOn, "Deadline"),
+    assigneeId,
+    assigneeName: assigneeName ?? undefined,
     accountId: optionalText(body.accountId, "Client", TEXT_LIMITS.short),
+    appId: optionalText(body.appId, "App", TEXT_LIMITS.short),
+    department: optionalText(body.department, "Department", TEXT_LIMITS.short),
+    // THE EISENHOWER PAIR. A `typeof` operand, never a cast: "important" arriving
+    // as the string "false" would otherwise be a task marked important by a typo.
+    important: typeof body.important === "boolean" ? body.important : false,
+    urgent: typeof body.urgent === "boolean" ? body.urgent : false,
+    fileUrl: file?.url,
+    fileName: file?.name,
   })
   await publishChange(env, guard.teamId, "tasks", id, "add", accountId ?? undefined)
   return taskPage(cfg, guard, { view: "open" })

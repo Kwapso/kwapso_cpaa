@@ -21,6 +21,7 @@ import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { useCached } from "@shared/web/store"
 import { delivery } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
+import { useT } from "@shared/web/language"
 
 type Sprints = Awaited<ReturnType<typeof delivery.sprints>>["sprints"]
 
@@ -34,6 +35,7 @@ function dates(s: Sprints[number]): string {
 }
 
 export function DeliveryBlock() {
+  const t = useT()
   const sprintsQ = useCached<Sprints>(cacheKeys.delivery, () => delivery.sprints().then((r) => r.sprints))
   const sprints = sprintsQ.data ?? []
   // Nothing bought yet renders nothing at all, for the same reason the to-do
@@ -42,7 +44,7 @@ export function DeliveryBlock() {
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-lg font-semibold">What you bought</h2>
+      <h2 className="text-lg font-semibold">{t("What you bought")}</h2>
       <ul className="flex flex-col gap-2">
         {sprints.map((s) => (
           <li key={`${s.ref ?? s.name}`} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">
@@ -51,7 +53,7 @@ export function DeliveryBlock() {
                 {s.name}
                 {s.completedAt && (
                   <Badge variant="success" className="ml-2 align-middle">
-                    Finished
+                    {t("Finished")}
                   </Badge>
                 )}
               </p>
@@ -61,7 +63,7 @@ export function DeliveryBlock() {
             </div>
             {s.storyCount > 0 && (
               <span className="text-muted-foreground shrink-0 text-sm">
-                {s.doneStoryCount} of {s.storyCount} done
+                {s.doneStoryCount} of {s.storyCount} {t("done")}
               </span>
             )}
           </li>

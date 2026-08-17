@@ -26,12 +26,26 @@
     "not_found_handling": "404-page",
     // Worker-first for every DYNAMIC path the worker owns. An ARRAY here means
     // non-listed paths skip the worker entirely (asset-only), so ALL must be
-    // listed: /api/* (routed to the domain workers), /media/* (R2), and /t/*
-    // (the deep-link shell — otherwise the asset layer 404s an unknown
-    // /t/<team>/<module>/<id> navigation before the worker sees it). Static
-    // screens (/, /home, /_next/static/**) are NOT listed, so they keep the
-    // fast asset path + the immutable _headers caching.
-    "run_worker_first": ["/api/*", "/media/*", "/t/*", "/learning/*", "/help/*", "/mcp"]
+    // listed: /api/* (routed to the domain workers), /media/* (R2), /t/* (the
+    // deep-link shell — otherwise the asset layer 404s an unknown
+    // /t/<team>/<module>/<id> navigation before the worker sees it), and ONE
+    // ENTRY PER SHELL MODULE, because those clean URLs (/tickets/<id>,
+    // /stories/<id>, …) are the same client-resolved shell. Static screens (/,
+    // /home, /_next/static/**) are NOT listed, so they keep the fast asset path
+    // + the immutable _headers caching.
+    //
+    // This list carried `/learning/*` and a `/help/*` that is not a URL segment
+    // in this app at all, while src/index.ts had grown to fifteen shell modules:
+    // every one of the other fourteen 404'd on a shared link or a reload, which
+    // is the "deep links fail to load" a tester reported. SHELL_MODULES in
+    // src/index.ts is the source of truth; test/shell-routing.test.ts reads that
+    // file and this one and fails if they drift, in EITHER environment.
+    "run_worker_first": [
+      "/api/*", "/media/*", "/mcp", "/t/*",
+      "/accounts/*", "/tickets/*", "/knowledge/*", "/processes/*",
+      "/stories/*", "/sprints/*", "/apps/*", "/tasks/*", "/time/*", "/meetings/*",
+      "/brand/*", "/purposes/*"
+    ]
   },
   "services": [
     { "binding": "AUTH", "service": "kwapso-auth" },
@@ -59,7 +73,14 @@
         "directory": "../../web/out",
         "binding": "ASSETS",
         "not_found_handling": "404-page",
-        "run_worker_first": ["/api/*", "/media/*", "/t/*", "/learning/*", "/help/*", "/mcp"]
+        // Said again in full, because envs do NOT inherit the top-level value —
+        // and staging is where a deep link is tested before anybody shares one.
+        "run_worker_first": [
+          "/api/*", "/media/*", "/mcp", "/t/*",
+          "/accounts/*", "/tickets/*", "/knowledge/*", "/processes/*",
+          "/stories/*", "/sprints/*", "/apps/*", "/tasks/*", "/time/*", "/meetings/*",
+          "/brand/*", "/purposes/*"
+        ]
       },
       "services": [
         { "binding": "AUTH", "service": "kwapso-auth-staging" },

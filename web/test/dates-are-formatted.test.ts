@@ -27,6 +27,10 @@ import { join } from "node:path"
 const DATE_FIELDS = [
   "startsOn",
   "endsOn",
+  // A STORY'S DEADLINE IS ITS SPRINT'S END DATE (17 Aug 2026: the story's own
+  // due date went rather than let two dates disagree about one promise), so the
+  // field a story screen renders is this one and it is held to the same rule.
+  "sprintEndsOn",
   "dueOn",
   "startsAt",
   "endsAt",

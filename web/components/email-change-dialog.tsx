@@ -23,6 +23,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure, auth } from "@/lib/api"
 import { CodeInput } from "@shared/web/code-input"
+import { useT } from "@shared/web/language"
 
 const emailField = { ...defaultFieldConfig, label: "New email", required: true }
 
@@ -37,6 +38,7 @@ export function EmailChangeDialog({
   currentEmail: string
   onSaved: () => Promise<void>
 }) {
+  const t = useT()
   const [step, setStep] = React.useState<"email" | "code">("email")
   const [email, setEmail] = React.useState("")
   const [code, setCode] = React.useState("")
@@ -61,7 +63,7 @@ export function EmailChangeDialog({
       setStep("code")
       setCode("")
       // The code goes ONLY to the new inbox — never the response or a toast.
-      toast.success(`Code sent — check ${email.trim()}.`)
+      toast.success(`Code sent. Check ${email.trim()}.`)
     } catch (e) {
       setError(e instanceof ApiFailure ? e.message : "Couldn't send the code.")
     } finally {
@@ -76,7 +78,7 @@ export function EmailChangeDialog({
       await auth.verifyEmailChange(email.trim(), fullCode)
       await onSaved()
       onOpenChange(false)
-      toast.success("Email changed. Your other devices were signed out.")
+      toast.success(t("Email changed. Your other devices were signed out."))
     } catch (e) {
       setCode("")
       setError(e instanceof ApiFailure ? e.message : "That didn't work. Try again.")
@@ -89,7 +91,7 @@ export function EmailChangeDialog({
     <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Change your email</DialogTitle>
+          <DialogTitle>{t("Change your email")}</DialogTitle>
           <DialogDescription>
             {step === "email"
               ? `You currently sign in with ${currentEmail}.`
@@ -147,10 +149,10 @@ export function EmailChangeDialog({
                   setError(undefined)
                 }}
               >
-                Use a different email
+                {t("Use a different email")}
               </Button>
               <Button variant="ghost" size="sm" disabled={busy} onClick={() => void sendCode()}>
-                Resend code
+                {t("Resend code")}
               </Button>
             </div>
           </div>

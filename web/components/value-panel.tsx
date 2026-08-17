@@ -44,6 +44,7 @@ import {
   type SavingsView,
   type StepSaving,
 } from "@shared/workers/savings"
+import { useT } from "@shared/web/language"
 
 /** ONE step's arithmetic, said out loud. This line is the answer to the third
  * click, and it is deliberately the whole sum rather than its result.
@@ -54,6 +55,7 @@ import {
  * differently-worded version of the same sum on the map is being asked to check
  * whether two sentences mean the same thing. One component, one wording. */
 export function SavingStepLine({ step }: { step: StepSaving }) {
+  const t = useT()
   const gain = step.savedSecondsPerMonth >= 0
   return (
     <div className="flex flex-col gap-1 border-t py-3 first:border-t-0 sm:flex-row sm:items-baseline sm:justify-between">
@@ -62,20 +64,20 @@ export function SavingStepLine({ step }: { step: StepSaving }) {
           {step.name}
           {step.removed && (
             <Badge variant="secondary" className="ml-2 text-[10px]">
-              no longer done
+              {t("no longer done")}
             </Badge>
           )}
         </p>
         <p className="text-muted-foreground text-xs">
-          {minutesText(step.baselineSecondsPerRun)} before ·{" "}
+          {minutesText(step.baselineSecondsPerRun)} {t("before ·")}{" "}
           {step.removed ? "not done now" : `${minutesText(step.latestSecondsPerRun)} now`} ·{" "}
-          {step.runsPerMonth.toLocaleString()}× a month
+          {step.runsPerMonth.toLocaleString()}{t("× a month")}
         </p>
       </div>
       <div className="shrink-0 text-sm sm:text-right">
         <span className={gain ? "text-foreground font-medium" : "text-destructive font-medium"}>
           {gain ? "" : "−"}
-          {hoursText(step.savedSecondsPerMonth)} a month
+          {hoursText(step.savedSecondsPerMonth)} {t("a month")}
         </span>
         {step.regression && (
           <p className="text-muted-foreground text-xs">
@@ -88,6 +90,7 @@ export function SavingStepLine({ step }: { step: StepSaving }) {
 }
 
 export function ValuePanel({ view }: { view: SavingsView | undefined }) {
+  const t = useT()
   if (view === undefined) return <Skeleton variant="list" lines={4} />
 
   const unexplained = view.apps
@@ -97,10 +100,9 @@ export function ValuePanel({ view }: { view: SavingsView | undefined }) {
   if (view.apps.length === 0)
     return (
       <div className="rounded-lg border p-4">
-        <p className="text-sm font-medium">No value to show yet.</p>
+        <p className="text-sm font-medium">{t("No value to show yet.")}</p>
         <p className="text-muted-foreground mt-1 text-sm">
-          Map a process, write down how long each step took before, and the saving appears here as
-          soon as a step gets faster.
+          {t("Map a process, write down how long each step took before, and the saving appears here as soon as a step gets faster.")}
         </p>
       </div>
     )
@@ -108,7 +110,7 @@ export function ValuePanel({ view }: { view: SavingsView | undefined }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="rounded-lg border p-4">
-        <p className="text-muted-foreground text-sm">Time given back, every month</p>
+        <p className="text-muted-foreground text-sm">{t("Time given back, every month")}</p>
         <p className="text-2xl font-semibold tracking-tight">
           {hoursText(view.savedSecondsPerMonth)}
         </p>
@@ -120,7 +122,7 @@ export function ValuePanel({ view }: { view: SavingsView | undefined }) {
             {unexplained === 1
               ? "1 step takes longer than it used to and has no explanation yet."
               : `${unexplained} steps take longer than they used to and have no explanation yet.`}{" "}
-            Add one on the map — the client sees these either way.
+            {t("Add one on the map, the client sees these either way.")}
           </p>
         )}
       </div>
@@ -132,7 +134,7 @@ export function ValuePanel({ view }: { view: SavingsView | undefined }) {
               <span className="flex w-full items-baseline justify-between gap-3 pr-2">
                 <span className="truncate">{app.name}</span>
                 <span className="text-muted-foreground shrink-0 text-xs font-normal">
-                  {hoursText(app.savedSecondsPerMonth)} a month
+                  {hoursText(app.savedSecondsPerMonth)} {t("a month")}
                 </span>
               </span>
             </AccordionTrigger>
@@ -144,7 +146,7 @@ export function ValuePanel({ view }: { view: SavingsView | undefined }) {
                       <span className="flex w-full items-baseline justify-between gap-3 pr-2">
                         <span className="truncate">{process.name}</span>
                         <span className="text-muted-foreground shrink-0 text-xs font-normal">
-                          {hoursText(process.savedSecondsPerMonth)} a month
+                          {hoursText(process.savedSecondsPerMonth)} {t("a month")}
                         </span>
                       </span>
                     </AccordionTrigger>

@@ -19,6 +19,7 @@ import { ScrollArea } from "@kwapso/ui/registry/primitives/scroll-area/scroll-ar
 import type { AgentThread } from "@shared/types"
 import { dataOps } from "@/lib/api"
 import { formatActivityWhen } from "@shared/web/format"
+import { useT } from "@shared/web/language"
 
 export function AgentHistoryDialog({
   open,
@@ -33,6 +34,7 @@ export function AgentHistoryDialog({
   currentThreadId?: string
   onPick: (threadId: string) => void
 }) {
+  const t = useT()
   const [threads, setThreads] = React.useState<AgentThread[] | null>(null)
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState(false)
@@ -56,14 +58,14 @@ export function AgentHistoryDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Your conversations</DialogTitle>
-          <DialogDescription>Pick up any chat where you left off — on any device.</DialogDescription>
+          <DialogTitle>{t("Your conversations")}</DialogTitle>
+          <DialogDescription>{t("Pick up any chat where you left off, on any device.")}</DialogDescription>
         </DialogHeader>
         {loading ? (
-          <p className="text-muted-foreground py-6 text-center text-sm">Loading…</p>
+          <p className="text-muted-foreground py-6 text-center text-sm">{t("Loading…")}</p>
         ) : error ? (
           <p className="text-muted-foreground py-6 text-center text-sm">
-            Couldn&apos;t load your conversations. Try again.
+            {t("Couldn't load your conversations. Try again.")}
           </p>
         ) : threads && threads.length > 0 ? (
           <ScrollArea className="max-h-80">
@@ -92,7 +94,7 @@ export function AgentHistoryDialog({
             </ul>
           </ScrollArea>
         ) : (
-          <p className="text-muted-foreground py-6 text-center text-sm">No conversations yet.</p>
+          <p className="text-muted-foreground py-6 text-center text-sm">{t("No conversations yet.")}</p>
         )}
       </DialogContent>
     </Dialog>

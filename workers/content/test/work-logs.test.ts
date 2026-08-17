@@ -63,7 +63,14 @@ const historyFor = (id: string): string[] =>
 
 /** A story to log against. */
 async function addStory(title: string): Promise<string> {
-  const res = await call(IDS.staffUser, "POST /api/content/stories", { title })
+  const res = await call(IDS.staffUser, "POST /api/content/stories", {
+    title,
+    // A kind and an answer about processes are both required now (CHECKLIST 6.2
+    // and 6.5). Neither is what these cases are about; they are the ordinary
+    // answers so the fixture reads as an ordinary story.
+    storyType: "Fix",
+    changesNoStep: true,
+  })
   expect(res.status).toBe(200)
   return (db().prepare(`SELECT id FROM stories WHERE title = ?`).get(title) as { id: string }).id
 }
@@ -98,7 +105,15 @@ describe("what time may be logged against", () => {
     ).tickets[0].id
     await call(IDS.staffUser, "POST /api/content/tasks", { title: "Our own VAT return" })
     const task = (db().prepare(`SELECT id FROM tasks LIMIT 1`).get() as { id: string }).id
-    const ids: Record<string, string> = { stories: story, help: ticket, tasks: task }
+    // A meeting straight into the table rather than through its door: this suite
+    // is about what time may be LOGGED against, and the meetings module has its
+    // own suite for how one is created.
+    db().exec(`
+      INSERT INTO meetings (id, title, starts_at, status, created_at)
+        VALUES ('mtg1', 'The Tuesday call', '2026-08-18T09:00:00.000Z', 'scheduled', '2026-08-18T08:00:00.000Z');
+    `)
+    const meeting = "mtg1"
+    const ids: Record<string, string> = { stories: story, help: ticket, tasks: task, meetings: meeting }
     for (const table of Object.keys(WORK_LOG_TARGETS)) {
       const res = await call(IDS.staffUser, "POST /api/content/work-logs/start", {
         targetTable: table,

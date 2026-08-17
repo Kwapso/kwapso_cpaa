@@ -79,7 +79,7 @@ const AGENT_ONLY: AgentTool[] = [
   {
     name: "get_role_permissions",
     description:
-      "Read a role's access rights (its permission matrix, by role id): for each module — read, create, edit, delete.",
+      "Read a role's access rights (its permission matrix, by role id): for each module. Read, create, edit, delete.",
     schema: obj({ roleId: S }, ["roleId"]),
     binding: "TENANCY",
     method: "GET",
@@ -92,9 +92,9 @@ const AGENT_ONLY: AgentTool[] = [
   {
     name: "set_help_status_by_filter",
     description:
-      "The SET-shaped bulk: move EVERY support ticket matching a facet filter (status and/or type — the " +
+      "The SET-shaped bulk: move EVERY support ticket matching a facet filter (status and/or type, the " +
       "same facets the Tickets screen sends; free text is NOT accepted for a write) to one status, in one " +
-      "call. Call it FIRST with dryRun:true to learn the TRUE match count, then again for real — the " +
+      "call. Call it FIRST with dryRun:true to learn the TRUE match count, then again for real, the " +
       `count you state must come from that dry run. Refuses a filter matching more than ${BULK_IDS_LIMIT} ` +
       "tickets; a re-run changes nothing (idempotent).",
     schema: obj(
@@ -122,7 +122,7 @@ const AGENT_ONLY: AgentTool[] = [
     name: "bulk_set_help_status",
     description:
       "Move MANY support tickets to the same status at once (open, in_progress, resolved, reopened). " +
-      "First list the tickets (a read) to get their ids, then call this with those ids — at most " +
+      "First list the tickets (a read) to get their ids, then call this with those ids, at most " +
       `${BULK_IDS_LIMIT} per call (the door refuses more). A bulk change is confirmed with a count ` +
       "before it runs. For a filter-shaped job prefer set_help_status_by_filter (one call, true count).",
     schema: obj(
@@ -136,26 +136,6 @@ const AGENT_ONLY: AgentTool[] = [
     confirm: true, // a bulk change is high-blast — always confirm
     buildBody: (i) => ({ ids: i.ids, status: i.status }),
     summarize: (i) => `Set ${Array.isArray(i.ids) ? i.ids.length : 0} tickets to ${i.status}`,
-  },
-  {
-    name: "bulk_set_learning_active",
-    description:
-      "Switch MANY learning articles off (deactivate) or back on (reactivate) at once — never deleted. " +
-      "First list the articles (a read) to get their ids, then call this with those ids — at most " +
-      `${BULK_IDS_LIMIT} per call (the door refuses more). A bulk change is confirmed with a count ` +
-      "before it runs.",
-    schema: obj(
-      { ids: { type: "array", items: S, maxItems: BULK_IDS_LIMIT }, active: { type: "boolean" } },
-      ["ids", "active"]
-    ),
-    binding: "CONTENT",
-    method: "POST",
-    path: "/api/content/learning/bulk-active",
-    write: true,
-    confirm: true, // a bulk change is high-blast — always confirm
-    buildBody: (i) => ({ ids: i.ids, active: i.active }),
-    summarize: (i) =>
-      `${i.active ? "Activate" : "Deactivate"} ${Array.isArray(i.ids) ? i.ids.length : 0} articles`,
   },
   {
     // Runs INSIDE data-ops (binding SELF): the import batch engine, not a worker fetch.
@@ -177,8 +157,13 @@ const AGENT_ONLY: AgentTool[] = [
   },
 
   /* ------------------------------- GOOGLE ---------------------------------- */
-  // Thirteen tools on the four services somebody has connected THEIR OWN account
-  // to. Act-as-user does all the work here, as it does everywhere else: the
+  // Twenty-six tools on the four services somebody has connected THEIR OWN
+  // account to — the thirteen below, and the thirteen that finish the sentence
+  // further down (rewriting a file, filing mail, replying in a thread, labelling,
+  // the four edits on an event, the transcript join, the space list, and the two
+  // that take something back).
+  //
+  // Act-as-user does all the work here, as it does everywhere else: the
   // executor forwards the caller's cookie, the door resolves the connection from
   // `guard.userId`, and there is no parameter anywhere in this module that could
   // name a different person's Drive. So "the assistant sees only what that person
@@ -203,7 +188,7 @@ const AGENT_ONLY: AgentTool[] = [
     description:
       "Which Google services the signed-in person has connected (Drive, Gmail, Calendar, Google Chat), " +
       "which Google account each is, and which folders and spaces they have shared. Call this FIRST if " +
-      "you are unsure whether you can read something — an unconnected service is not an error, it is a " +
+      "you are unsure whether you can read something, an unconnected service is not an error, it is a " +
       "thing to tell them about.",
     schema: obj({}),
     binding: "CONTENT",
@@ -216,7 +201,7 @@ const AGENT_ONLY: AgentTool[] = [
   {
     name: "google_drive_files",
     description:
-      "List files in the Drive FOLDERS this person has shared with kwapso — never their whole Drive. " +
+      "List files in the Drive FOLDERS this person has shared with kwapso, never their whole Drive. " +
       "`q` narrows by name INSIDE those folders. A person who has shared no folders gets an empty list, " +
       "which means 'nothing shared', not 'nothing there'.",
     schema: obj({ q: S }),
@@ -246,7 +231,7 @@ const AGENT_ONLY: AgentTool[] = [
     name: "google_drive_upload",
     description:
       "Write a text file INTO one of the folders this person has shared. `sourceId` is the shared " +
-      "folder's id from list_google_connections — not a Google folder id, because you can only ever " +
+      "folder's id from list_google_connections, not a Google folder id, because you can only ever " +
       "write into a folder they chose.",
     schema: obj({ sourceId: S, name: S, text: S, mimeType: S }, ["sourceId", "name", "text"]),
     binding: "CONTENT",
@@ -267,7 +252,7 @@ const AGENT_ONLY: AgentTool[] = [
   {
     name: "google_mail_search",
     description:
-      "Search this person's mail — ONLY messages to or from someone on one of the team's accounts. " +
+      "Search this person's mail. ONLY messages to or from someone on one of the team's accounts. " +
       "That fence is built by the door from the accounts' own email addresses; `q` narrows INSIDE it " +
       "and cannot widen it. If no contact has an email address yet, the answer says so.",
     schema: obj({ q: S }),
@@ -297,7 +282,7 @@ const AGENT_ONLY: AgentTool[] = [
       "Write a reply and LEAVE IT IN THEIR GMAIL DRAFTS. Nothing is sent. This is the normal way to " +
       "answer mail: the person opens the draft, changes what they like and sends it. Pass `threadId` " +
       "(from google_mail_search) to keep it in the same conversation. The answer carries a link " +
-      "straight to the draft — always give them that link.",
+      "straight to the draft, always give them that link.",
     schema: obj({ to: S, subject: S, body: S, threadId: S }, ["to", "subject", "body"]),
     binding: "CONTENT",
     method: "POST",
@@ -317,7 +302,7 @@ const AGENT_ONLY: AgentTool[] = [
   {
     name: "google_send_mail",
     description:
-      "ACTUALLY SEND mail as this person. Needs their role's own send switch — a role without it gets a " +
+      "ACTUALLY SEND mail as this person. Needs their role's own send switch, a role without it gets a " +
       "refusal, and that is the intended answer, not a problem to work around. Prefer google_draft_reply " +
       "unless the person has clearly asked for it to go now. Pass `draftId` to send a draft you already " +
       "wrote, or the message fields to send a new one.",
@@ -397,7 +382,7 @@ const AGENT_ONLY: AgentTool[] = [
     name: "google_chat_messages",
     description:
       "Read recent messages in ONE Google Chat space this person has shared. `sourceId` is the shared " +
-      "space's id from list_google_connections — a space they have not shared cannot be named here.",
+      "space's id from list_google_connections, a space they have not shared cannot be named here.",
     schema: obj({ sourceId: S }, ["sourceId"]),
     binding: "CONTENT",
     method: "GET",
@@ -422,6 +407,285 @@ const AGENT_ONLY: AgentTool[] = [
     confirm: true,
     buildBody: (i) => ({ sourceId: str(i, "sourceId"), text: str(i, "text") }),
     summarize: () => "Post in a shared Chat space",
+  },
+
+  /* ------------------- GOOGLE: the acts that were missing ------------------- */
+  // Thirteen more, and they divide into three groups worth reading as groups.
+  //
+  // TAKING SOMETHING BACK (`google_drive_trash`, `google_chat_delete`). Neither
+  // was on the owner's list and both are here because the list makes them
+  // necessary: an assistant that can make a folder, rewrite a file and post in a
+  // space, with no way to undo any of it, turns every mistake into a permanent
+  // one. Both confirm, both are the softest form of the act available — Drive's
+  // bin rather than a delete, and a message this app itself sent.
+  //
+  // THE CONFIRM RULE, applied rather than restated. The owner's line is: mail
+  // always asks, calendar entries do not, because a sent message is in somebody
+  // else's inbox forever and a diary entry is one click from gone. Read that way,
+  // `google_reply_mail` asks (it sends), `google_event_guests` asks (an
+  // invitation lands in a third party's inbox and cannot be recalled), and
+  // changing a title, a room or a time does not. `google_label_mail` does not
+  // ask either: a label is filing, nobody else can see it, and taking it off
+  // again costs one call.
+  //
+  // AND ONE JOIN NOBODY COULD MAKE BEFORE: `google_meeting_transcript` starts at
+  // the diary entry, which is where a person starts ("what did we agree in
+  // Tuesday's call?"), and finds what Meet filed in the folders they shared.
+  {
+    name: "google_drive_update",
+    description:
+      "Rewrite a Drive file kwapso can write to, `text` replaces the WHOLE contents, it is not " +
+      "appended. `fileId` comes from google_drive_files or from google_drive_upload. Pass `name` to " +
+      "rename it in the same breath. Google refuses a file this app did not create, and that refusal " +
+      "is the fence: you cannot rewrite something the person only ever let kwapso read.",
+    schema: obj({ fileId: S, text: S, name: S, mimeType: S }, ["fileId", "text"]),
+    binding: "CONTENT",
+    method: "POST",
+    path: "/api/content/google/drive/update",
+    write: true,
+    // Constructive in the same sense the upload is, and reversible: the previous
+    // version stays in Drive's own file history.
+    confirm: false,
+    buildBody: (i) => ({
+      fileId: str(i, "fileId"),
+      text: str(i, "text"),
+      ...(str(i, "name") ? { name: str(i, "name") } : {}),
+      ...(str(i, "mimeType") ? { mimeType: str(i, "mimeType") } : {}),
+    }),
+    summarize: (i) => `Rewrite a shared Drive file${str(i, "name") ? ` as "${str(i, "name")}"` : ""}`,
+  },
+  {
+    name: "google_drive_folder",
+    description:
+      "Make a new folder INSIDE one of the folders this person has shared. `sourceId` is the shared " +
+      "folder's id from list_google_connections, a folder can only be made somewhere they already " +
+      "chose. The answer carries the new folder's id, which google_drive_upload cannot use: uploads " +
+      "name a SHARED folder, not any folder.",
+    schema: obj({ sourceId: S, name: S }, ["sourceId", "name"]),
+    binding: "CONTENT",
+    method: "POST",
+    path: "/api/content/google/drive/folder",
+    write: true,
+    confirm: false,
+    buildBody: (i) => ({ sourceId: str(i, "sourceId"), name: str(i, "name") }),
+    summarize: (i) => `Make the "${str(i, "name")}" folder in a shared Drive folder`,
+  },
+  {
+    name: "google_mail_to_drive",
+    description:
+      "File a message, or a whole conversation, into a shared Drive folder as a readable text " +
+      "document. Pass `threadId` for the whole exchange (from google_mail_search) or `messageId` for " +
+      "one message; `sourceId` is the shared folder it goes into. Use it when somebody says 'put that " +
+      "exchange in the client folder'. The document is text, not a mail archive, so it can be read, " +
+      "searched and indexed afterwards.",
+    schema: obj({ sourceId: S, threadId: S, messageId: S, name: S }, ["sourceId"]),
+    binding: "CONTENT",
+    method: "POST",
+    path: "/api/content/google/drive/save-mail",
+    write: true,
+    confirm: false,
+    buildBody: (i) => ({
+      sourceId: str(i, "sourceId"),
+      ...(str(i, "threadId") ? { threadId: str(i, "threadId") } : {}),
+      ...(str(i, "messageId") ? { messageId: str(i, "messageId") } : {}),
+      ...(str(i, "name") ? { name: str(i, "name") } : {}),
+    }),
+    summarize: (i) => (str(i, "threadId") ? "File a conversation in Drive" : "File a message in Drive"),
+  },
+  {
+    name: "google_drive_trash",
+    description:
+      "Put a Drive file in the bin, never a permanent delete. It keeps its name and its sharing for " +
+      "thirty days and the person can restore it in one click. Use it to undo a file kwapso wrote. " +
+      "`fileId` comes from google_drive_upload or google_drive_files; the answer says whether anything " +
+      "moved (`changed` is false when the file was already in the bin).",
+    schema: obj({ fileId: S }, ["fileId"]),
+    binding: "CONTENT",
+    method: "POST",
+    path: "/api/content/google/drive/trash",
+    write: true,
+    // It takes something away. Every destructive act in this catalogue asks.
+    confirm: true,
+    buildBody: (i) => ({ fileId: str(i, "fileId") }),
+    summarize: () => "Put a Drive file in the bin",
+  },
+  {
+    name: "google_reply_mail",
+    description:
+      "SEND a reply inside an existing conversation. It takes `messageId` (from google_mail_search) " +
+      "and what to say, who it goes to, what it is called and which thread it belongs to are all read " +
+      "off the message being answered, so a reply can never land in the wrong person's inbox or start " +
+      "a new conversation by accident. Needs their role's own send switch. Prefer google_draft_reply " +
+      "unless the person has clearly asked for it to go now.",
+    schema: obj({ messageId: S, body: S }, ["messageId", "body"]),
+    binding: "CONTENT",
+    method: "POST",
+    path: "/api/content/google/gmail/reply",
+    write: true,
+    // It sends. MAIL ALWAYS ASKS — the same rule as google_send_mail, for the
+    // same reason: it is in somebody else's inbox and cannot be recalled.
+    confirm: true,
+    buildBody: (i) => ({ messageId: str(i, "messageId"), body: str(i, "body") }),
+    summarize: () => "Reply in the conversation",
+  },
+  {
+    name: "google_label_mail",
+    description:
+      "File a message under a Gmail label, or take the label off. `label` is the name a person says " +
+      "('Contracts'), matched without regard to capitals; applying one creates it if it isn't there, " +
+      "removing one never does. `on` says which way. The answer's `changed` is false when the message " +
+      "already was (or already wasn't) filed there, so a second call is safe.",
+    schema: obj({ messageId: S, label: S, on: B }, ["messageId", "label", "on"]),
+    binding: "CONTENT",
+    method: "POST",
+    path: "/api/content/google/gmail/label",
+    write: true,
+    // Filing, not sending: nobody else can see a label and taking it off again
+    // is one call. The same reading that lets a Drive upload run straight away.
+    confirm: false,
+    buildBody: (i) => ({ messageId: str(i, "messageId"), label: str(i, "label"), on: i.on === true }),
+    summarize: (i) =>
+      i.on === true ? `File a message under "${str(i, "label")}"` : `Take "${str(i, "label")}" off a message`,
+  },
+  {
+    name: "google_update_event",
+    description:
+      "Change what a calendar entry SAYS and WHEN it is. `eventId` comes from google_calendar_events. " +
+      "Send only the fields that change, anything left out stays as it is, so fixing a title cannot " +
+      "wipe a guest list. `start` and `end` are RFC-3339 timestamps, or plain dates with allDay:true. " +
+      "Guests are told. For where it is use google_event_location; for who is coming use " +
+      "google_event_guests. Needs their role's own events switch.",
+    schema: obj({ eventId: S, summary: S, description: S, start: S, end: S, allDay: B }, ["eventId"]),
+    binding: "CONTENT",
+    method: "POST",
+    path: "/api/content/google/calendar/event/update",
+    write: true,
+    // Same reading as google_create_event: a diary entry its owner can fix in
+    // one click, so asking every time would slow the assistant down without
+    // making anything safer.
+    confirm: false,
+    buildBody: (i) => ({
+      eventId: str(i, "eventId"),
+      ...(str(i, "summary") ? { summary: str(i, "summary") } : {}),
+      ...(str(i, "description") ? { description: str(i, "description") } : {}),
+      ...(str(i, "start") ? { start: str(i, "start") } : {}),
+      ...(str(i, "end") ? { end: str(i, "end") } : {}),
+      ...(i.allDay === true ? { allDay: true } : {}),
+    }),
+    summarize: (i) => (str(i, "summary") ? `Rename an event to "${str(i, "summary")}"` : "Change an event"),
+  },
+  {
+    name: "google_event_guests",
+    description:
+      "Invite people to a calendar entry, or take them off, both in one call, so 'swap Ana for " +
+      "Marta' sends one notification rather than two. `add` and `remove` are lists of email " +
+      "addresses. Everyone on the entry is emailed about the change. The answer's `changed` is false " +
+      "when nobody new was invited and nobody was actually on it to remove. Needs their role's own " +
+      "events switch.",
+    schema: obj({ eventId: S, add: { type: "array", items: S }, remove: { type: "array", items: S } }, [
+      "eventId",
+    ]),
+    binding: "CONTENT",
+    method: "POST",
+    path: "/api/content/google/calendar/event/guests",
+    write: true,
+    // THE ONE CALENDAR WRITE THAT ASKS, and it is the mail rule rather than an
+    // exception to the event rule: an invitation lands in a third party's inbox
+    // the moment it is sent, and there is no version of undo that unsends it.
+    confirm: true,
+    buildBody: (i) => ({
+      eventId: str(i, "eventId"),
+      add: Array.isArray(i.add) ? i.add : [],
+      remove: Array.isArray(i.remove) ? i.remove : [],
+    }),
+    summarize: (i) => {
+      const added = Array.isArray(i.add) ? i.add.length : 0
+      const dropped = Array.isArray(i.remove) ? i.remove.length : 0
+      return `Change who is coming (${added} invited, ${dropped} removed)`
+    },
+  },
+  {
+    name: "google_event_location",
+    description:
+      "Say WHERE a calendar entry happens, a room, an address, anything a person would write down. " +
+      "`eventId` comes from google_calendar_events. Its own action because where is the one thing " +
+      "people change on its own once the time is agreed, and doing it here cannot disturb a time " +
+      "somebody moved in Google since. Guests are told. Needs their role's own events switch.",
+    schema: obj({ eventId: S, location: S }, ["eventId", "location"]),
+    binding: "CONTENT",
+    method: "POST",
+    path: "/api/content/google/calendar/event/location",
+    write: true,
+    confirm: false, // an event field, and events do not ask — see google_create_event.
+    buildBody: (i) => ({ eventId: str(i, "eventId"), location: str(i, "location") }),
+    summarize: (i) => `Set where an event happens, ${str(i, "location")}`,
+  },
+  {
+    name: "google_cancel_event",
+    description:
+      "Call a calendar entry off. It is marked CANCELLED rather than deleted, so it stays in " +
+      "everybody's calendar saying so and every guest is told, an appointment that silently vanished " +
+      "is worse than one that says it is off. `eventId` comes from google_calendar_events. The " +
+      "answer's `changed` is false when it was already cancelled. Needs their role's own events switch.",
+    schema: obj({ eventId: S }, ["eventId"]),
+    binding: "CONTENT",
+    method: "POST",
+    path: "/api/content/google/calendar/event/cancel",
+    write: true,
+    // It takes an arrangement away from other people. Destructive, so it asks —
+    // the same line every deactivate in this catalogue sits on.
+    confirm: true,
+    buildBody: (i) => ({ eventId: str(i, "eventId") }),
+    summarize: () => "Call off a calendar entry",
+  },
+  {
+    name: "google_meeting_transcript",
+    description:
+      "Read what was SAID in a meeting, starting from the meeting itself. Give it `eventId` from " +
+      "google_calendar_events and it finds the transcript Google Meet filed. Meet writes one as an " +
+      "ordinary document named after the meeting, so this is the only way to reach it without already " +
+      "knowing which document it is. It looks ONLY in the Drive folders this person has shared: if the " +
+      "answer's `transcript` is null the `note` says why, and 'share the Meet Recordings folder' is " +
+      "usually the fix.",
+    schema: obj({ eventId: S }, ["eventId"]),
+    binding: "CONTENT",
+    method: "GET",
+    path: "/api/content/google/calendar/event/transcript",
+    write: false,
+    confirm: false,
+    buildQuery: (i) => `?eventId=${encodeURIComponent(str(i, "eventId"))}`,
+    summarize: () => "Read a meeting's transcript",
+  },
+  {
+    name: "google_chat_spaces",
+    description:
+      "List every Google Chat space this person can see, and which of them are already shared with " +
+      "kwapso. Each one carries `shared` and, where it is, the `sourceId` google_chat_messages needs. " +
+      "Call this when somebody names a space you have no id for, reading the LIST is not reading what " +
+      "is in them, and an unshared space still cannot be read.",
+    schema: obj({}),
+    binding: "CONTENT",
+    method: "GET",
+    path: "/api/content/google/chat/spaces",
+    write: false,
+    confirm: false,
+    summarize: () => "List the Chat spaces",
+  },
+  {
+    name: "google_chat_delete",
+    description:
+      "Take back a message kwapso posted in a shared space. `messageName` is the id google_chat_post " +
+      "gave back, and `sourceId` is the space it went into. Google refuses a message this app did not " +
+      "send, so this can only ever undo kwapso's own posts.",
+    schema: obj({ sourceId: S, messageName: S }, ["sourceId", "messageName"]),
+    binding: "CONTENT",
+    method: "POST",
+    path: "/api/content/google/chat/delete",
+    write: true,
+    // Destructive, and in a space other people are reading. It asks.
+    confirm: true,
+    buildBody: (i) => ({ sourceId: str(i, "sourceId"), messageName: str(i, "messageName") }),
+    summarize: () => "Take back a message in a shared Chat space",
   },
 ]
 

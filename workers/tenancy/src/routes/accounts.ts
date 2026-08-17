@@ -18,6 +18,7 @@ import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/worke
 import { publishChange } from "@shared/workers/realtime"
 import { gated, gatedBody, openTeam } from "@shared/workers/route"
 import { accountScope, type AccountScope } from "@shared/workers/account-scope"
+import { MAX_IMAGE_BYTES, mediaKey, parseDataUrl } from "@shared/workers/image"
 import { GuardError, hasRight, teamContext, whoAmI, type MemberGuard } from "@shared/workers/gating"
 import type { D1Rest } from "@shared/workers/d1-rest"
 import type { PortalUser } from "@shared/types"
@@ -49,12 +50,24 @@ import type { Env } from "../env"
 type Body = Record<string, unknown>
 
 /** The optional-text fields an account carries, validated identically on create
- * and edit so the two can't drift into different limits. */
+ * and edit so the two can't drift into different limits.
+ *
+ * THE ADDRESS IS FOUR FIELDS, not one line: a country typed free is a country
+ * spelled five ways, and "which of our clients are in Berlin?" is a question one
+ * text column cannot answer. `about` is the one long field — it is authored as
+ * rich text — and the two image fields hold what the picker produced. */
 function accountFields(body: Record<string, unknown>) {
   return {
     email: optionalText(body.email, "Email", TEXT_LIMITS.short),
     phone: optionalText(body.phone, "Phone", TEXT_LIMITS.short),
-    address: optionalText(body.address, "Address", TEXT_LIMITS.long),
+    street: optionalText(body.street, "Street", TEXT_LIMITS.short),
+    postalCode: optionalText(body.postalCode, "Postal code", TEXT_LIMITS.short),
+    city: optionalText(body.city, "City", TEXT_LIMITS.short),
+    country: optionalText(body.country, "Country", TEXT_LIMITS.short),
+    industry: optionalText(body.industry, "Industry", TEXT_LIMITS.short),
+    about: optionalText(body.about, "About", TEXT_LIMITS.long),
+    logoUrl: optionalText(body.logoUrl, "Logo", TEXT_LIMITS.long),
+    coverUrl: optionalText(body.coverUrl, "Cover image", TEXT_LIMITS.long),
     code: optionalText(body.code, "Reference", TEXT_LIMITS.short),
     currency: optionalText(body.currency, "Currency", TEXT_LIMITS.short),
     locale: optionalText(body.locale, "Language", TEXT_LIMITS.short),
@@ -63,19 +76,97 @@ function accountFields(body: Record<string, unknown>) {
   }
 }
 
+/** A PICKED IMAGE BECOMES AN OBJECT IN R2, NEVER A COLUMN.
+ *
+ * The form hands back a data URL (the file the person just chose, already
+ * downsized in the browser). Storing that string is the tempting shortcut and it
+ * is the wrong one twice over: a 512px JPEG is ~60 KB of base64, so a page of
+ * fifty accounts carrying a logo and a cover would be several megabytes on every
+ * list read and every CSV export — and a `data:` URL rendered into `src` is
+ * exactly the shape `safeSrc` refuses, because a caller who can write the column
+ * can write any scheme they like.
+ *
+ * So it lands in the bucket and the row keeps the `/media/...` path, which is the
+ * same thing a team logo has always done (lib/teams.ts updateTeamDetails). The
+ * key carries a random tail because the /media door has no session — the key IS
+ * the credential (shared/workers/image.ts mediaKey).
+ *
+ * Anything that is NOT a data URL passes straight through: an empty string is
+ * "clear it", and an existing `/media/...` path is the form handing back what it
+ * was given. */
+async function storedImage(env: Env, teamId: string, value: string | undefined): Promise<string | undefined> {
+  if (!value || !value.startsWith("data:")) return value
+  const parsed = parseDataUrl(value)
+  if (!parsed) throw new GuardError(400, "bad_image", "That image format isn't supported.")
+  if (parsed.bytes.byteLength > MAX_IMAGE_BYTES)
+    throw new GuardError(400, "image_too_large", "That image is too large.")
+  const key = mediaKey(teamId, "accounts")
+  await env.MEDIA.put(key, parsed.bytes, { httpMetadata: { contentType: parsed.contentType } })
+  return `/media/${key}?v=${Date.now()}`
+}
+
+/** Both of an account's images, through the store above. */
+async function accountImages(
+  env: Env,
+  guard: MemberGuard,
+  fields: { logoUrl?: string; coverUrl?: string }
+): Promise<{ logoUrl?: string; coverUrl?: string }> {
+  const [logoUrl, coverUrl] = await Promise.all([
+    storedImage(env, guard.teamId, fields.logoUrl),
+    storedImage(env, guard.teamId, fields.coverUrl),
+  ])
+  return { logoUrl, coverUrl }
+}
+
+/** MAY THIS CALLER LIST PEOPLE? — the `contacts` right, resolved once per
+ * request and handed to the read as a boolean.
+ *
+ * `hasRight` rather than `requireRight` on purpose: without it the accounts
+ * collection is still answered, it is just the COMPANIES. Refusing the whole
+ * door would take a developer's client list away to withhold its address book,
+ * which is the opposite of what was asked for. Aurora's sentence is about the
+ * PEOPLE — "people of the development team does not need to know who are the
+ * contacts" — and this is that sentence and no more of it.
+ *
+ * The same shape the logins already use one door down (`portal_users:read` on
+ * the detail), and for the same reason: a bigger decision than editing a phone
+ * number gets its own switch on the matrix. */
+async function contactSight(cfg: D1Rest, guard: MemberGuard, scope: AccountScope) {
+  // A CLIENT LOGIN'S OWN COLLEAGUES ARE NOT THE AGENCY'S ADDRESS BOOK. The fence
+  // has already narrowed a portal caller to one company and everything nested
+  // under it, and the people in there are their own — SCOPE ch.06 says a contact
+  // sees their company's world, and the portal's own People list is drawn from
+  // exactly this read. This right governs which of OUR staff may enumerate our
+  // customers' people; it was never about a client reading their own.
+  //
+  // Said as a POSITIVE test on `kind`, never as "not staff": the same inversion
+  // `accountScope` warns about in its own header would fail open on precisely
+  // the people the fence exists for.
+  if (scope.kind === "portal") return { mayListPeople: true }
+  return { mayListPeople: await hasRight(cfg, guard, "contacts", "read") }
+}
+
 /** GET /api/tenancy/accounts — the caller's accounts, paged (R14: this list grows
  * with ordinary use, so it answers with a cursor rather than a ceiling). */
 export async function getAccounts(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "accounts", "read")
   const scope = await accountScope(cfg, guard)
   const url = new URL(request.url)
-  const page = await listAccounts(cfg, guard, scope, {
+  const page = await listAccounts(cfg, guard, scope, await contactSight(cfg, guard, scope), {
     ...accountQuery(url),
     // Capped like every other query parameter — an opaque cursor is ~70 chars, so a
     // megabyte of it is a bad request, not an atob + JSON.parse of a megabyte.
     cursor: queryText(url.searchParams.get("cursor"), "Cursor") ?? null,
   })
-  return pagedJson("accounts", page)
+  // The two extras are the tab strip's badges (R16): how many companies and how
+  // many people this caller may see. They ride the SAME response as the page so
+  // a screen cannot badge a tab from a number it fetched separately — and so a
+  // role without the contacts right gets `individualTotal: 0` beside a list with
+  // no people in it, which is one answer rather than two.
+  return pagedJson("accounts", page, {
+    entityTotal: page.entityTotal,
+    individualTotal: page.individualTotal,
+  })
 }
 
 /** The filters an accounts read accepts, parsed ONCE — the list door and the
@@ -119,21 +210,32 @@ function accountQuery(url: URL): AccountFilters {
 export async function getAccountsExport(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "accounts", "read")
   const scope = await accountScope(cfg, guard)
-  const { rows, complete } = await listAccountsForExport(cfg, guard, scope, accountQuery(new URL(request.url)))
+  // Narrowed the same way the list is (see contactSight): an export that carried
+  // the people a caller may not list would be the address book leaving in its
+  // most convenient form, one request, in a file.
+  const { rows, complete } = await listAccountsForExport(
+    cfg,
+    guard,
+    scope,
+    await contactSight(cfg, guard, scope),
+    accountQuery(new URL(request.url))
+  )
   if (!complete)
     return exportTooLarge(
       EXPORT_HARD_CAP,
       "accounts",
-      "Narrow it — search for a name, pick companies or people, or ask for one parent's accounts — or read the list a page at a time."
+      "Narrow it. Search for a name, pick companies or people, or ask for one parent's accounts, or read the list a page at a time."
     )
   const csv = toCsv(
     [
-      "name", "accountType", "code", "email", "phone", "address", "status",
+      "name", "accountType", "code", "email", "phone", "street", "postalCode", "city",
+      "country", "industry", "about", "status",
       "parent_account_id", "currency", "locale", "timezone", "commercials_visible",
       "active", "created_at", "created_by", "updated_at", "updated_by",
     ],
     rows.map((r) => [
-      r.name, r.accountType, r.code, r.email, r.phone, r.address, r.status,
+      r.name, r.accountType, r.code, r.email, r.phone, r.street, r.postalCode, r.city,
+      r.country, r.industry, r.about, r.status,
       r.parentAccountId, r.currency, r.locale, r.timezone, r.commercialsVisible,
       r.active, r.createdAt, r.createdByName, r.updatedAt, r.editedByName,
     ])
@@ -160,8 +262,20 @@ export async function getAccountDetail(request: Request, env: Env): Promise<Resp
   // is the shape the gating seam's own header forbids: "security is never just
   // hiding UI". The server now decides it too.
   const maySeeLogins = await hasRight(cfg, guard, "portal_users", "read")
+  // …AND THE PEOPLE ARE A SEPARATELY GRANTED MODULE TOO, for the same reason
+  // said one table over. A developer opening a client sees the company and the
+  // work hanging off it; the address book inside it is `contacts:read`. Withheld
+  // HERE rather than hidden on the screen, because a tab that is not drawn is
+  // not a permission — the Portal-access tab was hidden client-side for months
+  // while the server shipped the rows to anyone with `accounts:read`, which is
+  // the defect this door's own header is about.
+  const { mayListPeople } = await contactSight(cfg, guard, scope)
   return json({
     ...detail,
+    links: mayListPeople ? detail.links : [],
+    linksTotal: mayListPeople ? detail.linksTotal : 0,
+    companies: mayListPeople ? detail.companies : [],
+    companiesTotal: mayListPeople ? detail.companiesTotal : 0,
     portalUsers: maySeeLogins ? await withEmails(env, detail.portalUsers) : [],
     portalUsersTotal: maySeeLogins ? detail.portalUsersTotal : 0,
   })
@@ -179,11 +293,15 @@ export async function postCreateAccount(request: Request, env: Env): Promise<Res
   if (accountType !== "entity" && accountType !== "individual")
     return fail(400, "invalid_input", "An account is either a company or a person.")
   const name = requireText(body.name, "Name", TEXT_LIMITS.short)
+  const fields = accountFields(body)
   const id = await createAccount(cfg, guard, scope, actor, {
     accountType,
     name,
     parentAccountId: optionalText(body.parentAccountId, "Parent", TEXT_LIMITS.short),
-    ...accountFields(body),
+    ...fields,
+    // A picked image is a data URL on the way in and an object in R2 by the time
+    // the row is written — see storedImage.
+    ...(await accountImages(env, guard, fields)),
   })
   // Row-level: carry the new id so an open list patches just that row.
   await publishChange(env, guard.teamId, "accounts", id, "add")
@@ -217,9 +335,19 @@ export async function postUpdateAccount(request: Request, env: Env): Promise<Res
   const scope = await accountScope(cfg, guard)
   const id = requireText(body.id, "Account", TEXT_LIMITS.short)
   const name = requireText(body.name, "Name", TEXT_LIMITS.short)
+  const patch = accountPatch(body)
+  // A NEW image only. `accountPatch` keeps absent/null/"" meaning what they mean
+  // (leave it, clear it), and only a data URL is something to store — so the
+  // upload happens for exactly the field the person just changed.
+  const stored = await accountImages(env, guard, {
+    logoUrl: typeof patch.logoUrl === "string" ? patch.logoUrl : undefined,
+    coverUrl: typeof patch.coverUrl === "string" ? patch.coverUrl : undefined,
+  })
   await updateAccount(cfg, guard, scope, actor, id, {
     name,
-    ...accountPatch(body),
+    ...patch,
+    ...(stored.logoUrl !== undefined ? { logoUrl: stored.logoUrl } : {}),
+    ...(stored.coverUrl !== undefined ? { coverUrl: stored.coverUrl } : {}),
     commercialsVisible: typeof body.commercialsVisible === "boolean" ? body.commercialsVisible : undefined,
   })
   await publishChange(env, guard.teamId, "accounts", id)
@@ -267,10 +395,13 @@ export async function postAccountActive(request: Request, env: Env): Promise<Res
  * account's detail — so the account id is the one id a listener can act on
  * (re-pull that row, refresh that open detail). Same for the login pings below. */
 export async function postLinkPerson(request: Request, env: Env): Promise<Response> {
+  // GATED ON `contacts`, not `accounts`: saying that a named human works at a
+  // named company is the address book being written, and the module that governs
+  // reading it governs writing it too.
   const { actor, cfg, guard, body } = await gatedBody<Body>(
     request,
     env,
-    "accounts",
+    "contacts",
     "create"
   )
   const scope = await accountScope(cfg, guard)
@@ -286,10 +417,11 @@ export async function postLinkPerson(request: Request, env: Env): Promise<Respon
 }
 
 export async function postLinkActive(request: Request, env: Env): Promise<Response> {
+  // `contacts`, like its create half above — one module for the address book.
   const { actor, cfg, guard, body } = await gatedBody<Body>(
     request,
     env,
-    "accounts",
+    "contacts",
     "delete"
   )
   const scope = await accountScope(cfg, guard)
@@ -355,7 +487,7 @@ export async function postGrantPortalAccess(request: Request, env: Env): Promise
     return fail(
       409,
       "is_staff",
-      "That person is a member of your team — a client login would lock them out of the agency app."
+      "That person is a member of your team, a client login would lock them out of the agency app."
     )
   const id = await grantPortalAccess(cfg, guard, scope, actor, {
     onAccountId: accountId,
@@ -378,12 +510,33 @@ async function userIdForPerson(
   personAccountId: string
 ): Promise<string> {
   const person = await getAccountRow(cfg, guard, scope, personAccountId)
+  // ONLY A CONTACT MAY HOLD A LOGIN (7.4 — Aurora's ruling, over "both levels").
+  //
+  // The refusal that matters is `grantPortalAccess`'s, one file along: a stored
+  // grant whose row is a company would widen the fence to every sibling under
+  // that company's parent, so it is refused where the row is written. This is the
+  // same sentence said EARLIER, and it is not a duplicate — it is the difference
+  // between the right answer and the right answer.
+  //
+  // Identity is resolved before the write, and it is resolved BY EMAIL. A company
+  // row with an info@ address on it therefore reached "hasn't signed in here yet.
+  // Ask them to sign in once with info@…", and one without an address reached
+  // "Add an email address to Bergman GmbH first — that's how they sign in." Both
+  // are instructions for making a company into a login-holder, offered by a door
+  // that was always going to refuse. Nobody is misled about what the product
+  // allows now: the FIRST thing this door reads decides it.
+  if (person.accountType !== "individual")
+    throw new GuardError(
+      400,
+      "invalid_input",
+      "A login belongs to a person, not to a company. Pick one of their contacts."
+    )
   const email = person.email?.trim().toLowerCase()
   if (!email)
     throw new GuardError(
       400,
       "no_email",
-      `Add an email address to ${person.name} first — that's how they sign in.`
+      `Add an email address to ${person.name} first, that's how they sign in.`
     )
   const row = await env.DB.prepare("SELECT id FROM users WHERE email = ? AND deactivated_at IS NULL")
     .bind(email)

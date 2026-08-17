@@ -18,6 +18,7 @@ import type {
   AccountRate,
   ActiveContext,
   ActivityItem,
+  AppMoneyBack,
   AppRow,
   InternalRate,
   Invite,
@@ -28,6 +29,7 @@ import type {
   ProcessSummary,
   ReceivedInvite,
   RolePermissions,
+  RoleRate,
   SelectableValue,
   TeamMeta,
   TeamMember,
@@ -68,11 +70,20 @@ export const tenancy = {
       body: JSON.stringify({ name }),
     }),
 
-  /** Edit the active team's name + optional logo (data URL). Needs teams:edit. */
-  updateTeam: (name: string, logoDataUrl?: string) =>
+  /** Edit the active team's name + optional logo (data URL) + the agency's own
+   * legal details. Needs teams:edit.
+   *
+   * `legal` is PATCHED, never replaced: a field this call leaves out keeps what
+   * it had, so the team-edit dialog can save a rename without erasing an address
+   * it was never showing. Sending an empty string is how a caller clears one. */
+  updateTeam: (
+    name: string,
+    logoDataUrl?: string,
+    legal?: { legalName?: string; legalAddress?: string; legalNumbers?: string; phone?: string }
+  ) =>
     api<{ ok: true }>("/api/tenancy/teams/update", {
       method: "POST",
-      body: JSON.stringify({ name, logoDataUrl }),
+      body: JSON.stringify({ name, logoDataUrl, ...legal }),
     }),
 
   /** Everyone on the active team (identity + role + the guard flags). */
@@ -156,10 +167,10 @@ export const tenancy = {
 
   /** Add a dropdown value to a type group (pick-or-create the type). Needs
    * selectable_data:create. Returns the refreshed value list. */
-  createSelectable: (type: string, value: string) =>
+  createSelectable: (type: string, value: string, mark?: string) =>
     api<{ values: SelectableValue[] }>("/api/tenancy/selectable", {
       method: "POST",
-      body: JSON.stringify({ type, value }),
+      body: JSON.stringify({ type, value, mark }),
     }),
 
   /** Rename a dropdown value (its type stays). Needs selectable_data:edit. */
@@ -267,7 +278,11 @@ export const tenancy = {
 
   /** R14: a PAGE of accounts (a GROWING collection) — hand `cursor` back from the
    * previous response for the next one; `total` is the exact server count of what
-   * this caller may see. `parentId` narrows to one account's children. */
+   * this caller may see. `parentId` narrows to one account's children.
+   *
+   * `entityTotal` / `individualTotal` are the All / Companies / People strip's two
+   * other badges: the COLLECTION's counts rather than this call's, so a badge on a
+   * tab nobody has pressed does not move while somebody types in the search box. */
   accounts: (
     opts: {
       q?: string
@@ -288,7 +303,9 @@ export const tenancy = {
     if (opts.parentId) p.set("parentId", opts.parentId)
     if (opts.cursor) p.set("cursor", opts.cursor)
     const qs = p.toString()
-    return api<PagedResponse<{ accounts: Account[] }>>(`/api/tenancy/accounts${qs ? `?${qs}` : ""}`)
+    return api<PagedResponse<{ accounts: Account[]; entityTotal: number; individualTotal: number }>>(
+      `/api/tenancy/accounts${qs ? `?${qs}` : ""}`
+    )
   },
 
   /** One account opened: the record, its parent, its people, its logins, and the
@@ -349,6 +366,15 @@ export const tenancy = {
     api<{ ok: true }>("/api/tenancy/apps/update", post(input)),
   setAppActive: (id: string, active: boolean) =>
     api<{ ok: true }>("/api/tenancy/apps/active", post({ id, active })),
+
+  /** WHAT AN HOUR OF EACH ROLE IS WORTH, and what one app gives back (8.13).
+   * INTERNAL, both of them: the money is computed from the role rate card, the
+   * doors refuse a client login, and the portal gateway opens neither (R24). */
+  roleRates: () => api<{ roleRates: RoleRate[]; total: number }>("/api/tenancy/role-rates"),
+  /** One door for add, re-price and retire — the role name is the key. */
+  setRoleRate: (input: { roleName: string; centsPerHour: number; active: boolean }) =>
+    api<{ id: string }>("/api/tenancy/role-rates", post(input)),
+  appMoney: (appId: string) => api<AppMoneyBack>(`/api/tenancy/app-money?appId=${enc(appId)}`),
 
   /** R14: a PAGE of process maps (a GROWING collection) — hand `cursor` back from
    * the previous response for the next one; `total` is the exact server count of

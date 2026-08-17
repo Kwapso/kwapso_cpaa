@@ -39,7 +39,7 @@ import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
 import { sourceFiles } from "@shared/rules/source-scan"
-import { CRON_ALERT_CAP, D1_MAX_BOUND_PARAMS, PORTAL_ROOTS_CAP } from "@shared/workers/limits"
+import { CRON_ALERT_CAP, D1_MAX_BOUND_PARAMS, PORTAL_ROOTS_CAP, STORY_PROCESS_CAP } from "@shared/workers/limits"
 
 const SRC = join(__dirname, "..", "src")
 const REPO = join(__dirname, "..", "..", "..")
@@ -107,7 +107,36 @@ describe("no statement can bind more parameters than D1 accepts", () => {
         "the ingest state keys — INGEST_KINDS (3) plus one per GOOGLE_SERVICE (4), both fixed at author time",
       "content/src/lib/ready-flip.ts: FLIPPABLE":
         "a module-level constant: the ticket statuses a Ready flip may move from. " +
-        "Five strings, fixed at author time.",
+        "Derived from HELP_STATUSES, fixed at author time.",
+      // The same shape, one function along: `flip` takes the states an automatic
+      // move may claim, and every caller passes a module-level constant
+      // (SCHEDULABLE, STARTABLE) derived from HELP_STATUSES. There is no call
+      // site that hands it a list a request supplied.
+      "content/src/lib/ready-flip.ts: from":
+        "the ticket statuses an automatic flip may move OUT of — SCHEDULABLE / STARTABLE, " +
+        "both module-level constants derived from HELP_STATUSES",
+      // PROVEN by the cap the caller checks one line above the statement:
+      // `resolveProcesses` refuses past STORY_PROCESS_CAP before it builds the
+      // list, so the placeholder count cannot exceed 20.
+      "content/src/lib/stories.ts: unique":
+        `the processes one story links to, capped at STORY_PROCESS_CAP (${STORY_PROCESS_CAP}) by the door itself`,
+      // The resolution email's two named recipients, read back out of the core
+      // database. Bounded by the read that produced the ids: the portal-grant
+      // lookup carries `LIMIT 100`, and the set is de-duped before it is bound.
+      // PROVEN by the read that produced the list: the attendee addresses come
+      // off ONE calendar entry, and the calendar layer caps those at
+      // EVENT_ATTENDEE_CAP (50) before this file ever sees them. De-duped and
+      // lower-cased first, so the placeholder count is at most fifty.
+      "content/src/lib/meetings.ts: list":
+        "one calendar entry's attendee addresses, capped at EVENT_ATTENDEE_CAP (50) by the read that fetched them",
+      "content/src/lib/notify.ts: list":
+        "the resolution's recipients — the raiser and the main stakeholder, from a read bounded at LIMIT 100",
+      // PROVEN by the cap the DOOR applies before the lib is ever called:
+      // routes/processes.ts refuses a staff or stakeholder list longer than
+      // APP_PEOPLE_CAP (50), and the write binds nine audit values beside it —
+      // fifty-nine, with headroom against D1's hundred.
+      "tenancy/src/lib/processes.ts: wanted":
+        "the people named on one app, capped at APP_PEOPLE_CAP (50) by the door before the lib sees it",
       "content/src/lib/stakeholders.ts: batch":
         "one slice of idBatches — bounded BY D1_MAX_BOUND_PARAMS itself, which is the point of it",
       "tenancy/src/routes/accounts.ts: batch":
@@ -160,6 +189,10 @@ describe("no statement can bind more parameters than D1 accepts", () => {
     expect(
       PORTAL_ROOTS_CAP,
       "PORTAL_ROOTS_CAP must stay under D1's parameter cap — the switcher binds one per root"
+    ).toBeLessThan(D1_MAX_BOUND_PARAMS)
+    expect(
+      STORY_PROCESS_CAP,
+      "STORY_PROCESS_CAP must stay under D1's parameter cap — the proof binds one per process"
     ).toBeLessThan(D1_MAX_BOUND_PARAMS)
     expect(
       CRON_ALERT_CAP,

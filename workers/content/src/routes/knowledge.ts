@@ -149,16 +149,40 @@ export async function getKnowledgeSync(request: Request, env: Env): Promise<Resp
  *
  * A coarse ping, not a row-level one: a slice touches many sources and no one
  * row is the change — the same shape the shared sync door already has.
+ *
+ * IT FIRES BY ITSELF NOW (14.12). The app calls this once on open, in the
+ * background, so somebody's Drive and diary are in step without anybody pressing
+ * anything — and THAT caller sends `onlyIfStale`, which is what the door's
+ * five-minute floor hangs on (`sweepGoogle` says why the floor is opt-in rather
+ * than universal: a button somebody presses is a deliberate act with an expected
+ * result). `skipped` comes back true when the floor bit, meaning the answer is
+ * the state as of the last real sweep and Google was not asked at all.
  */
 export async function postKnowledgeSyncGoogle(request: Request, env: Env): Promise<Response> {
-  const { cfg, guard } = await gated(request, env, "knowledge", "create")
+  const { cfg, guard, body } = await gatedBody<{ onlyIfStale?: unknown }>(
+    request,
+    env,
+    "knowledge",
+    "create"
+  )
   await refusePortalCaller(cfg, guard)
   await requireRight(cfg, guard, "google", "read")
-  const results = await sweepGoogle(env, cfg, guard)
-  if (results.some((r) => r.indexed > 0)) await publishChange(env, guard.teamId, "knowledge")
+  // R20, positionally: a strict comparison against a literal. Anything that is
+  // not exactly `true` — absent, a string, a number — means the ordinary sweep,
+  // which is the behaviour every caller had before this field existed.
+  const sweep = await sweepGoogle(env, cfg, guard, { onlyIfStale: body.onlyIfStale === true })
+  if (sweep.results.some((r) => r.indexed > 0)) await publishChange(env, guard.teamId, "knowledge")
+  // WRITTEN OUT LONGHAND, and that is R27 rather than a style preference: the
+  // response-key derivation reads the keys of a `json({…})` literal, and a
+  // SHORTHAND property reads as a variable rather than a field name. `skipped`
+  // is named in this tool's description, so it has to be derivable from the door
+  // — a vocabulary exemption for a word the door could simply say is a bypass
+  // with better manners (the `yours` line in DESCRIPTION_VOCABULARY is the one
+  // case where the shorthand really was the clearer reading; this is not it).
   return json({
-    results,
-    caughtUp: results.every((r) => r.caughtUp && !r.error),
+    results: sweep.results,
+    skipped: sweep.skipped,
+    caughtUp: sweep.results.every((r) => r.caughtUp && !r.error),
     total: await countSources(cfg, guard),
   })
 }
@@ -207,7 +231,7 @@ export async function postUploadKnowledgeFile(request: Request, env: Env): Promi
     return fail(
       413,
       "too_large",
-      `That upload is too big — the most we can take in one file is ${mb(KNOWLEDGE_FILE_MAX_BYTES)}. Nothing was saved.`
+      `That upload is too big, the most we can take in one file is ${mb(KNOWLEDGE_FILE_MAX_BYTES)}. Nothing was saved.`
     )
   const { actor, cfg, guard, body } = await gatedBody<{
     title?: unknown
@@ -215,6 +239,7 @@ export async function postUploadKnowledgeFile(request: Request, env: Env): Promi
     fileDataUrl?: unknown
     accountId?: unknown
     visibility?: unknown
+    visibleToAppId?: unknown
   }>(request, env, "knowledge", "create")
   await refusePortalCaller(cfg, guard)
 
@@ -263,6 +288,9 @@ export async function postUploadKnowledgeFile(request: Request, env: Env): Promi
     title,
     accountId: optionalText(body.accountId, "Account", TEXT_LIMITS.short) ?? null,
     privateToMe: body.visibility === "private",
+    // 12.3: limit it to one app's people. The lib refuses an app this caller
+    // cannot open, so a person cannot file something into a room they are not in.
+    visibleToAppId: optionalText(body.visibleToAppId, "App", TEXT_LIMITS.short) ?? null,
     file: {
       url: `/media/internal/${key}`,
       name: fileName,
@@ -322,7 +350,7 @@ export async function postStreamKnowledgeFile(request: Request, env: Env): Promi
     return fail(
       413,
       "too_large",
-      `That upload is too big — the most we can take in one file is ${mb(STREAM_UPLOAD_MAX_BYTES)}. Nothing was saved.`
+      `That upload is too big, the most we can take in one file is ${mb(STREAM_UPLOAD_MAX_BYTES)}. Nothing was saved.`
     )
 
   const { actor, cfg, guard } = await gated(request, env, "knowledge", "create")
@@ -341,6 +369,7 @@ export async function postStreamKnowledgeFile(request: Request, env: Env): Promi
     return fail(400, "invalid_input", "That upload did not say what the file is called. Nothing was saved.")
   const title = queryText(url.searchParams.get("title"), "Title", TEXT_LIMITS.short) ?? fileName
   const accountId = queryText(url.searchParams.get("accountId"), "Account", TEXT_LIMITS.short) ?? null
+  const visibleToAppId = queryText(url.searchParams.get("visibleToAppId"), "App", TEXT_LIMITS.short) ?? null
   // …and the same for the one read only ever compared against a literal. A
   // comparison bounds what the value MEANS, never what it COSTS to carry here.
   const privateToMe =
@@ -390,6 +419,7 @@ export async function postStreamKnowledgeFile(request: Request, env: Env): Promi
     title,
     accountId,
     privateToMe,
+    visibleToAppId,
     file: { url: `/media/internal/${key}`, name: fileName, type: contentType, bytes: declared },
     extract,
   })

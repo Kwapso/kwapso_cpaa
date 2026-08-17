@@ -70,7 +70,7 @@ export type IngestRow = {
    * assistant quotes it forever because the sweep never visits it again". */
   retired?: boolean
   /** WHO THIS MAY EVER ANSWER FOR. Null = the team's, which is what every row
-   * this app owns is: a ticket, an article and an account belong to everybody
+   * this app owns is: a ticket, an app and an account belong to everybody
    * who may read the module. A person's id means the material arrived through
    * ONE PERSON'S OWN SIGHT of it (their Drive, their mailbox) and is readable
    * only in THEIR answers — the personal fence lib/knowledge.ts applies to every
@@ -142,7 +142,6 @@ function after(cursor: Cursor | null, sortExpr: string, idExpr = "id"): { sql: s
 }
 
 const TICKET_SORT = "COALESCE(h.updated_at, h.created_at)"
-const ROW_SORT = "COALESCE(updated_at, created_at)"
 
 export const INGEST_KINDS: IngestKind[] = [
   {
@@ -218,56 +217,6 @@ export const INGEST_KINDS: IngestKind[] = [
           ownerUserId: null,
         }
       })
-    },
-  },
-  {
-    kind: "article",
-    table: "learning",
-    label: "learning articles",
-    read: async (cfg, guard, cursor, limit) => {
-      const keyset = after(cursor, ROW_SORT)
-      const rows = await d1Query<{
-        id: string
-        content_title: string
-        content_description: string | null
-        content_body: string | null
-        content_link: string | null
-        category: string | null
-        deactivated_at: string | null
-        created_at: string
-        sort_at: string
-      }>(
-        cfg,
-        guard.databaseId,
-        // R14 hard cap: `limit` is INGEST_SOURCES_PER_TICK.
-        `SELECT id, content_title, content_description, content_body, content_link, category,
-                deactivated_at, created_at, ${ROW_SORT} AS sort_at
-           FROM learning
-          ${keyset.sql ? `WHERE ${keyset.sql}` : ""}
-          ORDER BY sort_at, id LIMIT ${limit}`,
-        keyset.params
-      )
-      return rows.map((r) => ({
-        originRowId: r.id,
-        sortAt: r.sort_at,
-        title: r.content_title,
-        summary: buildSummary({
-          noun: "learning article",
-          title: r.content_title,
-          notes: [r.category ? `Filed under ${r.category}.` : null],
-          detail: plainText(r.content_description ?? r.content_body ?? ""),
-        }),
-        body: [r.category ? `Category: ${r.category}.` : "", r.content_description ?? "", r.content_body ?? ""]
-          .filter(Boolean)
-          .join("\n\n"),
-        // The agency's own how-to library belongs to nobody's client.
-        accountId: null,
-        recordDate: r.created_at,
-        // …and to nobody in particular either: an article is written FOR the team.
-        ownerUserId: null,
-        sourceUrl: r.content_link,
-        retired: r.deactivated_at !== null,
-      }))
     },
   },
   {

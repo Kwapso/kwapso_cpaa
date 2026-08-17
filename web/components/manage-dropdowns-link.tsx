@@ -10,8 +10,10 @@
 import { Settings2 } from "lucide-react"
 
 import { usePermissions } from "@/lib/perms"
+import { useT } from "@shared/web/language"
 
 export function ManageDropdownsLink({ teamId }: { teamId: string | null }) {
+  const t = useT()
   const { can } = usePermissions(teamId)
   const allowed = !!teamId && (can("selectable_data", "create") || can("selectable_data", "edit"))
   if (!allowed) return null
@@ -21,7 +23,7 @@ export function ManageDropdownsLink({ teamId }: { teamId: string | null }) {
       className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-xs underline-offset-2 hover:underline"
     >
       <Settings2 className="size-3" aria-hidden />
-      Manage dropdowns
+      {t("Manage dropdowns")}
     </a>
   )
 }

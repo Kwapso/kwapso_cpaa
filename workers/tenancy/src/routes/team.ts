@@ -2,7 +2,7 @@
 // switcher, creating a team, editing it, the Overview metadata + Activity feed.
 
 import { fail, json, pagedJson } from "@shared/workers/http"
-import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { logActivity } from "@shared/workers/activity"
 import { getActivity } from "../lib/activity-read"
@@ -25,6 +25,12 @@ import { accountScope, refusePortalCaller } from "@shared/workers/account-scope"
 import { gatedBody } from "@shared/workers/route"
 import { teamContext, toActor, whoAmI } from "../context"
 import type { Env } from "../env"
+
+/** A route body is untrusted JSON until each field is validated. The alias keeps
+ * the gate call free of NESTED angle brackets, which the gating-seam scan
+ * (rightly) refuses to parse: a gate it cannot SEE is a gate that does not
+ * count. Same reason the processes routes carry one. */
+type Body = Record<string, unknown>
 
 /**
  * The locked onboarding flow: active invites? -> join those teams (no personal
@@ -203,9 +209,7 @@ export async function createNamedTeam(request: Request, env: Env): Promise<Respo
 }
 
 export async function postUpdateTeam(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{ name?: unknown; logoDataUrl?: unknown }>(
-    request, env, "teams", "edit"
-  )
+  const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "teams", "edit")
   // R21 AT THE DOOR, ON THE WRITE HALF TOO. Every READ door on this module already
   // refuses a client login; not one WRITE door did, so the refusal existed on the
   // module and was missing on exactly the half that changes things. It held only
@@ -219,7 +223,31 @@ export async function postUpdateTeam(request: Request, env: Env): Promise<Respon
   // reach .exec() as a coerced value and a bad logo would look like a good one).
   if (body.logoDataUrl !== undefined && typeof body.logoDataUrl !== "string")
     return fail(400, "invalid_input", "The logo must be an image.")
-  await updateTeamDetails(env, guard.teamId, name, body.logoDataUrl)
+  // THE AGENCY'S OWN DETAILS (db/core/0025), each field sitting in a validator's
+  // first argument so R20's positional scan can SEE the check. Absent means "say
+  // nothing about this"; sent-and-empty means "clear it" — which is why each one
+  // is `"field" in body ? … : undefined` rather than a plain optionalText that
+  // would read a missing field as a request to blank the column.
+  const legal = {
+    legalName:
+      "legalName" in body ? (optionalText(body.legalName, "Legal name", TEXT_LIMITS.short) ?? "") : undefined,
+    legalAddress:
+      "legalAddress" in body
+        ? (optionalText(body.legalAddress, "Legal address", TEXT_LIMITS.long) ?? "")
+        : undefined,
+    legalNumbers:
+      "legalNumbers" in body
+        ? (optionalText(body.legalNumbers, "Legal numbers", TEXT_LIMITS.long) ?? "")
+        : undefined,
+    phone: "phone" in body ? (optionalText(body.phone, "Phone", TEXT_LIMITS.short) ?? "") : undefined,
+  }
+  await updateTeamDetails(
+    env,
+    guard.teamId,
+    name,
+    typeof body.logoDataUrl === "string" ? body.logoDataUrl : undefined,
+    legal
+  )
   // Record the edit on the team's Activity feed (was missing — team-edit feedback).
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Team details updated",

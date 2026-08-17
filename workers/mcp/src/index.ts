@@ -138,7 +138,7 @@ async function getTokens(request: Request, env: Env): Promise<Response> {
 async function postToken(request: Request, env: Env): Promise<Response> {
   const user = await requireUser(request, env)
   if (!user.currentTeamId)
-    return fail(409, "no_team", "Pick a team first — a token is pinned to one team.")
+    return fail(409, "no_team", "Pick a team first, a token is pinned to one team.")
   // A CLIENT LOGIN MINTS NOTHING. They are a team member by construction, so
   // "signed in" was never the question — see lib/staff.ts. Asked with the
   // caller's OWN cookie, before the label is even read.

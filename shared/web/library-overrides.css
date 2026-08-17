@@ -5,10 +5,57 @@
  * here, so the day the library adopts it as its default there is one line to
  * delete, not two to remember.
  *
- * Overlay readability (feedback 2026-06-30): the library's frosted `.glass` sits
- * at 72% surface opacity — too see-through to read dialog/sheet text against the
- * living background. Keep the frosted blur, make the surface mostly opaque. (A
- * library prompt tracks adopting this as the default; see UI-GAPS.md.) */
-.glass {
-  background-color: color-mix(in oklch, var(--card) 94%, transparent);
-}
+ * ── THERE ARE NO OVERRIDES RIGHT NOW, AND THAT IS THE POINT ────────────────
+ *
+ * This file held exactly one rule for six weeks:
+ *
+ *     .glass { background-color: color-mix(in oklch, var(--card) 94%, transparent) }
+ *
+ * It was written on 2026-06-30 because the library's `.glass` was frosted at 72%
+ * opacity and dialog text was hard to read against the moving background. That
+ * was true then. The library has since replaced `.glass` with a flat, FULLY
+ * OPAQUE paper surface, and its own comment quotes the brand book while doing
+ * it: "No frosted-glass cards, no translucent panels."
+ *
+ * So the override stopped fixing anything and started causing something. Six
+ * percent of translucency does not read as translucency — it reads as a COLOUR,
+ * because `web/app/globals.css` drifts three blurred mango pools behind the
+ * whole page on 47- and 61-second loops. `Card` carries `glass` in its base
+ * class, so every card, dialog, popover and menu in both apps was tinted by a
+ * slowly moving orange field underneath it.
+ *
+ * That is the "cards have this pink background, this is not a brand colour"
+ * report from 2026-08-17, and the "we don't need these animations" beside it.
+ * Neither was a theme problem: `--card` is #f7f2ea and `--background` is
+ * #fffef9, which match kwapso.com's own surfaces to within a unit. One stale
+ * line was painting over a palette that was already right.
+ *
+ * DELETED rather than re-tuned. Lowering it to 2% would have made the tint
+ * subtler and left the same bug for somebody to find again in November.
+ *
+ * BEFORE YOU ADD AN OVERRIDE HERE, check whether the library already does what
+ * you want. This one was fighting a fix that had already shipped. */
+
+/* ── shared/web IS A SOURCE, AND TAILWIND HAD NEVER BEEN TOLD ──────────────
+ *
+ * Tailwind v4 discovers its own sources, rooted at the project it is built from.
+ * Both front doors are their own npm workspaces (`web/`, `web-portal/`), so that
+ * root is the front door — and `shared/web/` sits OUTSIDE it. Every component we
+ * deliberately share between the two apps (FormShell, the language menu and
+ * section, the code input, the Google button, the splash screen) was therefore
+ * written in a vocabulary Tailwind never read.
+ *
+ * A class is only missing when NOTHING under web/ happens to use it too, which is
+ * why this hid for months and then surfaced as one specific complaint: the action
+ * bar of every form in both apps sat flush against its separator, because
+ * form-shell.tsx's `pt-6` — the ONE value an eleven-line comment said "governs it
+ * everywhere" — was the only `pt-6` in either app and so was never generated.
+ * Measured on staging, that div's computed padding-top was 0px. The comment
+ * described a fix that had never once run.
+ *
+ * `@source` paths are relative to THIS file, so "." is shared/web. It lives here,
+ * in the one stylesheet both `web/app/globals.css` and
+ * `web-portal/app/globals.css` already import, because a per-door line is a line
+ * one door can be given and the other forgotten — the same reasoning the front
+ * door helpers are shared for. Locked by web/test/shared-web-is-styled.test.ts. */
+@source ".";

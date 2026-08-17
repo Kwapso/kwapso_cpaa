@@ -64,7 +64,7 @@ beforeEach(() => {
   db().exec(`UPDATE accounts SET code = 'BERG' WHERE id = '${IDS.victimAccount}';`)
 })
 
-describe("the five states", () => {
+describe("the seven states", () => {
   it("a ticket is raised as `new`, not as anything the old vocabulary knew", async () => {
     const res = await call(IDS.staffUser, "POST /api/content/help", {
       description: "The dispatch board stopped refreshing",
@@ -77,27 +77,113 @@ describe("the five states", () => {
     expect(raised.status).toBe("new")
   })
 
-  it("moves through triaged, in progress, ready and resolved, and refuses anything else", async () => {
+  it("moves through the stages a hand may still set, and refuses anything else", async () => {
     const id = (await ticketIds(
       await call(IDS.staffUser, "POST /api/content/help", { description: "Walk the lifecycle" })
     ))[0]
-    for (const status of ["triaged", "in_progress", "ready", "resolved"]) {
+    for (const status of ["triaged", "scheduled", "in_progress", "ready"]) {
       expect((await call(IDS.staffUser, "POST /api/content/help/status", { id, status })).status).toBe(200)
       expect(row(id).status).toBe(status)
     }
     // `reopened` was a state and is not one any more — the way back is `triaged`.
     const gone = await call(IDS.staffUser, "POST /api/content/help/status", { id, status: "reopened" })
     expect(gone.status).toBe(400)
-    expect(row(id).status).toBe("resolved")
+    expect(row(id).status).toBe("ready")
+  })
+
+  // CHECKLIST 5.6: "resolve is refused until a resolution has been written". The
+  // word cannot be reached through the status door AT ALL — not by the single
+  // move, not by either bulk — because answering a client is a thing a PERSON
+  // sends, and a value in a dropdown of seven carries no words with it.
+  it("refuses `resolved` on every status door — answering is not a status move", async () => {
+    const id = (await ticketIds(
+      await call(IDS.staffUser, "POST /api/content/help", { description: "Not resolvable by a dropdown" })
+    ))[0]
+    for (const route of [
+      "POST /api/content/help/status",
+      "POST /api/content/help/bulk-status",
+      "POST /api/content/help/bulk-status-by-filter",
+    ]) {
+      const body =
+        route.endsWith("bulk-status")
+          ? { ids: [id], status: "resolved" }
+          : route.endsWith("by-filter")
+            ? { toStatus: "resolved" }
+            : { id, status: "resolved" }
+      const res = await call(IDS.staffUser, route, body)
+      expect(res.status, `${route} let a status move resolve a ticket`).toBe(400)
+      expect((await res.json()) as { error: string }).toMatchObject({ error: "resolution_required" })
+    }
+    expect(row(id).status).toBe("new")
+    expect(historyFor(id).filter((h) => h.type === "Ticket resolved")).toHaveLength(0)
   })
 
   it("resolving twice moves zero rows the second time — no duplicate history (R17)", async () => {
     const id = (await ticketIds(
       await call(IDS.staffUser, "POST /api/content/help", { description: "Idempotent resolve" })
     ))[0]
-    await call(IDS.staffUser, "POST /api/content/help/status", { id, status: "resolved" })
-    await call(IDS.staffUser, "POST /api/content/help/status", { id, status: "resolved" })
+    const answer = { id, resolution: "Fixed, and here is what changed." }
+    await call(IDS.staffUser, "POST /api/content/help/resolve", answer)
+    await call(IDS.staffUser, "POST /api/content/help/resolve", answer)
     expect(historyFor(id).filter((h) => h.type === "Ticket resolved")).toHaveLength(1)
+  })
+
+  // CHECKLIST 5.13, and Aurora's ap2 is the load-bearing half: only an extra, a
+  // request or feedback waits for the client. A question or an issue is somebody
+  // stuck, and making them ask their own colleague for permission first is the
+  // version of this rule that gets it switched off.
+  it("holds an extra for the client to confirm, and lets a question straight in", async () => {
+    const waits = (await ticketIds(
+      await call(IDS.staffUser, "POST /api/content/help", {
+        description: "Could we also add a second dashboard",
+        helpType: "Extra",
+        accountId: IDS.victimAccount,
+      })
+    ))[0]
+    const straight = (await ticketIds(
+      await call(IDS.staffUser, "POST /api/content/help", {
+        description: "How do I export this",
+        helpType: "Question",
+        accountId: IDS.victimAccount,
+      })
+    ))[0]
+    expect(row(waits).status).toBe("awaiting_validation")
+    expect(row(straight).status).toBe("new")
+
+    // …and the confirm moves it into the ordinary queue, once.
+    expect((await call(IDS.staffUser, "POST /api/content/help/validate", { id: waits })).status).toBe(200)
+    expect(row(waits).status).toBe("new")
+    const stamp = row(waits).updated_at
+    // R17: a second confirm moves zero rows — no second history line, no re-sort.
+    await call(IDS.staffUser, "POST /api/content/help/validate", { id: waits })
+    expect(historyFor(waits).filter((h) => h.type === "Ticket validated")).toHaveLength(1)
+    expect(row(waits).updated_at).toBe(stamp)
+  })
+
+  // The agency's own extra has nobody outside the building to ask, so it must not
+  // sit waiting on a stakeholder who does not exist.
+  it("never holds OUR own question, whatever kind it is", async () => {
+    const ours = (await ticketIds(
+      await call(IDS.staffUser, "POST /api/content/help", {
+        description: "Shall we also tidy the seed script",
+        helpType: "Extra",
+      })
+    ))[0]
+    expect(row(ours).status).toBe("new")
+  })
+
+  // CHECKLIST 5.11: reading a request is the one judgement nothing can infer, and
+  // it must never drag a started one backwards.
+  it("marks a ticket triaged once, and never pulls a started one back", async () => {
+    const id = (await ticketIds(
+      await call(IDS.staffUser, "POST /api/content/help", { description: "Somebody read this" })
+    ))[0]
+    expect((await call(IDS.staffUser, "POST /api/content/help/triage-read", { id })).status).toBe(200)
+    expect(row(id).status).toBe("triaged")
+    await call(IDS.staffUser, "POST /api/content/help/status", { id, status: "in_progress" })
+    await call(IDS.staffUser, "POST /api/content/help/triage-read", { id })
+    expect(row(id).status).toBe("in_progress")
+    expect(historyFor(id).filter((h) => h.type === "Ticket triaged")).toHaveLength(1)
   })
 })
 

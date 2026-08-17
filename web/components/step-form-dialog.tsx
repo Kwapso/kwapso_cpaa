@@ -18,19 +18,17 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { Pencil, Plus } from "lucide-react"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 export type StepFormValues = {
   name: string
@@ -46,7 +44,7 @@ const minutesField = {
   ...defaultFieldConfig,
   label: "Minutes it takes, each time",
   required: true,
-  hint: "The time you agreed with them — not a measurement.",
+  hint: "The time you agreed with them, not a measurement.",
 }
 const runsField = {
   ...defaultFieldConfig,
@@ -70,6 +68,7 @@ export function StepFormDialog({
   draftKey?: string
   onSubmit: (values: StepFormValues) => Promise<void>
 }) {
+  const t = useT()
   const editing = initial !== undefined
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
@@ -123,22 +122,20 @@ export function StepFormDialog({
       title={<DialogTitle>{editing ? "Edit step" : "Add a step"}</DialogTitle>}
       subtitle={
         <DialogDescription>
-          It goes into {versionLabel}. Older versions stay exactly as they were agreed.
+          {t("It goes into")} {versionLabel}. Older versions stay exactly as they were agreed.
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !ready} className="gap-1.5">
-          {busy ? <Spinner /> : editing ? <Pencil className="size-4" /> : <Plus className="size-4" />}
-          {busy ? "Saving…" : editing ? "Save step" : "Add step"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !ready,
+      }}
     >
       <Field config={nameField} htmlFor="step-name" className={fieldSpacing}>
         <Input
           id="step-name"
           value={values.name}
           onChange={(e) => setValues((s) => ({ ...s, name: e.target.value }))}
-          placeholder="e.g. Check the invoice against the order"
+          placeholder={t("e.g. Check the invoice against the order")}
           disabled={busy}
           autoFocus
         />
@@ -148,7 +145,7 @@ export function StepFormDialog({
           id="step-description"
           value={values.description}
           onChange={(e) => setValues((s) => ({ ...s, description: e.target.value }))}
-          placeholder="Anything worth remembering about how it's done."
+          placeholder={t("Anything worth remembering about how it's done.")}
           disabled={busy}
           rows={2}
         />

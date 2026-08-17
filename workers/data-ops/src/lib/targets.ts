@@ -3,7 +3,7 @@
 // holds the catalog data the UI/agent see; this map holds the bits that are code —
 // the permission module gated on, and the gated create endpoint each row is POSTed
 // to (act-as-user). A table is importable ONLY if it appears here AND is active in
-// the catalog. Locked for now (owner's call): member roles + learning content only.
+// the catalog. Locked for now (owner's call): member roles + dropdown values first.
 
 import type { ImportColumn } from "@shared/types"
 import { MODULE_RIGHTS, TEAM_MODULE_CATALOG } from "@shared/team-modules"
@@ -104,12 +104,12 @@ export function targetFor(key: string | null | undefined): TargetDef | undefined
 
 export const TARGETS: Record<string, TargetDef> = {
   // Dropdown values ("Selectable data") — the base's PARENT in the worked
-  // multi-table demo: import these first, then learning articles reference them.
+  // multi-table demo: import these first, then the rows that name a value do.
   selectable_data: {
     tableKey: "selectable_data",
     module: "selectable_data",
     displayName: "Dropdown values",
-    description: "Add selectable dropdown values in bulk (e.g. Learning categories, Ticket types).",
+    description: "Add selectable dropdown values in bulk (e.g. Ticket types, Sprint types).",
     columns: [
       { key: "type", label: "Group", required: true },
       { key: "value", label: "Value", required: true },
@@ -117,7 +117,7 @@ export const TARGETS: Record<string, TargetDef> = {
     endpoint: { binding: "TENANCY", path: "/api/tenancy/selectable" },
     exportPath: "/api/tenancy/selectable/export",
     naturalKey: "value",
-    sample: { type: "Learning category", value: "Getting Started" },
+    sample: { type: "Ticket type", value: "Question" },
     buildBody: (r) => ({ type: r.type, value: r.value }),
   },
   member_roles: {
@@ -125,7 +125,7 @@ export const TARGETS: Record<string, TargetDef> = {
     module: "member_roles",
     displayName: "Member roles",
     description:
-      "Create team roles in bulk — optionally with their permission matrix (one module.right column each, yes/no). Rows without matrix columns start with permissions off.",
+      "Create team roles in bulk, optionally with their permission matrix (one module.right column each, yes/no). Rows without matrix columns start with permissions off.",
     columns: [
       { key: "title", label: "Role name", required: true },
       { key: "description", label: "Description", required: false },
@@ -137,10 +137,9 @@ export const TARGETS: Record<string, TargetDef> = {
     sample: {
       title: "Editor",
       description: "Can create and edit, but not remove",
-      "learning.read": "yes",
-      "learning.create": "yes",
-      "learning.edit": "yes",
       "help.read": "yes",
+      "help.create": "yes",
+      "help.edit": "yes",
       "selectable_data.read": "yes",
     },
     // A row WITH matrix cells also sets the role's permissions (the endpoint then
@@ -165,14 +164,20 @@ export const TARGETS: Record<string, TargetDef> = {
     module: "accounts",
     displayName: "Accounts",
     description:
-      "Create accounts in bulk — companies and people in one file. Say which each row is in the Type column (company or person). The account each one sits under is set afterwards on the account itself.",
+      "Create accounts in bulk, companies and people in one file. Say which each row is in the Type column (company or person). The account each one sits under is set afterwards on the account itself.",
     columns: [
       { key: "name", label: "Name", required: true },
       { key: "accountType", label: "Type", required: true },
       { key: "code", label: "Reference", required: false },
       { key: "email", label: "Email", required: false },
       { key: "phone", label: "Phone", required: false },
-      { key: "address", label: "Address", required: false },
+      // The address is four columns, not one line — the same four the record
+      // itself carries, so a file goes out and comes back meaning the same thing.
+      { key: "street", label: "Street", required: false },
+      { key: "postalCode", label: "Postal code", required: false },
+      { key: "city", label: "City", required: false },
+      { key: "country", label: "Country", required: false },
+      { key: "industry", label: "Industry", required: false },
       { key: "status", label: "Status", required: false },
     ],
     endpoint: { binding: "TENANCY", path: "/api/tenancy/accounts" },
@@ -186,11 +191,17 @@ export const TARGETS: Record<string, TargetDef> = {
     sample: {
       name: "Bergman S.A.",
       accountType: "company",
+      // A file may carry the agency's own legacy references. Leave the column
+      // out and the door mints one (BERG, BERG2 on a clash) — nobody types these.
       code: "BERG",
       email: "hola@bergman.example",
       phone: "+34 600 000 000",
-      address: "Calle Mayor 1, Madrid",
-      status: "client",
+      street: "Calle Mayor 1",
+      postalCode: "28013",
+      city: "Madrid",
+      country: "Spain",
+      industry: "Hospitality",
+      status: "active_client",
     },
     buildBody: (r) => ({
       accountType: accountType(r.accountType),
@@ -198,209 +209,20 @@ export const TARGETS: Record<string, TargetDef> = {
       code: r.code || undefined,
       email: r.email || undefined,
       phone: r.phone || undefined,
-      address: r.address || undefined,
+      street: r.street || undefined,
+      postalCode: r.postalCode || undefined,
+      city: r.city || undefined,
+      country: r.country || undefined,
+      industry: r.industry || undefined,
       status: r.status || undefined,
     }),
   },
-  learning: {
-    tableKey: "learning",
-    module: "learning",
-    displayName: "Learning content",
-    description: "Create how-to / learning items in bulk.",
-    columns: [
-      { key: "title", label: "Title", required: true },
-      { key: "category", label: "Category", required: false },
-      { key: "description", label: "Description", required: false },
-      { key: "contentType", label: "Type", required: false },
-      { key: "contentLink", label: "Link", required: false },
-      { key: "body", label: "Body", required: false },
-    ],
-    endpoint: { binding: "CONTENT", path: "/api/content/learning" },
-    exportPath: "/api/content/learning/export",
-    naturalKey: "title",
-    sample: {
-      title: "How to log in",
-      category: "Getting Started",
-      description: "Step-by-step sign-in guide",
-      contentType: "Other link",
-      contentLink: "https://example.com/guide",
-      body: "1. Open the app. 2. Enter your email. 3. Type the code we send you.",
-    },
-    // The worked base dependency: a learning article's category is a Dropdown value.
-    // mode:"value" (the endpoint auto-creates a missing category), so the reference's
-    // job is ORDER — import dropdowns before articles so categories are canonical.
-    references: [
-      { column: "category", target: "selectable_data", by: "value", mode: "value", onMissing: "create" },
-    ],
-    buildBody: (r) => ({
-      title: r.title,
-      category: r.category || undefined,
-      description: r.description || undefined,
-      contentType: r.contentType || undefined,
-      contentLink: r.contentLink || undefined,
-      body: r.body || undefined,
-    }),
-  },
-  // THE WORK ENGINE'S BACKLOG. Importable, and unusually for this catalogue that
-  // is not a convenience: two years of history arrive from the previous system
-  // as 3,677 rows (.plans/BUILD-1 §10), and the alternative to a file is nobody
-  // typing them and the margin having nothing to subtract.
-  //
-  // NO ASSIGNEE, NO SPRINT, NO STEP COLUMN, deliberately. Those three are ids in
-  // this app and names in a spreadsheet, and a wrong guess is worse than a blank:
-  // an assignee resolved by fuzzy name puts somebody else's work on your list, a
-  // step resolved by name attaches a saving to the wrong part of a map. They are
-  // set afterwards, on the story, by the person who knows. The file's job is
-  // getting the work IN — the same sentence the accounts target makes about a
-  // parent account, and for the same reason.
-  stories: {
-    tableKey: "stories",
-    module: "work",
-    displayName: "Stories",
-    description:
-      "Create stories in bulk — one row per piece of work. The sprint, the assignee and the process step each story changes are set afterwards on the story itself, because those are records here and only names in a file.",
-    columns: [
-      { key: "title", label: "Title", required: true },
-      { key: "detail", label: "Detail", required: false },
-      { key: "dueOn", label: "Due date", required: false },
-    ],
-    endpoint: { binding: "CONTENT", path: "/api/content/stories" },
-    naturalKey: "title",
-    sample: {
-      title: "Move dispatch onto the driver app",
-      detail: "Replace the paper run sheet with the list on the phone.",
-      dueOn: "2026-09-30",
-    },
-    buildBody: (r) => ({
-      title: r.title,
-      detail: r.detail || undefined,
-      dueOn: r.dueOn || undefined,
-    }),
-  },
-
-  // ── THE AGENCY'S OWN HOUSEKEEPING ──────────────────────────────────────────
-  // Four of the seven legacy tables land here as import targets, which is what
-  // makes the migration a mapping exercise rather than a typing exercise: 251
-  // posts, 74 brand assets, 10 programmes and 27 meeting purposes go in through
-  // the SAME gated create doors a person uses, so every row lands audited,
-  // published and permission-checked. The fifth module (staff profiles) is a
-  // reasoned CATALOG_EXEMPT line instead — a CSV cannot say which colleague a
-  // profile belongs to.
-  //
-  // Each declares its vocabulary column as a `mode:"value"` reference to the
-  // dropdown target. The door auto-creates a missing value, so the reference's
-  // job is ORDER: import the vocabulary first and the channels, departments and
-  // categories are canonical before the rows that use them arrive — which is
-  // precisely the thing the two legacy label tables were folded in to achieve.
-  marketing_posts: {
-    tableKey: "marketing_posts",
-    module: "marketing",
-    displayName: "Marketing posts",
-    description:
-      "Bring the agency's own published posts in in bulk — what went out, on which channel, on which day. Ours alone: nothing here ever reaches a client's portal.",
-    columns: [
-      { key: "title", label: "Title", required: true },
-      { key: "channel", label: "Channel", required: false },
-      { key: "status", label: "Status", required: false },
-      { key: "summary", label: "Summary", required: false },
-      { key: "body", label: "Body", required: false },
-      { key: "link", label: "Link", required: false },
-      { key: "publishedOn", label: "Published on", required: false },
-    ],
-    endpoint: { binding: "CONTENT", path: "/api/content/marketing" },
-    exportPath: "/api/content/marketing/export",
-    naturalKey: "title",
-    sample: {
-      title: "How we halved a dispatch handover",
-      channel: "Newsletter",
-      status: "Published",
-      summary: "A short write-up of the Bergman process map",
-      body: "We mapped the handover, timed every step with them, and cut two of them entirely.",
-      link: "https://example.com/posts/dispatch-handover",
-      publishedOn: "2026-05-14",
-    },
-    references: [
-      { column: "channel", target: "selectable_data", by: "value", mode: "value", onMissing: "create" },
-    ],
-    buildBody: (r) => ({
-      title: r.title,
-      channel: r.channel || undefined,
-      status: r.status || undefined,
-      summary: r.summary || undefined,
-      body: r.body || undefined,
-      link: r.link || undefined,
-      publishedOn: r.publishedOn || undefined,
-    }),
-  },
-  brand_assets: {
-    tableKey: "brand_assets",
-    module: "brand_assets",
-    displayName: "Brand library",
-    description:
-      "Bring the agency's own brand material in in bulk — logos, decks, templates. The file column takes a link; the bytes are re-hosted separately.",
-    columns: [
-      { key: "name", label: "Name", required: true },
-      { key: "category", label: "Category", required: false },
-      { key: "description", label: "Description", required: false },
-      { key: "fileUrl", label: "File", required: false },
-    ],
-    endpoint: { binding: "CONTENT", path: "/api/content/brand-assets" },
-    exportPath: "/api/content/brand-assets/export",
-    naturalKey: "name",
-    sample: {
-      name: "Primary logo (dark)",
-      category: "Logos",
-      description: "For light backgrounds. SVG, no padding.",
-      fileUrl: "https://example.com/brand/logo-dark.svg",
-    },
-    references: [
-      { column: "category", target: "selectable_data", by: "value", mode: "value", onMissing: "create" },
-    ],
-    buildBody: (r) => ({
-      name: r.name,
-      category: r.category || undefined,
-      description: r.description || undefined,
-      fileUrl: r.fileUrl || undefined,
-    }),
-  },
-  programs: {
-    tableKey: "programs",
-    module: "delivery",
-    displayName: "Delivery programmes",
-    description: "Bring the ways the agency runs an engagement in in bulk, in the order they should read.",
-    columns: [
-      { key: "name", label: "Name", required: true },
-      { key: "description", label: "Description", required: false },
-      { key: "sequence", label: "Order", required: false },
-    ],
-    endpoint: { binding: "CONTENT", path: "/api/content/delivery/programs" },
-    exportPath: "/api/content/delivery/programs/export",
-    naturalKey: "name",
-    sample: { name: "Blueprint", description: "Two weeks mapping how the work is done today.", sequence: "1" },
-    buildBody: (r) => ({
-      name: r.name,
-      description: r.description || undefined,
-      sequence: r.sequence ? Number(r.sequence) : undefined,
-    }),
-  },
-  // THE 350 MEETINGS GLIDE HELD, and the reason this target exists at all. The
-  // legacy reconciliation folded every one of them into a WORK LOG, because a
-  // work log was the only row that carried a date, a duration and a client —
-  // which kept the hours and threw away the agenda and what was decided. Now
-  // that a meeting is a record, the history can come back in as itself.
-  //
-  // NO PURPOSE COLUMN, deliberately, and the same sentence the stories target
-  // makes about an assignee: a meeting purpose is a RECORD here and a word in a
-  // spreadsheet, and a wrong fuzzy match files a conversation under the wrong
-  // reason for ever. The client IS resolvable, because an account has a name a
-  // file can carry and the reference resolves it to the real row or rejects the
-  // line — no guess in either direction.
   meetings: {
     tableKey: "meetings",
     module: "meetings",
     displayName: "Meetings",
     description:
-      "Bring the diary in in bulk — one row per conversation, with what was on the agenda and what was decided. The reason we met is set afterwards on the meeting itself, because a meeting purpose is a record here and only a word in a file.",
+      "Bring the diary in in bulk, one row per conversation, with what was on the agenda and what was decided. The reason we met is set afterwards on the meeting itself, because a meeting purpose is a record here and only a word in a file.",
     columns: [
       { key: "title", label: "Title", required: true },
       { key: "startsAt", label: "When", required: true },
@@ -436,6 +258,88 @@ export const TARGETS: Record<string, TargetDef> = {
       location: r.location || undefined,
       agenda: r.agenda || undefined,
       notes: r.notes || undefined,
+    }),
+  },
+  // THE WORK ENGINE'S BACKLOG. Importable, and unusually for this catalogue that
+  // is not a convenience: two years of history arrive from the previous system
+  // as 3,677 rows (.plans/BUILD-1 §10), and the alternative to a file is nobody
+  // typing them and the margin having nothing to subtract.
+  //
+  // NO ASSIGNEE, NO SPRINT, NO STEP COLUMN, deliberately. Those three are ids in
+  // this app and names in a spreadsheet, and a wrong guess is worse than a blank:
+  // an assignee resolved by fuzzy name puts somebody else's work on your list, a
+  // step resolved by name attaches a saving to the wrong part of a map. They are
+  // set afterwards, on the story, by the person who knows. The file's job is
+  // getting the work IN — the same sentence the accounts target makes about a
+  // parent account, and for the same reason.
+  stories: {
+    tableKey: "stories",
+    module: "work",
+    displayName: "Stories",
+    description:
+      "Create stories in bulk, one row per piece of work. The sprint, the assignee and the process step each story changes are set afterwards on the story itself, because those are records here and only names in a file.",
+    columns: [
+      { key: "title", label: "Title", required: true },
+      { key: "detail", label: "Detail", required: false },
+      { key: "dueOn", label: "Due date", required: false },
+    ],
+    endpoint: { binding: "CONTENT", path: "/api/content/stories" },
+    naturalKey: "title",
+    sample: {
+      title: "Move dispatch onto the driver app",
+      detail: "Replace the paper run sheet with the list on the phone.",
+      dueOn: "2026-09-30",
+    },
+    buildBody: (r) => ({
+      title: r.title,
+      detail: r.detail || undefined,
+      dueOn: r.dueOn || undefined,
+    }),
+  },
+
+  // ── THE AGENCY'S OWN HOUSEKEEPING ──────────────────────────────────────────
+  // Four of the seven legacy tables land here as import targets, which is what
+  // makes the migration a mapping exercise rather than a typing exercise: 251
+  // posts, 74 brand assets, 10 programmes and 27 meeting purposes go in through
+  // the SAME gated create doors a person uses, so every row lands audited,
+  // published and permission-checked. The fifth module (staff profiles) is a
+  // reasoned CATALOG_EXEMPT line instead — a CSV cannot say which colleague a
+  // profile belongs to.
+  //
+  // Each declares its vocabulary column as a `mode:"value"` reference to the
+  // dropdown target. The door auto-creates a missing value, so the reference's
+  // job is ORDER: import the vocabulary first and the departments and categories
+  // are canonical before the rows that use them arrive — which is precisely the
+  // thing the legacy label tables were folded in to achieve.
+  brand_assets: {
+    tableKey: "brand_assets",
+    module: "brand_assets",
+    displayName: "Brand library",
+    description:
+      "Bring the agency's own brand material in in bulk, logos, decks, templates. The file column takes a link; the bytes are re-hosted separately.",
+    columns: [
+      { key: "name", label: "Name", required: true },
+      { key: "category", label: "Category", required: false },
+      { key: "description", label: "Description", required: false },
+      { key: "fileUrl", label: "File", required: false },
+    ],
+    endpoint: { binding: "CONTENT", path: "/api/content/brand-assets" },
+    exportPath: "/api/content/brand-assets/export",
+    naturalKey: "name",
+    sample: {
+      name: "Primary logo (dark)",
+      category: "Logos",
+      description: "For light backgrounds. SVG, no padding.",
+      fileUrl: "https://example.com/brand/logo-dark.svg",
+    },
+    references: [
+      { column: "category", target: "selectable_data", by: "value", mode: "value", onMissing: "create" },
+    ],
+    buildBody: (r) => ({
+      name: r.name,
+      category: r.category || undefined,
+      description: r.description || undefined,
+      fileUrl: r.fileUrl || undefined,
     }),
   },
   meeting_purposes: {

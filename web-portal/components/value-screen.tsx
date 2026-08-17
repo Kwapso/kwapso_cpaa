@@ -49,6 +49,7 @@ import { invalidate, useCached } from "@shared/web/store"
 import { ApiFailure, value as valueApi, type PortalValue } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 import type { PortalReady } from "@/components/portal-shell"
+import { useT } from "@shared/web/language"
 
 // Money comes from `shared/web/money.ts`, and hours and minutes from
 // `shared/workers/savings.ts` beside the rounding they spell — imported at the
@@ -65,6 +66,7 @@ import type { PortalReady } from "@/components/portal-shell"
 /** One step, and the whole sum behind it. This line is the answer to the third
  * click — deliberately the arithmetic rather than its result. */
 function StepLine({ step }: { step: StepSaving }) {
+  const t = useT()
   const gain = step.savedSecondsPerMonth >= 0
   return (
     <div className="flex flex-col gap-1 border-t py-3 first:border-t-0 sm:flex-row sm:items-baseline sm:justify-between">
@@ -73,20 +75,20 @@ function StepLine({ step }: { step: StepSaving }) {
           {step.name}
           {step.removed && (
             <Badge variant="secondary" className="ml-2 text-[10px]">
-              no longer needed
+              {t("no longer needed")}
             </Badge>
           )}
         </p>
         <p className="text-muted-foreground text-xs">
-          {minutesText(step.baselineSecondsPerRun)} before ·{" "}
+          {minutesText(step.baselineSecondsPerRun)} {t("before ·")}{" "}
           {step.removed ? "not needed now" : `${minutesText(step.latestSecondsPerRun)} now`} ·{" "}
-          {step.runsPerMonth.toLocaleString()}× a month
+          {step.runsPerMonth.toLocaleString()}{t("× a month")}
         </p>
       </div>
       <div className="shrink-0 text-sm sm:text-right">
         <span className={gain ? "text-foreground font-medium" : "text-destructive font-medium"}>
           {gain ? "" : "−"}
-          {hoursText(step.savedSecondsPerMonth)} a month
+          {hoursText(step.savedSecondsPerMonth)} {t("a month")}
         </span>
         {/* A step that takes LONGER. Shown, always, and counted in the totals —
             with our explanation when we have written one, and an honest sentence
@@ -104,6 +106,7 @@ function StepLine({ step }: { step: StepSaving }) {
 }
 
 export function ValueScreen({ ready }: { ready: PortalReady }) {
+  const t = useT()
   void ready // the account is decided by the server from the caller's own stamp
   const { data, loading } = useCached<PortalValue>(cacheKeys.value, () => valueApi.read())
   const [openProcessId, setOpenProcessId] = React.useState<string | null>(null)
@@ -120,10 +123,9 @@ export function ValueScreen({ ready }: { ready: PortalReady }) {
   if (data.apps.length === 0)
     return (
       <div className="flex flex-col gap-4">
-        <h1 className="text-3xl font-semibold tracking-tight">What this has been worth</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">{t("What this has been worth")}</h1>
         <p className="text-muted-foreground rounded-xl border border-dashed p-8 text-center">
-          Nothing to show yet. As soon as we&apos;ve mapped how a job used to be done and changed
-          it, the time it gives back appears here.
+          {t("Nothing to show yet. As soon as we've mapped how a job used to be done and changed it, the time it gives back appears here.")}
         </p>
       </div>
     )
@@ -131,14 +133,14 @@ export function ValueScreen({ ready }: { ready: PortalReady }) {
   return (
     <div className="flex flex-col gap-10">
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-semibold tracking-tight">What this has been worth</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">{t("What this has been worth")}</h1>
         <p className="text-muted-foreground">
-          Time your team gets back, every month — and where every hour of it comes from.
+          {t("Time your team gets back, every month, and where every hour of it comes from.")}
         </p>
       </div>
 
       <section className="rounded-xl border p-6">
-        <p className="text-muted-foreground text-sm">Time given back, every month</p>
+        <p className="text-muted-foreground text-sm">{t("Time given back, every month")}</p>
         <p className="text-3xl font-semibold tracking-tight">
           {hoursText(data.savedSecondsPerMonth)}
         </p>
@@ -150,10 +152,10 @@ export function ValueScreen({ ready }: { ready: PortalReady }) {
       {/* WHAT YOU BOUGHT — only when we were sent it. No flag on this side. */}
       {data.prices && (
         <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-medium">What you bought</h2>
+          <h2 className="text-lg font-medium">{t("What you bought")}</h2>
           {data.prices.soldCents !== null && (
             <p className="text-sm">
-              Agreed so far:{" "}
+              {t("Agreed so far:")}{" "}
               <span className="font-medium">
                 {moneyText(data.prices.soldCents, data.prices.rates[0]?.currency ?? null)}
               </span>
@@ -168,7 +170,7 @@ export function ValueScreen({ ready }: { ready: PortalReady }) {
                 >
                   <span className="text-sm">{r.label}</span>
                   <span className="text-muted-foreground text-sm">
-                    {moneyText(r.centsPerHour, r.currency)} an hour
+                    {moneyText(r.centsPerHour, r.currency)} {t("an hour")}
                   </span>
                 </div>
               ))}
@@ -178,7 +180,7 @@ export function ValueScreen({ ready }: { ready: PortalReady }) {
       )}
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Where it comes from</h2>
+        <h2 className="text-lg font-medium">{t("Where it comes from")}</h2>
         <Accordion type="multiple" className="rounded-xl border px-4">
           {data.apps.map((app) => (
             <AccordionItem key={app.appId} value={app.appId} className="last:border-b-0">
@@ -186,7 +188,7 @@ export function ValueScreen({ ready }: { ready: PortalReady }) {
                 <span className="flex w-full items-baseline justify-between gap-3 pr-2">
                   <span className="truncate">{app.name}</span>
                   <span className="text-muted-foreground shrink-0 text-xs font-normal">
-                    {hoursText(app.savedSecondsPerMonth)} a month
+                    {hoursText(app.savedSecondsPerMonth)} {t("a month")}
                   </span>
                 </span>
               </AccordionTrigger>
@@ -202,7 +204,7 @@ export function ValueScreen({ ready }: { ready: PortalReady }) {
                         <span className="flex w-full items-baseline justify-between gap-3 pr-2">
                           <span className="truncate">{process.name}</span>
                           <span className="text-muted-foreground shrink-0 text-xs font-normal">
-                            {hoursText(process.savedSecondsPerMonth)} a month
+                            {hoursText(process.savedSecondsPerMonth)} {t("a month")}
                           </span>
                         </span>
                       </AccordionTrigger>
@@ -237,6 +239,7 @@ export function ValueScreen({ ready }: { ready: PortalReady }) {
  * never which staff member is doing it); the server withholds it, and this
  * screen renders what it was given. */
 function ProcessConversation({ processId, open }: { processId: string; open: boolean }) {
+  const t = useT()
   const { data } = useCached<{ comments: ProcessComment[]; total: number }>(
     open ? cacheKeys.processComments(processId) : null,
     () => valueApi.comments(processId)
@@ -258,12 +261,12 @@ function ProcessConversation({ processId, open }: { processId: string; open: boo
 
   return (
     <div className="mt-4 border-t pt-4">
-      <p className="mb-2 text-sm font-medium">Questions about this?</p>
+      <p className="mb-2 text-sm font-medium">{t("Questions about this?")}</p>
       <Comments
         items={(data?.comments ?? []).map((c) => ({
           id: c.id,
           author: c.createdByName ?? (c.fromStaff ? "Your team" : "A colleague"),
-          body: c.explainsStepKey ? `Why a step takes longer — ${c.body}` : c.body,
+          body: c.explainsStepKey ? `Why a step takes longer, ${c.body}` : c.body,
           time: new Date(c.createdAt).toLocaleDateString(),
         }))}
         onAdd={busy ? undefined : (body) => void add(body)}

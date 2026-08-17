@@ -55,8 +55,9 @@ type Upstream = "AUTH" | "TENANCY" | "CONTENT" | "REALTIME"
  *     agency's own machinery; a client has no business seeing it exists.
  *   • /api/tenancy/portal-users + /api/tenancy/accounts (writes) — granting a
  *     login and editing the books are staff decisions (SCOPE ch.03).
- *   • /api/content/learning — the team's how-to articles are INTERNAL and carry
- *     no account fence; publishing them here would be a disclosure, not a
+ *   • /api/content/brand-assets + /api/content/delivery/* — the agency's own
+ *     material and the taxonomy of why it meets are INTERNAL and carry no
+ *     account fence; publishing either here would be a disclosure, not a
  *     feature (see the report / ROADMAP note).
  *   • /api/content/help/stakeholders — a stakeholder list names the staff on a
  *     ticket. "The portal shows work status but never which staff member is
@@ -82,6 +83,12 @@ export const PORTAL_DOORS: Record<string, Upstream> = {
   "GET /api/auth/google/callback": "AUTH",
   "GET /api/auth/me": "AUTH",
   "POST /api/auth/profile": "AUTH",
+  // A contact choosing the language they read their own portal in. On the
+  // allow-list deliberately: SCOPE's point about the portal is that a client
+  // sees their world in their own words, and the door touches exactly one column
+  // on the caller's own user row. It reveals nothing about the agency and
+  // nothing about any other account.
+  "POST /api/auth/language": "AUTH",
   "POST /api/auth/logout": "AUTH",
 
   // ── the client's own world (every read fenced by the caller's account set) ──
@@ -118,6 +125,23 @@ export const PORTAL_DOORS: Record<string, Upstream> = {
   // and there is no client-side reopen button.
   "POST /api/content/help/update": "CONTENT",
   "POST /api/content/help/rank": "CONTENT",
+  // SHOWING US WHAT THEY MEAN (CHECKLIST 5.10). Several files and several links
+  // on one ticket, "from BOTH front doors" — a screenshot of the thing that is
+  // wrong is the client's half of a support conversation, and they had no way to
+  // send one. The file goes into the SHARED media bucket, which this gateway
+  // already serves at /media/*, so they can read their own back.
+  "GET /api/content/help/attachments": "CONTENT",
+  "POST /api/content/help/attachments": "CONTENT",
+  "POST /api/content/help/attachments/remove": "CONTENT",
+  // THE ONE LIFECYCLE DOOR A CLIENT MAY PUSH (CHECKLIST 5.13, Aurora's ap2). An
+  // extra, a request or a piece of feedback waits for the company that pays for
+  // it to confirm they want it — a question or an issue never waits at all. It is
+  // the deliberate exception to the paragraph above, and it is narrow by
+  // construction rather than by this table: the account fence rides its UPDATE,
+  // and R17's predicate means the ONLY move it can make is
+  // awaiting_validation → new. It cannot reopen, resolve, or touch a request
+  // somebody here has already started.
+  "POST /api/content/help/validate": "CONTENT",
 
   // ── what we are waiting on them for ────────────────────────────────────────
   // The only rows in the work engine a client writes to. They read their own

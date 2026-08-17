@@ -1,12 +1,11 @@
-// THE THREE MEDIA UPLOAD DOORS, STREAMED — learning media, staff files, brand
-// assets. The knowledge base's streamed door has its own suite; these three are
-// together because they are one shape with three buckets, and because the thing
-// that separates them from the knowledge door is a SECURITY boundary that has to
-// hold on all three.
+// THE TWO MEDIA UPLOAD DOORS, STREAMED — staff files and brand assets. The
+// knowledge base's streamed door has its own suite; these two are together
+// because they are one shape, and because the thing that separates them from the
+// knowledge door is a SECURITY boundary that has to hold on both.
 //
 // THE DIFFERENCE, AND WHY IT IS THE MAIN TEST HERE. The knowledge base stores
 // every byte as `application/octet-stream`, so it can afford to accept any file at
-// all — the label a browser would have to trust is never written down. These three
+// all — the label a browser would have to trust is never written down. These two
 // serve the object BACK under the type the caller declared, because that is what
 // makes an image render in an article. So a script-capable type (`text/html`,
 // `image/svg+xml`) reaching R2 here would be stored XSS on the app's own origin,
@@ -44,7 +43,6 @@ vi.mock("@shared/workers/account-scope", async (importOriginal) => ({
   },
 }))
 
-import { postStreamLearningFile } from "../src/routes/learning"
 import { postStreamStaffFile } from "../src/routes/staff"
 import { postStreamBrandAsset } from "../src/routes/brand-assets"
 import type { Env } from "../src/env"
@@ -60,16 +58,18 @@ function bucket() {
 }
 
 /** Both buckets, so a door writing to the wrong shelf is visible rather than
- * merely passing. */
-function envWith(learning: ReturnType<typeof bucket>, internal: ReturnType<typeof bucket>): Env {
-  return { LEARNING_MEDIA: learning, INTERNAL_MEDIA: internal } as unknown as Env
+ * merely passing. The `other` shelf is bound but never a target: the doors below
+ * both write to INTERNAL_MEDIA, and a put landing anywhere else has to be
+ * visible as a failure rather than as silence. */
+function envWith(other: ReturnType<typeof bucket>, internal: ReturnType<typeof bucket>): Env {
+  return { LEARNING_MEDIA: other, INTERNAL_MEDIA: internal } as unknown as Env
 }
 
 function upload(opts: { length?: number; type?: string | null } = {}): Request {
   const headers = new Headers()
   headers.set("content-length", String(opts.length ?? 10))
   if (opts.type !== null) headers.set("content-type", opts.type ?? "image/png")
-  return new Request("https://x/api/content/learning/upload-stream", {
+  return new Request("https://x/api/content/brand-assets/upload-stream", {
     method: "POST",
     headers,
     body: new Blob(["bytes"]).stream(),
@@ -78,17 +78,10 @@ function upload(opts: { length?: number; type?: string | null } = {}): Request {
   })
 }
 
-/** The three doors, each with the bucket it MUST write to and the URL prefix it
+/** The two doors, each with the bucket it MUST write to and the URL prefix it
  * must hand back. Driven as a table so a new streaming door cannot be added with
  * one of these four facts left untested. */
 const DOORS = [
-  {
-    name: "learning media",
-    call: postStreamLearningFile,
-    shelf: "learning" as const,
-    prefix: "/media/learning/",
-    gate: "learning:create",
-  },
   {
     name: "staff files",
     call: postStreamStaffFile,
@@ -112,16 +105,16 @@ beforeEach(() => {
 
 describe.each(DOORS)("$name, streamed", ({ call, shelf, prefix, gate }) => {
   const shelves = () => {
-    const learning = bucket()
+    const other = bucket()
     const internal = bucket()
-    return { learning, internal, env: envWith(learning, internal), of: (s: typeof shelf) => (s === "learning" ? learning : internal) }
+    return { other, internal, env: envWith(other, internal), of: (_s: typeof shelf) => internal }
   }
 
   it("refuses a file past the ceiling WITHOUT touching a bucket", async () => {
     const s = shelves()
     const res = await call(upload({ length: STREAM_UPLOAD_MAX_BYTES + 1 }), s.env)
     expect(res.status).toBe(413)
-    expect(s.learning.puts, "nothing is written when the answer is no").toEqual([])
+    expect(s.other.puts, "nothing is written when the answer is no").toEqual([])
     expect(s.internal.puts).toEqual([])
     expect(await res.clone().text(), "the refusal names the size").toMatch(/90 MB/)
   })
@@ -189,7 +182,7 @@ describe.each(DOORS)("$name, streamed", ({ call, shelf, prefix, gate }) => {
       const s = shelves()
       const res = await call(upload({ type: type || null }), s.env)
       expect(res.status).toBe(400)
-      expect(s.learning.puts, "stored XSS would be one put away").toEqual([])
+      expect(s.other.puts, "stored XSS would be one put away").toEqual([])
       expect(s.internal.puts).toEqual([])
     }
   )

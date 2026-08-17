@@ -23,7 +23,6 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
@@ -34,19 +33,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { Pencil, Plus } from "lucide-react"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
-import { ApiFailure } from "@/lib/api"
+import { ApiFailure, tenancy } from "@/lib/api"
 import { accountsKey, listFetch } from "@/lib/live-resources"
 import { useActiveTeam } from "@/lib/use-active-team"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useCached } from "@shared/web/store"
-import type { Account } from "@shared/types"
+import type { Account, SelectableValue } from "@shared/types"
+import { useLanguage } from "@shared/web/language"
 
 export type SprintFormValues = {
   name: string
@@ -66,12 +64,69 @@ export type SprintFormValues = {
 /** "Nothing chosen" as a real Select value — an empty string is not selectable. */
 const NONE = "__none__"
 
-/** The three SCOPE names. A "blueprint" is a PRICED PLANNING sprint, not a fourth
- * type (.plans/BUILD-1 §3), so it is a price on a Planning row and not an option
- * here. The vocabulary is editable on the Dropdown values screen; these are the
- * ones every team starts with, which is what a form should offer before anybody
- * has been to that screen. */
-const SPRINT_TYPES = ["Planning", "Implementation", "Iteration"]
+/** The two SCOPE names the delivery catalogue has no word of its own for. A
+ * "blueprint" is a PRICED PLANNING sprint, not a type (.plans/BUILD-1 §3), so it
+ * is a price on a Planning row and not an option here. These are a FALLBACK and
+ * nothing more — what the picker offers before the team's own vocabulary has
+ * loaded, so an empty dropdown never greets somebody on a cold cache. */
+const FALLBACK_SPRINT_TYPES = ["Planning", "Iteration", "Implementation"]
+
+/** ONE SPRINT TYPE, as the app reads it — the word, the mark somebody
+ * recognises it by, the label a German client reads, and how long a block of
+ * this kind normally runs.
+ *
+ * All three extras arrived with team-schema 0025, when the Delivery method page
+ * was retired and its ten programmes were folded onto the sprint type they had
+ * always been a second name for. They are OPTIONAL because a team adds its own
+ * types on the Dropdown values screen and nobody should have to fill in four
+ * fields to name one. */
+export type SprintTypeOption = {
+  value: string
+  mark: string | null
+  nameDe: string | null
+  standardDays: number | null
+}
+
+/** THE TEAM'S OWN SPRINT TYPES, not a list in this file.
+ *
+ * The picker used to offer three hard-coded words, which meant the Dropdown
+ * values screen — the ONE place a type is added (the owner's and Aurora's shared
+ * answer) — could not actually add one. It reads the vocabulary now, active rows
+ * only, exactly as every other pick-or-create field in the app does. */
+export function useSprintTypes(teamId: string | null): SprintTypeOption[] {
+  const q = useCached<SelectableValue[]>(teamId ? `selectable:${teamId}` : null, () =>
+    tenancy.selectable().then((r) => r.values)
+  )
+  const rows = (q.data ?? [])
+    .filter((v) => v.active && v.type === "Sprint type")
+    .map((v) => ({ value: v.value, mark: v.mark, nameDe: v.nameDe, standardDays: v.standardDays }))
+  return rows.length
+    ? rows
+    : FALLBACK_SPRINT_TYPES.map((value) => ({ value, mark: null, nameDe: null, standardDays: null }))
+}
+
+/** JUST THE WORD — the type's name in the reader's own language, with no mark on
+ * the front of it. The German label is a CURATED word carried over from the
+ * delivery catalogue, not a translation seam: everything the app itself says is
+ * translated at build time from the string catalogue, and a team's own
+ * vocabulary is not the app talking.
+ *
+ * It is its own function because a TYPE MARK has to be `aria-hidden` and sit
+ * where an icon sits (UI-CONVENTIONS §5), which means the mark and the word are
+ * two elements on a row rather than one string. This is the half `sprintTypeLabel`
+ * puts second, so a screen that renders them apart and a picker that renders them
+ * together can never disagree about which word a German client reads. */
+export function sprintTypeName(option: SprintTypeOption, lang: string): string {
+  return lang === "de" && option.nameDe ? option.nameDe : option.value
+}
+
+/** What a person reads for one type in a single string: its mark, then its name.
+ * For a picker option and any other place a mark cannot have an element of its
+ * own. */
+export function sprintTypeLabel(option: SprintTypeOption, lang: string): string {
+  const name = sprintTypeName(option, lang)
+  return option.mark ? `${option.mark} ${name}` : name
+}
 
 const nameField = { ...defaultFieldConfig, label: "Sprint name", required: true }
 const typeField = { ...defaultFieldConfig, label: "Kind", required: false }
@@ -129,8 +184,10 @@ export function SprintFormDialog({
   draftKey?: string
   onSubmit: (values: SprintFormValues) => Promise<void>
 }) {
+  const { t, lang } = useLanguage()
   const isEdit = !!initial
   const teamId = useActiveTeam().ctx?.team?.id ?? null
+  const sprintTypes = useSprintTypes(teamId)
   // Page one of the accounts list is plenty for a picker, and it is the SAME
   // cache the accounts screen holds.
   const accountsQ = useCached<Account[]>(teamId ? accountsKey(teamId) : null, () =>
@@ -209,19 +266,17 @@ export function SprintFormDialog({
             : "A block of delivery work for one client, with a start, an end and a price."}
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !ready} className="gap-1.5">
-          {busy ? <Spinner /> : isEdit ? <Pencil className="size-4" /> : <Plus className="size-4" />}
-          {busy ? "Saving…" : isEdit ? "Save changes" : "Start it"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !ready,
+      }}
     >
       <Field config={nameField} htmlFor="sprint-name" className={fieldSpacing}>
         <Input
           id="sprint-name"
           value={values.name}
           onChange={(e) => setValues((s) => ({ ...s, name: e.target.value }))}
-          placeholder="e.g. Dispatch, sprint 4"
+          placeholder={t("e.g. Dispatch, sprint 4")}
           disabled={busy}
           autoFocus
         />
@@ -233,13 +288,14 @@ export function SprintFormDialog({
           disabled={busy}
         >
           <SelectTrigger id="sprint-type">
-            <SelectValue placeholder="Not said" />
+            <SelectValue placeholder={t("Not said")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={NONE}>Not said</SelectItem>
-            {SPRINT_TYPES.map((t) => (
-              <SelectItem key={t} value={t}>
-                {t}
+            <SelectItem value={NONE}>{t("Not said")}</SelectItem>
+            {sprintTypes.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {sprintTypeLabel(option, lang)}
+                {option.standardDays === null ? "" : ` · ${option.standardDays} days`}
               </SelectItem>
             ))}
           </SelectContent>
@@ -257,10 +313,10 @@ export function SprintFormDialog({
           disabled={busy}
         >
           <SelectTrigger id="sprint-account">
-            <SelectValue placeholder="Ours, no client" />
+            <SelectValue placeholder={t("Ours, no client")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={NONE}>Ours, no client</SelectItem>
+            <SelectItem value={NONE}>{t("Ours, no client")}</SelectItem>
             {companies.map((a) => (
               <SelectItem key={a.id} value={a.id}>
                 {a.name}
@@ -286,10 +342,10 @@ export function SprintFormDialog({
             disabled={busy}
           >
             <SelectTrigger id="sprint-app">
-              <SelectValue placeholder="No app yet" />
+              <SelectValue placeholder={t("No app yet")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={NONE}>No app yet</SelectItem>
+              <SelectItem value={NONE}>{t("No app yet")}</SelectItem>
               {apps.map((a) => (
                 <SelectItem key={a.id} value={a.id}>
                   {a.name}
@@ -304,7 +360,7 @@ export function SprintFormDialog({
           id="sprint-goal"
           value={values.goal}
           onChange={(e) => setValues((s) => ({ ...s, goal: e.target.value }))}
-          placeholder="What this block of work is meant to achieve."
+          placeholder={t("What this block of work is meant to achieve.")}
           disabled={busy}
           rows={2}
         />
@@ -333,7 +389,7 @@ export function SprintFormDialog({
           inputMode="decimal"
           value={values.price}
           onChange={(e) => setValues((s) => ({ ...s, price: e.target.value }))}
-          placeholder="e.g. 4500"
+          placeholder={t("e.g. 4500")}
           disabled={busy}
         />
       </Field>

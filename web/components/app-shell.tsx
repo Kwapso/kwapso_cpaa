@@ -16,21 +16,21 @@ import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import {
   AppWindow,
+  BadgeCheck,
   Building2,
+  CalendarClock,
   CalendarRange,
   Hammer,
   Home,
   LibraryBig,
   ListTodo,
-  Megaphone,
   Palette,
   Route,
   Settings,
-  GraduationCap,
   LifeBuoy,
   PanelLeftClose,
   PanelLeftOpen,
-  Workflow,
+  Timer,
 } from "lucide-react"
 
 import type { ActiveTeam } from "@/lib/use-active-team"
@@ -45,20 +45,31 @@ import { invalidate, invalidatePrefix, patchRow, primeCache, readCache, reconcil
 import { NAV, TEAM_SECTIONS, bottomNavItems, isNavActive, type Crumb, type NavGroup } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useTeamPrewarm } from "@/lib/use-team-prewarm"
+import { useGoogleCatchUp } from "@/lib/use-google-catch-up"
+import { useT } from "@shared/web/language"
 import { CreateTeamDialog } from "@/components/create-team-dialog"
 import { TEAM_CREATION_CLOSED } from "@shared/product"
 import { ProfileMenu } from "@/components/profile-menu"
 import { TeamSwitcher } from "@/components/team-switcher"
 import { TimerBar } from "@/components/timer-bar"
+import { LanguageProvider } from "@shared/web/language"
+import { applyScale } from "@shared/web/scale-section"
 
-const NAV_ICONS = { home: Home, settings: Settings } as const
+const NAV_ICONS = { home: Home, settings: Settings, kwapso: BadgeCheck } as const
 // The lucide component for each team SIDEBAR page in the rail — the same concept
 // icons the tabs use (CONCEPT_ICON, pages.ts), as components rather than names
 // because the rail renders them directly. Every sidebar section has a line here;
 // a section without one falls back to Home, which is the tell that one is missing.
+//
+// TWO WERE MISSING, and the fallback is exactly why nobody noticed: `time` and
+// `meetings` shipped without a line, so the rail drew Home three times — Home,
+// Time and Meetings wearing one icon, which a tester reported as "Meetings and
+// Time share the same icon". Both concepts already had their own glyph in
+// CONCEPT_ICON (`timer`, `calendar-clock`); only this map had not been told.
+// web/test/nav.test.ts now derives the required keys from TEAM_SECTIONS and
+// insists every icon is distinct, so a silent fallback cannot ship again.
 const SECTION_ICONS: Record<string, typeof Home> = {
   accounts: Building2,
-  learning: GraduationCap,
   tickets: LifeBuoy,
   knowledge: LibraryBig,
   processes: Route,
@@ -66,9 +77,9 @@ const SECTION_ICONS: Record<string, typeof Home> = {
   sprints: CalendarRange,
   apps: AppWindow,
   tasks: ListTodo,
-  marketing: Megaphone,
+  time: Timer,
+  meetings: CalendarClock,
   brand: Palette,
-  delivery: Workflow,
 }
 
 export function AppShell({
@@ -90,6 +101,7 @@ export function AppShell({
    * path here; other pages rely on `usePathname`. */
   activePath?: string
 }) {
+  const t = useT()
   const pathname = usePathname()
   const [creating, setCreating] = React.useState(false)
   // The AI co-pilot (launcher + panel + screen-trace engine) is mounted ONCE at the
@@ -102,6 +114,18 @@ export function AppShell({
   // into a tab paints from cache, not a skeleton. Cold-guarded + failure-swallowed
   // (see the hook) — it only SEEDS cold keys, never touching a warm/live entry.
   useTeamPrewarm(teamId)
+
+  // HOW BIG THIS PERSON WANTS THE APP. One root font size on <html>, applied
+  // here rather than in the root layout for the same reason the language is:
+  // the root layout is a server component with no session, and the preference
+  // arrives on `active.user`. Every size token in the theme is in `rem`, so this
+  // one number moves text and spacing together (UI-RULEBOOK S4) — and because
+  // the viewport is locked against pinch-zoom (S5) it is the only way anybody
+  // can make this app bigger.
+  const userScale = active.user?.scale ?? null
+  React.useEffect(() => {
+    applyScale(userScale, "agency")
+  }, [userScale])
 
   // Desktop sidebar collapse (icon rail), remembered across sessions.
   const [collapsed, setCollapsed] = React.useState(false)
@@ -117,6 +141,10 @@ export function AppShell({
   }
 
   const { can } = usePermissions(teamId)
+  // GOOGLE COMES INTO STEP ON OPEN (14.12). One background request, behind first
+  // paint, only for somebody who holds both rights the door asks for — see the
+  // hook, which is where all the reasoning about why this is not a cron lives.
+  useGoogleCatchUp(teamId, can)
   const navigate = onNavigate ?? softNavigate
   const here = activePath ?? pathname
 
@@ -129,7 +157,7 @@ export function AppShell({
   type ShellLink = { slug: string; title: string; Icon: typeof Home; path: string; group: NavGroup }
   const universal: ShellLink[] = NAV.filter((i) => !i.need).map((i) => ({
     slug: i.slug,
-    title: i.title,
+    title: t(i.title),
     Icon: NAV_ICONS[i.icon],
     path: i.path,
     group: i.group,
@@ -137,7 +165,7 @@ export function AppShell({
   const sidebarPages: ShellLink[] = teamId
     ? TEAM_SECTIONS.filter((s) => s.placement === "sidebar" && can(s.module, "read")).map((s) => ({
         slug: s.key,
-        title: s.title,
+        title: t(s.title),
         Icon: SECTION_ICONS[s.key] ?? Home,
         // Clean top-level URL (/stories, /tickets) — resolves the active team from
         // context, like Home. (The gateway serves the shell for any sub-path.)
@@ -278,6 +306,12 @@ export function AppShell({
   })
 
   return (
+    // THE LANGUAGE WRAPS THE WHOLE SHELL, so the nav, the breadcrumbs, every
+    // routed screen and every dialog opened from one all read the same `t`.
+    // Here rather than in the root layout because the root layout is a server
+    // component with no session: the preference arrives on `active.user`, which
+    // this shell already has in hand before it paints.
+    <LanguageProvider value={active.user?.language}>
     <div className="flex min-h-[100svh]">
       {/* Desktop sidebar (collapsible to an icon rail).
        *
@@ -333,9 +367,20 @@ export function AppShell({
         </div>
       </aside>
 
-      <div className="flex min-h-[100svh] min-w-0 flex-1 flex-col">
-        {/* Mobile top bar */}
-        <header className="glass sticky top-0 z-20 flex items-center justify-between gap-2 border-b px-4 py-2.5 md:hidden">
+      {/* `--shell-top`. HOW FAR DOWN THE SHELL'S OWN CHROME REACHES, published
+       * once here and read by anything inside `<main>` that wants to pin itself
+       * (today: a record's collapsed title line and its tab strip — UI-RULEBOOK
+       * D3). On a phone the app bar below is sticky at the top of the window, so
+       * content pinned at 0 would slide UNDER it; on desktop that bar is not
+       * rendered at all and the offset is zero. In `rem` so it moves with the
+       * display-scale setting (S4) rather than being pinned to 16px.
+       *
+       * This is the shell half of L6: the frame owns z-20 and this variable, the
+       * in-content sticky layer takes z-10 and reads it. */}
+      <div className="flex min-h-[100svh] min-w-0 flex-1 flex-col [--shell-top:3.75rem] md:[--shell-top:0px]">
+        {/* Mobile top bar, an explicit height, because `--shell-top` above is a
+            promise about it. */}
+        <header className="glass sticky top-0 z-20 flex h-[3.75rem] items-center justify-between gap-2 border-b px-4 md:hidden">
           <TeamSwitcher active={active} onCreateTeam={() => setCreating(true)} />
           <div className="flex items-center gap-1">
             {/* BUILD-1 §5: the running timer is in the header of EVERY screen, so
@@ -352,7 +397,7 @@ export function AppShell({
          * The running timer sits on the same row on desktop (the mobile bar has
          * its own copy above): one line that is present on every screen and shows
          * nothing at all when nobody is timing anything. */}
-        <div className="flex items-center justify-between gap-3 px-4 pt-4">
+        <div className="flex items-center justify-between gap-3 px-4 pt-4 sm:px-6 lg:px-10">
           <div className="min-w-0">
             {breadcrumbs && breadcrumbs.length > 0 && (
               <Breadcrumbs items={breadcrumbs} onNavigate={onNavigate ?? softNavigate} />
@@ -363,7 +408,20 @@ export function AppShell({
           </div>
         </div>
 
-        <main className="min-w-0 flex-1 overflow-x-hidden px-4 py-6 pb-24 md:pb-8">
+        {/* THE PAGE GUTTERS (UI-RULEBOOK L1 / S2). One string, used here and by
+            the record header band so both align to the same left edge. `lg:px-10`
+            is 40px, the brand site's own `--margin--m`, and what `.nk-container`
+            computes to at every desktop width.
+
+            `overflow-x-clip`, NOT `overflow-x-hidden`. They look identical and
+            they are not: CSS says an element with `overflow-x: hidden` and a
+            visible other axis computes `overflow-y` to `auto`, which makes this
+            a SCROLL CONTAINER. A `position: sticky` child then sticks to a box
+            that never scrolls, so it silently does nothing, which is exactly
+            what happened to the record header and tab strip (D3) the first time
+            they were built. `clip` clips the same overflow and creates no scroll
+            container, so the document stays the scroller and sticky works. */}
+        <main className="min-w-0 flex-1 overflow-x-clip px-4 py-6 pb-24 sm:px-6 md:pb-8 lg:px-10">
           {children}
         </main>
 
@@ -408,6 +466,7 @@ export function AppShell({
        * (agent-host.tsx) so it survives navigation — it is intentionally not
        * rendered here. */}
     </div>
+    </LanguageProvider>
   )
 }
 

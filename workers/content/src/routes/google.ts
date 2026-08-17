@@ -58,20 +58,33 @@ import {
   readCookie,
 } from "../lib/google-oauth"
 import {
+  calendarCancel,
   calendarCreate,
+  calendarGet,
+  calendarGuests,
   calendarList,
+  calendarUpdate,
+  chatDelete,
   chatMessages,
   chatPost,
   chatSpaces,
+  driveCreateFolder,
   driveFileText,
   driveFolders,
   driveList,
+  driveTrash,
+  driveUpdate,
   driveUpload,
   gmailDraft,
+  gmailLabelId,
+  gmailLabelMessage,
   gmailMessage,
+  gmailMessageLabelIds,
+  gmailReply,
   gmailSearch,
   gmailSend,
   gmailSendDraft,
+  gmailThread,
   knownContactQuery,
 } from "../lib/google-api"
 import { knownContactEmails } from "../lib/google-read"
@@ -348,6 +361,171 @@ export async function postGoogleDriveUpload(request: Request, env: Env): Promise
   return json({ file })
 }
 
+/**
+ * POST /api/content/google/drive/update — rewrite a file that is already there.
+ *
+ * THE PAIR TO THE UPLOAD ABOVE, and the two are fenced differently on purpose.
+ * The upload names one of the caller's OWN folders, because choosing where a new
+ * file lands is a decision only they can make. A rewrite names a FILE, and the
+ * fence is Google's own: the connection holds `drive.file`, which grants writing
+ * only to files this app created or the person explicitly opened to it, so a file
+ * id naming somebody's tax return is refused at Google rather than by a clause
+ * here that could be forgotten. That is the same reasoning the scope list itself
+ * gives — a promise kept at Google beats a promise kept in a line of our code.
+ *
+ * `text` is the WHOLE new contents, not an append. A door that appended would
+ * need a door that replaced beside it, and two ways to write one file is how two
+ * callers end up disagreeing about what the file says.
+ */
+export async function postGoogleDriveUpdate(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{
+    fileId?: unknown
+    name?: unknown
+    text?: unknown
+    mimeType?: unknown
+  }>(request, env, "google", "edit")
+  await refusePortalCaller(cfg, guard)
+  const fileId = requireText(body.fileId, "File", TEXT_LIMITS.short)
+  const { token, connectionId } = await accessTokenFor(env, cfg, guard, "drive")
+  const file = await driveUpdate(token, {
+    fileId,
+    name: optionalText(body.name, "File name", TEXT_LIMITS.short),
+    mimeType: optionalText(body.mimeType, "File type", TEXT_LIMITS.short) ?? "text/plain",
+    text: requireText(body.text, "Contents", TEXT_LIMITS.long),
+  })
+  await recordGoogleAct(cfg, guard, actor, {
+    connectionId,
+    type: "File rewritten in Drive",
+    description: `${actor.name} rewrote "${file.name}" in Drive`,
+  })
+  await publishChange(env, guard.teamId, "google", connectionId)
+  return json({ file })
+}
+
+/** POST /api/content/google/drive/folder — a new folder inside one I named.
+ *
+ * `sourceId` is one of the caller's own named folders, exactly as the upload's
+ * is: a folder can only be made somewhere they already chose. That keeps "named
+ * folders only" true for the SHAPE of somebody's Drive as well as its contents —
+ * there is no way to spell a parent this person did not name. */
+export async function postGoogleDriveFolder(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{ sourceId?: unknown; name?: unknown }>(
+    request,
+    env,
+    "google",
+    "edit"
+  )
+  await refusePortalCaller(cfg, guard)
+  const source = await ownSourceOrThrow(cfg, guard, requireText(body.sourceId, "Folder", TEXT_LIMITS.short))
+  if (source.service !== "drive") return fail(400, "invalid_input", "That isn't a Drive folder.")
+  const name = requireText(body.name, "Folder name", TEXT_LIMITS.short)
+  const { token, connectionId } = await accessTokenFor(env, cfg, guard, "drive")
+  const folder = await driveCreateFolder(token, { parentId: source.externalId, name })
+  await recordGoogleAct(cfg, guard, actor, {
+    connectionId,
+    type: "Folder made in Drive",
+    description: `${actor.name} made the "${name}" folder inside "${source.name}"`,
+  })
+  await publishChange(env, guard.teamId, "google", connectionId)
+  return json({ folder })
+}
+
+/**
+ * POST /api/content/google/drive/save-mail — file a message, or a whole
+ * conversation, into Drive as a document.
+ *
+ * THE ONE DOOR IN THIS MODULE THAT TOUCHES TWO SERVICES, and it needs both
+ * connections because it is genuinely doing two things: reading mail as the
+ * caller, and writing a file as the caller. Either one missing is answered by
+ * the token seam in the ordinary way — "you haven't connected that yet" — rather
+ * than by a half-done copy.
+ *
+ * `threadId` copies the WHOLE exchange, oldest first; `messageId` copies one
+ * message. A thread is what a person means nine times in ten ("put the Bergman
+ * negotiation in the client folder"), and a single message is what they mean
+ * when they say "just that one".
+ *
+ * It is a text document rather than an .eml: the point of filing a conversation
+ * is that somebody can READ it later — in Drive's own preview, in a search, and
+ * through the knowledge base, which indexes text and cannot open a mail archive.
+ */
+export async function postGoogleDriveSaveMail(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{
+    sourceId?: unknown
+    messageId?: unknown
+    threadId?: unknown
+    name?: unknown
+  }>(request, env, "google", "edit")
+  await refusePortalCaller(cfg, guard)
+  const source = await ownSourceOrThrow(cfg, guard, requireText(body.sourceId, "Folder", TEXT_LIMITS.short))
+  if (source.service !== "drive") return fail(400, "invalid_input", "That isn't a Drive folder.")
+  const messageId = optionalText(body.messageId, "Message", TEXT_LIMITS.short)
+  const threadId = optionalText(body.threadId, "Conversation", TEXT_LIMITS.short)
+  if (!messageId && !threadId)
+    return fail(400, "invalid_input", "Say which message or which conversation.")
+
+  const { token: mailToken } = await accessTokenFor(env, cfg, guard, "gmail")
+  const messages = threadId
+    ? await gmailThread(mailToken, threadId)
+    : [await gmailMessage(mailToken, messageId as string)]
+  if (messages.length === 0) return fail(404, "google_mail_not_found", "There's nothing in that conversation.")
+
+  const { token: driveToken, connectionId } = await accessTokenFor(env, cfg, guard, "drive")
+  const name =
+    optionalText(body.name, "File name", TEXT_LIMITS.short) ??
+    `${messages[0].subject || "(no subject)"}.txt`
+  const file = await driveUpload(driveToken, {
+    folderId: source.externalId,
+    name,
+    mimeType: "text/plain",
+    text: messages
+      .map((m) => `From: ${m.from}\nTo: ${m.to}\nDate: ${m.date ?? ""}\nSubject: ${m.subject}\n\n${m.text || m.snippet}`)
+      .join("\n\n———\n\n"),
+  })
+  await recordGoogleAct(cfg, guard, actor, {
+    connectionId,
+    type: "Mail filed in Drive",
+    description: `${actor.name} filed ${messages.length === 1 ? "a message" : `${messages.length} messages`} into "${source.name}"`,
+  })
+  await publishChange(env, guard.teamId, "google", connectionId)
+  return json({ file, messagesSaved: messages.length })
+}
+
+/**
+ * POST /api/content/google/drive/trash — put a file kwapso wrote back in the bin.
+ *
+ * NOT ONE OF THE ELEVEN THE OWNER ASKED FOR, and it is here because the other
+ * three make it necessary: an assistant that can make a folder, write a file and
+ * rewrite it, with no way to take any of it back, is an assistant whose mistakes
+ * are permanent. The bin rather than a delete is the house rule in Google's own
+ * words — the file keeps its name, its history and its sharing for thirty days
+ * and one click restores it — so there is no act here anybody has to be afraid of.
+ *
+ * R17: a file already in the bin moves nothing, writes no history row and rings
+ * no bell.
+ */
+export async function postGoogleDriveTrash(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{ fileId?: unknown }>(
+    request,
+    env,
+    "google",
+    "delete"
+  )
+  await refusePortalCaller(cfg, guard)
+  const fileId = requireText(body.fileId, "File", TEXT_LIMITS.short)
+  const { token, connectionId } = await accessTokenFor(env, cfg, guard, "drive")
+  const result = await driveTrash(token, fileId)
+  if (result.changed) {
+    await recordGoogleAct(cfg, guard, actor, {
+      connectionId,
+      type: "File binned in Drive",
+      description: `${actor.name} put "${result.name}" in the Drive bin`,
+    })
+    await publishChange(env, guard.teamId, "google", connectionId)
+  }
+  return json({ changed: result.changed, name: result.name })
+}
+
 // ── GMAIL ────────────────────────────────────────────────────────────────────
 
 /** GET /api/content/google/gmail/messages?q= — mail to or from a KNOWN CONTACT,
@@ -405,7 +583,7 @@ export async function postGoogleMailDraft(request: Request, env: Env): Promise<R
   await recordGoogleAct(cfg, guard, actor, {
     connectionId,
     type: "Draft written",
-    description: `${actor.name} had a reply to ${to} drafted — "${subject}"`,
+    description: `${actor.name} had a reply to ${to} drafted, "${subject}"`,
   })
   await publishChange(env, guard.teamId, "google", connectionId)
   return json({ draft })
@@ -454,6 +632,102 @@ export async function postGoogleMailSend(request: Request, env: Env): Promise<Re
   })
   await publishChange(env, guard.teamId, "google", connectionId)
   return json({ sent })
+}
+
+/**
+ * POST /api/content/google/gmail/reply — answer inside the conversation.
+ *
+ * TWO GATES, the same two the send door has, and for the same reason: this
+ * SENDS. A reply is not a softer act than a message — it is a message, in
+ * somebody's inbox, with our name on it — so `google_mail:create` is demanded
+ * here exactly as it is there, and the agent tool pauses for a yes/no panel.
+ *
+ * IT TAKES A MESSAGE AND A SENTENCE, and nothing else. Who it goes to, what it
+ * is called and which conversation it belongs to are all written on the message
+ * being answered (lib/google-api.ts gmailReply says how). Asking a caller for
+ * those would be asking a caller to get them wrong, and the way they go wrong is
+ * an answer that lands as a brand-new conversation — or in the wrong person's
+ * inbox, because somebody pasted the To of the message they happened to be
+ * looking at.
+ *
+ * The draft door beside it is still the normal way to answer mail. This is for
+ * when a person has said, in as many words, send it.
+ */
+export async function postGoogleMailReply(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{ messageId?: unknown; body?: unknown }>(
+    request,
+    env,
+    "google",
+    "edit"
+  )
+  await refusePortalCaller(cfg, guard)
+  await requireRight(cfg, guard, "google_mail", "create")
+  const { token, connectionId } = await accessTokenFor(env, cfg, guard, "gmail")
+  const sent = await gmailReply(token, {
+    messageId: requireText(body.messageId, "Message", TEXT_LIMITS.short),
+    body: requireText(body.body, "Message", TEXT_LIMITS.long),
+  })
+  await recordGoogleAct(cfg, guard, actor, {
+    connectionId,
+    type: "Reply sent",
+    description: `kwapso replied to ${sent.to} as ${actor.name}, "${sent.subject}"`,
+  })
+  await publishChange(env, guard.teamId, "google", connectionId)
+  return json({ sent })
+}
+
+/**
+ * POST /api/content/google/gmail/label — file a message under a label, or take
+ * the label off.
+ *
+ * `label` is the NAME a person says ("Contracts"), never Gmail's own id, and the
+ * match is case-insensitive — somebody who types "contracts" and gets a second
+ * label beside their existing "Contracts" has been handed a filing system with
+ * two drawers for one thing.
+ *
+ * ONE DOOR FOR BOTH DIRECTIONS, decided by `on`. Two doors would be two places
+ * to get the label lookup right, and the asymmetry that matters is inside:
+ * applying a label CREATES it when it is missing (that is what "file this under
+ * Contracts" means to a person), and removing one never does — making a label in
+ * order to take it off a message is a write nobody asked for.
+ *
+ * Gated on `google:edit` and NOT on the mail switch, which is a considered line
+ * rather than an oversight: the owner's switch is about mail LEAVING the
+ * building, and a label leaves nothing. Nobody else can see it. It is the same
+ * reading that puts a Drive upload under `google:edit` — writing inside the
+ * world this person connected.
+ *
+ * R17: a message that already carries the label (or already does not) moves
+ * nothing, writes no history row and rings no bell.
+ */
+export async function postGoogleMailLabel(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{
+    messageId?: unknown
+    label?: unknown
+    on?: unknown
+  }>(request, env, "google", "edit")
+  await refusePortalCaller(cfg, guard)
+  const messageId = requireText(body.messageId, "Message", TEXT_LIMITS.short)
+  const label = requireText(body.label, "Label", TEXT_LIMITS.short)
+  if (typeof body.on !== "boolean")
+    return fail(400, "invalid_input", "Say whether the label goes on or comes off.")
+  const on = body.on
+  const { token, connectionId } = await accessTokenFor(env, cfg, guard, "gmail")
+  // Create it only when applying — see the doc comment above.
+  const labelId = await gmailLabelId(token, label, on)
+  // Nothing to take off: the label does not exist, so the message does not carry
+  // it, so the answer the caller wanted is already true.
+  if (!labelId) return json({ changed: false, label, on })
+  const changed = (await gmailMessageLabelIds(token, messageId)).includes(labelId) !== on
+  if (!changed) return json({ changed: false, label, on })
+  await gmailLabelMessage(token, messageId, labelId, on)
+  await recordGoogleAct(cfg, guard, actor, {
+    connectionId,
+    type: on ? "Message labelled" : "Label removed",
+    description: `${actor.name} ${on ? "filed a message under" : "took a message out of"} "${label}"`,
+  })
+  await publishChange(env, guard.teamId, "google", connectionId)
+  return json({ changed: true, label, on })
 }
 
 // ── CALENDAR ─────────────────────────────────────────────────────────────────
@@ -509,6 +783,239 @@ export async function postGoogleEvent(request: Request, env: Env): Promise<Respo
 }
 
 /**
+ * THE FOUR DOORS ON AN EVENT THAT ALREADY EXISTS — and why they are four doors
+ * and not one with a dozen optional fields.
+ *
+ * They answer four different questions, and a person changes one at a time:
+ * WHAT it says and WHEN it is (update), WHO is coming (guests), WHERE it is
+ * (location), and whether it is happening at all (cancel). Splitting them that
+ * way is not decoration — the guest door is the only one of the four that puts
+ * something in a THIRD PARTY's inbox, which is why its agent tool pauses for a
+ * yes/no panel where the others do not, exactly as mail does and events don't.
+ * A single door carrying every field could not make that distinction, because
+ * the distinction lives in what the caller happened to fill in.
+ *
+ * NO FIELD IS SET IN TWO PLACES. Location is absent from the update door on
+ * purpose: two ways to write one field is how two callers end up disagreeing
+ * about what an entry says.
+ *
+ * ALL FOUR DEMAND THE EVENTS SWITCH, cancel included. The owner's switch reads
+ * "kwapso may put an EVENT in your calendar", and the honest reading of it is
+ * "kwapso may touch my diary" — of which calling somebody's appointment off is
+ * the sharpest version there is.
+ */
+export async function postGoogleEventUpdate(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{
+    eventId?: unknown
+    summary?: unknown
+    description?: unknown
+    start?: unknown
+    end?: unknown
+    allDay?: unknown
+  }>(request, env, "google", "edit")
+  await refusePortalCaller(cfg, guard)
+  await requireRight(cfg, guard, "google_events", "create")
+  const eventId = requireText(body.eventId, "Event", TEXT_LIMITS.short)
+  const change = {
+    summary: optionalText(body.summary, "Title", TEXT_LIMITS.short),
+    description: optionalText(body.description, "Details", TEXT_LIMITS.long),
+    start: optionalText(body.start, "Start", TEXT_LIMITS.short),
+    end: optionalText(body.end, "End", TEXT_LIMITS.short),
+    allDay: body.allDay === true,
+  }
+  // Nothing named is not a no-op, it is a caller who thinks they changed
+  // something. Say so, rather than answering 200 to an empty edit.
+  if (!change.summary && !change.description && !change.start && !change.end)
+    return fail(400, "invalid_input", "Say what to change, the title, the details, or the times.")
+  const { token, connectionId } = await accessTokenFor(env, cfg, guard, "calendar")
+  const event = await calendarUpdate(token, eventId, change)
+  await recordGoogleAct(cfg, guard, actor, {
+    connectionId,
+    type: "Event changed",
+    description: `kwapso changed "${event.summary}" in ${actor.name}'s calendar`,
+  })
+  await publishChange(env, guard.teamId, "google", connectionId)
+  return json({ event })
+}
+
+/** POST /api/content/google/calendar/event/guests — invite people, or take them
+ * off. Both in one call, because "swap Ana for Marta" is one act to the person
+ * asking and two round-trips would send two notifications for it.
+ *
+ * R17: a call that invites nobody new and removes nobody who was there moves
+ * nothing — and, more to the point, mails nobody a change notification about a
+ * change that did not happen. */
+export async function postGoogleEventGuests(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{
+    eventId?: unknown
+    add?: unknown
+    remove?: unknown
+  }>(request, env, "google", "edit")
+  await refusePortalCaller(cfg, guard)
+  await requireRight(cfg, guard, "google_events", "create")
+  const eventId = requireText(body.eventId, "Event", TEXT_LIMITS.short)
+  // R20, the array shape: `Array.isArray` decides it is a list, then every entry
+  // goes through the same text seam a single field would — a list is not a way
+  // in for values a scalar could not carry.
+  const add = guestList(Array.isArray(body.add) ? body.add : [], "Guest to add")
+  const remove = guestList(Array.isArray(body.remove) ? body.remove : [], "Guest to remove")
+  if (add.length === 0 && remove.length === 0)
+    return fail(400, "invalid_input", "Say who to add, or who to take off.")
+  const { token, connectionId } = await accessTokenFor(env, cfg, guard, "calendar")
+  const { event, changed } = await calendarGuests(token, eventId, { add, remove })
+  if (changed) {
+    await recordGoogleAct(cfg, guard, actor, {
+      connectionId,
+      type: "Event guests changed",
+      description: `kwapso changed who is coming to "${event.summary}"`,
+    })
+    await publishChange(env, guard.teamId, "google", connectionId)
+  }
+  // `changed` first, and the order is load-bearing: R27 derives what a
+  // description may promise from the keys of this literal, and its scan sees the
+  // first shorthand key in an object. Naming the field the tool's description
+  // talks about first is what keeps that promise checkable.
+  return json({ changed, event })
+}
+
+/** POST /api/content/google/calendar/event/location — say where it is.
+ *
+ * Its own door because WHERE is the field a person changes on its own, long
+ * after the what and the when are agreed ("same time, different room"), and
+ * because it is the one field the kwapso meeting record already holds — so this
+ * is the seam that pushes a booked meeting's room into the diary entry without
+ * restating a time somebody may have moved in Google since. */
+export async function postGoogleEventLocation(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{ eventId?: unknown; location?: unknown }>(
+    request,
+    env,
+    "google",
+    "edit"
+  )
+  await refusePortalCaller(cfg, guard)
+  await requireRight(cfg, guard, "google_events", "create")
+  const eventId = requireText(body.eventId, "Event", TEXT_LIMITS.short)
+  const location = requireText(body.location, "Where", TEXT_LIMITS.short)
+  const { token, connectionId } = await accessTokenFor(env, cfg, guard, "calendar")
+  const event = await calendarUpdate(token, eventId, { location })
+  await recordGoogleAct(cfg, guard, actor, {
+    connectionId,
+    type: "Event location set",
+    description: `kwapso set where "${event.summary}" happens, ${location}`,
+  })
+  await publishChange(env, guard.teamId, "google", connectionId)
+  return json({ event })
+}
+
+/** POST /api/content/google/calendar/event/cancel — call it off.
+ *
+ * CANCELLED, NOT DELETED, which is the base's own rule in Google's words: the
+ * entry stays in everybody's calendar marked cancelled and every guest is told,
+ * rather than an appointment silently evaporating out of somebody's morning.
+ * R17: a second press moves nothing and mails nobody. */
+export async function postGoogleEventCancel(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{ eventId?: unknown }>(
+    request,
+    env,
+    "google",
+    "edit"
+  )
+  await refusePortalCaller(cfg, guard)
+  await requireRight(cfg, guard, "google_events", "create")
+  const eventId = requireText(body.eventId, "Event", TEXT_LIMITS.short)
+  const { token, connectionId } = await accessTokenFor(env, cfg, guard, "calendar")
+  const { event, changed } = await calendarCancel(token, eventId)
+  if (changed) {
+    await recordGoogleAct(cfg, guard, actor, {
+      connectionId,
+      type: "Event cancelled",
+      description: `kwapso called off "${event.summary}" in ${actor.name}'s calendar`,
+    })
+    await publishChange(env, guard.teamId, "google", connectionId)
+  }
+  // `changed` first — see the note on the guests door above.
+  return json({ changed, event })
+}
+
+/** Guest addresses off a request: a bounded list, every entry through the same
+ * text seam a single field would use, lower-cased and de-duplicated so one
+ * person named twice is one invitation. */
+function guestList(value: unknown[], field: string): string[] {
+  if (value.length > GUEST_CHANGE_CAP)
+    throw new GuardError(400, "invalid_input", `That's more than ${GUEST_CHANGE_CAP} people in one go.`)
+  return [...new Set(value.map((v) => requireText(v, field, TEXT_LIMITS.short).toLowerCase()))]
+}
+
+/** People one call may invite or uninvite. Small on purpose: a guest change is
+ * something a person does by name, and a request naming fifty is a mail merge
+ * wearing a calendar's clothes. */
+const GUEST_CHANGE_CAP = 25
+
+/**
+ * GET /api/content/google/calendar/event/transcript?eventId= — what was SAID in
+ * the meeting, reached from the meeting itself.
+ *
+ * THE JOIN THIS DOOR EXISTS TO MAKE. Google Meet files a transcript as an
+ * ordinary Google Doc, named after the meeting, in the organiser's Drive — so
+ * until now the only way to read one was to already know which document it was.
+ * Nobody thinks that way. They think "what did we agree in Tuesday's call", and
+ * Tuesday's call is a diary entry. This door starts where the person starts.
+ *
+ * IT SEARCHES ONLY THE FOLDERS THEY NAMED, which is the module's first promise
+ * and is not bent for this. Meet's transcripts land in a "Meet Recordings"
+ * folder; sharing that folder is what makes them reachable, and a person who
+ * has not shared it gets an honest "nothing shared that holds it" rather than
+ * kwapso quietly reading their whole Drive to find one file.
+ *
+ * TWO SEARCHES AT MOST: the meeting's title, then — only if that found nothing —
+ * its Meet code, which is what Google names a transcript after when the entry
+ * had no title. Both are bounded reads inside the named folders.
+ */
+export async function getGoogleEventTranscript(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "google", "read")
+  await refusePortalCaller(cfg, guard)
+  const eventId = queryText(new URL(request.url).searchParams.get("eventId"), "Event", TEXT_LIMITS.short)
+  if (!eventId) return fail(400, "invalid_input", "Say which event.")
+  const { token: calendarToken } = await accessTokenFor(env, cfg, guard, "calendar")
+  const event = await calendarGet(calendarToken, eventId)
+
+  const { token: driveToken } = await accessTokenFor(env, cfg, guard, "drive")
+  const folders = (await listNamedSources(cfg, guard, "drive"))
+    .filter((s) => s.active)
+    .map((s) => s.externalId)
+  if (folders.length === 0)
+    return json({ event, transcript: null, note: "No Drive folder is shared, so there's nowhere to look." })
+
+  const terms = [event.summary, event.meetingCode].filter(Boolean)
+  let found: { id: string; name: string; webViewLink: string | null; modifiedTime: string | null } | null =
+    null
+  for (const term of terms) {
+    const hits = (await driveList(driveToken, folders, term))
+      .filter((f) => /transcript/i.test(f.name))
+      .sort((a, b) => (b.modifiedTime ?? "").localeCompare(a.modifiedTime ?? ""))
+    if (hits[0]) {
+      found = hits[0]
+      break
+    }
+  }
+  if (!found)
+    return json({
+      event,
+      transcript: null,
+      note: "No transcript for that meeting in the folders you've shared.",
+    })
+  return json({
+    event,
+    transcript: {
+      fileId: found.id,
+      name: found.name,
+      url: found.webViewLink,
+      text: await driveFileText(driveToken, found.id),
+    },
+  })
+}
+
+/**
  * POST /api/content/google/calendar/sprint — a sprint's dates, in my calendar.
  *
  * FROM kwapso TO GOOGLE, the first of the two the owner named. A sprint is a
@@ -541,7 +1048,7 @@ export async function postGoogleSprintEvent(request: Request, env: Env): Promise
   const { token, connectionId } = await accessTokenFor(env, cfg, guard, "calendar")
   const event = await calendarCreate(token, {
     summary: `${sprint.ref ? `${sprint.ref} · ` : ""}${sprint.name}`,
-    description: [sprint.goal, sprint.accountName].filter(Boolean).join(" — "),
+    description: [sprint.goal, sprint.accountName].filter(Boolean).join(", "),
     start: sprint.startsOn,
     // Google's all-day END is EXCLUSIVE: an entry ending on the 14th shows up to
     // the 13th. So the last day of the sprint has to be its end date plus one, or
@@ -592,7 +1099,7 @@ export async function postGoogleMeetingEvent(request: Request, env: Env): Promis
   const meeting = await getMeeting(cfg, guard, requireText(body.meetingId, "Meeting", TEXT_LIMITS.short))
   if (!meeting) return fail(404, "meeting_not_found", "That meeting doesn't exist.")
   if (!meeting.active)
-    return fail(409, "meeting_cancelled", "That meeting is cancelled — put it back in the diary first.")
+    return fail(409, "meeting_cancelled", "That meeting is cancelled. Put it back in the diary first.")
   // Already there: answer with what exists. Not an error — somebody pressing a
   // button twice means it once.
   if (meeting.googleEventId)
@@ -639,6 +1146,82 @@ function dayAfter(date: string): string {
 }
 
 // ── GOOGLE CHAT ──────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/content/google/chat/spaces — every space this person can see, and
+ * which of them kwapso has been given.
+ *
+ * THE GAP THIS FILLS. Until now a space could only be read if you already knew
+ * its id, which meant somebody had to have named it — so "which spaces are
+ * there?" had no answer at all unless you were standing on the sharing form.
+ * The picker beside it (`/google/pick`) answers a nearby question for that form,
+ * gated on `google:create` and shaped as a list of options; this is the plain
+ * READ, gated on `google:read`, and it carries the one thing the picker cannot:
+ * whether each space is already shared, and under which row. That is the
+ * difference between two doors and two answers to one question.
+ *
+ * Reading the LIST of spaces is not reading what is in them. The messages door
+ * below still refuses any space this person has not named.
+ */
+export async function getGoogleChatSpaces(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "google", "read")
+  await refusePortalCaller(cfg, guard)
+  const { token } = await accessTokenFor(env, cfg, guard, "chat")
+  const named = new Map(
+    (await listNamedSources(cfg, guard, "chat")).map((s) => [s.externalId, s])
+  )
+  return json({
+    spaces: (await chatSpaces(token)).map((s) => {
+      const source = named.get(s.name)
+      return {
+        externalId: s.name,
+        name: s.displayName,
+        // Shared, and which row says so — so the caller can go straight to the
+        // messages door without a second lookup, and can tell "I could share
+        // this" from "I already have".
+        sourceId: source?.id ?? null,
+        shared: Boolean(source?.active),
+      }
+    }),
+  })
+}
+
+/**
+ * POST /api/content/google/chat/delete — take back something kwapso posted.
+ *
+ * NOT ONE OF THE ELEVEN, and here for the same reason the Drive bin is: posting
+ * into a space colleagues read is the act in this module with no undo, and an
+ * assistant that can post but not retract makes every wrong message permanent.
+ *
+ * `messageName` is Google's own full name (`spaces/AAA/messages/BBB`) and it
+ * only ever comes back from posting in, or reading, a space this person named —
+ * and the door re-checks the space anyway. Google refuses to delete a message
+ * this app did not send, which is the second fence: kwapso can take back what
+ * kwapso said and nothing else.
+ */
+export async function postGoogleChatDelete(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{ sourceId?: unknown; messageName?: unknown }>(
+    request,
+    env,
+    "google",
+    "delete"
+  )
+  await refusePortalCaller(cfg, guard)
+  const source = await ownSourceOrThrow(cfg, guard, requireText(body.sourceId, "Space", TEXT_LIMITS.short))
+  if (source.service !== "chat") return fail(400, "invalid_input", "That isn't a Chat space.")
+  const messageName = requireText(body.messageName, "Message", TEXT_LIMITS.short)
+  if (!messageName.startsWith(`${source.externalId}/messages/`))
+    return fail(400, "invalid_input", "That message isn't in that space.")
+  const { token, connectionId } = await accessTokenFor(env, cfg, guard, "chat")
+  await chatDelete(token, messageName)
+  await recordGoogleAct(cfg, guard, actor, {
+    connectionId,
+    type: "Message taken back",
+    description: `${actor.name} took a message back out of "${source.name}"`,
+  })
+  await publishChange(env, guard.teamId, "google", connectionId)
+  return json({ removed: true })
+}
 
 /** GET /api/content/google/chat/messages?sourceId= — one NAMED space's messages.
  * `sourceId` is one of the caller's own rows, so a space they never named cannot

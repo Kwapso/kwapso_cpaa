@@ -16,10 +16,8 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Send } from "lucide-react"
@@ -28,6 +26,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { ApiFailure } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 export type ResolveFormValues = { resolution: string }
 
@@ -52,6 +51,7 @@ export function ResolveDialog({
   draftKey?: string
   onSubmit: (values: ResolveFormValues) => Promise<void>
 }) {
+  const t = useT()
   const [values, setValues, clearDraft] = useFormDraft(draftKey, { resolution: draft ?? "" }, open)
   const [busy, setBusy] = React.useState(false)
   const ready = values.resolution.trim() !== ""
@@ -78,25 +78,24 @@ export function ResolveDialog({
       busy={busy}
       clearDraft={clearDraft}
       onSubmit={submit}
-      title={<DialogTitle>Answer this ticket</DialogTitle>}
+      title={<DialogTitle>{t("Answer this ticket")}</DialogTitle>}
       subtitle={
         <DialogDescription>
-          It resolves the ticket, joins the conversation, and goes to the client by email.
+          {t("It resolves the ticket, joins the conversation, and goes to the client by email.")}
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !ready} className="gap-1.5">
-          {busy ? <Spinner /> : <Send className="size-4" />}
-          {busy ? "Sending…" : "Send and resolve"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !ready,
+        icon: <Send className="size-4" />,
+      }}
     >
       <Field config={resolutionField} htmlFor="resolve-text" className={fieldSpacing}>
         <Textarea
           id="resolve-text"
           value={values.resolution}
           onChange={(e) => setValues((s) => ({ ...s, resolution: e.target.value }))}
-          placeholder="What we did, in the words they'd use."
+          placeholder={t("What we did, in the words they'd use.")}
           disabled={busy}
           rows={6}
           autoFocus

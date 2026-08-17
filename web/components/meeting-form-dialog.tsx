@@ -15,7 +15,6 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
@@ -26,7 +25,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
@@ -35,6 +33,7 @@ import { ApiFailure } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { toMoment } from "@shared/web/format"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 /** Radix Select can't hold an empty value, so "nobody in particular" needs a
  * sentinel — the same one the knowledge form uses for the agency's own material. */
@@ -44,6 +43,10 @@ const titleField = { ...defaultFieldConfig, label: "What it is about", required:
 const whenField = { ...defaultFieldConfig, label: "When", required: true }
 const untilField = { ...defaultFieldConfig, label: "Until", required: false }
 const clientField = { ...defaultFieldConfig, label: "Who it is with", required: false }
+// WHICH SYSTEM IT WAS ABOUT. Optional on purpose: plenty of meetings are about
+// the account rather than one of its systems, and the first kickoff call is one
+// of them. It is what fills the app record's own Meetings tab.
+const appField = { ...defaultFieldConfig, label: "Which app", required: false }
 const purposeField = { ...defaultFieldConfig, label: "Why we are meeting", required: false }
 const whereField = { ...defaultFieldConfig, label: "Where", required: false }
 const agendaField = { ...defaultFieldConfig, label: "Agenda", required: false }
@@ -54,6 +57,7 @@ export type MeetingFormValues = {
   startsAt: string
   endsAt: string
   accountId: string
+  appId: string
   purposeId: string
   location: string
   agenda: string
@@ -65,6 +69,7 @@ export function MeetingFormDialog({
   onOpenChange,
   onSubmit,
   accountOptions,
+  appOptions,
   purposeOptions,
   initial,
   draftKey,
@@ -75,12 +80,16 @@ export function MeetingFormDialog({
   /** the clients this caller may file a meeting under — already fenced by their
    * own read of the accounts door. */
   accountOptions: { id: string; name: string }[]
+  /** the systems a meeting can be filed against — the same bounded apps list
+   * every other form in the work engine picks from. */
+  appOptions: { id: string; name: string }[]
   /** why we meet, out of the settled taxonomy under Delivery method. */
   purposeOptions: { id: string; name: string }[]
   /** Present = EDIT mode (prefilled). */
   initial?: Partial<MeetingFormValues>
   draftKey?: string
 }) {
+  const t = useT()
   const isEdit = !!initial
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
@@ -89,6 +98,7 @@ export function MeetingFormDialog({
       startsAt: initial?.startsAt ?? "",
       endsAt: initial?.endsAt ?? "",
       accountId: initial?.accountId || NONE,
+      appId: initial?.appId || NONE,
       purposeId: initial?.purposeId || NONE,
       location: initial?.location ?? "",
       agenda: initial?.agenda ?? "",
@@ -109,6 +119,7 @@ export function MeetingFormDialog({
         startsAt: toMoment(values.startsAt),
         endsAt: toMoment(values.endsAt),
         accountId: values.accountId === NONE ? "" : values.accountId,
+        appId: values.appId === NONE ? "" : values.appId,
         purposeId: values.purposeId === NONE ? "" : values.purposeId,
         location: values.location.trim(),
         agenda: values.agenda.trim(),
@@ -136,23 +147,21 @@ export function MeetingFormDialog({
       subtitle={
         <DialogDescription>
           {isEdit
-            ? "Write up what was decided while it is still fresh — the notes are the part worth keeping."
+            ? "Write up what was decided while it is still fresh, the notes are the part worth keeping."
             : "A conversation, with what you mean to cover. You can add it to your own calendar afterwards."}
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !ready}>
-          {busy ? <Spinner /> : null}
-          {busy ? "Saving…" : isEdit ? "Save changes" : "Put it in the diary"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !ready,
+      }}
     >
       <Field config={titleField} htmlFor="meeting-title" className={fieldSpacing}>
         <Input
           id="meeting-title"
           value={values.title}
           onChange={(e) => setValues((s) => ({ ...s, title: e.target.value }))}
-          placeholder="e.g. Quarterly review with Bergman"
+          placeholder={t("e.g. Quarterly review with Bergman")}
           disabled={busy}
           autoFocus
         />
@@ -182,11 +191,30 @@ export function MeetingFormDialog({
           disabled={busy}
         >
           <SelectTrigger id="meeting-client">
-            <SelectValue placeholder="Nobody — it is ours" />
+            <SelectValue placeholder={t("Nobody, it is ours")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={NONE}>Nobody — it is ours</SelectItem>
+            <SelectItem value={NONE}>{t("Nobody, it is ours")}</SelectItem>
             {accountOptions.map((a) => (
+              <SelectItem key={a.id} value={a.id}>
+                {a.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+      <Field config={appField} htmlFor="meeting-app" className={fieldSpacing}>
+        <Select
+          value={values.appId}
+          onValueChange={(v) => setValues((s) => ({ ...s, appId: v }))}
+          disabled={busy}
+        >
+          <SelectTrigger id="meeting-app">
+            <SelectValue placeholder={t("Not about one app")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NONE}>{t("Not about one app")}</SelectItem>
+            {appOptions.map((a) => (
               <SelectItem key={a.id} value={a.id}>
                 {a.name}
               </SelectItem>
@@ -201,10 +229,10 @@ export function MeetingFormDialog({
           disabled={busy}
         >
           <SelectTrigger id="meeting-purpose">
-            <SelectValue placeholder="Not said" />
+            <SelectValue placeholder={t("Not said")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={NONE}>Not said</SelectItem>
+            <SelectItem value={NONE}>{t("Not said")}</SelectItem>
             {purposeOptions.map((p) => (
               <SelectItem key={p.id} value={p.id}>
                 {p.name}
@@ -218,7 +246,7 @@ export function MeetingFormDialog({
           id="meeting-where"
           value={values.location}
           onChange={(e) => setValues((s) => ({ ...s, location: e.target.value }))}
-          placeholder="e.g. Their office, or a video call"
+          placeholder={t("e.g. Their office, or a video call")}
           disabled={busy}
         />
       </Field>
@@ -227,7 +255,7 @@ export function MeetingFormDialog({
           id="meeting-agenda"
           value={values.agenda}
           onChange={(e) => setValues((s) => ({ ...s, agenda: e.target.value }))}
-          placeholder="What we mean to cover."
+          placeholder={t("What we mean to cover.")}
           disabled={busy}
           rows={3}
         />
@@ -237,7 +265,7 @@ export function MeetingFormDialog({
           id="meeting-notes"
           value={values.notes}
           onChange={(e) => setValues((s) => ({ ...s, notes: e.target.value }))}
-          placeholder="What was said and decided."
+          placeholder={t("What was said and decided.")}
           disabled={busy}
           rows={4}
         />

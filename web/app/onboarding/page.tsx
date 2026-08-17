@@ -25,6 +25,7 @@ import { ApiFailure, auth, tenancy } from "@/lib/api"
 import { BrandMark } from "@/components/brand-mark"
 import { personInitials } from "@/lib/identity"
 import { fileToDataUrl } from "@/lib/image"
+import { useT } from "@shared/web/language"
 
 const firstNameField = { ...defaultFieldConfig, label: "First name", required: true }
 const lastNameField = { ...defaultFieldConfig, label: "Last name", required: true }
@@ -36,6 +37,7 @@ const lastNameField = { ...defaultFieldConfig, label: "Last name", required: tru
 const CLIENT_LOGIN = "client_login"
 
 export default function OnboardingPage() {
+  const t = useT()
   const router = useRouter()
   const [checking, setChecking] = React.useState(true)
   const [firstName, setFirstName] = React.useState("")
@@ -105,7 +107,7 @@ export default function OnboardingPage() {
     try {
       setPhoto(await fileToDataUrl(files[0]))
     } catch {
-      toast.error("Couldn't read that image — try another one.")
+      toast.error(t("Couldn't read that image. Try another one."))
     }
   }
 
@@ -169,13 +171,11 @@ export default function OnboardingPage() {
         </div>
         <div className="animate-rise w-full max-w-sm text-center">
           <BrandMark className="mb-1" />
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight">You&apos;re in the right place</h1>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight">{t("You're in the right place")}</h1>
           {/* The worker's own sentence, not a second copy written here. */}
           <p className="text-muted-foreground mt-2 text-sm">{wrongDoor}</p>
           <p className="text-muted-foreground mt-4 text-sm">
-            Your invitation has been accepted, so nothing is waiting on you. Open the portal at
-            the address your invitation email came from, and sign in with this same email
-            address.
+            {t("Your invitation has been accepted, so nothing is waiting on you. Open the portal at the address your invitation email came from, and sign in with this same email address.")}
           </p>
         </div>
       </main>
@@ -198,13 +198,13 @@ export default function OnboardingPage() {
           <p className="text-muted-foreground mt-1 text-sm">
             {teamless
               ? "An admin can invite you back, or you can start a team of your own below."
-              : "Tell us who you are — your team gets created right after."}
+              : "Tell us who you are, your team gets created right after."}
           </p>
         </div>
         <form className="mt-6 flex flex-col gap-4" onSubmit={finish}>
             <div className="flex flex-col items-center gap-3">
               <Avatar className="size-20">
-                {photo && <AvatarImage src={photo} alt="Your photo" />}
+                {photo && <AvatarImage src={photo} alt={t("Your photo")} />}
                 <AvatarFallback className="text-lg">{initials}</AvatarFallback>
               </Avatar>
               <FileUpload accept="image/*" multiple={false} onChange={handlePhoto} />
@@ -215,7 +215,7 @@ export default function OnboardingPage() {
                 id="first-name"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                placeholder="Chris"
+                placeholder={t("Chris")}
                 disabled={busy}
                 autoFocus
               />
@@ -225,7 +225,7 @@ export default function OnboardingPage() {
                 id="last-name"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                placeholder="Martin"
+                placeholder={t("Martin")}
                 disabled={busy}
               />
             </Field>

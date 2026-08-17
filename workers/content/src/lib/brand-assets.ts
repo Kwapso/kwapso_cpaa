@@ -141,7 +141,7 @@ export async function updateBrandAsset(
   ])
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Brand asset edited",
-    description: `${actor.name} edited "${v.name}"${changes ? ` — ${changes}` : ""}`,
+    description: `${actor.name} edited "${v.name}"${changes ? `, ${changes}` : ""}`,
     relatedTable: "brand_assets",
     relatedRowId: id,
   })

@@ -27,6 +27,7 @@ import {
 
 import { dataOps, type UsageLogRow } from "@/lib/api"
 import { formatActivityWhen } from "@shared/web/format"
+import { useT } from "@shared/web/language"
 
 /** A redacted row's stand-in line: the row is real (who + when + credits), only
  * the TEXT is theirs. Never a blank bubble with a teammate's name on it. */
@@ -45,6 +46,7 @@ export function AgentUsageDialog({
   /** the header line: free left today + purchased balance */
   summary: string
 }) {
+  const t = useT()
   const [rows, setRows] = React.useState<UsageLogRow[] | null>(null)
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState(false)
@@ -75,14 +77,14 @@ export function AgentUsageDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Assistant usage</DialogTitle>
+          <DialogTitle>{t("Assistant usage")}</DialogTitle>
           {summary && <DialogDescription>{summary}</DialogDescription>}
         </DialogHeader>
         {loading ? (
-          <p className="text-muted-foreground py-6 text-center text-sm">Loading…</p>
+          <p className="text-muted-foreground py-6 text-center text-sm">{t("Loading…")}</p>
         ) : error ? (
           <p className="text-muted-foreground py-6 text-center text-sm">
-            Couldn&apos;t load usage. Try again.
+            {t("Couldn't load usage. Try again.")}
           </p>
         ) : items.length > 0 ? (
           <ScrollArea className="max-h-80">
@@ -91,7 +93,7 @@ export function AgentUsageDialog({
             </div>
           </ScrollArea>
         ) : (
-          <p className="text-muted-foreground py-6 text-center text-sm">No usage yet today.</p>
+          <p className="text-muted-foreground py-6 text-center text-sm">{t("No usage yet today.")}</p>
         )}
       </DialogContent>
     </Dialog>

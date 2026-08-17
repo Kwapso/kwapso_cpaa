@@ -12,7 +12,6 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { type ScreenQuery } from "@kwapso/ui/lib/recipe"
 
 import { AccountFormDialog } from "@/components/account-form-dialog"
-import { LearningFormDialog } from "@/components/learning-form-dialog"
 import { KnowledgeFormDialog } from "@/components/knowledge-form-dialog"
 import { KnowledgeUploadDialog } from "@/components/knowledge-upload-dialog"
 import { HelpFormDialog } from "@/components/help-form-dialog"
@@ -24,8 +23,6 @@ import { ConfirmAction } from "@/components/deep-link/confirm-action"
 import {
   InternalRecordDialog,
   brandAssetFields,
-  marketingFields,
-  programmeFields,
   purposeFields,
 } from "@/components/internal-record-dialog"
 import {
@@ -46,8 +43,11 @@ import { type usePermissions } from "@/lib/perms"
 import { type useActiveTeam } from "@/lib/use-active-team"
 import { type useScreenActions } from "@/lib/use-screen-actions"
 import { type useScreenData } from "@/lib/use-screen-data"
+import { appsKey, listFetch } from "@/lib/live-resources"
+import { useCached } from "@shared/web/store"
 import { reportError } from "@shared/web/log"
-import type { TeamRole } from "@shared/types"
+import type { AppRow, TeamRole } from "@shared/types"
+import { useT } from "@shared/web/language"
 
 /** Everything the write layer needs from the host: the URL's ?panel/?confirm, the
  * caller's rights, the lists the pickers offer, and the mutations to run. Taken as
@@ -57,24 +57,17 @@ export type WritePanelsProps = Pick<
   ReturnType<typeof useScreenData>,
   | "membersQ"
   | "accountsQ"
-  | "learningCategoryOptions"
-  | "contentTypeOptions"
   | "helpTypeOptions"
   // The agency's own housekeeping: the pick-or-create vocabularies its forms
   // offer, and the loaded rows an EDIT panel prefills from.
-  | "marketingChannelOptions"
-  | "marketingStatusOptions"
   | "brandCategoryOptions"
   | "departmentOptions"
-  | "marketingQ"
   | "brandQ"
-  | "programmesQ"
   | "purposesQ"
 > &
   Pick<
     ReturnType<typeof useScreenActions>,
     | "runAction"
-    | "createLearning"
     | "createHelp"
     | "createAccount"
     | "createKnowledge"
@@ -98,26 +91,19 @@ export type WritePanelsProps = Pick<
  * one place the translation is written down, so the form, the confirm and the
  * writer all agree. */
 const INTERNAL_PANELS: Record<string, InternalKind | undefined> = {
-  marketing: "marketing",
   brand: "brand",
-  delivery: "delivery",
   purposes: "purposes",
 }
 
-/** …and the permission module each kind gates on. Two of them share `delivery`,
- * which is the point of that module: one right, two nouns. */
+/** …and the permission module each kind gates on. */
 const INTERNAL_MODULE: Record<string, string> = {
-  marketing: "marketing",
   brand: "brand_assets",
-  delivery: "delivery",
   purposes: "delivery",
 }
 
 /** What to call one in a sentence a person reads before archiving it. */
 const INTERNAL_NOUN: Record<string, string> = {
-  marketing: "post",
   brand: "brand asset",
-  delivery: "programme",
   purposes: "meeting purpose",
 }
 
@@ -138,65 +124,57 @@ export function WritePanels({
   active,
   membersQ,
   accountsQ,
-  learningCategoryOptions,
-  contentTypeOptions,
   helpTypeOptions,
   runAction,
-  createLearning,
   createHelp,
   createAccount,
   createKnowledge,
   uploadKnowledgeFile,
   saveInternalRecord,
   setInternalActive,
-  marketingChannelOptions,
-  marketingStatusOptions,
   brandCategoryOptions,
   departmentOptions,
-  marketingQ,
   brandQ,
-  programmesQ,
   purposesQ,
   closePanel,
   onRecordGone,
 }: WritePanelsProps) {
+  const t = useT()
   const [archiving, setArchiving] = React.useState(false)
+
+  // THE APPS THIS CALLER MAY OPEN (8.11), for the knowledge dialogs' visibility
+  // limit (12.3). `canOpen` is decided by the DOOR and rides every app row, so
+  // this list is the server's answer rather than a second opinion formed here.
+  // A caller staffed to nothing gets an empty list and the dialog leaves the
+  // option out — an option that can only end in a refusal is not an option.
+  const appsQ = useCached<AppRow[]>(teamId ? appsKey(teamId) : null, () =>
+    listFetch.apps(teamId as string)
+  )
+  const openableApps = React.useMemo(
+    () =>
+      (appsQ.data ?? []).filter((a) => a.canOpen && a.active).map((a) => ({ id: a.id, name: a.name })),
+    [appsQ.data]
+  )
 
   // WHICH agency-internal form the URL is asking for, and everything it needs to
   // open prefilled. Resolved once, here, because "is this panel mine?" and "what
-  // does it show?" are the same question asked of four segments — answering it
+  // does it show?" are the same question asked of two segments — answering it
   // per-dialog is how a create panel and an edit panel end up offering different
   // fields for one record kind.
   const internal = React.useMemo(() => {
     const kind = INTERNAL_PANELS[query.module ?? ""]
     const spec = kind
       ? {
-          marketing: {
-            fields: marketingFields(marketingChannelOptions, marketingStatusOptions),
-            title: "Marketing post",
-            subtitle: "Something we published about ourselves. Ours alone — no client ever sees it.",
-            submitLabel: "Record it",
-            rows: marketingQ.data,
-          },
           brand: {
             fields: brandAssetFields(brandCategoryOptions),
-            title: "Brand asset",
-            subtitle: "A piece of our own brand material — a logo, a deck, a template.",
-            submitLabel: "Add it",
+            title: t("Brand asset"),
+            subtitle: "A piece of our own brand material, a logo, a deck, a template.",
             rows: brandQ.data,
-          },
-          delivery: {
-            fields: programmeFields(),
-            title: "Delivery programme",
-            subtitle: "A way we run an engagement, start to finish.",
-            submitLabel: "Add it",
-            rows: programmesQ.data,
           },
           purposes: {
             fields: purposeFields(departmentOptions),
-            title: "Meeting purpose",
+            title: t("Meeting purpose"),
             subtitle: "Why we meet, and the department it belongs to.",
-            submitLabel: "Add it",
             rows: purposesQ.data,
           },
         }[kind]
@@ -212,15 +190,14 @@ export function WritePanels({
       fields: spec?.fields ?? [],
       title: spec?.title ?? "",
       subtitle: spec?.subtitle ?? "",
-      submitLabel: spec?.submitLabel ?? "Save",
       // The dialog's own draft rule (R7) is keyed per record, so an edit prefills
       // from the loaded row and a create starts blank.
       initial: row ? (prefill(row) as Record<string, string>) : undefined,
     }
   }, [
     query.module, query.panel, query.id, can,
-    marketingChannelOptions, marketingStatusOptions, brandCategoryOptions, departmentOptions,
-    marketingQ.data, brandQ.data, programmesQ.data, purposesQ.data,
+    brandCategoryOptions, departmentOptions,
+    brandQ.data, purposesQ.data, t,
   ])
 
   const internalArchive = React.useMemo(() => {
@@ -228,7 +205,7 @@ export function WritePanels({
     return {
       kind,
       open: !!kind && query.confirm === `${kind}.archive` && !!query.id && can(INTERNAL_MODULE[kind], "delete"),
-      title: `Archive this ${INTERNAL_NOUN[kind ?? "marketing"]}?`,
+      title: `Archive this ${INTERNAL_NOUN[kind ?? "brand"]}?`,
     }
   }, [query.confirm, query.id, can])
 
@@ -286,17 +263,6 @@ export function WritePanels({
         onSubmit={createAccount}
       />
 
-      {/* Create a learning article (?panel=add&module=learning) — gated by create. */}
-      <LearningFormDialog
-        open={query.panel === "add" && query.module === "learning" && can("learning", "create")}
-        onOpenChange={(o) => !o && closePanel()}
-        draftKey={teamId ? `learning:new:${teamId}` : undefined}
-        teamId={teamId}
-        categoryOptions={learningCategoryOptions}
-        contentTypeOptions={contentTypeOptions}
-        onSubmit={createLearning}
-      />
-
       {/* Raise a help ticket (?panel=add&module=help) — gated by create. */}
       <HelpFormDialog
         open={query.panel === "add" && query.module === "tickets" && can("help", "create")}
@@ -309,12 +275,16 @@ export function WritePanels({
 
       {/* Add a knowledge source (?panel=add&module=knowledge) — gated by create.
           The account picker offers the accounts the caller can already see, so a
-          source can only ever be filed under a client they may read. */}
+          source can only ever be filed under a client they may read; the APP
+          picker offers only the apps they may OPEN (8.11's `canOpen`, decided by
+          the door), because those are the only ones the knowledge door will
+          accept as a visibility limit (12.3). */}
       <KnowledgeFormDialog
         open={query.panel === "add" && query.module === "knowledge" && can("knowledge", "create")}
         onOpenChange={(o) => !o && closePanel()}
         draftKey={teamId ? `knowledge:new:${teamId}` : undefined}
         accountOptions={(accountsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
+        appOptions={openableApps}
         onSubmit={createKnowledge}
       />
 
@@ -329,6 +299,7 @@ export function WritePanels({
         onOpenChange={(o) => !o && closePanel()}
         draftKey={teamId ? `knowledge:upload:${teamId}` : undefined}
         accountOptions={(accountsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
+        appOptions={openableApps}
         onSubmit={uploadKnowledgeFile}
       />
 
@@ -354,7 +325,6 @@ export function WritePanels({
         fields={internal.fields}
         title={internal.title}
         subtitle={internal.subtitle}
-        submitLabel={query.id ? "Save changes" : internal.submitLabel}
         initial={internal.initial}
         onSubmit={(values) =>
           saveInternalRecord(internal.kind as InternalKind, values, query.id || undefined)
@@ -372,12 +342,11 @@ export function WritePanels({
           <AlertDialogHeader>
             <AlertDialogTitle>{internalArchive.title}</AlertDialogTitle>
             <AlertDialogDescription>
-              It stops showing as live and nothing is deleted — its history stays, and you can put
-              it back at any time.
+              {t("It stops showing as live and nothing is deleted, its history stays, and you can put it back at any time.")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={archiving}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={archiving}>{t("Cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
                 e.preventDefault()
@@ -395,7 +364,7 @@ export function WritePanels({
               disabled={archiving}
             >
               {archiving ? <Spinner /> : null}
-              Archive
+              {t("Archive")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

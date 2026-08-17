@@ -43,6 +43,13 @@ export type TriageView = {
   waiting: { id: string; ref: string | null; description: string; createdAt: string; days: number }[]
   /** R16: the exact server count of those, over the same question */
   total: number
+  /** IS THIS CALLER THE ONE ON DUTY (CHECKLIST 5.11: "only the person on duty
+   * sees what is waiting to be triaged")? Answered by the door rather than
+   * computed in the browser from `onDuty.userId`, because it decides whether
+   * `waiting` is populated at all — a screen that filtered a list it had already
+   * been handed would be a curtain, not a rule. Admins count as on duty, or a
+   * week nobody was named for would be a week nobody could triage. */
+  yours: boolean
 }
 
 /** Who is on triage duty for the week containing `at`. */

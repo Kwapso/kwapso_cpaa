@@ -1,63 +1,38 @@
 "use client"
 
-// Story status as a left-to-right STEPPER, the same control a ticket gets and for
-// the same reason: four fixed states, and a dropdown makes them look like a
-// label somebody chose rather than a track work moves along.
+// A STORY'S STATUS, AS A FACT (CHECKLIST 6.7: "the status becomes a label; a
+// timer moves it, not the other way round. Today it is backwards.").
 //
-// THE REVIEW STEP IS DELIBERATE (SCOPE ch.07): work is checked before it is
-// called done. Done is a decision and not a tidy-up — closing a story appends its
-// closing note to the ticket's draft resolution and flips that ticket to Ready if
-// it was the last piece of work outstanding — so it is the far end of a track,
-// where a person can see how far they have come to reach it.
+// It really was backwards. Marking a story "in progress" started a timer, so the
+// declaration was the cause and the work was the effect. Now:
 //
-// The stages are DERIVED from STORY_STATUSES, the one list the server validates
-// against, so a fifth state could never be a state the door accepts and this
-// control cannot show.
+//   open         written down, nobody has started;
+//   in_progress  a timer started on it (routes/work-logs.ts, storyProgressFlip);
+//   in_review    somebody pressed "Ready for review" — refused while any timer on
+//                it is still running and until an explanation is written;
+//   done         the reviewer pressed the one Done button.
+//
+// So two of the four happen by themselves and the other two are named acts with
+// their own panels. Nothing on this strip is pressable, which is the whole of the
+// change here — see help-status-stepper.tsx, which made the same move for the
+// same reason on the same day.
 
 import { StatusStepper, type StepperTone } from "@kwapso/ui/registry/primitives/status-stepper/status-stepper"
 
 import { STORY_STATUSES, type StoryStatus } from "@shared/types"
+import { STORY_STATUS_LABEL } from "@/components/work-panels"
 
-const LABELS: Record<StoryStatus, string> = {
-  open: "Open",
-  in_progress: "In progress",
-  in_review: "In review",
-  done: "Done",
-}
-const STAGES = STORY_STATUSES.map((value) => ({ value, label: LABELS[value] }))
+/** The track, in order — DERIVED from the one list the server validates against,
+ * and labelled from the one map every other story screen reads. */
+const STAGES = STORY_STATUSES.map((value) => ({ value, label: STORY_STATUS_LABEL[value] }))
 
-// Waiting / in-motion / done, in the same semantic tones the ticket stepper uses
-// so a status looks the same colour wherever it appears. `in_review` is a success
-// tone before `done`: the work IS finished, and only the checking is left.
 const TONES: Record<string, StepperTone> = {
   open: "neutral",
   in_progress: "warning",
-  in_review: "success",
+  in_review: "warning",
   done: "success",
 }
 
-export function StoryStatusStepper({
-  status,
-  canEdit,
-  onChange,
-  busy,
-}: {
-  status: StoryStatus
-  canEdit: boolean
-  onChange: (next: StoryStatus) => void
-  busy?: boolean
-}) {
-  function change(stage: string) {
-    if (stage !== status) onChange(stage as StoryStatus)
-  }
-
-  return (
-    <StatusStepper
-      stages={STAGES}
-      value={status}
-      tones={TONES}
-      disabled={!canEdit || busy}
-      onChange={canEdit ? change : undefined}
-    />
-  )
+export function StoryStatusStepper({ status }: { status: StoryStatus }) {
+  return <StatusStepper stages={STAGES} value={status} tones={TONES} disabled />
 }

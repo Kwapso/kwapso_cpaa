@@ -1,4 +1,4 @@
-# RUNBOOK.md — it is live, it is broken, and you were not here when it was built
+# RUNBOOK.md, it is live, it is broken, and you were not here when it was built
 
 BOOTSTRAP.md stands the base up. OPERATIONS.md ships a change. **This file is for
 the other direction**: taking a change back out, getting data back after somebody
@@ -13,7 +13,7 @@ lost it, and working out what is wrong at two in the morning.
 ## 0 · Which Cloudflare account am I about to change?
 
 `wrangler` picks an account from whatever the machine is logged into. **No worker
-in this repo pins `account_id`**, so nothing in the code corrects a wrong login —
+in this repo pins `account_id`**, so nothing in the code corrects a wrong login,
 a deploy, a database delete or a secret push simply lands wherever the session
 points. On the machine this project was written on, the default login was a
 *different* client's account, and the only thing that ever prevented an accident
@@ -26,12 +26,12 @@ npx wrangler whoami           # prints the account name + id you are about to ac
 ```
 
 Compare the id against `CF_ACCOUNT_ID` in `workers/tenancy/wrangler.jsonc` (all
-five core-bound workers carry the same value — see INVENTORY.md). If they differ,
+five core-bound workers carry the same value. See INVENTORY.md). If they differ,
 stop and fix the login; do not "just try it".
 
 `scripts/reset-all.mjs` enforces this for you and refuses to start unless
 `CLOUDFLARE_ACCOUNT_ID` matches the id compiled into it. Its error message
-mentions a wrapper called `cf-exec` — **that wrapper is not in this repository.**
+mentions a wrapper called `cf-exec`, **that wrapper is not in this repository.**
 It was a shell function on the original author's machine. Ignore it and export the
 two variables yourself:
 
@@ -56,7 +56,7 @@ npx wrangler rollback <version-id> --env staging -m "why"
 Omit `--env staging` for production. `wrangler rollback` with no version id
 returns to the previously-deployed version, which is what you want in a hurry.
 
-### The order to roll back in — the reverse of the deploy order
+### The order to roll back in, the reverse of the deploy order
 
 Deploy is `realtime → auth → tenancy → content → data-ops → mcp → gateway →
 portal-gateway`, innermost first, because each worker service-binds the ones
@@ -74,9 +74,9 @@ still-new gateway is calling an older shape of the thing it forwards to, which i
 the failure you were trying to end.
 
 **In practice you rarely need all eight.** Roll back only the workers whose
-version actually changed — `npx wrangler versions list` shows the upload time.
+version actually changed, `npx wrangler versions list` shows the upload time.
 
-### Named triggers — when to roll back rather than fix forward
+### Named triggers, when to roll back rather than fix forward
 
 Roll back immediately, without discussion, if any of these is true:
 
@@ -90,7 +90,7 @@ Roll back immediately, without discussion, if any of these is true:
 
 **Fix forward instead** when the break is cosmetic, affects one screen a role
 rarely opens, or when the previous version has a *worse* bug. Say which you chose
-in the rollback message or the commit — the next person needs to know a version
+in the rollback message or the commit, the next person needs to know a version
 was skipped on purpose.
 
 ### What a rollback does NOT undo
@@ -100,14 +100,14 @@ was skipped on purpose.
 - **Migrations.** Both core and team migrations are additive and are never edited
   once applied. Rolling code back to before a migration is safe (the extra column
   is simply unread); rolling the *database* back is section 2.
-- **Vars in `wrangler.jsonc`.** These ship with a version, so they do come back —
+- **Vars in `wrangler.jsonc`.** These ship with a version, so they do come back,
   which is worth remembering if you changed one deliberately.
 
 ---
 
 ## 2 · Getting data back
 
-### The core database and every team database — D1 Time Travel
+### The core database and every team database. D1 Time Travel
 
 D1 keeps a continuous 30-day history. There is nothing to enable and nothing to
 schedule; it is already on.
@@ -128,7 +128,7 @@ takes a Unix time or RFC3339 and is easier to reason about. Anything older than
 core database and every team's content in its OWN database. They are separate D1
 databases, so Time Travel restores them separately. Roll the core database back
 past a team's creation and that team's database still exists, full of rows, with
-nothing pointing at it — and the reverse leaves members holding a team whose
+nothing pointing at it, and the reverse leaves members holding a team whose
 content jumped backwards. **If you restore one, work out whether the other has to
 move with it**, and restore both to the same moment.
 
@@ -146,10 +146,10 @@ npx wrangler d1 export kwapso-core --remote --output ./core-$(date +%F).sql
 ```
 
 There is no scheduled job doing this. **If an off-Cloudflare backup matters to
-this product, that is a decision nobody has made yet** — it is listed in
+this product, that is a decision nobody has made yet**, it is listed in
 INVENTORY.md § *What has no backup*.
 
-### R2 — the uploaded files
+### R2, the uploaded files
 
 The four buckets (`kwapso-media`, `kwapso-learning-media`, `kwapso-help-media`,
 `kwapso-internal-media`, each with a `-staging` twin) have **no point-in-time
@@ -157,10 +157,17 @@ restore and no versioning**. A deleted object is gone. Nothing in the app delete
 objects today, which is why this has not bitten anyone; treat any future bulk
 delete as irreversible and copy the bucket out first.
 
-The rescued Glide files are a special case — see INVENTORY.md § *The legacy Glide
+`kwapso-learning-media` deserves a line of its own: nothing writes to it any more
+(the Learning module was purged on 17 Aug 2026) but the gateway still serves it at
+`/media/learning/*`, because the images inside the articles the knowledge base
+kept still point there. It is the one bucket that can only ever lose objects, so
+it is the one where a bulk delete is unrecoverable by definition, there is no
+process left that would put anything back.
+
+The rescued Glide files are a special case. See INVENTORY.md § *The legacy Glide
 data*.
 
-### The Durable Object — nothing to restore
+### The Durable Object, nothing to restore
 
 `TeamChannel` fans out `{resource, id, op}` pings and holds no application data.
 Losing it costs live updates until the next connection, never a row.
@@ -171,10 +178,10 @@ Losing it costs live updates until the next connection, never a row.
 
 Work down this list. Each step is cheap and rules something out.
 
-**1 — Is it the app or the platform?**
+**1. Is it the app or the platform?**
 `https://www.cloudflarestatus.com`. Workers, D1 and R2 are listed separately.
 
-**2 — Are the workers actually up?**
+**2. Are the workers actually up?**
 Each worker answers a health route through its gateway. The agency gateway is the
 one to ask, because it is the path a user takes:
 
@@ -183,9 +190,9 @@ curl -s -o /dev/null -w "%{http_code}\n" https://agency-staging.kwapso.app/
 curl -s https://agency-staging.kwapso.app/api/auth/health
 ```
 
-**3 — What did the app itself record?**
+**3. What did the app itself record?**
 Every worker writes failures to the central `error_logs` table. Read it newest
-first — this is usually the fastest answer in the building:
+first, this is usually the fastest answer in the building:
 
 ```bash
 curl -s "https://agency-staging.kwapso.app/api/data-ops/admin/errors?status=open&limit=25" \
@@ -195,13 +202,13 @@ curl -s "https://agency-staging.kwapso.app/api/data-ops/admin/errors?status=open
 Mark one dealt with as you go: `POST /api/data-ops/admin/errors/resolve`
 `{ id, note }`. ERROR-HANDLING.md explains the seam.
 
-**4 — Watch it happen live.**
+**4. Watch it happen live.**
 
 ```bash
 cd workers/<name> && npx wrangler tail --env staging
 ```
 
-**5 — Run the journey end to end.**
+**5. Run the journey end to end.**
 
 ```bash
 export TEST_LOGIN_KEY=…  SMOKE_BASE=https://agency-staging.kwapso.app
@@ -215,10 +222,10 @@ job after repeated test logins, not a fault. Wait it out.
 
 | What you see | Almost always |
 |---|---|
-| Team creation 500s, everything else fine | `CF_D1_TOKEN` is stale on tenancy. Secrets are copies, not references — re-push it to **every** worker that holds it, then test with a FRESH signup, not a reused team |
-| The whole MCP surface 401s or 500s | a core migration was not applied — the MCP tables and the token-expiry column both live in core |
+| Team creation 500s, everything else fine | `CF_D1_TOKEN` is stale on tenancy. Secrets are copies, not references, re-push it to **every** worker that holds it, then test with a FRESH signup, not a reused team |
+| The whole MCP surface 401s or 500s | a core migration was not applied, the MCP tables and the token-expiry column both live in core |
 | Sign-in code request 500s | same: a core migration behind the send throttle has not been applied |
-| Live updates stop for client logins only | `CF_D1_TOKEN` missing on **realtime** — the channel fails closed rather than leak row ids |
+| Live updates stop for client logins only | `CF_D1_TOKEN` missing on **realtime**, the channel fails closed rather than leak row ids |
 | An existing team's ticket-type picker is empty | a team-schema migration has not been rolled out. `POST /api/tenancy/admin/migrate-teams` with `x-admin-key` |
 | A worker "not found" on a first deploy | the cold-start binding cycle. OPERATIONS.md § deploy order has the one-time fix |
 | The import target picker looks wrong | it self-heals on read; a target an owner switched off stays off on purpose |
@@ -228,7 +235,7 @@ job after repeated test logins, not a fault. Wait it out.
 ## 4 · The changes that need a plan, not a command
 
 - **A new core migration** goes on `kwapso-core-staging` and `kwapso-core` BEFORE
-  the workers that read it are deployed. Apply first, deploy second — the reverse
+  the workers that read it are deployed. Apply first, deploy second, the reverse
   is an outage.
 - **A new team-schema migration** ships in `workers/tenancy/src/team-schema.ts`
   and reaches existing teams only when the migrate-teams robot runs. New teams get

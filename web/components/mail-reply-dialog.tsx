@@ -43,6 +43,7 @@ import { ApiFailure, content } from "@/lib/api"
 import { safeHref } from "@/lib/rich-text"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 const toField = { ...defaultFieldConfig, label: "To", required: true }
 const subjectField = { ...defaultFieldConfig, label: "Subject", required: true }
@@ -73,6 +74,7 @@ export function MailReplyDialog({
    * mail out of their mailbox. */
   canSend: boolean
 }) {
+  const t = useT()
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
     { to: defaultTo, subject: defaultSubject, body: defaultBody },
@@ -101,7 +103,7 @@ export function MailReplyDialog({
         body: values.body,
       })
       setWritten({ draftId: draft.draftId, url: draft.url })
-      toast.success("Written into your Gmail drafts.")
+      toast.success(t("Written into your Gmail drafts."))
     } catch (err) {
       // The door's own sentence when Gmail isn't connected reads better than
       // anything this form could invent ("Connect Gmail in Settings first —
@@ -127,7 +129,7 @@ export function MailReplyDialog({
       )
       clearDraft()
       onOpenChange(false)
-      toast.success("Sent from your mailbox.")
+      toast.success(t("Sent from your mailbox."))
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't send that.")
     } finally {
@@ -142,11 +144,10 @@ export function MailReplyDialog({
       busy={busy !== null}
       clearDraft={clearDraft}
       onSubmit={send}
-      title={<DialogTitle>Reply by email</DialogTitle>}
+      title={<DialogTitle>{t("Reply by email")}</DialogTitle>}
       subtitle={
         <DialogDescription>
-          From your own mailbox. Leave it in your Gmail drafts to check it there, or send it from
-          here.
+          {t("From your own mailbox. Leave it in your Gmail drafts to check it there, or send it from here.")}
         </DialogDescription>
       }
       footer={
@@ -164,15 +165,14 @@ export function MailReplyDialog({
               {busy === "draft" ? <Spinner /> : <PenLine className="size-4" />}
               {busy === "draft" ? "Writing…" : written ? "Write it again" : "Save to Gmail drafts"}
             </Button>
-            {canSend && (
-              <Button type="submit" disabled={!ready || busy !== null} className="gap-1.5">
-                {busy === "send" ? <Spinner /> : <Send className="size-4" />}
-                {busy === "send" ? "Sending…" : "Send it from kwapso"}
-              </Button>
-            )}
           </div>
         </div>
       }
+      /* THE ONE FORM WITH A SECOND ACTION. Saving a draft to Gmail is a
+         different act from sending, so it keeps its own words in the footer
+         above; the SUBMIT is the send, and it says Submit like every other form
+         (F1). It is offered only to somebody who may send. */
+      submit={canSend ? { busy: busy === "send", disabled: !ready || busy !== null, icon: <Send className="size-4" /> } : undefined}
     >
       <Field config={toField} htmlFor="mail-to" className={fieldSpacing}>
         <Input
@@ -189,7 +189,7 @@ export function MailReplyDialog({
           id="mail-subject"
           value={values.subject}
           onChange={(e) => setValues((v) => ({ ...v, subject: e.target.value }))}
-          placeholder="What it is about"
+          placeholder={t("What it is about")}
           disabled={busy !== null}
         />
       </Field>
@@ -198,7 +198,7 @@ export function MailReplyDialog({
           id="mail-body"
           value={values.body}
           onChange={(e) => setValues((v) => ({ ...v, body: e.target.value }))}
-          placeholder="Write the reply."
+          placeholder={t("Write the reply.")}
           disabled={busy !== null}
           rows={8}
         />
@@ -210,7 +210,7 @@ export function MailReplyDialog({
           to my Gmail". */}
       {gmailLink && (
         <p className="border-border/60 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-sm">
-          <span className="min-w-0 flex-1">It is waiting in your Gmail drafts. Nothing is sent.</span>
+          <span className="min-w-0 flex-1">{t("It is waiting in your Gmail drafts. Nothing is sent.")}</span>
           <a
             href={gmailLink}
             target="_blank"
@@ -218,7 +218,7 @@ export function MailReplyDialog({
             className="text-primary inline-flex shrink-0 items-center gap-1.5 underline-offset-2 hover:underline"
           >
             <ExternalLink className="size-3.5" />
-            Open it in Gmail
+            {t("Open it in Gmail")}
           </a>
         </p>
       )}

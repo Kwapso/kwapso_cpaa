@@ -13,6 +13,7 @@
 // a list primes its total in the same round-trip.
 
 import { content as contentApi, tenancy } from "@/lib/api"
+import { TASK_VIEWS, type HelpTicket, type TaskViewName } from "@shared/types"
 import { primeCache, readCache } from "@shared/web/store"
 
 /** The sidecar cache key holding a collection's exact server total (R16). */
@@ -84,26 +85,18 @@ export const listFetch = {
       primeCache(totalKey("selectable", teamId), r.total)
       return r.values
     }),
-  learning: (teamId: string) =>
-    contentApi.learning().then((r) => {
-      primeCache(totalKey("learning", teamId), r.total)
-      return r.learning
-    }),
   // R14: accounts are PAGED — every company AND every person an agency works with
   // is a row here, so the door answers with a cursor rather than a ceiling. Page
   // one lands in the cache, its next cursor in the sidecar <LoadMore> reads.
   accounts: (teamId: string) =>
     tenancy.accounts().then((r) => {
       primeCache(totalKey("accounts", teamId), r.total)
+      // The two tab badges (R16), exact and from the same read as the rows. Both
+      // are the COLLECTION's counts, not this call's — see the note on them in
+      // workers/tenancy/src/lib/accounts.ts.
+      primeCache(totalKey("accounts-entity", teamId), r.entityTotal)
+      primeCache(totalKey("accounts-individual", teamId), r.individualTotal)
       primeCache(cursorKey(accountsKey(teamId)), r.nextCursor)
-      return r.accounts
-    }),
-  // The accounts nested UNDER one account — the same paged door, narrowed by
-  // parent. Keyed by the ACCOUNT (not the team): it is that record's own list.
-  accountChildren: (accountId: string) =>
-    tenancy.accounts({ parentId: accountId }).then((r) => {
-      primeCache(totalKey("account-children", accountId), r.total)
-      primeCache(cursorKey(childrenKey(accountId)), r.nextCursor)
       return r.accounts
     }),
   // R14: help is PAGED — the fetchers below load page ONE and park the next
@@ -123,6 +116,10 @@ export const listFetch = {
       primeCache(totalKey("help", teamId), r.total)
       primeCache(totalKey("help-mine", teamId), r.mineTotal)
       primeCache(cursorKey(helpKey(teamId, "all")), r.nextCursor)
+      // The sub-tab badges (CHECKLIST 5.1). One grouped read on the server rides
+      // every ticket page, so the strip costs nothing extra to draw.
+      primeCache(`help-by-type:${teamId}`, r.byType)
+      primeCache(`help-by-status:${teamId}`, r.byStatus)
       return r.tickets
     }),
   helpMine: (teamId: string) =>
@@ -143,6 +140,34 @@ export const listFetch = {
       primeCache(cursorKey(helpKey(teamId, "archived")), r.nextCursor)
       return r.tickets
     }),
+  /** ONE SUB-TAB'S PAGE (CHECKLIST 5.1). Same door, same paging, same exact
+   * totals — the narrowing is the door's, not the browser's, because the list
+   * pages and filtering a loaded page would answer "the questions among the
+   * newest fifty" under a badge counting all of them (R14 + R16).
+   *
+   * `byType` / `byStatus` are primed from EVERY ticket read, including this one:
+   * they are counted over the list ignoring the kind and stage facets, so the
+   * strip's badges stay right whichever sub-tab is open. */
+  helpFacet: (teamId: string, scope: HelpScope, facet: HelpFacet) => {
+    const f = helpFacetFilter(facet)
+    return contentApi
+      .help(
+        scope === "mine" ? "mine" : "all",
+        null,
+        scope === "archived" ? "archived" : "live",
+        undefined,
+        undefined,
+        f.helpType,
+        f.status as HelpTicket["status"] | undefined
+      )
+      .then((r) => {
+        primeCache(totalKey(`help-facet:${scope}:${facet}`, teamId), r.total)
+        primeCache(cursorKey(helpFacetKey(teamId, scope, facet)), r.nextCursor)
+        primeCache(`help-by-type:${teamId}`, r.byType)
+        primeCache(`help-by-status:${teamId}`, r.byStatus)
+        return r.tickets
+      })
+  },
   // R14: process maps are PAGED — every app of every client grows them, and none
   // is ever deleted (the savings computed from a baseline have to stay checkable
   // years later). Page one lands in the cache, its next cursor in the sidecar
@@ -184,12 +209,20 @@ export const listFetch = {
       primeCache(totalKey("todos", teamId), r.total)
       return r.todos
     }),
-  // Both counts come back from either view's fetch (R16), because the badge on
-  // the strip's OTHER tab cannot be counted from the rows in front of you.
+  // EVERY count comes back from ANY view's fetch (R16), because the badge on a
+  // tab you are not looking at cannot be counted from the rows in front of you —
+  // and the progress bar's pair rides along for the same reason: it is pinned to
+  // the top of all six tabs, so it must be true on whichever one is open.
   tasks: (teamId: string, view: TaskView = "open") =>
     contentApi.tasks(view).then((r) => {
       primeCache(totalKey("tasks", teamId), r.openTotal)
       primeCache(totalKey("tasks-all", teamId), r.allTotal)
+      primeCache(totalKey("tasks-overdue", teamId), r.overdueTotal)
+      primeCache(totalKey("tasks-upcoming", teamId), r.upcomingTotal)
+      primeCache(totalKey("tasks-completed", teamId), r.completedTotal)
+      primeCache(totalKey("tasks-calendar", teamId), r.calendarTotal)
+      primeCache(totalKey("tasks-due-today", teamId), r.dueTodayTotal)
+      primeCache(totalKey("tasks-due-today-done", teamId), r.dueTodayDone)
       return r.tasks
     }),
   // R14: meetings are PAGED — an event is never curated away, so the door answers
@@ -198,6 +231,11 @@ export const listFetch = {
   meetings: (teamId: string) =>
     contentApi.meetings().then((r) => {
       primeCache(totalKey("meetings", teamId), r.total)
+      // THE WEEK'S OWN EXACT TOTAL, off the same response (9.1). The three-view
+      // strip badges two server counts and asks for one page — the week is
+      // decided by the door, so the badge and the rows can never mean two
+      // different weeks (R16).
+      primeCache(totalKey("meetings-week", teamId), r.weekTotal)
       primeCache(cursorKey(meetingsKey(teamId)), r.nextCursor)
       return r.meetings
     }),
@@ -216,23 +254,13 @@ export const listFetch = {
       primeCache(totalKey("apps", teamId), r.total)
       return r.apps
     }),
-  // THE AGENCY'S OWN HOUSEKEEPING — four capped collections (R14: authored
-  // libraries and settled taxonomies, not feeds), so each fetcher primes its
+  // THE AGENCY'S OWN HOUSEKEEPING — two capped collections (R14: an authored
+  // library and a settled taxonomy, not feeds), so each fetcher primes its
   // exact `total:` sidecar and there is no cursor to park.
-  marketing: (teamId: string) =>
-    contentApi.marketing().then((r) => {
-      primeCache(totalKey("marketing", teamId), r.total)
-      return r.posts
-    }),
   brandAssets: (teamId: string) =>
     contentApi.brandAssets().then((r) => {
       primeCache(totalKey("brand_assets", teamId), r.total)
       return r.assets
-    }),
-  programmes: (teamId: string) =>
-    contentApi.programmes().then((r) => {
-      primeCache(totalKey("programmes", teamId), r.total)
-      return r.programs
     }),
   purposes: (teamId: string) =>
     contentApi.meetingPurposes().then((r) => {
@@ -281,10 +309,15 @@ export function todosKey(teamId: string): string {
 /** Which pile of our own admin a screen is showing. A SERVER view, not a client
  * filter: the list is capped (R14), so sieving the loaded rows for the done ones
  * would show "the finished tasks among the newest N" under a badge counting all
- * of them (R16) — the same reason the ticket strip is a server scope. */
-export type TaskView = "open" | "all"
+ * of them (R16) — the same reason the ticket strip is a server scope.
+ *
+ * Six of them now, one per tab (shared/types.ts TASK_VIEWS is the wire word for
+ * each). `open` is the everyday pile and keeps the bare key it has always had, so
+ * every listener, sidecar and prewarm that names `tasks:<team>` still lands on
+ * the list the strip opens on. */
+export type TaskView = TaskViewName
 export function tasksKey(teamId: string, view: TaskView = "open"): string {
-  return view === "all" ? `tasks-all:${teamId}` : `tasks:${teamId}`
+  return view === "open" ? `tasks:${teamId}` : `tasks-${view}:${teamId}`
 }
 
 /** The diary's cache key (the paged meetings list). */
@@ -323,14 +356,8 @@ export function recordTimeKey(targetTable: string, targetId: string): string {
  * inline templates for the same reason the accounts and ticket keys are: the
  * live registry, the screen read and the count sidecar all have to say the same
  * string, and three places typing it is three places to mistype it. */
-export function marketingKey(teamId: string): string {
-  return `marketing:${teamId}`
-}
 export function brandAssetsKey(teamId: string): string {
   return `brand_assets:${teamId}`
-}
-export function programmesKey(teamId: string): string {
-  return `programmes:${teamId}`
 }
 export function purposesKey(teamId: string): string {
   return `purposes:${teamId}`
@@ -379,6 +406,12 @@ export const PROCESS_VERSION_SLICES = "process-version:"
 export function valueKey(teamId: string): string {
   return `value:${teamId}`
 }
+/** The same drill-down NARROWED to one client — what their work has given them
+ * back, summed across their apps. Its own key beside the team-wide one, because
+ * they are two different questions and one cache cannot hold both answers. */
+export function accountValueKey(accountId: string): string {
+  return `value:account:${accountId}`
+}
 /** The systems we've built (bounded, team-wide) — a filter and a heading on the
  * maps screen, and the names inside the value drill-down. */
 export function appsKey(teamId: string): string {
@@ -395,6 +428,18 @@ export function marginKey(accountId: string): string {
 }
 /** The agency's own cost card — team-wide, because an internal rate is a fact
  * about us and not about any client. */
+/** What an hour of each ROLE costs (8.13) — one small settled list, team-wide,
+ * read whole on the internal rates screen. */
+export function roleRatesKey(teamId: string): string {
+  return `role-rates:${teamId}`
+}
+
+/** What ONE app has given back — hours and money. Its own key per app, because
+ * it is read on that app's record and nowhere else. */
+export function appMoneyKey(appId: string): string {
+  return `app-money:${appId}`
+}
+
 export function internalRatesKey(teamId: string): string {
   return `internal-rates:${teamId}`
 }
@@ -404,14 +449,12 @@ export function accountsKey(teamId: string): string {
   return `accounts:${teamId}`
 }
 
-/** One account's own caches: the opened record (with its people, its logins and
- * their exact totals) and the accounts nested under it. Keyed by the ACCOUNT, so
- * moving between records never clobbers the one you came from. */
+/** One account's own cache: the opened record, with its people, its logins and
+ * their exact totals. Keyed by the ACCOUNT, so moving between records never
+ * clobbers the one you came from. (There was a second key here — the accounts
+ * nested under this one — and it went with the tab that read it, 7.2.) */
 export function accountKey(accountId: string): string {
   return `account:${accountId}`
-}
-export function childrenKey(accountId: string): string {
-  return `account-children:${accountId}`
 }
 
 /** The knowledge-source list's cache key. */
@@ -432,6 +475,36 @@ export function helpKey(teamId: string, scope: HelpScope): string {
  * (`mine` / `all`) and one is a VIEW (`archived`), and they are one type because
  * a screen shows exactly one of the three at a time — the strip is one strip. */
 export type HelpScope = "mine" | "all" | "archived"
+
+/** THE SECOND STRIP (CHECKLIST 5.1): sub-tabs by TYPE beneath All / My /
+ * Archived, plus the two stage tabs and the triage queue.
+ *
+ * ONE STRING FOR TWO KINDS OF NARROWING, and the prefix is what tells them apart:
+ * `type:Question` is the team's own `Ticket type` vocabulary (so the strip is
+ * DERIVED from their values — retiring a word on the Dropdown values screen
+ * retires its tab) and `status:ready` is the fixed lifecycle. `all` is neither.
+ * `triage` is not a filter at all: it swaps the collection for the triage queue,
+ * which is a different screen wearing the same tab strip (5.11).
+ *
+ * A string rather than an object because it is a TAB VALUE — the library's
+ * `TabsView` hands back the value it was given, and an object would have to be
+ * encoded into one anyway. */
+export type HelpFacet = string
+
+/** Split a facet token into the two filters the door parses. `triage` and `all`
+ * narrow nothing; the caller decides what to render for the first. */
+export function helpFacetFilter(facet: HelpFacet): { helpType?: string; status?: string } {
+  if (facet.startsWith("type:")) return { helpType: facet.slice(5) }
+  if (facet.startsWith("status:")) return { status: facet.slice(7) }
+  return {}
+}
+
+/** The cache key for one sub-tab of one scope. It carries BOTH, because the two
+ * strips compose: "my questions" and "all questions" are different pages, and a
+ * key that named only the facet would show one under the other's badge. */
+export function helpFacetKey(teamId: string, scope: HelpScope, facet: HelpFacet): string {
+  return `${helpKey(teamId, scope)}::${facet}`
+}
 
 /** Row-level live registry: a "<resource> row <id> changed" ping → re-pull JUST
  * that row and patch it into the cached list (never refetch the whole list);
@@ -490,15 +563,6 @@ export const TEAM_RESOURCES: Record<
     fetchOne: (id) => tenancy.selectableOne(id),
     fetchList: (t) => listFetch.selectable(t),
   },
-  // Learning content — row-level live. An edit / (de)activate elsewhere patches
-  // just that article in the cached list; the row read passes the team filter so a
-  // genuinely-gone item drops out. (Done toggles are personal, not broadcast.)
-  learning: {
-    key: (t) => `learning:${t}`,
-    idField: "id",
-    fetchOne: (id) => contentApi.learningOne(id),
-    fetchList: (t) => listFetch.learning(t),
-  },
   // THE CUSTOMER SPINE — three resources, one row-level target. `accounts` pings
   // carry the account id, and so do `account_links` / `portal_users`: a contact
   // and a login are read ONLY on their account's detail (neither has a list of
@@ -510,7 +574,7 @@ export const TEAM_RESOURCES: Record<
     idField: "id",
     fetchOne: (id) => tenancy.accountRow(id),
     fetchList: (t) => listFetch.accounts(t),
-    deps: (_t, id) => [accountKey(id), childrenKey(id), `activity:record:accounts:${id}`],
+    deps: (_t, id) => [accountKey(id), `activity:record:accounts:${id}`],
   },
   account_links: {
     key: (t) => accountsKey(t),
@@ -551,6 +615,10 @@ export const TEAM_RESOURCES: Record<
     // its Activity tab + Stakeholders tab. The My list is a SERVER-scoped page, so
     // it can't be row-patched from here — drop it and it reloads page one.
     deps: (t, id) => [`activity:record:help:${id}`, `help-stakeholders:${id}`, `help-mine:${t}`],
+    // …and every per-account slice of the ticket list — a contact's Tickets tab
+    // is one of those, and a slice nobody drops is a tab that goes stale the
+    // moment somebody else raises a ticket.
+    slicePrefix: "tickets-account-of:",
   },
   // PROCESS MAPS — row-level live. A step edited on somebody else's screen
   // patches just that map in the cached list; the deps carry the parts of the
@@ -629,15 +697,20 @@ export const TEAM_RESOURCES: Record<
     deps: (_t, id) => [`activity:record:todos:${id}`],
   },
   // TASKS — our own admin, agency-side only. The row-level patch lands on the
-  // OPEN list; the All list is dropped instead, because a task that has just
-  // been ticked leaves one collection and stays in the other, and "patch the row
+  // OPEN list; the OTHER FIVE views are dropped instead, because a task that has
+  // just been ticked leaves one collection and joins another, and "patch the row
   // in place" has no answer for a row that changed which list it belongs to.
+  // R15: every one of the six is named here, so a view that gained a tab did not
+  // silently gain a list nothing keeps live.
   tasks: {
     key: (t) => tasksKey(t, "open"),
     idField: "id",
     fetchOne: (id) => contentApi.taskOne(id),
     fetchList: (t) => listFetch.tasks(t, "open"),
-    deps: (t, id) => [tasksKey(t, "all"), `activity:record:tasks:${id}`],
+    deps: (t, id) => [
+      ...TASK_VIEWS.filter((v) => v !== "open").map((v) => tasksKey(t, v)),
+      `activity:record:tasks:${id}`,
+    ],
   },
   // MEETINGS — row-level live. A paged list's rows live in a cache key with its
   // cursor in a sidecar, so the same registry keeps it live (R15's own words).
@@ -649,35 +722,27 @@ export const TEAM_RESOURCES: Record<
     fetchOne: (id) => contentApi.meetingOne(id),
     fetchList: (t) => listFetch.meetings(t),
     deps: (_t, id) => [`activity:record:meetings:${id}`],
+    // THE PER-OWNER SLICES OF THE DIARY — a contact's Meetings tab
+    // (`meetings-account-of:`) and an app's (`meetings-app-of:`). One prefix
+    // covers both because `sliceKey` spells every slice `<kind>-of:<id>` and
+    // both kinds start with the module's own name. It cannot reach the list key
+    // itself, which is `meetings:<teamId>` — a colon where this has a hyphen.
+    slicePrefix: "meetings-",
   },
   // A rate card ping carries the ACCOUNT it sits on — a card is only ever read on
   // its account's own screen, so the account is the row a listener can act on.
   // The same shape `account_links` and `portal_users` already have, and for the
   // same reason: neither has a list of its own.
   // ── THE AGENCY'S OWN HOUSEKEEPING ────────────────────────────────────────
-  // Six resources, row-level, one per table. Each patches just the changed row
+  // Four resources, row-level, one per table. Each patches just the changed row
   // in its own list and refreshes that record's history — the same shape every
   // other content module here has.
-  marketing_posts: {
-    key: (t) => marketingKey(t),
-    idField: "id",
-    fetchOne: (id) => contentApi.marketingOne(id),
-    fetchList: (t) => listFetch.marketing(t),
-    deps: (_t, id) => [`activity:record:marketing_posts:${id}`],
-  },
   brand_assets: {
     key: (t) => brandAssetsKey(t),
     idField: "id",
     fetchOne: (id) => contentApi.brandAssetOne(id),
     fetchList: (t) => listFetch.brandAssets(t),
     deps: (_t, id) => [`activity:record:brand_assets:${id}`],
-  },
-  programs: {
-    key: (t) => programmesKey(t),
-    idField: "id",
-    fetchOne: (id) => contentApi.programmeOne(id),
-    fetchList: (t) => listFetch.programmes(t),
-    deps: (_t, id) => [`activity:record:programs:${id}`],
   },
   meeting_purposes: {
     key: (t) => purposesKey(t),
@@ -741,6 +806,12 @@ export const SIMPLE_INVALIDATIONS: Record<string, (teamId: string) => string[]> 
   // the margin panel closes that itself by re-reading when the rate card it also
   // shows changes underneath it (see margin-panel.tsx).
   internal_rates: (t) => [internalRatesKey(t)],
+  // The ROLE rate card, beside it and for the same reason: it is one small
+  // settled list read whole on one screen, so a coarse drop is the whole of the
+  // answer. The per-app money it feeds is keyed by app and cannot be enumerated
+  // from here — that panel re-reads when the card it is computed from changes,
+  // exactly as the margin panel does.
+  role_rates: (t) => [roleRatesKey(t)],
   // The rota has no list of its own: it is one line above the ticket list saying
   // whose week it is, read together with the backlog it is about. A ping drops
   // both, because the answer to "is anything sitting?" moves with the answer to
@@ -753,13 +824,12 @@ export const SIMPLE_INVALIDATIONS: Record<string, (teamId: string) => string[]> 
   work: (t) => [storiesKey(t), sprintsKey(t)],
   // THE IMPORT'S OWN PINGS. The import engine publishes each TargetDef's MODULE
   // key (never a row id — a batch touches many rows and no one row is the
-  // change), so two module names reach the live layer that no single table
-  // owns: `marketing` and `delivery`. A coarse drop is the whole of the answer
-  // for both, and it is the same shape the knowledge sweep's ping already has.
-  // (`brand_assets` needs no line: its module key and its table name are one
-  // word, so the row-level listener above already claims it.)
-  marketing: (t) => [marketingKey(t)],
-  delivery: (t) => [programmesKey(t), purposesKey(t)],
+  // change), so one module name reaches the live layer that no single table
+  // owns: `delivery`, whose table is `meeting_purposes`. A coarse drop is the
+  // whole of the answer, and it is the same shape the knowledge sweep's ping
+  // already has. (`brand_assets` needs no line: its module key and its table
+  // name are one word, so the row-level listener above already claims it.)
+  delivery: (t) => [purposesKey(t)],
   // GOOGLE CONNECTIONS. A coarse drop rather than a row-level patch, because the
   // card holds ONE answer (your connections AND the folders and spaces under
   // them) rather than a list of rows: a connection changing means the sources

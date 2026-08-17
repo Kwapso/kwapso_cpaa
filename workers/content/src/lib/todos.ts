@@ -184,7 +184,7 @@ VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(input.accountId)}, ${sq
   )
   await logActivity(cfg, guard.databaseId, actor, {
     type: "To-do raised",
-    description: `${actor.name} asked the client for ${ref ?? "something"} — ${input.title}`,
+    description: `${actor.name} asked the client for ${ref ?? "something"}, ${input.title}`,
     relatedTable: "todos",
     relatedRowId: id,
   })
@@ -267,7 +267,7 @@ export async function cancelTodo(
   if (!changed[0]) return { moved: false, accountId: row.account_id }
   await logActivity(cfg, guard.databaseId, actor, {
     type: "To-do withdrawn",
-    description: `${actor.name} withdrew ${row.ref ?? row.title} — we no longer need it`,
+    description: `${actor.name} withdrew ${row.ref ?? row.title}, we no longer need it`,
     relatedTable: "todos",
     relatedRowId: id,
   })

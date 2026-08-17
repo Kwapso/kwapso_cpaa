@@ -130,6 +130,29 @@ export const INVITE_SWEEP_CAP = 25
  * unbounded send from a trusted sender. */
 export const MENTIONS_LIMIT = 50
 
+/** Rows the ticket sub-tab tally may return (R14). It is a GROUP BY over
+ * (`help_type`, `status`) — two collections that cannot run away, since one is a
+ * team's own dropdown vocabulary and the other is the seven-value fixed
+ * lifecycle — so the ceiling is generous and exists to make the bound VISIBLE at
+ * the query rather than implied by the shape of the data. */
+export const TICKET_FACET_CAP = 500
+
+/** Files AND links one ticket may carry (CHECKLIST 5.10). "Several" is the ask,
+ * from both front doors; a ceiling turns "several" into something a list can be
+ * read to the end of and a count can be trusted. */
+export const TICKET_ATTACHMENT_CAP = 50
+
+/** Processes one story may link to (CHECKLIST 6.5). "One or more" is the ask; a
+ * ceiling is what makes the `IN (...)` proof a bounded statement rather than one
+ * with as many placeholders as somebody types. */
+export const STORY_PROCESS_CAP = 20
+
+/** Bytes one file attached to a ticket may carry, before base64. The same 10 MB a
+ * to-do's evidence gets (routes/todos.ts) — the ask is the same ask, "a photo of
+ * the thing I mean", and two different ceilings for the same act is two different
+ * refusals a person has to learn. */
+export const TICKET_FILE_MAX_BYTES = 10 * 1024 * 1024
+
 /** Bytes one agent chat request may declare. The per-file caps (8 files × ~5 MB)
  * are real, and they were all enforced AFTER `request.json()` had already parsed
  * the whole body — so the caps described what could be imported while the parse
@@ -156,9 +179,9 @@ export const AGENT_MAX_FILES = 8
 
 /** Bytes one uploaded file may carry into the knowledge base.
  *
- * 25 MB is the number the product already teaches: it is the learning-attachment
- * cap, so the sentence a person meets when they pick something enormous is the
- * one they have already met once. It is a ceiling on the FILE, not on the
+ * 25 MB is the number the product already teaches: it is the cap on every other
+ * upload door, so the sentence a person meets when they pick something enormous
+ * is the one they have already met once. It is a ceiling on the FILE, not on the
  * material — a 25 MB scanned PDF may convert to a few hundred kilobytes of text,
  * and a 3 MB spreadsheet may convert to more than the row can hold. The text has
  * its own, separate ceiling (`DOCUMENT_LIMIT_BYTES` in validate.ts), because the
@@ -197,11 +220,11 @@ export const KNOWLEDGE_UPLOAD_MAX_BYTES = Math.ceil(KNOWLEDGE_FILE_MAX_BYTES * (
 // So this sits deliberately UNDER the platform wall, with headroom for headers
 // and the query string: refused by us, with a sentence a person can act on,
 // rather than cut off mid-body by the edge with nothing useful to say.
-// ONE NUMBER FOR ALL FOUR STREAMING DOORS — the knowledge base, learning media,
-// staff files and brand assets. They differ in which bucket they write and in
-// whether the bytes are ever served back under their declared type; they do not
-// differ in what the platform will carry, and that is the only thing this number
-// is about. Four constants would be four chances to raise one and forget three.
+// ONE NUMBER FOR EVERY STREAMING DOOR — the knowledge base, staff files and
+// brand assets. They differ in which bucket they write and in whether the bytes
+// are ever served back under their declared type; they do not differ in what the
+// platform will carry, and that is the only thing this number is about. A
+// constant each would be a chance to raise one and forget the rest.
 //
 // Decimal megabytes, not binary, because `mb()` renders the refusal by dividing
 // by 1,000,000 — so this way the number in the code and the number the person is

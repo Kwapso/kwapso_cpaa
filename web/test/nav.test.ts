@@ -1,5 +1,5 @@
 // The navigation order is a locked owner decision: Home first, then the team pages
-// (Learning, Tickets), Settings last — the SAME order on the desktop rail and the
+// (Knowledge base, Tickets), Settings last — the SAME order on the desktop rail and the
 // mobile bottom bar (no centre-pinning). These lock the mobile derivation.
 
 import { readFileSync } from "node:fs"
@@ -14,16 +14,16 @@ const ROOT = join(__dirname, "..", "..")
 
 const composed = [
   { slug: "home" },
-  { slug: "learning" },
+  { slug: "knowledge" },
   { slug: "tickets" },
   { slug: "settings" },
 ]
 
-describe("bottomNavItems — Home, Learning, Tickets, Settings", () => {
+describe("bottomNavItems — Home, Knowledge base, Tickets, Settings", () => {
   it("keeps the composed order (Home FIRST, not centre-pinned)", () => {
     expect(bottomNavItems(composed).map((i) => i.slug)).toEqual([
       "home",
-      "learning",
+      "knowledge",
       "tickets",
       "settings",
     ])
@@ -80,16 +80,20 @@ describe("the sidebar sequence the owner fixed", () => {
     ])
   })
 
-  it("puts the nine occasional ones below it, in his order", () => {
+  it("puts the occasional ones below it, in his order", () => {
+    // FIVE, and the fifth changed on 17 Aug 2026. Marketing and Learning were
+    // purged, the Delivery method page went with its programmes folded onto the
+    // sprint type, and Process maps became contextual — a map is read inside the
+    // app it belongs to. Then BRAND LIBRARY became contextual too and KWAPSO
+    // took its place: the library is one of the three things the Kwapso page is
+    // for, and a rail that lists both the section and the page it lives on reads
+    // as two ideas. None of the five lost a screen; three lost a module and two
+    // lost only their line on the rail.
     expect(composeLikeTheShell()[1]).toEqual([
       "meetings",
       "apps",
-      "processes",
       "sprints",
-      "marketing",
-      "brand",
-      "delivery",
-      "learning",
+      "kwapso",
       "settings",
     ])
   })
@@ -100,6 +104,51 @@ describe("the sidebar sequence the owner fixed", () => {
     for (const key of sidebarKeys)
       expect(rail, `the "${key}" section is in the registry but not on the rail`).toContain(key)
     expect(new Set(rail).size, "a destination appears twice on the rail").toBe(rail.length)
+  })
+})
+
+// EVERY PAGE ON THE RAIL HAS ITS OWN GLYPH, AND THE FALLBACK IS NOT ONE.
+//
+// `SECTION_ICONS` in app-shell.tsx maps a sidebar section to its lucide component
+// and falls back to Home for anything missing. A fallback that renders is a
+// fallback nobody sees: `time` and `meetings` shipped without a line, so the rail
+// drew the house three times and a tester reported that Meetings and Time share
+// an icon. Both concepts already had a glyph in CONCEPT_ICON; only this map had
+// not been told, and nothing could tell.
+//
+// The keys are DERIVED from the registry, so a new sidebar page has to bring its
+// icon with it, and the values must all be different, so the next one cannot
+// quietly land on somebody else's.
+describe("the rail's icons", () => {
+  const src = readFileSync(join(ROOT, "web/components/app-shell.tsx"), "utf8")
+  const block = src.match(/const SECTION_ICONS[^{]*\{([^}]*)\}/)?.[1] ?? ""
+  const pairs = [...block.matchAll(/^\s*"?([\w-]+)"?:\s*(\w+),/gm)].map(([, key, icon]) => ({ key, icon }))
+
+  it("names an icon for every sidebar section in the registry", () => {
+    expect(pairs.length, "SECTION_ICONS could not be read out of app-shell.tsx").toBeGreaterThan(0)
+    const named = new Set(pairs.map((p) => p.key))
+    const missing = TEAM_SECTIONS.filter((s) => s.placement === "sidebar" && !named.has(s.key)).map(
+      (s) => s.key
+    )
+    expect(
+      missing,
+      "these rail pages fall back to the Home icon, so they are indistinguishable from Home and from each other"
+    ).toEqual([])
+  })
+
+  it("gives each one a DIFFERENT icon, Home included", () => {
+    // Home is not in SECTION_ICONS (it is a NAV entry), but it is on the same
+    // rail and it is what the fallback resolved to — so it counts here.
+    const icons = ["Home", ...pairs.map((p) => p.icon)]
+    const seen = new Map<string, string[]>()
+    pairs.forEach((p) => seen.set(p.icon, [...(seen.get(p.icon) ?? []), p.key]))
+    seen.set("Home", [...(seen.get("Home") ?? []), "home"])
+    const shared = [...seen.entries()].filter(([, keys]) => keys.length > 1)
+    expect(
+      shared.map(([icon, keys]) => `${icon}: ${keys.join(" + ")}`),
+      "two rail pages wearing one glyph — one concept, one icon (UI-CONVENTIONS §4)"
+    ).toEqual([])
+    expect(new Set(icons).size).toBe(icons.length)
   })
 })
 
@@ -150,9 +199,16 @@ describe("every navigable section is reachable from its own URL", () => {
   //
   // Both ends derived: the sections from this registry, the served list from the
   // gateway's own source.
+  //
+  // THIS PASSED WHILE FOURTEEN OF THE FIFTEEN 404'd, and that is worth writing
+  // down. The handler's list was complete and always had been; what was missing
+  // was `run_worker_first` in the gateway's wrangler.jsonc, which decides whether
+  // a request reaches the handler AT ALL. A green test about the right half of a
+  // two-part contract reads as coverage of the whole. The other half is now held
+  // by workers/gateway/test/shell-routing.test.ts.
   it("the gateway serves a shell for every sidebar section's sub-paths", () => {
     const src = readFileSync(join(ROOT, "workers", "gateway", "src", "index.ts"), "utf8")
-    const list = src.match(/for \(const mod of \[([^\]]*)\]\)/)?.[1] ?? ""
+    const list = src.match(/export const SHELL_MODULES = \[([\s\S]*?)\]/)?.[1] ?? ""
     const served = [...list.matchAll(/"([^"]+)"/g)].map((m) => m[1])
     expect(
       served.length,

@@ -9,9 +9,13 @@
 //   • FILED UNDER — which client's compartment this belongs to, or the agency's.
 //     A picker over accounts the caller can already see, because a compartment
 //     built from an id nobody owns is a slice nothing can ever reach again.
-//   • WHO CAN USE IT — the team, or only you. That is the second fence
-//     (`owner_user_id`), and it is the one a personal Google connection lands on
-//     later: material that arrived through what YOU can see stays in YOUR answers.
+//   • WHO CAN USE IT — the team, the people on one app, or only you. Two fences
+//     behind one question: `owner_user_id` (the one a personal Google connection
+//     lands on — material that arrived through what YOU can see stays in YOUR
+//     answers) and `visible_to_app_id`, which borrows the app record's own rule
+//     that only its staff and an admin may open it (12.3 + 8.11). Picking an app
+//     you are not on is refused by the door, in words, rather than quietly
+//     filing something you would be the first person unable to read.
 //
 // A MIRRORED source (one the sweep keeps in step with a ticket, an article or an
 // account) hands `textOwnedElsewhere` in, and the two text fields go read-only
@@ -21,7 +25,6 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
@@ -34,18 +37,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 const titleField = { ...defaultFieldConfig, label: "What is it called?", required: true }
 const bodyField = { ...defaultFieldConfig, label: "What should the assistant know?", required: false }
 const linkField = { ...defaultFieldConfig, label: "Link (optional)", required: false }
 const filedField = { ...defaultFieldConfig, label: "Filed under", required: false }
 const visibilityField = { ...defaultFieldConfig, label: "Who can use it", required: false }
+const appField = { ...defaultFieldConfig, label: "Which app's people", required: true }
 
 /** Radix Select can't hold an empty value, so "the agency's own" uses a sentinel. */
 const AGENCY = "__agency__"
@@ -55,7 +59,9 @@ export type KnowledgeFormValues = {
   body: string
   sourceUrl: string
   accountId: string
-  visibility: "team" | "private"
+  visibility: "team" | "app" | "private"
+  /** the app whose people may read it — meaningful only when visibility is "app" */
+  visibleToAppId: string
 }
 
 export function KnowledgeFormDialog({
@@ -63,6 +69,7 @@ export function KnowledgeFormDialog({
   onOpenChange,
   onSubmit,
   accountOptions,
+  appOptions,
   initial,
   draftKey,
   textOwnedElsewhere,
@@ -74,6 +81,10 @@ export function KnowledgeFormDialog({
   onSubmit: (values: KnowledgeFormValues) => Promise<void>
   /** the accounts this caller may file under — already fenced by their own read */
   accountOptions: { id: string; name: string }[]
+  /** the apps this caller may limit a source to. The host hands in the ones it
+   * already loaded; the DOOR is what decides, and it refuses any app the caller
+   * is not staffed to — this list only stops somebody choosing one to be told no. */
+  appOptions: { id: string; name: string }[]
   /** Present = EDIT mode (prefilled). */
   initial?: Partial<KnowledgeFormValues>
   /** stable id for per-session draft persistence (CACHING.md §11); omit to disable */
@@ -94,6 +105,7 @@ export function KnowledgeFormDialog({
    * has always meant. */
   titleOwnedElsewhere?: boolean
 }) {
+  const t = useT()
   const isEdit = !!initial
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
@@ -103,6 +115,7 @@ export function KnowledgeFormDialog({
       sourceUrl: initial?.sourceUrl ?? "",
       accountId: initial?.accountId || AGENCY,
       visibility: initial?.visibility ?? ("team" as const),
+      visibleToAppId: initial?.visibleToAppId ?? "",
     },
     open
   )
@@ -118,6 +131,10 @@ export function KnowledgeFormDialog({
         sourceUrl: values.sourceUrl.trim(),
         accountId: values.accountId === AGENCY ? "" : values.accountId,
         visibility: values.visibility,
+        // Only sent when it is the answer. "Team" and "only me" both mean no
+        // app, and sending one alongside them would store a restriction the
+        // person did not choose.
+        visibleToAppId: values.visibility === "app" ? values.visibleToAppId : "",
       })
       clearDraft()
       onOpenChange(false)
@@ -147,22 +164,20 @@ export function KnowledgeFormDialog({
           {textOwnedElsewhere
             ? (textOwnedNote ??
               "This one is kept in step with the record it came from, so its words are edited there. You can still change where it is filed and who can use it.")
-            : "Anything you put here is something the assistant may use to answer questions — and it will name this source when it does."}
+            : "Anything you put here is something the assistant may use to answer questions, and it will name this source when it does."}
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !values.title.trim()}>
-          {busy ? <Spinner /> : null}
-          {busy ? "Saving…" : isEdit ? "Save changes" : "Add source"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !values.title.trim(),
+      }}
     >
       <Field config={titleField} htmlFor="knowledge-title" className={fieldSpacing}>
         <Input
           id="knowledge-title"
           value={values.title}
           onChange={(e) => setValues((v) => ({ ...v, title: e.target.value }))}
-          placeholder="e.g. How we handle a Bergman dispatch outage"
+          placeholder={t("e.g. How we handle a Bergman dispatch outage")}
           disabled={busy || (titleOwnedElsewhere ?? textOwnedElsewhere)}
           autoFocus
         />
@@ -172,7 +187,7 @@ export function KnowledgeFormDialog({
           id="knowledge-body"
           value={values.body}
           onChange={(e) => setValues((v) => ({ ...v, body: e.target.value }))}
-          placeholder="Write it the way you would explain it to a new colleague."
+          placeholder={t("Write it the way you would explain it to a new colleague.")}
           disabled={busy || textOwnedElsewhere}
           rows={8}
         />
@@ -193,10 +208,10 @@ export function KnowledgeFormDialog({
           disabled={busy}
         >
           <SelectTrigger id="knowledge-filed">
-            <SelectValue placeholder="The agency's own" />
+            <SelectValue placeholder={t("The agency's own")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={AGENCY}>The agency&apos;s own</SelectItem>
+            <SelectItem value={AGENCY}>{t("The agency's own")}</SelectItem>
             {accountOptions.map((a) => (
               <SelectItem key={a.id} value={a.id}>
                 {a.name}
@@ -205,14 +220,18 @@ export function KnowledgeFormDialog({
           </SelectContent>
         </Select>
         <p className="text-muted-foreground mt-1 text-xs">
-          Filing it under a client is how a question about them finds it first.
+          {t("Filing it under a client is how a question about them finds it first.")}
         </p>
       </Field>
       <Field config={visibilityField} htmlFor="knowledge-visibility" className={fieldSpacing}>
         <Select
           value={values.visibility}
           onValueChange={(visibility) =>
-            setValues((v) => ({ ...v, visibility: visibility === "private" ? "private" : "team" }))
+            setValues((v) => ({
+              ...v,
+              visibility:
+                visibility === "private" ? "private" : visibility === "app" ? "app" : "team",
+            }))
           }
           disabled={busy}
         >
@@ -220,11 +239,40 @@ export function KnowledgeFormDialog({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="team">Anyone who can read the knowledge base</SelectItem>
-            <SelectItem value="private">Only me</SelectItem>
+            <SelectItem value="team">{t("Anyone who can read the knowledge base")}</SelectItem>
+            {/* THE MIDDLE ANSWER (12.3). Offered only when this caller is on an
+                app, the door refuses any other, so a picker with nothing in it
+                would be an option that can only end in a refusal. */}
+            {appOptions.length > 0 && (
+              <SelectItem value="app">{t("Only the people on one app")}</SelectItem>
+            )}
+            <SelectItem value="private">{t("Only me")}</SelectItem>
           </SelectContent>
         </Select>
       </Field>
+      {values.visibility === "app" && (
+        <Field config={appField} htmlFor="knowledge-app" className={fieldSpacing}>
+          <Select
+            value={values.visibleToAppId}
+            onValueChange={(visibleToAppId) => setValues((v) => ({ ...v, visibleToAppId }))}
+            disabled={busy}
+          >
+            <SelectTrigger id="knowledge-app">
+              <SelectValue placeholder={t("Pick the app")} />
+            </SelectTrigger>
+            <SelectContent>
+              {appOptions.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {a.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-muted-foreground mt-1 text-xs">
+            {t("The staff on that app can read it, and so can an admin. Nobody else will see it, and the assistant will not answer anyone else from it.")}
+          </p>
+        </Field>
+      )}
     </FormShellDialog>
   )
 }

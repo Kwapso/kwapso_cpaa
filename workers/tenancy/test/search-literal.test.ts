@@ -45,16 +45,20 @@ beforeEach(() => {
   )
 })
 
+/** A caller holding `contacts:read` — companies AND people. Held constant so
+ * what is measured here is the ESCAPING, not the narrowing. */
+const SEES_PEOPLE = { mayListPeople: true }
+
 describe("the accounts search matches what was typed", () => {
   it("an underscore is a character, not 'any character'", async () => {
-    const page = await listAccounts(cfg, guard, staff, { q: "PO_1" })
+    const page = await listAccounts(cfg, guard, staff, SEES_PEOPLE, { q: "PO_1" })
     expect(page.rows.map((r) => r.id)).toEqual(["A_UNDER"])
     // The exact total rides the SAME where clause (R16), so it must agree.
     expect(page.total).toBe(1)
   })
 
   it("a percent sign is a character too — it does not select the whole book", async () => {
-    const page = await listAccounts(cfg, guard, staff, { q: "%" })
+    const page = await listAccounts(cfg, guard, staff, SEES_PEOPLE, { q: "%" })
     expect(page.rows, "searching for a literal % finds rows containing one").toEqual([])
     expect(page.total).toBe(0)
   })
@@ -64,12 +68,12 @@ describe("the accounts search matches what was typed", () => {
       `INSERT INTO accounts (id, account_type, name, code, created_at, creator_id)
        VALUES ('A_SLASH', 'entity', 'Back\\slash Ltd', 'BS1', '2026-01-01', '${IDS.staffUser}');`
     )
-    const page = await listAccounts(cfg, guard, staff, { q: "\\" })
+    const page = await listAccounts(cfg, guard, staff, SEES_PEOPLE, { q: "\\" })
     expect(page.rows.map((r) => r.id)).toEqual(["A_SLASH"])
   })
 
   it("ordinary text still searches — escaping is not refusing", async () => {
-    const page = await listAccounts(cfg, guard, staff, { q: "Decoy" })
+    const page = await listAccounts(cfg, guard, staff, SEES_PEOPLE, { q: "Decoy" })
     expect(page.rows.map((r) => r.id)).toEqual(["A_DECOY"])
   })
 
@@ -77,7 +81,7 @@ describe("the accounts search matches what was typed", () => {
     // The list and the CSV are built from one `accountsWhere` on purpose, so a
     // fix applied to one and not the other is impossible by construction. Proved,
     // not assumed: two answers to the same question is how they drift.
-    const { rows } = await listAccountsForExport(cfg, guard, staff, { q: "PO_1" })
+    const { rows } = await listAccountsForExport(cfg, guard, staff, SEES_PEOPLE, { q: "PO_1" })
     expect(rows.map((r) => r.id)).toEqual(["A_UNDER"])
   })
 })

@@ -1,12 +1,12 @@
 "use client"
 
-// ONE form for the four agency-internal RECORD kinds — a marketing post, a brand
-// asset, a delivery programme, a meeting purpose.
+// ONE form for the two agency-internal RECORD kinds — a brand asset and a
+// meeting purpose.
 //
 // They are the same form: a name, an optional vocabulary field, some prose, and
-// one or two extras. Four dialogs would be four copies of one draft rule, one
-// submit path and one busy state — and the day the draft rule changes, three of
-// them quietly stop matching. So the SHAPE lives here and each kind supplies its
+// one or two extras. Two dialogs would be two copies of one draft rule, one
+// submit path and one busy state — and the day the draft rule changes, one of
+// them quietly stops matching. So the SHAPE lives here and each kind supplies its
 // FIELDS, which is the same trade the screen recipes make one layer up.
 //
 // The vocabulary fields (channel, status, category, department) are PICK-OR-
@@ -19,13 +19,11 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
@@ -59,7 +57,6 @@ export function InternalRecordDialog({
   fields,
   title,
   subtitle,
-  submitLabel,
   initial,
   draftKey,
 }: {
@@ -69,7 +66,6 @@ export function InternalRecordDialog({
   fields: InternalField[]
   title: string
   subtitle: string
-  submitLabel: string
   /** Present = EDIT mode (prefilled). */
   initial?: InternalRecordValues
   /** stable id for per-session draft persistence (CACHING.md §11). */
@@ -111,12 +107,10 @@ export function InternalRecordDialog({
       onSubmit={submit}
       title={<DialogTitle>{title}</DialogTitle>}
       subtitle={<DialogDescription>{subtitle}</DialogDescription>}
-      footer={
-        <Button type="submit" disabled={busy || !ready}>
-          {busy ? <Spinner /> : null}
-          {busy ? "Saving…" : submitLabel}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !ready,
+      }}
     >
       {fields.map((f, i) => {
         const id = `internal-${f.key}`
@@ -173,20 +167,10 @@ export function InternalRecordDialog({
   )
 }
 
-/* --------------------------- the four field sets --------------------------- */
+/* --------------------------- the two field sets ---------------------------- */
 // Kept beside the form rather than at each call site: the CREATE panel and the
 // EDIT panel for one record kind have to offer the same fields, and two lists
 // that must match are one list.
-
-export const marketingFields = (channels: string[], statuses: string[]): InternalField[] => [
-  { key: "title", label: "Title", kind: "text", required: true, placeholder: "What did we publish?" },
-  { key: "channel", label: "Channel", kind: "text", options: channels, placeholder: "Newsletter, LinkedIn, the blog…" },
-  { key: "status", label: "Status", kind: "text", options: statuses, placeholder: "Drafted, scheduled, published…" },
-  { key: "publishedOn", label: "Published on", kind: "date" },
-  { key: "summary", label: "Summary", kind: "text", placeholder: "One line, for the list" },
-  { key: "link", label: "Link", kind: "text", placeholder: "https://…" },
-  { key: "body", label: "The post", kind: "prose", placeholder: "What it said." },
-]
 
 export const brandAssetFields = (categories: string[]): InternalField[] => [
   { key: "name", label: "Name", kind: "text", required: true, placeholder: "Primary logo (dark)" },
@@ -194,8 +178,8 @@ export const brandAssetFields = (categories: string[]): InternalField[] => [
   // THE MATERIAL ITSELF. The brand library holds what everything else is made
   // with, and this field used to ask for a link to somewhere else — the upload
   // door existed and nothing on any screen called it, so a logo could be
-  // described here and only ever kept elsewhere. It is the one field on the four
-  // internal forms that is a file, which is why `kind: "file"` carries its own
+  // described here and only ever kept elsewhere. It is the one field on either
+  // internal form that is a file, which is why `kind: "file"` carries its own
   // door rather than the dialog knowing about any.
   {
     key: "fileUrl",
@@ -204,12 +188,6 @@ export const brandAssetFields = (categories: string[]): InternalField[] => [
     upload: (dataUrl) => content.uploadBrandAssetFile(dataUrl).then((r) => r.url),
   },
   { key: "description", label: "Description", kind: "prose", placeholder: "When to use it, and when not to." },
-]
-
-export const programmeFields = (): InternalField[] => [
-  { key: "name", label: "Name", kind: "text", required: true, placeholder: "Blueprint" },
-  { key: "sequence", label: "Order", kind: "number", placeholder: "1" },
-  { key: "description", label: "Description", kind: "prose", placeholder: "What happens, and how long it takes." },
 ]
 
 export const purposeFields = (departments: string[]): InternalField[] => [

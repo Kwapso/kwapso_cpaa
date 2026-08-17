@@ -50,12 +50,12 @@ describe("useRecordActivity", () => {
   it("returns page one's rows and the door's EXACT total, not the page length", async () => {
     const id = freshId()
     recordActivity.mockResolvedValue(page(2, 143))
-    const { result } = renderHook(() => useRecordActivity("learning", id))
+    const { result } = renderHook(() => useRecordActivity("brand_assets", id))
 
     await waitFor(() => expect(result.current.total).toBe(143))
     expect(result.current.rows).toHaveLength(2) // the page…
     expect(formatCount(result.current.total)).toBe("143") // …the badge counts them all
-    expect(recordActivity).toHaveBeenCalledWith("learning", id, undefined) // page one asks for no cursor
+    expect(recordActivity).toHaveBeenCalledWith("brand_assets", id, undefined) // page one asks for no cursor
   })
 
   // R14 — the other half of that same truth: a badge counting 143 over a feed

@@ -109,7 +109,7 @@ describe("setRolePermissions", () => {
     // the team_members row is written with can_read=1, can_create=1
     expect(script).toContain("'team_members', 1, 1, 0, 0")
     // a module not in the value is written all-off
-    expect(script).toContain("'learning', 0, 0, 0, 0")
+    expect(script).toContain("'knowledge', 0, 0, 0, 0")
   })
 })
 
@@ -214,7 +214,7 @@ describe("getRolePermissions", () => {
       edit: true,
       delete: true,
     })
-    expect(res.value.learning).toEqual({
+    expect(res.value.knowledge).toEqual({
       read: false,
       create: false,
       edit: false,

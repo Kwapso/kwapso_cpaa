@@ -20,7 +20,6 @@
 
 import * as React from "react"
 
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
@@ -31,11 +30,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { Switch } from "@kwapso/ui/registry/primitives/switch/switch"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { Pencil, Plus } from "lucide-react"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
@@ -46,6 +43,7 @@ import { toLocalInput, toMoment } from "@shared/web/format"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useCached } from "@shared/web/store"
 import type { HelpTicket, Story, WorkLog } from "@shared/types"
+import { useT } from "@shared/web/language"
 
 export type TimeFormValues = {
   targetTable: string
@@ -87,6 +85,7 @@ export function TimeFormDialog({
   initial?: WorkLog | null
   onSubmit: (values: TimeFormValues) => Promise<void>
 }) {
+  const t = useT()
   const isEdit = !!initial
   const teamId = useActiveTeam().ctx?.team?.id ?? null
   // A correction needs neither list: what it is against cannot move, so the two
@@ -169,15 +168,13 @@ export function TimeFormDialog({
         <DialogDescription>
           {isEdit
             ? "Fix what was written down. The change is kept in the record's history, with your name on it."
-            : "For work already finished. Say when it started and when it stopped — we work out the rest."}
+            : "For work already finished. Say when it started and when it stopped, we work out the rest."}
         </DialogDescription>
       }
-      footer={
-        <Button type="submit" disabled={busy || !ready} className="gap-1.5">
-          {busy ? <Spinner /> : isEdit ? <Pencil className="size-4" /> : <Plus className="size-4" />}
-          {busy ? "Saving…" : isEdit ? "Save the correction" : "Log it"}
-        </Button>
-      }
+      submit={{
+        busy: busy,
+        disabled: !ready,
+      }}
     >
       <Field config={workField} htmlFor="time-target" className={fieldSpacing}>
         {isEdit ? (
@@ -194,7 +191,7 @@ export function TimeFormDialog({
             disabled={busy}
           >
             <SelectTrigger id="time-target">
-              <SelectValue placeholder="Pick a story or a ticket" />
+              <SelectValue placeholder={t("Pick a story or a ticket")} />
             </SelectTrigger>
             <SelectContent>
               {options.map((o) => (
@@ -229,7 +226,7 @@ export function TimeFormDialog({
           id="time-kind"
           value={values.kind}
           onChange={(e) => setValues((s) => ({ ...s, kind: e.target.value }))}
-          placeholder="Development, design, project management…"
+          placeholder={t("Development, design, project management…")}
           disabled={busy}
         />
       </Field>
@@ -238,7 +235,7 @@ export function TimeFormDialog({
           id="time-note"
           value={values.note}
           onChange={(e) => setValues((s) => ({ ...s, note: e.target.value }))}
-          placeholder="What you actually did."
+          placeholder={t("What you actually did.")}
           disabled={busy}
           rows={2}
         />

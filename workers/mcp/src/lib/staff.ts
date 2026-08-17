@@ -10,12 +10,11 @@
 // asking — `requireUser` was a bare "are you signed in?".
 //
 // So a client could sign in at the agency address, mint a personal access token,
-// and call `list_learning` or `export_learning_csv` with their Client role's
-// rights: every internal how-to article, in full, as a CSV. Nothing was
-// bypassed. The gate ran and PASSED — `learning:read` is on the Client role
-// because the portal's own doors need nothing from it, and the reason those
-// articles are safe is that the client's gateway REFUSES that door outright
-// ("the team's how-to articles are INTERNAL and carry no account fence").
+// and call `export_dropdown_values_csv` with their Client role's rights: the
+// team's whole editable vocabulary, in full, as a CSV. Nothing was bypassed. The
+// gate ran and PASSED — `selectable_data:read` is on the Client role because the
+// portal's own doors need nothing from it, and the reason that vocabulary is
+// safe is that the client's gateway REFUSES that door outright.
 //
 // That is the whole shape of the finding: the fence is a DOOR-LEVEL idea, and
 // the machine surface had no door-level opinion. It has one now, and it is the
@@ -55,6 +54,6 @@ export async function requireStaff(env: Env, cookie: string): Promise<void> {
     throw new GuardError(
       403,
       "portal_login",
-      "Access tokens are for the team's own staff. Your login is a client portal login — sign in at your portal address instead."
+      "Access tokens are for the team's own staff. Your login is a client portal login, sign in at your portal address instead."
     )
 }

@@ -19,30 +19,39 @@ import * as React from "react"
 import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
-import { ArrowDown, ArrowUp, Pencil, Play } from "lucide-react"
+import { Check, ClipboardCheck, Pencil } from "lucide-react"
 
 import { LoadMore } from "@/components/load-more"
 import { StoryFormDialog, type StoryFormValues } from "@/components/story-form-dialog"
+import { ReviewDialog, type ReviewFormValues } from "@/components/review-dialog"
 import { useStoryFormOptions } from "@/components/stories-screen"
 import { STORY_STATUS_LABEL } from "@/components/work-panels"
 import { TimeFormDialog, type TimeFormValues } from "@/components/time-form-dialog"
 import { StoryStatusStepper } from "@/components/story-status-stepper"
+import { RecordTimerButton } from "@/components/timer-bar"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, content as contentApi } from "@/lib/api"
-import { auditItems } from "@/lib/audit-overview"
+import {
+  RecordActionsMenu,
+  RecordFooter,
+  RecordScreen,
+  STICKY_TABS,
+  type RecordAction,
+} from "@/components/record-chrome"
+import { MARK_GROUP, typeMark } from "@/lib/type-marks"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
-import { cursorKey, recordTimeKey, runningTimersKey, storiesKey, totalKey } from "@/lib/live-resources"
+import { cursorKey, recordTimeKey, storiesKey, totalKey } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import type { Story, WorkLog } from "@shared/types"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
+import { useT } from "@shared/web/language"
 
 /** Whole seconds → the hours and minutes a person would say. */
 function spell(seconds: number): string {
@@ -60,18 +69,12 @@ export function StoryDetailScreen({
   /** the stories list in the URL form we arrived through */
   basePath: string
 }) {
+  const t = useT()
   // The backlog is PAGED, so a story reached by a deep link may sit past page
   // one — it is fetched by id and kept in its own cache key, exactly as the
   // knowledge base does for a source past its first page.
   const storyQ = useCached<Story | null>(`story:one:${storyId}`, () => contentApi.storyOne(storyId))
   const activity = useRecordActivity("stories", storyId)
-  // The backlog page this record's neighbours are read out of, for the two
-  // reorder controls below. Cache-first: it is already loaded if you arrived
-  // from the list, and the controls simply don't offer a move when it isn't.
-  const backlogQ = useCached<Story[]>(storiesKey(teamId), () =>
-    contentApi.stories().then((r) => r.stories)
-  )
-
   // The time on THIS story. Keyed through recordTimeKey rather than the generic
   // slice key, because that family is the one the live registry drops when any
   // row of time moves (R15) — a stop pressed on the header bar has to land here.
@@ -87,9 +90,14 @@ export function StoryDetailScreen({
 
   const { can } = usePermissions(teamId)
   const canEdit = can("work", "edit")
+  // The timer asks for the right its own door asks for (`work:create`), not the
+  // one that governs editing the story — a person who may log time but not
+  // rewrite the work was being offered neither.
+  const canLogTime = can("work", "create")
 
   const [tab, setTab] = React.useState("overview")
   const [editOpen, setEditOpen] = React.useState(false)
+  const [reviewOpen, setReviewOpen] = React.useState(false)
   // THE ROW OF TIME BEING CORRECTED. Held rather than routed through the URL,
   // for the reason the Stories page's panel holds its own: a correction is a
   // thing you do to a line you are looking at, and Back should close the form
@@ -135,82 +143,87 @@ export function StoryDetailScreen({
     })
     invalidate(timeKey)
     invalidate(`activity:record:stories:${storyId}`)
-    toast.success("Time corrected.")
+    toast.success(t("Time corrected."))
   }
 
   async function save(values: StoryFormValues) {
     await contentApi.updateStory({
       id: storyId,
       title: values.title,
+      storyType: values.storyType,
       detail: values.detail || undefined,
       sprintId: values.sprintId || undefined,
       appId: values.appId || undefined,
       ticketId: values.ticketId || undefined,
       assigneeId: values.assigneeId || undefined,
-      dueOn: values.dueOn || undefined,
+      processIds: values.processIds,
+      changesNoStep: values.changesNoStep,
     })
     refresh()
-    toast.success("Story updated.")
+    toast.success(t("Story updated."))
   }
 
-  if (storyQ.error) return <p className="text-destructive text-sm">Couldn&apos;t load the story.</p>
+  /** READY FOR REVIEW (CHECKLIST 6.9) — refused until every timer on this story
+   * is stopped and an explanation is written. Both refusals live at the door, so
+   * this panel only has to collect the words; the file is optional, which is
+   * Aurora's ruling over "all three always" — plenty of work has nothing to show.
+   */
+  async function sendToReview(values: ReviewFormValues) {
+    await contentApi.setStoryStatus(storyId, "in_review", undefined, {
+      reviewNote: values.reviewNote,
+      reviewFileUrl: values.reviewFileUrl || undefined,
+      reviewFileName: values.reviewFileName || undefined,
+    })
+    refresh()
+    toast.success(t("Sent for review."))
+  }
+
+  if (storyQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the story.")}</p>
   if (storyQ.data === undefined) return <Skeleton variant="list" lines={5} />
   const story = storyQ.data
-  if (!story) return <p className="text-muted-foreground text-sm">That story no longer exists.</p>
-
-  // WHERE THE PERSON PUT IT (SCOPE ch.07: drag-rank is the only priority signal
-  // in the product). The door takes NEIGHBOURS, never a position, so moving up
-  // means "go between the two rows above me" — which is exactly what a drag
-  // does, said with a button. It only offers a move it can name both ends of.
-  const order = backlogQ.data ?? []
-  const at = order.findIndex((s) => s.id === storyId)
-  const moveTo = (delta: -1 | 1) => {
-    // The list reads highest-rank-first, so "up" is towards index 0 — the row
-    // ABOVE becomes the one below us in rank terms. Naming both neighbours is
-    // what lets two people reorder at once without fighting over a number.
-    const target = at + delta
-    const before = delta === -1 ? order[target - 1] : order[target]
-    const after = delta === -1 ? order[target] : order[target + 1]
-    return run(
-      () => contentApi.rankStory(storyId, before?.id ?? null, after?.id ?? null),
-      "Moved.",
-      "Couldn't move that."
-    )
-  }
-  const canMoveUp = canEdit && at > 0
-  const canMoveDown = canEdit && at > -1 && at < order.length - 1
+  if (!story) return <p className="text-muted-foreground text-sm">{t("That story no longer exists.")}</p>
 
   const overviewItems = [
-    { label: "Status", value: STORY_STATUS_LABEL[story.status] },
-    { label: "Reference", value: story.ref || "—" },
-    { label: "Who's doing it", value: story.assigneeName || "Nobody yet" },
-    { label: "Due", value: formatDate(story.dueOn) || "—" },
-    { label: "Detail", value: story.detail || "—" },
-    { label: "What we'll tell them", value: story.closingNote || "—" },
-    ...auditItems({
-      createdByName: story.createdByName,
-      createdAt: story.createdAt,
-      editedByName: story.editedByName,
-      updatedAt: story.updatedAt,
-      status: STORY_STATUS_LABEL[story.status],
-    }),
+    { label: t("Status"), value: STORY_STATUS_LABEL[story.status] },
+    { label: t("Kind"), value: story.storyType || "—" },
+    { label: t("Reference"), value: story.ref || "—" },
+    { label: t("Who's doing it"), value: story.assigneeName || "Nobody yet" },
+    // INHERITED, not typed. A story is due when the block it was sold inside is
+    // due, so this is the SPRINT's end date — the story's own date field went on
+    // 17 Aug 2026 rather than let two dates disagree about one promise. A story
+    // with no sprint has no deadline to show, which is the honest answer.
+    { label: t("Due"), value: formatDate(story.sprintEndsOn) || "—" },
+    { label: t("Detail"), value: story.detail || "—" },
+    {
+      label: t("Processes it changes"),
+      value: story.changesNoStep
+        ? "None"
+        : story.processIds.map((id) => options.processNames.get(id) ?? id).join(", ") || "—",
+    },
+    { label: t("What was done"), value: story.reviewNote || "—" },
+    { label: t("What we'll tell them"), value: story.closingNote || "—" },
+    // The audit rows moved to the footer at the foot of the record (D7 /
+    // CHECKLIST 11.3); the status is on the header band's own line.
   ]
 
   const tabsConfig = {
     ...defaultTabsConfig,
     variant: "line" as const,
     tabs: [
-      { value: "overview", label: "Overview", icon: "info", badge: "", badgeVariant: "" as const },
+      { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       {
+        // CHECKLIST 6.8: "a work logs tab on the story, and on every other detail
+        // screen that captures time". The tab was already here and called Time;
+        // Work logs is the word the glossary and the section both use now.
         value: "time",
-        label: "Time",
+        label: t("Work logs"),
         icon: CONCEPT_ICON.time,
         badge: formatCount(timeTotal),
         badgeVariant: "" as const,
       },
       {
         value: "activity",
-        label: "Activity",
+        label: t("Activity"),
         icon: CONCEPT_ICON.activity,
         badge: formatCount(activity.total),
         badgeVariant: "" as const,
@@ -218,19 +231,88 @@ export function StoryDetailScreen({
     ],
   }
 
+  /* B1 / CHECKLIST 11.2 — one primary, one secondary, and a menu. The act that
+   * MOVES THE STORY FORWARD is the primary (ready for review, then done: only
+   * ever one is offered, because they belong to different stages), the clock is
+   * the secondary, and Edit goes into the three-dot menu. */
+  const overflow: RecordAction[] = canEdit
+    ? [
+        {
+          key: "edit",
+          label: t("Edit"),
+          icon: <Pencil className="size-3.5" />,
+          onSelect: () => setEditOpen(true),
+        },
+      ]
+    : []
+
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight">
-            <span className="truncate">{story.title}</span>
-            {story.status === "done" && (
-              <Badge variant="secondary" className="text-[10px]">
-                Done
-              </Badge>
-            )}
-          </h1>
-          {/* THE CROSS-LINKS UP THE TREE — the app the work is on, the sprint it
+    <RecordScreen
+      mark={typeMark(options.selectableValues, MARK_GROUP.story, story.storyType)}
+      // D4: the type word and the reference, above the title.
+      eyebrow={[story.storyType || t("Story"), story.ref].filter(Boolean).join(" · ")}
+      title={story.title}
+      // D5: where it is, who has it, when it is due. Three facts, no more.
+      status={[
+        STORY_STATUS_LABEL[story.status],
+        story.assigneeName ?? undefined,
+        formatDate(story.sprintEndsOn) || undefined,
+      ]
+        .filter(Boolean)
+        .join(" · ")}
+      actions={
+        <>
+          {/* START, AND STOP. It used to be a permanent "Start timer" that could
+              not see the timer already running on this very story, so pressing it
+              again asked the door a question it had to refuse. The shared control
+              reads the same running-timers cache the header bar reads. */}
+          <RecordTimerButton
+            teamId={teamId}
+            targetTable="stories"
+            targetId={storyId}
+            canLog={canLogTime}
+            disabled={story.status === "done"}
+          />
+          {/* READY FOR REVIEW (CHECKLIST 6.9). Offered only while the work is
+              actually in hand: a story nobody has started has nothing to explain,
+              and one already in review or done has been explained. The panel
+              collects the words; the door refuses if a timer is still running. */}
+          {canEdit && (story.status === "open" || story.status === "in_progress") && (
+            <Button disabled={busy} onClick={() => setReviewOpen(true)} className="gap-1.5">
+              <ClipboardCheck className="size-3.5" />
+              {t("Ready for review")}
+            </Button>
+          )}
+          {/* ONE DONE BUTTON, TOP RIGHT (CHECKLIST 6.10). It appears only on a
+              story that has been reviewed, so "done" stays downstream of somebody
+              having looked. */}
+          {canEdit && story.status === "in_review" && (
+            <Button
+              disabled={busy}
+              onClick={() =>
+                void run(
+                  () => contentApi.setStoryStatus(storyId, "done", story.closingNote ?? undefined),
+                  "Done.",
+                  "Couldn't close that story."
+                )
+              }
+              className="gap-1.5"
+            >
+              <Check className="size-3.5" />
+              {t("Done")}
+            </Button>
+          )}
+          <RecordActionsMenu actions={overflow} />
+        </>
+      }
+      /* THE LIFECYCLE AS A FACT (CHECKLIST 6.7). It used to be four buttons, and
+         pressing "in progress" started a timer — the tester asked for that
+         inversion and this is it: a timer start moves the story, and the track
+         reports where it got to. */
+      headerExtra={
+        <>
+          <StoryStatusStepper status={story.status} />
+          {/* THE CROSS-LINKS UP THE TREE, the app the work is on, the sprint it
               was sold inside, and the request it answers. The owner's answer on
               which path a person takes was "all three should get her there", and
               this is the other end of all three. */}
@@ -251,7 +333,7 @@ export function StoryDetailScreen({
                 onClick={() => softNavigate(`${host.base}/sprints/${story.sprintId}`)}
                 className="hover:text-foreground underline-offset-2 hover:underline"
               >
-                In {story.sprintName}
+                {t("In")} {story.sprintName}
               </button>
             )}
             {story.ticketId && (
@@ -260,93 +342,16 @@ export function StoryDetailScreen({
                 onClick={() => softNavigate(`${host.base}/tickets/${story.ticketId}`)}
                 className="hover:text-foreground underline-offset-2 hover:underline"
               >
-                Answers {story.ticketRef ?? "a request"}
+                {t("Answers")} {story.ticketRef ?? "a request"}
               </button>
             )}
           </p>
-        </div>
-        {/* ml-auto on the GROUP so a narrow phone reflows instead of clipping. */}
-        <div className="flex flex-wrap gap-2 sm:ml-auto sm:shrink-0">
-          {canEdit && (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={busy || story.status === "done"}
-              onClick={() =>
-                void run(
-                  async () => {
-                    await contentApi.startTimer("stories", storyId)
-                    // The header bar on every screen and this record's own Time
-                    // tab both read a running timer — neither is the cache the
-                    // generic refresh above drops.
-                    invalidate(runningTimersKey(teamId))
-                    invalidate(timeKey)
-                  },
-                  "Timer started.",
-                  "Couldn't start the timer."
-                )
-              }
-              className="gap-1.5"
-            >
-              {busy ? <Spinner /> : <Play className="size-3.5" />}
-              Start timer
-            </Button>
-          )}
-          {canEdit && (
-            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-1.5">
-              <Pencil className="size-3.5" />
-              Edit
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* WHERE IT SITS IN THE ORDER. Drag-rank is the only priority signal in the
-          product and it had no control at all — the door shipped and nothing on
-          any screen could reach it. */}
-      {(canMoveUp || canMoveDown) && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-muted-foreground text-sm">Order in the backlog</span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={busy || !canMoveUp}
-            onClick={() => void moveTo(-1)}
-            className="gap-1.5"
-          >
-            <ArrowUp className="size-3.5" />
-            Move up
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={busy || !canMoveDown}
-            onClick={() => void moveTo(1)}
-            className="gap-1.5"
-          >
-            <ArrowDown className="size-3.5" />
-            Move down
-          </Button>
-        </div>
-      )}
-
-      {/* THE LIFECYCLE, as a track rather than a dropdown — the same control a
-          ticket gets. Closing a story settles the ticket half in the same call,
-          which is why the far end of it reads as a decision. */}
-      <StoryStatusStepper
-        status={story.status}
-        canEdit={canEdit}
-        busy={busy}
-        onChange={(next) =>
-          void run(
-            () => contentApi.setStoryStatus(storyId, next, story.closingNote ?? undefined),
-            `Moved to ${STORY_STATUS_LABEL[next].toLowerCase()}.`,
-            "Couldn't move that story."
-          )
-        }
-      />
+        </>
+      }
+    >
 
       <TabsView
+        className={STICKY_TABS}
         config={tabsConfig}
         value={tab}
         onValueChange={setTab}
@@ -420,6 +425,16 @@ export function StoryDetailScreen({
         }}
       />
 
+      {/* D7 / CHECKLIST 11.3, the audit line, grey, at the foot of the record. */}
+      <RecordFooter
+        audit={{
+          createdByName: story.createdByName,
+          createdAt: story.createdAt,
+          editedByName: story.editedByName,
+          updatedAt: story.updatedAt,
+        }}
+      />
+
       <StoryFormDialog
         open={editOpen}
         onOpenChange={setEditOpen}
@@ -427,6 +442,9 @@ export function StoryDetailScreen({
         apps={options.apps}
         tickets={options.tickets}
         members={options.members}
+        appStaff={options.appStaff}
+        processes={options.processes}
+        storyTypes={options.storyTypes}
         initial={{
           title: story.title,
           detail: story.detail ?? "",
@@ -434,10 +452,23 @@ export function StoryDetailScreen({
           appId: story.appId ?? "",
           ticketId: story.ticketId ?? "",
           assigneeId: story.assigneeId ?? "",
-          dueOn: story.dueOn ?? "",
+          storyType: story.storyType ?? "",
+          processIds: story.processIds,
+          changesNoStep: story.changesNoStep,
         }}
         draftKey={`story:edit:${storyId}`}
         onSubmit={save}
+      />
+      <ReviewDialog
+        open={reviewOpen}
+        onOpenChange={setReviewOpen}
+        draftKey={`story:review:${storyId}`}
+        initial={{
+          reviewNote: story.reviewNote ?? "",
+          reviewFileUrl: story.reviewFileUrl ?? "",
+          reviewFileName: story.reviewFileName ?? "",
+        }}
+        onSubmit={sendToReview}
       />
       <TimeFormDialog
         open={!!editingLog}
@@ -446,6 +477,6 @@ export function StoryDetailScreen({
         initial={editingLog}
         onSubmit={correctTime}
       />
-    </div>
+    </RecordScreen>
   )
 }
