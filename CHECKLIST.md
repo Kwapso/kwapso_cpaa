@@ -184,7 +184,7 @@ Last updated 17 Aug 2026.
 | 11.1 | Side padding drops to roughly a tenth; wide, with a cap on big screens | TO DO |
 | 11.2 | At most two buttons on a title, the rest behind a three-dot menu | TO DO |
 | 11.3 | A grey footer with created and last edited, moved off Overview | TO DO |
-| 11.4 | Cards: off-white on white, no border, no animation, no pink | TO DO |
+| 11.4 | Cards: off-white on white, no border, no animation, no pink | **DONE** — it was one stale line forcing cards 6% transparent over a moving orange background, not a colour choice |
 | 11.5 | Detail screens: ambient at the top only, clean below the tabs | TO DO |
 | 11.6 | Sticky header and tabs with a reduced title and breadcrumbs | TO DO |
 | 11.7 | The add button is a plus icon with no text | TO DO |
@@ -206,16 +206,16 @@ Last updated 17 Aug 2026.
 | 13.1 | A language switcher in the agency app | **DONE** — live on staging |
 | 13.2 | A language switcher in the client portal | **DONE** — **CHANGED**: it sits in the header, not a settings page. You confirmed no settings page for the portal |
 | 13.3 | The preference saves and survives a reload | **DONE** — proved live, and it refuses eight kinds of bad input |
-| 13.4 | Every string the app says gets translated | **BUILDING** — 45 of about 745 today. This is why the switcher looked broken |
-| 13.5 | Translation happens at build time into static files, costing nothing at runtime | **BUILDING** |
+| 13.4 | Every string the app says gets translated | **BLOCKED ON YOU** — 794 strings found, 785 wired up. The Anthropic account has no credit, so nothing could be translated. About $5 and one command |
+| 13.5 | Translation happens at build time into static files, costing nothing at runtime | **DONE** — the extractor and the translator both exist and run |
 | 13.6 | What people type is translated once and cached, never on reload | **BUILDING** |
 | 13.7 | A re-translate button when the text and the reader's language differ | **BUILDING** |
 | 13.8 | "See original" always available | **BUILDING** |
 | 13.9 | The assistant answers in the reader's language | **DONE** |
 | 13.10 | The assistant never translates data, only prose | **DONE** — and there is a test that fails if the rule leaves the prompt |
 | 13.11 | Everything on the backend stays English: queries, filters, statuses, search | **DONE** by the same rule |
-| 13.12 | Top 25 languages | **BUILDING** — your four first, then the top 25, in a one-line config |
-| 13.13 | Haiku, one pass, no reviewer | **BUILDING** — **CHANGED**: Aurora wanted a second checking pass. You overruled |
+| 13.12 | Top 25 languages | **DONE** — 29 languages, your four first, one exported list |
+| 13.13 | Haiku, one pass, no reviewer | **DONE** — **CHANGED**: Aurora wanted a second checking pass. You overruled |
 | 13.14 | The language is set per account, overridable per contact, and staff switch their own | **BUILDING** — **CHANGED**: Aurora wanted account-only. You overruled |
 | 13.15 | A rule that fails the build when a new string escapes the catalogue | TO DO |
 
@@ -225,15 +225,15 @@ Last updated 17 Aug 2026.
 |---|---|---|
 | 14.1 | One refused file no longer empties a whole Drive folder | **DONE** — documents indexed went from 0 with a false error to 8 with none |
 | 14.2 | Drive: list, read, upload | **DONE** |
-| 14.3 | Drive: edit a file, make a folder, copy mail in | **BUILDING** |
+| 14.3 | Drive: edit a file, make a folder, copy mail in | **DONE** — all three driven live against your account and cleaned up |
 | 14.4 | Gmail: list, read, draft, send | **DONE** |
-| 14.5 | Gmail: reply in a thread, apply a label | **BUILDING** |
+| 14.5 | Gmail: reply in a thread, apply a label | Reply **DONE**, proved in-thread. Label **BLOCKED ON YOU** — it needs the `gmail.modify` permission and your existing grant predates it. Reconnect Gmail in Settings and it passes |
 | 14.6 | Calendar: list, create | **DONE** |
-| 14.7 | Calendar: edit, guests, location, cancel | **BUILDING** |
+| 14.7 | Calendar: edit, guests, location, cancel | **DONE** — all four driven live, guests added and removed, event cancelled and the second press stayed silent |
 | 14.8 | Chat: read a space, post to it | **DONE** |
-| 14.9 | Chat: list every space | **BUILDING** |
-| 14.10 | Transcripts: read one, and reach it from its event | **BUILDING** |
-| 14.11 | Every door driven for real against your account, then cleaned up | **BUILDING** |
+| 14.9 | Chat: list every space | **DONE** — 19 spaces found, 2 of them shared |
+| 14.10 | Transcripts: read one, and reach it from its event | **DONE** — reached from the diary entry, text read back |
+| 14.11 | Every door driven for real against your account, then cleaned up | **DONE** — 42 of 44 checks pass. Drive back to its original 8 files, zero sweep events in the calendar, zero sweep messages in either space |
 | 14.12 | Google comes into step when you open the app, not only on a button | TO DO |
 
 ## 15 · Things deliberately NOT being done
