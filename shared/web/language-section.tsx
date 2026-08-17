@@ -41,7 +41,11 @@ export function LanguageSection({
     setSaving(next)
     try {
       await save(next)
-      toast.success(t("Language changed."))
+      // In the language they JUST CHOSE, not the one `t` was bound to when this
+      // component rendered. `t` is captured before the optimistic switch, so
+      // using it here confirms a change to German in English — which is a small
+      // thing that says the feature is skin deep.
+      toast.success(translate("Language changed.", next))
     } catch {
       // Back to what they could read. The message is deliberately composed in
       // `previous`, not through the `t` above — telling somebody in Catalan that

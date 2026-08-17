@@ -42,7 +42,8 @@ export function LanguageMenu({ save }: { save: (lang: Language) => Promise<unkno
     setSaving(true)
     try {
       await save(next)
-      toast.success(t("Language changed."))
+      // The language they just chose — see the same line in language-section.
+      toast.success(translate("Language changed.", next))
     } catch {
       setLang(previous)
       toast.error(translate("That didn't save. Try again.", previous))
