@@ -16,8 +16,10 @@ import type { Learning, LearningProgressEntry, TeamMember } from "@shared/types"
 import { content, tenancy } from "@/lib/api"
 import { personName } from "@/lib/identity"
 import { useCached } from "@shared/web/store"
+import { useT } from "@shared/web/language"
 
 export function LearningProgressScreen({ teamId }: { teamId: string }) {
+  const t = useT()
   const membersQ = useCached<TeamMember[]>(`members:${teamId}`, () =>
     tenancy.members().then((r) => r.members)
   )
@@ -31,7 +33,7 @@ export function LearningProgressScreen({ teamId }: { teamId: string }) {
   )
 
   if (membersQ.error || learningQ.error || progressQ.error)
-    return <p className="text-destructive text-sm">Couldn&apos;t load team progress.</p>
+    return <p className="text-destructive text-sm">{t("Couldn't load team progress.")}</p>
   if (membersQ.data === undefined || learningQ.data === undefined || progressQ.data === undefined)
     return <Skeleton className="h-64 w-full rounded-xl" />
 
@@ -48,9 +50,9 @@ export function LearningProgressScreen({ teamId }: { teamId: string }) {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Team progress</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{t("Team progress")}</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Who&apos;s marked each article done. Only switched-on articles are shown.
+          {t("Who's marked each article done. Only switched-on articles are shown.")}
         </p>
       </div>
       <ProgressDashboard members={members} items={items} done={done} />

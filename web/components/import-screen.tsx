@@ -26,10 +26,12 @@ import { fileToCsv, UserFileError } from "@/lib/file-to-csv"
 import { formatActivityWhen } from "@shared/web/format"
 import { usePermissions } from "@/lib/perms"
 import { useCached } from "@shared/web/store"
+import { useT } from "@shared/web/language"
 
 type Phase = "upload" | "review" | "done"
 
 export function ImportScreen({ teamId, initialTarget }: { teamId: string; initialTarget?: string }) {
+  const t = useT()
   const { perms, loading: permsLoading } = usePermissions(teamId)
   const canImport = perms ? Object.values(perms).some((m) => m?.create) : false
 
@@ -135,12 +137,11 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
   // ---- guards (wait for rights before judging — a loading `can` reads false) ----
   if (permsLoading && perms === undefined) return <Skeleton variant="list" lines={4} />
   if (perms === undefined)
-    return <p className="text-destructive text-sm">Couldn&apos;t load your access rights. Refresh to try again.</p>
+    return <p className="text-destructive text-sm">{t("Couldn't load your access rights. Refresh to try again.")}</p>
   if (!canImport)
     return (
       <p className="text-muted-foreground text-sm">
-        There&apos;s nothing here you can import into yet. You can import once you&apos;re allowed to create
-        Roles, Learning articles or Dropdown values.
+        {t("There's nothing here you can import into yet. You can import once you're allowed to create Roles, Learning articles or Dropdown values.")}
       </p>
     )
 
@@ -164,10 +165,9 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
             }}
           >
             <Upload className="text-muted-foreground size-6" aria-hidden />
-            <span className="text-sm font-medium">Drop your spreadsheets here, or click to choose</span>
+            <span className="text-sm font-medium">{t("Drop your spreadsheets here, or click to choose")}</span>
             <span className="text-muted-foreground text-xs">
-              CSV or Excel (.xlsx) files. Add several at once — the assistant sorts out how they
-              connect.
+              {t("CSV or Excel (.xlsx) files. Add several at once — the assistant sorts out how they connect.")}
             </span>
             <input
               ref={fileRef}
@@ -183,7 +183,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
           {/* Sample files — see a good file for each table before preparing yours. */}
           {samples.length > 0 && (
             <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-              <span>New to this? Download a sample:</span>
+              <span>{t("New to this? Download a sample:")}</span>
               {samples.map((t) => (
                 <a
                   key={t.tableKey}
@@ -202,15 +202,15 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
                 <div key={f.fileId} className="flex items-center gap-2 rounded-lg border p-2.5 text-sm">
                   <FileSpreadsheet className="text-muted-foreground size-4 shrink-0" aria-hidden />
                   <span className="min-w-0 flex-1 truncate font-medium">{f.name}</span>
-                  <span className="text-muted-foreground shrink-0 text-xs">{f.rowCount} rows</span>
+                  <span className="text-muted-foreground shrink-0 text-xs">{f.rowCount} {t("rows")}</span>
                 </div>
               ))}
               <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-muted-foreground text-xs">
-                  Planning uses the assistant (a few credits), so you can review before anything is written.
+                  {t("Planning uses the assistant (a few credits), so you can review before anything is written.")}
                 </p>
                 <Button onClick={() => void plan()} disabled={busy} className="gap-1.5">
-                  <Sparkles className="size-4" aria-hidden /> Analyze &amp; plan
+                  <Sparkles className="size-4" aria-hidden /> {t("Analyze & plan")}
                 </Button>
               </div>
             </div>
@@ -225,10 +225,10 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between gap-2">
             <div>
-              <p className="text-sm font-medium">Here&apos;s the plan</p>
+              <p className="text-sm font-medium">{t("Here's the plan")}</p>
               <p className="text-muted-foreground text-xs">
-                {batch.plan.steps.length} file(s) →{" "}
-                {batch.plan.order.length} table(s), in order. Review, then run once.
+                {batch.plan.steps.length} {t("file(s) →")}{" "}
+                {batch.plan.order.length} {t("table(s), in order. Review, then run once.")}
               </p>
             </div>
             <Badge variant="secondary" className="shrink-0 text-[10px]">
@@ -246,23 +246,23 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
             <div key={step.fileId} className="flex flex-col gap-2.5 rounded-xl border p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="outline" className="text-[10px]">
-                  Step {i + 1}
+                  {t("Step")} {i + 1}
                 </Badge>
                 <span className="text-sm font-medium">{step.fileName}</span>
                 <span className="text-muted-foreground text-xs">→</span>
                 <span className="text-sm font-medium">{step.targetName}</span>
-                <span className="text-muted-foreground text-xs">· {step.rowCount} rows</span>
+                <span className="text-muted-foreground text-xs">· {step.rowCount} {t("rows")}</span>
               </div>
 
               {step.references.length > 0 && (
                 <p className="text-muted-foreground text-xs">
-                  Uses{" "}
+                  {t("Uses")}{" "}
                   {step.references.map((r) => (
                     <span key={r.column} className="text-foreground font-medium">
                       {r.column}
                     </span>
                   ))}{" "}
-                  from an earlier table — that&apos;s why order matters.
+                  {t("from an earlier table — that's why order matters.")}
                 </p>
               )}
 
@@ -287,7 +287,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
                         {theirHeader ? (
                           <span>{theirHeader}</span>
                         ) : (
-                          <span className="text-muted-foreground italic">not in your file</span>
+                          <span className="text-muted-foreground italic">{t("not in your file")}</span>
                         )}
                         {step.transforms[ourCol] && (
                           <Badge variant="secondary" className="text-[9px]">
@@ -298,8 +298,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
                     ))}
                     {folded > 0 && (
                       <p className="text-muted-foreground text-xs">
-                        + {folded} optional column{folded === 1 ? "" : "s"} not in your file — fine to
-                        leave out.
+                        + {folded} {t("optional column")}{folded === 1 ? "" : "s"} {t("not in your file — fine to leave out.")}
                       </p>
                     )}
                   </div>
@@ -309,17 +308,17 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
               {step.predictedRejects > 0 && (
                 <div className="bg-amber-500/10 flex flex-col gap-1 rounded-lg p-2.5">
                   <p className="text-xs font-medium text-amber-600 dark:text-amber-500">
-                    {step.predictedRejects} of {step.rowCount} row(s) will be skipped
+                    {step.predictedRejects} of {step.rowCount} {t("row(s) will be skipped")}
                     {step.notes ? ` — ${step.notes}` : ""}
                   </p>
                   {(step.predictedRejections ?? []).slice(0, 3).map((r, j) => (
                     <p key={j} className="text-muted-foreground text-xs">
-                      Row {r.row}: {r.reason}
+                      {t("Row")} {r.row}: {r.reason}
                     </p>
                   ))}
                   {(step.predictedRejections?.length ?? 0) > 3 && (
                     <p className="text-muted-foreground text-xs">
-                      …and {step.predictedRejects - 3} more — download the list below.
+                      …and {step.predictedRejects - 3} {t("more — download the list below.")}
                     </p>
                   )}
                 </div>
@@ -332,10 +331,10 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
 
           <div className="flex flex-wrap justify-end gap-2">
             <Button variant="outline" onClick={() => setPhase("upload")} disabled={busy}>
-              Back
+              {t("Back")}
             </Button>
             <Button onClick={() => void run()} disabled={busy || !batch.plan.order.length} className="gap-1.5">
-              <Upload className="size-4" aria-hidden /> Run import
+              <Upload className="size-4" aria-hidden /> {t("Run import")}
             </Button>
           </div>
         </div>
@@ -345,9 +344,9 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
       {phase === "done" && report && (
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap gap-3">
-            <Stat label="Added" value={report.created} tone="good" />
-            <Stat label="Skipped" value={report.skipped} tone={report.skipped ? "warn" : "muted"} />
-            <Stat label="Failed" value={report.failed} tone={report.failed ? "bad" : "muted"} />
+            <Stat label={t("Added")} value={report.created} tone="good" />
+            <Stat label={t("Skipped")} value={report.skipped} tone={report.skipped ? "warn" : "muted"} />
+            <Stat label={t("Failed")} value={report.failed} tone={report.failed ? "bad" : "muted"} />
           </div>
 
           {report.perTarget.map((t) => (
@@ -362,14 +361,14 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
           {report.rejections.length > 0 && (
             <div className="flex flex-col gap-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-medium">Rejected rows ({report.rejections.length})</p>
+                <p className="text-sm font-medium">{t("Rejected rows (")}{report.rejections.length})</p>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => downloadRejections(report.rejections, "import-rejections.csv")}
                   className="gap-1.5"
                 >
-                  <Download className="size-3.5" aria-hidden /> Download to fix
+                  <Download className="size-3.5" aria-hidden /> {t("Download to fix")}
                 </Button>
               </div>
               <div className="max-h-48 overflow-auto rounded-lg border">
@@ -387,7 +386,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
 
           <div className="flex flex-wrap justify-end gap-2">
             <Button onClick={reset} className="gap-1.5">
-              <Upload className="size-4" aria-hidden /> Import more
+              <Upload className="size-4" aria-hidden /> {t("Import more")}
             </Button>
           </div>
         </div>
@@ -401,6 +400,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
  * we see past import runs?" without leaving the Import screen. Summaries only
  * (never row contents); a draft/planned batch shows as "not run". */
 function PastImports({ teamId }: { teamId: string }) {
+  const t = useT()
   const q = useCached<ImportBatchSummary[]>(`import-batches:${teamId}`, () =>
     dataOps.importBatches().then((r) => r.batches)
   )
@@ -408,7 +408,7 @@ function PastImports({ teamId }: { teamId: string }) {
   if (!batches.length) return null
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-sm font-medium">Past imports</p>
+      <p className="text-sm font-medium">{t("Past imports")}</p>
       <div className="flex flex-col gap-1.5">
         {batches.map((b) => (
           <div key={b.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg border p-2.5 text-xs">
@@ -420,13 +420,13 @@ function PastImports({ teamId }: { teamId: string }) {
             </span>
             {b.status === "complete" ? (
               <span className="shrink-0">
-                <span className="text-emerald-600 dark:text-emerald-500">{b.created} added</span>
+                <span className="text-emerald-600 dark:text-emerald-500">{b.created} {t("added")}</span>
                 {b.skipped + b.failed > 0 && (
-                  <span className="text-amber-600 dark:text-amber-500"> · {b.skipped + b.failed} skipped</span>
+                  <span className="text-amber-600 dark:text-amber-500"> · {b.skipped + b.failed} {t("skipped")}</span>
                 )}
               </span>
             ) : (
-              <span className="text-muted-foreground shrink-0">not run</span>
+              <span className="text-muted-foreground shrink-0">{t("not run")}</span>
             )}
           </div>
         ))}
@@ -446,20 +446,21 @@ function PlanSummary({
   plan: NonNullable<ImportBatchView["plan"]>
   onDownload: (rows: { file: string; row: number; reason: string }[], filename: string) => void
 }) {
+  const t = useT()
   const totalRows = plan.steps.reduce((n, s) => n + s.rowCount, 0)
   const skipped = plan.steps.reduce((n, s) => n + s.predictedRejects, 0)
   const rejections = plan.steps.flatMap((s) => s.predictedRejections ?? [])
   return (
     <div className="flex flex-col gap-3 border-t pt-4">
       <div className="flex flex-wrap gap-3">
-        <Stat label="Will import" value={totalRows - skipped} tone={totalRows - skipped ? "good" : "muted"} />
-        <Stat label="Will be skipped" value={skipped} tone={skipped ? "warn" : "muted"} />
-        <Stat label="Tables" value={plan.order.length} tone="muted" />
+        <Stat label={t("Will import")} value={totalRows - skipped} tone={totalRows - skipped ? "good" : "muted"} />
+        <Stat label={t("Will be skipped")} value={skipped} tone={skipped ? "warn" : "muted"} />
+        <Stat label={t("Tables")} value={plan.order.length} tone="muted" />
       </div>
       {rejections.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-muted-foreground text-xs">
-            Skipped rows are listed with reasons — fix them and re-import, or run now without them.
+            {t("Skipped rows are listed with reasons — fix them and re-import, or run now without them.")}
           </p>
           <Button
             variant="outline"
@@ -467,7 +468,7 @@ function PlanSummary({
             onClick={() => onDownload(rejections, "rows-to-fix.csv")}
             className="gap-1.5"
           >
-            <Download className="size-3.5" aria-hidden /> Download the list
+            <Download className="size-3.5" aria-hidden /> {t("Download the list")}
           </Button>
         </div>
       )}

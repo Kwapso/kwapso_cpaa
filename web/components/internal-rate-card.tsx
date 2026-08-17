@@ -51,8 +51,10 @@ import { internalRatesKey, totalKey } from "@/lib/live-resources"
 import { usePermissions } from "@/lib/perms"
 import { rateText } from "@shared/web/money"
 import { primeCache, useCached } from "@shared/web/store"
+import { useT } from "@shared/web/language"
 
 export function InternalRateCardScreen({ teamId }: { teamId: string }) {
+  const t = useT()
   const ratesQ = useCached<InternalRate[]>(internalRatesKey(teamId), () =>
     tenancy.internalRates().then((r) => {
       // R16: the door's exact COUNT(*), primed by the same fetch that loaded the
@@ -125,7 +127,7 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
   }
 
   if (ratesQ.error)
-    return <p className="text-destructive text-sm">Couldn&apos;t load the internal rates.</p>
+    return <p className="text-destructive text-sm">{t("Couldn't load the internal rates.")}</p>
   if (ratesQ.data === undefined) return <Skeleton variant="list" lines={4} />
   const rates = ratesQ.data
 
@@ -133,20 +135,19 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight">Internal rates</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("Internal rates")}</h1>
           {/* The sentence that says who may read this, on the screen rather than
               in a doc. Somebody setting these numbers should know before they
               type them, not after. */}
           <p className="text-muted-foreground mt-1 text-sm">
-            What an hour of our own work costs us, by kind of work. Ours alone — it never appears in
-            a client&apos;s portal, and no client login can reach it.
+            {t("What an hour of our own work costs us, by kind of work. Ours alone — it never appears in a client's portal, and no client login can reach it.")}
           </p>
         </div>
         {canCreate && (
           <div className="flex flex-wrap gap-2 sm:ml-auto sm:shrink-0">
             <Button size="sm" onClick={() => setAdding(true)} className="gap-1.5">
               <Plus className="size-4" />
-              New internal rate
+              {t("New internal rate")}
             </Button>
           </div>
         )}
@@ -154,7 +155,7 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
 
       {rates.length === 0 ? (
         <p className="text-muted-foreground text-sm">
-          No internal rates yet. Until one is set, an hour of our time counts as costing nothing.
+          {t("No internal rates yet. Until one is set, an hour of our time counts as costing nothing.")}
         </p>
       ) : (
         <ul className="flex flex-col gap-1.5">
@@ -169,12 +170,12 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
               <span className="text-sm tabular-nums">{rateText(r.centsPerHour, r.currency)}</span>
               {r.isDefault && (
                 <Badge variant="secondary" className="text-[10px]">
-                  Used when unnamed
+                  {t("Used when unnamed")}
                 </Badge>
               )}
               {!r.active && (
                 <Badge variant="outline" className="text-muted-foreground text-[10px]">
-                  Retired
+                  {t("Retired")}
                 </Badge>
               )}
               <span className="ml-auto flex shrink-0 gap-1">
@@ -187,7 +188,7 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
                     className="gap-1.5"
                   >
                     <Pencil className="size-3.5" />
-                    Edit
+                    {t("Edit")}
                   </Button>
                 )}
                 {canRetire &&
@@ -200,7 +201,7 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
                       className="text-destructive hover:text-destructive gap-1.5"
                     >
                       <Power className="size-3.5" />
-                      Retire
+                      {t("Retire")}
                     </Button>
                   ) : (
                     <Button
@@ -217,7 +218,7 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
                       className="gap-1.5"
                     >
                       <Power className="size-3.5" />
-                      Restore
+                      {t("Restore")}
                     </Button>
                   ))}
               </span>
@@ -230,9 +231,9 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
         open={adding}
         onOpenChange={setAdding}
         draftKey={`internal-rate:add:${teamId}`}
-        title="New internal rate"
+        title={t("New internal rate")}
         subtitle="What this kind of work costs us for an hour of somebody's time."
-        submitLabel="Add it"
+        submitLabel={t("Add it")}
         showDefault
         onSubmit={add}
       />
@@ -240,9 +241,9 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
         open={!!editing}
         onOpenChange={(o) => !o && setEditing(null)}
         draftKey={editing ? `internal-rate:edit:${editing.id}` : undefined}
-        title="Edit internal rate"
+        title={t("Edit internal rate")}
         subtitle="It applies from now on. Figures already worked out keep the rate they were worked out with."
-        submitLabel="Save"
+        submitLabel={t("Save")}
         showDefault
         initial={
           editing
@@ -262,14 +263,13 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
       <AlertDialog open={!!retiring} onOpenChange={(o) => !busy && !o && setRetiring(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Retire the {retiring?.label} rate?</AlertDialogTitle>
+            <AlertDialogTitle>{t("Retire the")} {retiring?.label} {t("rate?")}</AlertDialogTitle>
             <AlertDialogDescription>
-              It stops being applied to time from now on. Everything already worked out with it
-              stays exactly as it is, and you can bring it back any time.
+              {t("It stops being applied to time from now on. Everything already worked out with it stays exactly as it is, and you can bring it back any time.")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={busy}>{t("Cancel")}</AlertDialogCancel>
             <AlertDialogAction
               disabled={busy}
               onClick={(e) => {

@@ -17,8 +17,10 @@ import { useActiveTeam } from "@/lib/use-active-team"
 import { usePermissions } from "@/lib/perms"
 import { useAgentOpen, setAgentOpen } from "@/lib/agent-open"
 import { useScreenTraceEngine } from "@/lib/screen-trace"
+import { useT } from "@shared/web/language"
 
 export function AgentHost() {
+  const t = useT()
   const active = useActiveTeam()
   const teamId = active.ctx?.team?.id ?? null
   const { can } = usePermissions(teamId)
@@ -39,7 +41,7 @@ export function AgentHost() {
       <button
         type="button"
         onClick={() => setAgentOpen(true)}
-        aria-label="Open the assistant"
+        aria-label={t("Open the assistant")}
         className="bg-primary text-primary-foreground hover:bg-primary/90 fixed right-4 bottom-20 z-30 flex size-12 items-center justify-center rounded-full shadow-lg transition-colors md:bottom-6"
       >
         <Sparkles className="size-5" />

@@ -25,11 +25,13 @@ import { useFormDraft } from "@shared/web/use-form-draft"
 import { invalidate } from "@shared/web/store"
 import { ApiFailure, auth } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
+import { useT } from "@shared/web/language"
 
 const firstConfig = { ...defaultFieldConfig, label: "First name", required: true }
 const lastConfig = { ...defaultFieldConfig, label: "Last name", required: true }
 
 export function NeedsName({ onDone }: { onDone: () => void }) {
+  const t = useT()
   const [values, setValues, clearDraft] = useFormDraft(
     "portal:name",
     { firstName: "", lastName: "" },
@@ -59,17 +61,17 @@ export function NeedsName({ onDone }: { onDone: () => void }) {
   return (
     <main className="mx-auto flex min-h-[100svh] max-w-md flex-col justify-center px-6">
       <FormShell
-        title={<h1 className="text-2xl font-semibold tracking-tight">What should we call you?</h1>}
+        title={<h1 className="text-2xl font-semibold tracking-tight">{t("What should we call you?")}</h1>}
         subtitle={
           <p className="text-muted-foreground">
-            Your name goes on anything you send us, so we know who we&apos;re talking to.
+            {t("Your name goes on anything you send us, so we know who we're talking to.")}
           </p>
         }
         onSubmit={save}
         footer={
           <Button type="submit" className="w-full" disabled={busy || !ready}>
             {busy ? <Spinner /> : null}
-            Continue
+            {t("Continue")}
           </Button>
         }
       >

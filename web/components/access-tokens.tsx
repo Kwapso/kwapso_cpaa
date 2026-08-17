@@ -40,6 +40,7 @@ import { FormShell, fieldSpacing } from "@shared/web/form-shell"
 import { ApiFailure, mcp } from "@/lib/api"
 import { formatActivityWhen, formatDate } from "@shared/web/format"
 import { useCached, primeCache } from "@shared/web/store"
+import { useT } from "@shared/web/language"
 
 /** Past its deadline (or missing one — the server treats that as expired too).
  * A token that has run out is not "active": it stops working the same way a
@@ -85,6 +86,7 @@ function copyInstructions(token: string) {
 }
 
 export function AccessTokensSection({ teamName }: { teamName: string | null }) {
+  const t = useT()
   const tokensQ = useCached<McpTokenSummary[]>("mcp-tokens", () =>
     mcp.tokens().then((r) => r.tokens)
   )
@@ -118,7 +120,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
     try {
       await mcp.revokeToken(revoking.id)
       primeCache("mcp-tokens", await mcp.tokens().then((x) => x.tokens))
-      toast.success("Token revoked.")
+      toast.success(t("Token revoked."))
       setRevoking(null)
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't revoke the token.")
@@ -131,23 +133,22 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
     <section className="animate-rise flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-          Access tokens
+          {t("Access tokens")}
         </h2>
         <Button variant="outline" size="sm" onClick={() => setCreateOpen(true)} className="gap-1.5">
-          <Plus className="size-3.5" aria-hidden /> New token
+          <Plus className="size-3.5" aria-hidden /> {t("New token")}
         </Button>
       </div>
       <p className="text-muted-foreground text-sm">
-        Let an outside tool (an AI agent, a script, an automation) work in your team as you —
-        capped by your role, in the team the token was made for.
+        {t("Let an outside tool (an AI agent, a script, an automation) work in your team as you — capped by your role, in the team the token was made for.")}
       </p>
 
       {tokensQ.error ? (
-        <p className="text-destructive text-sm">Couldn&apos;t load your tokens.</p>
+        <p className="text-destructive text-sm">{t("Couldn't load your tokens.")}</p>
       ) : tokensQ.data === undefined ? (
         <Skeleton variant="list" lines={2} />
       ) : tokens.length === 0 ? (
-        <p className="text-muted-foreground text-sm">No tokens yet.</p>
+        <p className="text-muted-foreground text-sm">{t("No tokens yet.")}</p>
       ) : (
         <div className="flex flex-col rounded-xl border">
           {tokens.map((t) => (
@@ -225,11 +226,11 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
         <DialogContent>
           {secret ? (
             <div className="flex flex-col gap-4">
-              <DialogTitle>Copy your token now</DialogTitle>
+              <DialogTitle>{t("Copy your token now")}</DialogTitle>
               <DialogDescription>
-                This is the only time it&apos;s shown. Anyone holding it can act as you in{" "}
+                {t("This is the only time it's shown. Anyone holding it can act as you in")}{" "}
                 {teamName ?? "this team"} — treat it like a password. It works for{" "}
-                {MCP_TOKEN_TTL_DAYS} days, then you make a new one.
+                {MCP_TOKEN_TTL_DAYS} {t("days, then you make a new one.")}
               </DialogDescription>
               <div className="bg-muted/60 flex items-center gap-2 rounded-lg border p-3">
                 <code className="min-w-0 flex-1 break-all text-xs">{secret}</code>
@@ -239,12 +240,12 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
                   className="shrink-0 gap-1.5"
                   onClick={() => {
                     void navigator.clipboard?.writeText(secret).then(
-                      () => toast.success("Copied."),
-                      () => toast.error("Couldn't copy — select it by hand.")
+                      () => toast.success(t("Copied.")),
+                      () => toast.error(t("Couldn't copy — select it by hand."))
                     )
                   }}
                 >
-                  <Copy className="size-3.5" aria-hidden /> Copy
+                  <Copy className="size-3.5" aria-hidden /> {t("Copy")}
                 </Button>
               </div>
               {/* One-tap: the whole connect prompt WITH this token embedded, ready to
@@ -255,7 +256,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
                 className="gap-1.5 self-start"
                 onClick={() => copyInstructions(secret)}
               >
-                <ClipboardCopy className="size-3.5" aria-hidden /> Copy setup prompt for any AI
+                <ClipboardCopy className="size-3.5" aria-hidden /> {t("Copy setup prompt for any AI")}
               </Button>
               <div className="flex flex-wrap justify-end gap-2">
                 <Button
@@ -264,7 +265,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
                     setCreateOpen(false)
                   }}
                 >
-                  Done
+                  {t("Done")}
                 </Button>
               </div>
             </div>
@@ -274,11 +275,11 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
                 e.preventDefault()
                 void create()
               }}
-              title={<DialogTitle>New access token</DialogTitle>}
+              title={<DialogTitle>{t("New access token")}</DialogTitle>}
               subtitle={
                 <DialogDescription>
-                  Pinned to {teamName ?? "your current team"}. It can do exactly what you can do
-                  there — nothing more — and it stops working after {MCP_TOKEN_TTL_DAYS} days.
+                  {t("Pinned to")} {teamName ?? "your current team"}. It can do exactly what you can do
+                  there — nothing more — and it stops working after {MCP_TOKEN_TTL_DAYS} {t("days.")}
                 </DialogDescription>
               }
               footer={
@@ -289,7 +290,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
               }
             >
               <Field
-                config={{ ...defaultFieldConfig, label: "Name", required: true }}
+                config={{ ...defaultFieldConfig, label: t("Name"), required: true }}
                 htmlFor="token-label"
                 className={fieldSpacing}
               >
@@ -297,7 +298,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
                   id="token-label"
                   value={label}
                   onChange={(e) => setLabel(e.target.value)}
-                  placeholder="CI importer"
+                  placeholder={t("CI importer")}
                   disabled={busy}
                   autoFocus
                 />
@@ -311,14 +312,13 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
       <AlertDialog open={!!revoking} onOpenChange={(o) => !busy && !o && setRevoking(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Revoke {revoking?.label}?</AlertDialogTitle>
+            <AlertDialogTitle>{t("Revoke")} {revoking?.label}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Anything using this token stops working immediately. This can&apos;t be undone — you
-              can always create a new token.
+              {t("Anything using this token stops working immediately. This can't be undone — you can always create a new token.")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={busy}>{t("Cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
                 e.preventDefault()

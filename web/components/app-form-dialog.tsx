@@ -32,6 +32,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { ApiFailure } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 export type AppFormValues = {
   name: string
@@ -77,6 +78,7 @@ export function AppFormDialog({
   draftKey?: string
   onSubmit: (values: AppFormValues) => Promise<void>
 }) {
+  const t = useT()
   const editing = initial !== undefined
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
@@ -147,7 +149,7 @@ export function AppFormDialog({
           id="app-name"
           value={values.name}
           onChange={(e) => setValues((s) => ({ ...s, name: e.target.value }))}
-          placeholder="e.g. Dispatch"
+          placeholder={t("e.g. Dispatch")}
           disabled={busy}
           autoFocus
         />
@@ -160,7 +162,7 @@ export function AppFormDialog({
           disabled={busy}
         >
           <SelectTrigger id="app-account">
-            <SelectValue placeholder="One of ours" />
+            <SelectValue placeholder={t("One of ours")} />
           </SelectTrigger>
           <SelectContent>
             {accounts.map((a) => (
@@ -186,7 +188,7 @@ export function AppFormDialog({
           id="app-stage"
           value={values.stage}
           onChange={(e) => setValues((s) => ({ ...s, stage: e.target.value }))}
-          placeholder="e.g. live"
+          placeholder={t("e.g. live")}
           disabled={busy}
         />
       </Field>

@@ -24,6 +24,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { ApiFailure } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 const groupField = { ...defaultFieldConfig, label: "Group", required: true }
 const optionField = { ...defaultFieldConfig, label: "Option", required: true }
@@ -43,6 +44,7 @@ export function SelectableFormDialog({
   /** Stable id for per-session draft persistence (CACHING.md §11); omit to disable. */
   draftKey?: string
 }) {
+  const t = useT()
   const [values, setValues, clearDraft] = useFormDraft(draftKey, { type: "", value: "" }, open)
   const [busy, setBusy] = React.useState(false)
 
@@ -68,10 +70,10 @@ export function SelectableFormDialog({
       busy={busy}
       clearDraft={clearDraft}
       onSubmit={submit}
-      title={<DialogTitle>New dropdown value</DialogTitle>}
+      title={<DialogTitle>{t("New dropdown value")}</DialogTitle>}
       subtitle={
         <DialogDescription>
-          Pick an existing group or start a new one, then add the option.
+          {t("Pick an existing group or start a new one, then add the option.")}
         </DialogDescription>
       }
       footer={
@@ -91,7 +93,7 @@ export function SelectableFormDialog({
           list="dropdown-types"
           value={values.type}
           onChange={(e) => setValues((v) => ({ ...v, type: e.target.value }))}
-          placeholder="e.g. Ticket type"
+          placeholder={t("e.g. Ticket type")}
           disabled={busy}
           autoFocus
         />
@@ -106,7 +108,7 @@ export function SelectableFormDialog({
           id="selectable-value"
           value={values.value}
           onChange={(e) => setValues((v) => ({ ...v, value: e.target.value }))}
-          placeholder="New option"
+          placeholder={t("New option")}
           disabled={busy}
         />
       </Field>

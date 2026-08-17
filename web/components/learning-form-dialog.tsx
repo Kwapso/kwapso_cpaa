@@ -34,6 +34,7 @@ import { useFormDraft } from "@shared/web/use-form-draft"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { FilePicker } from "@/components/file-picker"
 import { ManageDropdownsLink } from "@/components/manage-dropdowns-link"
+import { useT } from "@shared/web/language"
 
 const titleField = { ...defaultFieldConfig, label: "Title", required: true }
 const categoryField = { ...defaultFieldConfig, label: "Category", required: false }
@@ -92,6 +93,7 @@ export function LearningFormDialog({
   /** existing "File type" values to pick from */
   contentTypeOptions?: string[]
 }) {
+  const t = useT()
   const isEdit = !!initial
   const initialValues: LearningFormValues = {
     title: initial?.title ?? "",
@@ -154,7 +156,7 @@ export function LearningFormDialog({
           id="learning-title"
           value={values.title}
           onChange={(e) => setValues((v) => ({ ...v, title: e.target.value }))}
-          placeholder="How to onboard a new client"
+          placeholder={t("How to onboard a new client")}
           disabled={busy}
           autoFocus
         />
@@ -168,10 +170,10 @@ export function LearningFormDialog({
             disabled={busy}
           >
             <SelectTrigger id="learning-category" className="flex-1">
-              <SelectValue placeholder="Choose a category (optional)" />
+              <SelectValue placeholder={t("Choose a category (optional)")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={NONE}>No category</SelectItem>
+              <SelectItem value={NONE}>{t("No category")}</SelectItem>
               {categoryOptions.map((c) => (
                 <SelectItem key={c} value={c}>
                   {c}
@@ -187,7 +189,7 @@ export function LearningFormDialog({
               onClick={() => setValues((v) => ({ ...v, category: NONE }))}
               disabled={busy}
               className="text-muted-foreground shrink-0"
-              aria-label="Clear category"
+              aria-label={t("Clear category")}
             >
               <X className="size-4" />
             </Button>
@@ -203,10 +205,10 @@ export function LearningFormDialog({
             disabled={busy}
           >
             <SelectTrigger id="learning-type" className="flex-1">
-              <SelectValue placeholder="Choose a type (optional)" />
+              <SelectValue placeholder={t("Choose a type (optional)")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={NONE}>No type</SelectItem>
+              <SelectItem value={NONE}>{t("No type")}</SelectItem>
               {contentTypeOptions.map((c) => (
                 <SelectItem key={c} value={c}>
                   {c}
@@ -222,7 +224,7 @@ export function LearningFormDialog({
               onClick={() => setValues((v) => ({ ...v, contentType: NONE }))}
               disabled={busy}
               className="text-muted-foreground shrink-0"
-              aria-label="Clear content type"
+              aria-label={t("Clear content type")}
             >
               <X className="size-4" />
             </Button>
@@ -263,7 +265,7 @@ export function LearningFormDialog({
           key={seed}
           defaultValue={values.body}
           onChange={(html) => setValues((v) => ({ ...v, body: html }))}
-          placeholder="Write the article — bold, italic, highlight, and lists are supported."
+          placeholder={t("Write the article — bold, italic, highlight, and lists are supported.")}
           className="min-h-40"
         />
       </Field>

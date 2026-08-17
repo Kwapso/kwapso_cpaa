@@ -14,6 +14,7 @@ import * as React from "react"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { CLIENT_PAGE_ROWS_CAP, cursorKey, loadMore } from "@/lib/live-resources"
 import { useCachedValue } from "@shared/web/store"
+import { useT } from "@shared/web/language"
 
 export function LoadMore<T>({
   listKey,
@@ -26,6 +27,7 @@ export function LoadMore<T>({
   fetchPage: (cursor: string) => Promise<{ rows: T[]; nextCursor: string | null }>
   label?: string
 }) {
+  const t = useT()
   const cursor = useCachedValue<string | null>(cursorKey(listKey))
   // The list itself, only to know HOW MUCH of it is loaded. `useCachedValue`
   // rather than a fetcher: the list has one owner and this is not it.
@@ -39,7 +41,7 @@ export function LoadMore<T>({
   if ((loaded?.length ?? 0) >= CLIENT_PAGE_ROWS_CAP)
     return (
       <p className="text-muted-foreground text-center text-sm">
-        That&apos;s the first {CLIENT_PAGE_ROWS_CAP.toLocaleString()} — search or filter to find
+        {t("That's the first")} {CLIENT_PAGE_ROWS_CAP.toLocaleString()} — search or filter to find
         what you&apos;re after.
       </p>
     )

@@ -33,6 +33,7 @@ import { AgentHistoryDialog } from "@/components/agent-history-dialog"
 import { AgentUsageDialog } from "@/components/agent-usage-dialog"
 import { useAgentChat } from "@/lib/use-agent-chat"
 import { usePermissions } from "@/lib/perms"
+import { useT } from "@shared/web/language"
 
 export function AgentPanel({
   teamId,
@@ -43,6 +44,7 @@ export function AgentPanel({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
+  const t = useT()
   const { can } = usePermissions(teamId)
   const canUse = can("agent", "create")
 
@@ -74,7 +76,7 @@ export function AgentPanel({
          * swallows its taps (the bug the owner hit). */}
         <SheetHeader className="border-b p-4 pe-12">
           <div className="flex items-center justify-between gap-2">
-            <SheetTitle>Assistant</SheetTitle>
+            <SheetTitle>{t("Assistant")}</SheetTitle>
             {canUse && (
               <div className="flex items-center gap-1.5">
                 {chat.quotaLabel && (
@@ -82,7 +84,7 @@ export function AgentPanel({
                     type="button"
                     onClick={() => setUsageOpen(true)}
                     className="rounded-full focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none"
-                    title="See where your assistant credits went"
+                    title={t("See where your assistant credits went")}
                   >
                     <Badge
                       variant={chat.quota?.blocked ? "destructive" : "secondary"}
@@ -102,8 +104,8 @@ export function AgentPanel({
                   className="size-10"
                   onClick={() => setHistoryOpen(true)}
                   disabled={chat.busy}
-                  title="Past conversations"
-                  aria-label="Past conversations"
+                  title={t("Past conversations")}
+                  aria-label={t("Past conversations")}
                 >
                   <History className="size-5" aria-hidden />
                 </Button>
@@ -114,8 +116,8 @@ export function AgentPanel({
                     className="size-10"
                     onClick={chat.newChat}
                     disabled={chat.busy}
-                    title="New chat"
-                    aria-label="New chat"
+                    title={t("New chat")}
+                    aria-label={t("New chat")}
                   >
                     <Plus className="size-5" aria-hidden />
                   </Button>
@@ -123,12 +125,12 @@ export function AgentPanel({
               </div>
             )}
           </div>
-          <SheetDescription>Ask me anything, or tell me what to change — I&apos;ll only do what you can do.</SheetDescription>
+          <SheetDescription>{t("Ask me anything, or tell me what to change — I'll only do what you can do.")}</SheetDescription>
         </SheetHeader>
 
         {!canUse ? (
           <div className="text-muted-foreground flex flex-1 items-center justify-center p-6 text-center text-sm">
-            The assistant isn&apos;t available for your role here.
+            {t("The assistant isn't available for your role here.")}
           </div>
         ) : (
           // agent-chat-host scopes the composer autofocus selector. Dropping files
@@ -156,8 +158,8 @@ export function AgentPanel({
                 // detected (underlined) on phones and breaks the centred line mid-quote.
                 emptyState={
                   <div className="flex max-w-64 flex-col gap-1">
-                    <span>Try “invite a teammate as an Editor”</span>
-                    <span>or “what changed this week?”</span>
+                    <span>{t("Try “invite a teammate as an Editor”")}</span>
+                    <span>{t("or “what changed this week?”")}</span>
                   </div>
                 }
                 onSend={(t) => void chat.send(t)}
@@ -174,7 +176,7 @@ export function AgentPanel({
             {/* A paused turn: the proposed actions + approve / decline. */}
             {chat.pending && (
               <div className="flex flex-col gap-3 border-t p-4">
-                <p className="text-sm font-medium">I&apos;d like to make these changes:</p>
+                <p className="text-sm font-medium">{t("I'd like to make these changes:")}</p>
                 {/* Each step now carries the PAYLOAD under its label (a role's
                  * whole access sheet is a dozen lines), so the list scrolls on
                  * its own and the two buttons stay where a thumb expects them —
@@ -190,10 +192,10 @@ export function AgentPanel({
                     onClick={() => void chat.resolve(false)}
                     disabled={chat.busy}
                   >
-                    Not now
+                    {t("Not now")}
                   </Button>
                   <Button size="sm" onClick={() => void chat.resolve(true)} disabled={chat.busy}>
-                    Go ahead
+                    {t("Go ahead")}
                   </Button>
                 </div>
               </div>

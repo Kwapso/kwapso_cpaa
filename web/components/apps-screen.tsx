@@ -27,6 +27,7 @@ import { accountsKey, appsKey, listFetch, valueKey } from "@/lib/live-resources"
 import { withDataDrivenCollection } from "@/lib/screens"
 import type { Account, AppRow } from "@shared/types"
 import { invalidate, useCached } from "@shared/web/store"
+import { useT } from "@shared/web/language"
 
 /** One app, as a row: whose it is, where it is up to, and its address. The
  * monthly tool cost is deliberately NOT here — it is what the system costs US,
@@ -83,13 +84,14 @@ export function AppsScreen({
   onAction: (actionId: string, ctx: ScreenActionContext) => void
   onIntent: (intent: ScreenIntent) => void
 }) {
+  const t = useT()
   const appsQ = useCached<AppRow[]>(appsKey(teamId), () => listFetch.apps(teamId))
   // The accounts an app can belong to — page one is plenty for a picker, and it
   // is the SAME cache the accounts screen holds.
   const accountsQ = useCached<Account[]>(accountsKey(teamId), () => listFetch.accounts(teamId))
   const [addOpen, setAddOpen] = React.useState(false)
 
-  if (appsQ.error) return <p className="text-destructive text-sm">Couldn&apos;t load the apps.</p>
+  if (appsQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the apps.")}</p>
   if (appsQ.data === undefined) return <Skeleton variant="list" lines={4} />
 
   const names = new Map((accountsQ.data ?? []).map((a) => [a.id, a.name]))
@@ -104,7 +106,7 @@ export function AppsScreen({
 
       <SectionWithCreate
         show={canCreate}
-        label="Record an app"
+        label={t("Record an app")}
         icon="plus"
         onCreate={() => setAddOpen(true)}
       >

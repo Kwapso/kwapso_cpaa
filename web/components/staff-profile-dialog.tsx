@@ -31,6 +31,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { ApiFailure, content } from "@/lib/api"
 import { FilePicker } from "@/components/file-picker"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 export type StaffProfileValues = {
   headline: string
@@ -69,6 +70,7 @@ export function StaffProfileDialog({
   initial?: Partial<StaffProfileValues>
   draftKey?: string
 }) {
+  const t = useT()
   const [values, setValues, clearDraft] = useFormDraft(draftKey, { ...EMPTY, ...initial }, open)
   const [busy, setBusy] = React.useState(false)
 
@@ -109,7 +111,7 @@ export function StaffProfileDialog({
     </Field>
   )
 
-  const photoField = { ...defaultFieldConfig, label: "Photo", required: false }
+  const photoField = { ...defaultFieldConfig, label: t("Photo"), required: false }
 
   const prose = (key: keyof StaffProfileValues, label: string, placeholder: string) => (
     <Field config={{ ...defaultFieldConfig, label }} htmlFor={`staff-${key}`} className={fieldSpacing}>
@@ -134,8 +136,7 @@ export function StaffProfileDialog({
       title={<DialogTitle>{subjectName}&apos;s profile</DialogTitle>}
       subtitle={
         <DialogDescription>
-          Anyone on the team can read this. No client ever can — it doesn&apos;t appear in the portal,
-          and no client login can reach it.
+          {t("Anyone on the team can read this. No client ever can — it doesn't appear in the portal, and no client login can reach it.")}
         </DialogDescription>
       }
       footer={

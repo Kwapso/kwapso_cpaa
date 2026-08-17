@@ -31,6 +31,7 @@ import type { TeamRole } from "@shared/types"
 import { ApiFailure } from "@/lib/api"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { reportError } from "@shared/web/log"
+import { useT } from "@shared/web/language"
 
 const emailField = { ...defaultFieldConfig, label: "Email", required: true }
 const roleField = { ...defaultFieldConfig, label: "Role", required: true }
@@ -50,6 +51,7 @@ export function InviteDialog({
   /** stable id for per-session draft persistence (CACHING.md §11); omit to disable */
   draftKey?: string
 }) {
+  const t = useT()
   // Default the role to the first non-Admin; the hook seeds this on open.
   const initialValues = {
     email: "",
@@ -87,10 +89,10 @@ export function InviteDialog({
       busy={busy}
       clearDraft={clearDraft}
       onSubmit={submit}
-      title={<DialogTitle>Invite someone to the team</DialogTitle>}
+      title={<DialogTitle>{t("Invite someone to the team")}</DialogTitle>}
       subtitle={
         <DialogDescription>
-          We&apos;ll email them an invite to join in the role you pick.
+          {t("We'll email them an invite to join in the role you pick.")}
         </DialogDescription>
       }
       footer={
@@ -118,7 +120,7 @@ export function InviteDialog({
           disabled={busy}
         >
           <SelectTrigger id="invite-role" className="w-full">
-            <SelectValue placeholder="Role" />
+            <SelectValue placeholder={t("Role")} />
           </SelectTrigger>
           <SelectContent>
             {roles.map((r) => (

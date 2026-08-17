@@ -46,6 +46,7 @@ import { toLocalInput, toMoment } from "@shared/web/format"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useCached } from "@shared/web/store"
 import type { HelpTicket, Story, WorkLog } from "@shared/types"
+import { useT } from "@shared/web/language"
 
 export type TimeFormValues = {
   targetTable: string
@@ -87,6 +88,7 @@ export function TimeFormDialog({
   initial?: WorkLog | null
   onSubmit: (values: TimeFormValues) => Promise<void>
 }) {
+  const t = useT()
   const isEdit = !!initial
   const teamId = useActiveTeam().ctx?.team?.id ?? null
   // A correction needs neither list: what it is against cannot move, so the two
@@ -194,7 +196,7 @@ export function TimeFormDialog({
             disabled={busy}
           >
             <SelectTrigger id="time-target">
-              <SelectValue placeholder="Pick a story or a ticket" />
+              <SelectValue placeholder={t("Pick a story or a ticket")} />
             </SelectTrigger>
             <SelectContent>
               {options.map((o) => (
@@ -229,7 +231,7 @@ export function TimeFormDialog({
           id="time-kind"
           value={values.kind}
           onChange={(e) => setValues((s) => ({ ...s, kind: e.target.value }))}
-          placeholder="Development, design, project management…"
+          placeholder={t("Development, design, project management…")}
           disabled={busy}
         />
       </Field>
@@ -238,7 +240,7 @@ export function TimeFormDialog({
           id="time-note"
           value={values.note}
           onChange={(e) => setValues((s) => ({ ...s, note: e.target.value }))}
-          placeholder="What you actually did."
+          placeholder={t("What you actually did.")}
           disabled={busy}
           rows={2}
         />

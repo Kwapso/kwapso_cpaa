@@ -40,6 +40,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 const titleField = { ...defaultFieldConfig, label: "What is it called?", required: true }
 const bodyField = { ...defaultFieldConfig, label: "What should the assistant know?", required: false }
@@ -94,6 +95,7 @@ export function KnowledgeFormDialog({
    * has always meant. */
   titleOwnedElsewhere?: boolean
 }) {
+  const t = useT()
   const isEdit = !!initial
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
@@ -162,7 +164,7 @@ export function KnowledgeFormDialog({
           id="knowledge-title"
           value={values.title}
           onChange={(e) => setValues((v) => ({ ...v, title: e.target.value }))}
-          placeholder="e.g. How we handle a Bergman dispatch outage"
+          placeholder={t("e.g. How we handle a Bergman dispatch outage")}
           disabled={busy || (titleOwnedElsewhere ?? textOwnedElsewhere)}
           autoFocus
         />
@@ -172,7 +174,7 @@ export function KnowledgeFormDialog({
           id="knowledge-body"
           value={values.body}
           onChange={(e) => setValues((v) => ({ ...v, body: e.target.value }))}
-          placeholder="Write it the way you would explain it to a new colleague."
+          placeholder={t("Write it the way you would explain it to a new colleague.")}
           disabled={busy || textOwnedElsewhere}
           rows={8}
         />
@@ -193,10 +195,10 @@ export function KnowledgeFormDialog({
           disabled={busy}
         >
           <SelectTrigger id="knowledge-filed">
-            <SelectValue placeholder="The agency's own" />
+            <SelectValue placeholder={t("The agency's own")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={AGENCY}>The agency&apos;s own</SelectItem>
+            <SelectItem value={AGENCY}>{t("The agency's own")}</SelectItem>
             {accountOptions.map((a) => (
               <SelectItem key={a.id} value={a.id}>
                 {a.name}
@@ -205,7 +207,7 @@ export function KnowledgeFormDialog({
           </SelectContent>
         </Select>
         <p className="text-muted-foreground mt-1 text-xs">
-          Filing it under a client is how a question about them finds it first.
+          {t("Filing it under a client is how a question about them finds it first.")}
         </p>
       </Field>
       <Field config={visibilityField} htmlFor="knowledge-visibility" className={fieldSpacing}>
@@ -220,8 +222,8 @@ export function KnowledgeFormDialog({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="team">Anyone who can read the knowledge base</SelectItem>
-            <SelectItem value="private">Only me</SelectItem>
+            <SelectItem value="team">{t("Anyone who can read the knowledge base")}</SelectItem>
+            <SelectItem value="private">{t("Only me")}</SelectItem>
           </SelectContent>
         </Select>
       </Field>

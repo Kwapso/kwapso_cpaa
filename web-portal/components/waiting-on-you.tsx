@@ -26,12 +26,14 @@ import { invalidate, useCached } from "@shared/web/store"
 import { ApiFailure, delivery } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 import type { Todo } from "@shared/types"
+import { useT } from "@shared/web/language"
 
 /** What a browser will turn into a data URL for us. Generous for a logo or a
  * signed PDF; the door caps it again at 10 MB, which is the cap that counts. */
 const MAX_FILE_BYTES = 10 * 1024 * 1024
 
 export function WaitingOnYou() {
+  const t = useT()
   const todosQ = useCached<Todo[]>(cacheKeys.todos, () => delivery.todos().then((r) => r.todos))
   const [busy, setBusy] = React.useState<string | null>(null)
   const pickers = React.useRef<Record<string, HTMLInputElement | null>>({})
@@ -43,13 +45,13 @@ export function WaitingOnYou() {
     setBusy(id)
     try {
       if (file && file.size > MAX_FILE_BYTES) {
-        toast.error("That file is too big — 10 MB is the most we can take.")
+        toast.error(t("That file is too big — 10 MB is the most we can take."))
         return
       }
       const attachment = file ? { dataUrl: await readFileAsDataUrl(file), name: file.name } : undefined
       await delivery.completeTodo(id, attachment)
       invalidate(cacheKeys.todos)
-      toast.success("Thank you — that's off your list.")
+      toast.success(t("Thank you — that's off your list."))
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't mark that done.")
     } finally {
@@ -59,7 +61,7 @@ export function WaitingOnYou() {
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-lg font-semibold">We&apos;re waiting on you</h2>
+      <h2 className="text-lg font-semibold">{t("We're waiting on you")}</h2>
       <ul className="flex flex-col gap-2">
         {open.map((t) => (
           <li key={t.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">

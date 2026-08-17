@@ -25,8 +25,10 @@ import { clearAllFormDrafts } from "@shared/web/use-form-draft"
 import { clearCache } from "@shared/web/store"
 import { reportError } from "@shared/web/log"
 import { auth } from "@/lib/api"
+import { useT } from "@shared/web/language"
 
 export function NoAccess({ email }: { email: string }) {
+  const t = useT()
   async function signOut() {
     // The session cookie is HttpOnly, so ONLY the server's Set-Cookie clears it.
     // Swallowing a failed sign-out wipes the local state, redirects, and looks
@@ -38,7 +40,7 @@ export function NoAccess({ email }: { email: string }) {
       await auth.logout()
     } catch (e) {
       reportError("no-access.signOut", e)
-      toast.error("We couldn't sign you out. Check your connection and try again.")
+      toast.error(t("We couldn't sign you out. Check your connection and try again."))
       return
     }
     clearAllFormDrafts()
@@ -48,17 +50,17 @@ export function NoAccess({ email }: { email: string }) {
 
   return (
     <main className="mx-auto flex min-h-[100svh] max-w-md flex-col items-center justify-center gap-5 px-6 text-center">
-      <h1 className="text-2xl font-semibold tracking-tight">You&apos;re signed in</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">{t("You're signed in")}</h1>
       <p className="text-muted-foreground">
-        There&apos;s nothing here for <span className="text-foreground">{email}</span> yet. Someone at{" "}
-        {brand.name} needs to switch your access on before your company&apos;s work shows up.
+        {t("There's nothing here for")} <span className="text-foreground">{email}</span> {t("yet. Someone at")}{" "}
+        {brand.name} {t("needs to switch your access on before your company's work shows up.")}
       </p>
       <p className="text-muted-foreground text-sm">
-        Ask whoever you work with here, and try again after they&apos;ve done it.
+        {t("Ask whoever you work with here, and try again after they've done it.")}
       </p>
       <Button variant="outline" onClick={() => void signOut()}>
         <LogOut className="size-3.5" />
-        Sign out
+        {t("Sign out")}
       </Button>
     </main>
   )

@@ -53,6 +53,7 @@ import { useFormDraft } from "@shared/web/use-form-draft"
 import { useCached } from "@shared/web/store"
 import { ManageDropdownsLink } from "@/components/manage-dropdowns-link"
 import type { Account } from "@shared/types"
+import { useT } from "@shared/web/language"
 
 const descField = { ...defaultFieldConfig, label: "What do you need help with?", required: true }
 const typeField = { ...defaultFieldConfig, label: "Type", required: false }
@@ -87,6 +88,7 @@ export function HelpFormDialog({
   /** active team — drives the gated "Manage dropdowns" link */
   teamId?: string | null
 }) {
+  const t = useT()
   const isEdit = !!initial
   // THE PICKER FETCHES ITS OWN LIST, and that is the half a passed-in prop would
   // have got wrong: the screen-level `accountsQ` is only loaded on the ACCOUNTS
@@ -170,7 +172,7 @@ export function HelpFormDialog({
           id="help-desc"
           value={values.description}
           onChange={(e) => setValues((v) => ({ ...v, description: e.target.value }))}
-          placeholder="Tell us what's going on — e.g. I can't invite a new member, the button is greyed out."
+          placeholder={t("Tell us what's going on — e.g. I can't invite a new member, the button is greyed out.")}
           disabled={busy}
           rows={4}
           autoFocus
@@ -184,10 +186,10 @@ export function HelpFormDialog({
             disabled={busy}
           >
             <SelectTrigger id="help-type">
-              <SelectValue placeholder="Choose a type (optional)" />
+              <SelectValue placeholder={t("Choose a type (optional)")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={NONE}>No type</SelectItem>
+              <SelectItem value={NONE}>{t("No type")}</SelectItem>
               {helpTypeOptions.map((v) => (
                 <SelectItem key={v} value={v}>
                   {v}
@@ -199,7 +201,7 @@ export function HelpFormDialog({
           {values.helpType !== NONE && !busy && (
             <button
               type="button"
-              aria-label="Clear type"
+              aria-label={t("Clear type")}
               onClick={() => setValues((v) => ({ ...v, helpType: NONE }))}
               className="text-muted-foreground hover:text-foreground absolute inset-y-0 right-8 my-auto flex size-5 items-center justify-center rounded-sm"
             >
@@ -225,10 +227,10 @@ export function HelpFormDialog({
             disabled={busy}
           >
             <SelectTrigger id="help-account">
-              <SelectValue placeholder="Ours — no client" />
+              <SelectValue placeholder={t("Ours — no client")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={NONE}>Ours — no client</SelectItem>
+              <SelectItem value={NONE}>{t("Ours — no client")}</SelectItem>
               {accountOptions.map((a) => (
                 <SelectItem key={a.id} value={a.id}>
                   {a.name}

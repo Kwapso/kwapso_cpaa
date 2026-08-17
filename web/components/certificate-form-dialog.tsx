@@ -27,6 +27,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { ApiFailure, content } from "@/lib/api"
 import { FilePicker } from "@/components/file-picker"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 export type CertificateValues = {
   title: string
@@ -54,6 +55,7 @@ export function CertificateFormDialog({
   initial?: Partial<CertificateValues>
   draftKey?: string
 }) {
+  const t = useT()
   const isEdit = !!initial
   const [values, setValues, clearDraft] = useFormDraft(draftKey, { ...EMPTY, ...initial }, open)
   const [busy, setBusy] = React.useState(false)
@@ -106,7 +108,7 @@ export function CertificateFormDialog({
       title={<DialogTitle>{isEdit ? "Edit certificate" : `Record a certificate for ${subjectName}`}</DialogTitle>}
       subtitle={
         <DialogDescription>
-          What they hold, who issued it, and when it lapses. The team can see this; no client can.
+          {t("What they hold, who issued it, and when it lapses. The team can see this; no client can.")}
         </DialogDescription>
       }
       footer={
@@ -124,7 +126,7 @@ export function CertificateFormDialog({
           word for it — and until now that was the only thing this form could
           hold, because the upload door had no control anywhere. */}
       <Field
-        config={{ ...defaultFieldConfig, label: "The certificate itself", required: false }}
+        config={{ ...defaultFieldConfig, label: t("The certificate itself"), required: false }}
         htmlFor="cert-file"
         className={fieldSpacing}
       >

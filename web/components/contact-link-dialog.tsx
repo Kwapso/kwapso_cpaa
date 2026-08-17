@@ -37,6 +37,7 @@ import { ApiFailure, tenancy } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useCached } from "@shared/web/store"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 const personField = { ...defaultFieldConfig, label: "Person", required: true }
 const relationshipField = { ...defaultFieldConfig, label: "Relationship", required: false }
@@ -70,6 +71,7 @@ export function ContactLinkDialog({
   onSubmit: (values: ContactLinkValues) => Promise<void>
   draftKey?: string
 }) {
+  const t = useT()
   const [values, setValues, clearDraft] = useFormDraft(draftKey, EMPTY, open)
   const [query, setQuery] = React.useState("")
   const [busy, setBusy] = React.useState(false)
@@ -106,10 +108,10 @@ export function ContactLinkDialog({
       busy={busy}
       clearDraft={clearDraft}
       onSubmit={submit}
-      title={<DialogTitle>Add a contact</DialogTitle>}
+      title={<DialogTitle>{t("Add a contact")}</DialogTitle>}
       subtitle={
         <DialogDescription>
-          Pick the person who&apos;s a contact of {accountName}. If they&apos;re new, add them
+          {t("Pick the person who's a contact of")} {accountName}. If they&apos;re new, add them
           as a person first.
         </DialogDescription>
       }
@@ -129,10 +131,10 @@ export function ContactLinkDialog({
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search people…"
+            placeholder={t("Search people…")}
             className="pl-8"
             disabled={busy}
-            aria-label="Search people"
+            aria-label={t("Search people")}
           />
         </div>
         <Select
@@ -159,7 +161,7 @@ export function ContactLinkDialog({
           id="contact-relationship"
           value={values.relationship}
           onChange={(e) => setValues((v) => ({ ...v, relationship: e.target.value }))}
-          placeholder="Operations"
+          placeholder={t("Operations")}
           disabled={busy}
         />
       </Field>
@@ -172,7 +174,7 @@ export function ContactLinkDialog({
           disabled={busy}
         />
         <label htmlFor="contact-main" className="text-sm">
-          Main contact — the person you deal with first
+          {t("Main contact — the person you deal with first")}
         </label>
       </div>
     </FormShellDialog>

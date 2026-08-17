@@ -28,6 +28,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { ApiFailure } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 export type ResolveFormValues = { resolution: string }
 
@@ -52,6 +53,7 @@ export function ResolveDialog({
   draftKey?: string
   onSubmit: (values: ResolveFormValues) => Promise<void>
 }) {
+  const t = useT()
   const [values, setValues, clearDraft] = useFormDraft(draftKey, { resolution: draft ?? "" }, open)
   const [busy, setBusy] = React.useState(false)
   const ready = values.resolution.trim() !== ""
@@ -78,10 +80,10 @@ export function ResolveDialog({
       busy={busy}
       clearDraft={clearDraft}
       onSubmit={submit}
-      title={<DialogTitle>Answer this ticket</DialogTitle>}
+      title={<DialogTitle>{t("Answer this ticket")}</DialogTitle>}
       subtitle={
         <DialogDescription>
-          It resolves the ticket, joins the conversation, and goes to the client by email.
+          {t("It resolves the ticket, joins the conversation, and goes to the client by email.")}
         </DialogDescription>
       }
       footer={
@@ -96,7 +98,7 @@ export function ResolveDialog({
           id="resolve-text"
           value={values.resolution}
           onChange={(e) => setValues((s) => ({ ...s, resolution: e.target.value }))}
-          placeholder="What we did, in the words they'd use."
+          placeholder={t("What we did, in the words they'd use.")}
           disabled={busy}
           rows={6}
           autoFocus

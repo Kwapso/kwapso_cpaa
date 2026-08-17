@@ -34,6 +34,7 @@ import { listFetch, meetingsKey } from "@/lib/live-resources"
 import { withDataDrivenCollection } from "@/lib/screens"
 import type { Account, Meeting, MeetingPurpose } from "@shared/types"
 import { invalidate, useCached } from "@shared/web/store"
+import { useT } from "@shared/web/language"
 
 export function MeetingsScreen({
   teamId,
@@ -53,6 +54,7 @@ export function MeetingsScreen({
   onAction: (actionId: string, ctx: ScreenActionContext) => void
   onIntent: (intent: ScreenIntent) => void
 }) {
+  const t = useT()
   const meetingsQ = useCached<Meeting[]>(meetingsKey(teamId), () => listFetch.meetings(teamId))
   // The two pickers the form needs. Both are read only when the dialog can be
   // opened at all — a person who cannot create a meeting has no use for either.
@@ -76,10 +78,10 @@ export function MeetingsScreen({
       notes: values.notes || undefined,
     })
     invalidate(meetingsKey(teamId))
-    toast.success("It's in the diary.")
+    toast.success(t("It's in the diary."))
   }
 
-  if (meetingsQ.error) return <p className="text-destructive text-sm">Couldn&apos;t load the meetings.</p>
+  if (meetingsQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the meetings.")}</p>
   if (meetingsQ.data === undefined) return <Skeleton variant="list" lines={4} />
   const loaded = meetingsQ.data
 
@@ -94,7 +96,7 @@ export function MeetingsScreen({
           diary rather than the page in the browser. */}
       <PagedFind<Meeting>
         listKey={meetingsKey(teamId)}
-        placeholder="Search meetings…"
+        placeholder={t("Search meetings…")}
         noun="meetings"
         fetchPage={(query, cursor) =>
           contentApi
@@ -109,7 +111,7 @@ export function MeetingsScreen({
           const listRecipe = withDataDrivenCollection(recipe, data.rows ?? [], found.emptyText)
           return (
             <>
-              <SectionWithCreate show={canCreate} label="New meeting" icon="plus" onCreate={() => setOpen(true)}>
+              <SectionWithCreate show={canCreate} label={t("New meeting")} icon="plus" onCreate={() => setOpen(true)}>
                 <ScreenRenderer
                   recipe={listRecipe}
                   data={data}
@@ -124,7 +126,7 @@ export function MeetingsScreen({
               <LoadMore
                 listKey={found.listKey ?? meetingsKey(teamId)}
                 fetchPage={found.fetchPage}
-                label="Load more meetings"
+                label={t("Load more meetings")}
               />
             </>
           )

@@ -32,6 +32,7 @@ import {
 import { withDataDrivenCollection } from "@/lib/screens"
 import { formatCount } from "@shared/web/format-count"
 import type { BrandAsset, MarketingPost, MeetingPurpose, Program } from "@shared/types"
+import { useT } from "@shared/web/language"
 
 /** Everything one of these screens needs from the host. The same bundle four
  * times, because they are the same screen four times. */
@@ -72,6 +73,7 @@ function InternalCollection({
   data: ReturnType<typeof shapeMarketingList>
   heading: React.ReactNode
 } & Omit<InternalScreenProps<never>, "rows" | "total">) {
+  const t = useT()
   const tuned = withDataDrivenCollection(recipe, data.rows ?? [])
   return (
     <div className="flex flex-col gap-4">
@@ -80,8 +82,8 @@ function InternalCollection({
         show={canCreate}
         label={createLabel}
         icon="plus"
-        secondary={onImport ? { show: canCreate, label: "Import CSV", onClick: onImport } : undefined}
-        download={{ show: (data.rows?.length ?? 0) > 0, label: "Export CSV", href: exportHref }}
+        secondary={onImport ? { show: canCreate, label: t("Import CSV"), onClick: onImport } : undefined}
+        download={{ show: (data.rows?.length ?? 0) > 0, label: t("Export CSV"), href: exportHref }}
         onCreate={onCreate}
       >
         <ScreenRenderer recipe={tuned} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
@@ -122,6 +124,7 @@ export function BrandLibraryScreen(props: InternalScreenProps<BrandAsset>) {
 export function ProgrammesScreen(
   props: InternalScreenProps<Program> & { purposeCount: number | undefined; onPurposes: () => void }
 ) {
+  const t = useT()
   const { rows, purposeCount, onPurposes, ...rest } = props
   return (
     <div className="flex flex-col gap-4">
@@ -139,7 +142,7 @@ export function ProgrammesScreen(
         {/* R16: the number is the door's exact total through the ONE seam, and
             an unloaded total renders nothing rather than a "0" that reads as
             "there are none". */}
-        Meeting purposes{formatCount(purposeCount) ? ` (${formatCount(purposeCount)})` : ""}
+        {t("Meeting purposes")}{formatCount(purposeCount) ? ` (${formatCount(purposeCount)})` : ""}
       </button>
     </div>
   )

@@ -37,6 +37,7 @@ import { Plus } from "lucide-react"
 import { ApiFailure } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 const typeField = { ...defaultFieldConfig, label: "Type", required: true }
 const nameField = { ...defaultFieldConfig, label: "Name", required: true }
@@ -96,6 +97,7 @@ export function AccountFormDialog({
   /** stable id for per-session draft persistence; omit to disable. */
   draftKey?: string
 }) {
+  const t = useT()
   const isEdit = !!initial
   const [values, setValues, clearDraft] = useFormDraft(draftKey, initial ?? EMPTY, open)
   const [busy, setBusy] = React.useState(false)
@@ -152,8 +154,8 @@ export function AccountFormDialog({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="entity">Company</SelectItem>
-              <SelectItem value="individual">Person</SelectItem>
+              <SelectItem value="entity">{t("Company")}</SelectItem>
+              <SelectItem value="individual">{t("Person")}</SelectItem>
             </SelectContent>
           </Select>
         </Field>
@@ -164,7 +166,7 @@ export function AccountFormDialog({
           id="account-name"
           value={values.name}
           onChange={(e) => set({ name: e.target.value })}
-          placeholder="Bergman S.A."
+          placeholder={t("Bergman S.A.")}
           disabled={busy}
           autoFocus
         />
@@ -177,10 +179,10 @@ export function AccountFormDialog({
           disabled={busy}
         >
           <SelectTrigger id="account-parent">
-            <SelectValue placeholder="Sits on its own" />
+            <SelectValue placeholder={t("Sits on its own")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={TOP}>Sits on its own</SelectItem>
+            <SelectItem value={TOP}>{t("Sits on its own")}</SelectItem>
             {parentOptions.map((p) => (
               <SelectItem key={p.id} value={p.id}>
                 {p.name}
@@ -195,7 +197,7 @@ export function AccountFormDialog({
           id="account-code"
           value={values.code}
           onChange={(e) => set({ code: e.target.value })}
-          placeholder="BERG"
+          placeholder={t("BERG")}
           disabled={busy}
         />
       </Field>
@@ -226,7 +228,7 @@ export function AccountFormDialog({
           id="account-address"
           value={values.address}
           onChange={(e) => set({ address: e.target.value })}
-          placeholder="Where they are (optional)."
+          placeholder={t("Where they are (optional).")}
           disabled={busy}
           rows={2}
         />
@@ -238,7 +240,7 @@ export function AccountFormDialog({
           list="account-statuses"
           value={values.status}
           onChange={(e) => set({ status: e.target.value })}
-          placeholder="client"
+          placeholder={t("client")}
           disabled={busy}
         />
         <datalist id="account-statuses">

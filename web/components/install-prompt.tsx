@@ -32,6 +32,7 @@ import {
 
 import { brand } from "@shared/brand"
 import { detectPlatform, isIOSSafari, isStandalone, type PwaPlatform } from "@/lib/pwa"
+import { useT } from "@shared/web/language"
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>
@@ -42,6 +43,7 @@ const DISMISS_KEY = "pwa_install_dismissed_at"
 const COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000
 
 export function InstallPrompt() {
+  const t = useT()
   const pathname = usePathname()
   const [open, setOpen] = React.useState(false)
   const [platform, setPlatform] = React.useState<PwaPlatform>("desktop")
@@ -114,9 +116,9 @@ export function InstallPrompt() {
               <Download className="size-5" />
             </span>
             <div className="min-w-0">
-              <SheetTitle>Install {brand.name}</SheetTitle>
+              <SheetTitle>{t("Install")} {brand.name}</SheetTitle>
               <SheetDescription>
-                Add it to your home screen for a faster, full-screen, app-like experience.
+                {t("Add it to your home screen for a faster, full-screen, app-like experience.")}
               </SheetDescription>
             </div>
           </SheetHeader>
@@ -126,13 +128,13 @@ export function InstallPrompt() {
             <ol className="text-muted-foreground space-y-2 text-sm">
               <li className="flex items-center gap-2">
                 <span className="text-foreground font-medium">1.</span>
-                Tap the Share button
-                <Share className="text-foreground size-4" aria-label="Share" />
-                in the toolbar.
+                {t("Tap the Share button")}
+                <Share className="text-foreground size-4" aria-label={t("Share")} />
+                {t("in the toolbar.")}
               </li>
               <li className="flex items-center gap-2">
                 <span className="text-foreground font-medium">2.</span>
-                Choose “Add to Home Screen”
+                {t("Choose “Add to Home Screen”")}
                 <Plus className="text-foreground size-4" aria-hidden />.
               </li>
             </ol>
@@ -143,15 +145,15 @@ export function InstallPrompt() {
               parent — that pushes overflow off the LEFT edge where it hides). */}
           <SheetFooter className="flex-row flex-wrap gap-2 [&>*:first-child]:ml-auto">
             <Button variant="ghost" onClick={dismiss}>
-              Not now
+              {t("Not now")}
             </Button>
             {hasNative ? (
               <Button onClick={() => void install()} className="gap-1.5">
                 <Download className="size-4" />
-                Install
+                {t("Install")}
               </Button>
             ) : iosSafari ? (
-              <Button onClick={dismiss}>Got it</Button>
+              <Button onClick={dismiss}>{t("Got it")}</Button>
             ) : null}
           </SheetFooter>
         </div>

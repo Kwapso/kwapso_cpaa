@@ -32,6 +32,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { ApiFailure } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 export type ProcessFormValues = {
   appId: string
@@ -67,6 +68,7 @@ export function ProcessFormDialog({
   draftKey?: string
   onSubmit: (values: ProcessFormValues) => Promise<void>
 }) {
+  const t = useT()
   const editing = initial !== undefined
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
@@ -132,7 +134,7 @@ export function ProcessFormDialog({
             disabled={busy}
           >
             <SelectTrigger id="process-app">
-              <SelectValue placeholder="Pick the app" />
+              <SelectValue placeholder={t("Pick the app")} />
             </SelectTrigger>
             <SelectContent>
               {apps.map((a) => (
@@ -149,7 +151,7 @@ export function ProcessFormDialog({
           id="process-name"
           value={values.name}
           onChange={(e) => setValues((s) => ({ ...s, name: e.target.value }))}
-          placeholder="e.g. Approving a supplier invoice"
+          placeholder={t("e.g. Approving a supplier invoice")}
           disabled={busy}
           autoFocus
         />
@@ -159,7 +161,7 @@ export function ProcessFormDialog({
           id="process-description"
           value={values.description}
           onChange={(e) => setValues((s) => ({ ...s, description: e.target.value }))}
-          placeholder="Who does it, when, and what it's for."
+          placeholder={t("Who does it, when, and what it's for.")}
           disabled={busy}
           rows={3}
         />
@@ -170,7 +172,7 @@ export function ProcessFormDialog({
             id="process-baseline"
             value={values.baselineLabel}
             onChange={(e) => setValues((s) => ({ ...s, baselineLabel: e.target.value }))}
-            placeholder="How it worked before"
+            placeholder={t("How it worked before")}
             disabled={busy}
           />
         </Field>

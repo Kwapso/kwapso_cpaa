@@ -45,6 +45,7 @@ import { invalidate, invalidatePrefix, patchRow, primeCache, readCache, reconcil
 import { NAV, TEAM_SECTIONS, bottomNavItems, isNavActive, type Crumb, type NavGroup } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useTeamPrewarm } from "@/lib/use-team-prewarm"
+import { useT } from "@shared/web/language"
 import { CreateTeamDialog } from "@/components/create-team-dialog"
 import { TEAM_CREATION_CLOSED } from "@shared/product"
 import { ProfileMenu } from "@/components/profile-menu"
@@ -91,6 +92,7 @@ export function AppShell({
    * path here; other pages rely on `usePathname`. */
   activePath?: string
 }) {
+  const t = useT()
   const pathname = usePathname()
   const [creating, setCreating] = React.useState(false)
   // The AI co-pilot (launcher + panel + screen-trace engine) is mounted ONCE at the
@@ -130,7 +132,7 @@ export function AppShell({
   type ShellLink = { slug: string; title: string; Icon: typeof Home; path: string; group: NavGroup }
   const universal: ShellLink[] = NAV.filter((i) => !i.need).map((i) => ({
     slug: i.slug,
-    title: i.title,
+    title: t(i.title),
     Icon: NAV_ICONS[i.icon],
     path: i.path,
     group: i.group,
@@ -138,7 +140,7 @@ export function AppShell({
   const sidebarPages: ShellLink[] = teamId
     ? TEAM_SECTIONS.filter((s) => s.placement === "sidebar" && can(s.module, "read")).map((s) => ({
         slug: s.key,
-        title: s.title,
+        title: t(s.title),
         Icon: SECTION_ICONS[s.key] ?? Home,
         // Clean top-level URL (/stories, /tickets) — resolves the active team from
         // context, like Home. (The gateway serves the shell for any sub-path.)

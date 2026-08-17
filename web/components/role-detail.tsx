@@ -45,8 +45,10 @@ import { formatCount } from "@shared/web/format-count"
 import { usePermissions } from "@/lib/perms"
 import { primeCache, useCached } from "@shared/web/store"
 import { useRecordActivity } from "@/lib/use-record-activity"
+import { useT } from "@shared/web/language"
 
 export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: string }) {
+  const t = useT()
   const rolesQ = useCached<TeamRole[]>(`member_roles:${teamId}`, () =>
     tenancy.roles().then((r) => r.roles)
   )
@@ -110,7 +112,7 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
       primeCache(`role-perms:${roleId}`, fresh)
       serverRef.current = { roleId, value: fresh.value }
       setDraft(fresh.value)
-      toast.success("Permissions saved.")
+      toast.success(t("Permissions saved."))
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't save permissions.")
     } finally {
@@ -121,7 +123,7 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
   async function updateDetails(title: string, description: string) {
     const { roles: next } = await tenancy.updateRole(roleId, title, description)
     primeCache(`member_roles:${teamId}`, next)
-    toast.success("Role updated.")
+    toast.success(t("Role updated."))
   }
 
   async function setActive(activeNext: boolean) {
@@ -138,9 +140,9 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
     }
   }
 
-  if (rolesQ.error) return <p className="text-destructive text-sm">Couldn&apos;t load the role.</p>
+  if (rolesQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the role.")}</p>
   if (rolesQ.data === undefined) return <Skeleton variant="list" lines={4} />
-  if (!role) return <p className="text-muted-foreground text-sm">That role doesn&apos;t exist.</p>
+  if (!role) return <p className="text-muted-foreground text-sm">{t("That role doesn't exist.")}</p>
 
   const matrixConfig: PermissionMatrixConfig | null = perms && {
     ...defaultPermissionMatrixConfig,
@@ -152,8 +154,8 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
   const canSave = perms != null && !perms.isDefault && perms.canEdit
 
   const overviewItems = [
-    { label: "Description", value: role.description || "—" },
-    { label: "Members with this role", value: String(role.memberCount) },
+    { label: t("Description"), value: role.description || "—" },
+    { label: t("Members with this role"), value: String(role.memberCount) },
     ...auditItems({
       createdByName: role.createdByName,
       createdAt: role.createdAt,
@@ -168,11 +170,11 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
     ...defaultTabsConfig,
     variant: "line" as const,
     tabs: [
-      { value: "permissions", label: "Permissions", icon: "shield-check", badge: "", badgeVariant: "" as const },
-      { value: "overview", label: "Overview", icon: "info", badge: "", badgeVariant: "" as const },
+      { value: "permissions", label: t("Permissions"), icon: "shield-check", badge: "", badgeVariant: "" as const },
+      { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       {
         value: "activity",
-        label: "Activity",
+        label: t("Activity"),
         icon: "history",
         badge: formatCount(activity.total),
         badgeVariant: "" as const,
@@ -190,12 +192,12 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
             {role.isDefault && (
               <Badge variant="outline" className="gap-1 text-[10px]">
                 <Lock className="size-2.5" aria-hidden />
-                Locked
+                {t("Locked")}
               </Badge>
             )}
             {!role.active && (
               <Badge variant="outline" className="text-muted-foreground text-[10px]">
-                Inactive
+                {t("Inactive")}
               </Badge>
             )}
           </h1>
@@ -211,7 +213,7 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
             className="shrink-0 gap-1.5"
           >
             <Pencil className="size-3.5" />
-            Edit details
+            {t("Edit details")}
           </Button>
         )}
       </div>
@@ -301,14 +303,13 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Deactivate {role.title}?</AlertDialogTitle>
+            <AlertDialogTitle>{t("Deactivate")} {role.title}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Members who have it keep their access, but you can&apos;t give it to anyone new.
-              You can activate it again later.
+              {t("Members who have it keep their access, but you can't give it to anyone new. You can activate it again later.")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={busyActive}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={busyActive}>{t("Cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
                 e.preventDefault()

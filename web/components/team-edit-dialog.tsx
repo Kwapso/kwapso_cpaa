@@ -28,6 +28,7 @@ import { ApiFailure, tenancy } from "@/lib/api"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { letterMark } from "@/lib/identity"
 import { fileToDataUrl } from "@/lib/image"
+import { useT } from "@shared/web/language"
 
 const nameField = { ...defaultFieldConfig, label: "Team name", required: true }
 
@@ -45,6 +46,7 @@ export function TeamEditDialog({
   /** stable id for per-session draft persistence (CACHING.md §11); omit to disable */
   draftKey?: string
 }) {
+  const t = useT()
   const initialValues: { name: string; logo?: string } = {
     name: team?.name ?? "",
     logo: undefined,
@@ -60,7 +62,7 @@ export function TeamEditDialog({
       const dataUrl = await fileToDataUrl(files[0])
       setValues((v) => ({ ...v, logo: dataUrl }))
     } catch {
-      toast.error("Couldn't read that image — try another one.")
+      toast.error(t("Couldn't read that image — try another one."))
     }
   }
 
@@ -72,7 +74,7 @@ export function TeamEditDialog({
       await onSaved()
       clearDraft()
       onOpenChange(false)
-      toast.success("Team updated.")
+      toast.success(t("Team updated."))
     } catch (err) {
       toast.error(
         err instanceof ApiFailure ? err.message : "Couldn't save the team."
@@ -89,10 +91,10 @@ export function TeamEditDialog({
       busy={busy}
       clearDraft={clearDraft}
       onSubmit={submit}
-      title={<DialogTitle>Edit your team</DialogTitle>}
+      title={<DialogTitle>{t("Edit your team")}</DialogTitle>}
       subtitle={
         <DialogDescription>
-          Change your team&apos;s name or add a logo. This is what everyone sees.
+          {t("Change your team's name or add a logo. This is what everyone sees.")}
         </DialogDescription>
       }
       footer={
@@ -105,7 +107,7 @@ export function TeamEditDialog({
       <div className="flex flex-col items-center gap-3">
         <Avatar className="size-20">
           {(logo || team?.logoUrl) && (
-            <AvatarImage src={logo || (team?.logoUrl as string)} alt="Team logo" />
+            <AvatarImage src={logo || (team?.logoUrl as string)} alt={t("Team logo")} />
           )}
           <AvatarFallback className="text-xl">
             {letterMark(name)}

@@ -34,6 +34,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { ApiFailure } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 export type StoryFormValues = {
   title: string
@@ -103,6 +104,7 @@ export function StoryFormDialog({
   draftKey?: string
   onSubmit: (values: StoryFormValues) => Promise<void>
 }) {
+  const t = useT()
   const editing = initial !== undefined
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
@@ -186,7 +188,7 @@ export function StoryFormDialog({
           id="story-title"
           value={values.title}
           onChange={(e) => setValues((s) => ({ ...s, title: e.target.value }))}
-          placeholder="e.g. Move dispatch onto the driver app"
+          placeholder={t("e.g. Move dispatch onto the driver app")}
           disabled={busy}
           autoFocus
         />
@@ -196,7 +198,7 @@ export function StoryFormDialog({
           id="story-detail"
           value={values.detail}
           onChange={(e) => setValues((s) => ({ ...s, detail: e.target.value }))}
-          placeholder="What good looks like when it's finished."
+          placeholder={t("What good looks like when it's finished.")}
           disabled={busy}
           rows={3}
         />

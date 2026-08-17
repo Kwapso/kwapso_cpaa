@@ -14,6 +14,7 @@ import * as React from "react"
 import { formatCount } from "@shared/web/format-count"
 import { TEAM_SECTIONS } from "@/lib/pages"
 import { useCountStandsDown } from "@/components/counted-tabs"
+import { useT } from "@shared/web/language"
 
 export function CollectionHeading({
   sectionKey,
@@ -26,6 +27,7 @@ export function CollectionHeading({
 }) {
   // ARBITRATION (R16 iii): the hook is called ABOVE the early return — a counted
   // tab strip wins and this heading stands down entirely.
+  const t = useT()
   const standsDown = useCountStandsDown()
   if (standsDown) return null
 
@@ -33,7 +35,7 @@ export function CollectionHeading({
   const badge = formatCount(total)
   return (
     <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-      {title}
+      {t(title)}
       {badge ? (
         <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs font-medium">
           {badge}

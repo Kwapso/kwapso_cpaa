@@ -2,11 +2,13 @@
 
 // THE SWITCHER — one component, shown in both apps' Settings.
 //
-// Four languages, four buttons, no dropdown. A dropdown hides three of the four
-// choices behind a click and makes somebody who cannot read the current language
-// hunt for the control that fixes that. Everything here is legible to a person
-// who does not yet understand a word on the screen: the flag, the language's own
-// name for itself, and a tick on the one in force.
+// One button per language, wrapping, no dropdown. A dropdown hides every choice
+// but the current one behind a click, and makes somebody who cannot read the
+// current language hunt for the control that fixes that. Everything here is
+// legible to a person who does not yet understand a word on the screen: the
+// flag, the language's own name for itself, and a tick on the one in force. The
+// list is whatever LANGUAGES says — the agency's own four first, then the
+// world's top twenty-five — so adding one adds a button and nothing else.
 //
 // OPTIMISTIC, THEN PERSISTED. The click re-renders the app instantly and the
 // save follows. If the save fails the language snaps back and says so, in the

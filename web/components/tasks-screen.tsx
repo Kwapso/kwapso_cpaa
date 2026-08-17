@@ -38,6 +38,7 @@ import type { Task } from "@shared/types"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
 import { invalidate, useCached } from "@shared/web/store"
+import { useT } from "@shared/web/language"
 
 /** One task, as a row: who has it and when it is due. A task that names a client
  * says so, because that is what puts its time in the right margin. */
@@ -92,6 +93,7 @@ export function TasksScreen({
   onAction: (actionId: string, ctx: ScreenActionContext) => void
   onIntent: (intent: ScreenIntent) => void
 }) {
+  const t = useT()
   const tasksQ = useCached<Task[]>(tasksKey(teamId, view), () => listFetch.tasks(teamId, view))
   const [taskOpen, setTaskOpen] = React.useState(false)
   const [todoOpen, setTodoOpen] = React.useState(false)
@@ -105,7 +107,7 @@ export function TasksScreen({
     // A new task belongs in BOTH piles, and only one of them is on screen.
     invalidate(tasksKey(teamId, "open"))
     invalidate(tasksKey(teamId, "all"))
-    toast.success("Task added.")
+    toast.success(t("Task added."))
   }
 
   async function raiseTodo(values: TodoFormValues) {
@@ -116,10 +118,10 @@ export function TasksScreen({
       dueOn: values.dueOn ? new Date(values.dueOn).toISOString() : undefined,
     })
     invalidate(todosKey(teamId))
-    toast.success("Asked — and emailed to them.")
+    toast.success(t("Asked — and emailed to them."))
   }
 
-  if (tasksQ.error) return <p className="text-destructive text-sm">Couldn&apos;t load the tasks.</p>
+  if (tasksQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the tasks.")}</p>
   if (tasksQ.data === undefined) return <Skeleton variant="list" lines={4} />
 
   const data = shapeTasks(tasksQ.data)
@@ -139,7 +141,7 @@ export function TasksScreen({
 
       <SectionWithCreate
         show={canCreate}
-        label="New task"
+        label={t("New task")}
         icon="plus"
         onCreate={() => setTaskOpen(true)}
         // OPEN / ALL, above the boxed list — it scopes which tasks the card
@@ -154,14 +156,14 @@ export function TasksScreen({
               tabs: [
                 {
                   value: "open",
-                  label: "Still to do",
+                  label: t("Still to do"),
                   icon: "inbox",
                   badge: openBadge,
                   badgeVariant: "",
                 },
                 {
                   value: "all",
-                  label: "All tasks",
+                  label: t("All tasks"),
                   icon: "list",
                   badge: formatCount(allTotal),
                   badgeVariant: "",
@@ -187,7 +189,7 @@ export function TasksScreen({
       <section className="flex flex-col gap-2">
         <h2 className="text-muted-foreground flex items-center gap-1.5 text-sm font-medium">
           <Inbox className="size-3.5" />
-          Waiting on clients
+          {t("Waiting on clients")}
         </h2>
         <TodosPanel
           teamId={teamId}

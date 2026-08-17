@@ -98,6 +98,7 @@ import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, invalidatePrefix, useCached } from "@shared/web/store"
 import { useRecordActivity } from "@/lib/use-record-activity"
+import { useT } from "@shared/web/language"
 
 /** How a version is named out loud, everywhere on this screen: its number, then
  * what somebody called it. Written once so the picker, the banner and the
@@ -124,6 +125,7 @@ export function ProcessDetailScreen({
   teamId: string
   processId: string
 }) {
+  const t = useT()
   // WHICH VERSION IS BEING READ. `null` is "the current one", which is what the
   // record cache holds and what every live ping is about — so the default costs
   // no extra read and stays row-level live. Choosing an older one reads a slice
@@ -204,7 +206,7 @@ export function ProcessDetailScreen({
       description: values.description || null,
     })
     refresh()
-    toast.success("Process updated.")
+    toast.success(t("Process updated."))
   }
 
   async function saveStep(values: StepFormValues) {
@@ -228,7 +230,7 @@ export function ProcessDetailScreen({
     toast.success(editingStep ? "Step updated." : "Step added.")
   }
 
-  if (detailQ.error) return <p className="text-destructive text-sm">Couldn&apos;t load the process.</p>
+  if (detailQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the process.")}</p>
   if (detailQ.data === undefined) return <Skeleton variant="list" lines={5} />
 
   const { process, versions, commentsTotal, saving, savingsCaption } = detailQ.data
@@ -253,9 +255,9 @@ export function ProcessDetailScreen({
   const shownTotalSeconds = (shownSteps ?? []).reduce((n, s) => n + stepSecondsPerMonth(s), 0)
 
   const overviewItems = [
-    { label: "App", value: process.appName },
-    { label: "Current version", value: current ? versionLabel(current) : "—" },
-    { label: "Baseline", value: baseline ? versionLabel(baseline) : "Version 1" },
+    { label: t("App"), value: process.appName },
+    { label: t("Current version"), value: current ? versionLabel(current) : "—" },
+    { label: t("Baseline"), value: baseline ? versionLabel(baseline) : "Version 1" },
     ...auditItems({
       createdByName: null,
       createdAt: process.createdAt,
@@ -269,10 +271,10 @@ export function ProcessDetailScreen({
     ...defaultTabsConfig,
     variant: "line" as const,
     tabs: [
-      { value: "overview", label: "Overview", icon: "info", badge: "", badgeVariant: "" as const },
+      { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       {
         value: "steps",
-        label: "Steps",
+        label: t("Steps"),
         icon: CONCEPT_ICON.steps,
         // R16: the exact server count of the version being SHOWN — it moves with
         // the picker, because a badge counting today's steps over version 1's
@@ -282,21 +284,21 @@ export function ProcessDetailScreen({
       },
       {
         value: "versions",
-        label: "Versions",
+        label: t("Versions"),
         icon: CONCEPT_ICON.versions,
         badge: formatCount(process.versionCount),
         badgeVariant: "" as const,
       },
       {
         value: "conversation",
-        label: "Conversation",
+        label: t("Conversation"),
         icon: CONCEPT_ICON.comments,
         badge: formatCount(commentsQ.data?.total ?? commentsTotal),
         badgeVariant: "" as const,
       },
       {
         value: "activity",
-        label: "Activity",
+        label: t("Activity"),
         icon: CONCEPT_ICON.activity,
         // R8: a tab that reveals a collection carries its count, and R16 says the
         // number is the server total through the one seam — never the loaded page.
@@ -314,7 +316,7 @@ export function ProcessDetailScreen({
             <span className="truncate">{process.name}</span>
             {!process.active && (
               <Badge variant="outline" className="text-muted-foreground text-[10px]">
-                Archived
+                {t("Archived")}
               </Badge>
             )}
           </h1>
@@ -327,7 +329,7 @@ export function ProcessDetailScreen({
           {canEdit && (
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-1.5">
               <Pencil className="size-3.5" />
-              Edit
+              {t("Edit")}
             </Button>
           )}
           {canCreate && (
@@ -337,7 +339,7 @@ export function ProcessDetailScreen({
               disabled={busy}
               onClick={() =>
                 setConfirm({
-                  title: "Cut a new version?",
+                  title: t("Cut a new version?"),
                   body: "Today's steps are copied into a new version, and this one is kept exactly as it was agreed. Edits from now on describe the new way of working.",
                   action: "Cut version",
                   run: () =>
@@ -351,7 +353,7 @@ export function ProcessDetailScreen({
               className="gap-1.5"
             >
               <GitBranch className="size-3.5" />
-              Cut version
+              {t("Cut version")}
             </Button>
           )}
           {canArchive &&
@@ -376,7 +378,7 @@ export function ProcessDetailScreen({
                 className="text-destructive hover:text-destructive gap-1.5"
               >
                 <Power className="size-3.5" />
-                Archive
+                {t("Archive")}
               </Button>
             ) : (
               <Button
@@ -392,7 +394,7 @@ export function ProcessDetailScreen({
                 className="gap-1.5"
               >
                 {busy ? <Spinner /> : <Power className="size-3.5" />}
-                Restore
+                {t("Restore")}
               </Button>
             ))}
         </div>
@@ -744,7 +746,7 @@ export function ProcessDetailScreen({
             <AlertDialogDescription>{confirm?.body}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={busy}>{t("Cancel")}</AlertDialogCancel>
             <AlertDialogAction
               disabled={busy}
               onClick={(e) => {

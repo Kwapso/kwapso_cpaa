@@ -21,6 +21,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 const titleField = { ...defaultFieldConfig, label: "Role name", required: true }
 const descField = { ...defaultFieldConfig, label: "Description", required: false }
@@ -40,6 +41,7 @@ export function RoleFormDialog({
   /** stable id for per-session draft persistence (CACHING.md §11); omit to disable */
   draftKey?: string
 }) {
+  const t = useT()
   const isEdit = !!initial
   const initialValues = {
     title: initial?.title ?? "",
@@ -92,7 +94,7 @@ export function RoleFormDialog({
           id="role-title"
           value={values.title}
           onChange={(e) => setValues((v) => ({ ...v, title: e.target.value }))}
-          placeholder="Editor"
+          placeholder={t("Editor")}
           disabled={busy}
           autoFocus
         />
@@ -102,7 +104,7 @@ export function RoleFormDialog({
           id="role-desc"
           value={values.description}
           onChange={(e) => setValues((v) => ({ ...v, description: e.target.value }))}
-          placeholder="What this role is for (optional)."
+          placeholder={t("What this role is for (optional).")}
           disabled={busy}
           rows={3}
         />

@@ -32,6 +32,7 @@ import { tenancy } from "@/lib/api"
 import { ratesKey, totalKey } from "@/lib/live-resources"
 import { rateText } from "@shared/web/money"
 import { primeCache, useCached } from "@shared/web/store"
+import { useT } from "@shared/web/language"
 
 /** One account's card. Keyed by the ACCOUNT (`rates:<id>`) — the same key the
  * live registry's `account_rates` listener drops, so a colleague setting a price
@@ -52,6 +53,7 @@ export function AccountRateCard({
   /** the host's confirm + write verbs — one confirm dialog on the record */
   actions: PanelActions
 }) {
+  const t = useT()
   const ratesQ = useCached<AccountRate[]>(ratesKey(accountId), () =>
     tenancy.accountRates(accountId).then((r) => {
       // R16: the door's exact COUNT(*), primed by the same fetch that loaded the
@@ -92,7 +94,7 @@ export function AccountRateCard({
     await refresh()
   }
 
-  if (ratesQ.error) return <p className="text-destructive text-sm">Couldn&apos;t load the rates.</p>
+  if (ratesQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the rates.")}</p>
   if (ratesQ.data === undefined) return <Skeleton variant="list" lines={3} />
   const rates = ratesQ.data
 
@@ -102,14 +104,14 @@ export function AccountRateCard({
         <div className="flex flex-wrap justify-end gap-2">
           <Button size="sm" onClick={() => setAdding(true)} className="gap-1.5">
             <Plus className="size-4" />
-            New rate
+            {t("New rate")}
           </Button>
         </div>
       )}
 
       {rates.length === 0 ? (
         <p className="text-muted-foreground text-sm">
-          No rates set for {accountName} yet — nothing is being charged by the hour.
+          {t("No rates set for")} {accountName} {t("yet — nothing is being charged by the hour.")}
         </p>
       ) : (
         <ul className="flex flex-col gap-1.5">
@@ -124,7 +126,7 @@ export function AccountRateCard({
               <span className="text-sm tabular-nums">{rateText(r.centsPerHour, r.currency)}</span>
               {!r.active && (
                 <Badge variant="outline" className="text-muted-foreground text-[10px]">
-                  Retired
+                  {t("Retired")}
                 </Badge>
               )}
               {/* ml-auto on the GROUP so a narrow phone reflows instead of
@@ -139,7 +141,7 @@ export function AccountRateCard({
                     className="gap-1.5"
                   >
                     <Pencil className="size-3.5" />
-                    Edit
+                    {t("Edit")}
                   </Button>
                 )}
                 {canRetire &&
@@ -164,7 +166,7 @@ export function AccountRateCard({
                       className="text-destructive hover:text-destructive gap-1.5"
                     >
                       <Power className="size-3.5" />
-                      Retire
+                      {t("Retire")}
                     </Button>
                   ) : (
                     <Button
@@ -181,7 +183,7 @@ export function AccountRateCard({
                       className="gap-1.5"
                     >
                       <Power className="size-3.5" />
-                      Restore
+                      {t("Restore")}
                     </Button>
                   ))}
               </span>
@@ -194,18 +196,18 @@ export function AccountRateCard({
         open={adding}
         onOpenChange={setAdding}
         draftKey={`account-rate:add:${accountId}`}
-        title="New rate"
+        title={t("New rate")}
         subtitle={`What ${accountName} is charged for an hour of this kind of work.`}
-        submitLabel="Add it"
+        submitLabel={t("Add it")}
         onSubmit={add}
       />
       <RateFormDialog
         open={!!editing}
         onOpenChange={(o) => !o && setEditing(null)}
         draftKey={editing ? `account-rate:edit:${editing.id}` : undefined}
-        title="Edit rate"
+        title={t("Edit rate")}
         subtitle="Changing it affects what is charged from now on, not what has already been charged."
-        submitLabel="Save"
+        submitLabel={t("Save")}
         initial={
           editing
             ? { label: editing.label, centsPerHour: editing.centsPerHour, currency: editing.currency }

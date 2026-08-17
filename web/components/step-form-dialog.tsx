@@ -31,6 +31,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { ApiFailure } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 export type StepFormValues = {
   name: string
@@ -70,6 +71,7 @@ export function StepFormDialog({
   draftKey?: string
   onSubmit: (values: StepFormValues) => Promise<void>
 }) {
+  const t = useT()
   const editing = initial !== undefined
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
@@ -123,7 +125,7 @@ export function StepFormDialog({
       title={<DialogTitle>{editing ? "Edit step" : "Add a step"}</DialogTitle>}
       subtitle={
         <DialogDescription>
-          It goes into {versionLabel}. Older versions stay exactly as they were agreed.
+          {t("It goes into")} {versionLabel}. Older versions stay exactly as they were agreed.
         </DialogDescription>
       }
       footer={
@@ -138,7 +140,7 @@ export function StepFormDialog({
           id="step-name"
           value={values.name}
           onChange={(e) => setValues((s) => ({ ...s, name: e.target.value }))}
-          placeholder="e.g. Check the invoice against the order"
+          placeholder={t("e.g. Check the invoice against the order")}
           disabled={busy}
           autoFocus
         />
@@ -148,7 +150,7 @@ export function StepFormDialog({
           id="step-description"
           value={values.description}
           onChange={(e) => setValues((s) => ({ ...s, description: e.target.value }))}
-          placeholder="Anything worth remembering about how it's done."
+          placeholder={t("Anything worth remembering about how it's done.")}
           disabled={busy}
           rows={2}
         />

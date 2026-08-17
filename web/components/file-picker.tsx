@@ -32,6 +32,7 @@ import { ApiFailure } from "@/lib/api"
 // No canvas re-encode: a certificate is a document, and a PDF put through an
 // image pipeline is not a PDF. The seam says so once, for both front doors.
 import { readFileAsDataUrl } from "@shared/web/file"
+import { useT } from "@shared/web/language"
 
 /** The client-side cap. The doors have their own — this one exists so a person
  * who picked a 400 MB video is told before they spend two minutes uploading it. */
@@ -54,6 +55,7 @@ export function FilePicker({
   accept?: string
   disabled?: boolean
 }) {
+  const t = useT()
   const [uploading, setUploading] = React.useState(false)
   // The chosen file's name, for the chip. It is display only — the FIELD holds
   // the URL, so a page reopened later shows "Uploaded file" rather than a name
@@ -66,7 +68,7 @@ export function FilePicker({
     e.target.value = "" // let the same file be re-picked after a remove
     if (!file) return
     if (file.size > MAX_UPLOAD_BYTES) {
-      toast.error("That file is over 25 MB — please pick a smaller one.")
+      toast.error(t("That file is over 25 MB — please pick a smaller one."))
       return
     }
     setUploading(true)
@@ -96,7 +98,7 @@ export function FilePicker({
           disabled={disabled || uploading}
           className="text-muted-foreground h-auto shrink-0 px-2 py-1"
         >
-          Remove
+          {t("Remove")}
         </Button>
       </div>
     )
@@ -123,7 +125,7 @@ export function FilePicker({
         {uploading ? <Spinner /> : <Paperclip className="size-3.5" />}
         {uploading ? "Uploading…" : "Choose a file"}
       </Button>
-      <span className="text-muted-foreground text-xs">Up to 25 MB.</span>
+      <span className="text-muted-foreground text-xs">{t("Up to 25 MB.")}</span>
     </div>
   )
 }

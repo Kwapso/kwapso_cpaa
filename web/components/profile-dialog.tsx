@@ -31,6 +31,7 @@ import type { SessionUser } from "@shared/types"
 import { ApiFailure, auth } from "@/lib/api"
 import { personInitials } from "@/lib/identity"
 import { fileToDataUrl } from "@/lib/image"
+import { useT } from "@shared/web/language"
 
 const firstField = { ...defaultFieldConfig, label: "First name", required: true }
 const lastField = { ...defaultFieldConfig, label: "Last name", required: true }
@@ -46,6 +47,7 @@ export function ProfileDialog({
   user: SessionUser | null
   onSaved: () => Promise<void>
 }) {
+  const t = useT()
   const [firstName, setFirstName] = React.useState("")
   const [lastName, setLastName] = React.useState("")
   const [photo, setPhoto] = React.useState<string | undefined>()
@@ -64,7 +66,7 @@ export function ProfileDialog({
     try {
       setPhoto(await fileToDataUrl(files[0]))
     } catch {
-      toast.error("Couldn't read that image — try another one.")
+      toast.error(t("Couldn't read that image — try another one."))
     }
   }
 
@@ -79,7 +81,7 @@ export function ProfileDialog({
       })
       await onSaved()
       onOpenChange(false)
-      toast.success("Profile updated.")
+      toast.success(t("Profile updated."))
     } catch (err) {
       toast.error(
         err instanceof ApiFailure ? err.message : "Couldn't save your profile."
@@ -95,14 +97,14 @@ export function ProfileDialog({
     <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit your profile</DialogTitle>
-          <DialogDescription>Your name and photo across the app.</DialogDescription>
+          <DialogTitle>{t("Edit your profile")}</DialogTitle>
+          <DialogDescription>{t("Your name and photo across the app.")}</DialogDescription>
         </DialogHeader>
         <form className="flex flex-col gap-4" onSubmit={submit}>
           <div className="flex flex-col items-center gap-3">
             <Avatar className="size-20">
               {(photo || user?.imageUrl) && (
-                <AvatarImage src={photo || (user?.imageUrl as string)} alt="Your photo" />
+                <AvatarImage src={photo || (user?.imageUrl as string)} alt={t("Your photo")} />
               )}
               <AvatarFallback className="text-lg">{initials}</AvatarFallback>
             </Avatar>

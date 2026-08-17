@@ -36,8 +36,10 @@ import { formatCount } from "@shared/web/format-count"
 import { formatDateTime, toLocalInput } from "@shared/web/format"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
+import { useT } from "@shared/web/language"
 
 export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; meetingId: string }) {
+  const t = useT()
   const meetingsQ = useCached<Meeting[]>(meetingsKey(teamId), () => listFetch.meetings(teamId))
   // The list is a PAGE (R14), so the record may not be in it — a link straight to
   // a meeting the loaded prefix doesn't reach must still open. One read by id,
@@ -95,7 +97,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
       notes: values.notes || null,
     })
     patchLists(meeting)
-    toast.success("Meeting updated.")
+    toast.success(t("Meeting updated."))
   }
 
   async function setHeld(held: boolean) {
@@ -142,20 +144,20 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
     }
   }
 
-  if (meetingsQ.error) return <p className="text-destructive text-sm">Couldn&apos;t load the meeting.</p>
+  if (meetingsQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the meeting.")}</p>
   if (meetingsQ.data === undefined) return <Skeleton variant="list" lines={4} />
   if (!item && oneQ.data === undefined && !inPage) return <Skeleton variant="list" lines={4} />
-  if (!item) return <p className="text-muted-foreground text-sm">That meeting doesn&apos;t exist.</p>
+  if (!item) return <p className="text-muted-foreground text-sm">{t("That meeting doesn't exist.")}</p>
 
   const overviewItems = [
-    { label: "Who it is with", value: item.accountName ?? "Nobody — it is ours" },
-    { label: "Why we are meeting", value: item.purposeName ?? "—" },
-    { label: "When", value: formatDateTime(item.startsAt) },
-    { label: "Until", value: item.endsAt ? formatDateTime(item.endsAt) : "—" },
-    { label: "Where", value: item.location ?? "—" },
-    { label: "Reference", value: item.ref ?? "—" },
+    { label: t("Who it is with"), value: item.accountName ?? "Nobody — it is ours" },
+    { label: t("Why we are meeting"), value: item.purposeName ?? "—" },
+    { label: t("When"), value: formatDateTime(item.startsAt) },
+    { label: t("Until"), value: item.endsAt ? formatDateTime(item.endsAt) : "—" },
+    { label: t("Where"), value: item.location ?? "—" },
+    { label: t("Reference"), value: item.ref ?? "—" },
     {
-      label: "In your calendar",
+      label: t("In your calendar"),
       // Said as a fact rather than as a link: the entry lives in the person's own
       // Google, and whether THIS reader can see it depends on whose connection
       // pushed it.
@@ -174,11 +176,11 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
     ...defaultTabsConfig,
     variant: "line" as const,
     tabs: [
-      { value: "notes", label: "Agenda & notes", icon: "notebook-pen", badge: "", badgeVariant: "" as const },
-      { value: "overview", label: "Overview", icon: "info", badge: "", badgeVariant: "" as const },
+      { value: "notes", label: t("Agenda & notes"), icon: "notebook-pen", badge: "", badgeVariant: "" as const },
+      { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       {
         value: "activity",
-        label: "Activity",
+        label: t("Activity"),
         icon: "history",
         badge: formatCount(activity.total),
         badgeVariant: "" as const,
@@ -194,12 +196,12 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
             <span className="truncate">{item.title}</span>
             {!item.active && (
               <Badge variant="outline" className="text-muted-foreground text-[10px]">
-                Cancelled
+                {t("Cancelled")}
               </Badge>
             )}
             {item.active && item.status === "held" && (
               <Badge variant="secondary" className="text-[10px]">
-                Held
+                {t("Held")}
               </Badge>
             )}
           </h1>
@@ -213,7 +215,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
           {canEdit && (
             <Button variant="outline" size="sm" onClick={() => setEditing(true)} className="gap-1.5">
               <Pencil className="size-3.5" />
-              Edit
+              {t("Edit")}
             </Button>
           )}
           {canEdit && item.active && (
@@ -237,7 +239,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
               className="gap-1.5"
             >
               {busy === "calendar" ? <Spinner /> : <CalendarPlus className="size-3.5" />}
-              Add to my calendar
+              {t("Add to my calendar")}
             </Button>
           )}
           {canCancel && (

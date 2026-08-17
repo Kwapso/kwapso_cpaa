@@ -31,7 +31,7 @@ import { useRealtime } from "@shared/web/realtime"
 import { clearAllFormDrafts } from "@shared/web/use-form-draft"
 import { clearCache } from "@shared/web/store"
 import { reportError } from "@shared/web/log"
-import { LanguageProvider } from "@shared/web/language"
+import { useT, LanguageProvider } from "@shared/web/language"
 import { LanguageMenu } from "@shared/web/language-menu"
 import { auth } from "@/lib/api"
 import { applyLivePing, PORTAL_SUBSCRIPTIONS, replayAfterReconnect } from "@/lib/live-resources"
@@ -56,6 +56,7 @@ const DESTINATIONS = [
 export type PortalReady = Extract<PortalSession, { state: "ready" }>
 
 export function PortalShell({ children }: { children: (ready: PortalReady) => React.ReactNode }) {
+  const t = useT()
   const router = useRouter()
   const pathname = usePathname()
   const { session, refresh } = usePortalSession()
@@ -99,11 +100,11 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
   if (session.state === "unavailable")
     return (
       <main className="mx-auto flex min-h-[100svh] max-w-md flex-col items-center justify-center gap-5 px-6 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">We can&apos;t reach your account</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{t("We can't reach your account")}</h1>
         <p className="text-muted-foreground">
-          Something on our side isn&apos;t responding. Nothing is lost — try again in a moment.
+          {t("Something on our side isn't responding. Nothing is lost — try again in a moment.")}
         </p>
-        <Button onClick={refresh}>Try again</Button>
+        <Button onClick={refresh}>{t("Try again")}</Button>
       </main>
     )
 
@@ -121,7 +122,7 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
       await auth.logout()
     } catch (e) {
       reportError("portal-shell.signOut", e)
-      toast.error("We couldn't sign you out. Check your connection and try again.")
+      toast.error(t("We couldn't sign you out. Check your connection and try again."))
       return
     }
     clearAllFormDrafts() // one person's half-typed ticket is never the next one's
@@ -153,7 +154,7 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
            * wanted from every screen, about nothing in the client's own data. */}
           <LanguageMenu save={(lang) => auth.setLanguage(lang)} />
           <ModeToggle />
-          <Button variant="ghost" size="icon" aria-label="Sign out" onClick={() => void signOut()}>
+          <Button variant="ghost" size="icon" aria-label={t("Sign out")} onClick={() => void signOut()}>
             <LogOut className="size-3.5" />
           </Button>
         </div>
@@ -167,7 +168,7 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
          * not a spinner floating in an empty page. */}
         {switching ? (
           <div className="flex flex-col gap-6" aria-busy="true" aria-live="polite">
-            <span className="sr-only">Switching company…</span>
+            <span className="sr-only">{t("Switching company…")}</span>
             <Skeleton className="h-8 w-56 rounded-lg" />
             <Skeleton className="h-20 w-full rounded-xl" />
             <Skeleton className="h-20 w-full rounded-xl" />
@@ -194,7 +195,7 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
                 }`}
               >
                 <Icon className="size-5" />
-                {label}
+                {t(label)}
               </Link>
             )
           })}

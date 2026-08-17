@@ -35,6 +35,7 @@ import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useCached } from "@shared/web/store"
 import type { Account } from "@shared/types"
+import { useT } from "@shared/web/language"
 
 export type TodoFormValues = { accountId: string; title: string; detail: string; dueOn: string }
 
@@ -54,6 +55,7 @@ export function TodoFormDialog({
   draftKey?: string
   onSubmit: (values: TodoFormValues) => Promise<void>
 }) {
+  const t = useT()
   const teamId = useActiveTeam().ctx?.team?.id ?? null
   const accountsQ = useCached<Account[]>(teamId ? accountsKey(teamId) : null, () =>
     listFetch.accounts(teamId as string)
@@ -95,11 +97,10 @@ export function TodoFormDialog({
       busy={busy}
       clearDraft={clearDraft}
       onSubmit={submit}
-      title={<DialogTitle>Ask a client for something</DialogTitle>}
+      title={<DialogTitle>{t("Ask a client for something")}</DialogTitle>}
       subtitle={
         <DialogDescription>
-          This lands in their portal with a due date, and we email them about it. Only for something we
-          genuinely can&apos;t get on without.
+          {t("This lands in their portal with a due date, and we email them about it. Only for something we genuinely can't get on without.")}
         </DialogDescription>
       }
       footer={
@@ -116,7 +117,7 @@ export function TodoFormDialog({
           disabled={busy}
         >
           <SelectTrigger id="todo-account">
-            <SelectValue placeholder="Pick the client" />
+            <SelectValue placeholder={t("Pick the client")} />
           </SelectTrigger>
           <SelectContent>
             {companies.map((a) => (
@@ -132,7 +133,7 @@ export function TodoFormDialog({
           id="todo-title"
           value={values.title}
           onChange={(e) => setValues((s) => ({ ...s, title: e.target.value }))}
-          placeholder="e.g. Send us your brand logo as an SVG"
+          placeholder={t("e.g. Send us your brand logo as an SVG")}
           disabled={busy}
           autoFocus
         />
@@ -142,7 +143,7 @@ export function TodoFormDialog({
           id="todo-detail"
           value={values.detail}
           onChange={(e) => setValues((s) => ({ ...s, detail: e.target.value }))}
-          placeholder="Where to find it, what format, who to ask."
+          placeholder={t("Where to find it, what format, who to ask.")}
           disabled={busy}
           rows={3}
         />

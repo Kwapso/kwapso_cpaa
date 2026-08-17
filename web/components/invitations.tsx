@@ -26,6 +26,7 @@ import { letterMark } from "@/lib/identity"
 import { softNavigate } from "@/lib/nav"
 import { primeCache, useCached } from "@shared/web/store"
 import type { ActiveTeam } from "@/lib/use-active-team"
+import { useT } from "@shared/web/language"
 
 /** The signed-in person's pending received invitations. Shared cache key so the
  * inbox page, the Settings section and the switcher badge stay in lock-step. */
@@ -36,6 +37,7 @@ export function useReceivedInvites() {
 }
 
 export function InvitationsPanel({ active }: { active: ActiveTeam }) {
+  const t = useT()
   const invitesQ = useReceivedInvites()
   const invites = invitesQ.data
   const [accepting, setAccepting] = React.useState<string | null>(null)
@@ -60,7 +62,7 @@ export function InvitationsPanel({ active }: { active: ActiveTeam }) {
   }
 
   if (invitesQ.error)
-    return <p className="text-destructive text-sm">Couldn&apos;t load your invitations.</p>
+    return <p className="text-destructive text-sm">{t("Couldn't load your invitations.")}</p>
   if (invites === undefined) return <Skeleton variant="list" lines={2} />
 
   // Library List (flat surface + a border to match the design language). Rows

@@ -37,6 +37,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { ApiFailure } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 /** What the form hands back. Cents, never a float: money in floats is how a
  * total disagrees with the sum of its own rows (the worker says the same thing
@@ -87,6 +88,7 @@ export function RateFormDialog({
   /** the internal card's fallback switch — see the note at the top of the file */
   showDefault?: boolean
 }) {
+  const t = useT()
   // MAJOR UNITS IN THE BOX, CENTS ON THE WIRE. A person types what they would
   // say out loud; the arithmetic keeps the unit it can add up. Same trade the
   // sprint's price and an app's tool cost already make.
@@ -148,7 +150,7 @@ export function RateFormDialog({
           id="rate-label"
           value={values.label}
           onChange={(e) => setValues((v) => ({ ...v, label: e.target.value }))}
-          placeholder="Development, design, project management…"
+          placeholder={t("Development, design, project management…")}
           disabled={busy}
           autoFocus
         />
@@ -175,7 +177,7 @@ export function RateFormDialog({
             id="rate-currency"
             value={values.currency}
             onChange={(e) => setValues((v) => ({ ...v, currency: e.target.value }))}
-            placeholder="EUR"
+            placeholder={t("EUR")}
             disabled={busy}
           />
         </Field>

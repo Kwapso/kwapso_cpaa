@@ -89,6 +89,7 @@ export function buildCrumbs({
   teamPath,
   sectionPath,
   records,
+  t,
 }: {
   topLevel: boolean
   module: string | null
@@ -97,6 +98,10 @@ export function buildCrumbs({
   teamPath: string
   sectionPath: string
   records: CrumbRecords
+  /** The reader's language. Applied ONLY to a SECTION title — the words we
+   * wrote for a destination. A record's own name and a team's own name are
+   * somebody's typing and go through untouched. */
+  t: (english: string) => string
 }): Crumb[] {
   // STEP TWO — the record itself, the page you are on, so it carries no href.
   const here = recordId ? recordLabel(module, recordId, records) : ""
@@ -105,18 +110,18 @@ export function buildCrumbs({
   // and on the team overview itself there is nothing above it, so it stands alone.
   if (!topLevel) {
     if (!module || module === "team") return [{ label: teamName }]
-    const section: Crumb = { label: sectionTitle(module), href: recordId ? sectionPath : undefined }
+    const section: Crumb = { label: t(sectionTitle(module)), href: recordId ? sectionPath : undefined }
     // On a section list, step one is the team; on a record, step one is the
     // section it came out of — always the thing DIRECTLY above, never the route.
     return recordId
       ? here
         ? [section, { label: here }]
         : [section]
-      : [{ label: teamName, href: teamPath }, { label: sectionTitle(module) }]
+      : [{ label: teamName, href: teamPath }, { label: t(sectionTitle(module)) }]
   }
 
   // A sidebar page (/stories, /tickets, /apps…). It sits inside nothing, so a
   // collection is one crumb and a record is two.
-  const section: Crumb = { label: sectionTitle(module ?? ""), href: recordId ? sectionPath : undefined }
+  const section: Crumb = { label: t(sectionTitle(module ?? "")), href: recordId ? sectionPath : undefined }
   return recordId && here ? [section, { label: here }] : [section]
 }

@@ -100,6 +100,11 @@ export type ModuleContentCtx = Pick<
   query: ScreenQuery
   taskView: TaskView
   setTaskView: (v: TaskView) => void
+  /** The reader's language, as `t`. It rides the ctx rather than a hook because
+   * these two render halves are plain functions, not components — the host
+   * calls `useT()` once and hands the result down with everything else. Every
+   * recipe on screen is translated by passing it to `resolveRecipe`. */
+  t: (english: string) => string
 }
 
 /** The row is whichever record kind a segment holds; each shaper takes its own
@@ -159,6 +164,7 @@ function internalDetail(
 
 export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
   const {
+    t,
     noAccess,
     enabled,
     perms,
@@ -220,7 +226,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
 
     // Team overview ----------------------------------------------------------
     if (module === "team") {
-      const base = resolveRecipe("team.detail", overridesQ.data)
+      const base = resolveRecipe("team.detail", overridesQ.data, t)
       if (!base) return <NotFound />
       if (metaQ.data === undefined) return <Skeleton variant="list" lines={3} />
       // R8: the Activity tab badges the feed's EXACT server total (R16's seam),
@@ -276,7 +282,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       if (membersQ.data === undefined) return <Skeleton variant="list" lines={4} />
       const member = membersQ.data.find((m) => m.userId === recordId) ?? null
       if (!member) return <p className="text-muted-foreground text-sm">That member isn&apos;t on this team.</p>
-      const base = resolveRecipe("members.detail", overridesQ.data)
+      const base = resolveRecipe("members.detail", overridesQ.data, t)
       if (!base) return <NotFound />
       // R8/R16: the Activity tab badges this member's exact history total.
       let recipe = withTabCounts(base, { activity: activityTotal })
@@ -300,7 +306,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       if (invitesQ.data === undefined) return <Skeleton variant="list" lines={4} />
       const invite = invitesQ.data.find((i) => i.id === recordId) ?? null
       if (!invite) return <p className="text-muted-foreground text-sm">That invite no longer exists.</p>
-      const base = resolveRecipe("invites.detail", overridesQ.data)
+      const base = resolveRecipe("invites.detail", overridesQ.data, t)
       if (!base) return <NotFound />
       // R8/R16: the Activity tab badges this invite's exact history total.
       let recipe = withTabCounts(base, { activity: activityTotal })
@@ -372,7 +378,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       return <MeetingDetailScreen teamId={teamId as string} meetingId={recordId} />
     }
     if (module === "tasks") {
-      const base = resolveRecipe("tasks.detail", overridesQ.data)
+      const base = resolveRecipe("tasks.detail", overridesQ.data, t)
       if (!base) return <NotFound />
       // R8/R16: the Activity tab badges this record's exact history total.
       return internalDetail(ctx, withTabCounts(base, { activity: ctx.internalActivity.total }), {
@@ -411,7 +417,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     // law cannot read is a law quietly switched off, so the shape it measures is
     // the shape they are written in.
     if (module === "marketing") {
-      const base = resolveRecipe("marketing.detail", overridesQ.data)
+      const base = resolveRecipe("marketing.detail", overridesQ.data, t)
       if (!base) return <NotFound />
       // R8/R16: the Activity tab badges this record's exact history total.
       return internalDetail(ctx, withTabCounts(base, { activity: ctx.internalActivity.total }), {
@@ -421,7 +427,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       })
     }
     if (module === "brand") {
-      const base = resolveRecipe("brand.detail", overridesQ.data)
+      const base = resolveRecipe("brand.detail", overridesQ.data, t)
       if (!base) return <NotFound />
       return internalDetail(ctx, withTabCounts(base, { activity: ctx.internalActivity.total }), {
         what: "the brand library",
@@ -430,7 +436,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       })
     }
     if (module === "delivery") {
-      const base = resolveRecipe("delivery.detail", overridesQ.data)
+      const base = resolveRecipe("delivery.detail", overridesQ.data, t)
       if (!base) return <NotFound />
       return internalDetail(ctx, withTabCounts(base, { activity: ctx.internalActivity.total }), {
         what: "the delivery programmes",
@@ -439,7 +445,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       })
     }
     if (module === "purposes") {
-      const base = resolveRecipe("purposes.detail", overridesQ.data)
+      const base = resolveRecipe("purposes.detail", overridesQ.data, t)
       if (!base) return <NotFound />
       return internalDetail(ctx, withTabCounts(base, { activity: ctx.internalActivity.total }), {
         what: "the meeting purposes",

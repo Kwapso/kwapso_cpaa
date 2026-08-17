@@ -43,6 +43,7 @@ import { usePermissions } from "@/lib/perms"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import type { Story, WorkLog } from "@shared/types"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
+import { useT } from "@shared/web/language"
 
 /** Whole seconds → the hours and minutes a person would say. */
 function spell(seconds: number): string {
@@ -60,6 +61,7 @@ export function StoryDetailScreen({
   /** the stories list in the URL form we arrived through */
   basePath: string
 }) {
+  const t = useT()
   // The backlog is PAGED, so a story reached by a deep link may sit past page
   // one — it is fetched by id and kept in its own cache key, exactly as the
   // knowledge base does for a source past its first page.
@@ -135,7 +137,7 @@ export function StoryDetailScreen({
     })
     invalidate(timeKey)
     invalidate(`activity:record:stories:${storyId}`)
-    toast.success("Time corrected.")
+    toast.success(t("Time corrected."))
   }
 
   async function save(values: StoryFormValues) {
@@ -150,13 +152,13 @@ export function StoryDetailScreen({
       dueOn: values.dueOn || undefined,
     })
     refresh()
-    toast.success("Story updated.")
+    toast.success(t("Story updated."))
   }
 
-  if (storyQ.error) return <p className="text-destructive text-sm">Couldn&apos;t load the story.</p>
+  if (storyQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the story.")}</p>
   if (storyQ.data === undefined) return <Skeleton variant="list" lines={5} />
   const story = storyQ.data
-  if (!story) return <p className="text-muted-foreground text-sm">That story no longer exists.</p>
+  if (!story) return <p className="text-muted-foreground text-sm">{t("That story no longer exists.")}</p>
 
   // WHERE THE PERSON PUT IT (SCOPE ch.07: drag-rank is the only priority signal
   // in the product). The door takes NEIGHBOURS, never a position, so moving up
@@ -181,12 +183,12 @@ export function StoryDetailScreen({
   const canMoveDown = canEdit && at > -1 && at < order.length - 1
 
   const overviewItems = [
-    { label: "Status", value: STORY_STATUS_LABEL[story.status] },
-    { label: "Reference", value: story.ref || "—" },
-    { label: "Who's doing it", value: story.assigneeName || "Nobody yet" },
-    { label: "Due", value: formatDate(story.dueOn) || "—" },
-    { label: "Detail", value: story.detail || "—" },
-    { label: "What we'll tell them", value: story.closingNote || "—" },
+    { label: t("Status"), value: STORY_STATUS_LABEL[story.status] },
+    { label: t("Reference"), value: story.ref || "—" },
+    { label: t("Who's doing it"), value: story.assigneeName || "Nobody yet" },
+    { label: t("Due"), value: formatDate(story.dueOn) || "—" },
+    { label: t("Detail"), value: story.detail || "—" },
+    { label: t("What we'll tell them"), value: story.closingNote || "—" },
     ...auditItems({
       createdByName: story.createdByName,
       createdAt: story.createdAt,
@@ -200,17 +202,17 @@ export function StoryDetailScreen({
     ...defaultTabsConfig,
     variant: "line" as const,
     tabs: [
-      { value: "overview", label: "Overview", icon: "info", badge: "", badgeVariant: "" as const },
+      { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       {
         value: "time",
-        label: "Time",
+        label: t("Time"),
         icon: CONCEPT_ICON.time,
         badge: formatCount(timeTotal),
         badgeVariant: "" as const,
       },
       {
         value: "activity",
-        label: "Activity",
+        label: t("Activity"),
         icon: CONCEPT_ICON.activity,
         badge: formatCount(activity.total),
         badgeVariant: "" as const,
@@ -226,7 +228,7 @@ export function StoryDetailScreen({
             <span className="truncate">{story.title}</span>
             {story.status === "done" && (
               <Badge variant="secondary" className="text-[10px]">
-                Done
+                {t("Done")}
               </Badge>
             )}
           </h1>
@@ -251,7 +253,7 @@ export function StoryDetailScreen({
                 onClick={() => softNavigate(`${host.base}/sprints/${story.sprintId}`)}
                 className="hover:text-foreground underline-offset-2 hover:underline"
               >
-                In {story.sprintName}
+                {t("In")} {story.sprintName}
               </button>
             )}
             {story.ticketId && (
@@ -260,7 +262,7 @@ export function StoryDetailScreen({
                 onClick={() => softNavigate(`${host.base}/tickets/${story.ticketId}`)}
                 className="hover:text-foreground underline-offset-2 hover:underline"
               >
-                Answers {story.ticketRef ?? "a request"}
+                {t("Answers")} {story.ticketRef ?? "a request"}
               </button>
             )}
           </p>
@@ -289,13 +291,13 @@ export function StoryDetailScreen({
               className="gap-1.5"
             >
               {busy ? <Spinner /> : <Play className="size-3.5" />}
-              Start timer
+              {t("Start timer")}
             </Button>
           )}
           {canEdit && (
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-1.5">
               <Pencil className="size-3.5" />
-              Edit
+              {t("Edit")}
             </Button>
           )}
         </div>
@@ -306,7 +308,7 @@ export function StoryDetailScreen({
           any screen could reach it. */}
       {(canMoveUp || canMoveDown) && (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-muted-foreground text-sm">Order in the backlog</span>
+          <span className="text-muted-foreground text-sm">{t("Order in the backlog")}</span>
           <Button
             variant="outline"
             size="sm"
@@ -315,7 +317,7 @@ export function StoryDetailScreen({
             className="gap-1.5"
           >
             <ArrowUp className="size-3.5" />
-            Move up
+            {t("Move up")}
           </Button>
           <Button
             variant="outline"
@@ -325,7 +327,7 @@ export function StoryDetailScreen({
             className="gap-1.5"
           >
             <ArrowDown className="size-3.5" />
-            Move down
+            {t("Move down")}
           </Button>
         </div>
       )}

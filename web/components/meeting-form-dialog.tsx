@@ -35,6 +35,7 @@ import { ApiFailure } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { toMoment } from "@shared/web/format"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 /** Radix Select can't hold an empty value, so "nobody in particular" needs a
  * sentinel — the same one the knowledge form uses for the agency's own material. */
@@ -81,6 +82,7 @@ export function MeetingFormDialog({
   initial?: Partial<MeetingFormValues>
   draftKey?: string
 }) {
+  const t = useT()
   const isEdit = !!initial
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
@@ -152,7 +154,7 @@ export function MeetingFormDialog({
           id="meeting-title"
           value={values.title}
           onChange={(e) => setValues((s) => ({ ...s, title: e.target.value }))}
-          placeholder="e.g. Quarterly review with Bergman"
+          placeholder={t("e.g. Quarterly review with Bergman")}
           disabled={busy}
           autoFocus
         />
@@ -182,10 +184,10 @@ export function MeetingFormDialog({
           disabled={busy}
         >
           <SelectTrigger id="meeting-client">
-            <SelectValue placeholder="Nobody — it is ours" />
+            <SelectValue placeholder={t("Nobody — it is ours")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={NONE}>Nobody — it is ours</SelectItem>
+            <SelectItem value={NONE}>{t("Nobody — it is ours")}</SelectItem>
             {accountOptions.map((a) => (
               <SelectItem key={a.id} value={a.id}>
                 {a.name}
@@ -201,10 +203,10 @@ export function MeetingFormDialog({
           disabled={busy}
         >
           <SelectTrigger id="meeting-purpose">
-            <SelectValue placeholder="Not said" />
+            <SelectValue placeholder={t("Not said")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={NONE}>Not said</SelectItem>
+            <SelectItem value={NONE}>{t("Not said")}</SelectItem>
             {purposeOptions.map((p) => (
               <SelectItem key={p.id} value={p.id}>
                 {p.name}
@@ -218,7 +220,7 @@ export function MeetingFormDialog({
           id="meeting-where"
           value={values.location}
           onChange={(e) => setValues((s) => ({ ...s, location: e.target.value }))}
-          placeholder="e.g. Their office, or a video call"
+          placeholder={t("e.g. Their office, or a video call")}
           disabled={busy}
         />
       </Field>
@@ -227,7 +229,7 @@ export function MeetingFormDialog({
           id="meeting-agenda"
           value={values.agenda}
           onChange={(e) => setValues((s) => ({ ...s, agenda: e.target.value }))}
-          placeholder="What we mean to cover."
+          placeholder={t("What we mean to cover.")}
           disabled={busy}
           rows={3}
         />
@@ -237,7 +239,7 @@ export function MeetingFormDialog({
           id="meeting-notes"
           value={values.notes}
           onChange={(e) => setValues((s) => ({ ...s, notes: e.target.value }))}
-          placeholder="What was said and decided."
+          placeholder={t("What was said and decided.")}
           disabled={busy}
           rows={4}
         />

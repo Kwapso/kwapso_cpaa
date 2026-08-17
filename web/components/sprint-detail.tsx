@@ -40,6 +40,7 @@ import { useRecordActivity } from "@/lib/use-record-activity"
 import type { Sprint } from "@shared/types"
 import { moneyText } from "@shared/web/money"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
+import { useT } from "@shared/web/language"
 
 /** Whole cents → what a person would say. The FORMATTING is the shared seam
  * (shared/web/money.ts) now that the two rate cards render prices of their own;
@@ -61,6 +62,7 @@ export function SprintDetailScreen({
   /** the sprints list in the URL form we arrived through */
   basePath: string
 }) {
+  const t = useT()
   // Sprints are bounded and read whole, so the record comes out of the same cache
   // the list holds — opening one costs no round-trip.
   const sprintsQ = useCached<Sprint[]>(sprintsKey(teamId), () => listFetch.sprints(teamId))
@@ -92,28 +94,28 @@ export function SprintDetailScreen({
     }
   }
 
-  if (sprintsQ.error) return <p className="text-destructive text-sm">Couldn&apos;t load the sprint.</p>
+  if (sprintsQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the sprint.")}</p>
   if (sprintsQ.data === undefined) return <Skeleton variant="list" lines={5} />
   const sprint = sprintsQ.data.find((s) => s.id === sprintId) ?? null
-  if (!sprint) return <p className="text-muted-foreground text-sm">That sprint no longer exists.</p>
+  if (!sprint) return <p className="text-muted-foreground text-sm">{t("That sprint no longer exists.")}</p>
 
   const done = sprint.storyCount - sprint.openStoryCount
   const overviewItems = [
-    { label: "Reference", value: sprint.ref || "—" },
-    { label: "Kind", value: sprint.sprintType || "—" },
-    { label: "Client", value: sprint.accountName || "Ours — no client" },
-    { label: "App", value: sprint.appName || "—" },
-    { label: "What it's for", value: sprint.goal || "—" },
+    { label: t("Reference"), value: sprint.ref || "—" },
+    { label: t("Kind"), value: sprint.sprintType || "—" },
+    { label: t("Client"), value: sprint.accountName || "Ours — no client" },
+    { label: t("App"), value: sprint.appName || "—" },
+    { label: t("What it's for"), value: sprint.goal || "—" },
     {
-      label: "Runs",
+      label: t("Runs"),
       value:
         sprint.startsOn && sprint.endsOn
           ? `${formatDate(sprint.startsOn)} → ${formatDate(sprint.endsOn)}`
           : (formatDate(sprint.startsOn) || formatDate(sprint.endsOn) || "—"),
     },
-    { label: "Price sold", value: priceSold(sprint.soldPriceCents, sprint.currency) },
+    { label: t("Price sold"), value: priceSold(sprint.soldPriceCents, sprint.currency) },
     {
-      label: "Work inside it",
+      label: t("Work inside it"),
       value: sprint.storyCount > 0 ? `${done} of ${sprint.storyCount} done` : "Nothing in it yet",
     },
     ...auditItems({
@@ -129,17 +131,17 @@ export function SprintDetailScreen({
     ...defaultTabsConfig,
     variant: "line" as const,
     tabs: [
-      { value: "overview", label: "Overview", icon: "info", badge: "", badgeVariant: "" as const },
+      { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       {
         value: "stories",
-        label: "Stories",
+        label: t("Stories"),
         icon: CONCEPT_ICON.stories,
         badge: formatCount(storiesTotal),
         badgeVariant: "" as const,
       },
       {
         value: "activity",
-        label: "Activity",
+        label: t("Activity"),
         icon: CONCEPT_ICON.activity,
         badge: formatCount(activity.total),
         badgeVariant: "" as const,
@@ -155,7 +157,7 @@ export function SprintDetailScreen({
             <span className="truncate">{sprint.name}</span>
             {sprint.completedAt && (
               <Badge variant="secondary" className="text-[10px]">
-                Complete
+                {t("Complete")}
               </Badge>
             )}
           </h1>
@@ -169,7 +171,7 @@ export function SprintDetailScreen({
                 onClick={() => softNavigate(`${host.base}/apps/${sprint.appId}`)}
                 className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
               >
-                On {sprint.appName}
+                {t("On")} {sprint.appName}
               </button>
             )}
             {sprint.accountId && sprint.accountName && (
@@ -178,7 +180,7 @@ export function SprintDetailScreen({
                 onClick={() => softNavigate(`${host.base}/accounts/${sprint.accountId}`)}
                 className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
               >
-                For {sprint.accountName}
+                {t("For")} {sprint.accountName}
               </button>
             )}
           </p>
@@ -197,7 +199,7 @@ export function SprintDetailScreen({
               className="gap-1.5"
             >
               <Pencil className="size-3.5" />
-              Edit
+              {t("Edit")}
             </Button>
           )}
           {canEdit && (
@@ -223,8 +225,7 @@ export function SprintDetailScreen({
 
       {canEdit && !sprint.completedAt && (
         <p className="text-muted-foreground text-sm">
-          Completing this sprint cuts a new version of every process map inside its app, so the
-          savings can be measured from what changed.
+          {t("Completing this sprint cuts a new version of every process map inside its app, so the savings can be measured from what changed.")}
         </p>
       )}
 
@@ -300,7 +301,7 @@ export function SprintDetailScreen({
           })
           primeCache(sprintsKey(teamId), sprints)
           invalidate(`activity:record:sprints:${sprintId}`)
-          toast.success("Sprint updated.")
+          toast.success(t("Sprint updated."))
         }}
       />
     </div>

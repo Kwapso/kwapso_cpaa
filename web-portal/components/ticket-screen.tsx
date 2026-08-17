@@ -66,6 +66,7 @@ import { cacheKeys } from "@/lib/live-resources"
 import { useTickets } from "@/lib/tickets"
 import { STATUS_WORDS } from "@/components/ticket-row"
 import type { PortalReady } from "@/components/portal-shell"
+import { useT } from "@shared/web/language"
 
 /** WHICH SIDE A MESSAGE SITS ON — and why it is this way round.
  *
@@ -104,6 +105,7 @@ const OWN_BUBBLE = `${BUBBLE} bg-primary text-primary-foreground`
 const OTHER_BUBBLE = `${BUBBLE} bg-muted text-foreground`
 
 export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId: string }) {
+  const t = useT()
   // The list is usually already warm (they tapped a row to get here), so read the
   // ticket out of it; fall back to the by-id door on a cold deep link from email.
   const { tickets } = useTickets()
@@ -168,7 +170,7 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
       className="text-muted-foreground hover:text-foreground -ml-1 flex w-fit items-center gap-1.5 text-sm"
     >
       <ArrowLeft className="size-3.5" />
-      All tickets
+      {t("All tickets")}
     </Link>
   )
 
@@ -182,7 +184,7 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
           // Outside the fence a real id and a made-up one are the same sentence —
           // the door answers null either way, and so do we.
           <p className="text-muted-foreground rounded-xl border border-dashed p-10 text-center">
-            We can&apos;t find that request.
+            {t("We can't find that request.")}
           </p>
         )}
       </div>
@@ -226,10 +228,10 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
         <Textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="Write a reply…"
+          placeholder={t("Write a reply…")}
           rows={3}
           className="resize-none"
-          aria-label="Reply"
+          aria-label={t("Reply")}
           disabled={sending}
         />
         <Button

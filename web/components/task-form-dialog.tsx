@@ -20,6 +20,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { ApiFailure } from "@/lib/api"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 export type TaskFormValues = { title: string; detail: string; dueOn: string }
 
@@ -38,6 +39,7 @@ export function TaskFormDialog({
   draftKey?: string
   onSubmit: (values: TaskFormValues) => Promise<void>
 }) {
+  const t = useT()
   const [values, setValues, clearDraft] = useFormDraft(draftKey, { title: "", detail: "", dueOn: "" }, open)
   const [busy, setBusy] = React.useState(false)
   const ready = values.title.trim() !== ""
@@ -64,8 +66,8 @@ export function TaskFormDialog({
       busy={busy}
       clearDraft={clearDraft}
       onSubmit={submit}
-      title={<DialogTitle>New task</DialogTitle>}
-      subtitle={<DialogDescription>Our own admin. Time can be logged against it.</DialogDescription>}
+      title={<DialogTitle>{t("New task")}</DialogTitle>}
+      subtitle={<DialogDescription>{t("Our own admin. Time can be logged against it.")}</DialogDescription>}
       footer={
         <Button type="submit" disabled={busy || !ready} className="gap-1.5">
           {busy ? <Spinner /> : <Plus className="size-4" />}
@@ -78,7 +80,7 @@ export function TaskFormDialog({
           id="task-title"
           value={values.title}
           onChange={(e) => setValues((s) => ({ ...s, title: e.target.value }))}
-          placeholder="e.g. File the quarterly VAT return"
+          placeholder={t("e.g. File the quarterly VAT return")}
           disabled={busy}
           autoFocus
         />

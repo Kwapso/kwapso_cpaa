@@ -26,8 +26,10 @@ import { personName, personInitials } from "@/lib/identity"
 import { softNavigate } from "@/lib/nav"
 import { clearAllFormDrafts } from "@shared/web/use-form-draft"
 import type { ActiveTeam } from "@/lib/use-active-team"
+import { useT } from "@shared/web/language"
 
 export function ProfileMenu({ active }: { active: ActiveTeam }) {
+  const t = useT()
   const router = useRouter()
   const { user } = active
   return (
@@ -35,7 +37,7 @@ export function ProfileMenu({ active }: { active: ActiveTeam }) {
       <DropdownMenuTrigger asChild>
         <button className="rounded-full outline-none ring-offset-2 focus-visible:ring-2">
           <Avatar className="size-8">
-            {user?.imageUrl && <AvatarImage src={user.imageUrl} alt="You" />}
+            {user?.imageUrl && <AvatarImage src={user.imageUrl} alt={t("You")} />}
             <AvatarFallback className="text-xs">
               {personInitials(user?.firstName, user?.lastName)}
             </AvatarFallback>
@@ -54,7 +56,7 @@ export function ProfileMenu({ active }: { active: ActiveTeam }) {
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => softNavigate("/settings")} className="gap-2">
           <UserRound className="size-4" />
-          Account
+          {t("Account")}
         </DropdownMenuItem>
         <DropdownMenuItem
           onSelect={() =>
@@ -66,7 +68,7 @@ export function ProfileMenu({ active }: { active: ActiveTeam }) {
           className="gap-2"
         >
           <LogOut className="size-4" />
-          Sign out
+          {t("Sign out")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

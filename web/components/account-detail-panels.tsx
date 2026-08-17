@@ -25,6 +25,7 @@ import { ACCOUNT_TYPE } from "@/components/deep-link/shape"
 import { tenancy } from "@/lib/api"
 import { formatDate } from "@shared/web/format"
 import { childrenKey } from "@/lib/live-resources"
+import { useT } from "@shared/web/language"
 
 /** A destructive action waiting for a yes. One dialog in the host serves all of
  * them — they differ only in their words and what they run. `run` answers
@@ -75,18 +76,19 @@ export function ContactsPanel({
   onAdd: () => void
   onOpen: (accountId: string) => void
 }) {
+  const t = useT()
   return (
     <div className="flex flex-col gap-3">
       {canCreate && (
         <div className="flex flex-wrap justify-end gap-2">
           <Button size="sm" onClick={onAdd} className="gap-1.5">
             <Plus className="size-4" />
-            Add contact
+            {t("Add contact")}
           </Button>
         </div>
       )}
       {links.length === 0 ? (
-        <p className="text-muted-foreground text-sm">No contacts yet.</p>
+        <p className="text-muted-foreground text-sm">{t("No contacts yet.")}</p>
       ) : (
         <ul className="flex flex-col gap-1.5">
           {links.map((l) => (
@@ -103,10 +105,10 @@ export function ContactsPanel({
               )}
               {l.isMainStakeholder && (
                 <Badge variant="secondary" className="text-[10px]">
-                  Main contact
+                  {t("Main contact")}
                 </Badge>
               )}
-              {!l.active && <span className="text-muted-foreground text-xs">Not a contact now</span>}
+              {!l.active && <span className="text-muted-foreground text-xs">{t("Not a contact now")}</span>}
               {canArchive &&
                 (l.active ? (
                   <Button
@@ -146,7 +148,7 @@ export function ContactsPanel({
                     className="gap-1.5"
                     aria-label={`Add ${l.personName} back`}
                   >
-                    <Power className="size-3.5" /> Add back
+                    <Power className="size-3.5" /> {t("Add back")}
                   </Button>
                 ))}
             </Row>
@@ -171,10 +173,11 @@ export function ChildrenPanel({
   accounts: Account[]
   onOpen: (accountId: string) => void
 }) {
+  const t = useT()
   return (
     <div className="flex flex-col gap-3">
       {accounts.length === 0 ? (
-        <p className="text-muted-foreground text-sm">Nothing sits under this account yet.</p>
+        <p className="text-muted-foreground text-sm">{t("Nothing sits under this account yet.")}</p>
       ) : (
         <ul className="flex flex-col gap-1.5">
           {accounts.map((c) => (
@@ -198,7 +201,7 @@ export function ChildrenPanel({
       )}
       <LoadMore
         listKey={childrenKey(accountId)}
-        label="Load more accounts"
+        label={t("Load more accounts")}
         fetchPage={(c: string) =>
           tenancy
             .accounts({ parentId: accountId, cursor: c })
@@ -225,20 +228,20 @@ export function PortalAccessPanel({
   actions: PanelActions
   onGrant: () => void
 }) {
+  const t = useT()
   return (
     <div className="flex flex-col gap-3">
       {canGrant && (
         <div className="flex flex-wrap justify-end gap-2">
           <Button size="sm" onClick={onGrant} className="gap-1.5">
             <KeyRound className="size-4" />
-            Give access
+            {t("Give access")}
           </Button>
         </div>
       )}
       {portalUsers.length === 0 ? (
         <p className="text-muted-foreground text-sm">
-          Nobody here can sign in yet. Give access to someone and they&apos;ll see this
-          account&apos;s own work.
+          {t("Nobody here can sign in yet. Give access to someone and they'll see this account's own work.")}
         </p>
       ) : (
         <ul className="flex flex-col gap-1.5">
@@ -260,7 +263,7 @@ export function PortalAccessPanel({
                     disabled={busy}
                     onClick={() =>
                       ask({
-                        title: "Take this login away?",
+                        title: t("Take this login away?"),
                         body: "They won't be able to sign in any more. Everything they're attached to — their records, their history — stays exactly where it is, and you can switch it back on later.",
                         action: "Take access away",
                         run: () =>
@@ -272,7 +275,7 @@ export function PortalAccessPanel({
                       })
                     }
                     className="text-destructive hover:text-destructive gap-1.5"
-                    aria-label="Take access away"
+                    aria-label={t("Take access away")}
                   >
                     <Ban className="size-3.5" />
                   </Button>
@@ -289,9 +292,9 @@ export function PortalAccessPanel({
                       )
                     }
                     className="gap-1.5"
-                    aria-label="Switch access back on"
+                    aria-label={t("Switch access back on")}
                   >
-                    <Power className="size-3.5" /> Switch back on
+                    <Power className="size-3.5" /> {t("Switch back on")}
                   </Button>
                 ))}
             </Row>

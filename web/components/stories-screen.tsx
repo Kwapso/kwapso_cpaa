@@ -39,6 +39,7 @@ import { withDataDrivenCollection } from "@/lib/screens"
 import type { AppRow, HelpTicket, Sprint, Story, TeamMember } from "@shared/types"
 import { formatDate } from "@shared/web/format"
 import { invalidate, useCached } from "@shared/web/store"
+import { useT } from "@shared/web/language"
 
 /** One story, as a row. The summary line is a stand-up sentence: where it is,
  * who has it, when it is due, and which request it answers. */
@@ -136,13 +137,14 @@ export function StoriesScreen({
   onAction: (actionId: string, ctx: ScreenActionContext) => void
   onIntent: (intent: ScreenIntent) => void
 }) {
+  const t = useT()
   // Page one of the backlog, its next cursor parked in the sidecar <LoadMore>
   // reads (R14). The same fetcher primes the exact `total:` sidecar (R16).
   const storiesQ = useCached<Story[]>(storiesKey(teamId), () => listFetch.stories(teamId))
   const options = useStoryFormOptions(teamId)
   const [storyOpen, setStoryOpen] = React.useState(false)
 
-  if (storiesQ.error) return <p className="text-destructive text-sm">Couldn&apos;t load the work.</p>
+  if (storiesQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the work.")}</p>
   if (storiesQ.data === undefined) return <Skeleton variant="list" lines={4} />
 
   const loaded = storiesQ.data
@@ -160,7 +162,7 @@ export function StoriesScreen({
           narrowing the backlog by app in the browser. The door answers it. */}
       <PagedFind<Story>
         listKey={storiesKey(teamId)}
-        placeholder="Search work…"
+        placeholder={t("Search work…")}
         noun="stories"
         fetchPage={(query, cursor) =>
           contentApi
@@ -180,7 +182,7 @@ export function StoriesScreen({
             <>
               <SectionWithCreate
                 show={canCreate}
-                label="New story"
+                label={t("New story")}
                 icon="plus"
                 onCreate={() => setStoryOpen(true)}
               >
@@ -196,7 +198,7 @@ export function StoriesScreen({
               {/* R14: the backlog only grows and a done story is never deleted, so it pages. */}
               <LoadMore
                 listKey={found.listKey ?? storiesKey(teamId)}
-                label="Load more work"
+                label={t("Load more work")}
                 fetchPage={found.fetchPage}
               />
             </>

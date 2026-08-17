@@ -28,8 +28,10 @@ import { portal } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 import { CollectionHeading } from "@/components/collection-heading"
 import type { PortalReady } from "@/components/portal-shell"
+import { useT } from "@shared/web/language"
 
 export function CompanyScreen({ ready }: { ready: PortalReady }) {
+  const t = useT()
   const accountId = ready.currentAccountId
   const { data, loading } = useCached<AccountDetail>(cacheKeys.company(accountId), () =>
     portal.company(accountId)
@@ -50,10 +52,10 @@ export function CompanyScreen({ ready }: { ready: PortalReady }) {
   const contacts = links.filter((l) => l.active)
 
   const details = [
-    account.code ? { label: "Reference", value: account.code } : null,
-    account.email ? { label: "Email", value: account.email } : null,
-    account.phone ? { label: "Phone", value: account.phone } : null,
-    account.address ? { label: "Address", value: account.address } : null,
+    account.code ? { label: t("Reference"), value: account.code } : null,
+    account.email ? { label: t("Email"), value: account.email } : null,
+    account.phone ? { label: t("Phone"), value: account.phone } : null,
+    account.address ? { label: t("Address"), value: account.address } : null,
   ].filter((d): d is { label: string; value: string } => d !== null)
 
   return (
@@ -61,30 +63,30 @@ export function CompanyScreen({ ready }: { ready: PortalReady }) {
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold tracking-tight">{account.name}</h1>
         <p className="text-muted-foreground">
-          What we hold for you. If any of it is wrong, tell us and we&apos;ll fix it.
+          {t("What we hold for you. If any of it is wrong, tell us and we'll fix it.")}
         </p>
       </div>
 
       {details.length > 0 ? (
         <section>
-          <h2 className="mb-4 text-lg font-medium">Your details</h2>
+          <h2 className="mb-4 text-lg font-medium">{t("Your details")}</h2>
           <DescriptionList config={defaultDescriptionListConfig} items={details} />
         </section>
       ) : null}
 
       <section>
         {/* R16: the door's exact server total, not the number of rows on screen. */}
-        <CollectionHeading label="People" total={linksTotal} />
+        <CollectionHeading label={t("People")} total={linksTotal} />
         {contacts.length === 0 ? (
           <p className="text-muted-foreground rounded-xl border border-dashed p-8 text-center">
-            Just you, for now.
+            {t("Just you, for now.")}
           </p>
         ) : (
           <ul className="flex flex-col gap-3">
             {contacts.map((c) => (
               <li key={c.id} className="flex items-center gap-3 rounded-xl border p-4">
                 <span className="min-w-0 flex-1 truncate">{c.personName}</span>
-                {c.isMainStakeholder ? <Badge variant="secondary">Main contact</Badge> : null}
+                {c.isMainStakeholder ? <Badge variant="secondary">{t("Main contact")}</Badge> : null}
                 {/* Staff often type the relationship as "Main contact" too, and then
                     the row says it twice. Say it once — the badge is the stronger
                     of the two. */}

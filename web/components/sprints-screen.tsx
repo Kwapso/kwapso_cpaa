@@ -29,6 +29,7 @@ import { appsKey, listFetch, sprintsKey } from "@/lib/live-resources"
 import { withDataDrivenCollection } from "@/lib/screens"
 import type { AppRow, Sprint } from "@shared/types"
 import { invalidate, useCached } from "@shared/web/store"
+import { useT } from "@shared/web/language"
 
 /** One sprint, as a row. Everything a person would say about one out loud. */
 function shapeSprints(sprints: Sprint[]) {
@@ -81,13 +82,14 @@ export function SprintsScreen({
   onAction: (actionId: string, ctx: ScreenActionContext) => void
   onIntent: (intent: ScreenIntent) => void
 }) {
+  const t = useT()
   const sprintsQ = useCached<Sprint[]>(sprintsKey(teamId), () => listFetch.sprints(teamId))
   // The apps a sprint can cover. Bounded and already held by three other screens,
   // so opening this one costs nothing extra.
   const appsQ = useCached<AppRow[]>(appsKey(teamId), () => listFetch.apps(teamId))
   const [addOpen, setAddOpen] = React.useState(false)
 
-  if (sprintsQ.error) return <p className="text-destructive text-sm">Couldn&apos;t load the sprints.</p>
+  if (sprintsQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the sprints.")}</p>
   if (sprintsQ.data === undefined) return <Skeleton variant="list" lines={4} />
 
   const data = shapeSprints(sprintsQ.data)
@@ -101,7 +103,7 @@ export function SprintsScreen({
 
       <SectionWithCreate
         show={canCreate}
-        label="Start a sprint"
+        label={t("Start a sprint")}
         icon="plus"
         onCreate={() => setAddOpen(true)}
       >

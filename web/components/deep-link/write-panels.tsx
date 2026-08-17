@@ -48,6 +48,7 @@ import { type useScreenActions } from "@/lib/use-screen-actions"
 import { type useScreenData } from "@/lib/use-screen-data"
 import { reportError } from "@shared/web/log"
 import type { TeamRole } from "@shared/types"
+import { useT } from "@shared/web/language"
 
 /** Everything the write layer needs from the host: the URL's ?panel/?confirm, the
  * caller's rights, the lists the pickers offer, and the mutations to run. Taken as
@@ -160,6 +161,7 @@ export function WritePanels({
   closePanel,
   onRecordGone,
 }: WritePanelsProps) {
+  const t = useT()
   const [archiving, setArchiving] = React.useState(false)
 
   // WHICH agency-internal form the URL is asking for, and everything it needs to
@@ -173,30 +175,30 @@ export function WritePanels({
       ? {
           marketing: {
             fields: marketingFields(marketingChannelOptions, marketingStatusOptions),
-            title: "Marketing post",
+            title: t("Marketing post"),
             subtitle: "Something we published about ourselves. Ours alone — no client ever sees it.",
-            submitLabel: "Record it",
+            submitLabel: t("Record it"),
             rows: marketingQ.data,
           },
           brand: {
             fields: brandAssetFields(brandCategoryOptions),
-            title: "Brand asset",
+            title: t("Brand asset"),
             subtitle: "A piece of our own brand material — a logo, a deck, a template.",
-            submitLabel: "Add it",
+            submitLabel: t("Add it"),
             rows: brandQ.data,
           },
           delivery: {
             fields: programmeFields(),
-            title: "Delivery programme",
+            title: t("Delivery programme"),
             subtitle: "A way we run an engagement, start to finish.",
-            submitLabel: "Add it",
+            submitLabel: t("Add it"),
             rows: programmesQ.data,
           },
           purposes: {
             fields: purposeFields(departmentOptions),
-            title: "Meeting purpose",
+            title: t("Meeting purpose"),
             subtitle: "Why we meet, and the department it belongs to.",
-            submitLabel: "Add it",
+            submitLabel: t("Add it"),
             rows: purposesQ.data,
           },
         }[kind]
@@ -220,7 +222,7 @@ export function WritePanels({
   }, [
     query.module, query.panel, query.id, can,
     marketingChannelOptions, marketingStatusOptions, brandCategoryOptions, departmentOptions,
-    marketingQ.data, brandQ.data, programmesQ.data, purposesQ.data,
+    marketingQ.data, brandQ.data, programmesQ.data, purposesQ.data, t,
   ])
 
   const internalArchive = React.useMemo(() => {
@@ -372,12 +374,11 @@ export function WritePanels({
           <AlertDialogHeader>
             <AlertDialogTitle>{internalArchive.title}</AlertDialogTitle>
             <AlertDialogDescription>
-              It stops showing as live and nothing is deleted — its history stays, and you can put
-              it back at any time.
+              {t("It stops showing as live and nothing is deleted — its history stays, and you can put it back at any time.")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={archiving}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={archiving}>{t("Cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
                 e.preventDefault()
@@ -395,7 +396,7 @@ export function WritePanels({
               disabled={archiving}
             >
               {archiving ? <Spinner /> : null}
-              Archive
+              {t("Archive")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

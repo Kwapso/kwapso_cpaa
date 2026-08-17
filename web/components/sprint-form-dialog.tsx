@@ -47,6 +47,7 @@ import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useCached } from "@shared/web/store"
 import type { Account } from "@shared/types"
+import { useT } from "@shared/web/language"
 
 export type SprintFormValues = {
   name: string
@@ -129,6 +130,7 @@ export function SprintFormDialog({
   draftKey?: string
   onSubmit: (values: SprintFormValues) => Promise<void>
 }) {
+  const t = useT()
   const isEdit = !!initial
   const teamId = useActiveTeam().ctx?.team?.id ?? null
   // Page one of the accounts list is plenty for a picker, and it is the SAME
@@ -221,7 +223,7 @@ export function SprintFormDialog({
           id="sprint-name"
           value={values.name}
           onChange={(e) => setValues((s) => ({ ...s, name: e.target.value }))}
-          placeholder="e.g. Dispatch, sprint 4"
+          placeholder={t("e.g. Dispatch, sprint 4")}
           disabled={busy}
           autoFocus
         />
@@ -233,10 +235,10 @@ export function SprintFormDialog({
           disabled={busy}
         >
           <SelectTrigger id="sprint-type">
-            <SelectValue placeholder="Not said" />
+            <SelectValue placeholder={t("Not said")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={NONE}>Not said</SelectItem>
+            <SelectItem value={NONE}>{t("Not said")}</SelectItem>
             {SPRINT_TYPES.map((t) => (
               <SelectItem key={t} value={t}>
                 {t}
@@ -257,10 +259,10 @@ export function SprintFormDialog({
           disabled={busy}
         >
           <SelectTrigger id="sprint-account">
-            <SelectValue placeholder="Ours, no client" />
+            <SelectValue placeholder={t("Ours, no client")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={NONE}>Ours, no client</SelectItem>
+            <SelectItem value={NONE}>{t("Ours, no client")}</SelectItem>
             {companies.map((a) => (
               <SelectItem key={a.id} value={a.id}>
                 {a.name}
@@ -286,10 +288,10 @@ export function SprintFormDialog({
             disabled={busy}
           >
             <SelectTrigger id="sprint-app">
-              <SelectValue placeholder="No app yet" />
+              <SelectValue placeholder={t("No app yet")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={NONE}>No app yet</SelectItem>
+              <SelectItem value={NONE}>{t("No app yet")}</SelectItem>
               {apps.map((a) => (
                 <SelectItem key={a.id} value={a.id}>
                   {a.name}
@@ -304,7 +306,7 @@ export function SprintFormDialog({
           id="sprint-goal"
           value={values.goal}
           onChange={(e) => setValues((s) => ({ ...s, goal: e.target.value }))}
-          placeholder="What this block of work is meant to achieve."
+          placeholder={t("What this block of work is meant to achieve.")}
           disabled={busy}
           rows={2}
         />
@@ -333,7 +335,7 @@ export function SprintFormDialog({
           inputMode="decimal"
           value={values.price}
           onChange={(e) => setValues((s) => ({ ...s, price: e.target.value }))}
-          placeholder="e.g. 4500"
+          placeholder={t("e.g. 4500")}
           disabled={busy}
         />
       </Field>

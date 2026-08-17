@@ -42,6 +42,7 @@ import { usePermissions } from "@/lib/perms"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import type { Account, AppRow } from "@shared/types"
 import { invalidate, useCached, useCachedValue } from "@shared/web/store"
+import { useT } from "@shared/web/language"
 
 export function AppDetailScreen({
   teamId,
@@ -53,6 +54,7 @@ export function AppDetailScreen({
   /** the apps list in the URL form we arrived through (/apps or /t/<team>/apps) */
   basePath: string
 }) {
+  const t = useT()
   // The apps set is bounded and read whole, so the record comes out of the same
   // cache the list holds — opening one costs no round-trip.
   const appsQ = useCached<AppRow[]>(appsKey(teamId), () => listFetch.apps(teamId))
@@ -98,7 +100,7 @@ export function AppDetailScreen({
       toolCostCentsPerMonth: values.toolCostCentsPerMonth,
     })
     refresh()
-    toast.success("App updated.")
+    toast.success(t("App updated."))
   }
 
   async function setActive(active: boolean) {
@@ -114,18 +116,18 @@ export function AppDetailScreen({
     }
   }
 
-  if (appsQ.error) return <p className="text-destructive text-sm">Couldn&apos;t load the app.</p>
+  if (appsQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the app.")}</p>
   if (appsQ.data === undefined) return <Skeleton variant="list" lines={5} />
   const app = appsQ.data.find((a) => a.id === appId) ?? null
-  if (!app) return <p className="text-muted-foreground text-sm">That app no longer exists.</p>
+  if (!app) return <p className="text-muted-foreground text-sm">{t("That app no longer exists.")}</p>
 
   const account = app.accountId ? (accountsQ.data ?? []).find((a) => a.id === app.accountId) : null
   const accountName = account?.name ?? (app.accountId ? "A client" : null)
 
   const overviewItems = [
-    { label: "Client", value: accountName ?? "Ours — no client" },
-    { label: "Stage", value: app.stage || "—" },
-    { label: "Address", value: app.url || "—" },
+    { label: t("Client"), value: accountName ?? "Ours — no client" },
+    { label: t("Stage"), value: app.stage || "—" },
+    { label: t("Address"), value: app.url || "—" },
     ...auditItems({
       createdByName: app.createdByName ?? null,
       createdAt: app.createdAt ?? null,
@@ -139,31 +141,31 @@ export function AppDetailScreen({
     ...defaultTabsConfig,
     variant: "line" as const,
     tabs: [
-      { value: "overview", label: "Overview", icon: "info", badge: "", badgeVariant: "" as const },
+      { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       {
         value: "sprints",
-        label: "Sprints",
+        label: t("Sprints"),
         icon: CONCEPT_ICON.sprints,
         badge: formatCount(sprintsTotal),
         badgeVariant: "" as const,
       },
       {
         value: "stories",
-        label: "Stories",
+        label: t("Stories"),
         icon: CONCEPT_ICON.stories,
         badge: formatCount(storiesTotal),
         badgeVariant: "" as const,
       },
       {
         value: "maps",
-        label: "Process maps",
+        label: t("Process maps"),
         icon: CONCEPT_ICON.processes,
         badge: formatCount(mapsTotal),
         badgeVariant: "" as const,
       },
       {
         value: "activity",
-        label: "Activity",
+        label: t("Activity"),
         icon: CONCEPT_ICON.activity,
         badge: formatCount(activity.total),
         badgeVariant: "" as const,
@@ -179,7 +181,7 @@ export function AppDetailScreen({
             <span className="truncate">{app.name}</span>
             {!app.active && (
               <Badge variant="outline" className="text-muted-foreground text-[10px]">
-                Archived
+                {t("Archived")}
               </Badge>
             )}
           </h1>
@@ -192,10 +194,10 @@ export function AppDetailScreen({
                 onClick={() => softNavigate(`${host.base}/accounts/${app.accountId}`)}
                 className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
               >
-                Built for {accountName}
+                {t("Built for")} {accountName}
               </button>
             ) : (
-              <span>Ours — no client</span>
+              <span>{t("Ours — no client")}</span>
             )}
             {app.stage && <span>{app.stage}</span>}
           </p>
@@ -205,7 +207,7 @@ export function AppDetailScreen({
           {canEdit && (
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-1.5">
               <Pencil className="size-3.5" />
-              Edit
+              {t("Edit")}
             </Button>
           )}
           {canArchive &&
@@ -218,12 +220,12 @@ export function AppDetailScreen({
                 className="text-destructive hover:text-destructive gap-1.5"
               >
                 {busy ? <Spinner /> : <Power className="size-3.5" />}
-                Archive
+                {t("Archive")}
               </Button>
             ) : (
               <Button size="sm" disabled={busy} onClick={() => void setActive(true)} className="gap-1.5">
                 {busy ? <Spinner /> : <Power className="size-3.5" />}
-                Restore
+                {t("Restore")}
               </Button>
             ))}
         </div>

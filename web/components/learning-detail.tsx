@@ -30,6 +30,7 @@ import { safeHref, safeSrc } from "@/lib/rich-text"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
+import { useT } from "@shared/web/language"
 
 // Show the linked resource IN-APP. We pick the player by the content-type keyword
 // first (the team's own label, e.g. "Video file"), then fall back to the URL's
@@ -42,6 +43,7 @@ import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
 // safeSrc seam (http/https or app-relative only); a framed `javascript:` URL would
 // otherwise run with THIS origin's cookies. An unsafe link renders no player at all.
 function LearningMedia({ url, contentType }: { url: string; contentType: string }) {
+  const t = useT()
   const src = safeSrc(url)
   if (!src) return null
   const type = contentType.toLowerCase()
@@ -59,10 +61,11 @@ function LearningMedia({ url, contentType }: { url: string; contentType: string 
   if (isAudio) return <audio src={src} controls className="w-full" />
   // No obvious media type (a PDF, an /media upload we can't classify, or an
   // external embeddable page) → frame it.
-  return <WebEmbed src={src} title="Linked resource" />
+  return <WebEmbed src={src} title={t("Linked resource")} />
 }
 
 export function LearningDetailScreen({ teamId, learningId }: { teamId: string; learningId: string }) {
+  const t = useT()
   const learningQ = useCached<Learning[]>(`learning:${teamId}`, () =>
     content.learning().then((r) => r.learning)
   )
@@ -124,7 +127,7 @@ export function LearningDetailScreen({ teamId, learningId }: { teamId: string; l
     })
     primeCache(`learning:${teamId}`, nextList)
     invalidateActivity()
-    toast.success("Article updated.")
+    toast.success(t("Article updated."))
   }
 
   function invalidateActivity() {
@@ -150,14 +153,14 @@ export function LearningDetailScreen({ teamId, learningId }: { teamId: string; l
     }
   }
 
-  if (learningQ.error) return <p className="text-destructive text-sm">Couldn&apos;t load the article.</p>
+  if (learningQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the article.")}</p>
   if (learningQ.data === undefined) return <Skeleton variant="list" lines={4} />
-  if (!item) return <p className="text-muted-foreground text-sm">That article doesn&apos;t exist.</p>
+  if (!item) return <p className="text-muted-foreground text-sm">{t("That article doesn't exist.")}</p>
 
   const overviewItems = [
-    { label: "Category", value: item.category || "" },
-    { label: "Content type", value: item.contentType || "" },
-    { label: "Link", value: item.contentLink || "" },
+    { label: t("Category"), value: item.category || "" },
+    { label: t("Content type"), value: item.contentType || "" },
+    { label: t("Link"), value: item.contentLink || "" },
     ...auditItems({
       createdByName: item.creatorName,
       createdAt: item.createdAt,
@@ -175,11 +178,11 @@ export function LearningDetailScreen({ teamId, learningId }: { teamId: string; l
     ...defaultTabsConfig,
     variant: "line" as const,
     tabs: [
-      { value: "article", label: "Article", icon: "book-open", badge: "", badgeVariant: "" as const },
-      { value: "overview", label: "Overview", icon: "info", badge: "", badgeVariant: "" as const },
+      { value: "article", label: t("Article"), icon: "book-open", badge: "", badgeVariant: "" as const },
+      { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       {
         value: "activity",
-        label: "Activity",
+        label: t("Activity"),
         icon: "history",
         badge: formatCount(activity.total),
         badgeVariant: "" as const,
@@ -195,12 +198,12 @@ export function LearningDetailScreen({ teamId, learningId }: { teamId: string; l
             <span className="truncate">{item.title}</span>
             {!item.active && (
               <Badge variant="outline" className="text-muted-foreground text-[10px]">
-                Inactive
+                {t("Inactive")}
               </Badge>
             )}
             {item.required && (
               <Badge variant="secondary" className="text-[10px]">
-                Required
+                {t("Required")}
               </Badge>
             )}
           </h1>
@@ -214,7 +217,7 @@ export function LearningDetailScreen({ teamId, learningId }: { teamId: string; l
             className="shrink-0 gap-1.5"
           >
             <Pencil className="size-3.5" />
-            Edit
+            {t("Edit")}
           </Button>
         )}
       </div>

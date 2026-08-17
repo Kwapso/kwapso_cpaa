@@ -35,8 +35,10 @@ import { CollectionHeading } from "@/components/collection-heading"
 import { RaiseTicketDialog } from "@/components/raise-ticket-dialog"
 import { TicketRow } from "@/components/ticket-row"
 import type { PortalReady } from "@/components/portal-shell"
+import { useT } from "@shared/web/language"
 
 export function TicketsScreen({ ready }: { ready: PortalReady }) {
+  const t = useT()
   const { tickets, total, loading, hasMore, loadingMore, loadMore } = useTickets()
   const [raising, setRaising] = React.useState(false)
 
@@ -56,12 +58,12 @@ export function TicketsScreen({ ready }: { ready: PortalReady }) {
        * reader something untrue about who can see what. The copy changed the day
        * the rule did. */}
       <CollectionHeading
-        label="Your company's tickets"
+        label={t("Your company's tickets")}
         total={total}
         action={
           <Button onClick={() => setRaising(true)}>
             <Plus className="size-3.5" />
-            Ask us something
+            {t("Ask us something")}
           </Button>
         }
       />
@@ -74,9 +76,9 @@ export function TicketsScreen({ ready }: { ready: PortalReady }) {
         </div>
       ) : (tickets ?? []).length === 0 ? (
         <div className="text-muted-foreground rounded-xl border border-dashed p-10 text-center">
-          <p>Nothing here yet.</p>
+          <p>{t("Nothing here yet.")}</p>
           <p className="mt-1 text-sm">
-            Anything you ask us — a question, a problem, a change — lives on this page.
+            {t("Anything you ask us — a question, a problem, a change — lives on this page.")}
           </p>
         </div>
       ) : (
@@ -87,7 +89,7 @@ export function TicketsScreen({ ready }: { ready: PortalReady }) {
           {hasMore ? (
             <Button variant="outline" onClick={() => void loadMore()} disabled={loadingMore}>
               {loadingMore ? <Spinner /> : null}
-              Show older
+              {t("Show older")}
             </Button>
           ) : null}
         </div>

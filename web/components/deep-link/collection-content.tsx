@@ -66,6 +66,7 @@ import type { ModuleContentCtx } from "./module-content"
 /** The list screen for `module`, or the honest refusal/empty state. */
 export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
   const {
+    t,
     module,
     teamId,
     can,
@@ -115,7 +116,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     )
   }
 
-  const recipe = resolveRecipe(`${module}.list`, overridesQ.data)
+  const recipe = resolveRecipe(`${module}.list`, overridesQ.data, t)
   if (!recipe) return <NotFound />
   if (module === "members") {
     if (membersQ.error) return <LoadError what="members" />

@@ -27,6 +27,7 @@ import { letterMark } from "@/lib/identity"
 import { TEAM_CREATION_CLOSED } from "@shared/product"
 import { softNavigate } from "@/lib/nav"
 import type { ActiveTeam } from "@/lib/use-active-team"
+import { useT } from "@shared/web/language"
 
 export function TeamSwitcher({
   active,
@@ -38,6 +39,7 @@ export function TeamSwitcher({
   /** icon-only trigger (collapsed sidebar) */
   collapsed?: boolean
 }) {
+  const t = useT()
   const { ctx } = active
   const pendingInvites = useReceivedInvites().data?.length ?? 0
   async function handleSwitch(teamId: string) {
@@ -53,7 +55,7 @@ export function TeamSwitcher({
           <button
             className="rounded-lg outline-none ring-offset-2 focus-visible:ring-2"
             title={ctx?.team?.name ?? "No team"}
-            aria-label="Switch team"
+            aria-label={t("Switch team")}
           >
             <Avatar className="size-8">
               {ctx?.team?.logoUrl && <AvatarImage src={ctx.team.logoUrl} alt={ctx.team.name} />}
@@ -80,7 +82,7 @@ export function TeamSwitcher({
           <>
             <DropdownMenuItem onSelect={() => softNavigate("/invitations")} className="gap-2">
               <Inbox className="size-4" />
-              <span className="min-w-0 flex-1">Invitations</span>
+              <span className="min-w-0 flex-1">{t("Invitations")}</span>
               <Badge variant="secondary" className="text-[10px]">
                 {pendingInvites}
               </Badge>
@@ -88,7 +90,7 @@ export function TeamSwitcher({
             <DropdownMenuSeparator />
           </>
         )}
-        <DropdownMenuLabel>Your teams</DropdownMenuLabel>
+        <DropdownMenuLabel>{t("Your teams")}</DropdownMenuLabel>
         {ctx?.teams.map((team) => (
           <DropdownMenuItem key={team.id} onSelect={() => void handleSwitch(team.id)} className="gap-2">
             <Avatar className="size-6">
@@ -107,7 +109,7 @@ export function TeamSwitcher({
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={onCreateTeam} className="gap-2">
               <Plus className="size-4" />
-              Create team
+              {t("Create team")}
             </DropdownMenuItem>
           </>
         )}

@@ -25,6 +25,7 @@ import { ApiFailure, content as contentApi } from "@/lib/api"
 import { TIME_SLICE_PREFIX, runningTimersKey, storiesKey, workLogsKey } from "@/lib/live-resources"
 import type { RunningTimer } from "@shared/types"
 import { invalidate, invalidatePrefix, useCached } from "@shared/web/store"
+import { useT } from "@shared/web/language"
 
 /** Whole seconds as a clock a person reads at a glance: 1:04:09, or 4:09 under an
  * hour. Never "3849s", and never a decimal — a timer is read, not calculated. */
@@ -62,6 +63,7 @@ export function TimerBar({
   teamId: string
   onNavigate?: (href: string) => void
 }) {
+  const t = useT()
   const timersQ = useCached<RunningTimer[]>(runningTimersKey(teamId), () =>
     contentApi.runningTimers().then((r) => r.timers)
   )
@@ -88,7 +90,7 @@ export function TimerBar({
       // straight at that tab, and a screen that waits on a round trip through
       // the live layer to stop saying "running" is the bug this fixes.
       invalidatePrefix(TIME_SLICE_PREFIX)
-      toast.success("Timer stopped.")
+      toast.success(t("Timer stopped."))
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't stop that timer.")
     }

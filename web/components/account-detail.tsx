@@ -66,6 +66,7 @@ import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, useCached, useCachedValue } from "@shared/web/store"
 import { useRecordActivity } from "@/lib/use-record-activity"
+import { useT } from "@shared/web/language"
 
 export function AccountDetailScreen({
   teamId,
@@ -78,6 +79,7 @@ export function AccountDetailScreen({
    * /t/<teamId>/accounts) — sibling links stay in that same form. */
   basePath: string
 }) {
+  const t = useT()
   const detailQ = useCached<AccountDetail>(accountKey(accountId), () =>
     tenancy.accountDetail(accountId)
   )
@@ -192,7 +194,7 @@ export function AccountDetailScreen({
       status: values.status.trim() || undefined,
     })
     refresh()
-    toast.success("Account updated.")
+    toast.success(t("Account updated."))
   }
 
   async function addContact(values: ContactLinkValues) {
@@ -203,17 +205,17 @@ export function AccountDetailScreen({
       isMainStakeholder: values.isMainStakeholder,
     })
     refresh()
-    toast.success("Contact added.")
+    toast.success(t("Contact added."))
   }
 
   async function giveAccess(personAccountId: string) {
     await tenancy.grantPortalAccess(accountId, personAccountId)
     refresh()
-    toast.success("Access switched on.")
+    toast.success(t("Access switched on."))
   }
 
   if (detailQ.error)
-    return <p className="text-destructive text-sm">Couldn&apos;t load the account.</p>
+    return <p className="text-destructive text-sm">{t("Couldn't load the account.")}</p>
   if (detailQ.data === undefined) return <Skeleton variant="list" lines={5} />
 
   const { account, parent, links, portalUsers, linksTotal, portalUsersTotal } = detailQ.data
@@ -221,13 +223,13 @@ export function AccountDetailScreen({
   const statusText = accountStatus(account.status)
 
   const overviewItems = [
-    { label: "Type", value: ACCOUNT_TYPE[account.accountType] },
-    { label: "Parent account", value: parent ? parent.name : "Sits on its own" },
-    { label: "Reference", value: account.code || "—" },
-    { label: "Email", value: account.email || "—" },
-    { label: "Phone", value: account.phone || "—" },
-    { label: "Address", value: account.address || "—" },
-    { label: "Status", value: statusText || "—" },
+    { label: t("Type"), value: ACCOUNT_TYPE[account.accountType] },
+    { label: t("Parent account"), value: parent ? parent.name : "Sits on its own" },
+    { label: t("Reference"), value: account.code || "—" },
+    { label: t("Email"), value: account.email || "—" },
+    { label: t("Phone"), value: account.phone || "—" },
+    { label: t("Address"), value: account.address || "—" },
+    { label: t("Status"), value: statusText || "—" },
     ...auditItems({
       createdByName: account.createdByName,
       createdAt: account.createdAt,
@@ -267,17 +269,17 @@ export function AccountDetailScreen({
     ...defaultTabsConfig,
     variant: "line" as const,
     tabs: [
-      { value: "overview", label: "Overview", icon: "info", badge: "", badgeVariant: "" as const },
+      { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       {
         value: "contacts",
-        label: "Contacts",
+        label: t("Contacts"),
         icon: CONCEPT_ICON.contacts,
         badge: formatCount(linksTotal),
         badgeVariant: "" as const,
       },
       {
         value: "children",
-        label: "Under this account",
+        label: t("Under this account"),
         icon: CONCEPT_ICON.accounts,
         badge: formatCount(childrenTotal),
         badgeVariant: "" as const,
@@ -287,7 +289,7 @@ export function AccountDetailScreen({
         ? [
             {
               value: "apps",
-              label: "Apps",
+              label: t("Apps"),
               icon: CONCEPT_ICON.apps,
               badge: formatCount(appsTotal),
               badgeVariant: "" as const,
@@ -298,7 +300,7 @@ export function AccountDetailScreen({
         ? [
             {
               value: "sprints",
-              label: "Sprints",
+              label: t("Sprints"),
               icon: CONCEPT_ICON.sprints,
               badge: formatCount(sprintsTotal),
               badgeVariant: "" as const,
@@ -309,7 +311,7 @@ export function AccountDetailScreen({
         ? [
             {
               value: "todos",
-              label: "To-dos",
+              label: t("To-dos"),
               icon: CONCEPT_ICON.todos,
               badge: formatCount(todosTotal),
               badgeVariant: "" as const,
@@ -320,7 +322,7 @@ export function AccountDetailScreen({
         ? [
             {
               value: "rates",
-              label: "Rates",
+              label: t("Rates"),
               icon: CONCEPT_ICON["internal-rates"],
               // R8/R16: the tab reveals a collection, so it carries that
               // collection's exact server total through the one seam.
@@ -333,7 +335,7 @@ export function AccountDetailScreen({
         ? [
             {
               value: "portal",
-              label: "Portal access",
+              label: t("Portal access"),
               icon: CONCEPT_ICON.portal,
               badge: formatCount(portalUsersTotal),
               badgeVariant: "" as const,
@@ -342,7 +344,7 @@ export function AccountDetailScreen({
         : []),
       {
         value: "activity",
-        label: "Activity",
+        label: t("Activity"),
         icon: CONCEPT_ICON.activity,
         // R8: a tab that reveals a collection carries its count, and R16 says the
         // number is the server total through the one seam — never the loaded page.
@@ -366,7 +368,7 @@ export function AccountDetailScreen({
             </Badge>
             {!account.active && (
               <Badge variant="outline" className="text-muted-foreground text-[10px]">
-                Archived
+                {t("Archived")}
               </Badge>
             )}
           </h1>
@@ -379,10 +381,10 @@ export function AccountDetailScreen({
                 onClick={() => openAccount(parent.id)}
                 className="hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
               >
-                Part of {parent.name}
+                {t("Part of")} {parent.name}
               </button>
             ) : (
-              <span>Sits on its own</span>
+              <span>{t("Sits on its own")}</span>
             )}
           </p>
         </div>
@@ -396,7 +398,7 @@ export function AccountDetailScreen({
               className="gap-1.5"
             >
               <Pencil className="size-3.5" />
-              Edit
+              {t("Edit")}
             </Button>
           )}
           {canArchive &&
@@ -421,7 +423,7 @@ export function AccountDetailScreen({
                 className="text-destructive hover:text-destructive gap-1.5"
               >
                 <Power className="size-3.5" />
-                Archive
+                {t("Archive")}
               </Button>
             ) : (
               <Button
@@ -437,7 +439,7 @@ export function AccountDetailScreen({
                 className="gap-1.5"
               >
                 {busy ? <Spinner /> : <Power className="size-3.5" />}
-                Restore
+                {t("Restore")}
               </Button>
             ))}
         </div>
@@ -602,7 +604,7 @@ export function AccountDetailScreen({
             <AlertDialogDescription>{confirm?.body}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={busy}>{t("Cancel")}</AlertDialogCancel>
             <AlertDialogAction
               disabled={busy}
               onClick={(e) => {

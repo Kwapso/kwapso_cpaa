@@ -49,6 +49,7 @@ import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
 import { accountsKey, totalKey } from "@/lib/live-resources"
 import { CONCEPT_ICON } from "@/lib/pages"
+import { useT } from "@shared/web/language"
 
 // LIBRARY ⇄ SERVER status. These were one-to-one until the work engine gave the
 // ticket its five states (SCOPE ch.07); the library's `TicketStatus` has four,
@@ -95,6 +96,7 @@ export function HelpDetailScreen({
    * /t/<team>/tickets) — a cross-link off this record stays in that shape. */
   basePath: string
 }) {
+  const t = useT()
   const ticketsQ = useCached<HelpTicket[]>(`help:${teamId}`, () =>
     content.help("all").then((r) => r.tickets)
   )
@@ -184,7 +186,7 @@ export function HelpDetailScreen({
       const { tickets } = await content.setHelpStatus(helpId, next)
       primeCache(`help:${teamId}`, tickets)
       invalidate(recordActivityKey("help", helpId))
-      toast.success("Status updated.")
+      toast.success(t("Status updated."))
       // Triaged means "we have read it and it is real". That is the moment to
       // ask what we are going to DO about it — and only when nothing has been
       // written down yet, because a ticket that already has work on it has been
@@ -209,7 +211,7 @@ export function HelpDetailScreen({
     })
     primeCache(`help:${teamId}`, tickets)
     invalidate(recordActivityKey("help", helpId))
-    toast.success("Ticket updated.")
+    toast.success(t("Ticket updated."))
   }
 
   async function addStakeholder(userId: string) {
@@ -282,7 +284,7 @@ export function HelpDetailScreen({
     try {
       const { tickets } = await content.rankHelp(helpId, below?.id ?? null, above?.id ?? null)
       primeCache(`help:${teamId}`, tickets)
-      toast.success("Moved.")
+      toast.success(t("Moved."))
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't move that.")
     } finally {
@@ -297,7 +299,7 @@ export function HelpDetailScreen({
     invalidate(`help:${teamId}`)
     invalidate(`help-thread:${helpId}`)
     invalidate(recordActivityKey("help", helpId))
-    toast.success("Answered — and emailed to them.")
+    toast.success(t("Answered — and emailed to them."))
   }
 
   /** TRANSLATE AND SET IT. The door spends one unit of the team's AI allowance
@@ -308,7 +310,7 @@ export function HelpDetailScreen({
     try {
       await dataOps.translateTicket(helpId)
       invalidate(`help:${teamId}`)
-      toast.success("Translated.")
+      toast.success(t("Translated."))
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't translate that.")
     } finally {
@@ -316,9 +318,9 @@ export function HelpDetailScreen({
     }
   }
 
-  if (ticketsQ.error) return <p className="text-destructive text-sm">Couldn&apos;t load the ticket.</p>
+  if (ticketsQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the ticket.")}</p>
   if (ticketsQ.data === undefined) return <Skeleton variant="list" lines={4} />
-  if (!ticket) return <p className="text-muted-foreground text-sm">That ticket no longer exists.</p>
+  if (!ticket) return <p className="text-muted-foreground text-sm">{t("That ticket no longer exists.")}</p>
 
   // self-tag fix: you can't @mention yourself
   const mentionableMembers: TicketMember[] = (membersQ.data ?? [])
@@ -334,14 +336,14 @@ export function HelpDetailScreen({
   }))
 
   const overviewItems = [
-    { label: "Type", value: ticket.helpType || "General" },
+    { label: t("Type"), value: ticket.helpType || "General" },
     // BOTH TITLES, and the German one first when it is the original. 788 of the
     // requests arriving from the previous system exist ONLY in German (BUILD-1
     // §8), so "the title" is two fields here and the screen says so rather than
     // picking one and hoping.
-    { label: "Title", value: ticket.titleDe || "" },
-    { label: "Title (English)", value: ticket.titleEn || "" },
-    { label: "Raised from", value: ticket.sourceScreen || "" },
+    { label: t("Title"), value: ticket.titleDe || "" },
+    { label: t("Title (English)"), value: ticket.titleEn || "" },
+    { label: t("Raised from"), value: ticket.sourceScreen || "" },
     ...auditItems({
       createdByName: ticket.raiserName,
       createdAt: ticket.createdAt,
@@ -349,7 +351,7 @@ export function HelpDetailScreen({
       updatedAt: ticket.updatedAt,
       status: STATUS_LABEL[ticket.status],
     }),
-    { label: "Resolved", value: ticket.resolvedAt ? formatRelative(ticket.resolvedAt) : "" },
+    { label: t("Resolved"), value: ticket.resolvedAt ? formatRelative(ticket.resolvedAt) : "" },
   ]
 
 
@@ -359,29 +361,29 @@ export function HelpDetailScreen({
     tabs: [
       {
         value: "conversation",
-        label: "Conversation",
+        label: t("Conversation"),
         icon: "messages-square",
         badge: formatCount(threadTotal),
         badgeVariant: "" as const,
       },
-      { value: "overview", label: "Overview", icon: "info", badge: "", badgeVariant: "" as const },
+      { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       {
         value: "activity",
-        label: "Activity",
+        label: t("Activity"),
         icon: "history",
         badge: formatCount(activity.total),
         badgeVariant: "" as const,
       },
       {
         value: "stories",
-        label: "Related stories",
+        label: t("Related stories"),
         icon: CONCEPT_ICON.stories,
         badge: formatCount(storiesTotal),
         badgeVariant: "" as const,
       },
       {
         value: "stakeholders",
-        label: "Stakeholders",
+        label: t("Stakeholders"),
         icon: "users",
         // The stakeholder set is COMPUTED in full (raiser + admins + mentions + adds),
         // not a capped table read — its size IS the true total, shown via the one seam.
@@ -403,7 +405,7 @@ export function HelpDetailScreen({
               <p className="text-muted-foreground mb-0.5 flex flex-wrap items-center gap-2 text-xs">
                 {ticket.ref && <span>{ticket.ref}</span>}
                 {ticket.archivedAt && (
-                  <span className="text-muted-foreground">Archived</span>
+                  <span className="text-muted-foreground">{t("Archived")}</span>
                 )}
               </p>
             )}
@@ -433,7 +435,7 @@ export function HelpDetailScreen({
           {canEdit && ticket.status !== "resolved" && (
             <Button size="sm" onClick={() => setResolving(true)} className="shrink-0 gap-1.5">
               <Send className="size-3.5" />
-              Answer
+              {t("Answer")}
             </Button>
           )}
           {/* REPLY BY EMAIL — the owner's own sentence, as a control: write it
@@ -450,7 +452,7 @@ export function HelpDetailScreen({
               className="shrink-0 gap-1.5"
             >
               <Mail className="size-3.5" />
-              Reply by email
+              {t("Reply by email")}
             </Button>
           )}
           {/* MAKE IT A STORY — the first of the three ways (the owner asked for
@@ -464,7 +466,7 @@ export function HelpDetailScreen({
               className="shrink-0 gap-1.5"
             >
               <Hammer className="size-3.5" />
-              Make it a story
+              {t("Make it a story")}
             </Button>
           )}
           {canEdit && (
@@ -475,7 +477,7 @@ export function HelpDetailScreen({
               className="shrink-0 gap-1.5"
             >
               <Pencil className="size-3.5" />
-              Edit
+              {t("Edit")}
             </Button>
           )}
           {/* PUT IT AWAY. Available from any state (SCOPE ch.07), destructive in
@@ -491,7 +493,7 @@ export function HelpDetailScreen({
                 className="shrink-0 gap-1.5"
               >
                 <ArchiveRestore className="size-3.5" />
-                Take it back out
+                {t("Take it back out")}
               </Button>
             ) : (
               <Button
@@ -502,7 +504,7 @@ export function HelpDetailScreen({
                 className="text-destructive hover:text-destructive shrink-0 gap-1.5"
               >
                 <Archive className="size-3.5" />
-                Archive
+                {t("Archive")}
               </Button>
             ))}
         </div>
@@ -516,7 +518,7 @@ export function HelpDetailScreen({
             and until now the only one with no control anywhere. */}
         {canEdit && (
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-muted-foreground text-sm">Order in the list</span>
+            <span className="text-muted-foreground text-sm">{t("Order in the list")}</span>
             <Button
               variant="outline"
               size="sm"
@@ -525,7 +527,7 @@ export function HelpDetailScreen({
               className="gap-1.5"
             >
               <ArrowUp className="size-3.5" />
-              Move up
+              {t("Move up")}
             </Button>
             <Button
               variant="outline"
@@ -535,7 +537,7 @@ export function HelpDetailScreen({
               className="gap-1.5"
             >
               <ArrowDown className="size-3.5" />
-              Move down
+              {t("Move down")}
             </Button>
           </div>
         )}
@@ -547,14 +549,14 @@ export function HelpDetailScreen({
       {promptStory && canWriteWork && (
         <div className="border-border/60 flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2">
           <p className="min-w-0 flex-1 text-sm">
-            Read and real. What are we going to do about it?
+            {t("Read and real. What are we going to do about it?")}
           </p>
           <Button size="sm" onClick={() => setStoryOpen(true)} className="gap-1.5">
             <Hammer className="size-3.5" />
-            Write the first story
+            {t("Write the first story")}
           </Button>
           <Button variant="ghost" size="sm" onClick={() => setPromptStory(false)}>
-            Not yet
+            {t("Not yet")}
           </Button>
         </div>
       )}

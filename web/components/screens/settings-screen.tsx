@@ -48,8 +48,10 @@ import { personName, personInitials, letterMark } from "@/lib/identity"
 import { softNavigate } from "@/lib/nav"
 import { useCached } from "@shared/web/store"
 import type { ActiveTeam } from "@/lib/use-active-team"
+import { useT } from "@shared/web/language"
 
 export function SettingsScreen({ active }: { active: ActiveTeam }) {
+  const t = useT()
   const [tab, setTab] = React.useState("account")
   const [editing, setEditing] = React.useState(false)
   const [changingEmail, setChangingEmail] = React.useState(false)
@@ -75,9 +77,9 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
     ...defaultTabsConfig,
     variant: "line" as const,
     tabs: [
-      { value: "account", label: "Account", icon: "user", badge: "", badgeVariant: "" as const },
-      { value: "teams", label: "Teams", icon: "building", badge: "", badgeVariant: "" as const },
-      { value: "access", label: "Access", icon: "key-round", badge: "", badgeVariant: "" as const },
+      { value: "account", label: t("Account"), icon: "user", badge: "", badgeVariant: "" as const },
+      { value: "teams", label: t("Teams"), icon: "building", badge: "", badgeVariant: "" as const },
+      { value: "access", label: t("Access"), icon: "key-round", badge: "", badgeVariant: "" as const },
     ],
   }
 
@@ -99,7 +101,7 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
               title: name,
               trailing: (
                 <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-                  Edit profile
+                  {t("Edit profile")}
                 </Button>
               ),
             },
@@ -113,7 +115,7 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
               title: user?.email,
               trailing: (
                 <Button variant="outline" size="sm" onClick={() => setChangingEmail(true)}>
-                  Change email
+                  {t("Change email")}
                 </Button>
               ),
             },
@@ -128,14 +130,14 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
       <LanguageSection save={(lang) => auth.setLanguage(lang)} />
 
       <section className="animate-rise flex flex-col gap-3">
-        <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Account activity</h2>
+        <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Account activity")}</h2>
         {accountActivityQ.error ? (
-          <p className="text-destructive text-sm">Couldn&apos;t load your activity.</p>
+          <p className="text-destructive text-sm">{t("Couldn't load your activity.")}</p>
         ) : accountActivityQ.data === undefined ? (
           <Skeleton variant="list" lines={3} />
         ) : (
           <ActivityFeed
-            config={{ ...defaultActivityFeedConfig, newestFirst: false, emptyText: "No account activity yet." }}
+            config={{ ...defaultActivityFeedConfig, newestFirst: false, emptyText: t("No account activity yet.") }}
             items={accountActivityQ.data.map((a) => ({
               id: a.id,
               description: a.description,
@@ -165,7 +167,7 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
             <span className="truncate">{team.name}</span>
             {team.id === ctx.team?.id && (
               <Badge variant="secondary" className="text-[10px]">
-                Active
+                {t("Active")}
               </Badge>
             )}
           </span>
@@ -184,7 +186,7 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
             none, which is nearly always. */}
         {pendingInvites.length > 0 && (
           <section className="animate-rise flex flex-col gap-3">
-            <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Invitations</h2>
+            <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Invitations")}</h2>
             <InvitationsPanel active={active} />
           </section>
         )}
@@ -200,7 +202,7 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
           }}
         />
         <section className="animate-rise flex flex-col gap-3">
-          <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Account</h2>
+          <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Account")}</h2>
           <List
             surface="none"
             className="rounded-xl border"
@@ -216,7 +218,7 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
                 title: name,
                 trailing: (
                   <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-                    Edit profile
+                    {t("Edit profile")}
                   </Button>
                 ),
               },
@@ -230,7 +232,7 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
                 title: user?.email,
                 trailing: (
                   <Button variant="outline" size="sm" onClick={() => setChangingEmail(true)}>
-                    Change email
+                    {t("Change email")}
                   </Button>
                 ),
               },
@@ -245,14 +247,14 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
         <GoogleConnectionsSection teamId={ctx.team?.id ?? null} />
 
         <section className="animate-rise flex flex-col gap-3">
-          <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Account activity</h2>
+          <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Account activity")}</h2>
           {accountActivityQ.error ? (
-            <p className="text-destructive text-sm">Couldn&apos;t load your activity.</p>
+            <p className="text-destructive text-sm">{t("Couldn't load your activity.")}</p>
           ) : accountActivityQ.data === undefined ? (
             <Skeleton variant="list" lines={3} />
           ) : (
             <ActivityFeed
-              config={{ ...defaultActivityFeedConfig, newestFirst: false, emptyText: "No account activity yet." }}
+              config={{ ...defaultActivityFeedConfig, newestFirst: false, emptyText: t("No account activity yet.") }}
               items={accountActivityQ.data.map((a) => ({
                 id: a.id,
                 description: a.description,
@@ -263,7 +265,7 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
         </section>
 
         <section className="animate-rise flex flex-col gap-3">
-          <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Teams</h2>
+          <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Teams")}</h2>
           <List
             surface="none"
             className="rounded-xl border"
@@ -281,7 +283,7 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
                   <span className="truncate">{team.name}</span>
                   {team.id === ctx.team?.id && (
                     <Badge variant="secondary" className="text-[10px]">
-                      Active
+                      {t("Active")}
                     </Badge>
                   )}
                 </span>

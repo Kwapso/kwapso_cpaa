@@ -38,26 +38,32 @@ import {
   translate,
   translator,
   type Catalogue,
+  type Language,
 } from "@shared/i18n"
 import { SYSTEM, systemFor } from "../../data-ops/src/lib/agent"
 import { d1, migration } from "./core-sqlite"
 
 describe("what counts as a language (R20, at the door)", () => {
-  it("accepts exactly the four we speak", () => {
+  it("accepts every language we speak, and English is one of them", () => {
     for (const l of LANGUAGES) expect(isLanguage(l.code), l.code).toBe(true)
+    expect(isLanguage(DEFAULT_LANGUAGE)).toBe(true)
   })
 
   it("refuses everything else, including the near misses", () => {
     // The near misses are the point. A locale string, a case variant and a
     // language we do not have are all things a real client would send.
-    for (const bad of ["en-GB", "EN", "de-DE", "fr", "", " ", "english", null, 7, {}, ["de"]])
+    //
+    // `xx` rather than `fr` since the list grew past the agency's own four: a
+    // fixture naming a real language would have started passing for the wrong
+    // reason the day we added it, which is a green test asserting nothing.
+    for (const bad of ["en-GB", "EN", "de-DE", "xx", "", " ", "english", null, 7, {}, ["de"]])
       expect(isLanguage(bad), JSON.stringify(bad)).toBe(false)
   })
 
   it("never throws on a stored value, however wrong", () => {
     expect(toLanguage(null)).toBe(DEFAULT_LANGUAGE)
     expect(toLanguage(undefined)).toBe(DEFAULT_LANGUAGE)
-    expect(toLanguage("fr")).toBe(DEFAULT_LANGUAGE)
+    expect(toLanguage("xx")).toBe(DEFAULT_LANGUAGE)
     expect(toLanguage(42)).toBe(DEFAULT_LANGUAGE)
     expect(toLanguage("de")).toBe("de")
   })
@@ -132,7 +138,14 @@ describe("coverage, as the switcher reports it", () => {
   })
 
   it("an empty catalogue is zero rather than a division by nothing", () => {
-    expect(coverage({})).toEqual({ de: 0, es: 0, ca: 0 })
+    const empty = coverage({})
+    // Every language that needs writing reports zero, and English — which IS the
+    // key and therefore always complete — is not in the report at all.
+    for (const l of LANGUAGES) {
+      if (l.code === DEFAULT_LANGUAGE) expect(l.code in empty, l.code).toBe(false)
+      else expect(empty[l.code as Exclude<Language, "en">], l.code).toBe(0)
+    }
+    expect(Object.keys(empty)).toHaveLength(LANGUAGES.length - 1)
   })
 })
 

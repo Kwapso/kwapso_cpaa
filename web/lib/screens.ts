@@ -7,7 +7,14 @@
 // module is the friendly URL segment used in the deep-link grammar
 // (/t/<teamId>/<module>/<id>).
 
-import type { RecipeAction, RecipeField, RecipeTab, ScreenRecipe } from "@kwapso/ui/lib/recipe"
+import type {
+  RecipeAction,
+  RecipeBlock,
+  RecipeField,
+  RecipeNode,
+  RecipeTab,
+  ScreenRecipe,
+} from "@kwapso/ui/lib/recipe"
 import {
   defaultCollectionConfig,
   defaultFieldConfig,
@@ -17,6 +24,10 @@ import {
 
 import { CONCEPT_ICON } from "@/lib/pages"
 import { formatCount } from "@shared/web/format-count"
+
+/** What `useT()` hands back — the recipe layer takes the function, not the
+ * hook, because a recipe is data and data has no React in it. */
+type Translate = (english: string) => string
 
 /** A plain text column/field for a recipe (label only — the host supplies the
  * already-formatted value in the row/record). */
@@ -844,17 +855,114 @@ export function isScreenRecipe(value: unknown): value is ScreenRecipe {
  * override can never break the screen. */
 export function resolveRecipe(
   key: string,
-  overrides: Record<string, string> | undefined
+  overrides: Record<string, string> | undefined,
+  /** The caller's language, as `t`. Omit it and the recipe comes back in
+   * English — which is what a test wants, and what the rule scans read. */
+  t?: Translate
 ): ScreenRecipe | null {
   const base = BASE_RECIPES[key] ?? null
   const raw = overrides?.[key]
-  if (!raw) return base
-  try {
-    const parsed: unknown = JSON.parse(raw)
-    return isScreenRecipe(parsed) ? parsed : base
-  } catch {
-    return base
+  const chosen = (() => {
+    if (!raw) return base
+    try {
+      const parsed: unknown = JSON.parse(raw)
+      return isScreenRecipe(parsed) ? parsed : base
+    } catch {
+      return base
+    }
+  })()
+  return t && chosen ? translateRecipe(chosen, t) : chosen
+}
+
+/** THE RECIPE'S OWN WORDS, in the reader's language — one pass, at the one place
+ * every rendered recipe passes through (`resolveRecipe`).
+ *
+ * A recipe is DATA in a module with no React in it, so it cannot call a hook and
+ * `t("Accounts")` cannot be written where the recipe is declared. Nor should it
+ * be: the recipe is also what a team OVERRIDES and what the tests read, and both
+ * of those want the English. So the English stays in the recipe — it is the
+ * catalogue's key (shared/i18n.ts) — and the translation happens once, on the
+ * way to the screen. One function instead of two hundred call sites, and a new
+ * recipe is translated the day it is written without anybody remembering to.
+ *
+ * WHAT IS TRANSLATED AND WHAT IS NOT is the whole care in here. Every string
+ * below is one WE wrote: a heading, a button, a column's label, an empty state,
+ * a confirm. Deliberately untouched:
+ *
+ *   • `binding.module`, `field.column`, `facet.field`, `sortBy` — names of data,
+ *     not words on a screen. Translating one silently unbinds the screen.
+ *   • `header.title` / `header.subtitle` — despite the names, these are the
+ *     record COLUMNS the header reads from (see ScreenHeader), so they belong in
+ *     the list above.
+ *   • `filterFacets[].options` — derived from the rows at render, which is
+ *     somebody's own typing, and that is never translated.
+ *
+ * A fresh copy throughout; the base recipe is never mutated. */
+export function translateRecipe(recipe: ScreenRecipe, t: Translate): ScreenRecipe {
+  return {
+    ...recipe,
+    fields: recipe.fields.map((f) => ({
+      ...f,
+      field: {
+        ...f.field,
+        label: t(f.field.label),
+        helpText: f.field.helpText ? t(f.field.helpText) : f.field.helpText,
+      },
+    })),
+    actions: recipe.actions.map(translateAction),
+    ...(recipe.confirm ? { confirm: translateConfirm(recipe.confirm, t) } : {}),
+    ...(recipe.tabs
+      ? {
+          tabs: recipe.tabs.map((tab) => ({
+            ...tab,
+            label: t(tab.label),
+            block: translateBlock(tab.block, t),
+          })),
+        }
+      : {}),
+    ...(recipe.collection ? { collection: translateCollection(recipe.collection, t) } : {}),
+    ...(recipe.layout ? { layout: translateNode(recipe.layout, t) } : {}),
   }
+
+  function translateAction(a: RecipeAction): RecipeAction {
+    return {
+      ...a,
+      label: t(a.label),
+      ...(a.confirm ? { confirm: translateConfirm(a.confirm, t) } : {}),
+    }
+  }
+}
+
+/** `{ title, body }` — the same shape on a screen-level confirm and on an
+ * action's own, so it is read once. */
+function translateConfirm<T extends { title: string; body: string }>(confirm: T, t: Translate): T {
+  return { ...confirm, title: t(confirm.title), body: t(confirm.body) }
+}
+
+function translateCollection(c: CollectionConfig, t: Translate): CollectionConfig {
+  return {
+    ...c,
+    title: c.title ? t(c.title) : c.title,
+    emptyText: c.emptyText ? t(c.emptyText) : c.emptyText,
+    searchPlaceholder: c.searchPlaceholder ? t(c.searchPlaceholder) : c.searchPlaceholder,
+    sortOptions: c.sortOptions.map((o) => ({ ...o, label: t(o.label) })),
+    filterFacets: c.filterFacets.map((f) => ({ ...f, label: t(f.label) })),
+  }
+}
+
+function translateBlock(block: RecipeBlock, t: Translate): RecipeBlock {
+  if (block.kind === "description") {
+    return { ...block, rows: block.rows.map((r) => ({ ...r, label: t(r.label) })) }
+  }
+  if (block.kind === "list" && block.collection) {
+    return { ...block, collection: translateCollection(block.collection, t) }
+  }
+  return block
+}
+
+function translateNode(node: RecipeNode, t: Translate): RecipeNode {
+  if (node.node === "block") return { ...node, block: translateBlock(node.block, t) }
+  return { ...node, children: node.children.map((child) => translateNode(child, t)) }
 }
 
 /** Tune a list recipe's collection chrome to the DATA it's about to show, so we

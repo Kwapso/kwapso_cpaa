@@ -15,6 +15,7 @@ import { ChevronRight } from "lucide-react"
 
 import type { HelpTicket } from "@shared/types"
 import { formatRelative } from "@shared/web/format"
+import { useT } from "@shared/web/language"
 
 /** Plain words for each state, and a colour that means the same thing every
  * time. "In progress" is the only one that needed translating from the wire. */
@@ -32,6 +33,7 @@ export const STATUS_WORDS: Record<HelpTicket["status"], { label: string; variant
 }
 
 export function TicketRow({ ticket }: { ticket: HelpTicket }) {
+  const t = useT()
   const status = STATUS_WORDS[ticket.status]
   return (
     <Link
@@ -50,8 +52,8 @@ export function TicketRow({ ticket }: { ticket: HelpTicket }) {
               without needing to build anything. */}
           {ticket.storyCount > 0 && (
             <span>
-              {ticket.storyCount} {ticket.storyCount === 1 ? "piece" : "pieces"} of work,{" "}
-              {ticket.doneStoryCount} done
+              {ticket.storyCount} {ticket.storyCount === 1 ? "piece" : "pieces"} {t("of work,")}{" "}
+              {ticket.doneStoryCount} {t("done")}
             </span>
           )}
           <span>{formatRelative(ticket.updatedAt ?? ticket.createdAt)}</span>

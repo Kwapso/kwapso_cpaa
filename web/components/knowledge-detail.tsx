@@ -39,6 +39,7 @@ import { safeHref } from "@/lib/rich-text"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
+import { useT } from "@shared/web/language"
 
 export function KnowledgeDetailScreen({
   teamId,
@@ -47,6 +48,7 @@ export function KnowledgeDetailScreen({
   teamId: string
   sourceId: string
 }) {
+  const t = useT()
   const sourcesQ = useCached<KnowledgeSource[]>(knowledgeKey(teamId), () =>
     content.knowledge().then((r) => r.sources)
   )
@@ -106,7 +108,7 @@ export function KnowledgeDetailScreen({
       visibility: values.visibility,
     })
     patchLists(source)
-    toast.success("Source updated.")
+    toast.success(t("Source updated."))
   }
 
   async function setActive(activeNext: boolean) {
@@ -124,10 +126,10 @@ export function KnowledgeDetailScreen({
     }
   }
 
-  if (sourcesQ.error) return <p className="text-destructive text-sm">Couldn&apos;t load the source.</p>
+  if (sourcesQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the source.")}</p>
   if (sourcesQ.data === undefined) return <Skeleton variant="list" lines={4} />
   if (!item && oneQ.data === undefined && !inPage) return <Skeleton variant="list" lines={4} />
-  if (!item) return <p className="text-muted-foreground text-sm">That source doesn&apos;t exist.</p>
+  if (!item) return <p className="text-muted-foreground text-sm">{t("That source doesn't exist.")}</p>
 
   const mirrored = item.originRowId !== null
   // A FILE's words belong to the file, exactly as a mirrored source's belong to
@@ -138,14 +140,14 @@ export function KnowledgeDetailScreen({
   const textOwnedElsewhere = mirrored || item.fileUrl !== null
   const filedUnder = item.accountId ? (accountNames.get(item.accountId) ?? "A client") : "The agency"
   const overviewItems = [
-    { label: "Kind", value: KNOWLEDGE_KIND[item.kind] ?? item.kind },
-    { label: "Filed under", value: filedUnder },
+    { label: t("Kind"), value: KNOWLEDGE_KIND[item.kind] ?? item.kind },
+    { label: t("Filed under"), value: filedUnder },
     {
-      label: "Who can use it",
+      label: t("Who can use it"),
       value: item.visibility === "private" ? "Only you" : "Anyone who can read the knowledge base",
     },
     {
-      label: "Searchable pieces",
+      label: t("Searchable pieces"),
       // An indexed source with no pieces is a real state (its text was empty),
       // and saying "0" is the honest reading of it. For an UPLOADED file that is
       // also the commonest honest state — a deck or an archive is kept and not
@@ -159,14 +161,14 @@ export function KnowledgeDetailScreen({
     },
     ...(item.fileUrl
       ? [
-          { label: "File", value: item.fileName ?? "Uploaded file" },
+          { label: t("File"), value: item.fileName ?? "Uploaded file" },
           {
-            label: "Size",
+            label: t("Size"),
             value: `${Math.max(1, Math.round(item.fileBytes / 1000)).toLocaleString()} KB`,
           },
         ]
       : []),
-    { label: "Last indexed", value: item.indexedAt ? formatDateTime(item.indexedAt) : "—" },
+    { label: t("Last indexed"), value: item.indexedAt ? formatDateTime(item.indexedAt) : "—" },
     ...auditItems({
       createdByName: item.creatorName,
       createdAt: item.createdAt,
@@ -182,11 +184,11 @@ export function KnowledgeDetailScreen({
     ...defaultTabsConfig,
     variant: "line" as const,
     tabs: [
-      { value: "source", label: "Source", icon: "file-text", badge: "", badgeVariant: "" as const },
-      { value: "overview", label: "Overview", icon: "info", badge: "", badgeVariant: "" as const },
+      { value: "source", label: t("Source"), icon: "file-text", badge: "", badgeVariant: "" as const },
+      { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       {
         value: "activity",
-        label: "Activity",
+        label: t("Activity"),
         icon: "history",
         badge: formatCount(activity.total),
         badgeVariant: "" as const,
@@ -202,12 +204,12 @@ export function KnowledgeDetailScreen({
             <span className="truncate">{item.title}</span>
             {!item.active && (
               <Badge variant="outline" className="text-muted-foreground text-[10px]">
-                Not in use
+                {t("Not in use")}
               </Badge>
             )}
             {item.visibility === "private" && (
               <Badge variant="secondary" className="text-[10px]">
-                Private to you
+                {t("Private to you")}
               </Badge>
             )}
           </h1>
@@ -223,7 +225,7 @@ export function KnowledgeDetailScreen({
             className="shrink-0 gap-1.5"
           >
             <Pencil className="size-3.5" />
-            Edit
+            {t("Edit")}
           </Button>
         )}
       </div>

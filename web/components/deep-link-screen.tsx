@@ -54,9 +54,11 @@ import { useScreenData } from "@/lib/use-screen-data"
 import { useScreenActions } from "@/lib/use-screen-actions"
 import { useActiveTeam } from "@/lib/use-active-team"
 import { TEAM_SECTIONS, type Crumb } from "@/lib/pages"
+import { useT } from "@shared/web/language"
 
 export function DeepLinkScreen() {
   const active = useActiveTeam()
+  const t = useT()
   const router = useRouter()
 
   /* -------------------------------- where am I ------------------------------- */
@@ -297,6 +299,7 @@ export function DeepLinkScreen() {
   })
 
   const crumbs = buildCrumbs({
+    t,
     topLevel,
     module,
     recordId,
@@ -353,7 +356,7 @@ export function DeepLinkScreen() {
             activityQ, activityTotal, activityKey, activityScope, inviteAuditQ, teamName, active,
             rights, onAction, onIntent,
             sectionPath, helpScope, setHelpScope, myUserId, query, helpMineQ, helpArchivedQ,
-            taskView, setTaskView,
+            taskView, setTaskView, t,
           })}
         </CountedTabs>
       </div>

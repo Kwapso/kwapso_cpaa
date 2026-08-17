@@ -37,6 +37,7 @@ import { marginKey } from "@/lib/live-resources"
 import { usePermissions } from "@/lib/perms"
 import { moneyText } from "@shared/web/money"
 import { useCached } from "@shared/web/store"
+import { useT } from "@shared/web/language"
 
 /** Logged seconds as a person says them. One decimal place: a line reading
  * "0 hours" beside a cost of 45.00 is the kind of row that makes somebody
@@ -86,6 +87,7 @@ export function MarginPanel({
   accountId: string
   accountName: string
 }) {
+  const t = useT()
   const { can } = usePermissions(teamId)
   // Cache-first, keyed by the ACCOUNT — the same key the `account_rates`
   // listener drops, so a colleague changing a price moves this figure without a
@@ -94,7 +96,7 @@ export function MarginPanel({
   // cannot name the accounts whose margins it moved (see live-resources.ts).
   const marginQ = useCached(marginKey(accountId), () => tenancy.margin(accountId))
 
-  if (marginQ.error) return <p className="text-destructive text-sm">Couldn&apos;t work out the margin.</p>
+  if (marginQ.error) return <p className="text-destructive text-sm">{t("Couldn't work out the margin.")}</p>
   if (marginQ.data === undefined) return <Skeleton variant="list" lines={3} />
   const m = marginQ.data
 
@@ -102,10 +104,9 @@ export function MarginPanel({
   if (nothingYet)
     return (
       <div className="rounded-lg border p-4">
-        <p className="text-sm font-medium">Nothing to weigh up yet.</p>
+        <p className="text-sm font-medium">{t("Nothing to weigh up yet.")}</p>
         <p className="text-muted-foreground mt-1 text-sm">
-          Sell {accountName} a sprint and log some time against it, and what the work leaves us
-          appears here.
+          {t("Sell")} {accountName} {t("a sprint and log some time against it, and what the work leaves us appears here.")}
         </p>
       </div>
     )
@@ -115,7 +116,7 @@ export function MarginPanel({
   return (
     <div className="flex flex-col gap-3">
       <div className="rounded-lg border p-4">
-        <p className="text-muted-foreground text-sm">What this account leaves us</p>
+        <p className="text-muted-foreground text-sm">{t("What this account leaves us")}</p>
         <p
           className={`text-2xl font-semibold tracking-tight tabular-nums ${down ? "text-destructive" : ""}`}
         >
@@ -131,8 +132,7 @@ export function MarginPanel({
             the internal rate card, which is an agreed number rather than a
             measured one — say so here rather than let somebody discover it. */}
         <p className="text-muted-foreground mt-2 text-xs">
-          Sold, minus our own time at the rates on our cost card, minus what the tools cost each
-          month. Our time is priced at agreed rates, not measured cost.
+          {t("Sold, minus our own time at the rates on our cost card, minus what the tools cost each month. Our time is priced at agreed rates, not measured cost.")}
         </p>
         {/* …and this is the cost card that sentence means. Same shape as the
             "Manage dropdowns" link under a dropdown: small, gated, and it takes
@@ -144,18 +144,18 @@ export function MarginPanel({
             className="text-muted-foreground hover:text-foreground mt-2 inline-flex w-fit items-center gap-1 text-xs underline-offset-2 hover:underline"
           >
             <Banknote className="size-3" aria-hidden />
-            Change what our hour costs
+            {t("Change what our hour costs")}
           </a>
         )}
         {down && (
           <p className="text-destructive mt-2 text-xs">
-            This account is costing more than it brings in.
+            {t("This account is costing more than it brings in.")}
           </p>
         )}
       </div>
 
       <div className="rounded-lg border px-4 py-1">
-        <Line label="Sold" detail="Everything priced on this account's sprints" cents={m.revenueCents} />
+        <Line label={t("Sold")} detail="Everything priced on this account's sprints" cents={m.revenueCents} />
         {m.lines.map((l) => (
           <Line
             key={l.label}
@@ -166,7 +166,7 @@ export function MarginPanel({
           />
         ))}
         <Line
-          label="Tools"
+          label={t("Tools")}
           detail="What the systems built for this account cost to run each month"
           cents={m.toolCostCents}
           subtract
@@ -179,8 +179,7 @@ export function MarginPanel({
           missing rather than show a confident wrong number. */}
       {!m.loggedTimeAvailable && (
         <p className="text-muted-foreground text-xs">
-          Our own time isn&apos;t counted in this yet — the work log for this account hasn&apos;t
-          been set up, so the figure above is what was sold minus the tools only.
+          {t("Our own time isn't counted in this yet — the work log for this account hasn't been set up, so the figure above is what was sold minus the tools only.")}
         </p>
       )}
     </div>

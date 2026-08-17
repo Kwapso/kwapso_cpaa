@@ -32,6 +32,7 @@ import { softNavigate } from "@/lib/nav"
 import type { AppRow, ProcessSummary, Sprint, Story, Todo } from "@shared/types"
 import { formatDate } from "@shared/web/format"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
+import { useT } from "@shared/web/language"
 
 /** The four states a story moves through, in the words a person reads. The
  * states the code trusts are STORY_STATUSES; this is only their spelling. */
@@ -125,6 +126,7 @@ export function StoriesPanel({
   onNew?: () => void
   emptyText: string
 }) {
+  const t = useT()
   const key = sliceKey(`stories-${ownerKind}`, ownerId)
   const q = useCached<Story[]>(key, () =>
     // `view: "all"` on purpose: this is the record of what was done, not a
@@ -136,7 +138,7 @@ export function StoriesPanel({
     })
   )
 
-  if (q.error) return <p className="text-destructive text-sm">Couldn&apos;t load the work.</p>
+  if (q.error) return <p className="text-destructive text-sm">{t("Couldn't load the work.")}</p>
   if (q.data === undefined) return <Skeleton variant="list" lines={3} />
   const rows = q.data
 
@@ -146,7 +148,7 @@ export function StoriesPanel({
         <div className="flex flex-wrap justify-end gap-2">
           <Button size="sm" onClick={onNew} className="gap-1.5">
             <Plus className="size-4" />
-            New story
+            {t("New story")}
           </Button>
         </div>
       )}
@@ -165,7 +167,7 @@ export function StoriesPanel({
               </div>
               {s.status === "done" && (
                 <Badge variant="secondary" className="text-[10px]">
-                  Done
+                  {t("Done")}
                 </Badge>
               )}
             </Row>
@@ -176,7 +178,7 @@ export function StoriesPanel({
           to be able to reach the rest of it. */}
       <LoadMore
         listKey={key}
-        label="Load more work"
+        label={t("Load more work")}
         fetchPage={(c: string) =>
           contentApi
             .stories({ filter: { ...filter, view: "all" }, cursor: c })
@@ -230,6 +232,7 @@ export function SprintsPanel({
   onNew?: () => void
   emptyText: string
 }) {
+  const t = useT()
   const key = sliceKey(`sprints-${ownerKind}`, ownerId)
   const q = useCached<Sprint[]>(key, () =>
     contentApi.sprints(filter).then((r) => {
@@ -238,7 +241,7 @@ export function SprintsPanel({
     })
   )
 
-  if (q.error) return <p className="text-destructive text-sm">Couldn&apos;t load the sprints.</p>
+  if (q.error) return <p className="text-destructive text-sm">{t("Couldn't load the sprints.")}</p>
   if (q.data === undefined) return <Skeleton variant="list" lines={3} />
   const rows = q.data
 
@@ -248,7 +251,7 @@ export function SprintsPanel({
         <div className="flex flex-wrap justify-end gap-2">
           <Button size="sm" onClick={onNew} className="gap-1.5">
             <Plus className="size-4" />
-            Start a sprint
+            {t("Start a sprint")}
           </Button>
         </div>
       )}
@@ -267,7 +270,7 @@ export function SprintsPanel({
               </div>
               {s.completedAt && (
                 <Badge variant="secondary" className="text-[10px]">
-                  Complete
+                  {t("Complete")}
                 </Badge>
               )}
             </Row>
@@ -299,6 +302,7 @@ export function AppsPanel({
   host: PanelHost
   onNew?: () => void
 }) {
+  const t = useT()
   const key = sliceKey("apps-account", accountId)
   const q = useCached<AppRow[]>(key, () =>
     tenancy.apps(accountId).then((r) => {
@@ -307,7 +311,7 @@ export function AppsPanel({
     })
   )
 
-  if (q.error) return <p className="text-destructive text-sm">Couldn&apos;t load the apps.</p>
+  if (q.error) return <p className="text-destructive text-sm">{t("Couldn't load the apps.")}</p>
   if (q.data === undefined) return <Skeleton variant="list" lines={3} />
   const rows = q.data
 
@@ -317,12 +321,12 @@ export function AppsPanel({
         <div className="flex flex-wrap justify-end gap-2">
           <Button size="sm" onClick={onNew} className="gap-1.5">
             <Plus className="size-4" />
-            Record an app
+            {t("Record an app")}
           </Button>
         </div>
       )}
       {rows.length === 0 ? (
-        <p className="text-muted-foreground text-sm">Nothing built for {accountName} yet.</p>
+        <p className="text-muted-foreground text-sm">{t("Nothing built for")} {accountName} {t("yet.")}</p>
       ) : (
         <ul className="flex flex-col gap-1.5">
           {rows.map((a) => (
@@ -333,7 +337,7 @@ export function AppsPanel({
               </div>
               {!a.active && (
                 <Badge variant="outline" className="text-muted-foreground text-[10px]">
-                  Archived
+                  {t("Archived")}
                 </Badge>
               )}
             </Row>
@@ -350,6 +354,7 @@ export function AppsPanel({
  * every app of every client grows them and none is ever deleted, because a
  * saving computed from a baseline has to stay checkable years later. */
 export function ProcessesPanel({ appId, host }: { appId: string; host: PanelHost }) {
+  const t = useT()
   const key = sliceKey("processes-app", appId)
   const q = useCached<ProcessSummary[]>(key, () =>
     tenancy.processes({ appId }).then((r) => {
@@ -359,7 +364,7 @@ export function ProcessesPanel({ appId, host }: { appId: string; host: PanelHost
     })
   )
 
-  if (q.error) return <p className="text-destructive text-sm">Couldn&apos;t load the process maps.</p>
+  if (q.error) return <p className="text-destructive text-sm">{t("Couldn't load the process maps.")}</p>
   if (q.data === undefined) return <Skeleton variant="list" lines={3} />
   const rows = q.data
 
@@ -367,7 +372,7 @@ export function ProcessesPanel({ appId, host }: { appId: string; host: PanelHost
     <div className="flex flex-col gap-3">
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">
-          No process maps drawn inside this app yet.
+          {t("No process maps drawn inside this app yet.")}
         </p>
       ) : (
         <ul className="flex flex-col gap-1.5">
@@ -392,7 +397,7 @@ export function ProcessesPanel({ appId, host }: { appId: string; host: PanelHost
       )}
       <LoadMore
         listKey={key}
-        label="Load more process maps"
+        label={t("Load more process maps")}
         fetchPage={(c: string) =>
           tenancy
             .processes({ appId, cursor: c })
@@ -423,6 +428,7 @@ export function TodosPanel({
   canCancel: boolean
   onNew?: () => void
 }) {
+  const t = useT()
   const key = accountId ? sliceKey("todos-account", accountId) : todosKey(teamId)
   const q = useCached<Todo[]>(key, () =>
     contentApi.todos(accountId ? { accountId } : {}).then((r) => {
@@ -435,13 +441,13 @@ export function TodosPanel({
     try {
       await contentApi.cancelTodo(id)
       invalidate(key)
-      toast.success("Withdrawn.")
+      toast.success(t("Withdrawn."))
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't withdraw that.")
     }
   }
 
-  if (q.error) return <p className="text-destructive text-sm">Couldn&apos;t load the to-dos.</p>
+  if (q.error) return <p className="text-destructive text-sm">{t("Couldn't load the to-dos.")}</p>
   if (q.data === undefined) return <Skeleton variant="list" lines={3} />
   const rows = q.data
 
@@ -451,12 +457,12 @@ export function TodosPanel({
         <div className="flex flex-wrap justify-end gap-2">
           <Button size="sm" onClick={onNew} className="gap-1.5">
             <Plus className="size-4" />
-            Ask for something
+            {t("Ask for something")}
           </Button>
         </div>
       )}
       {rows.length === 0 ? (
-        <p className="text-muted-foreground text-sm">Nothing outstanding with a client.</p>
+        <p className="text-muted-foreground text-sm">{t("Nothing outstanding with a client.")}</p>
       ) : (
         <ul className="flex flex-col gap-1.5">
           {rows.map((t) => (

@@ -26,6 +26,7 @@ import { ApiFailure, tenancy } from "@/lib/api"
 import { SelectableFormDialog } from "@/components/selectable-form-dialog"
 import { usePermissions } from "@/lib/perms"
 import { primeCache, useCached } from "@shared/web/store"
+import { useT } from "@shared/web/language"
 
 export function SelectableScreen({
   teamId,
@@ -35,6 +36,7 @@ export function SelectableScreen({
   /** Host-provided soft-nav to the import wizard (pre-targeted to dropdown values). */
   onImport?: () => void
 }) {
+  const t = useT()
   const { can } = usePermissions(teamId)
   const valuesQ = useCached<SelectableValue[]>(`selectable:${teamId}`, () =>
     tenancy.selectable().then((r) => r.values)
@@ -84,7 +86,7 @@ export function SelectableScreen({
       const { values: next } = await tenancy.updateSelectable(id, editValue)
       primeCache(`selectable:${teamId}`, next)
       setEditingId(null)
-      toast.success("Renamed.")
+      toast.success(t("Renamed."))
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't rename that option.")
     }
@@ -104,17 +106,16 @@ export function SelectableScreen({
   }
 
   if (valuesQ.error)
-    return <p className="text-destructive text-sm">Couldn&apos;t load dropdown values.</p>
+    return <p className="text-destructive text-sm">{t("Couldn't load dropdown values.")}</p>
   if (valuesQ.data === undefined) return <Skeleton variant="list" lines={5} />
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Dropdown values</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("Dropdown values")}</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            The options behind your team&apos;s dropdowns — Ticket types, Learning categories and more.
-            Pick a group, or start a new one.
+            {t("The options behind your team's dropdowns — Ticket types, Learning categories and more. Pick a group, or start a new one.")}
           </p>
         </div>
         {/* Actions — New value / Import / Export. flex-wrap so the buttons never
@@ -124,18 +125,18 @@ export function SelectableScreen({
           {values.length > 0 && (
             <Button asChild variant="outline" className="gap-1.5">
               <a href="/api/tenancy/selectable/export">
-                <Download className="size-4" aria-hidden /> Export CSV
+                <Download className="size-4" aria-hidden /> {t("Export CSV")}
               </a>
             </Button>
           )}
           {canCreate && onImport && (
             <Button variant="outline" onClick={onImport} className="gap-1.5">
-              <Upload className="size-4" aria-hidden /> Import CSV
+              <Upload className="size-4" aria-hidden /> {t("Import CSV")}
             </Button>
           )}
           {canCreate && (
             <Button onClick={() => setAddOpen(true)} className="gap-1.5">
-              <Plus className="size-4" aria-hidden /> New value
+              <Plus className="size-4" aria-hidden /> {t("New value")}
             </Button>
           )}
         </div>
@@ -157,7 +158,7 @@ export function SelectableScreen({
       {values.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-muted-foreground mr-1 text-sm">
-            Showing {filtered.length} of {values.length}
+            {t("Showing")} {filtered.length} of {values.length}
           </span>
           <div className="relative w-full sm:w-56">
             <Search
@@ -167,19 +168,19 @@ export function SelectableScreen({
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search values…"
+              placeholder={t("Search values…")}
               className="h-9 pl-8"
-              aria-label="Search dropdown values"
+              aria-label={t("Search dropdown values")}
             />
           </div>
           <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
-            <SelectTrigger className="h-9 w-full sm:w-40" aria-label="Filter by status">
+            <SelectTrigger className="h-9 w-full sm:w-40" aria-label={t("Filter by status")}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
-              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="active">{t("Active")}</SelectItem>
+              <SelectItem value="inactive">{t("Inactive")}</SelectItem>
+              <SelectItem value="all">{t("All")}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -217,7 +218,7 @@ export function SelectableScreen({
                           size="sm"
                           variant="ghost"
                           onClick={() => void saveRename(v.id)}
-                          aria-label="Save"
+                          aria-label={t("Save")}
                         >
                           <Check className="size-4" />
                         </Button>
@@ -225,7 +226,7 @@ export function SelectableScreen({
                           size="sm"
                           variant="ghost"
                           onClick={() => setEditingId(null)}
-                          aria-label="Cancel"
+                          aria-label={t("Cancel")}
                         >
                           <X className="size-4" />
                         </Button>
@@ -234,7 +235,7 @@ export function SelectableScreen({
                       <>
                         <span className="flex-1 text-sm">{v.value}</span>
                         {!v.active && (
-                          <span className="text-muted-foreground text-xs">Deactivated</span>
+                          <span className="text-muted-foreground text-xs">{t("Deactivated")}</span>
                         )}
                         {v.active ? (
                           <>
@@ -271,7 +272,7 @@ export function SelectableScreen({
                               className="gap-1.5"
                               aria-label={`Activate ${v.value}`}
                             >
-                              <Power className="size-3.5" /> Activate
+                              <Power className="size-3.5" /> {t("Activate")}
                             </Button>
                           )
                         )}

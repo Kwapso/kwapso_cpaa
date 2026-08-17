@@ -27,8 +27,12 @@
 //      they will simply think it is broken.
 //
 // The cost is that rewording the English orphans its translations. That is real,
-// and it is why the catalogue is checked for orphans rather than left to rot
-// (RULES.md R28).
+// and it is why the catalogue is GENERATED rather than kept by hand:
+// `scripts/i18n-extract.mjs` reads every string the two front doors say straight
+// off the source, and `scripts/i18n-translate.mjs` fills in only what is missing.
+// Reword a button and the old key stops being extracted; re-run the pair and the
+// new wording is translated. `node scripts/i18n-extract.mjs --check` says whether
+// the extracted list still matches the code.
 
 import { CATALOGUE } from "./i18n-catalogue"
 
@@ -36,15 +40,66 @@ export { CATALOGUE }
 
 /** The languages this app speaks, in the order a switcher shows them.
  *
- * These four are not invented: they are the LANGUAGES rows in the agency's own
- * legacy data, which is also where the flags come from. `native` is what the
- * switcher shows — somebody looking for their own language scans for the word
- * they call it, not for the English name of it. */
+ * ONE ARRAY, so adding or dropping a language is one line. Everything else is
+ * derived from it: the type, the guard, the switcher's buttons, the coverage
+ * figures, the agent's "answer in their language" instruction, and the set the
+ * build-time translator fills in (`scripts/i18n-translate.mjs` reads this very
+ * file rather than keeping its own list — a second list is a second truth).
+ *
+ * THE FIRST FOUR ARE NOT INVENTED. They are the LANGUAGES rows in the agency's
+ * own legacy data, which is also where their flags come from, and their German
+ * is lifted from the words the agency has been using with German clients for
+ * years (shared/i18n-seed.ts). They stay first because they are the ones a
+ * kwapso user actually picks.
+ *
+ * THE REST ARE THE WORLD'S TOP 25 BY TOTAL SPEAKERS — native plus second
+ * language — in that order, so the list answers "can this app speak to the
+ * person in front of me" for most of the planet. Two judgement calls, stated
+ * rather than hidden: regional varieties that share a written form with one
+ * already here (Wu and Yue against Mandarin, Egyptian against Modern Standard
+ * Arabic) are not repeated, because a language switcher offers a person a
+ * SCREEN, and those screens would be the same one; and each entry has to be a
+ * language somebody can be shown a whole interface in.
+ *
+ * `native` is what the switcher shows — somebody looking for their own language
+ * scans for the word they call it, not for the English name of it. `english` is
+ * what the machine translator and the assistant are told to write in.
+ *
+ * KNOWN GAP: Arabic, Urdu and Persian are read right to left, and nothing here
+ * sets the document's direction yet. Their words are correct; their layout is
+ * not. That is a screen-level change, not a catalogue one. */
 export const LANGUAGES = [
+  // The agency's own four.
   { code: "en", english: "English", native: "English", flag: "🇬🇧" },
   { code: "de", english: "German", native: "Deutsch", flag: "🇩🇪" },
   { code: "es", english: "Spanish", native: "Español", flag: "🇪🇸" },
   { code: "ca", english: "Catalan", native: "Català", flag: "🇦🇩" },
+  // Then the world's, by how many people speak them.
+  { code: "zh", english: "Mandarin Chinese", native: "中文", flag: "🇨🇳" },
+  { code: "hi", english: "Hindi", native: "हिन्दी", flag: "🇮🇳" },
+  { code: "ar", english: "Modern Standard Arabic", native: "العربية", flag: "🇸🇦" },
+  { code: "fr", english: "French", native: "Français", flag: "🇫🇷" },
+  { code: "bn", english: "Bengali", native: "বাংলা", flag: "🇧🇩" },
+  { code: "pt", english: "Portuguese", native: "Português", flag: "🇵🇹" },
+  { code: "ru", english: "Russian", native: "Русский", flag: "🇷🇺" },
+  { code: "ur", english: "Urdu", native: "اردو", flag: "🇵🇰" },
+  { code: "id", english: "Indonesian", native: "Bahasa Indonesia", flag: "🇮🇩" },
+  { code: "ja", english: "Japanese", native: "日本語", flag: "🇯🇵" },
+  { code: "pa", english: "Punjabi", native: "ਪੰਜਾਬੀ", flag: "🇮🇳" },
+  { code: "mr", english: "Marathi", native: "मराठी", flag: "🇮🇳" },
+  { code: "te", english: "Telugu", native: "తెలుగు", flag: "🇮🇳" },
+  { code: "tr", english: "Turkish", native: "Türkçe", flag: "🇹🇷" },
+  { code: "ta", english: "Tamil", native: "தமிழ்", flag: "🇮🇳" },
+  { code: "vi", english: "Vietnamese", native: "Tiếng Việt", flag: "🇻🇳" },
+  { code: "ha", english: "Hausa", native: "Hausa", flag: "🇳🇬" },
+  { code: "sw", english: "Swahili", native: "Kiswahili", flag: "🇰🇪" },
+  { code: "tl", english: "Filipino", native: "Filipino", flag: "🇵🇭" },
+  { code: "ko", english: "Korean", native: "한국어", flag: "🇰🇷" },
+  { code: "fa", english: "Persian", native: "فارسی", flag: "🇮🇷" },
+  { code: "jv", english: "Javanese", native: "Basa Jawa", flag: "🇮🇩" },
+  { code: "it", english: "Italian", native: "Italiano", flag: "🇮🇹" },
+  { code: "gu", english: "Gujarati", native: "ગુજરાતી", flag: "🇮🇳" },
+  { code: "th", english: "Thai", native: "ไทย", flag: "🇹🇭" },
 ] as const
 
 export type Language = (typeof LANGUAGES)[number]["code"]
@@ -56,6 +111,13 @@ export const DEFAULT_LANGUAGE: Language = "en"
 
 /** Every language that needs a written translation — English is the source. */
 export type Translated = Exclude<Language, "en">
+
+/** The same set at runtime, DERIVED rather than typed out a second time. The
+ * switcher, the coverage figures and the build-time translator all walk this,
+ * so adding a language to LANGUAGES is genuinely the only edit. */
+export const TRANSLATED_LANGUAGES: readonly Translated[] = LANGUAGES.map((l) => l.code).filter(
+  (code): code is Translated => code !== DEFAULT_LANGUAGE
+)
 
 /** THE POSITIONAL GUARD (R20). A language arrives off a request body or a query
  * string like anything else, so it is type-checked at the door rather than cast.
@@ -89,7 +151,7 @@ export type Vars = Record<string, string | number>
  *
  * Deliberately not a template engine. No conditionals, no plurals, no nesting —
  * a translator gets a sentence with holes in it, which is the most they can be
- * asked to preserve faithfully across four languages. */
+ * asked to preserve faithfully across twenty-nine languages. */
 export function fill(text: string, vars?: Vars): string {
   if (!vars) return text
   return text.replace(/\{(\w+)\}/g, (whole, key: string) =>
@@ -126,9 +188,12 @@ export function translator(lang: Language, catalogue?: Catalogue) {
 export function coverage(catalogue?: Catalogue): Record<Translated, number> {
   const c = catalogue ?? CATALOGUE
   const keys = Object.keys(c)
-  const out = { de: 0, es: 0, ca: 0 } as Record<Translated, number>
+  const out = Object.fromEntries(TRANSLATED_LANGUAGES.map((l) => [l, 0])) as Record<
+    Translated,
+    number
+  >
   if (keys.length === 0) return out
-  for (const lang of ["de", "es", "ca"] as const) {
+  for (const lang of TRANSLATED_LANGUAGES) {
     const done = keys.filter((k) => typeof c[k]?.[lang] === "string" && c[k][lang] !== "").length
     out[lang] = done / keys.length
   }
