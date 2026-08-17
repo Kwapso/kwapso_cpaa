@@ -17,6 +17,7 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import {
   AppWindow,
   Building2,
+  CalendarClock,
   CalendarRange,
   Hammer,
   Home,
@@ -30,6 +31,7 @@ import {
   LifeBuoy,
   PanelLeftClose,
   PanelLeftOpen,
+  Timer,
   Workflow,
 } from "lucide-react"
 
@@ -58,6 +60,14 @@ const NAV_ICONS = { home: Home, settings: Settings } as const
 // icons the tabs use (CONCEPT_ICON, pages.ts), as components rather than names
 // because the rail renders them directly. Every sidebar section has a line here;
 // a section without one falls back to Home, which is the tell that one is missing.
+//
+// TWO WERE MISSING, and the fallback is exactly why nobody noticed: `time` and
+// `meetings` shipped without a line, so the rail drew Home three times — Home,
+// Time and Meetings wearing one icon, which a tester reported as "Meetings and
+// Time share the same icon". Both concepts already had their own glyph in
+// CONCEPT_ICON (`timer`, `calendar-clock`); only this map had not been told.
+// web/test/nav.test.ts now derives the required keys from TEAM_SECTIONS and
+// insists every icon is distinct, so a silent fallback cannot ship again.
 const SECTION_ICONS: Record<string, typeof Home> = {
   accounts: Building2,
   learning: GraduationCap,
@@ -68,6 +78,8 @@ const SECTION_ICONS: Record<string, typeof Home> = {
   sprints: CalendarRange,
   apps: AppWindow,
   tasks: ListTodo,
+  time: Timer,
+  meetings: CalendarClock,
   marketing: Megaphone,
   brand: Palette,
   delivery: Workflow,

@@ -223,9 +223,12 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
           if (!o) setSecret(null)
         }}
       >
-        <DialogContent>
+        {/* p-0: this dialog has two faces and one of them is a FormShell, which
+            owns its own edges (see shared/web/form-shell.tsx). The other face
+            re-states the padding for itself, one line down. */}
+        <DialogContent className="gap-0 overflow-hidden p-0">
           {secret ? (
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4 p-6">
               <DialogTitle>{t("Copy your token now")}</DialogTitle>
               <DialogDescription>
                 {t("This is the only time it's shown. Anyone holding it can act as you in")}{" "}

@@ -18,11 +18,17 @@
 import * as React from "react"
 
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { CircleStop, Timer } from "lucide-react"
+import { CircleStop, Play, Timer } from "lucide-react"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 
 import { ApiFailure, content as contentApi } from "@/lib/api"
-import { TIME_SLICE_PREFIX, runningTimersKey, storiesKey, workLogsKey } from "@/lib/live-resources"
+import {
+  TIME_SLICE_PREFIX,
+  recordTimeKey,
+  runningTimersKey,
+  storiesKey,
+  workLogsKey,
+} from "@/lib/live-resources"
 import type { RunningTimer } from "@shared/types"
 import { invalidate, invalidatePrefix, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
@@ -132,5 +138,94 @@ export function TimerBar({
         )
       })}
     </div>
+  )
+}
+
+/** Everything a start or a stop makes stale, in one place, because four screens
+ * do it and a screen that forgets one of them shows a timer that isn't running.
+ * `recordTimeKey` is the record's OWN Time tab — the family the live registry
+ * drops when a row of time moves, and the one a generic refresh does not name. */
+function refreshTimers(teamId: string, targetTable: string, targetId: string): void {
+  invalidate(runningTimersKey(teamId))
+  invalidate(workLogsKey(teamId))
+  invalidate(storiesKey(teamId))
+  invalidate(recordTimeKey(targetTable, targetId))
+  invalidatePrefix(TIME_SLICE_PREFIX)
+}
+
+/** THE CLOCK ON ONE RECORD — start it, and stop the one you started.
+ *
+ * A record's own screen is where a person decides to begin working on it, so it
+ * is where the control belongs, and it exists here rather than three times over
+ * because it was written once and then not repeated: the ticket and the task had
+ * NO way to start a timer at all, while the server has accepted all three targets
+ * since work logs shipped (WORK_LOG_TARGETS: stories, help, tasks).
+ *
+ * IT SAYS WHICH WAY IT GOES. The story's button was a permanent "Start timer"
+ * that did not know a timer was already running on that very story, so the second
+ * press answered "You already have a timer running on this" — the door refusing
+ * correctly, and the screen having asked the wrong question. It reads the same
+ * running-timers cache the header bar reads, so the two can never disagree.
+ *
+ * The variant is CONSTANT on purpose: the label and the glyph carry the state,
+ * and a `variant={running ? … : …}` is the shape R3's check hunts for. */
+export function RecordTimerButton({
+  teamId,
+  targetTable,
+  targetId,
+  /** `work:edit` at the call site — the same right the door gates on. */
+  canLog,
+  /** A finished piece of work has nothing left to time. */
+  disabled,
+}: {
+  teamId: string
+  targetTable: "stories" | "help" | "tasks"
+  targetId: string
+  canLog: boolean
+  disabled?: boolean
+}) {
+  const t = useT()
+  const [busy, setBusy] = React.useState(false)
+  const timersQ = useCached<RunningTimer[]>(runningTimersKey(teamId), () =>
+    contentApi.runningTimers().then((r) => r.timers)
+  )
+  const mine = (timersQ.data ?? []).find(
+    (x) => x.targetTable === targetTable && x.targetId === targetId
+  )
+
+  if (!canLog) return null
+
+  async function toggle() {
+    setBusy(true)
+    try {
+      if (mine) {
+        await contentApi.stopTimer(mine.id)
+        refreshTimers(teamId, targetTable, targetId)
+        toast.success(t("Timer stopped."))
+      } else {
+        await contentApi.startTimer(targetTable, targetId)
+        refreshTimers(teamId, targetTable, targetId)
+        toast.success(t("Timer started."))
+      }
+    } catch (err) {
+      toast.error(
+        err instanceof ApiFailure ? err.message : mine ? "Couldn't stop that timer." : "Couldn't start the timer."
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="gap-1.5"
+      disabled={busy || disabled}
+      onClick={() => void toggle()}
+    >
+      {mine ? <CircleStop className="size-3.5" /> : <Play className="size-3.5" />}
+      {mine ? t("Stop timer") : t("Start timer")}
+    </Button>
   )
 }

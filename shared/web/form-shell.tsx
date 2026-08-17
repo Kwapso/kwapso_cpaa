@@ -3,16 +3,40 @@
 // FormShell — the ONE layout every form/dialog uses, so create / edit screens are
 // predictable and identical across modules (the owner's design-language law):
 //
-//   title + subtitle   ·   ─── separator ───   ·   the fields   ·   ─── separator ───   ·   action
+//   title + subtitle   ·   the fields, SCROLLING   ·   the action bar, PINNED
 //
 // A host-side recipe assembled from library primitives — NOT a new library
 // component. Pass the title as a <DialogTitle> and subtitle as a <DialogDescription>
 // (so Radix Dialog a11y stays intact) and the action button(s) as `footer`.
+//
+// ── WHY IT IS A THREE-ROW GRID (UI-RULEBOOK F2 / F3) ───────────────────────
+//
+// It used to be a plain `flex flex-col` with no height bound at all, and a form is
+// as tall as its fields. `DialogContent` centres itself with `top-1/2
+// -translate-y-1/2`, so a form taller than the window grew EQUALLY off the top and
+// off the bottom, and nothing scrolled: on a 1280×640 window the Edit story dialog
+// measured 738px, its title clipped above the viewport and its Save button below
+// it, unreachable. A tester reported it as the Save button rendering outside the
+// dialog box, which is exactly what it looks like.
+//
+// `max-h-[85dvh]` + `grid-rows-[auto_1fr_auto]` fixes the class of bug rather than
+// the instance: the header and the action bar are `auto`, the FIELDS are the `1fr`
+// row and the only thing that scrolls, so the action bar is always on screen no
+// matter how many fields a module adds. `dvh` rather than `vh` because a phone's
+// address bar is the difference between "pinned" and "just under the fold".
+//
+// And the two separators are gone. A free-standing hairline sitting a fixed gap
+// above a 42px pill is a collision waiting for the next type-scale change (it had
+// already had one: see the note on `pt-6` in library-overrides.css, a documented
+// fix that never actually shipped). A `border-t` on a PADDED bar cannot collide
+// with the button inside it, at any size, because the hairline is the bar's own
+// edge. This removes both front doors' last use of `primitives/separator`, which
+// is right: a separator divides peers, and a form's action bar is not a peer of
+// its fields.
 
 import * as React from "react"
 
 import { Dialog, DialogContent } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Separator } from "@kwapso/ui/registry/primitives/separator/separator"
 
 export function FormShell({
   title,
@@ -32,26 +56,26 @@ export function FormShell({
   onSubmit?: (e: React.FormEvent) => void
 }) {
   return (
-    <form className="flex flex-col" onSubmit={onSubmit}>
-      <div className="flex flex-col gap-1.5 pb-4">
+    // FormShell owns the WHOLE box, edge to edge: its parent gives it no padding
+    // (FormShellDialog passes p-0 to DialogContent) and each region states its own,
+    // so the two hairlines run the full width of the sheet instead of floating in a
+    // 24px inset. That is also why the height cap can be trusted — 85dvh is the
+    // dialog's height, not 85dvh plus somebody else's padding.
+    <form
+      className="grid max-h-[85dvh] grid-rows-[auto_1fr_auto] overflow-hidden rounded-xl"
+      onSubmit={onSubmit}
+    >
+      <div className="flex flex-col gap-1.5 px-6 pt-6 pb-4">
         {title}
         {subtitle}
       </div>
-      <Separator />
-      <div className="flex flex-col gap-4 py-4">{children}</div>
-      <Separator />
-      {/* pt-6, not pt-4, and this is the ONE value that governs it everywhere.
-       * Separator is used in exactly one place across both front doors — right
-       * here — so every form in the agency app AND the portal shared the same
-       * 1rem gap between the hairline and the action button, and at the portal's
-       * larger reading size a 42px pill sitting 17px under a full-width rule
-       * reads as a collision (owner, staging, Aug 2026). 1.5rem matches the
-       * dialog's own p-6, so the action row now breathes the same as the card.
-       * Deliberately ASYMMETRIC with the pb-4/py-4 above: those separate text
-       * from text, this one separates a heavy control from everything else.
-       * Nothing to ask of the library — its Separator is a bare h-px with no
-       * margin, which is correct; the spacing was always ours to set. */}
-      <div className="flex flex-wrap justify-end gap-2 pt-6">{footer}</div>
+      {/* THE ONLY THING THAT SCROLLS. overscroll-contain so reaching the end of a
+          long form does not start scrolling the page behind the dialog. */}
+      <div className="overflow-y-auto overscroll-contain border-t px-6 py-5">
+        <div className="flex flex-col gap-4">{children}</div>
+      </div>
+      {/* The bar's own top edge IS the hairline — nothing to collide with. */}
+      <div className="bg-card flex flex-wrap justify-end gap-2 border-t px-6 py-4">{footer}</div>
     </form>
   )
 }
@@ -102,7 +126,11 @@ export function FormShellDialog({
         onOpenChange(o)
       }}
     >
-      <DialogContent>
+      {/* p-0 gap-0: the shell inside owns every edge (see FormShell). Without
+          this the dialog's own p-6 would sit OUTSIDE the height cap, so a full
+          form would be 85dvh + 48px — taller than the window again — and both
+          hairlines would stop 24px short of the sheet they are meant to divide. */}
+      <DialogContent className="gap-0 overflow-hidden p-0">
         <FormShell onSubmit={onSubmit} title={title} subtitle={subtitle} footer={footer}>
           {children}
         </FormShell>

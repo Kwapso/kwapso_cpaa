@@ -45,6 +45,7 @@ import { ResolveDialog, type ResolveFormValues } from "@/components/resolve-dial
 import { StoryFormDialog } from "@/components/story-form-dialog"
 import { createStoryFrom, useStoryFormOptions } from "@/components/stories-screen"
 import { StoriesPanel, sliceKey } from "@/components/work-panels"
+import { RecordTimerButton } from "@/components/timer-bar"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
 import { accountsKey, totalKey } from "@/lib/live-resources"
@@ -130,6 +131,11 @@ export function HelpDetailScreen({
   // may read and answer requests is not necessarily a person who may put things
   // on the team's backlog, and all three routes to a story respect that.
   const canWriteWork = can("work", "create")
+  // Logging time is `work:create` — the right the start/stop door itself gates
+  // on, so the button offers exactly what the server would accept. It is WORK's
+  // right and not the ticket's: answering a request and putting hours on the
+  // team's timesheet are two different things a role may grant separately.
+  const canLogTime = can("work", "create")
   // REPLYING FROM YOUR OWN MAILBOX. `google:edit` is "you may use your own
   // connection"; the send half needs the owner's second switch as well, and the
   // dialog asks for it separately — writing a draft changes nothing outside the
@@ -429,6 +435,17 @@ export function HelpDetailScreen({
               {translating ? "Translating…" : "Translate"}
             </Button>
           )}
+          {/* THE CLOCK ON A REQUEST. Reading, triaging and resolving one is real
+              work and BUILD-1 §5 is explicit that it is loggable against the
+              request — the door has accepted `help` as a work-log target since
+              work logs shipped, and no screen had ever offered the button. */}
+          <RecordTimerButton
+            teamId={teamId}
+            targetTable="help"
+            targetId={helpId}
+            canLog={canLogTime}
+            disabled={ticket.status === "resolved"}
+          />
           {/* ANSWER IT — the second and last thing in the product that emails a
               client, so it is a deliberate button with a dialog behind it and
               never a side effect of the stepper. Gone once it is answered. */}

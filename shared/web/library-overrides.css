@@ -35,3 +35,27 @@
  *
  * BEFORE YOU ADD AN OVERRIDE HERE, check whether the library already does what
  * you want. This one was fighting a fix that had already shipped. */
+
+/* ── shared/web IS A SOURCE, AND TAILWIND HAD NEVER BEEN TOLD ──────────────
+ *
+ * Tailwind v4 discovers its own sources, rooted at the project it is built from.
+ * Both front doors are their own npm workspaces (`web/`, `web-portal/`), so that
+ * root is the front door — and `shared/web/` sits OUTSIDE it. Every component we
+ * deliberately share between the two apps (FormShell, the language menu and
+ * section, the code input, the Google button, the splash screen) was therefore
+ * written in a vocabulary Tailwind never read.
+ *
+ * A class is only missing when NOTHING under web/ happens to use it too, which is
+ * why this hid for months and then surfaced as one specific complaint: the action
+ * bar of every form in both apps sat flush against its separator, because
+ * form-shell.tsx's `pt-6` — the ONE value an eleven-line comment said "governs it
+ * everywhere" — was the only `pt-6` in either app and so was never generated.
+ * Measured on staging, that div's computed padding-top was 0px. The comment
+ * described a fix that had never once run.
+ *
+ * `@source` paths are relative to THIS file, so "." is shared/web. It lives here,
+ * in the one stylesheet both `web/app/globals.css` and
+ * `web-portal/app/globals.css` already import, because a per-door line is a line
+ * one door can be given and the other forgotten — the same reasoning the front
+ * door helpers are shared for. Locked by web/test/shared-web-is-styled.test.ts. */
+@source ".";

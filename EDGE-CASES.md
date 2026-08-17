@@ -52,6 +52,28 @@ re-read the URL and re-render in place.
 - **The one-shell is the machine-checked invariant.** No in-app link may use
   `router.push` (that was the reload); the account modules must each render a screen.
 
+**AND THE SHELL ONLY GETS SERVED IF THE WORKER RUNS.** The half of this trap that
+lives in configuration, found on 2026-08-17 when a tester said sharing a ticket
+link "fails to load". `workers/gateway/src/index.ts` serves the right shell for any
+depth under `/t/*` and under every module in `SHELL_MODULES` — and always had. But
+`assets.run_worker_first` in `workers/gateway/wrangler.jsonc` is an **ARRAY**, and an
+array means every path NOT listed **skips the Worker entirely** and is answered by
+the asset layer, which with `not_found_handling: "404-page"` is a 404. That array
+read `["/api/*", "/media/*", "/t/*", "/learning/*", "/help/*", "/mcp"]`: one live
+module, plus a `/help/*` that stopped being a URL segment when the section was
+renamed to `tickets`. So `/tickets/<id>`, `/stories/<id>`, `/tasks/<id>` and eleven
+more 404'd on a shared link or a reload, while `/t/<team>/tickets/<id>` worked
+perfectly — which is why it read as random rather than as one bug.
+
+Neither half looks wrong alone: the loop looks complete, the array looks like a
+deliberate short list. And `web/test/nav.test.ts` had checked the loop against
+`TEAM_SECTIONS` since the pages shipped, going green the whole time — **a passing
+test about one half of a two-part contract reads as coverage of the whole.**
+`workers/gateway/test/shell-routing.test.ts` now derives the required prefixes from
+`SHELL_MODULES` and fails if the config disagrees, in **every** environment (wrangler
+envs do not inherit an `assets` block). **Adding a top-level module page is two
+edits, not one.**
+
 **version-watch heals the stale tab, it doesn't prevent reloads.** Because there
 is no service worker, a long-lived tab holds the **old shell + its hashed
 chunks** across a deploy. `web/components/version-watch.tsx` handles the two
@@ -623,6 +645,8 @@ last) fails, and deploying a worker before its migration 500s at runtime.
 | `await` the run before returning the stream | Kills streaming; isolate may drop | Return the readable, write async (`streamRun`) |
 | Guard an invariant with a pre-write `COUNT` only | TOCTOU race | Re-check in the `UPDATE … WHERE`; count is just the friendly error |
 | Assume hot reads route through sharding | They query `guard.databaseId` directly | Fine today; revisit any batched script if a module is split |
+| Add a top-level module page and only teach the gateway's handler | `run_worker_first` is an allow-list; an unlisted path never reaches the Worker | Add `/mod/*` to the assets block in EVERY env too (§1) |
+| Reach for a Tailwind class in `shared/web/` | It is outside both front doors' source roots | Already covered by `@source "."` in library-overrides.css — keep that import |
 | Deploy auth-first / worker-before-migration | Binder-before-target 500s; missing table | realtime-FIRST; migrations to both DBs first |
 | Split `lib/accounts.ts` because it is "1,136 lines" | 369 of those are comments, and a law pins every spine statement to that one file | Measure CODE lines; check what pins the file before proposing a split (§ *A long file that a law is holding open*) |
 
@@ -655,6 +679,28 @@ marks a badged tab's panel, `CountedAbove` marks a counted sibling strip, and th
 heading calls the hook ABOVE its early return and renders null when marked. The
 tab wins; the heading stands down. (R16 owns the NUMBER; the tab-tie law R8 owns
 WHICH collection a tab describes — if they conflict, R16 prevails.)
+
+## A class in `shared/web/` only exists if Tailwind was told to look there
+**The trap.** Tailwind v4 finds its own sources, rooted at the project it is built
+inside. Both front doors are their own npm workspaces (`web/`, `web-portal/`), so
+that root is the front door — and `shared/web/` is **outside both**. Every class
+used ONLY by a shared component was therefore never generated. It fails silently
+and selectively: a class survives if anything under `web/` happens to use it too,
+so `py-4` worked and `pt-6` did not, in the same file, on the same day.
+
+That is not hypothetical. `shared/web/form-shell.tsx` carried an eleven-line comment
+defending `pt-6` as "the ONE value that governs it everywhere", written when the
+owner reported the separator colliding with the submit button. Measured on staging,
+that div's computed `padding-top` was **0px** and `.pt-6` was in no stylesheet the
+app shipped. The documented fix had never once run, and the bug was re-reported
+three months later.
+
+**The rule.** `shared/web/library-overrides.css` — the one stylesheet BOTH doors
+already `@import` — carries `@source ".";`. It lives there rather than in each
+`globals.css` for the reason the front-door helpers are shared: a per-door line is a
+line one door can be given and the other forgotten. Locked by
+`web/test/shared-web-is-styled.test.ts`. If you add a THIRD front door, its
+`globals.css` must import that file or every shared component loses its styling.
 
 ## A hook below an early return (the white screen)
 **The trap.** A `use*` hook placed AFTER a top-level `if (…) return` renders fine

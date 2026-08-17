@@ -59,7 +59,9 @@ export function NeedsName({ onDone }: { onDone: () => void }) {
   const ready = values.firstName.trim() !== "" && values.lastName.trim() !== ""
 
   return (
-    <main className="mx-auto flex min-h-[100svh] max-w-md flex-col justify-center px-6">
+    // No px here: FormShell states its own padding on every region now, so a
+    // gutter at this level would double it on a phone.
+    <main className="mx-auto flex min-h-[100svh] max-w-md flex-col justify-center">
       <FormShell
         title={<h1 className="text-2xl font-semibold tracking-tight">{t("What should we call you?")}</h1>}
         subtitle={

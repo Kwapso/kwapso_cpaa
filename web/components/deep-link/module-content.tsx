@@ -34,6 +34,7 @@ import { AppDetailScreen } from "@/components/app-detail"
 import { SprintDetailScreen } from "@/components/sprint-detail"
 import { StoryDetailScreen } from "@/components/story-detail"
 import { MeetingDetailScreen } from "@/components/meeting-detail"
+import { RecordTimerButton } from "@/components/timer-bar"
 import { ImportScreen } from "@/components/import-screen"
 import { InternalRateCardScreen } from "@/components/internal-rate-card"
 import { StaffPanel } from "@/components/staff-panel"
@@ -135,6 +136,11 @@ function internalDetail(
      * label deciding from a different spelling of the same field is how a button
      * ends up disagreeing with the write behind it. */
     adapt?: (recipe: ScreenRecipe, record: Record<string, unknown>) => ScreenRecipe
+    /** One control above the engine's blocks, for the thing a recipe cannot draw
+     * at all. Today that is exactly one thing — the timer on a task — and it is
+     * a slot rather than a fifth branch because the alternative was to stop
+     * using the engine for a record the engine draws perfectly well. */
+    above?: React.ReactNode
   }
 ): React.ReactNode {
   if (spec.query.error) return <LoadError what={spec.what} />
@@ -144,6 +150,7 @@ function internalDetail(
   const data = spec.shape(row, ctx.internalActivity.rows)
   return (
     <div className="flex flex-col gap-4">
+      {spec.above && <div className="flex flex-wrap justify-end gap-2">{spec.above}</div>}
       <ScreenRenderer
         recipe={spec.adapt ? spec.adapt(recipe, data.record ?? {}) : recipe}
         data={data}
@@ -388,6 +395,21 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
         // no longer exists" the instant you used the button on it.
         query: ctx.tasksAllQ,
         shape: shapeTaskDetail as InternalShaper,
+        // THE CLOCK ON OUR OWN ADMIN. Forty minutes on the quarterly VAT return
+        // costs the agency what forty minutes of delivery costs, which is why
+        // `tasks` has been a work-log target since work logs shipped — and why
+        // the absence of any control to start one was a capability the code had
+        // and no screen offered. A task that is already ticked off has nothing
+        // left to time.
+        above: (
+          <RecordTimerButton
+            teamId={teamId as string}
+            targetTable="tasks"
+            targetId={recordId}
+            canLog={can("work", "create")}
+            disabled={ctx.tasksAllQ.data?.find((r) => r.id === recordId)?.status === "done"}
+          />
+        ),
         // THE TICK SAYS WHAT IT WILL DO NEXT. Same door, two directions — the
         // host already toggles on the record's status, and the label has to
         // agree with it or a finished task offers to be finished again.

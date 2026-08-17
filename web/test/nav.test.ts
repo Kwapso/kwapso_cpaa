@@ -103,6 +103,51 @@ describe("the sidebar sequence the owner fixed", () => {
   })
 })
 
+// EVERY PAGE ON THE RAIL HAS ITS OWN GLYPH, AND THE FALLBACK IS NOT ONE.
+//
+// `SECTION_ICONS` in app-shell.tsx maps a sidebar section to its lucide component
+// and falls back to Home for anything missing. A fallback that renders is a
+// fallback nobody sees: `time` and `meetings` shipped without a line, so the rail
+// drew the house three times and a tester reported that Meetings and Time share
+// an icon. Both concepts already had a glyph in CONCEPT_ICON; only this map had
+// not been told, and nothing could tell.
+//
+// The keys are DERIVED from the registry, so a new sidebar page has to bring its
+// icon with it, and the values must all be different, so the next one cannot
+// quietly land on somebody else's.
+describe("the rail's icons", () => {
+  const src = readFileSync(join(ROOT, "web/components/app-shell.tsx"), "utf8")
+  const block = src.match(/const SECTION_ICONS[^{]*\{([^}]*)\}/)?.[1] ?? ""
+  const pairs = [...block.matchAll(/^\s*"?([\w-]+)"?:\s*(\w+),/gm)].map(([, key, icon]) => ({ key, icon }))
+
+  it("names an icon for every sidebar section in the registry", () => {
+    expect(pairs.length, "SECTION_ICONS could not be read out of app-shell.tsx").toBeGreaterThan(0)
+    const named = new Set(pairs.map((p) => p.key))
+    const missing = TEAM_SECTIONS.filter((s) => s.placement === "sidebar" && !named.has(s.key)).map(
+      (s) => s.key
+    )
+    expect(
+      missing,
+      "these rail pages fall back to the Home icon, so they are indistinguishable from Home and from each other"
+    ).toEqual([])
+  })
+
+  it("gives each one a DIFFERENT icon, Home included", () => {
+    // Home is not in SECTION_ICONS (it is a NAV entry), but it is on the same
+    // rail and it is what the fallback resolved to — so it counts here.
+    const icons = ["Home", ...pairs.map((p) => p.icon)]
+    const seen = new Map<string, string[]>()
+    pairs.forEach((p) => seen.set(p.icon, [...(seen.get(p.icon) ?? []), p.key]))
+    seen.set("Home", [...(seen.get("Home") ?? []), "home"])
+    const shared = [...seen.entries()].filter(([, keys]) => keys.length > 1)
+    expect(
+      shared.map(([icon, keys]) => `${icon}: ${keys.join(" + ")}`),
+      "two rail pages wearing one glyph — one concept, one icon (UI-CONVENTIONS §4)"
+    ).toEqual([])
+    expect(new Set(icons).size).toBe(icons.length)
+  })
+})
+
 // A section's URL segment and the right the server enforces used to be the same
 // word everywhere, so nothing had to check that they agreed. They no longer are:
 // the Tickets section is addressed at /tickets and gated by `help` — the string
@@ -150,9 +195,16 @@ describe("every navigable section is reachable from its own URL", () => {
   //
   // Both ends derived: the sections from this registry, the served list from the
   // gateway's own source.
+  //
+  // THIS PASSED WHILE FOURTEEN OF THE FIFTEEN 404'd, and that is worth writing
+  // down. The handler's list was complete and always had been; what was missing
+  // was `run_worker_first` in the gateway's wrangler.jsonc, which decides whether
+  // a request reaches the handler AT ALL. A green test about the right half of a
+  // two-part contract reads as coverage of the whole. The other half is now held
+  // by workers/gateway/test/shell-routing.test.ts.
   it("the gateway serves a shell for every sidebar section's sub-paths", () => {
     const src = readFileSync(join(ROOT, "workers", "gateway", "src", "index.ts"), "utf8")
-    const list = src.match(/for \(const mod of \[([^\]]*)\]\)/)?.[1] ?? ""
+    const list = src.match(/export const SHELL_MODULES = \[([\s\S]*?)\]/)?.[1] ?? ""
     const served = [...list.matchAll(/"([^"]+)"/g)].map((m) => m[1])
     expect(
       served.length,

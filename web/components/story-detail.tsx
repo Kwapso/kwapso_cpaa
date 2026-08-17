@@ -19,10 +19,9 @@ import * as React from "react"
 import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
-import { ArrowDown, ArrowUp, Pencil, Play } from "lucide-react"
+import { ArrowDown, ArrowUp, Pencil } from "lucide-react"
 
 import { LoadMore } from "@/components/load-more"
 import { StoryFormDialog, type StoryFormValues } from "@/components/story-form-dialog"
@@ -30,13 +29,14 @@ import { useStoryFormOptions } from "@/components/stories-screen"
 import { STORY_STATUS_LABEL } from "@/components/work-panels"
 import { TimeFormDialog, type TimeFormValues } from "@/components/time-form-dialog"
 import { StoryStatusStepper } from "@/components/story-status-stepper"
+import { RecordTimerButton } from "@/components/timer-bar"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, content as contentApi } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
-import { cursorKey, recordTimeKey, runningTimersKey, storiesKey, totalKey } from "@/lib/live-resources"
+import { cursorKey, recordTimeKey, storiesKey, totalKey } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
@@ -89,6 +89,10 @@ export function StoryDetailScreen({
 
   const { can } = usePermissions(teamId)
   const canEdit = can("work", "edit")
+  // The timer asks for the right its own door asks for (`work:create`), not the
+  // one that governs editing the story — a person who may log time but not
+  // rewrite the work was being offered neither.
+  const canLogTime = can("work", "create")
 
   const [tab, setTab] = React.useState("overview")
   const [editOpen, setEditOpen] = React.useState(false)
@@ -269,31 +273,17 @@ export function StoryDetailScreen({
         </div>
         {/* ml-auto on the GROUP so a narrow phone reflows instead of clipping. */}
         <div className="flex flex-wrap gap-2 sm:ml-auto sm:shrink-0">
-          {canEdit && (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={busy || story.status === "done"}
-              onClick={() =>
-                void run(
-                  async () => {
-                    await contentApi.startTimer("stories", storyId)
-                    // The header bar on every screen and this record's own Time
-                    // tab both read a running timer — neither is the cache the
-                    // generic refresh above drops.
-                    invalidate(runningTimersKey(teamId))
-                    invalidate(timeKey)
-                  },
-                  "Timer started.",
-                  "Couldn't start the timer."
-                )
-              }
-              className="gap-1.5"
-            >
-              {busy ? <Spinner /> : <Play className="size-3.5" />}
-              {t("Start timer")}
-            </Button>
-          )}
+          {/* START, AND STOP. It used to be a permanent "Start timer" that could
+              not see the timer already running on this very story, so pressing it
+              again asked the door a question it had to refuse. The shared control
+              reads the same running-timers cache the header bar reads. */}
+          <RecordTimerButton
+            teamId={teamId}
+            targetTable="stories"
+            targetId={storyId}
+            canLog={canLogTime}
+            disabled={story.status === "done"}
+          />
           {canEdit && (
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-1.5">
               <Pencil className="size-3.5" />
