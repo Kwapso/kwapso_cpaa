@@ -77,7 +77,7 @@ describe("agency gateway — /api reaches the worker its path names", () => {
   const byPrefix: [string, string, string][] = [
     ["/api/auth/me", "AUTH", "identity"],
     ["/api/tenancy/roles", "TENANCY", "the team's machinery"],
-    ["/api/content/help", "CONTENT", "learning + help"],
+    ["/api/content/help", "CONTENT", "tickets + the work engine"],
     ["/api/data-ops/agent/chat", "DATAOPS", "import + the assistant"],
     ["/api/mcp/tokens", "MCP", "the machine surface's front desk"],
     ["/mcp", "MCP", "the machine surface itself"],
@@ -169,7 +169,7 @@ describe("agency gateway — the screens (the static-export trap)", () => {
   })
 
   it("serves each module's own shell for its sub-paths", async () => {
-    for (const mod of ["accounts", "learning", "tickets"]) {
+    for (const mod of ["accounts", "knowledge", "tickets"]) {
       const log: string[] = []
       await call("GET", `/${mod}/01RECORD`, log)
       expect(log, `/${mod}/<id> must resolve to the ${mod} shell`).toEqual([`ASSETS /${mod}`])
@@ -196,7 +196,7 @@ describe("agency gateway — the media doors are capability URLs, so the key is 
     expect(log).toEqual(["MEDIA.get users/01USER/01J8ZQ4H7M9K2P5R7T9V1X3Y5Z"])
   })
 
-  it("sends learning attachments to their own bucket (the more specific prefix wins)", async () => {
+  it("still serves the learning bucket its bytes outlived the module in (the more specific prefix wins)", async () => {
     const log: string[] = []
     await call("GET", "/media/learning/01TEAM/01J8ZQ4H7M9K2P5R7T9V1X3Y5Z", log)
     expect(log).toEqual(["LEARNING_MEDIA.get 01TEAM/01J8ZQ4H7M9K2P5R7T9V1X3Y5Z"])

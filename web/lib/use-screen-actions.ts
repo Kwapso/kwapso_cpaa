@@ -1,7 +1,7 @@
 "use client"
 
 // useScreenActions — the deep-link host's WRITE layer: the named-action dispatcher
-// plus the two rich-payload creators (learning article, help ticket). Lifted out of
+// plus the rich-payload creator (a help ticket). Lifted out of
 // the component so the host's mutation surface is one named thing, not inline in the
 // render path.
 //
@@ -23,25 +23,22 @@ import {
   brandAssetsKey,
   knowledgeKey,
   listFetch,
-  marketingKey,
-  programmesKey,
   purposesKey,
   tasksKey,
   totalKey,
 } from "@/lib/live-resources"
 import { invalidate, primeCache } from "@shared/web/store"
 import type { AccountFormValues } from "@/components/account-form-dialog"
-import type { LearningFormValues } from "@/components/learning-form-dialog"
 import type { KnowledgeFormValues } from "@/components/knowledge-form-dialog"
 
 /** The four agency-internal record kinds, keyed by their URL segment (which is
  * what the host has in hand when a panel opens). */
-export type InternalKind = "marketing" | "brand" | "delivery" | "purposes"
+export type InternalKind = "brand" | "purposes"
 
 /** Per kind: which door writes it, which cache holds it, which table its history
  * is under, and what to say when one is created. A table rather than a switch
- * with four near-identical arms — the arms would differ only in those four
- * values, and a switch hides that they are the only difference. */
+ * with near-identical arms — the arms would differ only in those four values,
+ * and a switch hides that they are the only difference. */
 const INTERNAL_WRITERS: Record<
   InternalKind,
   {
@@ -52,27 +49,6 @@ const INTERNAL_WRITERS: Record<
     setActive: (id: string, active: boolean) => Promise<unknown[]>
   }
 > = {
-  marketing: {
-    table: "marketing_posts",
-    created: "Post recorded.",
-    key: marketingKey,
-    save: async (v, id) => {
-      const body = {
-        title: v.title,
-        channel: v.channel || undefined,
-        status: v.status || undefined,
-        summary: v.summary || undefined,
-        body: v.body || undefined,
-        link: v.link || undefined,
-        publishedOn: v.publishedOn || undefined,
-      }
-      const r = id
-        ? await contentApi.updateMarketingPost({ id, ...body })
-        : await contentApi.createMarketingPost(body)
-      return r.posts
-    },
-    setActive: (id, active) => contentApi.setMarketingPostActive(id, active).then((r) => r.posts),
-  },
   brand: {
     table: "brand_assets",
     created: "Added to the brand library.",
@@ -88,23 +64,6 @@ const INTERNAL_WRITERS: Record<
       return r.assets
     },
     setActive: (id, active) => contentApi.setBrandAssetActive(id, active).then((r) => r.assets),
-  },
-  delivery: {
-    table: "programs",
-    created: "Programme added.",
-    key: programmesKey,
-    save: async (v, id) => {
-      const body = {
-        name: v.name,
-        description: v.description || undefined,
-        // The one numeric field in the four: the form hands back a string, and
-        // an empty one means "leave it at the default" rather than zero.
-        sequence: v.sequence ? Number(v.sequence) : undefined,
-      }
-      const r = id ? await contentApi.updateProgramme({ id, ...body }) : await contentApi.createProgramme(body)
-      return r.programs
-    },
-    setActive: (id, active) => contentApi.setProgrammeActive(id, active).then((r) => r.programs),
   },
   purposes: {
     table: "meeting_purposes",
@@ -195,25 +154,6 @@ export function useScreenActions(teamId: string | null) {
           break
         }
       }
-    },
-    [teamId]
-  )
-
-  // Create a learning article — its own handler (a rich payload, not the flat string
-  // map runAction takes). Primes the list so the new article appears at once; the
-  // realtime "add" ping refreshes it for everyone else.
-  const createLearning = React.useCallback(
-    async (values: LearningFormValues) => {
-      if (!teamId) return
-      const { learning: next } = await contentApi.createLearning({
-        title: values.title,
-        category: values.category || null,
-        contentType: values.contentType || null,
-        contentLink: values.contentLink || null,
-        body: values.body || null,
-      })
-      primeCache(`learning:${teamId}`, next)
-      toast.success(`Created "${values.title}".`)
     },
     [teamId]
   )
@@ -347,7 +287,6 @@ export function useScreenActions(teamId: string | null) {
 
   return {
     runAction,
-    createLearning,
     createHelp,
     createAccount,
     createKnowledge,

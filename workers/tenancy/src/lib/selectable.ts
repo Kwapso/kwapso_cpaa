@@ -1,8 +1,16 @@
 // Dropdown values ("Selectable data") module — the per-team dropdown VALUES,
 // grouped by TYPE (e.g. "File type" → Image file / Video link…), in the team's
-// OWN database. Admins manage them so the Learning-category / Ticket-type pickers
-// stay theirs to shape. Deactivate-only (ARCHITECTURE §4): a removed value is
+// OWN database. Admins manage them so the Ticket-type / Sprint-type pickers stay
+// theirs to shape. Deactivate-only (ARCHITECTURE §4): a removed value is
 // retired, never hard-deleted, so old rows that referenced it stay truthful.
+//
+// A VALUE CAN CARRY MORE THAN ITS WORD. Four nullable columns arrived with
+// team-schema 0025, when the Delivery method page was retired and its ten
+// programmes — a mark, a German name, what the block includes, how long it
+// normally runs — were folded onto the sprint type, which had always been the
+// same idea under another name. They are optional everywhere and null on almost
+// every row: a File type has no standard length, and nothing here pretends
+// otherwise.
 
 import { logActivity, type Actor } from "@shared/workers/activity"
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
@@ -11,10 +19,32 @@ import type { SelectableValue } from "@shared/types"
 import { GuardError, type MemberGuard } from "./permissions"
 import { EXPORT_HARD_CAP, LIST_HARD_CAP } from "@shared/workers/limits"
 
-type Row = { id: string; type: string; value: string; is_default: number; deactivated_at: string | null }
+type Row = {
+  id: string
+  type: string
+  value: string
+  is_default: number
+  deactivated_at: string | null
+  mark: string | null
+  name_de: string | null
+  description: string | null
+  standard_days: number | null
+}
+
+const COLUMNS = "id, type, value, is_default, deactivated_at, mark, name_de, description, standard_days"
 
 function toValue(r: Row): SelectableValue {
-  return { id: r.id, type: r.type, value: r.value, isDefault: r.is_default === 1, active: r.deactivated_at == null }
+  return {
+    id: r.id,
+    type: r.type,
+    value: r.value,
+    isDefault: r.is_default === 1,
+    active: r.deactivated_at == null,
+    mark: r.mark ?? null,
+    nameDe: r.name_de ?? null,
+    description: r.description ?? null,
+    standardDays: r.standard_days ?? null,
+  }
 }
 
 /** Every dropdown value in the team — ACTIVE first, then deactivated — grouped by
@@ -27,7 +57,7 @@ export async function listSelectable(cfg: D1Rest, guard: MemberGuard): Promise<S
     cfg,
     guard.databaseId,
     // R14 hard cap — never unbounded; move to real paging before this bites.
-    `SELECT id, type, value, is_default, deactivated_at FROM selectable_data ORDER BY type ASC, (deactivated_at IS NULL) DESC, value ASC LIMIT ${LIST_HARD_CAP}`,
+    `SELECT ${COLUMNS} FROM selectable_data ORDER BY type ASC, (deactivated_at IS NULL) DESC, value ASC LIMIT ${LIST_HARD_CAP}`,
     []
   )
   return rows.map(toValue)
@@ -119,7 +149,7 @@ export async function updateSelectable(
   const rows = await d1Query<Row>(
     cfg,
     guard.databaseId,
-    "SELECT id, type, value, is_default FROM selectable_data WHERE id = ? AND deactivated_at IS NULL",
+    `SELECT ${COLUMNS} FROM selectable_data WHERE id = ? AND deactivated_at IS NULL`,
     [id]
   )
   const row = rows[0]
@@ -150,7 +180,7 @@ export async function setSelectableActive(
   const rows = await d1Query<Row>(
     cfg,
     guard.databaseId,
-    "SELECT id, type, value, is_default FROM selectable_data WHERE id = ?",
+    `SELECT ${COLUMNS} FROM selectable_data WHERE id = ?`,
     [id]
   )
   const row = rows[0]

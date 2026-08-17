@@ -3,14 +3,15 @@
 // R21 is enforced (`client-reachable-doors` in rules.test.ts) and it asks exactly
 // the right question — "can a caller holding the Client role's rights pass this
 // door?" — which means it stops at every door the shipped role cannot reach.
-// Eleven agency-only WRITE doors sat in that shadow: the learning library, the
+// Eleven agency-only WRITE doors sat in that shadow: the learning library (since
+// purged), the
 // dropdown vocabulary and the team's own record each had `refusePortalCaller` on
 // EVERY read door and on NOT ONE write door.
 //
 // Nothing was leaking. The seeded Client role holds no write right, so the doors
 // were refuted as findings — and that is precisely the objection. R21's own text
 // says the refusal belongs at the door "so it does not depend on how carefully a
-// role was built", and an owner who ticks `learning: edit` on their client role
+// role was built", and an owner who ticks `brand_assets: edit` on their client role
 // is one checkbox away from a client editing the agency's how-to library. A
 // defence that survives only because of a permission matrix somebody may change
 // tomorrow is a defence with a date on it.
@@ -171,8 +172,6 @@ describe("a module refuses a client login on both halves, or on neither", () => 
       "delivery",
       "google",
       "knowledge",
-      "learning",
-      "marketing",
       "meetings",
       "selectable_data",
       "staff_profiles",

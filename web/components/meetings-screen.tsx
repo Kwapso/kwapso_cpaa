@@ -11,6 +11,12 @@
 // The heading carries the exact server COUNT(*) (R16) because a sidebar page has
 // no tab strip to badge; the arbitration context makes sure only one of the two
 // ever renders it.
+//
+// AND IT IS WHERE MEETING PURPOSES ARE REACHED FROM. The taxonomy of why we meet
+// used to sit under the Delivery method page; that page went on 17 Aug 2026 with
+// its programmes folded onto the sprint type, and a purpose belongs beside the
+// diary rather than on a rail of its own — it is the vocabulary behind this
+// screen, not a second destination.
 
 import * as React from "react"
 
@@ -34,6 +40,7 @@ import { listFetch, meetingsKey } from "@/lib/live-resources"
 import { withDataDrivenCollection } from "@/lib/screens"
 import type { Account, Meeting, MeetingPurpose } from "@shared/types"
 import { invalidate, useCached } from "@shared/web/store"
+import { formatCount } from "@shared/web/format-count"
 import { useT } from "@shared/web/language"
 
 export function MeetingsScreen({
@@ -41,7 +48,10 @@ export function MeetingsScreen({
   recipe,
   rights,
   total,
+  purposeCount,
   canCreate,
+  canReadPurposes,
+  onPurposes,
   onAction,
   onIntent,
 }: {
@@ -50,7 +60,12 @@ export function MeetingsScreen({
   rights: ScreenRights
   /** the exact server total (R16) — never the loaded page's length */
   total: number | undefined
+  /** the exact server total of the MEETING PURPOSES, for the link below */
+  purposeCount: number | undefined
   canCreate: boolean
+  /** `delivery:read` — the right the purposes screen itself gates on. */
+  canReadPurposes: boolean
+  onPurposes: () => void
   onAction: (actionId: string, ctx: ScreenActionContext) => void
   onIntent: (intent: ScreenIntent) => void
 }) {
@@ -61,7 +76,9 @@ export function MeetingsScreen({
   const accountsQ = useCached<Account[]>(canCreate ? `accounts:${teamId}` : null, () =>
     tenancy.accounts().then((r) => r.accounts)
   )
-  const purposesQ = useCached<MeetingPurpose[]>(canCreate ? `purposes:${teamId}` : null, () =>
+  // The purposes are read whenever this screen can offer them at all — the form
+  // picker needs them, and so does the count on the link below.
+  const purposesQ = useCached<MeetingPurpose[]>(canCreate || canReadPurposes ? `purposes:${teamId}` : null, () =>
     listFetch.purposes(teamId)
   )
   const [open, setOpen] = React.useState(false)
@@ -132,6 +149,22 @@ export function MeetingsScreen({
           )
         }}
       </PagedFind>
+
+      {/* WHY WE MEET, one level down. A link rather than a nav line: the purposes
+          are the vocabulary this screen picks from, and a rail that lists both a
+          page and the words behind it reads as two ideas. R16: the number is the
+          door's exact total through the ONE seam, and an unloaded total renders
+          nothing rather than a "0" that reads as "there are none". */}
+      {canReadPurposes ? (
+        <button
+          type="button"
+          onClick={onPurposes}
+          className="text-muted-foreground hover:text-foreground w-fit text-sm underline-offset-4 hover:underline"
+        >
+          {t("Meeting purposes")}
+          {formatCount(purposeCount) ? ` (${formatCount(purposeCount)})` : ""}
+        </button>
+      ) : null}
 
       <MeetingFormDialog
         open={open}

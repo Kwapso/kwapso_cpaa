@@ -470,7 +470,6 @@ export const PORTAL_ACTIVITY_FENCE: Record<string, { fence: "account" | null; wh
     fence: null,
     why: "a ticket's history names the staff who moved it and quotes the problem statement — the client is shown the STATUS instead (PORTAL_ACTIVITY_EXEMPT says the same thing about the screen). THE LEAK: help sat outside the deciding list, so another client's support history came back by ticket id. STILL null after the 11 Aug 2026 widening: a contact now sees their whole company's TICKETS, which is a decision about the rows; their HISTORY is a different question, and its answer is the one SCOPE ch.06 gives — the portal never says which staff member is doing the work.",
   },
-  learning: { fence: null, why: "the agency's own how-to library — a client has no screen on it" },
   knowledge_sources: {
     fence: null,
     why: "the knowledge base is the agency's own material — its process notes, its internal tickets, what it knows about each client — and a client login cannot reach a single door on it (every knowledge handler opens with refusePortalCaller). Its HISTORY would name what was filed under whom, which is a worse disclosure than the sources themselves: 'X filed \"the Delaval renewal\" under Delaval' tells a reader at another company that Delaval is a client. Silence, in the same fail-closed direction as everything else here.",
@@ -511,16 +510,14 @@ export const PORTAL_ACTIVITY_FENCE: Record<string, { fence: "account" | null; wh
   },
   work_logs: { fence: null, why: "how long one of our people took over a piece of work, and who corrected the figure afterwards. It is the input to the agency's own margin, and the hours behind a price are never the client's to read — they see the VALUE the work produced (the savings drilled through their process map) and not what it cost us to produce it" },
   sprints: { fence: null, why: "a sprint's history names who priced it and what the price was before. The client is shown the sprint as a NAMED BLOCK WITH DATES because it is what they bought (BUILD-1 §7); the record of us changing our minds about it is ours" },
-  // THE AGENCY'S OWN HOUSEKEEPING — six tables, one answer, and it is the
-  // EASIEST six entries in this table rather than the hardest. Everywhere else
-  // here the question is genuinely difficult ("the rows are theirs but the
-  // history names us"). Not here: the ROWS are not theirs either. A client login
-  // cannot reach a single door on any of these four modules (every handler opens
-  // with refusePortalCaller), so `null` is not a withholding — it is the same
+  // THE AGENCY'S OWN HOUSEKEEPING — four tables, one answer, and they are the
+  // EASIEST entries in this table rather than the hardest. Everywhere else here
+  // the question is genuinely difficult ("the rows are theirs but the history
+  // names us"). Not here: the ROWS are not theirs either. A client login cannot
+  // reach a single door on any of these three modules (every handler opens with
+  // refusePortalCaller), so `null` is not a withholding — it is the same
   // sentence the door already said, repeated where the feed can hear it.
-  marketing_posts: { fence: null, why: "what the agency publishes about ITSELF, and the record of editing it — the client is not the audience for the post, let alone for its drafts" },
   brand_assets: { fence: null, why: "the agency's own brand material and who changed it — a client sees the work, never our library" },
-  programs: { fence: null, why: "how the agency runs an engagement, and every revision of it — our method, which is ours whoever it is applied to" },
   meeting_purposes: { fence: null, why: "why the agency meets and which department owns it — a description of our own organisation" },
   staff_profiles: { fence: null, why: "what a colleague is like and what they are bad at. The sharpest case of agency-only material in the app, and its HISTORY names both the subject and the person who wrote it down" },
   staff_certificates: { fence: null, why: "what our people are qualified in, and when a qualification was corrected — the agency's own credential register" },
@@ -573,7 +570,6 @@ export const PORTAL_ACTIVITY_EXEMPT: Record<string, string> = {
  * a table the feed cannot NAME is a table it cannot withhold. */
 export const ACTIVITY_GATE_MAP: Record<string, string> = {
   help: "help",
-  learning: "learning",
   selectable_data: "selectable_data",
   member_roles: "member_roles",
   users: "team_members",
@@ -617,14 +613,10 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
   // notes are the thing being permissioned, and why `delivery` (the taxonomy of
   // why we meet) is not the same question.
   meetings: "meetings",
-  // THE AGENCY'S OWN HOUSEKEEPING. Six tables, four modules — grouped the way a
-  // reader meets them: two tables gate on `delivery` because a programme and a
-  // meeting purpose are one taxonomy, and two on `staff_profiles` because a
-  // person's profile and their certificates are one record from the member
-  // page's point of view.
-  marketing_posts: "marketing",
+  // THE AGENCY'S OWN HOUSEKEEPING. Four tables, three modules — grouped the way
+  // a reader meets them: two gate on `staff_profiles` because a person's profile
+  // and their certificates are one record from the member page's point of view.
   brand_assets: "brand_assets",
-  programs: "delivery",
   meeting_purposes: "delivery",
   staff_profiles: "staff_profiles",
   staff_certificates: "staff_profiles",
@@ -778,7 +770,6 @@ export const MUTATING_WORKERS = ["tenancy", "content", "data-ops"] as const
  * Overview + Activity tabs themselves (the engine-recipe details get them for free). */
 export const RECORD_DETAIL_COMPONENTS = [
   "help-detail",
-  "learning-detail",
   "role-detail",
   "account-detail",
   // A CONTACT'S OWN SCREEN. One table underneath (a company and a person are one
@@ -838,8 +829,6 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
   "role-detail.permissions":
     "the permission matrix is a fixed grid of the app's modules × four rights — app furniture that ships with the code, not a team collection that grows.",
   "role-detail.overview": "one role's description, member count and audit block — one record, not a collection.",
-  "learning-detail.article": "the article's own prose + linked media — one record's body, not a collection.",
-  "learning-detail.overview": "one article's category, type and audit block — one record, not a collection.",
   "help-detail.overview": "one ticket's type, source and audit block — one record, not a collection.",
   "account-detail.overview":
     "one company's own fields — its reference, its industry, its postal address, its language, where it sits, the paragraph about it, and the hours its apps have given back. One record, not a collection. Every collection tab beside it — contacts, children, apps, sprints, to-dos, rates, activity — carries a server count.",
@@ -851,9 +840,7 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
   // a `description` block of the record's own fields — so there is no collection
   // on the Overview tab to count, and its sibling Activity tab carries the exact
   // server total like every other record in the app.
-  "marketing.detail.overview": "one post's channel, status, link and audit block — one record, not a collection.",
   "brand.detail.overview": "one asset's category, description, file and audit block — one record, not a collection.",
-  "delivery.detail.overview": "one programme's description, order and audit block — one record, not a collection.",
   "purposes.detail.overview": "one meeting purpose's department, description and audit block — one record, not a collection.",
   // The work engine's one recipe detail. Its three siblings (an app, a sprint, a
   // story) are components because each carries a collection tab or a status
@@ -874,7 +861,6 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
 /** R4 — the form dialogs that MUST use FormShell. */
 export const FORM_DIALOGS = [
   "help-form-dialog",
-  "learning-form-dialog",
   "role-form-dialog",
   "invite-dialog",
   "team-edit-dialog",

@@ -80,17 +80,6 @@ export function traceFor(
     case "set_dropdown_active":
       return { path: seg(teamId, "dropdowns"), highlight: "main" }
 
-    /* ------------------------------- learning ------------------------------ */
-    // Create → the learning list (the "New article" form is a rich dialog; land on the
-    // list where the new row appears live). Edit / (de)activate / mark-done → the
-    // article's detail.
-    case "create_learning":
-      return { path: seg(teamId, "learning"), highlight: "main" }
-    case "update_learning":
-    case "set_learning_active":
-    case "mark_learning_done":
-      return { path: `${seg(teamId, "learning")}/${str(input, "id")}`, highlight: "main" }
-
     /* -------------------------------- tickets ------------------------------- */
     // Raise → the Tickets list (the new ticket appears live). Reply / edit / status
     // → that ticket's detail thread.
@@ -157,8 +146,6 @@ export function traceFor(
     case "bulk_set_help_status":
     case "set_help_status_by_filter":
       return { path: seg(teamId, "tickets"), highlight: "main" }
-    case "bulk_set_learning_active":
-      return { path: seg(teamId, "learning"), highlight: "main" }
 
     /* ----------------------------- process maps ----------------------------- */
     // An APP has no screen of its own — it is the heading a map sits under, and
@@ -272,21 +259,11 @@ export function traceFor(
     // owner's own reason: a profile and a certificate live on the MEMBER's page,
     // so that is where a trace has to go — `/t/<team>/staff/<id>` would be a URL
     // this app deliberately does not have.
-    case "create_marketing_post":
-      return { path: seg(teamId, "marketing"), highlight: "main" }
-    case "update_marketing_post":
-    case "set_marketing_post_active":
-      return { path: `${seg(teamId, "marketing")}/${str(input, "id")}`, highlight: "main" }
     case "create_brand_asset":
       return { path: seg(teamId, "brand"), highlight: "main" }
     case "update_brand_asset":
     case "set_brand_asset_active":
       return { path: `${seg(teamId, "brand")}/${str(input, "id")}`, highlight: "main" }
-    case "create_programme":
-      return { path: seg(teamId, "delivery"), highlight: "main" }
-    case "update_programme":
-    case "set_programme_active":
-      return { path: `${seg(teamId, "delivery")}/${str(input, "id")}`, highlight: "main" }
     case "create_meeting_purpose":
       return { path: seg(teamId, "purposes"), highlight: "main" }
     case "update_meeting_purpose":

@@ -112,8 +112,6 @@ const TOOLLESS_DOORS: Record<string, string> = {
   "POST /api/content/google/sources/active":
     "stops sharing a folder or space, or shares it again. The same decision as the door above, in reverse, and out of the assistant's hands for the same reason — re-sharing something a person deliberately withdrew is exactly the act nobody should be able to delegate by accident.",
 
-    "POST /api/content/learning/upload-stream":
-    "the SAME door as the learning upload above, with the file as the request BODY rather than a base64 field inside it. Unreachable from this surface for a DIFFERENT reason than its twin, and the difference is worth writing down so nobody tries to \"finish\" the pair: the buffered door cannot be called because 34 million characters will not fit in an argument, while this one cannot be called because a JSON-RPC tool call has no request body to stream into at all. A machine writes the article and references media it already has a URL for.",
 
   "POST /api/content/brand-assets/upload-stream":
     "the streamed twin of the brand-asset upload — the file is the request body, which is not a shape a JSON-RPC call has. Same conclusion as the buffered door beside it, reached from the transport rather than from the argument size.",
@@ -121,11 +119,9 @@ const TOOLLESS_DOORS: Record<string, string> = {
   "POST /api/content/staff/upload-stream":
     "the streamed twin of the staff-file upload — a photo or a certificate PDF as the request body, which a tool call cannot express. Same reasoning as its buffered pair.",
 
-"POST /api/content/learning/upload":
-    "shovels bytes — an image or short clip as a base64 data URL, up to 25 MB — into the learning-media bucket and hands back a URL to paste into an article. It writes no row and leaves no record of its own. One call on this surface may ANSWER with 400,000 characters; a 25 MB base64 argument is two orders of magnitude past what it is built to carry. A machine writes the article, and references media it already has a URL for.",
 
   "POST /api/content/knowledge/upload":
-    "the SAME arithmetic as the learning upload above, with a sharper edge. It carries a whole file as a base64 data URL — up to 25 MB, which is ~34 million characters of argument on a surface whose entire ANSWER is capped at 400,000 — so no model can physically make this call. That is why it is a door of its own rather than a `fileDataUrl` field on POST /api/content/knowledge: bolting it onto the door `add_knowledge_source` already sits on would have made R22 require the tool to expose and forward a field it cannot emit, which is a contract that can only be met by writing an excuse. Nothing is lost. A machine that HAS words puts them in with add_knowledge_source, which takes 1.5 MB of them; what it cannot do is hold a PDF, and it never could.",
+    "the SAME arithmetic as the brand-asset upload below, with a sharper edge. It carries a whole file as a base64 data URL — up to 25 MB, which is ~34 million characters of argument on a surface whose entire ANSWER is capped at 400,000 — so no model can physically make this call. That is why it is a door of its own rather than a `fileDataUrl` field on POST /api/content/knowledge: bolting it onto the door `add_knowledge_source` already sits on would have made R22 require the tool to expose and forward a field it cannot emit, which is a contract that can only be met by writing an excuse. Nothing is lost. A machine that HAS words puts them in with add_knowledge_source, which takes 1.5 MB of them; what it cannot do is hold a PDF, and it never could.",
 
   "POST /api/content/knowledge/upload-stream":
     "the SAME door as the buffered upload above, with the file as the request BODY rather than a base64 field inside it — which changes the memory arithmetic and changes nothing at all about whether a machine can call it. This surface is JSON-RPC: a tool call IS a JSON object, so there is no request body for a tool to stream into and no way to express `the bytes are the body` as an argument. The buffered door is unreachable because 34 million characters will not fit in an argument; this one is unreachable because it does not take arguments for the part that matters. Same conclusion, different reason, and the reason is worth writing down so the next person does not try to \"finish\" the pair by adding a tool to one of them.",
@@ -139,7 +135,7 @@ const TOOLLESS_DOORS: Record<string, string> = {
   "POST /api/data-ops/agent/translate-ticket":
     "the ONE button in the app that spends the team's AI allowance without going through a chat turn, and that is exactly why it is not on this surface. MCP.md §6 is a promise about cost: a machine token's reads, writes, exports and imports are free endpoint hits, and only `agent_chat` / `agent_confirm` / `plan_import` draw the allowance — a role without the agent right spends zero AI. A tool here would put a fourth spender on that list, silently, from a headless client that cannot see the balance it is drawing down. Changing the cost model is the owner's decision, not a parity default. And the capability is already reachable in the shape this surface is built for: a chat turn translates the title (metered, visible in the usage log) and calls `update_help_ticket` with `titleEn`, which is one of the fields R22 makes it expose.",
   "POST /api/content/brand-assets/upload":
-    "the same door as the learning upload, for the same bytes and the same reason: up to 25 MB of base64 argument on a surface whose whole ANSWER is capped at 400,000 characters. A machine writes the brand-asset ROW — create_brand_asset carries `fileUrl` — and references a file it already has a URL for. Uploading the bytes is a screen action.",
+    "a byte-shovel, and the arithmetic is the whole answer: up to 25 MB of base64 argument on a surface whose whole ANSWER is capped at 400,000 characters. A machine writes the brand-asset ROW — create_brand_asset carries `fileUrl` — and references a file it already has a URL for. Uploading the bytes is a screen action.",
   "POST /api/content/staff/upload":
     "the third of the byte-shovels, and the narrowest: a profile photo or a certificate PDF, up to 25 MB of base64. save_staff_profile and create_staff_certificate both carry the URL field, so the record half is fully machine-writable; the bytes are not, for the arithmetic reason the other two give.",
 
@@ -176,7 +172,7 @@ const TOOLLESS_DOORS: Record<string, string> = {
  * now DOES expose turns the build red, so the list can only shrink. */
 const NARROWED_BODY_FIELDS: Record<string, string> = {
   "POST /api/tenancy/teams/update::logoDataUrl":
-    "a logo is BYTES, not prose — a base64 image data URL up to 2.5 MB (MAX_IMAGE_BYTES), which is ~3.4 million characters of argument on a surface whose whole ANSWER is capped at 400,000. It is the same objection, and the same order-of-magnitude arithmetic, that keeps POST /api/content/learning/upload off this surface entirely (MCP.md §3 item 6). Renaming is unaffected: updateTeamDetails treats an absent logo as 'leave it as it is', so a machine rename can never blank a logo it cannot send.",
+    "a logo is BYTES, not prose — a base64 image data URL up to 2.5 MB (MAX_IMAGE_BYTES), which is ~3.4 million characters of argument on a surface whose whole ANSWER is capped at 400,000. It is the same objection, and the same order-of-magnitude arithmetic, that keeps POST /api/content/brand-assets/upload off this surface entirely (MCP.md §3 item 6). Renaming is unaffected: updateTeamDetails treats an absent logo as 'leave it as it is', so a machine rename can never blank a logo it cannot send.",
   "POST /api/content/todos/complete::fileDataUrl":
     "the same bytes-not-prose objection as the two below, and one more on top of it. A to-do's attachment is a base64 data URL up to 10 MB — around 14 million characters of argument on a surface whose whole ANSWER is capped at 400,000. And the file is the CLIENT's: 'send us the signed contract' is answered by the person who has it, from their own portal, on their own machine. A machine caller marking the to-do done is a legitimate act (the thing arrived by email, somebody is tidying up); a machine caller INVENTING the file is not a shape this door should make easy. `id` is exposed and forwarded, so the capability the surface actually needs is whole.",
   "POST /api/content/todos/complete::fileName":
@@ -215,7 +211,7 @@ const propsOf = (tool: ToolView): Record<string, { type?: string }> =>
 
 /** A FILLED-IN call of a tool, typed the way its own schema declares. R22's
  * forwarding half RUNS the builder on this rather than reading its source: a
- * builder that delegates (`(i) => learningBody(i)`) forwards perfectly and
+ * builder that delegates (`(i) => brandAssetBody(i)`) forwards perfectly and
  * mentions not one field by name, so a substring scan would call it broken. What
  * the door actually receives is the only honest question, and it is answerable —
  * so ask it. */

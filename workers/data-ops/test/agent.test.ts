@@ -61,8 +61,8 @@ describe("agent tool catalog + confirm rule (destructive + privilege grants)", (
   // See workers/content/test/fence-row-confirm.test.ts and FENCED_ROW_OWNERS.
   const RUNS_FREELY = [
     "update_team",
-    "create_learning",
-    "update_learning",
+    "create_brand_asset",
+    "update_brand_asset",
     "reply_help_ticket",
     "create_dropdown_value",
     "update_dropdown_value",
@@ -103,7 +103,7 @@ describe("agent tool catalog + confirm rule (destructive + privilege grants)", (
     // set_role_active is NOT in this list: it writes to member_roles, so the
     // derived privilege rule makes it confirm both ways (a reactivated role hands
     // its rights back to everyone holding it).
-    for (const name of ["set_learning_active", "set_dropdown_active"]) {
+    for (const name of ["set_brand_asset_active", "set_dropdown_active"]) {
       const t = getTool(name)!
       expect(requiresConfirm(t, { active: false }), `${name} deactivate must confirm`).toBe(true)
       expect(requiresConfirm(t, { active: true }), `${name} activate runs freely`).toBe(false)
@@ -128,7 +128,7 @@ describe("agent tool catalog + confirm rule (destructive + privilege grants)", (
 
   it("bulk tools change many records at once — write, confirm (high-blast), via CONTENT", () => {
     // A bulk change hits many rows, so it's always confirmed with a count-bearing summary.
-    for (const name of ["bulk_set_learning_active", "bulk_set_help_status"]) {
+    for (const name of ["bulk_set_help_status"]) {
       const t = getTool(name)
       expect(t, `tool "${name}" must be defined`).toBeDefined()
       expect(t!.write).toBe(true)

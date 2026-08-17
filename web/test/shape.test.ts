@@ -4,7 +4,6 @@ import type {
   HelpTicket,
   Invite,
   InviteAudit,
-  Learning,
   TeamMember,
   TeamMeta,
   TeamRole,
@@ -21,7 +20,6 @@ import {
   shapeHelpList,
   shapeInviteDetail,
   shapeInvitesList,
-  shapeLearningList,
   shapeMemberDetail,
   shapeMembersList,
   shapeRolesList,
@@ -70,23 +68,6 @@ const audit: InviteAudit = {
   accepted: false,
   acceptedAt: null,
   shelfLifeHours: 168,
-}
-
-const learning: Learning = {
-  id: "l1",
-  category: "Onboarding",
-  title: "How to onboard a client",
-  description: "A quick guide",
-  contentType: "Guide",
-  contentLink: null,
-  body: "# Steps\n- one\n- two",
-  sequence: 0,
-  required: false,
-  active: true,
-  createdAt: "2026-06-13T10:00:00.000Z",
-  creatorName: "Alaap Kanchwala",
-  editorName: null,
-  updatedAt: null,
 }
 
 const ticket: HelpTicket = {
@@ -205,27 +186,6 @@ describe("shapeInvitesList", () => {
     expect(rows?.[0].email).toBe("guest@x.com")
     expect(String(rows?.[0].detail)).toContain("Editor")
     expect(String(rows?.[0].detail)).toContain(INVITE_STATUS.pending)
-  })
-})
-
-describe("shapeLearningList", () => {
-  it("maps id, title→name, and category→detail", () => {
-    const { rows } = shapeLearningList([learning])
-    expect(rows?.[0].id).toBe("l1")
-    expect(rows?.[0].name).toBe("How to onboard a client")
-    expect(rows?.[0].detail).toBe("Onboarding")
-  })
-
-  it('adds the "(inactive)" suffix when !active', () => {
-    const { rows } = shapeLearningList([{ ...learning, active: false }])
-    expect(rows?.[0].name).toBe("How to onboard a client (inactive)")
-  })
-
-  it("falls back the detail to the description, then to a dash", () => {
-    expect(shapeLearningList([{ ...learning, category: null }]).rows?.[0].detail).toBe("A quick guide")
-    expect(
-      shapeLearningList([{ ...learning, category: null, description: null }]).rows?.[0].detail
-    ).toBe("—")
   })
 })
 

@@ -1,5 +1,5 @@
 // The navigation order is a locked owner decision: Home first, then the team pages
-// (Learning, Tickets), Settings last — the SAME order on the desktop rail and the
+// (Knowledge base, Tickets), Settings last — the SAME order on the desktop rail and the
 // mobile bottom bar (no centre-pinning). These lock the mobile derivation.
 
 import { readFileSync } from "node:fs"
@@ -14,16 +14,16 @@ const ROOT = join(__dirname, "..", "..")
 
 const composed = [
   { slug: "home" },
-  { slug: "learning" },
+  { slug: "knowledge" },
   { slug: "tickets" },
   { slug: "settings" },
 ]
 
-describe("bottomNavItems — Home, Learning, Tickets, Settings", () => {
+describe("bottomNavItems — Home, Knowledge base, Tickets, Settings", () => {
   it("keeps the composed order (Home FIRST, not centre-pinned)", () => {
     expect(bottomNavItems(composed).map((i) => i.slug)).toEqual([
       "home",
-      "learning",
+      "knowledge",
       "tickets",
       "settings",
     ])
@@ -80,16 +80,17 @@ describe("the sidebar sequence the owner fixed", () => {
     ])
   })
 
-  it("puts the nine occasional ones below it, in his order", () => {
+  it("puts the occasional ones below it, in his order", () => {
+    // FIVE, not nine, since 17 Aug 2026. Marketing and Learning were purged, the
+    // Delivery method page went with its programmes folded onto the sprint type,
+    // and Process maps became contextual — a map is read inside the app it
+    // belongs to. None of the four lost a screen; three lost a module and one
+    // lost only its line on the rail.
     expect(composeLikeTheShell()[1]).toEqual([
       "meetings",
       "apps",
-      "processes",
       "sprints",
-      "marketing",
       "brand",
-      "delivery",
-      "learning",
       "settings",
     ])
   })

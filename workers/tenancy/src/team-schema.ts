@@ -5,6 +5,8 @@
 
 import { sqlString } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
+import { TASK_DEPARTMENTS } from "@shared/departments"
+import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
 
 // The module list itself lives in shared/team-modules.ts — data-ops builds the
 // import/export permission-matrix columns from the SAME list, so the matrix a
@@ -47,6 +49,47 @@ const COMPANY_VOCABULARY: { type: string; value: string }[] = [
   { type: "Account status", value: "active_client" },
   { type: "Account status", value: "past_client" },
   { type: "Account status", value: "archived" },
+]
+
+/** THE SPRINT-TYPE CATALOGUE — the ten ways the agency runs an engagement.
+ *
+ * These rows used to be the `programs` table behind the Delivery method page.
+ * The page went on 17 Aug 2026 and the DATA did not: a programme was never
+ * anything but "the kind of block this sprint is", which is the question the
+ * sprint type already answers, so the two were one idea wearing two names. What
+ * the programme carried and the sprint type did not is here — the mark somebody
+ * recognises it by, the German name the agency already uses with its German
+ * clients, the sentence that explains what the block includes, and how long one
+ * normally runs. That is what lets a sprint say "Implementation, 21 days".
+ *
+ * A STARTING vocabulary, like the ticket types: every field is editable on the
+ * team's own Dropdown values screen, and a team that has retired one keeps it
+ * retired (the seed and migration 0025 are both pick-or-create).
+ *
+ * `standardDays` is a suggestion, never a rule — a sprint's real dates are the
+ * ones somebody agreed with the client. `nameDe` is the ONE curated label
+ * carried across from the legacy catalogue, because these words were already in
+ * front of German clients; every other language comes from the translation
+ * layer, which is why there is no third column here and never will be.
+ * `Assessment` arrives bare — the legacy row had no mark, no German name and no
+ * length, and inventing three would be worse than carrying a thin row honestly. */
+export const SPRINT_TYPE_CATALOGUE: {
+  value: string
+  mark: string | null
+  nameDe: string | null
+  description: string | null
+  standardDays: number | null
+}[] = [
+  { value: "Assessment", mark: null, nameDe: null, description: null, standardDays: null },
+  { value: "Diagnostic", mark: "🔎", nameDe: "Prozessanalyse", description: "We map the organisation around the solution, the tool stack, the data architecture, the way the work is done today and the main user stories behind it, and we set out what it costs in time and money now, alongside the needs and expectations.", standardDays: 14 },
+  { value: "Process Optimization", mark: "🎯", nameDe: "Prozessoptimierung", description: "Working from the diagnostic, we design the improved process — removing steps, simplifying them, automating them — and produce the assets and the solution paper that meet the needs and expectations and bring the running cost down.", standardDays: 7 },
+  { value: "Data Migration", mark: "🗂️", nameDe: "Datenpflege", description: null, standardDays: 7 },
+  { value: "Foundation", mark: "🛠️", nameDe: "Fundament", description: "Your data, in your app. This is the foundation everything else is built on.", standardDays: 7 },
+  { value: "Implementation", mark: "💎", nameDe: "Umsetzung", description: "We build everything designed during the process optimization, on top of the foundation.", standardDays: 21 },
+  { value: "Validation", mark: "👀", nameDe: "Validierung", description: "The stakeholders watch the walkthrough, and at the end of the week we meet so you can show us how you use the app. We answer your questions, find what can still be improved, and write the tickets together — though you can raise one at any moment.", standardDays: 14 },
+  { value: "Refinement", mark: "✨", nameDe: "Anpassung", description: null, standardDays: 14 },
+  { value: "Training", mark: "🎓", nameDe: "Schulung", description: "One live online training with the main stakeholders, and a follow-up meeting a few days later to answer what came up.", standardDays: 7 },
+  { value: "Enhancement", mark: "🚀", nameDe: "Erweiterung", description: "An enhancement cycle adds new steps around what is already live — better automations, new screens, new user stories. It covers a fixed number of tickets and is priced on its own. It opens with one clarification and ideation meeting where we adjust the process map and agree expectations, and closes with a recording of what was built and one follow-up meeting for questions and training.", standardDays: 21 },
 ]
 
 export const TEAM_MIGRATIONS: { version: string; sql: string }[] = [
@@ -145,42 +188,22 @@ CREATE TABLE invite_logs (
 `,
   },
   {
-    // The next-build modules (learning + help + import + the agent's saved
-    // conversations), all per-team. See AGENT-MODULES-PLAN.md + the design notes.
+    // The next-build modules (help + import + the agent's saved conversations),
+    // all per-team. See AGENT-MODULES-PLAN.md + the design notes.
     // Tickets are team-wide (My/All tabs = a creator filter, no row-level privacy).
     // Agent conversations get their OWN tables (not help's). Module file storage
     // lives in per-module R2 buckets with a per-team key prefix (not in D1).
+    //
+    // THIS MIGRATION USED TO CREATE `learning` AND `learning_progress` TOO.
+    // The Learning module was purged on 17 Aug 2026 (the owner's ruling: the
+    // material had already been indexed into the knowledge base, so the module
+    // was a second home for words that had a first one). The CREATEs are gone
+    // from HISTORY rather than merely dropped afterwards, because a fresh clone
+    // must not rebuild the module even for a moment — and 0025 drops the tables
+    // for the teams that already ran this version. Git history keeps the shape
+    // for anyone who needs to read it; this file is what a new database becomes.
     version: "0004_modules",
     sql: `
--- Learning: a team's how-to content. content_body is the in-app text the agent
--- reads to answer help; content_link points at external material. sequence is
--- display order only (nothing locked).
-CREATE TABLE learning (
-  id TEXT PRIMARY KEY,
-  category TEXT,
-  content_title TEXT NOT NULL,
-  content_description TEXT,
-  content_type TEXT,
-  content_link TEXT,
-  content_body TEXT,
-  sequence INTEGER NOT NULL DEFAULT 0,
-  is_required INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
-  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
-  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
-);
-
--- Per-user learning progress: an explicit, reversible "mark as done".
-CREATE TABLE learning_progress (
-  id TEXT PRIMARY KEY,
-  learning_id TEXT NOT NULL REFERENCES learning (id),
-  user_id TEXT NOT NULL,
-  done INTEGER NOT NULL DEFAULT 0,
-  done_at TEXT,
-  updated_at TEXT NOT NULL,
-  UNIQUE (learning_id, user_id)
-);
-
 -- Tickets (team-wide). The built-in status (open/in_progress/resolved/
 -- reopened) is the source of truth the code trusts; help_type is a cosmetic
 -- selectable value. source_* captures the screen/record a ticket was raised from.
@@ -1230,30 +1253,14 @@ CREATE UNIQUE INDEX idx_triage_duty_week ON triage_duty (week_start);
     // halves of each module to the same answer.
     version: "0018_agency_internal",
     sql: `
--- MARKETING: what the agency publishes about itself — 251 posts across six
--- channels in the legacy app. \`channel\` is a STRING, pick-or-created against the
--- "Marketing channel" dropdown group, exactly as a learning article's category is
--- pick-or-created against "Learning category". That is what makes six channels a
--- canonical six instead of six spellings, without a second table to join.
---
--- \`published_on\` is a DATE (YYYY-MM-DD), not a timestamp: a post goes out on a
--- day, and storing an instant would invent a precision nobody typed. NULL is a
--- post that has not gone out yet, which is a real and common state.
-CREATE TABLE marketing_posts (
-  id TEXT PRIMARY KEY,
-  title TEXT NOT NULL,
-  channel TEXT,
-  status TEXT,
-  summary TEXT,
-  body TEXT,
-  link TEXT,
-  published_on TEXT,
-  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
-  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
-  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
-);
-CREATE INDEX idx_marketing_posts_channel ON marketing_posts (channel);
-CREATE INDEX idx_marketing_posts_published ON marketing_posts (published_on);
+-- THIS MIGRATION USED TO CREATE \`marketing_posts\` AND \`programs\` TOO.
+-- Both were purged on 17 Aug 2026 by the owner's ruling — Marketing the MODULE
+-- goes (Marketing the task DEPARTMENT stays, and it is a dropdown value, not a
+-- table), and the Delivery method PAGE goes with its programme half folded onto
+-- the sprint type a person actually picks. The CREATEs are gone from HISTORY
+-- rather than merely dropped afterwards, so that a fresh clone never builds
+-- either one; 0025 drops them for the teams that already ran this version, after
+-- carrying every programme field across.
 
 -- THE BRAND LIBRARY: 74 rows of the material everything else is made with —
 -- logos, decks, templates. \`file_url\` is either an object we host (a
@@ -1272,21 +1279,6 @@ CREATE TABLE brand_assets (
   deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
 );
 CREATE INDEX idx_brand_assets_category ON brand_assets (category);
-
--- THE DELIVERY METHOD, in two tables under one module.
---
--- A PROGRAMME is a way we run an engagement — the ten rows the legacy app used
--- to describe how delivery works. \`sequence\` is display order only, the same
--- meaning it has on a learning article: nothing is locked to it.
-CREATE TABLE programs (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  description TEXT,
-  sequence INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
-  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT,
-  deactivated_at TEXT, deactivator_id TEXT, deactivator_email TEXT, deactivator_name TEXT
-);
 
 -- A MEETING PURPOSE is why we meet — and it is the one legacy lookup that could
 -- NOT become a dropdown value, because a purpose belongs to a department and a
@@ -1314,7 +1306,7 @@ CREATE INDEX idx_meeting_purposes_department ON meeting_purposes (department);
 --
 -- \`user_id\` is the GLOBAL user id, held as plain TEXT with no REFERENCES — the
 -- members themselves live in the core database, so a foreign key here would name
--- a table this database does not have. \`learning_progress.user_id\` has exactly
+-- a table this database does not have. \`google_connections.user_id\` has exactly
 -- the same shape for exactly the same reason.
 --
 -- The partial unique index is the invariant: ONE live profile per person. It
@@ -1340,12 +1332,10 @@ CREATE UNIQUE INDEX idx_staff_profiles_user
   ON staff_profiles (user_id) WHERE deactivated_at IS NULL;
 
 -- A CERTIFICATE a member holds. Five rows in the legacy app, described there as
--- learning completions — which is why the columns are a CREDENTIAL's rather than
--- a completion's (an issuer, the day it was granted, the day it lapses, the
--- paper itself). A completion fits inside a credential; the reverse does not,
--- and the base already records "this person finished this article" in
--- learning_progress, so shaping these five rows as completions would have been a
--- second, weaker copy of a thing that already exists.
+-- course completions — which is why the columns are a CREDENTIAL's rather than a
+-- completion's (an issuer, the day it was granted, the day it lapses, the paper
+-- itself). A completion fits inside a credential; the reverse does not, and a
+-- credential is the fact that outlives the course it came from.
 CREATE TABLE staff_certificates (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
@@ -1421,7 +1411,7 @@ SELECT lower(hex(randomblob(16))), '${v.type}', '${v.value}', 1, datetime('now')
 -- configuration mistake somebody could make, it is a column that does not exist.
 --
 -- \`user_id\` is the GLOBAL user id, plain TEXT with no REFERENCES, for the same
--- reason \`learning_progress.user_id\` and \`staff_profiles.user_id\` are: the
+-- reason \`staff_profiles.user_id\` is: the
 -- members themselves live in the core database, so a foreign key here would name
 -- a table this database does not have.
 --
@@ -1818,12 +1808,195 @@ SELECT lower(hex(randomblob(16))), '${v.type}', '${v.value}', 1, datetime('now')
 ).join("\n")}
 `,
   },
+  {
+    // THE PURGE, AND THE ONE THING IT REFUSED TO THROW AWAY.
+    //
+    // The owner's ruling of 17 Aug 2026 retires three things: Marketing the
+    // MODULE (Marketing the task DEPARTMENT stays — it is a dropdown value and
+    // always was), Learning, and the Delivery method PAGE. The CREATE statements
+    // are already gone from 0004 and 0018, so a database built from this file
+    // today never has these four tables at all; this migration is for the teams
+    // that were built before the ruling.
+    //
+    // NOTHING READABLE IS LOST BY EITHER DROP:
+    //   • Learning's 41 articles were indexed into the knowledge base before the
+    //     module was retired (measured, not assumed) — the sources survive with
+    //     kind `article`, which is why lib/knowledge.ts keeps that kind with no
+    //     sweep behind it any more;
+    //   • the ten programmes were the sprint types wearing a second name, and
+    //     everything they carried is folded onto the sprint type below;
+    //   • marketing posts are the one genuine loss, and the ruling is explicit
+    //     that the module goes. An owner who wants the 251 legacy posts still
+    //     has them in the Glide export.
+    //
+    // THE FOUR COLUMNS GO ON `selectable_data` RATHER THAN ON A SPRINT-TYPE
+    // TABLE, because a sprint type is a dropdown value and a table for it would
+    // be a second vocabulary seam beside the one that already exists. Every one
+    // of them is nullable and every one is meaningful beyond sprint types: a
+    // mark is what UI-RULEBOOK's type mark reads, a description is what a
+    // picker's hint line shows, a curated foreign label is what an agency writes
+    // once for a client who reads another language. `standard_days` is the only
+    // narrow one, and it is a number nobody else has to look at.
+    version: "0025_purge_learning_marketing_programmes",
+    sql: `
+ALTER TABLE selectable_data ADD COLUMN mark TEXT;
+ALTER TABLE selectable_data ADD COLUMN name_de TEXT;
+ALTER TABLE selectable_data ADD COLUMN description TEXT;
+ALTER TABLE selectable_data ADD COLUMN standard_days INTEGER;
+
+-- THE FOLD. One statement per value, generated from the catalogue — D1's
+-- compound-SELECT ceiling is FIVE terms, and 0018 is the migration that learned
+-- it the hard way. Pick-or-create for the row, then a plain UPDATE for the
+-- enrichment: a team that already has "Implementation" keeps its own row, its
+-- own id and its own history, and simply gains the mark, the German name, the
+-- sentence and the length. A team that retired one keeps it retired.
+${SPRINT_TYPE_CATALOGUE.map(
+  (t) => `INSERT INTO selectable_data (id, type, value, is_default, created_at, creator_id, creator_email, creator_name)
+SELECT lower(hex(randomblob(16))), 'Sprint type', ${sqlString(t.value)}, 1, datetime('now'), NULL, NULL, 'System'
+ WHERE NOT EXISTS (SELECT 1 FROM selectable_data s WHERE s.type = 'Sprint type' AND s.value = ${sqlString(t.value)});
+UPDATE selectable_data
+   SET mark = ${sqlString(t.mark)}, name_de = ${sqlString(t.nameDe)},
+       description = COALESCE(description, ${sqlString(t.description)}),
+       standard_days = ${t.standardDays === null ? "NULL" : t.standardDays}
+ WHERE type = 'Sprint type' AND value = ${sqlString(t.value)};`
+).join("\n")}
+
+-- AND THE TABLES GO. IF EXISTS on every one: a database built after the CREATEs
+-- left 0004 and 0018 reaches this migration with none of them, and a migration
+-- that only works on the old shape is a migration that breaks every new team.
+-- learning_progress first — it is the one with the foreign key.
+DROP TABLE IF EXISTS learning_progress;
+DROP TABLE IF EXISTS learning;
+DROP TABLE IF EXISTS marketing_posts;
+DROP TABLE IF EXISTS programs;
+`,
+  },
+  {
+    // THE 26 DUPLICATES EVERY TEAM BORN BEFORE THE SEED WAS GUARDED IS CARRYING.
+    //
+    // `createTeam` applies every migration and THEN runs the seed. Several
+    // migrations back-fill a default vocabulary into existing teams (0009's four
+    // ticket types, 0016's three sprint types, 0018's six countries and five
+    // company-size bands) and they guard themselves with WHERE NOT EXISTS,
+    // because they have to be safe against a team that already has the value.
+    // The seed did not, because when it was written it ran into an empty table —
+    // so a brand-new team got each of those 26 values twice, and every picker in
+    // the app offered each word twice. That is exactly what a tester meant by
+    // "ticket types appear two, three and four times".
+    //
+    // The seed is guarded now, so no NEW team can be born with them. This is the
+    // other half: the teams that already were.
+    //
+    // WHICH COPY SURVIVES, and why it cannot be "the one with the most
+    // references". A dropdown value is referenced by its STRING, everywhere in
+    // this app — a ticket's \`help_type\` holds the word "Question", not the id
+    // of a row. Two live rows reading (Ticket type, Question) are therefore
+    // indistinguishable to every reference in the database: there is no count to
+    // compare. So the rule is the only one that can be applied honestly — the
+    // OLDEST row survives, ties broken by id, which is the row every earlier
+    // reference was looking at anyway.
+    //
+    // DEACTIVATED, NEVER DELETED (ARCHITECTURE §4). A retired duplicate keeps
+    // its id, its audit block and its history, shows up greyed on the Dropdown
+    // values screen with an Activate button, and can be brought back by anybody
+    // who thinks this was wrong. \`deactivator_name\` says 'System' because that
+    // is who did it.
+    //
+    // IDEMPOTENT: run it twice and the second pass finds nothing live to retire,
+    // because the survivor of each group is the only row still matching.
+    version: "0026_retire_duplicate_dropdown_values",
+    sql: `
+UPDATE selectable_data
+   SET deactivated_at = datetime('now'),
+       deactivator_id = NULL,
+       deactivator_email = NULL,
+       deactivator_name = 'System',
+       updated_at = datetime('now')
+ WHERE deactivated_at IS NULL
+   AND EXISTS (
+     SELECT 1 FROM selectable_data keeper
+      WHERE keeper.type = selectable_data.type
+        AND keeper.value = selectable_data.value
+        AND keeper.id <> selectable_data.id
+        AND keeper.deactivated_at IS NULL
+        AND (keeper.created_at < selectable_data.created_at
+             OR (keeper.created_at = selectable_data.created_at AND keeper.id < selectable_data.id))
+   );
+`,
+  },
+  {
+    // TASKS, REBUILT (CHECKLIST §4). Six columns on the table we already have,
+    // because every one of them is a fact ABOUT a task rather than a record of
+    // its own — the shape rule this file has followed since 0016.
+    //
+    // `important` + `urgent` REPLACE a priority word. The score they make is
+    // `(important × 2) + urgent + 1`, 1 to 4, and it is computed in
+    // shared/departments.ts rather than stored: a derived number in a column is
+    // a number that can disagree with the two ticks it came from. The old
+    // high/medium/low never reached this table, so there is nothing to migrate.
+    //
+    // `department` is a WORD, not a foreign key — the five live in the
+    // `Department` dropdown group (seeded below), which is the one home this base
+    // has for a team's editable vocabulary. A department renamed on that screen
+    // leaves old rows reading truthfully, exactly as a renamed ticket status does.
+    //
+    // `app_id` is the second field a Production task asks for; the account column
+    // 0016 already added is the one Sales and Admin ask for. Both nullable: a
+    // department that asks nothing leaves both empty, and NOT NULL here would
+    // make the form's rule a schema fact that the next department breaks.
+    //
+    // `file_url` / `file_name` are the one attachment a task carries, the same
+    // pair and the same reasoning as a to-do's: the ask is "a photo of the
+    // letter", and a second file is a second task or a note on the one it is on.
+    // It lands in INTERNAL_MEDIA, which only the AGENCY gateway serves (R21) —
+    // a task is our own admin and its evidence must not be redeemable at the
+    // client's hostname.
+    //
+    // The due-date index is what the six views cost: Overdue, Upcoming and the
+    // "due today or earlier" progress bar all ask about `due_on` on every read.
+    version: "0027_task_admin",
+    sql: `
+ALTER TABLE tasks ADD COLUMN important INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE tasks ADD COLUMN urgent INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE tasks ADD COLUMN department TEXT;
+ALTER TABLE tasks ADD COLUMN app_id TEXT REFERENCES apps (id);
+ALTER TABLE tasks ADD COLUMN file_url TEXT;
+ALTER TABLE tasks ADD COLUMN file_name TEXT;
+CREATE INDEX idx_tasks_due_on ON tasks (due_on);
+
+-- The five departments the agency already runs on, as ordinary dropdown values
+-- so they are editable (the owner's answer to c1). Pick-or-create, like every
+-- other vocabulary this file seeds: a team that already typed "Marketing" for a
+-- meeting purpose keeps the row it has, and the two nouns share one word.
+--
+-- ONE STATEMENT PER VALUE, generated from the shared list — D1's compound-SELECT
+-- ceiling is FIVE terms, which 0018 learned the hard way.
+${TASK_DEPARTMENTS.map(
+  (d) => `INSERT INTO selectable_data (id, type, value, is_default, created_at, creator_id, creator_email, creator_name)
+SELECT lower(hex(randomblob(16))), '${SELECTABLE_GROUPS.department}', '${d.name}', 1, datetime('now'), NULL, NULL, 'System'
+ WHERE NOT EXISTS (SELECT 1 FROM selectable_data s WHERE s.type = '${SELECTABLE_GROUPS.department}' AND s.value = '${d.name}');`
+).join("\n")}
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }
 
-/** Default dropdown values every new team starts with (from Base v3). */
-export const DEFAULT_SELECTABLE: { type: string; value: string }[] = [
+/** Default dropdown values every new team starts with (from Base v3). The four
+ * optional fields are the enrichment 0025 folded onto the sprint types — a mark,
+ * the German label, the sentence that explains the block, and how long one
+ * normally runs. Absent on every other group, which is the honest shape: a file
+ * type has no standard length. */
+export type DefaultSelectable = {
+  type: string
+  value: string
+  mark?: string | null
+  nameDe?: string | null
+  description?: string | null
+  standardDays?: number | null
+}
+
+export const DEFAULT_SELECTABLE: DefaultSelectable[] = [
   { type: "File type", value: "Image file" },
   { type: "File type", value: "Image link" },
   { type: "File type", value: "Video file" },
@@ -1846,13 +2019,21 @@ export const DEFAULT_SELECTABLE: { type: string; value: string }[] = [
   { type: "Ticket status", value: "In progress" },
   { type: "Ticket status", value: "Ready" },
   { type: "Ticket status", value: "Resolved" },
-  // The three sprint types SCOPE ch.02 names, and no more. A "blueprint" is a
-  // PRICED PLANNING sprint, not a fourth type (BUILD-1 §3), so it is a price on
-  // a Planning row rather than a value here. Editable, like the ticket types:
-  // these are a starting vocabulary a team adds to on the Dropdown values screen.
+  // THE SPRINT TYPES: the two SCOPE ch.02 names that the delivery catalogue has
+  // no word of its own for, and then the catalogue itself. A "blueprint" is a
+  // PRICED PLANNING sprint, not a type (BUILD-1 §3), so it is a price on a
+  // Planning row rather than a value here.
+  //
+  // The ten catalogue rows are the old `programs` table — the ways this agency
+  // actually runs an engagement, each with its mark, its German name, what the
+  // block includes and how long it normally runs. Implementation appears in both
+  // SCOPE's three and the catalogue's ten, so it is listed ONCE and the
+  // catalogue's richer row is the one that survives. Editable like every other
+  // dropdown value: this is a starting vocabulary, not an enum, and a team that
+  // runs three kinds of sprint retires the rest on its own screen.
   { type: "Sprint type", value: "Planning" },
-  { type: "Sprint type", value: "Implementation" },
   { type: "Sprint type", value: "Iteration" },
+  ...SPRINT_TYPE_CATALOGUE.map((t) => ({ type: "Sprint type", ...t })),
   // Display-only labels for the four story states. The states the code trusts
   // are STORY_STATUSES in shared/types.ts — rewording a row here can never move
   // a story, exactly as with the ticket labels above.
@@ -1886,6 +2067,12 @@ export const DEFAULT_SELECTABLE: { type: string; value: string }[] = [
   // COMPANY_VOCABULARY so a NEW team's seed and an EXISTING team's migration
   // (0024) can never offer two different starting sets.
   ...COMPANY_VOCABULARY,
+  // THE FIVE DEPARTMENTS a task belongs to, from the same shared list migration
+  // 0027 hands to teams that already exist — so a newborn team and an upgraded
+  // one offer the same five words. Their mark and colour are NOT here: a
+  // dropdown row has nowhere to put them, and they live beside the rule each
+  // department implies (shared/departments.ts).
+  ...TASK_DEPARTMENTS.map((d) => ({ type: SELECTABLE_GROUPS.department, value: d.name })),
 ]
 
 /**
@@ -1942,8 +2129,8 @@ export function buildTeamSeed(
   // migrations and this seed into SQLite and fails on any repeated (type, value).
   for (const item of DEFAULT_SELECTABLE) {
     statements.push(
-      `INSERT INTO selectable_data (id, type, value, is_default, created_at, creator_id, creator_email, creator_name)
-SELECT ${sqlString(ulid())}, ${sqlString(item.type)}, ${sqlString(item.value)}, 1, ${a([])}
+      `INSERT INTO selectable_data (id, type, value, is_default, mark, name_de, description, standard_days, created_at, creator_id, creator_email, creator_name)
+SELECT ${sqlString(ulid())}, ${sqlString(item.type)}, ${sqlString(item.value)}, 1, ${sqlString(item.mark ?? null)}, ${sqlString(item.nameDe ?? null)}, ${sqlString(item.description ?? null)}, ${item.standardDays == null ? "NULL" : item.standardDays}, ${a([])}
  WHERE NOT EXISTS (SELECT 1 FROM selectable_data s WHERE s.type = ${sqlString(item.type)} AND s.value = ${sqlString(item.value)});`
     )
   }

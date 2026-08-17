@@ -203,7 +203,9 @@ const offendersOf = (t: Judged): string[] =>
 describe("described-contracts (R27): a description may only name what is real", () => {
   it("finds the whole surface to judge (the census must not silently go blind)", () => {
     // All three catalogues are in the universe…
-    expect(JUDGED.filter((t) => t.surface === "shared").length).toBeGreaterThanOrEqual(120)
+    // The floor moved from 120 to 115 on 17 Aug 2026: Marketing, Learning and
+    // the delivery programmes were purged, taking eleven shared tools with them.
+    expect(JUDGED.filter((t) => t.surface === "shared").length).toBeGreaterThanOrEqual(115)
     expect(JUDGED.filter((t) => t.surface === "mcp").length).toBeGreaterThanOrEqual(20)
     expect(JUDGED.filter((t) => t.surface === "agent").length).toBeGreaterThanOrEqual(15)
     // …and the descriptions really carry identifiers to judge (150+ today; a
@@ -225,7 +227,7 @@ describe("described-contracts (R27): a description may only name what is real", 
     expect(allowedFor(by("ask_knowledge")).has("found")).toBe(true)
     // And the allow-set has NOT degenerated into "everything": a word that is
     // real elsewhere is still refused where it names nothing.
-    expect(allowedFor(by("list_learning")).has("parentId")).toBe(false)
+    expect(allowedFor(by("list_dropdown_values")).has("parentId")).toBe(false)
     expect(allowedFor(by("list_help_tickets")).has("stepKey")).toBe(false)
   })
 

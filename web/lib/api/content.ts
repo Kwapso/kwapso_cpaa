@@ -1,4 +1,4 @@
-// CONTENT — learning articles and tickets.
+// CONTENT — tickets, the work engine and the knowledge base.
 //
 // One of the five door lists behind `@/lib/api`. They are split by WORKER,
 // because that is the boundary the doors already have: a path under
@@ -22,18 +22,15 @@ import type {
   HelpTicket,
   KnowledgeAnswer,
   KnowledgeSource,
-  Learning,
-  LearningProgressEntry,
   RunningTimer,
   Sprint,
   Story,
   Task,
+  TaskViewName,
   Todo,
   WorkLog,
-  MarketingPost,
   Meeting,
   MeetingPurpose,
-  Program,
   StaffCertificate,
   StaffProfile,
 } from "@shared/types"
@@ -99,12 +96,21 @@ export type StoryWrite = {
 
 /** The facets the work-log list door parses. */
 /** What every tasks door answers with: the rows for the view asked for, the
- * count over that view, and BOTH view counts for the strip's two badges (R16). */
+ * count over that view, and EVERY view's count for the strip's six badges (R16)
+ * — plus the pair the progress bar at the top of every tab is made of. All of
+ * them come out of one server read, so no two can disagree. */
 export type TaskListResponse = {
   tasks: Task[]
   total: number
   openTotal: number
   allTotal: number
+  overdueTotal: number
+  upcomingTotal: number
+  completedTotal: number
+  calendarTotal: number
+  /** everything due today or earlier, and how many of those are done */
+  dueTodayTotal: number
+  dueTodayDone: number
 }
 
 export type LogQuery = {
@@ -139,31 +145,8 @@ function storyQuery(filter: StoryQuery | undefined, cursor: string | null | unde
   return s ? `?${s}` : ""
 }
 
-/** Content worker — Learning + Tickets (team-DB content modules). */
+/** Content worker — Tickets, the work engine and the knowledge base. */
 export const content = {
-  learning: () => api<{ learning: Learning[]; total: number }>("/api/content/learning"),
-  learningOne: (id: string) =>
-    api<{ learning: Learning[] }>(`/api/content/learning?id=${enc(id)}`).then((r) => r.learning[0] ?? null),
-  createLearning: (input: Partial<Learning>) =>
-    api<{ learning: Learning[] }>("/api/content/learning", post(input)),
-  updateLearning: (input: Partial<Learning> & { id: string }) =>
-    api<{ learning: Learning[] }>("/api/content/learning/update", post(input)),
-  setLearningActive: (id: string, active: boolean) =>
-    api<{ learning: Learning[] }>("/api/content/learning/active", post({ id, active })),
-  /** Upload a file for an article (gated by learning:create). Streams the bytes
-   * as the request body; get back the served /media URL + its content type.
-   *
-   * `filename` is gone, not forgotten: the buffered door accepted it and never
-   * read it — the key is minted server-side from the team id and a ULID, and a
-   * learning URL is pasted into an article rather than downloaded by name. A
-   * parameter nothing reads is a contract nobody can rely on. */
-  uploadLearningFile: (dataUrl: string) =>
-    sendFile<{ url: string; contentType: string }>("/api/content/learning/upload-stream", dataUrl),
-  markLearningDone: (id: string, done: boolean) =>
-    api<{ ok: true }>("/api/content/learning/done", post({ id, done })),
-  learningProgress: () =>
-    api<{ progress: LearningProgressEntry[] }>("/api/content/learning/progress"),
-
   /** R14: a PAGE of tickets (a GROWING collection) — hand back `nextCursor` from
    * the previous response to get the next one. `total`/`mineTotal` are exact. */
   help: (
@@ -318,16 +301,29 @@ export const content = {
       post({ id, fileDataUrl: file?.dataUrl, fileName: file?.name })
     ),
   cancelTodo: (id: string) => api<{ todos: Todo[]; total: number }>("/api/content/todos/cancel", post({ id })),
-  /** Our own admin. `openTotal` and `allTotal` are the two exact server counts
-   * the view strip badges (R16) — both come back whichever view was asked for,
-   * because the count on the tab you are not looking at cannot be derived from
-   * the rows on the one you are. `total` is the count over what was listed. */
-  tasks: (view?: "open" | "all") =>
+  /** Our own admin, in one of six views. Every view's count comes back whichever
+   * one was asked for (R16) — the badge on a tab you are not looking at cannot be
+   * derived from the rows on the one you are. `total` is the count over what was
+   * listed. */
+  tasks: (view?: TaskViewName) =>
     api<TaskListResponse>(`/api/content/tasks${view ? `?view=${view}` : ""}`),
   taskOne: (id: string) =>
     api<{ tasks: Task[] }>("/api/content/tasks?view=all").then((r) => r.tasks.find((t) => t.id === id) ?? null),
-  createTask: (input: { title: string; detail?: string; dueOn?: string; assigneeId?: string; accountId?: string }) =>
-    api<TaskListResponse>("/api/content/tasks", post(input)),
+  /** `fileDataUrl` is a base64 data URL — the door caps it, parses it and puts
+   * the bytes in the agency's own bucket, exactly as a to-do's attachment is. */
+  createTask: (input: {
+    title: string
+    detail?: string
+    dueOn?: string
+    assigneeId?: string
+    accountId?: string
+    appId?: string
+    department?: string
+    important?: boolean
+    urgent?: boolean
+    fileDataUrl?: string
+    fileName?: string
+  }) => api<TaskListResponse>("/api/content/tasks", post(input)),
   setTaskDone: (id: string, done: boolean) =>
     api<TaskListResponse>("/api/content/tasks/done", post({ id, done })),
 
@@ -536,19 +532,9 @@ export const content = {
     api<{ meeting: Meeting | null; total: number }>("/api/content/meetings/active", post({ id, active })),
 
   /* ------------------- the agency's own housekeeping ------------------------
-   * Four modules, all CAPPED rather than paged (R14) — authored libraries and
-   * settled taxonomies, the same shape Learning is, so each door answers with
-   * the whole collection plus its exact `total` for the badge (R16). */
-  marketing: () => api<{ posts: MarketingPost[]; total: number }>("/api/content/marketing"),
-  marketingOne: (id: string) =>
-    api<{ posts: MarketingPost[] }>(`/api/content/marketing?id=${enc(id)}`).then((r) => r.posts[0] ?? null),
-  createMarketingPost: (input: Partial<MarketingPost>) =>
-    api<{ posts: MarketingPost[]; total: number }>("/api/content/marketing", post(input)),
-  updateMarketingPost: (input: Partial<MarketingPost> & { id: string }) =>
-    api<{ posts: MarketingPost[]; total: number }>("/api/content/marketing/update", post(input)),
-  setMarketingPostActive: (id: string, active: boolean) =>
-    api<{ posts: MarketingPost[]; total: number }>("/api/content/marketing/active", post({ id, active })),
-
+   * Two modules, both CAPPED rather than paged (R14) — an authored library and a
+   * settled taxonomy, so each door answers with the whole collection plus its
+   * exact `total` for the badge (R16). */
   brandAssets: () => api<{ assets: BrandAsset[]; total: number }>("/api/content/brand-assets"),
   brandAssetOne: (id: string) =>
     api<{ assets: BrandAsset[] }>(`/api/content/brand-assets?id=${enc(id)}`).then((r) => r.assets[0] ?? null),
@@ -562,16 +548,6 @@ export const content = {
    * bytes as the request body; get back the served /media/internal URL. */
   uploadBrandAssetFile: (dataUrl: string) =>
     sendFile<{ url: string; contentType: string }>("/api/content/brand-assets/upload-stream", dataUrl),
-
-  programmes: () => api<{ programs: Program[]; total: number }>("/api/content/delivery/programs"),
-  programmeOne: (id: string) =>
-    api<{ programs: Program[] }>(`/api/content/delivery/programs?id=${enc(id)}`).then((r) => r.programs[0] ?? null),
-  createProgramme: (input: Partial<Program>) =>
-    api<{ programs: Program[]; total: number }>("/api/content/delivery/programs", post(input)),
-  updateProgramme: (input: Partial<Program> & { id: string }) =>
-    api<{ programs: Program[]; total: number }>("/api/content/delivery/programs/update", post(input)),
-  setProgrammeActive: (id: string, active: boolean) =>
-    api<{ programs: Program[]; total: number }>("/api/content/delivery/programs/active", post({ id, active })),
 
   meetingPurposes: () => api<{ purposes: MeetingPurpose[]; total: number }>("/api/content/delivery/purposes"),
   meetingPurposeOne: (id: string) =>

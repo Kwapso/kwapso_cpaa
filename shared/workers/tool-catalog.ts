@@ -107,45 +107,15 @@ const ACCOUNT_FIELD_SCHEMA = {
   timezone: S, status: S,
 }
 
-/** The learning create/edit body — the same optional field set both surfaces send
- * (undefined keys drop out of JSON.stringify, so the door treats them as omitted). */
-const learningBody = (i: Record<string, unknown>): Record<string, unknown> => ({
-  title: str(i, "title"),
-  category: opt(i, "category"),
-  description: opt(i, "description"),
-  contentType: opt(i, "contentType"),
-  contentLink: opt(i, "contentLink"),
-  body: opt(i, "body"),
-  sequence: typeof i.sequence === "number" ? i.sequence : undefined,
-  required: typeof i.required === "boolean" ? i.required : undefined,
-})
-
-/** THE AGENCY-INTERNAL BODIES. Same reason `learningBody` exists: one builder per
- * door shape, so create and edit send the SAME field set and cannot drift into
- * two contracts. R22 proves the forwarding half by RUNNING these rather than
+/** THE AGENCY-INTERNAL BODIES. One builder per door shape, so create and edit
+ * send the SAME field set and cannot drift into two contracts. R22 proves the forwarding half by RUNNING these rather than
  * reading them, which is exactly why they are shared functions — a builder that
  * delegates is judged by what the door receives. */
-const marketingBody = (i: Record<string, unknown>): Record<string, unknown> => ({
-  title: str(i, "title"),
-  channel: opt(i, "channel"),
-  status: opt(i, "status"),
-  summary: opt(i, "summary"),
-  body: opt(i, "body"),
-  link: opt(i, "link"),
-  publishedOn: opt(i, "publishedOn"),
-})
-
 const brandAssetBody = (i: Record<string, unknown>): Record<string, unknown> => ({
   name: str(i, "name"),
   category: opt(i, "category"),
   description: opt(i, "description"),
   fileUrl: opt(i, "fileUrl"),
-})
-
-const programmeBody = (i: Record<string, unknown>): Record<string, unknown> => ({
-  name: str(i, "name"),
-  description: opt(i, "description"),
-  sequence: typeof i.sequence === "number" ? i.sequence : undefined,
 })
 
 const meetingPurposeBody = (i: Record<string, unknown>): Record<string, unknown> => ({
@@ -205,7 +175,7 @@ export type SharedTool = {
 /* -------------------------------- the catalog --------------------------------- */
 
 /** WHY SOME CONSTRUCTIVE WRITES STILL CONFIRM. The rule is that only DESTRUCTIVE
- * acts stop for a yes/no panel — creating an article or replying to a ticket just
+ * acts stop for a yes/no panel — recording a work log or replying to a ticket just
  * runs. ACCESS writes are the reviewed exception, and access has two halves:
  *   • WHO CAN DO WHAT — anything gated on member_roles: or team_members:;
  *   • WHO CAN SEE WHOSE — anything that writes an input to the ACCOUNT FENCE
@@ -263,14 +233,6 @@ export const SHARED_TOOLS: SharedTool[] = [
     schema: obj({ id: S }),
     buildQuery: (i) => (str(i, "id") ? `?id=${encodeURIComponent(str(i, "id"))}` : ""),
     agent: { write: false, summarize: (i) => (str(i, "id") ? "Look up one dropdown value" : "List dropdown values") },
-  },
-  {
-    name: "list_learning",
-    summary: "List the team's learning / how-to articles. Pass `id` to fetch just one article.",
-    binding: "CONTENT", method: "GET", path: "/api/content/learning",
-    schema: obj({ id: S }),
-    buildQuery: (i) => (str(i, "id") ? `?id=${encodeURIComponent(str(i, "id"))}` : ""),
-    agent: { write: false, summarize: (i) => (str(i, "id") ? "Look up one article" : "List learning articles") },
   },
   {
     name: "list_help_tickets",
@@ -333,7 +295,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_accounts",
     summary:
-      "List the team's accounts — companies and people in one list, unless the caller's role lacks the contacts right, in which case it is the companies. Filters: `q` (searches name, reference and email), `type` ('entity' for a company or 'individual' for a person), `status` (the team's own word for where an account stands, e.g. 'client' or 'past_client' — as stored), `archived` ('yes' for only the put-away ones, 'no' for only the live ones; both by default), `parentId` (only the accounts sitting under that one). The `total` counts the SAME filtered question the rows answer, so it is the answer to 'how many are there?' as well. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
+      "List the team's accounts — companies and people in one list, unless the caller's role lacks the contacts right, in which case it is the companies. Filters: `q` (searches name, reference and email), `type` ('entity' for a company or 'individual' for a person), `status` (the team's own word for where an account stands, e.g. 'client' or 'past_client' — as stored), `archived` ('yes' for only the put-away ones, 'no' for only the live ones; both by default), `parentId` (only the accounts sitting under that one). The `total` counts the SAME filtered question the rows answer, so it is the answer to 'how many are there?' as well. `entityTotal` and `individualTotal` are a different question — how many companies and how many people there are in the whole collection, whatever this call asked for. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/accounts",
     schema: obj({ q: S, type: S, status: S, archived: S, parentId: S, cursor: S }),
     buildQuery: (i) => {
@@ -564,7 +526,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "set_role_permissions",
     summary:
-      "Set a role's access rights (by role id). `value` is an object keyed by module — one of teams, team_members, member_roles, learning, help, selectable_data, screens, agent — each mapping to { read, create, edit, delete } booleans. Turning on create/edit/delete auto-enables read. The Admin role is locked (the server enforces this).",
+      "Set a role's access rights (by role id). `value` is an object keyed by module — one of teams, team_members, member_roles, help, selectable_data, screens, agent — each mapping to { read, create, edit, delete } booleans. Turning on create/edit/delete auto-enables read. The Admin role is locked (the server enforces this).",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/roles/permissions",
     schema: obj({ roleId: S, value: { type: "object" } }, ["roleId", "value"]),
     buildBody: (i) => ({ roleId: str(i, "roleId"), value: i.value }),
@@ -651,54 +613,6 @@ export const SHARED_TOOLS: SharedTool[] = [
       write: true,
       confirm: (i) => i.active !== true, // destructive only when DEACTIVATING
       summarize: (i) => `${i.active === true ? "Activate" : "Deactivate"} dropdown value ${str(i, "id")}`,
-    },
-  },
-
-  /* -------------------------------- learning ------------------------------- */
-  {
-    name: "create_learning",
-    summary: "Create a new learning / how-to article (title required; category is picked-or-created).",
-    binding: "CONTENT", method: "POST", path: "/api/content/learning",
-    schema: obj(
-      { title: S, category: S, description: S, contentType: S, contentLink: S, body: S, sequence: N, required: B },
-      ["title"]
-    ),
-    buildBody: (i) => learningBody(i),
-    agent: { write: true, confirm: false, summarize: (i) => `Create the learning article "${str(i, "title")}"` },
-  },
-  {
-    name: "update_learning",
-    summary: "Edit an existing learning article (by id).",
-    binding: "CONTENT", method: "POST", path: "/api/content/learning/update",
-    schema: obj(
-      { id: S, title: S, category: S, description: S, contentType: S, contentLink: S, body: S, sequence: N, required: B },
-      ["id", "title"]
-    ),
-    buildBody: (i) => ({ id: str(i, "id"), ...learningBody(i) }),
-    agent: { write: true, confirm: false, summarize: (i) => `Edit learning article ${str(i, "id")}` },
-  },
-  {
-    name: "set_learning_active",
-    summary: "Switch a learning article off (deactivate — member progress survives) or back on (reactivate) — never deleted.",
-    binding: "CONTENT", method: "POST", path: "/api/content/learning/active",
-    schema: obj({ id: S, active: B }, ["id", "active"]),
-    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
-    agent: {
-      write: true,
-      confirm: (i) => i.active !== true, // destructive only when DEACTIVATING
-      summarize: (i) => `${i.active === true ? "Activate" : "Deactivate"} learning article ${str(i, "id")}`,
-    },
-  },
-
-  {
-    name: "mark_learning_done",
-    summary: "Mark a learning article done (or not done) for YOURSELF — never for anyone else. Everyone's done state is a separate read (the curator's progress view).",
-    binding: "CONTENT", method: "POST", path: "/api/content/learning/done",
-    schema: obj({ id: S, done: B }, ["id", "done"]),
-    buildBody: (i) => ({ id: str(i, "id"), done: i.done === true }),
-    agent: {
-      write: true, confirm: false,
-      summarize: (i) => `Mark learning article ${str(i, "id")} ${i.done === true ? "done" : "not done"}`,
     },
   },
 
@@ -1221,7 +1135,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_tasks",
     summary:
-      "List KWAPSO'S OWN internal admin — never anything a client sees, which is list_todos. `view` is 'open' by default; pass 'all' for the finished ones. `assigneeId` narrows to one person's.",
+      "List KWAPSO'S OWN internal admin — never anything a client sees, which is list_todos. `view` is 'open' by default (everything not finished); the other five are 'overdue' (past its deadline), 'upcoming' (due today or later), 'completed', 'calendar' (everything with a deadline, finished or not) and 'all'. `assigneeId` narrows to one person's. Every view's count comes back whichever one you ask for — `openTotal`, `overdueTotal`, `upcomingTotal`, `completedTotal`, `calendarTotal`, `allTotal` — plus `dueTodayTotal` and `dueTodayDone`, which are everything due today or earlier and how many of those are done.",
     binding: "CONTENT", method: "GET", path: "/api/content/tasks",
     schema: obj({ view: S, assigneeId: S }),
     buildQuery: (i) => {
@@ -1234,15 +1148,27 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_task",
     summary:
-      "Write down a piece of OUR OWN admin — the quarterly VAT return, renewing a domain, preparing next week's review. Nobody outside the agency ever sees one. `accountId` is optional and usually left off; naming a client is for admin ABOUT them (chasing an invoice), which is what puts the time in the right margin. Time can be logged against a task, unlike a to-do.",
+      "Write down a piece of OUR OWN admin — the quarterly VAT return, renewing a domain, preparing next week's review. Nobody outside the agency ever sees one. `dueOn` is the deadline. `accountId` is optional and usually left off; naming a client is for admin ABOUT them (chasing an invoice), which is what puts the time in the right margin. `department` is one of the agency's five (Sales, Admin, Production, Marketing, Business) and it decides a second field: a Production task must name `appId`, a Sales task must name `accountId`, and an Admin task may. `important` and `urgent` are the two priority ticks, scored 1 to 4. `fileDataUrl` attaches one file (a base64 data URL, at most 10 MB) with `fileName` beside it. Time can be logged against a task, unlike a to-do.",
     binding: "CONTENT", method: "POST", path: "/api/content/tasks",
-    schema: obj({ title: S, detail: S, dueOn: S, assigneeId: S, accountId: S }, ["title"]),
+    schema: obj(
+      {
+        title: S, detail: S, dueOn: S, assigneeId: S, accountId: S,
+        appId: S, department: S, important: B, urgent: B, fileDataUrl: S, fileName: S,
+      },
+      ["title"]
+    ),
     buildBody: (i) => ({
       title: str(i, "title"),
       detail: opt(i, "detail"),
       dueOn: opt(i, "dueOn"),
       assigneeId: opt(i, "assigneeId"),
       accountId: opt(i, "accountId"),
+      appId: opt(i, "appId"),
+      department: opt(i, "department"),
+      important: i.important === true,
+      urgent: i.urgent === true,
+      fileDataUrl: opt(i, "fileDataUrl"),
+      fileName: opt(i, "fileName"),
     }),
     agent: { write: true, confirm: false, summarize: (i) => `Add a task: "${str(i, "title").slice(0, 50)}"` },
   },
@@ -1394,7 +1320,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_knowledge_sources",
     summary:
-      "List what the assistant is allowed to read. Filters: `kind` ('note' for something typed here, or 'ticket' / 'article' / 'account' / 'app' / 'story' / 'sprint' for material mirrored from the app's own rows), `compartment` ('agency' or 'account:<id>'), `q` (searches the title and the summary). Pass `id` for one source — a list row carries the SUMMARY of each source rather than its material, because a source can be a three-hundred-page contract; read one by id for its words. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
+      "List what the assistant is allowed to read. Filters: `kind` ('note' for something typed here, or 'ticket' / 'account' / 'app' / 'story' / 'sprint' for material mirrored from the app's own rows), `compartment` ('agency' or 'account:<id>'), `q` (searches the title and the summary). Pass `id` for one source — a list row carries the SUMMARY of each source rather than its material, because a source can be a three-hundred-page contract; read one by id for its words. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
     binding: "CONTENT", method: "GET", path: "/api/content/knowledge",
     schema: obj({ id: S, kind: S, compartment: S, q: S, cursor: S }),
     buildQuery: (i) => {
@@ -1411,7 +1337,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "get_knowledge_status",
     summary:
-      "Is the knowledge base in step? One row per kind of material the app keeps in step for you (tickets, learning articles, accounts, apps, stories, sprints): how far the sweep has read, when it last ran, when it last SUCCEEDED, and what went wrong if it didn't. `lastError` set with an old `lastOkAt` is the shape of 'it has been failing since Tuesday' — read this before trusting an answer that seems to be missing something recent.",
+      "Is the knowledge base in step? One row per kind of material the app keeps in step for you (tickets, accounts, apps, stories, sprints): how far the sweep has read, when it last ran, when it last SUCCEEDED, and what went wrong if it didn't. `lastError` set with an old `lastOkAt` is the shape of 'it has been failing since Tuesday' — read this before trusting an answer that seems to be missing something recent.",
     binding: "CONTENT", method: "GET", path: "/api/content/knowledge/sync",
     schema: obj({}),
     agent: { write: false, summarize: () => "Check whether the knowledge base is up to date" },
@@ -1434,7 +1360,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_knowledge_source",
     summary:
-      "Correct a source (by id). A source MIRRORED from the app's own rows (a ticket, an article, an account) owns its own text — for those, only the filing can change here (`accountId`, `visibility`), because the sweep would overwrite anything else on its next pass. A note typed into the knowledge base is editable in full.",
+      "Correct a source (by id). A source MIRRORED from the app's own rows (a ticket, an account, an app) owns its own text — for those, only the filing can change here (`accountId`, `visibility`), because the sweep would overwrite anything else on its next pass. A note typed into the knowledge base is editable in full.",
     binding: "CONTENT", method: "POST", path: "/api/content/knowledge/update",
     schema: obj({ id: S, title: S, body: S, sourceUrl: S, accountId: S, visibility: S }, ["id", "title"]),
     buildBody: (i) => ({
@@ -1468,7 +1394,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "sync_knowledge",
     summary:
-      "Bring the knowledge base into step with the app's own rows — tickets, learning articles, accounts, apps, stories and sprints — one bounded slice at a time. Every result carries `caughtUp`; keep calling while any of them is false. You rarely need it: asking a question catches the base up first, and a 15-minute sweep is the backstop. This is for the FIRST FILL of a base that has never been indexed.",
+      "Bring the knowledge base into step with the app's own rows — tickets, accounts, apps, stories and sprints — one bounded slice at a time. Every result carries `caughtUp`; keep calling while any of them is false. You rarely need it: asking a question catches the base up first, and a 15-minute sweep is the backstop. This is for the FIRST FILL of a base that has never been indexed.",
     binding: "CONTENT", method: "POST", path: "/api/content/knowledge/sync",
     schema: obj({}),
     buildBody: () => ({}),
@@ -1824,51 +1750,12 @@ export const SHARED_TOOLS: SharedTool[] = [
   },
 
   /* ------------------- the agency's own housekeeping ------------------------ */
-  // Four modules the assistant reaches exactly as a person does — same doors,
+  // Three modules the assistant reaches exactly as a person does — same doors,
   // same gates, same audit rows. Every summary below says whose material it is,
   // because the assistant repeats what it reads: an agency asking it to draft a
   // client update must not be handed "what Ana is bad at" as context, and the
   // structural defence (no portal door, refusePortalCaller everywhere) protects
   // the CLIENT's session, not the assistant's own choice of words.
-
-  {
-    name: "list_marketing_posts",
-    summary:
-      "The agency's OWN published posts — what went out, on which channel, on which day. Internal: these never appear in a client's portal, and a client login cannot reach this door at all.",
-    binding: "CONTENT", method: "GET", path: "/api/content/marketing",
-    schema: obj({ id: S }),
-    buildQuery: (i) => (str(i, "id") ? `?id=${encodeURIComponent(str(i, "id"))}` : ""),
-    agent: { write: false, summarize: () => "Read the agency's marketing posts" },
-  },
-  {
-    name: "create_marketing_post",
-    summary:
-      "Record a post the agency published (title required). `channel` and `status` are picked-or-created as dropdown values, so a new channel becomes a canonical one rather than a spelling. `publishedOn` is a day, written YYYY-MM-DD.",
-    binding: "CONTENT", method: "POST", path: "/api/content/marketing",
-    schema: obj({ title: S, channel: S, status: S, summary: S, body: S, link: S, publishedOn: S }, ["title"]),
-    buildBody: (i) => marketingBody(i),
-    agent: { write: true, confirm: false, summarize: (i) => `Record the post "${str(i, "title")}"` },
-  },
-  {
-    name: "update_marketing_post",
-    summary: "Edit a marketing post (by id). Same fields as creating one.",
-    binding: "CONTENT", method: "POST", path: "/api/content/marketing/update",
-    schema: obj({ id: S, title: S, channel: S, status: S, summary: S, body: S, link: S, publishedOn: S }, ["id", "title"]),
-    buildBody: (i) => ({ id: str(i, "id"), ...marketingBody(i) }),
-    agent: { write: true, confirm: false, summarize: (i) => `Edit marketing post ${str(i, "id")}` },
-  },
-  {
-    name: "set_marketing_post_active",
-    summary: "Archive a marketing post, or put it back — never deleted, so a campaign's history survives it.",
-    binding: "CONTENT", method: "POST", path: "/api/content/marketing/active",
-    schema: obj({ id: S, active: B }, ["id", "active"]),
-    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
-    agent: {
-      write: true,
-      confirm: (i) => i.active !== true, // destructive only when ARCHIVING
-      summarize: (i) => `${i.active === true ? "Restore" : "Archive"} marketing post ${str(i, "id")}`,
-    },
-  },
 
   {
     name: "list_brand_assets",
@@ -1907,43 +1794,6 @@ export const SHARED_TOOLS: SharedTool[] = [
       write: true,
       confirm: (i) => i.active !== true,
       summarize: (i) => `${i.active === true ? "Restore" : "Archive"} brand asset ${str(i, "id")}`,
-    },
-  },
-
-  {
-    name: "list_programmes",
-    summary: "How the agency runs an engagement, in the order the programmes read. Internal.",
-    binding: "CONTENT", method: "GET", path: "/api/content/delivery/programs",
-    schema: obj({ id: S }),
-    buildQuery: (i) => (str(i, "id") ? `?id=${encodeURIComponent(str(i, "id"))}` : ""),
-    agent: { write: false, summarize: () => "Read the delivery programmes" },
-  },
-  {
-    name: "create_programme",
-    summary: "Add a delivery programme (name required). `sequence` is display order only — nothing is locked to it.",
-    binding: "CONTENT", method: "POST", path: "/api/content/delivery/programs",
-    schema: obj({ name: S, description: S, sequence: N }, ["name"]),
-    buildBody: (i) => programmeBody(i),
-    agent: { write: true, confirm: false, summarize: (i) => `Add the "${str(i, "name")}" programme` },
-  },
-  {
-    name: "update_programme",
-    summary: "Edit a delivery programme (by id).",
-    binding: "CONTENT", method: "POST", path: "/api/content/delivery/programs/update",
-    schema: obj({ id: S, name: S, description: S, sequence: N }, ["id", "name"]),
-    buildBody: (i) => ({ id: str(i, "id"), ...programmeBody(i) }),
-    agent: { write: true, confirm: false, summarize: (i) => `Edit programme ${str(i, "id")}` },
-  },
-  {
-    name: "set_programme_active",
-    summary: "Archive a delivery programme, or put it back — never deleted.",
-    binding: "CONTENT", method: "POST", path: "/api/content/delivery/programs/active",
-    schema: obj({ id: S, active: B }, ["id", "active"]),
-    buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
-    agent: {
-      write: true,
-      confirm: (i) => i.active !== true,
-      summarize: (i) => `${i.active === true ? "Restore" : "Archive"} programme ${str(i, "id")}`,
     },
   },
 

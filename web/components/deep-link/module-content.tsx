@@ -26,7 +26,6 @@ import { type ScreenQuery, type ScreenRecipe, type ScreenRights } from "@kwapso/
 
 import { AccountDetailScreen } from "@/components/account-detail"
 import { RoleDetailScreen } from "@/components/role-detail"
-import { LearningDetailScreen } from "@/components/learning-detail"
 import { KnowledgeDetailScreen } from "@/components/knowledge-detail"
 import { HelpDetailScreen } from "@/components/help-detail"
 import { ProcessDetailScreen } from "@/components/process-detail"
@@ -46,9 +45,7 @@ import type { HelpScope, TaskView } from "@/lib/live-resources"
 import {
   shapeBrandDetail,
   shapeInviteDetail,
-  shapeMarketingDetail,
   shapeMemberDetail,
-  shapeProgrammeDetail,
   shapePurposeDetail,
   shapeTaskDetail,
   shapeTeamDetail,
@@ -75,8 +72,8 @@ type ScreenData = ReturnType<typeof useScreenData>
  * The host owns all of it; this bundle is how it hands the render half a snapshot. */
 export type ModuleContentCtx = Pick<
   ScreenData,
-  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "learningQ" | "helpQ" | "helpMineQ" | "helpArchivedQ" | "accountsQ" | "knowledgeQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "inviteAuditQ"
-  | "marketingQ" | "brandQ" | "programmesQ" | "purposesQ" | "internalActivity"
+  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "helpQ" | "helpMineQ" | "helpArchivedQ" | "accountsQ" | "knowledgeQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "inviteAuditQ"
+  | "brandQ" | "purposesQ" | "internalActivity"
   | "storiesQ" | "sprintsQ" | "appsQ" | "tasksOpenQ" | "tasksAllQ" | "workLogsQ" | "meetingsQ"
 > & {
   noAccess: boolean
@@ -109,13 +106,13 @@ export type ModuleContentCtx = Pick<
 }
 
 /** The row is whichever record kind a segment holds; each shaper takes its own
- * type, so the four call sites erase it through this one alias rather than four
- * inline casts. */
-type InternalShaper = (row: { id: string }, activity: ActivityItem[]) => ReturnType<typeof shapeMarketingDetail>
+ * type, so the three call sites erase it through this one alias rather than
+ * three inline casts. */
+type InternalShaper = (row: { id: string }, activity: ActivityItem[]) => ReturnType<typeof shapeBrandDetail>
 
 /** The BODY of an agency-internal record detail, once: find the row in its
  * loaded collection, render it through the engine, and hang the paged history
- * under it. The four branches above each own the two things a law reads off
+ * under it. The three branches above each own the two things a law reads off
  * them — which recipe, and that it went through withTabCounts — and share
  * everything that is genuinely identical. */
 function internalDetail(
@@ -339,9 +336,6 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     if (module === "roles") {
       return <RoleDetailScreen teamId={teamId as string} roleId={recordId} />
     }
-    if (module === "learning") {
-      return <LearningDetailScreen teamId={teamId as string} learningId={recordId} />
-    }
     if (module === "knowledge") {
       return <KnowledgeDetailScreen teamId={teamId as string} sourceId={recordId} />
     }
@@ -364,7 +358,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     // collection tab with its own create action (or, on the story, a status
     // stepper and the time logged against it) — controls no engine block draws.
     // The TASK carries none of that: it is a title, a date and a tick, so its
-    // detail is the recipe below with the four housekeeping ones.
+    // detail is the recipe below with the housekeeping ones.
     if (module === "apps") {
       return <AppDetailScreen teamId={teamId as string} appId={recordId} basePath={sectionPath} />
     }
@@ -425,29 +419,19 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     // the record's own fields plus its history, which is exactly the pair of
     // blocks the engine draws. The bespoke details beside them exist because no
     // engine block draws a ticket's conversation or a map's arithmetic; none of
-    // these four has that problem, so none of them is a component.
+    // these three has that problem, so none of them is a component.
     //
     // The history comes through the GENERIC (table, id) path (R5) — the same
     // hook every bespoke detail uses, resolved once in use-screen-data because a
     // render switch full of early returns cannot call a hook.
     //
-    // FOUR BRANCHES, NOT A TABLE, and that is the law's doing rather than a
+    // SEPARATE BRANCHES, NOT A TABLE, and that is the law's doing rather than a
     // preference. R8's check counts `resolveRecipe("<x>.detail"` literals and
     // demands one `withTabCounts` per rendered detail — a table that resolved
     // its recipe from a variable was invisible to the count, which means the law
-    // could no longer see whether these four tabs carried their badge. Code a
+    // could no longer see whether these tabs carried their badge. Code a
     // law cannot read is a law quietly switched off, so the shape it measures is
     // the shape they are written in.
-    if (module === "marketing") {
-      const base = resolveRecipe("marketing.detail", overridesQ.data, t)
-      if (!base) return <NotFound />
-      // R8/R16: the Activity tab badges this record's exact history total.
-      return internalDetail(ctx, withTabCounts(base, { activity: ctx.internalActivity.total }), {
-        what: "marketing posts",
-        query: ctx.marketingQ,
-        shape: shapeMarketingDetail as InternalShaper,
-      })
-    }
     if (module === "brand") {
       const base = resolveRecipe("brand.detail", overridesQ.data, t)
       if (!base) return <NotFound />
@@ -455,15 +439,6 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
         what: "the brand library",
         query: ctx.brandQ,
         shape: shapeBrandDetail as InternalShaper,
-      })
-    }
-    if (module === "delivery") {
-      const base = resolveRecipe("delivery.detail", overridesQ.data, t)
-      if (!base) return <NotFound />
-      return internalDetail(ctx, withTabCounts(base, { activity: ctx.internalActivity.total }), {
-        what: "the delivery programmes",
-        query: ctx.programmesQ,
-        shape: shapeProgrammeDetail as InternalShaper,
       })
     }
     if (module === "purposes") {

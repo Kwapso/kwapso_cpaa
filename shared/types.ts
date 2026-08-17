@@ -80,7 +80,7 @@ export type PermissionValue = Record<string, RightSet>
 
 /** A per-team dropdown value ("selectable data"): a `value` inside a `type` group
  * (e.g. "Video link" in "File type"). Managed on the team Settings page; powers
- * the Learning-category / Ticket-type pickers. */
+ * the Ticket-type / Sprint-type pickers. */
 export type SelectableValue = {
   id: string
   type: string
@@ -89,6 +89,24 @@ export type SelectableValue = {
   /** false = deactivated (retired). The manager shows these greyed with an Activate
    * button; form pickers filter to active. Always present. */
   active: boolean
+  /** WHAT A VALUE CARRIES BESIDES ITS WORD — all four optional, all four null on
+   * most rows, and that is the point: a dropdown value is a label first.
+   *
+   * They arrived with the delivery catalogue (team-schema 0025), which had ten
+   * rows describing how the agency runs an engagement and nowhere to put them
+   * once the Delivery method page went. A sprint type was already the same idea
+   * wearing a different name, so the enrichment moved onto it rather than into a
+   * table of its own.
+   *
+   * `mark` is the type mark UI-RULEBOOK defines — one glyph where an icon sits,
+   * never in a sentence. `nameDe` is a curated label for readers of German, not
+   * a translation seam: everything else the app says is translated at build time
+   * from the string catalogue. `standardDays` is a suggested length, never a
+   * rule — a sprint's dates are the ones somebody agreed with the client. */
+  mark: string | null
+  nameDe: string | null
+  description: string | null
+  standardDays: number | null
 }
 
 /** A role's permission matrix as the tenancy worker returns it: the module rows
@@ -203,34 +221,6 @@ export type ApiError = {
 }
 
 /* ----------------------------- next-build modules ----------------------------- */
-
-/** A learning (how-to) item. `body` is the in-app text the agent reads to answer
- * help; `done` is the viewing user's own progress (merged in by the read). */
-export type Learning = {
-  id: string
-  category: string | null
-  title: string
-  description: string | null
-  contentType: string | null
-  contentLink: string | null
-  body: string | null
-  sequence: number
-  required: boolean
-  active: boolean
-  createdAt: string
-  creatorName: string | null
-  editorName: string | null
-  updatedAt: string | null
-  done?: boolean
-}
-
-/** One member's completion of one learning item (for the curator progress view). */
-export type LearningProgressEntry = {
-  learningId: string
-  userId: string
-  done: boolean
-  doneAt: string | null
-}
 
 /** THE ticket lifecycle — the one list, for every side of the app. The server
  * validates against it, the stepper renders from it, and the agent's tool
@@ -648,7 +638,7 @@ export type PortalUser = {
 
 /** ONE SOURCE — a piece of material the assistant may read. Two families in one
  * shape: a `note` a person typed here (the body is the truth), and a MIRROR of a
- * row the app already owns (`ticket` / `article` / `account` — the row is the
+ * row the app already owns (`ticket` / `account` / `app` — the row is the
  * truth and the sweep keeps the body in step). `compartment` is which slice of
  * the knowledge base it belongs to: "agency", or "account:<id>". */
 export type KnowledgeSource = {
@@ -1067,6 +1057,8 @@ export type Task = {
   detail: string | null
   assigneeId: string | null
   assigneeName: string | null
+  /** WHEN IT HAS TO BE DONE. The field is `due_on` in the table and the word on
+   * every screen is "Deadline" — the tester's, and the one this build uses. */
   dueOn: string | null
   status: "open" | "done"
   completedAt: string | null
@@ -1074,9 +1066,39 @@ export type Task = {
    * (chasing an invoice, preparing a review) may name it, which is what puts its
    * time in the right margin. */
   accountId: string | null
+  accountName: string | null
+  /** THE EISENHOWER PAIR, which replaced a high/medium/low word. `priority` is
+   * `(important × 2) + urgent + 1`, 1 to 4, computed from the two rather than
+   * stored — a derived column is a column that can disagree with its inputs. */
+  important: boolean
+  urgent: boolean
+  priority: 1 | 2 | 3 | 4
+  /** which of the agency's five departments it belongs to — a word from the
+   * `Department` dropdown group, editable on that screen. It is also what decides
+   * the SECOND field: Production names an app, Sales a client, Admin may. */
+  department: string | null
+  appId: string | null
+  appName: string | null
+  /** the one thing attached to it — a photo of the letter, the form to file. It
+   * lives in the agency's own bucket, served at /media/internal/ by the agency
+   * gateway alone (R21): a task is ours, and so is its evidence. */
+  fileUrl: string | null
+  fileName: string | null
   createdAt: string
   createdByName: string | null
 }
+
+/** THE SIX PILES of our own admin, as SERVER views — the tab strip's own words.
+ *
+ * Not client filters, for the reason the ticket strip is a server scope: the list
+ * is capped (R14), so sieving the loaded rows for the overdue ones would show
+ * "the overdue among the newest N" under a badge counting all of them (R16).
+ *
+ * `open` is the everyday one and keeps its old name on the wire — the door has
+ * answered to `?view=open` and `?view=all` since it shipped, and a rename would
+ * be a contract change to relabel a tab. */
+export const TASK_VIEWS = ["open", "overdue", "upcoming", "completed", "calendar", "all"] as const
+export type TaskViewName = (typeof TASK_VIEWS)[number]
 
 /** The two states a meeting has. Cancelling is not a third one — it is the
  * module's `delete`, and the row survives it. */
@@ -1126,27 +1148,8 @@ export type Meeting = {
  *
  * None of them carries an `accountId`. That is not an omission: these rows
  * belong to no client, so there is nothing for the account fence to fence, and
- * every door on all four refuses a client login outright instead (R21).
+ * every door on all three refuses a client login outright instead (R21).
  * ────────────────────────────────────────────────────────────────────────── */
-
-/** Something the agency published about itself — the legacy `content` table. */
-export type MarketingPost = {
-  id: string
-  title: string
-  /** pick-or-created into the "Marketing channel" dropdown group. */
-  channel: string | null
-  status: string | null
-  summary: string | null
-  body: string | null
-  link: string | null
-  /** the DAY it went out (YYYY-MM-DD), or null while it hasn't. */
-  publishedOn: string | null
-  active: boolean
-  createdAt: string
-  creatorName: string | null
-  updatedAt: string | null
-  editorName: string | null
-}
 
 /** One piece of the agency's brand material — the legacy `branding` table. */
 export type BrandAsset = {
@@ -1156,20 +1159,6 @@ export type BrandAsset = {
   description: string | null
   /** an object we host (/media/internal/…) or a link somewhere else. */
   fileUrl: string | null
-  active: boolean
-  createdAt: string
-  creatorName: string | null
-  updatedAt: string | null
-  editorName: string | null
-}
-
-/** A way the agency runs an engagement — the legacy `program` table. */
-export type Program = {
-  id: string
-  name: string
-  description: string | null
-  /** display order only — nothing is locked to it. */
-  sequence: number
   active: boolean
   createdAt: string
   creatorName: string | null

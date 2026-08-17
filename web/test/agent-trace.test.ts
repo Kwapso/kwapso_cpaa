@@ -50,16 +50,6 @@ describe("traceFor — write tools land on the RESULT screen, never an input for
     }
   })
 
-  it("create_learning → learning list; update/active/done → the article detail", () => {
-    expect(traceFor("create_learning", { title: "Onboarding" }, TEAM)?.path).toBe(`/t/${TEAM}/learning`)
-    for (const tool of ["update_learning", "set_learning_active", "mark_learning_done"]) {
-      expect(traceFor(tool, { id: "art3" }, TEAM)?.path).toBe(`/t/${TEAM}/learning/art3`)
-    }
-  })
-
-  // The TOOL names still say `help` (they are the external contract the machine
-  // surface publishes); the SCREEN they land on is /tickets, because that is the
-  // address a person sees. This test is where the two meet.
   it("raise_help_ticket → the tickets list; reply/update/status → the ticket detail", () => {
     expect(traceFor("raise_help_ticket", { description: "Printer down" }, TEAM)?.path).toBe(
       `/t/${TEAM}/tickets`
@@ -91,7 +81,7 @@ describe("traceFor — write tools land on the RESULT screen, never an input for
 
 describe("traceFor — reads have no trace", () => {
   it("returns null for every list_* / read tool and unknowns", () => {
-    for (const tool of ["list_members", "list_roles", "list_learning", "list_help_tickets", "who_knows"]) {
+    for (const tool of ["list_members", "list_roles", "list_accounts", "list_help_tickets", "who_knows"]) {
       expect(traceFor(tool, {}, TEAM)).toBeNull()
     }
   })

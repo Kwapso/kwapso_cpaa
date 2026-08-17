@@ -55,8 +55,9 @@ type Upstream = "AUTH" | "TENANCY" | "CONTENT" | "REALTIME"
  *     agency's own machinery; a client has no business seeing it exists.
  *   • /api/tenancy/portal-users + /api/tenancy/accounts (writes) — granting a
  *     login and editing the books are staff decisions (SCOPE ch.03).
- *   • /api/content/learning — the team's how-to articles are INTERNAL and carry
- *     no account fence; publishing them here would be a disclosure, not a
+ *   • /api/content/brand-assets + /api/content/delivery/* — the agency's own
+ *     material and the taxonomy of why it meets are INTERNAL and carry no
+ *     account fence; publishing either here would be a disclosure, not a
  *     feature (see the report / ROADMAP note).
  *   • /api/content/help/stakeholders — a stakeholder list names the staff on a
  *     ticket. "The portal shows work status but never which staff member is

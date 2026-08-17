@@ -9,7 +9,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 // The team-DB reads (admin-role lookup, role existence) go through d1Query (the
 // REST door) — mock those; the global-DB writes hit our real-SQLite env.DB.
 const { d1Query } = vi.hoisted(() => ({ d1Query: vi.fn() }))
-vi.mock("@shared/workers/d1-rest", () => ({ d1Query }))
+// `sqlString` is not a behaviour under test here — it is real, because the
+// migration list builds its SQL with it at module load and a mock that omits it
+// turns a missing export into a failure with nothing to do with this suite.
+vi.mock("@shared/workers/d1-rest", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  d1Query,
+}))
 vi.mock("@shared/workers/activity", () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))

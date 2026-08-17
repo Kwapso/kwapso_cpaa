@@ -138,26 +138,6 @@ const AGENT_ONLY: AgentTool[] = [
     summarize: (i) => `Set ${Array.isArray(i.ids) ? i.ids.length : 0} tickets to ${i.status}`,
   },
   {
-    name: "bulk_set_learning_active",
-    description:
-      "Switch MANY learning articles off (deactivate) or back on (reactivate) at once — never deleted. " +
-      "First list the articles (a read) to get their ids, then call this with those ids — at most " +
-      `${BULK_IDS_LIMIT} per call (the door refuses more). A bulk change is confirmed with a count ` +
-      "before it runs.",
-    schema: obj(
-      { ids: { type: "array", items: S, maxItems: BULK_IDS_LIMIT }, active: { type: "boolean" } },
-      ["ids", "active"]
-    ),
-    binding: "CONTENT",
-    method: "POST",
-    path: "/api/content/learning/bulk-active",
-    write: true,
-    confirm: true, // a bulk change is high-blast — always confirm
-    buildBody: (i) => ({ ids: i.ids, active: i.active }),
-    summarize: (i) =>
-      `${i.active ? "Activate" : "Deactivate"} ${Array.isArray(i.ids) ? i.ids.length : 0} articles`,
-  },
-  {
     // Runs INSIDE data-ops (binding SELF): the import batch engine, not a worker fetch.
     // Only reachable for a batch the SAME user created (creator-scoped load) — the model
     // can't run someone else's import, and every target module is re-gated for `create`.

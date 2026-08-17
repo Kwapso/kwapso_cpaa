@@ -23,8 +23,7 @@ const HOUSEKEEPING = [
   // request body. Streaming changed how the bytes ARRIVE and nothing at all about
   // what they change — still a file and still no row — so the reasoning above
   // covers both halves, and the pair is listed rather than the rule loosened.
-  "POST /api/content/learning/upload",
-  "POST /api/content/learning/upload-stream",
+  //
   // The caller's OWN timer preference (does starting one stop the others?). It
   // changes no record anybody else can see and no screen anybody else is looking
   // at, so there is nothing for a ping to patch.

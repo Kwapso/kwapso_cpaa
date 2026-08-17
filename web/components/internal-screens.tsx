@@ -1,16 +1,15 @@
 "use client"
 
-// THE AGENCY'S OWN HOUSEKEEPING, as screens — the four list pages behind
-// Marketing, the Brand library and the Delivery method (which is two
-// collections on one page, so it gets the only host-composed layout here).
+// THE AGENCY'S OWN HOUSEKEEPING, as screens — the two list pages behind the
+// Brand library and the Meeting purposes.
 //
 // Its own file, so the deep-link collection switch stays a switch — the same
 // reason processes-screen.tsx exists. Everything below is the standard
-// arrangement said four times rather than abstracted into one loop, and that is
-// deliberate: R16 (ii) requires each sidebar collection to render a
+// arrangement said twice rather than abstracted into one loop, and that is
+// deliberate: R16 (ii) requires each collection to render a
 // `<CollectionHeading sectionKey="…">` naming its own section, so a generic
 // component parameterised by key would satisfy nobody reading it and nothing
-// checking it. Four short, obvious blocks beat one clever one.
+// checking it. Two short, obvious blocks beat one clever one.
 
 import * as React from "react"
 
@@ -23,19 +22,13 @@ import type { ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
 
 import { CollectionHeading } from "@/components/collection-heading"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
-import {
-  shapeBrandList,
-  shapeMarketingList,
-  shapeProgrammesList,
-  shapePurposesList,
-} from "@/components/deep-link/shape"
+import { shapeBrandList, shapePurposesList } from "@/components/deep-link/shape"
 import { withDataDrivenCollection } from "@/lib/screens"
-import { formatCount } from "@shared/web/format-count"
-import type { BrandAsset, MarketingPost, MeetingPurpose, Program } from "@shared/types"
+import type { BrandAsset, MeetingPurpose } from "@shared/types"
 import { useT } from "@shared/web/language"
 
-/** Everything one of these screens needs from the host. The same bundle four
- * times, because they are the same screen four times. */
+/** Everything one of these screens needs from the host. The same bundle twice,
+ * because they are the same screen twice. */
 type InternalScreenProps<T> = {
   rows: T[]
   recipe: ScreenRecipe
@@ -70,7 +63,7 @@ function InternalCollection({
   heading,
 }: {
   createLabel: string
-  data: ReturnType<typeof shapeMarketingList>
+  data: ReturnType<typeof shapeBrandList>
   heading: React.ReactNode
 } & Omit<InternalScreenProps<never>, "rows" | "total">) {
   const t = useT()
@@ -92,18 +85,6 @@ function InternalCollection({
   )
 }
 
-export function MarketingScreen(props: InternalScreenProps<MarketingPost>) {
-  const { rows, ...rest } = props
-  return (
-    <InternalCollection
-      {...rest}
-      createLabel="New post"
-      data={shapeMarketingList(rows)}
-      heading={<CollectionHeading sectionKey="marketing" total={props.total} />}
-    />
-  )
-}
-
 export function BrandLibraryScreen(props: InternalScreenProps<BrandAsset>) {
   const { rows, ...rest } = props
   return (
@@ -113,38 +94,6 @@ export function BrandLibraryScreen(props: InternalScreenProps<BrandAsset>) {
       data={shapeBrandList(rows)}
       heading={<CollectionHeading sectionKey="brand" total={props.total} />}
     />
-  )
-}
-
-/** The Delivery method screen leads with the PROGRAMMES and offers the meeting
- * purposes beside them, because a programme is what somebody arrives looking for
- * and a purpose is what they go on to. Two collections, one module, one right —
- * so the button below is a link to the other half rather than a permission
- * question. */
-export function ProgrammesScreen(
-  props: InternalScreenProps<Program> & { purposeCount: number | undefined; onPurposes: () => void }
-) {
-  const t = useT()
-  const { rows, purposeCount, onPurposes, ...rest } = props
-  return (
-    <div className="flex flex-col gap-4">
-      <InternalCollection
-        {...rest}
-          createLabel="New programme"
-        data={shapeProgrammesList(rows)}
-        heading={<CollectionHeading sectionKey="delivery" total={props.total} />}
-      />
-      <button
-        type="button"
-        onClick={onPurposes}
-        className="text-muted-foreground hover:text-foreground w-fit text-sm underline-offset-4 hover:underline"
-      >
-        {/* R16: the number is the door's exact total through the ONE seam, and
-            an unloaded total renders nothing rather than a "0" that reads as
-            "there are none". */}
-        {t("Meeting purposes")}{formatCount(purposeCount) ? ` (${formatCount(purposeCount)})` : ""}
-      </button>
-    </div>
   )
 }
 

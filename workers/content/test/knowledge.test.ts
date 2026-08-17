@@ -539,7 +539,7 @@ describe("the sweep — the app's own rows become material, and stay in step", (
     const { ingest } = (await res.json()) as {
       ingest: { kind: string; lastOkAt: string | null; lastError: string | null; sourcesIndexed: number }[]
     }
-    expect(ingest.map((i) => i.kind).sort()).toEqual(["account", "app", "article", "sprint", "story", "ticket"])
+    expect(ingest.map((i) => i.kind).sort()).toEqual(["account", "app", "sprint", "story", "ticket"])
     for (const row of ingest) {
       expect(row.lastOkAt).not.toBeNull()
       expect(row.lastError).toBeNull()

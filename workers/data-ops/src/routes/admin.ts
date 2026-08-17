@@ -1,7 +1,7 @@
 // Owner-only import-catalog maintenance (x-admin-key, like tenancy's maintenance
 // endpoints). The import catalog (importable_databases) is global + owner-maintained;
 // seeded to the code-supported targets in DEFAULT_CATALOG (Object.values(TARGETS)):
-// today selectable_data (Dropdown values) + member_roles + learning.
+// today selectable_data (Dropdown values) + member_roles + the record modules.
 // Re-running the seed is idempotent (upsert by table_key), so it's safe at deploy.
 
 import { json } from "@shared/workers/http"

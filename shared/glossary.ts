@@ -42,11 +42,7 @@ export const GLOSSARY = {
   engagementType: { term: "Engagement type", def: "A label on time saying how it was sold: blueprint, sprint, support or hourly." },
   recordReference: { term: "Reference number", def: "The short number on a ticket, story or sprint — BERG-T0412 — so anyone can say which one they mean." },
   stakeholder: { term: "Stakeholder", def: "Someone kept in the loop on a ticket — the person who raised it, your admins, and anyone mentioned." },
-  learning: { term: "Learning", def: "Your team's how-to articles, read right here in the app." },
-  article: { term: "Article", def: "One how-to in Learning." },
-  category: { term: "Category", def: "A label that groups your learning articles." },
-  progress: { term: "Done", def: "Whether you've personally finished a learning article." },
-  dropdownValues: { term: "Dropdown values", def: "The options behind your team's dropdowns — like Ticket types and Learning categories." },
+  dropdownValues: { term: "Dropdown values", def: "The options behind your team's dropdowns — like Ticket types and Sprint types." },
   importCsv: { term: "Import", def: "Bring rows in from a spreadsheet (CSV) instead of typing them one by one." },
   exportCsv: { term: "Export", def: "Download what you can see as a spreadsheet (CSV) file." },
   sampleFile: { term: "Sample file", def: "A downloadable example that shows what a good import file looks like." },
@@ -77,13 +73,10 @@ export const GLOSSARY = {
   toolCost: { term: "Tool cost", def: "What an app costs us to keep running each month — hosting and the services behind it." },
   priceVisibility: { term: "Price visibility", def: "The switch on an account that decides whether they see what they bought. Value is shown either way." },
 
-  // THE AGENCY'S OWN HOUSEKEEPING — the words for the four modules that describe
+  // THE AGENCY'S OWN HOUSEKEEPING — the words for the three modules that describe
   // how we run ourselves. Every definition here says, or implies, the same thing
   // the code says at every door: this is ours, and a client never sees it.
-  marketingPost: { term: "Marketing post", def: "Something we published about ourselves — on a channel, on a day. Ours alone; it never reaches a client's portal." },
-  channel: { term: "Channel", def: "Where a marketing post goes out — the newsletter, a social account, the blog." },
   brandAsset: { term: "Brand asset", def: "One piece of our own brand material: a logo, a deck, a template." },
-  programme: { term: "Programme", def: "A way we run an engagement, start to finish." },
   meetingPurpose: { term: "Meeting purpose", def: "Why we meet — and the department it belongs to." },
   meeting: { term: "Meeting", def: "A conversation we had or are about to have, with what we meant to cover and what was decided." },
   agenda: { term: "Agenda", def: "What we mean to cover in a meeting, written before it." },

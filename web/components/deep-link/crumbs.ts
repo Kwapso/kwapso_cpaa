@@ -19,7 +19,6 @@ import type {
   AppRow,
   Invite,
   KnowledgeSource,
-  Learning,
   Sprint,
   Story,
   Meeting,
@@ -35,7 +34,6 @@ export type CrumbRecords = {
   members: TeamMember[] | undefined
   roles: TeamRole[]
   invites: Invite[] | undefined
-  learning: Learning[] | undefined
   knowledge: KnowledgeSource[] | undefined
   apps: AppRow[] | undefined
   sprints: Sprint[] | undefined
@@ -54,7 +52,6 @@ function recordLabel(module: string | null, recordId: string | null, records: Cr
   }
   if (module === "roles") return records.roles.find((r) => r.id === recordId)?.title ?? "Role"
   if (module === "invites") return records.invites?.find((i) => i.id === recordId)?.email ?? "Invite"
-  if (module === "learning") return records.learning?.find((l) => l.id === recordId)?.title ?? "Article"
   if (module === "knowledge")
     return records.knowledge?.find((k) => k.id === recordId)?.title ?? "Source"
   // The work engine. A story and a sprint are said out loud by their REFERENCE

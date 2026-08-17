@@ -17,7 +17,6 @@ export type SectionKey =
   // the account's card is not beside it).
   | "internal-rates"
   | "accounts"
-  | "learning"
   | "tickets"
   | "knowledge"
   | "processes"
@@ -30,9 +29,7 @@ export type SectionKey =
   | "meetings"
   // The agency's own housekeeping (staff profiles has no section — the owner's
   // ruling puts a profile on the member's own page, not on a page of its own).
-  | "marketing"
   | "brand"
-  | "delivery"
   | "purposes"
   | "import"
 
@@ -43,19 +40,19 @@ export type Route = {
   /** "" = the list / overview level (no record selected) */
   recordId: string
   query: ScreenQuery
-  /** true when reached via a clean top-level module URL (/learning, /tickets) rather
+  /** true when reached via a clean top-level module URL (/tickets, /accounts) rather
    * than /t/<teamId>/… — the host resolves the team from the active context, like
    * /home does. */
   topLevel: boolean
 }
 
 /** Top-level app URLs that resolve INSIDE the one deep-link shell (not nested under
- * /t/<teamId>) — the team sidebar pages (/learning, /tickets) AND the account screens
+ * /t/<teamId>) — the team sidebar pages (/tickets, /accounts) AND the account screens
  * (/home, /settings, /invitations). Everything here is in-app, so `go()` moves to it
  * with the History API (no reload); only pre-auth routes (/login, /onboarding) are left
  * out, so leaving the app is a real navigation. */
 export const TOP_LEVEL_MODULES = [
-  "accounts", "learning", "tickets", "processes",
+  "accounts", "tickets", "processes",
   // The knowledge base was MISSING from this list while being a sidebar page, so
   // every tap on it left the History API and did a full reload — which throws
   // away the warm in-memory cache the whole caching model is built on. The four
@@ -64,7 +61,7 @@ export const TOP_LEVEL_MODULES = [
   "knowledge", "apps", "sprints", "stories", "tasks", "time", "meetings",
   // The agency's own housekeeping — clean top-level URLs, like every other
   // sidebar page (`purposes` rides along because it has records of its own).
-  "marketing", "brand", "delivery", "purposes",
+  "brand", "purposes",
   "home", "settings", "invitations",
 ]
 
@@ -84,7 +81,7 @@ export function parseRoute(pathname: string, search: string): Route {
       topLevel: false,
     }
   }
-  // Top-level module URL: /learning, /learning/<id>, /tickets, /tickets/<id>.
+  // Top-level module URL: /tickets, /tickets/<id>, /accounts, /accounts/<id>.
   const levels = parseScreenPath(segs)
   return {
     teamId: "",

@@ -19,7 +19,6 @@ export const TEAM_MODULES = [
   // SHAPE of that table, never a second spine.
   "contacts",
   "portal_users",
-  "learning",
   "help",
   "knowledge",
   "selectable_data",
@@ -33,11 +32,10 @@ export const TEAM_MODULES = [
   // permissioned. The taxonomy of why we meet lives under `delivery`; what was
   // said in the room is a different question to ask a role about.
   "meetings",
-  // THE AGENCY'S OWN HOUSEKEEPING — four modules carrying the seven Glide tables
-  // that describe how the agency runs ITSELF rather than what it does for a
-  // client. None of them is customer material, so every door on all four refuses
-  // a client login outright (R21) rather than fencing.
-  "marketing",
+  // THE AGENCY'S OWN HOUSEKEEPING — three modules carrying the Glide tables that
+  // describe how the agency runs ITSELF rather than what it does for a client.
+  // None of them is customer material, so every door on all three refuses a
+  // client login outright (R21) rather than fencing.
   "brand_assets",
   "delivery",
   "staff_profiles",
@@ -75,7 +73,6 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   // raiser) — this right is about being able to LIST them.
   contacts: "Contacts",
   portal_users: "Portal access",
-  learning: "Learning",
   // The module KEY stays `help` — it is the permission string every role's sheet
   // already carries, the table the rows live in, and the path the API answers on.
   // The LABEL is what a person reads, and the word for this is Tickets.
@@ -128,25 +125,27 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   meetings: "Meetings",
 
   // ── THE AGENCY'S OWN HOUSEKEEPING ──────────────────────────────────────────
-  // Four modules, seven legacy tables, and one sentence that decides all of it:
-  // none of this is any client's. It is what WE publish, the material we publish
-  // it with, how we run our own delivery, and who our people are — so these
-  // modules never appear in a portal, never carry an account fence, and every
-  // door on them refuses a client login the way `learning` and `knowledge` do.
+  // Three modules and one sentence that decides all of it: none of this is any
+  // client's. It is the material we make our own work with, why we meet, and who
+  // our people are — so these modules never appear in a portal, never carry an
+  // account fence, and every door on them refuses a client login the way
+  // `knowledge` does.
   //
-  // Two of the seven legacy tables are NOT here, on purpose. `departments` (8
-  // rows) and `channels` (6) are bare labels with no fields of their own, and the
-  // base already has exactly one home for a team's editable vocabulary — the
-  // dropdown values module, which carries its own permissions, screen, import,
-  // export and machine tools. Giving each of them a table, a screen and a
-  // permission row would be a module built to hold a word.
-  marketing: "Marketing",
+  // Several of the legacy tables are NOT here, on purpose. `departments` (8 rows)
+  // and `channels` (6) are bare labels with no fields of their own, and the base
+  // already has exactly one home for a team's editable vocabulary — the dropdown
+  // values module, which carries its own permissions, screen, import, export and
+  // machine tools. Giving each of them a table, a screen and a permission row
+  // would be a module built to hold a word. `content` (marketing posts) and the
+  // learning library were purged outright on 17 Aug 2026, and `program` went the
+  // same day with its ten rows folded onto the sprint type, which had always been
+  // the same idea under a second name (team-schema 0025).
   brand_assets: "Brand library",
-  // Programmes and meeting purposes: two thin tables, one area. The legacy
-  // reconciliation groups them in a single sentence ("`program` and `purposes`
-  // support meetings and the delivery method"), and they are read together, so
-  // they are one module the same way apps, processes and steps are one.
-  delivery: "Delivery method",
+  // WHY WE MEET. One thin table, and a module of its own rather than four more
+  // rights on `meetings`: the taxonomy of why an agency meets is a settled list
+  // somebody sets and leaves, and what was SAID in the room is a different
+  // question to ask a role about.
+  delivery: "Meeting purposes",
   // The person behind the member row: their profile and the certificates they
   // hold. Visible to the team, never to a client — which is why it is its own
   // permission row and not four more rights on `team_members`: an agency can

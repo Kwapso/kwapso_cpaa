@@ -21,7 +21,6 @@ import {
   ScreenRenderer,
 } from "@kwapso/ui/registry/collections/screen-renderer/screen-renderer"
 
-import { LearningProgressScreen } from "@/components/learning-progress"
 import { ProcessesScreen } from "@/components/processes-screen"
 import { AppsScreen } from "@/components/apps-screen"
 import { SprintsScreen } from "@/components/sprints-screen"
@@ -32,8 +31,6 @@ import { MeetingsScreen } from "@/components/meetings-screen"
 import { TriageStrip } from "@/components/triage-strip"
 import {
   BrandLibraryScreen,
-  MarketingScreen,
-  ProgrammesScreen,
   PurposesScreen,
 } from "@/components/internal-screens"
 import { NotFound, LoadError, SectionWithCreate, CollectionCard } from "@/components/deep-link/screen-bits"
@@ -46,13 +43,11 @@ import { accountsKey, helpKey, knowledgeKey, type HelpScope } from "@/lib/live-r
 import { CountedAbove } from "@/components/counted-tabs"
 import { formatCount } from "@shared/web/format-count"
 import {
-  ACCOUNT_TYPE,
   accountStatus,
   shapeAccountsList,
   shapeHelpList,
   shapeInvitesList,
   shapeKnowledgeList,
-  shapeLearningList,
   shapeMembersList,
   shapeRolesList,
 } from "@/components/deep-link/shape"
@@ -76,13 +71,10 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     rolesQ,
     roles,
     invitesQ,
-    learningQ,
     helpQ,
     accountsQ,
     knowledgeQ,
-    marketingQ,
     brandQ,
-    programmesQ,
     purposesQ,
     totals,
     rights,
@@ -92,7 +84,6 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     helpScope,
     helpMineQ,
     setHelpScope,
-    query,
   } = ctx
 
   // TIME — the one collection with NO recipe, so it is answered before the
@@ -171,80 +162,6 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
       </SectionWithCreate>
     )
   }
-  if (module === "learning") {
-    if (learningQ.error) return <LoadError what="learning" />
-    if (learningQ.data === undefined) return <Skeleton variant="list" lines={4} />
-    const data = shapeLearningList(learningQ.data)
-    const learningRecipe = withDataDrivenCollection(recipe, data.rows ?? [])
-    const articlesPanel = (
-      <SectionWithCreate
-        show={can("learning", "create")}
-        label={t("New article")}
-        icon="plus"
-        secondary={{
-          show: can("learning", "create"),
-          label: t("Import CSV"),
-          onClick: () => go(`/t/${teamId}/import/learning`),
-        }}
-        download={{
-          show: (data.rows?.length ?? 0) > 0, // export needs READ — implied by seeing this list
-          label: t("Export CSV"),
-          href: "/api/content/learning/export",
-        }}
-        onCreate={() => go(sectionPath, { panel: "add", module: "learning" })}
-      >
-        <ScreenRenderer recipe={learningRecipe} data={data} rights={rights} onAction={onAction} onIntent={onIntent} />
-      </SectionWithCreate>
-    )
-    // R16: the badge is the exact server total through the ONE seam — never
-    // rows.length (a capped list's length is a ceiling, not a total).
-    const learningBadge = formatCount(totals.learning)
-    // Articles / Team progress as a REAL tab strip (library TabsView, URL-driven
-    // via ?tab so Back works). The completion grid is for curators (learning:edit).
-    // NON-curators see no strip — so the count lives in the CollectionHeading
-    // instead (R16: a count must never depend on an unrelated permission; it
-    // used to vanish for anyone without the edit right, because the strip
-    // carrying it was the curator's).
-    if (!can("learning", "edit"))
-      return (
-        <div className="flex flex-col gap-4">
-          <CollectionHeading sectionKey="learning" total={totals.learning} />
-          {articlesPanel}
-        </div>
-      )
-    const learnTab = query.tab === "progress" ? "progress" : "articles"
-    const learnTabsConfig = {
-      ...defaultTabsConfig,
-      variant: "line" as const,
-      tabs: [
-        {
-          value: "articles",
-          label: t("Articles"),
-          icon: "book-open",
-          badge: learningBadge,
-          badgeVariant: "" as const,
-        },
-        { value: "progress", label: t("Team progress"), icon: "users", badge: "", badgeVariant: "" as const },
-      ],
-    }
-    // ARBITRATION (R16 iii): the counted strip is the heading's SIBLING here,
-    // so CountedAbove marks it — the badged tab WINS, the heading stands down.
-    return (
-      <CountedAbove active={learningBadge !== ""}>
-        <div className="flex flex-col gap-4">
-          <CollectionHeading sectionKey="learning" total={totals.learning} />
-          <TabsView
-            config={learnTabsConfig}
-            value={learnTab}
-            onValueChange={(v) => go(sectionPath, v === "progress" ? { tab: "progress" } : {})}
-            renderPanel={(t) =>
-              t.value === "progress" ? <LearningProgressScreen teamId={teamId as string} /> : articlesPanel
-            }
-          />
-        </div>
-      </CountedAbove>
-    )
-  }
   if (module === "processes") {
     // The whole screen is host-composed: the VALUE drill-down sits above the
     // list, and a map cannot be created without the apps it might belong to. Its
@@ -312,9 +229,18 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         recipe={recipe}
         rights={rights}
         total={totals.tasks}
-        allTotal={totals.tasksAll}
+        counts={{
+          all: totals.tasksAll,
+          overdue: totals.tasksOverdue,
+          upcoming: totals.tasksUpcoming,
+          completed: totals.tasksCompleted,
+          calendar: totals.tasksCalendar,
+          dueToday: totals.tasksDueToday,
+          dueTodayDone: totals.tasksDueTodayDone,
+        }}
         view={ctx.taskView}
         onViewChange={ctx.setTaskView}
+        myUserId={ctx.myUserId}
         canCreate={can("work", "create")}
         canRaiseTodo={can("todos", "create")}
         canCancelTodo={can("todos", "delete")}
@@ -330,33 +256,18 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         recipe={recipe}
         rights={rights}
         total={totals.meetings}
+        purposeCount={totals.purposes}
         canCreate={can("meetings", "create")}
+        canReadPurposes={can("delivery", "read")}
+        onPurposes={() => go(`/t/${teamId}/purposes`)}
         onAction={onAction}
         onIntent={onIntent}
       />
     )
   }
   // ── THE AGENCY'S OWN HOUSEKEEPING ─────────────────────────────────────────
-  // Four collections, one shape, in their own file (internal-screens.tsx) so
+  // Two collections, one shape, in their own file (internal-screens.tsx) so
   // this switch stays a switch.
-  if (module === "marketing") {
-    if (marketingQ.error) return <LoadError what="marketing posts" />
-    if (marketingQ.data === undefined) return <Skeleton variant="list" lines={4} />
-    return (
-      <MarketingScreen
-        rows={marketingQ.data}
-        recipe={recipe}
-        rights={rights}
-        total={totals.marketing}
-        canCreate={can("marketing", "create")}
-        onCreate={() => go(sectionPath, { panel: "add", module: "marketing" })}
-        onImport={() => go(`/t/${teamId}/import/marketing_posts`)}
-        exportHref="/api/content/marketing/export"
-        onAction={onAction}
-        onIntent={onIntent}
-      />
-    )
-  }
   if (module === "brand") {
     if (brandQ.error) return <LoadError what="the brand library" />
     if (brandQ.data === undefined) return <Skeleton variant="list" lines={4} />
@@ -370,26 +281,6 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         onCreate={() => go(sectionPath, { panel: "add", module: "brand" })}
         onImport={() => go(`/t/${teamId}/import/brand_assets`)}
         exportHref="/api/content/brand-assets/export"
-        onAction={onAction}
-        onIntent={onIntent}
-      />
-    )
-  }
-  if (module === "delivery") {
-    if (programmesQ.error) return <LoadError what="the delivery programmes" />
-    if (programmesQ.data === undefined) return <Skeleton variant="list" lines={4} />
-    return (
-      <ProgrammesScreen
-        rows={programmesQ.data}
-        recipe={recipe}
-        rights={rights}
-        total={totals.programmes}
-        purposeCount={totals.purposes}
-        onPurposes={() => go(`/t/${teamId}/purposes`)}
-        canCreate={can("delivery", "create")}
-        onCreate={() => go(sectionPath, { panel: "add", module: "delivery" })}
-        onImport={() => go(`/t/${teamId}/import/programs`)}
-        exportHref="/api/content/delivery/programs/export"
         onAction={onAction}
         onIntent={onIntent}
       />
@@ -417,11 +308,55 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     if (accountsQ.error) return <LoadError what="accounts" />
     if (accountsQ.data === undefined) return <Skeleton variant="list" lines={4} />
     const loaded = accountsQ.data
-    // R16: the count lives in the heading (a sidebar page has no tab strip to
-    // badge), and it is the door's exact COUNT(*) — never the loaded page's
-    // length, which on a paged list is just "50" forever. The find bar's own
-    // count is a different number about a different question, and says so.
+    // ALL / COMPANIES / PEOPLE — the strip Aurora asked for ("the Accounts tab is
+    // a bit confusing, she would like to see things by company, customer or
+    // contact"). It replaces the Type select rather than sitting beside it: two
+    // controls for one field is the clutter she was describing.
+    //
+    // It is a SERVER narrowing, driven through the find's `fixed` question, so
+    // the paging, the search box, the other filters and the CSV export all narrow
+    // together — a tab that sieved the loaded page would show "the companies
+    // among the newest fifty" under a badge counting all of them.
+    //
+    // A PERSON WHO MAY NOT LIST CONTACTS IS SHOWN NO PEOPLE TAB. The door already
+    // narrows them to the companies through one `accountsWhere` (and answers
+    // `individualTotal: 0`); a tab offering a pile they cannot have would be the
+    // UI disagreeing with the fence out loud.
+    const seesPeople = can("contacts", "read")
+    const accountTab =
+      seesPeople && ctx.query.tab === "people"
+        ? "people"
+        : ctx.query.tab === "companies"
+          ? "companies"
+          : "all"
+    // R16: every badge is the door's exact COUNT(*), through the ONE seam — never
+    // the loaded page's length, which on a paged list is just "50" forever.
+    const accountsBadge = formatCount(totals.accounts)
+    const accountTabs = [
+      { value: "all", label: t("All"), icon: "users", badge: accountsBadge, badgeVariant: "" as const },
+      {
+        value: "companies",
+        label: t("Companies"),
+        icon: "building",
+        badge: formatCount(totals.accountsEntity),
+        badgeVariant: "" as const,
+      },
+      ...(seesPeople
+        ? [
+            {
+              value: "people",
+              label: t("People"),
+              icon: "user",
+              badge: formatCount(totals.accountsIndividual),
+              badgeVariant: "" as const,
+            },
+          ]
+        : []),
+    ]
+    // ARBITRATION (R16 iii): the badged strip WINS and the heading stands down,
+    // through the context rather than by saying the same number twice.
     return (
+      <CountedAbove active={accountsBadge !== ""}>
       <div className="flex flex-col gap-4">
         <CollectionHeading sectionKey="accounts" total={totals.accounts} />
         {/* R14's other half: the list pages, so the search box and every filter
@@ -432,16 +367,8 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
           listKey={accountsKey(teamId as string)}
           placeholder={t("Search accounts…")}
           noun="accounts"
+          fixed={accountTab === "all" ? undefined : { type: accountTab === "people" ? "individual" : "entity" }}
           facets={[
-            {
-              field: "type",
-              label: t("Type"),
-              control: "select",
-              options: [
-                { value: "entity", label: ACCOUNT_TYPE.entity },
-                { value: "individual", label: ACCOUNT_TYPE.individual },
-              ],
-            },
             {
               field: "status",
               label: t("Status"),
@@ -500,6 +427,17 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
                     href: `/api/tenancy/accounts/export${found.queryString}`,
                   }}
                   onCreate={() => go(sectionPath, { panel: "add", module: "accounts" })}
+                  // The strip sits ABOVE the boxed list — it scopes which accounts
+                  // the collection card shows, so it is not part of that unit. It
+                  // is URL-driven (?tab=) so Back works and a link to "the people"
+                  // is a link somebody can send.
+                  aboveCard={
+                    <TabsView
+                      config={{ ...defaultTabsConfig, variant: "line", tabs: accountTabs }}
+                      value={accountTab}
+                      onValueChange={(v) => go(sectionPath, v === "all" ? {} : { tab: v })}
+                    />
+                  }
                 >
                   <ScreenRenderer
                     recipe={accountsRecipe}
@@ -521,6 +459,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
           }}
         </PagedFind>
       </div>
+      </CountedAbove>
     )
   }
   if (module === "knowledge") {

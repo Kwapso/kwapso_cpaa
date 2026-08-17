@@ -1,5 +1,5 @@
-// kwapso CONTENT worker — team-DB content modules (Learning + Tickets +
-// the Knowledge base). This file is just the SWITCHBOARD: it maps each route to
+// kwapso CONTENT worker — team-DB content modules (Tickets, the work engine
+// and the Knowledge base). This file is just the SWITCHBOARD: it maps each route to
 // a handler (grouped by domain under ./routes/*) and centrally maps thrown
 // GuardErrors to clean HTTP responses. The shared opening (whoAmI / teamContext
 // / requireRight) lives in the shared gating seam.
@@ -12,15 +12,6 @@
 //     the person whose week it is, and never to a client.
 // Both record their failures (R12): unattended work has nobody watching.
 //
-//   GET  /api/content/learning            -> the team's learning items (?id → one)
-//   POST /api/content/learning            -> create a learning item
-//   POST /api/content/learning/update     -> edit a learning item
-//   POST /api/content/learning/active     -> deactivate / reactivate an item (never deleted)
-//   POST /api/content/learning/bulk-active -> (de)activate MANY items at once → {updated,skipped}
-//   POST /api/content/learning/done       -> mark an item done / not-done (your own progress)
-//   POST /api/content/learning/upload      -> upload a local file (image/clip) to team R2 → URL
-//   POST /api/content/learning/upload-stream -> the same, file as the raw body
-//   GET  /api/content/learning/progress   -> curator dashboard (every member's done state)
 //   GET  /api/content/help                -> the team's tickets (?scope=mine|all, ?id → one)
 //   GET  /api/content/help/thread         -> one ticket's replies (?id=<ticketId>)
 //   POST /api/content/help                -> raise a ticket
@@ -76,11 +67,8 @@
 //   POST /api/content/meetings/update     -> correct it / write the notes up
 //   POST /api/content/meetings/held       -> it happened / it hasn't yet
 //   POST /api/content/meetings/active     -> cancel it / put it back
-//   GET  /api/content/marketing           -> the agency's own posts (?id → one)
-//   POST /api/content/marketing[/update|/active] -> write / edit / archive a post
 //   GET  /api/content/brand-assets        -> the brand library (?id → one)
 //   POST /api/content/brand-assets[/update|/active|/upload] -> write / edit / archive / store bytes
-//   GET  /api/content/delivery/programs   -> the delivery programmes (?id → one)
 //   GET  /api/content/delivery/purposes   -> why we meet (?id → one)
 //   GET  /api/content/staff/profiles      -> the team's own profiles (?userId → one)
 //   GET  /api/content/staff/certificates  -> what people hold (?userId → one person's)
@@ -92,18 +80,6 @@ import { GuardError } from "@shared/workers/gating"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { requestId } from "@shared/workers/trace"
 import type { Env } from "./env"
-import {
-  getLearning,
-  getLearningProgress,
-  postBulkSetLearningActive,
-  postCreateLearning,
-  postLearningDone,
-  postSetLearningActive,
-  postUpdateLearning,
-  postStreamLearningFile,
-  postUploadLearningFile,
-  getLearningExport,
-} from "./routes/learning"
 import {
   getHelp,
   getHelpStakeholders,
@@ -171,13 +147,6 @@ import {
   postUpdateMeeting,
 } from "./routes/meetings"
 import {
-  getMarketing,
-  getMarketingExport,
-  postCreateMarketing,
-  postSetMarketingActive,
-  postUpdateMarketing,
-} from "./routes/marketing"
-import {
   getBrandAssets,
   getBrandAssetsExport,
   postCreateBrandAsset,
@@ -189,14 +158,9 @@ import {
 import {
   getMeetingPurposes,
   getMeetingPurposesExport,
-  getPrograms,
-  getProgramsExport,
   postCreateMeetingPurpose,
-  postCreateProgram,
   postSetMeetingPurposeActive,
-  postSetProgramActive,
   postUpdateMeetingPurpose,
-  postUpdateProgram,
 } from "./routes/delivery"
 import {
   getStaffCertificates,
@@ -337,17 +301,7 @@ export async function teamSlice(
 type RouteKind = "read" | "mutation" | "housekeeping"
 type Handler = (request: Request, env: Env) => Promise<Response>
 export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
-  "GET /api/content/learning": { handler: getLearning, kind: "read" },
-  "GET /api/content/learning/export": { handler: getLearningExport, kind: "read" },
-  "POST /api/content/learning": { handler: postCreateLearning, kind: "mutation" },
-  "POST /api/content/learning/update": { handler: postUpdateLearning, kind: "mutation" },
-  "POST /api/content/learning/active": { handler: postSetLearningActive, kind: "mutation" },
-  "POST /api/content/learning/bulk-active": { handler: postBulkSetLearningActive, kind: "mutation" },
-  "POST /api/content/learning/done": { handler: postLearningDone, kind: "mutation" },
   // Stores a file in R2 but changes NO record (no row to patch) → housekeeping.
-  "POST /api/content/learning/upload": { handler: postUploadLearningFile, kind: "housekeeping" },
-  "POST /api/content/learning/upload-stream": { handler: postStreamLearningFile, kind: "housekeeping" },
-  "GET /api/content/learning/progress": { handler: getLearningProgress, kind: "read" },
   "GET /api/content/help": { handler: getHelp, kind: "read" },
   "GET /api/content/help/thread": { handler: getHelpThread, kind: "read" },
   "POST /api/content/help": { handler: postCreateHelp, kind: "mutation" },
@@ -412,8 +366,8 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "GET /api/content/knowledge/sync": { handler: getKnowledgeSync, kind: "read" },
   "POST /api/content/knowledge": { handler: postCreateKnowledge, kind: "mutation" },
   // A file becomes a source: stored whole, read where we can, and honest about
-  // it where we cannot. A MUTATION, not housekeeping — unlike the learning
-  // upload door beside it, this one writes the record as well as the bytes.
+  // it where we cannot. A MUTATION, not housekeeping — unlike the brand-library
+  // upload door below, this one writes the record as well as the bytes.
   "POST /api/content/knowledge/upload": { handler: postUploadKnowledgeFile, kind: "mutation" },
   "POST /api/content/knowledge/upload-stream": { handler: postStreamKnowledgeFile, kind: "mutation" },
   "POST /api/content/knowledge/update": { handler: postUpdateKnowledge, kind: "mutation" },
@@ -437,28 +391,18 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/content/meetings/active": { handler: postSetMeetingActive, kind: "mutation" },
 
   // ── THE AGENCY'S OWN HOUSEKEEPING ──────────────────────────────────────────
-  // Four modules, six tables, and one thing every door below has in common: it
+  // Three modules, four tables, and one thing every door below has in common: it
   // opens with `refusePortalCaller`. None of this material is a client's, so
   // there is no fenced slice of it to serve one — only a refusal (R21).
-  "GET /api/content/marketing": { handler: getMarketing, kind: "read" },
-  "GET /api/content/marketing/export": { handler: getMarketingExport, kind: "read" },
-  "POST /api/content/marketing": { handler: postCreateMarketing, kind: "mutation" },
-  "POST /api/content/marketing/update": { handler: postUpdateMarketing, kind: "mutation" },
-  "POST /api/content/marketing/active": { handler: postSetMarketingActive, kind: "mutation" },
   "GET /api/content/brand-assets": { handler: getBrandAssets, kind: "read" },
   "GET /api/content/brand-assets/export": { handler: getBrandAssetsExport, kind: "read" },
   "POST /api/content/brand-assets": { handler: postCreateBrandAsset, kind: "mutation" },
   "POST /api/content/brand-assets/update": { handler: postUpdateBrandAsset, kind: "mutation" },
   "POST /api/content/brand-assets/active": { handler: postSetBrandAssetActive, kind: "mutation" },
   // Stores a file in R2 but changes NO record (no row to patch) → housekeeping,
-  // the same classification the learning upload carries.
+  // which is what separates it from the knowledge upload door above.
   "POST /api/content/brand-assets/upload": { handler: postUploadBrandAsset, kind: "housekeeping" },
   "POST /api/content/brand-assets/upload-stream": { handler: postStreamBrandAsset, kind: "housekeeping" },
-  "GET /api/content/delivery/programs": { handler: getPrograms, kind: "read" },
-  "GET /api/content/delivery/programs/export": { handler: getProgramsExport, kind: "read" },
-  "POST /api/content/delivery/programs": { handler: postCreateProgram, kind: "mutation" },
-  "POST /api/content/delivery/programs/update": { handler: postUpdateProgram, kind: "mutation" },
-  "POST /api/content/delivery/programs/active": { handler: postSetProgramActive, kind: "mutation" },
   "GET /api/content/delivery/purposes": { handler: getMeetingPurposes, kind: "read" },
   "GET /api/content/delivery/purposes/export": { handler: getMeetingPurposesExport, kind: "read" },
   "POST /api/content/delivery/purposes": { handler: postCreateMeetingPurpose, kind: "mutation" },

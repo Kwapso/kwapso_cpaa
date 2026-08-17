@@ -12,7 +12,6 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { type ScreenQuery } from "@kwapso/ui/lib/recipe"
 
 import { AccountFormDialog } from "@/components/account-form-dialog"
-import { LearningFormDialog } from "@/components/learning-form-dialog"
 import { KnowledgeFormDialog } from "@/components/knowledge-form-dialog"
 import { KnowledgeUploadDialog } from "@/components/knowledge-upload-dialog"
 import { HelpFormDialog } from "@/components/help-form-dialog"
@@ -24,8 +23,6 @@ import { ConfirmAction } from "@/components/deep-link/confirm-action"
 import {
   InternalRecordDialog,
   brandAssetFields,
-  marketingFields,
-  programmeFields,
   purposeFields,
 } from "@/components/internal-record-dialog"
 import {
@@ -58,24 +55,17 @@ export type WritePanelsProps = Pick<
   ReturnType<typeof useScreenData>,
   | "membersQ"
   | "accountsQ"
-  | "learningCategoryOptions"
-  | "contentTypeOptions"
   | "helpTypeOptions"
   // The agency's own housekeeping: the pick-or-create vocabularies its forms
   // offer, and the loaded rows an EDIT panel prefills from.
-  | "marketingChannelOptions"
-  | "marketingStatusOptions"
   | "brandCategoryOptions"
   | "departmentOptions"
-  | "marketingQ"
   | "brandQ"
-  | "programmesQ"
   | "purposesQ"
 > &
   Pick<
     ReturnType<typeof useScreenActions>,
     | "runAction"
-    | "createLearning"
     | "createHelp"
     | "createAccount"
     | "createKnowledge"
@@ -99,26 +89,19 @@ export type WritePanelsProps = Pick<
  * one place the translation is written down, so the form, the confirm and the
  * writer all agree. */
 const INTERNAL_PANELS: Record<string, InternalKind | undefined> = {
-  marketing: "marketing",
   brand: "brand",
-  delivery: "delivery",
   purposes: "purposes",
 }
 
-/** …and the permission module each kind gates on. Two of them share `delivery`,
- * which is the point of that module: one right, two nouns. */
+/** …and the permission module each kind gates on. */
 const INTERNAL_MODULE: Record<string, string> = {
-  marketing: "marketing",
   brand: "brand_assets",
-  delivery: "delivery",
   purposes: "delivery",
 }
 
 /** What to call one in a sentence a person reads before archiving it. */
 const INTERNAL_NOUN: Record<string, string> = {
-  marketing: "post",
   brand: "brand asset",
-  delivery: "programme",
   purposes: "meeting purpose",
 }
 
@@ -139,24 +122,17 @@ export function WritePanels({
   active,
   membersQ,
   accountsQ,
-  learningCategoryOptions,
-  contentTypeOptions,
   helpTypeOptions,
   runAction,
-  createLearning,
   createHelp,
   createAccount,
   createKnowledge,
   uploadKnowledgeFile,
   saveInternalRecord,
   setInternalActive,
-  marketingChannelOptions,
-  marketingStatusOptions,
   brandCategoryOptions,
   departmentOptions,
-  marketingQ,
   brandQ,
-  programmesQ,
   purposesQ,
   closePanel,
   onRecordGone,
@@ -166,33 +142,19 @@ export function WritePanels({
 
   // WHICH agency-internal form the URL is asking for, and everything it needs to
   // open prefilled. Resolved once, here, because "is this panel mine?" and "what
-  // does it show?" are the same question asked of four segments — answering it
+  // does it show?" are the same question asked of two segments — answering it
   // per-dialog is how a create panel and an edit panel end up offering different
   // fields for one record kind.
   const internal = React.useMemo(() => {
     const kind = INTERNAL_PANELS[query.module ?? ""]
     const spec = kind
       ? {
-          marketing: {
-            fields: marketingFields(marketingChannelOptions, marketingStatusOptions),
-            title: t("Marketing post"),
-            subtitle: "Something we published about ourselves. Ours alone — no client ever sees it.",
-            submitLabel: t("Record it"),
-            rows: marketingQ.data,
-          },
           brand: {
             fields: brandAssetFields(brandCategoryOptions),
             title: t("Brand asset"),
             subtitle: "A piece of our own brand material — a logo, a deck, a template.",
             submitLabel: t("Add it"),
             rows: brandQ.data,
-          },
-          delivery: {
-            fields: programmeFields(),
-            title: t("Delivery programme"),
-            subtitle: "A way we run an engagement, start to finish.",
-            submitLabel: t("Add it"),
-            rows: programmesQ.data,
           },
           purposes: {
             fields: purposeFields(departmentOptions),
@@ -221,8 +183,8 @@ export function WritePanels({
     }
   }, [
     query.module, query.panel, query.id, can,
-    marketingChannelOptions, marketingStatusOptions, brandCategoryOptions, departmentOptions,
-    marketingQ.data, brandQ.data, programmesQ.data, purposesQ.data, t,
+    brandCategoryOptions, departmentOptions,
+    brandQ.data, purposesQ.data, t,
   ])
 
   const internalArchive = React.useMemo(() => {
@@ -230,7 +192,7 @@ export function WritePanels({
     return {
       kind,
       open: !!kind && query.confirm === `${kind}.archive` && !!query.id && can(INTERNAL_MODULE[kind], "delete"),
-      title: `Archive this ${INTERNAL_NOUN[kind ?? "marketing"]}?`,
+      title: `Archive this ${INTERNAL_NOUN[kind ?? "brand"]}?`,
     }
   }, [query.confirm, query.id, can])
 
@@ -286,17 +248,6 @@ export function WritePanels({
           ...new Set((accountsQ.data ?? []).map((a) => a.status).filter((s): s is string => !!s)),
         ]}
         onSubmit={createAccount}
-      />
-
-      {/* Create a learning article (?panel=add&module=learning) — gated by create. */}
-      <LearningFormDialog
-        open={query.panel === "add" && query.module === "learning" && can("learning", "create")}
-        onOpenChange={(o) => !o && closePanel()}
-        draftKey={teamId ? `learning:new:${teamId}` : undefined}
-        teamId={teamId}
-        categoryOptions={learningCategoryOptions}
-        contentTypeOptions={contentTypeOptions}
-        onSubmit={createLearning}
       />
 
       {/* Raise a help ticket (?panel=add&module=help) — gated by create. */}

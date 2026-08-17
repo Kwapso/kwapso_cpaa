@@ -23,16 +23,13 @@ import {
   Home,
   LibraryBig,
   ListTodo,
-  Megaphone,
   Palette,
   Route,
   Settings,
-  GraduationCap,
   LifeBuoy,
   PanelLeftClose,
   PanelLeftOpen,
   Timer,
-  Workflow,
 } from "lucide-react"
 
 import type { ActiveTeam } from "@/lib/use-active-team"
@@ -70,7 +67,6 @@ const NAV_ICONS = { home: Home, settings: Settings } as const
 // insists every icon is distinct, so a silent fallback cannot ship again.
 const SECTION_ICONS: Record<string, typeof Home> = {
   accounts: Building2,
-  learning: GraduationCap,
   tickets: LifeBuoy,
   knowledge: LibraryBig,
   processes: Route,
@@ -80,9 +76,7 @@ const SECTION_ICONS: Record<string, typeof Home> = {
   tasks: ListTodo,
   time: Timer,
   meetings: CalendarClock,
-  marketing: Megaphone,
   brand: Palette,
-  delivery: Workflow,
 }
 
 export function AppShell({

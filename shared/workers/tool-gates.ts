@@ -47,15 +47,9 @@ export const TOOL_GATES: Record<string, string> = {
   create_dropdown_value: "selectable_data:create",
   update_dropdown_value: "selectable_data:edit",
   set_dropdown_active: "selectable_data:delete",
-  create_marketing_post: "marketing:create",
-  update_marketing_post: "marketing:edit",
-  set_marketing_post_active: "marketing:delete",
   create_brand_asset: "brand_assets:create",
   update_brand_asset: "brand_assets:edit",
   set_brand_asset_active: "brand_assets:delete",
-  create_programme: "delivery:create",
-  update_programme: "delivery:edit",
-  set_programme_active: "delivery:delete",
   create_meeting_purpose: "delivery:create",
   update_meeting_purpose: "delivery:edit",
   set_meeting_purpose_active: "delivery:delete",
@@ -68,10 +62,6 @@ export const TOOL_GATES: Record<string, string> = {
   create_staff_certificate: "staff_profiles:create",
   update_staff_certificate: "staff_profiles:edit",
   set_staff_certificate_active: "staff_profiles:delete",
-  create_learning: "learning:create",
-  update_learning: "learning:edit",
-  set_learning_active: "learning:delete",
-  mark_learning_done: "learning:read",
   add_knowledge_source: "knowledge:create",
   update_knowledge_source: "knowledge:edit",
   set_knowledge_source_active: "knowledge:delete",
@@ -141,7 +131,6 @@ export const TOOL_GATES: Record<string, string> = {
   // REGEX decides for.
   bulk_set_help_status: "help:edit",
   set_help_status_by_filter: "help:edit",
-  bulk_set_learning_active: "learning:delete",
   // The map: one module, four rights, and the same three-way split every other
   // module has — create maps and steps, edit them, and `delete` for the two acts
   // that take something out of the picture (archiving, and recording that a step

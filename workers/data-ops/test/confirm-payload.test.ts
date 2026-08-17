@@ -41,7 +41,7 @@ function sampleInput(tool: AgentTool): Record<string, unknown> {
         break
       case "object":
         // The only object field today is a role's permission sheet.
-        input[key] = { learning: { read: true, create: true } }
+        input[key] = { knowledge: { read: true, create: true } }
         break
       default:
         input[key] = `sample ${key}`
@@ -67,7 +67,7 @@ describe("the confirm panel shows the payload it asks an admin to approve", () =
     expect(names.length, names.join(", ")).toBeGreaterThanOrEqual(12)
     // The ones that only confirm on the way DOWN must be in the set, or their
     // payload would go unchecked precisely when it matters.
-    for (const n of ["set_learning_active", "set_dropdown_active", "set_help_status_by_filter"])
+    for (const n of ["set_brand_asset_active", "set_dropdown_active", "set_help_status_by_filter"])
       expect(names, `${n} must be covered in its destructive direction`).toContain(n)
   })
 
@@ -84,7 +84,7 @@ describe("the confirm panel shows the payload it asks an admin to approve", () =
         if (value === undefined || value === null) continue
         if (value && typeof value === "object" && !Array.isArray(value)) {
           // A permission sheet: every module row must be there (see below).
-          expect(text, `${tool.name}.${key} must be spelled out`).toContain("Learning: read, create")
+          expect(text, `${tool.name}.${key} must be spelled out`).toContain("Knowledge base: read, create")
           continue
         }
         if (typeof value === "string" && value) {
@@ -109,10 +109,10 @@ describe("the confirm panel shows the payload it asks an admin to approve", () =
     // through, which is the same escalation risk in reverse.
     const lines = describePayload("set_role_permissions", {
       roleId: "01ROLE",
-      value: { learning: { read: true, create: true, edit: false }, help: { read: true } },
+      value: { knowledge: { read: true, create: true, edit: false }, help: { read: true } },
     })
     const text = lines.join("\n")
-    expect(text).toContain("Learning: read, create")
+    expect(text).toContain("Knowledge base: read, create")
     // The permission KEY is still `help` (the string in every role's sheet); the
     // LABEL the panel prints is the word a person reads, and that word is Tickets.
     expect(text).toContain("Tickets: read")
@@ -122,7 +122,7 @@ describe("the confirm panel shows the payload it asks an admin to approve", () =
     for (const m of TEAM_MODULE_CATALOG)
       expect(text, `${m.label} must appear`).toContain(`${m.label}:`)
     // "edit: false" is not access — it must not read as granted.
-    expect(text).not.toContain("Learning: read, create, edit")
+    expect(text).not.toContain("Knowledge base: read, create, edit")
   })
 
   it("still spells the sheet out when the payload carries a stray extra key", () => {
@@ -138,7 +138,7 @@ describe("the confirm panel shows the payload it asks an admin to approve", () =
     // sheet. Data does not get a vote on how it is read.
     const lines = describePayload("set_role_permissions", {
       roleId: "01ROLE",
-      value: { learning: { read: true }, note: "" },
+      value: { knowledge: { read: true }, note: "" },
     })
     const text = lines.join("\n")
     for (const m of TEAM_MODULE_CATALOG)
@@ -153,7 +153,7 @@ describe("the confirm panel shows the payload it asks an admin to approve", () =
     // The same object under a DIFFERENT tool is not a permission sheet, and must
     // not be rendered as the whole module catalogue.
     const text = describePayload("some_future_tool", {
-      value: { learning: { read: true }, help: { read: true } },
+      value: { knowledge: { read: true }, help: { read: true } },
     }).join("\n")
     expect(text).not.toContain("Members: no access")
   })

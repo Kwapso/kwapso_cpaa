@@ -82,15 +82,6 @@ const MCP_ONLY: McpTool[] = [
     method: "GET",
     path: "/api/tenancy/team-meta",
   },
-  {
-    name: "list_learning_progress",
-    description:
-      "Every member's done state for the team's learning articles — the curator's view of who has finished what. (mark_learning_done sets it, for yourself only.) Needs learning:read.",
-    inputSchema: obj({}),
-    binding: "CONTENT",
-    method: "GET",
-    path: "/api/content/learning/progress",
-  },
   // ---- exports (READ right; the same full-field CSVs the Export buttons serve) ----
   {
     name: "export_roles_csv",
@@ -99,14 +90,6 @@ const MCP_ONLY: McpTool[] = [
     binding: "TENANCY",
     method: "GET",
     path: "/api/tenancy/roles/export",
-  },
-  {
-    name: "export_learning_csv",
-    description: "Every learning article as CSV (full fields + audit).",
-    inputSchema: obj({}),
-    binding: "CONTENT",
-    method: "GET",
-    path: "/api/content/learning/export",
   },
   {
     name: "export_dropdown_values_csv",
@@ -120,29 +103,12 @@ const MCP_ONLY: McpTool[] = [
   // a file exported here goes straight back in through the importer — which is
   // what makes the legacy migration reversible while it is still being checked.
   {
-    name: "export_marketing_posts_csv",
-    description:
-      "Every marketing post the agency has published, as CSV (full fields + audit). Internal — these never appear in a client's portal.",
-    inputSchema: obj({}),
-    binding: "CONTENT",
-    method: "GET",
-    path: "/api/content/marketing/export",
-  },
-  {
     name: "export_brand_assets_csv",
     description: "The whole brand library as CSV (full fields + audit).",
     inputSchema: obj({}),
     binding: "CONTENT",
     method: "GET",
     path: "/api/content/brand-assets/export",
-  },
-  {
-    name: "export_programmes_csv",
-    description: "Every delivery programme as CSV (full fields + audit).",
-    inputSchema: obj({}),
-    binding: "CONTENT",
-    method: "GET",
-    path: "/api/content/delivery/programs/export",
   },
   {
     name: "export_meeting_purposes_csv",

@@ -160,6 +160,12 @@ export const KNOWLEDGE_KINDS = [
   // between words a colleague typed and words a converter produced.
   "file",
   "ticket",
+  // ARTICLE — a kind with no mirror behind it any more, and deliberately kept.
+  // The Learning module was purged on 17 Aug 2026 and its table went with it,
+  // but its 41 articles had already been indexed here, so the material outlived
+  // the module. Dropping the kind would orphan those rows: the sweep no longer
+  // writes one, and nothing reads `learning` — this word is only what an
+  // existing source calls itself, and what a person filters by to find one.
   "article",
   "account",
   // The three record kinds the vector rebuild added — an app, a story and a

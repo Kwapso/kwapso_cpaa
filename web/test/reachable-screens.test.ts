@@ -17,7 +17,7 @@
 //      gateway forwarding its sub-paths (or a deep link to a record 404s).
 //      Every one of those four was broken for at least one live section when
 //      this check was written: Knowledge base and Work were missing from
-//      TOP_LEVEL_MODULES, and Marketing, Brand library, Delivery method and
+//      TOP_LEVEL_MODULES, and the Brand library and
 //      Meeting purposes had no page shell at all — four sidebar links that
 //      404'd on reload, in a green build.
 //
@@ -303,18 +303,14 @@ describe("the screens are reachable", () => {
  * a screen that now exists. */
 const NO_CONTROL: Record<string, string> = {
   /* ── for a client that is already out there ───────────────────────────── */
-  "POST /api/content/learning/upload":
-    "FOR AN OLDER BUILD OF THIS APP. The buffered half of the learning-media upload pair — a base64 data URL in a JSON body — replaced on 17 Aug 2026 by /upload-stream, which hands the file to R2 as it arrives. No screen in THIS build calls it, and that is deliberate: a browser holds its own copy of the app for as long as the tab is open, so somebody who loaded a page before the deploy is still running the old JavaScript and still posting here. An upload contract is the one change where the server must be ready before the client and outlast it afterwards. All four of these lines go when no build in the wild uses them.",
   "POST /api/content/brand-assets/upload":
-    "FOR AN OLDER BUILD OF THIS APP — the buffered half of the brand-asset upload pair, kept for tabs opened before the 17 Aug 2026 deploy for the reason written on the learning line above.",
+    "FOR AN OLDER BUILD OF THIS APP. The buffered half of the brand-asset upload pair — a base64 data URL in a JSON body — replaced on 17 Aug 2026 by /upload-stream, which hands the file to R2 as it arrives. No screen in THIS build calls it, and that is deliberate: a browser holds its own copy of the app for as long as the tab is open, so somebody who loaded a page before the deploy is still running the old JavaScript and still posting here. An upload contract is the one change where the server must be ready before the client and outlast it afterwards. All of these lines go when no build in the wild uses them.",
   "POST /api/content/staff/upload":
-    "FOR AN OLDER BUILD OF THIS APP — the buffered half of the staff-file upload pair, kept for tabs opened before the 17 Aug 2026 deploy for the reason written on the learning line above.",
+    "FOR AN OLDER BUILD OF THIS APP — the buffered half of the staff-file upload pair, kept for tabs opened before the 17 Aug 2026 deploy for the reason written on the brand-asset line above.",
   "POST /api/content/knowledge/upload":
     "FOR AN OLDER BUILD OF THIS APP. The buffered upload door — a base64 data URL in a JSON body — replaced on 17 Aug 2026 by /upload-stream, which takes the file as the request body and never materialises it. No screen in THIS build calls it, and that is the point rather than a gap: a browser holds its own copy of the app for as long as the tab is open, so a person who loaded the app before the deploy is still running the old JavaScript and still posting here. The door stays until no build in the wild uses it; deleting it then is a separate, boring change. An upload contract is the one kind of change where the server must be ready before the client is, and outlast it afterwards.",
 
   /* ── for a machine ─────────────────────────────────────────────────────── */
-  "POST /api/content/learning/bulk-active":
-    "FOR A MACHINE. The SET-shaped write — 'switch these forty articles off'. It exists for the assistant and the machine surface, where a caller names a set; a person switches one article off on its own screen, which is the door beside this one.",
   "POST /api/content/help/bulk-status":
     "FOR A MACHINE. The same shape for tickets: a set of ids moved together. A person moves one ticket with the stepper on its own screen.",
   "POST /api/content/help/bulk-status-by-filter":

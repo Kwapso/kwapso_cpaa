@@ -19,8 +19,8 @@ import {
 import { sampleRows, TARGETS, type ReferenceDef } from "../src/lib/targets"
 
 describe("detectTarget: pick the table a file feeds by its required columns", () => {
-  it("matches learning by title (+ fuzzy headers)", () => {
-    expect(detectTarget(["Title", "Category", "Body"])).toBe("learning")
+  it("matches the brand library by name (+ fuzzy headers)", () => {
+    expect(detectTarget(["Name", "Category", "File"])).toBe("brand_assets")
   })
   it("matches dropdown values by group/value", () => {
     expect(detectTarget(["Group", "Value"])).toBe("selectable_data")
@@ -34,9 +34,9 @@ describe("detectTarget: pick the table a file feeds by its required columns", ()
 })
 
 describe("orderTargets: parents before children (the dependency topo-sort)", () => {
-  it("orders dropdown values BEFORE learning (learning.category → selectable_data)", () => {
-    const { order, warnings } = orderTargets(["learning", "selectable_data"])
-    expect(order.indexOf("selectable_data")).toBeLessThan(order.indexOf("learning"))
+  it("orders dropdown values BEFORE the brand library (brand_assets.category → selectable_data)", () => {
+    const { order, warnings } = orderTargets(["brand_assets", "selectable_data"])
+    expect(order.indexOf("selectable_data")).toBeLessThan(order.indexOf("brand_assets"))
     expect(warnings).toEqual([])
   })
   it("a single independent target just returns itself", () => {
@@ -64,16 +64,16 @@ describe("normalizers: the fixed safe vocabulary", () => {
 
 describe("buildFallbackPlan: a usable plan with no model", () => {
   const files: PlanFile[] = [
-    { fileId: "f1", name: "articles.csv", headers: ["Title", "Category"], rowCount: 3 },
+    { fileId: "f1", name: "assets.csv", headers: ["Name", "Category", "File"], rowCount: 3 },
     { fileId: "f2", name: "cats.csv", headers: ["Group", "Value"], rowCount: 2 },
   ]
   it("detects both targets, orders dropdowns first, maps the required columns", () => {
     const plan = buildFallbackPlan(files)
     expect(plan.bySource).toBe("fallback")
-    expect(plan.order.indexOf("selectable_data")).toBeLessThan(plan.order.indexOf("learning"))
-    const learning = plan.steps.find((s) => s.target === "learning")!
-    expect(learning.mapping.title).toBe("Title") // required column mapped
-    expect(learning.predictedRejects).toBe(0)
+    expect(plan.order.indexOf("selectable_data")).toBeLessThan(plan.order.indexOf("brand_assets"))
+    const assets = plan.steps.find((s) => s.target === "brand_assets")!
+    expect(assets.mapping.name).toBe("Name") // required column mapped
+    expect(assets.predictedRejects).toBe(0)
   })
   it("predicts every row rejects when a required column is unmapped", () => {
     const plan = buildFallbackPlan([{ fileId: "f3", name: "x.csv", headers: ["Value"], rowCount: 5 }])
@@ -134,7 +134,7 @@ describe("every import target yields a downloadable sample (AGENTIC-IMPORT §10)
 
   it("the roles sample carries permission-matrix columns (export ↔ import round-trip)", () => {
     const { header, row } = sampleRows(TARGETS.member_roles)
-    const i = header.indexOf("learning.read")
+    const i = header.indexOf("help.read")
     expect(i).toBeGreaterThan(-1)
     expect(row[i]).toBe("yes")
   })
@@ -220,12 +220,12 @@ describe("member_roles buildBody: the matrix rides along only when the file carr
     const body = TARGETS.member_roles.buildBody({
       title: "Editor",
       description: "",
-      "learning.read": "yes",
-      "learning.create": "TRUE",
-      "help.read": "1",
+      "help.read": "yes",
+      "help.create": "TRUE",
+      "knowledge.read": "1",
     }) as { permissions?: Record<string, Record<string, boolean>> }
-    expect(body.permissions?.learning).toEqual({ read: true, create: true, edit: false, delete: false })
-    expect(body.permissions?.help.read).toBe(true)
+    expect(body.permissions?.help).toEqual({ read: true, create: true, edit: false, delete: false })
+    expect(body.permissions?.knowledge.read).toBe(true)
     expect(body.permissions?.teams.read).toBe(false)
   })
 

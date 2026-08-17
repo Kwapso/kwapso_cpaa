@@ -161,7 +161,6 @@ describe("team schema", () => {
       // (companies and people are one row shape), two permissions on top.
       "contacts",
       "portal_users",
-      "learning",
       "help",
       "knowledge",
       "selectable_data",
@@ -183,16 +182,17 @@ describe("team schema", () => {
       // `work`, which no client holds at all.
       "todos",
       "meetings",
-      // THE AGENCY'S OWN HOUSEKEEPING — the four modules carrying the seven
-      // legacy tables that describe how the agency runs ITSELF rather than what
-      // it does for a client. None of them is customer material, so unlike
-      // `processes` every door on all four REFUSES a client login rather than
-      // fencing one (the refusal-symmetry suite holds both halves of each).
+      // THE AGENCY'S OWN HOUSEKEEPING — the three modules carrying the legacy
+      // tables that describe how the agency runs ITSELF rather than what it does
+      // for a client. None of them is customer material, so unlike `processes`
+      // every door on all three REFUSES a client login rather than fencing one
+      // (the refusal-symmetry suite holds both halves of each).
       //
-      // Two of the seven legacy tables are deliberately not here: `departments`
-      // and `channels` are bare labels, and the base already has one home for a
+      // Several legacy tables are deliberately not here: `departments` and
+      // `channels` are bare labels, and the base already has one home for a
       // team's editable vocabulary. A module built to hold a word is ceremony.
-      "marketing",
+      // `content` (marketing) and the learning library were purged on 17 Aug
+      // 2026, and `program` went the same day — folded onto the sprint type.
       "brand_assets",
       "delivery",
       "staff_profiles",
@@ -273,11 +273,9 @@ describe("the two dropdown groups the legacy migration lands in", () => {
 describe("the agency-internal migration", () => {
   const sql = TEAM_MIGRATIONS.find((m) => m.version === "0018_agency_internal")?.sql ?? ""
 
-  it("creates the six tables the four modules own", () => {
+  it("creates the four tables the three modules own", () => {
     for (const table of [
-      "marketing_posts",
       "brand_assets",
-      "programs",
       "meeting_purposes",
       "staff_profiles",
       "staff_certificates",
@@ -286,10 +284,10 @@ describe("the agency-internal migration", () => {
   })
 
   it("gives every one of them the deactivate-not-delete column, and no DELETE", () => {
-    // ARCHITECTURE §4: the row is retired, never removed. Six tables, six audit
-    // blocks — a table that shipped without one would be the only place in the
-    // app where history can be destroyed.
-    expect((sql.match(/deactivated_at TEXT/g) ?? []).length).toBe(6)
+    // ARCHITECTURE §4: the row is retired, never removed. Four tables, four
+    // audit blocks — a table that shipped without one would be the only place in
+    // the app where history can be destroyed.
+    expect((sql.match(/deactivated_at TEXT/g) ?? []).length).toBe(4)
     expect(sql, "there is no delete in this model").not.toMatch(/\bDELETE\b/)
   })
 
@@ -303,13 +301,13 @@ describe("the agency-internal migration", () => {
     )
   })
 
-  it("hands the four new modules to the locked Admin role and to nobody else", () => {
+  it("hands the new modules to the locked Admin role and to nobody else", () => {
     // Same shape as 0007 and 0013, for the same reason: a migration must never
     // hand out sight of the agency's own material that nobody granted. The
     // rights come from `r.is_default`, which is 1 for the locked Admin role and
     // 0 for every role somebody built by hand.
     const backfill = sql.slice(sql.indexOf("INSERT INTO role_permissions"))
-    for (const m of ["marketing", "brand_assets", "delivery", "staff_profiles"])
+    for (const m of ["brand_assets", "delivery", "staff_profiles"])
       expect(backfill, `${m} must reach existing teams`).toContain(`'${m}'`)
     expect(backfill, "every other role must gain nothing").toContain("r.is_default")
     expect(backfill, "and it must not re-grant what a team already has").toContain("WHERE NOT EXISTS")
@@ -321,7 +319,7 @@ describe("the agency-internal migration", () => {
     // customer; not one of these does, because they belong to the agency. A
     // column that isn't there cannot be joined to an account-fenced read by
     // somebody who assumed it meant the same thing here.
-    const tables = sql.slice(sql.indexOf("CREATE TABLE marketing_posts"), sql.indexOf("INSERT INTO role_permissions"))
+    const tables = sql.slice(sql.indexOf("CREATE TABLE brand_assets"), sql.indexOf("INSERT INTO role_permissions"))
     expect(tables, "an agency-internal table with an account column is a category error").not.toContain(
       "account_id"
     )

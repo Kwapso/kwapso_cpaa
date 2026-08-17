@@ -70,7 +70,7 @@ export function DeepLinkScreen() {
   const query = route?.query ?? {}
   const topLevel = route?.topLevel ?? false
 
-  // Top-level pages (/learning, /tickets) run against the ACTIVE team (like /home);
+  // Top-level pages (/tickets, /accounts) run against the ACTIVE team (like /home);
   // /t/<id> URLs name their team explicitly, so only those switch teams.
   const { teamId, onTeam, enabled, isMemberOfUrlTeam, teamCount, noAccess } = useRouteTeam({
     active,
@@ -101,13 +101,10 @@ export function DeepLinkScreen() {
     rolesQ,
     invitesQ,
     metaQ,
-    learningQ,
     helpQ,
     helpMineQ,
     helpArchivedQ,
-    marketingQ,
     brandQ,
-    programmesQ,
     purposesQ,
     storiesQ,
     sprintsQ,
@@ -116,15 +113,11 @@ export function DeepLinkScreen() {
     tasksAllQ,
     workLogsQ,
     meetingsQ,
-    marketingChannelOptions,
-    marketingStatusOptions,
     brandCategoryOptions,
     departmentOptions,
     internalActivity,
     totals,
     helpTypeOptions,
-    learningCategoryOptions,
-    contentTypeOptions,
     activityScope,
     activityKey,
     activityQ,
@@ -138,7 +131,7 @@ export function DeepLinkScreen() {
 
   /* ------------------------------- navigation ------------------------------- */
 
-  // The base URL for the current screen — a clean top-level path (/learning) or the
+  // The base URL for the current screen — a clean top-level path (/tickets) or the
   // team-scoped form (/t/<teamId>/<module>). go() / breadcrumbs / closePanel build
   // off these, so intra-screen nav stays in whichever form you arrived through.
   const teamPath = teamId ? `/t/${teamId}` : "/"
@@ -167,7 +160,6 @@ export function DeepLinkScreen() {
   // failure so the calling dialog / confirm surfaces it.
   const {
     runAction,
-    createLearning,
     createHelp,
     createAccount,
     createKnowledge,
@@ -206,13 +198,11 @@ export function DeepLinkScreen() {
       case "team.edit":
         go(currentPath, { panel: "edit", module: "team" })
         break
-      // The agency's own housekeeping. Four modules, two actions each, and the
+      // The agency's own housekeeping. Two modules, two actions each, and the
       // same routing every other write in this host uses: the action opens a
       // URL (?panel / ?confirm) and the dialog behind it does the mutation, so
       // Back closes it and the link is shareable.
-      case "marketing.edit":
       case "brand.edit":
-      case "programme.edit":
       case "purpose.edit":
         go(currentPath, { panel: "edit", module: module as string, id })
         break
@@ -227,9 +217,7 @@ export function DeepLinkScreen() {
         })
         break
       }
-      case "marketing.archive":
       case "brand.archive":
-      case "programme.archive":
       case "purpose.archive":
         go(currentPath, { confirm: `${module}.archive`, id })
         break
@@ -269,9 +257,10 @@ export function DeepLinkScreen() {
   const teamName = active.ctx.team?.name ?? "Team"
   const myUserId = active.user?.id ?? null
   // Import has no read-right of its own — it's gated per-target. You can reach it
-  // if you can CREATE into any supported target (member roles, learning, accounts).
+  // if you can CREATE into any supported target (member roles, dropdown values,
+  // accounts).
   const canImport =
-    can("member_roles", "create") || can("learning", "create") || can("accounts", "create")
+    can("member_roles", "create") || can("selectable_data", "create") || can("accounts", "create")
 
   // The team tab strip. The NUMBER on each badge is an exact server total (LAW
   // R16): members from the active context's COUNT(*), everything else from the
@@ -283,7 +272,6 @@ export function DeepLinkScreen() {
     invites: totals.invites,
     selectable: totals.selectable,
     internal_rates: totals.internal_rates,
-    learning: totals.learning,
     help: totals.help,
     accounts: totals.accounts,
     knowledge: totals.knowledge,
@@ -292,9 +280,7 @@ export function DeepLinkScreen() {
     apps: totals.apps,
     tasks: totals.tasks,
     meetings: totals.meetings,
-    marketing: totals.marketing,
     brand_assets: totals.brand_assets,
-    programmes: totals.programmes,
     purposes: totals.purposes,
   })
 
@@ -311,7 +297,6 @@ export function DeepLinkScreen() {
       members: membersQ.data,
       roles,
       invites: invitesQ.data,
-      learning: learningQ.data,
       knowledge: knowledgeQ.data,
       apps: appsQ.data,
       sprints: sprintsQ.data,
@@ -350,8 +335,8 @@ export function DeepLinkScreen() {
         <CountedTabs badged={showTabs && sectionCounts[section] !== undefined}>
           {renderModuleContent({
             noAccess, enabled, perms, can, module, recordId, teamId, canImport, go,
-            overridesQ, metaQ, membersQ, rolesQ, roles, invitesQ, learningQ, helpQ, accountsQ, knowledgeQ, totals,
-            marketingQ, brandQ, programmesQ, purposesQ, internalActivity,
+            overridesQ, metaQ, membersQ, rolesQ, roles, invitesQ, helpQ, accountsQ, knowledgeQ, totals,
+            brandQ, purposesQ, internalActivity,
             storiesQ, sprintsQ, appsQ, tasksOpenQ, tasksAllQ, workLogsQ, meetingsQ,
             activityQ, activityTotal, activityKey, activityScope, inviteAuditQ, teamName, active,
             rights, onAction, onIntent,
@@ -369,19 +354,12 @@ export function DeepLinkScreen() {
         active={active}
         membersQ={membersQ}
         accountsQ={accountsQ}
-        learningCategoryOptions={learningCategoryOptions}
-        contentTypeOptions={contentTypeOptions}
-        marketingChannelOptions={marketingChannelOptions}
-        marketingStatusOptions={marketingStatusOptions}
         brandCategoryOptions={brandCategoryOptions}
         departmentOptions={departmentOptions}
-        marketingQ={marketingQ}
         brandQ={brandQ}
-        programmesQ={programmesQ}
         purposesQ={purposesQ}
         helpTypeOptions={helpTypeOptions}
         runAction={runAction}
-        createLearning={createLearning}
         createHelp={createHelp}
         createAccount={createAccount}
         createKnowledge={createKnowledge}
@@ -412,7 +390,6 @@ function teamTabStrip(
     module === "dropdowns" ||
     module === "internal-rates" ||
     module === "accounts" ||
-    module === "learning" ||
     module === "tickets" ||
     module === "knowledge" ||
     module === "processes" ||
@@ -421,9 +398,7 @@ function teamTabStrip(
     module === "apps" ||
     module === "tasks" ||
     module === "meetings" ||
-    module === "marketing" ||
     module === "brand" ||
-    module === "delivery" ||
     module === "purposes" ||
     module === "import"
       ? module

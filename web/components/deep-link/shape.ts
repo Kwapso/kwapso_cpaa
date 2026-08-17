@@ -15,12 +15,9 @@ import type {
   Invite,
   InviteAudit,
   KnowledgeSource,
-  Learning,
-  MarketingPost,
   Meeting,
   MeetingPurpose,
   Task,
-  Program,
   TeamMeta,
   TeamMember,
   TeamRole,
@@ -142,21 +139,6 @@ export function shapeHelpList(tickets: HelpTicket[]): ScreenData {
   }
 }
 
-export function shapeLearningList(items: Learning[]): ScreenData {
-  return {
-    rows: items.map((l) => ({
-      id: l.id,
-      // Inactive items stay visible to curators (deactivate-not-delete) — flag it
-      // in the title, matching how roles show "(inactive)".
-      name: l.active ? l.title : `${l.title} (inactive)`,
-      detail: l.category || l.description || "—",
-      // Facet columns (read by the filter engine, not the renderer).
-      category: l.category || "—",
-      state: l.active ? "Active" : "Inactive",
-    })),
-  }
-}
-
 /* -------------------------------- knowledge ------------------------------- */
 
 /** What a source IS, in the words a person uses for it. A `note` is something
@@ -166,6 +148,9 @@ export const KNOWLEDGE_KIND: Record<string, string> = {
   note: "Note",
   file: "From a file",
   ticket: "From a ticket",
+  // A KIND WITH NO MODULE BEHIND IT ANY MORE. Learning went on 17 Aug 2026 and
+  // its 41 articles stayed, already indexed — so this word still names what a
+  // source IS even though nothing writes a new one.
   article: "From an article",
   account: "From an account",
 }
@@ -313,49 +298,14 @@ export function shapeInviteDetail(
 }
 
 /* ------------------- the agency's own housekeeping ------------------------ */
-// Four modules, one shaping pattern, and one thing to keep in view while reading
+// Two modules, one shaping pattern, and one thing to keep in view while reading
 // them: an ARCHIVED row stays in the list. That is deactivate-not-delete showing
 // through to the screen — the row is retired, not removed, so it is still there
 // to restore — and the `(archived)` suffix plus the `state` facet are how a
-// person tells the two apart at a glance. Roles and learning articles have said
-// "(inactive)" for the same reason since the base's first commit; these say
-// "(archived)" because that is the word this app's glossary uses for putting a
-// record away without losing it.
-
-export function shapeMarketingList(items: MarketingPost[]): ScreenData {
-  return {
-    rows: items.map((p) => ({
-      id: p.id,
-      name: p.active ? p.title : `${p.title} (archived)`,
-      detail: [p.channel, p.publishedOn ? formatDate(p.publishedOn) : "Not published"]
-        .filter(Boolean)
-        .join(" · ") || "—",
-      // Facet columns (read by the filter engine, not the renderer).
-      channel: p.channel || "—",
-      status: p.status || "—",
-      state: p.active ? "Live" : "Archived",
-    })),
-  }
-}
-
-export function shapeMarketingDetail(post: MarketingPost, activity: ActivityItem[]): ScreenData {
-  return {
-    record: {
-      id: post.id,
-      name: post.title,
-      detail: post.channel || "No channel",
-      channel: post.channel || "—",
-      status: post.status || "—",
-      published: post.publishedOn ? formatDate(post.publishedOn) : "Not published yet",
-      summary: post.summary || "—",
-      link: post.link || "—",
-      created: formatDateTime(post.createdAt),
-      createdBy: post.creatorName || "—",
-      updated: post.updatedAt ? formatDateTime(post.updatedAt) : "—",
-    },
-    sets: { activity: shapeActivity(activity) },
-  }
-}
+// person tells the two apart at a glance. Roles have said "(inactive)" for the
+// same reason since the base's first commit; these say "(archived)" because that
+// is the word this app's glossary uses for putting a record away without losing
+// it.
 
 export function shapeBrandList(items: BrandAsset[]): ScreenData {
   return {
@@ -381,33 +331,6 @@ export function shapeBrandDetail(asset: BrandAsset, activity: ActivityItem[]): S
       created: formatDateTime(asset.createdAt),
       createdBy: asset.creatorName || "—",
       updated: asset.updatedAt ? formatDateTime(asset.updatedAt) : "—",
-    },
-    sets: { activity: shapeActivity(activity) },
-  }
-}
-
-export function shapeProgrammesList(items: Program[]): ScreenData {
-  return {
-    rows: items.map((p) => ({
-      id: p.id,
-      name: p.active ? p.name : `${p.name} (archived)`,
-      detail: p.description || "—",
-      state: p.active ? "Live" : "Archived",
-    })),
-  }
-}
-
-export function shapeProgrammeDetail(programme: Program, activity: ActivityItem[]): ScreenData {
-  return {
-    record: {
-      id: programme.id,
-      name: programme.name,
-      detail: programme.description || "No description",
-      description: programme.description || "—",
-      order: String(programme.sequence),
-      created: formatDateTime(programme.createdAt),
-      createdBy: programme.creatorName || "—",
-      updated: programme.updatedAt ? formatDateTime(programme.updatedAt) : "—",
     },
     sets: { activity: shapeActivity(activity) },
   }
