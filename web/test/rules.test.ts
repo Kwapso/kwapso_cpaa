@@ -1361,6 +1361,7 @@ describe("RULES — the laws of the base", () => {
       "internal-money-never-in-portal", // R24: the import-graph scan above
       "savings-caption", // R25: the derived-screens scan above
       "vector-fence", // R26: workers/content/test/vector-fence.test.ts
+      "described-contracts", // R27: workers/mcp/test/described-contracts.test.ts, beside R19/R22 on the same door census
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")
