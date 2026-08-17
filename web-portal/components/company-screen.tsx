@@ -23,6 +23,7 @@ import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 
 import type { AccountDetail } from "@shared/types"
+import { postalAddress } from "@shared/web/format"
 import { useCached } from "@shared/web/store"
 import { portal } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
@@ -55,7 +56,9 @@ export function CompanyScreen({ ready }: { ready: PortalReady }) {
     account.code ? { label: t("Reference"), value: account.code } : null,
     account.email ? { label: t("Email"), value: account.email } : null,
     account.phone ? { label: t("Phone"), value: account.phone } : null,
-    account.address ? { label: t("Address"), value: account.address } : null,
+    // The postal address, read as one line from the four fields it is stored in
+    // — a client reading their own record wants the address, not four rows.
+    postalAddress(account) ? { label: t("Address"), value: postalAddress(account) } : null,
   ].filter((d): d is { label: string; value: string } => d !== null)
 
   return (

@@ -226,6 +226,8 @@ export const CATALOG_EXEMPT: Record<string, string> = {
   help: "tickets are conversations raised in-app; importing them would forge authorship and timelines",
   screens: "screen recipes are app furniture (config), not team data",
   agent: "the assistant's threads/usage are system records, not importable content",
+  contacts:
+    "not a table — the module is a SWITCH over rows the `accounts` target already imports. A company and a person are one row shape (SCOPE ch.03), so a file of people is a file of accounts with the Type column set to person, and the link between a person and a company is set on the account afterwards for the same reason the parent pointer is: a file's own rows cannot be resolved to ids until the file has been written. Giving this module a second import target would be two ways to load one table, and the second one would be the one nobody keeps in step.",
   portal_users:
     "a login is a granted identity, not importable content — a CSV cannot consent for a person (the same reason team_members is exempt)",
   knowledge:
@@ -577,7 +579,11 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
   users: "team_members",
   invite_logs: "team_members",
   accounts: "accounts",
-  account_links: "accounts",
+  // WHO IS LINKED TO WHOM is the contacts module's own history, not the
+  // account's. A role that may see a client but not its address book must not
+  // read "Ana linked Marta to Bergman" out of the feed either — the sentence
+  // names the person the right exists to withhold.
+  account_links: "contacts",
   portal_users: "portal_users",
   knowledge_sources: "knowledge",
   // The map and the money. Five tables gate on `processes` because they are one
@@ -775,6 +781,11 @@ export const RECORD_DETAIL_COMPONENTS = [
   "learning-detail",
   "role-detail",
   "account-detail",
+  // A CONTACT'S OWN SCREEN. One table underneath (a company and a person are one
+  // row shape), two screens on top: a person has no sprints, no rate card and no
+  // contacts of their own, and drawing them with a company's tabs is what the
+  // split was asked for.
+  "contact-detail",
   "knowledge-detail",
   // A meeting's detail is a component rather than a recipe because two of its
   // three tabs are PROSE somebody wrote (the agenda, and the notes afterwards)
@@ -831,7 +842,9 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
   "learning-detail.overview": "one article's category, type and audit block — one record, not a collection.",
   "help-detail.overview": "one ticket's type, source and audit block — one record, not a collection.",
   "account-detail.overview":
-    "one account's own fields (type, reference, contact details, where it sits) — one record, not a collection. Its four collection tabs — contacts, children, portal access, activity — each carry a server count.",
+    "one company's own fields — its reference, its industry, its postal address, its language, where it sits, the paragraph about it, and the hours its apps have given back. One record, not a collection. Every collection tab beside it — contacts, children, apps, sprints, to-dos, rates, activity — carries a server count.",
+  "contact-detail.overview":
+    "one person's own fields (their company, how to reach them, where they are, their language, their reference) — one record, not a collection. Its five collection tabs — companies, to-dos, tickets, meetings, portal login, activity — each carry a server count.",
   "knowledge-detail.source":
     "the source's own text — the exact words the assistant reads out of it, plus where they came from. One record's body, not a collection. (How many searchable pieces that text became is a FIELD on the Overview, not a tab: the pieces are derived from the text on this same panel, so a tab over them would be the same thing twice.)",
   // The agency's own housekeeping. Four engine-recipe details, each leading with

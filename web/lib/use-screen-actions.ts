@@ -183,7 +183,15 @@ export function useScreenActions(teamId: string | null) {
           primeCache(totalKey("tasks-all", teamId), allTotal)
           invalidate(tasksKey(teamId, "all"))
           invalidate(`activity:record:tasks:${payload.id}`)
-          toast.success(payload.done === "true" ? "Ticked off." : "Put back.")
+          // AND IT SAYS WHERE THE ROW WENT. A tester read the tick as a delete,
+          // because the only thing they saw was a row vanishing from the list
+          // they were looking at. It has not gone anywhere — "All tasks" beside
+          // "Still to do" has held the finished ones since that strip shipped —
+          // so the fix is not a second screen, it is one sentence naming the one
+          // that is already there.
+          toast.success(
+            payload.done === "true" ? "Ticked off. It's under All tasks." : "Put back."
+          )
           break
         }
       }
@@ -229,14 +237,23 @@ export function useScreenActions(teamId: string | null) {
   const createAccount = React.useCallback(
     async (values: AccountFormValues) => {
       if (!teamId) return
+      // No `code`: the door mints the reference from the name (BERG, BERG2 on a
+      // clash), because nobody types one — see account-form-dialog's header.
       await tenancy.createAccount({
         accountType: values.accountType,
         name: values.name.trim(),
         parentAccountId: values.parentAccountId || undefined,
-        code: values.code.trim() || undefined,
         email: values.email.trim() || undefined,
         phone: values.phone.trim() || undefined,
-        address: values.address.trim() || undefined,
+        street: values.street.trim() || undefined,
+        postalCode: values.postalCode.trim() || undefined,
+        city: values.city.trim() || undefined,
+        country: values.country.trim() || undefined,
+        industry: values.industry.trim() || undefined,
+        about: values.about.trim() || undefined,
+        logoUrl: values.logoUrl || undefined,
+        coverUrl: values.coverUrl || undefined,
+        locale: values.locale.trim() || undefined,
         status: values.status.trim() || undefined,
       })
       primeCache(accountsKey(teamId), await listFetch.accounts(teamId))

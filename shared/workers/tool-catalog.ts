@@ -82,12 +82,30 @@ const accountFields = (i: Record<string, unknown>): Record<string, unknown> => (
   code: sent(i, "code"),
   email: sent(i, "email"),
   phone: sent(i, "phone"),
-  address: sent(i, "address"),
+  // The postal address is four fields, not one line (R22: the door reads these,
+  // so the tools offer and forward every one of them).
+  street: sent(i, "street"),
+  postalCode: sent(i, "postalCode"),
+  city: sent(i, "city"),
+  country: sent(i, "country"),
+  industry: sent(i, "industry"),
+  about: sent(i, "about"),
+  logoUrl: sent(i, "logoUrl"),
+  coverUrl: sent(i, "coverUrl"),
   currency: sent(i, "currency"),
   locale: sent(i, "locale"),
   timezone: sent(i, "timezone"),
   status: sent(i, "status"),
 })
+
+/** The account fields' SCHEMA half — declared once beside `accountFields` so the
+ * shape a tool advertises and the body it builds are written in one place. R22
+ * proves them equal by RUNNING buildBody; this is what keeps them equal. */
+const ACCOUNT_FIELD_SCHEMA = {
+  code: S, email: S, phone: S, street: S, postalCode: S, city: S, country: S,
+  industry: S, about: S, logoUrl: S, coverUrl: S, currency: S, locale: S,
+  timezone: S, status: S,
+}
 
 /** The learning create/edit body — the same optional field set both surfaces send
  * (undefined keys drop out of JSON.stringify, so the door treats them as omitted). */
@@ -257,12 +275,13 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_help_tickets",
     summary:
-      "List the team's tickets. scope: 'mine' (yours) or 'all' (default all); view: 'live' (default — the everyday list) or 'archived' (tickets that have been put away); `q` searches the reference, the description and the title. Pass `id` to fetch just one ticket, archived or not. The `total` counts the SAME filtered question the rows answer. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
+      "List the team's tickets. scope: 'mine' (yours) or 'all' (default all); view: 'live' (default — the everyday list) or 'archived' (tickets that have been put away); `q` searches the reference, the description and the title; `accountId` narrows to one client's tickets. Pass `id` to fetch just one ticket, archived or not. The `total` counts the SAME filtered question the rows answer. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
     binding: "CONTENT", method: "GET", path: "/api/content/help",
-    schema: obj({ scope: S, view: S, q: S, id: S, cursor: S }),
+    schema: obj({ scope: S, view: S, q: S, accountId: S, id: S, cursor: S }),
     buildQuery: (i) => {
       const q = [str(i, "scope") === "mine" ? "scope=mine" : "scope=all"]
       if (str(i, "q")) q.push(`q=${encodeURIComponent(str(i, "q"))}`)
+      if (str(i, "accountId")) q.push(`accountId=${encodeURIComponent(str(i, "accountId"))}`)
       // Forwarded only when the caller asked for the archive: the door defaults
       // to the live list, and sending `view=live` on every call would be noise
       // the model has to keep re-reading.
@@ -314,7 +333,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_accounts",
     summary:
-      "List the team's accounts — companies and people in one list. Filters: `q` (searches name, reference and email), `type` ('entity' for a company or 'individual' for a person), `status` (the team's own word for where an account stands, e.g. 'client' or 'past_client' — as stored), `archived` ('yes' for only the put-away ones, 'no' for only the live ones; both by default), `parentId` (only the accounts sitting under that one). The `total` counts the SAME filtered question the rows answer, so it is the answer to 'how many are there?' as well. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
+      "List the team's accounts — companies and people in one list, unless the caller's role lacks the contacts right, in which case it is the companies. Filters: `q` (searches name, reference and email), `type` ('entity' for a company or 'individual' for a person), `status` (the team's own word for where an account stands, e.g. 'client' or 'past_client' — as stored), `archived` ('yes' for only the put-away ones, 'no' for only the live ones; both by default), `parentId` (only the accounts sitting under that one). The `total` counts the SAME filtered question the rows answer, so it is the answer to 'how many are there?' as well. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/accounts",
     schema: obj({ q: S, type: S, status: S, archived: S, parentId: S, cursor: S }),
     buildQuery: (i) => {
@@ -328,7 +347,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "get_account",
     summary:
-      "One account in full (by id), with its contacts (the people linked to it) and its portal logins. Use list_accounts to find the id.",
+      "One account in full (by id). For a company it carries `links` — the people linked to it — and for a person it carries `companies`, the accounts they are a contact of; both are empty without the contacts right. `portalUsers` is who can sign in, and needs the portal access right. Use list_accounts to find the id.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/accounts/detail",
     schema: obj({ id: S }, ["id"]),
     buildQuery: (i) => `?id=${encodeURIComponent(str(i, "id"))}`,
@@ -337,10 +356,10 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_account",
     summary:
-      "Create an account. `accountType` is 'entity' (a company) or 'individual' (a person) — nothing else is accepted. `parentAccountId` puts it under another account; leave it out for a top-level one.",
+      "Create an account. `accountType` is 'entity' (a company) or 'individual' (a person) — nothing else is accepted. `parentAccountId` puts it under another account; leave it out for a top-level one. The postal address is four fields — `street`, `postalCode`, `city`, `country` — and `country` and `industry` are picked from the team's own dropdown values. `code` is the reference, and you almost never send it: leave it out and one is minted from the name (BERG for Bergman S.A., BERG2 when that is taken).",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/accounts",
     schema: obj(
-      { accountType: S, name: S, parentAccountId: S, code: S, email: S, phone: S, address: S, currency: S, locale: S, timezone: S, status: S },
+      { accountType: S, name: S, parentAccountId: S, ...ACCOUNT_FIELD_SCHEMA },
       ["accountType", "name"]
     ),
     buildBody: (i) => ({
@@ -358,10 +377,10 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_account",
     summary:
-      "Edit an account's own details (by id) — never its place in the hierarchy; that's set_account_parent. Send ONLY the fields you are changing: anything you leave out keeps its current value. To empty a field, send it as an empty string.",
+      "Edit an account's own details (by id) — never its place in the hierarchy; that's set_account_parent. Send ONLY the fields you are changing: anything you leave out keeps its current value. To empty a field, send it as an empty string. The postal address is four fields — `street`, `postalCode`, `city`, `country` — and `about` is the paragraph about them.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/accounts/update",
     schema: obj(
-      { id: S, name: S, code: S, email: S, phone: S, address: S, currency: S, locale: S, timezone: S, status: S, commercialsVisible: B },
+      { id: S, name: S, ...ACCOUNT_FIELD_SCHEMA, commercialsVisible: B },
       ["id", "name"]
     ),
     buildBody: (i) => ({

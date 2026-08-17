@@ -31,6 +31,24 @@ const INTERNAL_VOCABULARY: { type: string; value: string }[] = [
   { type: "Company size", value: "More than 500" },
 ]
 
+/** The vocabulary a COMPANY record picks from — the industry it is in, and the
+ * word for where the relationship stands. Both are ordinary dropdown values a
+ * team edits on its own screen; these are a starting set, not an enum. The three
+ * statuses are the words the front end reads (SCOPE: an active client, a past
+ * client, one that is put away) — stored as written, tidied for display by
+ * `accountStatus` rather than mapped through a table that would need keeping in
+ * step with whatever a team renames them to. */
+const COMPANY_VOCABULARY: { type: string; value: string }[] = [
+  { type: "Industry", value: "Manufacturing" },
+  { type: "Industry", value: "Retail" },
+  { type: "Industry", value: "Hospitality" },
+  { type: "Industry", value: "Professional services" },
+  { type: "Industry", value: "Construction" },
+  { type: "Account status", value: "active_client" },
+  { type: "Account status", value: "past_client" },
+  { type: "Account status", value: "archived" },
+]
+
 export const TEAM_MIGRATIONS: { version: string; sql: string }[] = [
   {
     version: "0001_team_base",
@@ -1730,6 +1748,76 @@ CREATE INDEX IF NOT EXISTS idx_activity_feed ON activity (created_at DESC, id DE
 CREATE INDEX IF NOT EXISTS idx_activity_table_feed ON activity (related_table, created_at DESC, id DESC);
 `,
   },
+  {
+    // COMPANIES AND CONTACTS: ONE TABLE, TWO SCREENS, TWO PERMISSIONS.
+    //
+    // The owner ruled twice that a company and a person stay ONE row shape in
+    // `accounts` — two tables would cap a person at one company, and the agency
+    // has contacts who sit at two (Marta is at Bergman and at Delaval). So this
+    // migration splits nothing in the database. It splits the two things that
+    // were actually being complained about:
+    //
+    //   • the SIGHT of people, which becomes its own module (`contacts`), off
+    //     for every role but Admin — "people of the development team does not
+    //     need to know who are the contacts" (Aurora);
+    //   • the SHAPE of a company, which gains the fields a company record was
+    //     always missing: a real postal address rather than one free-text line,
+    //     the industry it is in, a paragraph about it, a logo, a cover image.
+    //
+    // THE ADDRESS IS SPLIT AND THE OLD COLUMN IS BACKFILLED, NOT DROPPED.
+    // `street` starts life holding whatever `address` held, so nothing anybody
+    // typed is lost and no read has to know which of the two it is looking at.
+    // `address` stops being written and stops being read the day this ships —
+    // every surface (the form, the CSV export, the import target, the machine
+    // tools) names the four fields instead. It is left in the table because
+    // dropping a column is the one migration you cannot take back, and there is
+    // nothing to gain by taking it back.
+    //
+    // `locale` is not re-invented here: the LANGUAGE an account is written to is
+    // the column that has held it since 0007, and this only puts a control on it.
+    version: "0024_contacts_and_company_shape",
+    sql: `
+ALTER TABLE accounts ADD COLUMN street TEXT;
+ALTER TABLE accounts ADD COLUMN postal_code TEXT;
+ALTER TABLE accounts ADD COLUMN city TEXT;
+ALTER TABLE accounts ADD COLUMN country TEXT;
+ALTER TABLE accounts ADD COLUMN industry TEXT;
+ALTER TABLE accounts ADD COLUMN about TEXT;
+ALTER TABLE accounts ADD COLUMN logo_url TEXT;
+ALTER TABLE accounts ADD COLUMN cover_url TEXT;
+
+-- The one line anybody ever typed becomes the street line. Chosen over guessing
+-- at commas: a postal code parsed out of free text wrongly is worse than one
+-- somebody types once, and this way every character survives somewhere visible.
+UPDATE accounts SET street = address WHERE address IS NOT NULL AND address <> '';
+
+-- Existing teams: the locked Admin role gains the new module in full (it is
+-- DEFINED as full access and cannot be edited afterwards to grant it). Every
+-- other role gains nothing — which is the whole point of this one: an address
+-- book is a separate grant, and a migration must never hand out sight of
+-- somebody's people that nobody granted. Same shape as 0007, 0013, 0018, 0019
+-- and 0021. New teams don't reach this: their seed writes the rows already.
+INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+SELECT lower(hex(randomblob(16))), r.id, 'contacts', r.is_default, r.is_default, r.is_default, r.is_default
+  FROM member_roles r
+ WHERE NOT EXISTS (
+   SELECT 1 FROM role_permissions p WHERE p.role_id = r.id AND p.module = 'contacts'
+ );
+
+-- The two vocabularies the company form now picks from. Country already had a
+-- group (0018); Industry and Account status are new, and all three are ordinary
+-- dropdown values a team edits on its own Dropdown values screen. Pick-or-create,
+-- so a team that already typed its own words keeps them.
+--
+-- ONE STATEMENT PER VALUE, generated from an array — D1's compound-SELECT
+-- ceiling is FIVE terms, and 0018 is the migration that learned it the hard way.
+${COMPANY_VOCABULARY.map(
+  (v) => `INSERT INTO selectable_data (id, type, value, is_default, created_at, creator_id, creator_email, creator_name)
+SELECT lower(hex(randomblob(16))), '${v.type}', '${v.value}', 1, datetime('now'), NULL, NULL, 'System'
+ WHERE NOT EXISTS (SELECT 1 FROM selectable_data s WHERE s.type = '${v.type}' AND s.value = '${v.value}');`
+).join("\n")}
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }
@@ -1794,6 +1882,10 @@ export const DEFAULT_SELECTABLE: { type: string; value: string }[] = [
   { type: "Company size", value: "51–200" },
   { type: "Company size", value: "201–500" },
   { type: "Company size", value: "More than 500" },
+  // The company record's other two vocabularies, written once in
+  // COMPANY_VOCABULARY so a NEW team's seed and an EXISTING team's migration
+  // (0024) can never offer two different starting sets.
+  ...COMPANY_VOCABULARY,
 ]
 
 /**
@@ -1827,9 +1919,32 @@ export function buildTeamSeed(
     )
   }
 
+  // THE SEED RUNS AFTER THE MIGRATIONS, AND SOME OF THEM SEED TOO.
+  //
+  // `createTeam` applies every TEAM_MIGRATION and then runs this script, so any
+  // value that appears BOTH in a migration's back-fill and in DEFAULT_SELECTABLE
+  // was inserted twice into a brand-new team: the four ticket types (0009), the
+  // three sprint types (0016), the six countries and five company-size bands
+  // (0018). Every picker in the app then offered each of those words twice, which
+  // is what a tester meant by "ticket types appear two, three and four times".
+  //
+  // The migrations already guard themselves with WHERE NOT EXISTS, because they
+  // have to be safe against a team that already has the value. The seed did not,
+  // because when it was written it ran into an empty table. It does now: this is
+  // the migrations' own guard, said the same way, and it makes the seed safe to
+  // run in any order against any state. A team that has genuinely retired a
+  // default keeps its (deactivated) row rather than being handed a fresh live
+  // copy of it — the same reason R13's catalogue reconcile is INSERT-only.
+  //
+  // Existing teams keep the duplicate rows they were born with; a duplicate is an
+  // ordinary value and it is retired on the Dropdown values screen, which is what
+  // that screen is for. workers/tenancy/test/team-schema.test.ts runs the real
+  // migrations and this seed into SQLite and fails on any repeated (type, value).
   for (const item of DEFAULT_SELECTABLE) {
     statements.push(
-      `INSERT INTO selectable_data (id, type, value, is_default, created_at, creator_id, creator_email, creator_name) VALUES (${sqlString(ulid())}, ${sqlString(item.type)}, ${sqlString(item.value)}, 1, ${a([])});`
+      `INSERT INTO selectable_data (id, type, value, is_default, created_at, creator_id, creator_email, creator_name)
+SELECT ${sqlString(ulid())}, ${sqlString(item.type)}, ${sqlString(item.value)}, 1, ${a([])}
+ WHERE NOT EXISTS (SELECT 1 FROM selectable_data s WHERE s.type = ${sqlString(item.type)} AND s.value = ${sqlString(item.value)});`
     )
   }
 

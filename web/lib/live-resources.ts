@@ -379,6 +379,12 @@ export const PROCESS_VERSION_SLICES = "process-version:"
 export function valueKey(teamId: string): string {
   return `value:${teamId}`
 }
+/** The same drill-down NARROWED to one client — what their work has given them
+ * back, summed across their apps. Its own key beside the team-wide one, because
+ * they are two different questions and one cache cannot hold both answers. */
+export function accountValueKey(accountId: string): string {
+  return `value:account:${accountId}`
+}
 /** The systems we've built (bounded, team-wide) — a filter and a heading on the
  * maps screen, and the names inside the value drill-down. */
 export function appsKey(teamId: string): string {
@@ -551,6 +557,10 @@ export const TEAM_RESOURCES: Record<
     // its Activity tab + Stakeholders tab. The My list is a SERVER-scoped page, so
     // it can't be row-patched from here — drop it and it reloads page one.
     deps: (t, id) => [`activity:record:help:${id}`, `help-stakeholders:${id}`, `help-mine:${t}`],
+    // …and every per-account slice of the ticket list — a contact's Tickets tab
+    // is one of those, and a slice nobody drops is a tab that goes stale the
+    // moment somebody else raises a ticket.
+    slicePrefix: "tickets-account-of:",
   },
   // PROCESS MAPS — row-level live. A step edited on somebody else's screen
   // patches just that map in the cached list; the deps carry the parts of the
@@ -649,6 +659,8 @@ export const TEAM_RESOURCES: Record<
     fetchOne: (id) => contentApi.meetingOne(id),
     fetchList: (t) => listFetch.meetings(t),
     deps: (_t, id) => [`activity:record:meetings:${id}`],
+    // The per-account slices of the diary — a contact's Meetings tab.
+    slicePrefix: "meetings-account-of:",
   },
   // A rate card ping carries the ACCOUNT it sits on — a card is only ever read on
   // its account's own screen, so the account is the row a listener can act on.

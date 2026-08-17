@@ -49,11 +49,16 @@ beforeEach(() => {
 /** What the door answered: its rows, with the one assertion this file exists for
  * — the number beside them counts the SAME question. (One page: the harness's
  * whole book is far inside PAGE_SIZE, so `total` and the rows are comparable.) */
-async function findAccounts(filters: Parameters<typeof listAccounts>[3]): Promise<string[]> {
-  const page = await listAccounts(cfg, guard, staff, filters)
+async function findAccounts(filters: Parameters<typeof listAccounts>[4]): Promise<string[]> {
+  const page = await listAccounts(cfg, guard, staff, SEES_PEOPLE, filters)
   expect(page.total, "the exact total must count the rows the door just filtered").toBe(page.rows.length)
   return page.rows.map((r) => r.id).sort()
 }
+
+/** A caller holding `contacts:read` — the whole book, companies and people. The
+ * narrowing this parameter exists for has its own cases in accounts.test.ts;
+ * here it is held constant so a FILTER's arithmetic is what is being measured. */
+const SEES_PEOPLE = { mayListPeople: true }
 
 /** The same question asked of the database directly, in SQL this file wrote. The
  * door builds its own; comparing the two is what makes this a test rather than a
@@ -104,7 +109,7 @@ describe("an accounts filter narrows the rows AND the count", () => {
     // The list and the CSV are built from one `accountsWhere`, so "export what
     // I'm looking at" cannot mean something else. Proved for the two filters that
     // arrived with the find bar, as search-literal.test.ts proves it for `q`.
-    const { rows } = await listAccountsForExport(cfg, guard, staff, { status: "past_client" })
+    const { rows } = await listAccountsForExport(cfg, guard, staff, SEES_PEOPLE, { status: "past_client" })
     expect(rows.map((r) => r.id).sort()).toEqual(inTheDatabase("status = 'past_client'"))
   })
 })

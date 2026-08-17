@@ -10,6 +10,14 @@ export const TEAM_MODULES = [
   "team_members",
   "member_roles",
   "accounts",
+  // CONTACTS — the PEOPLE on an account, as their own switch. A company record
+  // and the list of humans inside it are two different sights: "people of the
+  // development team does not need to know who are the contacts" (Aurora, 17 Aug
+  // 2026), and a developer opening a client should see the company and its apps
+  // without the address book. The rows are the same `accounts` table (companies
+  // and people are one table — SCOPE ch.03), so this is a permission over a
+  // SHAPE of that table, never a second spine.
+  "contacts",
   "portal_users",
   "learning",
   "help",
@@ -59,6 +67,13 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   // granting someone a login is separately gated because it hands out sight of
   // customer data, which is a bigger decision than editing a phone number.
   accounts: "Accounts",
+  // The PEOPLE on an account. Off by default for every role but Admin, because
+  // an address book is the one part of a client record that is somebody's
+  // personal data rather than the company's: seeing who we work with is a
+  // separate grant from seeing that we work with them. A contact still SURFACES
+  // by name where a record already points at one (a to-do's dropdown, a ticket's
+  // raiser) — this right is about being able to LIST them.
+  contacts: "Contacts",
   portal_users: "Portal access",
   learning: "Learning",
   // The module KEY stays `help` — it is the permission string every role's sheet

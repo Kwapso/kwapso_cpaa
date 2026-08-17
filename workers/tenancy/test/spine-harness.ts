@@ -137,6 +137,10 @@ export function buildSpineDb(): DatabaseSync {
   // burglar holding it is not a worst case at all — it is the ordinary case, and
   // what stops them reading Bergman's homework is the account fence rather than
   // a refusal.
+  // `contacts` is on the list for the burglar's sake, most of all: the address
+  // book is now its own module, and a burglar refused by their ROLE would prove
+  // nothing about whether the FENCE holds. Holding it is the worst case, which
+  // is what this harness is for.
   // `work` is here for exactly that reason and no other. No real Client role
   // would ever hold it — every work-engine door refuses a portal caller outright
   // — which is precisely why the burglar must: a refusal proved against a caller
@@ -146,7 +150,8 @@ export function buildSpineDb(): DatabaseSync {
       INSERT INTO member_roles (id, title, is_default, created_at) VALUES ('${roleId}', '${roleId}', 0, '2026-01-01');
       INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
       SELECT '${roleId}_' || m.module, '${roleId}', m.module, 1, 1, 1, 1
-        FROM (SELECT 'accounts' AS module UNION ALL SELECT 'portal_users'
+        FROM (SELECT 'accounts' AS module UNION ALL SELECT 'contacts'
+              UNION ALL SELECT 'portal_users'
               UNION ALL SELECT 'team_members' UNION ALL SELECT 'member_roles'
               UNION ALL SELECT 'help' UNION ALL SELECT 'processes'
               UNION ALL SELECT 'work' UNION ALL SELECT 'todos') m;`)

@@ -76,14 +76,17 @@ async function ticketPage(
   tab: "mine" | "all",
   view: "live" | "archived",
   cursor: string | null,
-  q?: string
+  q?: string,
+  accountId?: string
 ): Promise<Response> {
   const [page, counts] = await Promise.all([
-    listTickets(cfg, guard, scope, tab, view, cursor, q),
+    listTickets(cfg, guard, scope, tab, view, cursor, q, accountId),
     // R16: the total is counted over the SAME view the page came from, or the
     // badge is a number the list cannot reach — and over the same SEARCH, or a
     // search's own count is a number about somebody else's question.
-    countTickets(cfg, guard, scope, view, q),
+    // …and over the same ACCOUNT, when one is named: a tab badging one client's
+    // tickets over a total counting everybody's is the same failure again.
+    countTickets(cfg, guard, scope, view, q, accountId),
   ])
   return pagedJson("tickets", { ...page, total: counts.total }, { mineTotal: counts.mineTotal })
 }
@@ -138,7 +141,13 @@ export async function getHelp(request: Request, env: Env): Promise<Response> {
     tab,
     view,
     queryText(url.searchParams.get("cursor"), "Cursor") ?? null,
-    queryText(url.searchParams.get("q"), "Search")
+    queryText(url.searchParams.get("q"), "Search"),
+    // WHOSE tickets — one account's, when the caller names one. A FILTER on top
+    // of the fence, never instead of it: naming somebody else's account narrows
+    // to rows the fence has already excluded, which is an empty page rather than
+    // a leak. It is what a client record's Tickets tab and a contact's own screen
+    // ask, so the rows and the badge answer the same question (R16).
+    queryText(url.searchParams.get("accountId"), "Client")
   )
 }
 

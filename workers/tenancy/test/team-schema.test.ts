@@ -1,6 +1,7 @@
 // Unit tests for the team factory's pure logic: schema + seed building.
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
+import { DatabaseSync } from "node:sqlite"
 import { describe, expect, it } from "vitest"
 
 import { sqlString } from "@shared/workers/d1-rest"
@@ -51,6 +52,49 @@ describe("sqlString", () => {
   it("doubles single quotes and handles null", () => {
     expect(sqlString("it's")).toBe("'it''s'")
     expect(sqlString(null)).toBe("NULL")
+  })
+})
+
+// A NEWBORN TEAM'S DROPDOWNS, COUNTED — because two places seed them.
+//
+// `createTeam` applies every TEAM_MIGRATION and then runs buildTeamSeed, and some
+// of those migrations back-fill the very values the seed writes (the four ticket
+// types, the three sprint types, the countries, the company-size bands). The
+// migrations guard themselves with WHERE NOT EXISTS; the seed did not, so every
+// team created since 0009 was born with each of those words TWICE, and every
+// picker in the app showed it twice. A tester reported it as "ticket types appear
+// two, three and four times".
+//
+// This runs the production order — real migrations, then the real seed — into a
+// real SQLite handle and asks the only question that matters: is any (type, value)
+// in the table more than once? It fails on the old seed and it fails on any future
+// migration that back-fills a value the seed already writes, which is the same
+// mistake wearing a different vocabulary.
+describe("a fresh team's dropdown values, after migrations AND seed", () => {
+  const db = new DatabaseSync(":memory:")
+  for (const m of TEAM_MIGRATIONS) db.exec(m.sql)
+  db.exec(buildTeamSeed(ACTOR, "2026-06-12T00:00:00.000Z").script)
+
+  it("holds every value exactly once", () => {
+    const dupes = db
+      .prepare(
+        `SELECT type, value, COUNT(*) AS n FROM selectable_data
+          GROUP BY type, value HAVING n > 1 ORDER BY type, value`
+      )
+      .all() as { type: string; value: string; n: number }[]
+    expect(
+      dupes.map((d) => `${d.type} / ${d.value} ×${d.n}`),
+      "a value seeded by BOTH a migration and buildTeamSeed lands twice — every picker showing it repeats it"
+    ).toEqual([])
+  })
+
+  it("still writes every default the seed promises", () => {
+    for (const item of DEFAULT_SELECTABLE) {
+      const row = db
+        .prepare(`SELECT COUNT(*) AS n FROM selectable_data WHERE type = ? AND value = ?`)
+        .get(item.type, item.value) as { n: number }
+      expect(row.n, `${item.type} / ${item.value} is missing from a fresh team`).toBe(1)
+    }
   })
 })
 
@@ -113,6 +157,9 @@ describe("team schema", () => {
       "team_members",
       "member_roles",
       "accounts",
+      // The PEOPLE on an account, as their own switch — one table underneath
+      // (companies and people are one row shape), two permissions on top.
+      "contacts",
       "portal_users",
       "learning",
       "help",

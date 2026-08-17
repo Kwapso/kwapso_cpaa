@@ -1,12 +1,28 @@
 "use client"
 
-// Account detail — one company or one person at /accounts/<id>, as a tabbed record
-// (Law R2): Overview / Contacts / Under this account / Portal access / Activity.
-// Host-composed, because three of those tabs are collections with their own
-// actions — link a person, give someone a login, take one away — and no engine
-// block draws those. Those three list bodies live next door in
-// account-detail-panels.tsx; this file owns the record itself — its data, its
-// rights, its tabs and counts, its dialogs, and the one confirm they all share.
+// Account detail — one COMPANY at /accounts/<id>, as a tabbed record (Law R2):
+// Overview / Contacts / Under this account / its work / Rates / Activity.
+// Host-composed, because most of those tabs are collections with their own
+// actions — link a person, add an app, retire a rate — and no engine block draws
+// those. Those list bodies live next door in account-detail-panels.tsx; this file
+// owns the record itself — its data, its rights, its tabs and counts, its
+// dialogs, and the one confirm they all share.
+//
+// A PERSON GETS A DIFFERENT SCREEN. Companies and people are one table (SCOPE
+// ch.03) and were, until now, one screen — which drew a human being with sprints,
+// a rate card and a Contacts tab of their own. This file reads the record and
+// hands an individual straight to contact-detail.tsx: one door, one read, two
+// screens. What splits is the SCREEN and the PERMISSION, never the table.
+//
+// THE LOGINS MOVED WITH THEM. Only a person can hold one (the owner's ruling), so
+// the Portal access tab is on the contact's page now rather than on the company's
+// — where it invited the question "who exactly is signing in?" and answered it
+// with a list.
+//
+// THE PEOPLE ARE THEIR OWN PERMISSION. The Contacts tab is behind `contacts:read`
+// — a developer opening a client sees the company and its apps, and not the
+// address book. The server withholds the rows too (routes/accounts.ts): a tab
+// that is not drawn is not a permission.
 //
 // The hierarchy is meant to be readable at a glance, so it is stated twice over:
 // the header says which account this one sits under (a link, one tap up the tree),
@@ -39,28 +55,38 @@ import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs
 import { Pencil, Power } from "lucide-react"
 
 import type { Account, AccountDetail } from "@shared/types"
+import type { SavingsView } from "@shared/workers/savings"
 import { AccountFormDialog, type AccountFormValues } from "@/components/account-form-dialog"
 import { AccountRateCard } from "@/components/account-rate-card"
 import { MarginPanel } from "@/components/margin-panel"
 import {
   ChildrenPanel,
   ContactsPanel,
-  PortalAccessPanel,
   type Confirm,
   type PanelActions,
 } from "@/components/account-detail-panels"
 import { ContactLinkDialog, type ContactLinkValues } from "@/components/contact-link-dialog"
-import { PortalAccessDialog } from "@/components/portal-access-dialog"
+import { ContactDetailScreen } from "@/components/contact-detail"
 import { AppFormDialog } from "@/components/app-form-dialog"
+import { RichText } from "@/components/rich-text"
+import { safeSrc } from "@/lib/rich-text"
+import { ValuePanel } from "@/components/value-panel"
 import { createAppFrom } from "@/components/apps-screen"
 import { AppsPanel, SprintsPanel, TodosPanel, sliceKey } from "@/components/work-panels"
-import { ACCOUNT_TYPE, accountStatus } from "@/components/deep-link/shape"
+import { accountStatus } from "@/components/deep-link/shape"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
 import { formatCount } from "@shared/web/format-count"
-import { accountKey, accountsKey, childrenKey, listFetch, totalKey } from "@/lib/live-resources"
+import {
+  accountKey,
+  accountValueKey,
+  accountsKey,
+  childrenKey,
+  listFetch,
+  totalKey,
+} from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
@@ -96,14 +122,24 @@ export function AccountDetailScreen({
   // The same page-one cache the list screen holds — it feeds the parent picker and
   // the statuses already in use, so opening this record adds no round-trip.
   const accountsQ = useCached<Account[]>(accountsKey(teamId), () => listFetch.accounts(teamId))
+  // TOTAL IMPACT — the hours this client's apps have given back, and the money
+  // that is worth, from the ONE savings door (it narrows by account, so the
+  // arithmetic here is the same arithmetic the maps screen shows for everybody).
+  // R25: the panel renders SAVINGS_CAPTION with it, word for word.
+  const valueQ = useCached<SavingsView>(accountValueKey(accountId), () =>
+    tenancy.value({ accountId })
+  )
 
   const { can } = usePermissions(teamId)
   const canEdit = can("accounts", "edit")
-  const canCreate = can("accounts", "create")
   const canArchive = can("accounts", "delete")
-  const canSeeLogins = can("portal_users", "read")
-  const canGrant = can("portal_users", "create")
-  const canRevoke = can("portal_users", "delete")
+  // THE ADDRESS BOOK IS ITS OWN GRANT. `contacts` rather than `accounts`: a
+  // developer opening a client sees the company and its apps, not the list of
+  // people inside it (Aurora, 17 Aug 2026). The server withholds the rows too —
+  // this only decides whether to draw the tab.
+  const canSeeContacts = can("contacts", "read")
+  const canLinkContacts = can("contacts", "create")
+  const canUnlinkContacts = can("contacts", "delete")
   // THE WORK HANGING OFF THIS CLIENT. Apps are the record directly below an
   // account (an app belongs to ONE account, always — the owner's ruling), and
   // the sprints and to-dos beside them are the two other collections a door
@@ -130,7 +166,6 @@ export function AccountDetailScreen({
   const [tab, setTab] = React.useState("overview")
   const [editOpen, setEditOpen] = React.useState(false)
   const [linkOpen, setLinkOpen] = React.useState(false)
-  const [grantOpen, setGrantOpen] = React.useState(false)
   const [confirm, setConfirm] = React.useState<Confirm | null>(null)
   const [appOpen, setAppOpen] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
@@ -187,10 +222,17 @@ export function AccountDetailScreen({
     await tenancy.updateAccount({
       id: accountId,
       name: values.name.trim(),
-      code: values.code.trim() || null,
       email: values.email.trim() || null,
       phone: values.phone.trim() || null,
-      address: values.address.trim() || null,
+      street: values.street.trim() || null,
+      postalCode: values.postalCode.trim() || null,
+      city: values.city.trim() || null,
+      country: values.country.trim() || null,
+      industry: values.industry.trim() || null,
+      about: values.about.trim() || null,
+      logoUrl: values.logoUrl || null,
+      coverUrl: values.coverUrl || null,
+      locale: values.locale.trim() || null,
       status: values.status.trim() || undefined,
     })
     refresh()
@@ -208,27 +250,44 @@ export function AccountDetailScreen({
     toast.success(t("Contact added."))
   }
 
-  async function giveAccess(personAccountId: string) {
-    await tenancy.grantPortalAccess(accountId, personAccountId)
-    refresh()
-    toast.success(t("Access switched on."))
-  }
-
   if (detailQ.error)
     return <p className="text-destructive text-sm">{t("Couldn't load the account.")}</p>
   if (detailQ.data === undefined) return <Skeleton variant="list" lines={5} />
 
-  const { account, parent, links, portalUsers, linksTotal, portalUsersTotal } = detailQ.data
+  const { account, parent, links, linksTotal } = detailQ.data
   const children = childrenQ.data ?? []
   const statusText = accountStatus(account.status)
 
+  // A PERSON IS A DIFFERENT SCREEN. One table, one door, one read — and from here
+  // two compositions, because a contact has no sprints, no rate card and no
+  // contacts of their own. Everything below this line is about a COMPANY.
+  if (account.accountType === "individual")
+    return (
+      <ContactDetailScreen
+        teamId={teamId}
+        detail={detailQ.data}
+        basePath={basePath}
+        onSaved={refresh}
+      />
+    )
+
+  // THE STORED PATH, through the one URL boundary (lib/rich-text safeSrc): the
+  // column is ordinary text a machine caller can write, so what reaches a `src`
+  // is checked here rather than trusted because we happen to have written it.
+  const cover = safeSrc(account.coverUrl)
+
+  const where = [account.street, account.postalCode, account.city, account.country]
+    .filter(Boolean)
+    .join(", ")
+
   const overviewItems = [
-    { label: t("Type"), value: ACCOUNT_TYPE[account.accountType] },
     { label: t("Parent account"), value: parent ? parent.name : "Sits on its own" },
     { label: t("Reference"), value: account.code || "—" },
+    { label: t("Industry"), value: account.industry || "—" },
     { label: t("Email"), value: account.email || "—" },
     { label: t("Phone"), value: account.phone || "—" },
-    { label: t("Address"), value: account.address || "—" },
+    { label: t("Address"), value: where || "—" },
+    { label: t("Language"), value: account.locale || "Ours" },
     { label: t("Status"), value: statusText || "—" },
     ...auditItems({
       createdByName: account.createdByName,
@@ -237,18 +296,6 @@ export function AccountDetailScreen({
       updatedAt: account.updatedAt,
       status: account.active ? "Active" : "Archived",
     }),
-  ]
-
-
-  // Who could be given a login: the people linked to this account, plus the
-  // account itself when it IS a person (a freelancer with no company above them).
-  const loginCandidates = [
-    ...(account.accountType === "individual"
-      ? [{ id: account.id, name: account.name, email: account.email }]
-      : []),
-    ...links
-      .filter((l) => l.active)
-      .map((l) => ({ id: l.personAccountId, name: l.personName, email: null })),
   ]
 
   // The parent picker: the account it sits under TODAY (which may be archived, or
@@ -270,13 +317,20 @@ export function AccountDetailScreen({
     variant: "line" as const,
     tabs: [
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
-      {
-        value: "contacts",
-        label: t("Contacts"),
-        icon: CONCEPT_ICON.contacts,
-        badge: formatCount(linksTotal),
-        badgeVariant: "" as const,
-      },
+      // THE ADDRESS BOOK, behind its own right. A role without `contacts:read`
+      // does not see this tab — and the door sends it no rows either, so the tab
+      // is the consequence of the permission rather than the permission itself.
+      ...(canSeeContacts
+        ? [
+            {
+              value: "contacts",
+              label: t("Contacts"),
+              icon: CONCEPT_ICON.contacts,
+              badge: formatCount(linksTotal),
+              badgeVariant: "" as const,
+            },
+          ]
+        : []),
       {
         value: "children",
         label: t("Under this account"),
@@ -331,17 +385,8 @@ export function AccountDetailScreen({
             },
           ]
         : []),
-      ...(canSeeLogins
-        ? [
-            {
-              value: "portal",
-              label: t("Portal access"),
-              icon: CONCEPT_ICON.portal,
-              badge: formatCount(portalUsersTotal),
-              badgeVariant: "" as const,
-            },
-          ]
-        : []),
+      // NO PORTAL TAB. Only a person can hold a login (the owner's ruling), so
+      // the switch lives on the contact's own page — see contact-detail.tsx.
       {
         value: "activity",
         label: t("Activity"),
@@ -364,7 +409,7 @@ export function AccountDetailScreen({
           <h1 className="flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight">
             <span className="truncate">{account.name}</span>
             <Badge variant="secondary" className="text-[10px]">
-              {ACCOUNT_TYPE[account.accountType]}
+              {t("Company")}
             </Badge>
             {!account.active && (
               <Badge variant="outline" className="text-muted-foreground text-[10px]">
@@ -449,27 +494,57 @@ export function AccountDetailScreen({
         config={tabsConfig}
         value={tab}
         onValueChange={setTab}
-        renderPanel={(t) => {
-          if (t.value === "overview")
-            return <OverviewList items={overviewItems} />
+        renderPanel={(tabItem) => {
+          if (tabItem.value === "overview")
+            return (
+              <div className="flex flex-col gap-4">
+                {/* The cover, then the record. An image at the top of a company's
+                    page is the fastest way to know you are on the right one. */}
+                {cover && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={cover} alt="" className="h-32 w-full rounded-xl object-cover sm:h-40" />
+                )}
+                <OverviewList items={overviewItems} />
+                {account.about && (
+                  <div className="rounded-xl border p-4">
+                    <p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
+                      {t("About")}
+                    </p>
+                    <RichText html={account.about} />
+                  </div>
+                )}
+                {/* WHAT WE HAVE GIVEN THEM BACK, summed across their apps — the
+                    question a client asks first and the one the whole product is
+                    for. The panel carries the caption that makes the number
+                    honest (R25); it is never assembled here. */}
+                {canSeeApps && (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                      {t("Total impact")}
+                    </p>
+                    <ValuePanel view={valueQ.data} />
+                  </div>
+                )}
+              </div>
+            )
 
-          if (t.value === "activity")
+          if (tabItem.value === "activity")
             return <ActivityPanel activity={activity} />
 
-          if (t.value === "contacts")
+          if (tabItem.value === "contacts")
             return (
               <ContactsPanel
                 accountName={account.name}
                 links={links}
-                canCreate={canCreate}
-                canArchive={canArchive}
+                canCreate={canLinkContacts}
+                canArchive={canUnlinkContacts}
                 actions={actions}
                 onAdd={() => setLinkOpen(true)}
                 onOpen={openAccount}
               />
             )
 
-          if (t.value === "children")
+          if (tabItem.value === "children")
             return (
               <ChildrenPanel accountId={accountId} accounts={children} onOpen={openAccount} />
             )
@@ -477,7 +552,7 @@ export function AccountDetailScreen({
           // THE WORK HANGING OFF THIS CLIENT. Each panel asks the SERVER its own
           // narrowed question (?accountId=), so the rows and the badge above are
           // the same answer — never a page of everything filtered in the browser.
-          if (t.value === "apps")
+          if (tabItem.value === "apps")
             return (
               <AppsPanel
                 accountId={accountId}
@@ -486,7 +561,7 @@ export function AccountDetailScreen({
                 onNew={canWriteApps ? () => setAppOpen(true) : undefined}
               />
             )
-          if (t.value === "sprints")
+          if (tabItem.value === "sprints")
             return (
               <SprintsPanel
                 ownerKind="account"
@@ -496,7 +571,7 @@ export function AccountDetailScreen({
                 emptyText={`Nothing has been sold to ${account.name} yet.`}
               />
             )
-          if (t.value === "todos")
+          if (tabItem.value === "todos")
             return <TodosPanel teamId={teamId} accountId={accountId} canCancel={canCancelTodo} />
 
           // WHAT WE CHARGE THEM. The door answers about ONE account, so the rows
@@ -513,7 +588,7 @@ export function AccountDetailScreen({
           // doors open with — and the margin door additionally refuses a portal
           // caller outright, so this tab cannot leak our own cost even to a
           // client who reached the agency origin (R24).
-          if (t.value === "rates")
+          if (tabItem.value === "rates")
             return (
               <div className="flex flex-col gap-6">
                 <AccountRateCard
@@ -528,17 +603,9 @@ export function AccountDetailScreen({
               </div>
             )
 
-          // Portal access — the login switch. Only rendered for someone who may
-          // see logins at all (the tab itself is hidden otherwise).
-          return (
-            <PortalAccessPanel
-              portalUsers={portalUsers}
-              canGrant={canGrant}
-              canRevoke={canRevoke}
-              actions={actions}
-              onGrant={() => setGrantOpen(true)}
-            />
-          )
+          // ACTIVITY is the last tab, and the fall-through. The login switch is
+          // not here any more — only a person can hold one.
+          return <ActivityPanel activity={activity} />
         }}
       />
 
@@ -550,10 +617,17 @@ export function AccountDetailScreen({
           accountType: account.accountType,
           name: account.name,
           parentAccountId: account.parentAccountId ?? "",
-          code: account.code ?? "",
           email: account.email ?? "",
           phone: account.phone ?? "",
-          address: account.address ?? "",
+          street: account.street ?? "",
+          postalCode: account.postalCode ?? "",
+          city: account.city ?? "",
+          country: account.country ?? "",
+          industry: account.industry ?? "",
+          about: account.about ?? "",
+          logoUrl: account.logoUrl ?? "",
+          coverUrl: account.coverUrl ?? "",
+          locale: account.locale ?? "",
           status: account.status ?? "",
         }}
         parentOptions={parentOptions}
@@ -584,15 +658,6 @@ export function AccountDetailScreen({
         draftKey={`account:contact:${accountId}`}
         excludeIds={[accountId, ...links.filter((l) => l.active).map((l) => l.personAccountId)]}
         onSubmit={addContact}
-      />
-
-      <PortalAccessDialog
-        open={grantOpen}
-        onOpenChange={setGrantOpen}
-        accountName={account.name}
-        draftKey={`account:portal:${accountId}`}
-        candidates={loginCandidates}
-        onSubmit={giveAccess}
       />
 
       {/* One confirm for every red action — nothing here deletes, so each one says

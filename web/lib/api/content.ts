@@ -172,12 +172,15 @@ export const content = {
     view: "live" | "archived" = "live",
     /** the search box, answered by the DOOR — the list pages, so a browser could
      * only ever search the page it had loaded. `total` counts the same question. */
-    q?: string
+    q?: string,
+    /** one client's tickets — the door narrows, so the rows and the exact total
+     * beside them answer the same question (R16). */
+    accountId?: string
   ) =>
     api<PagedResponse<{ tickets: HelpTicket[]; mineTotal: number }>>(
       `/api/content/help?scope=${scope}&view=${view}${q ? `&q=${enc(q)}` : ""}${
-        cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""
-      }`
+        accountId ? `&accountId=${enc(accountId)}` : ""
+      }${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`
     ),
   /** PUT IT AWAY, or take it back out. The door has answered this since archive
    * shipped; nothing on any screen called it, so a ticket could be archived by
@@ -504,12 +507,14 @@ export const content = {
     view?: "upcoming" | "all",
     /** the diary's search box, answered by the DOOR — the list pages, and the
      * meeting somebody digs for is the OLD one. */
-    q?: string
+    q?: string,
+    /** one client's diary — the door already parses it; this is the web half. */
+    accountId?: string
   ) =>
     api<PagedResponse<{ meetings: Meeting[] }>>(
       `/api/content/meetings?view=${enc(view ?? "all")}${q ? `&q=${enc(q)}` : ""}${
-        cursor ? `&cursor=${enc(cursor)}` : ""
-      }`
+        accountId ? `&accountId=${enc(accountId)}` : ""
+      }${cursor ? `&cursor=${enc(cursor)}` : ""}`
     ),
   meetingOne: (id: string) =>
     api<{ meetings: Meeting[] }>(`/api/content/meetings?id=${enc(id)}`).then((r) => r.meetings[0] ?? null),

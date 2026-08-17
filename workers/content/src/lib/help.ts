@@ -299,6 +299,15 @@ function archiveClause(view: "live" | "archived"): string {
  * two reasons the accounts search is (`workers/tenancy/src/lib/accounts.ts`): a
  * search box is not a pattern box, and an alternating `%a%a%…` needle is a
  * handful of bytes that costs the worker exponential time over the whole table. */
+/** WHOSE TICKETS — narrowed to one account (a client's own company, or one
+ * person's own row). A FILTER, not a fence: the fence has already decided which
+ * accounts this caller may see at all, and this only says which of them they are
+ * looking at. It rides the list AND its count, or the badge would answer a
+ * different question from the rows (R16). */
+function accountClause(accountId: string | undefined): { sql: string; params: string[] } {
+  return accountId ? { sql: "account_id = ?", params: [accountId] } : { sql: "", params: [] }
+}
+
 function searchClause(q: string | undefined): { sql: string; params: string[] } {
   if (!q) return { sql: "", params: [] }
   const needle = `%${likeLiteral(q.toLowerCase())}%`
@@ -315,19 +324,22 @@ export async function listTickets(
   tab: "mine" | "all",
   view: "live" | "archived",
   cursor: string | null,
-  q?: string
+  q?: string,
+  accountId?: string
 ): Promise<Page<HelpTicket>> {
   const pos = decodeCursor(cursor)
   const after = keysetAfter(pos, TICKET_ORDER)
   const fence = ticketFence(guard, scope, tab)
   const find = searchClause(q)
+  const whose = accountClause(accountId)
   const clauses = [
     archiveClause(view),
     ...(fence.sql ? [fence.sql] : []),
+    ...(whose.sql ? [whose.sql] : []),
     ...(find.sql ? [find.sql] : []),
     ...(after.sql ? [after.sql] : []),
   ]
-  const params = [...fence.params, ...find.params, ...after.params]
+  const params = [...fence.params, ...whose.params, ...find.params, ...after.params]
   const rows = await d1Query<TicketRow>(
     cfg,
     guard.databaseId,
@@ -349,7 +361,8 @@ export async function countTickets(
   guard: MemberGuard,
   scope: AccountScope,
   view: "live" | "archived",
-  q?: string
+  q?: string,
+  accountId?: string
 ): Promise<{ total: number; mineTotal: number }> {
   // R16 says the count is exact; the fence says exact ABOUT WHAT THEY MAY SEE.
   // An unfenced total would tell a client how many tickets exist that it is
@@ -364,9 +377,15 @@ export async function countTickets(
   // unfiltered total is the R16 failure the other way round.
   const fence = ticketFence(guard, scope, "all")
   const find = searchClause(q)
-  const where = [archiveClause(view), ...(fence.sql ? [fence.sql] : []), ...(find.sql ? [find.sql] : [])].join(
-    " AND "
-  )
+  // …and the SAME account narrowing, for the same reason: a tab badging one
+  // client's tickets over a total counting everybody's is the R16 failure again.
+  const whose = accountClause(accountId)
+  const where = [
+    archiveClause(view),
+    ...(fence.sql ? [fence.sql] : []),
+    ...(whose.sql ? [whose.sql] : []),
+    ...(find.sql ? [find.sql] : []),
+  ].join(" AND ")
   // R16 (amended): counted exactly to TOTAL_COUNT_CAP through the one bounded
   // seam. Both numbers are BADGES, so both are clamped — "my" tickets cannot
   // exceed all tickets, and a partial tally beside a partial total tells the same

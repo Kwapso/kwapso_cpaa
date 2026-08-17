@@ -164,7 +164,7 @@ const MCP_ONLY: McpTool[] = [
   {
     name: "export_accounts_csv",
     description:
-      "Every account you can see as CSV — companies and people, full fields + audit. The columns lead with the import format, so the file goes straight back in through the importer. Narrows by the SAME five filters as list_accounts: `q` (name, reference, email), `type` ('entity' or 'individual'), `status` (the team's own word, as stored), `archived` ('yes' or 'no'), `parentId`. THE FILE IS WHOLE OR IT IS AN ERROR — a collection bigger than one file comes back `export_too_large` rather than as a short CSV that looks complete; narrow it, or read list_accounts a page at a time.",
+      "Every account you can see as CSV — companies and people, full fields + audit. The columns lead with the import format, so the file goes straight back in through the importer. Narrows by the SAME five filters as list_accounts: `q` (name, reference, email), `type` ('entity' or 'individual'), `status` (the team's own word, as stored), `archived` ('yes' or 'no'), `parentId`. Without the contacts right the file is the COMPANIES, the same way the list is. THE FILE IS WHOLE OR IT IS AN ERROR — a collection bigger than one file comes back `export_too_large` rather than as a short CSV that looks complete; narrow it, or read list_accounts a page at a time.",
     inputSchema: obj({ q: S, type: S, status: S, archived: S, parentId: S }),
     binding: "TENANCY",
     method: "GET",

@@ -172,7 +172,13 @@ export const TARGETS: Record<string, TargetDef> = {
       { key: "code", label: "Reference", required: false },
       { key: "email", label: "Email", required: false },
       { key: "phone", label: "Phone", required: false },
-      { key: "address", label: "Address", required: false },
+      // The address is four columns, not one line — the same four the record
+      // itself carries, so a file goes out and comes back meaning the same thing.
+      { key: "street", label: "Street", required: false },
+      { key: "postalCode", label: "Postal code", required: false },
+      { key: "city", label: "City", required: false },
+      { key: "country", label: "Country", required: false },
+      { key: "industry", label: "Industry", required: false },
       { key: "status", label: "Status", required: false },
     ],
     endpoint: { binding: "TENANCY", path: "/api/tenancy/accounts" },
@@ -186,11 +192,17 @@ export const TARGETS: Record<string, TargetDef> = {
     sample: {
       name: "Bergman S.A.",
       accountType: "company",
+      // A file may carry the agency's own legacy references. Leave the column
+      // out and the door mints one (BERG, BERG2 on a clash) — nobody types these.
       code: "BERG",
       email: "hola@bergman.example",
       phone: "+34 600 000 000",
-      address: "Calle Mayor 1, Madrid",
-      status: "client",
+      street: "Calle Mayor 1",
+      postalCode: "28013",
+      city: "Madrid",
+      country: "Spain",
+      industry: "Hospitality",
+      status: "active_client",
     },
     buildBody: (r) => ({
       accountType: accountType(r.accountType),
@@ -198,7 +210,11 @@ export const TARGETS: Record<string, TargetDef> = {
       code: r.code || undefined,
       email: r.email || undefined,
       phone: r.phone || undefined,
-      address: r.address || undefined,
+      street: r.street || undefined,
+      postalCode: r.postalCode || undefined,
+      city: r.city || undefined,
+      country: r.country || undefined,
+      industry: r.industry || undefined,
       status: r.status || undefined,
     }),
   },

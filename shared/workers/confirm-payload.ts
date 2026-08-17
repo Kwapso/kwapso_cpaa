@@ -46,8 +46,21 @@ const MAX_VALUE = 160
  * (Two lanes found this independently and fixed it two ways. The other derived
  * the cap from the module catalogue, which also never rots; it is gone because
  * once a grid is exempt outright the cap governs only payloads that are NOT
- * sheets, and for those a plain 16 says what it means.) */
-const MAX_LINES = 16
+ * sheets, and for those a plain 16 says what it means.)
+ *
+ * AND THEN IT ROTTED ANYWAY, from the other direction, exactly as that comment
+ * predicted for the number it had just replaced. Nothing to do with modules this
+ * time: an ACCOUNT grew. A company record gained a split postal address, an
+ * industry, a paragraph, a logo and a cover, which took `create_account`'s body
+ * past sixteen named fields — and the seventeenth to fall off the panel was the
+ * language the client is written to. The admin was still asked to approve it.
+ *
+ * So the number says what it is now: a ceiling on lines a payload can produce
+ * VARIABLY (a nested object, an array of ids), sized so that no tool's own
+ * declared fields can reach it. A schema is written by hand, one field at a
+ * time, by somebody who meant each one; there is no honest reason to hide one
+ * from the person being asked to say yes. */
+const MAX_LINES = 32
 /** Ids listed from a bulk array before the count carries the rest. */
 const MAX_ITEMS = 3
 

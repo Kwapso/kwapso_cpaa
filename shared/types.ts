@@ -555,10 +555,29 @@ export type Account = {
   name: string
   email: string | null
   phone: string | null
-  address: string | null
-  /** the human reference staff assign when work starts (BERG). Display only. */
+  /** THE POSTAL ADDRESS, in four fields rather than one free-text line. A
+   * country typed free is a country spelled five ways, and "which city are our
+   * German clients in?" is a question one text column cannot answer. `country`
+   * is picked from the Country dropdown group; the other three are typed. */
+  street: string | null
+  postalCode: string | null
+  city: string | null
+  country: string | null
+  /** what this company does, from the Industry dropdown group */
+  industry: string | null
+  /** a paragraph about them, authored as rich text (HTML) */
+  about: string | null
+  /** their mark, and the wide image their record leads with */
+  logoUrl: string | null
+  coverUrl: string | null
+  /** the human reference staff assign when work starts (BERG). GENERATED, not
+   * typed: the first four letters of the name, uppercased, with a numeric suffix
+   * when that is already taken. Display only — every route addresses a row by
+   * its ULID `id`, so re-coding an account never re-points its records. */
   code: string | null
   currency: string | null
+  /** the language this account is written to. The account's own default; a
+   * contact may override it, and staff switch their own. */
   locale: string | null
   timezone: string | null
   /** may this account see money figures on its own work? `null` on the way OUT
@@ -595,9 +614,19 @@ export type AccountLink = {
 export type AccountDetail = {
   account: Account
   parent: Account | null
+  /** the PEOPLE inside this company. Empty for a person (they are somebody's
+   * contact, not somebody with contacts) and empty for any caller without
+   * `contacts:read` — the address book is its own grant. */
   links: AccountLink[]
+  /** the COMPANIES this person is a contact of — the same link table read from
+   * the other end, which is why companies and people stayed one table: a person
+   * can be a contact at two companies and a parent pointer has room for one.
+   * Empty for a company. `personName` on each row carries the COMPANY's name. */
+  companies: AccountLink[]
   portalUsers: PortalUser[]
   linksTotal: number
+  /** the exact server COUNT(*) behind `companies` (R16) */
+  companiesTotal: number
   portalUsersTotal: number
 }
 

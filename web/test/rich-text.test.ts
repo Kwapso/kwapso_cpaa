@@ -217,6 +217,16 @@ const NOT_USER_TYPED: Record<string, string> = {
   "s.imageUrl": "server-minted /media path",
   "photo || (user.imageUrl as string)": "local preview, else server-minted /media path",
   "logo || (team.logoUrl as string)": "local preview, else server-minted /media path",
+  // An account's logo and cover, in the form that edits them. Both come out of
+  // one local `preview()` that is the seam plus the one case the seam cannot
+  // express: a `data:` URL is REFUSED by safeSrc on purpose, and the file the
+  // person picked two seconds ago in this browser is a data URL until the door
+  // has stored it. So `preview` returns the picked file as-is and puts anything
+  // else — which is only ever the stored `/media/...` path — through safeSrc.
+  // Named here rather than inlined because the check reads the EXPRESSION, and
+  // an inline ternary would hide the interesting half of it in a test message.
+  logoPreview: "the file just picked in this session, else the stored path through safeSrc",
+  coverPreview: "the file just picked in this session, else the stored path through safeSrc",
 }
 
 describe("no screen binds an unchecked URL to an attribute", () => {
