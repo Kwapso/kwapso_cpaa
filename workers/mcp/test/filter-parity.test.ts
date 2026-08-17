@@ -120,7 +120,16 @@ const TOOLLESS_DOORS: Record<string, string> = {
   "POST /api/content/google/sources/active":
     "stops sharing a folder or space, or shares it again. The same decision as the door above, in reverse, and out of the assistant's hands for the same reason — re-sharing something a person deliberately withdrew is exactly the act nobody should be able to delegate by accident.",
 
-  "POST /api/content/learning/upload":
+    "POST /api/content/learning/upload-stream":
+    "the SAME door as the learning upload above, with the file as the request BODY rather than a base64 field inside it. Unreachable from this surface for a DIFFERENT reason than its twin, and the difference is worth writing down so nobody tries to \"finish\" the pair: the buffered door cannot be called because 34 million characters will not fit in an argument, while this one cannot be called because a JSON-RPC tool call has no request body to stream into at all. A machine writes the article and references media it already has a URL for.",
+
+  "POST /api/content/brand-assets/upload-stream":
+    "the streamed twin of the brand-asset upload — the file is the request body, which is not a shape a JSON-RPC call has. Same conclusion as the buffered door beside it, reached from the transport rather than from the argument size.",
+
+  "POST /api/content/staff/upload-stream":
+    "the streamed twin of the staff-file upload — a photo or a certificate PDF as the request body, which a tool call cannot express. Same reasoning as its buffered pair.",
+
+"POST /api/content/learning/upload":
     "shovels bytes — an image or short clip as a base64 data URL, up to 25 MB — into the learning-media bucket and hands back a URL to paste into an article. It writes no row and leaves no record of its own. One call on this surface may ANSWER with 400,000 characters; a 25 MB base64 argument is two orders of magnitude past what it is built to carry. A machine writes the article, and references media it already has a URL for.",
 
   "POST /api/content/knowledge/upload":

@@ -45,6 +45,17 @@
   // Created by hand once (BOOTSTRAP.md) with its nine metadata indexes BEFORE
   // anything is ingested: Vectorize will not index metadata retrospectively.
   "vectorize": [{ "binding": "KNOWLEDGE_INDEX", "index_name": "kwapso-knowledge" }],
+  // PER-CALLER RATE LIMIT (shared/workers/rate-limit.ts). The ceiling and the
+  // reasoning behind the number are CALLER_REQUESTS_PER_MINUTE in
+  // shared/workers/limits.ts — 600 is about ten times the busiest real person, and
+  // the period must be 10 or 60 because those are the only two the binding takes.
+  // Its own namespace_id per worker, so these budgets are independent: a busy
+  // Tickets screen must not spend the allowance the Accounts screen needs.
+  // The code FAILS OPEN if this block is missing, which is what makes it safe to
+  // deploy the worker before adding the binding.
+  "ratelimits": [
+    { "name": "CALLER_LIMIT", "namespace_id": "1102", "simple": { "limit": 600, "period": 60 } }
+  ],
   "vars": { "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7", "PUBLIC_APP_URL": "https://agency.kwapso.app" },
   // The knowledge sweep. Fifteen minutes is the backstop §3 names ("push where
   // the source supports it, with a 15-minute sweep as the backstop"); a tick
@@ -77,6 +88,9 @@
       "ai": { "binding": "AI" },
       "vectorize": [{ "binding": "KNOWLEDGE_INDEX", "index_name": "kwapso-knowledge-staging" }],
       "triggers": { "crons": ["*/15 * * * *", "0 7 * * *"] },
+      "ratelimits": [
+        { "name": "CALLER_LIMIT", "namespace_id": "1102", "simple": { "limit": 600, "period": 60 } }
+      ],
       "vars": { "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7", "PUBLIC_APP_URL": "https://agency-staging.kwapso.app" }
     }
   }

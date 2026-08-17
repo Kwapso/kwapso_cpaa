@@ -174,12 +174,13 @@ export const KNOWLEDGE_FILE_MAX_BYTES = 25 * 1024 * 1024
 export const KNOWLEDGE_UPLOAD_MAX_BYTES = Math.ceil(KNOWLEDGE_FILE_MAX_BYTES * (4 / 3)) + 64 * 1024
 
 // ── the STREAMED upload, and why its ceiling is a different number ────────────
-// The cap above bounds a file that is BUFFERED: a base64 data URL inside a JSON
+// The caps above bound a file that is BUFFERED: a base64 data URL inside a JSON
 // body, which `request.json()` materialises whole before a single validation
 // runs. At 25 MB that is ~33 MB of base64, plus the decoded copy, plus the JSON
 // string around them — well over 100 MB of a 128 MB isolate, on the request path.
 // So 25 MB was never a judgement about files; it was the largest number that fits
-// in memory three times.
+// in memory three times. Every upload door in the base wore it for that reason and
+// explained it to people as if it described documents.
 //
 // The streamed door does not buffer. The body goes to R2 as it arrives
 // (`put(key, request.body)`), so the isolate holds a window rather than a file
@@ -196,10 +197,16 @@ export const KNOWLEDGE_UPLOAD_MAX_BYTES = Math.ceil(KNOWLEDGE_FILE_MAX_BYTES * (
 // So this sits deliberately UNDER the platform wall, with headroom for headers
 // and the query string: refused by us, with a sentence a person can act on,
 // rather than cut off mid-body by the edge with nothing useful to say.
+// ONE NUMBER FOR ALL FOUR STREAMING DOORS — the knowledge base, learning media,
+// staff files and brand assets. They differ in which bucket they write and in
+// whether the bytes are ever served back under their declared type; they do not
+// differ in what the platform will carry, and that is the only thing this number
+// is about. Four constants would be four chances to raise one and forget three.
+//
 // Decimal megabytes, not binary, because `mb()` renders the refusal by dividing
 // by 1,000,000 — so this way the number in the code and the number the person is
 // told are the same number. (90 MiB would be refused with the words "94 MB".)
-export const KNOWLEDGE_STREAM_MAX_BYTES = 90 * 1_000_000
+export const STREAM_UPLOAD_MAX_BYTES = 90 * 1_000_000
 
 /** How large a streamed file we will still READ (convert to text for the
  * assistant). Extraction needs the bytes in memory — that is what conversion IS —
@@ -249,6 +256,40 @@ export const BULK_IDS_LIMIT = Math.floor((AGENT_MAX_TOKENS - AGENT_REPLY_ENVELOP
 // YOURS. The core database is everybody's. So every write a signed-in person can
 // repeat at will against it carries a ceiling, and — CONCURRENCY.md — the ceiling
 // rides the INSERT rather than being read first.
+
+// ── what one CALLER may ask for, per worker, per minute ──────────────────────
+// The caps above bound one request's work. This one bounds how many requests one
+// person gets, which is the axis nothing covered: every read door in the app was
+// unthrottled, and a read of the activity feed or the accounts list is real work
+// on a database the whole team shares.
+
+/** Requests one CALLER may make to ONE worker in a minute (shared/workers/rate-limit.ts).
+ *
+ * CHOSEN FROM THIS APP'S REAL SHAPE, not from a round number. The estate is 20
+ * client companies, 104 contacts and 6 staff, and realistic peak concurrency is
+ * about 40 sockets (ARCHITECTURE.md §7). The heaviest honest moment a single person
+ * produces is a cold open of the app — priming the caches behind a screen is on the
+ * order of twenty requests — and then navigation, which is a handful per screen.
+ * Somebody working hard, clicking constantly, with a page refreshing behind them,
+ * is tens per minute. Not hundreds.
+ *
+ * So 600 is roughly ten times the busiest real person and about ten requests a
+ * second sustained: generous enough that no human and no ordinary screen can reach
+ * it — including a screen that is retrying because something is wrong, which is the
+ * case that must NOT be throttled, because that person is already having a bad time
+ * — and low enough that a loop hits a wall in the first second rather than after it
+ * has read a database ten thousand times.
+ *
+ * PER WORKER, because the binding is per worker: a person's budget on content and
+ * their budget on tenancy are separate, which is the honest shape — they are
+ * separate databases' worth of work, and a busy Tickets screen should not spend the
+ * allowance the Accounts screen needs.
+ *
+ * The period is 60 seconds because Cloudflare's rate-limiting binding allows 10 or
+ * 60 and nothing else; the number here and the `period` in each wrangler.jsonc are
+ * the same decision written in two places, which is why every one of them says
+ * this constant's name in a comment beside it. */
+export const CALLER_REQUESTS_PER_MINUTE = 600
 
 /** Account-activity rows one PERSON may write in an hour. Every identity edit
  * (name, photo, email) appends a row to the shared core database AND pings that

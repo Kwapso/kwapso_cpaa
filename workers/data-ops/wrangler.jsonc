@@ -30,6 +30,17 @@
     { "binding": "TENANCY", "service": "kwapso-tenancy" }
   ],
   "ai": { "binding": "AI" },
+  // PER-CALLER RATE LIMIT (shared/workers/rate-limit.ts). The ceiling and the
+  // reasoning behind the number are CALLER_REQUESTS_PER_MINUTE in
+  // shared/workers/limits.ts — 600 is about ten times the busiest real person, and
+  // the period must be 10 or 60 because those are the only two the binding takes.
+  // Its own namespace_id per worker, so these budgets are independent: a busy
+  // Tickets screen must not spend the allowance the Accounts screen needs.
+  // The code FAILS OPEN if this block is missing, which is what makes it safe to
+  // deploy the worker before adding the binding.
+  "ratelimits": [
+    { "name": "CALLER_LIMIT", "namespace_id": "1103", "simple": { "limit": 600, "period": 60 } }
+  ],
   "vars": {
     "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7",
     "AGENT_MODEL": "claude-sonnet-5",
@@ -58,6 +69,9 @@
         { "binding": "TENANCY", "service": "kwapso-tenancy-staging" }
       ],
       "ai": { "binding": "AI" },
+      "ratelimits": [
+        { "name": "CALLER_LIMIT", "namespace_id": "1103", "simple": { "limit": 600, "period": 60 } }
+      ],
       "vars": {
         "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7",
         "AGENT_MODEL": "claude-sonnet-5",

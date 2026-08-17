@@ -9,6 +9,7 @@ import type { Fetcher, D1Database } from "@cloudflare/workers-types"
 import type { SessionUser } from "../types"
 import { d1Query, type D1Rest } from "./d1-rest"
 import { fail } from "./http"
+import { callerHasBudget, TOO_FAST, type RateLimitEnv } from "./rate-limit"
 import { requestId, traceHeaders } from "./trace"
 
 /** The slice of a worker Env the gating needs. Every domain worker's Env
@@ -20,7 +21,11 @@ export type GatingEnv = {
   CF_ACCOUNT_ID: string
   CF_D1_TOKEN?: string
   ADMIN_KEY?: string
-}
+  /** Cloudflare's rate-limiting binding, per worker. OPTIONAL on purpose — see
+   * shared/workers/rate-limit.ts: an environment without it behaves exactly as
+   * this app did before the limiter existed, which is what makes the binding safe
+   * to add after the code that reads it. */
+} & RateLimitEnv
 
 export type Right = "read" | "create" | "edit" | "delete"
 export type Actor = { id: string; email: string; name: string }
@@ -145,6 +150,21 @@ export async function requireMember(
 export async function teamContext(request: Request, env: GatingEnv): Promise<TeamCtx> {
   const user = await whoAmI(request, env)
   if (!user) throw new GuardError(401, "signed_out", "Not signed in.")
+
+  // THE PER-CALLER CEILING, and this is the one place in the request path where it
+  // can be applied honestly. The gateway cannot: it does not decode a session, so
+  // it does not know who is asking, and the only keys available to it are an IP
+  // (one client's whole office in one bucket) or a fresh auth round trip on every
+  // good request. Here the caller has just been resolved, so keying on the person
+  // costs nothing — and every team-scoped door on tenancy, content and data-ops
+  // passes through this function exactly once, so the count is one per request
+  // rather than one per permission check.
+  //
+  // BEFORE the membership read below, because that read is the work being
+  // protected. It fails OPEN if the limiter is missing or unwell (rate-limit.ts
+  // argues that at length): a broken safety valve must not become an outage.
+  if (!(await callerHasBudget(env, user.id)))
+    throw new GuardError(429, "too_many_requests", TOO_FAST)
 
   // whoAmI already carries the active team (auth /me reads it fresh from the
   // users row) — no need for a second native-DB read for the same value.

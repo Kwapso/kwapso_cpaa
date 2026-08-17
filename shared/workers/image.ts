@@ -155,7 +155,15 @@ export function parseDataUrl(
 // could upload a page that runs JS in the app origin and rides any viewer's session.
 // This allowlist is the boundary that stops it. Raster images, short A/V clips, and PDFs
 // only — exactly what a learning attachment is.
-const INLINE_SAFE_UPLOAD =
+/** EXPORTED, because the STREAMING doors have to test the same list.
+ *
+ * A streamed upload has no data URL to parse, so it cannot go through
+ * `parseUploadDataUrl` — but it lands in the same buckets, is served back by the
+ * same `/media/*` path under the same declared type, and therefore stands or falls
+ * on exactly this boundary. A streaming door with its own copy of this regex would
+ * be a second allow-list nobody remembers to widen, which is the failure the
+ * comment above is about. One list, both shapes of door. */
+export const INLINE_SAFE_UPLOAD =
   /^(image\/(png|jpe?g|webp|gif|avif)|video\/(mp4|webm|ogg)|audio\/(mpeg|mp4|webm|ogg)|application\/pdf)$/
 
 /** ANY well-formed mime — for a door that STORES the bytes without ever letting

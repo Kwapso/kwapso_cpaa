@@ -110,6 +110,11 @@ const NUM = "one|two|three|four|five|six|seven|eight|nine|ten|\\d{1,2}"
  * the test goes red: re-read the sentence, then re-approve it here. */
 const SUBSET_CLAIMS: { doc: string; phrase: string; why: string }[] = [
   {
+    doc: "OPERATIONS.md",
+    phrase: "four workers",
+    why: "the per-caller rate limiter's roster, not the app's: CALLER_LIMIT is bound on tenancy, content, data-ops and mcp — the four that resolve a caller. The two gateways cannot (they decode no session), realtime holds no doors, and auth's doors have no session to key on by definition and carry their own throttles.",
+  },
+  {
     doc: "CONVENTIONS.md",
     phrase: "two workers",
     why: "the shared/ rule — 'if two workers would write it the same way, it lives in shared/'. A pair, not a roster.",

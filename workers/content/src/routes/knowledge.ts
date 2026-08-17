@@ -23,7 +23,7 @@ import { ANY_FILE_TYPE, mediaKey, NEUTRALISED_CONTENT_TYPE, parseUploadDataUrl }
 import {
   KNOWLEDGE_EXTRACT_MAX_BYTES,
   KNOWLEDGE_FILE_MAX_BYTES,
-  KNOWLEDGE_STREAM_MAX_BYTES,
+  STREAM_UPLOAD_MAX_BYTES,
   KNOWLEDGE_UPLOAD_MAX_BYTES,
 } from "@shared/workers/limits"
 import {
@@ -318,11 +318,11 @@ export async function postStreamKnowledgeFile(request: Request, env: Env): Promi
   const declared = Number(request.headers.get("content-length") ?? 0)
   if (!Number.isFinite(declared) || declared <= 0)
     return fail(411, "length_required", "That upload did not say how big it is, so we did not start it.")
-  if (declared > KNOWLEDGE_STREAM_MAX_BYTES)
+  if (declared > STREAM_UPLOAD_MAX_BYTES)
     return fail(
       413,
       "too_large",
-      `That upload is too big — the most we can take in one file is ${mb(KNOWLEDGE_STREAM_MAX_BYTES)}. Nothing was saved.`
+      `That upload is too big — the most we can take in one file is ${mb(STREAM_UPLOAD_MAX_BYTES)}. Nothing was saved.`
     )
 
   const { actor, cfg, guard } = await gated(request, env, "knowledge", "create")

@@ -345,11 +345,31 @@ many days each has left at its current rate.
   configuration state, but "a database crossed 80% and nobody was told" is exactly the
   silence this closes — so the cron records it rather than shrugging.
 
-What is still open: per-caller rate limiting on ordinary doors. On re-examination it is
-**not** the config-level change it looked like — neither gateway decodes a session, so
-neither can key a limiter on a user without a lookup on every request, and per-IP puts
-the whole office behind one bucket. The config-level version is zone-level WAF rules in
-the Cloudflare dashboard. See `scaling-review.md` §6.7.
+**Per-caller rate limiting is now on** (17 Aug 2026), and the thing that made it look
+like config is worth keeping written down: neither gateway decodes a session, so
+neither can key a limiter on a person — per-IP would put one client's whole office in
+a single bucket, and a session lookup at the edge is an auth round trip on every good
+request. So the limiter sits where the caller is ALREADY resolved: `teamContext`
+(tenancy, content, data-ops — one call per request, every team-scoped door) and
+`verifyToken` on the machine surface. `CALLER_LIMIT` is bound on those four workers in
+both environments, 600 requests per caller per worker per minute
+(`CALLER_REQUESTS_PER_MINUTE` in shared/workers/limits.ts says why 600).
+
+- **It FAILS OPEN.** No binding, a throwing binding or a nonsense answer all allow the
+  request, and the fail-open path logs rather than swallowing. A safety valve whose
+  failure is an outage is worse than the surge it prevents.
+- **Which means the binding can be added after the deploy**, in either order, with no
+  window where the app is broken — and an environment that never gets it behaves
+  exactly as the app did before.
+- **Over the line is a 429** with one plain sentence: nothing was lost, wait a moment.
+  No numbers in it — a real person meeting it is usually a stuck page retrying.
+- **Auth's own doors are deliberately not covered here.** They have no session to key
+  on (that is what they are for) and carry their own throttles already: the send
+  budget, the per-address code cap and the OTP cooldown.
+- **UNPROVEN UNTIL DEPLOYED:** the binding itself. `env.CALLER_LIMIT` does not exist in
+  the local test runtime, so every test covers the seam's decisions and the config's
+  shape, and none of them exercises Cloudflare's limiter. First deploy should watch for
+  429s on ordinary reads — there should be none from real use.
 
 ## Local dev
 

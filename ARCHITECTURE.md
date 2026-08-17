@@ -477,7 +477,7 @@ its largest tenant is a few hundred people or a few hundred thousand.
 | accepted | why it stays | the trigger |
 |---|---|---|
 | Base64 uploads through the worker (not presigned direct-to-R2) | changes the client contract *and* the capability-URL model SCOPE ch.06 records | a file cap above ~25 MB, or the 128 MB isolate budget being hit in practice |
-| The module mover is one non-resumable request | safe and no longer quadratic since 2026-08-14; it fails loudly rather than corrupting | a team database actually crossing 8 GB |
+| ~~The module mover is one non-resumable request~~ **RESUMED 2026-08-17** | progress lives in `team_module_moves` (db/core/0023), not in a stack frame: bounded copy batches per call, a per-table cursor, an idempotent `INSERT OR IGNORE`, and a claim a killed Worker cannot strand. A killed call is continued by calling again, and routing is still flipped last so an interrupted move is never a doubled read. | the FIRST real move — the resumption logic is unit-proven against an in-memory D1, never against Cloudflare's |
 | No cross-shard merge (`d1QueryAcross` refuses a paged or counted read across shards) | nothing paged is on the split path, and refusing beats answering wrongly | the first time a PAGED module has to be split |
 | The crons rotate their team window rather than queueing | rotation makes a late team late, not skipped | more than ~600 teams |
 | R16's exact `COUNT(*)` on every feed page | it is a **Law** (RULES.md) — changing it means rule, registry and check together | an activity table past ~5M rows in one team |
