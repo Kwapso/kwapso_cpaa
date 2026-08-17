@@ -425,7 +425,17 @@ the token budget trying to feed it everything.
   turns breaks provider APIs.
 - Tool results are handed back **fenced as DATA**, capped at 2000 chars
   (`fence`), never as instructions — a big list can't blow context,
-  and data can't smuggle in a prompt. **The fence is provider-shaped, and the
+  and data can't smuggle in a prompt. **The cap drops ROWS, not the tail, and it
+  says so** (`trimResult`): a list door answers `{rows: […], total, hasMore,
+  nextCursor}` with the rows FIRST, so cutting the string used to delete the exact
+  count, the paging cursor and any way of knowing they were gone — and the model,
+  asked "how many open tickets does this client have?", called the same tool four
+  times in a row because nothing it was handed could answer. Every non-row field
+  now survives the trim, whole rows go from the end, and a plain sentence says how
+  many of how many are shown. Behind it, `repeatGuard` makes an identical **read**
+  (same tool, same arguments) within one turn answer from the first call — reads
+  only, because a read is idempotent and a write's second run is the door's and the
+  confirm panel's decision, not the transport's. **The fence is provider-shaped, and the
   weaker one had to be built by hand:** Claude's `tool_result` block is structural,
   but Workers AI (selected whenever `ANTHROPIC_API_KEY` is unset) flattens tool
   history into plain turns, where an attacker's ticket description read exactly

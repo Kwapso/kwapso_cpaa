@@ -77,7 +77,10 @@ function fakeVector(text: string): number[] {
   return v
 }
 
-function env(userId: string, opts: { brokenModel?: boolean; noVectorStore?: boolean } = {}) {
+function env(
+  userId: string,
+  opts: { brokenModel?: boolean; noVectorStore?: boolean; minScore?: string } = {}
+) {
   const base = makeEnv(() => db(), userId) as unknown as Record<string, unknown>
   return {
     ...base,
@@ -89,7 +92,7 @@ function env(userId: string, opts: { brokenModel?: boolean; noVectorStore?: bool
     // that it refuses below it — not the shipped number, which was measured
     // against the real model on 7,441 real chunks. Setting it here is the same
     // act as setting it for a new model in production.
-    KNOWLEDGE_MIN_SCORE: "0.35",
+    KNOWLEDGE_MIN_SCORE: opts.minScore ?? "0.35",
     AI: {
       run: async (_model: string, input: { text: string[] }) => {
         embedded.push(...input.text)
@@ -130,9 +133,14 @@ async function addSource(
   return source.id
 }
 
-async function ask(userId: string, question: string, accountId?: string): Promise<KnowledgeAnswer> {
+async function ask(
+  userId: string,
+  question: string,
+  accountId?: string,
+  opts: { minScore?: string } = {}
+): Promise<KnowledgeAnswer> {
   const query = `?q=${encodeURIComponent(question)}${accountId ? `&accountId=${accountId}` : ""}`
-  const res = await call(userId, "GET /api/content/knowledge/ask", undefined, query)
+  const res = await call(userId, "GET /api/content/knowledge/ask", undefined, query, opts)
   expect(res.status).toBe(200)
   return (await res.json()) as KnowledgeAnswer
 }
@@ -237,6 +245,70 @@ describe("a source a person writes is answerable straight away", () => {
   })
 })
 
+// A QUESTION FROM OUTSIDE THE TEAM'S WORLD — the honesty case R23 is FOR, and the
+// one that got out. Asked "What is the capital of France?" on staging, the
+// knowledge base answered, with citations, out of material that had nothing to do
+// with it. The path is the fallback: nothing was close enough for the vector arm,
+// so the word arm ran as everything-we-have — and its floor was "half the
+// question", which for a two-word question is one word. Any chunk saying "capital"
+// was, arithmetically, half an answer about France.
+//
+// The corpus below is built to make that leak happen: one source contains one of
+// the two words, the other contains the other, and neither contains both. Under the
+// old floor each of them cleared it on its own.
+//
+// NOTHING IS CLOSE ENOUGH is set here rather than hoped for. The trigger is
+// `vector.length === 0`, which retrieve() reaches by four routes it treats
+// identically — no store bound, the question could not be embedded, the material
+// has no vector, or nothing clears the relevance floor. Staging took the last one,
+// so this suite takes it too, by putting the floor out of the stand-in model's
+// reach. Leaving it at the suite default would measure that model's accidental
+// collisions (a two-word question and a two-word account name share a hashed slot
+// often enough) rather than this floor.
+const NOTHING_CLOSE_ENOUGH = { minScore: "0.99" }
+
+describe("R23 — a question the team's material cannot answer is refused, not approximated", () => {
+  beforeEach(async () => {
+    await addSource(IDS.staffUser, {
+      title: "Capital expenditure sign-off",
+      body: "Any capital expenditure above ten thousand needs the finance lead to sign it off before the purchase order is raised, and the approval is recorded against the project it belongs to.",
+    })
+    await addSource(IDS.staffUser, {
+      title: "Where our suppliers are",
+      body: "The label printer is shipped from a supplier in France, so allow an extra week on any hardware order that goes through them during the summer.",
+    })
+  })
+
+  it("refuses a short question whose words appear in the base but never together", async () => {
+    const answer = await ask(IDS.staffUser, "What is the capital of France?", undefined, NOTHING_CLOSE_ENOUGH)
+    expect(answer.found, `answered out of ${titles(answer).join(", ") || "nothing"}`).toBe(false)
+    expect(answer.citations).toEqual([])
+    expect(answer.passages).toEqual([])
+    expect(answer.message).toMatch(/do not answer from memory/i)
+  })
+
+  // THE REASONING IS PART OF THE ANSWER (R23), so it is held to the same floor.
+  // The router had none: a vector search always returns a nearest neighbour, so the
+  // sentence riding the answer named the three least-unlike records for every
+  // question ever asked — including this one, where it sat next to a refusal
+  // telling the reader the question was about three documents it had just said it
+  // could not answer from.
+  it("and its reasoning claims no subject either", async () => {
+    const answer = await ask(IDS.staffUser, "What is the capital of France?", undefined, NOTHING_CLOSE_ENOUGH)
+    expect(answer.records).toEqual([])
+    expect(answer.reason).not.toMatch(/reads like a question about/i)
+  })
+
+  it("still answers when the words really are together — the floor is not a mute button", async () => {
+    // The same two-word shape and the SAME sole-evidence path, this time genuinely
+    // covered. If the stricter floor ever becomes "refuse anything short", this is
+    // what goes red.
+    const answer = await ask(IDS.staffUser, "capital expenditure?", undefined, NOTHING_CLOSE_ENOUGH)
+    expect(answer.found).toBe(true)
+    expect(titles(answer)).toContain("Capital expenditure sign-off")
+  })
+})
+
 describe("the compartment is derived, and it is the reasoning that ships", () => {
   beforeEach(async () => {
     await addSource(IDS.staffUser, {
@@ -281,6 +353,41 @@ describe("the compartment is derived, and it is the reasoning that ships", () =>
     expect(answer.compartments).toEqual([])
     expect(answer.reason).toContain("named no client")
     expect(titles(answer)).toContain("How we run a rollout")
+  })
+
+  // A QUESTION ABOUT THE APP ITSELF. The agency's own documentation — the scope
+  // chapters, the vocabulary, the laws, the screen guide that
+  // scripts/seed-knowledge-about-the-app.mjs writes — lives in the agency's
+  // compartment, and a staging test reported one of those questions being answered
+  // out of a client's material instead.
+  //
+  // The compartment cannot be what did that, and this is the assertion that says
+  // so out loud rather than leaving it to be re-derived: EVERY branch of the route
+  // keeps the agency's own compartment. Standing on a client's record adds theirs;
+  // naming a client in the question adds theirs; naming nobody narrows to nothing
+  // at all. There is no route through deriveCompartment that puts the agency's own
+  // material out of reach, so if app-self material ever loses, it lost on RANKING
+  // and the fix is not here.
+  it("never routes a question away from the agency's own material", async () => {
+    await addSource(IDS.staffUser, {
+      title: "Why the client portal is a separate app",
+      body: "The client portal is a different app at a different address. It is not a copy of the agency app and nothing is synced between them — they are two permission-gated views of the same rows.",
+    })
+    for (const [label, answer] of [
+      ["names a client", await ask(IDS.staffUser, "why does Bergman have a separate client portal?")],
+      ["stands on a client", await ask(IDS.staffUser, "why a separate client portal?", IDS.burglarAccount)],
+      ["names nobody", await ask(IDS.staffUser, "why is the client portal a separate app?")],
+    ] as const) {
+      const searched = answer.compartments
+      expect(
+        searched.length === 0 || searched.includes("agency"),
+        `${label}: searched ${JSON.stringify(searched)} — the agency's own material must always be in reach`
+      ).toBe(true)
+    }
+    // …and it really is reachable, not merely in scope.
+    expect(titles(await ask(IDS.staffUser, "why is the client portal a separate app?"))).toContain(
+      "Why the client portal is a separate app"
+    )
   })
 
   it("a word inside a longer name does not file a question under that client", async () => {
