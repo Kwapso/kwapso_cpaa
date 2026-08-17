@@ -11,6 +11,23 @@ export const LIST_HARD_CAP = 1000
  * deliberate download), still bounded so one request can't stream a whole shard. */
 export const EXPORT_HARD_CAP = 10_000
 
+/** WHERE COUNTING STOPS — the one ceiling on every total this app reports, for a
+ * filtered SEARCH and (since R16 was amended on 2026-08-14) for a COLLECTION too.
+ *
+ * ONE number rather than two, deliberately. A filtered search has always counted
+ * exactly to a million and then said "1m+"; the amendment gives a collection total
+ * the same ceiling and the same sentence, so there is one place in the product
+ * where counting stops instead of two that could drift apart. A door that stopped
+ * counting at one number while the badge started hedging at another would produce
+ * precisely the output this seam exists to prevent: a total that is quietly wrong
+ * and looks exact.
+ *
+ * It lives HERE, beside the other read ceilings, because both sides need it and
+ * neither may own it — `shared/workers/count.ts` bounds the scan with it and
+ * `shared/web/format-count.ts` renders the "+" from it. This file is pure
+ * constants with no imports, so the browser pays nothing to read it. */
+export const TOTAL_COUNT_CAP = 1_000_000
+
 /** Hard cap on a conversation/derived read (a ticket's replies, a chat thread's
  * messages, a per-member progress matrix). */
 export const THREAD_HARD_CAP = 500
@@ -155,6 +172,46 @@ export const KNOWLEDGE_FILE_MAX_BYTES = 25 * 1024 * 1024
  * `Content-Length` BEFORE the body is parsed — a cap is only a cap if it is
  * checked before the expensive step. */
 export const KNOWLEDGE_UPLOAD_MAX_BYTES = Math.ceil(KNOWLEDGE_FILE_MAX_BYTES * (4 / 3)) + 64 * 1024
+
+// ── the STREAMED upload, and why its ceiling is a different number ────────────
+// The cap above bounds a file that is BUFFERED: a base64 data URL inside a JSON
+// body, which `request.json()` materialises whole before a single validation
+// runs. At 25 MB that is ~33 MB of base64, plus the decoded copy, plus the JSON
+// string around them — well over 100 MB of a 128 MB isolate, on the request path.
+// So 25 MB was never a judgement about files; it was the largest number that fits
+// in memory three times.
+//
+// The streamed door does not buffer. The body goes to R2 as it arrives
+// (`put(key, request.body)`), so the isolate holds a window rather than a file
+// and the memory ceiling stops being the binding constraint.
+//
+// WHAT BINDS IT INSTEAD IS THE PLATFORM, and it is worth naming precisely rather
+// than discovering: Cloudflare caps the REQUEST BODY a Worker may receive — 100 MB
+// on this plan. No amount of streaming gets past that, because the limit is on the
+// request, not on our handling of it. The only door past it is a client PUT
+// straight to R2 on a presigned URL, which needs an R2 S3 access key and bucket
+// CORS (see the report of 17 Aug 2026); that is a different decision with a
+// credential in it, and it is not taken here.
+//
+// So this sits deliberately UNDER the platform wall, with headroom for headers
+// and the query string: refused by us, with a sentence a person can act on,
+// rather than cut off mid-body by the edge with nothing useful to say.
+// Decimal megabytes, not binary, because `mb()` renders the refusal by dividing
+// by 1,000,000 — so this way the number in the code and the number the person is
+// told are the same number. (90 MiB would be refused with the words "94 MB".)
+export const KNOWLEDGE_STREAM_MAX_BYTES = 90 * 1_000_000
+
+/** How large a streamed file we will still READ (convert to text for the
+ * assistant). Extraction needs the bytes in memory — that is what conversion IS —
+ * so it keeps the ceiling the buffered door always had, and it is read back from
+ * R2 once, rather than held alongside a base64 copy and a JSON string.
+ *
+ * Past it the file is STORED AND LISTED and says it was not read, which is the
+ * behaviour the knowledge base already has for a file it cannot convert
+ * (`unreadableNote`). Storing a 60 MB archive nobody can search is a better
+ * answer than refusing it: the alternative is that the material does not exist in
+ * the product at all. */
+export const KNOWLEDGE_EXTRACT_MAX_BYTES = KNOWLEDGE_FILE_MAX_BYTES
 
 /** How far up the account tree the loop guard will walk. The tree is self-nesting,
  * so the ancestor walk is the only unbounded recursion in the base. Past this depth

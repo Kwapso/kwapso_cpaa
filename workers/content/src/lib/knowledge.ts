@@ -105,6 +105,7 @@
 // permission.
 
 import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
+import { countCollection } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { ulid } from "@shared/workers/id"
@@ -477,20 +478,23 @@ export async function listSources(
  * same personal fence as the list, or the badge would count sources the reader
  * cannot see — and the same FILTERS, or a search's own count is a number about
  * somebody else's question. Called with no filter (the default) it is still the
- * whole collection's total, which is what the badge above the list shows. */
+ * whole collection's total, which is what the badge above the list shows.
+ *
+ * R16 (amended): counted exactly to TOTAL_COUNT_CAP through the one bounded
+ * seam, then "at least". The filters ride the same WHERE, so a searched count
+ * answers the searched question and is bounded on the same terms. */
 export async function countSources(
   cfg: D1Rest,
   guard: MemberGuard,
   filter: SourceFilters = {}
 ): Promise<number> {
   const narrowed = sourcesWhere(guard, filter)
-  const rows = await d1Query<{ n: number }>(
+  return countCollection(
     cfg,
     guard.databaseId,
-    `SELECT COUNT(*) AS n FROM knowledge_sources WHERE ${narrowed.sql.join(" AND ")}`,
+    `SELECT 1 FROM knowledge_sources WHERE ${narrowed.sql.join(" AND ")}`,
     narrowed.params
   )
-  return rows[0]?.n ?? 0
 }
 
 /** One source by id, or null. */

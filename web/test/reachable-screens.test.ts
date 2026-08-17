@@ -295,6 +295,10 @@ describe("the screens are reachable", () => {
  * build goes red. So it can only ever shrink, and it can never quietly describe
  * a screen that now exists. */
 const NO_CONTROL: Record<string, string> = {
+  /* ── for a client that is already out there ───────────────────────────── */
+  "POST /api/content/knowledge/upload":
+    "FOR AN OLDER BUILD OF THIS APP. The buffered upload door — a base64 data URL in a JSON body — replaced on 17 Aug 2026 by /upload-stream, which takes the file as the request body and never materialises it. No screen in THIS build calls it, and that is the point rather than a gap: a browser holds its own copy of the app for as long as the tab is open, so a person who loaded the app before the deploy is still running the old JavaScript and still posting here. The door stays until no build in the wild uses it; deleting it then is a separate, boring change. An upload contract is the one kind of change where the server must be ready before the client is, and outlast it afterwards.",
+
   /* ── for a machine ─────────────────────────────────────────────────────── */
   "POST /api/content/learning/bulk-active":
     "FOR A MACHINE. The SET-shaped write — 'switch these forty articles off'. It exists for the assistant and the machine surface, where a caller names a set; a person switches one article off on its own screen, which is the door beside this one.",

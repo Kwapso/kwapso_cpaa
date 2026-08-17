@@ -18,6 +18,7 @@
 
 import { accountScopeClause, type AccountScope } from "@shared/workers/account-scope"
 import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
+import { countCollectionWith, reportedTotal } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { HELP_STATUSES, type HelpMessage, type HelpStatus, type HelpTicket } from "@shared/types"
@@ -366,13 +367,19 @@ export async function countTickets(
   const where = [archiveClause(view), ...(fence.sql ? [fence.sql] : []), ...(find.sql ? [find.sql] : [])].join(
     " AND "
   )
-  const rows = await d1Query<{ total: number; mine: number }>(
+  // R16 (amended): counted exactly to TOTAL_COUNT_CAP through the one bounded
+  // seam. Both numbers are BADGES, so both are clamped — "my" tickets cannot
+  // exceed all tickets, and a partial tally beside a partial total tells the same
+  // story at the same ceiling. The SEARCH clause rides the same WHERE, so a
+  // filtered list's total answers the filtered question (and is bounded too).
+  const row = await countCollectionWith<{ total: number; mine: number }>(
     cfg,
     guard.databaseId,
-    `SELECT COUNT(*) AS total, SUM(CASE WHEN creator_id = ? THEN 1 ELSE 0 END) AS mine FROM help WHERE ${where}`,
+    `SELECT (creator_id = ?) AS is_mine FROM help WHERE ${where}`,
+    "COUNT(*) AS total, SUM(is_mine) AS mine",
     [guard.userId, ...fence.params, ...find.params]
   )
-  return { total: rows[0]?.total ?? 0, mineTotal: rows[0]?.mine ?? 0 }
+  return { total: reportedTotal(row?.total ?? 0), mineTotal: reportedTotal(row?.mine ?? 0) }
 }
 
 /** The rank a new ticket takes: above every one the caller can already see.

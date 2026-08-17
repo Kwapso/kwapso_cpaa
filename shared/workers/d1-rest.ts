@@ -166,7 +166,12 @@ const UNMERGEABLE: { pattern: RegExp; what: string }[] = [
   { pattern: /\bORDER\s+BY\b/i, what: "an ORDER BY (sorted per shard, unsorted between them)" },
   {
     pattern: /\b(COUNT|SUM|AVG|MIN|MAX|GROUP_CONCAT)\s*\(/i,
-    what: "an aggregate (one row per shard, and every caller reads the first)",
+    what:
+      "an aggregate (one row per shard, and every caller reads the first). " +
+      "A collection COUNT now HAS a real merge — countCollectionAcross in " +
+      "shared/workers/count.ts sums the per-shard bounded counts and clamps once, " +
+      "which is exact below the ceiling and an honest floor above it. Use that " +
+      "rather than reaching for this seam",
   },
 ]
 

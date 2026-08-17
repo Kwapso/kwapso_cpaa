@@ -39,10 +39,21 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T
 }
 
-/** R14: what every PAGED door returns — the rows, the exact server `total`, and
- * the pair that says whether there's another page. `nextCursor` is OPAQUE: hand
- * it straight back, never build or parse one. */
-export type PagedResponse<T> = T & { total: number; hasMore: boolean; nextCursor: string | null }
+/** R14: what every PAGED door returns — the rows, the server `total`, and the
+ * pair that says whether there's another page. `nextCursor` is OPAQUE: hand it
+ * straight back, never build or parse one.
+ *
+ * R16 (amended): `totalCapped` says whether `total` is the exact number or a
+ * floor — true means "at least this many". It is on the TYPE rather than left to
+ * each caller to remember, for the same reason `pagedJson` derives it rather than
+ * taking it: a field that says how much to trust the field beside it is worth
+ * nothing if half the readers do not know it is there. */
+export type PagedResponse<T> = T & {
+  total: number
+  totalCapped: boolean
+  hasMore: boolean
+  nextCursor: string | null
+}
 
 /** Two one-liners every caller repeats: a URL-safe id, and a JSON POST. */
 export const enc = encodeURIComponent

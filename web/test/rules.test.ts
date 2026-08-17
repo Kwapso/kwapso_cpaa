@@ -36,6 +36,21 @@ const WEB = join(HERE, "..") // web/
 const ROOT = join(WEB, "..") // repo root
 const read = (p: string) => readFileSync(p, "utf8")
 
+/** The READ functions in a lib — `count*` / `list*` / `search*` — each as its own
+ * body, so a rule about what a BADGE's number may do doesn't reach a count that
+ * decides whether a WRITE proceeds. A body runs to the next top-level `export`,
+ * the same slice the publish-seam and gating scans take. */
+function readerBodies(src: string): { name: string; body: string }[] {
+  const out: { name: string; body: string }[] = []
+  const starts = [...src.matchAll(/export\s+(?:async\s+)?function\s+(\w+)/g)]
+  starts.forEach((m, i) => {
+    if (!/^(count|list|search)/i.test(m[1])) return
+    const next = i + 1 < starts.length ? starts[i + 1].index : undefined
+    out.push({ name: m[1], body: src.slice(m.index, next) })
+  })
+  return out
+}
+
 /** Every worker's src .ts file (recursively), as [repo-relative path, source]. */
 function workerSources(): [string, string][] {
   const srcDirs = readdirSync(join(ROOT, "workers"), { withFileTypes: true })
@@ -636,6 +651,122 @@ describe("RULES — the laws of the base", () => {
   // NUMBER through the one formatCount seam (never rows.length), the PLACE a
   // counted tab or a CollectionHeading, the ARBITRATION a context (a counted tab
   // wins; the heading stands down).
+  // R16 AMENDED (2026-08-14) — the SERVER half of the number, which this check
+  // did not have. Every clause above is about the browser: which component
+  // renders the badge, where it sits, who stands down. None of them could see
+  // that the total behind the badge was an unbounded `COUNT(*)` over a table that
+  // grows on every mutation — the one read in the product with no ceiling at all.
+  //
+  // So the law now also says WHERE COUNTING STOPS, and this is the clause that
+  // holds it: every GROWING collection's count goes through the one bounded seam
+  // (shared/workers/count.ts), DERIVED from GROWING_COLLECTIONS rather than
+  // hand-listed, so a tenth growing collection cannot be added without one.
+  //
+  // The exemption is as important as the rule. A number that feeds a DECISION —
+  // billable seconds, an export's completeness — must NOT be capped, so this
+  // clause deliberately checks only the count, and a separate assertion below
+  // proves the two paths that must stay exact still are.
+  it("counted-collections (server): every growing collection counts through the bounded seam", () => {
+    const offenders: string[] = []
+    let checked = 0
+    for (const [name, c] of Object.entries(GROWING_COLLECTIONS)) {
+      const src = stripComments(read(join(ROOT, c.lib)))
+      // The seam, in any of its three spellings: the two helpers, or the exported
+      // bounded subquery for the one door that computes a capped count beside an
+      // exact sum (work_logs). A door importing none of them is counting without
+      // a ceiling. The generic is allowed for (`countCollectionWith<{…}>(`) — the
+      // same blindness the R10 gate scan was once fooled by.
+      if (!/\b(countCollection|countCollectionWith|boundedInner)(?:<[^(<>]*>)?\s*\(/.test(src))
+        offenders.push(`${name} (${c.lib}) — no bounded count seam`)
+      // …and no hand-written unbounded COUNT(*) over the collection's OWN table
+      // may survive INSIDE A READER, or the seam is decoration.
+      //
+      // SCOPED TO THE READERS, deliberately, and this is the distinction the law
+      // turns on rather than a convenience: a `count*`/`list*`/`search*` function
+      // answers "how many are there" for a BADGE, which is what the cap is for. A
+      // count anywhere else in the same file is answering something else — the
+      // bulk status move confirms how many rows it is about to touch, and that
+      // number decides whether a write proceeds. Capping a decision is the bug
+      // this amendment is most likely to cause, so the check must not demand it.
+      for (const fn of readerBodies(src))
+        for (const m of fn.body.matchAll(/SELECT\s+COUNT\(\*\)\s+AS\s+\w+\s+FROM\s+(\w+)/gi))
+          if (m[1] === c.rowsKey || m[1] === name)
+            offenders.push(`${name} (${c.lib}) — unbounded COUNT(*) over ${m[1]} in ${fn.name}`)
+      checked++
+    }
+    expect(checked, "GROWING_COLLECTIONS must not be empty — the check derives from it").toBe(
+      Object.keys(GROWING_COLLECTIONS).length
+    )
+    expect(
+      offenders,
+      `R16 (amended): a growing collection's total is counted through shared/workers/count.ts, exactly to TOTAL_COUNT_CAP and "at least" beyond it: ${offenders.join(", ")}`
+    ).toEqual([])
+
+    // The seam says where counting stops ONCE — the cap is imported from
+    // limits.ts by both sides, never restated. A second literal is how a door
+    // that stops counting and a badge that starts hedging come to disagree.
+    const seam = read(join(ROOT, "shared", "workers", "count.ts"))
+    expect(seam, "the seam imports the one cap").toContain("TOTAL_COUNT_CAP")
+    expect(
+      stripComments(seam).match(/1_000_000|1000000/),
+      "the seam must not restate the cap as a literal"
+    ).toBeNull()
+    // The badge side is asserted differently, because `1_000_000` appears there
+    // legitimately as a RUNG of the abbreviation ladder (the "m" magnitude) and
+    // banning the literal would ban the ladder. What must not exist is a SECOND
+    // cap: the file imports the one number and declares none of its own.
+    const badge = stripComments(read(join(ROOT, "shared", "web", "format-count.ts")))
+    expect(badge, "the badge imports the one cap").toContain("TOTAL_COUNT_CAP")
+    expect(
+      badge.match(/const\s+\w*_?CAP\b/),
+      "the badge must not declare a cap of its own — one ceiling, imported"
+    ).toBeNull()
+
+    // …and pagedJson DERIVES totalCapped, so no door can promise an exactness it
+    // did not pay for. This is why the amendment needed no edit at 13 call sites.
+    const http = stripComments(read(join(ROOT, "shared", "workers", "http.ts")))
+    expect(http, "pagedJson must declare totalCapped").toContain("totalCapped")
+    expect(http, "…and DERIVE it from the total, not take it from the caller").toMatch(
+      /totalCapped:\s*isCapped\(page\.total\)/
+    )
+  })
+
+  // The other half of the amendment, and the one that would have shipped a
+  // billing bug: a number that feeds a DECISION stays EXACT. Asserted rather
+  // than assumed, because "we did not cap that one" is not a property of code.
+  it("counted-collections (server): decision numbers are NOT capped", () => {
+    // Billable time. The work-log door computes a capped ROW COUNT beside an
+    // EXACT SUM in one statement — the sum must sit outside the bounded subquery.
+    const wl = stripComments(read(join(ROOT, "workers", "content", "src", "lib", "work-logs.ts")))
+    expect(wl, "the row count is bounded").toContain("boundedInner(")
+    expect(
+      wl,
+      "…and SUM(w.seconds) is read OUTSIDE it — billable time is never a partial sum"
+    ).toMatch(/SELECT\s+SUM\(w\.seconds\)\s+FROM\s+work_logs\s+w\s+WHERE/)
+    expect(wl.indexOf("SUM(w.seconds)"), "the sum must not be an aggregate over the bounded set")
+      .toBeGreaterThan(-1)
+    expect(
+      /boundedInner\(`SELECT 1 FROM work_logs[^`]*`\)/.test(wl),
+      "the bounded subquery selects rows to COUNT, never seconds to SUM"
+    ).toBe(true)
+
+    // An export proves it came out WHOLE through its own `complete` flag, which
+    // predates this amendment and must survive it untouched: an export that
+    // silently stopped at the collection cap would answer "complete" about a
+    // truncated file. These three doors are the whole of that path.
+    for (const f of [
+      join(ROOT, "workers", "tenancy", "src", "lib", "accounts.ts"),
+      join(ROOT, "workers", "content", "src", "lib", "learning.ts"),
+      join(ROOT, "workers", "content", "src", "lib", "brand-assets.ts"),
+    ]) {
+      const src = stripComments(read(f))
+      expect(src, `${f} keeps its EXPORT_HARD_CAP completeness flag`).toContain("EXPORT_HARD_CAP")
+      expect(src, `${f} must not route its export through the collection cap`).not.toMatch(
+        /complete:[^\n]*TOTAL_COUNT_CAP/
+      )
+    }
+  })
+
   it("counted-collections: server totals through ONE seam, one place, arbitrated", () => {
     // (i) THE NUMBER — no component builds a count badge from a loaded list's length.
     const lengthBadges = componentFiles().filter((f) => /badge:[^,\n]*\.length/.test(read(f)))

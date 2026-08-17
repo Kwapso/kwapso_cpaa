@@ -65,6 +65,7 @@
 //   GET  /api/content/knowledge/sync      -> how far the sweep has got with each kind
 //   POST /api/content/knowledge           -> add a source
 //   POST /api/content/knowledge/upload    -> …or hand it a FILE, and read it
+//   POST /api/content/knowledge/upload-stream -> the same, file as the raw body
 //   POST /api/content/knowledge/update    -> correct a source
 //   POST /api/content/knowledge/active    -> take a source away from the assistant / give it back
 //   POST /api/content/knowledge/sync      -> bring the base into step, one bounded slice
@@ -157,6 +158,7 @@ import {
   postKnowledgeSyncGoogle,
   postSetKnowledgeActive,
   postUpdateKnowledge,
+  postStreamKnowledgeFile,
   postUploadKnowledgeFile,
 } from "./routes/knowledge"
 import {
@@ -395,6 +397,7 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // it where we cannot. A MUTATION, not housekeeping — unlike the learning
   // upload door beside it, this one writes the record as well as the bytes.
   "POST /api/content/knowledge/upload": { handler: postUploadKnowledgeFile, kind: "mutation" },
+  "POST /api/content/knowledge/upload-stream": { handler: postStreamKnowledgeFile, kind: "mutation" },
   "POST /api/content/knowledge/update": { handler: postUpdateKnowledge, kind: "mutation" },
   "POST /api/content/knowledge/active": { handler: postSetKnowledgeActive, kind: "mutation" },
   // A slice of the sweep, by hand — it writes source rows, so it publishes (a

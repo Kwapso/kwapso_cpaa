@@ -2,6 +2,7 @@
 // same error contract (shared/types.ts ApiError), defined exactly once.
 
 import type { ApiError } from "../types"
+import { isCapped } from "./count"
 
 export const json = (
   data: unknown,
@@ -21,16 +22,32 @@ export const fail = (
 
 /** R14 — the ONE paged response. A growing collection's door answers through
  * this and only this, so it cannot half-implement the contract: the rows under
- * their own key, the EXACT server total, hasMore, and the opaque nextCursor the
+ * their own key, the server total, hasMore, and the opaque nextCursor the
  * client hands straight back. `extra` carries a door's own additions (help's
  * mineTotal). Drop the seam and the client silently loses page two, so the
- * bounded-lists check asserts every growing door still goes through it. */
+ * bounded-lists check asserts every growing door still goes through it.
+ *
+ * R16 (amended 2026-08-14) — `totalCapped` says whether `total` is the exact
+ * number or a floor. It is DERIVED here from the total itself rather than passed
+ * in by each door, and that is the whole reason the amendment is safe to make: a
+ * door cannot forget to declare it, cannot declare it wrongly, and cannot
+ * disagree with the seam that stopped counting. Thirteen call sites needed no
+ * edit at all. The same shape as an export's `complete` flag — the fact and the
+ * number ride in one object, one decision in one place, exactly as R23 makes
+ * `found`/`passages`/`citations` inseparable. */
 export const pagedJson = (
   rowsKey: string,
   page: { rows: unknown[]; total: number; hasMore: boolean; nextCursor: string | null },
   extra: Record<string, unknown> = {}
 ): Response =>
-  json({ [rowsKey]: page.rows, total: page.total, hasMore: page.hasMore, nextCursor: page.nextCursor, ...extra })
+  json({
+    [rowsKey]: page.rows,
+    total: page.total,
+    totalCapped: isCapped(page.total),
+    hasMore: page.hasMore,
+    nextCursor: page.nextCursor,
+    ...extra,
+  })
 
 /** Forward a request to a gated door over a service binding, carrying the caller's
  * session cookie so the door re-checks permissions + validates AS them. Returns the

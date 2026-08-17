@@ -4,6 +4,7 @@
 // the activity ruleset in ARCHITECTURE.md.
 
 import type { ActivityItem } from "@shared/types"
+import { countCollection } from "@shared/workers/count"
 import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
 import {
   accountActivityClause,
@@ -138,8 +139,11 @@ export async function getActivity(
        ORDER BY created_at DESC, id DESC LIMIT ${PAGE_SIZE + 1}`,
       [...params, ...after.params]
     ),
-    // R16: the exact total of what this caller may see — never the page's length.
-    d1Query<{ n: number }>(cfg, guard.databaseId, `SELECT COUNT(*) AS n FROM activity${where}`, params),
+    // R16 (amended): the total of what this caller may see — never the page's
+    // length — counted exactly to TOTAL_COUNT_CAP and "at least" beyond it. THE
+    // feed this amendment was written for: it gains a row on every mutation, so
+    // it is the one collection whose count had no ceiling at all.
+    countCollection(cfg, guard.databaseId, `SELECT 1 FROM activity${where}`, params),
   ])
   const page = toPage(rows, PAGE_SIZE, (r) => [r.created_at, r.id])
   return {
@@ -151,6 +155,6 @@ export async function getActivity(
       actorName: r.creator_name,
       createdAt: r.created_at,
     })),
-    total: counted[0]?.n ?? 0,
+    total: counted,
   }
 }
