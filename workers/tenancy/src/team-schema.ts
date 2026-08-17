@@ -2237,6 +2237,40 @@ CREATE UNIQUE INDEX idx_internal_role_rates_role ON internal_role_rates (role_na
 ALTER TABLE processes ADD COLUMN role_name TEXT;
 `,
   },
+  {
+    // THE DIARY LEARNS THREE THINGS (CHECKLIST 9.2, 9.4 and 9.7).
+    //
+    // \`transcript_file_id\` + \`transcript_captured_at\` — WHICH transcript was
+    // read off Drive and WHEN. Two columns rather than one because they answer
+    // two different questions: the id is what a person opens, and the timestamp
+    // is the idempotence predicate. Capturing a transcript ticks "held" and
+    // writes a work log per participant, and both of those are things that must
+    // happen exactly once however many times the button is pressed — so the
+    // write rides \`transcript_captured_at IS NULL\`, which is R17 for a job
+    // rather than a status.
+    //
+    // \`recurring_event_id\` — the Google series an entry belongs to. It was
+    // being thrown away: the calendar read asks for \`singleEvents=true\`, which
+    // expands a series into instances and hands back the parent's id on each
+    // one, and nothing kept it. Without it the app cannot tell the eleventh
+    // Monday stand-up from a one-off, which is the whole of 9.7.
+    //
+    // NOT A UNIQUE INDEX, unlike \`google_event_id\` beside it: a series has many
+    // instances and every one of them carries the same parent id. The instance's
+    // own id is what stays unique, and it already is.
+    //
+    // AND A WORK LOG MAY NOW POINT AT A MEETING. The allow-list is code
+    // (\`WORK_LOG_TARGETS\`), not schema — the column deliberately has no CHECK —
+    // so this migration adds the INDEX that makes the new target cheap to read
+    // and the allow-list is widened in the same commit.
+    version: "0032_meeting_transcripts_and_series",
+    sql: `
+ALTER TABLE meetings ADD COLUMN transcript_file_id TEXT;
+ALTER TABLE meetings ADD COLUMN transcript_captured_at TEXT;
+ALTER TABLE meetings ADD COLUMN recurring_event_id TEXT;
+CREATE INDEX idx_meetings_recurring ON meetings (recurring_event_id);
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

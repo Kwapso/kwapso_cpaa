@@ -146,6 +146,7 @@ import {
   getMeetings,
   postCreateMeeting,
   postMeetingHeld,
+  postMeetingTranscript,
   postSetMeetingActive,
   postUpdateMeeting,
 } from "./routes/meetings"
@@ -400,6 +401,10 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/content/meetings": { handler: postCreateMeeting, kind: "mutation" },
   "POST /api/content/meetings/update": { handler: postUpdateMeeting, kind: "mutation" },
   "POST /api/content/meetings/held": { handler: postMeetingHeld, kind: "mutation" },
+  // The transcript arriving is what tells the app the conversation happened: it
+  // ticks "held" and writes a work log for every one of OUR people who was in
+  // the room (9.4 + 9.2). One door, because it is one moment.
+  "POST /api/content/meetings/transcript": { handler: postMeetingTranscript, kind: "mutation" },
   "POST /api/content/meetings/active": { handler: postSetMeetingActive, kind: "mutation" },
 
   // ── THE AGENCY'S OWN HOUSEKEEPING ──────────────────────────────────────────

@@ -1328,6 +1328,15 @@ export type Meeting = {
    * pressing the button twice cannot make a second entry. */
   googleEventId: string | null
   googleEventUrl: string | null
+  /** WHICH TRANSCRIPT WAS READ, and WHEN (CHECKLIST 9.2 + 9.4). The timestamp is
+   * the idempotence predicate as much as it is a fact: reading a transcript
+   * ticks the meeting held and writes a work log for every one of OUR people who
+   * was in the room, and both of those must happen exactly once. */
+  transcriptFileId: string | null
+  transcriptCapturedAt: string | null
+  /** THE GOOGLE SERIES this entry belongs to, when it is one of a repeating set
+   * (9.7). Null on a one-off. */
+  recurringEventId: string | null
   active: boolean
   createdAt: string
   creatorName: string | null

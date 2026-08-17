@@ -1138,6 +1138,19 @@ export const SHARED_TOOLS: SharedTool[] = [
     },
   },
   {
+    name: "read_meeting_transcript",
+    summary:
+      "Read the transcript of a meeting that has already happened, by `id`, and record what its arrival means: the meeting is marked held and a row of time is written for every one of OUR OWN people who was in the room. The client's people are never given one — a client's hour is not our cost. It looks only in the Drive folders the caller has shared, first by the meeting's title and then by its Meet code. `captured` false means nothing was found or it had already been read, and `note` says which in a sentence; `logsWritten` counts the rows of time it wrote. Reading it twice does nothing the second time.",
+    binding: "CONTENT", method: "POST", path: "/api/content/meetings/transcript",
+    schema: obj({ id: S }, ["id"]),
+    buildBody: (i) => ({ id: str(i, "id") }),
+    agent: {
+      write: true,
+      confirm: false,
+      summarize: (i) => `Read the transcript of meeting ${str(i, "id")}`,
+    },
+  },
+  {
     name: "add_meeting_to_calendar",
     summary:
       "Put a meeting that is already in kwapso into YOUR OWN Google Calendar, by id. Needs a connected Calendar account and the 'Calendar on your behalf' right. Pressing it twice makes ONE entry — the second call answers with the one that already exists.",
@@ -1285,12 +1298,12 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_work_logs",
     summary:
-      "List rows of time — who worked on what, and for how long in whole seconds. Filters: `scope` ('mine' for the caller's own, 'all' otherwise), `targetTable` + `targetId` (the time against one story or ticket), and `userId`. Returns ONE page plus `total` (rows — exact up to 1,000,000; `totalCapped` true means there are more than that), `totalSeconds` (the number anybody actually wants, and ALWAYS exact — it is billable time, never capped), `hasMore` and an opaque `nextCursor` — call again passing that as `cursor` to read further. Binned runaway timers are never in the list.",
+      "List rows of time — who worked on what, and for how long in whole seconds. Filters: `scope` ('mine' for the caller's own, 'all' otherwise), `targetTable` + `targetId` (the time against one story, ticket, task or meeting), `userId`, and `meetingTime` — 'exclude' drops the time spent in meetings, 'only' keeps nothing else, and leaving it off counts all of it. Returns ONE page plus `total` (rows — exact up to 1,000,000; `totalCapped` true means there are more than that), `totalSeconds` (the number anybody actually wants, and ALWAYS exact — it is billable time, never capped), `hasMore` and an opaque `nextCursor` — call again passing that as `cursor` to read further. Binned runaway timers are never in the list.",
     binding: "CONTENT", method: "GET", path: "/api/content/work-logs",
-    schema: obj({ scope: S, targetTable: S, targetId: S, userId: S, cursor: S }),
+    schema: obj({ scope: S, targetTable: S, targetId: S, userId: S, meetingTime: S, cursor: S }),
     buildQuery: (i) => {
       const q: string[] = []
-      for (const k of ["scope", "targetTable", "targetId", "userId", "cursor"])
+      for (const k of ["scope", "targetTable", "targetId", "userId", "meetingTime", "cursor"])
         if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
       return q.length ? `?${q.join("&")}` : ""
     },

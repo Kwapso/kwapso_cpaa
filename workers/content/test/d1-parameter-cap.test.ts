@@ -123,6 +123,12 @@ describe("no statement can bind more parameters than D1 accepts", () => {
       // The resolution email's two named recipients, read back out of the core
       // database. Bounded by the read that produced the ids: the portal-grant
       // lookup carries `LIMIT 100`, and the set is de-duped before it is bound.
+      // PROVEN by the read that produced the list: the attendee addresses come
+      // off ONE calendar entry, and the calendar layer caps those at
+      // EVENT_ATTENDEE_CAP (50) before this file ever sees them. De-duped and
+      // lower-cased first, so the placeholder count is at most fifty.
+      "content/src/lib/meetings.ts: list":
+        "one calendar entry's attendee addresses, capped at EVENT_ATTENDEE_CAP (50) by the read that fetched them",
       "content/src/lib/notify.ts: list":
         "the resolution's recipients — the raiser and the main stakeholder, from a read bounded at LIMIT 100",
       // PROVEN by the cap the DOOR applies before the lib is ever called:

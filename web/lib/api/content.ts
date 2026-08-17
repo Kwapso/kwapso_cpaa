@@ -606,6 +606,18 @@ export const content = {
     api<{ meeting: Meeting | null; total: number }>("/api/content/meetings/held", post({ id, held })),
   setMeetingActive: (id: string, active: boolean) =>
     api<{ meeting: Meeting | null; total: number }>("/api/content/meetings/active", post({ id, active })),
+  /** READ THE TRANSCRIPT and do what its arrival means (9.4 + 9.2): the meeting
+   * is ticked held and a row of time is written for each of OUR people who was
+   * in the room. Idempotent — a second press does nothing. */
+  readMeetingTranscript: (id: string) =>
+    api<{
+      captured: boolean
+      fileId: string | null
+      fileName: string | null
+      logsWritten: number
+      note: string | null
+      meeting: Meeting | null
+    }>("/api/content/meetings/transcript", post({ id })),
 
   /* ------------------- the agency's own housekeeping ------------------------
    * Two modules, both CAPPED rather than paged (R14) — an authored library and a

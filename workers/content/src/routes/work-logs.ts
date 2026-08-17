@@ -46,6 +46,15 @@ function logFilterFrom(url: URL): LogFilter {
     targetTable: queryText(url.searchParams.get("targetTable"), "Target"),
     targetId: queryText(url.searchParams.get("targetId"), "Target"),
     userId: queryText(url.searchParams.get("userId"), "Person"),
+    // WITH OR WITHOUT MEETING TIME (9.3). Anything but the two words means all
+    // of it — a fail-safe default, because "everything" is the answer a mistyped
+    // parameter should land you in.
+    meetingTime:
+      queryText(url.searchParams.get("meetingTime"), "Meeting time") === "exclude"
+        ? "exclude"
+        : queryText(url.searchParams.get("meetingTime"), "Meeting time") === "only"
+          ? "only"
+          : undefined,
   }
 }
 

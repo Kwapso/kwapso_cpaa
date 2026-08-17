@@ -178,7 +178,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth —
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **216 doors, 176 with a tool, 40 with a written reason** — the
+  red build. Today: **217 doors, 177 with a tool, 40 with a written reason** — the
   reasons being the team-pin doors (§3.2 below), the client-portal standing doors
   (§3.3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the THREE upload pairs — two media doors and the knowledge base, each a
@@ -187,7 +187,7 @@ Today it covers:
   called because a JSON-RPC request has no body to stream into. Same conclusion,
   two different reasons, both written down — the seven
   Google doors that are a person's own decision, the timesheet correction, one
-  invite's audit trail and the cross-module activity feed. Of the 176, **147 are on THIS surface** and 29 are the in-app assistant's
+  invite's audit trail and the cross-module activity feed. Of the 177, **148 are on THIS surface** and 29 are the in-app assistant's
   alone — the twenty-six Google tools, the two confirm-panel bulk writes and the role
   permission matrix read, each reasoned in §3. Those three numbers are asserted
   against the live census in `workers/mcp/test/filter-parity.test.ts`, so this
@@ -346,7 +346,11 @@ Today it covers:
     `set_meeting_active` (`meetings:create` / `:edit` / `:edit` / `:delete`;
     cancelling IS this module's delete and the row survives it), and
     `add_meeting_to_calendar`, which opens on `meetings:read` and then demands
-    `google:edit` and the events switch at the door itself.
+    `google:edit` and the events switch at the door itself. `read_meeting_transcript`
+    is the other direction: it opens on `meetings:edit`, demands `google:read` at
+    the door, and one call ticks the meeting held AND writes a row of time for each
+    of OUR OWN people who was in the room — never the client's, because a client's
+    hour is not our cost. It is idempotent, so a second read does nothing.
   - the agency's own housekeeping — `create_marketing_post`, `update_marketing_post`,
     `set_marketing_post_active` (`marketing:*`); `create_brand_asset`,
     `update_brand_asset`, `set_brand_asset_active` (`brand_assets:*`);

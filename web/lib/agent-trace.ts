@@ -256,6 +256,9 @@ export function traceFor(
     case "update_meeting":
     case "set_meeting_held":
     case "set_meeting_active":
+    // Reading the transcript changes the meeting's own status line and its work
+    // logs tab, both of which are on the record — so the record is where to land.
+    case "read_meeting_transcript":
       return { path: `${seg(teamId, "meetings")}/${str(input, "id")}`, highlight: "main" }
     case "add_meeting_to_calendar":
       return { path: `${seg(teamId, "meetings")}/${str(input, "meetingId")}`, highlight: "main" }

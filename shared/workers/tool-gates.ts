@@ -169,6 +169,10 @@ export const TOOL_GATES: Record<string, string> = {
   // One tool for add / re-price / retire, so one gate: setting a price IS an
   // edit of the card whichever of the three it turns out to be.
   set_role_rate: "commercials:edit",
+  // Reading a transcript MOVES the meeting to held and writes time against it,
+  // so it is an edit of the meeting — and `google:read` besides, which the door
+  // asks for itself because it reaches the caller's own Drive.
+  read_meeting_transcript: "meetings:edit",
   set_internal_rate_active: "commercials:delete",
   // GOOGLE. Every write through somebody's own connection is `google:edit` —
   // "change something in the world you connected" — because `create` on this

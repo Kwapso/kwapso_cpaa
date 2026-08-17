@@ -15,6 +15,7 @@
 // of this module in it.
 
 import { fail, json, pagedJson } from "@shared/workers/http"
+import { requireRight } from "@shared/workers/gating"
 import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { refusePortalCaller } from "@shared/workers/account-scope"
@@ -24,6 +25,7 @@ import {
   createMeeting,
   getMeeting,
   listMeetings,
+  captureTranscript,
   setMeetingActive,
   setMeetingHeld,
   updateMeeting,
@@ -134,4 +136,40 @@ export async function postSetMeetingActive(request: Request, env: Env): Promise<
   const { moved, accountId } = await setMeetingActive(cfg, guard, actor, id, body.active)
   if (moved) await publishChange(env, guard.teamId, "meetings", id, "edit", accountId ?? undefined)
   return json({ meeting: await getMeeting(cfg, guard, id), total: await countMeetings(cfg, guard, {}) })
+}
+
+/** POST /api/content/meetings/transcript — read the transcript, and do what its
+ * arrival MEANS (CHECKLIST 9.4 and 9.2).
+ *
+ * Three gates, because it reaches three things: this module's own `edit` right
+ * (it moves the meeting to held), `google:read` (it reads the caller's own Drive
+ * and calendar, with the caller's own token) and the portal refusal every door
+ * here keeps. The timesheet right is deliberately NOT one of them: the logs it
+ * writes are a consequence of a meeting having happened, not somebody filling in
+ * a timesheet, and asking for that right would mean the person who runs the
+ * client call cannot record that they ran it.
+ *
+ * Idempotent (R17): the capture claims the row with `transcript_captured_at IS
+ * NULL` riding the UPDATE, so a second press reads no transcript, ticks nothing
+ * and writes no time. */
+export async function postMeetingTranscript(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown }>(request, env, "meetings", "edit")
+  await refusePortalCaller(cfg, guard)
+  await requireRight(cfg, guard, "google", "read")
+  const id = requireText(body.id, "Meeting", TEXT_LIMITS.short)
+  const result = await captureTranscript(env, cfg, guard, actor, id)
+  // R1 — the meeting moved and so did somebody's week. Both pings, and only when
+  // something actually changed.
+  if (result.captured) {
+    await publishChange(env, guard.teamId, "meetings", id, "edit")
+    await publishChange(env, guard.teamId, "work_logs", id, "add")
+  }
+  return json({
+    captured: result.captured,
+    fileId: result.fileId,
+    fileName: result.fileName,
+    logsWritten: result.logsWritten,
+    note: result.note,
+    meeting: await getMeeting(cfg, guard, id),
+  })
 }

@@ -22,7 +22,8 @@ import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
-import { CalendarPlus, CheckCheck, Pencil, Power } from "lucide-react"
+import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
+import { CalendarPlus, CheckCheck, FileText, Pencil, Power } from "lucide-react"
 
 import type { Account, AppRow, Meeting, MeetingPurpose } from "@shared/types"
 import { MeetingFormDialog, type MeetingFormValues } from "@/components/meeting-form-dialog"
@@ -76,7 +77,12 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
 
   const [tab, setTab] = React.useState("notes")
   const [editing, setEditing] = React.useState(false)
-  const [busy, setBusy] = React.useState<"held" | "active" | "calendar" | null>(null)
+  const [busy, setBusy] = React.useState<"held" | "active" | "calendar" | "transcript" | "notes" | null>(null)
+  // 9.6 — the notes are an OPEN FIELD on this screen until the meeting is held or
+  // closed, and only on the edit page afterwards. The draft lives here rather
+  // than in the form so a person can type straight into the record, which is
+  // what "open field" means and what the edit dialog was getting in the way of.
+  const [notesDraft, setNotesDraft] = React.useState<string | null>(null)
 
   function patchLists(next: Meeting | null) {
     if (!next) return
@@ -113,6 +119,60 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
       toast.success(held ? "Marked as held." : "Back in the diary.")
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't change that.")
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  /** 9.4 AND 9.2, IN ONE PRESS. The transcript arriving is what tells the app the
+   * conversation happened, so reading it ticks "held" and writes a row of time
+   * for each of our own people who was in the room. The door does all of that;
+   * this reports what it did, including the honest nothing. */
+  async function readTranscript() {
+    setBusy("transcript")
+    try {
+      const r = await content.readMeetingTranscript(meetingId)
+      patchLists(r.meeting)
+      if (!r.captured) toast.info(r.note ?? "Nothing to read yet.")
+      else
+        toast.success(
+          r.logsWritten > 0
+            ? `Transcript read. Marked held, and ${r.logsWritten} ${
+                r.logsWritten === 1 ? "person's" : "people's"
+              } time was logged.`
+            : "Transcript read, and the meeting is marked held."
+        )
+    } catch (err) {
+      toast.error(err instanceof ApiFailure ? err.message : "Couldn't read the transcript.")
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  /** 9.6 — the notes, saved from the record itself. It goes through the ordinary
+   * edit door with every one of the meeting's own values beside the new notes,
+   * because that door REPLACES what it is given: sending the notes alone would
+   * quietly blank the title. */
+  async function saveNotes(now: Meeting, notes: string) {
+    setBusy("notes")
+    try {
+      const { meeting } = await content.updateMeeting({
+        id: meetingId,
+        title: now.title,
+        startsAt: now.startsAt,
+        endsAt: now.endsAt,
+        accountId: now.accountId,
+        appId: now.appId,
+        purposeId: now.purposeId,
+        location: now.location,
+        agenda: now.agenda,
+        notes: notes || null,
+      })
+      patchLists(meeting)
+      setNotesDraft(null)
+      toast.success(t("Notes saved."))
+    } catch (err) {
+      toast.error(err instanceof ApiFailure ? err.message : "Couldn't save the notes.")
     } finally {
       setBusy(null)
     }
@@ -236,6 +296,22 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
               {item.status === "held" ? "Not held after all" : "Mark held"}
             </Button>
           )}
+          {/* 9.4 — the transcript is what tells the app the conversation
+              happened, so this one button ticks "held" and logs everybody's
+              time. Offered only once the entry is in a calendar (there is
+              nowhere else to look) and only while nothing has been read yet. */}
+          {canEdit && canPush && item.active && item.googleEventId && !item.transcriptCapturedAt && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy !== null}
+              onClick={readTranscript}
+              className="gap-1.5"
+            >
+              {busy === "transcript" ? <Spinner /> : <FileText className="size-3.5" />}
+              {t("Read the transcript")}
+            </Button>
+          )}
           {canPush && item.active && !item.googleEventId && (
             <Button
               variant="outline"
@@ -282,9 +358,38 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
                   <p className="text-muted-foreground text-sm">Nothing written down yet.</p>
                 )}
               </section>
+              {/* THE NOTES ARE AN OPEN FIELD UNTIL THE MEETING IS OVER (9.6).
+                  Somebody types into the record while the conversation is still
+                  happening; once it is held or cancelled the writing-up is done
+                  and the field closes, so a later correction is a deliberate
+                  edit on the edit page rather than a stray keystroke.
+                  The AGENDA is never editable here — it is set beforehand, on
+                  the edit page, which is the other half of the same rule. */}
               <section className="flex flex-col gap-2">
                 <h2 className="text-muted-foreground text-sm font-medium">Notes</h2>
-                {item.notes ? (
+                {canEdit && item.active && item.status !== "held" ? (
+                  <>
+                    <Textarea
+                      rows={8}
+                      value={notesDraft ?? item.notes ?? ""}
+                      onChange={(e) => setNotesDraft(e.target.value)}
+                      placeholder="Type as you go — this is the part worth keeping."
+                      disabled={busy !== null}
+                      aria-label="Notes"
+                    />
+                    <div className="flex justify-end">
+                      <Button
+                        size="sm"
+                        disabled={busy !== null || notesDraft === null}
+                        onClick={() => void saveNotes(item, notesDraft ?? "")}
+                        className="gap-1.5"
+                      >
+                        {busy === "notes" ? <Spinner /> : null}
+                        Save notes
+                      </Button>
+                    </div>
+                  </>
+                ) : item.notes ? (
                   <p className="text-sm whitespace-pre-wrap">{item.notes}</p>
                 ) : (
                   <p className="text-muted-foreground text-sm">
