@@ -302,6 +302,75 @@ describe("a sprint is the block of work sold", () => {
     expect(db().prepare(`SELECT COUNT(*) AS n FROM sprints`).get()).toEqual({ n: 0 })
   })
 
+  // THE PRICE CAN BE SET AFTER THE FACT, which is the whole reason this door
+  // exists: a sprint is usually agreed before its price is, and until now
+  // `sold_price_cents` could be written only in the instant the sprint was
+  // started — so the revenue half of every margin had no second chance.
+  it("a sprint's price can be corrected after it was started", async () => {
+    await call(IDS.staffUser, "POST /api/content/sprints", {
+      name: "Priced later",
+      accountId: IDS.victimAccount,
+    })
+    const id = (db().prepare(`SELECT id FROM sprints LIMIT 1`).get() as { id: string }).id
+    expect(
+      (db().prepare(`SELECT sold_price_cents FROM sprints WHERE id = ?`).get(id) as { sold_price_cents: number })
+        .sold_price_cents
+    ).toBe(0)
+
+    const res = await call(IDS.staffUser, "POST /api/content/sprints/update", {
+      id,
+      name: "Priced later",
+      soldPriceCents: 450_000,
+      sprintType: "Implementation",
+    })
+    expect(res.status).toBe(200)
+    const after = db().prepare(`SELECT * FROM sprints WHERE id = ?`).get(id) as Record<string, string | number>
+    expect(after.sold_price_cents).toBe(450_000)
+    expect(after.sprint_type).toBe("Implementation")
+    expect(historyFor(id)).toEqual(["Sprint created", "Sprint edited"].sort())
+  })
+
+  // …and the two fields it must NOT move. The reference a client quotes was
+  // minted against the account, and completing the sprint cuts a version of every
+  // process map inside its app — so a body naming either is simply not read.
+  it("will not move a sprint to another client or another app", async () => {
+    await call(IDS.staffUser, "POST /api/content/sprints", {
+      name: "Stays put",
+      accountId: IDS.victimAccount,
+    })
+    const before = db().prepare(`SELECT * FROM sprints LIMIT 1`).get() as Record<string, string | number>
+    await call(IDS.staffUser, "POST /api/content/sprints/update", {
+      id: before.id,
+      name: "Stays put",
+      accountId: "some-other-account",
+      appId: "some-other-app",
+    })
+    const after = db().prepare(`SELECT * FROM sprints WHERE id = ?`).get(before.id) as Record<
+      string,
+      string | number
+    >
+    expect(after.account_id).toBe(before.account_id)
+    expect(after.app_id).toBe(before.app_id)
+    expect(after.ref).toBe(before.ref)
+  })
+
+  it("refuses a price that is not whole cents on the EDIT door too", async () => {
+    await call(IDS.staffUser, "POST /api/content/sprints", { name: "Edited badly" })
+    const id = (db().prepare(`SELECT id FROM sprints LIMIT 1`).get() as { id: string }).id
+    for (const soldPriceCents of [-1, 12.5, "4500"]) {
+      const res = await call(IDS.staffUser, "POST /api/content/sprints/update", {
+        id,
+        name: "Edited badly",
+        soldPriceCents,
+      })
+      expect(res.status, `a price of ${String(soldPriceCents)} was accepted`).toBe(400)
+    }
+    expect(
+      (db().prepare(`SELECT sold_price_cents FROM sprints WHERE id = ?`).get(id) as { sold_price_cents: number })
+        .sold_price_cents
+    ).toBe(0)
+  })
+
   it("R17 — completing a completed sprint changes nothing and cuts nothing", async () => {
     await call(IDS.staffUser, "POST /api/content/sprints", { name: "Once", accountId: IDS.victimAccount })
     const id = (db().prepare(`SELECT id FROM sprints LIMIT 1`).get() as { id: string }).id

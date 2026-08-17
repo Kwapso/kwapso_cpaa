@@ -16,7 +16,8 @@ import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
 import { sourceFiles } from "@shared/rules/source-scan"
-import { richTextPlain, safeHref, safeSrc, sanitizeRichHtml } from "@/lib/rich-text"
+import { toHtml } from "@/lib/agent-markdown-html"
+import { looksLikeHtml, richTextPlain, safeHref, safeSrc, sanitizeRichHtml } from "@/lib/rich-text"
 
 describe("sanitizeRichHtml", () => {
   it("keeps allowlisted formatting + lists", () => {
@@ -59,6 +60,66 @@ describe("sanitizeRichHtml", () => {
   it("escapes raw angle brackets in text (no injection through text nodes)", () => {
     const out = sanitizeRichHtml("a &lt;b&gt; c")
     expect(out).not.toContain("<b>")
+  })
+})
+
+// TWO FORMATS IN ONE COLUMN. The Notes editor writes HTML; the bodies that came
+// with the legacy Glide catalogue are markdown, and there is no flag between
+// them — so half the learning library rendered its own asterisks and hashes as
+// literal text. `looksLikeHtml` is the discriminator the renderer asks, and the
+// direction it must never get wrong is the HTML one: real markup put through a
+// markdown converter is a rendering bug, while a misread markdown body costs a
+// paragraph break.
+describe("looksLikeHtml — which pipeline a body takes", () => {
+  it("says HTML for anything the Notes editor emits", () => {
+    for (const html of [
+      "<p>Hello</p>",
+      "<ul><li>one</li></ul>",
+      '<a href="https://x.test">link</a>',
+      "line<br>break",
+      "<div>plain-ish</div>",
+    ])
+      expect(looksLikeHtml(html), html).toBe(true)
+  })
+
+  it("says NOT HTML for markdown and for plain text", () => {
+    for (const md of [
+      "## A heading\n\nSome **bold** text.",
+      "- one\n- two",
+      "Ordinary prose with no markup at all.",
+      "A < B and C > D", // stray comparison signs are not a tag
+      "",
+      null,
+      undefined,
+    ])
+      expect(looksLikeHtml(md), String(md)).toBe(false)
+  })
+})
+
+// The markdown half, through the SAME converter the assistant's replies take
+// (there is one markdown pipeline, and this is it). Escape-first, so what comes
+// out is safe by construction rather than by a second sanitising pass.
+describe("toHtml on an article body", () => {
+  it("renders headings, bold and lists instead of printing their markers", () => {
+    const out = toHtml("# Getting started\n\nDo the **first** thing.\n\n- one\n- two")
+    expect(out).toContain("<h3>Getting started</h3>")
+    expect(out).toContain("<strong>first</strong>")
+    expect((out.match(/<li>/g) ?? []).length).toBe(2)
+    expect(out).not.toContain("# Getting")
+    expect(out).not.toContain("**")
+  })
+
+  it("clamps heading levels to the two the prose styles know", () => {
+    // A body must not outrank the page title, and the two renderers must agree
+    // about what a "##" looks like — sanitizeRichHtml clamps to h3/h4 too.
+    expect(toHtml("## Two")).toContain("<h3>Two</h3>")
+    expect(toHtml("#### Four")).toContain("<h4>Four</h4>")
+  })
+
+  it("escapes markup in a markdown body rather than rendering it", () => {
+    const out = toHtml("A tag: <script>alert(1)</script>")
+    expect(out).not.toContain("<script>")
+    expect(out).toContain("&lt;script&gt;")
   })
 })
 

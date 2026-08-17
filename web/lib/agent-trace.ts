@@ -220,6 +220,10 @@ export function traceFor(
       return { path: `${seg(teamId, "stories")}/${str(input, "id")}`, highlight: "main" }
     case "create_sprint":
       return { path: seg(teamId, "sprints"), highlight: "main" }
+    // Both land on the sprint's own screen — it is where the price and the
+    // Complete button both live, so it is where somebody watching the assistant
+    // sees either of them happen.
+    case "update_sprint":
     case "complete_sprint":
       return { path: `${seg(teamId, "sprints")}/${str(input, "id")}`, highlight: "main" }
     // Time lands on the backlog, where the week's rows are listed, and the

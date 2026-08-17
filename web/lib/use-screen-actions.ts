@@ -213,7 +213,7 @@ export function useScreenActions(teamId: string | null) {
   // Raise a help ticket — its own handler (a small object payload). Primes the list
   // so the ticket shows at once; the realtime "add" ping refreshes everyone else.
   const createHelp = React.useCallback(
-    async (input: { description: string; helpType?: string }) => {
+    async (input: { description: string; helpType?: string; accountId?: string }) => {
       if (!teamId) return
       const { tickets } = await contentApi.createHelp(input)
       primeCache(`help:${teamId}`, tickets)

@@ -197,11 +197,15 @@ export function HelpDetailScreen({
     }
   }
 
-  async function editTicket(input: { description: string; helpType?: string }) {
+  async function editTicket(input: { description: string; helpType?: string; accountId?: string }) {
     const { tickets } = await content.updateHelp({
       id: helpId,
       description: input.description,
       helpType: input.helpType,
+      // Naming the client on a ticket that has none. Once it has one the form
+      // sends the SAME id back and the door leaves it where it is; it refuses a
+      // DIFFERENT one, which is the case this field must never quietly cause.
+      accountId: input.accountId,
     })
     primeCache(`help:${teamId}`, tickets)
     invalidate(recordActivityKey("help", helpId))
@@ -658,7 +662,11 @@ export function HelpDetailScreen({
         draftKey={`help:edit:${helpId}`}
         teamId={teamId}
         helpTypeOptions={helpTypeOptions}
-        initial={{ description: ticket.description, helpType: ticket.helpType }}
+        initial={{
+          description: ticket.description,
+          helpType: ticket.helpType,
+          accountId: ticket.accountId,
+        }}
         onSubmit={editTicket}
       />
     </div>

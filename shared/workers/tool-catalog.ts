@@ -954,6 +954,27 @@ export const SHARED_TOOLS: SharedTool[] = [
     agent: { write: true, confirm: false, summarize: (i) => `Start sprint "${str(i, "name")}"` },
   },
   {
+    name: "update_sprint",
+    summary:
+      "Edit a sprint by id — its name, kind, goal, dates and the flat price it was sold for. `soldPriceCents` is WHOLE CENTS, like `create_sprint`, and it is the field this door exists for: a sprint's price is the revenue half of every margin, and it was previously settable only at the moment the sprint was started. The CLIENT and the APP are NOT on this door and cannot be changed: the reference a client quotes was minted against the account, and completing the sprint cuts a version of every process map inside its app — so re-pointing either would rewrite what an already-published figure means. Omitted fields are CLEARED, not kept: send the whole sprint as it should end up.",
+    binding: "CONTENT", method: "POST", path: "/api/content/sprints/update",
+    schema: obj(
+      { id: S, name: S, goal: S, sprintType: S, startsOn: S, endsOn: S, soldPriceCents: N, currency: S },
+      ["id", "name"]
+    ),
+    buildBody: (i) => ({
+      id: str(i, "id"),
+      name: str(i, "name"),
+      goal: opt(i, "goal"),
+      sprintType: opt(i, "sprintType"),
+      startsOn: opt(i, "startsOn"),
+      endsOn: opt(i, "endsOn"),
+      soldPriceCents: typeof i.soldPriceCents === "number" ? i.soldPriceCents : undefined,
+      currency: opt(i, "currency"),
+    }),
+    agent: { write: true, confirm: false, summarize: (i) => `Edit sprint ${str(i, "id")}` },
+  },
+  {
     name: "complete_sprint",
     summary:
       "Mark a sprint finished, or reopen it (`complete`: true / false). Completing one CUTS A VERSION of every process map beneath it — the point from which the next savings figure is measured — so it is not a label, it is an event. Re-completing an already-complete sprint changes nothing and cuts nothing.",

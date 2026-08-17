@@ -40,6 +40,7 @@
 //   POST /api/content/stories/rank        -> drag-rank a story between two others
 //   GET  /api/content/sprints             -> the blocks of work sold (?accountId → one client's)
 //   POST /api/content/sprints             -> start a sprint
+//   POST /api/content/sprints/update      -> edit one (name, kind, dates, PRICE)
 //   POST /api/content/sprints/complete    -> mark a sprint finished / reopen it
 //   GET  /api/content/work-logs           -> time, newest first (scope/target/user filters)
 //   GET  /api/content/work-logs/running   -> what the caller has running right now
@@ -123,6 +124,7 @@ import {
   postSprintComplete,
   postStoryRank,
   postStoryStatus,
+  postUpdateSprint,
   postUpdateStory,
 } from "./routes/stories"
 import {
@@ -353,6 +355,7 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/content/stories/rank": { handler: postStoryRank, kind: "mutation" },
   "GET /api/content/sprints": { handler: getSprints, kind: "read" },
   "POST /api/content/sprints": { handler: postCreateSprint, kind: "mutation" },
+  "POST /api/content/sprints/update": { handler: postUpdateSprint, kind: "mutation" },
   "POST /api/content/sprints/complete": { handler: postSprintComplete, kind: "mutation" },
   // TIME. A timer is a work log with no end yet, so there is one table and one
   // pair of doors rather than a timer service beside a timesheet.

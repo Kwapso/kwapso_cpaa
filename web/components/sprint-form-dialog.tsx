@@ -1,7 +1,19 @@
 "use client"
 
-// Start-a-sprint dialog — a block of delivery work sold to one account. Through
-// the shared FormShell (Law R4) with a per-session draft (Law R7).
+// Start-a-sprint dialog — a block of delivery work sold to one account — and the
+// EDIT form for one (when `initial` is present). Through the shared FormShell
+// (Law R4) with a per-session draft (Law R7).
+//
+// EDITING EXISTS BECAUSE OF THE PRICE. A sprint's flat price is the revenue half
+// of every margin the app computes, and it could be typed only in the seconds
+// between deciding to start a sprint and starting it — which is not when a price
+// is usually agreed. So a sprint's own screen now opens this form again.
+//
+// In edit mode the CLIENT and the APP become sentences rather than pickers. The
+// door refuses to move either (workers/content/src/lib/stories.ts updateSprint:
+// the reference was minted against the account, and completing the sprint cuts a
+// version of every process map inside the app), so offering the choice would be
+// offering a refusal.
 //
 // THE PRICE IS TYPED IN WHOLE UNITS AND SENT IN CENTS, converted once, here. Every
 // money column in this database is an integer number of cents on purpose (a float
@@ -25,7 +37,7 @@ import {
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { Plus } from "lucide-react"
+import { Pencil, Plus } from "lucide-react"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
@@ -80,11 +92,28 @@ const priceField = {
   hint: "The flat price for this block of work. Leave it at zero if it isn't sold separately.",
 }
 
+/** What an EDIT form opens with. Money arrives in whole cents (the shape the rest
+ * of the app holds it in) and is shown in major units, the same conversion the
+ * submit does in reverse. `accountName` / `appName` are what the two fixed rows
+ * SAY — the ids are not offered at all, because they cannot be changed. */
+export type SprintFormInitial = {
+  name: string
+  goal: string | null
+  sprintType: string | null
+  accountName: string | null
+  appName: string | null
+  startsOn: string | null
+  endsOn: string | null
+  soldPriceCents: number
+  currency: string | null
+}
+
 export function SprintFormDialog({
   open,
   onOpenChange,
   apps,
   fixedApp,
+  initial,
   draftKey,
   onSubmit,
 }: {
@@ -95,9 +124,12 @@ export function SprintFormDialog({
    * fact about where you are standing rather than a question, so the picker is
    * replaced by the app's name and the value cannot be changed by accident. */
   fixedApp?: { id: string; name: string }
+  /** Present = EDIT mode (prefilled; client and app shown, not offered). */
+  initial?: SprintFormInitial
   draftKey?: string
   onSubmit: (values: SprintFormValues) => Promise<void>
 }) {
+  const isEdit = !!initial
   const teamId = useActiveTeam().ctx?.team?.id ?? null
   // Page one of the accounts list is plenty for a picker, and it is the SAME
   // cache the accounts screen holds.
@@ -106,7 +138,20 @@ export function SprintFormDialog({
   )
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
-    { name: "", goal: "", sprintType: "", accountId: "", appId: "", startsOn: "", endsOn: "", price: "", currency: "" },
+    {
+      name: initial?.name ?? "",
+      goal: initial?.goal ?? "",
+      sprintType: initial?.sprintType ?? "",
+      accountId: "",
+      appId: "",
+      startsOn: initial?.startsOn ?? "",
+      endsOn: initial?.endsOn ?? "",
+      // Whole cents → the major units a person types. Zero shows as an empty box
+      // rather than "0": "not sold separately" is the absence of a price, and a
+      // typed zero and a blank must mean the same thing on the way back out.
+      price: initial?.soldPriceCents ? (initial.soldPriceCents / 100).toString() : "",
+      currency: initial?.currency ?? "",
+    },
     open
   )
   const [busy, setBusy] = React.useState(false)
@@ -135,7 +180,13 @@ export function SprintFormDialog({
       clearDraft()
       onOpenChange(false)
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't start the sprint.")
+      toast.error(
+        err instanceof ApiFailure
+          ? err.message
+          : isEdit
+            ? "Couldn't save the sprint."
+            : "Couldn't start the sprint."
+      )
     } finally {
       setBusy(false)
     }
@@ -150,16 +201,18 @@ export function SprintFormDialog({
       busy={busy}
       clearDraft={clearDraft}
       onSubmit={submit}
-      title={<DialogTitle>Start a sprint</DialogTitle>}
+      title={<DialogTitle>{isEdit ? "Edit this sprint" : "Start a sprint"}</DialogTitle>}
       subtitle={
         <DialogDescription>
-          A block of delivery work for one client, with a start, an end and a price.
+          {isEdit
+            ? "What it's called, when it runs, and what it was sold for. The client and the app it covers stay as they are."
+            : "A block of delivery work for one client, with a start, an end and a price."}
         </DialogDescription>
       }
       footer={
         <Button type="submit" disabled={busy || !ready} className="gap-1.5">
-          {busy ? <Spinner /> : <Plus className="size-4" />}
-          {busy ? "Saving…" : "Start it"}
+          {busy ? <Spinner /> : isEdit ? <Pencil className="size-4" /> : <Plus className="size-4" />}
+          {busy ? "Saving…" : isEdit ? "Save changes" : "Start it"}
         </Button>
       }
     >
@@ -193,6 +246,11 @@ export function SprintFormDialog({
         </Select>
       </Field>
       <Field config={accountField} htmlFor="sprint-account" className={fieldSpacing}>
+        {initial ? (
+          <p className="text-muted-foreground text-sm" id="sprint-account">
+            {initial.accountName || "Ours, no client"}
+          </p>
+        ) : (
         <Select
           value={values.accountId || NONE}
           onValueChange={(v) => setValues((s) => ({ ...s, accountId: v === NONE ? "" : v }))}
@@ -210,9 +268,14 @@ export function SprintFormDialog({
             ))}
           </SelectContent>
         </Select>
+        )}
       </Field>
       <Field config={appField} htmlFor="sprint-app" className={fieldSpacing}>
-        {fixedApp ? (
+        {initial ? (
+          <p className="text-muted-foreground text-sm" id="sprint-app">
+            {initial.appName || "No app"}
+          </p>
+        ) : fixedApp ? (
           <p className="text-muted-foreground text-sm" id="sprint-app">
             {fixedApp.name}
           </p>

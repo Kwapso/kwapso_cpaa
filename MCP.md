@@ -176,13 +176,13 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth —
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **209 doors, 173 with a tool, 36 with a written reason** — the
+  red build. Today: **210 doors, 174 with a tool, 36 with a written reason** — the
   reasons being the team-pin doors (§3.2 below), the client-portal standing doors
   (§3.3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the three media uploads, the knowledge-base file upload (a data URL of an
   arbitrary document, which is not a shape a tool argument should carry), the seven
   Google doors that are a person's own decision, the timesheet correction, one
-  invite's audit trail and the cross-module activity feed. Of the 173, **156 are on THIS surface** and 17 are the in-app assistant's
+  invite's audit trail and the cross-module activity feed. Of the 174, **157 are on THIS surface** and 17 are the in-app assistant's
   alone — the thirteen Google tools, the three confirm-panel bulk writes and the role
   permission matrix read, each reasoned in §3. Those three numbers are asserted
   against the live census in `workers/mcp/test/filter-parity.test.ts`, so this
@@ -294,8 +294,14 @@ Today it covers:
     ticket away without deleting anything; read them back with
     `list_help_tickets` and `view: 'archived'`.
   - the work engine, stories and sprints — `create_story`, `update_story`,
-    `set_story_status`, `rank_story` (`work:create` / `work:edit`), `create_sprint`
-    and `complete_sprint`. Priority here is the ORDER, exactly as it is on a ticket:
+    `set_story_status`, `rank_story` (`work:create` / `work:edit`), `create_sprint`,
+    `update_sprint` and `complete_sprint`. `update_sprint` is where a sprint's flat
+    PRICE is set or corrected — it is the revenue half of every margin, and until
+    that door existed it could be typed only in the moment the sprint was started.
+    It will not move a sprint to another client or another app: the reference the
+    client quotes was minted against the account, and completing the sprint cuts a
+    version of every process map inside its app.
+    Priority here is the ORDER, exactly as it is on a ticket:
     `rank_story` moves a story, there is no priority field. No client login holds
     `work:*` and the doors refuse a portal caller outright, so unlike the ticket
     doors the question "what if a contact reaches this?" has a one-word answer.

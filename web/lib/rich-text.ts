@@ -101,6 +101,28 @@ function serializeNode(node: ChildNode): string {
   return `<${mapped}>${children}</${mapped}>`
 }
 
+/** IS THIS BODY HTML, OR IS IT MARKDOWN?
+ *
+ * The Notes editor emits HTML and always has. Bodies that arrived with the legacy
+ * Glide catalogue were written in MARKDOWN, and the two sit in the same column
+ * with no flag between them — so half the learning library rendered its own
+ * asterisks and hashes as literal text. There is no discriminator to read, so the
+ * body is asked the only question that has a reliable answer: does it contain an
+ * element at all?
+ *
+ * A TAG IS THE TEST, not "does it look like markdown". Getting it wrong in the
+ * markdown direction costs a paragraph break; getting it wrong in the HTML
+ * direction would put real markup through a markdown converter, which is a
+ * rendering bug at best. So HTML keeps the path it has always had, and everything
+ * else — markdown and plain text alike — goes the other way, where a plain
+ * paragraph is still just a paragraph.
+ *
+ * The RENDERING half is in components/rich-text.tsx: it picks the pipeline, and
+ * there is exactly one of each. */
+export function looksLikeHtml(s: string | null | undefined): boolean {
+  return !!s && /<\/?[a-z][a-z0-9]*(\s[^<>]*)?>/i.test(s)
+}
+
 /** Parse + allowlist user HTML into a safe HTML string (safe to inject). */
 export function sanitizeRichHtml(html: string | null | undefined): string {
   if (!html) return ""
