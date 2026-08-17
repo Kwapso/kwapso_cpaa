@@ -32,7 +32,6 @@ import {
   listSprints,
   listStories,
   setSprintComplete,
-  setStoryRank,
   setStoryStatus,
   updateSprint,
   updateStory,
@@ -184,24 +183,6 @@ export async function postStoryStatus(request: Request, env: Env): Promise<Respo
     if (flip.moved)
       await publishChange(env, guard.teamId, "help", ticketId, "edit", flip.accountId ?? undefined)
   }
-  return storyPage(cfg, guard, storyFilterFrom(new URL(request.url)), null)
-}
-
-/** POST /api/content/stories/rank — put a story between two others (work:edit).
- * The body names NEIGHBOURS, never a position. */
-export async function postStoryRank(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{
-    id?: unknown
-    afterId?: unknown
-    beforeId?: unknown
-  }>(request, env, "work", "edit")
-  await refusePortalCaller(cfg, guard)
-  const id = requireText(body.id, "Story", TEXT_LIMITS.short)
-  const afterId = optionalText(body.afterId, "Story above", TEXT_LIMITS.short) ?? null
-  const beforeId = optionalText(body.beforeId, "Story below", TEXT_LIMITS.short) ?? null
-  // R17: dropped back where it started → zero rows moved → no history, no ping.
-  const { moved, accountId } = await setStoryRank(cfg, guard, actor, id, afterId, beforeId)
-  if (moved) await publishChange(env, guard.teamId, "stories", id, "edit", accountId ?? undefined)
   return storyPage(cfg, guard, storyFilterFrom(new URL(request.url)), null)
 }
 

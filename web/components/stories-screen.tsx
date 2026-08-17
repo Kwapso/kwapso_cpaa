@@ -52,7 +52,7 @@ function shapeStories(stories: Story[], appNames: Map<string, string>) {
         [
           STORY_STATUS_LABEL[s.status],
           s.assigneeName ?? "unassigned",
-          s.dueOn ? `due ${formatDate(s.dueOn)}` : null,
+          s.sprintEndsOn ? `due ${formatDate(s.sprintEndsOn)}` : null,
           s.sprintName,
           s.ticketRef,
         ]
@@ -109,7 +109,6 @@ export async function createStoryFrom(teamId: string, values: StoryFormValues): 
       appId: values.appId || undefined,
       ticketId: values.ticketId || undefined,
       assigneeId: values.assigneeId || undefined,
-      dueOn: values.dueOn || undefined,
     })
     invalidate(storiesKey(teamId))
     invalidate(sprintsKey(teamId))

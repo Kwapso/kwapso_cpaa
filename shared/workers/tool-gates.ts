@@ -91,7 +91,6 @@ export const TOOL_GATES: Record<string, string> = {
   create_story: "work:create",
   update_story: "work:edit",
   set_story_status: "work:edit",
-  rank_story: "work:edit",
   create_sprint: "work:create",
   update_sprint: "work:edit",
   complete_sprint: "work:edit",

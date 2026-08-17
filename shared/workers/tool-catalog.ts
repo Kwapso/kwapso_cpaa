@@ -844,15 +844,6 @@ export const SHARED_TOOLS: SharedTool[] = [
     },
   },
   {
-    name: "rank_story",
-    summary:
-      "Move a story up or down the backlog, by id. There is no priority field — the list's ORDER is the priority, exactly as it is for tickets. Name the neighbours it should sit between: `afterId` is the story it goes below (higher up) and `beforeId` the one it goes above. Omit `afterId` for the very top, `beforeId` for the very bottom.",
-    binding: "CONTENT", method: "POST", path: "/api/content/stories/rank",
-    schema: obj({ id: S, afterId: S, beforeId: S }, ["id"]),
-    buildBody: (i) => ({ id: str(i, "id"), afterId: str(i, "afterId"), beforeId: str(i, "beforeId") }),
-    agent: { write: true, confirm: false, summarize: (i) => `Reorder story ${str(i, "id")}` },
-  },
-  {
     name: "list_sprints",
     summary:
       "List the blocks of delivery work sold, newest first — each with its kind, its dates, the flat price it was sold for (in whole cents) and how many of its stories are done. Pass `accountId` for one client's, or `appId` for one system's (a sprint covers exactly one app). Bounded, not paged: a sprint is a contract, so there are few of them.",

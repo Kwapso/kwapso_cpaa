@@ -310,6 +310,12 @@ const NO_CONTROL: Record<string, string> = {
   "POST /api/content/knowledge/upload":
     "FOR AN OLDER BUILD OF THIS APP. The buffered upload door — a base64 data URL in a JSON body — replaced on 17 Aug 2026 by /upload-stream, which takes the file as the request body and never materialises it. No screen in THIS build calls it, and that is the point rather than a gap: a browser holds its own copy of the app for as long as the tab is open, so a person who loaded the app before the deploy is still running the old JavaScript and still posting here. The door stays until no build in the wild uses it; deleting it then is a separate, boring change. An upload contract is the one kind of change where the server must be ready before the client is, and outlast it afterwards.",
 
+  /* ── the control left the screen, the door did not ──────────────────────── */
+  "POST /api/content/help/rank":
+    "THE ORDER IS STILL THE PRIORITY, and it is still set — just not from the ticket's own screen. Drag-rank is the one priority signal SCOPE ch.07 allows, and Move up / Move down sat on the ticket detail until 17 Aug 2026, when the owner took them off it: a person reading ONE request is not deciding where it sits among forty, and two buttons that move a row you cannot see are a control with no feedback. The door stays because the machine surface still ranks (`rank_help_ticket`), and because the day this app grows a drag handle on the LIST is the day it is wanted back.",
+  "POST /api/content/help/resolve":
+    "ANSWER IT — resolve, append to the conversation, and email the client, in one call. The button came off the ticket screen on 17 Aug 2026: the owner's model is that resolving is DECIDED by the flow (every related story closing moves a ticket to ready, CHECKLIST 5.5) and the email goes automatically to the raiser and the app's main stakeholder (5.7), rather than being one more button a person has to remember to press. The door is what that flow will call, and `resolve_help_ticket` on the machine surface already calls it.",
+
   /* ── for a machine ─────────────────────────────────────────────────────── */
   "POST /api/content/help/bulk-status":
     "FOR A MACHINE. The same shape for tickets: a set of ids moved together. A person moves one ticket with the stepper on its own screen.",

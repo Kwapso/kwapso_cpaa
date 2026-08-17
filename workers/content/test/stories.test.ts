@@ -183,20 +183,6 @@ describe("R17 — moving a story twice is not two events", () => {
     // reading a backlog later actually depends on.
     expect(storyRow(id).closed_at).toBe(first)
   })
-
-  it("dropping a story back exactly where it was is not a reorder", async () => {
-    const a = await addStory({ title: "Top" })
-    await addStory({ title: "Bottom" })
-    // No neighbours = the very top, which is where the newest story already is.
-    await call(IDS.staffUser, "POST /api/content/stories/rank", { id: a, afterId: null, beforeId: null })
-    const again = historyFor(a)
-    await call(IDS.staffUser, "POST /api/content/stories/rank", {
-      id: a,
-      afterId: null,
-      beforeId: null,
-    })
-    expect(historyFor(a)).toEqual(again)
-  })
 })
 
 describe("the list answers with a page and an exact total (R14 + R16)", () => {

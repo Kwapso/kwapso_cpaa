@@ -21,7 +21,7 @@ import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
-import { ArrowDown, ArrowUp, Pencil } from "lucide-react"
+import { Pencil } from "lucide-react"
 
 import { LoadMore } from "@/components/load-more"
 import { StoryFormDialog, type StoryFormValues } from "@/components/story-form-dialog"
@@ -67,13 +67,6 @@ export function StoryDetailScreen({
   // knowledge base does for a source past its first page.
   const storyQ = useCached<Story | null>(`story:one:${storyId}`, () => contentApi.storyOne(storyId))
   const activity = useRecordActivity("stories", storyId)
-  // The backlog page this record's neighbours are read out of, for the two
-  // reorder controls below. Cache-first: it is already loaded if you arrived
-  // from the list, and the controls simply don't offer a move when it isn't.
-  const backlogQ = useCached<Story[]>(storiesKey(teamId), () =>
-    contentApi.stories().then((r) => r.stories)
-  )
-
   // The time on THIS story. Keyed through recordTimeKey rather than the generic
   // slice key, because that family is the one the live registry drops when any
   // row of time moves (R15) — a stop pressed on the header bar has to land here.
@@ -153,7 +146,6 @@ export function StoryDetailScreen({
       appId: values.appId || undefined,
       ticketId: values.ticketId || undefined,
       assigneeId: values.assigneeId || undefined,
-      dueOn: values.dueOn || undefined,
     })
     refresh()
     toast.success(t("Story updated."))
@@ -164,33 +156,15 @@ export function StoryDetailScreen({
   const story = storyQ.data
   if (!story) return <p className="text-muted-foreground text-sm">{t("That story no longer exists.")}</p>
 
-  // WHERE THE PERSON PUT IT (SCOPE ch.07: drag-rank is the only priority signal
-  // in the product). The door takes NEIGHBOURS, never a position, so moving up
-  // means "go between the two rows above me" — which is exactly what a drag
-  // does, said with a button. It only offers a move it can name both ends of.
-  const order = backlogQ.data ?? []
-  const at = order.findIndex((s) => s.id === storyId)
-  const moveTo = (delta: -1 | 1) => {
-    // The list reads highest-rank-first, so "up" is towards index 0 — the row
-    // ABOVE becomes the one below us in rank terms. Naming both neighbours is
-    // what lets two people reorder at once without fighting over a number.
-    const target = at + delta
-    const before = delta === -1 ? order[target - 1] : order[target]
-    const after = delta === -1 ? order[target] : order[target + 1]
-    return run(
-      () => contentApi.rankStory(storyId, before?.id ?? null, after?.id ?? null),
-      "Moved.",
-      "Couldn't move that."
-    )
-  }
-  const canMoveUp = canEdit && at > 0
-  const canMoveDown = canEdit && at > -1 && at < order.length - 1
-
   const overviewItems = [
     { label: t("Status"), value: STORY_STATUS_LABEL[story.status] },
     { label: t("Reference"), value: story.ref || "—" },
     { label: t("Who's doing it"), value: story.assigneeName || "Nobody yet" },
-    { label: t("Due"), value: formatDate(story.dueOn) || "—" },
+    // INHERITED, not typed. A story is due when the block it was sold inside is
+    // due, so this is the SPRINT's end date — the story's own date field went on
+    // 17 Aug 2026 rather than let two dates disagree about one promise. A story
+    // with no sprint has no deadline to show, which is the honest answer.
+    { label: t("Due"), value: formatDate(story.sprintEndsOn) || "—" },
     { label: t("Detail"), value: story.detail || "—" },
     { label: t("What we'll tell them"), value: story.closingNote || "—" },
     ...auditItems({
@@ -292,35 +266,6 @@ export function StoryDetailScreen({
           )}
         </div>
       </div>
-
-      {/* WHERE IT SITS IN THE ORDER. Drag-rank is the only priority signal in the
-          product and it had no control at all — the door shipped and nothing on
-          any screen could reach it. */}
-      {(canMoveUp || canMoveDown) && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-muted-foreground text-sm">{t("Order in the backlog")}</span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={busy || !canMoveUp}
-            onClick={() => void moveTo(-1)}
-            className="gap-1.5"
-          >
-            <ArrowUp className="size-3.5" />
-            {t("Move up")}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={busy || !canMoveDown}
-            onClick={() => void moveTo(1)}
-            className="gap-1.5"
-          >
-            <ArrowDown className="size-3.5" />
-            {t("Move down")}
-          </Button>
-        </div>
-      )}
 
       {/* THE LIFECYCLE, as a track rather than a dropdown — the same control a
           ticket gets. Closing a story settles the ticket half in the same call,
@@ -426,7 +371,6 @@ export function StoryDetailScreen({
           appId: story.appId ?? "",
           ticketId: story.ticketId ?? "",
           assigneeId: story.assigneeId ?? "",
-          dueOn: story.dueOn ?? "",
         }}
         draftKey={`story:edit:${storyId}`}
         onSubmit={save}

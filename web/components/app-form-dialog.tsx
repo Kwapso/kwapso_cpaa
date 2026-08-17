@@ -2,12 +2,23 @@
 
 // Record-an-app dialog — the system we built, the thing with its own address.
 //
-// Two fields on this form are worth a sentence each. The ACCOUNT is written once
-// and never edited: moving an app to another client would silently republish its
-// whole map, its savings and its conversation into somebody else's portal, so
-// there is no move-app door and this is the only place it is decided. The
-// MONTHLY COST is what the system costs US to keep running, and the form says so
-// — it is one of the two figures a client never sees, under any flag.
+// The ACCOUNT is written once and never edited: moving an app to another client
+// would silently republish its whole map, its savings and its conversation into
+// somebody else's portal, so there is no move-app door and this is the only
+// place it is decided.
+//
+// TWO FIELDS THIS FORM NO LONGER ASKS FOR, and the difference between them.
+// The owner's ruling of 17 Aug 2026 took the ADDRESS off the form — an app's URL
+// was one more thing to type at the moment somebody is trying to record that the
+// app exists — and deferred WHAT IT COSTS US A MONTH to version two, in Aurora's
+// own words: "it's a much more complex topic, not a single number".
+//
+// Both COLUMNS stay, and so do both values on this form's state. An app's monthly
+// cost is an input to the agency's own margin (lib/internal-money.ts sums it),
+// and a form that stopped asking for a number while still SENDING one would
+// quietly zero every app it was used to edit. So `url` and `toolCostCentsPerMonth`
+// ride through from `initial` untouched on an edit, and a newly recorded app
+// simply starts without them.
 //
 // FormShell (R4) + a per-session draft (R7), like every other write.
 
@@ -50,14 +61,7 @@ const accountField = {
   required: false,
   hint: "Set once. Leave it blank for one of our own.",
 }
-const urlField = { ...defaultFieldConfig, label: "Address", required: false }
 const stageField = { ...defaultFieldConfig, label: "Stage", required: false }
-const costField = {
-  ...defaultFieldConfig,
-  label: "What it costs us a month",
-  required: false,
-  hint: "Hosting and the services behind it. Ours alone — a client never sees this.",
-}
 
 export function AppFormDialog({
   open,
@@ -101,9 +105,10 @@ export function AppFormDialog({
     if (!ready) return
     setBusy(true)
     try {
-      // Whole units in, whole cents out — the same conversion the step form makes
-      // between minutes and seconds, for the same reason: a person types what
-      // they would say, and the arithmetic keeps the unit it can add up.
+      // Whole units in, whole cents out. The form no longer ASKS for this, so on
+      // a new app the amount is empty and lands as zero; on an edit it is the
+      // app's existing cost, carried through the draft so saving a rename cannot
+      // wipe a number nobody was shown.
       const amount = Number(values.cost.trim())
       await onSubmit({
         name: values.name.trim(),
@@ -133,8 +138,8 @@ export function AppFormDialog({
       subtitle={
         <DialogDescription>
           {editing
-            ? "Change what it's called, where it lives, or what it costs us."
-            : "A system we built — the thing with its own address. Process maps live inside one."}
+            ? "Change what it's called, or where it has got to."
+            : "A system we built for somebody. Process maps live inside one."}
         </DialogDescription>
       }
       footer={
@@ -174,34 +179,12 @@ export function AppFormDialog({
         </Select>
       </Field>
       )}
-      <Field config={urlField} htmlFor="app-url" className={fieldSpacing}>
-        <Input
-          id="app-url"
-          value={values.url}
-          onChange={(e) => setValues((s) => ({ ...s, url: e.target.value }))}
-          placeholder="https://…"
-          disabled={busy}
-        />
-      </Field>
       <Field config={stageField} htmlFor="app-stage" className={fieldSpacing}>
         <Input
           id="app-stage"
           value={values.stage}
           onChange={(e) => setValues((s) => ({ ...s, stage: e.target.value }))}
           placeholder={t("e.g. live")}
-          disabled={busy}
-        />
-      </Field>
-      <Field config={costField} htmlFor="app-cost" className={fieldSpacing}>
-        <Input
-          id="app-cost"
-          type="number"
-          min={0}
-          step="0.01"
-          inputMode="decimal"
-          value={values.cost}
-          onChange={(e) => setValues((s) => ({ ...s, cost: e.target.value }))}
-          placeholder="0.00"
           disabled={busy}
         />
       </Field>

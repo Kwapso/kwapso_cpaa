@@ -203,7 +203,6 @@ export function traceFor(
       return { path: seg(teamId, "stories"), highlight: "main" }
     case "update_story":
     case "set_story_status":
-    case "rank_story":
       return { path: `${seg(teamId, "stories")}/${str(input, "id")}`, highlight: "main" }
     case "create_sprint":
       return { path: seg(teamId, "sprints"), highlight: "main" }

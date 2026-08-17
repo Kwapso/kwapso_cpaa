@@ -46,6 +46,7 @@ import { formatDateTime } from "@shared/web/format"
 import { LanguageSection } from "@shared/web/language-section"
 import { personName, personInitials, letterMark } from "@/lib/identity"
 import { softNavigate } from "@/lib/nav"
+import { TEAM_SCREENS_HIDDEN } from "@shared/product"
 import { useCached } from "@shared/web/store"
 import type { ActiveTeam } from "@/lib/use-active-team"
 import { useT } from "@shared/web/language"
@@ -78,7 +79,12 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
     variant: "line" as const,
     tabs: [
       { value: "account", label: t("Account"), icon: "user", badge: "", badgeVariant: "" as const },
-      { value: "teams", label: t("Teams"), icon: "building", badge: "", badgeVariant: "" as const },
+      // THE TEAMS TAB IS HIDDEN, not removed — shared/product.ts explains at
+      // length why the plumbing under it is untouched. One team, and a second
+      // would be an empty world, so the tab was a list with one row in it.
+      ...(TEAM_SCREENS_HIDDEN
+        ? []
+        : [{ value: "teams", label: t("Teams"), icon: "building", badge: "", badgeVariant: "" as const }]),
       { value: "access", label: t("Access"), icon: "key-round", badge: "", badgeVariant: "" as const },
     ],
   }
@@ -196,7 +202,7 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
           value={tab}
           onValueChange={setTab}
           renderPanel={(t) => {
-            if (t.value === "teams") return teamsPanel
+            if (t.value === "teams") return TEAM_SCREENS_HIDDEN ? null : teamsPanel
             if (t.value === "access") return <AccessTokensSection teamName={ctx.team?.name ?? null} />
             return accountPanel
           }}
@@ -264,34 +270,6 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
           )}
         </section>
 
-        <section className="animate-rise flex flex-col gap-3">
-          <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Teams")}</h2>
-          <List
-            surface="none"
-            className="rounded-xl border"
-            onItemClick={(item) => void openTeam(item.id)}
-            items={ctx.teams.map((team) => ({
-              id: team.id,
-              leading: (
-                <Avatar className="size-9">
-                  {team.logoUrl && <AvatarImage src={team.logoUrl} alt={team.name} />}
-                  <AvatarFallback className="text-xs">{letterMark(team.name)}</AvatarFallback>
-                </Avatar>
-              ),
-              title: (
-                <span className="flex items-center gap-2">
-                  <span className="truncate">{team.name}</span>
-                  {team.id === ctx.team?.id && (
-                    <Badge variant="secondary" className="text-[10px]">
-                      {t("Active")}
-                    </Badge>
-                  )}
-                </span>
-              ),
-              trailing: <ChevronRight className="text-muted-foreground size-4" />,
-            }))}
-          />
-        </section>
       </div>
 
       <ProfileDialog open={editing} onOpenChange={setEditing} user={user} onSaved={active.refresh} />

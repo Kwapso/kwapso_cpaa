@@ -95,7 +95,7 @@ function storyLine(s: Story): string {
     [
       STORY_STATUS_LABEL[s.status],
       s.assigneeName ?? "unassigned",
-      s.dueOn ? `due ${formatDate(s.dueOn)}` : null,
+      s.sprintEndsOn ? `due ${formatDate(s.sprintEndsOn)}` : null,
       s.sprintName,
       s.ticketRef,
     ]

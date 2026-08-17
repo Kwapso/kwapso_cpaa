@@ -22,3 +22,31 @@
  * Reopening this is a product decision, not a config change: flip it here, and
  * the check in web/test/rules.test.ts tells you every surface it reopens. */
 export const TEAM_CREATION_CLOSED = true
+
+/** THE TEAM SCREENS ARE HIDDEN, AND EVERYTHING UNDER THEM IS UNTOUCHED.
+ *
+ * A tester asked for teams to be removed altogether. The owner overruled it,
+ * twice, and the reason is the whole point of this file: the multi-team
+ * plumbing is not a feature kwapso uses, it is the thing that gets FORKED for a
+ * paying client next year. Deleting it would save one nav line and cost the
+ * product it is built to become.
+ *
+ * So this hides two things and only two things:
+ *   • the TEAM SWITCHER — the dropdown in the sidebar and the mobile top bar
+ *     (web/components/team-switcher.tsx, rendered from app-shell.tsx);
+ *   • the TEAMS LIST on the Settings screen
+ *     (web/components/screens/settings-screen.tsx).
+ *
+ * NOTHING ELSE CHANGES. Every team route still answers, `switchTeam` still
+ * works, `/t/<teamId>/…` still resolves a team from the URL and switches to it,
+ * the per-team databases are still per-team, a person can still hold more than
+ * one membership, and the whole permission spine is exactly as it was. Kwapso
+ * runs one team and the second one would be an empty world (see
+ * TEAM_CREATION_CLOSED above), so the controls were offering a choice with one
+ * option in it.
+ *
+ * TO SHOW THEM AGAIN: change this line to `false`. That is the entire change —
+ * both surfaces read this constant and nothing else was removed. Documented at
+ * length because the owner asked specifically that a future reader be able to
+ * find that out without reading the diff. */
+export const TEAM_SCREENS_HIDDEN = true

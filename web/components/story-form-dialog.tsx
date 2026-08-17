@@ -46,7 +46,6 @@ export type StoryFormValues = {
   appId: string
   ticketId: string
   assigneeId: string
-  dueOn: string
 }
 
 /** "Nothing chosen" as a real Select value: an empty string is not selectable in
@@ -70,7 +69,6 @@ const ticketField = {
   hint: "Optional — most work stands on its own.",
 }
 const assigneeField = { ...defaultFieldConfig, label: "Who's doing it", required: false }
-const dueField = { ...defaultFieldConfig, label: "Due", required: false }
 
 export function StoryFormDialog({
   open,
@@ -108,7 +106,7 @@ export function StoryFormDialog({
   const editing = initial !== undefined
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
-    initial ?? { title: "", detail: "", sprintId: "", appId: "", ticketId: "", assigneeId: "", dueOn: "" },
+    initial ?? { title: "", detail: "", sprintId: "", appId: "", ticketId: "", assigneeId: "" },
     open
   )
   const [busy, setBusy] = React.useState(false)
@@ -126,7 +124,6 @@ export function StoryFormDialog({
         appId: fixedApp ? fixedApp.id : values.appId,
         ticketId: fixedTicket ? fixedTicket.id : values.ticketId,
         assigneeId: values.assigneeId,
-        dueOn: values.dueOn.trim(),
       })
       clearDraft()
       onOpenChange(false)
@@ -250,15 +247,6 @@ export function StoryFormDialog({
           members.map((m) => ({ id: m.id, label: m.name })),
           (v) => setValues((s) => ({ ...s, assigneeId: v }))
         )}
-      </Field>
-      <Field config={dueField} htmlFor="story-due" className={fieldSpacing}>
-        <Input
-          id="story-due"
-          type="date"
-          value={values.dueOn}
-          onChange={(e) => setValues((s) => ({ ...s, dueOn: e.target.value }))}
-          disabled={busy}
-        />
       </Field>
     </FormShellDialog>
   )

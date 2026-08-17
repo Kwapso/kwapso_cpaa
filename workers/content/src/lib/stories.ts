@@ -33,7 +33,7 @@ import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { optionalText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { LIST_HARD_CAP } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
-import { rankAtTop, rankBetween } from "@shared/workers/rank"
+import { rankAtTop } from "@shared/workers/rank"
 import { STORY_STATUSES, type Sprint, type Story, type StoryStatus } from "@shared/types"
 
 import { nextRef, REF_KINDS } from "./refs"
@@ -60,6 +60,7 @@ type StoryRow = {
   reviewer_name: string | null
   starts_on: string | null
   due_on: string | null
+  sprint_ends_on?: string | null
   closed_at: string | null
   closing_note: string | null
   rank: string | null
@@ -77,7 +78,17 @@ const STORY_COLS = `s.id, s.ref, s.title, s.detail, s.status, s.ticket_id, s.spr
   s.reviewer_name, s.starts_on, s.due_on, s.closed_at, s.closing_note, s.rank, s.account_id,
   s.created_at, s.updated_at, s.creator_name, s.editor_name,
   (SELECT h.ref FROM help h WHERE h.id = s.ticket_id) AS ticket_ref,
-  (SELECT sp.name FROM sprints sp WHERE sp.id = s.sprint_id) AS sprint_name`
+  (SELECT sp.name FROM sprints sp WHERE sp.id = s.sprint_id) AS sprint_name,
+  -- WHEN THIS IS DUE, AND WHY IT IS NOT A COLUMN ON THIS TABLE ANY MORE.
+  -- A story is one piece of work inside a block that was sold with an end date
+  -- on it, so the block's end date IS the story's deadline: two dates for one
+  -- promise is two dates that disagree the first time a sprint moves. The owner
+  -- retired the story's own due date on 17 Aug 2026 and it is inherited from the
+  -- sprint instead. \`s.due_on\` is still selected above and still answered as
+  -- \`dueOn\` — the column keeps what anybody typed before the change (a column
+  -- dropped is the one migration you cannot take back) — and every screen reads
+  -- the inherited date beside it.
+  (SELECT sp.ends_on FROM sprints sp WHERE sp.id = s.sprint_id) AS sprint_ends_on`
 
 function toStory(r: StoryRow): Story {
   return {
@@ -105,6 +116,7 @@ function toStory(r: StoryRow): Story {
     reviewerName: r.reviewer_name,
     startsOn: r.starts_on,
     dueOn: r.due_on,
+    sprintEndsOn: r.sprint_ends_on ?? null,
     closedAt: r.closed_at,
     closingNote: r.closing_note,
     rank: r.rank,
@@ -558,42 +570,6 @@ export async function setStoryStatus(
     relatedRowId: id,
   })
   return { moved: true, story: toStory(story), ticketId: before.ticket_id, accountId: before.account_id }
-}
-
-/** DRAG-RANK — put a story between two others, exactly as a ticket does. The
- * caller names its NEIGHBOURS, never a position: a position is arithmetic over a
- * list the browser loaded seconds ago, and the list has moved since.
- *
- * R17: dropped back where it started → zero rows → no history, no ping. */
-export async function setStoryRank(
-  cfg: D1Rest,
-  guard: MemberGuard,
-  actor: Actor,
-  id: string,
-  afterId: string | null,
-  beforeId: string | null
-): Promise<{ moved: boolean; accountId: string | null }> {
-  const row = await storyOrThrow(cfg, guard, id)
-  const neighbour = async (nid: string | null): Promise<string | null> => {
-    if (!nid) return null
-    const found = await storyOrThrow(cfg, guard, nid)
-    return found.rank ?? found.id
-  }
-  const rank = rankBetween(await neighbour(beforeId), await neighbour(afterId))
-  const changed = await d1Query<{ id: string }>(
-    cfg,
-    guard.databaseId,
-    `UPDATE stories SET rank = ? WHERE id = ? AND COALESCE(rank, id) <> ? RETURNING id`,
-    [rank, id, rank]
-  )
-  if (!changed[0]) return { moved: false, accountId: row.account_id }
-  await logActivity(cfg, guard.databaseId, actor, {
-    type: "Story reordered",
-    description: `${actor.name} moved ${row.ref ?? "a story"} in the list`,
-    relatedTable: "stories",
-    relatedRowId: id,
-  })
-  return { moved: true, accountId: row.account_id }
 }
 
 /* ---------------------------------- sprints --------------------------------- */

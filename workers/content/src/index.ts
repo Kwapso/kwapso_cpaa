@@ -29,7 +29,6 @@
 //   POST /api/content/stories             -> write one piece of work down
 //   POST /api/content/stories/update      -> edit a story
 //   POST /api/content/stories/status      -> move a story along its four states
-//   POST /api/content/stories/rank        -> drag-rank a story between two others
 //   GET  /api/content/sprints             -> the blocks of work sold (?accountId → one client's)
 //   POST /api/content/sprints             -> start a sprint
 //   POST /api/content/sprints/update      -> edit one (name, kind, dates, PRICE)
@@ -101,7 +100,6 @@ import {
   postCreateSprint,
   postCreateStory,
   postSprintComplete,
-  postStoryRank,
   postStoryStatus,
   postUpdateSprint,
   postUpdateStory,
@@ -326,7 +324,6 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/content/stories": { handler: postCreateStory, kind: "mutation" },
   "POST /api/content/stories/update": { handler: postUpdateStory, kind: "mutation" },
   "POST /api/content/stories/status": { handler: postStoryStatus, kind: "mutation" },
-  "POST /api/content/stories/rank": { handler: postStoryRank, kind: "mutation" },
   "GET /api/content/sprints": { handler: getSprints, kind: "read" },
   "POST /api/content/sprints": { handler: postCreateSprint, kind: "mutation" },
   "POST /api/content/sprints/update": { handler: postUpdateSprint, kind: "mutation" },

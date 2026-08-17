@@ -173,13 +173,6 @@ export const content = {
       "/api/content/help/archive",
       post({ id, archived })
     ),
-  /** WHERE THE PERSON PUT IT — the body names NEIGHBOURS, never a position, so two
-   * people reordering at once cannot fight over a number (shared/workers/rank.ts). */
-  rankHelp: (id: string, afterId: string | null, beforeId: string | null) =>
-    api<PagedResponse<{ tickets: HelpTicket[]; mineTotal: number }>>(
-      "/api/content/help/rank",
-      post({ id, afterId, beforeId })
-    ),
   helpOne: (id: string) =>
     api<{ tickets: HelpTicket[] }>(`/api/content/help?id=${enc(id)}`).then((r) => r.tickets[0] ?? null),
   helpThread: (id: string) =>
@@ -199,11 +192,6 @@ export const content = {
     api<{ tickets: HelpTicket[] }>("/api/content/help/status", post({ id, status })),
   replyHelp: (helpId: string, body: string, taggedUserIds?: string[]) =>
     api<{ replies: HelpMessage[]; total: number }>("/api/content/help/reply", post({ helpId, body, taggedUserIds })),
-  /** ANSWER IT: resolve the ticket, add the words to its conversation, and email
-   * the client. One call, because they are one act — and `alreadyResolved` comes
-   * back rather than a second email when the answer has already gone. */
-  resolveHelp: (id: string, resolution: string) =>
-    api<{ sent: boolean; alreadyResolved: boolean }>("/api/content/help/resolve", post({ id, resolution })),
   helpStakeholders: (id: string) =>
     api<{ stakeholders: HelpStakeholder[] }>(`/api/content/help/stakeholders?id=${enc(id)}`),
   addStakeholder: (id: string, userId: string) =>
@@ -224,11 +212,6 @@ export const content = {
     api<{ stories: Story[] }>("/api/content/stories/update", post(input)),
   setStoryStatus: (id: string, status: Story["status"], closingNote?: string) =>
     api<{ stories: Story[] }>("/api/content/stories/status", post({ id, status, closingNote })),
-  rankStory: (id: string, afterId: string | null, beforeId: string | null) =>
-    api<{ stories: Story[] }>("/api/content/stories/rank", post({ id, afterId, beforeId })),
-  /** The blocks of sold work. `accountId` narrows to one client, `appId` to one
-   * system — the same two questions the door parses, so a caller cannot invent a
-   * third the server ignores in silence. */
   sprints: (filter: { accountId?: string; appId?: string } = {}) => {
     const q = new URLSearchParams()
     if (filter.accountId) q.set("accountId", filter.accountId)

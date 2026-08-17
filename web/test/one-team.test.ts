@@ -14,7 +14,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
-import { TEAM_CREATION_CLOSED } from "@shared/product"
+import { TEAM_CREATION_CLOSED, TEAM_SCREENS_HIDDEN } from "@shared/product"
 
 const WEB = join(dirname(fileURLToPath(import.meta.url)), "..")
 const read = (p: string) => readFileSync(join(WEB, "components", p), "utf8")
@@ -42,4 +42,50 @@ describe("one team: the UI offers no way to make another", () => {
       ).toBe(true)
     })
   }
+})
+
+// ONE TEAM ON SCREEN, AND EVERY BIT OF THE PLUMBING STILL THERE.
+//
+// A tester asked for teams to be removed altogether. The owner overruled it
+// TWICE, and the reason is the product rather than the code: the multi-team
+// machinery is what gets forked for a paying client, so hiding two controls is
+// the whole change and deleting the spine would be the expensive mistake.
+//
+// This suite is the guard on BOTH halves — that the controls really are hidden,
+// and that hiding them did not turn into removing them. It is a source scan for
+// the same reason the block above is: what is being checked is that the decision
+// is written down where the next person will meet it.
+describe("the team screens are hidden, and nothing underneath moved", () => {
+  it("is actually hidden (the checks below mean nothing otherwise)", () => {
+    expect(TEAM_SCREENS_HIDDEN).toBe(true)
+  })
+
+  for (const [file, what] of [
+    ["team-switcher.tsx", "the switcher in the sidebar and the mobile bar"],
+    ["screens/settings-screen.tsx", "the Teams list on Settings"],
+  ] as const) {
+    it(`${what} reads the product flag`, () => {
+      const src = read(file)
+      expect(
+        src.includes("TEAM_SCREENS_HIDDEN"),
+        `${file} still shows a team control — gate it on TEAM_SCREENS_HIDDEN from @shared/product`
+      ).toBe(true)
+    })
+  }
+
+  it("the plumbing is untouched — switching a team still works in code", () => {
+    // The four things somebody 'finishing the removal' would take out next. Each
+    // is load-bearing for the fork this decision exists to protect, and none of
+    // them is reachable from a control any more — which is exactly why a test
+    // has to hold them rather than a reader noticing.
+    const active = readFileSync(join(WEB, "lib", "use-active-team.ts"), "utf8")
+    expect(active, "switchTeam is how /t/<id> resolves a team from the URL").toContain("switchTeam")
+    const routeTeam = readFileSync(join(WEB, "components", "deep-link", "use-route-team.ts"), "utf8")
+    expect(routeTeam, "a team-scoped URL still switches to its team").toContain("switchTeam")
+    const api = readFileSync(join(WEB, "lib", "api", "tenancy.ts"), "utf8")
+    expect(api, "the teams list door is still called").toContain("teams")
+    // And the switcher itself is still a whole component, not a stub: flipping
+    // the flag back has to give the menu back, not a placeholder.
+    expect(read("team-switcher.tsx"), "the dropdown is still written").toContain("DropdownMenu")
+  })
 })

@@ -937,7 +937,14 @@ export type Story = {
   reviewerId: string | null
   reviewerName: string | null
   startsOn: string | null
+  /** THE STORY'S OWN due date, kept for the rows that already carry one and
+   * never asked for again — the form stopped offering it on 17 Aug 2026. */
   dueOn: string | null
+  /** WHEN IT IS ACTUALLY DUE: the end date of the sprint this work sits in. A
+   * story is one piece of a block that was sold with an end date on it, so the
+   * block's date is the promise; two dates for one promise is two dates that
+   * disagree the first time a sprint moves. Null on a story with no sprint. */
+  sprintEndsOn: string | null
   closedAt: string | null
   /** what we will tell the client. Closing a story appends this to the ticket's
    * DRAFT resolution — a draft, never a sent message. */

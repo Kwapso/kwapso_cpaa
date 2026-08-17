@@ -18,10 +18,9 @@ import {
   type TicketMember,
   type TicketStatus,
 } from "@kwapso/ui/registry/collections/ticket-thread/ticket-thread"
-import { ArchiveRestore, ArrowDown, ArrowUp, Archive, Hammer, Languages, Mail, Pencil, Send } from "lucide-react"
+import { ArchiveRestore, Archive, Languages, Pencil } from "lucide-react"
 
 import type {
-  Account,
   HelpMessage,
   HelpStakeholder,
   HelpTicket,
@@ -38,17 +37,13 @@ import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/s
 import { formatCount } from "@shared/web/format-count"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
 import { HelpFormDialog } from "@/components/help-form-dialog"
-import { MailReplyDialog } from "@/components/mail-reply-dialog"
 import { HelpStakeholders } from "@/components/help-stakeholders"
 import { HelpStatusStepper, type HelpStatusValue } from "@/components/help-status-stepper"
-import { ResolveDialog, type ResolveFormValues } from "@/components/resolve-dialog"
-import { StoryFormDialog } from "@/components/story-form-dialog"
-import { createStoryFrom, useStoryFormOptions } from "@/components/stories-screen"
-import { StoriesPanel, sliceKey } from "@/components/work-panels"
+import { StoriesPanel } from "@/components/work-panels"
 import { RecordTimerButton } from "@/components/timer-bar"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
-import { accountsKey, totalKey } from "@/lib/live-resources"
+import { totalKey } from "@/lib/live-resources"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { useT } from "@shared/web/language"
 
@@ -127,48 +122,21 @@ export function HelpDetailScreen({
   const stakeholderBadge = formatCount(stakeholdersQ.data?.length)
   const { can } = usePermissions(teamId)
   const canEdit = can("help", "edit") // single source — gates Edit, the stepper, and the thread's resolve
-  // Writing work down is the WORK module's right, not the ticket's: a person who
-  // may read and answer requests is not necessarily a person who may put things
-  // on the team's backlog, and all three routes to a story respect that.
-  const canWriteWork = can("work", "create")
   // Logging time is `work:create` — the right the start/stop door itself gates
   // on, so the button offers exactly what the server would accept. It is WORK's
   // right and not the ticket's: answering a request and putting hours on the
   // team's timesheet are two different things a role may grant separately.
   const canLogTime = can("work", "create")
-  // REPLYING FROM YOUR OWN MAILBOX. `google:edit` is "you may use your own
-  // connection"; the send half needs the owner's second switch as well, and the
-  // dialog asks for it separately — writing a draft changes nothing outside the
-  // building, sending it does.
-  const canMail = can("google", "edit")
-  const canSendMail = can("google_mail", "create")
 
   const [tab, setTab] = React.useState("conversation")
   const [editing, setEditing] = React.useState(false)
-  const [resolving, setResolving] = React.useState(false)
   const [translating, setTranslating] = React.useState(false)
   const [statusBusy, setStatusBusy] = React.useState(false)
   // THE WORK ANSWERING THIS REQUEST. One story may answer many tickets and one
   // ticket may need many stories (the owner's ruling), so this is a collection
   // on the record rather than a field on it. Its exact total badges the tab.
   const storiesTotal = useCachedValue<number>(totalKey("stories-ticket", helpId))
-  const [storyOpen, setStoryOpen] = React.useState(false)
-  // THE TRIAGE PROMPT — the third of the three ways a ticket becomes a story.
-  // Set the moment a status move lands on `triaged`, which is exactly when a
-  // person has decided the request is real and not yet decided what to do about
-  // it. Held in state rather than the URL because it is a suggestion, not a
-  // destination: dismissing it should not be a page in the back history.
-  const [promptStory, setPromptStory] = React.useState(false)
-  const [mailing, setMailing] = React.useState(false)
-  const [ranking, setRanking] = React.useState(false)
-  const options = useStoryFormOptions(teamId)
   const host = { base: basePath.replace(/\/tickets$/, "") }
-  // WHO TO WRITE TO, when we already know. A cache READ, never a fetch: if the
-  // accounts list is warm (you came through it, or the assistant loaded it) the
-  // client's address fills itself in; if it is cold, or their account sits past
-  // page one, the box is simply empty and a person types it. Costing every
-  // ticket screen a round-trip to save one line of typing is the wrong trade.
-  const accounts = useCachedValue<Account[]>(accountsKey(teamId))
 
   // Land on the newest reply, and follow the one you just sent — the same
   // behaviour the client gets on their side of this same conversation, from the
@@ -193,11 +161,6 @@ export function HelpDetailScreen({
       primeCache(`help:${teamId}`, tickets)
       invalidate(recordActivityKey("help", helpId))
       toast.success(t("Status updated."))
-      // Triaged means "we have read it and it is real". That is the moment to
-      // ask what we are going to DO about it — and only when nothing has been
-      // written down yet, because a ticket that already has work on it has been
-      // answered and the prompt would be noise.
-      if (next === "triaged" && (ticket?.storyCount ?? 0) === 0) setPromptStory(true)
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't update the status.")
     } finally {
@@ -269,43 +232,6 @@ export function HelpDetailScreen({
     } finally {
       setStatusBusy(false)
     }
-  }
-
-  /** WHERE THE PERSON PUT IT. Drag-rank is the only priority signal in the
-   * product (SCOPE ch.07 — there is no priority dropdown and there will not be
-   * one) and it had no control on any screen: the door shipped, the sparse-key
-   * algorithm shipped, and the order could only ever be the order rows arrived
-   * in. The door takes NEIGHBOURS rather than a position, which is what lets two
-   * people reorder at once without fighting over a number. */
-  async function move(delta: -1 | 1) {
-    const order = ticketsQ.data ?? []
-    const at = order.findIndex((t) => t.id === helpId)
-    if (at < 0) return
-    const target = at + delta
-    // The list reads highest-rank-first, so moving UP means landing between the
-    // two rows above this one.
-    const below = delta === -1 ? order[target - 1] : order[target]
-    const above = delta === -1 ? order[target] : order[target + 1]
-    setRanking(true)
-    try {
-      const { tickets } = await content.rankHelp(helpId, below?.id ?? null, above?.id ?? null)
-      primeCache(`help:${teamId}`, tickets)
-      toast.success(t("Moved."))
-    } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't move that.")
-    } finally {
-      setRanking(false)
-    }
-  }
-
-  /** ANSWER IT: resolve, append to the conversation, email the client — one call,
-   * because they are one act and a half-done answer is the worst of the three. */
-  async function resolve(values: ResolveFormValues) {
-    await content.resolveHelp(helpId, values.resolution)
-    invalidate(`help:${teamId}`)
-    invalidate(`help-thread:${helpId}`)
-    invalidate(recordActivityKey("help", helpId))
-    toast.success(t("Answered — and emailed to them."))
   }
 
   /** TRANSLATE AND SET IT. The door spends one unit of the team's AI allowance
@@ -446,46 +372,6 @@ export function HelpDetailScreen({
             canLog={canLogTime}
             disabled={ticket.status === "resolved"}
           />
-          {/* ANSWER IT — the second and last thing in the product that emails a
-              client, so it is a deliberate button with a dialog behind it and
-              never a side effect of the stepper. Gone once it is answered. */}
-          {canEdit && ticket.status !== "resolved" && (
-            <Button size="sm" onClick={() => setResolving(true)} className="shrink-0 gap-1.5">
-              <Send className="size-3.5" />
-              {t("Answer")}
-            </Button>
-          )}
-          {/* REPLY BY EMAIL — the owner's own sentence, as a control: write it
-              into your Gmail drafts and click through to it there, or send it
-              from here. It is beside Answer rather than replacing it, because
-              they are different acts: Answer resolves the request and emails the
-              resolution; this is one letter to one person, out of your own
-              mailbox, leaving the ticket exactly where it is. */}
-          {canMail && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setMailing(true)}
-              className="shrink-0 gap-1.5"
-            >
-              <Mail className="size-3.5" />
-              {t("Reply by email")}
-            </Button>
-          )}
-          {/* MAKE IT A STORY — the first of the three ways (the owner asked for
-              all three): a button on the ticket. It opens the story form with
-              THIS request already filled in, so the link cannot be mistyped. */}
-          {canWriteWork && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setStoryOpen(true)}
-              className="shrink-0 gap-1.5"
-            >
-              <Hammer className="size-3.5" />
-              {t("Make it a story")}
-            </Button>
-          )}
           {canEdit && (
             <Button
               variant="outline"
@@ -531,52 +417,7 @@ export function HelpDetailScreen({
           onChange={(n) => void changeStatus(n)}
           busy={statusBusy}
         />
-        {/* WHERE IT SITS IN THE ORDER — the only priority signal in the product,
-            and until now the only one with no control anywhere. */}
-        {canEdit && (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-muted-foreground text-sm">{t("Order in the list")}</span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={ranking}
-              onClick={() => void move(-1)}
-              className="gap-1.5"
-            >
-              <ArrowUp className="size-3.5" />
-              {t("Move up")}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={ranking}
-              onClick={() => void move(1)}
-              className="gap-1.5"
-            >
-              <ArrowDown className="size-3.5" />
-              {t("Move down")}
-            </Button>
-          </div>
-        )}
       </div>
-
-      {/* THE TRIAGE PROMPT — the third way in. It appears the moment somebody
-          moves this request to triaged with no work written down against it,
-          which is precisely the moment the question is live. */}
-      {promptStory && canWriteWork && (
-        <div className="border-border/60 flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2">
-          <p className="min-w-0 flex-1 text-sm">
-            {t("Read and real. What are we going to do about it?")}
-          </p>
-          <Button size="sm" onClick={() => setStoryOpen(true)} className="gap-1.5">
-            <Hammer className="size-3.5" />
-            {t("Write the first story")}
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => setPromptStory(false)}>
-            {t("Not yet")}
-          </Button>
-        </div>
-      )}
 
       <TabsView
         config={tabsConfig}
@@ -597,7 +438,6 @@ export function HelpDetailScreen({
                 ownerId={helpId}
                 filter={{ ticketId: helpId }}
                 host={host}
-                onNew={canWriteWork ? () => setStoryOpen(true) : undefined}
                 emptyText="No work written down against this request yet."
               />
             )
@@ -627,52 +467,6 @@ export function HelpDetailScreen({
             />
           )
         }}
-      />
-
-      <ResolveDialog
-        open={resolving}
-        onOpenChange={setResolving}
-        draft={ticket.draftResolution}
-        draftKey={`help:resolve:${helpId}`}
-        onSubmit={resolve}
-      />
-
-      {/* All three ways in open this ONE form, with the request already filled
-          in and unchangeable — three doors into one room, which is the point. */}
-      <StoryFormDialog
-        open={storyOpen}
-        onOpenChange={setStoryOpen}
-        sprints={options.sprints}
-        apps={options.apps}
-        tickets={options.tickets}
-        fixedTicket={{
-          id: helpId,
-          label: ticket.ref ? `${ticket.ref} · ${ticket.description}` : ticket.description,
-        }}
-        members={options.members}
-        draftKey={`story:add:ticket:${helpId}`}
-        onSubmit={async (v) => {
-          await createStoryFrom(teamId, v)
-          invalidate(sliceKey("stories-ticket", helpId))
-          invalidate(`help:${teamId}`)
-          setPromptStory(false)
-        }}
-      />
-
-      {/* The subject carries the reference number the client quotes, when the
-          ticket has one — it is the whole reason that number exists. The body
-          starts from our own working text if there is any, because the alternative
-          is somebody retyping what the app already wrote down. */}
-      <MailReplyDialog
-        open={mailing}
-        onOpenChange={setMailing}
-        draftKey={`help:mail:${helpId}`}
-        defaultTo={
-          (accounts ?? []).find((a) => a.id === ticket.accountId)?.email ?? ""
-        }
-        defaultSubject={ticket.ref ? `${ticket.ref} · ${ticket.description}` : ticket.description}
-        defaultBody={ticket.draftResolution ?? ""}
-        canSend={canSendMail}
       />
 
       <HelpFormDialog
