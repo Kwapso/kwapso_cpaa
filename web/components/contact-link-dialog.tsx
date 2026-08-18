@@ -249,7 +249,15 @@ export function ContactCreateDialog({
       title={<DialogTitle>{t("New contact")}</DialogTitle>}
       subtitle={
         <DialogDescription>
-          {t("Add someone new to your accounts and make them a contact of")} {accountName}.
+          {/* ONE entry with a hole in it, not a fragment plus a name. The sentence
+              used to end on "of" and have the company appended after it, which
+              nine of the twenty-eight languages cannot do — Hindi, Japanese,
+              Korean, Chinese and five others put the possessed noun before the
+              possessor, so there is nothing for a translator to end on. A
+              placeholder can be moved; a dangling preposition cannot. */}
+          {t("Add someone new to your accounts and make them a contact of {name}.", {
+            name: accountName,
+          })}
         </DialogDescription>
       }
       submit={{
