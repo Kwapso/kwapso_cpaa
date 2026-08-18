@@ -85,7 +85,7 @@ export async function notifyInviteRevoked(
     const name = await teamName(env, teamId)
     await send(env, to, `Your invite to ${name} was withdrawn`, {
       heading: `Your invite to ${name} was withdrawn`,
-      intro: `Your invitation to join ${name} on ${brand.name} was withdrawn. No action is needed.`,
+      intro: `Your invite to join ${name} on ${brand.name} was withdrawn. No action is needed.`,
       footnote: "If you think this was a mistake, ask a team admin to invite you again.",
     })
   } catch (e) {

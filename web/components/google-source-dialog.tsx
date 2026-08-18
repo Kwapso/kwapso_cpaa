@@ -82,7 +82,7 @@ export type GoogleSourceValues = {
 const AGENCY = "__agency__"
 
 const searchField = { ...defaultFieldConfig, label: "Find it", required: false }
-const kindField = { ...defaultFieldConfig, label: "What kind of thing", required: true }
+const kindField = { ...defaultFieldConfig, label: "Type", required: true }
 const chosenField = { ...defaultFieldConfig, label: "What you're sharing", required: true }
 const shelfField = { ...defaultFieldConfig, label: "Who will be able to read it", required: true }
 const filedField = { ...defaultFieldConfig, label: "Whose material is in it", required: false }

@@ -299,7 +299,7 @@ export async function postTranslateTicket(request: Request, env: Env): Promise<R
 
   const spend = await consumeAiUnit(env, guard.teamId)
   if (!spend.ok)
-    return fail(429, "ai_quota_spent", "Today's AI allowance is used up, it resets tomorrow.")
+    return fail(429, "ai_quota_spent", "You're out of assistant credits for now. The free ones come back tomorrow, or an admin can add more.")
 
   let titleEn = ""
   try {
@@ -412,7 +412,7 @@ export async function postTranslateText(request: Request, env: Env): Promise<Res
   const language = LANGUAGES.find((l) => l.code === wanted)
   const spend = await consumeAiUnit(env, guard.teamId)
   if (!spend.ok)
-    return fail(429, "ai_quota_spent", "Today's AI allowance is used up, it resets tomorrow.")
+    return fail(429, "ai_quota_spent", "You're out of assistant credits for now. The free ones come back tomorrow, or an admin can add more.")
 
   const system = [
     `You translate pieces of text written by people using a business app into ${language?.english ?? "English"}.`,

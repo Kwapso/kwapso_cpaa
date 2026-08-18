@@ -50,7 +50,7 @@ export const COLLECTION_SORTS: Record<string, CollectionSort> = {
       { value: "created", label: "Newest first", defaultDir: "desc" },
       { value: "updated", label: "Recently changed", defaultDir: "desc" },
       { value: "status", label: "Stage", defaultDir: "asc" },
-      { value: "kind", label: "Kind", defaultDir: "asc" },
+      { value: "kind", label: "Type", defaultDir: "asc" },
       { value: "title", label: "What was asked", defaultDir: "asc" },
     ],
   },
@@ -60,7 +60,7 @@ export const COLLECTION_SORTS: Record<string, CollectionSort> = {
       { value: "touched", label: "Recently changed", defaultDir: "desc" },
       { value: "added", label: "Newest first", defaultDir: "desc" },
       { value: "title", label: "Title", defaultDir: "asc" },
-      { value: "kind", label: "Kind", defaultDir: "asc" },
+      { value: "kind", label: "Type", defaultDir: "asc" },
       // NOT the same as "added": a contract signed in March and filed in August
       // is March's, and "what do we have from last spring?" is a question only
       // this one answers.

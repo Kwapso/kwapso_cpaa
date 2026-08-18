@@ -66,7 +66,7 @@ export async function getKnowledge(request: Request, env: Env): Promise<Response
       { rows: one ? [one] : [], total: await countSources(cfg, guard), hasMore: false, nextCursor: null }
     )
   }
-  const kind = queryText(url.searchParams.get("kind"), "Kind")
+  const kind = queryText(url.searchParams.get("kind"), "Type")
   // IN USE, OR TAKEN AWAY — an allow-list of two words, checked here so nothing
   // but our own literal ever reaches the statement (R20). Anything else is
   // dropped for the same reason an unknown kind is: a filter narrows, and

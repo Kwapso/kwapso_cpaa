@@ -81,10 +81,11 @@ export function StaffPanel({
   if (profilesQ.data === undefined || certsQ.data === undefined) return <Skeleton variant="list" lines={3} />
 
   // The LIVE profile if there is one; otherwise the last one that was taken
-  // down. Retiring one used to make it vanish from the only screen that shows
-  // it, which would have made "retire" mean "lose" — and nothing here is ever
-  // lost. (A member can hold both: saving after a retirement writes a fresh row
-  // rather than reviving the old one, so the newest is the one to show.)
+  // down. Switching one off used to make it vanish from the only screen that
+  // shows it, which would have made "deactivate" mean "lose" — and nothing here
+  // is ever lost. (A member can hold both: saving after one has been switched
+  // off writes a fresh row rather than reviving the old one, so the newest is
+  // the one to show.)
   const forMember = profilesQ.data.filter((p) => p.userId === userId)
   const profile = forMember.find((p) => p.active) ?? forMember[forMember.length - 1] ?? null
   const certificates = certsQ.data.filter((c) => c.userId === userId)
@@ -103,16 +104,16 @@ export function StaffPanel({
     toast.success(editingCert ? "Certificate saved." : "Certificate recorded.")
   }
 
-  /** RETIRE THE PROFILE, or bring it back. A colleague who leaves keeps a live
-   * profile until somebody says otherwise — the door has answered this since the
-   * module shipped and no screen called it, so the only way to retire one was to
-   * ask the assistant. Nothing is deleted: what was written stays written, and
-   * the panel reads it back the moment it is restored. */
+  /** SWITCH THE PROFILE OFF, or bring it back. A colleague who leaves keeps a
+   * live profile until somebody says otherwise — the door has answered this
+   * since the module shipped and no screen called it, so the only way to switch
+   * one off was to ask the assistant. Nothing is deleted: what was written stays
+   * written, and the panel reads it back the moment it comes on again. */
   async function setProfileActive(profile: StaffProfile, active: boolean) {
     try {
       const { profiles } = await content.setStaffProfileActive(profile.id, active)
       primeCache(staffProfilesKey(teamId), profiles)
-      toast.success(active ? "Profile restored." : "Profile retired.")
+      toast.success(active ? "Profile activated." : "Profile deactivated.")
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't update the profile.")
     }
@@ -149,7 +150,7 @@ export function StaffPanel({
           {t("Profile")}
           {profile && !profile.active && (
             <Badge variant="outline" className="text-muted-foreground text-[10px]">
-              {t("Retired")}
+              {t("Inactive")}
             </Badge>
           )}
         </h2>
@@ -174,7 +175,7 @@ export function StaffPanel({
                 className="text-destructive hover:text-destructive gap-1"
               >
                 <Power className="size-3.5" />
-                {t("Retire profile")}
+                {t("Deactivate profile")}
               </Button>
             ) : (
               <Button
@@ -184,7 +185,7 @@ export function StaffPanel({
                 className="gap-1"
               >
                 <Power className="size-3.5" />
-                {t("Restore profile")}
+                {t("Activate profile")}
               </Button>
             ))}
         </div>
@@ -311,10 +312,10 @@ export function StaffPanel({
         draftKey={`staff-profile:${userId}`}
         subjectName={memberName}
         initial={
-          // A RETIRED profile does not prefill the form: writing after a
-          // retirement starts a fresh record (the door writes a new row rather
-          // than reviving the old one), and Restore beside it is the way to get
-          // the old words back. Two buttons, two meanings.
+          // A SWITCHED-OFF profile does not prefill the form: writing after one
+          // has been deactivated starts a fresh record (the door writes a new row
+          // rather than reviving the old one), and Activate beside it is the way
+          // to get the old words back. Two buttons, two meanings.
           profile?.active
             ? {
                 headline: profile.headline ?? "",

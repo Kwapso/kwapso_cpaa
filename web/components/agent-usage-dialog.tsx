@@ -43,7 +43,7 @@ export function AgentUsageDialog({
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** the header line: free left today + purchased balance */
+  /** the header line: free credits left today + what an admin added */
   summary: string
 }) {
   const t = useT()

@@ -92,7 +92,7 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
           disappears when there is none, which is nearly always. */}
       {pendingInvites.length > 0 && (
         <section className="animate-rise flex flex-col gap-4">
-          <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Invitations")}</h2>
+          <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Invites waiting for you")}</h2>
           <InvitationsPanel active={active} />
         </section>
       )}

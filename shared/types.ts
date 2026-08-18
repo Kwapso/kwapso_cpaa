@@ -162,7 +162,7 @@ export type Invite = {
 }
 
 /** An invite the signed-in person has RECEIVED (matched by their email) — for
- * the Invitations inbox. Read from the global invite_index + teams row, so it
+ * the invites inbox. Read from the global invite_index + teams row, so it
  * works for ANY signed-in user without opening a team database. */
 export type ReceivedInvite = {
   id: string

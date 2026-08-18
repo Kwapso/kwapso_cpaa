@@ -12,7 +12,7 @@ export function InvitationsScreen({ active }: { active: ActiveTeam }) {
   return (
     <div className="flex w-full flex-col gap-6">
       <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-        {t("Invitations")}
+        {t("Invites waiting for you")}
       </h2>
       <InvitationsPanel active={active} />
     </div>

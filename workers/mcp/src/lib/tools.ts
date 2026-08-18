@@ -212,7 +212,7 @@ const MCP_ONLY: McpTool[] = [
   {
     name: "get_import",
     description:
-      "One import batch in full (by `id`): its files, the plan, which table each file feeds, the column mapping, the rows that will be skipped and why, and, once it has run, the per-row report. Re-READING a plan is free; re-PLANNING spends one request of the app's own daily AI allowance, so a client that lost a plan_import answer should come here first.",
+      "One import batch in full (by `id`): its files, the plan, which table each file feeds, the column mapping, the rows that will be skipped and why, and, once it has run, the per-row report. Re-READING a plan is free; re-PLANNING spends one of the team's assistant credits, so a client that lost a plan_import answer should come here first.",
     inputSchema: obj({ id: S }, ["id"]),
     binding: "DATAOPS",
     method: "GET",
@@ -223,7 +223,7 @@ const MCP_ONLY: McpTool[] = [
   {
     name: "get_ai_allowance",
     description:
-      "How much of the app's own daily AI allowance this team has left (the free daily amount plus any credits an admin has added). agent_chat, agent_confirm and plan_import each draw on it; every other tool here is free. When it runs out those three answer 429 until it resets, this is how a client sees that coming instead of discovering it. Needs agent:read.",
+      "How many assistant credits this team has left (the free daily ones plus any an admin has added). agent_chat, agent_confirm and plan_import each draw on it; every other tool here is free. When it runs out those three answer 429 until it resets, this is how a client sees that coming instead of discovering it. Needs agent:read.",
     inputSchema: obj({}),
     binding: "DATAOPS",
     method: "GET",

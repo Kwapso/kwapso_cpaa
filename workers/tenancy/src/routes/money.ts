@@ -10,7 +10,7 @@
 // The account rate card is the softer of the two — a client MAY be shown what
 // they are charged, when their price visibility is switched on — but they are
 // shown it through the portal's own value door, projected, never by knocking on
-// this one. A rate card door answers with the audit block, the retired rows and
+// this one. A rate card door answers with the audit block, the inactive rows and
 // every account's card in one place; the projection answers with the numbers
 // that are theirs.
 
@@ -95,13 +95,13 @@ export async function postUpdateAccountRate(request: Request, env: Env): Promise
   return json({ ok: true })
 }
 
-/** POST /api/tenancy/rates/active — retire / restore. Never delete: what an
+/** POST /api/tenancy/rates/active — deactivate / activate. Never delete: what an
  * account was charged last year has to stay true. */
 export async function postAccountRateActive(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "commercials", "delete")
   const scope = await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Rate", TEXT_LIMITS.short)
-  if (typeof body.active !== "boolean") return fail(400, "invalid_input", "Retire or restore?")
+  if (typeof body.active !== "boolean") return fail(400, "invalid_input", "Deactivate or activate?")
   // R17: null = zero rows moved = already like that → no ping, no history row.
   const accountId = await setAccountRateActive(cfg, guard, scope, actor, id, body.active)
   if (accountId) await publishChange(env, guard.teamId, "account_rates", accountId)
@@ -149,7 +149,7 @@ export async function postInternalRateActive(request: Request, env: Env): Promis
   const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "commercials", "delete")
   await refusePortalCaller(cfg, guard)
   const id = requireText(body.id, "Rate", TEXT_LIMITS.short)
-  if (typeof body.active !== "boolean") return fail(400, "invalid_input", "Retire or restore?")
+  if (typeof body.active !== "boolean") return fail(400, "invalid_input", "Deactivate or activate?")
   const changed = await setInternalRateActive(cfg, guard, actor, id, body.active)
   if (changed) await publishChange(env, guard.teamId, "internal_rates", id)
   return json({ ok: true })
@@ -193,15 +193,15 @@ export async function getRoleRates(request: Request, env: Env): Promise<Response
   return json({ roleRates: rows, total })
 }
 
-/** POST /api/tenancy/role-rates — set what a role's hour costs, or retire it.
+/** POST /api/tenancy/role-rates — set what a role's hour costs, or switch it off.
  *
- * ONE door for add, re-price and retire, because the ROLE is the key and all
+ * ONE door for add, re-price and deactivate, because the ROLE is the key and all
  * three are the same sentence about it. See setRoleRate for why that is the lean
  * shape rather than a shortcut. */
 export async function postSetRoleRate(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<Body>(request, env, "commercials", "edit")
   await refusePortalCaller(cfg, guard)
-  if (typeof body.active !== "boolean") return fail(400, "invalid_input", "Live rate, or retired?")
+  if (typeof body.active !== "boolean") return fail(400, "invalid_input", "Live rate, or deactivated?")
   const { id, moved } = await setRoleRate(cfg, guard, actor, {
     roleName: requireText(body.roleName, "Role", TEXT_LIMITS.short),
     centsPerHour: centsPerHour(Number(body.centsPerHour)),

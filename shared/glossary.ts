@@ -17,8 +17,23 @@ export const GLOSSARY = {
   permission: { term: "Access right", def: "A single thing a role can do: read, create, edit, or delete." },
   invite: { term: "Invite", def: "An email asking someone to join your team in a role you choose." },
   revoke: { term: "Revoke", def: "Cancel an invite before it's accepted." },
-  deactivate: { term: "Activate / deactivate", def: "Turn a record on or off without deleting it, it's retired, not removed, so its history and access survive." },
+  // ONE VERB FOR SWITCHING A RECORD OFF (R6, decided 2026-08-19). The word
+  // "retired" used to sit inside this definition, and three screens had taken it
+  // out again as a button of its own — a rate card and a staff profile both said
+  // Retire / Restore for the very thing this entry names, and staff-panel.tsx
+  // put Retire and Archive on one screen for two records that behave alike. Both
+  // doors write an `active` flag and both rows stay on screen greyed, which is
+  // this word, not Archive's. So the word is gone from the definition too: a
+  // term the app is not allowed to say should not survive as prose here.
+  deactivate: { term: "Activate / deactivate", def: "Turn a record on or off without deleting it. Off, it stops being offered, and its history and access survive." },
   account: { term: "Account", def: "A company or a person you work with, both live in the same list." },
+  // THE OTHER HALF OF `account`, WHICH HAD NO ENTRY (R6, decided 2026-08-19).
+  // It is a tab on Accounts with its own server count, the account detail's
+  // eyebrow, a tab on a contact, and the whole of the client portal's nav
+  // ("My company") — a first-class word carrying a first-class distinction
+  // (`accountType: "entity"` vs `"individual"`), and it was being spoken on four
+  // screens with nothing saying what it meant.
+  company: { term: "Company", def: "An account that is a business rather than a person." },
   parentAccount: { term: "Parent account", def: "The account this one sits under, like a business under its holding company." },
   contact: { term: "Contact", def: "A person linked to an account. The same person can be a contact of more than one." },
   referenceCode: { term: "Reference", def: "A short code you give an account so it's easy to say out loud. It's a label, not its identity." },
@@ -47,6 +62,19 @@ export const GLOSSARY = {
   exportCsv: { term: "Export", def: "Download what you can see as a spreadsheet (CSV) file." },
   sampleFile: { term: "Sample file", def: "A downloadable example that shows what a good import file looks like." },
   assistant: { term: "Assistant", def: "Your in-app helper, it can find things, explain them, and make changes for you." },
+  // WHAT THE ASSISTANT COSTS, IN ONE WORD (R6, decided 2026-08-19). The app said
+  // "assistant requests" and "assistant allowance" two lines apart in the same
+  // paragraph, "assistant credits" in the header badge, and "AI quota" in the
+  // prompt handed to an outside tool — four names for one number, and no entry
+  // for any of them. Underneath there are genuinely TWO POTS (a free daily count
+  // in `agent_usage`, a balance an admin tops up in `agent_credits`), but they
+  // hold the SAME unit, and `AgentQuota.remaining` already adds them together to
+  // answer the only question a person asks: can I ask it something? So the UNIT
+  // gets the word, and the two pots are said as plain adjectives on that one word
+  // ("free credits left today", "an admin can add more") rather than earning a
+  // second term somebody has to keep apart. The usage view is the one screen that
+  // splits them, because that is the screen whose whole job is the split.
+  assistantCredit: { term: "Credit", def: "One request to the assistant. Your team gets a batch free each day, and an admin can add more to the balance." },
   knowledgeBase: { term: "Knowledge base", def: "Everything the assistant is allowed to read, in one place, you can add to it, correct it, and take things out." },
   source: { term: "Source", def: "One piece of material in the knowledge base: a note you wrote, or something the app keeps in step for you." },
   compartment: { term: "Compartment", def: "The slice of the knowledge base a question is answered from, one client's world, or the agency's own." },
@@ -54,6 +82,21 @@ export const GLOSSARY = {
   activity: { term: "Activity", def: "A history of what changed on a record, and who changed it." },
   overview: { term: "Overview", def: "The key facts about a record at a glance." },
   status: { term: "Status", def: "Where a record sits in its lifecycle, a ticket runs new to resolved; an account is a prospect, a client, or a past client." },
+  // ONE WORD FOR WHAT SORT OF THING A RECORD IS (R6, decided 2026-08-19). A
+  // ticket said Type, a sprint and a story said Kind, a deliverable said Kind
+  // and a brand asset said Category — four words for one field, on screens a
+  // person walks between in a morning. The dropdown groups behind three of the
+  // four were already seeded "Ticket type" / "Sprint type" / "Story type", so
+  // the app's own data had settled this before its copy did. The word is Type.
+  //
+  // WHAT DID NOT CHANGE, and why: the GROUP STRINGS ("Sprint type", "Deliverable
+  // kind", "Brand asset category") are values in `selectable_data.type` in every
+  // team database, and renaming one orphans its rows from the values filed under
+  // it. Same ruling as CLAUDE.md's `help`/Tickets: the human-facing word moves,
+  // the identifier stays. "Kind of work" also stays — a rate is priced per
+  // CATEGORY OF LABOUR, which is a different thing from a record's type, and it
+  // is `rateCard`'s own wording below.
+  recordType: { term: "Type", def: "What sort of thing a record is. Most types are your team's own list, so you can add one we haven't thought of." },
 
   // PROCESS MAPS, VERSIONS AND THE MONEY (SCOPE ch.02 — ported, never invented).
   // The chain is App → Process → Step, and it is what every savings figure is
@@ -72,11 +115,12 @@ export const GLOSSARY = {
   margin: { term: "Margin", def: "What is left of revenue after our own time and tool costs. Ours alone, never shown to a client." },
   toolCost: { term: "Tool cost", def: "What an app costs us to keep running each month, hosting and the services behind it." },
   priceVisibility: { term: "Price visibility", def: "The switch on an account that decides whether they see what they bought. Value is shown either way." },
-  // WHAT WE HAND OVER on an app. Two words, because the KIND is a field a person
-  // fills in and a word the card shows in small caps, so it needs a definition of
-  // its own or somebody writes "category" on one screen and "type" on the next.
+  // WHAT WE HAND OVER on an app. ONE word now, not two: the KIND entry that used
+  // to sit here was the very fault it was written to prevent — it worried that
+  // "somebody writes 'category' on one screen and 'type' on the next", and by
+  // then a brand asset already said Category and a ticket already said Type. So
+  // the concept moved up to `recordType`, and the deliverable keeps its own noun.
   deliverable: { term: "Deliverable", def: "Something we handed over on an app: a handover doc, an API reference, a recorded walkthrough, an SOP." },
-  deliverableKind: { term: "Kind", def: "What sort of thing a deliverable is. Your own list, so you can add one we haven't thought of." },
 
   // THE AGENCY'S OWN HOUSEKEEPING — the words for the three modules that describe
   // how we run ourselves. Every definition here says, or implies, the same thing

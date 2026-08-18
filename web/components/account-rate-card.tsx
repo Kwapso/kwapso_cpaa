@@ -43,14 +43,14 @@ export function AccountRateCard({
   accountName,
   canCreate,
   canEdit,
-  canRetire,
+  canDeactivate,
   actions: { busy, ask, act },
 }: {
   accountId: string
   accountName: string
   canCreate: boolean
   canEdit: boolean
-  canRetire: boolean
+  canDeactivate: boolean
   /** the host's confirm + write verbs — one confirm dialog on the record */
   actions: PanelActions
 }) {
@@ -124,13 +124,13 @@ export function AccountRateCard({
               <span className="text-sm tabular-nums">{rateText(r.centsPerHour, r.currency)}</span>
               {!r.active && (
                 <Badge variant="outline" className="text-muted-foreground text-[10px]">
-                  {t("Retired")}
+                  {t("Inactive")}
                 </Badge>
               )}
               {/* The third of the three rate rows, and the same fix as the other
                   two: facts on the line, the state as a badge, both actions in
-                  the row's own menu (N4, B2). The confirm on Retire travels with
-                  the action into the menu — moving a destructive act never
+                  the row's own menu (N4, B2). The confirm on Deactivate travels
+                  with the action into the menu — moving a destructive act never
                   removes the question it asks first. It also settles the
                   narrow-phone note this row used to carry: one trigger cannot
                   clip a second one off the edge. */}
@@ -148,40 +148,40 @@ export function AccountRateCard({
                         },
                       ]
                     : []),
-                  ...(canRetire
+                  ...(canDeactivate
                     ? [
                         r.active
                           ? {
-                              key: "retire",
-                              label: t("Retire"),
+                              key: "deactivate",
+                              label: t("Deactivate"),
                               icon: <Power className="size-3.5" />,
                               disabled: busy,
                               destructive: true,
                               onSelect: () =>
                                 ask({
-                                  title: `${t("Retire the")} ${r.label} ${t("rate?")}`,
+                                  title: `${t("Deactivate the")} ${r.label} ${t("rate?")}`,
                                   body: t(
                                     "It stops being offered on new work. What has already been charged at it stays exactly as it is, and you can bring it back any time."
                                   ),
-                                  action: t("Retire"),
+                                  action: t("Deactivate"),
                                   run: () =>
                                     act(
                                       () => tenancy.setAccountRateActive(r.id, false).then(refresh),
-                                      t("Rate retired."),
-                                      t("Couldn't retire that rate.")
+                                      t("Rate deactivated."),
+                                      t("Couldn't deactivate that rate.")
                                     ),
                                 }),
                             }
                           : {
-                              key: "restore",
-                              label: t("Restore"),
+                              key: "activate",
+                              label: t("Activate"),
                               icon: <Power className="size-3.5" />,
                               disabled: busy,
                               onSelect: () =>
                                 void act(
                                   () => tenancy.setAccountRateActive(r.id, true).then(refresh),
-                                  t("Rate restored."),
-                                  t("Couldn't restore that rate.")
+                                  t("Rate activated."),
+                                  t("Couldn't activate that rate.")
                                 ),
                             },
                       ]

@@ -86,7 +86,7 @@ export function SprintDetailScreen({
   // `work:read` (R18), and it renders as nothing exactly as a zero does.
   const storiesTotal = useCachedValue<number | null>(totalKey("stories-sprint", sprintId))
   // The team's own sprint-type vocabulary, for the mark and the standard length
-  // the Kind row shows. Cache-first: the form beside it reads the same key.
+  // the Type row shows. Cache-first: the form beside it reads the same key.
   const sprintTypes = useSprintTypes(teamId)
 
   const { can } = usePermissions(teamId)
@@ -143,7 +143,7 @@ export function SprintDetailScreen({
     // normally runs — the delivery catalogue's fields, on the thing they were
     // always describing. The DATES are still the ones somebody agreed; this
     // number is what to expect, said beside them.
-    { label: t("Kind"), value: kindLine },
+    { label: t("Type"), value: kindLine },
     { label: t("Client"), value: sprint.accountName || "Ours, no client" },
     { label: t("App"), value: sprint.appName || "—" },
     { label: t("What it's for"), value: sprint.goal ? <RichText html={sprint.goal} /> : "—" },

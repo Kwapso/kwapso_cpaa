@@ -85,7 +85,7 @@ const appField = {
 const titleField = { ...defaultFieldConfig, label: "What needs doing", required: true }
 const typeField = {
   ...defaultFieldConfig,
-  label: "Kind of work",
+  label: "Type",
   required: true,
   hint: "Editable on the Dropdown values screen.",
 }
@@ -324,7 +324,7 @@ export function StoryFormDialog({
           onChange={(v) => setValues((s) => ({ ...s, storyType: v === NONE ? "" : v }))}
           options={storyTypes.map((v) => ({ value: v, label: v }))}
           placeholder={t("Pick one")}
-          searchPlaceholder={t("Search kinds…")}
+          searchPlaceholder={t("Search types…")}
           emptyText={t("Nothing matched.")}
           disabled={busy}
         />

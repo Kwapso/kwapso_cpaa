@@ -99,7 +99,7 @@ export function SelectableScreen({
     }
   }
 
-  // Deactivate / reactivate one value. A deactivated value is retired, not deleted:
+  // Deactivate / reactivate one value. A deactivated value is switched off, not deleted:
   // it stays visible here (greyed, with an Activate button) so it's never a dead end,
   // and drops out of the form pickers. Same key the pickers read, so both refresh.
   async function setActive(v: SelectableValue, next: boolean) {
@@ -276,11 +276,11 @@ export function SelectableScreen({
                         <span className="flex-1 text-sm">{v.value}</span>
                         {!v.active && (
                           <Badge variant="outline" className="shrink-0">
-                            {t("Deactivated")}
+                            {t("Inactive")}
                           </Badge>
                         )}
                         {/* THE TWO ACTIONS, IN THE ROW'S OWN MENU (B2). The row
-                            was `mark · value · "Deactivated" · Edit · Power`:
+                            was `mark · value · "Inactive" · Edit · Power`:
                             two facts, a state and two actions in one sweep,
                             which is N4's other worked example. Facts on the
                             line, the state as a badge at the end of it, the

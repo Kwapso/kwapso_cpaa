@@ -1178,7 +1178,7 @@ export const EMAIL_CENSUS: Record<string, EmailClassification> = {
   /* ── tenancy: membership, invites, and the estate's own plumbing ── */
   "workers/tenancy/src/lib/invites.ts::createInvite": {
     refersToRecord: true,
-    link: "invite → the in-app Invitations inbox (agency; the portal has none, and an invite is how a portal login comes into being in the first place)",
+    link: "invite → the in-app invites inbox (agency; the portal has none, and an invite is how a portal login comes into being in the first place)",
   },
   "workers/tenancy/src/lib/notify.ts::notifyRoleChanged": {
     refersToRecord: true,
@@ -1190,7 +1190,7 @@ export const EMAIL_CENSUS: Record<string, EmailClassification> = {
   },
   "workers/tenancy/src/lib/notify.ts::notifyInviteRevoked": {
     refersToRecord: false,
-    why: "the invite it names has been withdrawn, so the Invitations inbox the invite email points at would show them nothing. 'No action is needed' is the whole message, and a button under it would suggest otherwise.",
+    why: "the invite it names has been withdrawn, so the invites inbox the invite email points at would show them nothing. 'No action is needed' is the whole message, and a button under it would suggest otherwise.",
   },
   "workers/tenancy/src/lib/sharding.ts::alertNewAlarms": {
     refersToRecord: false,

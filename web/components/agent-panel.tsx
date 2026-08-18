@@ -11,7 +11,7 @@
 // new-chat / open-thread actions — lives in web/lib/use-agent-chat.tsx. The
 // usage + history dialogs are self-contained components beside this one.
 //
-// The AI quota (free daily + credits) shows in the header. Using the agent needs
+// The credit count (free daily + what an admin added) shows in the header. Using the agent needs
 // agent:create; the server re-gates every action AS the signed-in user.
 
 import * as React from "react"

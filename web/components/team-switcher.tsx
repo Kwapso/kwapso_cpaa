@@ -110,7 +110,7 @@ export function TeamSwitcher({
           <>
             <DropdownMenuItem onSelect={() => softNavigate("/invitations")} className="gap-2">
               <Inbox className="size-4" />
-              <span className="min-w-0 flex-1">{t("Invitations")}</span>
+              <span className="min-w-0 flex-1">{t("Invites")}</span>
               <Badge variant="secondary" className="text-[10px]">
                 {pendingInvites}
               </Badge>

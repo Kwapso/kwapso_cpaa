@@ -124,13 +124,13 @@ const openTicket = () =>
     <HelpDetailScreen teamId="team-1" helpId="help-1" myUserId="u-1" basePath="/tickets" />
   )
 
-/** Choose the kind of work through the REAL control. It is the searchable
+/** Choose the story's TYPE through the REAL control. It is the searchable
  * RecordPicker now, not a Radix Select — a button that opens a popover holding
  * a cmdk list — so it opens on a click rather than on Enter. The option is
  * still chosen exactly as a person would, rather than a value being written
  * past the control. */
 async function pickStoryType() {
-  fireEvent.click(screen.getByLabelText(/kind of work/i))
+  fireEvent.click(screen.getByLabelText(/^type\s*\*?$/i))
   fireEvent.click(await screen.findByRole("option", { name: "Fix" }))
 }
 
@@ -166,7 +166,7 @@ describe("writing a story on the ticket that asked for it", () => {
     fireEvent.change(await screen.findByLabelText(/what needs doing/i), {
       target: { value: "Make the board responsive" },
     })
-    // The kind of work is required by the door, so the form collects it.
+    // The type is required by the door, so the form collects it.
     await pickStoryType()
     // …and the explicit "it changes no process", which the door refuses to infer.
     fireEvent.click(screen.getByLabelText(/changes no process/i))

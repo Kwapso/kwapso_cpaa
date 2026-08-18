@@ -115,11 +115,11 @@ const DESTINATIONS: Record<RecordKind, Record<Audience, Destination | null>> = {
     portal: null,
   },
   invite: {
-    // The in-app Invitations inbox: an already-signed-in person lands on Accept,
+    // The in-app invites inbox: an already-signed-in person lands on Accept,
     // a new one is sent to sign in and onboarding joins them. It is not
     // team-scoped — the whole point is that they are not in the team yet.
-    agency: { label: "Open your invitations", path: () => "/invitations" },
-    // The portal has no invitations screen, and an invite is how a portal login
+    agency: { label: "Open your invites", path: () => "/invitations" },
+    // The portal has no invites screen, and an invite is how a portal login
     // comes into being in the first place — there is nowhere else to send it.
     portal: null,
   },

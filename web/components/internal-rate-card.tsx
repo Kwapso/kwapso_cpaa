@@ -70,11 +70,11 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
   const { can } = usePermissions(teamId)
   const canCreate = can("commercials", "create")
   const canEdit = can("commercials", "edit")
-  const canRetire = can("commercials", "delete")
+  const canDeactivate = can("commercials", "delete")
 
   const [adding, setAdding] = React.useState(false)
   const [editing, setEditing] = React.useState<InternalRate | null>(null)
-  const [retiring, setRetiring] = React.useState<InternalRate | null>(null)
+  const [deactivating, setDeactivating] = React.useState<InternalRate | null>(null)
   const [busy, setBusy] = React.useState(false)
 
   const refresh = React.useCallback(async () => {
@@ -167,7 +167,7 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
               }`}
             >
               {/* ONE QUESTION PER PART OF THE ROW (N4). It read `label · rate ·
-                  "Used when unnamed" · "Retired" · Edit · Retire`: two facts,
+                  "Used when unnamed" · "Inactive" · Edit · Deactivate`: two facts,
                   two states and two actions in a single left-to-right sweep, and
                   the rule book uses this exact row as its worked example of the
                   "twisted" fault. Split by the question each part answers — the
@@ -179,7 +179,7 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
               <span className="text-sm tabular-nums">{rateText(r.centsPerHour, r.currency)}</span>
               {!r.active ? (
                 <Badge variant="outline" className="text-muted-foreground shrink-0 text-[10px]">
-                  {t("Retired")}
+                  {t("Inactive")}
                 </Badge>
               ) : (
                 r.isDefault && (
@@ -202,27 +202,27 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
                         },
                       ]
                     : []),
-                  ...(canRetire
+                  ...(canDeactivate
                     ? [
                         r.active
                           ? {
-                              key: "retire",
-                              label: t("Retire"),
+                              key: "deactivate",
+                              label: t("Deactivate"),
                               icon: <Power className="size-3.5" />,
                               disabled: busy,
                               destructive: true,
-                              onSelect: () => setRetiring(r),
+                              onSelect: () => setDeactivating(r),
                             }
                           : {
-                              key: "restore",
-                              label: t("Restore"),
+                              key: "activate",
+                              label: t("Activate"),
                               icon: <Power className="size-3.5" />,
                               disabled: busy,
                               onSelect: () =>
                                 void run(
                                   () => tenancy.setInternalRateActive(r.id, true),
-                                  t("Rate restored."),
-                                  t("Couldn't restore that rate.")
+                                  t("Rate activated."),
+                                  t("Couldn't activate that rate.")
                                 ),
                             },
                       ]
@@ -265,10 +265,10 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
 
       {/* Red and asks first, like every destructive action in the app — and the
           body says what survives, because nothing here is deleted. */}
-      <AlertDialog open={!!retiring} onOpenChange={(o) => !busy && !o && setRetiring(null)}>
+      <AlertDialog open={!!deactivating} onOpenChange={(o) => !busy && !o && setDeactivating(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("Retire the")} {retiring?.label} {t("rate?")}</AlertDialogTitle>
+            <AlertDialogTitle>{t("Deactivate the")} {deactivating?.label} {t("rate?")}</AlertDialogTitle>
             <AlertDialogDescription>
               {t("It stops being applied to time from now on. Everything already worked out with it stays exactly as it is, and you can bring it back any time.")}
             </AlertDialogDescription>
@@ -279,17 +279,17 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
               disabled={busy}
               onClick={(e) => {
                 e.preventDefault()
-                const r = retiring
+                const r = deactivating
                 if (!r) return
                 void run(
                   () => tenancy.setInternalRateActive(r.id, false),
-                  "Rate retired.",
-                  "Couldn't retire that rate."
-                ).then((ok) => ok && setRetiring(null))
+                  "Rate deactivated.",
+                  "Couldn't deactivate that rate."
+                ).then((ok) => ok && setDeactivating(null))
               }}
             >
               {busy ? <Spinner /> : null}
-              {busy ? "Working…" : "Retire"}
+              {busy ? "Working…" : "Deactivate"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -314,8 +314,8 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
  * for an hour?" two destinations.
  *
  * ONE FORM, ONE DOOR, ALL THREE MOVES. The ROLE is the key, so typing a role
- * that already has a price re-prices it, a new one adds it, and Retire turns it
- * off. There is no edit dialog because there is nothing to edit that is not the
+ * that already has a price re-prices it, a new one adds it, and Deactivate
+ * turns it off. There is no edit dialog because there is nothing to edit that is not the
  * two fields already on the screen.
  */
 export function RoleRateCard({ teamId }: { teamId: string }) {
@@ -392,7 +392,7 @@ export function RoleRateCard({ teamId }: { teamId: string }) {
               <span className="text-sm tabular-nums">{rateText(r.centsPerHour, null)}</span>
               {!r.active && (
                 <Badge variant="outline" className="text-muted-foreground shrink-0 text-[10px]">
-                  {t("Retired")}
+                  {t("Inactive")}
                 </Badge>
               )}
               {canEdit && (
@@ -410,8 +410,8 @@ export function RoleRateCard({ teamId }: { teamId: string }) {
                       },
                     },
                     {
-                      key: r.active ? "retire" : "restore",
-                      label: r.active ? t("Retire") : t("Restore"),
+                      key: r.active ? "deactivate" : "activate",
+                      label: r.active ? t("Deactivate") : t("Activate"),
                       icon: <Power className="size-3.5" />,
                       disabled: busy,
                       destructive: r.active,
@@ -420,7 +420,7 @@ export function RoleRateCard({ teamId }: { teamId: string }) {
                           r.roleName,
                           r.centsPerHour,
                           !r.active,
-                          r.active ? t("Rate retired.") : t("Rate restored.")
+                          r.active ? t("Rate deactivated.") : t("Rate activated.")
                         ),
                     },
                   ]}
