@@ -265,7 +265,7 @@ export function TicketAttachments({ ticketId }: { ticketId: string }) {
           <AlertDialogHeader>
             <AlertDialogTitle>{t("Take this off the ticket?")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t("{label} won't be part of this request any more. You can always send it again.", {
+              {t("{label} won't be part of this ticket any more. You can always send it again.", {
                 label: removing?.label ?? "",
               })}
             </AlertDialogDescription>

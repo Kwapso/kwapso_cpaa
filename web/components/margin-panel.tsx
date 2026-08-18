@@ -132,7 +132,7 @@ export function MarginPanel({
             the internal rate card, which is an agreed number rather than a
             measured one. Say so here rather than let somebody discover it. */}
         <p className="text-muted-foreground mt-2 text-xs">
-          {t("Sold, minus our own time at the rates on our cost card, minus what the tools cost each month. Our time is priced at agreed rates, not measured cost.")}
+          {t("Sold, minus our own time at our internal rates, minus what the tools cost each month. Our time is priced at agreed rates, not measured cost.")}
         </p>
         {/* …and this is the cost card that sentence means. Same shape as the
             "Manage dropdowns" link under a dropdown: small, gated, and it takes

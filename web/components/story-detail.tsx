@@ -328,7 +328,7 @@ export function StoryDetailScreen({
                 onClick={() => softNavigate(`${host.base}/tickets/${story.ticketId}`)}
                 className="hover:text-foreground underline-offset-2 hover:underline"
               >
-                {t("Answers")} {story.ticketRef ?? "a request"}
+                {t("Answers")} {story.ticketRef ?? "a ticket"}
               </button>
             )}
           </p>

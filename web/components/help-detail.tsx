@@ -626,7 +626,7 @@ export function HelpDetailScreen({
                 filter={{ ticketId: helpId }}
                 host={host}
                 onNew={canWriteWork ? () => setStoryOpen(true) : undefined}
-                emptyText="No work written down against this request yet."
+                emptyText="No work written down against this ticket yet."
               />
             )
           if (t.value === "time")

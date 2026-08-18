@@ -1,7 +1,7 @@
 "use client"
 
 // Add-a-dropdown-value dialog — the form overlay for creating a Selectable value
-// (a group + an option). Opened from the Dropdown values screen's "New value"
+// (a group + a value). Opened from the Dropdown values screen's "New value"
 // button. Like every other create in the base it goes through the shared FormShell
 // (Law R4: title/subtitle · separator · fields · separator · action) and persists a
 // per-session draft (Law R7 · CACHING.md §11). The caller does the create + cache
@@ -25,7 +25,7 @@ import { useFormDraft } from "@shared/web/use-form-draft"
 import { useT } from "@shared/web/language"
 
 const groupField = { ...defaultFieldConfig, label: "Group", required: true }
-const optionField = { ...defaultFieldConfig, label: "Option", required: true }
+const optionField = { ...defaultFieldConfig, label: "Value", required: true }
 /** THE TYPE MARK (CHECKLIST 11.8, UI-RULEBOOK G2). One glyph, set HERE rather
  * than written into a component, which is the fourth condition UI-CONVENTIONS §5
  * puts on a type mark. Optional on purpose: most groups are plain labels, and a
@@ -65,7 +65,7 @@ export function SelectableFormDialog({
       clearDraft()
       onOpenChange(false)
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't add that option.")
+      toast.error(err instanceof ApiFailure ? err.message : "Couldn't add that value.")
     } finally {
       setBusy(false)
     }
@@ -81,7 +81,7 @@ export function SelectableFormDialog({
       title={<DialogTitle>{t("New dropdown value")}</DialogTitle>}
       subtitle={
         <DialogDescription>
-          {t("Pick an existing group or start a new one, then add the option.")}
+          {t("Pick an existing group or start a new one, then add the value.")}
         </DialogDescription>
       }
       submit={{
@@ -111,7 +111,7 @@ export function SelectableFormDialog({
           id="selectable-value"
           value={values.value}
           onChange={(e) => setValues((v) => ({ ...v, value: e.target.value }))}
-          placeholder={t("New option")}
+          placeholder={t("e.g. Question")}
           disabled={busy}
         />
       </Field>

@@ -258,7 +258,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
                 className="gap-1 self-start"
                 onClick={() => copyInstructions(secret)}
               >
-                <ClipboardCopy className="size-3.5" aria-hidden /> {t("Copy setup prompt for any AI")}
+                <ClipboardCopy className="size-3.5" aria-hidden /> {t("Copy setup instructions for any AI")}
               </Button>
               <div className="flex flex-wrap justify-end gap-2">
                 <Button
