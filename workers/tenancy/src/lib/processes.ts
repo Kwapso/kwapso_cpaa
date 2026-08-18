@@ -75,6 +75,47 @@ async function insertRow(
 
 // ── apps ─────────────────────────────────────────────────────────────────────
 
+/** THE APPS THIS CALLER MAY SEE, AS A QUESTION — the account fence plus the
+ * optional narrowing to one client, written once so the rows and the count over
+ * them cannot be asked differently (R16). */
+function appsWhere(scope: AccountScope, opts: { accountId?: string }): { sql: string; params: string[] } {
+  const fence = accountScopeClause(scope, "account_id")
+  return {
+    sql: where([fence.sql, opts.accountId ? "account_id = ?" : undefined]),
+    params: opts.accountId ? [...fence.params, opts.accountId] : [...fence.params],
+  }
+}
+
+/** R16: the exact server COUNT(*) an Apps badge shows, over the SAME fence and
+ * the same narrowing the list applies. Not bounded through the count seam
+ * because `apps` is not a GROWING_COLLECTIONS row — an agency has tens of built
+ * systems, not thousands, which is the same reason the list is capped and not
+ * paged.
+ *
+ * Apart from the list because a client's record now badges its Apps tab BEFORE
+ * the tab is opened (shared/record-counts.ts) — the whole point being not to
+ * pull the rows to learn how many there are.
+ *
+ * IT DOES NOT SUBTRACT RECORD-LEVEL VISIBILITY, and that is deliberate rather
+ * than an oversight: `listApps` withholds four context FIELDS from a reader who
+ * is not staffed on an app (8.11), and everyone still SEES the app. The row is
+ * in the list either way, so the count over the list is the count. */
+export async function countApps(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  opts: { accountId?: string } = {}
+): Promise<number> {
+  const q = appsWhere(scope, opts)
+  const rows = await d1Query<{ n: number }>(
+    cfg,
+    guard.databaseId,
+    `SELECT COUNT(*) AS n FROM apps${q.sql}`,
+    q.params
+  )
+  return rows[0]?.n ?? 0
+}
+
 /** The team's apps. BOUNDED, not paged: an app is a whole built system, and an
  * agency has tens of them, not thousands — the collection that grows underneath
  * is `processes`, which pages. */
@@ -84,9 +125,7 @@ export async function listApps(
   scope: AccountScope,
   opts: { accountId?: string } = {}
 ): Promise<{ rows: AppRow[]; total: number }> {
-  const fence = accountScopeClause(scope, "account_id")
-  const sql = where([fence.sql, opts.accountId ? "account_id = ?" : undefined])
-  const params = opts.accountId ? [...fence.params, opts.accountId] : [...fence.params]
+  const { sql, params } = appsWhere(scope, opts)
   const [rows, counted] = await Promise.all([
     d1Query<{
       id: string
@@ -120,8 +159,9 @@ export async function listApps(
       params
     ),
     // R16: the exact total of what THIS caller may see — the same WHERE, so a
-    // badge can never count rows the list withholds.
-    d1Query<{ n: number }>(cfg, guard.databaseId, `SELECT COUNT(*) AS n FROM apps${sql}`, params),
+    // badge can never count rows the list withholds. ONE expression, shared with
+    // the eager badge above.
+    countApps(cfg, guard, scope, opts),
   ])
   // WHO MAY OPEN WHAT (8.11). Aurora's ruling: everyone still SEES an app in the
   // overview, and only the staff on it (plus an admin) open its detail. That is
@@ -175,7 +215,7 @@ export async function listApps(
         editedByName: scope.kind === "portal" ? null : r.editor_name,
       }
     }),
-    total: counted[0]?.n ?? 0,
+    total: counted,
   }
 }
 
@@ -606,6 +646,29 @@ function processesWhere(scope: AccountScope, opts: ProcessFilters): { sql: strin
   return { sql: where([fence.sql, ...filters]), params }
 }
 
+/** R16 (amended): the exact server total behind a process-map badge — the SAME
+ * WHERE and the SAME join the page uses, counted exactly to TOTAL_COUNT_CAP
+ * through the one bounded seam and reported as "at least" beyond it, because
+ * `processes` GROWS with ordinary use.
+ *
+ * Apart from the list for the reason the whole of shared/record-counts.ts
+ * exists: an app's Process maps tab is badged when the record opens, and pulling
+ * a page of maps to learn how many there are is what the eager count replaces. */
+export async function countProcesses(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  opts: ProcessFilters = {}
+): Promise<number> {
+  const { sql, params } = processesWhere(scope, opts)
+  return countCollection(
+    cfg,
+    guard.databaseId,
+    `SELECT 1 FROM processes p JOIN apps a ON a.id = p.app_id${sql}`,
+    params
+  )
+}
+
 /** The team's processes, newest first, PAGED by key.
  *
  * R14: processes GROW with ordinary use — every app of every client grows a map,
@@ -652,13 +715,9 @@ export async function listProcesses(
     ),
     // R16 (amended): the total behind the page — the SAME WHERE and the SAME
     // join, so a badge can never count rows the list withholds — counted exactly
-    // to TOTAL_COUNT_CAP and "at least" beyond it.
-    countCollection(
-      cfg,
-      guard.databaseId,
-      `SELECT 1 FROM processes p JOIN apps a ON a.id = p.app_id${base}`,
-      params
-    ),
+    // to TOTAL_COUNT_CAP and "at least" beyond it. ONE expression, shared with
+    // the eager badge above.
+    countProcesses(cfg, guard, scope, opts),
   ])
 
   const page = toPage(rows, PAGE_SIZE, (r) => [r.created_at, r.id])

@@ -77,6 +77,15 @@ const TOOLLESS_DOORS: Record<string, string> = {
     "the forensic trail behind ONE invite (who sent it, when it was opened, when it was revoked). The invite's own state — email, role, status, id — is already machine-readable through list_invites; this is the strip a person reads on the invite's detail when something looks wrong.",
   "GET /api/tenancy/activity":
     "the cross-module history feed, and the one door whose answer is assembled by SUBTRACTING the caller's denied modules (R18). Everything it reports is readable through the module's own tools, with that module's own gate; putting the merged stream on the machine surface is a separate decision for the owner, not a parity default.",
+  // THE TWO BADGE DOORS — one per worker, because the counting functions live
+  // with the modules that own them. They exist to save a SCREEN round trips: a
+  // record's tabs are badged when the record opens instead of when a tab is
+  // clicked, so what they return is a bundle of numbers the machine surface can
+  // already get, each with more control than this door offers.
+  "GET /api/tenancy/record-counts":
+    "how many apps, process maps and rate lines hang off one record — a bundle assembled so a SCREEN can badge its tabs in one round trip instead of five. Every figure in it is already machine-readable, exactly and with filters this door does not take: `list_apps` and `list_processes` each answer with the same exact `total` over the same narrowing, from the same count. A tool here would be a slower way to ask questions the surface can already ask, and its `null` (meaning 'your role may not read that module') is a distinction a tool caller learns better from being refused by the door itself.",
+  "GET /api/content/record-counts":
+    "the same bundle, content's half — sprints, stories, to-dos, tickets, meetings and a ticket's files. Same reason, and the same list of tools that already answer it one at a time with the narrowing of the caller's choosing: `list_sprints`, `list_stories`, `list_todos`, `list_help_tickets`, `list_meetings`.",
   "GET /api/tenancy/config/screens":
     "the screen-engine recipe store — which blocks the AGENCY APP renders on a module's screen. It describes an interface, not the team's data, and an MCP client has no screen to render it on.",
   "POST /api/tenancy/config/screens":

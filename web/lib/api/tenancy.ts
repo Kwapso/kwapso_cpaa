@@ -36,6 +36,7 @@ import type {
   TeamRole,
   TeamSummary,
 } from "@shared/types"
+import type { RecordCounts } from "@shared/record-counts"
 import type { SavingsView } from "@shared/workers/savings"
 import { api, enc, post } from "@shared/web/api"
 import type { PagedResponse } from "@shared/web/api"
@@ -450,6 +451,12 @@ export const tenancy = {
     const qs = p.toString()
     return api<SavingsView>(`/api/tenancy/value${qs ? `?${qs}` : ""}`)
   },
+
+  /** HOW MANY OF EACH THING HANG OFF ONE RECORD — this worker's half (apps,
+   * process maps, the rate card). Asked when the record opens so its tabs are
+   * badged before anybody clicks one; the rows behind each tab stay lazy. */
+  recordCounts: (table: string, id: string) =>
+    api<RecordCounts>(`/api/tenancy/record-counts?table=${enc(table)}&id=${enc(id)}`),
 
   /* ---- the money (agency only — every door below refuses a client login) ---- */
 

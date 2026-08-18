@@ -72,6 +72,7 @@ import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, useCached, useCachedValue } from "@shared/web/store"
 import { useRecordActivity } from "@/lib/use-record-activity"
+import { useRecordCounts } from "@/lib/use-record-counts"
 import { useT } from "@shared/web/language"
 
 export function ContactDetailScreen({
@@ -113,11 +114,18 @@ export function ContactDetailScreen({
   const canSeeTickets = can("help", "read")
   const canSeeMeetings = can("meetings", "read")
 
-  // R16: the exact server totals the tabs badge, each primed by the panel's own
-  // fetch over the same narrowed question its rows came from.
-  const todosTotal = useCachedValue<number>(totalKey("todos-account", accountId))
-  const ticketsTotal = useCachedValue<number>(totalKey("tickets-account", accountId))
-  const meetingsTotal = useCachedValue<number>(totalKey("meetings-account", accountId))
+  // THE BADGES, BEFORE THE CLICK. A person and a company are one table, so this
+  // is the same one bounded read the company screen makes — the door skips any
+  // collection whose module this role cannot read, and the three tabs a person
+  // does not have are three numbers nothing on this screen looks at.
+  useRecordCounts("accounts", accountId)
+  // R16: the exact server totals the tabs badge — from the counts read above,
+  // and re-primed by each panel's own fetch over the same narrowed question its
+  // rows came from. `null` means the role may not read that module (R18), which
+  // renders as nothing exactly as a zero does and stays a different fact.
+  const todosTotal = useCachedValue<number | null>(totalKey("todos-account", accountId))
+  const ticketsTotal = useCachedValue<number | null>(totalKey("tickets-account", accountId))
+  const meetingsTotal = useCachedValue<number | null>(totalKey("meetings-account", accountId))
 
   const [tab, setTab] = React.useState("overview")
   const [editOpen, setEditOpen] = React.useState(false)

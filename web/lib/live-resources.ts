@@ -14,7 +14,8 @@
 
 import { content as contentApi, tenancy } from "@/lib/api"
 import { TASK_VIEWS, type HelpTicket, type TaskViewName } from "@shared/types"
-import { primeCache, readCache } from "@shared/web/store"
+import { RECORD_CHILDREN } from "@shared/record-counts"
+import { cachedKeys, primeCache, readCache } from "@shared/web/store"
 
 /** The sidecar cache key holding a collection's exact server total (R16). */
 export function totalKey(prefix: string, teamId: string): string {
@@ -357,6 +358,46 @@ export function insightsKey(teamId: string): string {
   return `insights:${teamId}`
 }
 
+/** THE BADGES ON ONE RECORD'S TABS — how many apps, sprints, to-dos, tickets,
+ * meetings or files hang off it, fetched when the record OPENS rather than when
+ * a tab is clicked (shared/record-counts.ts says why, and which).
+ *
+ * Its own cache key, and not merely the sidecars it primes, because the LIVE
+ * layer has to be able to NAME something: a count fetched once and never re-read
+ * would replace "blank until you click" with "stale for ever", which is worse
+ * because it looks right. Dropping this key re-reads every one of that record's
+ * badges in one round trip — the same shape the pulse above already has. */
+export function recordCountsKey(table: string, id: string): string {
+  return `counts:record:${table}:${id}`
+}
+
+/** THE PREFIX over that family, so the listener below and the key above cannot
+ * drift apart. */
+const RECORD_COUNTS_PREFIX = "counts:record:"
+
+/** WHICH LOADED RECORDS' BADGES THIS RESOURCE MOVES (R15).
+ *
+ * A ping carries the CHILD row's id — a new sprint, a withdrawn to-do — and the
+ * record it hangs off is on the row, which the listener has not read and may
+ * never read. So the parent cannot be derived from the ping; it can only be
+ * found by looking at which record screens are open. `cachedKeys` answers that,
+ * and the registry answers "does this record's badge count that resource?", so
+ * a story landing drops the counts of the app, sprint and ticket screens on
+ * display and leaves a client's record — which badges no stories — alone.
+ *
+ * DERIVED, never hand-listed: a new child collection in RECORD_CHILDREN is live
+ * the day it is added, which is R8's sentence about badges applied to the layer
+ * that keeps them true. Cache-first, so this is normally nothing at all — a
+ * record nobody has open has no entry to drop. */
+function recordCountDeps(resource: string): string[] {
+  return cachedKeys(RECORD_COUNTS_PREFIX).filter((key) => {
+    // `counts:record:<table>:<id>` — the table is the one segment we need, and
+    // an id may itself contain nothing that breaks this, since it is a ULID.
+    const table = key.slice(RECORD_COUNTS_PREFIX.length).split(":")[0]
+    return (RECORD_CHILDREN[table] ?? []).some((child) => child.resource === resource)
+  })
+}
+
 export function runningTimersKey(teamId: string): string {
   return `running-timers:${teamId}`
 }
@@ -655,11 +696,15 @@ export const TEAM_RESOURCES: Record<
     // …and the PULSE, whose open-ticket number and stage chart are counted off
     // this collection. A derived cache has no row to patch, so it is dropped and
     // re-read — and only actually re-read when a screen is showing it.
+    // …and the TAB BADGES of any record counting tickets — an app's Tickets tab,
+    // a contact's — which are now answered when the record opens rather than
+    // when the tab is clicked, so nothing else would ever re-read them (R15).
     deps: (t, id) => [
       `activity:record:help:${id}`,
       `help-stakeholders:${id}`,
       `help-mine:${t}`,
       insightsKey(t),
+      ...recordCountDeps("help"),
     ],
     // …and every per-account slice of the ticket list — a contact's Tickets tab
     // is one of those, and a slice nobody drops is a tab that goes stale the
@@ -676,7 +721,14 @@ export const TEAM_RESOURCES: Record<
     idField: "id",
     fetchOne: (id) => tenancy.processRow(id),
     fetchList: (t) => listFetch.processes(t),
-    deps: (t, id) => [processKey(id), processCommentsKey(id), `activity:record:processes:${id}`, valueKey(t)],
+    deps: (t, id) => [
+      processKey(id),
+      processCommentsKey(id),
+      `activity:record:processes:${id}`,
+      valueKey(t),
+      // …and the Process maps badge on whichever app screen is open (R15).
+      ...recordCountDeps("processes"),
+    ],
     // …and any OLDER version somebody has open. A cut is a `processes` ping, and
     // it is the one event that changes what an old version IS — the version that
     // was current a moment ago is now one of these. The ping names the map, not
@@ -704,7 +756,13 @@ export const TEAM_RESOURCES: Record<
     idField: "id",
     fetchOne: (id) => contentApi.storyOne(id),
     fetchList: (t) => listFetch.stories(t),
-    deps: (t, id) => [`activity:record:stories:${id}`, sprintsKey(t), insightsKey(t)],
+    // …and the Stories badge on whichever app, sprint or ticket is open (R15).
+    deps: (t, id) => [
+      `activity:record:stories:${id}`,
+      sprintsKey(t),
+      insightsKey(t),
+      ...recordCountDeps("stories"),
+    ],
   },
   // A sprint has a list of its own, and its rows carry counts of the stories
   // inside it — so a sprint ping patches the sprint row and leaves the backlog
@@ -714,7 +772,8 @@ export const TEAM_RESOURCES: Record<
     idField: "id",
     fetchOne: (id) => contentApi.sprintOne(id),
     fetchList: (t) => listFetch.sprints(t),
-    deps: (_t, id) => [`activity:record:sprints:${id}`],
+    // …and the Sprints badge on whichever client or app record is open (R15).
+    deps: (_t, id) => [`activity:record:sprints:${id}`, ...recordCountDeps("sprints")],
   },
   // TIME — row-level live, and the one resource whose ping most often lands on
   // the person who caused it: the header timer is on every screen, so starting
@@ -746,7 +805,9 @@ export const TEAM_RESOURCES: Record<
     idField: "id",
     fetchOne: (id) => contentApi.todoOne(id),
     fetchList: (t) => listFetch.todos(t),
-    deps: (_t, id) => [`activity:record:todos:${id}`],
+    // …and the To-dos badge on whichever client's record is open (R15) — the one
+    // of these a CLIENT can move, from their own portal, while we are looking.
+    deps: (_t, id) => [`activity:record:todos:${id}`, ...recordCountDeps("todos")],
   },
   // TASKS — our own admin, agency-side only. The row-level patch lands on the
   // OPEN list; the OTHER FIVE views are dropped instead, because a task that has
@@ -784,7 +845,12 @@ export const TEAM_RESOURCES: Record<
     // …and the team's own pulse, which counts THIS WEEK'S meetings: a diary
     // entry that appears or is cancelled moves a number on Home, and a stale
     // headline beside a list that just changed is the same fault one line up.
+    //
+    // …and the Meetings badge on whichever app or contact record is open, for
+    // the same reason one line up: the badge is answered when the record opens,
+    // so nothing else would ever re-read it (R15).
     deps: (t, id) => [
+      ...recordCountDeps("meetings"),
       `activity:record:meetings:${id}`,
       meetingPeopleKey(id),
       meetingTranscriptKey(id),
@@ -843,7 +909,11 @@ export const TEAM_RESOURCES: Record<
     idField: "id",
     fetchOne: (id) => tenancy.accountRow(id),
     fetchList: (t) => listFetch.accounts(t),
-    deps: (_t, id) => [ratesKey(id), marginKey(id), accountKey(id)],
+    // The ping carries the ACCOUNT, so the record's own counts key is nameable
+    // directly — but it goes through the same derivation as everything else, so
+    // there is one answer to "which badges does this resource move" rather than
+    // one general one and one special case (R15).
+    deps: (_t, id) => [ratesKey(id), marginKey(id), accountKey(id), ...recordCountDeps("account_rates")],
   },
   // APPS — row-level live now that they have a list and a record screen of their
   // own. Like the staff profiles above, an app has no by-id read door (it is
@@ -857,7 +927,14 @@ export const TEAM_RESOURCES: Record<
     idField: "id",
     fetchOne: (id) => tenancy.apps().then((r) => r.apps.find((a) => a.id === id) ?? null),
     fetchList: (t) => listFetch.apps(t),
-    deps: (t, id) => [valueKey(t), sprintsKey(t), storiesKey(t), `activity:record:apps:${id}`],
+    // …and the Apps badge on whichever client's record is open (R15).
+    deps: (t, id) => [
+      valueKey(t),
+      sprintsKey(t),
+      storiesKey(t),
+      `activity:record:apps:${id}`,
+      ...recordCountDeps("apps"),
+    ],
   },
 }
 
@@ -891,7 +968,11 @@ export const SIMPLE_INVALIDATIONS: Record<string, (teamId: string) => string[]> 
   // because a sprint row carries the counts of the stories inside it.
   // …and the pulse with them: a file of stories moves the backlog number Home
   // shows, and an import is the one write that moves it by hundreds at once.
-  work: (t) => [storiesKey(t), sprintsKey(t), insightsKey(t)],
+  // …and the tab badges of any record open at the time. An import is the one
+  // write that moves those by hundreds at once, and it is also the one that
+  // carries no row id — so the per-row `deps` path below never runs for it, and
+  // this is the only place the badges hear about it (R15).
+  work: (t) => [storiesKey(t), sprintsKey(t), insightsKey(t), ...recordCountDeps("stories")],
   // THE IMPORT'S OWN PINGS. The import engine publishes each TargetDef's MODULE
   // key (never a row id — a batch touches many rows and no one row is the
   // change), so one module name reaches the live layer that no single table

@@ -47,6 +47,7 @@ import { softNavigate } from "@/lib/nav"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useRecordActivity } from "@/lib/use-record-activity"
+import { useRecordCounts } from "@/lib/use-record-counts"
 import type { Sprint } from "@shared/types"
 import { moneyText } from "@shared/web/money"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
@@ -78,7 +79,12 @@ export function SprintDetailScreen({
   // the list holds — opening one costs no round-trip.
   const sprintsQ = useCached<Sprint[]>(sprintsKey(teamId), () => listFetch.sprints(teamId))
   const activity = useRecordActivity("sprints", sprintId)
-  const storiesTotal = useCachedValue<number>(totalKey("stories-sprint", sprintId))
+  // THE BADGE, BEFORE THE CLICK — the work inside this block, counted when the
+  // sprint opens rather than when the tab is opened; the rows stay lazy.
+  useRecordCounts("sprints", sprintId)
+  // `null` is the third answer beside a number and an absence: the role holds no
+  // `work:read` (R18), and it renders as nothing exactly as a zero does.
+  const storiesTotal = useCachedValue<number | null>(totalKey("stories-sprint", sprintId))
   // The team's own sprint-type vocabulary, for the mark and the standard length
   // the Kind row shows. Cache-first: the form beside it reads the same key.
   const sprintTypes = useSprintTypes(teamId)

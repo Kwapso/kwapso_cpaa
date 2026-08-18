@@ -56,6 +56,7 @@ import { appStageMark } from "@shared/app-stages"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useRecordActivity } from "@/lib/use-record-activity"
+import { useRecordCounts } from "@/lib/use-record-counts"
 import type { Account, AppRow } from "@shared/types"
 import { invalidate, useCached, useCachedValue } from "@shared/web/store"
 import { useT } from "@shared/web/language"
@@ -79,13 +80,20 @@ export function AppDetailScreen({
   // The ONE web-side read of a record's history (R5) — rows, the door's exact
   // COUNT(*) for the tab badge, and the cursor the feed below spends.
   const activity = useRecordActivity("apps", appId)
-  // The exact totals the three collection tabs badge (R16). Each is primed by
-  // the panel's own fetch, over the same filter the panel's rows came from.
-  const sprintsTotal = useCachedValue<number>(totalKey("sprints-app", appId))
-  const storiesTotal = useCachedValue<number>(totalKey("stories-app", appId))
-  const mapsTotal = useCachedValue<number>(totalKey("processes-app", appId))
-  const meetingsTotal = useCachedValue<number>(totalKey("meetings-app", appId))
-  const ticketsTotal = useCachedValue<number>(totalKey("tickets-app", appId))
+  // THE BADGES, BEFORE THE CLICK. Five collections hang off a system and all
+  // five used to be blank until you opened the tab — this record is the one the
+  // owner named first. One bounded read of every total, primed into the same
+  // sidecars below; the ROWS behind each tab stay lazy.
+  useRecordCounts("apps", appId)
+  // The exact totals the five collection tabs badge (R16) — from the counts read
+  // above, and re-primed by each panel's own fetch over the same filter its rows
+  // came from. `null` is the third answer: the role may not read that module
+  // (R18), which renders as nothing exactly as a zero does.
+  const sprintsTotal = useCachedValue<number | null>(totalKey("sprints-app", appId))
+  const storiesTotal = useCachedValue<number | null>(totalKey("stories-app", appId))
+  const mapsTotal = useCachedValue<number | null>(totalKey("processes-app", appId))
+  const meetingsTotal = useCachedValue<number | null>(totalKey("meetings-app", appId))
+  const ticketsTotal = useCachedValue<number | null>(totalKey("tickets-app", appId))
 
   const { can } = usePermissions(teamId)
   const canEdit = can("processes", "edit")

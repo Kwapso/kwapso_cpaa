@@ -43,6 +43,7 @@ import { usePermissions } from "@/lib/perms"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { formatCount } from "@shared/web/format-count"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
+import { useRecordCounts } from "@/lib/use-record-counts"
 import { HelpAttachmentsPanel, helpAttachmentsKey } from "@/components/help-attachments"
 import { HelpFormDialog } from "@/components/help-form-dialog"
 import { HelpStakeholders } from "@/components/help-stakeholders"
@@ -119,6 +120,10 @@ export function HelpDetailScreen({
   // The generic record feed (Law R5) + the exact server total its tab badges
   // (R8 for the place, R16 for the number — never the loaded page's length).
   const activity = useRecordActivity("help", helpId)
+  // THE BADGES, BEFORE THE CLICK — the work written down against this request,
+  // and what is attached to it. One bounded read of both totals when the ticket
+  // opens; the rows behind each tab stay lazy (lib/use-record-counts).
+  useRecordCounts("help", helpId)
   const selectableQ = useCached<SelectableValue[]>(`selectable:${teamId}`, () =>
     tenancy.selectable().then((r) => r.values)
   )
@@ -140,12 +145,14 @@ export function HelpDetailScreen({
   const [resolving, setResolving] = React.useState(false)
   const [translating, setTranslating] = React.useState(false)
   const [statusBusy, setStatusBusy] = React.useState(false)
-  // R16: the Files and links tab badges the door's exact COUNT(*).
-  const attachmentsTotal = useCachedValue<number>(`total:${helpAttachmentsKey(helpId)}`)
+  // R16: the Files and links tab badges the door's exact COUNT(*). `null` there
+  // is the third answer beside a number and an absence — the role may not read
+  // the module (R18) — and it renders as nothing, exactly as a zero does.
+  const attachmentsTotal = useCachedValue<number | null>(`total:${helpAttachmentsKey(helpId)}`)
   // THE WORK ANSWERING THIS REQUEST. One story may answer many tickets and one
   // ticket may need many stories (the owner's ruling), so this is a collection
   // on the record rather than a field on it. Its exact total badges the tab.
-  const storiesTotal = useCachedValue<number>(totalKey("stories-ticket", helpId))
+  const storiesTotal = useCachedValue<number | null>(totalKey("stories-ticket", helpId))
   const host = { base: basePath.replace(/\/tickets$/, "") }
 
   // Land on the newest reply, and follow the one you just sent — the same
