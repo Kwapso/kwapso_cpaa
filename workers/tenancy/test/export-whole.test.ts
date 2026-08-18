@@ -115,7 +115,7 @@ describe("the roles export refuses rather than revoking", () => {
     const body = (await res.json()) as { error: string; message: string }
     expect(body.error).toBe("export_too_large")
     // It has to say what to DO — a refusal with no next step is a dead end.
-    expect(body.message.toLowerCase()).toContain("retire")
+    expect(body.message.toLowerCase()).toContain("deactivate")
   })
 
   // THE OTHER CEILING, and why it needs a case of its own. With ten modules

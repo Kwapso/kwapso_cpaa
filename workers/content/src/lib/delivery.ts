@@ -154,7 +154,7 @@ export async function updateMeetingPurpose(
   })
 }
 
-/** Retire or restore a meeting purpose. R17: the predicate rides the UPDATE. */
+/** Archive or restore a meeting purpose. R17: the predicate rides the UPDATE. */
 export async function setMeetingPurposeActive(
   cfg: D1Rest,
   guard: MemberGuard,

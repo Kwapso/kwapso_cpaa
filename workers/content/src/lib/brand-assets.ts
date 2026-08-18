@@ -147,7 +147,7 @@ export async function updateBrandAsset(
   })
 }
 
-/** Retire or restore an asset. R17: the predicate rides the UPDATE.
+/** Archive or restore an asset. R17: the predicate rides the UPDATE.
  *
  * The BYTES are deliberately not reclaimed here, for the reason Learning states
  * at length: an edit SUPERSEDES a file (nothing points at it, so it is garbage),

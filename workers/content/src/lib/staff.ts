@@ -178,7 +178,7 @@ ON CONFLICT(user_id) WHERE deactivated_at IS NULL DO UPDATE SET
   return { id, created: !before }
 }
 
-/** Retire or restore a profile. R17: the predicate rides the UPDATE.
+/** Deactivate or activate a profile. R17: the predicate rides the UPDATE.
  *
  * Retiring is how a profile is taken down without losing what it said — a person
  * leaving, or asking for it to come off the board. Restoring is refused by the
@@ -372,7 +372,7 @@ export async function updateStaffCertificate(
   })
 }
 
-/** Retire or restore a certificate. R17: the predicate rides the UPDATE. */
+/** Archive or restore a certificate. R17: the predicate rides the UPDATE. */
 export async function setStaffCertificateActive(
   cfg: D1Rest,
   guard: MemberGuard,

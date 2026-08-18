@@ -249,7 +249,7 @@ export async function updateInternalRate(
   })
 }
 
-/** Retire / restore an internal rate. R17 predicate; zero rows moved = silence. */
+/** Deactivate / activate an internal rate. R17 predicate; zero rows moved = silence. */
 export async function setInternalRateActive(
   cfg: D1Rest,
   guard: MemberGuard,

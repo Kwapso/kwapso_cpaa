@@ -75,7 +75,7 @@ export async function getRolesExport(request: Request, env: Env): Promise<Respon
     return exportTooLarge(
       Math.min(total, LIST_HARD_CAP),
       "roles",
-      "Retire the roles you no longer use, or read the Roles screen instead, a file this size would import back as a permission change nobody asked for."
+      "Deactivate the roles you no longer use, or read the Roles screen instead, a file this size would import back as a permission change nobody asked for."
     )
   const permsByRole = perms.byRole
   const auditBy = new Map(audit.map((a) => [a.id, a]))
@@ -159,7 +159,7 @@ export async function postCreateRole(request: Request, env: Env): Promise<Respon
     return fail(
       403,
       "role_limit",
-      `This team already has ${MAX_ROLES_PER_TEAM} roles, which is the limit. Retire one you no longer use and try again.`
+      `This team already has ${MAX_ROLES_PER_TEAM} roles, which is the limit. Deactivate one you no longer use and try again.`
     )
   // Creating WITH a permission matrix (the import round-trip / a matrix-carrying
   // CSV) is create + edit in one move, so it demands BOTH rights — the same gate
