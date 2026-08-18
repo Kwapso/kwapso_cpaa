@@ -722,7 +722,35 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
  * DATA, not a hand-list in a test: adding a growing module means adding a line here. */
 export const GROWING_COLLECTIONS: Record<
   string,
-  { lib: string; fn: string; routes: string; rowsKey: string; webKey: string; listRecipe?: string; why: string }
+  {
+    lib: string
+    fn: string
+    routes: string
+    rowsKey: string
+    webKey: string
+    listRecipe?: string
+    /** WHERE PAGE TWO IS REACHED — the component holding THIS collection's own
+     * `<LoadMore>`, relative to `web/`, and the string that must appear inside
+     * that control's own props.
+     *
+     * Per-ENTRY because the check over it used to be per-BRANCH, and one branch
+     * stood for three collections. It keyed on `!c.listRecipe`, which is true of
+     * `recordActivity`, `activity` AND `workLogs`, and then asserted a
+     * `<LoadMore listKey={activity.listKey}>` inside `activity-panel.tsx` — the
+     * record feed's control, and nothing whatever to do with the team feed or the
+     * work-log list. For those two the conjunct was a CONSTANT: deleting their
+     * pagers outright left the build green, where the older, weaker-looking
+     * sentence it replaced had gone red.
+     *
+     * `pagerKey` is usually the same string as `webKey`. On the record feed it is
+     * not — that control reads `listKey={activity.listKey}`, a value the hook
+     * hands it — and that difference is the reason this is named here rather than
+     * inferred: the two halves of that pairing live in two files by construction,
+     * so each has to be pointed at. */
+    pagerFile: string
+    pagerKey: string
+    why: string
+  }
 > = {
   help: {
     lib: "workers/content/src/lib/help.ts",
@@ -731,6 +759,8 @@ export const GROWING_COLLECTIONS: Record<
     rowsKey: "tickets",
     listRecipe: "tickets.list",
     webKey: "helpKey(",
+    pagerFile: "components/tickets-collection.tsx",
+    pagerKey: "helpKey(",
     why: "tickets accumulate forever — a team that has raised 3,000 must still reach the oldest",
   },
   knowledge: {
@@ -740,6 +770,8 @@ export const GROWING_COLLECTIONS: Record<
     rowsKey: "sources",
     listRecipe: "knowledge.list",
     webKey: "knowledgeKey(",
+    pagerFile: "components/deep-link/collection-content.tsx",
+    pagerKey: "knowledgeKey(",
     why: "one source per ticket, per article, per account, plus every note anybody writes — the agency's own history is thousands of rows on day one and the sweep only ever adds",
   },
   accounts: {
@@ -749,6 +781,8 @@ export const GROWING_COLLECTIONS: Record<
     rowsKey: "accounts",
     listRecipe: "accounts.list",
     webKey: "accountsKey(",
+    pagerFile: "components/deep-link/collection-content.tsx",
+    pagerKey: "accountsKey(",
     why: "every company AND every person an agency works with is a row here — a contact list that only grows, so a ceiling would eventually become a refusal to answer",
   },
   activity: {
@@ -757,6 +791,8 @@ export const GROWING_COLLECTIONS: Record<
     routes: "workers/tenancy/src/routes/team.ts",
     rowsKey: "activity",
     webKey: "activity:team:",
+    pagerFile: "components/deep-link/module-content.tsx",
+    pagerKey: "activity:team:",
     why: "the fastest-growing table in the base — EVERY mutation writes a row",
   },
   // The SAME door and the SAME rows, read through the generic (table, id) scope —
@@ -769,6 +805,8 @@ export const GROWING_COLLECTIONS: Record<
     routes: "workers/tenancy/src/routes/team.ts",
     rowsKey: "activity",
     webKey: "useRecordActivity(",
+    pagerFile: "components/activity-panel.tsx",
+    pagerKey: "activity.listKey",
     why: "one record's slice of the same ever-growing feed — a long-running ticket outgrows a page on its own",
   },
   processes: {
@@ -778,6 +816,8 @@ export const GROWING_COLLECTIONS: Record<
     rowsKey: "processes",
     listRecipe: "processes.list",
     webKey: "processesKey(",
+    pagerFile: "components/processes-screen.tsx",
+    pagerKey: "processesKey(",
     why: "every app of every client grows maps, and every map is kept rather than replaced — a process is archived, never deleted, because the savings computed from its baseline have to stay checkable years later. An agency two years in has more of these than it has clients, and the oldest is the one a client is most likely to ask about",
   },
   workLogs: {
@@ -786,6 +826,8 @@ export const GROWING_COLLECTIONS: Record<
     routes: "workers/content/src/routes/work-logs.ts",
     rowsKey: "logs",
     webKey: "workLogsKey(",
+    pagerFile: "components/time-panel.tsx",
+    pagerKey: "workLogsKey(",
     why: "the fastest-growing row in the work engine — 2,940 arrived from two years of the previous system and the rate only goes up, because every piece of work produces several. A ceiling here would eventually be a refusal to show somebody their own week",
   },
   meetings: {
@@ -795,6 +837,8 @@ export const GROWING_COLLECTIONS: Record<
     rowsKey: "meetings",
     listRecipe: "meetings.list",
     webKey: "meetingsKey(",
+    pagerFile: "components/meetings-screen.tsx",
+    pagerKey: "meetingsKey(",
     why: "an EVENT, which is the shape this law names first: a meeting happens, is written up and is never curated away, because a cancelled call in March is still the answer to 'didn't we speak in March?'. Glide's own two years are 350 rows before this app has held a single conversation of its own, and the oldest is the one somebody digs for",
   },
   stories: {
@@ -804,6 +848,8 @@ export const GROWING_COLLECTIONS: Record<
     rowsKey: "stories",
     listRecipe: "stories.list",
     webKey: "storiesKey(",
+    pagerFile: "components/stories-screen.tsx",
+    pagerKey: "storiesKey(",
     why: "one piece of work per thing we do, kept forever — the two years arriving from Glide are 3,677 rows on day one, and a done story is never deleted because the savings and the margin computed from it have to stay checkable. SPRINTS are deliberately NOT here beside it: a sprint is a block of SOLD work, so that collection grows at the speed of contracts rather than of clicks and a hard ceiling is an honest answer",
   },
 }

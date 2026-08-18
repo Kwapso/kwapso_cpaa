@@ -41,6 +41,7 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
 
 import worker from "../src/index"
 import { PULSE_WEEKS, pulseWeekStarts } from "../src/lib/insights"
+import { WORK_LOG_GROUP_CAP } from "@shared/workers/limits"
 import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
 import type { WorkLogSummary } from "@shared/types"
 
@@ -179,6 +180,45 @@ describe("the work-log summary door", () => {
     expect(body.kinds.reduce((n, k) => n + k.seconds, 0)).toBe(body.totalSeconds)
   })
 
+  // R16, AND THE ONE FIGURE ON THIS DOOR THAT WAS A CEILING WEARING A TOTAL'S
+  // CLOTHES. "People on it" was rendered from `people.length`, and `people` is
+  // the top `WORK_LOG_GROUP_CAP` by hours — so a record worked on by more than
+  // fifty people read "50" for ever, with nothing on the screen saying it had
+  // stopped. The array is still capped, because a bar chart of eighty bars is not
+  // a picture; the COUNT beside it is now the door's own.
+  it("counts every person who worked on it, past the cap on the chart under it", async () => {
+    const people = WORK_LOG_GROUP_CAP + 3
+    for (let i = 0; i < people; i++)
+      logSeconds(`P${i}`, {
+        userId: `u-${i}`,
+        userName: `Person ${i}`,
+        startedAt: thisWeek(),
+        // Descending, so the cap keeps a stable top fifty rather than an
+        // arbitrary one — the assertion is about the LENGTH, not about who.
+        seconds: (people - i) * 60,
+      })
+
+    const body = (await (
+      await summary(IDS.staffUser, "targetTable=stories&targetId=S1")
+    ).json()) as WorkLogSummary
+    expect(body.peopleTotal).toBe(people)
+    // …and the two are DIFFERENT numbers here, which is the whole point: read the
+    // count off the array and this record loses three people silently.
+    expect(body.people).toHaveLength(WORK_LOG_GROUP_CAP)
+    expect(body.peopleTotal).toBeGreaterThan(body.people.length)
+    // One person's several entries are one person, not several — it is a count of
+    // PEOPLE and the rows are grouped, so this is the other way to get it wrong.
+    logSeconds("AGAIN", { userId: "u-0", userName: "Person 0", startedAt: thisWeek(), seconds: 60 })
+    const after = (await (
+      await summary(IDS.staffUser, "targetTable=stories&targetId=S1")
+    ).json()) as WorkLogSummary
+    expect(after.total).toBe(people + 1)
+    expect(after.peopleTotal).toBe(people)
+    // …and the total says whether it stopped early, in the same object (R16).
+    // This door answers with `json`, so nothing derives the flag for it.
+    expect(after.totalCapped).toBe(false)
+  })
+
   it("never counts time somebody deliberately binned, in any of the four figures", async () => {
     logSeconds("KEPT", { userName: "Marta", kind: "Build", startedAt: thisWeek(), seconds: 600 })
     logSeconds("BINNED", { userName: "Otto", kind: "Fix", startedAt: thisWeek(), seconds: 600 })
@@ -190,6 +230,9 @@ describe("the work-log summary door", () => {
     expect(body.total).toBe(1)
     expect(body.totalSeconds).toBe(600)
     expect(body.people.map((p) => p.userName)).toEqual(["Marta"])
+    // …the person count included: Otto's only row was binned, so he is not a
+    // person who worked on this.
+    expect(body.peopleTotal).toBe(1)
     expect(body.kinds.map((k) => k.kind)).toEqual(["Build"])
     expect(body.weeks[PULSE_WEEKS - 1].seconds).toBe(600)
   })
@@ -203,6 +246,7 @@ describe("the work-log summary door", () => {
     // crash the honest-empty-state rule exists to avoid.
     expect(body.total).toBe(0)
     expect(body.totalSeconds).toBe(0)
+    expect(body.peopleTotal).toBe(0)
     expect(body.people).toEqual([])
     expect(body.kinds).toEqual([])
     expect(body.weeks).toHaveLength(PULSE_WEEKS)

@@ -158,7 +158,7 @@ export function HelpDetailScreen({
   const canEditTime = can("work", "edit")
   // R16: the door's exact COUNT(*) over this record's time, fetched by the panel
   // and read back here for the badge.
-  const timeTotal = useCachedValue<number>(workLogsTotalKey("help", helpId))
+  const timeTotal = useCachedValue<number | null>(workLogsTotalKey("help", helpId))
 
   const [tab, setTab] = React.useState("conversation")
   const [editing, setEditing] = React.useState(false)

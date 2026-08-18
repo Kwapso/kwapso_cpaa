@@ -39,8 +39,10 @@ import { LoadMore } from "@/components/load-more"
 import { BandCard, HoursByChart, NothingYet, RecordWeeksChart, hoursSpoken } from "@/components/pulse"
 import { TimeFormDialog, type TimeFormValues } from "@/components/time-form-dialog"
 import { content as contentApi } from "@/lib/api"
-import { cursorKey, recordTimeKey, recordTimeSummaryKey } from "@/lib/live-resources"
+import { cursorKey, recordTimeKey, recordTimeSummaryKey, totalKey } from "@/lib/live-resources"
+import { recordTimeCountKey } from "@shared/record-counts"
 import type { WorkLog, WorkLogSummary } from "@shared/types"
+import { formatCount } from "@shared/web/format-count"
 import { formatDayMonth } from "@shared/web/format"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
@@ -51,9 +53,18 @@ import { useT } from "@shared/web/language"
  * Exported because the badge is drawn by the HOST, in its tabs config, and the
  * panel is what fetches the number. One function so the two cannot type the
  * string differently — which is the whole reason every key in this app is a
- * function rather than a template literal at each site. */
+ * function rather than a template literal at each site.
+ *
+ * IT IS AN ORDINARY `totalKey` SIDECAR NOW, and that is the whole of the fix for
+ * a badge that stayed blank until you opened the tab. The panel's own list fetch
+ * used to be the only thing that ever primed it, and the panel does not mount
+ * until the tab is active — so on a story, a ticket, a task and a meeting the
+ * Time badge was missing exactly when a reader needed it to decide whether to
+ * look. Composed through `recordTimeCountKey` it is a line in the record-counts
+ * registry like any other, fetched when the record OPENS, and this fetch simply
+ * refreshes the same key when the rows finally arrive. */
 export function workLogsTotalKey(targetTable: string, targetId: string): string {
-  return `total:time:${targetTable}:${targetId}`
+  return totalKey(recordTimeCountKey(targetTable), targetId)
 }
 
 /** Whole seconds → the hours and minutes a person would say out loud. */
@@ -76,8 +87,27 @@ const ENOUGH_TO_CHART = 4
  * took. Always shown, on any record with any time at all: a big number is honest
  * at one row in a way a chart is not.
  *
- * `hoursSpoken` and never `formatCount`: hours are not a collection tally and
- * "1.3k hours" is nonsense (the rule the pulse band already follows). */
+ * `hoursSpoken` FOR THE HOURS and never `formatCount`: hours are not a collection
+ * tally and "1.3k hours" is nonsense (the rule the pulse band already follows).
+ *
+ * `formatCount` FOR THE OTHER TWO, and both of them used to bypass it (R16):
+ *
+ *   • ENTRIES rendered `String(summary.total)` while the tab strip directly above
+ *     rendered `formatCount` of the identical collection. At 1,200 entries the tab
+ *     read "1.2k" and the tile read "1200" — R16's origin story word for word,
+ *     one collection wearing two numbers, and the tile's would have gone on
+ *     reading "1000000" long after the door stopped counting.
+ *   • PEOPLE ON IT rendered `summary.people.length`, and `people` is the top
+ *     `WORK_LOG_GROUP_CAP` by hours. A record worked on by more than fifty people
+ *     read "People on it: 50" for ever, with nothing on the screen saying it had
+ *     stopped — a capped list's length wearing a total's clothes, which is the
+ *     failure the law was written for. `peopleTotal` is the door's own bounded
+ *     COUNT over the same filter; the array beside it stays the chart's top fifty.
+ *
+ * `|| "0"` because a tile is not a badge: `formatCount` renders nothing for a
+ * zero, which is right above a tab (no rows, no badge) and wrong inside a card
+ * that has already committed a label to the screen. The same expression the pulse
+ * band's tiles use. */
 function Numbers({ summary }: { summary: WorkLogSummary }) {
   const t = useT()
   const items = [
@@ -91,14 +121,14 @@ function Numbers({ summary }: { summary: WorkLogSummary }) {
     {
       id: "entries",
       label: t("Entries"),
-      value: String(summary.total),
+      value: formatCount(summary.total) || "0",
       delta: "",
       trend: "flat" as const,
     },
     {
       id: "people",
       label: t("People on it"),
-      value: String(summary.people.length),
+      value: formatCount(summary.peopleTotal) || "0",
       delta: "",
       trend: "flat" as const,
     },

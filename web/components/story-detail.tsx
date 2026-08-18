@@ -48,6 +48,7 @@ import { softNavigate } from "@/lib/nav"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useRecordActivity } from "@/lib/use-record-activity"
+import { useRecordCounts } from "@/lib/use-record-counts"
 import type { Story } from "@shared/types"
 import { invalidate, useCached, useCachedValue } from "@shared/web/store"
 import { useT } from "@shared/web/language"
@@ -69,11 +70,15 @@ export function StoryDetailScreen({
   // knowledge base does for a source past its first page.
   const storyQ = useCached<Story | null>(`story:one:${storyId}`, () => contentApi.storyOne(storyId))
   const activity = useRecordActivity("stories", storyId)
-  // The exact number of entries on THIS story, for the tab badge (R16). The
-  // WorkLogsPanel below is what fetches it — the panel owns the read, the host
-  // owns the badge, and one exported key function is what keeps the two saying
-  // the same string.
-  const timeTotal = useCachedValue<number>(workLogsTotalKey("stories", storyId))
+  // The exact number of entries on THIS story, for the tab badge (R16), fetched
+  // when the STORY opens rather than when the tab is clicked. It used to wait for
+  // the WorkLogsPanel below to mount, and a panel does not mount until its tab is
+  // active — so the badge was missing exactly when a reader needed it to decide
+  // whether the tab was worth opening (shared/record-counts.ts). One exported key
+  // function is still what keeps the panel's own refresh and this badge on the
+  // same string.
+  useRecordCounts("stories", storyId)
+  const timeTotal = useCachedValue<number | null>(workLogsTotalKey("stories", storyId))
 
   const { can } = usePermissions(teamId)
   const canEdit = can("work", "edit")

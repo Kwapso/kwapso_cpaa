@@ -1397,9 +1397,25 @@ export type TeamPulse = {
 export type WorkLogSummary = {
   /** how many entries — a badge number, bounded like every other count. */
   total: number
+  /** did that count stop early? R16 says a total that hit the ceiling SAYS SO in
+   * the same object, and this door answers with `json` rather than `pagedJson`,
+   * which is where every paged door gets the flag for free. Without it the only
+   * thing hedging was `formatCount`'s "+", which is a rendering decision — a
+   * caller reading the number itself (an export, the agent) had nothing to read. */
+  totalCapped: boolean
   /** whole seconds across all of them. EXACT, for the reason PulseWeek says. */
   totalSeconds: number
-  /** who spent it, biggest first. `userName` is the snapshot on the row, so time
+  /** HOW MANY PEOPLE HAVE WORKED ON IT — the door's own bounded count over the
+   * whole filter, and NOT `people.length`, which is the top `WORK_LOG_GROUP_CAP`
+   * by hours. A record worked on by more than fifty people read "People on it:
+   * 50" for ever (R16: a capped list's length is a ceiling, not a total).
+   *
+   * No `peopleCapped` beside it: the ceiling is `TOTAL_COUNT_CAP`, so reaching it
+   * means a million distinct people logged time against one story, and
+   * `formatCount` renders the "+" if that day ever comes. */
+  peopleTotal: number
+  /** who spent it, biggest first — the top `WORK_LOG_GROUP_CAP` of them, which is
+   * what a bar chart can show. `userName` is the snapshot on the row, so time
    * logged by somebody since removed from the team still has a name on it. */
   people: { userId: string; userName: string | null; seconds: number }[]
   /** what kind of work it was, biggest first. `null` is the real bucket for time

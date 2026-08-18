@@ -62,6 +62,26 @@ export type RecordChild = {
   door: "tenancy" | "content"
 }
 
+/** THE SIDECAR A RECORD'S TIME TAB BADGES, composed from the record's own table.
+ *
+ * The one family here whose key is not a literal, and it is not tidiness: ONE
+ * panel (`web/components/work-logs-panel.tsx`) serves all four things time can be
+ * logged against, so the prefix has to be built at runtime from whichever record
+ * it is hung on. Written once, and the registry lines below are built from it, so
+ * the key the panel primes, the key the badge reads, the line the door owes and
+ * the entry in this registry are one expression rather than five strings that
+ * agree until somebody renames one. */
+export function recordTimeCountKey(recordTable: string): string {
+  return `time-${recordTable}`
+}
+
+/** One record's Time tab as a registry line. `work` is the right the list door
+ * itself gates on (`work:read`), and `work_logs` is the resource whose pings move
+ * the figure — the same one that already drops the rows underneath it. */
+function timeOn(recordTable: string): RecordChild {
+  return { key: recordTimeCountKey(recordTable), module: "work", resource: "work_logs", door: "content" }
+}
+
 /** THE RECORDS WITH CHILD COLLECTIONS, keyed by the TABLE their screen is about
  * — the same word the activity feed and the live registry already use for a
  * record, so a caller naming a record names it once.
@@ -75,11 +95,20 @@ export type RecordChild = {
  * read, so a developer without `help:read` never pays for the ticket count.
  *
  * A record whose every badge already rides its own read is deliberately ABSENT:
- * a role, a source, a meeting, a task (activity only, and the activity total
- * comes back with the feed); a process map (its steps, versions and conversation
- * all ride the record's own door); a story (its Time tab fetches at the top of
- * the screen because the header timer needs it anyway). Adding them here would
- * buy a round trip and change no badge. */
+ * a role and a source (activity only, and the activity total comes back with the
+ * feed); a process map (its steps, versions and conversation all ride the
+ * record's own door). Adding them here would buy a round trip and change no
+ * badge.
+ *
+ * A STORY, A TICKET, A TASK AND A MEETING WERE ON THAT ABSENT LIST UNTIL
+ * 2026-08-18, and the reason given for the story was simply false: "its Time tab
+ * fetches at the top of the screen because the header timer needs it anyway".
+ * The header asks for the caller's RUNNING timers, which is a different question
+ * from how many entries sit against this record — nothing on any of those four
+ * screens fetched the Time badge, so all four were blank until the tab was
+ * clicked, which is the exact bug this file exists to have ended. It survived
+ * because the check over it filtered candidate badges with `includes("total")`
+ * and the builder is spelled `workLogsTotalKey`, with a capital T. */
 export const RECORD_CHILDREN: Record<string, RecordChild[]> = {
   accounts: [
     // The systems we have built them. An app belongs to ONE account, always.
@@ -114,8 +143,16 @@ export const RECORD_CHILDREN: Record<string, RecordChild[]> = {
     // The files and links on it. Same module as the ticket itself — an
     // attachment is part of the request, not a thing of its own.
     { key: "help-attachments", module: "help", resource: "help", door: "content" },
+    timeOn("help"),
   ],
   sprints: [{ key: "stories-sprint", module: "work", resource: "stories", door: "content" }],
+  // THE FOUR RECORDS TIME CAN BE LOGGED AGAINST, and nothing else on them. A
+  // story, a task and a meeting badge one collection each — their Time tab —
+  // and their Activity total already rides the feed; a ticket's Time tab is the
+  // fourth, listed above beside its stories and its files.
+  stories: [timeOn("stories")],
+  tasks: [timeOn("tasks")],
+  meetings: [timeOn("meetings")],
 }
 
 /** Which collections one worker owes for one record — the door's own slice of

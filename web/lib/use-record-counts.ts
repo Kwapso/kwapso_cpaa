@@ -88,9 +88,10 @@ function fetchRecordCounts(table: string, id: string): Promise<Record<string, nu
  * badges read the sidecars they always read. `table` / `id` may be null (a
  * screen that has not resolved which record it is yet), which fetches nothing.
  *
- * A record kind with no children in the registry fetches nothing either: a role,
- * a source, a meeting and a task badge only their Activity tab, whose total
- * already comes back with the feed. */
+ * A record kind with no children in the registry fetches nothing either: a role
+ * and a source badge only their Activity tab, whose total already comes back with
+ * the feed. A task and a meeting were on that list until 2026-08-18 — both carry
+ * a Time tab, and both badged a sidecar nothing filled until it was opened. */
 export function useRecordCounts(table: string | null, id: string | null): void {
   const on = Boolean(table && id && RECORD_CHILDREN[table as string]?.length)
   useCached<Record<string, number | null>>(

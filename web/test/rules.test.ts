@@ -523,36 +523,37 @@ describe("RULES — the laws of the base", () => {
       // its LIST had no paging control at all while its record DETAIL had one (for
       // the activity feed) and mentioned the list's cache key elsewhere, so a
       // component with both substrings existed and the law reported "all clear".
-      // Deleting the whole control left the build green. So for a paged LIST
-      // SCREEN (one with a `listRecipe`) the key must appear INSIDE the LoadMore's
-      // own props — that is what makes it that collection's paging control.
+      // Deleting the whole control left the build green. So the key must appear
+      // INSIDE the LoadMore's own props — that is what makes it that collection's
+      // paging control rather than a coincidence of substrings.
       //
-      // THE RECORD FEED IS PROVED IN TWO HALVES, IN THE TWO FILES THAT HOLD THEM.
-      //
-      // Its control does not write the key at the call site — it reads
-      // `listKey={activity.listKey}`, a value the hook named `useRecordActivity(`
-      // hands it — so the pairing lives in two files by construction: the hook is
-      // called in each record detail, and the pager is in the ONE activity panel
-      // they all render. This used to be a file-level AND over any component,
-      // which is a weaker sentence than it looks: it passed for two years because
-      // `story-detail.tsx` happened to contain a `<LoadMore>` for its TIME tab and
-      // a `useRecordActivity(` call for its history — two unrelated controls in
-      // one file reading as proof of each other. Moving that time list into a
-      // component of its own is what exposed it, and the fix is to assert the two
-      // halves where they actually are rather than to hunt for a file with both.
-      const wired = !c.listRecipe
-        ? componentFiles().some((f) => read(f).includes(c.webKey)) &&
-          [
-            ...read(join(WEB, "components", "activity-panel.tsx")).matchAll(
-              /<LoadMore[\s\S]{0,400}?\/>/g
-            ),
-          ].some((m) => m[0].includes("activity.listKey"))
-        : componentFiles().some((f) =>
-            [...read(f).matchAll(/<LoadMore[\s\S]{0,400}?\/>/g)].some((m) => m[0].includes(c.webKey))
-          )
+      // AND EVERY COLLECTION IS PROVED AGAINST ITS OWN CONTROL, IN ITS OWN FILE.
+      // The fix above was written as a BRANCH on `!c.listRecipe`, which reads like
+      // "the record feed" and is in fact true of THREE entries — `recordActivity`,
+      // `activity` and `workLogs`. That branch asserted a `<LoadMore
+      // listKey={activity.listKey}>` inside `activity-panel.tsx`, which is the
+      // record feed's control and has nothing to do with the team feed or the list
+      // of time. So for two of the three collections it was a CONSTANT: deleting
+      // `<LoadMore listKey={workLogsKey(teamId)}>` from `time-panel.tsx`, or the
+      // team-feed pager from `module-content.tsx`, left the build green — where the
+      // weaker-looking sentence it replaced had gone red. One branch cannot stand
+      // for three collections; `pagerFile`/`pagerKey` name each one's own.
+      const pager = read(join(WEB, c.pagerFile))
+      const wired = [...pager.matchAll(/<LoadMore[\s\S]{0,400}?\/>/g)].some((m) =>
+        m[0].includes(c.pagerKey)
+      )
       expect(
         wired,
-        `${name} pages on the server but nothing in web can reach page two — a <LoadMore> whose listKey is built from ${c.webKey}`
+        `${name} pages on the server but nothing in web can reach page two — ${c.pagerFile} must render a <LoadMore> whose listKey is built from ${c.pagerKey}`
+      ).toBe(true)
+      // …and the collection's cache key is NAMED by a component, which on the
+      // record feed is the second half of the pairing rather than a restatement of
+      // the first: its control reads `listKey={activity.listKey}`, a value the
+      // `useRecordActivity(` hook hands it, so the hook has to be called somewhere
+      // for that control to be about anything at all.
+      expect(
+        componentFiles().some((f) => read(f).includes(c.webKey)),
+        `${name}: no component names ${c.webKey}, so ${c.pagerFile}'s pager pages nothing`
       ).toBe(true)
 
       // R14 meets R16: the collection frame's own "Showing X of Y" counts the
@@ -883,6 +884,50 @@ describe("RULES — the laws of the base", () => {
     expect(
       lengthBadges,
       `a capped list's length is a ceiling, not a total (R16) — badge from the server total via formatCount: ${lengthBadges.join(", ")}`
+    ).toEqual([])
+
+    // (i, widened) A STAT TILE IS A BADGE WITH A LABEL, and this clause is the
+    // half that was missing. The scan above reads `badge:` props only, so
+    // `work-logs-panel.tsx` shipped both of R16's failure modes side by side,
+    // inside a `<StatGrid>`, under a green build:
+    //
+    //   • `value: String(summary.total)` — the SAME collection the tab strip
+    //     directly above it badged through `formatCount`. At 1,200 entries the
+    //     tab read "1.2k" and the tile read "1200": one collection, two numbers,
+    //     which is the sentence R16 opens with.
+    //   • `value: String(summary.people.length)` — and `people` is `LIMIT
+    //     WORK_LOG_GROUP_CAP`, so a record worked on by more than fifty people
+    //     read "People on it: 50" for ever with nothing saying it had stopped.
+    //     A capped list's length wearing a total's clothes: R16's origin story.
+    //
+    // SCOPED TO THE FILES THAT RENDER A `<StatGrid`, deliberately. A `value:`
+    // prop anywhere else is an overview FIELD — a phone number, a language, a
+    // status word — and holding those to a count seam would be noise that
+    // teaches people to widen the exemption list instead of fixing the number.
+    // Inside a stat grid every `value:` IS a figure, by construction.
+    const tileOffenders: string[] = []
+    let tiles = 0
+    for (const f of componentFiles()) {
+      const src = stripComments(read(f))
+      if (!src.includes("<StatGrid")) continue
+      for (const m of src.matchAll(/value:\s*([^,\n]+)/g)) {
+        const v = m[1].trim()
+        tiles++
+        // `.length` as the FIGURE. `xs.length - 1` is an index and `xs.length ?`
+        // is a "is there anything" test — neither is a count being rendered, and
+        // banning them would ban the pulse band's own last-week lookup.
+        if (/\.length/.test(v) && !/\.length\s*[-+]/.test(v) && !/\.length\s*\?/.test(v))
+          tileOffenders.push(`${f} → ${v}`)
+        // …and a figure stringified straight past the seam. `formatCount` is
+        // where the abbreviation ladder and the "+" at the counting ceiling live,
+        // so `String(n)` beside a badge is two renderings of one number.
+        if (/^String\(/.test(v)) tileOffenders.push(`${f} → ${v}`)
+      }
+    }
+    expect(tiles, "the stat-tile scan found no tiles — it has gone blind").toBeGreaterThan(5)
+    expect(
+      tileOffenders,
+      `a stat tile shows a figure exactly as a badge does (R16) — through formatCount (or hoursSpoken for hours), never String(n) and never a capped list's length: ${tileOffenders.join(", ")}`
     ).toEqual([])
     // …and the badge builders route through the seam. The deep-link switch's
     // badges are all on the COLLECTION half (a record detail badges its tabs
