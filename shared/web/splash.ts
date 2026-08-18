@@ -653,10 +653,40 @@ export function markLoopScript(): string {
  * document than this one and has not run yet.
  *
  * Capture-phase listeners so a tap anywhere skips before the app beneath can act
- * on it, and both are torn down on the way out so the app is not left holding
- * two document-level listeners for the rest of the session. Skipping also STOPS
- * the animator: a loop still running behind an invisible overlay is a loop still
- * costing frames on the screen that replaced it.
+ * on it, and every one of them is torn down on the way out so the app is not
+ * left holding document-level listeners for the rest of the session. Skipping
+ * also STOPS the animator: a loop still running behind an invisible overlay is
+ * a loop still costing frames on the screen that replaced it.
+ *
+ * ── A TAP HAS TO BE A TAP, AND `pointerdown` IS NOT ONE ───────────────────
+ *
+ * This dismissed on `pointerdown` at the document, which is the gesture nobody
+ * performs on purpose. A thumb resting on the glass while a phone loads is a
+ * pointerdown. The first millimetre of a scroll is a pointerdown. Neither is a
+ * person asking for the animation to stop — the first is a person HOLDING THEIR
+ * PHONE — and from the other side it reads as "the loader doesn't run on
+ * mobile", which is close to the owner's actual words. On a laptop nobody
+ * touches anything, which is why it only ever looked broken on a phone.
+ *
+ * So the skip is the three conditions that separate a tap from being held:
+ *
+ *   · it ends on `pointerup`, not on the press — a press that never lifts is
+ *     somebody holding the device, and the animation plays on under their thumb;
+ *   · the lift is within 10px of the press (the same slop iOS itself uses for a
+ *     tap), so a scroll — which travels, and on iOS usually arrives as a
+ *     `pointercancel` and never an up at all — is not a skip;
+ *   · and it lands within 600ms, because a rest ends in a lift too. Somebody
+ *     holding the phone and then taking their thumb off is a down and an up in
+ *     nearly the same place; only the DURATION tells the two apart. 600ms is
+ *     generous for a deliberate tap (they run 50–200ms) and far short of a rest.
+ *
+ * A press that is cancelled, or whose up belongs to a different pointer, is
+ * forgotten rather than remembered — otherwise a cancelled scroll could be
+ * completed later by an unrelated lift.
+ *
+ * The keyboard keeps its immediate skip: there is no such thing as accidentally
+ * leaning on a key while holding a laptop, and a keypress is deliberate by
+ * construction.
  *
  * `display:none` rather than `remove()`: React hydrates this subtree, and a node
  * that disappeared between server render and hydration is a mismatch — see the
@@ -669,9 +699,19 @@ export function splashScript(): string {
     `try{var m=null;try{m=localStorage.getItem("theme")}catch(_){}` +
     `if(m!=="dark"&&(m==="light"||!(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches)))` +
     `e.className="ks-lit";s=window.__ksMark(e)}catch(_){}` +
+    // `pi=-1` is the "no press in progress" sentinel: a real pointerId is never
+    // negative, so one comparison covers both "nothing is down" and "this up
+    // belongs to a different finger".
+    `var px=0,py=0,pt=0,pi=-1;` +
     `var f=function(){e.style.display="none";if(s)s();` +
-    `d.removeEventListener("pointerdown",f,!0);d.removeEventListener("keydown",f,!0)};` +
-    `d.addEventListener("pointerdown",f,!0);d.addEventListener("keydown",f,!0);` +
+    `d.removeEventListener("pointerdown",D,!0);d.removeEventListener("pointerup",U,!0);` +
+    `d.removeEventListener("pointercancel",C,!0);d.removeEventListener("keydown",f,!0)};` +
+    `var D=function(v){pi=v.pointerId;px=v.clientX;py=v.clientY;pt=Date.now()};` +
+    `var C=function(){pi=-1};` +
+    `var U=function(v){if(v.pointerId!==pi)return;pi=-1;` +
+    `if(Date.now()-pt>600||Math.abs(v.clientX-px)>10||Math.abs(v.clientY-py)>10)return;f()};` +
+    `d.addEventListener("pointerdown",D,!0);d.addEventListener("pointerup",U,!0);` +
+    `d.addEventListener("pointercancel",C,!0);d.addEventListener("keydown",f,!0);` +
     `setTimeout(f,${SPLASH_TOTAL_MS})}()`
   )
 }
