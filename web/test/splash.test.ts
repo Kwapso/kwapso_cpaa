@@ -316,15 +316,35 @@ describe("the whole opening frame is small enough to inline", () => {
 // tests and a clean `npm run check` said nothing, because none of them had ever
 // looked at a built file.
 //
-// So this one looks at the built file. It is SKIPPED when there is no export —
-// a fresh clone has none, and `npm run check` does not build — which makes it a
-// weaker guard than the rest of this file and worth saying out loud. What it
-// does catch is the case that matters: anybody who has run `npm run build` (the
-// deploy scripts do, every time) gets a red test the next time they check, with
-// the exact divergence printed.
+// So this one looks at the built file. And for two months it read a file that
+// was usually not there: it SKIPS when `<door>/out/` is absent, a fresh clone has
+// no export, and `npm run check` never builds — so the one guard covering a fault
+// no other test in this repo can see was also the one most likely to be silently
+// absent at the moment somebody asked "is it green?". A skipped test and a passing
+// test print the same colour on the way to a deploy.
+//
+// SO THE GATE BUILDS FIRST. `npm run check:built` (package.json) runs the real
+// static export of both doors and then re-runs this file with REQUIRE_EXPORT=1,
+// which turns "there is no export" from a silence into a failure. It sits on the
+// deploy path itself — `deploy:staging` and `deploy:production` call it instead of
+// `npm run build`, so the export these bytes are read out of is the very export
+// about to be uploaded — and it is listed in OPERATIONS.md's "Verify before
+// shipping", which is the list `/ship-staging` reads and runs. `npm run check`
+// stays as fast as it was; the build is bought once, on the path that was already
+// paying for it.
+//
+// AND IT READS BOTH DOORS. The mangling that shipped was in a string both front
+// ends inline from the same module, and only the agency app's export was ever
+// looked at — the same one-door blindness this file's own failure mode 1 is about.
 describe("what the compiler actually shipped", () => {
-  const exported = join(ROOT, "web", "out", "index.html")
-  const html = existsSync(exported) ? readFileSync(exported, "utf8") : null
+  // Set by `npm run check:built` once the export exists. Without it these cases
+  // skip, which is right for `npm run check` and wrong for a ship.
+  const REQUIRED = process.env.REQUIRE_EXPORT === "1"
+
+  const DOORS = [
+    ["the agency app", join(ROOT, "web", "out", "index.html")],
+    ["the client portal", join(ROOT, "web-portal", "out", "index.html")],
+  ] as const
 
   const cases: Array<[string, string, string]> = [
     ["the stylesheet", splashStyle(), "#ks-splash,.ks-mark-host{"],
@@ -332,22 +352,36 @@ describe("what the compiler actually shipped", () => {
     ["the animator", splashScript(), "!function(){if(window.__ksMark)"],
   ]
 
-  for (const [what, want, anchor] of cases)
-    it.skipIf(!html)(`${what} survives the build byte for byte`, () => {
-      const at = html!.indexOf(anchor)
-      expect(at, `${what} is not in web/out/index.html at all`).toBeGreaterThan(-1)
-      const got = html!.slice(at, at + want.length)
-      // Report the first divergence rather than 6KB of diff.
-      let i = 0
-      while (i < want.length && want[i] === got[i]) i++
+  for (const [door, exported] of DOORS) {
+    const html = existsSync(exported) ? readFileSync(exported, "utf8") : null
+
+    // The tripwire on the gate itself. Without this, `check:built` could pass on
+    // a build that produced nothing and report the same green as one that
+    // produced the right bytes.
+    it.skipIf(!REQUIRED)(`${door} has actually been exported`, () => {
       expect(
-        i,
-        `${what} was altered between the source and the export, from character ${i}:\n` +
-          `  source: ${JSON.stringify(want.slice(i, i + 80))}\n` +
-          `  export: ${JSON.stringify(got.slice(i, i + 80))}\n` +
-          `Interpolating a compile-time constant into a shipped string is what did this last time.`
-      ).toBe(want.length)
+        html,
+        `REQUIRE_EXPORT is set but ${exported} does not exist — run npm run check:built, which builds first`
+      ).not.toBeNull()
     })
+
+    for (const [what, want, anchor] of cases)
+      it.skipIf(!html)(`${door}: ${what} survives the build byte for byte`, () => {
+        const at = html!.indexOf(anchor)
+        expect(at, `${what} is not in ${exported} at all`).toBeGreaterThan(-1)
+        const got = html!.slice(at, at + want.length)
+        // Report the first divergence rather than 6KB of diff.
+        let i = 0
+        while (i < want.length && want[i] === got[i]) i++
+        expect(
+          i,
+          `${what} was altered between the source and ${door}'s export, from character ${i}:\n` +
+            `  source: ${JSON.stringify(want.slice(i, i + 80))}\n` +
+            `  export: ${JSON.stringify(got.slice(i, i + 80))}\n` +
+            `Interpolating a compile-time constant into a shipped string is what did this last time.`
+        ).toBe(want.length)
+      })
+  }
 })
 
 // THE IN-APP LOADER FROZE ON THE REAL BUILD AND ON NOTHING ELSE.

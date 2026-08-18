@@ -27,7 +27,7 @@ BOOTSTRAP.md stands the whole thing up from zero.
   `scripts/smoke-staging.mjs` and `scripts/smoke-mcp.mjs` read `SMOKE_BASE`, so
   export it to run either against a custom domain.)
 - build_command: npm run build (root; builds BOTH static exports, web/ → web/out and web-portal/ → web-portal/out). `npm run build:portal` builds the portal alone.
-- deploy_staging_command: npm run deploy:staging (root; builds both frontends then deploys ALL eight workers realtime-first: realtime → auth → tenancy → content → data-ops → mcp → gateway → portal-gateway, staging names)
+- deploy_staging_command: npm run deploy:staging (root; runs `check:built` — build both frontends, then re-run both front-door suites against the real export — then deploys ALL eight workers realtime-first: realtime → auth → tenancy → content → data-ops → mcp → gateway → portal-gateway, staging names)
 - deploy_production_command: npm run deploy:production (root; same eight-worker realtime-first order, production names)
 - github_remote: origin (https://github.com/Kwapso/kwapso_cpaa.git)
 
@@ -296,6 +296,8 @@ both owner-only:
 
 ## Verify before shipping
 
+- `npm run check` — lint, then TypeScript across every workspace, then every suite. Fast (no build), and it is what CI runs.
+- `npm run check:built` — **builds both static exports, then re-runs both front-door suites against them.** Not the same check twice: a handful of assertions can only be true of a BUILT app, and until 18 Aug 2026 they quietly skipped whenever `web/out/` was absent, which on a fresh clone is always. The one they exist for is a minifier mangling — SWC constant-folds a template literal whose substitutions are compile-time constants, and folding the boot loader's mark once DROPPED text, so an SVG attribute reached the browser unterminated under a green build (`web/test/splash.test.ts`). Vitest compiles with a different toolchain and folds nothing, so no source-level test can see it. `REQUIRE_EXPORT=1` makes a missing export a failure rather than a skip. It costs one build plus about ten seconds, and `deploy:staging` / `deploy:production` call it in place of `npm run build` so the export these bytes are read out of is the one about to be uploaded.
 - CI runs the same on every push (.github/workflows/ci.yml)
 - deploy:staging ends with scripts/smoke-staging.mjs, the LIVE login→team journey must pass or the deploy is considered failed
 

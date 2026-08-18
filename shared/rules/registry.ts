@@ -847,50 +847,33 @@ export const ACTIVITY_TABLE_EXEMPT: Record<string, string> = {
  * publish-seam test is a gap — track it here. */
 export const MUTATING_WORKERS = ["tenancy", "content", "data-ops"] as const
 
-/** R2 — the bespoke (host-composed) record-detail components that MUST render the
- * Overview + Activity tabs themselves (the engine-recipe details get them for free). */
-export const RECORD_DETAIL_COMPONENTS = [
-  "help-detail",
-  "role-detail",
-  "account-detail",
-  // A CONTACT'S OWN SCREEN. One table underneath (a company and a person are one
-  // row shape), two screens on top: a person has no sprints, no rate card and no
-  // contacts of their own, and drawing them with a company's tabs is what the
-  // split was asked for.
-  "contact-detail",
-  "knowledge-detail",
-  // A meeting's detail is a component rather than a recipe because two of its
-  // three tabs are PROSE somebody wrote (the agenda, and the notes afterwards)
-  // and its header carries the one button that reaches outside this app — "put
-  // it in my calendar". No engine block draws either.
-  "meeting-detail",
-  // A process map's detail is a component because its Steps tab draws an
-  // ARITHMETIC — a numbered sequence, each step's time, the version's total, and
-  // the subtraction between the baseline and today — over a collection the
-  // reader chooses the VERSION of. No engine block expresses either half.
-  //
-  // Listed here on 17 Aug 2026, after a tester could not tell what order the
-  // steps ran in and could not open an older version: the screen already had the
-  // tabs, but no law was walking it, so nothing would have caught the Steps badge
-  // counting today's steps over an older version's list.
-  "process-detail",
-  // An APP's detail is a component because five of its seven tabs are the work
-  // hanging off the system — sprints, stories, maps, meetings, tickets — each a
-  // collection with its own actions that no engine block draws, and because the
-  // record is the first in this codebase with RECORD-LEVEL visibility: only the
-  // staff on it and an admin open it at all (CHECKLIST 8.11).
-  //
-  // Listed here on 17 Aug 2026, when it grew the people, the tickets tab and the
-  // knowledge tab. It had a detail screen for a day without a law walking it.
-  "app-detail",
-  // A TASK was the work engine's one recipe detail, and the note that made it one
-  // was true while it was true: "a title, a date and a tick", nothing the engine
-  // had no block for. It grew a WORK LOGS tab on 18 Aug 2026 — a list of time
-  // under three charts, which is not a block the engine has — so the recipe went
-  // and the component came, and the law walks it from the day it arrived rather
-  // than a day later, which is the mistake the two lines above record.
-  "task-detail",
-] as const
+/** R2 / R8 — the components under `web/components` that are NOT record details,
+ * though the census in `web/test/rules.test.ts` would otherwise read them as one.
+ * Key = the file's basename, value = the reason, mandatory.
+ *
+ * THIS USED TO BE THE OTHER LIST. Until 18 Aug 2026 the registry held
+ * `RECORD_DETAIL_COMPONENTS`, an INCLUSION list of the bespoke record details,
+ * and R2 and R8 walked exactly the screens somebody had remembered to type into
+ * it. That is a hole by construction, and it opened twice: `app-detail` and
+ * `process-detail` were added on 17 Aug after a tester found faults on screens no
+ * law had ever walked, and on 18 Aug `sprint-detail` and `story-detail` turned
+ * out to have been missing the whole time — two record details with tabs and an
+ * Activity panel that R2 and R8 had never once read, under a green build. Both
+ * times the screen was correct-looking and the LAW was absent, which is the
+ * failure that leaves no trace.
+ *
+ * So the census is DERIVED from the code now, exactly as R8 already derives which
+ * collection a badge describes, and this list is the small reasoned residue that a
+ * derivation always needs. It is a RATCHET like `RAW_BODY_EXEMPT`: an entry naming
+ * a file the census would not have caught anyway turns the build red, so it can
+ * only ever shrink.
+ *
+ * Empty today. Nothing under `web/components` is named `*-detail.tsx` or renders an
+ * `<ActivityPanel>` without being a record detail — and the per-screen reasoning
+ * that used to live in the old list has not been lost with it: every one of those
+ * components opens with its own comment saying why it is host-composed rather than
+ * a recipe, which is where a reader looks for it. */
+export const RECORD_DETAIL_NOT: Record<string, string> = {}
 
 /** R2 — reviewed bypasses. Each MUST get tabs over time; the reason is mandatory.
  * (Empty today: role-detail — the last exception — grew its Permissions/Overview/
@@ -947,6 +930,15 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
     "one meeting's client, purpose, when and where, and its audit block — one record, not a collection. Its sibling Activity tab carries the exact server total like every other record in the app.",
   "meeting-detail.notes":
     "the agenda we set and the notes we took — the two pieces of prose this module exists to keep. One record's body, not a collection.",
+  // PINNED 18 Aug 2026, and the way it surfaced is the point. The tab's own
+  // comment in meeting-detail.tsx says "the rule caught this rather than a
+  // reviewer" — and the rule had never read the tab at all. R8's bespoke scan
+  // allows 300 characters between a tab's `value:` and its `badge:`, and those six
+  // lines of comment are longer than that, so the match simply did not happen. The
+  // reasoning was written down in the one place no law reads. It is here now, and
+  // the census strips comments before it matches so the window measures code.
+  "meeting-detail.calendar":
+    "the guest list mirrored from the calendar entry, which the calendar read CAPS — so its length is a ceiling, not a count (R16), and an invitation with sixty people on it would badge fifty. The tab lists them, and a list you can see the end of does not need a number on it. Shown only when the meeting is in a calendar at all.",
   "knowledge-detail.overview":
     "one source's kind, compartment, who may read it, how many pieces it was cut into and when it was last indexed — one record, not a collection.",
   "app-detail.overview":
@@ -957,6 +949,16 @@ export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
     "the knowledge base asked IN CONTEXT (8.9): a question box that already knows which system it is about, and the passages that answer it. Retrieval, not a collection — there is no set of rows to count, and a badge over it would be counting the whole base.",
   "process-detail.overview":
     "the map's own description — including the caveat saying whether its times have been agreed yet — plus its app, its current version, its baseline and its audit block. One record, not a collection. Its four siblings each carry a server count, and the Steps badge counts the VERSION being shown rather than always the current one.",
+  // THE WORK ENGINE'S TWO RECORDS, pinned on 18 Aug 2026 — the day the census
+  // stopped being a hand-kept list and read the code instead. Both screens had
+  // carried tabs and an Activity panel since they were written, and neither R2 nor
+  // R8 had ever walked either of them: they were simply not in the old
+  // RECORD_DETAIL_COMPONENTS array. Nothing was wrong on the screens; the law was
+  // absent, which is the failure that shows no colour at all.
+  "sprint-detail.overview":
+    "one block of sold work — what kind it is, when it runs, what it was sold for, and how much of the work inside it is done. One record, not a collection. Its two sibling tabs, stories and activity, each carry the exact server total.",
+  "story-detail.overview":
+    "one piece of work's own fields — its status, its kind, its reference, who has it, when the sprint it was sold inside is due, and the three pieces of prose somebody typed (the detail, what was done, what the client will be told). One record, not a collection. Its two sibling tabs, work logs and activity, each carry the exact server total.",
 }
 
 /** R4 — the form dialogs that MUST use FormShell. */

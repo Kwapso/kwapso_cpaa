@@ -4,7 +4,7 @@
 // can't be fooled by anything but the real code.
 
 import { existsSync, readdirSync, readFileSync } from "node:fs"
-import { dirname, join } from "node:path"
+import { basename, dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
@@ -21,7 +21,7 @@ import {
   MUTATING_WORKERS,
   PAGE_WIDTH_OWNER,
   RAW_BODY_EXEMPT,
-  RECORD_DETAIL_COMPONENTS,
+  RECORD_DETAIL_NOT,
   SCREEN_WIDTH_EXEMPT,
   PORTAL_VISIBLE_READS,
   RECORD_TAB_COUNT_EXCEPTIONS,
@@ -67,6 +67,51 @@ function componentFiles(): string[] {
   return sourceFiles(join(WEB, "components"), { extensions: [".tsx"] }).map((f) => f.path)
 }
 
+/** R2 / R8 — THE BESPOKE RECORD DETAILS, READ OFF THE CODE.
+ *
+ * A law that enumerates its subject from a hand-kept list has a hole by
+ * construction, and this one's opened twice. `RECORD_DETAIL_COMPONENTS` in the
+ * registry was that list: R2 and R8 walked exactly the screens somebody had
+ * remembered to type into it. `app-detail` and `process-detail` were added on 17
+ * Aug 2026 after a tester found faults on screens no law had ever read; `sprint-
+ * detail` and `story-detail` were found missing on 18 Aug, having shipped tabs
+ * and an Activity panel that neither law had ever looked at. Nothing was red
+ * either time. A screen that no law walks looks precisely like a screen that
+ * passes.
+ *
+ * So the subject is derived, the way R8 already derives which collection a badge
+ * describes. TWO INDEPENDENT SIGNALS, because either alone has a gap:
+ *
+ *   BY NAME       `web/components/**\/*-detail.tsx` — the convention every one of
+ *                 them already follows, and the one the hand-rolled-feed check
+ *                 below has always used.
+ *   BY BEHAVIOUR  it renders an `<ActivityPanel>` — a record's own history feed,
+ *                 which nothing but a record detail has any business drawing. This
+ *                 catches the detail screen that arrives under some other name.
+ *
+ * AND THE SIGNALS ARE DELIBERATELY NOT THE OBLIGATIONS, so nothing here is
+ * circular. R2 demands TabsView *and* ActivityPanel; a file caught by NAME is held
+ * to both with neither assumed, which is the case that actually bites — a new
+ * `foo-detail.tsx` shipped without tabs turns this red. A file caught only by
+ * BEHAVIOUR has satisfied one of the two by definition, and is still held to the
+ * other, and to every per-tab count R8 asks for.
+ *
+ * `RECORD_DETAIL_NOT` (registry) is the reasoned residue, rot-checked below.
+ *
+ * COMMENTS ARE STRIPPED FIRST, as every source scan here does (CONVENTIONS.md).
+ * Not housekeeping: R8's tab scan matches `{ value: "…" … badge: … }`, and
+ * `story-detail` writes three lines of comment between the brace and the value,
+ * so on the raw text its Work logs tab simply was not there. A tab a law cannot
+ * see is a tab with no count and nothing red — the same shape as the screens this
+ * census was written to stop losing, one level down. The blindness tripwire below
+ * is what surfaced it. */
+function recordDetailComponents(): { name: string; source: string }[] {
+  return sourceFiles(join(WEB, "components"), { extensions: [".tsx"] })
+    .map((f) => ({ name: basename(f.path, ".tsx"), source: stripComments(f.source) }))
+    .filter((c) => /-detail$/.test(c.name) || c.source.includes("<ActivityPanel"))
+    .filter((c) => !RECORD_DETAIL_NOT[c.name])
+}
+
 describe("RULES — the laws of the base", () => {
   // L0 — the keystone: the doc, the data, and the table can't drift.
   it("registry-integrity: RULES.md lists exactly the law ids in RULES_REGISTRY", () => {
@@ -99,20 +144,49 @@ describe("RULES — the laws of the base", () => {
       "<LoadMore"
     )
 
-    for (const c of RECORD_DETAIL_COMPONENTS) {
-      const src = read(join(WEB, "components", `${c}.tsx`))
-      expect(src, `${c} must use library TabsView`).toContain("TabsView")
-      expect(src, `${c} must render the Activity tab through <ActivityPanel>`).toContain("<ActivityPanel")
+    const details = recordDetailComponents()
+    // The census must not go blind. A derivation that matches nothing reports the
+    // same all-clear as one that matched everything and found no fault, which is
+    // the exact failure the hand-kept list used to produce one screen at a time.
+    expect(
+      details.length,
+      "the record-detail census found almost nothing — the derivation has gone blind"
+    ).toBeGreaterThanOrEqual(9)
+
+    for (const c of details) {
+      expect(c.source, `${c.name} must use library TabsView`).toContain("TabsView")
+      expect(c.source, `${c.name} must render the Activity tab through <ActivityPanel>`).toContain(
+        "<ActivityPanel"
+      )
+    }
+  })
+
+  // …and the exemptions can't rot. An entry naming a file the census would not
+  // have caught anyway is a line nobody can delete safely and nobody can justify —
+  // the ratchet RAW_BODY_EXEMPT already runs, so the list can only shrink.
+  it("record-detail-tabs: every RECORD_DETAIL_NOT entry is a real exemption", () => {
+    const caught = sourceFiles(join(WEB, "components"), { extensions: [".tsx"] })
+      .map((f) => ({ name: basename(f.path, ".tsx"), source: stripComments(f.source) }))
+      .filter((c) => /-detail$/.test(c.name) || c.source.includes("<ActivityPanel"))
+      .map((c) => c.name)
+    for (const [name, why] of Object.entries(RECORD_DETAIL_NOT)) {
+      expect(why.trim(), `RECORD_DETAIL_NOT["${name}"] must say WHY it is not a record detail`).not.toBe("")
+      expect(
+        caught,
+        `RECORD_DETAIL_NOT lists ${name}, which the census would not have caught — delete the line`
+      ).toContain(name)
     }
   })
 
   // …and nothing goes back to hand-rolling one. A detail that renders its own
   // ActivityFeed is a second copy of the pairing above, and the copy is exactly
-  // what shipped a feed under an unreachable badge the first time.
+  // what shipped a feed under an unreachable badge the first time. Same census as
+  // above, so a screen cannot be a record detail for one half of R2 and not the
+  // other.
   it("record-detail-tabs: no record detail hand-rolls its own Activity feed", () => {
-    const offenders = componentFiles()
-      .filter((f) => /-detail\.tsx$/.test(f))
-      .filter((f) => read(f).includes("<ActivityFeed"))
+    const offenders = recordDetailComponents()
+      .filter((c) => c.source.includes("<ActivityFeed"))
+      .map((c) => c.name)
     expect(
       offenders,
       `render the Activity tab through <ActivityPanel> instead of a local ActivityFeed: ${offenders.join(", ")}`
@@ -317,10 +391,9 @@ describe("RULES — the laws of the base", () => {
     // must therefore carry a badge OR be a reviewed exception. Reading the tabs
     // out of the source (not a hand-list) is what makes a NEW tab arrive already
     // held to the law.
-    for (const c of RECORD_DETAIL_COMPONENTS) {
-      const src = read(join(WEB, "components", `${c}.tsx`))
-      const tabs = [...src.matchAll(/\{\s*value: "([a-z-]+)",[\s\S]{0,300}?badge: ([^,\n]+),/g)]
-      expect(tabs.length, `${c}: the tab scan found no tabs — it has gone blind`).toBeGreaterThan(2)
+    for (const c of recordDetailComponents()) {
+      const tabs = [...c.source.matchAll(/\{\s*value: "([a-z-]+)",[\s\S]{0,300}?badge: ([^,\n]+),/g)]
+      expect(tabs.length, `${c.name}: the tab scan found no tabs — it has gone blind`).toBeGreaterThan(2)
       let counted = 0
       for (const [, value, badge] of tabs) {
         if (badge.trim() !== '""') {
@@ -328,15 +401,16 @@ describe("RULES — the laws of the base", () => {
           continue
         }
         expect(
-          RECORD_TAB_COUNT_EXCEPTIONS[`${c}.${value}`],
-          `${c} tab "${value}" carries no count → badge it from the door's exact total, or pin it (with a reason) in RECORD_TAB_COUNT_EXCEPTIONS`
+          RECORD_TAB_COUNT_EXCEPTIONS[`${c.name}.${value}`],
+          `${c.name} tab "${value}" carries no count → badge it from the door's exact total, or pin it (with a reason) in RECORD_TAB_COUNT_EXCEPTIONS`
         ).toBeTruthy()
       }
       // R16 owns the NUMBER here too — a counted bespoke tab goes through the seam.
       if (counted > 0)
-        expect(src, `${c} badges a tab → the number must come through the formatCount seam (R16)`).toContain(
-          "format-count"
-        )
+        expect(
+          c.source,
+          `${c.name} badges a tab → the number must come through the formatCount seam (R16)`
+        ).toContain("format-count")
     }
   })
 

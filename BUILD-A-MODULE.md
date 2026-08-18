@@ -40,8 +40,8 @@ shared notes). Substitute your real name everywhere you see `notes` / `note`.
 | 2. Register + permissions | `shared/team-modules.ts`. `TEAM_MODULES` + `MODULE_LABELS` (**not** `team-schema.ts`, which only re-exports them; the list moved to `shared/` the moment data-ops needed it too), then `buildTeamSeed` back in `team-schema.ts` | one module key, one label, seed rows for the two default roles |
 | 3. Worker handler | `workers/content/src/{routes,lib}/notes.ts` + `index.ts` `ROUTES` | gated CRUD → validate → audit → activity → `publishChange` |
 | 4. Web client + screen | `web/lib/api/content.ts`, `web/lib/screens.ts`, `web/lib/pages.ts`, `web/lib/live-resources.ts`, `web/components/deep-link/shape.ts`, `web/lib/use-screen-data.ts`, `web/components/deep-link/module-content.tsx` | api wrapper, a list recipe, a nav section, a cache key + fetcher, a shaper, the read, the render |
-| 5. Record detail | a `<module>.detail` recipe, or `web/components/note-detail.tsx` | Overview + Activity tabs (Law R2). A bespoke component's filename MUST equal the string you register in `RECORD_DETAIL_COMPONENTS` (the R2 check reads `web/components/<that-string>.tsx` off disk) |
-| 6. Tests | the existing seam/rule tests + `shared/rules/registry.ts` | register the detail component; the tests then force you to comply |
+| 5. Record detail | a `<module>.detail` recipe, or `web/components/note-detail.tsx` | Overview + Activity tabs (Law R2). Nothing to register: name the file `<module>-detail.tsx` and the R2/R8 census picks it up off disk from that day (it also catches any component that renders an `<ActivityPanel>`, whatever it is called) |
+| 6. Tests | the existing seam/rule tests + `shared/rules/registry.ts` | nothing to register for the detail — the laws already walk it; pin any tab that shows no collection, with its reason |
 
 The workers involved: **content** (`workers/content`) is the right home for a
 content-shaped module (records users author). Every team-DB read/write goes through
@@ -594,7 +594,7 @@ where a test looks for it.
 | Law | What it checks | What you do |
 |---|---|---|
 | **R1** publish-seam | `workers/content/test/publish-seam.test.ts` reads `ROUTES` + handler source: every `mutation` must contain a `publishChange` call; non-GET routes must be classified. | Classify each route (3e) and actually publish (3d). A `housekeeping` route (e.g. upload) must be added to the test's reviewed `HOUSEKEEPING` set. |
-| **R2** record-detail-tabs | `web/test/rules.test.ts` reads each name in `RECORD_DETAIL_COMPONENTS` and asserts the file contains `TabsView` + `ActivityFeed`. | Add `"note-detail"` to `RECORD_DETAIL_COMPONENTS` in `shared/rules/registry.ts`; the test then forces Layer 5. |
+| **R2** record-detail-tabs | `web/test/rules.test.ts` DERIVES the bespoke record details off disk — a component under `web/components` named `*-detail.tsx`, or one that renders an `<ActivityPanel>` — and asserts each contains `TabsView` + `<ActivityPanel>`. | Nothing to register. Name it `note-detail.tsx` and Layer 5 is forced from the moment the file exists. (It used to be a hand-kept list, and four record details were missing from it; `RECORD_DETAIL_NOT` is now the reasoned residue, for a file that is NOT a record detail.) |
 | **R3** no-handrolled-toggles | No component fakes a tab strip with `variant={x === y ? …}`. | Use `TabsView` for any tab strip (the Tickets list's All / My / Archived strip does). |
 | **R4/R7** forms | Every dialog in `FORM_DIALOGS` imports `FormShell` and `useFormDraft`. | If you add a `note-form-dialog`, add it to `FORM_DIALOGS` (registry.ts) and build it on `FormShell` + `useFormDraft`. |
 | **R5** generic-activity-path | The activity read has a generic `record` scope; the web reads via `recordActivity`. | Read history only via `tenancy.recordActivity(...)` (Layer 5). No new SQL. |
@@ -658,7 +658,7 @@ LAYER 5 — record detail  (a <module>.detail recipe, or web/components/<module>
 [ ] Actions carry lucide icons (Pencil edit, Power deactivate); destructive = red + confirm
 
 LAYER 6 — tests + ship
-[ ] (bespoke detail?) register "<module>-detail" in RECORD_DETAIL_COMPONENTS (registry.ts) — R2 check
+[ ] (bespoke detail?) name the file "<module>-detail.tsx" — the R2/R8 census derives it off disk, nothing to register
 [ ] (form dialog?) register in FORM_DIALOGS; build on FormShell + useFormDraft — R4/R7
 [ ] Add a unit test for the lib's business rules
 [ ] npm run check is GREEN
