@@ -67,7 +67,12 @@ import {
   type Confirm,
   type PanelActions,
 } from "@/components/account-detail-panels"
-import { ContactLinkDialog, type ContactLinkValues } from "@/components/contact-link-dialog"
+import {
+  ContactCreateDialog,
+  ContactLinkDialog,
+  type ContactCreateValues,
+  type ContactLinkValues,
+} from "@/components/contact-link-dialog"
 import { ContactDetailScreen } from "@/components/contact-detail"
 import { AppFormDialog } from "@/components/app-form-dialog"
 import { useAssignableMembers } from "@/lib/people"
@@ -147,6 +152,11 @@ export function AccountDetailScreen({
   const canSeeContacts = can("contacts", "read")
   const canLinkContacts = can("contacts", "create")
   const canUnlinkContacts = can("contacts", "delete")
+  // MAKING a contact is two writes and therefore two rights: the person is an
+  // `accounts` row and being a contact here is a `contacts` row. Both doors gate
+  // on their own (R10) — this only decides whether to offer a button that would
+  // come straight back a 403. Linking somebody we already hold stays one right.
+  const canCreateContacts = canLinkContacts && can("accounts", "create")
   // THE WORK HANGING OFF THIS CLIENT. Apps are the record directly below an
   // account (an app belongs to ONE account, always — the owner's ruling), and
   // the sprints and to-dos beside them are the two other collections a door
@@ -185,6 +195,7 @@ export function AccountDetailScreen({
   const [tab, setTab] = React.useState("overview")
   const [editOpen, setEditOpen] = React.useState(false)
   const [linkOpen, setLinkOpen] = React.useState(false)
+  const [newContactOpen, setNewContactOpen] = React.useState(false)
   const [confirm, setConfirm] = React.useState<Confirm | null>(null)
   const [appOpen, setAppOpen] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
@@ -264,6 +275,69 @@ export function AccountDetailScreen({
       relationship: values.relationship.trim() || undefined,
       isMainStakeholder: values.isMainStakeholder,
     })
+    refresh()
+    toast.success(t("Contact added."))
+  }
+
+  /** MAKE a person and put them on this company. Two writes, on purpose.
+   *
+   * THE LINK AND THE PARENT POINTER ARE DIFFERENT FACTS, and this does both.
+   * The parent says "Marta sits under Bergman" — one company, the tree the
+   * header draws. The LINK says "Marta is a contact of Bergman" — and the same
+   * person can hold several of those, at companies she does not sit under,
+   * which is precisely what a single pointer cannot express (see
+   * contact-link-dialog's header). Creating with a parent does NOT create a
+   * link, so the tab she was created on would not list her. Hence both.
+   *
+   * THE TYPE IS WRITTEN HERE, BY THE CODE. A contact is a person, always — it
+   * is not a question this form asks, the way it is no longer a question the
+   * account form asks (18 Aug 2026).
+   *
+   * WHEN THE SECOND WRITE FAILS. The person now exists and is not a contact.
+   * We do NOT roll her back: undoing it means archiving an account, which needs
+   * a right this caller may well not hold and is itself a write that can fail —
+   * a rollback that fails silently is worse than the state it was fixing. So we
+   * say exactly what happened and where she is. She is a live account, in the
+   * accounts list and findable by the Add contact search on this very tab, so
+   * the recovery is one button away and nothing is stranded in silence. The
+   * dialog closes rather than staying open, because a second submit would make
+   * a second Marta.
+   */
+  async function createContact(values: ContactCreateValues) {
+    const name = values.name.trim()
+    const { id } = await tenancy.createAccount({
+      accountType: "individual",
+      name,
+      parentAccountId: accountId,
+      email: values.email.trim() || undefined,
+      phone: values.phone.trim() || undefined,
+    })
+    try {
+      await tenancy.linkPerson({
+        accountId,
+        personAccountId: id,
+        relationship: values.relationship.trim() || undefined,
+        isMainStakeholder: values.isMainStakeholder,
+      })
+    } catch (err) {
+      refresh()
+      // Through `t` with a placeholder rather than a template literal: a
+      // computed string has no English key, so the catalogue cannot hold it and
+      // it would ship in English to somebody who chose German (R28 ·
+      // shared/i18n.ts `fill`). The server's own sentence rides in the same way
+      // when it has one — it is the half that knows WHY.
+      toast.error(
+        err instanceof ApiFailure
+          ? t("{name} is now in your accounts, but not a contact here: {reason} Use Add contact to finish.", {
+              name,
+              reason: err.message,
+            })
+          : t("{name} is now in your accounts, but we couldn't make them a contact here. Use Add contact to finish.", {
+              name,
+            })
+      )
+      return
+    }
     refresh()
     toast.success(t("Contact added."))
   }
@@ -577,9 +651,11 @@ export function AccountDetailScreen({
                 accountName={account.name}
                 links={links}
                 canCreate={canLinkContacts}
+                canCreatePerson={canCreateContacts}
                 canArchive={canUnlinkContacts}
                 actions={actions}
                 onAdd={() => setLinkOpen(true)}
+                onNew={() => setNewContactOpen(true)}
                 onOpen={openAccount}
               />
             )
@@ -720,6 +796,17 @@ export function AccountDetailScreen({
         draftKey={`account:contact:${accountId}`}
         excludeIds={[accountId, ...links.filter((l) => l.active).map((l) => l.personAccountId)]}
         onSubmit={addContact}
+      />
+
+      {/* The other way onto the same tab — a person who did not exist yet. Its own
+       * draft key, because a half-typed new person and a half-picked existing one
+       * are two different half-finished errands. */}
+      <ContactCreateDialog
+        open={newContactOpen}
+        onOpenChange={setNewContactOpen}
+        accountName={account.name}
+        draftKey={`account:new-contact:${accountId}`}
+        onSubmit={createContact}
       />
 
       {/* One confirm for every red action — nothing here deletes, so each one says
