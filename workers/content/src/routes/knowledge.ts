@@ -18,6 +18,7 @@ import type { D1Rest } from "@shared/workers/d1-rest"
 import type { KnowledgeCitation, KnowledgePassage } from "@shared/types"
 import { consumeAiUnit, logUsage, refundAiUnits, type UsageSource } from "@shared/workers/credits"
 import { fail, json, pagedJson } from "@shared/workers/http"
+import { resolveOrdering } from "@shared/workers/sorting"
 import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { hasRight, requireRight } from "@shared/workers/gating"
 import { publishChange } from "@shared/workers/realtime"
@@ -37,6 +38,7 @@ import {
   getSource,
   KNOWLEDGE_KINDS,
   listSources,
+  KNOWLEDGE_SORTS,
   retrieve,
   setSourceActive,
   updateSource,
@@ -74,7 +76,21 @@ export async function getKnowledge(request: Request, env: Env): Promise<Response
     q: queryText(url.searchParams.get("q"), "Search"),
   }
   const [page, total] = await Promise.all([
-    listSources(cfg, guard, filter, queryText(url.searchParams.get("cursor"), "Cursor") ?? null),
+    listSources(
+      cfg,
+      guard,
+      filter,
+      queryText(url.searchParams.get("cursor"), "Cursor") ?? null,
+      // WHAT ORDER — asked of the door, because the base PAGES (R14). Sorting
+      // the loaded page orders the newest fifty sources and says nothing about
+      // the thousands behind them.
+      resolveOrdering(
+        KNOWLEDGE_SORTS,
+        "touched",
+        queryText(url.searchParams.get("sort"), "Sort"),
+        queryText(url.searchParams.get("dir"), "Direction")
+      )
+    ),
     // …over the SAME question the rows answered. Counting the whole base beside a
     // searched page badges a number the list cannot reach.
     countSources(cfg, guard, filter),

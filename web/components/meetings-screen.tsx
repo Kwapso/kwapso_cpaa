@@ -39,6 +39,7 @@ import { CountedAbove } from "@/components/counted-tabs"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
+import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { MeetingFormDialog, type MeetingFormValues } from "@/components/meeting-form-dialog"
 import { RecordCalendar, type CalendarEntry } from "@/components/record-calendar"
 import { shapeMeetingsList } from "@/components/deep-link/shape"
@@ -275,9 +276,11 @@ export function MeetingsScreen({
         listKey={meetingsKey(teamId)}
         placeholder={t("Search meetings…")}
         noun="meetings"
+        sorts={translatedSorts("meetings", t)}
+        defaultSort={COLLECTION_SORTS.meetings.defaultSort}
         fetchPage={(query, cursor) =>
           contentApi
-            .meetings(cursor, "all", query.q)
+            .meetings(cursor, "all", query.q, undefined, undefined, { sort: query.sort, dir: query.dir })
             .then((r) => ({ rows: r.meetings, nextCursor: r.nextCursor, total: r.total }))
         }
       >
@@ -309,13 +312,17 @@ export function MeetingsScreen({
           // ALL shows far more columns (9.1). The other two views stay the
           // two-line list a person scans, which is the rulebook's own rule about
           // a table being for scanning and a list for reading.
+          // The display is decided BEFORE the collection is tuned, so the tuner
+          // can see it is drawing a table (whose column headers are its own sort
+          // control) and stand its picker down — see tasks-screen for the whole
+          // sentence.
           const listRecipe =
             view === "all"
-              ? {
-                  ...withDataDrivenCollection(recipe, data.rows ?? [], found.emptyText),
-                  display: "table" as const,
-                  fields: ALL_COLUMNS,
-                }
+              ? withDataDrivenCollection(
+                  { ...recipe, display: "table" as const, fields: ALL_COLUMNS },
+                  data.rows ?? [],
+                  found.emptyText
+                )
               : withDataDrivenCollection(recipe, data.rows ?? [], found.emptyText)
           return (
             <>

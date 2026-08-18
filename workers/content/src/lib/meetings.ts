@@ -37,6 +37,7 @@ const DEFAULT_MEETING_MS = 60 * 60 * 1000
 import { ulid } from "@shared/workers/id"
 import { LIST_HARD_CAP } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
+import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
 import { optionalMoment, optionalText, requireMoment, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import type { Meeting, MeetingAttachment, MeetingGuest, MeetingPersonLink } from "@shared/types"
 
@@ -102,6 +103,19 @@ const MEETING_COLS = `m.id, m.ref, m.title, m.account_id, m.app_id, m.purpose_id
  * read backwards is what somebody wants — the thing that just happened is the
  * thing they are looking for — and the future sits at the top where it belongs. */
 const MEETING_ORDER = "m.starts_at"
+
+/** WHAT THE DIARY MAY BE ORDERED BY (shared/workers/sorting.ts). `when` is the
+ * fallback and is the order above; the rest are the columns the "All" view
+ * already shows in a table, which is the view a person reads across rather than
+ * scans — and therefore the one they want ordered by client, or by whether it
+ * ever got written up. */
+export const MEETING_SORTS: SortMenu<Meeting> = {
+  when: { expr: MEETING_ORDER, dir: "desc", key: (m) => m.startsAt },
+  title: { expr: "m.title", dir: "asc", key: (m) => m.title },
+  client: { expr: "(SELECT a.name FROM accounts a WHERE a.id = m.account_id)", dir: "asc", key: (m) => m.accountName },
+  status: { expr: "m.status", dir: "asc", key: (m) => m.status },
+  added: { expr: "m.created_at", dir: "desc", key: (m) => m.createdAt },
+}
 
 /** A JSON MIRROR COLUMN, READ DEFENSIVELY.
  *
@@ -258,20 +272,22 @@ export async function listMeetings(
   cfg: D1Rest,
   guard: MemberGuard,
   filter: MeetingFilter,
-  cursor: string | null
+  cursor: string | null,
+  ordering: Ordering<Meeting> = resolveOrdering(MEETING_SORTS, "when", undefined, undefined)
 ): Promise<Page<Meeting>> {
   const base = whereFor(filter)
-  const after = keysetAfter(decodeCursor(cursor), MEETING_ORDER)
+  // One ordering feeds the ORDER BY, the keyset predicate and the next cursor.
+  const after = keysetAfter(decodeCursor(cursor, ordering.sig), ordering.expr, ordering.dir, "m.id")
   const params = [...base.params, ...after.params]
   const rows = await d1Query<MeetingRow>(
     cfg,
     guard.databaseId,
     `SELECT ${MEETING_COLS} FROM meetings m
       WHERE ${base.sql}${after.sql ? ` AND ${after.sql}` : ""}
-      ORDER BY ${MEETING_ORDER} DESC, m.id DESC LIMIT ${PAGE_SIZE + 1}`,
+      ${orderBy(ordering, "m.id")} LIMIT ${PAGE_SIZE + 1}`,
     params
   )
-  return toPage(rows.map(toMeeting), PAGE_SIZE, (m) => [m.startsAt, m.id])
+  return toPage(rows.map(toMeeting), PAGE_SIZE, (m) => [ordering.key(m), m.id], ordering.sig)
 }
 
 /** R16: the exact server COUNT(*), over the SAME question the list asked. */

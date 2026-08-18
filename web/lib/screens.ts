@@ -858,6 +858,7 @@ export function withDataDrivenCollection(
       return v != null && String(v).trim() !== ""
     })
   )
+  const sorts = frameSortOptions(recipe, collection, facets)
   return {
     ...recipe,
     collection: {
@@ -866,8 +867,61 @@ export function withDataDrivenCollection(
       searchable: collection.searchable,
       userFilter: facets.length > 0,
       filterFacets: facets,
+      sortOptions: sorts,
+      sortable: sorts.length > 0,
     },
   }
+}
+
+/** WHAT A BOUNDED COLLECTION MAY BE SORTED BY — derived from the recipe's own
+ * columns, never hand-listed, for the reason the facets above are filtered here:
+ * a control offering a column the rows do not carry is dead UI, and a list of
+ * fourteen recipes' sort options is fourteen chances to forget one.
+ *
+ * THE SPLIT IS THE WHOLE DESIGN, and it is the same line SEARCH.md draws for the
+ * search box. A BOUNDED collection is entirely in the browser, so ordering it
+ * there is honest and free. A PAGED one is not: the frame would order the fifty
+ * rows it is holding and call the result sorted, which is what the owner was
+ * looking at when he said "the sort actually doesn't work". So a paged
+ * collection gets NO frame sort at all — its control lives in `<PagedFind>` and
+ * asks the door (components/paged-find.tsx). One control per screen, and it is
+ * the one that can see past the cursor.
+ *
+ * `searchable` is what says which is which, because `listCollection(…, { paged:
+ * true })` already turns it off for exactly this reason. Reading the same knob
+ * rather than adding a second one is what stops the two answers drifting.
+ *
+ * The columns: the FIRST field (a row's title — "Member", "Sprint", "Asset")
+ * plus every facet that survived the cull. The second field is always the
+ * summary line, a sentence made of four facts, and ordering by it is ordering by
+ * whichever fact happens to come first. The labels are the recipe's own, already
+ * through the reader's language (`translateRecipe` runs before this), so a sort
+ * control costs the translation catalogue nothing (R28). */
+function frameSortOptions(
+  recipe: ScreenRecipe,
+  collection: CollectionConfig,
+  facets: FilterFacet[]
+): CollectionConfig["sortOptions"] {
+  // A recipe (or a team's override) that declared its own wins — this fills a
+  // gap, it does not overrule a decision somebody made.
+  if (collection.sortOptions.length > 0) return collection.sortOptions
+  if (!collection.searchable) return []
+  // A TABLE ALREADY HAS ITS CONTROL: the engine makes every column header
+  // clickable (`screen-renderer` sets `sortable: true` per column), so a picker
+  // above it would be a second control for one question — the thing R3 refuses
+  // about tabs and SEARCH.md refuses about a paged screen's two search boxes.
+  // The two screens that render a table build the recipe themselves and set
+  // `display` BEFORE calling this, so the fact is readable here rather than
+  // guessed.
+  if (recipe.display === "table") return []
+  const title = recipe.fields[0]
+  const options = [
+    ...(title ? [{ value: title.column, label: title.field.label, defaultDir: "asc" as const }] : []),
+    ...facets.map((f) => ({ value: f.field, label: f.label, defaultDir: "asc" as const })),
+  ]
+  // Two rows cannot be put in a meaningful order by one column, and a control
+  // over a single row is furniture.
+  return options.length > 1 ? options : []
 }
 
 /** LAW R8, the record-detail half — WHICH collection a detail tab reveals, read

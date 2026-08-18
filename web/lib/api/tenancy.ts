@@ -293,6 +293,11 @@ export const tenancy = {
       /** "yes" = only the put-away ones, "no" = only the live ones */
       archived?: string
       parentId?: string
+      /** WHAT ORDER, one of the door's own sort names (ACCOUNT_SORTS), with
+       * `dir` flipping it. Omit both for the door's default (newest first) —
+       * the list pages, so this is the only honest place to ask. */
+      sort?: string
+      dir?: string
       cursor?: string | null
     } = {}
   ) => {
@@ -302,6 +307,8 @@ export const tenancy = {
     if (opts.status) p.set("status", opts.status)
     if (opts.archived) p.set("archived", opts.archived)
     if (opts.parentId) p.set("parentId", opts.parentId)
+    if (opts.sort) p.set("sort", opts.sort)
+    if (opts.dir) p.set("dir", opts.dir)
     if (opts.cursor) p.set("cursor", opts.cursor)
     const qs = p.toString()
     return api<PagedResponse<{ accounts: Account[]; entityTotal: number; individualTotal: number }>>(
@@ -380,10 +387,14 @@ export const tenancy = {
   /** R14: a PAGE of process maps (a GROWING collection) — hand `cursor` back from
    * the previous response for the next one; `total` is the exact server count of
    * what this caller may see. */
-  processes: (opts: { q?: string; appId?: string; cursor?: string | null } = {}) => {
+  processes: (opts: { q?: string; appId?: string; sort?: string; dir?: string; cursor?: string | null } = {}) => {
     const p = new URLSearchParams()
     if (opts.q) p.set("q", opts.q)
     if (opts.appId) p.set("appId", opts.appId)
+    // The order, one of PROCESS_SORTS' own names — the maps page, so it is asked
+    // of the door rather than applied to the fifty rows in the browser.
+    if (opts.sort) p.set("sort", opts.sort)
+    if (opts.dir) p.set("dir", opts.dir)
     if (opts.cursor) p.set("cursor", opts.cursor)
     const qs = p.toString()
     return api<PagedResponse<{ processes: ProcessSummary[] }>>(

@@ -44,6 +44,7 @@ import { CollectionHeading } from "@/components/collection-heading"
 import { CountedAbove } from "@/components/counted-tabs"
 import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
+import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { TriageStrip } from "@/components/triage-strip"
 import { TicketStagesCard } from "@/components/pulse"
@@ -211,6 +212,8 @@ export function TicketsCollection({
             listKey={narrowed ? helpFacetKey(teamId, helpScope, facet) : helpKey(teamId, helpScope)}
             placeholder={t("Search tickets…")}
             noun="tickets"
+            sorts={translatedSorts("help", t)}
+            defaultSort={COLLECTION_SORTS.help.defaultSort}
             fetchPage={(query, cursor) => {
               // The search rides the SAME two narrowings the tab strip chose, so
               // "search my questions" means exactly that.
@@ -223,7 +226,9 @@ export function TicketsCollection({
                   query.q,
                   undefined,
                   f.helpType,
-                  f.status as HelpTicket["status"] | undefined
+                  f.status as HelpTicket["status"] | undefined,
+                  undefined,
+                  { sort: query.sort, dir: query.dir }
                 )
                 .then((r) => ({ rows: r.tickets, nextCursor: r.nextCursor, total: r.total }))
             }}

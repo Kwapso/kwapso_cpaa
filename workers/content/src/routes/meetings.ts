@@ -20,11 +20,13 @@ import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { refusePortalCaller } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
+import { resolveOrdering } from "@shared/workers/sorting"
 import {
   countMeetings,
   createMeeting,
   getMeeting,
   listMeetings,
+  MEETING_SORTS,
   captureTranscript,
   linkGuests,
   readTranscript,
@@ -71,7 +73,22 @@ export async function getMeetings(request: Request, env: Env): Promise<Response>
   }
   const filter = filterFrom(url)
   const [page, total, weekTotal] = await Promise.all([
-    listMeetings(cfg, guard, filter, queryText(url.searchParams.get("cursor"), "Cursor") ?? null),
+    listMeetings(
+      cfg,
+      guard,
+      filter,
+      queryText(url.searchParams.get("cursor"), "Cursor") ?? null,
+      // WHAT ORDER — asked of the door, because the diary PAGES (R14). The "All"
+      // view draws a TABLE with nine columns, and a column header that sorted
+      // the loaded page would order the newest fifty meetings under a badge
+      // counting every one the agency has ever held.
+      resolveOrdering(
+        MEETING_SORTS,
+        "when",
+        queryText(url.searchParams.get("sort"), "Sort"),
+        queryText(url.searchParams.get("dir"), "Direction")
+      )
+    ),
     // R16: the exact server total rides every list response, over the SAME
     // question the rows answered.
     countMeetings(cfg, guard, filter),

@@ -51,7 +51,7 @@ import { withDataDrivenCollection } from "@/lib/screens"
 import { PRIORITY_LABEL, departmentGlyph } from "@shared/departments"
 import type { AppRow, Account, SelectableValue, Task, TeamMember } from "@shared/types"
 import { formatCount } from "@shared/web/format-count"
-import { formatDate } from "@shared/web/format"
+import { formatDate, formatDateSortable } from "@shared/web/format"
 import { invalidate, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 import { assignableMembers } from "@/lib/people"
@@ -87,8 +87,11 @@ function shapeTasks(tasks: Task[]) {
         client: t.accountName ?? "—",
         important: t.important ? "Yes" : "No",
         urgent: t.urgent ? "Yes" : "No",
-        deadline: t.dueOn ? formatDate(t.dueOn) : "—",
-        closed: t.completedAt ? formatDate(t.completedAt) : "—",
+        // THE TWO TABLE COLUMNS PEOPLE SORT, so they are the sortable spelling
+        // of a date rather than the warm one (shared/web/format.ts says why).
+        // The summary line above keeps `formatDate`: it is read, not compared.
+        deadline: t.dueOn ? formatDateSortable(t.dueOn) : "—",
+        closed: t.completedAt ? formatDateSortable(t.completedAt) : "—",
         // Facet columns (read by the filter engine, not the renderer).
         status: t.status === "done" ? "Done" : "Open",
         assignee: t.assigneeName ?? "Nobody yet",
@@ -296,11 +299,15 @@ export function TasksScreen({
   // A TABLE, not a two-line list, and that is what makes the four priority levels
   // distinct: each is its own sortable, filterable column rather than the fourth
   // clause of a summary sentence nobody reads to the end of.
-  const listRecipe = {
-    ...withDataDrivenCollection(recipe, data.rows),
-    display: "table" as const,
-    fields: columns,
-  }
+  // THE DISPLAY IS DECIDED FIRST, then the collection is tuned to the rows — not
+  // the other way round. A table's column headers ARE its sort control, and the
+  // tuner stands its own picker down when it can see it is drawing one
+  // (`frameSortOptions`); spreading the display on afterwards would hide that
+  // fact from it and put two sort controls on one screen.
+  const listRecipe = withDataDrivenCollection(
+    { ...recipe, display: "table" as const, fields: columns },
+    data.rows
+  )
 
   // THE CALENDAR — the host's own (components/record-calendar.tsx), given the
   // same rows. It wants a bare day, so the deadline's day is what it is keyed on;

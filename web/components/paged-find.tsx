@@ -1,7 +1,7 @@
 "use client"
 
-// FIND — the search box and filter bar a PAGED collection (R14) has to wear, and
-// the one place either one is answered.
+// FIND — the search box, the filter bar and the SORT a PAGED collection (R14)
+// has to wear, and the one place any of the three is answered.
 //
 // WHY THIS EXISTS. The library's CollectionFrame searches and filters IN MEMORY,
 // over the array it was handed. On a bounded list (members, roles, dropdowns)
@@ -26,6 +26,26 @@
 //     own R16 badge above, which never moves. A collection total and a filtered
 //     total are two different numbers and the screen now says both, each labelled.
 //
+// AND THE SORT IS THE SAME SENTENCE, arrived at four months later (2026-08-18).
+// The library's `selectRows` orders the array the frame is HOLDING, so sorting a
+// paged collection orders page one — fifty of 254 tasks, arranged, and nothing on
+// the screen saying which fifty. Reported by the owner as "the sort actually
+// doesn't work… I don't see the order changing, even though I can see that there
+// are different values", which is what it looks like from the outside: a control
+// that moves rows around inside a window you cannot see the edges of.
+//
+// So a sort joins `q` and the facets as an ordinary query parameter, and it gets
+// the property that matters for free. A changed sort is a changed QUESTION, so it
+// lands in a different cache key — which means page one, a fresh cursor sidecar,
+// and a <LoadMore> that pages THIS order. "Changing the sort must reset to page
+// one" is therefore structural here rather than something a screen remembers; the
+// door's cursor carries its ordering as well (shared/workers/sorting.ts), so even
+// a stale one is refused rather than answered.
+//
+// The DEFAULT sort is deliberately not sent. A screen nobody has touched asks the
+// door nothing, reads the collection's own cache key and looks exactly as it did
+// before this existed — the sort only becomes a question once somebody asks it.
+//
 // It is a render-prop rather than a hook so a screen that is still a branch of
 // the host's switch (accounts, tickets, the knowledge base) can use it without
 // being turned into a component first: hooks cannot be called from inside a
@@ -36,7 +56,8 @@ import * as React from "react"
 
 import { FilterBar } from "@kwapso/ui/registry/primitives/filter-bar/filter-bar"
 import { SearchInput } from "@kwapso/ui/registry/primitives/search-input/search-input"
-import type { FilterFacet } from "@kwapso/ui/lib/config"
+import { SortControl } from "@kwapso/ui/registry/primitives/sort-control/sort-control"
+import type { FilterFacet, SortOption } from "@kwapso/ui/lib/config"
 
 import { cursorKey } from "@/lib/live-resources"
 import { formatSearchTotal } from "@shared/web/format-count"
@@ -96,6 +117,8 @@ export function PagedFind<T>({
   placeholder,
   noun,
   facets = [],
+  sorts = [],
+  defaultSort = "",
   fixed,
   children,
 }: {
@@ -115,6 +138,20 @@ export function PagedFind<T>({
    * door cannot answer does not belong here at all, which is the defect this
    * whole file is about. */
   facets?: FilterFacet[]
+  /** WHAT THIS COLLECTION MAY BE ORDERED BY — the same names the door's own sort
+   * menu declares (ACCOUNT_SORTS, TICKET_SORTS, …), because a name this screen
+   * offers and the door does not know is a clean 400 the moment it is picked.
+   * Each option's `defaultDir` is the direction it LANDS on when chosen (dates
+   * newest-first, names A→Z); the toggle beside it flips from there. Empty = the
+   * collection has no sort control, which is the right answer for one whose
+   * order IS its meaning. */
+  sorts?: SortOption[]
+  /** The name the DOOR falls back to. It is never sent — a screen sitting on its
+   * default asks the door nothing, so it reads the collection's own cache key and
+   * pages the collection's own cursor, exactly as it did before sorting existed.
+   * Required whenever `sorts` is given, so the control can show what is already
+   * true rather than an empty "Sort by". */
+  defaultSort?: string
   /** WHAT THE SCREEN IS ALREADY ASKING, above whatever the person types — a tab
    * strip's own narrowing (`{ type: "entity" }`), forwarded to the door as an
    * ordinary query parameter.
@@ -130,6 +167,11 @@ export function PagedFind<T>({
   // Debounced upstream by SearchInput (200ms), so a keystroke is not a request.
   const [text, setText] = React.useState("")
   const [values, setValues] = React.useState<Record<string, string>>({})
+  // The ORDER, seeded from the door's own default so the control shows what is
+  // already true. `null` dir = "whatever that option lands on", which is what
+  // the door decides — so an untouched screen sends neither.
+  const [sortBy, setSortBy] = React.useState(defaultSort)
+  const [sortDir, setSortDir] = React.useState<"asc" | "desc" | null>(null)
 
   const query: FindQuery = {}
   for (const [field, value] of Object.entries(values)) if (value) query[field] = value
@@ -141,6 +183,22 @@ export function PagedFind<T>({
   // untouched search box reads as one.
   const asked = Object.keys(query).length > 0
   for (const [field, value] of Object.entries(fixed ?? {})) if (value) query[field] = value
+  // …AND NEITHER IS A SORT, which is why it goes in down here, after `asked`.
+  // Ordering a list does not narrow it: "254 accounts match" under a screen where
+  // somebody pressed "Name A→Z" would be a count of everything, labelled as if it
+  // were a result. The DEFAULT order is not sent at all — see the header.
+  //
+  // "Is this still the default?" is asked of the DIRECTION too, and not by
+  // comparing against null: re-picking the option you are already on fires
+  // `onChange` with that option's own `defaultDir`, so a screen that only looked
+  // at "has a direction been set" would start asking the door for the order it
+  // was already in — a second cache key holding the same rows.
+  const landsOn = sorts.find((o) => o.value === defaultSort)?.defaultDir ?? "asc"
+  const sortedAway = sortBy !== defaultSort || (sortDir !== null && sortDir !== landsOn)
+  if (sorts.length > 0 && sortedAway) {
+    query.sort = sortBy
+    if (sortDir) query.dir = sortDir
+  }
   const active = Object.keys(query).length > 0
   const findKey = active ? findKeyFor(listKey, query) : null
 
@@ -168,6 +226,7 @@ export function PagedFind<T>({
   }
   const canClear = asked
   const showFilters = facets.length > 0
+  const showSort = sorts.length > 0
 
   // NOTHING FOUND is a sentence, not a blank. "No accounts yet." is the
   // collection's empty state and it is simply untrue mid-search — but an empty
@@ -178,6 +237,22 @@ export function PagedFind<T>({
     <div className="flex w-full flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
         <SearchInput value={text} onChange={setText} placeholder={placeholder} className="w-56" />
+        {/* THE ORDER, beside the search box and the filters because it is the
+            third half of one question and belongs on the same row (the library's
+            own CollectionFrame places it exactly here). What it changes is what
+            the DOOR is asked, so the answer spans the whole collection rather
+            than the page in front of you. */}
+        {showSort && (
+          <SortControl
+            options={sorts}
+            sortBy={sortBy}
+            sortDir={sortDir ?? landsOn}
+            onChange={(by, dir) => {
+              setSortBy(by)
+              setSortDir(dir)
+            }}
+          />
+        )}
         {showFilters && (
           <FilterBar
             facets={facets}
