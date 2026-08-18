@@ -47,6 +47,7 @@ import { Pencil, Plus, Power } from "lucide-react"
 
 import type { InternalRate, RoleRate } from "@shared/types"
 import { RateFormDialog, type RateFormValues } from "@/components/rate-form-dialog"
+import { RecordActionsMenu } from "@/components/record-chrome"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { internalRatesKey, roleRatesKey, totalKey } from "@/lib/live-resources"
 import { usePermissions } from "@/lib/perms"
@@ -165,62 +166,69 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
                 r.active ? "" : "opacity-60"
               }`}
             >
+              {/* ONE QUESTION PER PART OF THE ROW (N4). It read `label · rate ·
+                  "Used when unnamed" · "Retired" · Edit · Retire`: two facts,
+                  two states and two actions in a single left-to-right sweep, and
+                  the rule book uses this exact row as its worked example of the
+                  "twisted" fault. Split by the question each part answers — the
+                  NAME on the left, the PRICE right-aligned in tabular-nums so a
+                  column of rates can be compared down the page (T4), the state
+                  as one badge after it, and both actions in the row's own menu
+                  (B2), confirms untouched. H 6 → 3. */}
               <span className="min-w-0 flex-1 truncate text-sm font-medium">{r.label}</span>
               <span className="text-sm tabular-nums">{rateText(r.centsPerHour, r.currency)}</span>
-              {r.isDefault && (
-                <Badge variant="secondary" className="text-[10px]">
-                  {t("Used when unnamed")}
-                </Badge>
-              )}
-              {!r.active && (
-                <Badge variant="outline" className="text-muted-foreground text-[10px]">
+              {!r.active ? (
+                <Badge variant="outline" className="text-muted-foreground shrink-0 text-[10px]">
                   {t("Retired")}
                 </Badge>
+              ) : (
+                r.isDefault && (
+                  <Badge variant="secondary" className="shrink-0 text-[10px]">
+                    {t("Used when unnamed")}
+                  </Badge>
+                )
               )}
-              <span className="ml-auto flex shrink-0 gap-1">
-                {canEdit && r.active && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={busy}
-                    onClick={() => setEditing(r)}
-                    className="gap-1.5"
-                  >
-                    <Pencil className="size-3.5" />
-                    {t("Edit")}
-                  </Button>
-                )}
-                {canRetire &&
-                  (r.active ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={busy}
-                      onClick={() => setRetiring(r)}
-                      className="text-destructive hover:text-destructive gap-1.5"
-                    >
-                      <Power className="size-3.5" />
-                      {t("Retire")}
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={busy}
-                      onClick={() =>
-                        void run(
-                          () => tenancy.setInternalRateActive(r.id, true),
-                          "Rate restored.",
-                          "Couldn't restore that rate."
-                        )
-                      }
-                      className="gap-1.5"
-                    >
-                      <Power className="size-3.5" />
-                      {t("Restore")}
-                    </Button>
-                  ))}
-              </span>
+              <RecordActionsMenu
+                tone="row"
+                actions={[
+                  ...(canEdit && r.active
+                    ? [
+                        {
+                          key: "edit",
+                          label: t("Edit"),
+                          icon: <Pencil className="size-3.5" />,
+                          disabled: busy,
+                          onSelect: () => setEditing(r),
+                        },
+                      ]
+                    : []),
+                  ...(canRetire
+                    ? [
+                        r.active
+                          ? {
+                              key: "retire",
+                              label: t("Retire"),
+                              icon: <Power className="size-3.5" />,
+                              disabled: busy,
+                              destructive: true,
+                              onSelect: () => setRetiring(r),
+                            }
+                          : {
+                              key: "restore",
+                              label: t("Restore"),
+                              icon: <Power className="size-3.5" />,
+                              disabled: busy,
+                              onSelect: () =>
+                                void run(
+                                  () => tenancy.setInternalRateActive(r.id, true),
+                                  t("Rate restored."),
+                                  t("Couldn't restore that rate.")
+                                ),
+                            },
+                      ]
+                    : []),
+                ]}
+              />
             </li>
           ))}
         </ul>
@@ -377,46 +385,46 @@ export function RoleRateCard({ teamId }: { teamId: string }) {
                 r.active ? "" : "opacity-60"
               }`}
             >
+              {/* The same row as the internal rates above it, so it takes the
+                  same treatment: name, price, one state badge, and the actions
+                  in the row's menu (N4, B2). */}
               <span className="min-w-0 flex-1 truncate text-sm font-medium">{r.roleName}</span>
               <span className="text-sm tabular-nums">{rateText(r.centsPerHour, null)}</span>
               {!r.active && (
-                <Badge variant="outline" className="text-muted-foreground text-[10px]">
+                <Badge variant="outline" className="text-muted-foreground shrink-0 text-[10px]">
                   {t("Retired")}
                 </Badge>
               )}
               {canEdit && (
-                <span className="ml-auto flex shrink-0 gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={busy}
-                    onClick={() => {
-                      setRole(r.roleName)
-                      setAmount(String(r.centsPerHour / 100))
-                    }}
-                    className="gap-1.5"
-                  >
-                    <Pencil className="size-3.5" />
-                    {t("Edit")}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={busy}
-                    onClick={() =>
-                      void set(
-                        r.roleName,
-                        r.centsPerHour,
-                        !r.active,
-                        r.active ? "Rate retired." : "Rate restored."
-                      )
-                    }
-                    className={r.active ? "text-destructive hover:text-destructive gap-1.5" : "gap-1.5"}
-                  >
-                    <Power className="size-3.5" />
-                    {r.active ? t("Retire") : t("Restore")}
-                  </Button>
-                </span>
+                <RecordActionsMenu
+                  tone="row"
+                  actions={[
+                    {
+                      key: "edit",
+                      label: t("Edit"),
+                      icon: <Pencil className="size-3.5" />,
+                      disabled: busy,
+                      onSelect: () => {
+                        setRole(r.roleName)
+                        setAmount(String(r.centsPerHour / 100))
+                      },
+                    },
+                    {
+                      key: r.active ? "retire" : "restore",
+                      label: r.active ? t("Retire") : t("Restore"),
+                      icon: <Power className="size-3.5" />,
+                      disabled: busy,
+                      destructive: r.active,
+                      onSelect: () =>
+                        void set(
+                          r.roleName,
+                          r.centsPerHour,
+                          !r.active,
+                          r.active ? t("Rate retired.") : t("Rate restored.")
+                        ),
+                    },
+                  ]}
+                />
               )}
             </li>
           ))}

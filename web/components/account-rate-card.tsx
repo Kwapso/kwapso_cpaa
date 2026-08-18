@@ -21,7 +21,6 @@
 import * as React from "react"
 
 import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
-import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { Pencil, Power } from "lucide-react"
 
@@ -34,6 +33,7 @@ import { rateText } from "@shared/web/money"
 import { primeCache, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 import { AddButton } from "@/components/deep-link/screen-bits"
+import { RecordActionsMenu } from "@/components/record-chrome"
 
 /** One account's card. Keyed by the ACCOUNT (`rates:<id>`) — the same key the
  * live registry's `account_rates` listener drops, so a colleague setting a price
@@ -127,64 +127,67 @@ export function AccountRateCard({
                   {t("Retired")}
                 </Badge>
               )}
-              {/* ml-auto on the GROUP so a narrow phone reflows instead of
-                  clipping the leftmost button off the edge (UI-CONVENTIONS §4). */}
-              <span className="ml-auto flex shrink-0 gap-1">
-                {canEdit && r.active && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={busy}
-                    onClick={() => setEditing(r)}
-                    className="gap-1.5"
-                  >
-                    <Pencil className="size-3.5" />
-                    {t("Edit")}
-                  </Button>
-                )}
-                {canRetire &&
-                  (r.active ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={busy}
-                      onClick={() =>
-                        ask({
-                          title: `Retire the ${r.label} rate?`,
-                          body: "It stops being offered on new work. What has already been charged at it stays exactly as it is, and you can bring it back any time.",
-                          action: "Retire",
-                          run: () =>
-                            act(
-                              () => tenancy.setAccountRateActive(r.id, false).then(refresh),
-                              "Rate retired.",
-                              "Couldn't retire that rate."
-                            ),
-                        })
-                      }
-                      className="text-destructive hover:text-destructive gap-1.5"
-                    >
-                      <Power className="size-3.5" />
-                      {t("Retire")}
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={busy}
-                      onClick={() =>
-                        void act(
-                          () => tenancy.setAccountRateActive(r.id, true).then(refresh),
-                          "Rate restored.",
-                          "Couldn't restore that rate."
-                        )
-                      }
-                      className="gap-1.5"
-                    >
-                      <Power className="size-3.5" />
-                      {t("Restore")}
-                    </Button>
-                  ))}
-              </span>
+              {/* The third of the three rate rows, and the same fix as the other
+                  two: facts on the line, the state as a badge, both actions in
+                  the row's own menu (N4, B2). The confirm on Retire travels with
+                  the action into the menu — moving a destructive act never
+                  removes the question it asks first. It also settles the
+                  narrow-phone note this row used to carry: one trigger cannot
+                  clip a second one off the edge. */}
+              <RecordActionsMenu
+                tone="row"
+                actions={[
+                  ...(canEdit && r.active
+                    ? [
+                        {
+                          key: "edit",
+                          label: t("Edit"),
+                          icon: <Pencil className="size-3.5" />,
+                          disabled: busy,
+                          onSelect: () => setEditing(r),
+                        },
+                      ]
+                    : []),
+                  ...(canRetire
+                    ? [
+                        r.active
+                          ? {
+                              key: "retire",
+                              label: t("Retire"),
+                              icon: <Power className="size-3.5" />,
+                              disabled: busy,
+                              destructive: true,
+                              onSelect: () =>
+                                ask({
+                                  title: `${t("Retire the")} ${r.label} ${t("rate?")}`,
+                                  body: t(
+                                    "It stops being offered on new work. What has already been charged at it stays exactly as it is, and you can bring it back any time."
+                                  ),
+                                  action: t("Retire"),
+                                  run: () =>
+                                    act(
+                                      () => tenancy.setAccountRateActive(r.id, false).then(refresh),
+                                      t("Rate retired."),
+                                      t("Couldn't retire that rate.")
+                                    ),
+                                }),
+                            }
+                          : {
+                              key: "restore",
+                              label: t("Restore"),
+                              icon: <Power className="size-3.5" />,
+                              disabled: busy,
+                              onSelect: () =>
+                                void act(
+                                  () => tenancy.setAccountRateActive(r.id, true).then(refresh),
+                                  t("Rate restored."),
+                                  t("Couldn't restore that rate.")
+                                ),
+                            },
+                      ]
+                    : []),
+                ]}
+              />
             </li>
           ))}
         </ul>

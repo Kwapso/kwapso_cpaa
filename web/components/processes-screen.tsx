@@ -143,13 +143,11 @@ export function ProcessesScreen({
   const apps = (appsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       {/* R16: the count lives in the heading (a sidebar page has no tab strip to
           badge), and it is the door's exact COUNT(*) — never the loaded page's
           length, which on a paged list is just "50" forever. */}
       <CollectionHeading sectionKey="processes" total={total} />
-
-      <ValuePanel view={valueQ.data} />
 
       {/* R14's other half: maps are kept rather than replaced, and the oldest is
           the one a client asks about — so the search box is answered by the door
@@ -203,6 +201,15 @@ export function ProcessesScreen({
           )
         }}
       </PagedFind>
+
+      {/* WHAT THE MAPS ADD UP TO — under them, not over them. `ValuePanel` is a
+          headline, R25's caption and a three-level accordion, and it sat between
+          the heading and the search box: four blocks before the first process on
+          a screen called Processes (N2). The person came for the list. It is the
+          SUM of the rows above it, so it reads better after them anyway, and it
+          is one scroll away rather than a click — which is the trade the owner
+          asked for when he said people should be happy to scroll. */}
+      <ValuePanel view={valueQ.data} />
 
       <AppFormDialog
         members={members}
