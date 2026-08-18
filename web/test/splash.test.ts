@@ -32,7 +32,7 @@
 
 import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { stripComments } from "@shared/rules/source-scan"
 import {
@@ -344,6 +344,122 @@ describe("the whole opening frame is small enough to inline", () => {
   it("fits in ten kilobytes of CSS + markup + script", () => {
     const bytes = Buffer.byteLength(splashStyle() + splashInner() + splashScript(), "utf8")
     expect(bytes, `the inline splash payload is ${bytes} bytes`).toBeLessThan(10 * 1024)
+  })
+})
+
+// SKIPPING IS SOMETHING A PERSON DOES, NOT SOMETHING THAT HAPPENS TO THEM.
+//
+// The splash used to dismiss on `pointerdown` at the document — which is not a
+// gesture anybody performs on purpose. A thumb resting on the glass while a
+// phone loads is a pointerdown. The first millimetre of a scroll is a
+// pointerdown. On a laptop nobody touches anything, so the ident played to the
+// end and looked perfect; on a phone it could vanish before the fly-in
+// finished, which from the owner's side reads as "the loader doesn't run on
+// mobile" — close to his actual words.
+//
+// The other tests in this file READ the inline script. These RUN it, on the
+// markup that ships, and put three real gestures through it: a phone being
+// held, a scroll beginning, and somebody actually asking for it to go. The
+// clock is faked because the difference between a rest and a tap is duration
+// and nothing else — a rest is a press and a lift in nearly the same place.
+describe("skipping the splash is a deliberate act", () => {
+  // CLEANUP IS UNCONDITIONAL, and that is not tidiness. `boot()` puts a node
+  // with the id the script looks up into the document; a case that FAILS never
+  // reaches its own restore, so the node survives, and the next `boot()` leaves
+  // `getElementById` resolving to the dead one. The first version of this suite
+  // did exactly that, and breaking one guard on purpose turned four unrelated
+  // cases red — which would have read as "the fix broke everything" rather than
+  // "one test found its bug".
+  const opened: Array<() => void> = []
+  afterEach(() => {
+    while (opened.length) opened.pop()!()
+  })
+
+  /** Evaluate the shipped inline script against the shipped markup. */
+  function boot() {
+    // Only what the script itself uses. rAF is left alone deliberately: the
+    // animator is stubbed out below and a faked rAF here would fight it.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] })
+    const realRaf = window.requestAnimationFrame
+    window.requestAnimationFrame = (() => 0) as typeof window.requestAnimationFrame
+    window.cancelAnimationFrame = (() => {}) as typeof window.cancelAnimationFrame
+    delete (window as { __ksMark?: unknown }).__ksMark
+
+    const host = document.createElement("div")
+    host.id = "ks-splash"
+    host.innerHTML = splashInner({ kind: "mark" })
+    document.body.appendChild(host)
+    // eslint-disable-next-line no-new-func -- the point is to run the shipped text
+    new Function(splashScript())()
+
+    opened.push(() => {
+      window.requestAnimationFrame = realRaf
+      host.remove()
+      vi.useRealTimers()
+    })
+    return { host, gone: () => host.style.display === "none" }
+  }
+
+  /** jsdom has no PointerEvent constructor, so the two fields the script reads
+   * are put on a plain event — which is all it ever touches. */
+  const press = (type: string, x: number, y: number, id = 1) => {
+    const ev = new Event(type, { bubbles: true, cancelable: true })
+    Object.assign(ev, { clientX: x, clientY: y, pointerId: id })
+    return ev
+  }
+
+  it("plays on under a thumb resting on the screen", () => {
+    const m = boot()
+    m.host.dispatchEvent(press("pointerdown", 180, 600))
+    vi.advanceTimersByTime(1500) // holding the phone
+    m.host.dispatchEvent(press("pointerup", 181, 602)) // and taking the thumb off
+    expect(
+      m.gone(),
+      "holding the device dismissed the loader — this is the gesture nobody performs on purpose"
+    ).toBe(false)
+  })
+
+  it("plays on when a scroll starts", () => {
+    const m = boot()
+    m.host.dispatchEvent(press("pointerdown", 180, 600))
+    vi.advanceTimersByTime(80)
+    m.host.dispatchEvent(press("pointerup", 184, 500)) // travelled 100px
+    expect(m.gone(), "a swipe dismissed the loader — that is a scroll, not a tap").toBe(false)
+  })
+
+  // How a scroll usually arrives on iOS: the browser takes the gesture over and
+  // there is never an up at all. The press must be FORGOTTEN, or an unrelated
+  // lift later completes it.
+  it("forgets a press the browser took over", () => {
+    const m = boot()
+    m.host.dispatchEvent(press("pointerdown", 180, 600))
+    m.host.dispatchEvent(press("pointercancel", 180, 600))
+    vi.advanceTimersByTime(40)
+    m.host.dispatchEvent(press("pointerup", 180, 600))
+    expect(m.gone(), "a cancelled gesture was completed by a later lift").toBe(false)
+  })
+
+  it("goes when somebody actually taps it", () => {
+    const m = boot()
+    m.host.dispatchEvent(press("pointerdown", 180, 600))
+    vi.advanceTimersByTime(90)
+    m.host.dispatchEvent(press("pointerup", 183, 602))
+    expect(
+      m.gone(),
+      "a deliberate tap no longer dismisses the loader — the skip has to still work, or it is not a courtesy"
+    ).toBe(true)
+  })
+
+  it("goes on a keypress, which nobody does by accident", () => {
+    const m = boot()
+    m.host.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true }))
+    expect(m.gone(), "the keyboard skip is gone").toBe(true)
+  })
+
+  it("goes on its own if nobody touches anything at all", () => {
+    const m = boot()
+    vi.advanceTimersByTime(SPLASH_TOTAL_MS)
+    expect(m.gone(), "the splash outlived its own timeout").toBe(true)
   })
 })
 
