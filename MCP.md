@@ -184,11 +184,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-<<<<<<< HEAD
-  red build. Today: **224 doors, 178 with a tool, 46 with a written reason**, the
-=======
-  red build. Today: **225 doors, 178 with a tool, 47 with a written reason**, the
->>>>>>> lane/deliverables-portal
+  red build. Today: **226 doors, 179 with a tool, 47 with a written reason**, the
   reasons being the team-pin doors (§3.2 below), the client-portal standing doors
   (§3.3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the THREE upload pairs, two media doors and the knowledge base, each a
@@ -207,13 +203,8 @@ Today it covers:
   SCREEN can badge its tabs in one round trip: every number in that bundle is
   already machine-readable, exactly and with narrowing those doors do not take,
   through `list_apps`, `list_processes`, `list_sprints`, `list_stories`,
-<<<<<<< HEAD
-  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 178, **154 are on THIS surface** and 24 are the in-app assistant's
-  alone, the twenty-one Google tools, the two confirm-panel bulk writes and the role
-=======
-  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 178, **155 are on THIS surface** and 23 are the in-app assistant's
+  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 179, **155 are on THIS surface** and 24 are the in-app assistant's
   alone, the twenty Google tools, the two confirm-panel bulk writes and the role
->>>>>>> lane/deliverables-portal
   permission matrix read, each reasoned in §3.
 
   **Eight doors left the census on 18 August 2026**, and they are worth naming
