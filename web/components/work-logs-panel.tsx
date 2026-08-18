@@ -31,8 +31,9 @@ import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { StatGrid, defaultStatGridConfig } from "@kwapso/ui/registry/collections/stat-grid/stat-grid"
-import { Pencil, Plus } from "lucide-react"
+import { Pencil } from "lucide-react"
 
+import { AddButton } from "@/components/deep-link/screen-bits"
 import { LoadMore } from "@/components/load-more"
 import { BandCard, HoursByChart, NothingYet, RecordWeeksChart, hoursSpoken } from "@/components/pulse"
 import { TimeFormDialog, type TimeFormValues } from "@/components/time-form-dialog"
@@ -282,10 +283,10 @@ export function WorkLogsPanel({
     <div className="flex flex-col gap-4">
       {canLog && (
         <div className="flex flex-wrap justify-end gap-2">
-          <Button size="sm" onClick={() => setAdding(true)} className="gap-1.5">
-            <Plus className="size-3.5" />
-            {t("Log time")}
-          </Button>
+          {/* The same control every other collection tab in the app puts above
+              its list, so "add one of these" looks like one act wherever a person
+              meets it (UI-CONVENTIONS §4). */}
+          <AddButton label={t("Log time")} onClick={() => setAdding(true)} />
         </div>
       )}
 
