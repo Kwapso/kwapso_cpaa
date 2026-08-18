@@ -18,7 +18,7 @@ import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/worke
 import { publishChange } from "@shared/workers/realtime"
 import { gated, gatedBody, openTeam } from "@shared/workers/route"
 import { accountScope, type AccountScope } from "@shared/workers/account-scope"
-import { MAX_IMAGE_BYTES, mediaKey, parseDataUrl } from "@shared/workers/image"
+import { mediaKey, storeImageDataUrl } from "@shared/workers/image"
 import { GuardError, hasRight, teamContext, whoAmI, type MemberGuard } from "@shared/workers/gating"
 import type { D1Rest } from "@shared/workers/d1-rest"
 import type { PortalUser } from "@shared/types"
@@ -78,44 +78,25 @@ function accountFields(body: Record<string, unknown>) {
   }
 }
 
-/** A PICKED IMAGE BECOMES AN OBJECT IN R2, NEVER A COLUMN.
- *
- * The form hands back a data URL (the file the person just chose, already
- * downsized in the browser). Storing that string is the tempting shortcut and it
- * is the wrong one twice over: a 512px JPEG is ~60 KB of base64, so a page of
- * fifty accounts carrying a logo and a cover would be several megabytes on every
- * list read and every CSV export — and a `data:` URL rendered into `src` is
- * exactly the shape `safeSrc` refuses, because a caller who can write the column
- * can write any scheme they like.
- *
- * So it lands in the bucket and the row keeps the `/media/...` path, which is the
- * same thing a team logo has always done (lib/teams.ts updateTeamDetails). The
- * key carries a random tail because the /media door has no session — the key IS
- * the credential (shared/workers/image.ts mediaKey).
- *
- * Anything that is NOT a data URL passes straight through: an empty string is
- * "clear it", and an existing `/media/...` path is the form handing back what it
- * was given. */
-async function storedImage(env: Env, teamId: string, value: string | undefined): Promise<string | undefined> {
-  if (!value || !value.startsWith("data:")) return value
-  const parsed = parseDataUrl(value)
-  if (!parsed) throw new GuardError(400, "bad_image", "That image format isn't supported.")
-  if (parsed.bytes.byteLength > MAX_IMAGE_BYTES)
-    throw new GuardError(400, "image_too_large", "That image is too large.")
-  const key = mediaKey(teamId, "accounts")
-  await env.MEDIA.put(key, parsed.bytes, { httpMetadata: { contentType: parsed.contentType } })
-  return `/media/${key}?v=${Date.now()}`
+/** A picked image becomes an object in R2, never a column — through the one
+ * store seam every door that takes a picture shares (shared/workers/image.ts
+ * storeImageDataUrl, which carries the whole argument for why). The refusals are
+ * ours because the wording is: this door says "image", the seam is shared with
+ * the web build and may not reach for a GuardError. */
+const REFUSE_IMAGE = {
+  badImage: () => new GuardError(400, "bad_image", "That image format isn't supported."),
+  tooLarge: () => new GuardError(400, "image_too_large", "That image is too large."),
 }
 
-/** Both of an account's images, through the store above. */
+/** Both of an account's images, through the store seam. */
 async function accountImages(
   env: Env,
   guard: MemberGuard,
   fields: { logoUrl?: string; coverUrl?: string }
 ): Promise<{ logoUrl?: string; coverUrl?: string }> {
   const [logoUrl, coverUrl] = await Promise.all([
-    storedImage(env, guard.teamId, fields.logoUrl),
-    storedImage(env, guard.teamId, fields.coverUrl),
+    storeImageDataUrl(env.MEDIA, mediaKey(guard.teamId, "accounts"), fields.logoUrl, REFUSE_IMAGE),
+    storeImageDataUrl(env.MEDIA, mediaKey(guard.teamId, "accounts"), fields.coverUrl, REFUSE_IMAGE),
   ])
   return { logoUrl, coverUrl }
 }
@@ -313,7 +294,7 @@ export async function postCreateAccount(request: Request, env: Env): Promise<Res
     parentAccountId: optionalText(body.parentAccountId, "Parent", TEXT_LIMITS.short),
     ...fields,
     // A picked image is a data URL on the way in and an object in R2 by the time
-    // the row is written — see storedImage.
+    // the row is written — see accountImages.
     ...(await accountImages(env, guard, fields)),
   })
   // Row-level: carry the new id so an open list patches just that row.

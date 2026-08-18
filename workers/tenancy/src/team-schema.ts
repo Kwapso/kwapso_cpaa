@@ -2545,6 +2545,35 @@ SELECT lower(hex(randomblob(16))), ${sqlString(SELECTABLE_GROUPS.deliverableKind
 ).join("\n")}
 `,
   },
+  {
+    // THE ONE RECORD IN THIS APP A PERSON RECOGNISES BY SIGHT, and the only one
+    // whose picture had nowhere to live.
+    //
+    // The apps screen is a wall of tiles precisely because an app is known by
+    // its mark (\`app-tiles.tsx\`, UI-RULEBOOK K9) — and every tile drew the same
+    // stage glyph, because the column this migration adds did not exist. The
+    // legacy app it replaced showed the client's real logo on all twenty-eight,
+    // which is how the gap was noticed: two screens side by side, one of them
+    // full of gears.
+    //
+    // The data settles the argument rather than taste: 26 of Glide's 28 apps
+    // carry a picture (glide/RECONCILIATION.md § the work engine), so this is a
+    // column with rows waiting for it, not a field somebody might one day fill.
+    //
+    // ONE COLUMN, NOT TWO. An account has a logo AND a cover because a company
+    // record has a masthead to fill; an app is only ever seen as a square in a
+    // grid or a square on its own heading, so a second image would be a column
+    // no screen has a place for.
+    //
+    // It holds what the two doors that write it produce: a \`/media/<key>\` path
+    // minted by \`storeImageDataUrl\`, the same seam the account logo has used
+    // since 0024. Nothing else — the picker downsizes in the browser, the door
+    // puts the bytes in R2, and the row keeps the path.
+    version: "0037_app_logo",
+    sql: `
+ALTER TABLE apps ADD COLUMN logo_url TEXT;
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

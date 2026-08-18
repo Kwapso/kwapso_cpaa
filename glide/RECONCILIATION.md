@@ -173,11 +173,51 @@ history and no permission behind it, is a page anybody can quietly change about
 somebody else. They are now `staff_profiles`, one live row per person, on each
 member's own page, visible to the team and reachable by no client login at all.
 
-**5 · The Google-hosted files.**
+**5 · The Google-hosted files.** — **ANSWERED, 2026-08-18: done, and the bytes
+have moved.**
 Every logo, photo, asset and attachment is a `storage.googleapis.com/glide-prod...`
 URL. Those links die with the Glide account. *Recommendation:* the import copies
 each file into R2 as it goes. This is the one piece of the migration with a
 deadline attached — do not cancel Glide before it runs.
+
+Two scripts, because it is two jobs. `scripts/glide-files.mjs` rescued all 194
+files onto disk and `scripts/glide-to-r2.mjs` put them in a private archive
+bucket — that is the SAFETY copy, and it is deliberately servable to nobody.
+`scripts/glide-visuals.mjs` is the other half: it walks the records the seed
+migrated, reads the picture off disk, and POSTs it to the ordinary gated door, so
+the bytes land under the team's own R2 prefix and the row keeps a `/media/...`
+path. **86 pictures, 10.7 MB** — 25 app logos, 16 company logos, 14 covers and 31
+contact photos. It is safe to re-run: a record that already carries its picture is
+skipped, and it proves each write by reading the row back rather than trusting a
+200.
+
+Three facts the run turned up that the mapping had not:
+
+- **`apps` had no image column at all.** The rows migrated and the pictures had
+  nowhere to go, which is why every tile on the apps screen drew the same stage
+  glyph while the Glide app it replaced showed HORST, FluClinic, CONFIA and the
+  rest. Team migration `0037_app_logo`.
+- **The account columns existed and were never filled.** `logo_url` and
+  `cover_url` have been there since `0024`, with a picker on the form — the seed
+  simply never sent them.
+- **Four cells hold the picture INLINE**, as a `data:image/jpeg;base64,…` value
+  rather than a link (VU Solutions' logo and three contact photos). A data URL
+  parses with an empty host, so the obvious "is this Glide's?" test calls it
+  external and the honest-looking answer — *not ours to re-host* — is exactly
+  backwards.
+
+**27 pictures were left where they are**, and this is a decision rather than a
+failure: they were never in Glide's bucket. They point at a client's own website
+(`cdn.prod.website-files.com` mostly), at LinkedIn, at Xing, and one at a stock
+library. They do not die with the Glide account, and re-hosting somebody else's
+asset is not ours to do quietly. Four files needed re-encoding to pass the door's
+png/jpeg/webp, 2.5 MB rule (one AVIF and three over the cap); `sips` does it, and
+anything it cannot do is named in the run rather than dropped.
+
+Still not carried, because the RECORDS were never migrated: the 8 deliverable
+thumbnails, the 74 brand-library files, the 5 staff certificates and the 6 staff
+photos. Each of those tables has its image column already — the pictures are
+waiting on the rows, not on a column.
 
 **6 · The uncategorised dropdown values.** — **ANSWERED, 2026-08-12: overruled.**
 Sixteen of the 154 choices have no group and are really countries and company-size

@@ -25,6 +25,7 @@
 import * as React from "react"
 
 import { Checkbox } from "@kwapso/ui/registry/primitives/checkbox/checkbox"
+import { FileUpload } from "@kwapso/ui/registry/primitives/file-upload/file-upload"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
@@ -41,7 +42,8 @@ import type { SelectableValue } from "@shared/types"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/record-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
-import { richTextValue } from "@shared/web/rich-text"
+import { richTextValue, safeSrc } from "@shared/web/rich-text"
+import { fileToDataUrl } from "@/lib/image"
 import { useCached } from "@shared/web/store"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useT } from "@shared/web/language"
@@ -51,6 +53,10 @@ export type AppFormValues = {
   accountId: string
   url: string
   stage: string
+  /** THE CLIENT'S OWN MARK. A data URL on the way out of this form (the picker
+   * downsizes it in the browser) and a `/media/...` path on the way back in,
+   * because the door stores the bytes and keeps the path. */
+  logoUrl: string
   /** whole cents a month — converted from the amount the form asks for */
   toolCostCentsPerMonth: number
   // THE FOUR CONTEXT FIELDS. They are on the form, not on a second "describe it"
@@ -82,6 +88,12 @@ const accountField = {
   hint: "Set once. Leave it blank for one of our own.",
 }
 const stageField = { ...defaultFieldConfig, label: "Stage", required: false, hint: "Where it has got to." }
+const logoField = {
+  ...defaultFieldConfig,
+  label: "Logo",
+  required: false,
+  hint: "The client's own mark. Without one the tile shows the stage.",
+}
 const aboutField = { ...defaultFieldConfig, label: "About", required: false, hint: "What this system is, in a sentence or two." }
 const contextField = {
   ...defaultFieldConfig,
@@ -176,6 +188,7 @@ export function AppFormDialog({
           accountId: initial.accountId,
           url: initial.url,
           stage: initial.stage,
+          logoUrl: initial.logoUrl,
           cost: initial.toolCostCentsPerMonth ? String(initial.toolCostCentsPerMonth / 100) : "",
           about: initial.about,
           clientContext: initial.clientContext,
@@ -191,6 +204,7 @@ export function AppFormDialog({
           accountId: "",
           url: "",
           stage: "",
+          logoUrl: "",
           cost: "",
           about: "",
           clientContext: "",
@@ -216,6 +230,23 @@ export function AppFormDialog({
   const contacts = (contactsQ.data?.links ?? [])
     .filter((l) => l.active)
     .map((l) => ({ id: l.personAccountId, name: l.personName }))
+  /** A picked file becomes a data URL on the form, downsized in the browser
+   * first — the same seam the account logo and the team logo use, so the body
+   * that reaches the door is ~60 KB rather than a phone photo. */
+  const pickLogo = async (files: File[]) => {
+    if (!files[0]) return
+    try {
+      const dataUrl = await fileToDataUrl(files[0])
+      setValues((s) => ({ ...s, logoUrl: dataUrl }))
+    } catch {
+      toast.error(t("Couldn't read that image. Try another one."))
+    }
+  }
+  // The preview is either the file just picked (a `data:` URL that has not left
+  // the browser) or the stored path the door minted, which goes through the URL
+  // boundary like every other stored URL this app renders.
+  const logoPreview = values.logoUrl.startsWith("data:") ? values.logoUrl : safeSrc(values.logoUrl)
+
   // A lead who has been unticked is no longer a lead — worked out on the fly so
   // the form can never send the pair the door would refuse.
   const lead = values.staffUserIds.includes(values.leadUserId) ? values.leadUserId : ""
@@ -238,6 +269,7 @@ export function AppFormDialog({
         accountId: values.accountId,
         url: values.url.trim(),
         stage: values.stage.trim(),
+        logoUrl: values.logoUrl,
         toolCostCentsPerMonth:
           values.cost.trim() !== "" && Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 100) : 0,
         about: richTextValue(values.about),
@@ -324,6 +356,28 @@ export function AppFormDialog({
           emptyText={t("Nothing matched.")}
           disabled={busy}
         />
+      </Field>
+      {/* THE MARK, IN THE SQUARE IT WILL APPEAR IN. Same seam and same shape as
+          the account logo: the picker downsizes in the browser, the fallback is
+          the stage mark the tile draws today, and the preview is the tile.
+          A `data:` preview cannot pass `safeSrc` — it is not a stored URL and
+          never leaves the browser — so it is named rather than checked, exactly
+          as the account form does. */}
+      <Field config={logoField} htmlFor="app-logo" className={fieldSpacing}>
+        <div className="flex items-center gap-2">
+          <span
+            aria-hidden
+            className="bg-muted grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl text-2xl leading-none"
+          >
+            {logoPreview ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoPreview} alt="" className="size-full object-cover" />
+            ) : (
+              appStageMark(values.stage) || values.name.slice(0, 1).toUpperCase()
+            )}
+          </span>
+          <FileUpload accept="image/*" multiple={false} onChange={pickLogo} />
+        </div>
       </Field>
       <Field config={aboutField} htmlFor="app-about" className={fieldSpacing}>
         <Notes

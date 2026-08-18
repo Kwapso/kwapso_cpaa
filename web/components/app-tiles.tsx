@@ -4,9 +4,10 @@
 //
 // UI-RULEBOOK K9 allows a card grid exactly where a record carries an image, and
 // G3 says the type mark sits in a rounded square where a logo would. An app has
-// both: its stage mark today, and a real logo the day the column exists. So the
-// square is the tile's subject and the words underneath are two lines at most —
-// the name, and the client (K1).
+// both, and since 0037_app_logo it has the second one for real: the client's own
+// mark where they have one, the stage mark where they do not. So the square is
+// the tile's subject and the words underneath are two lines at most — the name,
+// and the client (K1).
 //
 // FLAT FILL, NO BORDER, NO HOVER LIFT (C2): the separation between a tile and
 // the page is three per cent of lightness, which is the brand's whole surface
@@ -18,13 +19,52 @@
 // a soft one. Extracted from the apps screen because the account record shows
 // the same tiles for one client's systems.
 
+import * as React from "react"
 import { ChevronRight } from "lucide-react"
 
 import { softNavigate } from "@/lib/nav"
-import { safeHref } from "@shared/web/rich-text"
+import { safeHref, safeSrc } from "@shared/web/rich-text"
 import { appStageMark } from "@shared/app-stages"
 import type { AppRow } from "@shared/types"
 import { useT } from "@shared/web/language"
+
+/** THE SQUARE AN APP IS KNOWN BY — its logo, or the stage mark it has always
+ * drawn. One component because there are two places that draw it (the tile here
+ * and the record heading's `leading` slot), and a fallback rule kept in two
+ * places is a fallback rule that will one day disagree with itself.
+ *
+ * A PICTURE THAT FAILS TO LOAD FALLS BACK TO THE MARK, never to the browser's
+ * broken-image glyph. That is the whole reason this is a component with state
+ * rather than a ternary: `logoUrl` being present is not the same fact as the
+ * bytes still being there, and the first stored URL a person ever pastes by hand
+ * will be the one that proves it. `key` on the <img> resets the failure when the
+ * logo changes, so a corrected picture is not permanently written off.
+ *
+ * Through `safeSrc` because a stored path is still a value out of a database —
+ * R20's render-side twin. */
+export function AppMark({ app, className = "size-12" }: { app: AppRow; className?: string }) {
+  const [broken, setBroken] = React.useState(false)
+  const src = safeSrc(app.logoUrl)
+  return (
+    <span
+      aria-hidden
+      className={`bg-muted grid shrink-0 place-items-center overflow-hidden rounded-xl text-2xl leading-none ${className}`}
+    >
+      {src && !broken ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={src}
+          src={src}
+          alt=""
+          className="size-full object-cover"
+          onError={() => setBroken(true)}
+        />
+      ) : (
+        appStageMark(app.stage) || app.name.slice(0, 1).toUpperCase()
+      )}
+    </span>
+  )
+}
 
 export function AppTiles({
   apps,
@@ -62,13 +102,10 @@ export function AppTiles({
             className="bg-card hover:bg-muted flex items-center gap-2 rounded-xl p-4 transition-colors duration-200"
           >
             {/* The mark is aria-hidden and the stage WORD is on the heading above
-                it, which is the pair UI-CONVENTIONS §5 requires of a type mark. */}
-            <span
-              aria-hidden
-              className="bg-muted grid size-12 shrink-0 place-items-center rounded-xl text-2xl leading-none"
-            >
-              {appStageMark(app.stage) || app.name.slice(0, 1).toUpperCase()}
-            </span>
+                it, which is the pair UI-CONVENTIONS §5 requires of a type mark.
+                A logo carries no meaning the name does not already say, so it is
+                hidden from a screen reader for exactly the same reason. */}
+            <AppMark app={app} />
             <span className="min-w-0 flex-1">
               <span className="block truncate font-medium">{app.name}</span>
               <span className="text-muted-foreground block truncate text-xs">

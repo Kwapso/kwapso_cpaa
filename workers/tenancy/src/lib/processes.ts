@@ -134,6 +134,7 @@ export async function listApps(
       name: string
       url: string | null
       stage: string | null
+      logo_url: string | null
       tool_cost_cents_per_month: number
       about: string | null
       client_context: string | null
@@ -153,7 +154,7 @@ export async function listApps(
       // laziness: the apps set is bounded and read whole, the detail screen reads
       // the record out of the same cache the list filled, and a second door for
       // four columns would be a round trip that buys a page nothing.
-      `SELECT id, account_id, name, url, stage, tool_cost_cents_per_month,
+      `SELECT id, account_id, name, url, stage, logo_url, tool_cost_cents_per_month,
               about, client_context, solution, key_actors, deactivated_at,
               created_at, creator_name, updated_at, editor_name
          FROM apps${sql} ORDER BY (deactivated_at IS NULL) DESC, name ASC LIMIT ${LIST_HARD_CAP}`,
@@ -190,6 +191,14 @@ export async function listApps(
         name: r.name,
         url: canOpen ? r.url : null,
         stage: r.stage,
+        // THE LOGO RIDES FOR EVERYONE, and that is the same ruling 8.11 made
+        // about the app's existence rather than an exception to it: everyone
+        // SEES an app in the overview, and on this screen the overview IS the
+        // picture (`app-tiles.tsx`). Withholding it from a colleague who is not
+        // staffed would leave them a wall of identical marks — hiding the one
+        // thing that makes the list readable, to protect nothing. It is a
+        // client's own logo, not a fact about us (R24).
+        logoUrl: r.logo_url,
         // WHAT AN APP COSTS US is an internal number and never crosses to a client.
         // It is withheld HERE, on the row, rather than at the three call sites — a
         // redaction you have to remember is one somebody forgets (the same argument
@@ -479,6 +488,7 @@ export async function createApp(
     accountId?: string
     url?: string
     stage?: string
+    logoUrl?: string
     toolCostCentsPerMonth?: number
     about?: string
     clientContext?: string
@@ -494,6 +504,7 @@ export async function createApp(
     name: input.name,
     url: input.url ?? null,
     stage: input.stage ?? null,
+    logo_url: input.logoUrl ?? null,
     tool_cost_cents_per_month: input.toolCostCentsPerMonth ?? 0,
     about: input.about ?? null,
     client_context: input.clientContext ?? null,
@@ -525,6 +536,7 @@ export async function updateApp(
     name: string
     url?: string | null
     stage?: string | null
+    logoUrl?: string | null
     toolCostCentsPerMonth?: number
     about?: string | null
     clientContext?: string | null
@@ -542,13 +554,14 @@ export async function updateApp(
   const changed = await d1Query<{ id: string }>(
     cfg,
     guard.databaseId,
-    `UPDATE apps SET name = ?, url = ?, stage = ?, tool_cost_cents_per_month = ?,
+    `UPDATE apps SET name = ?, url = ?, stage = ?, logo_url = ?, tool_cost_cents_per_month = ?,
             about = ?, client_context = ?, solution = ?, key_actors = ?, ${audit.sql}
      ${where([fence.sql, "id = ?"])} RETURNING id`,
     [
       input.name,
       keep(input.url, before.url),
       keep(input.stage, before.stage),
+      keep(input.logoUrl, before.logoUrl),
       keep(input.toolCostCentsPerMonth, before.toolCost),
       keep(input.about, before.about),
       keep(input.clientContext, before.clientContext),
@@ -566,6 +579,10 @@ export async function updateApp(
     { label: "Name", from: before.name, to: input.name },
     { label: "Address", from: before.url, to: keep(input.url, before.url) },
     { label: "Stage", from: before.stage, to: keep(input.stage, before.stage) },
+    // The logo is reported as CHANGED and never quoted, for the same reason the
+    // four paragraphs are: an activity line that pastes a media path is a feed
+    // nobody can read.
+    { label: "Logo", from: before.logoUrl, to: keep(input.logoUrl, before.logoUrl), hideValues: true },
     { label: "About", from: before.about, to: keep(input.about, before.about), hideValues: true },
     {
       label: "Client context",
@@ -1602,6 +1619,7 @@ async function appOrThrow(
   name: string
   url: string | null
   stage: string | null
+  logoUrl: string | null
   toolCost: number
   about: string | null
   clientContext: string | null
@@ -1615,6 +1633,7 @@ async function appOrThrow(
     name: string
     url: string | null
     stage: string | null
+    logo_url: string | null
     tool_cost_cents_per_month: number
     about: string | null
     client_context: string | null
@@ -1623,7 +1642,7 @@ async function appOrThrow(
   }>(
     cfg,
     guard.databaseId,
-    `SELECT id, account_id, name, url, stage, tool_cost_cents_per_month,
+    `SELECT id, account_id, name, url, stage, logo_url, tool_cost_cents_per_month,
             about, client_context, solution, key_actors
        FROM apps${where([fence.sql, "id = ?"])} LIMIT 1`,
     [...fence.params, id]
@@ -1635,6 +1654,7 @@ async function appOrThrow(
     name: rows[0].name,
     url: rows[0].url,
     stage: rows[0].stage,
+    logoUrl: rows[0].logo_url,
     toolCost: rows[0].tool_cost_cents_per_month,
     about: rows[0].about,
     clientContext: rows[0].client_context,

@@ -53,6 +53,7 @@ export async function createAppFrom(teamId: string, values: AppFormValues): Prom
     accountId: values.accountId || undefined,
     url: values.url || undefined,
     stage: values.stage || undefined,
+    logoUrl: values.logoUrl || undefined,
     toolCostCentsPerMonth: values.toolCostCentsPerMonth,
     about: values.about || undefined,
     clientContext: values.clientContext || undefined,

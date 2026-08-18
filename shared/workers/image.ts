@@ -87,6 +87,50 @@ export function ownedMediaKey(
  * types (front-door.ts does the same for the read side). */
 type ReclaimBucket = { delete(key: string): Promise<void> }
 
+/** Structural again, for the write side. */
+type StoreBucket = {
+  put(key: string, bytes: Uint8Array, options: { httpMetadata: { contentType: string } }): Promise<unknown>
+}
+
+/** A PICKED IMAGE BECOMES AN OBJECT IN R2, NEVER A COLUMN.
+ *
+ * A form hands back a data URL — the file the person just chose, already
+ * downsized in the browser. Storing that string is the tempting shortcut and it
+ * is the wrong one twice over: a 512px JPEG is ~60 KB of base64, so a page of
+ * fifty rows carrying one would be several megabytes on every list read and
+ * every CSV export — and a `data:` URL rendered into `src` is exactly the shape
+ * `safeSrc` refuses, because a caller who can write the column can write any
+ * scheme they like.
+ *
+ * So it lands in the bucket and the row keeps the `/media/...` path. The key
+ * carries a random tail because the /media door has no session — the key IS the
+ * credential (mediaKey, above).
+ *
+ * Anything that is NOT a data URL passes straight through: an empty string is
+ * "clear it", and an existing `/media/...` path is the form handing back what it
+ * was given.
+ *
+ * IT LIVES HERE RATHER THAN BESIDE ITS FIRST CALLER because there are now three
+ * of them — an account's logo, an account's cover, and an app's logo — and the
+ * cap, the parse and the key are the same sentence for all three. A second copy
+ * is how one door quietly acquires a different limit from the others.
+ *
+ * `onBadImage` / `onTooLarge` are the caller's own refusals: this file is shared
+ * with the web build and may not reach for the workers' GuardError. */
+export async function storeImageDataUrl(
+  bucket: StoreBucket,
+  key: string,
+  value: string | undefined,
+  refuse: { badImage: () => Error; tooLarge: () => Error }
+): Promise<string | undefined> {
+  if (!value || !value.startsWith("data:")) return value
+  if (dataUrlBytes(value) > MAX_IMAGE_BYTES) throw refuse.tooLarge()
+  const parsed = parseDataUrl(value)
+  if (!parsed) throw refuse.badImage()
+  await bucket.put(key, parsed.bytes, { httpMetadata: { contentType: parsed.contentType } })
+  return `/media/${key}?v=${Date.now()}`
+}
+
 /** Delete the objects a row no longer points at. ALWAYS called AFTER the row has
  * moved, and always FAIL-SOFT.
  *

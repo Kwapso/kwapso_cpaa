@@ -128,6 +128,7 @@ export function ProcessesScreen({
       accountId: values.accountId || undefined,
       url: values.url || undefined,
       stage: values.stage || undefined,
+      logoUrl: values.logoUrl || undefined,
       toolCostCentsPerMonth: values.toolCostCentsPerMonth,
     })
     invalidate(appsKey(teamId))

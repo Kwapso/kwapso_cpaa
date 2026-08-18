@@ -33,6 +33,7 @@ import { getAccountRow, pricesVisibleFor } from "../lib/accounts"
 import { listAccountRates } from "../lib/rates"
 import { workEngineFacts } from "../lib/work-engine"
 import { GuardError } from "@shared/workers/gating"
+import { mediaKey, storeImageDataUrl } from "@shared/workers/image"
 import { resolveOrdering } from "@shared/workers/sorting"
 import {
   addProcessComment,
@@ -102,6 +103,20 @@ const MAX_TOOL_COST_CENTS = 1_000_000_000
  * workers/content/test/d1-parameter-cap.test.ts holds this pairing. */
 const APP_PEOPLE_CAP = 50
 
+/** AN APP'S LOGO IS BYTES IN R2 AND A PATH ON THE ROW, through the one store
+ * seam every door that takes a picture shares (shared/workers/image.ts
+ * storeImageDataUrl). The picker downsizes in the browser and hands back a data
+ * URL; anything that is not one — an empty string meaning "clear it", or the
+ * `/media/...` path the form was given — passes straight through.
+ *
+ * The refusals are stated here because the WORDING is this door's: the seam is
+ * shared with the web build and may not reach for a GuardError. Same pair the
+ * accounts door names, because it is the same cap and the same parse. */
+const REFUSE_IMAGE = {
+  badImage: () => new GuardError(400, "bad_image", "That image format isn't supported."),
+  tooLarge: () => new GuardError(400, "image_too_large", "That image is too large."),
+}
+
 // ── apps ─────────────────────────────────────────────────────────────────────
 
 /** GET /api/tenancy/apps[?accountId=] — the systems we have built.
@@ -127,6 +142,16 @@ export async function postCreateApp(request: Request, env: Env): Promise<Respons
     accountId: optionalText(body.accountId, "Account", TEXT_LIMITS.short),
     url: optionalText(body.url, "Address", TEXT_LIMITS.link),
     stage: optionalText(body.stage, "Stage", TEXT_LIMITS.short),
+    // The picked file is a data URL here and an object in R2 by the time the
+    // row is written. `TEXT_LIMITS.long` because a downsized 512px JPEG is
+    // ~60 KB of base64 — the byte cap that actually matters is the store seam's
+    // (MAX_IMAGE_BYTES), measured off the encoded text before anything decodes.
+    logoUrl: await storeImageDataUrl(
+      env.MEDIA,
+      mediaKey(guard.teamId, "apps"),
+      optionalText(body.logoUrl, "Logo", TEXT_LIMITS.long),
+      REFUSE_IMAGE
+    ),
     toolCostCentsPerMonth:
       body.toolCostCentsPerMonth === undefined
         ? undefined
@@ -216,6 +241,18 @@ export async function postUpdateApp(request: Request, env: Env): Promise<Respons
     // was not asked about).
     url: "url" in body ? (optionalText(body.url, "Address", TEXT_LIMITS.link) ?? null) : undefined,
     stage: "stage" in body ? (optionalText(body.stage, "Stage", TEXT_LIMITS.short) ?? null) : undefined,
+    // Sent-and-empty clears the picture; absent leaves it exactly where it was.
+    // A machine editing an app's stage must not silently take its logo away —
+    // the same patch rule the prose fields keep, said about an image.
+    logoUrl:
+      "logoUrl" in body
+        ? ((await storeImageDataUrl(
+            env.MEDIA,
+            mediaKey(guard.teamId, "apps"),
+            optionalText(body.logoUrl, "Logo", TEXT_LIMITS.long),
+            REFUSE_IMAGE
+          )) ?? null)
+        : undefined,
     toolCostCentsPerMonth:
       body.toolCostCentsPerMonth === undefined
         ? undefined
