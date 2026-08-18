@@ -44,7 +44,7 @@ import { ApiFailure, tenancy } from "@/lib/api"
 import { listFetch } from "@/lib/live-resources"
 import { APP_STAGES, appStageMark } from "@shared/app-stages"
 import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
-import type { SelectableValue, TeamMember } from "@shared/types"
+import type { SelectableValue } from "@shared/types"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
 import { useCached } from "@shared/web/store"
@@ -143,19 +143,6 @@ export function useAppStages(teamId: string): { value: string; mark: string }[] 
   return rows.length > 0 ? rows : APP_STAGES.map((s) => ({ value: s.name, mark: s.mark }))
 }
 
-/** THE TEAM, for the "who is on it" list (8.10). Its own hook beside the stage
- * one so every screen that can record an app asks the same question of the same
- * cache — the members list four other screens already hold, so opening the
- * dialog costs a round trip only on a page that has never needed it. */
-export function useTeamMembers(teamId: string): { id: string; name: string }[] {
-  const membersQ = useCached<TeamMember[]>(`members:${teamId}`, () =>
-    tenancy.members().then((r) => r.members)
-  )
-  return (membersQ.data ?? []).map((m) => ({
-    id: m.userId,
-    name: [m.firstName, m.lastName].filter(Boolean).join(" ") || m.email,
-  }))
-}
 
 export function AppFormDialog({
   open,

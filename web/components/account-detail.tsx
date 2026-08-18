@@ -69,7 +69,8 @@ import {
 } from "@/components/account-detail-panels"
 import { ContactLinkDialog, type ContactLinkValues } from "@/components/contact-link-dialog"
 import { ContactDetailScreen } from "@/components/contact-detail"
-import { AppFormDialog, useTeamMembers } from "@/components/app-form-dialog"
+import { AppFormDialog } from "@/components/app-form-dialog"
+import { useAssignableMembers } from "@/lib/people"
 import { KnowledgeAsk } from "@/components/knowledge-ask"
 import { RichText } from "@shared/web/rich-text-view"
 import { safeSrc } from "@shared/web/rich-text"
@@ -135,7 +136,7 @@ export function AccountDetailScreen({
 
   const { can } = usePermissions(teamId)
   // Who can be put on an app (8.10), for the record-an-app dialog below.
-  const members = useTeamMembers(teamId)
+  const members = useAssignableMembers(teamId)
   const canReadKnowledge = can("knowledge", "read")
   const canEdit = can("accounts", "edit")
   const canArchive = can("accounts", "delete")

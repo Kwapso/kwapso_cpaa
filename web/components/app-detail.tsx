@@ -22,7 +22,8 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import { Pencil, Power } from "lucide-react"
 
-import { AppFormDialog, useTeamMembers, type AppFormValues } from "@/components/app-form-dialog"
+import { AppFormDialog, type AppFormValues } from "@/components/app-form-dialog"
+import { useAssignableMembers } from "@/lib/people"
 import { ProcessFormDialog } from "@/components/process-form-dialog"
 import { SprintFormDialog } from "@/components/sprint-form-dialog"
 import { StoryFormDialog } from "@/components/story-form-dialog"
@@ -98,7 +99,7 @@ export function AppDetailScreen({
   const canReadTickets = can("help", "read")
   // Who can be put on this app (8.10) — the team, from the cache the members
   // screen already fills.
-  const members = useTeamMembers(teamId)
+  const members = useAssignableMembers(teamId)
   // The client's own people, by name — see the note beside `contactNames` below
   // for why this is a second read rather than the accounts cache.
   const clientId = appsQ.data?.find((a) => a.id === appId)?.accountId ?? null

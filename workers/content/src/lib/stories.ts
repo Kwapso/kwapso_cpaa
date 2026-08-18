@@ -45,6 +45,8 @@ import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared
 import { rankAtTop } from "@shared/workers/rank"
 import { STORY_STATUSES, type Sprint, type Story, type StoryStatus } from "@shared/types"
 
+import type { Env } from "../env"
+import { teamMemberNames } from "./notify"
 import { nextRef, REF_KINDS } from "./refs"
 
 export { STORY_STATUSES, type StoryStatus }
@@ -449,24 +451,28 @@ async function resolveAccount(
  * so a list of fifty stories draws fifty names without fifty lookups; the id is
  * what anything is ever decided from. */
 async function memberOrThrow(
-  cfg: D1Rest,
+  env: Env,
   guard: MemberGuard,
   userId: string,
   what: string
 ): Promise<{ id: string; name: string }> {
-  // The team's own membership lives in the CORE database, but every team database
-  // already carries the name on the audit blocks of rows that person has written.
-  // Rather than reach across, the door hands us the name it resolved from the
-  // team's member list; this proves the id at least belongs to somebody who has
-  // touched this team's data. A wrong id is a 400, never a silent null assignee.
-  const rows = await d1Query<{ name: string }>(
-    cfg,
-    guard.databaseId,
-    `SELECT creator_name AS name FROM activity WHERE creator_id = ? AND creator_name IS NOT NULL
-      ORDER BY id DESC LIMIT 1`,
-    [userId]
-  )
-  return { id: userId, name: rows[0]?.name ?? what }
+  // THE MEMBER LIST, NOT THE ACTIVITY FEED. It used to read the newest
+  // `creator_name` this person had written into the team database — which is a
+  // name they once typed under, not the name they are called — and fell back to
+  // the literal label when there was none. So a story handed to somebody in
+  // their first week, before they had touched a single row, stored
+  // `assignee_name = "Assignee"`, and that is what every list drew.
+  //
+  // Membership and identity both live in the CORE database, so ask it: the same
+  // read the to-do door already uses, and the same one `listMembers` answers the
+  // picker from. A name is still STORED beside the id (the audit habit of this
+  // codebase) so fifty stories draw fifty names without fifty lookups; the id is
+  // what anything is ever decided from. And an id belonging to nobody on the
+  // team is now the 400 the old comment already claimed it was.
+  const member = (await teamMemberNames(env, guard.teamId)).find((m) => m.userId === userId)
+  if (!member)
+    throw new GuardError(400, "invalid_input", `That ${what.toLowerCase()} isn't on the team.`)
+  return { id: userId, name: member.name }
 }
 
 /* ------------------- the app's own people decide two things ---------------- */
@@ -559,6 +565,7 @@ async function topRank(cfg: D1Rest, guard: MemberGuard): Promise<string> {
 
 /** Raise a story. Title is required; everything else optional. Opens in `open`. */
 export async function createStory(
+  env: Env,
   cfg: D1Rest,
   guard: MemberGuard,
   actor: Actor,
@@ -586,8 +593,8 @@ export async function createStory(
   const processIds = await resolveProcesses(cfg, guard, input.processIds, changesNoStep)
   // 6.6 — the work goes to somebody who is on this app, or nowhere.
   await refuseOffAppAssignee(cfg, guard, appId ?? null, assigneeId ?? null, "That person")
-  const assignee = assigneeId ? await memberOrThrow(cfg, guard, assigneeId, "Assignee") : null
-  const reviewer = reviewerId ? await memberOrThrow(cfg, guard, reviewerId, "Reviewer") : null
+  const assignee = assigneeId ? await memberOrThrow(env, guard, assigneeId, "Assignee") : null
+  const reviewer = reviewerId ? await memberOrThrow(env, guard, reviewerId, "Reviewer") : null
 
   const id = ulid()
   const now = new Date().toISOString()
@@ -619,6 +626,7 @@ VALUES (${sqlString(id)}, ${sqlString(ref)}, ${sqlString(accountId)}, ${sqlStrin
 /** Edit a story's content. Everything except the status and the rank, which have
  * their own doors — a status is a transition, not a field. */
 export async function updateStory(
+  env: Env,
   cfg: D1Rest,
   guard: MemberGuard,
   actor: Actor,
@@ -651,8 +659,8 @@ export async function updateStory(
   // another system and handing it to somebody who is not on that system is one
   // refusal rather than two edits that each looked fine.
   await refuseOffAppAssignee(cfg, guard, appId ?? before.app_id, assigneeId ?? null, "That person")
-  const assignee = assigneeId ? await memberOrThrow(cfg, guard, assigneeId, "Assignee") : null
-  const reviewer = reviewerId ? await memberOrThrow(cfg, guard, reviewerId, "Reviewer") : null
+  const assignee = assigneeId ? await memberOrThrow(env, guard, assigneeId, "Assignee") : null
+  const reviewer = reviewerId ? await memberOrThrow(env, guard, reviewerId, "Reviewer") : null
 
   const now = new Date().toISOString()
   await d1Query(

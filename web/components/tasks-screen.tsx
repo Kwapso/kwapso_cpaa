@@ -57,6 +57,7 @@ import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
 import { invalidate, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
+import { assignableMembers } from "@/lib/people"
 
 /** One task, as a row. Every column the six views need is on it, so the two
  * column sets below are a CHOICE of what to show rather than two shapings that
@@ -154,10 +155,9 @@ function useTaskFormOptions(teamId: string) {
   const accountsQ = useCached<Account[]>(`accounts:${teamId}`, () => listFetch.accounts(teamId))
   const valuesQ = useCached<SelectableValue[]>(`selectable:${teamId}`, () => listFetch.selectable(teamId))
   return {
-    members: (membersQ.data ?? []).map((m) => ({
-      id: m.userId,
-      name: [m.firstName, m.lastName].filter(Boolean).join(" ") || m.email,
-    })),
+    // Who's doing it: OUR people. A client login is an ordinary member and
+    // was in this dropdown until the one seam started deciding (lib/people).
+    members: assignableMembers(membersQ.data),
     apps: (appsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name })),
     accounts: (accountsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name })),
     // A retired department never appears as a pickable option, exactly as a

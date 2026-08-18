@@ -80,6 +80,16 @@ export type TeamMember = {
   isYou: boolean
   /** true if they hold the team's locked Admin role */
   isAdmin: boolean
+  /** TRUE IF THIS IS A CLIENT LOGIN, NOT ONE OF OURS.
+   *
+   * A portal login is an ordinary team member — grant → invite → accept is the
+   * only way to make a working one — so a client contact has always been in this
+   * list, and therefore in every dropdown built from it. That is right for the
+   * admin screens (they are a member; somebody has to be able to see and remove
+   * them) and wrong everywhere work is handed out, which is what the front door
+   * uses this to decide (web/lib/people.ts). The fact is a `portal_users` row in
+   * the team's own database, the same table the account fence reads. */
+  isClient: boolean
   joinedAt: string
 }
 

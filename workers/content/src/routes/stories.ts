@@ -111,7 +111,7 @@ export async function postCreateStory(request: Request, env: Env): Promise<Respo
   requireText(body.title, "Title", TEXT_LIMITS.short)
   requireText(body.storyType, "Story type", TEXT_LIMITS.short)
   const ticketId = optionalText(body.ticketId, "Ticket", TEXT_LIMITS.short)
-  const { id, accountId } = await createStory(cfg, guard, actor, body)
+  const { id, accountId } = await createStory(env, cfg, guard, actor, body)
   await publishChange(env, guard.teamId, "stories", id, "add", accountId ?? undefined)
   // CHECKLIST 5.3: work existing in a sprint is what SCHEDULES the request behind
   // it. R17 rides the flip, so a second story on an already-scheduled ticket
@@ -133,7 +133,7 @@ export async function postUpdateStory(request: Request, env: Env): Promise<Respo
   requireText(body.title, "Title", TEXT_LIMITS.short)
   requireText(body.storyType, "Story type", TEXT_LIMITS.short)
   const ticketId = optionalText(body.ticketId, "Ticket", TEXT_LIMITS.short)
-  const { accountId } = await updateStory(cfg, guard, actor, id, body)
+  const { accountId } = await updateStory(env, cfg, guard, actor, id, body)
   await publishChange(env, guard.teamId, "stories", id, "edit", accountId ?? undefined)
   // The edit form is where a sprint gets attached, so this is the ordinary way a
   // ticket becomes `scheduled`.
