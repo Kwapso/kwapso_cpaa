@@ -194,6 +194,50 @@ export async function grantCredits(env: Env, teamId: string, amount: number): Pr
 /** Where a turn's AI units came from: all free, all paid credit, or a bit of each. */
 export type UsageSource = "free" | "credit" | "mixed"
 
+/** WHAT A TURN ACTUALLY COST IN TOKENS, as the provider reported it — the four
+ * numbers Anthropic returns in its `usage` block, in our words.
+ *
+ * A UNIT IS NOT A COST. `credits` above counts REQUESTS, which is the right
+ * shape for an allowance a person reads ("25 left today") and the wrong shape
+ * for a bill: two turns that each spend one unit can differ tenfold in tokens.
+ * So the log records both — the unit that was metered, and the tokens it bought.
+ *
+ * `cacheWrite` and `cacheRead` are the whole reason this exists. The prompt
+ * cache is only worth what it actually HITS, and a hit rate is not something a
+ * console can be asked for after the fact: it has to be written down while the
+ * turn is happening. cacheRead ÷ (cacheRead + cacheWrite + input) is the answer,
+ * off our own table, on our own data.
+ *
+ * It lives HERE, beside the row it is written into, rather than in the model
+ * adapter that produces it, because `shared/` cannot import from a worker and
+ * two shapes for one row is how the two halves drift apart. */
+export type TokenUsage = {
+  /** prompt tokens charged at full price (everything after the last cache hit). */
+  input: number
+  /** tokens the model generated. */
+  output: number
+  /** prompt tokens WRITTEN to the cache this turn (billed at a premium, once). */
+  cacheWrite: number
+  /** prompt tokens SERVED from the cache this turn (billed at a tenth). */
+  cacheRead: number
+}
+
+/** A turn that reported nothing (the Workers AI path, or a call that threw). */
+export const NO_TOKENS: TokenUsage = { input: 0, output: 0, cacheWrite: 0, cacheRead: 0 }
+
+/** Add one model turn's tokens onto a running total. A turn can call the model
+ * more than once (each step, plus the unmetered failure wrap-up), and the row is
+ * per COMMAND — so the counts sum the same way the credits beside them do. */
+export function addTokens(total: TokenUsage, turn: TokenUsage | undefined): TokenUsage {
+  if (!turn) return total
+  return {
+    input: total.input + turn.input,
+    output: total.output + turn.output,
+    cacheWrite: total.cacheWrite + turn.cacheWrite,
+    cacheRead: total.cacheRead + turn.cacheRead,
+  }
+}
+
 /** What a usage row's summary IS: an ACTION the assistant took (team-visible —
  * the team is entitled to see actions taken in its name) or the PROMPT the
  * person typed (the author's own — showing a teammate's question would publish
@@ -210,14 +254,24 @@ export async function logUsage(
   credits: number,
   source: UsageSource,
   summary: string,
-  kind: UsageKind
+  kind: UsageKind,
+  /** What the turn cost in TOKENS (including the prompt-cache split). OMITTED
+   * means "not measured", and is written as NULL rather than as four zeroes —
+   * the knowledge base spends its unit on a provider that reports nothing, and a
+   * row of zeroes there would read as "measured, and it was free", which is the
+   * one thing these numbers must never say. */
+  tokens?: TokenUsage
 ): Promise<void> {
   try {
     await env.DB.prepare(
-      `INSERT INTO agent_usage_log (id, team_id, actor_id, actor_name, created_at, credits, source, summary, kind)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO agent_usage_log (id, team_id, actor_id, actor_name, created_at, credits, source, summary, kind,
+                                    input_tokens, output_tokens, cache_write_tokens, cache_read_tokens)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-      .bind(ulid(), teamId, actor.id, actor.name, new Date().toISOString(), credits, source, summary, kind)
+      .bind(
+        ulid(), teamId, actor.id, actor.name, new Date().toISOString(), credits, source, summary, kind,
+        tokens?.input ?? null, tokens?.output ?? null, tokens?.cacheWrite ?? null, tokens?.cacheRead ?? null
+      )
       .run()
   } catch {
     /* logging is never fatal — a missing table or write error must not break the turn */
@@ -239,7 +293,11 @@ export async function foldUsageIntoLatest(
   actor: Actor,
   addCredits: number,
   addSource: UsageSource,
-  actions: string
+  actions: string,
+  /** The continuation's TOKENS, folded in beside its units for the same reason
+   * they are: one command is one row, and a row whose credits reconcile while
+   * its tokens don't is a bill that only half adds up. */
+  tokens: TokenUsage = NO_TOKENS
 ): Promise<void> {
   if (addCredits <= 0) return
   try {
@@ -253,17 +311,25 @@ export async function foldUsageIntoLatest(
          SET credits = credits + ?,
              source = CASE WHEN source = ? THEN source ELSE 'mixed' END,
              summary = substr(CASE WHEN ? = '' THEN summary ELSE summary || ' · ' || ? END, 1, 300),
-             kind = CASE WHEN ? = '' THEN kind ELSE 'action' END
+             kind = CASE WHEN ? = '' THEN kind ELSE 'action' END,
+             input_tokens = COALESCE(input_tokens, 0) + ?,
+             output_tokens = COALESCE(output_tokens, 0) + ?,
+             cache_write_tokens = COALESCE(cache_write_tokens, 0) + ?,
+             cache_read_tokens = COALESCE(cache_read_tokens, 0) + ?
        WHERE id = (
          SELECT id FROM agent_usage_log
          WHERE team_id = ? AND actor_id = ? ORDER BY created_at DESC LIMIT 1
        )`
     )
-      .bind(addCredits, addSource, actions, actions, actions, teamId, actor.id)
+      .bind(
+        addCredits, addSource, actions, actions, actions,
+        tokens.input, tokens.output, tokens.cacheWrite, tokens.cacheRead,
+        teamId, actor.id
+      )
       .run()
     // No prior row to fold into (propose log failed) → don't lose the units.
     if ((res.meta.changes ?? 0) === 0)
-      await logUsage(env, teamId, actor, addCredits, addSource, actions || "assistant action", "action")
+      await logUsage(env, teamId, actor, addCredits, addSource, actions || "assistant action", "action", tokens)
   } catch {
     /* best-effort — a fold failure must never break the turn */
   }
