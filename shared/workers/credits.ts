@@ -18,10 +18,10 @@
 
 import type { D1Database } from "@cloudflare/workers-types"
 
-import type { AgentQuota, UsageLogRow } from "@shared/types"
-import type { Actor } from "@shared/workers/gating"
-import { ulid } from "@shared/workers/id"
-import { numberVar } from "@shared/workers/limits"
+import type { AgentQuota, UsageLogRow } from "../types"
+import type { Actor } from "./gating"
+import { ulid } from "./id"
+import { numberVar } from "./limits"
 
 /** What this gate needs from a worker's env — structurally, so any worker that
  * spends the allowance can pass its own Env without importing another's. */
