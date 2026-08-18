@@ -350,7 +350,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_account",
     summary:
-      "Create an account. `accountType` is 'entity' (a company) or 'individual' (a person), nothing else is accepted. `parentAccountId` puts it under another account; leave it out for a top-level one. The postal address is four fields, `street`, `postalCode`, `city`, `country`, and `country` and `industry` are picked from the team's own dropdown values. `code` is the reference, and you almost never send it: leave it out and one is minted from the name (BERG for Bergman S.A., BERG2 when that is taken).",
+      "Create an account. `accountType` is 'entity' (a company) or 'individual' (a person), nothing else is accepted. Both are still live here, but the agency's own screens now only ever create companies: a person is made on a company's Contacts tab, which creates the account and then links it the way `link_contact` does. `parentAccountId` puts it under another account; leave it out for a top-level one. The postal address is four fields, `street`, `postalCode`, `city`, `country`, and `country` and `industry` are picked from the team's own dropdown values. `code` is the reference, and you almost never send it: leave it out and one is minted from the name (BERG for Bergman S.A., BERG2 when that is taken).",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/accounts",
     schema: obj(
       { accountType: S, name: S, parentAccountId: S, ...ACCOUNT_FIELD_SCHEMA },

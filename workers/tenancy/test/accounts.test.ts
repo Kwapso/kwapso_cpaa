@@ -219,6 +219,79 @@ describe("reference codes are labels, never identifiers", () => {
     })
   })
 
+  // THE COLUMN OUTLIVED THE QUESTION.
+  //
+  // On 18 Aug 2026 the Type selector came off the account form: every account
+  // somebody creates in the agency app is a company, and a person is made on a
+  // company's Contacts tab with the word filled in by the code. `account_type`
+  // stays — it is a live CHECK constraint, it decides which of the two screens
+  // an account gets, and the import file and the machine surface both still say
+  // it out loud. So the door has to keep meaning what it always meant, with no
+  // screen left in front of it to keep the value tidy.
+  describe("the door still decides what an account may be", () => {
+    const post = async (path: string, body: unknown) => {
+      const res = await worker.fetch(req(`POST ${path}`, body), makeEnv(() => db(), IDS.staffUser))
+      return { status: res.status, text: await res.text() }
+    }
+
+    it("refuses a third kind of account as bad input, not as a crash", async () => {
+      // The CHECK constraint would refuse this too, and that refusal would arrive
+      // through the central catch as a 500 with a row in the global error log.
+      // The door decides first, so it is a 400 in the words a manager uses.
+      const nonsense = await post("/api/tenancy/accounts", { accountType: "robot", name: "HAL" })
+      expect(nonsense.status, "bad input is a 400, never a 500").toBe(400)
+      expect(nonsense.text).toMatch(/company or a person/i)
+      expect(nonsense.text, "said in our words, never the database's").not.toMatch(
+        /CHECK|constraint|SQLITE|D1/i
+      )
+      // Nothing was written on the way to being refused.
+      const made = db().prepare("SELECT COUNT(*) n FROM accounts WHERE name = 'HAL'").get() as {
+        n: number
+      }
+      expect(made.n).toBe(0)
+    })
+
+    it("still accepts both kinds, because two surfaces still send both", async () => {
+      // The CSV import declares Type as a required column and the `create_account`
+      // tool declares `accountType` as a required argument. Neither was narrowed,
+      // so neither may be quietly broken here.
+      expect((await post("/api/tenancy/accounts", { accountType: "entity", name: "Bergman S.A." })).status).toBe(200)
+      expect((await post("/api/tenancy/accounts", { accountType: "individual", name: "Marta" })).status).toBe(200)
+    })
+
+    it("makes what the Contacts tab asks it for: a person, under the company, linked to it", async () => {
+      // The two writes that tab makes, in order, through the real doors. The
+      // PARENT and the LINK are different facts and the screen sets both — one
+      // person can be a contact of several companies, which is what the link row
+      // can say and a single pointer cannot.
+      const made = await post("/api/tenancy/accounts", {
+        accountType: "individual",
+        name: "Marta Bergman",
+        parentAccountId: IDS.victimAccount,
+      })
+      expect(made.status).toBe(200)
+      const personId = (JSON.parse(made.text) as { id: string }).id
+
+      const linked = await post("/api/tenancy/accounts/links", {
+        accountId: IDS.victimAccount,
+        personAccountId: personId,
+        relationship: "Operations",
+      })
+      expect(linked.status).toBe(200)
+
+      const row = db()
+        .prepare("SELECT account_type t, parent_account_id p FROM accounts WHERE id = ?")
+        .get(personId) as { t: string; p: string | null }
+      expect(row.t, "a contact is a person").toBe("individual")
+      expect(row.p, "and she sits under the company she was made on").toBe(IDS.victimAccount)
+
+      const link = db()
+        .prepare("SELECT COUNT(*) n FROM account_links WHERE account_id = ? AND person_account_id = ?")
+        .get(IDS.victimAccount, personId) as { n: number }
+      expect(link.n, "the parent pointer is not a contact link — both had to happen").toBe(1)
+    })
+  })
+
   it("re-coding an account changes nothing about what points at it", async () => {
     // The whole reason the code is not an identifier: its children, its links and
     // its logins all hold the ULID, so renaming the label moves no relationship.

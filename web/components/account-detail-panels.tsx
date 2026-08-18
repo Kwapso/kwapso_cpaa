@@ -19,7 +19,7 @@
 
 import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { Ban, KeyRound, Power, UserMinus } from "lucide-react"
+import { Ban, KeyRound, Link2, Power, UserMinus } from "lucide-react"
 
 import type { AccountDetail } from "@shared/types"
 import { tenancy } from "@/lib/api"
@@ -56,32 +56,61 @@ function Row({ active, children }: { active: boolean; children: React.ReactNode 
   )
 }
 
-/** The people attached to this account. Adding one is a link, never a new
- * person; removing one says they are no longer a contact HERE — they keep
+/** The people attached to this account.
+ *
+ * TWO WAYS IN, AND BOTH EARN THEIR PLACE. New contact makes a person who did not
+ * exist a minute ago; Add contact says someone we already hold is a contact here
+ * too — which is the case a parent pointer cannot express, and the reason we do
+ * not make somebody type a second Marta because the search missed the first.
+ *
+ * Until 18 Aug 2026 only the second existed, and the only way to make a person
+ * at all was the Type selector on the account form. Taking that selector away
+ * without this button would have left the search here pointed at a set nobody
+ * could ever add to.
+ *
+ * Removing a contact says they are no longer a contact HERE — they keep
  * everything else they are attached to. */
 export function ContactsPanel({
   accountName,
   links,
   canCreate,
+  canCreatePerson,
   canArchive,
   actions: { busy, ask, act },
   onAdd,
+  onNew,
   onOpen,
 }: {
   accountName: string
   links: AccountDetail["links"]
+  /** may LINK a person already on the books — `contacts:create` on its own. */
   canCreate: boolean
+  /** may make a NEW one, which writes an accounts row as well as a link, so it
+   * needs `accounts:create` too. The door decides either way (R10); this only
+   * decides whether we offer a button that would come back a 403. */
+  canCreatePerson: boolean
   canArchive: boolean
   actions: PanelActions
   onAdd: () => void
+  onNew: () => void
   onOpen: (accountId: string) => void
 }) {
   const t = useT()
   return (
     <div className="flex flex-col gap-3">
-      {canCreate && (
+      {(canCreate || canCreatePerson) && (
         <div className="flex flex-wrap justify-end gap-2">
-          <AddButton label={t("Add contact")} onClick={onAdd} />
+          {/* Distinct glyphs on purpose: two icon-only buttons that both showed a
+              plus would be one button drawn twice. Create keeps the Plus
+              (UI-CONVENTIONS §4); linking gets the link. */}
+          {canCreate && (
+            <AddButton
+              label={t("Add contact")}
+              onClick={onAdd}
+              icon={<Link2 className="size-4" />}
+            />
+          )}
+          {canCreatePerson && <AddButton label={t("New contact")} onClick={onNew} />}
         </div>
       )}
       {links.length === 0 ? (
