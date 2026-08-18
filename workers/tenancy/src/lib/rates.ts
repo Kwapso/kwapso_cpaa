@@ -46,6 +46,38 @@ async function refusingDuplicate<T>(message: string, write: () => Promise<T>): P
 
 const RATE_TAKEN = "That kind of work already has a rate on this account. Edit the one that's there."
 
+/** ONE ACCOUNT'S RATE CARD, AS A QUESTION — the fence plus the account, written
+ * once so the rows below and the count beside them cannot be asked differently
+ * (R16: a badge counting rows its list withholds is the leak). */
+function rateCardWhere(scope: AccountScope, accountId: string): { sql: string; params: string[] } {
+  const fence = accountScopeClause(scope, "account_id")
+  return { sql: where([fence.sql, "account_id = ?"]), params: [...fence.params, accountId] }
+}
+
+/** R16: the exact server COUNT(*) the Rates tab badges, over the SAME question
+ * the card asks. Bounded by nature rather than by a ceiling — a rate card is
+ * kinds of work, not hours, so `account_rates` is not a GROWING_COLLECTIONS row.
+ *
+ * It exists apart from the list because the badge is now answered BEFORE the tab
+ * is opened (shared/record-counts.ts): a screen asking "how many are there" must
+ * not have to pull the rows to find out. */
+export async function countAccountRates(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  accountId: string
+): Promise<number> {
+  requireAccountInScope(scope, accountId)
+  const q = rateCardWhere(scope, accountId)
+  const rows = await d1Query<{ n: number }>(
+    cfg,
+    guard.databaseId,
+    `SELECT COUNT(*) AS n FROM account_rates${q.sql}`,
+    q.params
+  )
+  return rows[0]?.n ?? 0
+}
+
 /** One account's rate card. BOUNDED: a rate card is a handful of lines — kinds
  * of work, not hours. */
 export async function listAccountRates(
@@ -55,9 +87,7 @@ export async function listAccountRates(
   accountId: string
 ): Promise<{ rows: AccountRate[]; total: number }> {
   requireAccountInScope(scope, accountId)
-  const fence = accountScopeClause(scope, "account_id")
-  const sql = where([fence.sql, "account_id = ?"])
-  const params = [...fence.params, accountId]
+  const { sql, params } = rateCardWhere(scope, accountId)
   const [rows, counted] = await Promise.all([
     d1Query<{
       id: string
@@ -80,8 +110,9 @@ export async function listAccountRates(
         LIMIT ${LIST_HARD_CAP}`,
       params
     ),
-    // R16 — the exact server total through the same fence.
-    d1Query<{ n: number }>(cfg, guard.databaseId, `SELECT COUNT(*) AS n FROM account_rates${sql}`, params),
+    // R16 — the exact server total through the same fence. ONE expression,
+    // shared with the eager badge above.
+    countAccountRates(cfg, guard, scope, accountId),
   ])
   return {
     rows: rows.map((r) => ({
@@ -98,7 +129,7 @@ export async function listAccountRates(
       updatedAt: r.updated_at,
       editedByName: scope.kind === "portal" ? null : r.editor_name,
     })),
-    total: counted[0]?.n ?? 0,
+    total: counted,
   }
 }
 

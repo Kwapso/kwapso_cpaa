@@ -102,6 +102,7 @@ import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { useRecordActivity } from "@/lib/use-record-activity"
+import { useRecordCounts } from "@/lib/use-record-counts"
 import { useT } from "@shared/web/language"
 
 export function AccountDetailScreen({
@@ -175,12 +176,21 @@ export function AccountDetailScreen({
       })
   )
 
-  // R16: the exact totals those tabs badge, each primed by the panel's own fetch
-  // over the same filter its rows came from.
-  const appsTotal = useCachedValue<number>(totalKey("apps-account", accountId))
-  const sprintsTotal = useCachedValue<number>(totalKey("sprints-account", accountId))
-  const todosTotal = useCachedValue<number>(totalKey("todos-account", accountId))
-  const ratesTotal = useCachedValue<number>(totalKey("account-rates", accountId))
+  // THE BADGES, BEFORE THE CLICK. One bounded read of every child total on this
+  // record, primed into the same sidecars below — so a tab with work behind it
+  // says so on arrival instead of only once you open it. The ROWS stay lazy:
+  // each panel still fetches its own when its tab is shown.
+  useRecordCounts("accounts", accountId)
+  // R16: the exact totals those tabs badge — from the counts read above, and
+  // re-primed by each panel's own fetch over the same filter its rows came from.
+  // `null` is a THIRD answer beside a number and an absence: the role holds no
+  // read right on that module, so nobody counted (R18). It renders as nothing,
+  // like a zero and like a still-loading total, and stays distinguishable from
+  // both in the cache.
+  const appsTotal = useCachedValue<number | null>(totalKey("apps-account", accountId))
+  const sprintsTotal = useCachedValue<number | null>(totalKey("sprints-account", accountId))
+  const todosTotal = useCachedValue<number | null>(totalKey("todos-account", accountId))
+  const ratesTotal = useCachedValue<number | null>(totalKey("account-rates", accountId))
 
   const [tab, setTab] = React.useState("overview")
   const [editOpen, setEditOpen] = React.useState(false)

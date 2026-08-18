@@ -39,6 +39,7 @@ import type {
   StaffCertificate,
   StaffProfile,
 } from "@shared/types"
+import type { RecordCounts } from "@shared/record-counts"
 import { api, enc, post } from "@shared/web/api"
 
 /** SEND A FILE AS THE BODY — the client half of the four streaming upload doors.
@@ -364,6 +365,13 @@ export const content = {
    * cannot read that module, which is why every screen reading this must render
    * nothing for a null rather than an empty state (R18). */
   insights: () => api<TeamPulse>("/api/content/insights"),
+
+  /** HOW MANY OF EACH THING HANG OFF ONE RECORD — this worker's half (sprints,
+   * stories, to-dos, tickets, meetings, a ticket's files). Asked when the record
+   * opens so its tabs are badged before anybody clicks one; the rows behind each
+   * tab stay lazy. */
+  recordCounts: (table: string, id: string) =>
+    api<RecordCounts>(`/api/content/record-counts?table=${enc(table)}&id=${enc(id)}`),
 
   /* ---------------------------- to-dos and tasks ---------------------------- */
   /** What we are waiting on a client for. Fenced: a client login sees their own

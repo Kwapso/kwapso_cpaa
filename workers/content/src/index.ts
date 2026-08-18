@@ -52,6 +52,7 @@
 //   GET  /api/content/triage              -> whose week it is + the tickets nobody has read
 //   POST /api/content/triage              -> put somebody on triage duty for a week
 //   GET  /api/content/insights            -> the team's week in numbers (per-module gated)
+//   GET  /api/content/record-counts       -> one record's child totals, before a tab is clicked
 //   GET  /api/content/knowledge           -> the sources the assistant may read (?id → one)
 //   GET  /api/content/knowledge/ask       -> answer a question from them, with citations
 //   GET  /api/content/knowledge/sync      -> how far the sweep has got with each kind
@@ -132,6 +133,7 @@ import {
 } from "./routes/todos"
 import { getTriage, postSetTriageDuty } from "./routes/triage"
 import { getInsights } from "./routes/insights"
+import { getRecordCounts } from "./routes/record-counts"
 import {
   getKnowledge,
   getKnowledgeAsk,
@@ -386,6 +388,11 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // standing in for three would give somebody a chart they may not read or take
   // away one they may (R18). See routes/insights.ts.
   "GET /api/content/insights": { handler: getInsights, kind: "read" },
+  // THE BADGES ON A RECORD'S TABS, answered when the record OPENS rather than
+  // when the tab is clicked — the counts are eager, the rows stay lazy. Gated
+  // per COLLECTION for the same R18 reason as the pulse above it, and refused to
+  // a client login. See routes/record-counts.ts.
+  "GET /api/content/record-counts": { handler: getRecordCounts, kind: "read" },
   "GET /api/content/knowledge": { handler: getKnowledge, kind: "read" },
   "GET /api/content/knowledge/ask": { handler: getKnowledgeAsk, kind: "read" },
   "GET /api/content/knowledge/sync": { handler: getKnowledgeSync, kind: "read" },

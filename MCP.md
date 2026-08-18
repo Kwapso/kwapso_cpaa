@@ -178,7 +178,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **223 doors, 181 with a tool, 42 with a written reason**, the
+  red build. Today: **225 doors, 181 with a tool, 44 with a written reason**, the
   reasons being the team-pin doors (§3.2 below), the client-portal standing doors
   (§3.3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the THREE upload pairs, two media doors and the knowledge base, each a
@@ -190,7 +190,12 @@ Today it covers:
   that spend the team's AI allowance outside a chat turn (translating a ticket's
   title, and translating a screen's human-typed text for the reader looking at
   it), one
-  invite's audit trail and the cross-module activity feed. Of the 181, **152 are on THIS surface** and 29 are the in-app assistant's
+  invite's audit trail, the cross-module activity feed, and the two
+  record-counts doors, one per worker, which bundle a record's child totals so a
+  SCREEN can badge its tabs in one round trip: every number in that bundle is
+  already machine-readable, exactly and with narrowing those doors do not take,
+  through `list_apps`, `list_processes`, `list_sprints`, `list_stories`,
+  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 181, **152 are on THIS surface** and 29 are the in-app assistant's
   alone, the twenty-six Google tools, the two confirm-panel bulk writes and the role
   permission matrix read, each reasoned in §3. Those three numbers are asserted
   against the live census in `workers/mcp/test/filter-parity.test.ts`, so this
