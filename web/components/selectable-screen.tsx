@@ -52,6 +52,10 @@ export function SelectableScreen({
   // Inline rename state (one row at a time).
   const [editingId, setEditingId] = React.useState<string | null>(null)
   const [editValue, setEditValue] = React.useState("")
+  // The emoji, editable at last. The door has parsed and written it since the
+  // day it shipped and this screen never sent one, so a value's emoji could be
+  // chosen when it was created and never changed again.
+  const [editMark, setEditMark] = React.useState("")
   // Collection filter chrome — the SAME shape the other collections (roles,
   // learning, help) use: a text search + a status filter defaulting to Active, so
   // deactivated values hide until you ask for them (then show greyed with Activate).
@@ -84,7 +88,7 @@ export function SelectableScreen({
   async function saveRename(id: string) {
     if (!editValue.trim()) return
     try {
-      const { values: next } = await tenancy.updateSelectable(id, editValue)
+      const { values: next } = await tenancy.updateSelectable(id, editValue, editMark)
       primeCache(`selectable:${teamId}`, next)
       setEditingId(null)
       toast.success(t("Renamed."))
@@ -207,8 +211,17 @@ export function SelectableScreen({
                     {editingId === v.id ? (
                       <>
                         <Input
+                          value={editMark}
+                          onChange={(e) => setEditMark(e.target.value)}
+                          aria-label={t("Emoji")}
+                          placeholder={t("Emoji")}
+                          maxLength={4}
+                          className="h-8 w-16 shrink-0 text-center"
+                        />
+                        <Input
                           value={editValue}
                           onChange={(e) => setEditValue(e.target.value)}
+                          aria-label={t("Option")}
                           // eslint-disable-next-line jsx-a11y/no-autofocus
                           autoFocus
                           className="h-8"
@@ -255,6 +268,7 @@ export function SelectableScreen({
                                 onClick={() => {
                                   setEditingId(v.id)
                                   setEditValue(v.value)
+                                  setEditMark(v.mark ?? "")
                                 }}
                                 aria-label={`Rename ${v.value}`}
                               >

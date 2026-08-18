@@ -174,11 +174,18 @@ export const tenancy = {
       body: JSON.stringify({ type, value, mark }),
     }),
 
-  /** Rename a dropdown value (its type stays). Needs selectable_data:edit. */
-  updateSelectable: (id: string, value: string) =>
+  /** Edit a dropdown value — its word and its emoji; its type stays. Needs
+   * selectable_data:edit.
+   *
+   * `mark` UNDEFINED leaves the emoji alone, an empty string clears it — the
+   * lib's own contract. The screen sends it either way, because it now has a
+   * field for it: the door has parsed and written `mark` since the day it
+   * shipped, and this client sent only the word, so a value's emoji could be
+   * set when it was created and never changed afterwards. */
+  updateSelectable: (id: string, value: string, mark?: string) =>
     api<{ values: SelectableValue[] }>("/api/tenancy/selectable/update", {
       method: "POST",
-      body: JSON.stringify({ id, value }),
+      body: JSON.stringify({ id, value, mark }),
     }),
 
   /** Deactivate / reactivate a dropdown value (deactivate-only). Needs
