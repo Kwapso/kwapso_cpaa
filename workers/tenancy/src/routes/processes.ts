@@ -285,12 +285,18 @@ export async function postAppActive(request: Request, env: Env): Promise<Respons
 
 // ── processes ────────────────────────────────────────────────────────────────
 
-/** The two filters a processes read accepts, parsed ONCE, so the list door and
- * any machine caller narrow by the same words. */
-function processQuery(url: URL): { q?: string; appId?: string } {
+/** The three filters a processes read accepts, parsed ONCE, so the list door and
+ * any machine caller narrow by the same words.
+ *
+ * `archived` is an allow-list of two words, checked HERE so nothing but our own
+ * literal ever reaches a statement (R20); anything else means "don't narrow",
+ * which is what this list has always answered. */
+function processQuery(url: URL): { q?: string; appId?: string; archived?: string } {
+  const archived = queryText(url.searchParams.get("archived"), "Archived")
   return {
     q: queryText(url.searchParams.get("q"), "Search"),
     appId: queryText(url.searchParams.get("appId"), "App"),
+    archived: archived === "yes" || archived === "no" ? archived : undefined,
   }
 }
 

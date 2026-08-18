@@ -44,7 +44,15 @@ export function field(column: string, label: string): RecipeField {
  * `filterFacets` adds the user-facing FILTER bar (`userFilter`): each facet's
  * `field` must be a real column on the SHAPED rows (a chosen value becomes an
  * `is` Rule on it); options are auto-derived from the data. Threaded per-call
- * like the search placeholder. */
+ * like the search placeholder.
+ *
+ * …AND A PAGED COLLECTION PASSES NONE, for the reason it gets no search box and
+ * no sort control: the frame filters the array it is holding, which on a list
+ * that pages is page one. Its facets are the DOOR's, declared in
+ * web/lib/collection-filters.ts and drawn by the host's find bar. A paged recipe
+ * that declares facets here turns the build red (`facets-ask-the-door`), because
+ * the two readings of `{ field: "kind" }` — the row's column and the door's
+ * parameter — look identical and answer different questions. */
 function listCollection(
   emptyText: string,
   searchPlaceholder: string,
@@ -341,12 +349,14 @@ const ticketsListRecipe: ScreenRecipe = {
   gate: { module: "help", right: "read" },
   fields: [field("name", "Ticket"), field("detail", "Details")],
   actions: [],
-  collection: listCollection(
-    "No tickets yet.",
-    "Search tickets…",
-    [{ field: "status", label: "Status", control: "select" }],
-    { paged: true }
-  ),
+  // NO FACET HERE, and this one is a REMOVAL rather than a move. The stage a
+  // ticket is at is already narrowed by the sub-tab strip below the header
+  // (Ready / the team's own kinds / Closed), which asks the DOOR — so a Status
+  // select beside it would be a second control on one field, which is exactly
+  // the clutter the accounts screen took away ("two controls for one field").
+  // The one in the frame narrowed the loaded fifty and was the same defect the
+  // strip was built to avoid.
+  collection: listCollection("No tickets yet.", "Search tickets…", [], { paged: true }),
 }
 
 /* -------------------------------- accounts -------------------------------- */
@@ -389,14 +399,16 @@ const knowledgeListRecipe: ScreenRecipe = {
   gate: { module: "knowledge", right: "read" },
   fields: [field("name", "Source"), field("detail", "Details")],
   actions: [],
+  // NO FACETS HERE, and that is the fix rather than a loss (see the accounts
+  // recipe above): on a collection that PAGES, a facet in the frame narrows the
+  // fifty rows the browser is holding. This screen's filters are the DOOR's now,
+  // declared in web/lib/collection-filters.ts and asked from the host's find bar.
+  // Reported by the owner: "From a meeting" answered TWO, over a base holding
+  // 170 of them, because two of them were on page one.
   collection: listCollection(
     "Nothing in the knowledge base yet.",
     "Search the knowledge base…",
-    [
-      { field: "kind", label: "Kind", control: "select" },
-      { field: "filed", label: "Filed under", control: "select" },
-      { field: "state", label: "Status", control: "select" },
-    ],
+    [],
     { paged: true }
   ),
 }
@@ -414,11 +426,11 @@ const meetingsListRecipe: ScreenRecipe = {
   gate: { module: "meetings", right: "read" },
   fields: [field("name", "Meeting"), field("detail", "Details")],
   actions: [],
-  collection: listCollection("Nothing in the diary yet.", "Search meetings…", [
-    { field: "client", label: "Client", control: "select" },
-    { field: "purpose", label: "Why we met", control: "select" },
-    { field: "state", label: "Status", control: "select" },
-  ], { paged: true }),
+  // NO FACETS HERE, and that is the fix rather than a loss (see the accounts
+  // recipe above): on a collection that PAGES, a facet in the frame narrows the
+  // fifty rows the browser is holding. This screen's filters are the DOOR's now,
+  // declared in web/lib/collection-filters.ts and asked from the host's find bar.
+  collection: listCollection("Nothing in the diary yet.", "Search meetings…", [], { paged: true }),
 }
 
 /* ------------------------------ process maps ------------------------------ */
@@ -436,15 +448,11 @@ const processesListRecipe: ScreenRecipe = {
   gate: { module: "processes", right: "read" },
   fields: [field("name", "Process"), field("detail", "Details")],
   actions: [],
-  collection: listCollection(
-    "No processes yet.",
-    "Search processes…",
-    [
-      { field: "app", label: "App", control: "select" },
-      { field: "archived", label: "Archived", control: "select" },
-    ],
-    { paged: true }
-  ),
+  // NO FACETS HERE, and that is the fix rather than a loss (see the accounts
+  // recipe above): on a collection that PAGES, a facet in the frame narrows the
+  // fifty rows the browser is holding. This screen's filters are the DOOR's now,
+  // declared in web/lib/collection-filters.ts and asked from the host's find bar.
+  collection: listCollection("No processes yet.", "Search processes…", [], { paged: true }),
 }
 
 /* ------------------------------- the work ------------------------------- */
@@ -462,17 +470,11 @@ const storiesListRecipe: ScreenRecipe = {
   gate: { module: "work", right: "read" },
   fields: [field("name", "Story"), field("detail", "Details")],
   actions: [],
-  collection: listCollection(
-    "No work in hand.",
-    "Search work…",
-    [
-      { field: "status", label: "Status", control: "select" },
-      { field: "assignee", label: "Assignee", control: "select" },
-      { field: "sprint", label: "Sprint", control: "select" },
-      { field: "app", label: "App", control: "select" },
-    ],
-    { paged: true }
-  ),
+  // NO FACETS HERE, and that is the fix rather than a loss (see the accounts
+  // recipe above): on a collection that PAGES, a facet in the frame narrows the
+  // fifty rows the browser is holding. This screen's filters are the DOOR's now,
+  // declared in web/lib/collection-filters.ts and asked from the host's find bar.
+  collection: listCollection("No work in hand.", "Search work…", [], { paged: true }),
 }
 
 /** THE SPRINTS — the blocks the work was sold inside. A row's summary line is

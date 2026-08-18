@@ -105,7 +105,7 @@ export function HelpDetailScreen({
 }) {
   const t = useT()
   const ticketsQ = useCached<HelpTicket[]>(`help:${teamId}`, () =>
-    content.help("all").then((r) => r.tickets)
+    content.help().then((r) => r.tickets)
   )
   const ticket = ticketsQ.data?.find((t) => t.id === helpId) ?? null
 

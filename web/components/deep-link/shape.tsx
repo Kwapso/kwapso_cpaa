@@ -135,8 +135,6 @@ export function shapeHelpList(tickets: HelpTicket[]): ScreenData {
       // the archived flag went with the same edit: a subtitle carrying four
       // facts is table content smuggled into a list (K2).
       detail: [HELP_STATUS[t.status], t.helpType || "General"].filter(Boolean).join(" · "),
-      // Facet column (read by the filter engine, not the renderer).
-      status: HELP_STATUS[t.status],
     })),
   }
 }
@@ -200,10 +198,6 @@ export function shapeKnowledgeList(
       detail: `${KNOWLEDGE_KIND[s.kind] ?? s.kind} · ${knowledgeFiledUnder(s, accountNames)}${
         s.visibility === "private" ? " · private to you" : ""
       }`,
-      // Facet columns (read by the filter engine, not the renderer).
-      kind: KNOWLEDGE_KIND[s.kind] ?? s.kind,
-      filed: knowledgeFiledUnder(s, accountNames),
-      state: s.active ? "In use" : "Not in use",
     })),
   }
 }
@@ -224,7 +218,10 @@ export function shapeMeetingsList(meetings: Meeting[]): ScreenData {
       // K1: when, and who with. The purpose is a column on the "all" view, which
       // is where a person compares meetings on it (K2).
       detail: [formatDate(m.startsAt), m.accountName ?? "ours"].filter(Boolean).join(" · ") || "—",
-      // Facet columns (read by the filter engine, not the renderer).
+      // TABLE COLUMNS, not facets. `client` and `state` are two of the six the
+      // "All" view draws, and the diary's filters are the DOOR's now
+      // (web/lib/collection-filters.ts) — so these are read by the table and by
+      // nothing else. `purpose` went with the facet that was its only reader.
       client: m.accountName ?? "Ours",
       purpose: m.purposeName ?? "Not said",
       // WHETHER IT HAS HAPPENED, FROM THE CLOCK. There used to be a `held` status
@@ -293,10 +290,6 @@ export function shapeAccountsList(accounts: Account[]): ScreenData {
         detail:
           [ACCOUNT_TYPE[a.accountType], accountStatus(a.status), parent].filter(Boolean).join(" · ") ||
           "—",
-        // Facet columns (read by the filter engine, not the renderer).
-        type: ACCOUNT_TYPE[a.accountType],
-        status: accountStatus(a.status) || "—",
-        archived: a.active ? "No" : "Yes",
       }
     }),
   }

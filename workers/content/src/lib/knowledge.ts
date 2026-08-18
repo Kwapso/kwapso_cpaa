@@ -509,9 +509,14 @@ export const KNOWLEDGE_SORTS: SortMenu<KnowledgeSource> = {
   dated: { expr: "COALESCE(record_date, created_at)", dir: "desc", key: (s) => s.recordDate ?? s.createdAt },
 }
 
-/** What a caller may narrow a source list to: the search box, and the two words
- * a source is filed under. */
-export type SourceFilters = { kind?: string; compartment?: string; q?: string }
+/** What a caller may narrow a source list to: the search box, the two words a
+ * source is filed under, and whether it is still in use.
+ *
+ * `active` is an ALLOW-LIST of two words rather than a boolean, because it
+ * arrives off a query string where everything is text and `"false"` is truthy.
+ * "yes" is the sources the assistant may read; "no" is the ones somebody took
+ * away and can put back (deactivate-never-delete, so they are still rows). */
+export type SourceFilters = { kind?: string; compartment?: string; q?: string; active?: string }
 
 /** THE FENCE PLUS THE FILTERS, built ONCE — because the list and the COUNT have
  * to be the same question. They were not: the count was the fence alone, so a
@@ -530,6 +535,11 @@ function sourcesWhere(guard: MemberGuard, filter: SourceFilters): { sql: string[
     sql.push("compartment = ?")
     params.push(filter.compartment)
   }
+  // Not a parameter: the two words are matched against literals ABOVE this line
+  // (the door's own allow-list), so what reaches the statement is our SQL and
+  // never the caller's text.
+  if (filter.active === "yes") sql.push("deactivated_at IS NULL")
+  if (filter.active === "no") sql.push("deactivated_at IS NOT NULL")
   if (filter.q) {
     // The needle is a LIKE PATTERN, not just a bound value — likeLiteral is what
     // stops `%` meaning "everything" and an alternating pattern costing the

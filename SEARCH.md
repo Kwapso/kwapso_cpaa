@@ -184,7 +184,8 @@ compartment model, the two fences); BOOTSTRAP.md §3b is how you stand the index
 
 A collection is asked three things — **which rows** (the filters), **which of
 those** (the search), and **in what order**. This document has always owned the
-first two. The third had no layer, no seam and, in most of the app, no control at
+first two, though only on paper for the first, as § *The FIRST question,
+answered last* below records. The third had no layer, no seam and, in most of the app, no control at
 all, and the reason it went unnoticed for so long is worth stating: sorting looks
 like a presentation detail until you notice it is answered in exactly the same
 place a search is, and can be wrong in exactly the same way.
@@ -311,6 +312,85 @@ The other half of the report — "there are many places where I have no way to s
 a collection" — was simply true, and the table above is the answer: before this,
 the only sortable thing in either front door was a column header on two screens.
 
+## The FIRST question, answered last: THE FACETS (BUILT 2026-08-18)
+
+§ *The third question* above says a collection is asked three things: which rows,
+which of those, and in what order. The filters are the FIRST of the three and the
+one this document has owned since it was written, which is exactly why they were
+the last to be moved. Nobody goes looking for the part that is already covered.
+
+**The report.** The owner filtered the knowledge base by **"From a meeting"** and
+was shown **two** sources. The door, asked properly, answers **52**. The app holds
+**170 meetings**. Nothing had crashed: `kind` was a `filterFacets` entry on a
+PAGED recipe, so the library's frame filtered the fifty rows it was holding, and
+page one happened to carry exactly two meetings. The screen reported two, under a
+badge (R16) correctly counting all 3,000-odd sources.
+
+**Why it survived two lanes that were looking straight at it.** A recipe facet and
+a door filter are written identically, `{ field: "kind" }`, and mean two
+different things: the loaded row's PROPERTY, and the door's query PARAMETER. Layer
+2 moved the search box and left the bar beside it alone; the sorting lane moved
+the order and left it alone again. Both times the thing that stayed was the one
+that looked like it had already been dealt with.
+
+- **The screen's half is `web/lib/collection-filters.ts`**, the exact sibling of
+  `collection-sorts.ts`: `field` is the DOOR's parameter, `options` are the DOOR's
+  values (`kind=meeting`, never `kind=From a meeting`). A CLOSED vocabulary is
+  declared there in full; a facet over rows (an account, an app, a sprint, a
+  person) declares none and the screen fills it in from what it already holds, and
+  a facet with nothing to offer is dropped rather than drawn empty.
+- **A changed facet is a changed question**, so it lands in its own cache key with
+  its own cursor sidecar: page one by construction, exactly as a changed sort does.
+  Nothing has to remember to reset, because there is nothing to reset.
+- **Nothing between the control and the door enumerates.** The screen spreads
+  `{ ...query, cursor }` and every paged list client builds its URL through one
+  `listQuery` (`shared/web/api.ts`). That was not a tidy-up: `content.knowledge`
+  took the find's whole question and copied three named fields of it across, so
+  when sorting arrived and put `sort` in that question, the knowledge base's sort
+  control changed the cache key, refetched the same rows in the same order, and
+  looked like it worked.
+- **Two doors learned a filter they had been shown and could not answer**: the
+  knowledge base's `active` (in use / taken away) and the process maps' `archived`.
+  Each is an allow-list of two words, checked at the door (R20) and exposed on the
+  machine surface beside every other filter (R19).
+- **Two facets were REMOVED rather than wired**, because an offered filter that
+  cannot be honoured must not be shown. Tickets' Status select went: the sub-tab
+  strip above it already narrows the same field at the door, and two controls on
+  one field is the clutter the accounts screen took away. The diary's
+  "Cancelled" went from its Status facet: cancelled is `active = 0` rather than a
+  status, and the meetings door parses no such parameter.
+
+### The census (derived 2026-08-18, from `GROWING_COLLECTIONS` and the recipes)
+
+**Every collection that PAGES**, what it offered before, and what it asks now. The
+left column is the recipe's `filterFacets`; the right is the door's own query
+parameters, which is where every one of them is answered from today.
+
+| Paged collection | Offered, in the frame (page one) | Asked of the door now |
+| --- | --- | --- |
+| **Accounts** | none, moved in August | `status` (the team's own words, from the loaded rows) · `archived` · the All / Companies / People strip as `type` |
+| **The knowledge base** | `kind` · `filed` · `state` | `kind` (all eighteen, a closed vocabulary the door allow-lists) · `compartment` · `active`, **NEW at the door** |
+| **The diary** | `client` · `purpose` · `state` | `accountId` · `purposeId` · `status`, two words rather than three, see below |
+| **Process maps** | `app` · `archived` | `appId` · `archived`, **NEW at the door** |
+| **The backlog** | `status` · `assignee` · `sprint` · `app` | `status` · `assigneeId` · `sprintId` · `appId`, all four already parsed and none asked |
+| **Tickets** | `status` | **none, and that is the fix**: the sub-tab strip already narrows stage and kind at the door |
+
+Note the NAMES down the middle column. Four of those facets read as if they named
+a door filter and named a loaded row's column instead (`app` against `appId`,
+`assignee` against `assigneeId`, `client` against `accountId`, `filed` against
+`compartment`), which is the substitution this whole section is about, written
+down where a reader could see it and still not see it.
+
+`workers/content/test/paged-facets.test.ts` proves the behaviour end to end
+against a real database: sixty sources, page size fifty, and the only meeting in
+the base is the sixtieth row. `web/test/facets-ask-the-door.test.tsx` proves the
+wiring by operating the real control and reading what the door was asked.
+`facets-ask-the-door` in `web/test/rules.test.ts` is the derived lock: a paged
+recipe that declares `filterFacets`, a facet naming a parameter its door does not
+parse, a screen that draws none, a `fetchPage` that copies fields instead of
+spreading the question, a client that spells its door's parameters out. Any one
+of the five turns the build red.
+
 ## Status (updated 2026-08-18)
 
 - **Layer 1 + the library search/filter UI**: SHIPPED, the library search/filter
@@ -325,12 +405,10 @@ the only sortable thing in either front door was a column header on two screens.
   filters (type / status / archived) are door filters too, so the filtered count
   moves with them. Two doors learned `q` in the same change (tickets, stories);
   the other four already parsed it and simply had nothing asking.
-  - **Not done, and named rather than left quiet:** the OTHER paged screens'
-    facets (kind / filed / status on the knowledge base, client / purpose / status
-    in the diary, app / archived on the maps, status / assignee / sprint / app on
-    the backlog) are still the frame's own, so they narrow the loaded page. Their
-    search is now honest and their counts do not claim otherwise — but the facets
-    are the same class of defect as B4 was on accounts. UI-GAPS #15 carries it.
+  - **The FACETS followed on 2026-08-18** (§ *The FIRST question, answered last*). Every paged
+    screen's filters are its door's now, declared once in
+    `web/lib/collection-filters.ts` and drawn by the same `<PagedFind>` that holds
+    the search box and the sort.
 - **Layer 3 (FTS5 full-text)**: designed here, still NOT BUILT, the content/data-ops
   workers shipped (2026-06-23) without it because client-side search over the
   cached list covers current volumes. The FTS5 migration ships with the first
@@ -342,6 +420,11 @@ the only sortable thing in either front door was a column header on two screens.
 - **The fourth layer (the knowledge base)**: BUILT 2026-08-11, retrieval rebuilt onto
   Vectorize 2026-08-12. Governed by Laws R23 and R26; owned by
   DATA-MODEL.md § *THE KNOWLEDGE BASE*.
+- **Filters on a paged collection**: SHIPPED 2026-08-18 (§ *The FIRST question,
+  answered last*).
+  Every paged screen's facets are its door's, declared in
+  `web/lib/collection-filters.ts`; two doors grew the filter they were being shown
+  without; two facets were removed rather than faked.
 - **Sorting**: SHIPPED 2026-08-18 (§ *The third question*). Every PAGED collection
   orders at its door; every bounded list recipe has a control derived from its own
   columns; the two tables compare their dates as dates. What is deliberately still

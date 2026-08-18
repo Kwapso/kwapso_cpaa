@@ -11,7 +11,6 @@ import type {
 import { describe, expect, it } from "vitest"
 
 import {
-  ACCOUNT_TYPE,
   HELP_STATUS,
   INVITE_STATUS,
   accountStatus,
@@ -324,10 +323,12 @@ describe("shapeAccountsList", () => {
     ]).rows
     expect(rows?.[0].name).toBe("Bergman S.A.")
     expect(rows?.[0].detail).toBe("Company · Past client")
-    // Facet columns the filter bar reads.
-    expect(rows?.[0].type).toBe(ACCOUNT_TYPE.entity)
-    expect(rows?.[0].status).toBe("Past client")
-    expect(rows?.[0].archived).toBe("No")
+    // …AND NOTHING ELSE. The row used to carry `type` / `status` / `archived`
+    // for the frame's own filter bar to sieve — which on a PAGED collection
+    // narrowed the loaded fifty. Those three are the DOOR's filters now
+    // (web/lib/collection-filters.ts), so a shaped row is what the screen shows
+    // and no longer half a filter index nothing reads.
+    expect(Object.keys(rows?.[0] ?? {}).sort()).toEqual(["detail", "id", "name"])
   })
 
   it("names the parent when it is on the page, and still says nested when it isn't", () => {
@@ -344,8 +345,10 @@ describe("shapeAccountsList", () => {
 
   it("keeps an archived account visible, and flags it (archive-never-delete)", () => {
     const rows = shapeAccountsList([account({ id: "a1", name: "Old Co", active: false })]).rows
+    // The row SAYS so in its name — which is what a person reads. "Only the
+    // archived ones" is a question for the door (`archived=yes`), asked from the
+    // find bar, and web/test/facets-ask-the-door.test.tsx is where that lives.
     expect(rows?.[0].name).toBe("Old Co (archived)")
-    expect(rows?.[0].archived).toBe("Yes")
   })
 })
 

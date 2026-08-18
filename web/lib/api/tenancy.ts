@@ -38,7 +38,7 @@ import type {
 } from "@shared/types"
 import type { RecordCounts } from "@shared/record-counts"
 import type { SavingsView } from "@shared/workers/savings"
-import { api, enc, post } from "@shared/web/api"
+import { api, enc, listQuery, post } from "@shared/web/api"
 import type { PagedResponse } from "@shared/web/api"
 
 export const tenancy = {
@@ -292,6 +292,9 @@ export const tenancy = {
    * other badges: the COLLECTION's counts rather than this call's, so a badge on a
    * tab nobody has pressed does not move while somebody types in the search box. */
   accounts: (
+    /** The door's own question, spread straight into the query string
+     * (`listQuery`) so a filter cannot be lost between the find bar and the
+     * door. */
     opts: {
       q?: string
       type?: string
@@ -307,21 +310,10 @@ export const tenancy = {
       dir?: string
       cursor?: string | null
     } = {}
-  ) => {
-    const p = new URLSearchParams()
-    if (opts.q) p.set("q", opts.q)
-    if (opts.type) p.set("type", opts.type)
-    if (opts.status) p.set("status", opts.status)
-    if (opts.archived) p.set("archived", opts.archived)
-    if (opts.parentId) p.set("parentId", opts.parentId)
-    if (opts.sort) p.set("sort", opts.sort)
-    if (opts.dir) p.set("dir", opts.dir)
-    if (opts.cursor) p.set("cursor", opts.cursor)
-    const qs = p.toString()
-    return api<PagedResponse<{ accounts: Account[]; entityTotal: number; individualTotal: number }>>(
-      `/api/tenancy/accounts${qs ? `?${qs}` : ""}`
-    )
-  },
+  ) =>
+    api<PagedResponse<{ accounts: Account[]; entityTotal: number; individualTotal: number }>>(
+      `/api/tenancy/accounts${listQuery(opts)}`
+    ),
 
   /** One account opened: the record, its parent, its people, its logins, and the
    * two exact totals its tabs badge. */
@@ -394,20 +386,25 @@ export const tenancy = {
   /** R14: a PAGE of process maps (a GROWING collection) — hand `cursor` back from
    * the previous response for the next one; `total` is the exact server count of
    * what this caller may see. */
-  processes: (opts: { q?: string; appId?: string; sort?: string; dir?: string; cursor?: string | null } = {}) => {
-    const p = new URLSearchParams()
-    if (opts.q) p.set("q", opts.q)
-    if (opts.appId) p.set("appId", opts.appId)
-    // The order, one of PROCESS_SORTS' own names — the maps page, so it is asked
-    // of the door rather than applied to the fifty rows in the browser.
-    if (opts.sort) p.set("sort", opts.sort)
-    if (opts.dir) p.set("dir", opts.dir)
-    if (opts.cursor) p.set("cursor", opts.cursor)
-    const qs = p.toString()
-    return api<PagedResponse<{ processes: ProcessSummary[] }>>(
-      `/api/tenancy/processes${qs ? `?${qs}` : ""}`
-    )
-  },
+  processes: (
+    /** Spread straight into the query string (`listQuery`), so a narrowing this
+     * door parses cannot be dropped on the way to it. */
+    opts: {
+      q?: string
+      appId?: string
+      /** "yes" = only the put-away maps, "no" = only the live ones. A map is
+       * archived and never deleted, so both are ordinary rows in this list. */
+      archived?: string
+      /** The order, one of PROCESS_SORTS' own names — the maps page, so it is
+       * asked of the door rather than applied to the fifty rows in the browser. */
+      sort?: string
+      dir?: string
+      cursor?: string | null
+    } = {}
+  ) =>
+    api<PagedResponse<{ processes: ProcessSummary[] }>>(
+      `/api/tenancy/processes${listQuery(opts)}`
+    ),
   /** One map opened: its versions, the steps of ONE of them, the exact totals its
    * tabs badge, and the saving those steps add up to.
    *

@@ -41,6 +41,7 @@ import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
+import { translatedFacets } from "@/lib/collection-filters"
 import { MeetingFormDialog, type MeetingFormValues } from "@/components/meeting-form-dialog"
 import { RecordCalendar, type CalendarEntry } from "@/components/record-calendar"
 import { RecordTable, visibleActions } from "@/components/record-table"
@@ -327,9 +328,35 @@ export function MeetingsScreen({
         noun="meetings"
         sorts={translatedSorts("meetings", t)}
         defaultSort={COLLECTION_SORTS.meetings.defaultSort}
+        // THE DIARY'S FILTERS, asked of the door. They were the frame's until
+        // 18 Aug 2026 — so "who we met" narrowed the fifty most recent meetings
+        // and said nothing about the two years behind them, which is the exact
+        // objection the comment above makes about the search box.
+        //
+        // The two picker-backed ones are filled from the caches this screen
+        // already reads for its form, so they appear for whoever can see those
+        // lists and are DROPPED rather than drawn empty for whoever cannot — the
+        // same rule the bounded recipes follow about a facet with no options.
+        facets={translatedFacets("meetings", t, {
+          accountId: (accountsQ.data ?? []).map((a) => ({ value: a.id, label: a.name })),
+          purposeId: (purposesQ.data ?? [])
+            .filter((pp) => pp.active)
+            .map((pp) => ({ value: pp.id, label: pp.name })),
+        })}
         fetchPage={(query, cursor) =>
           contentApi
-            .meetings(cursor, "all", query.q, undefined, undefined, { sort: query.sort, dir: query.dir })
+            .meetings({
+              // The whole diary is what a find searches; the week and the
+              // calendar are views on top of it. Here rather than in `fixed`,
+              // because `fixed` makes a find ACTIVE and the resting screen would
+              // then read a `find:` cache key the live registry does not patch
+              // (R15).
+              view: "all",
+              // …then the question itself, spread whole: `listQuery` forwards
+              // every key, so a filter cannot be lost on the way to the door.
+              ...query,
+              cursor,
+            })
             .then((r) => ({ rows: r.meetings, nextCursor: r.nextCursor, total: r.total }))
         }
       >

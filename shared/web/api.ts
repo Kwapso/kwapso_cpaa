@@ -58,3 +58,28 @@ export type PagedResponse<T> = T & {
 /** Two one-liners every caller repeats: a URL-safe id, and a JSON POST. */
 export const enc = encodeURIComponent
 export const post = (body: unknown): RequestInit => ({ method: "POST", body: JSON.stringify(body) })
+
+/** WHAT A PAGED LIST DOOR IS ASKED, as a query string — every key it was given,
+ * and nothing enumerated on the way.
+ *
+ * It exists because the client half of a list read used to spell its door's
+ * parameters out one `if` at a time, and a parameter spelled out is a parameter
+ * somebody can leave out. That is not hypothetical: `content.knowledge` took the
+ * find's whole question and copied three fields of it across, so when sorting
+ * arrived and put `sort` in that question, the knowledge base's sort control
+ * changed the cache key, refetched the same rows in the same order, and looked
+ * like it worked. Nothing was broken by the change — the drop was already there,
+ * waiting for a fourth parameter to exist.
+ *
+ * So nothing here knows the names. A caller hands over the object it was given
+ * (`{ ...query, cursor }`) and every non-empty value in it reaches the door,
+ * which is the one arrangement where forgetting is not possible. The TYPES on
+ * each client method still say what its door takes — that is what documents the
+ * contract; this is what carries it. */
+export function listQuery(parts: Record<string, string | number | null | undefined>): string {
+  const p = new URLSearchParams()
+  for (const [key, value] of Object.entries(parts))
+    if (value !== undefined && value !== null && value !== "") p.set(key, String(value))
+  const qs = p.toString()
+  return qs ? `?${qs}` : ""
+}

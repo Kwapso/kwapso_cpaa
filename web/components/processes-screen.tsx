@@ -28,6 +28,7 @@ import { CollectionHeading } from "@/components/collection-heading"
 import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
+import { translatedFacets } from "@/lib/collection-filters"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { AppFormDialog, type AppFormValues } from "@/components/app-form-dialog"
 import { useAssignableMembers } from "@/lib/people"
@@ -59,9 +60,6 @@ function shapeProcessesList(processes: ProcessSummary[]) {
         ]
           .filter(Boolean)
           .join(" · ") || "—",
-      // Facet columns (read by the filter engine, not the renderer).
-      app: p.appName,
-      archived: p.active ? "No" : "Yes",
     })),
   }
 }
@@ -159,6 +157,14 @@ export function ProcessesScreen({
         noun="maps"
         sorts={translatedSorts("processes", t)}
         defaultSort={COLLECTION_SORTS.processes.defaultSort}
+        // …and so are the filters. `app` and `archived` were the frame's until
+        // 18 Aug 2026, which meant picking an app narrowed the fifty maps in
+        // hand — under a badge counting every one of them. `appId` is the door's
+        // parameter (the frame's said `app`, the app's NAME, which is the
+        // substitution the whole class of fault is made of).
+        facets={translatedFacets("processes", t, {
+          appId: apps.map((a) => ({ value: a.id, label: a.name })),
+        })}
         fetchPage={(query, cursor) =>
           tenancy
             .processes({ ...query, cursor })

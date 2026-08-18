@@ -39,6 +39,7 @@ import { KnowledgeAsk } from "@/components/knowledge-ask"
 import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
+import { translatedFacets } from "@/lib/collection-filters"
 import { content as contentApi, tenancy } from "@/lib/api"
 import { accountsKey, knowledgeKey } from "@/lib/live-resources"
 import { invalidate } from "@shared/web/store"
@@ -372,25 +373,15 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
           sorts={translatedSorts("accounts", t)}
           defaultSort={COLLECTION_SORTS.accounts.defaultSort}
           fixed={accountTab === "all" ? undefined : { type: accountTab === "people" ? "individual" : "entity" }}
-          facets={[
-            {
-              field: "status",
-              label: t("Status"),
-              control: "select",
-              options: [...new Set(loaded.map((a) => a.status).filter((s): s is string => !!s))].map(
-                (s) => ({ value: s, label: accountStatus(s) })
-              ),
-            },
-            {
-              field: "archived",
-              label: t("Archived"),
-              control: "select",
-              options: [
-                { value: "no", label: t("No") },
-                { value: "yes", label: t("Yes") },
-              ],
-            },
-          ]}
+          // THE DOOR'S OWN FILTERS, named once in lib/collection-filters.ts
+          // beside every other paged collection's. `status` is the only one whose
+          // options are ROWS: the word is the team's own ("past_client"), and no
+          // list in a source file keeps up with a vocabulary a team edits.
+          facets={translatedFacets("accounts", t, {
+            status: [...new Set(loaded.map((a) => a.status).filter((s): s is string => !!s))].map(
+              (s) => ({ value: s, label: accountStatus(s) })
+            ),
+          })}
           fetchPage={(query, cursor) =>
             tenancy
               .accounts({ ...query, cursor })
@@ -515,9 +506,24 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
           listKey={knowledgeKey(teamId as string)}
           placeholder={t("Search the knowledge base…")}
           noun="sources"
+          // THE FILTERS, asked of the DOOR. They were the frame's until 18 Aug
+          // 2026, which meant "From a meeting" narrowed the loaded fifty and
+          // answered TWO over a base holding 170 — page one happened to have two
+          // meetings on it. `kind` and `active` are closed vocabularies the door
+          // allow-lists; `compartment` is rows, so it is filled in from the
+          // accounts the team area has already loaded.
+          facets={translatedFacets("knowledge", t, {
+            compartment: [
+              { value: "agency", label: t("The agency") },
+              ...[...names].map(([id, name]) => ({ value: `account:${id}`, label: name })),
+            ],
+          })}
           fetchPage={(query, cursor) =>
             contentApi
-              .knowledge(cursor, query)
+              // The whole question, spread — `listQuery` forwards every key of
+              // it, so a filter cannot be dropped between this control and the
+              // door.
+              .knowledge({ ...query, cursor })
               .then((r) => ({ rows: r.sources, nextCursor: r.nextCursor, total: r.total }))
           }
         >
