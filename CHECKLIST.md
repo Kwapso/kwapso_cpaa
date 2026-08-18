@@ -283,54 +283,54 @@ stays there as the record. **BUILDING** means a lane is on it in this session ri
 
 | # | The thing | Status |
 |---|---|---|
-| 17.1 | Every long-text input on a primary screen becomes a rich text notes component, and renders as rich text too | **DONE**, 15 more fields across both doors. The sanitizer moved to shared code, because a client types a ticket in the portal and staff read it in the agency app — one body, two doors, and the portal may not import from the agency app |
-| 17.2 | Clients stop appearing in internal people pickers on stories, tickets and tasks | **DONE**, and the cause was structural: a portal login IS an ordinary team member, so client contacts sat in the member list with nothing on the row to tell them apart. One seam now decides for all nine pickers |
-| 17.3 | Clients appear in exactly two places: marking to-dos, and raising a ticket on their behalf | **DONE**, and neither of the two is a person picker — a to-do names an account, a client-behalf ticket names an account and a contact |
-| 17.4 | The same name appears twice in "Who's doing it" | **DONE**, and it was not a repeated row. It was two different people with one display name, an agency login and a client login for the same human. Clients dropping out removes that pair; any name that is not unique now carries its email |
+| 17.1 | Every long-text input on a primary screen becomes a rich text notes component, and renders as rich text too | **DONE** |
+| 17.2 | Clients stop appearing in internal people pickers on stories, tickets and tasks | **DONE** |
+| 17.3 | Clients appear in exactly two places: marking to-dos, and raising a ticket on their behalf | **DONE** |
+| 17.4 | The same name appears twice in "Who's doing it" | **DONE**, and it was not a duplicate row — two different people with one display name. Any name that is not unique now carries its email |
 
 ## 18 · Meetings and the calendar
 
 | # | The thing | Status |
 |---|---|---|
 | 18.1 | A link that opens the meeting inside my calendar | **DONE** |
-| 18.2 | Location, stakeholders and every other piece of calendar data and metadata, organised | **DONE**, eighteen calendar fields where there were eleven, including the video link specifically rather than whatever the conference block lists first — a dial-in number must never be handed over as "the link" |
+| 18.2 | Location, stakeholders and every other piece of calendar data and metadata, organised | **DONE** |
 | 18.3 | The call transcript is already there on older meetings | **PART DONE**, all three routes built. Nothing was ingested end to end: the lane could not reach the app's own Google connection |
 | 18.4 | The knowledge base ingests transcripts from calendar meetings, from Google Docs, and from emails announcing a Doc was made for a meeting | **PART DONE**, same reason. It rides the existing knowledge seam, which also closed a gap nobody had noticed — agendas and notes were never answerable at all |
-| 18.5 | Past events re-sync, because a transcript lands minutes to an hour after the room empties | **DONE**, fourteen days back as well as four weeks forward, and it asks for deleted instances, because a cancelled meeting is not absent, it is invisible |
-| 18.6 | Every record stays in step with its calendar entry, past events included | **DONE**, and stakeholders resolve as a READ rather than a stored column, so a contact added next week lights up on a meeting held last week |
+| 18.5 | Past events re-sync, because a transcript lands minutes to an hour after the room empties | **DONE** |
+| 18.6 | Every record stays in step with its calendar entry, past events included | **DONE** |
 
 ## 19 · Google, deeper
 
 | # | The thing | Status |
 |---|---|---|
-| 19.1 | Select several folders, several spaces and several files in one go | **DONE**, up to 25 at a time |
-| 19.2 | Share a Drive FILE, not only a folder | **DONE**, and your instinct was right: a Drive file does not have to sit in a folder at all, so folder-only genuinely shut some out |
-| 19.3 | Chat spaces show their names, not `spaces/lJXiZKAAAAE` | **DONE**, and the old fallback was not one — Google leaves the display name empty for every direct message, so it printed the id every time. It now says plainly when Google has no name |
-| 19.4 | Logos, icons, thumbnails and previews pulled in wherever Google data appears: search, knowledge base, meetings | **DONE**, thumbnails proxied with your own token rather than copied — a copy outlives the moment somebody unshares the document |
-| 19.5 | The sync button on every screen showing Google data, not only Settings and Meetings | **DONE**, one shared button on Settings, Meetings and the knowledge base |
-| 19.6 | Sync often enough to feel instant | **DONE**, per-screen freshness on top of the app-open catch-up that already existed, with no second sweep path and no interval |
+| 19.1 | Select several folders, several spaces and several files in one go | **DONE** |
+| 19.2 | Share a Drive FILE, not only a folder | **DONE** |
+| 19.3 | Chat spaces show their names, not `spaces/lJXiZKAAAAE` | **DONE** |
+| 19.4 | Logos, icons, thumbnails and previews pulled in wherever Google data appears: search, knowledge base, meetings | **DONE** |
+| 19.5 | The sync button on every screen showing Google data, not only Settings and Meetings | **DONE** |
+| 19.6 | Sync often enough to feel instant | **DONE** |
 | 19.7 | The Chat app's Configuration tab in Google Cloud | **BLOCKED ON YOU**, Google refuses every post until name, avatar and description are filled in |
 
 ## 20 · Language
 
 | # | The thing | Status |
 |---|---|---|
-| 20.1 | Every system string translated by us, at build time, in all 29 languages | **DONE**, 26,588 of 26,600. Sixteen languages complete, twelve at 99.9%. No placeholder lost, no product name lost |
-| 20.2 | What a person types is translated only when somebody asks for it, on the cheapest Haiku | **DONE**, one press, one unit, refunded on failure, and it writes nothing — your row does not change for anybody else |
-| 20.3 | One translation call routed everywhere it is needed, rather than one per field | **DONE**, a whole screen's text in one call, cached so a toggle back and a return visit are free |
+| 20.1 | Every system string translated by us, at build time, in all 29 languages | **DONE** |
+| 20.2 | What a person types is translated only when somebody asks for it, on the cheapest Haiku | **DONE** |
+| 20.3 | One translation call routed everywhere it is needed, rather than one per field | **DONE** |
 | 20.4 | The switcher becomes a dropdown, not 25 stretched pills | **DONE** |
 
 ## 21 · How it looks, round two
 
 | # | The thing | Status |
 |---|---|---|
-| 21.1 | A cognitive-load metric of my own, measured on every page, screen, tab and detail screen | **DONE**, a glance score out of 100 from five counts taken off the code. 53 screens and 96 tabs measured, mean 75.9, seven screens under 55 |
-| 21.2 | One central rule set: colours, spacing, padding, separators, when a dropdown, when a shape | **DONE**, into the existing rule book as twelve new rules, not a third document |
-| 21.3 | The full horizontal span applied everywhere on desktop, the way work logs, tasks and meetings already do it | **PART DONE**, the ruling is written and R29 enforces it as a ratchet — the six screens that break it are pinned and a seventh cannot be added. Applying it is 21.4 |
-| 21.4 | The global rearrangement, executed against that rule set | **TO DO**, deliberately after the rules exist. Rearranging first is how you get 40 screens that each look reasonable and none of which match |
-| 21.5 | Charts and big numbers on the home page, main pages and detail screens, on real data, never taking the whole screen | **DONE**, on Home, tickets, work logs, sprints and both client screens. Deliberately NOT on tasks, where six badges and a progress bar already say every number a chart would draw |
-| 21.6 | Glyphs and icons on main screens, page icons and collections, not only detail screens | **PART DONE**, section icons on every collection heading, derived from the same key the title comes from. Four library gaps still block glyphs in rows, tabs, empty states and stat cards |
-| 21.7 | Dark mode reads better than light because the contrast between elements is clearer | **DONE**, and it turned out to be arithmetic: light separates page from card by 3.22, dark by 10.32. It is now the contrast rule rather than a preference |
+| 21.1 | A cognitive-load metric of my own, measured on every page, screen, tab and detail screen | **DONE** |
+| 21.2 | One central rule set: colours, spacing, padding, separators, when a dropdown, when a shape | **DONE** |
+| 21.3 | The full horizontal span applied everywhere on desktop, the way work logs, tasks and meetings already do it | **DONE** |
+| 21.4 | The global rearrangement, executed against that rule set | **DONE**, 21 screens rearranged. Mean glance score 61 to 83. Of 516 gaps 210 were off any scale and the gap meaning "these are separate" was used eleven times in the whole app; zero off-scale now, and that gap is used thirty-seven times |
+| 21.5 | Charts and big numbers on the home page, main pages and detail screens, on real data, never taking the whole screen | **DONE** |
+| 21.6 | Glyphs and icons on main screens, page icons and collections, not only detail screens | **PART DONE**, glyphs on every collection heading and the nav. Rows, tabs, empty states and stat cards still need one line of the library each (UI-GAPS 16, 17, 19, 20) |
+| 21.7 | Dark mode reads better than light because the contrast between elements is clearer | **DONE** |
 
 ## 22 · Answered rather than built
 
@@ -345,10 +345,10 @@ stays there as the record. **BUILDING** means a lane is on it in this session ri
 
 | # | The thing | What is needed |
 |---|---|---|
-| 23.1 | The Chat app's Configuration tab | Name, avatar, description in Google Cloud. Google 404s every post until then, and did before today |
-| 23.2 | The stray "co-op: check the account" text | The screenshot. The string is in no source file anywhere |
-| 23.3 | Production | Go or wait. Staging carries everything; production has deliberately not been touched |
-| 23.4 | The deliverables module (8.7) | It is a module, not a tab. Say whether to scope it now or park it |
+| 23.1 | The Chat app's Configuration tab | **DONE** by you |
+| 23.2 | The stray "co-op: check the account" text | **DONE**, it is gone |
+| 23.3 | Production | **PARKED** by you until staging is signed off |
+| 23.4 | The deliverables module (8.7) | **DONE**, you defined it and it is built |
 
 ## 24 · Found while building round two
 
@@ -377,19 +377,51 @@ Nobody asked for these. They are the faults the work walked into.
 
 | # | The thing | Status |
 |---|---|---|
-| 26.1 | Anything with a client's id on it is searchable from that client's record | **BUILDING**, and it was not. Six kinds were indexed. Processes and their steps — which IS the scope — were never in there at all, nor tasks, work logs, to-dos, contacts or the rate card |
-| 26.2 | The material is rich enough to answer with | **BUILDING**, and this is the real fault behind both your screenshots. The whole indexed text of an account was its name, "is a company we work with", its reference and its status. The search worked perfectly and returned the only thing it had |
-| 26.3 | Every passage links to the record it came from | **BUILDING** |
+| 26.1 | Anything with a client's id on it is searchable from that client's record | **DONE**, four kinds added: process maps, tasks, to-dos and contacts |
+| 26.2 | The material is rich enough to answer with | **DONE**, an account now carries its people, systems, sold work, mapped ways of working, open tickets, what we are waiting on and when we last met |
+| 26.3 | Every passage links to the record it came from | **DONE** |
 | 26.4 | Drive, Gmail, Chat, Calendar and transcripts are searched too | **DONE** for the four Google kinds; transcripts ride the meeting record |
-| 26.5 | A written answer, not a list of sources | **BUILDING**, on the cheapest model, one call per ask. It spends the allowance, which the screen used to say it did not |
-| 26.6 | Charts, flows and diagrams appear when they help, with no toggle | **BUILDING**, extending the four block kinds the assistant already draws rather than a second vocabulary |
+| 26.5 | A written answer, not a list of sources | **DONE** |
+| 26.6 | Charts, flows and diagrams appear when they help, with no toggle | **DONE**, one new shape: a flow of boxes joined by labelled arrows |
 | 26.7 | The client portal gets none of this yet | **CHANGED**, your decision. It has no knowledge surface at all today, and none is being added — the fence is being built as if a client could reach it tomorrow, so switching it on later is a decision rather than a rebuild |
-| 26.8 | A re-index after the text changes | **TO DO**, existing rows carry a content hash and would be skipped as unchanged. One command after deploy |
+| 26.8 | A re-index after the text changes | **DONE**, and it needed doing twice — the first run signed in as a test address and indexed an empty team |
 
 ## 27 · Tabs
 
 | # | The thing | Status |
 |---|---|---|
-| 27.1 | A record's tab badges appear on arrival, not after you click the tab | **BUILDING**, you reported it. The badge reads a number out of the cache and never fetches it, so only the tab you clicked could have one. Contacts was the exception because its total rides the record's own read |
-| 27.2 | An empty tab and an uncounted tab stop looking the same | **BUILDING**, they render identically today, which is why a blank badge read as "nothing in there" |
-| 27.3 | The rows still load only when you open the tab | **BUILDING**, unchanged. Counts eagerly, rows lazily, exactly as you put it |
+| 27.1 | A record's tab badges appear on arrival, not after you click the tab | **DONE** |
+| 27.2 | An empty tab and an uncounted tab stop looking the same | **DONE** |
+| 27.3 | The rows still load only when you open the tab | **DONE** |
+
+## 28 · The rest of round two
+
+| # | The thing | Status |
+|---|---|---|
+| 28.1 | Every collection can be sorted, and the sort reaches past page one | **DONE**. Three date columns were genuinely wrong and silent — April sorted before January, because a rendered date is text. On the tab you screenshotted, three columns held one repeated value, so sorting them legitimately did nothing |
+| 28.2 | A record on a calendar opens | **DONE**. The library's calendar event had no click handler and no callback of any kind, so this was true of all three calendars |
+| 28.3 | "+N more" on a calendar day opens that day | **DONE**, it was dead text naming records with no way to reach them |
+| 28.4 | An agenda view | **DONE**, and the answer to your question was no, it had never been built. It is the default below 640px, because a month grid at 375 renders each entry as a dot and a hyphen |
+| 28.5 | Dropdowns are searchable on a phone | **DONE**, 32 pickers. Below the phone breakpoint it is a sheet, not a popover, because the keyboard covers a popover and the box you are typing in |
+| 28.6 | Every email that names a record carries a button to it | **DONE**, 12 emails classified. Seven link, five deliberately do not — a login code with a link in it is the shape of every phishing message ever sent |
+| 28.7 | A related record can be created from the record it relates to | **DONE**, six tabs gained the create they described and did not have |
+| 28.8 | A work logs tab wherever time is tracked, with the numbers | **DONE**, four records — the door always allowed four and the tab existed on one |
+| 28.9 | Deliverables | **DONE**, a tab on an app: kind, title, date, and a file or a link |
+| 28.10 | The emoji is called Emoji, and you can edit it | **DONE**, the door has accepted it since the day it shipped and the screen never sent it |
+| 28.11 | The checkbox groups breaking out of their outline | **DONE**, the required ring is for one control; four fields wrap groups and now say so |
+| 28.12 | "My tickets" | **DONE**, gone. The door keeps it for the client portal, where the question means something |
+| 28.13 | Prompt caching on the assistant | **DONE**, 3.8x cheaper on the safe setting, 5.7x on the longer one. Break-even for your 3x bar is a 39% warm rate |
+
+## 29 · Found on the way, nobody reported
+
+| # | The thing | Status |
+|---|---|---|
+| 29.1 | 224 sentences the app says had never reached the translation catalogue | **DONE**, a string inside a JSX expression was invisible to the extractor. They shipped in English to anybody who chose another language |
+| 29.2 | Two blocks rendered English on a German screen because a variable shadowed the translator | **DONE** |
+| 29.3 | The build check that catches a mangled boot loader never ran | **DONE**, it skipped whenever there was no build, and nothing in the gate built |
+| 29.4 | Two record screens no law had ever walked | **DONE**, and the list they were missing from is gone — the census is derived from the code now |
+| 29.5 | The work logs badges were blank until you clicked, and the guard could not see them | **DONE**, the guard matched lowercase and the key has a capital letter |
+| 29.6 | A count shown twice on one screen, and a capped list's length sold as a count | **DONE** |
+| 29.7 | The morning digest reached clients | **DONE**, a client login is an ordinary team member, so the fallback mailed everybody the agency's own backlog |
+| 29.8 | A hard-coded colour two lanes old | **DONE**, caught by a law written hours later |
+| 29.9 | A shared file that only bundled in one worker | **DONE**, found by the deploy itself |
