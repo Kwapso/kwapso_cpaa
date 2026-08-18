@@ -72,7 +72,7 @@ type ScreenData = ReturnType<typeof useScreenData>
  * The host owns all of it; this bundle is how it hands the render half a snapshot. */
 export type ModuleContentCtx = Pick<
   ScreenData,
-  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "helpQ" | "helpMineQ" | "helpArchivedQ" | "accountsQ" | "knowledgeQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "inviteAuditQ"
+  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "helpQ" | "helpArchivedQ" | "accountsQ" | "knowledgeQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "inviteAuditQ"
   | "brandQ" | "purposesQ" | "internalActivity"
   | "storiesQ" | "sprintsQ" | "appsQ" | "tasksOpenQ" | "tasksAllQ" | "workLogsQ" | "meetingsQ"
   // The team's live `Ticket type` values. The tickets screen's sub-tab strip is

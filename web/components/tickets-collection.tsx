@@ -97,7 +97,7 @@ export function TicketsCollection({
   setHelpScope: (v: HelpScope) => void
   /** the team's live `Ticket type` values — the inner strip is built from these */
   helpTypeOptions: string[]
-  totals: { help?: number; helpMine?: number; helpArchived?: number }
+  totals: { help?: number; helpArchived?: number }
   can: (module: string, right: "read" | "create" | "edit" | "delete") => boolean
   onCreate: () => void
   onAction: (actionId: string, ctx: ScreenActionContext) => void
@@ -106,12 +106,9 @@ export function TicketsCollection({
   const t = useT()
   const [facet, setFacet] = React.useState<HelpFacet>(ALL)
 
-  // THE THREE SCOPE CACHES, unchanged: each is a server scope with its own page.
+  // THE TWO SCOPE CACHES: each is a server scope with its own page. There were
+  // three until "My tickets" went (live-resources.ts says why).
   const allQ = useCached<HelpTicket[]>(helpKey(teamId, "all"), () => listFetch.help(teamId))
-  const mineQ = useCached<HelpTicket[]>(
-    helpScope === "mine" ? helpKey(teamId, "mine") : null,
-    () => listFetch.helpMine(teamId)
-  )
   const archivedQ = useCached<HelpTicket[]>(
     helpScope === "archived" ? helpKey(teamId, "archived") : null,
     () => listFetch.helpArchived(teamId)
@@ -130,13 +127,7 @@ export function TicketsCollection({
   const byType = useCachedValue<Record<string, number>>(`help-by-type:${teamId}`)
   const byStatus = useCachedValue<Record<string, number>>(`help-by-status:${teamId}`)
 
-  const scopedQ = narrowed
-    ? facetQ
-    : helpScope === "mine"
-      ? mineQ
-      : helpScope === "archived"
-        ? archivedQ
-        : allQ
+  const scopedQ = narrowed ? facetQ : helpScope === "archived" ? archivedQ : allQ
   // The list key is written out at BOTH call sites below rather than held in a
   // variable: the paging and search checks read the JSX and look for the key the
   // door's own page lands in (`helpKey(`), which is the honest thing to look for
@@ -145,7 +136,7 @@ export function TicketsCollection({
     totalKey(`help-facet:${helpScope}:${facet}`, teamId)
   )
   const scopeTotal =
-    helpScope === "archived" ? totals.helpArchived : helpScope === "mine" ? totals.helpMine : totals.help
+    helpScope === "archived" ? totals.helpArchived : totals.help
   const shownTotal = narrowed ? facetTotal : scopeTotal
 
   const outerTabs = {
@@ -153,7 +144,6 @@ export function TicketsCollection({
     variant: "line" as const,
     tabs: [
       { value: "all", label: t("All tickets"), icon: "inbox", badge: formatCount(totals.help), badgeVariant: "" as const },
-      { value: "mine", label: t("My tickets"), icon: "user", badge: formatCount(totals.helpMine), badgeVariant: "" as const },
       // THE PUT-AWAY PILE. Archive shipped as a door with no button; giving it a
       // button without giving the pile a screen would have moved the dead end one
       // step along instead of ending it.

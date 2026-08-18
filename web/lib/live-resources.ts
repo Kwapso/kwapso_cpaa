@@ -122,13 +122,6 @@ export const listFetch = {
       primeCache(`help-by-status:${teamId}`, r.byStatus)
       return r.tickets
     }),
-  helpMine: (teamId: string) =>
-    contentApi.help("mine").then((r) => {
-      primeCache(totalKey("help", teamId), r.total)
-      primeCache(totalKey("help-mine", teamId), r.mineTotal)
-      primeCache(cursorKey(helpKey(teamId, "mine")), r.nextCursor)
-      return r.tickets
-    }),
   // PUT AWAY, AND FINDABLE. The archived view is its own paged read, and it has
   // to exist: archive shipped as a door with no button, and giving it a button
   // without giving the put-away pile a screen would only move the dead end one
@@ -152,7 +145,7 @@ export const listFetch = {
     const f = helpFacetFilter(facet)
     return contentApi
       .help(
-        scope === "mine" ? "mine" : "all",
+        "all",
         null,
         scope === "archived" ? "archived" : "live",
         undefined,
@@ -499,7 +492,6 @@ export function knowledgeKey(teamId: string): string {
  * once a list is paged, filtering the loaded page by raiser would show "my
  * tickets in the newest 50" under a badge counting all of them (R16). */
 export function helpKey(teamId: string, scope: HelpScope): string {
-  if (scope === "mine") return `help-mine:${teamId}`
   if (scope === "archived") return `help-archived:${teamId}`
   return `help:${teamId}`
 }
@@ -507,7 +499,20 @@ export function helpKey(teamId: string, scope: HelpScope): string {
 /** Which pile of tickets a screen is showing. Two of these are a raiser filter
  * (`mine` / `all`) and one is a VIEW (`archived`), and they are one type because
  * a screen shows exactly one of the three at a time — the strip is one strip. */
-export type HelpScope = "mine" | "all" | "archived"
+/** Which pile of tickets the agency's Tickets screen shows.
+ *
+ * "MINE" WENT ON 18 AUG 2026, at the owner's word: "there's no such thing as my
+ * tickets.. that tab does not make sense". In an agency nobody on staff HAS a
+ * ticket — a client raises it and staff answer it through a story. The tab had
+ * already been redefined once (CHECKLIST 2.3, from "tickets I typed" to "tickets
+ * on the apps I am staffed to") because the first meaning was wrong; the owner's
+ * ruling is that the question itself is the wrong one.
+ *
+ * THE DOOR KEEPS `scope=mine`, and deliberately: the CLIENT PORTAL asks it for
+ * "what I raised", which is the one place the question does mean something — a
+ * contact really did raise those, and without it their list would be every
+ * ticket their company ever sent. So `mineClause` in workers/content stays. */
+export type HelpScope = "all" | "archived"
 
 /** THE SECOND STRIP (CHECKLIST 5.1): sub-tabs by TYPE beneath All / My /
  * Archived, plus the two stage tabs and the triage queue.

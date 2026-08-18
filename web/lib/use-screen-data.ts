@@ -98,10 +98,6 @@ export function useScreenData({
   const helpQ = useCached(enabled && module === "tickets" ? helpKey(teamId as string, "all") : null, () =>
     listFetch.help(teamId as string)
   )
-  const helpMineQ = useCached(
-    enabled && module === "tickets" && helpScope === "mine" ? helpKey(teamId as string, "mine") : null,
-    () => listFetch.helpMine(teamId as string)
-  )
   const helpArchivedQ = useCached(
     enabled && module === "tickets" && helpScope === "archived"
       ? helpKey(teamId as string, "archived")
@@ -207,7 +203,6 @@ export function useScreenData({
     invites: useCachedValue<number>(enabled ? totalKey("invites", teamId as string) : null),
     selectable: useCachedValue<number>(enabled ? totalKey("selectable", teamId as string) : null),
     help: useCachedValue<number>(enabled ? totalKey("help", teamId as string) : null),
-    helpMine: useCachedValue<number>(enabled ? totalKey("help-mine", teamId as string) : null),
     helpArchived: useCachedValue<number>(enabled ? totalKey("help-archived", teamId as string) : null),
     accounts: useCachedValue<number>(enabled ? totalKey("accounts", teamId as string) : null),
     // The All / Companies / People strip's other two badges — exact, from the
@@ -340,7 +335,6 @@ export function useScreenData({
     invitesQ,
     metaQ,
     helpQ,
-    helpMineQ,
     helpArchivedQ,
     totals,
     formSelectableQ,
