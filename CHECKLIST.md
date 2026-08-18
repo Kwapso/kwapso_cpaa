@@ -216,7 +216,7 @@ longer builds the purged ones.
 | 13.1 | A language switcher in the agency app | **DONE**, live on staging |
 | 13.2 | A language switcher in the client portal | **DONE**. **CHANGED**: it sits in the header, not a settings page. You confirmed no settings page for the portal |
 | 13.3 | The preference saves and survives a reload | **DONE**, proved live, and it refuses eight kinds of bad input |
-| 13.4 | Every string the app says gets translated | **BLOCKED ON YOU**, 794 strings found, 785 wired up. The Anthropic account has no credit, so nothing could be translated. About $5 and one command |
+| 13.4 | Every string the app says gets translated | **MOSTLY DONE, the last stretch is YOUR CALL.** 1,317 sentences now, 1,011 translated into all 28 languages, so roughly 300 still fall back to English — a sentence rather than a bug, which is why the key IS the English. Two things changed since this line was written. Your account has credit again. And the seed now wins ON SCREEN, not only inside the generator (`SPOKEN = overlay(CATALOGUE, SEED)`), so a translation can be written by hand and reach a reader without spending anything — which it could not before: the only documented way to add one was to run the generator, and the generator spends your key. Finishing the last 300 by machine is one command and your permission; I have not run it |
 | 13.5 | Translation happens at build time into static files, costing nothing at runtime | **DONE**, the extractor and the translator both exist and run |
 | 13.6 | What people type is translated once and cached, never on reload | **BUILDING** |
 | 13.7 | A re-translate button when the text and the reader's language differ | **BUILDING** |
