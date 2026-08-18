@@ -561,7 +561,13 @@ export function ProcessDetailScreen({
                                     destructive: true,
                                     onSelect: () =>
                                       setConfirm({
-                                        title: `${t("Does")} "${step.name}" ${t("still happen?")}`,
+                                        // ONE question with the step's name in it. It was
+                                        // t("Does") + the name + t("still happen?"), which asks
+                                        // a translator to write the two ends of a sentence
+                                        // without seeing the middle — and languages that front
+                                        // the verb, or carry the question in a particle, have no
+                                        // two ends to write.
+                                        title: t('Does "{step}" still happen?', { step: step.name }),
                                         body: t(
                                           "Recording that it stopped is how its whole time becomes a saving. The step keeps its place in this version and in every older one, nothing is deleted."
                                         ),
