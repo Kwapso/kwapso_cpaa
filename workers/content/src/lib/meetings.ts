@@ -912,19 +912,40 @@ export async function syncCalendar(
   const now = new Date()
   const since = new Date(now.getTime() - CATCH_UP_DAYS * 24 * 60 * 60 * 1000)
   const horizon = new Date(now.getTime() + SERIES_HORIZON_DAYS * 24 * 60 * 60 * 1000)
-  // Two reads, because they answer two questions: what to MIRROR AND MAKE (the
-  // window that straddles today) and what to SHOW (beyond it, to the end of the
-  // quarter). The second is deliberately short — "there is a stand-up every
-  // Monday for ever" is not information — and the first asks for cancelled
-  // entries, because a cancellation is a fact that is only ever visible on
-  // request (see calendarList).
-  const [inWindow, beyond] = await Promise.all([
-    calendarList(token, { from: since.toISOString(), to: horizon.toISOString(), showDeleted: true }),
+  // THREE READS, AND THE FIRST TWO ARE SEPARATE FOR A REASON THAT COST A BUG.
+  //
+  // The obvious shape is ONE read from `since` to `horizon`, straddling today.
+  // It is wrong, and silently: every Google list here asks for one page of
+  // GOOGLE_PAGE_SIZE entries ordered by start time, so a six-week window over a
+  // busy diary returns the OLDEST fifty and stops. On a real calendar read while
+  // building this — ten entries in two days — fifty events is about a week, so
+  // the single-window version would have spent its whole page on the past and
+  // never reached tomorrow. Repeating meetings would quietly stop being created,
+  // and nothing would report an error: the sweep would succeed, every time,
+  // doing half its job.
+  //
+  // So the past and the future get a page each. They are asking two different
+  // questions anyway — what has FINISHED and might have grown a transcript, and
+  // what is COMING and might need a record — and giving each its own page is
+  // what makes both answers complete.
+  //
+  // BOTH ASK FOR CANCELLED ENTRIES, because a cancellation is a fact that is only
+  // ever visible on request (see calendarList): with `singleEvents=true` a
+  // cancelled instance is not returned at all unless it is asked for, which is
+  // indistinguishable from the window having moved past it.
+  //
+  // The third read is what to SHOW rather than what to make — the instances
+  // beyond the horizon. Deliberately short: "there is a stand-up every Monday for
+  // ever" is not information.
+  const [past, future, beyond] = await Promise.all([
+    calendarList(token, { from: since.toISOString(), to: now.toISOString(), showDeleted: true }),
+    calendarList(token, { from: now.toISOString(), to: horizon.toISOString(), showDeleted: true }),
     calendarList(token, {
       from: horizon.toISOString(),
       to: new Date(horizon.getTime() + SERIES_HORIZON_DAYS * 2 * 24 * 60 * 60 * 1000).toISOString(),
     }),
   ])
+  const inWindow = [...past, ...future]
 
   // WHICH OF THESE WE ALREADY HAVE. One read for the whole window rather than a
   // lookup per event: the window is bounded by the calendar read that produced
@@ -960,13 +981,13 @@ export async function syncCalendar(
       await d1ExecScript(
         cfg,
         guard.databaseId,
-        `INSERT INTO meetings (id, title, agenda, location, starts_at, ends_at, status,
+        `INSERT INTO meetings (id, title, agenda, location, starts_at, ends_at, status, held_at,
            recurring_event_id, from_calendar,
            google_event_id, google_event_url, google_join_url, google_organizer,
            google_attendees_json, google_attachments_json, google_status, google_recurrence,
            google_time_zone, google_updated_at, google_synced_at,
            created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString(event.summary || "A repeating meeting")}, ${sqlString(event.description || null)}, ${sqlString(event.location || null)}, ${sqlString(event.start)}, ${sqlString(event.end || null)}, ${sqlString(heldAlready(event, now) ? "held" : "scheduled")}, ${sqlString(event.recurringEventId)}, 1, ${sqlString(event.id)}, ${sqlString(event.url)}, ${sqlString(event.joinUrl)}, ${sqlString(event.organizer.email || null)}, ${sqlString(JSON.stringify(event.attendees))}, ${sqlString(JSON.stringify(event.attachments))}, ${sqlString(event.status || null)}, ${sqlString(event.recurrence.join("\n") || null)}, ${sqlString(event.timeZone || null)}, ${sqlString(event.updatedAt)}, ${sqlString(at)}, ${sqlString(at)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+VALUES (${sqlString(id)}, ${sqlString(event.summary || "A repeating meeting")}, ${sqlString(event.description || null)}, ${sqlString(event.location || null)}, ${sqlString(event.start)}, ${sqlString(event.end || null)}, ${sqlString(heldAlready(event, now) ? "held" : "scheduled")}, ${sqlString(heldAlready(event, now) ? event.end || event.start : null)}, ${sqlString(event.recurringEventId)}, 1, ${sqlString(event.id)}, ${sqlString(event.url)}, ${sqlString(event.joinUrl)}, ${sqlString(event.organizer.email || null)}, ${sqlString(JSON.stringify(event.attendees))}, ${sqlString(JSON.stringify(event.attachments))}, ${sqlString(event.status || null)}, ${sqlString(event.recurrence.join("\n") || null)}, ${sqlString(event.timeZone || null)}, ${sqlString(event.updatedAt)}, ${sqlString(at)}, ${sqlString(at)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
       )
       created++
       continue
@@ -1044,7 +1065,12 @@ VALUES (${sqlString(id)}, ${sqlString(event.summary || "A repeating meeting")}, 
  * is "scheduled" would put last Tuesday's stand-up in the diary as something
  * still to come. It is `held` on arrival when its end is in the past — the same
  * word the transcript capture ticks, reached by the same reasoning: the evidence
- * that a conversation happened is that its hour went by. */
+ * that a conversation happened is that its hour went by.
+ *
+ * `held_at` is written in the same breath, and with the meeting's OWN end rather
+ * than with now: the status and the stamp behind it must not disagree, and "held
+ * at the moment somebody first connected their calendar" would be a fact about
+ * this app rather than about the meeting. */
 function heldAlready(event: CalendarEvent, now: Date): boolean {
   const ended = Date.parse(event.end || event.start)
   return Number.isFinite(ended) && ended < now.getTime()
