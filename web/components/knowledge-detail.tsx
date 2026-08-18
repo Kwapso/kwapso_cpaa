@@ -30,6 +30,7 @@ import { KnowledgeFormDialog, type KnowledgeFormValues } from "@/components/know
 import { KNOWLEDGE_KIND } from "@/components/deep-link/shape"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
+import { TranslateAction, useHumanTranslation } from "@/components/translate-human-text"
 import { ApiFailure, content, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
 import { appsKey, knowledgeKey, listFetch } from "@/lib/live-resources"
@@ -89,6 +90,13 @@ export function KnowledgeDetailScreen({
   const [tab, setTab] = React.useState("source")
   const [editingOpen, setEditingOpen] = React.useState(false)
   const [busyActive, setBusyActive] = React.useState(false)
+
+  // READ THE MATERIAL IN YOUR OWN LANGUAGE, if you ask. A source is a document
+  // somebody wrote — a contract, a transcript, a page of house rules — so it is
+  // the same line every other record is on: never translated on a read, once on
+  // a press, and never written back. The words the assistant searches stay the
+  // words that were filed.
+  const translation = useHumanTranslation(teamId, [item?.body])
 
   function patchLists(next: KnowledgeSource | null) {
     if (!next) return
@@ -298,10 +306,18 @@ export function KnowledgeDetailScreen({
                 </p>
               ) : null}
               {item.body ? (
-                // The material itself, as text. Deliberately NOT rendered as
-                // rich text: what is shown here has to be what the assistant
-                // reads, and the assistant reads the plain words.
-                <p className="text-sm whitespace-pre-wrap">{item.body}</p>
+                <>
+                  {/* Above the material, because the material is what it acts
+                      on — and it changes nothing that is filed: the assistant
+                      still searches the words that were written. */}
+                  <div className="flex justify-end">
+                    <TranslateAction translation={translation} />
+                  </div>
+                  {/* The material itself, as text. Deliberately NOT rendered as
+                      rich text: what is shown here has to be what the assistant
+                      reads, and the assistant reads the plain words. */}
+                  <p className="text-sm whitespace-pre-wrap">{translation.of(item.body)}</p>
+                </>
               ) : (
                 <p className="text-muted-foreground text-sm">No text yet.</p>
               )}

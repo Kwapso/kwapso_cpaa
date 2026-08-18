@@ -162,4 +162,9 @@ export const SEED: Catalogue = {
     es: "{percent}% traducido",
     ca: "{percent}% traduït",
   },
+  "The rest is shown in English.": {
+    de: "Der Rest wird auf Englisch angezeigt.",
+    es: "El resto se muestra en inglés.",
+    ca: "La resta es mostra en anglès.",
+  },
 }

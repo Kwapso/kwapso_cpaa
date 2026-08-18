@@ -169,6 +169,23 @@ export const AGENT_FILE_MAX_BYTES = 5_000_000
 /** Files one agent chat message may attach. */
 export const AGENT_MAX_FILES = 8
 
+// ── translating what a PERSON typed, on demand ───────────────────────────────
+// Two numbers, and they are a pair with a purpose: one press of "Translate" is
+// ONE call and ONE unit of the team's AI allowance, so the pair is what stops a
+// screen with a long thread on it turning that promise into a request no model
+// can answer. A screen with more text than this translates the first
+// TRANSLATE_MAX_TEXTS pieces and leaves the rest in the language they were
+// written in, which is the same degradation the whole language engine is built
+// on: untranslated is a sentence, a failed request is not.
+
+/** Pieces of human-typed text one press of "Translate" may carry. */
+export const TRANSLATE_MAX_TEXTS = 40
+
+/** Characters of ONE of those pieces. Longer is truncated rather than refused —
+ * a paragraph and a half of somebody's ticket in their own language is more use
+ * than a refusal, and the original is always one press away. */
+export const TRANSLATE_MAX_CHARS = 4_000
+
 // ── a file dropped into the knowledge base ───────────────────────────────────
 // TWO NUMBERS, AND THEY ARE A PAIR — the same shape as the agent-chat ceiling
 // above, and for the same reason it was written: a per-file cap enforced AFTER

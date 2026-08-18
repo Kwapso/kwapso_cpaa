@@ -70,6 +70,13 @@ export function LanguageMenu({ save }: { save: (lang: Language) => Promise<unkno
           >
             <span aria-hidden>{l.flag}</span>
             <span className="flex-1">{l.native}</span>
+            {/* The English name beside the endonym, as the agency app's own
+             * switcher shows it: a person who knows their language only as
+             * "Punjabi" and a person who scans for ਪੰਜਾਬੀ both find the row.
+             * Skipped where the two are the same word. */}
+            {l.english !== l.native && (
+              <span className="text-muted-foreground text-xs">{l.english}</span>
+            )}
             {l.code === lang && <Check className="size-3.5" />}
           </DropdownMenuItem>
         ))}

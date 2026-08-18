@@ -33,6 +33,7 @@ import { StoryStatusStepper } from "@/components/story-status-stepper"
 import { RecordTimerButton } from "@/components/timer-bar"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
+import { TranslateAction, useHumanTranslation } from "@/components/translate-human-text"
 import { ApiFailure, content as contentApi } from "@/lib/api"
 import {
   RecordActionsMenu,
@@ -112,6 +113,16 @@ export function StoryDetailScreen({
     invalidate(storiesKey(teamId))
     invalidate(`activity:record:stories:${storyId}`)
   }, [storyId, teamId])
+
+  // READ THIS STORY IN YOUR OWN LANGUAGE, if you ask. Everything on it somebody
+  // typed goes in one array, so one press is one call. A hook, so it sits above
+  // the three early returns below.
+  const translation = useHumanTranslation(teamId, [
+    storyQ.data?.title,
+    storyQ.data?.detail,
+    storyQ.data?.reviewNote,
+    storyQ.data?.closingNote,
+  ])
 
   /** Run a write, say plainly if it was refused, and re-read. */
   async function run(what: () => Promise<unknown>, done: string, fallback: string) {
@@ -193,15 +204,18 @@ export function StoryDetailScreen({
     // 17 Aug 2026 rather than let two dates disagree about one promise. A story
     // with no sprint has no deadline to show, which is the honest answer.
     { label: t("Due"), value: formatDate(story.sprintEndsOn) || "—" },
-    { label: t("Detail"), value: story.detail || "—" },
+    // The three fields somebody TYPED — the detail, what was done, and what the
+    // client will be told — read through `of`, so the reader who pressed
+    // Translate sees them in their own language and nobody else's row changed.
+    { label: t("Detail"), value: translation.of(story.detail) || "—" },
     {
       label: t("Processes it changes"),
       value: story.changesNoStep
         ? "None"
         : story.processIds.map((id) => options.processNames.get(id) ?? id).join(", ") || "—",
     },
-    { label: t("What was done"), value: story.reviewNote || "—" },
-    { label: t("What we'll tell them"), value: story.closingNote || "—" },
+    { label: t("What was done"), value: translation.of(story.reviewNote) || "—" },
+    { label: t("What we'll tell them"), value: translation.of(story.closingNote) || "—" },
     // The audit rows moved to the footer at the foot of the record (D7 /
     // CHECKLIST 11.3); the status is on the header band's own line.
   ]
@@ -251,7 +265,7 @@ export function StoryDetailScreen({
       mark={typeMark(options.selectableValues, MARK_GROUP.story, story.storyType)}
       // D4: the type word and the reference, above the title.
       eyebrow={[story.storyType || t("Story"), story.ref].filter(Boolean).join(" · ")}
-      title={story.title}
+      title={translation.of(story.title)}
       // D5: where it is, who has it, when it is due. Three facts, no more.
       status={[
         STORY_STATUS_LABEL[story.status],
@@ -421,7 +435,17 @@ export function StoryDetailScreen({
             )
           if (t.value === "activity")
             return <ActivityPanel activity={activity} />
-          return <OverviewList items={overviewItems} />
+          return (
+            <>
+              {/* Above the fields it acts on, and out of the header's one-primary
+                  -one-secondary-and-a-menu discipline — this is a thing somebody
+                  presses while reading and presses back a moment later. */}
+              <div className="flex justify-end">
+                <TranslateAction translation={translation} />
+              </div>
+              <OverviewList items={overviewItems} />
+            </>
+          )
         }}
       />
 

@@ -33,6 +33,12 @@ const HOUSEKEEPING = [
   // twice; a first one from here would mean this worker had found a way into a
   // ticket that a person's edit does not use.
   "POST /api/data-ops/agent/translate-ticket",
+  // TRANSLATING A SCREEN'S HUMAN-TYPED TEXT for the reader who asked writes
+  // nothing at all — no row, no column, not even a cache. The words go back in
+  // the same response to the one person who pressed the button, and the record
+  // still says exactly what its author typed. There is no changed row to
+  // broadcast, which is the difference between this door and the one above it.
+  "POST /api/data-ops/agent/translate",
   // Resolving an error-log row is private maintainer bookkeeping in the core DB
   // (owner-only, x-admin-key) — no team screen shows it, so nothing to broadcast.
   "POST /api/data-ops/admin/errors/resolve",

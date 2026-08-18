@@ -28,6 +28,7 @@ import type { Account, AppRow, Meeting, MeetingPurpose } from "@shared/types"
 import { MeetingFormDialog, type MeetingFormValues } from "@/components/meeting-form-dialog"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
+import { TranslateAction, useHumanTranslation } from "@/components/translate-human-text"
 import { ApiFailure, content, tenancy } from "@/lib/api"
 import {
   RecordActionsMenu,
@@ -88,6 +89,11 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
   // than in the form so a person can type straight into the record, which is
   // what "open field" means and what the edit dialog was getting in the way of.
   const [notesDraft, setNotesDraft] = React.useState<string | null>(null)
+
+  // READ THE WRITE-UP IN YOUR OWN LANGUAGE, if you ask. The agenda and the notes
+  // are the two things on a meeting a person typed; they go in one array, so one
+  // press is one call. A hook, so it sits above the early returns below.
+  const translation = useHumanTranslation(teamId, [item?.agenda, item?.notes])
 
   function patchLists(next: Meeting | null) {
     if (!next) return
@@ -343,10 +349,15 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
             return <ActivityPanel activity={activity} />
           return (
             <div className="flex flex-col gap-6">
+              {/* Above the two things somebody typed, and out of the header's
+                  one-primary-one-secondary-and-a-menu discipline. */}
+              <div className="flex justify-end">
+                <TranslateAction translation={translation} />
+              </div>
               <section className="flex flex-col gap-2">
                 <h2 className="text-muted-foreground text-sm font-medium">Agenda</h2>
                 {item.agenda ? (
-                  <p className="text-sm whitespace-pre-wrap">{item.agenda}</p>
+                  <p className="text-sm whitespace-pre-wrap">{translation.of(item.agenda)}</p>
                 ) : (
                   <p className="text-muted-foreground text-sm">Nothing written down yet.</p>
                 )}
@@ -383,7 +394,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
                     </div>
                   </>
                 ) : item.notes ? (
-                  <p className="text-sm whitespace-pre-wrap">{item.notes}</p>
+                  <p className="text-sm whitespace-pre-wrap">{translation.of(item.notes)}</p>
                 ) : (
                   <p className="text-muted-foreground text-sm">
                     Nothing written up yet, the notes are the part worth keeping.

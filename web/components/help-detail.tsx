@@ -53,6 +53,7 @@ import { StoriesPanel } from "@/components/work-panels"
 import { RecordTimerButton } from "@/components/timer-bar"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
+import { TranslateAction, useHumanTranslation } from "@/components/translate-human-text"
 import { totalKey } from "@/lib/live-resources"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { useT } from "@shared/web/language"
@@ -160,6 +161,16 @@ export function HelpDetailScreen({
   const helpTypeOptions = (selectableQ.data ?? [])
     .filter((v) => v.type === "Ticket type")
     .map((v) => v.value)
+
+  // READ THIS CONVERSATION IN YOUR OWN LANGUAGE, if you ask. The whole screen's
+  // human-typed words go in one array — the request AND every reply on it — so
+  // one press is one call rather than one per paragraph. Nothing is written: the
+  // ticket still says exactly what the client typed, and "Show original" puts it
+  // straight back. A hook, so it sits above the three early returns below.
+  const translation = useHumanTranslation(teamId, [
+    ticket?.description,
+    ...replyRows.map((r) => r.body),
+  ])
 
   /** THE THREE ACTS THAT ARE LEFT. Everything else about this ticket's stage now
    * happens by itself — a sprint is picked, a timer starts, the last story
@@ -303,7 +314,10 @@ export function HelpDetailScreen({
     id: r.id,
     author: r.authorName || "Member",
     time: formatRelative(r.createdAt),
-    body: r.body,
+    // The reply as the reader asked for it: what was typed, or the translation
+    // they pressed for. Never both, and never a stored rewrite of somebody's
+    // words — `of` is a lookup, not a save.
+    body: translation.of(r.body),
     aiDrafted: r.isAgent,
   }))
 
@@ -387,16 +401,23 @@ export function HelpDetailScreen({
    * Translate, Edit and Archive go into the three-dot menu. None of them loses
    * its confirm or its colour by moving. */
   const overflow: RecordAction[] = [
-    // TRANSLATE, on a ticket that has a German title and no English one yet. It
-    // SETS the field rather than showing a preview (BUILD-1 §8): a preview is a
-    // thing one person reads once, and a set field is a thing the whole team,
-    // the search and the assistant read afterwards. It disappears the moment
-    // there is an English title, because there is then nothing to ask for.
+    // GIVE THE TICKET AN ENGLISH TITLE, on one that has a German title and no
+    // English one yet. It SETS the field rather than showing a preview (BUILD-1
+    // §8): a preview is a thing one person reads once, and a set field is a
+    // thing the whole team, the search and the assistant read afterwards. It
+    // disappears the moment there is an English title, because there is then
+    // nothing to ask for.
+    //
+    // IT IS NAMED FOR WHAT IT WRITES, not for what it does on the way, because
+    // the conversation below now carries a Translate of its own that changes
+    // nothing and belongs to one reader. Two buttons called "Translate", one
+    // permanent and team-wide and one personal and temporary, is the kind of
+    // thing somebody presses once and never trusts again.
     ...(canEdit && ticket.titleDe && !ticket.titleEn
       ? [
           {
             key: "translate",
-            label: translating ? t("Translating…") : t("Translate"),
+            label: translating ? t("Translating…") : t("Set an English title"),
             icon: <Languages className="size-3.5" />,
             disabled: translating,
             onSelect: () => void translate(),
@@ -496,7 +517,7 @@ export function HelpDetailScreen({
       eyebrow={[ticket.helpType || t("Ticket"), ticket.ref, ticket.archivedAt ? t("Archived") : null]
         .filter(Boolean)
         .join(" · ")}
-      title={ticket.description}
+      title={translation.of(ticket.description)}
       // D5: one line, three facts at most.
       status={[STATUS_LABEL[ticket.status], ticket.appName, ticket.raisedByContactName]
         .filter(Boolean)
@@ -542,24 +563,34 @@ export function HelpDetailScreen({
               />
             )
           return (
-            <TicketThread
-              ticket={{
-                description: ticket.description,
-                type: ticket.helpType || "General",
-                status: TO_LIBRARY[ticket.status],
-                fromScreen: ticket.sourceScreen ? { label: ticket.sourceScreen } : undefined,
-              }}
-              replies={replies}
-              members={mentionableMembers}
-              // NEITHER CONTROL. `showStatusControl` was already off; `canResolve`
-              // is off now too, because the library's resolve button moves a
-              // status with no words attached and CHECKLIST 5.6 says resolving is
-              // refused until a resolution is written. The one way to answer this
-              // ticket is the panel on the title, which sends what a person typed.
-              canResolve={false}
-              showStatusControl={false}
-              onReply={onReply}
-            />
+            <>
+              {/* READ IT IN YOUR OWN LANGUAGE — above the conversation, because
+                  the conversation is what it acts on. Inline rather than in the
+                  three-dot menu: this is a thing somebody presses while reading
+                  and presses back a moment later, and it must not be hidden
+                  behind a click for a person who cannot read the screen. */}
+              <div className="flex justify-end">
+                <TranslateAction translation={translation} />
+              </div>
+              <TicketThread
+                ticket={{
+                  description: translation.of(ticket.description),
+                  type: ticket.helpType || "General",
+                  status: TO_LIBRARY[ticket.status],
+                  fromScreen: ticket.sourceScreen ? { label: ticket.sourceScreen } : undefined,
+                }}
+                replies={replies}
+                members={mentionableMembers}
+                // NEITHER CONTROL. `showStatusControl` was already off; `canResolve`
+                // is off now too, because the library's resolve button moves a
+                // status with no words attached and CHECKLIST 5.6 says resolving is
+                // refused until a resolution is written. The one way to answer this
+                // ticket is the panel on the title, which sends what a person typed.
+                canResolve={false}
+                showStatusControl={false}
+                onReply={onReply}
+              />
+            </>
           )
         }}
       />
