@@ -30,6 +30,7 @@ import * as React from "react"
 import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
+import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { StatGrid, defaultStatGridConfig } from "@kwapso/ui/registry/collections/stat-grid/stat-grid"
 import { Pencil } from "lucide-react"
 
@@ -256,6 +257,7 @@ export function WorkLogsPanel({
       billable: values.billable,
     })
     refresh()
+    toast.success(t("Time corrected."))
   }
 
   /** WRITE TIME DOWN BY HAND, against the record you are standing on. Half of
@@ -273,6 +275,7 @@ export function WorkLogsPanel({
       billable: values.billable,
     })
     refresh()
+    toast.success(t("Time logged."))
   }
 
   if (logsQ.error) return <p className="text-destructive text-sm">{t("Couldn't load the time.")}</p>
