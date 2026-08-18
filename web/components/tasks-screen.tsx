@@ -29,8 +29,8 @@ import type {
   ScreenActionContext,
   ScreenIntent,
 } from "@kwapso/ui/registry/collections/screen-renderer/screen-renderer"
-import type { RecipeField, ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
-import { defaultFieldConfig, type CollectionConfig } from "@kwapso/ui/lib/config"
+import type { ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
+import { type CollectionConfig } from "@kwapso/ui/lib/config"
 import { Inbox } from "lucide-react"
 
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
