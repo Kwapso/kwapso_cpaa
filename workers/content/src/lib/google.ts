@@ -32,11 +32,14 @@ import {
   type GoogleSourceKind,
   type GoogleSource,
 } from "@shared/types"
+import { GOOGLE_MAIL_BIN_KINDS, type GoogleMailBinKind } from "./google-api"
 import { openToken, sealToken, type TokenKeyEnv } from "./google-crypto"
 import {
   connectCredentials,
+  missingScopes,
   refreshAccessToken,
   revokeAtGoogle,
+  unrequestedScopes,
   type ConnectEnv,
   type GoogleTokens,
 } from "./google-oauth"
@@ -67,12 +70,30 @@ type ConnectionRow = {
 }
 
 function toConnection(r: ConnectionRow): GoogleConnection {
+  const service = r.service as GoogleService
   return {
     id: r.id,
     userId: r.user_id,
-    service: r.service as GoogleService,
+    service,
     googleEmail: r.google_email,
     grantedScopes: r.scopes,
+    // WHAT GOOGLE GRANTED THAT WE DID NOT ASK FOR — decided HERE, in the one
+    // place that already knows both halves, and never in the browser. The scope
+    // table is the worker's (google-oauth.ts); shipping it to a screen so the
+    // screen could do this subtraction would put the app's own ask on the wire
+    // and make "did the narrowing work?" a question two files answer.
+    //
+    // It is normally empty. When it is not, a person is holding a grant wider
+    // than the app asks for — an old approval Google is still honouring — and
+    // the settings card says so and points at the fix (disconnect, then connect
+    // again). See the essay above GOOGLE_SCOPES for why that is the only fix.
+    extraScopes: unrequestedScopes(r.scopes),
+    // AND THE SAME SUBTRACTION THE OTHER WAY. A scope added to this app AFTER
+    // somebody connected is a permission they have never been asked for, so
+    // every door that needs it refuses them and blames a grant nobody touched
+    // (CHECKLIST 14.5, `gmail.modify`). The fix is the same two clicks, which is
+    // why both facts live on the same row and point at the same sentence.
+    missingScopes: missingScopes(service, r.scopes),
     lastUsedAt: r.last_used_at,
     lastError: r.last_error,
     active: r.deactivated_at === null,
@@ -97,6 +118,16 @@ export function asNamedService(value: unknown): GoogleNamedService {
   if (typeof value !== "string" || !(GOOGLE_NAMED_SERVICES as readonly string[]).includes(value))
     throw new GuardError(400, "invalid_input", "Only Drive folders and Chat spaces are named this way.")
   return value as GoogleNamedService
+}
+
+/** A draft, one message, or a whole conversation? The allow-list IS the check
+ * (R20), same as `asService` above and for the same reason: this word chooses
+ * which Gmail endpoint is called, so an unknown one is refused at the boundary
+ * rather than carried to a URL. */
+export function asMailBinKind(value: unknown): GoogleMailBinKind {
+  if (typeof value !== "string" || !(GOOGLE_MAIL_BIN_KINDS as readonly string[]).includes(value))
+    throw new GuardError(400, "invalid_input", "Say what to bin: a draft, a message or a conversation.")
+  return value as GoogleMailBinKind
 }
 
 /** Private, or the team's? Defaults to `private`, and the default is the point:
@@ -351,7 +382,23 @@ export async function disconnect(
         AND deactivated_at IS NULL;`
   )
 
-  const revoked = secret ? await revokeAtGoogle(await openToken(env, secret.refresh_token)) : false
+  // TELL GOOGLE. This is what actually narrows a scope — a grant is an additive
+  // set at Google's end, so nothing the app stops doing can take a power off it
+  // (google-oauth.ts, the essay above GOOGLE_SCOPES).
+  //
+  // THE UNSEALING IS INSIDE THE TRY, and that is not tidiness. `revokeAtGoogle`
+  // already swallows a network failure, but the decrypt ahead of it did not: a
+  // row sealed under a key this deploy no longer has threw AFTER the connection
+  // had been deactivated, so the person got a 500 for a disconnect that had
+  // already happened, no history row, and no revoke. The safe direction here is
+  // always "our row is gone, Google's grant might not be" — never a half-done
+  // disconnect nobody can finish.
+  let revoked = false
+  try {
+    if (secret) revoked = await revokeAtGoogle(await openToken(env, secret.refresh_token))
+  } catch {
+    revoked = false
+  }
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Google account disconnected",
     description: `${actor.name} disconnected ${serviceLabel(service)}${revoked ? "" : " (remove it in your Google account too)"}`,
@@ -483,7 +530,18 @@ export async function setNamedSourceActive(
 // ── the tokens ───────────────────────────────────────────────────────────────
 
 /** The two encrypted columns, read by NOTHING above this line. */
-type Secrets = { id: string; refresh_token: string; access_token: string | null; access_expires_at: string | null }
+type Secrets = {
+  id: string
+  refresh_token: string
+  access_token: string | null
+  access_expires_at: string | null
+  /** NOT a secret, and here because this is the one read that happens on the way
+   * to using a connection. A door that needs a particular permission can then
+   * check for it BEFORE spending a call on Google (`grantedScopeOrThrow`), which
+   * is the difference between "your Gmail connection was made before kwapso
+   * could do that" and a 403 the caller has to interpret. */
+  scopes: string
+}
 
 async function liveSecrets(
   cfg: D1Rest,
@@ -494,7 +552,7 @@ async function liveSecrets(
     cfg,
     guard.databaseId,
     // R14: one row by a unique index.
-    `SELECT id, refresh_token, access_token, access_expires_at FROM google_connections
+    `SELECT id, refresh_token, access_token, access_expires_at, scopes FROM google_connections
       WHERE user_id = ? AND service = ? AND deactivated_at IS NULL LIMIT 1`,
     [guard.userId, service]
   )
@@ -525,7 +583,7 @@ export async function accessTokenFor(
   cfg: D1Rest,
   guard: MemberGuard,
   service: GoogleService
-): Promise<{ token: string; connectionId: string }> {
+): Promise<{ token: string; connectionId: string; grantedScopes: string }> {
   const row = await liveSecrets(cfg, guard, service)
   if (!row)
     throw new GuardError(
@@ -537,7 +595,12 @@ export async function accessTokenFor(
     row.access_token &&
     row.access_expires_at &&
     Date.parse(row.access_expires_at) - EXPIRY_SKEW_MS > Date.now()
-  if (fresh) return { token: await openToken(env, row.access_token as string), connectionId: row.id }
+  if (fresh)
+    return {
+      token: await openToken(env, row.access_token as string),
+      connectionId: row.id,
+      grantedScopes: row.scopes,
+    }
 
   const creds = connectCredentials(env)
   if (!creds)
@@ -556,7 +619,38 @@ export async function accessTokenFor(
         access_expires_at = ${sqlString(tokens.expiresAt)}, last_error = NULL
       WHERE id = ${sqlString(row.id)};`
   )
-  return { token: tokens.accessToken, connectionId: row.id }
+  // THE STORED `scopes` IS WHAT CONSENT GRANTED, and it is not overwritten here
+  // on purpose. A refresh response MAY carry `scope` and may leave it out, and
+  // `redeem` reads an absent one as the empty string — so writing it back would
+  // let an ordinary hourly refresh erase the record of what the person actually
+  // approved, and every screen would then report the connection as missing
+  // everything. What consent said is a fact with a date on it; a refresh is not
+  // a new consent.
+  return { token: tokens.accessToken, connectionId: row.id, grantedScopes: row.scopes }
+}
+
+/**
+ * A DOOR NAMES THE PERMISSION IT NEEDS, and says so in words if it is missing.
+ *
+ * Without this, a scope added to the app after somebody connected shows up as a
+ * 403 from Google, which `googleFetch` translates into "the connection may have
+ * been removed in your Google account" — true about the status code and wrong
+ * about the cause, pointing a person at a grant nobody has touched. It cost
+ * CHECKLIST 14.5 an afternoon: filing a message under a label had been built,
+ * driven and marked blocked, against a Gmail connection made before
+ * `gmail.modify` was on the list.
+ *
+ * Checked BEFORE the call rather than after the refusal, because the honest
+ * sentence is available before the call and the refusal never carries it.
+ */
+export function grantedScopeOrThrow(grantedScopes: string, needed: string, service: GoogleService): void {
+  const held = grantedScopes.split(/\s+/).map((s) => s.trim())
+  if (held.includes(needed)) return
+  throw new GuardError(
+    409,
+    "google_scope_missing",
+    `Your ${serviceLabel(service)} connection was made before kwapso could do that. Disconnect ${serviceLabel(service)} in Settings and connect it again.`
+  )
 }
 
 /** Write down what Google said, so a broken grant is visible on the card instead

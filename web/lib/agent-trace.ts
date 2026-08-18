@@ -352,6 +352,10 @@ export const SCREENLESS_WRITE_TOOLS: string[] = [
   "google_send_mail",
   "google_reply_mail",
   "google_label_mail",
+  // Binning mail has the same answer and one extra reason: the thing it acted on
+  // is no longer where it was, so even Gmail's own link would land on a letter in
+  // Trash. The history row on the connection is the whole record.
+  "google_mail_trash",
   "google_chat_post",
   "google_chat_delete",
 ]

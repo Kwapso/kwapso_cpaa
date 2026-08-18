@@ -516,6 +516,34 @@ const AGENT_ONLY: AgentTool[] = [
     summarize: (i) =>
       i.on === true ? `File a message under "${str(i, "label")}"` : `Take "${str(i, "label")}" off a message`,
   },
+  {
+    name: "google_mail_trash",
+    description:
+      "Put mail in the Gmail bin, never a permanent delete: it sits in Trash for thirty days and the " +
+      "person restores it in one click. `kind` says what to bin, a draft, a message, or a thread " +
+      "(the whole exchange), and `id` is that thing's id, a draft id from google_draft_reply, a " +
+      "message id or a thread id from google_mail_search. Use it to take back a draft kwapso wrote. " +
+      "The answer's `changed` is false when it was already in the bin, so a second call is safe. " +
+      "kwapso cannot delete mail permanently and never will, that needs a scope this app does not ask " +
+      "for.",
+    schema: obj({ kind: S, id: S }, ["kind", "id"]),
+    binding: "CONTENT",
+    method: "POST",
+    path: "/api/content/google/gmail/trash",
+    write: true,
+    // It takes something away. Every destructive act in this catalogue asks —
+    // the same rule google_drive_trash and google_chat_delete follow, and the
+    // reason is the same one in a smaller room: the person, not the assistant,
+    // decides that a letter should stop existing where they can see it.
+    confirm: true,
+    buildBody: (i) => ({ kind: str(i, "kind"), id: str(i, "id") }),
+    summarize: (i) =>
+      str(i, "kind") === "draft"
+        ? "Put a draft in the Gmail bin"
+        : str(i, "kind") === "thread"
+          ? "Put a conversation in the Gmail bin"
+          : "Put a message in the Gmail bin",
+  },
   // FOUR CALENDAR WRITES STOOD HERE — change what an entry says and when, invite
   // and uninvite guests, set where it is, call it off. All four are gone with
   // their doors (18 August 2026): the calendar is read-only, so the assistant

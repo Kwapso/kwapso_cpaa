@@ -40,10 +40,12 @@ import { gated, gatedBody } from "@shared/workers/route"
 import {
   accessTokenFor,
   addNamedSource,
+  asMailBinKind,
   asNamedService,
   asService,
   asShelf,
   disconnect,
+  grantedScopeOrThrow,
   listConnections,
   listNamedSources,
   ownSourceOrThrow,
@@ -88,7 +90,9 @@ import {
   gmailSend,
   gmailSendDraft,
   gmailThread,
+  gmailTrash,
   knownContactQuery,
+  type GoogleMailBinKind,
 } from "../lib/google-api"
 import { knownContactEmails } from "../lib/google-read"
 import { findTranscript } from "../lib/google-transcript"
@@ -857,7 +861,12 @@ export async function postGoogleMailLabel(request: Request, env: Env): Promise<R
   if (typeof body.on !== "boolean")
     return fail(400, "invalid_input", "Say whether the label goes on or comes off.")
   const on = body.on
-  const { token, connectionId } = await accessTokenFor(env, cfg, guard, "gmail")
+  const { token, connectionId, grantedScopes } = await accessTokenFor(env, cfg, guard, "gmail")
+  // THE PERMISSION THIS ACT NEEDS, named before Google is asked. `gmail.modify`
+  // joined the list after the first connections were made, so a person who
+  // connected earlier gets a 403 whose own words blame a grant they never
+  // touched (CHECKLIST 14.5). Said properly here, with the two clicks that fix it.
+  grantedScopeOrThrow(grantedScopes, GMAIL_MODIFY_SCOPE, "gmail")
   // Create it only when applying — see the doc comment above.
   const labelId = await gmailLabelId(token, label, on)
   // Nothing to take off: the label does not exist, so the message does not carry
@@ -873,6 +882,94 @@ export async function postGoogleMailLabel(request: Request, env: Env): Promise<R
   })
   await publishChange(env, guard.teamId, "google", connectionId)
   return json({ changed: true, label, on })
+}
+
+/**
+ * POST /api/content/google/gmail/trash — put a draft, a message or a whole
+ * conversation in the Gmail bin.
+ *
+ * THE OWNER ASKED FOR THIS ONE IN WORDS: "why is there no method for you to
+ * delete drafts?" The gap was real and it was the same gap the Drive bin closed
+ * a week earlier — kwapso could WRITE a draft into somebody's mailbox and had no
+ * way to take it back, so every draft the assistant wrote by mistake was a
+ * letter the person had to go and tidy up themselves.
+ *
+ * THE BIN, NEVER A DELETE, and that is not a preference we could change our
+ * minds about: a permanent delete needs the full `https://mail.google.com/`
+ * scope — total control of somebody's mailbox — and this app does not ask for
+ * it. What it holds (`gmail.compose` for a draft, `gmail.modify` for a message
+ * or a thread) can bin and cannot destroy, so thirty days and one click of undo
+ * are guaranteed by Google rather than by us. It is the same reading as the
+ * Drive bin beside it, and the same house rule: deactivate, never delete.
+ *
+ * Gated on `google:delete` — the module's own word for taking something away,
+ * exactly as the Drive bin and the Chat retraction are. NOT on the mail switch:
+ * `google_mail:create` is about mail LEAVING the building, and binning takes
+ * something back rather than sending it. That is the line the label door already
+ * draws.
+ *
+ * R17: something already in the bin moves nothing, writes no history row and
+ * rings no bell. lib/google-api.ts `gmailTrash` says how each of the three is
+ * asked.
+ */
+export async function postGoogleMailTrash(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{ kind?: unknown; id?: unknown }>(
+    request,
+    env,
+    "google",
+    "delete"
+  )
+  await refusePortalCaller(cfg, guard)
+  // Through the text seam, THEN the module's own allow-list — the order the
+  // disconnect door explains (R20 is positional, and `asMailBinKind` is this
+  // module's word rather than the seam's).
+  const kind = asMailBinKind(requireText(body.kind, "Kind", TEXT_LIMITS.short))
+  const id = requireText(body.id, "Draft, message or conversation", TEXT_LIMITS.short)
+  const { token, connectionId, grantedScopes } = await accessTokenFor(env, cfg, guard, "gmail")
+  // WHICH PERMISSION EACH OF THE THREE NEEDS, asked before Google is. Binning a
+  // draft is part of writing one (`gmail.compose`); binning a message or a whole
+  // conversation is a mailbox change (`gmail.modify`), which joined the list
+  // after the first connections were made — so a connection older than that
+  // list gets a sentence naming the fix instead of a refusal naming nothing.
+  grantedScopeOrThrow(grantedScopes, MAIL_BIN_SCOPE[kind], "gmail")
+  const result = await gmailTrash(token, kind, id)
+  if (result.changed) {
+    await recordGoogleAct(cfg, guard, actor, {
+      connectionId,
+      type: MAIL_BIN_ACT[kind],
+      description: `${actor.name} put ${MAIL_BIN_WHAT[kind]} in the Gmail bin`,
+    })
+    await publishChange(env, guard.teamId, "google", connectionId)
+  }
+  return json({ changed: result.changed, kind })
+}
+
+/** What the history row is CALLED for each of the three, and what its sentence
+ * says. Data rather than a ternary chain, so the three read as one decision and
+ * a fourth kind cannot be added without stating both halves — the same shape the
+ * presence probes use. */
+const MAIL_BIN_ACT: Record<GoogleMailBinKind, string> = {
+  draft: "Draft binned",
+  message: "Message binned",
+  thread: "Conversation binned",
+}
+const MAIL_BIN_WHAT: Record<GoogleMailBinKind, string> = {
+  draft: "a draft",
+  message: "a message",
+  thread: "a conversation",
+}
+
+/** Gmail's own name for "change a mailbox" — labels, and moving a message or a
+ * thread to Trash. Spelled once, because it is named by two doors and a typo in
+ * either would refuse somebody who holds it. */
+const GMAIL_MODIFY_SCOPE = "https://www.googleapis.com/auth/gmail.modify"
+
+/** And what each of the three bins needs. A draft is part of composing one, so
+ * it rides `gmail.compose`; the other two change what is in the mailbox. */
+const MAIL_BIN_SCOPE: Record<GoogleMailBinKind, string> = {
+  draft: "https://www.googleapis.com/auth/gmail.compose",
+  message: GMAIL_MODIFY_SCOPE,
+  thread: GMAIL_MODIFY_SCOPE,
 }
 
 // ── CALENDAR ─────────────────────────────────────────────────────────────────

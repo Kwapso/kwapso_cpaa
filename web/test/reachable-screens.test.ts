@@ -344,7 +344,7 @@ const NO_CONTROL: Record<string, string> = {
   "POST /api/content/google/chat/messages":
     "FOR A MACHINE. Posting into a named space is an act the assistant performs on request; a person is already in the space. The owner asked for read AND post, and the post half is the assistant's.",
 
-  // THE SEVEN THAT FINISH THAT SENTENCE, and they are one decision, not seven.
+  // THE EIGHT THAT FINISH THAT SENTENCE, and they are one decision, not eight.
   // (It was thirteen before the calendar's write half was retired.) Every door on
   // this module acts INSIDE Google — a file in a Drive folder, a label in a
   // mailbox — and kwapso deliberately has no screen for any of it. That is the same ruling the four
@@ -369,6 +369,8 @@ const NO_CONTROL: Record<string, string> = {
     "FOR A MACHINE. The person's control is the mail reply dialog, which DRAFTS — the owner's ruling that a drafted reply is the normal way to answer mail. This door sends inside the thread, which is the assistant's half of the same sentence and carries the same always-ask confirm.",
   "POST /api/content/google/gmail/label":
     "FOR A MACHINE. Filing a message under a label is the assistant tidying a mailbox on request. A person clicks the label button in Gmail, where the message already is.",
+  "POST /api/content/google/gmail/trash":
+    "FOR A MACHINE, and specifically to undo a machine — the mail counterpart of the Drive bin two lines up, and the owner asked for it in those words ('why is there no method for you to delete drafts?'). The assistant can write a draft into somebody's mailbox, so it must be able to take one back; a person bins their own mail in Gmail, which is one click from where the message already is. It is also why this app lists no mail and no drafts on any screen: there is no inbox here to hang a bin button on, deliberately, because Gmail is better at being Gmail than a card we could build beside it. THE ONE THING WORTH RE-READING IF THAT CHANGES: web/components/mail-reply-dialog.tsx is the only place in either front end that ever holds a draft id, and today no screen opens it — the day something does, that dialog is where a person's own 'bin it' belongs and this line goes.",
   "POST /api/content/google/chat/delete":
     "FOR A MACHINE, and specifically to undo a machine — the counterpart of the post door above. It takes back a message kwapso itself sent; a person deletes their own message in Chat.",
 

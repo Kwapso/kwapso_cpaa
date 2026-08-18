@@ -201,24 +201,43 @@ Google surface at all.
 
 **Scopes to request on the client** (each service is consented separately, so a
 person connecting Drive is never shown a mailbox prompt): `drive.readonly` +
-`drive.file`; `gmail.readonly` + `gmail.compose` + `gmail.send`;
-`calendar.events`; `chat.messages` + `chat.spaces.readonly`; plus `openid email`
-on all four, to label which account was connected.
+`drive.file`; `gmail.readonly` + `gmail.compose` + `gmail.send` + `gmail.modify`;
+`calendar.readonly`; `chat.messages` + `chat.spaces.readonly`; plus `openid email`
+on all four, to label which account was connected. The single source is
+`GOOGLE_SCOPES` in `workers/content/src/lib/google-oauth.ts`; this list is a copy
+for the person filling in Google's console.
 
-**`calendar.events` is a READ/WRITE scope and the app no longer writes** (the
-calendar became one-way on 18 August 2026). The narrower
-`calendar.events.readonly` would match what the code does, and switching to it is
-an OWNER'S DECISION rather than a tidy-up, because **Google does not downgrade an
-existing grant**: a connection minted under the wider scope keeps it, and a
-connection minted under the narrower one is a *different* grant. So the switch
-costs a reconnection from **every person who has already connected a calendar** —
-each of them back through the consent screen, with the app's sweep finding nothing
-for whoever has not done it yet — and it cannot be staged, because the scope is
-one string on one OAuth client shared by staging and production. Nothing is
-gained in capability (there is no function left that could send a write) and one
-thing is gained in posture: a leaked refresh token could not be used to change
-somebody's diary. Worth doing at the same moment as another consent-screen change,
-not on its own.
+**THE CALENDAR ASK IS READ-ONLY AS OF 19 AUGUST 2026**, and the reconnection this
+page warned about was paid. What it warned about is worth keeping, because it is
+the trap and it applies to every future scope change on this client:
+
+**A grant at Google is an additive SET per OAuth client.** It does not remember
+what the app asked for last time; it remembers what the person has ever approved.
+So narrowing the string here narrows nothing on its own — an account that already
+approved `calendar.events` goes on holding it, and the next connect returns a
+token that STILL carries the write scope, past a consent screen that asks nothing
+new. Three things together make a narrowing real, and none of them works alone:
+
+1. **Disconnect revokes at Google** (`revokeAtGoogle`). Dropping our row stops US
+   using a grant and does nothing to the grant. Revoking is what empties the set.
+2. **Connect forces a fresh consent** — `prompt=consent`, and
+   `include_granted_scopes=false` so Google does not mint the token over
+   everything ever approved.
+3. **The granted scopes are read back** off the token response and compared with
+   the ask, both directions. A grant wider than the ask, or short of it, is
+   written on the person's own Settings card in words. That is the only leg that
+   produces evidence rather than confidence.
+
+**AND THE FOUR SERVICES ARE ONE OAuth CLIENT.** Four consent screens, four rows,
+one grant. So revoking any of them can end all four, and the operational
+consequence is the one to hand somebody: **to change a scope, disconnect ALL FOUR
+first, then connect them again.** Disconnecting only the one being narrowed leaves
+the old scope in the set under the other three. If a warning survives that, the
+last resort is removing kwapso at `myaccount.google.com/permissions` and
+connecting again, which empties the set unconditionally.
+
+It still cannot be staged: the scope list is one string on one OAuth client shared
+by staging and production.
 
 ### R2 buckets (BUILT 2026-06-23, bound to `kwapso-content*`)
 

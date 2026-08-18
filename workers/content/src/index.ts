@@ -222,6 +222,7 @@ import {
   postGoogleMailLabel,
   postGoogleMailReply,
   postGoogleMailSend,
+  postGoogleMailTrash,
   postGoogleSource,
   postGoogleSourceActive,
 } from "./routes/google"
@@ -543,6 +544,11 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // door demands the mail switch exactly as the send door does — it sends.
   "POST /api/content/google/gmail/reply": { handler: postGoogleMailReply, kind: "mutation" },
   "POST /api/content/google/gmail/label": { handler: postGoogleMailLabel, kind: "mutation" },
+  // AND TAKING MAIL BACK — the bin, never a delete, for a draft, one message or
+  // a whole conversation. The counterpart of the draft door above, and the same
+  // decision the Drive bin stands on: an assistant that can write into somebody's
+  // mailbox and cannot take it back makes every mistake the person's to tidy up.
+  "POST /api/content/google/gmail/trash": { handler: postGoogleMailTrash, kind: "mutation" },
   // TWO CALENDAR DOORS, AND BOTH ARE READS. There were nine. The other seven
   // wrote — create an entry, change what it says and when, invite and uninvite
   // guests, set where it is, call it off, push a sprint's dates in, push a

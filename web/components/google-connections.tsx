@@ -72,7 +72,15 @@ const SERVICE_COPY: Record<GoogleService, { label: string; scope: string }> = {
     scope:
       "Mail to or from someone on one of your accounts, plus Google's own notices about shared documents and recordings.",
   },
-  calendar: { label: "Calendar", scope: "Your own calendar, so meetings and sprints can be read and added." },
+  // READ ONLY, and the sentence says so because the grant now does. It read
+  // "so meetings and sprints can be read and added" for six weeks after the
+  // last calendar write was deleted — a promise about what kwapso may do, left
+  // describing a capability that no longer existed, on the one screen where
+  // somebody decides whether to hand over their diary.
+  calendar: {
+    label: "Calendar",
+    scope: "Your own calendar, read only. kwapso never adds, changes or cancels anything in it.",
+  },
   chat: { label: "Google Chat", scope: "Only the spaces you share below, nothing else in Chat." },
 }
 
@@ -240,6 +248,44 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                   </p>
                 )}
 
+                {/* A GRANT WIDER THAN THE ASK, said out loud.
+                  *
+                  * The silent failure this exists for: a scope is narrowed in
+                  * our code, somebody connects again, and Google hands back the
+                  * old wider approval because a grant is an additive set per
+                  * OAuth client. Nothing breaks, nothing logs, and the app
+                  * looks fixed while the power is still held. `extraScopes` is
+                  * the server's own subtraction of what came back minus what we
+                  * asked for, so this line appears exactly when that has
+                  * happened and never otherwise.
+                  *
+                  * The scope names themselves are deliberately NOT printed:
+                  * `https://www.googleapis.com/auth/calendar.events` tells a
+                  * manager nothing and looks like an error. What they need is
+                  * the fact and the fix, and the Disconnect button is on the
+                  * row above this line. */}
+                {live && live.extraScopes.length > 0 && (
+                  <p className="text-warning text-xs">
+                    {t("Google still allows kwapso more than it asks for here. Disconnecting and connecting again is the only thing that clears it.")}
+                  </p>
+                )}
+
+                {/* AND THE SAME ROW SAYS WHEN IT IS SHORT, which is the failure
+                  * that had already happened. `gmail.modify` was added to the
+                  * Gmail request after the first connections were made, so
+                  * filing a message under a label refused a person whose grant
+                  * nobody had touched — and the only place that fact was
+                  * written down was a line in a test plan. Two facts, two
+                  * sentences, one fix: they are different things to be told
+                  * ("kwapso can do more than it says" and "kwapso cannot do
+                  * what it says"), and blurring them into one line would lose
+                  * the only half a person can act on differently. */}
+                {live && live.missingScopes.length > 0 && (
+                  <p className="text-warning text-xs">
+                    {t("This connection is missing a permission kwapso now needs. Disconnect it and connect it again.")}
+                  </p>
+                )}
+
                 {live && NAMED.includes(service) && (
                   <div className="flex flex-col gap-1 pl-1">
                     {named.length === 0 ? (
@@ -381,8 +427,30 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
             <AlertDialogTitle>
               {t("Disconnect")} {disconnecting ? SERVICE_COPY[disconnecting].label : ""}?
             </AlertDialogTitle>
+            {/* ONE description holding two sentences, and the second is not an
+              * afterthought.
+              *
+              * THE SURPRISE, SAID BEFORE IT HAPPENS: the four services are four
+              * consent screens and four rows here, but ONE app at Google — one
+              * OAuth client holding one grant — so asking Google to drop this
+              * connection can end the other three at the same time. Nothing in
+              * this app can prevent that (it is Google's model, and it is also
+              * exactly what makes a narrowed scope actually narrow), so the
+              * honest thing is to say it at the moment somebody decides rather
+              * than let them find three broken connections afterwards and think
+              * something went wrong.
+              *
+              * ONE `AlertDialogDescription`, not two, and that is a correctness
+              * point rather than a layout one: the primitive is Radix's, which
+              * gives its description the dialog's own `aria-describedby` id, so a
+              * second one renders a duplicate id and a screen reader is told two
+              * different things are the description. The paragraph gets a second
+              * line inside it instead. */}
             <AlertDialogDescription>
               {t("kwapso stops reading and writing there straight away, and anything you shared through it stops being shared. We'll ask Google to drop the connection too.")}
+              <span className="mt-2 block">
+                {t("Your Google connections are all one app at Google, so the others may need connecting again afterwards. The card will say which.")}
+              </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

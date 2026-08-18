@@ -237,8 +237,9 @@ longer builds the purged ones.
 | 14.2 | Drive: list, read, upload | **DONE** |
 | 14.3 | Drive: edit a file, make a folder, copy mail in | **DONE**, all three driven live against your account and cleaned up |
 | 14.4 | Gmail: list, read, draft, send | **DONE** |
-| 14.5 | Gmail: reply in a thread, apply a label | Reply **DONE**, proved in-thread. Label **BLOCKED ON YOU**, it needs the `gmail.modify` permission and your existing grant predates it. Reconnect Gmail in Settings and it passes |
-| 14.6 | Calendar: list, create | **LIST DONE. CREATE WITHDRAWN 18 Aug 2026**, the calendar is one-way |
+| 14.5 | Gmail: reply in a thread, apply a label | Reply **DONE**, proved in-thread. Label **BLOCKED ON YOU**, it needs the `gmail.modify` permission and your existing grant predates it. **19 Aug 2026: the app now SAYS so** — the Settings card names a connection short of a permission, and the label door refuses with "your Gmail connection was made before kwapso could do that" instead of a 403 blaming a grant you never touched. It still needs the reconnect, and the calendar reconnect is the same one |
+| 14.13 | Gmail: bin a draft, a message, a conversation | **BUILT 19 Aug 2026**, not yet driven live: `POST /api/content/google/gmail/trash` + `google_mail_trash`. The draft half works on your current grant; the message and conversation halves need the same `gmail.modify` as 14.5. The bin only — a permanent delete needs the full-mailbox scope and this app asks for it nowhere |
+| 14.6 | Calendar: list, create | **LIST DONE. CREATE WITHDRAWN 18 Aug 2026**, the calendar is one-way. **19 Aug 2026: the GRANT is read-only too** (`calendar.readonly`), which needs a reconnect to take effect — a narrower ask alone changes nothing, because a grant at Google is additive per OAuth client |
 | 14.7 | Calendar: edit, guests, location, cancel | **WITHDRAWN 18 Aug 2026.** All four were built and driven live; all four are gone, with the doors and the tools under them. The owner: *"disable the ability to create, edit, or delete anything in the calendar from the frontend"* |
 | 14.8 | Chat: read a space, post to it | **DONE** |
 | 14.9 | Chat: list every space | **DONE**, 19 spaces found, 2 of them shared |

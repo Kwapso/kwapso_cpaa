@@ -20,6 +20,38 @@ and costs one command each.
 
 ---
 
+## The grant catches up with the code, 19 Aug 2026
+The day after the calendar became one-way, the owner closed the gap the previous
+entry left open: *"the app must hold only a READ-ONLY Google Calendar grant."*
+
+**The ask is `calendar.readonly`.** The interesting part is not the string, it is
+that changing the string fixes nothing. A grant at Google is an additive SET per
+OAuth client: an account that already approved `calendar.events` keeps holding
+it, so the next connect returns a token that still carries the write scope, past
+a consent screen that asks nothing new — a fix that looks done and is not. Three
+things together make it real, and the essay above `GOOGLE_SCOPES` in
+`workers/content/src/lib/google-oauth.ts` is the canonical account of them:
+disconnect **revokes** at Google (the only act that empties the set), connect
+**forces a fresh consent** and refuses incremental authorisation, and the token
+response's granted scopes are **read back** and compared with the ask — in both
+directions, so a connection that is wider than the ask *or* short of it says so
+on the person's own Settings card. That last leg is what turned an assumption
+into evidence; `workers/content/test/google-scopes.test.ts` locks all four.
+
+**The other direction had already bitten.** `gmail.modify` was added to the Gmail
+list after the first connections were made, so applying a label refused the owner
+with a sentence blaming a grant nobody had touched (CHECKLIST 14.5, "blocked on
+you", with no screen anywhere saying what to do). The same subtraction the other
+way now names it, on the card and at the door.
+
+**And the mail bin**, which the owner asked for in five words: *"why is there no
+method for you to delete drafts?"* One door bins a draft, a message or a whole
+conversation; a permanent delete is unreachable rather than un-built, because it
+needs the full `https://mail.google.com/` scope and this app does not ask for it
+on any surface.
+
+---
+
 ## The calendar becomes one-way, 18 Aug 2026
 The owner, twice in one day: *"disable the ability to create, edit, or delete
 anything in the calendar from the frontend… scour through our entire
@@ -33,10 +65,14 @@ tools across the assistant and the MCP surface, the "Add to my calendar" action,
 and the `google_events` permission ("Calendar on your behalf") that guarded them.
 The refusal is a missing function rather than a condition somebody can invert,
 which is the shape R24 already uses for internal money. The app's Google grant
-still asks for the read/write `calendar.events` scope, because Google will not
-downgrade an existing grant and narrowing it would sign every connected person
-out of their calendar until they reconnected; OPERATIONS.md records what that
-switch would cost, so it stays the owner's decision.
+still asked for the read/write `calendar.events` scope at the time, because
+Google will not downgrade an existing grant and narrowing it would sign every
+connected person out of their calendar until they reconnected; OPERATIONS.md
+recorded what that switch would cost, so it stayed the owner's decision. **He
+took it the next day** — see the 19 August entry: the ask is `calendar.readonly`,
+the reconnect was paid, and the three things that make a narrowing real (revoke
+on disconnect, forced consent, and reading back what Google granted) went in
+with it.
 
 **The `held` status is retired**, and the insight that made it simple is that a
 meeting's own start time already says whether it has happened. A status column
