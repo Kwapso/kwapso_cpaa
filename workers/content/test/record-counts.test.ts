@@ -42,7 +42,13 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
 
 import worker from "../src/index"
 import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
-import { childrenFor, type RecordCounts } from "@shared/record-counts"
+import {
+  childrenFor,
+  COUNTED_RECORD_TABLES,
+  recordTimeCountKey,
+  type RecordCounts,
+} from "@shared/record-counts"
+import { WORK_LOG_TARGETS } from "../src/lib/work-logs"
 
 const db = () => holder.db as DatabaseSync
 
@@ -224,7 +230,12 @@ describe("the record-counts door (content)", () => {
   // built to end — so every line this worker owes is proved to produce a NUMBER
   // for a caller who holds every right, derived from the registry itself.
   it("answers every collection the registry says this worker owes", async () => {
-    const owed = Object.keys({ accounts: 0, apps: 0, help: 0, sprints: 0 }).flatMap((table) =>
+    // EVERY record kind the registry knows, never a hand-written four. The list
+    // used to be `{ accounts, apps, help, sprints }` typed out here, so when a
+    // story, a task and a meeting gained a Time badge the loop simply did not
+    // reach them — a coverage test whose coverage is a literal proves whatever it
+    // was last edited to prove.
+    const owed = COUNTED_RECORD_TABLES.flatMap((table) =>
       childrenFor(table, "content").map((c) => [table, c.key] as const)
     )
     expect(owed.length, "the registry scan found nothing — it has gone blind").toBeGreaterThan(5)
@@ -243,8 +254,24 @@ describe("the record-counts door (content)", () => {
       sprints: "SP_NONE",
     }
     for (const [table, key] of owed) {
-      const body = await counts(IDS.staffUser, table, ids[table])
+      // A record kind with no seeded row still answers a NUMBER — zero is the
+      // honest count of a story nobody has logged time against, and it is `null`
+      // that would mean the counter is missing.
+      const body = await counts(IDS.staffUser, table, ids[table] ?? `${table.toUpperCase()}_NONE`)
       expect(typeof body[key], `${table}.${key} has no counter behind it`).toBe("number")
     }
+  })
+
+  // …and the other direction, for the one family whose lines are DERIVED. The
+  // counters are built from `WORK_LOG_TARGETS`, so a fifth thing time can be
+  // logged against would grow a counter here and no registry line — a badge the
+  // door could answer and no screen ever asks for, which looks exactly like a
+  // record that has no time on it.
+  it("badges every record time can be logged against", () => {
+    for (const table of Object.keys(WORK_LOG_TARGETS))
+      expect(
+        childrenFor(table, "content").map((c) => c.key),
+        `time can be logged against ${table}, so its record must badge ${recordTimeCountKey(table)}`
+      ).toContain(recordTimeCountKey(table))
   })
 })

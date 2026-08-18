@@ -22,11 +22,13 @@ import { GuardError, teamContext } from "@shared/workers/gating"
 import { accountScope, refusePortalCaller } from "@shared/workers/account-scope"
 import { queryText } from "@shared/workers/validate"
 import { answerRecordCounts, type RecordCounter } from "@shared/workers/record-counts"
+import { recordTimeCountKey } from "@shared/record-counts"
 import { countTickets } from "../lib/help"
 import { countAttachments } from "../lib/help-attachments"
 import { countSprints, countStories } from "../lib/stories"
 import { countTodos } from "../lib/todos"
 import { countMeetings } from "../lib/meetings"
+import { countWorkLogs, WORK_LOG_TARGETS } from "../lib/work-logs"
 import type { Env } from "../env"
 
 /** One figure, by the sidecar name the badge reads.
@@ -57,6 +59,20 @@ const COUNTERS: Record<string, RecordCounter> = {
   // A sprint's record.
   "stories-sprint": (cfg, guard, _s, id) =>
     countStories(cfg, guard, { sprintId: id, view: "all" }).then((r) => r.total),
+  // A RECORD'S OWN TIME, on all four things time can be logged against. Derived
+  // from `WORK_LOG_TARGETS` — the door's own allow-list, and the same object the
+  // panel, the write door and the label subselect are all built from — because
+  // four hand-written lines here would be a fifth target's badge quietly missing.
+  ...(Object.fromEntries(
+    Object.keys(WORK_LOG_TARGETS).map((table) => [
+      recordTimeCountKey(table),
+      // `countWorkLogs` and nothing of its own: the Time tab's list asks the door
+      // with exactly this filter, so the badge and the rows it reveals are one
+      // question (R16). Discarded rows are out of both, because `logWhere` says so.
+      (cfg, guard, _s, id) =>
+        countWorkLogs(cfg, guard, { targetTable: table, targetId: id }).then((r) => r.total),
+    ])
+  ) as Record<string, RecordCounter>),
 }
 
 /** GET /api/content/record-counts?table=&id= — the child totals this worker owes

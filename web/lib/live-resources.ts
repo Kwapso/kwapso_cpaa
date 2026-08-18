@@ -802,6 +802,11 @@ export const TEAM_RESOURCES: Record<
       `activity:record:work_logs:${id}`,
       // …and the hours-per-week chart, which is a SUM over exactly these rows.
       insightsKey(t),
+      // …and the Time BADGE on whichever story, ticket, task or meeting is open
+      // (R15). The rows below it are dropped by the slice prefix; the number
+      // above it is a different cache key, and a count fetched once and never
+      // re-read is worse than a blank one because it looks right.
+      ...recordCountDeps("work_logs"),
     ],
     // …and the Time tab on whichever record this row was logged against, which
     // the ping cannot name (recordTimeKey above says why it is a family drop).

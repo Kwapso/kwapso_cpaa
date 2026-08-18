@@ -25,7 +25,7 @@ import { join } from "node:path"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { formatCount } from "@shared/web/format-count"
-import { RECORD_CHILDREN } from "@shared/record-counts"
+import { RECORD_CHILDREN, recordTimeCountKey } from "@shared/record-counts"
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 import { invalidate, readCache } from "@shared/web/store"
 import { recordCountsKey, totalKey, TEAM_RESOURCES } from "@/lib/live-resources"
@@ -113,9 +113,10 @@ describe("a record's tab badges arrive with the record, not with the click", () 
 
   it("fetches nothing for a record with no child collections", () => {
     renderHook(() => useRecordCounts("member_roles", freshId()))
-    // A role, a source, a meeting and a task badge only their Activity tab, and
-    // that total already rides the feed. A round trip for nothing is the other
-    // way to answer this badly.
+    // A role and a source badge only their Activity tab, and that total already
+    // rides the feed. A round trip for nothing is the other way to answer this
+    // badly. (A task and a meeting used to be on this list and are not any more:
+    // both carry a Time tab, and both were blank until it was clicked.)
     expect(tenancyCounts).not.toHaveBeenCalled()
     expect(contentCounts).not.toHaveBeenCalled()
   })
@@ -237,14 +238,36 @@ describe("no record detail can go back to badging a sidecar nobody fills", () =>
         // is what lets the exemption below be exact: "this same screen fills this
         // same key" is a string match, not a family.
         const expr = /useCachedValue<[^>]*>\((.+)\)\s*$/.exec(line)?.[1]
-        if (!expr || !expr.includes("total")) continue
+        // CASE-INSENSITIVELY, and that word is the whole reason four screens
+        // walked past this check under a green build for a month. The filter was
+        // `expr.includes("total")`; the work engine's builder is spelled
+        // `workLogsTotalKey`, with a capital T; so the Time badge on a story, a
+        // ticket, a task and a meeting was never even a CANDIDATE — silently
+        // skipped, counted nowhere, and blank until the tab was clicked, which is
+        // the exact bug this file is named after. A scan that decides what to
+        // look at by matching a lowercase word is one rename from blind.
+        if (!expr || !/total/i.test(expr)) continue
         checked++
         // The sidecar's own name, derived from whichever shape wrote it:
         //   totalKey("sprints-app", …)          → sprints-app
+        //   workLogsTotalKey("stories", id)     → time-stories
         //   `total:${helpAttachmentsKey(id)}`   → help-attachments
         //   `total:help-thread:${id}`           → help-thread
+        //
+        // The work-engine line asks `recordTimeCountKey` rather than knowing the
+        // string, because ONE panel serves all four records time hangs off and the
+        // prefix is composed from the record's table — so the registry, the door,
+        // the panel and this scan all read the same function.
+        //
+        // FAIL-CLOSED, deliberately: an expression whose key none of these shapes
+        // can derive falls through to the raw expression, matches no registry line,
+        // and is reported. A fifth shape therefore arrives RED and gets a line here
+        // rather than joining the ones this scan cannot see.
         const key =
           /totalKey\(\s*"([a-z_-]+)"/.exec(expr)?.[1] ??
+          (/workLogsTotalKey\(\s*"([a-z_]+)"/.exec(expr)?.[1] !== undefined
+            ? recordTimeCountKey(/workLogsTotalKey\(\s*"([a-z_]+)"/.exec(expr)?.[1] as string)
+            : undefined) ??
           /`total:\$\{([a-zA-Z]+)Key\(/
             .exec(expr)?.[1]
             ?.replace(/([a-z])([A-Z])/g, "$1-$2")
@@ -252,9 +275,9 @@ describe("no record detail can go back to badging a sidecar nobody fills", () =>
           /`total:([a-z-]+):/.exec(expr)?.[1] ??
           expr
         // Answered when the record opens, OR filled by a read THIS screen already
-        // makes at the top of itself — the rate card and a story's Time tab are
-        // both fetched because something on the Overview needs them anyway, so
-        // neither waits for a click either.
+        // makes at the top of itself — the rate card is fetched because the
+        // Overview needs the headline rate anyway, so it does not wait for a click
+        // either.
         if (answered.has(key) || src.includes(`primeCache(${expr}`)) continue
         offenders.push(`${name} badges total:${key}: nothing fetches it until the tab is opened`)
       }

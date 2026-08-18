@@ -22,7 +22,7 @@
 //     answers on Monday morning instead (see resolveRunaway).
 
 import { logActivity, type Actor } from "@shared/workers/activity"
-import { boundedInner, reportedTotal } from "@shared/workers/count"
+import { boundedInner, countCollection, isCapped, reportedTotal } from "@shared/workers/count"
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
@@ -293,9 +293,14 @@ export async function countWorkLogs(
  * came from, so the total above the list and the rows inside it are one question
  * (R16).
  *
- * FOUR READS, and each is bounded at both ends:
+ * FIVE READS, and each is bounded at both ends:
  *   • the count and the exact seconds, through `countWorkLogs` — no second way
  *     to count anything, so the badge and this header can never disagree;
+ *   • HOW MANY PEOPLE, through the same bounded seam every other collection count
+ *     goes through. Its own read rather than `people.length`, because that array
+ *     is the top `WORK_LOG_GROUP_CAP` and its length is a CEILING: a record
+ *     worked on by eighty people answered "50" for ever, with nothing saying it
+ *     had stopped, which is exactly the failure R16 names first;
  *   • BY PERSON and BY KIND OF WORK: grouped, ordered by size, `WORK_LOG_GROUP_CAP`
  *     rows each (R14). A team has tens of people and a dropdown has tens of
  *     words, so the cap is a ceiling on a pathological row rather than a real
@@ -330,8 +335,17 @@ export async function summariseWorkLogs(
     weekParams.push(start.toISOString(), end.toISOString())
   })
 
-  const [counts, people, kinds, weekRows] = await Promise.all([
+  const [counts, peopleTotal, people, kinds, weekRows] = await Promise.all([
     countWorkLogs(cfg, guard, filter),
+    // HOW MANY PEOPLE, exactly — one row per distinct person, counted through the
+    // one bounded seam (R16). The same WHERE as everything else here, so the
+    // figure and the bars under it are one question.
+    countCollection(
+      cfg,
+      guard.databaseId,
+      `SELECT w.user_id FROM work_logs w WHERE ${where.sql} GROUP BY w.user_id`,
+      where.params
+    ),
     d1Query<{ user_id: string; user_name: string | null; s: number | null }>(
       cfg,
       guard.databaseId,
@@ -363,7 +377,13 @@ export async function summariseWorkLogs(
   const row = weekRows[0] ?? {}
   return {
     total: counts.total,
+    // …and it says whether it stopped early, in the same object. This door
+    // answers with `json` rather than `pagedJson`, which is the seam that DERIVES
+    // this flag for every paged door — so without the line it would be the one
+    // total in the app that hedges nowhere but in the browser's rendering.
+    totalCapped: isCapped(counts.total),
     totalSeconds: counts.totalSeconds,
+    peopleTotal,
     people: people.map((r) => ({
       userId: r.user_id,
       userName: r.user_name ?? null,

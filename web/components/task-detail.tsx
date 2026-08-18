@@ -33,6 +33,7 @@ import { WorkLogsPanel, workLogsTotalKey } from "@/components/work-logs-panel"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useRecordActivity } from "@/lib/use-record-activity"
+import { useRecordCounts } from "@/lib/use-record-counts"
 import type { Task } from "@shared/types"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
@@ -67,7 +68,11 @@ export function TaskDetailScreen({
   const canLogTime = can("work", "create")
   const canSeeTime = can("work", "read")
   const activity = useRecordActivity("tasks", taskId)
-  const timeTotal = useCachedValue<number>(workLogsTotalKey("tasks", taskId))
+  // The Time badge, counted when the TASK opens rather than when its tab is
+  // clicked — a badge that arrives with the panel is a badge that is missing
+  // exactly when it is being read (shared/record-counts.ts).
+  useRecordCounts("tasks", taskId)
+  const timeTotal = useCachedValue<number | null>(workLogsTotalKey("tasks", taskId))
   const [tab, setTab] = React.useState("overview")
 
   if (loading) return <Skeleton variant="list" lines={4} />

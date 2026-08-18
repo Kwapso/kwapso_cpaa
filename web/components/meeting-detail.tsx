@@ -65,6 +65,7 @@ import { formatDateTime, toLocalInput } from "@shared/web/format"
 import { RichText } from "@shared/web/rich-text-view"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
+import { useRecordCounts } from "@/lib/use-record-counts"
 // Every URL bound to an attribute goes through the seam, Google's included —
 // see the note in google-source-dialog.tsx for why "it came from Google" is not
 // a reason to skip it.
@@ -119,7 +120,11 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
   // Correcting a row is still offered, because a wrong figure is worse.
   const canSeeTime = can("work", "read")
   const canEditTime = can("work", "edit")
-  const timeTotal = useCachedValue<number>(workLogsTotalKey("meetings", meetingId))
+  // Counted when the MEETING opens rather than when the tab is clicked, for the
+  // reason shared/record-counts.ts gives: a badge that only arrives with the
+  // panel is blank exactly when somebody is deciding whether to open it.
+  useRecordCounts("meetings", meetingId)
+  const timeTotal = useCachedValue<number | null>(workLogsTotalKey("meetings", meetingId))
 
   const accountsQ = useCached<Account[]>(canEdit ? `accounts:${teamId}` : null, () =>
     tenancy.accounts().then((r) => r.accounts)
