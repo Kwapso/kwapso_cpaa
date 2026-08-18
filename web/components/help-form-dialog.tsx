@@ -34,23 +34,17 @@ import {
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@kwapso/ui/registry/primitives/select/select"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
-import { X } from "lucide-react"
 
 import { ApiFailure, tenancy } from "@/lib/api"
-import { accountsKey, appsKey, listFetch } from "@/lib/live-resources"
+import { appsKey, listFetch } from "@/lib/live-resources"
+import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useCached } from "@shared/web/store"
 import { ManageDropdownsLink } from "@/components/manage-dropdowns-link"
-import type { Account, AppRow } from "@shared/types"
+import { RecordPicker } from "@/components/record-picker"
+import type { AppRow } from "@shared/types"
 import { useT } from "@shared/web/language"
 
 const descField = { ...defaultFieldConfig, label: "What do you need help with?", required: true }
@@ -118,26 +112,19 @@ export function HelpFormDialog({
 }) {
   const t = useT()
   const isEdit = !!initial
-  // THE PICKER FETCHES ITS OWN LIST, and that is the half a passed-in prop would
-  // have got wrong: the screen-level `accountsQ` is only loaded on the ACCOUNTS
-  // section (use-screen-data.ts), so a ticket form handed that list would render
-  // an empty dropdown on the one screen it is opened from. Same seam and same
-  // cache key the accounts screen reads (page one is plenty for a picker), and
-  // the same shape SprintFormDialog uses for exactly this reason.
-  const accountsQ = useCached<Account[]>(teamId ? accountsKey(teamId) : null, () =>
-    listFetch.accounts(teamId as string)
-  )
-  const accountOptions = (accountsQ.data ?? []).filter((a) => a.active && a.accountType === "entity")
-  // The apps this ticket could be about. Same cache key the Apps screen reads,
-  // so a person who has been there pays nothing for this picker.
+  // THE CLIENT PICKER ASKS THE DOOR, and page one is exactly why. This used to
+  // read `accountsKey(teamId)` — the accounts LIST cache, whose fetcher primes a
+  // cursor, because accounts is a GROWING_COLLECTIONS row (R14). So the picker
+  // offered the newest fifty companies and had no opinion about the rest, which
+  // is the owner's own report from a phone: "not all clients or contacts are
+  // showing per account". `searchAccounts` puts the question to the accounts
+  // door's `q`, the same door and the same gate the accounts screen reads.
+  //
+  // The apps this ticket could be about stay a loaded list: apps are BOUNDED (a
+  // team's systems, not a feed), so the browser can match them for nothing.
   const appsQ = useCached<AppRow[]>(teamId ? appsKey(teamId) : null, () =>
     listFetch.apps(teamId as string)
   )
-  // The client already on the ticket — the one value on this form that is a fact
-  // rather than a question, because the door will refuse any attempt to change it.
-  const fixedAccount = initial?.accountId
-    ? (accountOptions.find((a) => a.id === initial.accountId) ?? { id: initial.accountId, name: "this client" })
-    : null
   const initialValues = {
     description: initial?.description ?? "",
     helpType: initial?.helpType || NONE,
@@ -151,10 +138,18 @@ export function HelpFormDialog({
   // WHICH CLIENT THE CONTACT LIST BELONGS TO — the one already on the ticket, or
   // the one being picked. Read from the same door the account screen reads, so
   // "who is a contact here" has one answer in the app.
-  const chosenAccountId = fixedAccount?.id ?? (values.accountId === NONE ? null : values.accountId)
+  const chosenAccountId = initial?.accountId ?? (values.accountId === NONE ? null : values.accountId)
   const detailQ = useCached(chosenAccountId ? `account-detail:${chosenAccountId}` : null, () =>
     tenancy.accountDetail(chosenAccountId as string)
   )
+  // The client already on the ticket — the one value on this form that is a fact
+  // rather than a question, because the door will refuse any attempt to change
+  // it. Its NAME now comes from the account's own record rather than from a page
+  // of the list: the detail is already being read for the contacts below it, and
+  // a company past page one used to be shown to its own ticket as "this client".
+  const fixedAccount = initial?.accountId
+    ? { id: initial.accountId, name: detailQ.data?.account.name ?? t("this client") }
+    : null
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -221,90 +216,64 @@ export function HelpFormDialog({
           autoFocus
         />
       </Field>
+      {/* The type vocabulary is the team's own and grows on the Dropdown values
+          screen, so it gets the search box too — and the picker's own clear X
+          replaces the one this field used to draw by hand. */}
       <Field config={typeField} htmlFor="help-type" className={fieldSpacing}>
-        <div className="relative">
-          <Select
-            value={values.helpType}
-            onValueChange={(helpType) => setValues((v) => ({ ...v, helpType }))}
-            disabled={busy}
-          >
-            <SelectTrigger id="help-type">
-              <SelectValue placeholder={t("Choose a type (optional)")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NONE}>{t("No type")}</SelectItem>
-              {helpTypeOptions.map((v) => (
-                <SelectItem key={v} value={v}>
-                  {v}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {/* Clear (X): reset to NONE without scrolling up to "No type". */}
-          {values.helpType !== NONE && !busy && (
-            <button
-              type="button"
-              aria-label={t("Clear type")}
-              onClick={() => setValues((v) => ({ ...v, helpType: NONE }))}
-              className="text-muted-foreground hover:text-foreground absolute inset-y-0 right-8 my-auto flex size-5 items-center justify-center rounded-sm"
-            >
-              <X className="size-3.5" />
-            </button>
-          )}
-        </div>
+        <RecordPicker
+          id="help-type"
+          value={values.helpType}
+          onChange={(helpType) => setValues((v) => ({ ...v, helpType }))}
+          options={helpTypeOptions.map((v) => ({ value: v, label: v }))}
+          emptyOption={{ value: NONE, label: t("No type") }}
+          placeholder={t("Choose a type (optional)")}
+          searchPlaceholder={t("Search types…")}
+          emptyText={t("No type matched.")}
+          disabled={busy}
+        />
         <ManageDropdownsLink teamId={teamId ?? null} />
       </Field>
       {/* WHICH SYSTEM (CHECKLIST 5.8). Above the client picker in the markup but
           BELOW it in meaning: the contact list under it depends on which client
           is chosen, so the three read top to bottom as one sentence. */}
       <Field config={appField} htmlFor="help-app" className={fieldSpacing}>
-        <Select
+        <RecordPicker
+          id="help-app"
           value={values.appId || NONE}
-          onValueChange={(appId) => setValues((v) => ({ ...v, appId }))}
+          onChange={(appId) => setValues((v) => ({ ...v, appId }))}
+          options={(appsQ.data ?? [])
+            .filter((a) => a.active)
+            .map((a) => ({ value: a.id, label: a.name }))}
+          emptyOption={{ value: NONE, label: t("No app") }}
+          placeholder={t("No app")}
+          searchPlaceholder={t("Search apps…")}
+          emptyText={t("No app matched.")}
           disabled={busy}
-        >
-          <SelectTrigger id="help-app">
-            <SelectValue placeholder={t("No app")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NONE}>{t("No app")}</SelectItem>
-            {(appsQ.data ?? [])
-              .filter((a) => a.active)
-              .map((a) => (
-                <SelectItem key={a.id} value={a.id}>
-                  {a.name}
-                </SelectItem>
-              ))}
-          </SelectContent>
-        </Select>
+        />
       </Field>
       {/* The picker reads `values.accountId || NONE` rather than the bare value:
           a draft saved in this tab before this field existed restores an object
-          without it, and an undefined value would quietly make the Select
-          uncontrolled. */}
+          without it, and an undefined value would quietly make the control
+          uncontrolled. The COMPANIES only (`type: "entity"`), which is the same
+          narrowing the old in-memory filter did, asked of the door instead. */}
       <Field config={accountField} htmlFor="help-account" className={fieldSpacing}>
         {fixedAccount ? (
           <p className="text-muted-foreground text-sm" id="help-account">
             {fixedAccount.name}, a ticket can&apos;t be moved to another client.
           </p>
         ) : (
-          <Select
+          <RecordPicker
+            id="help-account"
             value={values.accountId || NONE}
-            onValueChange={(accountId) => setValues((v) => ({ ...v, accountId }))}
+            onChange={(accountId) => setValues((v) => ({ ...v, accountId }))}
+            search={(term) => searchAccounts(term, { type: "entity" })}
+            searchKey={pickerKey("companies", teamId)}
+            emptyOption={{ value: NONE, label: t("Ours, no client") }}
+            placeholder={t("Ours, no client")}
+            searchPlaceholder={t("Search clients…")}
+            emptyText={t("No client matched.")}
             disabled={busy}
-          >
-            <SelectTrigger id="help-account">
-              <SelectValue placeholder={t("Ours, no client")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NONE}>{t("Ours, no client")}</SelectItem>
-              {accountOptions.map((a) => (
-                <SelectItem key={a.id} value={a.id}>
-                  {a.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          />
         )}
       </Field>
       {/* WHO ASKED (CHECKLIST 5.9), narrowed to that account's own contacts —
@@ -314,26 +283,31 @@ export function HelpFormDialog({
           question with no possible answer. */}
       {chosenAccountId && (
         <Field config={contactField} htmlFor="help-contact" className={fieldSpacing}>
-          <Select
+          {/* CLIENT-SIDE on purpose, and this is the picker where that is the
+              SAFE answer rather than the lazy one. A company's contact list is
+              BOUNDED (`listAccountLinks`, one hard-capped read), so the browser
+              holds all of it — nothing is hidden past a cursor. And it must stay
+              this list: the narrowing to one company's own people is the fence
+              the door enforces, so searching a wider one would offer names the
+              server would refuse. Search finds a contact faster; it does not
+              widen who may be named. */}
+          <RecordPicker
+            id="help-contact"
             value={values.raisedByContactId || NONE}
-            onValueChange={(raisedByContactId) => setValues((v) => ({ ...v, raisedByContactId }))}
+            onChange={(raisedByContactId) => setValues((v) => ({ ...v, raisedByContactId }))}
+            options={(detailQ.data?.links ?? [])
+              .filter((l) => l.active)
+              .map((l) => ({
+                value: l.personAccountId,
+                label: l.personName,
+                hint: l.isMainStakeholder ? t("Main contact") : (l.relationship ?? undefined),
+              }))}
+            emptyOption={{ value: NONE, label: t("Not said") }}
+            placeholder={t("Not said")}
+            searchPlaceholder={t("Search people…")}
+            emptyText={t("Nobody here matched.")}
             disabled={busy}
-          >
-            <SelectTrigger id="help-contact">
-              <SelectValue placeholder={t("Not said")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NONE}>{t("Not said")}</SelectItem>
-              {(detailQ.data?.links ?? [])
-                .filter((l) => l.active)
-                .map((l) => (
-                  <SelectItem key={l.personAccountId} value={l.personAccountId}>
-                    {l.personName}
-                    {l.isMainStakeholder ? ", main contact" : ""}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
+          />
         </Field>
       )}
     </FormShellDialog>

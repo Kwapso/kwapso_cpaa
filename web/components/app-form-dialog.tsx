@@ -28,13 +28,6 @@ import { Checkbox } from "@kwapso/ui/registry/primitives/checkbox/checkbox"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@kwapso/ui/registry/primitives/select/select"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
@@ -44,6 +37,8 @@ import { listFetch } from "@/lib/live-resources"
 import { APP_STAGES, appStageMark } from "@shared/app-stages"
 import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
 import type { SelectableValue, TeamMember } from "@shared/types"
+import { pickerKey, searchAccounts } from "@/lib/picker-sources"
+import { RecordPicker } from "@/components/record-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useCached } from "@shared/web/store"
 import { useFormDraft } from "@shared/web/use-form-draft"
@@ -306,44 +301,40 @@ export function AppFormDialog({
       </Field>
       {!editing && (
       <Field config={accountField} htmlFor="app-account" className={fieldSpacing}>
-        <Select
+        {/* The COMPANIES, asked of the door (accounts PAGE, R14). `accounts` is
+            still passed in: the screen's own page one, painted while the first
+            answer arrives, and where an app already on a client gets its name. */}
+        <RecordPicker
+          id="app-account"
           value={values.accountId}
-          onValueChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
+          onChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
+          search={(term) => searchAccounts(term, { type: "entity" })}
+          searchKey={pickerKey("companies", teamId)}
+          options={accounts.map((a) => ({ value: a.id, label: a.name }))}
+          placeholder={t("One of ours")}
+          searchPlaceholder={t("Search clients…")}
+          emptyText={t("No client matched.")}
           disabled={busy}
-        >
-          <SelectTrigger id="app-account">
-            <SelectValue placeholder={t("One of ours")} />
-          </SelectTrigger>
-          <SelectContent>
-            {accounts.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                {a.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
       </Field>
       )}
       {/* STAGE IS A CHOICE, not a typed word. It was free text until 17 Aug 2026,
           which is how one inventory came to carry "live", "Live" and "in dev" for
           the same three systems. The mark rides the LABEL only. */}
       <Field config={stageField} htmlFor="app-stage" className={fieldSpacing}>
-        <Select
+        <RecordPicker
+          id="app-stage"
           value={values.stage}
-          onValueChange={(v) => setValues((s) => ({ ...s, stage: v }))}
+          onChange={(v) => setValues((s) => ({ ...s, stage: v }))}
+          options={stages.map((s) => ({
+            value: s.value,
+            label: s.mark ? `${s.mark} ${t(s.value)}` : t(s.value),
+          }))}
+          placeholder={t("Not said")}
+          searchPlaceholder={t("Search stages…")}
+          emptyText={t("Nothing matched.")}
           disabled={busy}
-        >
-          <SelectTrigger id="app-stage">
-            <SelectValue placeholder={t("Not said")} />
-          </SelectTrigger>
-          <SelectContent>
-            {stages.map((s) => (
-              <SelectItem key={s.value} value={s.value}>
-                {s.mark ? `${s.mark} ${t(s.value)}` : t(s.value)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
       </Field>
       <Field config={aboutField} htmlFor="app-about" className={fieldSpacing}>
         <Textarea
@@ -420,25 +411,19 @@ export function AppFormDialog({
           a picker with nothing in it is a question with no possible answer. */}
       {values.staffUserIds.length > 0 && (
         <Field config={leadField} htmlFor="app-lead" className={fieldSpacing}>
-          <Select
+          <RecordPicker
+            id="app-lead"
             value={lead || NOBODY}
-            onValueChange={(v) => setValues((s) => ({ ...s, leadUserId: v === NOBODY ? "" : v }))}
+            onChange={(v) => setValues((s) => ({ ...s, leadUserId: v === NOBODY ? "" : v }))}
+            options={members
+              .filter((m) => values.staffUserIds.includes(m.id))
+              .map((m) => ({ value: m.id, label: m.name }))}
+            emptyOption={{ value: NOBODY, label: t("Nobody yet") }}
+            placeholder={t("Nobody yet")}
+            searchPlaceholder={t("Search people…")}
+            emptyText={t("Nobody here matched.")}
             disabled={busy}
-          >
-            <SelectTrigger id="app-lead">
-              <SelectValue placeholder={t("Nobody yet")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NOBODY}>{t("Nobody yet")}</SelectItem>
-              {members
-                .filter((m) => values.staffUserIds.includes(m.id))
-                .map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.name}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
+          />
         </Field>
       )}
       {/* THEIR PEOPLE (8.5), from the client's own contacts. Absent entirely on
@@ -475,27 +460,21 @@ export function AppFormDialog({
       )}
       {values.stakeholderContactIds.length > 0 && (
         <Field config={mainStakeholderField} htmlFor="app-main-stakeholder" className={fieldSpacing}>
-          <Select
+          <RecordPicker
+            id="app-main-stakeholder"
             value={mainHolder || NOBODY}
-            onValueChange={(v) =>
+            onChange={(v) =>
               setValues((s) => ({ ...s, mainStakeholderContactId: v === NOBODY ? "" : v }))
             }
+            options={contacts
+              .filter((c) => values.stakeholderContactIds.includes(c.id))
+              .map((c) => ({ value: c.id, label: c.name }))}
+            emptyOption={{ value: NOBODY, label: t("Not said") }}
+            placeholder={t("Not said")}
+            searchPlaceholder={t("Search people…")}
+            emptyText={t("Nobody here matched.")}
             disabled={busy}
-          >
-            <SelectTrigger id="app-main-stakeholder">
-              <SelectValue placeholder={t("Not said")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NOBODY}>{t("Not said")}</SelectItem>
-              {contacts
-                .filter((c) => values.stakeholderContactIds.includes(c.id))
-                .map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
+          />
         </Field>
       )}
     </FormShellDialog>

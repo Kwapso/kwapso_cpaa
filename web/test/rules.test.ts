@@ -141,6 +141,55 @@ describe("RULES — the laws of the base", () => {
     }
   })
 
+  // ONE SEARCHABLE PICKER, NOT NINE. Not a law of its own — a regression lock on
+  // the shape R4 already asks for. Every "which record do you mean?" control goes
+  // through components/record-picker.tsx, which is the only file that composes the
+  // library's Command palette. Nine screens each building their own is how they
+  // came to behave nine different ways, reported from a phone as "any drop-downs
+  // are becoming impossible to search through".
+  it("one-record-picker: only record-picker.tsx composes the library Command", () => {
+    const picker = read(join(WEB, "components", "record-picker.tsx"))
+    // A blind check reports "all clear" exactly like a passing one.
+    expect(picker, "the record picker must be the library Command + Popover").toContain(
+      "primitives/command/command"
+    )
+    const offenders = componentFiles()
+      .filter((f) => !f.endsWith("record-picker.tsx"))
+      .filter((f) => stripComments(read(f)).includes("primitives/command/command"))
+    expect(
+      offenders,
+      `use <RecordPicker> instead of composing a second searchable picker: ${offenders.join(", ")}`
+    ).toEqual([])
+  })
+
+  // …AND A PICKER OVER A PAGED COLLECTION ASKS THE DOOR, never the list cache.
+  // Derived from two pieces of registry data that were never read together: the
+  // GROWING collections' own web cache keys (R14) and the form dialogs (R4/R7).
+  // A form that filled a picker from one of those keys was offering PAGE ONE as
+  // if it were the collection — every company past the cursor silently
+  // un-nameable, under a control that gave no sign of it. Reported from staging
+  // as "not all clients or contacts are showing per account".
+  it("pickers-ask-the-door: no form dialog fills a picker from a PAGED list cache", () => {
+    // The LIST cache keys only (`…Key(`) — the activity feed's entries in the
+    // same table are a record's history, not a picker's options.
+    const pagedKeys = Object.values(GROWING_COLLECTIONS)
+      .map((c) => c.webKey)
+      .filter((k) => k.endsWith("Key("))
+    expect(pagedKeys.length, "no paged list keys to check — the derivation has gone blind").toBeGreaterThan(3)
+
+    const offenders: string[] = []
+    for (const d of FORM_DIALOGS) {
+      const file = join(WEB, "components", `${d}.tsx`)
+      if (!existsSync(file)) continue
+      const src = stripComments(read(file))
+      for (const key of pagedKeys) if (src.includes(key)) offenders.push(`${d} reads ${key}`)
+    }
+    expect(
+      offenders,
+      `a paged collection's list cache holds page one — search it at the door instead (lib/picker-sources.ts): ${offenders.join(", ")}`
+    ).toEqual([])
+  })
+
   // R8, surface ONE — the TEAM section strip. A placement:"tab" section that
   // shows a collection MUST declare a countCacheKey (so the badge is derived,
   // never a forgotten hand-listed key), AND the host must build the counts by

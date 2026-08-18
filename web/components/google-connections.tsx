@@ -381,6 +381,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
           onOpenChange={(o) => !o && setSharing(null)}
           service={sharing}
           draftKey={`google-source:${sharing}`}
+          teamId={teamId}
           accountOptions={(accountsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
           onSubmit={async (values) => {
             await content.googleAddSource({ service: sharing, ...values })

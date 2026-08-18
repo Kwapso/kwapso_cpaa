@@ -347,6 +347,7 @@ export function MeetingsScreen({
         open={open}
         onOpenChange={setOpen}
         draftKey={`meeting:add:${teamId}`}
+        teamId={teamId}
         accountOptions={(accountsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
         appOptions={(appsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
         purposeOptions={(purposesQ.data ?? []).filter((p) => p.active).map((p) => ({ id: p.id, name: p.name }))}

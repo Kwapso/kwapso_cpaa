@@ -9,13 +9,6 @@ import * as React from "react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@kwapso/ui/registry/primitives/avatar/avatar"
 import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@kwapso/ui/registry/primitives/select/select"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { UserPlus } from "lucide-react"
 
@@ -24,6 +17,7 @@ import { ApiFailure } from "@/lib/api"
 import { letterMark, personName } from "@/lib/identity"
 import { useT } from "@shared/web/language"
 import { AddButton } from "@/components/deep-link/screen-bits"
+import { RecordPicker } from "@/components/record-picker"
 
 const ORIGIN_LABEL: Record<HelpStakeholder["origin"], string> = {
   raiser: "Raiser",
@@ -94,18 +88,16 @@ export function HelpStakeholders({
 
       {canAdd && addable.length > 0 && (
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Select value={picked} onValueChange={setPicked} disabled={busy}>
-            <SelectTrigger className="w-full sm:w-64">
-              <SelectValue placeholder={t("Pick someone to keep in the loop")} />
-            </SelectTrigger>
-            <SelectContent>
-              {addable.map((m) => (
-                <SelectItem key={m.userId} value={m.userId}>
-                  {personName(m)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <RecordPicker
+            value={picked}
+            onChange={setPicked}
+            options={addable.map((m) => ({ value: m.userId, label: personName(m) }))}
+            placeholder={t("Pick someone to keep in the loop")}
+            searchPlaceholder={t("Search people…")}
+            emptyText={t("Nobody here matched.")}
+            disabled={busy}
+            className="w-full sm:w-64"
+          />
           <AddButton label={t("Add stakeholder")} onClick={() => void add()} icon={<UserPlus className="size-4" />} />
         </div>
       )}

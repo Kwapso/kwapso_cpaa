@@ -14,25 +14,17 @@ import * as React from "react"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@kwapso/ui/registry/primitives/select/select"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Send } from "lucide-react"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
-import { accountsKey, listFetch } from "@/lib/live-resources"
+import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { useActiveTeam } from "@/lib/use-active-team"
+import { RecordPicker } from "@/components/record-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useFormDraft } from "@shared/web/use-form-draft"
-import { useCached } from "@shared/web/store"
-import type { Account } from "@shared/types"
 import { useT } from "@shared/web/language"
 
 export type TodoFormValues = { accountId: string; title: string; detail: string; dueOn: string }
@@ -55,9 +47,6 @@ export function TodoFormDialog({
 }) {
   const t = useT()
   const teamId = useActiveTeam().ctx?.team?.id ?? null
-  const accountsQ = useCached<Account[]>(teamId ? accountsKey(teamId) : null, () =>
-    listFetch.accounts(teamId as string)
-  )
   const [values, setValues, clearDraft] = useFormDraft(
     draftKey,
     { accountId: "", title: "", detail: "", dueOn: "" },
@@ -86,8 +75,6 @@ export function TodoFormDialog({
     }
   }
 
-  const companies = (accountsQ.data ?? []).filter((a) => a.active)
-
   return (
     <FormShellDialog
       open={open}
@@ -108,22 +95,20 @@ export function TodoFormDialog({
       }}
     >
       <Field config={accountField} htmlFor="todo-account" className={fieldSpacing}>
-        <Select
+        {/* THE DOOR ANSWERS THIS, because accounts PAGE (R14): the list cache
+            this used to read holds page one, so an agency past fifty companies
+            could not ask the fifty-first for anything. */}
+        <RecordPicker
+          id="todo-account"
           value={values.accountId}
-          onValueChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
+          onChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
+          search={(term) => searchAccounts(term)}
+          searchKey={pickerKey("accounts", teamId)}
+          placeholder={t("Pick the client")}
+          searchPlaceholder={t("Search clients…")}
+          emptyText={t("No client matched.")}
           disabled={busy}
-        >
-          <SelectTrigger id="todo-account">
-            <SelectValue placeholder={t("Pick the client")} />
-          </SelectTrigger>
-          <SelectContent>
-            {companies.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                {a.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
       </Field>
       <Field config={titleField} htmlFor="todo-title" className={fieldSpacing}>
         <Input

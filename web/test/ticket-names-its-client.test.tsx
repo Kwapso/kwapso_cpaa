@@ -14,55 +14,61 @@
 // It drives the real dialog rather than scanning its source: a picker that renders
 // and a value that reaches `onSubmit` are two different claims, and the second is
 // the one the bug was about.
+//
+// WHERE "THE LIVE COMPANIES ONLY" IS NOW PROVED, and why it moved. This used to
+// assert that a retired account and a person were absent from the rendered option
+// rows — which was true of the options the browser had, and the browser had page
+// one. Accounts PAGE (R14), so that assertion was about the newest fifty and
+// silent about the rest, which is exactly the bug the owner then reported from a
+// phone. The narrowing now rides the request, so the claim is asserted on the
+// REQUEST: the door is asked for entities that are not archived, and the door
+// answers for the whole collection.
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-const accounts = [
-  { id: "acct-bergman", name: "Bergman", active: true, accountType: "entity" },
-  { id: "acct-retired", name: "Long gone", active: false, accountType: "entity" },
-  { id: "acct-person", name: "A person", active: true, accountType: "individual" },
-]
-
-// The picker fetches its own list through the shared store — the point of the
-// fix, since the screen-level accounts query is only loaded on the accounts
-// section. Warm it here rather than stubbing the component's internals.
-vi.mock("@shared/web/store", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@shared/web/store")>()
-  // KEYED, not blanket. The form now holds three cached reads (accounts, apps,
-  // and the chosen company's contacts) and answering all of them with the same
-  // rows would put "Bergman" in two pickers, which is a fixture lying rather than
-  // a screen failing.
-  return {
-    ...actual,
-    useCached: (key: string | null) => ({
-      data: key?.startsWith("accounts:") ? accounts : [],
-      error: undefined,
-    }),
-  }
-})
-
-vi.mock("@/lib/live-resources", () => ({
-  accountsKey: (t: string) => `accounts:${t}`,
-  // The form gained two more pickers on 17 Aug 2026 — WHICH SYSTEM the request is
-  // about (CHECKLIST 5.8) and WHO ASKED (5.9). Both read through the same store
-  // seam the client picker does, so the mock has to answer for all three or the
-  // dialog throws before any of these cases can look at it.
-  appsKey: (t: string) => `apps:${t}`,
-  listFetch: { accounts: async () => accounts, apps: async () => [] },
+/** What the accounts door was asked, captured. Hoisted so `vi.mock`'s factory —
+ * which runs before the module body — can close over it. */
+const door = vi.hoisted(() => ({
+  accounts: vi.fn(async (_opts: Record<string, unknown> = {}) => ({
+    accounts: [
+      { id: "acct-bergman", name: "Bergman", code: "BERG", email: null, active: true, accountType: "entity" },
+    ],
+    total: 1,
+    entityTotal: 1,
+    individualTotal: 0,
+    nextCursor: null,
+    hasMore: false,
+  })),
 }))
 
-// The contact picker asks the accounts DETAIL door for the chosen company's own
-// people. Empty here: these cases are about the client field, and a contact list
-// that answered would be a second thing to keep in step with them.
+vi.mock("@/lib/live-resources", () => ({
+  // WHICH SYSTEM the request is about (CHECKLIST 5.8) still reads a bounded list
+  // through the store, so the key and its fetcher both have to exist here or the
+  // dialog throws before any of these cases can look at it.
+  appsKey: (t: string) => `apps:${t}`,
+  listFetch: { apps: async () => [] },
+}))
+
+// The client picker asks the accounts door; the contact picker asks the accounts
+// DETAIL door for the chosen company's own people. The detail also carries the
+// company's NAME, which is what a ticket that already has a client shows.
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>()
-  return { ...actual, tenancy: { ...actual.tenancy, accountDetail: async () => ({ links: [] }) } }
+  return {
+    ...actual,
+    tenancy: {
+      ...actual.tenancy,
+      accounts: door.accounts,
+      accountDetail: async () => ({ account: { id: "acct-bergman", name: "Bergman" }, links: [] }),
+    },
+  }
 })
 
 vi.mock("@/lib/perms", () => ({ usePermissions: () => ({ can: () => false }) }))
 
 import { HelpFormDialog } from "@/components/help-form-dialog"
+import { searchAccounts } from "@/lib/picker-sources"
 
 afterEach(cleanup)
 
@@ -86,11 +92,18 @@ describe("raising a ticket in the agency app", () => {
     )
     // The question is on the form at all — this is the half that was missing.
     expect(screen.getByText("Client")).toBeTruthy()
-    // …and it offers the live COMPANIES only. A retired account can't be sold to
-    // and a contact is not a client, so neither is a thing to file a ticket under.
-    expect(screen.getByText("Bergman")).toBeTruthy()
-    expect(screen.queryByText("Long gone")).toBeNull()
-    expect(screen.queryByText("A person")).toBeNull()
+    // …and it is a real control a person can open, pointed at by that label.
+    const control = screen.getByLabelText("Client")
+    expect(control.getAttribute("role")).toBe("combobox")
+  })
+
+  it("asks the door for the live companies, not for a page of them", async () => {
+    door.accounts.mockClear()
+    await searchAccounts("berg", { type: "entity" })
+    // A retired account can't be sold to and a contact is not a client, so
+    // neither is a thing to file a ticket under — and both are refused by the
+    // DOOR, over the whole collection, rather than by a filter over page one.
+    expect(door.accounts).toHaveBeenCalledWith({ q: "berg", type: "entity", archived: "no" })
   })
 
   it("sends no client when the ticket is our own", async () => {
@@ -107,7 +120,7 @@ describe("raising a ticket in the agency app", () => {
     type(/what do you need help with/i, "Internal: rotate the D1 token")
     submitForm()
     await waitFor(() => expect(onSubmit).toHaveBeenCalled())
-    // undefined, not the empty-select sentinel — the door reads this straight.
+    // undefined, not the empty-picker sentinel — the door reads this straight.
     expect(onSubmit.mock.calls[0][0]).toMatchObject({ accountId: undefined })
   })
 
@@ -127,6 +140,9 @@ describe("raising a ticket in the agency app", () => {
       />
     )
     expect(screen.getByText(/can't be moved to another client/i)).toBeTruthy()
+    // The company is NAMED, from its own record — a client past page one used to
+    // be shown to its own ticket as "this client".
+    await waitFor(() => expect(screen.getByText(/^Bergman,/)).toBeTruthy())
     submitForm()
     await waitFor(() => expect(onSubmit).toHaveBeenCalled())
     expect(onSubmit.mock.calls[0][0]).toMatchObject({ accountId: "acct-bergman" })

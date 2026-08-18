@@ -63,13 +63,6 @@ import {
   AlertDialogTitle,
 } from "@kwapso/ui/registry/primitives/alert-dialog/alert-dialog"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@kwapso/ui/registry/primitives/select/select"
 import { Comments } from "@kwapso/ui/registry/collections/comments/comments"
 import { GitBranch, ListOrdered, Pencil, Power } from "lucide-react"
 
@@ -83,6 +76,7 @@ import { StepFormDialog, type StepFormValues } from "@/components/step-form-dial
 import { SavingStepLine } from "@/components/value-panel"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
+import { RecordPicker } from "@/components/record-picker"
 import { ApiFailure, tenancy } from "@/lib/api"
 import {
   RecordActionsMenu,
@@ -433,22 +427,20 @@ export function ProcessDetailScreen({
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground shrink-0 text-sm">Showing</span>
-                    <Select
+                    <RecordPicker
                       value={shownVersion?.id ?? ""}
-                      onValueChange={(v) => setVersionId(v === current?.id ? null : v)}
-                    >
-                      <SelectTrigger className="w-[19rem] max-w-full">
-                        <SelectValue placeholder="Pick a version" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {versions.map((v) => (
-                          <SelectItem key={v.id} value={v.id}>
-                            {versionLabel(v)}
-                            {v.id === current?.id ? " · current" : ""}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      onChange={(v) => setVersionId(v === current?.id ? null : v)}
+                      options={versions.map((v) => ({
+                        value: v.id,
+                        label: versionLabel(v),
+                        hint: v.id === current?.id ? "current" : undefined,
+                      }))}
+                      placeholder="Pick a version"
+                      searchPlaceholder="Search versions…"
+                      emptyText="Nothing matched."
+                      clearable={false}
+                      className="w-[19rem] max-w-full"
+                    />
                   </div>
                   {canCreate && isCurrent && (
                     <AddButton

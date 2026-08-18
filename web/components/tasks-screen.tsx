@@ -395,6 +395,7 @@ export function TasksScreen({
         open={taskOpen}
         onOpenChange={setTaskOpen}
         draftKey={`task:add:${teamId}`}
+        teamId={teamId}
         members={options.members}
         apps={options.apps}
         accounts={options.accounts}

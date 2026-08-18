@@ -283,6 +283,7 @@ export function WritePanels({
         open={query.panel === "add" && query.module === "knowledge" && can("knowledge", "create")}
         onOpenChange={(o) => !o && closePanel()}
         draftKey={teamId ? `knowledge:new:${teamId}` : undefined}
+        teamId={teamId}
         accountOptions={(accountsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
         appOptions={openableApps}
         onSubmit={createKnowledge}
@@ -298,6 +299,7 @@ export function WritePanels({
         open={query.panel === "add" && query.module === "knowledge-file" && can("knowledge", "create")}
         onOpenChange={(o) => !o && closePanel()}
         draftKey={teamId ? `knowledge:upload:${teamId}` : undefined}
+        teamId={teamId}
         accountOptions={(accountsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
         appOptions={openableApps}
         onSubmit={uploadKnowledgeFile}

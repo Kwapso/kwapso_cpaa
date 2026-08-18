@@ -272,6 +272,7 @@ export function StoriesScreen({
       <StartTimerStrip teamId={teamId} canCreate={canCreate} />
 
       <StoryFormDialog
+        teamId={teamId}
         open={storyOpen}
         onOpenChange={setStoryOpen}
         sprints={options.sprints}

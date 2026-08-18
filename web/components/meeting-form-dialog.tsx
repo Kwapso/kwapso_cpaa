@@ -18,24 +18,19 @@ import * as React from "react"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@kwapso/ui/registry/primitives/select/select"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure } from "@/lib/api"
+import { pickerKey, searchAccounts } from "@/lib/picker-sources"
+import { RecordPicker } from "@/components/record-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { toMoment } from "@shared/web/format"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useT } from "@shared/web/language"
 
-/** Radix Select can't hold an empty value, so "nobody in particular" needs a
+/** A picker can't hold an empty value, so "nobody in particular" needs a
  * sentinel — the same one the knowledge form uses for the agency's own material. */
 const NONE = "__none__"
 
@@ -68,6 +63,7 @@ export function MeetingFormDialog({
   open,
   onOpenChange,
   onSubmit,
+  teamId,
   accountOptions,
   appOptions,
   purposeOptions,
@@ -77,8 +73,11 @@ export function MeetingFormDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
   onSubmit: (values: MeetingFormValues) => Promise<void>
-  /** the clients this caller may file a meeting under — already fenced by their
-   * own read of the accounts door. */
+  /** the team whose clients the picker searches. Accounts PAGE (R14), so the
+   * question goes to the door rather than to the loaded page. */
+  teamId: string | null
+  /** the clients the screen already holds — painted while the door's first
+   * answer arrives, and where an edited meeting's client gets its NAME. */
   accountOptions: { id: string; name: string }[]
   /** the systems a meeting can be filed against — the same bounded apps list
    * every other form in the work engine picks from. */
@@ -185,61 +184,45 @@ export function MeetingFormDialog({
         />
       </Field>
       <Field config={clientField} htmlFor="meeting-client" className={fieldSpacing}>
-        <Select
+        <RecordPicker
+          id="meeting-client"
           value={values.accountId}
-          onValueChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
+          onChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
+          search={(term) => searchAccounts(term)}
+          searchKey={pickerKey("accounts", teamId)}
+          options={accountOptions.map((a) => ({ value: a.id, label: a.name }))}
+          emptyOption={{ value: NONE, label: t("Nobody, it is ours") }}
+          placeholder={t("Nobody, it is ours")}
+          searchPlaceholder={t("Search clients…")}
+          emptyText={t("No client matched.")}
           disabled={busy}
-        >
-          <SelectTrigger id="meeting-client">
-            <SelectValue placeholder={t("Nobody, it is ours")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NONE}>{t("Nobody, it is ours")}</SelectItem>
-            {accountOptions.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                {a.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
       </Field>
       <Field config={appField} htmlFor="meeting-app" className={fieldSpacing}>
-        <Select
+        <RecordPicker
+          id="meeting-app"
           value={values.appId}
-          onValueChange={(v) => setValues((s) => ({ ...s, appId: v }))}
+          onChange={(v) => setValues((s) => ({ ...s, appId: v }))}
+          options={appOptions.map((a) => ({ value: a.id, label: a.name }))}
+          emptyOption={{ value: NONE, label: t("Not about one app") }}
+          placeholder={t("Not about one app")}
+          searchPlaceholder={t("Search apps…")}
+          emptyText={t("No app matched.")}
           disabled={busy}
-        >
-          <SelectTrigger id="meeting-app">
-            <SelectValue placeholder={t("Not about one app")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NONE}>{t("Not about one app")}</SelectItem>
-            {appOptions.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                {a.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
       </Field>
       <Field config={purposeField} htmlFor="meeting-purpose" className={fieldSpacing}>
-        <Select
+        <RecordPicker
+          id="meeting-purpose"
           value={values.purposeId}
-          onValueChange={(v) => setValues((s) => ({ ...s, purposeId: v }))}
+          onChange={(v) => setValues((s) => ({ ...s, purposeId: v }))}
+          options={purposeOptions.map((p) => ({ value: p.id, label: p.name }))}
+          emptyOption={{ value: NONE, label: t("Not said") }}
+          placeholder={t("Not said")}
+          searchPlaceholder={t("Search reasons…")}
+          emptyText={t("Nothing matched.")}
           disabled={busy}
-        >
-          <SelectTrigger id="meeting-purpose">
-            <SelectValue placeholder={t("Not said")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NONE}>{t("Not said")}</SelectItem>
-            {purposeOptions.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
       </Field>
       <Field config={whereField} htmlFor="meeting-where" className={fieldSpacing}>
         <Input

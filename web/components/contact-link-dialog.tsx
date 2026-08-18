@@ -9,6 +9,11 @@
 // The search runs on the SERVER (the accounts door's own `q`), so a team with
 // thousands of people still finds the right one — a client-side filter over the
 // first page would quietly hide the rest. Shared FormShell (R4) + draft (R7).
+//
+// It used to say that with two controls, a search box above a Select, because
+// there was no one control that could do both. There is now: `RecordPicker` in
+// its server mode IS this pairing, and this dialog was the sketch the app's nine
+// other pickers were eventually built from.
 
 import * as React from "react"
 
@@ -19,21 +24,14 @@ import {
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@kwapso/ui/registry/primitives/select/select"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
-import { Plus, Search } from "lucide-react"
+import { Plus } from "lucide-react"
 
-import type { Account } from "@shared/types"
-import { ApiFailure, tenancy } from "@/lib/api"
+import { ApiFailure } from "@/lib/api"
+import { pickerKey, searchAccounts } from "@/lib/picker-sources"
+import { RecordPicker } from "@/components/record-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
-import { useCached } from "@shared/web/store"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useT } from "@shared/web/language"
 
@@ -71,18 +69,12 @@ export function ContactLinkDialog({
 }) {
   const t = useT()
   const [values, setValues, clearDraft] = useFormDraft(draftKey, EMPTY, open)
-  const [query, setQuery] = React.useState("")
   const [busy, setBusy] = React.useState(false)
 
-  // Server-side search over people only. Keyed by the term so each search is
-  // cached for the session; the door caps and pages, we show the first page.
-  const term = query.trim()
-  const peopleQ = useCached<Account[]>(
-    open ? `account-people:${teamId}:${term}` : null,
-    () => tenancy.accounts({ type: "individual", q: term || undefined }).then((r) => r.accounts)
-  )
+  // Server-side search over PEOPLE only, with the ones already on this account
+  // taken out of the answer — a list offering somebody who is already a contact
+  // is a list with a row that can only fail.
   const exclude = new Set(excludeIds)
-  const people = (peopleQ.data ?? []).filter((p) => p.active && !exclude.has(p.id))
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -120,37 +112,21 @@ export function ContactLinkDialog({
       }}
     >
       <Field config={personField} htmlFor="contact-person" className={fieldSpacing}>
-        <div className="relative">
-          <Search
-            className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
-            aria-hidden
-          />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t("Search people…")}
-            className="pl-8"
-            disabled={busy}
-            aria-label={t("Search people")}
-          />
-        </div>
-        <Select
+        <RecordPicker
+          id="contact-person"
           value={values.personAccountId}
-          onValueChange={(personAccountId) => setValues((v) => ({ ...v, personAccountId }))}
-          disabled={busy || people.length === 0}
-        >
-          <SelectTrigger id="contact-person">
-            <SelectValue placeholder={people.length ? "Choose a person" : "No people found"} />
-          </SelectTrigger>
-          <SelectContent>
-            {people.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.name}
-                {p.email ? ` · ${p.email}` : ""}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          onChange={(personAccountId) => setValues((v) => ({ ...v, personAccountId }))}
+          search={(term) =>
+            searchAccounts(term, { type: "individual" }).then((rows) =>
+              rows.filter((r) => !exclude.has(r.value))
+            )
+          }
+          searchKey={pickerKey("people", teamId)}
+          placeholder={t("Choose a person")}
+          searchPlaceholder={t("Search people…")}
+          emptyText={t("No people found.")}
+          disabled={busy}
+        />
       </Field>
 
       <Field config={relationshipField} htmlFor="contact-relationship" className={fieldSpacing}>

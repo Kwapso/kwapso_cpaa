@@ -15,16 +15,10 @@
 import * as React from "react"
 
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@kwapso/ui/registry/primitives/select/select"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { AlarmClock, UserCheck } from "lucide-react"
 
+import { RecordPicker } from "@/components/record-picker"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import { triageKey } from "@/lib/live-resources"
 import type { TeamMember } from "@shared/types"
@@ -76,18 +70,20 @@ export function TriageStrip({ teamId, canSetDuty }: { teamId: string; canSetDuty
       </span>
       {canSetDuty &&
         (picking ? (
-          <Select onValueChange={assign}>
-            <SelectTrigger className="w-56" aria-label="Who is on triage duty">
-              <SelectValue placeholder="Pick who's on duty" />
-            </SelectTrigger>
-            <SelectContent>
-              {(membersQ.data ?? []).map((m) => (
-                <SelectItem key={m.userId} value={m.userId}>
-                  {[m.firstName, m.lastName].filter(Boolean).join(" ") || m.email}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <RecordPicker
+            ariaLabel="Who is on triage duty"
+            value=""
+            onChange={assign}
+            options={(membersQ.data ?? []).map((m) => ({
+              value: m.userId,
+              label: [m.firstName, m.lastName].filter(Boolean).join(" ") || m.email,
+              hint: m.email,
+            }))}
+            placeholder="Pick who's on duty"
+            searchPlaceholder="Search people…"
+            emptyText="Nobody here matched."
+            className="w-56"
+          />
         ) : (
           <Button variant="outline" size="sm" onClick={() => setPicking(true)}>
             {t.onDuty ? "Change" : "Put somebody on duty"}
