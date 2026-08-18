@@ -872,7 +872,20 @@ export async function createProcess(
   guard: MemberGuard,
   scope: AccountScope,
   actor: Actor,
-  input: { appId: string; name: string; description?: string; baselineLabel?: string }
+  input: {
+    appId: string
+    name: string
+    description?: string
+    baselineLabel?: string
+    /** WHOSE HOURS THIS TAKES (8.13) — the role the saving is priced in.
+     * It is on the CREATE now, not only the edit: the form has asked "who
+     * does it" since the role rate card shipped, and this door dropped the
+     * answer on the floor. So every process ever mapped was born with no
+     * role, and a process with no role has no rate, and an app whose
+     * processes have no rate reports its hours and 0.00 for the money —
+     * which is exactly what the owner opened the Value tab and saw. */
+    roleName?: string
+  }
 ): Promise<string> {
   const app = await appOrThrow(cfg, guard, scope, input.appId)
   const id = ulid()
@@ -883,6 +896,7 @@ export async function createProcess(
     account_id: app.accountId,
     name: input.name,
     description: input.description ?? null,
+    role_name: input.roleName ?? null,
     created_at: now,
     creator_id: actor.id,
     creator_email: actor.email,

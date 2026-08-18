@@ -109,6 +109,9 @@ export function ProcessesScreen({
         name: values.name,
         description: values.description || undefined,
         baselineLabel: values.baselineLabel || undefined,
+        // The form has always asked; now it is also sent. Without it the map
+        // is born with no role, and no role means no rate means no money.
+        roleName: values.roleName || undefined,
       })
       invalidate(processesKey(teamId))
       invalidate(valueKey(teamId))

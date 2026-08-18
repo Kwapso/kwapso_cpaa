@@ -50,7 +50,7 @@ import {
   type RecordAction,
 } from "@/components/record-chrome"
 import { formatCount } from "@shared/web/format-count"
-import { accountsKey, appsKey, listFetch, totalKey, valueKey } from "@/lib/live-resources"
+import { accountsKey, appMoneyKey, appsKey, listFetch, totalKey, valueKey } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
 import { appStageMark } from "@shared/app-stages"
 import { CONCEPT_ICON } from "@/lib/pages"
@@ -421,7 +421,7 @@ export function AppDetailScreen({
             )
           if (t.value === "meetings") return <AppMeetingsPanel appId={appId} host={host} />
           if (t.value === "tickets") return <AppTicketsPanel appId={appId} host={host} />
-          if (t.value === "value") return <AppMoneyPanel appId={appId} />
+          if (t.value === "value") return <AppMoneyPanel appId={appId} host={host} />
           if (t.value === "knowledge")
             return (
               <KnowledgeAsk
@@ -487,9 +487,15 @@ export function AppDetailScreen({
             name: v.name,
             description: v.description || undefined,
             baselineLabel: v.baselineLabel || undefined,
+            // Who does it — the answer the form collects and this call used to
+            // drop, which is why the money half of the Value tab was 0.00.
+            roleName: v.roleName || undefined,
           })
           invalidate(sliceKey("processes-app", appId))
           invalidate(valueKey(teamId))
+          // The money is computed from this map's role, so the panel that shows
+          // it has to be told a priced map just appeared.
+          invalidate(appMoneyKey(appId))
           toast.success(t("Process mapped."))
         }}
       />

@@ -1647,14 +1647,15 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_process",
     summary:
-      "Map a way of working inside an app. It is created WITH its version 1, the way the work was done before we touched anything, because a process with no baseline can never produce a saving. `baselineLabel` is what the client calls that old way.",
+      "Map a way of working inside an app. It is created WITH its version 1, the way the work was done before we touched anything, because a process with no baseline can never produce a saving. `baselineLabel` is what the client calls that old way. `roleName` is WHOSE hours this takes, the bookkeeper, the dispatcher, whoever actually does it, and it is what turns the hours this map gives back into money (see get_app_value) — a map created without one counts its hours and reports no money at all, so name it here rather than leaving it for update_process.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/processes",
-    schema: obj({ appId: S, name: S, description: S, baselineLabel: S }, ["appId", "name"]),
+    schema: obj({ appId: S, name: S, description: S, baselineLabel: S, roleName: S }, ["appId", "name"]),
     buildBody: (i) => ({
       appId: str(i, "appId"),
       name: str(i, "name"),
       description: opt(i, "description"),
       baselineLabel: opt(i, "baselineLabel"),
+      roleName: opt(i, "roleName"),
     }),
     agent: { write: true, confirm: false, summarize: (i) => `Map the process "${str(i, "name")}"` },
   },
