@@ -186,7 +186,7 @@ export function parseFile(path) {
 }
 
 /** Walk a parsed file and call `hit({ text, node, kind })` for every position a
- * person reads. The SIX positions, and why each one:
+ * person reads. The SEVEN positions, and why each one:
  *
  *   jsx-text    <p>No tickets yet</p>          the words themselves
  *   jsx-child   <p>{busy ? "Saving…" : "Save"}</p>
@@ -196,6 +196,9 @@ export function parseFile(path) {
  *   property    { title: "Home" }              the nav registry and the screen
  *                                              recipes are DATA the engine
  *                                              renders, so their labels are copy
+ *   field-label field("name", "Meeting")       a table's column heading, which is
+ *                                              the same copy said through a
+ *                                              constructor instead of an object
  *   toast       toast.success("Saved.")        the sentence after a write
  *   t-call      t("Save")                      a string ALREADY adopted
  *
@@ -203,6 +206,20 @@ export function parseFile(path) {
  * `t(...)` would delete it from the extraction — the catalogue would lose its
  * key the moment the call site started using it, and the app would go back to
  * English with a green build.
+ *
+ * FIELD-LABEL IS THE SEVENTH, AND IT IS THE SAME WORDS AS `property`. A recipe
+ * field is built by `field(column, label)` (web/lib/screens.ts), so its label is
+ * an ARGUMENT rather than a `label:` property — and `property` only ever looked
+ * at the second. Every column heading in the app was therefore outside the
+ * catalogue: the recipes' own, and the tables a screen composes for itself. The
+ * law that exists to catch a sentence shipping in English could not see the one
+ * kind of sentence a person reads at the top of every column of every table.
+ *
+ * ONLY THE SECOND ARGUMENT, because the first is a COLUMN NAME — data, not
+ * words. That is the same line `translateRecipe` draws when it translates
+ * `field.label` and leaves `field.column` alone, and drawing it differently here
+ * would put a database column in the catalogue and, one codemod later, in
+ * German. Narrow by construction, exactly as `scope` above is.
  *
  * JSX-CHILD IS THE SIXTH, AND IT IS THE SAME WORDS AS THE FIRST. `<p>Save</p>`
  * and `<p>{busy ? "Saving…" : "Save"}</p>` are one sentence on screen and two
@@ -233,6 +250,12 @@ export function visitStrings(tree, hit) {
       report(literalTexts(node.initializer), node, "property")
     } else if (ts.isCallExpression(node)) {
       if (
+        ts.isIdentifier(node.expression) &&
+        node.expression.text === "field" &&
+        node.arguments.length >= 2
+      ) {
+        report(literalTexts(node.arguments[1]), node, "field-label")
+      } else if (
         ts.isPropertyAccessExpression(node.expression) &&
         TOAST_METHODS.has(node.expression.name.text) &&
         /(^|\.)toast$/.test(node.expression.expression.getText(tree)) &&

@@ -1,11 +1,20 @@
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
+
 import type { ScreenRecipe } from "@kwapso/ui/lib/recipe"
 import { describe, expect, it } from "vitest"
 
+import { sourceFiles } from "@shared/rules/source-scan"
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..") // repo root
+
 import {
   BASE_RECIPES,
+  field,
   isScreenRecipe,
   resolveRecipe,
   tabCountKey,
+  translateFields,
   withoutActions,
   withTabCounts,
 } from "@/lib/screens"
@@ -132,5 +141,75 @@ describe("tabCountKey / withTabCounts", () => {
   it("leaves a recipe with no tabs (a list) exactly as it was", () => {
     const list = BASE_RECIPES["members.list"] as ScreenRecipe
     expect(withTabCounts(list, { activity: 5 })).toBe(list)
+  })
+})
+
+// A HOST-COMPOSED TABLE SPEAKS THE READER'S LANGUAGE TOO.
+//
+// `resolveRecipe` translates a recipe on the way to the screen, so everything
+// declared in lib/screens.ts arrives in the reader's language. A screen that
+// composes its OWN columns — the tasks list, the meetings "all" view — spreads
+// them onto that recipe AFTERWARDS, which is after the pass has run, so those
+// headings rendered in English whatever language the reader chose. Nothing could
+// see it: TypeScript sees a string, and R28's catalogue check reads the SOURCE,
+// where the English is correct and expected.
+//
+// So the rule is one function (`translateFields`) with two kinds of caller, and
+// this is both halves: the function does the right thing, and no screen spreads
+// columns past it.
+describe("translateFields", () => {
+  const shout = (english: string) => english.toUpperCase()
+
+  it("translates the label and leaves the column alone", () => {
+    const [out] = translateFields([field("assignee", "Who has it")], shout)
+    expect(out.field.label).toBe("WHO HAS IT")
+    expect(out.column, "a column is the name of data — translating it unbinds the screen").toBe(
+      "assignee"
+    )
+  })
+
+  it("translates help text when there is some, and leaves a blank one blank", () => {
+    const one = field("name", "Task")
+    const withHelp = [{ ...one, field: { ...one.field, helpText: "Why" } }]
+    expect(translateFields(withHelp, shout)[0].field.helpText).toBe("WHY")
+    // A blank must not become the translation OF a blank — `t("")` is a lookup
+    // miss, and a miss answers with its own key, which is fine here and would not
+    // be if the catalogue ever gained an empty entry.
+    expect(translateFields([one], shout)[0].field.helpText).toBe("")
+  })
+
+  it("never mutates the fields it was handed", () => {
+    const original = [field("name", "Task")]
+    translateFields(original, shout)
+    expect(original[0].field.label).toBe("Task")
+  })
+
+  it("is what resolveRecipe uses, so a recipe and a host table cannot disagree", () => {
+    const resolved = resolveRecipe("members.detail", undefined, shout) as ScreenRecipe
+    const base = BASE_RECIPES["members.detail"]
+    expect(resolved.fields.map((f) => f.field.label)).toEqual(
+      translateFields(base.fields, shout).map((f) => f.field.label)
+    )
+  })
+
+  it("EVERY screen that spreads its own `fields` puts them through it", () => {
+    // Derived from the source, not hand-listed: a new host-composed table is
+    // covered the day it lands. The shape looked for is the one that broke —
+    // `fields:` inside a spread recipe literal — and the only acceptable value is
+    // a call to this function.
+    const screens = sourceFiles([join(ROOT, "web", "components"), join(ROOT, "web-portal", "components")], {
+      extensions: [".tsx"],
+      relativeTo: ROOT,
+    })
+    const offenders: string[] = []
+    for (const file of screens)
+      for (const [line] of file.source.matchAll(/\{\s*\.\.\.recipe,[^}]*?\bfields:\s*([^,}\n]+)/g)) {
+        const value = /\bfields:\s*([^,}\n]+)/.exec(line)?.[1]?.trim() ?? ""
+        if (!value.startsWith("translateFields(")) offenders.push(`${file.rel}: fields: ${value}`)
+      }
+    expect(
+      offenders,
+      "a host-composed table's headings are the app's own words and must be translated"
+    ).toEqual([])
   })
 })

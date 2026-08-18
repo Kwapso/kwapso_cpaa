@@ -45,7 +45,7 @@ import { RecordCalendar, type CalendarEntry } from "@/components/record-calendar
 import { shapeMeetingsList } from "@/components/deep-link/shape"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import { appsKey, cursorKey, listFetch, meetingsKey, totalKey } from "@/lib/live-resources"
-import { field, withDataDrivenCollection } from "@/lib/screens"
+import { field, translateFields, withDataDrivenCollection } from "@/lib/screens"
 import { usePermissions } from "@/lib/perms"
 import { useGoogleCatchUp } from "@/lib/use-google-catch-up"
 import type { Account, AppRow, Meeting, MeetingPurpose } from "@shared/types"
@@ -326,7 +326,12 @@ export function MeetingsScreen({
           const listRecipe =
             view === "all"
               ? withDataDrivenCollection(
-                  { ...recipe, display: "table" as const, fields: ALL_COLUMNS },
+                  // TRANSLATED HERE, because `resolveRecipe` translated the
+                  // recipe before this screen got it and these columns are the
+                  // host's own — spread on afterwards, they had never been
+                  // through the pass, so every heading in this table rendered in
+                  // English whatever language the reader chose.
+                  { ...recipe, display: "table" as const, fields: translateFields(ALL_COLUMNS, t) },
                   data.rows ?? [],
                   found.emptyText
                 )

@@ -761,14 +761,7 @@ export function resolveRecipe(
 export function translateRecipe(recipe: ScreenRecipe, t: Translate): ScreenRecipe {
   return {
     ...recipe,
-    fields: recipe.fields.map((f) => ({
-      ...f,
-      field: {
-        ...f.field,
-        label: t(f.field.label),
-        helpText: f.field.helpText ? t(f.field.helpText) : f.field.helpText,
-      },
-    })),
+    fields: translateFields(recipe.fields, t),
     actions: recipe.actions.map(translateAction),
     ...(recipe.confirm ? { confirm: translateConfirm(recipe.confirm, t) } : {}),
     ...(recipe.tabs
@@ -791,6 +784,29 @@ export function translateRecipe(recipe: ScreenRecipe, t: Translate): ScreenRecip
       ...(a.confirm ? { confirm: translateConfirm(a.confirm, t) } : {}),
     }
   }
+}
+
+/** A RECIPE FIELD'S OWN WORDS, in the reader's language — the label and the help
+ * text, and NEVER the column, which is the name of data.
+ *
+ * Its own export because a recipe is not the only thing that carries fields. A
+ * screen that composes its own table — the tasks list, the meetings "all" view —
+ * spreads host-declared columns onto the recipe AFTER `resolveRecipe` has
+ * translated it, so `translateRecipe` never sees them and every one of those
+ * column headings rendered in English whatever language the reader chose. The
+ * fix is not a second rule beside this one; it is this rule, called at the place
+ * the columns are spread in. One definition of "a field's words", two callers.
+ *
+ * A fresh copy; the fields handed in are never mutated. */
+export function translateFields(fields: RecipeField[], t: Translate): RecipeField[] {
+  return fields.map((f) => ({
+    ...f,
+    field: {
+      ...f.field,
+      label: t(f.field.label),
+      helpText: f.field.helpText ? t(f.field.helpText) : f.field.helpText,
+    },
+  }))
 }
 
 /** `{ title, body }` — the same shape on a screen-level confirm and on an

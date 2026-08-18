@@ -53,9 +53,13 @@ export const dataOps = {
    * request, one unit of the team's allowance — the whole screen's pieces go in
    * one array and come back in the same order. Nothing is written: the record
    * still says exactly what its author typed, and the reader can put the
-   * original back at any time. */
+   * original back at any time.
+   *
+   * `partial` is the door saying it could not do all of it: the pieces it could
+   * not translate come back as what was typed, and the screen has to say so
+   * rather than show German to somebody who asked for English. */
   translateText: (texts: string[], language: string) =>
-    api<{ language: string; translations: string[] }>(
+    api<{ language: string; translations: string[]; partial: boolean }>(
       "/api/data-ops/agent/translate",
       post({ texts, language })
     ),

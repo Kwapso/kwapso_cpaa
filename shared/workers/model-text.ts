@@ -30,19 +30,38 @@ export type CheapTextEnv = {
  * to when no Anthropic key is set. Named once so the two callers cannot drift. */
 export const CHEAP_TEXT_MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct"
 
-/** One cheap text completion (no tools). Returns the model's words, trimmed.
+/** What one cheap call came back with: the model's words, and whether the
+ * provider CUT THEM OFF rather than the model finishing its sentence.
+ *
+ * `truncated` exists because a caller cannot tell those apart from the words
+ * alone, and the difference is the whole of what it can honestly say to a
+ * person. A half-written answer and a short one look identical. */
+export type CheapAnswer = { text: string; truncated: boolean }
+
+/** THE PROVIDER'S OWN CEILING, WRITTEN DOWN, because leaving it unsaid cost us a
+ * feature. Workers AI defaults `max_tokens` to 256 when a call does not set one —
+ * so on 2026-08-18 the on-demand translation of a 3.3 KB knowledge source came
+ * back cut off at exactly 256 completion tokens (`finish_reason: "length"`), the
+ * half-written JSON array would not parse, and the screen said "the translation
+ * came back empty". Nothing was empty; it was interrupted. A caller that wants a
+ * long answer must ASK for the room, and a caller that asks for a paragraph
+ * should keep the cap — it is a ceiling on the bill as much as on the length. */
+export const PROVIDER_DEFAULT_MAX_TOKENS = 256
+
+/** One cheap text completion (no tools), with the two things the words alone
+ * cannot tell you: see `CheapAnswer`.
  *
  * `maxTokens` is optional and it is a CEILING ON THE BILL as much as on the
  * length: a job that asks for a paragraph should say so, because a model with no
  * cap will happily write an essay and the caller pays for it. Left unset, the
- * provider's own default applies — which is what the reply-draft path has always
- * done and is deliberately unchanged. */
-export async function cheapText(
+ * provider's own 256 applies — which is what the reply-draft path has always done
+ * and is deliberately unchanged. */
+export async function cheapAnswer(
   env: CheapTextEnv,
   system: string,
   user: string,
   opts?: { maxTokens?: number }
-): Promise<string> {
+): Promise<CheapAnswer> {
   const body: Record<string, unknown> = {
     messages: [
       { role: "system", content: system },
@@ -50,10 +69,59 @@ export async function cheapText(
     ],
   }
   if (opts?.maxTokens) body.max_tokens = opts.maxTokens
-  const out = (await env.AI.run((env.WORKERS_AI_MODEL || CHEAP_TEXT_MODEL) as never, body as never)) as {
-    response?: string
+  const out = (await env.AI.run(
+    (env.WORKERS_AI_MODEL || CHEAP_TEXT_MODEL) as never,
+    body as never
+  )) as ModelOutput
+  return {
+    text: modelWords(out),
+    // The provider's own word for "I stopped because I ran out of room". Every
+    // other reason to stop is the model having finished.
+    truncated: out?.choices?.[0]?.finish_reason === "length",
   }
-  return (out.response ?? "").trim()
+}
+
+/** One cheap text completion, when the caller only wants the words. */
+export async function cheapText(
+  env: CheapTextEnv,
+  system: string,
+  user: string,
+  opts?: { maxTokens?: number }
+): Promise<string> {
+  return (await cheapAnswer(env, system, user, opts)).text
+}
+
+/** Everything of the provider's answer this seam reads. Loose on purpose — the
+ * shape below is not a contract we control, and `modelWords` exists precisely
+ * because it varies from call to call. */
+type ModelOutput = {
+  response?: unknown
+  choices?: { finish_reason?: string; message?: { content?: unknown } }[]
+}
+
+/** THE ANSWER IS NOT ALWAYS A STRING, and that is not a corner case.
+ *
+ * Workers AI PARSES the model's output when the whole of it happens to be valid
+ * JSON, and hands the parsed value back in `response` — so a prompt that asks for
+ * a JSON array gets a real JavaScript array on the calls the model got right, and
+ * a plain string on the calls it got wrong or the provider cut short. Same model,
+ * same prompt, two types, decided by the content. `(out.response ?? "").trim()`
+ * therefore threw `trim is not a function` on exactly the answers that were
+ * PERFECT, which is how the translation door managed to fail for every input:
+ * short text threw, long text parsed to nothing.
+ *
+ * So the words are read back defensively, and a parsed value is turned BACK into
+ * the text the model wrote. The caller asked for text and gets text; a caller
+ * that wanted JSON parses it itself, which is what `readTranslations` does.
+ *
+ * `choices[0].message.content` is the fallback because the same envelope carries
+ * the OpenAI-shaped answer beside `response`, and a model whose `response` is
+ * missing is still one whose words are right there. */
+function modelWords(out: ModelOutput): string {
+  const said = out?.response ?? out?.choices?.[0]?.message?.content
+  if (typeof said === "string") return said.trim()
+  if (said === null || said === undefined) return ""
+  return JSON.stringify(said)
 }
 
 /* ------------------------------- the fence -------------------------------- */
