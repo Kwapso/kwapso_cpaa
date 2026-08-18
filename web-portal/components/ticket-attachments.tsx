@@ -172,7 +172,7 @@ export function TicketAttachments({ ticketId }: { ticketId: string }) {
           {attachments.map((a) => {
             const size = a.kind === "file" ? fileSize(a.sizeBytes) : null
             const Glyph = a.kind === "file" ? Paperclip : Link2
-            const meta = [a.addedByName ?? brand.name, formatRelative(a.createdAt), size]
+            const meta = [a.addedByName ?? brand.name, formatRelative(a.createdAt, t), size]
               .filter(Boolean)
               .join(" · ")
             return (

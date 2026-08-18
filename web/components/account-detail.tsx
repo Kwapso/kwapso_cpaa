@@ -414,7 +414,7 @@ export function AccountDetailScreen({
     .join(", ")
 
   const overviewItems = [
-    { label: t("Parent account"), value: parent ? parent.name : "Sits on its own" },
+    { label: t("Parent account"), value: parent ? parent.name : t("Sits on its own") },
     { label: t("Reference"), value: account.code || "—" },
     { label: t("Industry"), value: account.industry || "—" },
     { label: t("Email"), value: account.email || "—" },

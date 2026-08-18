@@ -63,7 +63,17 @@ export function DeliveryBlock() {
             </div>
             {s.storyCount > 0 && (
               <span className="text-muted-foreground shrink-0 text-sm">
-                {s.doneStoryCount} of {s.storyCount} {t("done")}
+                {/* ONE ENTRY WITH TWO HOLES (R28), the same one the ticket rows
+                    and the agency's sprint list use. It read `{n} of {m}
+                    {t("done")}`: `of` was a bare JSX text node the extractor
+                    refuses as a non-sentence, so the middle word of a line on
+                    the CLIENT's own screen was English in all twenty-nine
+                    languages, and `done` was a fragment nobody could reorder
+                    around two numbers. */}
+                {t("{done} of {total} done", {
+                  done: s.doneStoryCount,
+                  total: s.storyCount,
+                })}
               </span>
             )}
           </li>

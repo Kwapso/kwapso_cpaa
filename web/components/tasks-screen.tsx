@@ -273,7 +273,7 @@ export function TasksScreen({
         <p className="text-muted-foreground text-xs tabular-nums">
           {dueToday === 0
             ? t("Nothing due today or before.")
-            : `${doneToday} / ${dueToday} ${t("done")}`}
+            : t("{done} / {due} done", { done: doneToday, due: dueToday })}
         </p>
       </div>
       <Progress value={dueToday === 0 ? 100 : Math.round((doneToday / dueToday) * 100)} />

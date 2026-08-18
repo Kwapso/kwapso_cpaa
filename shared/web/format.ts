@@ -89,21 +89,53 @@ export function formatActivityWhen(iso?: string | null): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
+/** The `t` every screen already holds (`useT()` / `useLanguage()`), structurally.
+ * Named here so a formatter can ask for it without importing the whole engine —
+ * `shared/i18n.ts` pulls in the 1.4 MB generated catalogue, and a date
+ * formatter has no business doing that. */
+export type Translate = (english: string, vars?: Record<string, string | number>) => string
+
 /** "just now" · "5m ago" · "3h ago" · "2d ago", then falls back to a date — for
  * conversation timestamps (ticket replies) where recency matters more than the
- * exact clock time. ONE source, like the other formatters. */
-export function formatRelative(iso?: string | null): string {
+ * exact clock time. ONE source, like the other formatters.
+ *
+ * IT TAKES `t` AND THE PARAMETER IS REQUIRED. For a year this function returned
+ * four English strings to nine call sites across BOTH front doors — a message
+ * bubble's timestamp, an attachment's meta line, the record footer, the ticket
+ * list — and none of them was in any catalogue, because this file sits in
+ * `shared/web/` and the extractor was a list of six folders that did not name
+ * it. So `t("Created by {name} · {when}")` translated its own half of the line
+ * into German and rendered "vor" nowhere: *Erstellt von Aurora · 5d ago*.
+ *
+ * Required rather than optional, and that is the whole design of the parameter.
+ * An optional `t` defaulting to English is the failure this is fixing, spelled
+ * as an API: it compiles at every call site that forgets, and it is invisible
+ * to every check here. Required, TypeScript names the nine.
+ *
+ * THE HOLES ARE WHERE THEY ARE FOR THE TRANSLATOR, NOT FOR US. `{count}m ago`
+ * is one catalogue entry with one hole rather than a number glued to a unit
+ * glued to a word: German puts the preposition in front (*vor 5 Min.*) and
+ * Japanese puts the whole thing behind the number (*5分前*), and neither is
+ * reachable by concatenating fragments a translator cannot reorder.
+ *
+ * AND IT STAYS TERSE. Seven of the nine call sites are tight — table cells with
+ * `tabular-nums`, attachment meta lines, message-bubble timestamps — so the
+ * words stay as short as each language can make them. This is the app's ONE
+ * relative-time vocabulary; nothing else may grow a second. */
+export function formatRelative(iso: string | null | undefined, t: Translate): string {
   if (!iso) return ""
   const then = new Date(iso).getTime()
   if (Number.isNaN(then)) return ""
   const secs = Math.round((Date.now() - then) / 1000)
-  if (secs < 60) return "just now"
+  if (secs < 60) return t("just now")
   const mins = Math.round(secs / 60)
-  if (mins < 60) return `${mins}m ago`
+  if (mins < 60) return t("{count}m ago", { count: mins })
   const hrs = Math.round(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
+  if (hrs < 24) return t("{count}h ago", { count: hrs })
   const days = Math.round(hrs / 24)
-  if (days < 7) return `${days}d ago`
+  if (days < 7) return t("{count}d ago", { count: days })
+  // Past a week it is an absolute date, in the reader's own locale. That half is
+  // `formatDate`'s and is deliberately untouched: a date is not a sentence.
   return formatDate(iso)
 }
 

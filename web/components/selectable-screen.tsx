@@ -136,7 +136,10 @@ export function SelectableScreen({
               <span className="text-muted-foreground ml-2 text-base font-normal tabular-nums">
                 {filtered.length === values.length
                   ? values.length
-                  : `${filtered.length} ${t("of")} ${values.length}`}
+                  : t("{shown} of {total}", {
+                      shown: filtered.length,
+                      total: values.length,
+                    })}
               </span>
             )}
           </h1>

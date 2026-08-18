@@ -6,7 +6,12 @@
 //
 // WHAT COUNTS AS A STRING, and why a parser rather than a regex, is one shared
 // definition — scripts/lib/i18n-source.mjs — because the adoption codemod wraps
-// exactly the positions this reads. Read that file for the five positions.
+// exactly the positions this reads. Read that file for the seven positions.
+//
+// AND WHICH FILES, which used to be a list and is now derived. `appFiles()` is
+// the two front doors' own import closure, so a seam they both render out of
+// shared/web/ is read here for the same reason a component in web/components/
+// is: they import it. See its note for what a folder list was missing.
 //
 // ENGLISH IS THE KEY (shared/i18n.ts), so what comes out of here is exactly what
 // goes into `t(...)` at the call site and exactly what the catalogue is keyed
@@ -17,21 +22,18 @@
 import { readFileSync, writeFileSync } from "node:fs"
 import { join, relative } from "node:path"
 
-import { APP_DIRS, ROOT, parseFile, sourceFiles, visitStrings } from "./lib/i18n-source.mjs"
+import { ROOT, appFiles, visitStrings } from "./lib/i18n-source.mjs"
 
 const OUT = join(ROOT, "shared", "i18n-strings.json")
 
 const found = new Map() // english → "file:line" of its first appearance
-for (const dir of APP_DIRS) {
-  for (const path of sourceFiles(dir)) {
-    const tree = parseFile(path)
-    const rel = relative(ROOT, path)
-    visitStrings(tree, ({ text, node }) => {
-      if (found.has(text)) return
-      const { line } = tree.getLineAndCharacterOfPosition(node.getStart(tree))
-      found.set(text, `${rel}:${line + 1}`)
-    })
-  }
+for (const { path, tree } of appFiles()) {
+  const rel = relative(ROOT, path)
+  visitStrings(tree, ({ text, node }) => {
+    if (found.has(text)) return
+    const { line } = tree.getLineAndCharacterOfPosition(node.getStart(tree))
+    found.set(text, `${rel}:${line + 1}`)
+  })
 }
 
 // Sorted by code point rather than locale — `localeCompare` depends on the
@@ -55,9 +57,10 @@ if (process.argv.includes("--check")) {
   console.log(`OK: ${strings.length} strings, ${relative(ROOT, OUT)} is current.`)
 } else {
   writeFileSync(OUT, body)
-  const agency = [...found.values()].filter((w) => w.startsWith("web/")).length
+  const where = (prefix) => [...found.values()].filter((w) => w.startsWith(prefix)).length
   console.log(
     `${strings.length} strings → ${relative(ROOT, OUT)}` +
-      `  (first seen: ${agency} in web/, ${strings.length - agency} in web-portal/)`
+      `  (first seen: ${where("web/")} in web/, ${where("web-portal/")} in web-portal/,` +
+      ` ${where("shared/")} in shared/)`
   )
 }

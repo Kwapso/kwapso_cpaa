@@ -130,7 +130,7 @@ export function ReviewDialog({
             id="review-file"
             value={values.reviewFileUrl}
             onChange={(e) => setValues((v) => ({ ...v, reviewFileUrl: e.target.value }))}
-            placeholder={t("https://…")}
+            placeholder="https://…"
             disabled={busy}
           />
           <Input
