@@ -344,7 +344,7 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
             </AlertDialogTitle>
             <AlertDialogDescription>
               {t(
-                "Anyone at this company with a portal login will be able to open “{title}”. You can hide it again at any time."
+                "Anyone at this company with portal access will be able to open “{title}”. You can hide it again at any time."
               , { title: sharing?.title ?? "" })}
             </AlertDialogDescription>
           </AlertDialogHeader>

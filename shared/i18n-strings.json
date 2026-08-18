@@ -74,7 +74,7 @@
   "Answered, and they've been told.",
   "Answers",
   "Any file from your computer. We read the words out of documents, spreadsheets, PDFs and pictures so the assistant can answer from them and name the file when it does. Anything we can't read is still kept here, and we'll say so.",
-  "Anyone at this company with a portal login will be able to open “{title}”. You can hide it again at any time.",
+  "Anyone at this company with portal access will be able to open “{title}”. You can hide it again at any time.",
   "Anyone here whose role can read it. Their questions can be answered from it too.",
   "Anyone on the team can read this. No client ever can, it doesn't appear in the portal, and no client login can reach it.",
   "Anyone who can read the knowledge base",
