@@ -694,7 +694,7 @@ function CalendarPanel({
                     </Badge>
                   )}
                   {loadingLinks && !known && (
-                    <span className="text-muted-foreground text-[10px]">{t("…")}</span>
+                    <span className="text-muted-foreground text-[10px]">…</span>
                   )}
                   <span className="text-muted-foreground ml-auto text-xs">
                     {RESPONSE[g.response] ?? g.response}

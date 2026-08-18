@@ -10,16 +10,18 @@
 // not a quoted string, a prop value can be `foo="bar"` or `foo={"bar"}`, and a
 // regex that finds all three also finds every Tailwind class and every cache key.
 
-import { readdirSync, readFileSync } from "node:fs"
-import { dirname, join } from "node:path"
+import { existsSync, readdirSync, readFileSync } from "node:fs"
+import { dirname, join, relative, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import ts from "typescript"
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..")
 
-/** The two front doors, and the three folders in each that hold screens. */
-export const APP_DIRS = ["web", "web-portal"]
+/** WHERE THE WALK STARTS — the two front doors, and the three folders in each
+ * that hold screens. These are ROOTS, not the whole set: `appFiles()` follows
+ * their imports out from here. See its note for why the set is derived. */
+export const APP_ROOTS = ["web", "web-portal"]
   .flatMap((app) => ["app", "components", "lib"].map((dir) => join(ROOT, app, dir)))
   .sort()
 
@@ -206,6 +208,93 @@ export function parseFile(path) {
     true,
     ts.ScriptKind.TSX
   )
+}
+
+/** One import specifier → the repo file it means, or null for a package.
+ *
+ * The two aliases are the ones both front doors declare in their own
+ * tsconfig — `@/*` for the door's own tree and `@shared/*` for `shared/`.
+ * Anything bare (`react`, `@kwapso/ui/...`, `sonner`) is somebody else's code
+ * and is not ours to translate. */
+export function resolveImport(spec, fromFile) {
+  let base
+  if (spec.startsWith("@shared/")) base = join(ROOT, "shared", spec.slice("@shared/".length))
+  else if (spec.startsWith("@/")) {
+    // `@/` is the front door's OWN root, so which door depends on who is asking.
+    const door = relative(ROOT, fromFile).split(sep)[0]
+    if (door !== "web" && door !== "web-portal") return null
+    base = join(ROOT, door, spec.slice(2))
+  } else if (spec.startsWith(".")) base = resolve(dirname(fromFile), spec)
+  else return null
+  const candidates = [`${base}.ts`, `${base}.tsx`, join(base, "index.ts"), join(base, "index.tsx"), base]
+  return candidates.find((c) => /\.tsx?$/.test(c) && existsSync(c)) ?? null
+}
+
+/** Every specifier a file imports from, static and dynamic. */
+function importSpecifiers(tree) {
+  const out = []
+  const visit = (node) => {
+    if (
+      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+      node.moduleSpecifier &&
+      ts.isStringLiteral(node.moduleSpecifier)
+    )
+      out.push(node.moduleSpecifier.text)
+    else if (
+      ts.isCallExpression(node) &&
+      node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+      node.arguments.length > 0 &&
+      ts.isStringLiteral(node.arguments[0])
+    )
+      out.push(node.arguments[0].text)
+    ts.forEachChild(node, visit)
+  }
+  visit(tree)
+  return out
+}
+
+/** EVERY FILE A FRONT DOOR RENDERS — the roots, plus everything they import,
+ * transitively, parsed once each and returned in a stable order.
+ *
+ * A FILE IS WALKED BECAUSE A FRONT DOOR IMPORTS IT, NOT BECAUSE OF THE FOLDER
+ * IT SITS IN. That sentence is this function, and it is the correction of the
+ * hole R28 could not see: for a year the set was six hand-written folders, so a
+ * user-visible sentence escaped the catalogue by living anywhere else — and
+ * plenty did. `formatRelative` in `shared/web/format.ts` hardcoded "just now"
+ * and "5d ago" in English on nine call sites across BOTH front doors; the whole
+ * language settings screen and the whole text-size section live in
+ * `shared/web/`, already wrapped in `t(...)`, and were in no catalogue, so they
+ * were translated nowhere and only looked finished because the seed happened to
+ * carry three of the twenty-nine languages by hand. `shared/scale.ts` holds
+ * "Compact", "Comfortable" and "Large", rendered through `t(step.label)` with
+ * the English sitting one directory outside the walk.
+ *
+ * A FOLDER LIST CANNOT BE MADE CORRECT, ONLY CURRENT — somebody has to
+ * remember to widen it, which is the exact failure R28 exists to end
+ * (`--check` existed and was wired to nothing). An import cannot be forgotten,
+ * for the same reason R24 prefers a missing import to an invertible condition.
+ * And it draws the line where the law draws it: `shared/workers/record-link.ts`
+ * says "Open the ticket" in an EMAIL, no front door imports it, and it stays
+ * out — a fact about the code rather than a judgement somebody made once.
+ *
+ * The set is directory-independent, so `web/test/catalogued-strings.test.ts`
+ * can census the disk against it and turn the build red on any file this walk
+ * fails to reach that says something a person reads. */
+export function appFiles() {
+  const parsed = new Map() // path → its tree, so the 1.4 MB catalogue is read once
+  const queue = APP_ROOTS.flatMap((dir) => sourceFiles(dir))
+  while (queue.length > 0) {
+    const path = queue.shift()
+    if (parsed.has(path)) continue
+    const tree = parseFile(path)
+    parsed.set(path, tree)
+    for (const spec of importSpecifiers(tree)) {
+      const next = resolveImport(spec, path)
+      if (next && !parsed.has(next)) queue.push(next)
+    }
+  }
+  // Sorted by path so a re-run on unchanged source writes a byte-identical file.
+  return [...parsed.keys()].sort().map((path) => ({ path, tree: parsed.get(path) }))
 }
 
 /** Walk a parsed file and call `hit({ text, node, kind })` for every position a

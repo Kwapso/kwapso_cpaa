@@ -191,10 +191,27 @@ describe("the seed wins on SCREEN, not only inside the generator", () => {
         .map((lang) => [english, lang as Translated] as const)
     )
     expect(seedOnly.length, "nothing is seeded that the catalogue cannot already say").toBeGreaterThan(0)
-    for (const [english, lang] of seedOnly) {
+    for (const [english, lang] of seedOnly)
       expect(translate(english, lang), `${english} [${lang}]`).toBe(SEED[english][lang])
+
+    // "FELL BACK TO ENGLISH" IS ONLY ASKED WHERE IT CAN BE ANSWERED. Some
+    // languages KEEP the English word — the text-size steps are "Compact" in
+    // French and "Normal" in German, Spanish, Catalan, Indonesian and Javanese
+    // — and for those pairs a correct answer and a fallback are the same three
+    // syllables, so the two are indistinguishable by construction and no
+    // assertion can tell them apart. Demanding it anyway is a green test
+    // asserting the wrong intent, which is the thing this file exists to avoid:
+    // it would fail on a correct translation and teach the next person to
+    // mistranslate a word to keep the build green. Every pair whose seeded word
+    // DOES differ from its English still carries the proof, and the set is
+    // asserted non-empty so the clause cannot quietly empty itself.
+    const distinguishable = seedOnly.filter(([english, lang]) => SEED[english][lang] !== english)
+    expect(
+      distinguishable.length,
+      "every seed-only word now happens to equal its English, so nothing here proves the seam any more"
+    ).toBeGreaterThan(0)
+    for (const [english, lang] of distinguishable)
       expect(translate(english, lang), `${english} [${lang}] fell back to English`).not.toBe(english)
-    }
   })
 
   it("SPOKEN is the default both readers use", () => {

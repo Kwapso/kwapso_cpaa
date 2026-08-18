@@ -62,10 +62,8 @@ import ts from "typescript"
 
 import { TRANSLATED_WHERE_READ } from "../../shared/rules/registry"
 import {
-  APP_DIRS,
   ROOT,
-  parseFile,
-  sourceFiles,
+  appFiles,
   visitStrings,
 } from "../../scripts/lib/i18n-source.mjs"
 
@@ -75,9 +73,9 @@ type Hit = { text: string; kind: string; file: string; line: number; node: ts.No
  * has to open to fix it. */
 function positions(): Hit[] {
   const out: Hit[] = []
-  for (const dir of APP_DIRS)
-    for (const path of sourceFiles(dir)) {
-      const tree = parseFile(path)
+  // appFiles() hands back each file ALREADY PARSED — the same closure R28's own
+  // extractor walks, so the two laws cannot disagree about what a file is.
+  for (const { path, tree } of appFiles()) {
       const file = relative(ROOT, path)
       visitStrings(tree, ({ text, node, kind }: { text: string; node: ts.Node; kind: string }) => {
         const { line } = tree.getLineAndCharacterOfPosition(node.getStart(tree))
@@ -111,8 +109,8 @@ const pinned = (hit: Hit): boolean =>
 
 /** Every .ts/.tsx line in the two front doors, as one string to grep. */
 function frontDoorSource(): string {
-  return APP_DIRS.flatMap((dir: string) => sourceFiles(dir))
-    .map((p: string) => readFileSync(p, "utf8"))
+  return appFiles()
+    .map(({ path }: { path: string }) => readFileSync(path, "utf8"))
     .join("\n")
 }
 
@@ -145,9 +143,17 @@ describe("R33 · every extracted position asks for its translation", () => {
     // ON THE WAY TO THE SCREEN. That is only true while every screen renders
     // fields through the seam that does it, so the import is the enforced part:
     // a condition can be inverted and a call can be forgotten, an import cannot.
-    const offenders = APP_DIRS.flatMap((dir: string) => sourceFiles(dir))
-      .filter((p: string) => readFileSync(p, "utf8").includes("primitives/field/field"))
-      .map((p: string) => relative(ROOT, p))
+    // The SEAM ITSELF is the one file that must import the library Field — it is
+    // the thing doing the translating. It became visible here only when the walk
+    // became the front doors' import closure rather than a folder list, and the
+    // three assertions below are what hold it honest, so excluding it costs
+    // nothing: a seam that stopped translating fails them whether it is listed
+    // here or not.
+    const SEAM = "shared/web/field.tsx"
+    const offenders = appFiles()
+      .filter(({ path }: { path: string }) => readFileSync(path, "utf8").includes("primitives/field/field"))
+      .map(({ path }: { path: string }) => relative(ROOT, path))
+      .filter((rel: string) => rel !== SEAM)
 
     expect(
       offenders,

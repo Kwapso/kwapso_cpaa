@@ -350,7 +350,7 @@ function TriageQueue({ teamId, canTriage }: { teamId: string; canTriage: boolean
             {[w.ref, richTextPlain(w.description)].filter(Boolean).join(" · ")}
           </span>
           <span className="text-muted-foreground text-xs tabular-nums">
-            {`${w.days} days · ${formatRelative(w.createdAt)}`}
+            {t("{days} days · {when}", { days: w.days, when: formatRelative(w.createdAt, t) })}
           </span>
           {canTriage && (
             <Button

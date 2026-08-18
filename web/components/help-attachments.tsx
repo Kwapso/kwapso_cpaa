@@ -184,7 +184,7 @@ export function HelpAttachmentsPanel({
                 </span>
               )}
               <span className="text-muted-foreground text-xs tabular-nums">
-                {[spellSize(a.sizeBytes), a.addedByName, formatRelative(a.createdAt)]
+                {[spellSize(a.sizeBytes), a.addedByName, formatRelative(a.createdAt, t)]
                   .filter(Boolean)
                   .join(" · ")}
               </span>
@@ -230,7 +230,7 @@ export function HelpAttachmentsPanel({
               <Input
                 value={link.url}
                 onChange={(e) => setLink((l) => ({ ...l, url: e.target.value }))}
-                placeholder={t("https://…")}
+                placeholder="https://…"
                 className="w-64"
                 disabled={busy}
               />

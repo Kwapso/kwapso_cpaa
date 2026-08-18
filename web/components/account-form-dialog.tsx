@@ -407,7 +407,7 @@ export function AccountFormDialog({
           list="account-statuses"
           value={values.status}
           onChange={(e) => set({ status: e.target.value })}
-          placeholder={t("active_client")}
+          placeholder="active_client"
           disabled={busy}
         />
         <datalist id="account-statuses">

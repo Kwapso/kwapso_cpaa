@@ -60,6 +60,7 @@ import { CONCEPT_ICON } from "@/lib/pages"
 import { withDataDrivenCollection } from "@/lib/screens"
 import type { AppRow, Sprint } from "@shared/types"
 import { RecordMark } from "@shared/web/record-mark"
+import { type Translate } from "@shared/web/format"
 import { formatCount } from "@shared/web/format-count"
 import { invalidate, useCached } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
@@ -154,7 +155,7 @@ function groupByKind(
  * exactly as `sprintState` reads them: a block that was delivered and later
  * switched off was still delivered. A sprint still to run needs no badge — its
  * heading already said where it is. */
-function endingBadge(s: Sprint, t: (english: string) => string): React.ReactNode {
+function endingBadge(s: Sprint, t: Translate): React.ReactNode {
   if (s.completedAt) return <Badge variant="secondary">{t("Complete")}</Badge>
   if (!s.active) return <Badge variant="outline">{t("Cancelled")}</Badge>
   return undefined
@@ -169,14 +170,20 @@ function endingBadge(s: Sprint, t: (english: string) => string): React.ReactNode
  * lines up and can be compared without reading any of them. The two states are
  * mutually exclusive with each other and nearly always absent, so on a running
  * sprint this slot holds exactly one thing. */
-function progressTrailing(s: Sprint, t: (english: string) => string): React.ReactNode {
+function progressTrailing(s: Sprint, t: Translate): React.ReactNode {
   const badge = endingBadge(s, t)
   const done = s.storyCount - s.openStoryCount
   if (s.storyCount === 0) return badge
   return (
     <span className="flex items-center gap-2">
+      {/* ONE ENTRY WITH TWO HOLES (R28). It read `{done} {t("of")} {n} {t("done")}`,
+          and `of` is two lowercase letters — which the extractor refuses as a
+          non-sentence, so it was in no catalogue and every reader in every
+          language got the English word in the middle of their own. Word order
+          is the second half of the argument: a translator cannot move a
+          fragment past a number that is not theirs to move. */}
       <span className="text-muted-foreground text-xs tabular-nums">
-        {done} {t("of")} {s.storyCount} {t("done")}
+        {t("{done} of {total} done", { done, total: s.storyCount })}
       </span>
       {badge}
     </span>

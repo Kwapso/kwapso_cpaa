@@ -84,10 +84,13 @@ export function TicketRow({ ticket }: { ticket: HelpTicket }) {
               wherever somebody meets it. */}
           {ticket.storyCount > 0 && (
             <span>
-              {ticket.doneStoryCount} {t("of")} {ticket.storyCount} {t("done")}
+              {t("{done} of {total} done", {
+                done: ticket.doneStoryCount,
+                total: ticket.storyCount,
+              })}
             </span>
           )}
-          <span>{formatRelative(ticket.updatedAt ?? ticket.createdAt)}</span>
+          <span>{formatRelative(ticket.updatedAt ?? ticket.createdAt, t)}</span>
         </div>
       </div>
       <ChevronRight className="text-muted-foreground size-4 shrink-0" />

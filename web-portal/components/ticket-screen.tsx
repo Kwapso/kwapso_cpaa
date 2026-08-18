@@ -148,7 +148,7 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
       side,
       own: side === OWN_SIDE,
       author: m.authorId === me ? "You" : (m.authorName ?? brand.name),
-      time: formatRelative(m.createdAt),
+      time: formatRelative(m.createdAt, t),
       body: m.body,
     }
   })

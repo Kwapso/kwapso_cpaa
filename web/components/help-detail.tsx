@@ -367,7 +367,7 @@ export function HelpDetailScreen({
   const replies = (repliesQ.data ?? []).map((r) => ({
     id: r.id,
     author: r.authorName || "Member",
-    time: formatRelative(r.createdAt),
+    time: formatRelative(r.createdAt, t),
     // The reply as the reader asked for it: what was typed, or the translation
     // they pressed for. Never both, and never a stored rewrite of somebody's
     // words — `of` is a lookup, not a save.
@@ -394,7 +394,7 @@ export function HelpDetailScreen({
     // to the footer at the foot of the record (D7 / CHECKLIST 11.3), where they
     // stop pushing the ticket's own facts below the fold. The status is on the
     // header band's own line.
-    { label: t("Resolved"), value: ticket.resolvedAt ? formatRelative(ticket.resolvedAt) : "" },
+    { label: t("Resolved"), value: ticket.resolvedAt ? formatRelative(ticket.resolvedAt, t) : "" },
   ]
 
 

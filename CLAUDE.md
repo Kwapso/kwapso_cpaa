@@ -68,16 +68,28 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
   surface. Identifiers, not sentences, an invented NAME can no longer ship.
   (`described-contracts`)
 - **The translation catalogue cannot rot (R28).** `shared/i18n-strings.json` is
-  EXACTLY the set of user-visible English sentences in `web/` and `web-portal/`,
+  EXACTLY the set of user-visible English sentences the two front doors say,
   derived by re-running the one shared definition of what a person reads
-  (`scripts/lib/i18n-source.mjs`). A sentence MISSING from it ships in English to
-  somebody who chose German, silently, on a screen that looks finished, because
-  English is the key. An entry matching no string in the app is an ORPHAN and goes
-  red too: nothing breaks today, which is why it rots into a record of what the app
-  used to say while being translated on every build. The whole pipeline is
-  build-time, so "is the catalogue current?" was the assumption it all rested on
-  and the only thing enforcing it was somebody remembering to run a script. Run
-  `node scripts/i18n-extract.mjs` before you commit. (`catalogued-strings`)
+  (`scripts/lib/i18n-source.mjs`). That definition answers TWO questions and both
+  are derived: which POSITIONS a person reads (the seven), and which FILES —
+  `appFiles()`, **the front doors' own import closure. A file is walked because a
+  front door imports it, not because of the folder it sits in.** A sentence
+  MISSING from the catalogue ships in English to somebody who chose German,
+  silently, on a screen that looks finished, because English is the key. An entry
+  matching no string in the app is an ORPHAN and goes red too: nothing breaks
+  today, which is why it rots into a record of what the app used to say while
+  being translated on every build. A file under `web/`, `web-portal/` or
+  `shared/` that says something and that the walk never opens is UNREACHABLE and
+  goes red as well — censused off the DISK, not off the graph, with a reasoned
+  `UNWALKED_OK` line the only way out. And the call site may not disagree with the
+  definition: `t("of")` declares a string to be copy that `isUserVisible` refuses,
+  so it is translated nowhere — write the whole sentence with a `{hole}` in it,
+  which is also the only shape a translator can reorder. Earned twice: the
+  pipeline is build-time, so "is the catalogue current?" was the assumption it all
+  rested on; then "current against WHAT?" — `formatRelative` in `shared/web/` had
+  been saying "5d ago" in English to nine call sites on both front doors, beside a
+  German sentence, for a year. Run `node scripts/i18n-extract.mjs` before you
+  commit. (`catalogued-strings`)
 - **The page has one width, and a screen does not get its own (R29).** Each front
   door owns exactly ONE page container, `web/components/deep-link-screen.tsx` at
   `max-w-[1600px]` and `web-portal/components/portal-shell.tsx` at `max-w-3xl`

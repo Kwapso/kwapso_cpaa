@@ -162,8 +162,8 @@ export type RecordAudit = {
  * no catalogue and every reader in every language got the English word. */
 export function RecordFooter({ audit }: { audit: RecordAudit }) {
   const t = useT()
-  const created = audit.createdAt ? formatRelative(audit.createdAt) : null
-  const edited = audit.updatedAt ? formatRelative(audit.updatedAt) : null
+  const created = audit.createdAt ? formatRelative(audit.createdAt, t) : null
+  const edited = audit.updatedAt ? formatRelative(audit.updatedAt, t) : null
   const lines: string[] = []
   if (audit.createdByName && created)
     lines.push(t("Created by {name} · {when}", { name: audit.createdByName, when: created }))
