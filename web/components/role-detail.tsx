@@ -177,7 +177,13 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
 
   return (
     <RecordScreen
-      eyebrow={[t("Role"), role.isDefault ? t("Locked") : null, role.active ? null : t("Inactive")]
+      // D4 + N4: the eyebrow says WHAT THIS IS, and one thing about its state.
+      // It used to read `Role · Locked · Inactive` — a type plus two states on
+      // one band, which is three units before the title has been read. The two
+      // states are mutually exclusive in practice (a locked role is a seeded
+      // one and a seeded one is never switched off), so the eyebrow carries
+      // whichever applies and never both.
+      eyebrow={[t("Role"), role.active ? (role.isDefault ? t("Locked") : null) : t("Inactive")]
         .filter(Boolean)
         .join(" · ")}
       title={role.title}

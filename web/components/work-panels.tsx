@@ -102,14 +102,22 @@ export function sliceKey(kind: string, ownerId: string): string {
 /** One story, in one line: where it is, who has it, when it is due, and which
  * request it answers. The same sentence the backlog row says, because it is the
  * same record — a person reading it on a sprint should not have to re-learn it. */
-function storyLine(s: Story): string {
+function storyLine(s: Story, ownerKind: "sprint" | "app" | "ticket"): string {
   return (
     [
       STORY_STATUS_LABEL[s.status],
       s.assigneeName ?? "unassigned",
       s.sprintEndsOn ? `due ${formatDate(s.sprintEndsOn)}` : null,
-      s.sprintName,
-      s.ticketRef,
+      // THE OWNER IS NOT A FACT ABOUT THE ROW. This list hangs off a sprint, an
+      // app or a ticket, and it used to name the sprint and the ticket on every
+      // row of all three — so the sprint's own Stories tab said "Sprint 14" forty
+      // times under a heading that said Sprint 14, and the ticket's said its own
+      // reference. Five facts against D5's three, and the fifth was the record
+      // the reader was already looking at. The one that is NOT the owner still
+      // earns its place: on an app's stories, which sprint a story sits in is
+      // real information.
+      ownerKind === "sprint" ? null : s.sprintName,
+      ownerKind === "ticket" ? null : s.ticketRef,
     ]
       .filter(Boolean)
       .join(" · ") || "—"
@@ -172,7 +180,7 @@ export function StoriesPanel({
                   label={s.ref ? `${s.ref} · ${s.title}` : s.title}
                   onOpen={() => softNavigate(`${host.base}/stories/${s.id}`)}
                 />
-                <p className="text-muted-foreground truncate px-0 text-xs">{storyLine(s)}</p>
+                <p className="text-muted-foreground truncate px-0 text-xs">{storyLine(s, ownerKind)}</p>
               </div>
               {s.status === "done" && (
                 <Badge variant="secondary" className="text-[10px]">
