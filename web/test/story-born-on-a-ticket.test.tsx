@@ -211,3 +211,26 @@ describe("writing a story on the ticket that asked for it", () => {
     expect(toasts.error).not.toHaveBeenCalled()
   })
 })
+
+// THE SENTINEL IS THE FORM'S BUSINESS, NEVER THE READER'S.
+//
+// `RecordPicker` decides "is anything chosen?" by comparing the value it is
+// handed against its `emptyOption` — so a form that passes `value || "__none__"`
+// and declares no `emptyOption` has handed it a value it has never heard of.
+// It looks for a row with that id, finds none, and the last fallback in its
+// label chain paints the id itself. The kind-of-work field did exactly that and
+// a person opening the story form read `__none__` off the screen.
+//
+// Driven rather than scanned, for the reason at the top of this file: the prop
+// was absent, and there is nothing for a source scan to read in an absence
+// unless somebody first writes the scan for that one prop on that one control.
+// What a person SEES is the thing that was wrong, so that is what is asserted.
+describe("the story form never shows a person its own placeholder value", () => {
+  it("labels the kind-of-work picker with words, not the empty sentinel", async () => {
+    await relatedStoriesTab()
+    fireEvent.click(await screen.findByRole("button", { name: "New story" }))
+    const dialog = await screen.findByRole("dialog")
+    expect(dialog.textContent).not.toContain("__none__")
+    expect(screen.getByLabelText(/kind of work/i).textContent).toBe("Pick one")
+  })
+})

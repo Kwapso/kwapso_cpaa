@@ -601,5 +601,168 @@ describe("every module reaches the teams that already exist", () => {
     // seed against a database with no roles in it at all, so it wrote nothing —
     // which is the other half of "WHERE NOT EXISTS" doing its job.
     expect(rows.n).toBe(2)
+// A MIGRATION VERSION IS A PRIMARY KEY, AND TWO LANES CANNOT SHARE ONE.
+//
+// `_migrations.version` is `TEXT PRIMARY KEY`, and the two runners read it in
+// opposite directions: a FRESH team applies every entry in order, so a repeated
+// version hits the primary key and team creation fails outright; an EXISTING
+// team is upgraded against `SELECT version FROM _migrations`, so the second
+// entry is seen as already applied and its SQL never runs. One of those is loud
+// and one is silent, and the silent one leaves a live team a schema short.
+//
+// It is a MERGE hazard specifically, which is why nothing caught it before. Two
+// lanes each appending an entry to the end of the same array is not a textual
+// conflict — git merges both blocks happily and the duplicate only exists in the
+// result. It has now happened twice in one week: `0037` in the morning, and
+// `0039` between the migration below being written and being committed, which is
+// why that one is numbered 0041. Derived from the array, so it cannot rot and
+// nobody has to remember.
+describe("TEAM_MIGRATIONS — every version is claimed exactly once", () => {
+  it("has no duplicate version, in either direction of the runner", () => {
+    const seen = new Map<string, number>()
+    for (const m of TEAM_MIGRATIONS) seen.set(m.version, (seen.get(m.version) ?? 0) + 1)
+    const twice = [...seen.entries()].filter(([, n]) => n > 1).map(([v, n]) => `${v} ×${n}`)
+    expect(
+      twice,
+      "two entries claim one version. `_migrations.version` is a PRIMARY KEY: a fresh team's " +
+        "schema run hits the constraint and team creation fails, and an existing team's upgrade " +
+        "treats the second as already applied and never runs it. Renumber the newer one — check " +
+        "`main` for the highest number first"
+    ).toEqual([])
+  })
+
+  it("numbers them in order, so the newest is genuinely last", () => {
+    // The array's order IS the run order (`applyTeamSchema` walks it), and the
+    // admin route reports its last entry as "latest". A number out of sequence
+    // is a merge that placed a block in the wrong half of the array.
+    const numbers = TEAM_MIGRATIONS.map((m) => Number(m.version.slice(0, 4)))
+    expect(numbers.length, "no migrations found — this scan is reading the wrong shape").toBeGreaterThan(30)
+    expect(numbers.every((n) => Number.isFinite(n)), "every version starts with a four-digit number").toBe(true)
+    expect(
+      [...numbers].sort((a, b) => a - b),
+      "the migrations are out of numerical order — a merge has put a newer block before an older one"
+    ).toEqual(numbers)
+  })
+})
+
+// 0041 — ONE SPELLING OF ONE INSTANT, so the TEXT order is the TIME order.
+//
+// `meetings.starts_at` is TEXT, SQLite compares TEXT byte by byte, and the diary
+// is both ORDERED and PAGED by that column (the ORDER BY expression and the
+// keyset cursor are one value, which is what shared/workers/sorting.ts requires).
+// So the column is only chronological while every row is spelled the same way,
+// and sixty-three staging rows were not: the calendar sweep stored Google's own
+// offset — `2026-08-18T12:00:00+05:30` — beside every other row's `…Z`. A noon
+// meeting in Delhi is 06:30Z and sorted as though it were noon, so the day sheet
+// interleaved and page two of the diary began somewhere page one had not ended.
+//
+// DRIVEN AGAINST REAL SQLITE, because that is the only thing whose opinion
+// counts: the claim is about how a database orders bytes, and no amount of
+// reading the migration proves it. The rows below are the real staging shapes.
+describe("0039 — meeting moments are stored in UTC", () => {
+  const MIGRATION = "0041_meeting_moments_in_utc"
+
+  /** A team as it stood the moment BEFORE this migration, with the mixture of
+   * spellings the sweep and the forms had left behind. */
+  function beforeMigration(): DatabaseSync {
+    const db = new DatabaseSync(":memory:")
+    for (const m of TEAM_MIGRATIONS) {
+      if (m.version === MIGRATION) break
+      db.exec(m.sql)
+    }
+    const rows: [string, string, string, string | null][] = [
+      // id, title, starts_at, ends_at
+      ["m1", "Google, noon in Delhi (06:30Z)", "2026-08-18T12:00:00+05:30", "2026-08-18T13:00:00+05:30"],
+      ["m2", "Ours, 09:00Z", "2026-08-18T09:00:00.000Z", "2026-08-18T10:00:00.000Z"],
+      ["m3", "W33 Review, 15:30 in Delhi (10:00Z)", "2026-08-18T15:30:00+05:30", null],
+      ["m4", "Ours, 07:00Z", "2026-08-18T07:00:00.000Z", null],
+      // An all-day entry: Google's `date` with no `dateTime` at all. A day, not
+      // an hour — nothing to convert, and midnight UTC would invent a time.
+      ["m5", "All day", "2026-08-18", null],
+      ["m6", "Google, west of us (17:00Z)", "2026-08-18T09:00:00-08:00", null],
+      // Offset-SHAPED and not a date. `strftime` answers NULL for it, and a null
+      // start time would delete the meeting from every view keyed on it.
+      ["m7", "Not a date at all", "banana+05:30", null],
+    ]
+    for (const [id, title, starts, ends] of rows)
+      db.exec(
+        `INSERT INTO meetings (id, title, starts_at, ends_at, created_at) VALUES (${sqlString(id)}, ${sqlString(title)}, ${sqlString(starts)}, ${sqlString(ends)}, '2026-08-01T00:00:00.000Z');`
+      )
+    return db
+  }
+
+  const migrate = (db: DatabaseSync) =>
+    db.exec(TEAM_MIGRATIONS.find((m) => m.version === MIGRATION)!.sql)
+
+  /** The diary's own ordering expression, and the true instant beside it. */
+  const byText = (db: DatabaseSync) =>
+    db.prepare("SELECT id, starts_at FROM meetings ORDER BY starts_at, id").all() as {
+      id: string
+      starts_at: string
+    }[]
+
+  it("the defect is real BEFORE it runs — the text order is not the time order", () => {
+    const db = beforeMigration()
+    const order = byText(db).map((r) => r.id)
+    // 06:30Z sits after 09:00Z, and 17:00Z sits before it. This is the day sheet
+    // the owner was shown.
+    expect(order.indexOf("m1"), "the 06:30Z meeting sorts AFTER the 09:00Z one").toBeGreaterThan(
+      order.indexOf("m2")
+    )
+    expect(order.indexOf("m6"), "the 17:00Z meeting sorts BEFORE the 09:00Z one").toBeLessThan(
+      order.indexOf("m2")
+    )
+  })
+
+  it("makes the text order the chronological order, exactly", () => {
+    const db = beforeMigration()
+    migrate(db)
+    const chronological = db
+      .prepare(
+        `SELECT id FROM meetings WHERE julianday(starts_at) IS NOT NULL
+          ORDER BY julianday(starts_at), id`
+      )
+      .all() as { id: string }[]
+    const asStored = byText(db).filter((r) => r.id !== "m7")
+    expect(
+      asStored.map((r) => r.id),
+      "after the migration, ordering the TEXT must give the same list as ordering the INSTANTS"
+    ).toEqual(chronological.map((r) => r.id))
+    // …and the specific inversion the owner saw is gone.
+    const order = asStored.map((r) => r.id)
+    expect(order).toEqual(["m5", "m1", "m4", "m2", "m3", "m6"])
+  })
+
+  it("writes the same bytes the app's own forms write", () => {
+    const db = beforeMigration()
+    migrate(db)
+    const m1 = byText(db).find((r) => r.id === "m1")!
+    // `requireMoment` gives `new Date(ms).toISOString()`; the migration must give
+    // the identical shape, milliseconds and all, or two writers of one column
+    // produce values that parse alike and compare differently.
+    expect(m1.starts_at).toBe(new Date("2026-08-18T12:00:00+05:30").toISOString())
+    const ends = db.prepare("SELECT ends_at FROM meetings WHERE id = 'm1'").get() as {
+      ends_at: string
+    }
+    expect(ends.ends_at, "the end of a meeting is a moment too").toBe(
+      new Date("2026-08-18T13:00:00+05:30").toISOString()
+    )
+  })
+
+  it("leaves an all-day entry, an already-UTC row and an unreadable one exactly as they were", () => {
+    const db = beforeMigration()
+    const before = new Map(byText(db).map((r) => [r.id, r.starts_at]))
+    migrate(db)
+    const after = new Map(byText(db).map((r) => [r.id, r.starts_at]))
+    for (const id of ["m2", "m4", "m5", "m7"])
+      expect(after.get(id), `${id} carries no offset — nothing to convert`).toBe(before.get(id))
+  })
+
+  it("is idempotent — a second pass finds nothing left to convert", () => {
+    const db = beforeMigration()
+    migrate(db)
+    const once = byText(db)
+    migrate(db)
+    expect(byText(db)).toEqual(once)
   })
 })

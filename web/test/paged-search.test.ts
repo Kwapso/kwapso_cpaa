@@ -29,7 +29,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
-import { sourceFiles } from "@shared/rules/source-scan"
+import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 import { GROWING_COLLECTIONS } from "@shared/rules/registry"
 import { BASE_RECIPES } from "../lib/screens"
 
@@ -79,6 +79,45 @@ describe("paged-search (R14, the search half): a paged list searches the whole c
       ).toBe(true)
     })
   }
+
+  // THE COUNT AND THE LIST ARE ONE ANSWER (R16 meets the search half).
+  //
+  // A find bar asks the door and renders the door's own exact total beside the
+  // rows it got back — "1 meetings match". If the screen then narrows those rows
+  // in the browser, the number and the list are answering two different
+  // questions, and the screen says "1 meetings match" over "Nothing matched."
+  // That is what the diary shipped: it asked for the whole diary (`view: "all"`,
+  // correctly) and then kept only this week's rows out of the answer.
+  //
+  // Derived from the binding, not from a list of screens: every find-bar screen
+  // names its rows in the same line (`const rows = found.active ? found.rows :
+  // …`), so the check follows that name and demands that any narrowing of it
+  // stands down while a find is active. A resting screen may filter as much as
+  // it likes — nothing is counting it.
+  it("no screen re-filters the rows a find bar gave it while a find is running", () => {
+    const bindings = /const (\w+) = found\.active \? found\.rows/g
+    let inspected = 0
+    const offenders: string[] = []
+    for (const f of componentFiles()) {
+      const src = stripComments(read(f))
+      for (const bind of src.matchAll(bindings)) {
+        inspected++
+        for (const hit of src.matchAll(new RegExp(`\\b${bind[1]}\\.filter\\(`, "g"))) {
+          const line = src.slice(src.lastIndexOf("\n", hit.index) + 1, hit.index)
+          if (!line.includes("found.active"))
+            offenders.push(`${f.replace(`${ROOT}/`, "")}: ${bind[1]}.filter(…)`)
+        }
+      }
+    }
+    // A derivation that matches nothing reports all clear exactly like a passing
+    // one — the failure this whole file was written about, one level up.
+    expect(inspected, "no find-bar screen was inspected — the binding scan has gone blind").toBeGreaterThanOrEqual(5)
+    expect(
+      offenders,
+      "these screens narrow the door's own answer in the browser, under the door's own exact count (R16) — " +
+        "guard the filter with `!found.active`, or ask the door the narrower question in the first place"
+    ).toEqual([])
+  })
 
   it("the filtered total has ONE renderer, and it is the seam allowed to end in a +", () => {
     const users = componentFiles().filter((f) => read(f).includes("formatSearchTotal"))

@@ -27,7 +27,7 @@
 
 import { blockBrief } from "@shared/agent-blocks"
 import { recordWorkerError } from "@shared/workers/error-log"
-import { cheapText, fenceToolResult } from "@shared/workers/model-text"
+import { cheapText, fenceToolResult, stripFenceEcho } from "@shared/workers/model-text"
 import { GLOSSARY } from "@shared/glossary"
 import type { KnowledgeCitation, KnowledgePassage } from "@shared/types"
 import type { Env } from "../env"
@@ -112,7 +112,14 @@ export async function writeAnswer(
     const text = await cheapText(env, composeSystemPrompt(), composeUserPrompt(question, material, live), {
       maxTokens: ANSWER_MAX_TOKENS,
     })
-    return text.trim() || null
+    // THE MARKERS COME OFF BEFORE ANYBODY READS IT. The passages arrive fenced
+    // and the instructions say what the fence means, so the model sometimes
+    // writes one back — and a person opening the Knowledge tab read
+    // `<tool_result from="FluClinic">` in the middle of a sentence. See
+    // `stripFenceEcho` for why this is cleaned here rather than prompted away.
+    // An answer that was NOTHING BUT a fence strips to nothing, and nothing is
+    // already a complete answer here: the screen falls back to the passages.
+    return stripFenceEcho(text).trim() || null
   } catch (e) {
     // NEVER SWALLOWED (ERROR-HANDLING.md): it goes to the one logging seam, so a
     // model that has been failing since Tuesday is a row somebody can find rather

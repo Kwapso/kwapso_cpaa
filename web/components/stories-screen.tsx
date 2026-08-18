@@ -220,7 +220,11 @@ export function StoriesScreen({
       <PagedFind<Story>
         listKey={storiesKey(teamId)}
         placeholder={t("Search work…")}
-        noun="stories"
+        matches={{
+          none: t("No stories match"),
+          one: t("1 story matches"),
+          many: t("{count} stories match"),
+        }}
         sorts={translatedSorts("stories", t)}
         defaultSort={COLLECTION_SORTS.stories.defaultSort}
         // FOUR FILTERS, all of them the DOOR's. They were the frame's until

@@ -267,7 +267,19 @@ export function RecordCalendar({
           buttons whose variant flips, which is the shape R3 refuses. */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="text-sm font-medium">{monthLabel(month)}</div>
-        <div className="flex items-center gap-2">
+        {/* IT WRAPS, AND THE GROUP IS PUSHED WITH `ml-auto` — the house rule for
+            every action row in this app (UI-CONVENTIONS C4), which this one was
+            not following. Five controls whose widths are TEXT and therefore
+            change with the reader's language: the segmented control and the
+            three buttons come to about 307px in English, against roughly 309
+            inside the page's own padding and the collection card's at 375px. So
+            "Next month" was one or two pixels from the edge in English and off
+            it in German, where "Agenda" is "Tagesordnung" — and there is no
+            scrollable ancestor here, so off the edge means gone.
+            `ml-auto` rather than `justify-end` on this row, for the reason C4
+            gives: `justify-end` alone pushes the overflow off the LEFT edge,
+            where the container hides it instead of showing it. */}
+        <div className="flex flex-wrap items-center gap-2">
           <ToggleGroup
             type="single"
             value={mode}
@@ -283,7 +295,7 @@ export function RecordCalendar({
               <span className="text-xs">{t("Agenda")}</span>
             </ToggleGroupItem>
           </ToggleGroup>
-          <div className="flex items-center gap-1">
+          <div className="ml-auto flex items-center gap-1">
             <Button variant="outline" size="sm" onClick={() => setMonth(startOfMonth(new Date()))}>
               {t("Today")}
             </Button>

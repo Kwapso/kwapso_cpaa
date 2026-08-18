@@ -4,34 +4,28 @@
 
 import { parseScreenPath, parseScreenQuery, type ScreenQuery } from "@kwapso/ui/lib/recipe"
 
-import { TEAM_SECTIONS } from "@/lib/pages"
+import { TEAM_SECTIONS, type TeamSection } from "@/lib/pages"
 
-/** The team-area sections (the tab spine across /t/<teamId>/…). */
-export type SectionKey =
-  | "overview"
-  | "members"
-  | "roles"
-  | "invites"
-  | "dropdowns"
-  // The agency's own cost card (see TEAM_SECTIONS for why it is a tab, and why
-  // the account's card is not beside it).
-  | "internal-rates"
-  | "accounts"
-  | "tickets"
-  | "knowledge"
-  | "processes"
-  // The work engine's four destinations (see TEAM_SECTIONS for why four).
-  | "apps"
-  | "sprints"
-  | "stories"
-  | "tasks"
-  | "time"
-  | "meetings"
-  // The agency's own housekeeping (staff profiles has no section — the owner's
-  // ruling puts a profile on the member's own page, not on a page of its own).
-  | "brand"
-  | "purposes"
-  | "import"
+/** The team-area sections (the tab spine across /t/<teamId>/…) — the SAME set
+ * as the section table's own keys, derived rather than written out a second
+ * time. Two spellings of one union is two places a section can be added to, and
+ * the copy that gets forgotten is the one nothing renders. */
+export type SectionKey = TeamSection["key"]
+
+/** WHICH SECTION A MODULE SEGMENT IS, read off the section table.
+ *
+ * It used to be a hand-written list of nineteen segments inside the deep-link
+ * screen, and `time` was never on it — so Work logs resolved to `overview`,
+ * whose placement is "tab", and a sidebar page drew the Settings tab strip over
+ * itself. The list was the defect, not the missing line: the twentieth section
+ * would have repeated it. `sectionTitle` below has always read this same table
+ * the same way; this is its other half.
+ *
+ * The empty segment is the team overview itself, which is also where an
+ * unrecognised module lands — so it is skipped here rather than special-cased. */
+export function sectionFor(module: string): SectionKey {
+  return TEAM_SECTIONS.find((s) => s.segment !== "" && s.segment === module)?.key ?? "overview"
+}
 
 export type Route = {
   teamId: string

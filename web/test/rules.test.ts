@@ -17,6 +17,8 @@ import {
   CLIENT_REACHABLE_EXEMPT,
   DEAF_EXEMPT,
   FORM_DIALOGS,
+  GLOSSARY_SYNONYMS,
+  GLOSSARY_SYNONYM_OK,
   GROWING_COLLECTIONS,
   MUTATING_WORKERS,
   PAGE_WIDTH_OWNER,
@@ -592,6 +594,86 @@ describe("RULES — the laws of the base", () => {
       expect(terms.has(entry.term), `duplicate term "${entry.term}"`).toBe(false)
       terms.add(entry.term)
     }
+  })
+
+  // R6, THE OTHER HALF — the one the app is actually read in.
+  //
+  // `glossary-wellformed` above reads the glossary FILE and stops there: term
+  // non-empty, definition brief, no duplicates. R6's own sentence has always had
+  // a second clause — "use those words in UI copy; never invent a synonym" — and
+  // for a year nothing read a single line of copy against it. That is how the
+  // app came to say "Permissions" on the Roles screen and "access rights" on two
+  // others, "teammate" for a member, "cost card" for the internal rates and
+  // "Portal login" for portal access, all under a green build.
+  //
+  // WHAT IT READS. `shared/i18n-strings.json` — which R28 makes EXACTLY the set
+  // of user-visible English sentences in both front doors, re-derived from the
+  // source on every build. So this check inherits its reach: a sentence a person
+  // can read is a sentence in that file, and there is no second census to keep.
+  //
+  // WHAT IT REFUSES TO DO. It does not demand that copy be written out of the
+  // glossary — most sentences are ordinary English and a rule that flagged them
+  // would be switched off within a week. It carries a NARROW deny-list of words
+  // that, in this app, can mean nothing but a record that already has a name.
+  // The registry's own comment lists what was deliberately left off it and why
+  // ("client", "option", "request"); the short version is that a word people
+  // exempt their way past is worse than no word at all.
+  it("glossary-in-copy: no screen says a known synonym for a glossary term (R6/R33)", () => {
+    const strings: string[] = JSON.parse(read(join(ROOT, "shared", "i18n-strings.json")))
+    // The census must not go blind: an empty catalogue would pass this silently.
+    expect(strings.length, "the string catalogue is empty — this check is reading nothing").toBeGreaterThan(100)
+    expect(GLOSSARY_SYNONYMS.length, "the deny-list is empty").toBeGreaterThan(5)
+
+    const whole = (word: string) =>
+      new RegExp(`(?<![\\w-])${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, "\\s+")}(?![\\w-])`, "i")
+
+    // ROT, FIRST — a deny-list that has drifted from the dictionary is worse than
+    // none, because it reads as a promise that the words agree.
+    for (const s of GLOSSARY_SYNONYMS) {
+      expect(
+        Object.prototype.hasOwnProperty.call(GLOSSARY, s.term),
+        `"${s.word}" is banned in favour of the glossary key "${s.term}", which no longer exists`
+      ).toBe(true)
+      expect(s.why.trim(), `"${s.word}" needs a reason`).not.toBe("")
+      // And the dictionary may not contradict the rule. If a term or its
+      // definition uses the banned word, the ban is aimed at the glossary itself
+      // — which is the shape ("option") that makes a rule people exempt past.
+      const entry = GLOSSARY[s.term as keyof typeof GLOSSARY]
+      expect(
+        whole(s.word).test(`${entry.term} ${entry.def}`),
+        `the glossary's own "${entry.term}" says "${s.word}" — a rule that contradicts its dictionary cannot be obeyed`
+      ).toBe(false)
+    }
+
+    // …and the exemptions rot in both directions.
+    for (const [sentence, why] of Object.entries(GLOSSARY_SYNONYM_OK)) {
+      expect(why.trim(), `the exemption for "${sentence}" needs a reason`).not.toBe("")
+      expect(
+        strings.includes(sentence),
+        `GLOSSARY_SYNONYM_OK excuses "${sentence}", which the app no longer says — delete the line`
+      ).toBe(true)
+      expect(
+        GLOSSARY_SYNONYMS.some((s) => whole(s.word).test(sentence)),
+        `GLOSSARY_SYNONYM_OK excuses "${sentence}", which contains no banned word — delete the line`
+      ).toBe(true)
+    }
+
+    // THE CHECK.
+    const said: string[] = []
+    for (const sentence of strings) {
+      if (Object.prototype.hasOwnProperty.call(GLOSSARY_SYNONYM_OK, sentence)) continue
+      for (const s of GLOSSARY_SYNONYMS) {
+        if (!whole(s.word).test(sentence)) continue
+        const term = GLOSSARY[s.term as keyof typeof GLOSSARY].term
+        said.push(`"${sentence}" — says "${s.word}"; this app's word is "${term}" (${s.why})`)
+      }
+    }
+    expect(
+      said,
+      "R6: the glossary is the single source of product terms, and these sentences invent a second word for one. " +
+        "Reword the copy to the term, or — if the banned word is genuinely the right one there — add the sentence to " +
+        "GLOSSARY_SYNONYM_OK with the reason. Re-run `node scripts/i18n-extract.mjs` after any copy change (R28)"
+    ).toEqual([])
   })
 
   // R1, the ROSTER half. The per-worker publish-seam suites prove each mutation in
@@ -1898,6 +1980,7 @@ describe("RULES — the laws of the base", () => {
       "described-contracts", // R27: workers/mcp/test/described-contracts.test.ts, beside R19/R22 on the same door census
       "catalogued-strings", // R28: web/test/catalogued-strings.test.ts — re-runs the real extractor over both front doors
       "one-page-width", // R29: the page-container scan above, over both front doors
+      "glossary-in-copy", // R33: the deny-list scan over shared/i18n-strings.json, above
       "linked-emails", // R30: web/test/linked-emails.test.ts — the email census, derived from the send sites themselves
       "wrapped-strings", // R33: web/test/wrapped-strings.test.ts — R28's walk read the other way round, over both front doors
     ])

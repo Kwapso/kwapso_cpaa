@@ -61,6 +61,7 @@ import type { FilterFacet, SortOption } from "@kwapso/ui/lib/config"
 
 import type { CollectionOrder } from "@/lib/collection-sorts"
 import { cursorKey } from "@/lib/live-resources"
+import { fill } from "@shared/i18n"
 import { formatSearchTotal } from "@shared/web/format-count"
 import { primeCache, useCached, useCachedValue } from "@shared/web/store"
 
@@ -123,7 +124,7 @@ export function PagedFind<T>({
   listKey,
   fetchPage,
   placeholder,
-  noun,
+  matches,
   facets = [],
   sorts = [],
   defaultSort = "",
@@ -137,9 +138,23 @@ export function PagedFind<T>({
   fetchPage: (query: FindQuery, cursor: string | null) => Promise<FindPage<T>>
   /** the search box's placeholder, in the recipe's own words */
   placeholder: string
-  /** what the rows ARE, for the match line ("accounts", "tickets") — a glossary
-   * word, never a synonym. */
-  noun: string
+  /** WHAT THE MATCH LINE SAYS — three whole sentences, in the screen's own
+   * glossary words, never a synonym.
+   *
+   * Three, rather than a noun this seam builds a sentence around. The old shape
+   * was `` `${total} ${noun} match` ``, which said "1 tickets match" on every
+   * paged screen in the app — and the fix is not an `s`. A sentence glued
+   * together from a number, a noun and a verb is untranslatable: German inflects
+   * the noun, Russian has three number forms and Japanese has none, and none of
+   * them puts the pieces in this order. So the whole sentence is the unit — the
+   * only thing R28's catalogue can hold and a translator can be asked to
+   * preserve — and English's own two forms are the fewest a catalogue can carry.
+   *
+   * ALREADY TRANSLATED when it arrives: `t("…")` at the call site is what puts a
+   * sentence in the catalogue in the first place (the extractor reads `t` calls,
+   * not props). `{count}` in `many` is left for this seam, because the total is
+   * the one part of the sentence the screen does not know. */
+  matches: { none: string; one: string; many: string }
   /** the facets the DOOR parses, each `field` being its query parameter and each
    * option's `value` the word the door matches. Every facet declares its own
    * options, because the door's vocabulary is not the loaded page's: a facet the
@@ -288,7 +303,11 @@ export function PagedFind<T>({
             did before. */}
         {asked && !found.loading && (
           <span className="text-muted-foreground text-xs tabular-nums" aria-live="polite">
-            {total ? `${formatSearchTotal(total)} ${noun} match` : `No ${noun} match`}
+            {!total
+              ? matches.none
+              : total === 1
+                ? matches.one
+                : fill(matches.many, { count: formatSearchTotal(total) })}
           </span>
         )}
       </div>

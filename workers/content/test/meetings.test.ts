@@ -17,6 +17,8 @@
 //     retiring the `held` status could not weaken it — and this suite proves it
 //     rather than trusting the reading.
 
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import type { DatabaseSync } from "node:sqlite"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -565,5 +567,60 @@ describe("the transcript import is idempotent", () => {
     expect(second.logsWritten).toBe(0)
     expect(second.note).toContain("already been read")
     expect(logCount(), "and nobody's week grew a second time").toBe(written)
+  })
+})
+
+// THE OTHER HALF OF MIGRATION 0039. That migration converted the rows already
+// stored; this is what keeps the next sweep from writing the same mixture back.
+//
+// `starts_at` is TEXT and the diary is ordered and PAGED by it, so the column is
+// only chronological while every writer spells a moment the same way. The app's
+// own forms always did — `requireMoment` returns `new Date(ms).toISOString()` —
+// and the calendar sweep, the other door into the same column, stored whatever
+// Google sent: an hour in the EVENT's offset, `2026-08-18T12:00:00+05:30`, which
+// sorts as noon when it happens at 06:30Z.
+describe("a moment from Google is stored in UTC, like every other moment", () => {
+  it("converts an offset to UTC, byte for byte as the forms write it", async () => {
+    const { utcMoment } = await import("../src/lib/meetings")
+    expect(utcMoment("2026-08-18T12:00:00+05:30")).toBe(
+      new Date("2026-08-18T12:00:00+05:30").toISOString()
+    )
+    expect(utcMoment("2026-08-18T09:00:00-08:00")).toBe(
+      new Date("2026-08-18T09:00:00-08:00").toISOString()
+    )
+  })
+
+  it("leaves a moment that is already UTC exactly as it is", async () => {
+    const { utcMoment } = await import("../src/lib/meetings")
+    expect(utcMoment("2026-08-18T09:00:00.000Z")).toBe("2026-08-18T09:00:00.000Z")
+  })
+
+  it("leaves an ALL-DAY entry as a day — midnight UTC would invent a time", async () => {
+    const { utcMoment } = await import("../src/lib/meetings")
+    // Google's `date` with no `dateTime`. It also needs no help: a date with no
+    // `T` already sorts before every timed entry on its own day.
+    expect(utcMoment("2026-08-18")).toBe("2026-08-18")
+    expect(utcMoment(null)).toBeNull()
+  })
+
+  it("keeps a value it cannot read rather than losing the start time", async () => {
+    const { utcMoment } = await import("../src/lib/meetings")
+    // A null start would delete the meeting from every view keyed on it. A
+    // strange value somebody can see beats a row that quietly disappears.
+    expect(utcMoment("banana+05:30")).toBe("banana+05:30")
+  })
+
+  it("the sweep writes through it — both when it creates and when it mirrors", async () => {
+    const src = readFileSync(join(__dirname, "..", "src", "lib", "meetings.ts"), "utf8")
+    // Every `event.start` / `event.end` that reaches a statement goes through the
+    // converter. Read off the source because the fault was a raw value in a
+    // template literal, which is invisible to anything but a look at the write.
+    for (const raw of ["sqlString(event.start)", "sqlString(event.end || null)"])
+      expect(
+        src.includes(raw),
+        `the calendar sweep writes ${raw} straight into SQL — wrap it in utcMoment(), or the diary sorts strings instead of times`
+      ).toBe(false)
+    expect(src).toContain("sqlString(utcMoment(event.start))")
+    expect(src).toContain("sqlString(utcMoment(event.end || null))")
   })
 })

@@ -325,7 +325,11 @@ export function MeetingsScreen({
       <PagedFind<Meeting>
         listKey={meetingsKey(teamId)}
         placeholder={t("Search meetings…")}
-        noun="meetings"
+        matches={{
+          none: t("No meetings match"),
+          one: t("1 meeting matches"),
+          many: t("{count} meetings match"),
+        }}
         sorts={translatedSorts("meetings", t)}
         defaultSort={COLLECTION_SORTS.meetings.defaultSort}
         // THE DIARY'S FILTERS, asked of the door. They were the frame's until
@@ -368,7 +372,17 @@ export function MeetingsScreen({
           // its exact count), and the week sits inside the newest page for any
           // agency that has not held fifty meetings since Monday. The date
           // boundary is the same one the door computes — Monday, in UTC.
-          const shown = view === "week" ? rows.filter((m) => inThisWeek(m.startsAt)) : rows
+          //
+          // …AND IT STANDS DOWN THE MOMENT SOMEBODY ASKS A QUESTION. The find
+          // above asks the DOOR, over the whole diary (`view: "all"`, and the
+          // comment on it says why), so the door counts every meeting that
+          // matches and this filter then hid most of them: the screen read
+          // "1 meetings match" over "Nothing matched." A client-side filter
+          // underneath a server COUNT(*) is two answers to one question, which
+          // is the arrangement R16 exists to forbid — and the count is the half
+          // that is right. Searching the whole diary is also what the fetch above
+          // already promised: "the week and the calendar are views on top of it".
+          const shown = view === "week" && !found.active ? rows.filter((m) => inThisWeek(m.startsAt)) : rows
           const data = shapeMeetingsList(shown)
           // THE CALENDAR'S ROWS — the shaper's, so a meeting reads the same in
           // the grid as it does in the list underneath (a cancelled one still
