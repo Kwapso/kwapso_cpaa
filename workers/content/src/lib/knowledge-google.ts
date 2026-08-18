@@ -45,12 +45,14 @@
 // one of them may have filed it privately. Sharing one row would make the last
 // sweep to run decide who else can read somebody's document.
 
-import type { D1Rest } from "@shared/workers/d1-rest"
+import { d1Query, likeLiteral, type D1Rest } from "@shared/workers/d1-rest"
 import type { MemberGuard } from "@shared/workers/gating"
 import { GOOGLE_SERVICES, type GoogleItem, type GoogleService } from "@shared/types"
 import type { Env } from "../env"
-import { listConnections } from "./google"
+import { accessTokenFor, listConnections, listNamedSources } from "./google"
+import { googlePresence, type ProbableService } from "./google-api"
 import { hydrateText, readGoogleMaterial } from "./google-read"
+import { indexSource } from "./knowledge"
 import {
   INGEST_SOURCES_PER_TICK,
   listIngestState,
@@ -146,7 +148,17 @@ function rowId(item: GoogleItem): string {
  * could be swept as the wrong person. Bound once, at the only place that has the
  * right to build them.
  */
-export function googleIngestKinds(env: Env, cfg: D1Rest, guard: MemberGuard): IngestKind[] {
+export function googleIngestKinds(
+  env: Env,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  /** WHAT GOOGLE STILL HAD, filled in as each kind reads — the other half of
+   * `retireVanished` below, and the reason it costs no extra Google call. The
+   * sweep already asks each service what it holds; this keeps the answer instead
+   * of throwing it away. Optional, because a caller that only wants to INDEX has
+   * no business being made to hold a set it will not read. */
+  seen?: Map<GoogleService, Set<string>>
+): IngestKind[] {
   /** List cheaply, walk to the cursor, and only THEN pay for the bodies. A Drive
    * listing is one call for fifty files and their text is fifty more, so
    * hydrating before the slice would pay for forty-nine files this tick is not
@@ -159,6 +171,11 @@ export function googleIngestKinds(env: Env, cfg: D1Rest, guard: MemberGuard): In
     hydrate = false
   ): Promise<IngestRow[]> => {
     const { items } = await readGoogleMaterial(env, cfg, guard, { services: [service] })
+    // RECORDED BEFORE THE CURSOR NARROWS IT. The slice below is what this tick
+    // will FILE; this is everything the service currently holds, which is a
+    // different and much larger sentence — and it is the only one that can tell
+    // "Google no longer has this" from "the cursor has already passed it".
+    if (seen) seen.set(service, new Set(items.map((i) => i.externalId)))
     const wanted = afterCursor(inCursorOrder(toRows(items)), cursor).slice(0, limit)
     if (!hydrate || wanted.length === 0) return wanted
     // Hydration is per ITEM, so the slice is mapped back to the items it came
@@ -331,7 +348,8 @@ export async function sweepGoogle(
   const connected = new Set(
     (await listConnections(cfg, guard)).filter((c) => c.active).map((c) => c.service)
   )
-  const kinds = googleIngestKinds(env, cfg, guard).filter((k) =>
+  const seen = new Map<GoogleService, Set<string>>()
+  const kinds = googleIngestKinds(env, cfg, guard, seen).filter((k) =>
     connected.has(serviceOfStateKey(k.stateKey as string, guard.userId))
   )
   if (kinds.length === 0) return { results: [], skipped: false }
@@ -364,10 +382,11 @@ export async function sweepGoogle(
     if (recent) return { results: recent, skipped: true }
   }
 
-  return {
-    results: await sweepKinds(env, cfg, guard, kinds, options.limit ?? INGEST_SOURCES_PER_TICK),
-    skipped: false,
-  }
+  const results = await sweepKinds(env, cfg, guard, kinds, options.limit ?? INGEST_SOURCES_PER_TICK)
+  // AFTER the sweep, never instead of it: the reads above are what filled `seen`,
+  // and a retire pass that ran first would be reasoning about last tick's world.
+  await retireVanished(env, cfg, guard, seen)
+  return { results, skipped: false }
 }
 
 /** HOW LONG A PERSON'S GOOGLE STAYS "JUST CHECKED" — the floor above. Five
@@ -424,4 +443,164 @@ function serviceOfStateKey(stateKey: string, userId: string): GoogleService {
   return (
     GOOGLE_SERVICES.find((s) => googleStateKey(s, userId) === stateKey) ?? "drive"
   )
+}
+
+// ── LETTING GO ───────────────────────────────────────────────────────────────
+//
+// WHAT HAPPENS WHEN SOMEBODY DELETES A GOOGLE FILE, and what used to.
+//
+// Every kind this app owns the rows of retires itself. `IngestRow.retired` says
+// it in as many words: "TRUE when the row has left the part of the app this kind
+// mirrors — archived, switched off, deleted. The source is DEACTIVATED rather
+// than skipped, which is the difference between 'the assistant stops quoting it'
+// and 'the assistant quotes it forever because the sweep never visits it
+// again'." An archived ticket comes back from its own table with a column set,
+// and the engine acts on it.
+//
+// GOOGLE'S FOUR KINDS HAD NO SUCH COLUMN AND SET NO SUCH FLAG. They are not a
+// table this app walks; they are a LISTING, and a deleted file is not in it. So
+// the sweep moved forward past a source it would never be handed again, and the
+// assistant went on quoting a document that no longer existed — indefinitely,
+// because nothing in the loop was ever going to visit that row a second time.
+// Edits were always fine (the content hash catches a changed file the next time
+// its stamp moves). Deletions were the half nobody could see, because the
+// symptom is an answer that looks perfectly normal.
+//
+// THE TWO RULES THIS PASS IS BUILT ON:
+//
+//   • ABSENCE IS NOT DELETION. A source missing from a listing may have fallen
+//     outside a window, slid past a page cap, stopped matching a query, or been
+//     invisible for ninety seconds because Google was unwell. Retiring on
+//     absence would empty somebody's index during an outage and record it as
+//     housekeeping. So absence only makes a source a CANDIDATE, and a candidate
+//     is retired only when Google positively says it has gone (`googlePresence`
+//     — in the bin, called off, or 404).
+//   • RETIRE, NEVER DELETE. Exactly as everywhere else here: `deactivated_at` is
+//     set, the chunks are dropped so nothing can be quoted from it, and the row
+//     and its whole history stay where they are.
+//
+// AND ONE SOURCE THAT NEEDS NO GOOGLE CALL AT ALL. A Chat source IS a space
+// somebody named in kwapso, so the positive signal for it is that named source
+// being switched off — a fact in this app's own database. Nothing is asked of
+// Google about a space, which is why `ProbableService` has three members.
+
+/** How many of one person's sources for one kind this pass will LOOK at per
+ * tick. R14's hard cap, and generous on purpose: it is one indexed read of one
+ * person's own rows, and the number of Google sources anybody can have is itself
+ * bounded by the listing sizes that created them. */
+const RETIRE_SCAN_CAP = 500
+
+/** How many of those it will ASK GOOGLE about per tick. This is the number that
+ * costs something — one round trip each — so it is small, and the scan above is
+ * randomised so that a person with more candidates than this does not have the
+ * same head of the queue examined for ever while the tail is never reached. */
+const RETIRE_PROBES_PER_TICK = 25
+
+/** One live source of this person's, and the Google id behind it. */
+type HeldSource = { id: string; externalId: string }
+
+/**
+ * THE SOURCES THIS PERSON STILL HOLDS FOR ONE KIND.
+ *
+ * Keyed on `origin_row_id` rather than on `owner_user_id`, and that is not a
+ * shortcut: a source filed as TEAM material has a null owner (see `fencing`), so
+ * an owner column cannot find one. The reader's id is the first half of every
+ * Google `origin_row_id` by construction (see `rowId`), which makes it the one
+ * key that finds this person's rows whichever shelf they sit on.
+ */
+async function heldSources(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  originTable: string
+): Promise<HeldSource[]> {
+  const rows = await d1Query<{ id: string; origin_row_id: string }>(
+    cfg,
+    guard.databaseId,
+    // R14 hard cap: RETIRE_SCAN_CAP, said here and named above.
+    //
+    // RANDOM, and it is the cheapest way to be complete over time. There is no
+    // "last checked" column to order by and adding one would be a migration for
+    // a housekeeping detail; ordering by anything stable would examine the same
+    // head every tick and never reach a person's five-hundred-and-first source.
+    // Shuffling costs nothing at this size and means every source is looked at
+    // within a handful of ticks.
+    `SELECT id, origin_row_id FROM knowledge_sources
+      WHERE origin_table = ? AND origin_row_id LIKE ? ESCAPE '\\'
+        AND deactivated_at IS NULL
+      ORDER BY RANDOM() LIMIT ${RETIRE_SCAN_CAP}`,
+    [originTable, `${likeLiteral(guard.userId)}:%`]
+  )
+  // The id after the reader's own — see `rowId`. A row whose shape does not
+  // match is skipped rather than guessed at.
+  const prefix = `${guard.userId}:`
+  return rows
+    .filter((r) => r.origin_row_id.startsWith(prefix))
+    .map((r) => ({ id: r.id, externalId: r.origin_row_id.slice(prefix.length) }))
+}
+
+/** STOP QUOTING IT. The same two steps the ingest engine takes for an archived
+ * ticket, in the same order: mark the source, then re-index it — which, for a
+ * deactivated source, is what drops its chunks. */
+async function retire(env: Env, cfg: D1Rest, guard: MemberGuard, sourceId: string): Promise<void> {
+  const now = new Date().toISOString()
+  await d1Query(
+    cfg,
+    guard.databaseId,
+    // R17: the predicate rides the UPDATE, so a source another pass already
+    // retired moves zero rows and this one does nothing twice.
+    `UPDATE knowledge_sources SET deactivated_at = ?, deactivator_name = 'kwapso', updated_at = ?
+      WHERE id = ? AND deactivated_at IS NULL`,
+    [now, now, sourceId]
+  )
+  await indexSource(env, cfg, guard, sourceId)
+}
+
+/**
+ * RETIRE WHAT GOOGLE NO LONGER HAS — see the essay above for both rules.
+ *
+ * `seen` is what each service actually returned this tick. A service MISSING
+ * from it was not read at all (its kind errored, or the person has not connected
+ * it), and that is the most important case to get right: an unread service must
+ * retire nothing, because "we did not ask" and "it is not there" are the two
+ * sentences this whole pass exists to keep apart.
+ */
+async function retireVanished(
+  env: Env,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  seen: Map<GoogleService, Set<string>>
+): Promise<void> {
+  // CHAT FIRST, because it asks Google nothing. A Chat source is keyed on the
+  // named source ROW, so it has gone exactly when that row is no longer an
+  // active share — the owner switching a space off IS the positive signal, and
+  // it is one this app wrote down itself.
+  if (seen.has("chat")) {
+    const live = new Set(
+      (await listNamedSources(cfg, guard, "chat")).filter((s) => s.active).map((s) => s.id)
+    )
+    for (const held of await heldSources(cfg, guard, "google_chat"))
+      if (!live.has(held.externalId)) await retire(env, cfg, guard, held.id)
+  }
+
+  for (const service of ["drive", "gmail", "calendar"] as ProbableService[]) {
+    const current = seen.get(service)
+    // Not read this tick → nothing is knowable, so nothing happens.
+    if (!current) continue
+    const candidates = (await heldSources(cfg, guard, `google_${service}`))
+      .filter((h) => !current.has(h.externalId))
+      .slice(0, RETIRE_PROBES_PER_TICK)
+    if (candidates.length === 0) continue
+    // A token this person has, by definition: the kind was read a moment ago
+    // with it. A failure here is not "everything has gone" — it is one service
+    // this tick cannot ask about, and it is left alone.
+    let token: string
+    try {
+      token = (await accessTokenFor(env, cfg, guard, service)).token
+    } catch {
+      continue
+    }
+    for (const held of candidates)
+      if ((await googlePresence(service, token, held.externalId)) === "gone")
+        await retire(env, cfg, guard, held.id)
+  }
 }

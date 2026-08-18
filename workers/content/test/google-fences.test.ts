@@ -97,12 +97,37 @@ describe("Gmail is known contacts, and nothing else", () => {
     expect(q).toContain("to:cto@delaval.example")
   })
 
+  it("a contact is matched on cc as well as from and to", () => {
+    // THE GAP, off the owner's own mailbox: `cc:alaap@kwapso.com` returns "Re:
+    // Declined: Strategy Session w kwapso" — a colleague writing to an outside
+    // address with him copied in. Mail he can see, about his own agency, that
+    // the fence could not find, because "to or from" had been implemented as
+    // two terms and a cc is neither.
+    const q = knownContactQuery(["ana@berg.example"]) as string
+    expect(q).toContain("cc:ana@berg.example")
+  })
+
   it("the contact list is capped, so a long one cannot become a refused query", () => {
     const many = Array.from({ length: GMAIL_CONTACT_CAP + 25 }, (_, i) => `p${i}@example.com`)
     const q = knownContactQuery(many) as string
-    // Two terms per contact, and not one more.
-    expect(q.split(" ").length).toBe(GMAIL_CONTACT_CAP * 2)
+    // Three terms per contact now, and not one more.
+    expect(q.split(" ").length).toBe(GMAIL_CONTACT_CAP * 3)
     expect(q).not.toContain(`p${GMAIL_CONTACT_CAP}@example.com`)
+  })
+
+  it("adding the third direction did not make the query LONGER — the cap paid for it", () => {
+    // THE TRAP THIS LOCKS. A Gmail query that is too long is REFUSED, and a
+    // refused query reads from the outside exactly like an empty mailbox — the
+    // worst failure shape there is, because nothing looks wrong. Going from two
+    // terms to three at the old cap of forty would have taken the query from
+    // eighty terms to a hundred and twenty, past anything this product has ever
+    // asked Google and answered for.
+    //
+    // So the assertion is not "the cap is 26". It is that the QUERY cannot grow,
+    // whatever anybody does to the directions or the cap later.
+    const many = Array.from({ length: 500 }, (_, i) => `p${i}@example.com`)
+    const q = knownContactQuery(many) as string
+    expect(q.split(" ").length).toBeLessThanOrEqual(80)
   })
 
   it("a subject with a newline cannot smuggle a second header (Bcc:)", async () => {

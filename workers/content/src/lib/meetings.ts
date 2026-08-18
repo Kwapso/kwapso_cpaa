@@ -26,7 +26,7 @@ import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { accessTokenFor } from "./google"
 import { calendarGet, calendarList, type CalendarEvent } from "./google-api"
 import { capToRow } from "./knowledge-files"
-import { findTranscript, transcriptText, type TranscriptRoute } from "./google-transcript"
+import { findTranscript, type TranscriptRoute } from "./google-transcript"
 import { MEETING_LOG_KIND } from "./work-logs"
 import type { Env } from "../env"
 
@@ -718,11 +718,18 @@ export async function captureTranscript(
       "No transcript for this meeting yet, not on the calendar entry, not in the folders you've shared, and not in any notice from Google."
     )
 
-  // THE WORDS. Read before the claim on purpose: a transcript whose text we
-  // cannot get at is still worth naming on the row (the link opens it in Google),
-  // and reading it first means the claim below writes the whole fact at once
-  // rather than leaving a row that says "captured" with nothing in it.
-  const words = capToRow(await transcriptText(env, cfg, guard, found.fileId))
+  // THE WORDS came back WITH the find, and that is the fix for the row that used
+  // to say "captured" over nothing.
+  //
+  // It used to read the text here, after the hunt, and file whatever came back —
+  // including "". A transcript of zero characters ticked the meeting held, wrote
+  // a work log for everybody in the room, and set `transcript_captured_at`,
+  // which is the column that means "do not look again". So one unreadable file
+  // ended the search for that conversation permanently. The hunt now proves it
+  // can read a candidate before calling it a transcript (google-transcript.ts),
+  // so reaching this line means there are words; and a meeting whose transcript
+  // could not be read stays unclaimed and is tried again next time.
+  const words = capToRow(found.text)
 
   // THE CLAIM. Everything below happens exactly once because this statement
   // moves exactly one row exactly once — and it ticks "held" in the same breath
@@ -815,9 +822,11 @@ VALUES (${sqlString(ulid())}, ${sqlString(meeting.accountId)}, 'meetings', ${sql
 // on Friday is re-read on Monday; forward far enough that there is a month to
 // prepare. And the sweep does three things rather than one:
 //
-//   • CREATES — a repeating instance with no record yet becomes one (9.7),
-//     including one in the PAST, which is how a freshly connected calendar gets
-//     last week's stand-up and therefore last week's transcript.
+//   • CREATES — an entry with no record yet becomes one (9.7), including one in
+//     the PAST, which is how a freshly connected calendar gets last week's
+//     stand-up and therefore last week's transcript. WHICH entries qualify is
+//     WHICH entries qualify is now every entry the window holds, and the essay
+//     above `syncCalendar` says why it is no longer "the repeating ones".
 //   • REFRESHES — every meeting whose entry is in the window has its `google_*`
 //     mirror rewritten: the guest list and what each person answered, the
 //     organiser, the join link, the attachments, the zone, the repeat rule.
@@ -839,9 +848,48 @@ VALUES (${sqlString(ulid())}, ${sqlString(meeting.accountId)}, 'meetings', ${sql
 // needs: attaching a transcript to an event IS an edit of the event, so the one
 // stamp that says "look again" is the one that moves when a transcript lands.
 
-/** How far ahead a repeating entry becomes a real record. Four weeks, so there
+/** How far ahead a calendar entry becomes a real record. Four weeks, so there
  * is a month to prepare (Aurora's tk3). */
 const SERIES_HORIZON_DAYS = 28
+
+/**
+ * WHAT NOW BECOMES A RECORD: EVERYTHING ON THE CALENDAR THAT IS STILL ON.
+ *
+ * WHAT IT USED TO SAY. `if (!event.recurringEventId) continue`, so a record was
+ * made for a REPEATING INSTANCE and for nothing else. On the owner's real
+ * calendar on 2026-08-18 that was 21 mirrored rows, 21 of them recurring and 0
+ * one-off: "FluClinic: Client selectable data" — organised by a colleague, him
+ * an accepted guest, on his primary calendar, at the right hour — read back
+ * perfectly from Google and never appeared in the diary. It still reached the
+ * knowledge base, which sweeps every event, so the app could ANSWER questions
+ * about a meeting it would not SHOW him.
+ *
+ * WHAT IT SAYS NOW: nothing, because there is nothing left to ask. His
+ * instruction is not a narrower rule, it is the absence of one — "I want
+ * everything that's in my Google Calendar to sync here, whether they're past
+ * events, new events, whatever. Everything should be synced." A guest-list test
+ * was written first and thrown away: it would have kept out the block somebody
+ * puts in their own day to write a deck, which is a judgement he did not ask
+ * anybody to make on his behalf, and which he would have to know this rule
+ * exists to explain the gap.
+ *
+ * SO THE ONLY TEST IS THE ONE BELOW, AND IT IS ABOUT CANCELLATION rather than
+ * about kind: an entry already called off is not created purely in order to be
+ * retired in the same breath. An entry called off LATER is a different question
+ * with a different answer, twenty lines down.
+ *
+ * WHAT THIS DOES NOT YET DO. "Everything" here means everything in the sweep's
+ * WINDOW — a fortnight back, four weeks forward. Reaching the whole history of a
+ * calendar needs a wider window and a resumable cursor, which is a lane of its
+ * own and is named in the hand-over.
+ */
+
+/** WHAT TO CALL AN ENTRY THAT NEVER GOT A NAME. Said once because the insert and
+ * the refresh both need it and a row whose title changed on its second sync
+ * would look like somebody had renamed it. */
+function titleOf(event: CalendarEvent): string {
+  return event.summary || "A meeting with no title"
+}
 
 /** HOW FAR BACK THE SWEEP RE-READS.
  *
@@ -911,12 +959,11 @@ type SyncedRow = {
  * is unique on `google_event_id`, so an instance that already has a record
  * cannot get a second one however many times this runs.
  *
- * ONLY REPEATING ENTRIES BECOME RECORDS. A one-off in somebody's calendar is
- * their own diary, not the agency's record of a client conversation — importing
- * those would turn the meetings module into a copy of one person's Google
- * account. A one-off that is ALREADY a record here (somebody pushed it out from
- * kwapso) is still refreshed, because that is a meeting we own and Google has
- * facts about it.
+ * EVERY ENTRY IN THE WINDOW BECOMES A RECORD. It used to be the repeating ones
+ * alone; the essay above this function is the bug report that changed it and the
+ * owner's sentence that settled it. An entry that is ALREADY a record here
+ * (somebody pushed it out from kwapso) is refreshed whatever it looks like,
+ * because that is a meeting we own and Google has facts about it.
  */
 export async function syncCalendar(
   env: Env,
@@ -989,10 +1036,11 @@ export async function syncCalendar(
     const row = known.get(event.id)
 
     if (!row) {
-      // A record is only MADE for a repeating instance, and never for one that
-      // was already called off — importing a cancelled entry would put a meeting
-      // in the diary purely in order to cancel it.
-      if (!event.recurringEventId || event.status === "cancelled") continue
+      // Everything the diary holds becomes a record — see the essay above for
+      // why there is no second test here any more — except an entry that was
+      // already called off, which would be a meeting put in the diary purely in
+      // order to cancel it.
+      if (event.status === "cancelled") continue
       const id = ulid()
       await d1ExecScript(
         cfg,
@@ -1003,7 +1051,7 @@ export async function syncCalendar(
            google_attendees_json, google_attachments_json, google_status, google_recurrence,
            google_time_zone, google_updated_at, google_synced_at,
            created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString(event.summary || "A repeating meeting")}, ${sqlString(event.description || null)}, ${sqlString(event.location || null)}, ${sqlString(event.start)}, ${sqlString(event.end || null)}, ${sqlString(heldAlready(event, now) ? "held" : "scheduled")}, ${sqlString(heldAlready(event, now) ? event.end || event.start : null)}, ${sqlString(event.recurringEventId)}, 1, ${sqlString(event.id)}, ${sqlString(event.url)}, ${sqlString(event.joinUrl)}, ${sqlString(event.organizer.email || null)}, ${sqlString(JSON.stringify(event.attendees))}, ${sqlString(JSON.stringify(event.attachments))}, ${sqlString(event.status || null)}, ${sqlString(event.recurrence.join("\n") || null)}, ${sqlString(event.timeZone || null)}, ${sqlString(event.updatedAt)}, ${sqlString(at)}, ${sqlString(at)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+VALUES (${sqlString(id)}, ${sqlString(titleOf(event))}, ${sqlString(event.description || null)}, ${sqlString(event.location || null)}, ${sqlString(event.start)}, ${sqlString(event.end || null)}, ${sqlString(heldAlready(event, now) ? "held" : "scheduled")}, ${sqlString(heldAlready(event, now) ? event.end || event.start : null)}, ${sqlString(event.recurringEventId || null)}, 1, ${sqlString(event.id)}, ${sqlString(event.url)}, ${sqlString(event.joinUrl)}, ${sqlString(event.organizer.email || null)}, ${sqlString(JSON.stringify(event.attendees))}, ${sqlString(JSON.stringify(event.attachments))}, ${sqlString(event.status || null)}, ${sqlString(event.recurrence.join("\n") || null)}, ${sqlString(event.timeZone || null)}, ${sqlString(event.updatedAt)}, ${sqlString(at)}, ${sqlString(at)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
       )
       created++
       continue
@@ -1034,7 +1082,7 @@ VALUES (${sqlString(id)}, ${sqlString(event.summary || "A repeating meeting")}, 
     // Google's words for a row Google authored; only the mirror for one of ours.
     const ownWords =
       row.from_calendar === 1
-        ? `, title = ${sqlString(event.summary || "A repeating meeting")},
+        ? `, title = ${sqlString(titleOf(event))},
              starts_at = ${sqlString(event.start)},
              ends_at = ${sqlString(event.end || null)},
              location = ${sqlString(event.location || null)},
@@ -1071,9 +1119,14 @@ VALUES (${sqlString(id)}, ${sqlString(event.summary || "A repeating meeting")}, 
     cancelled,
     // Read-only, and shown as such: these are not records and nothing may be
     // written against them until they cross the horizon.
+    // THE SAME PREDICATE AS THE CREATE, and that is the point of it being a
+    // function. "What is coming that isn't a record yet" is only a useful
+    // sentence if it lists the entries that WILL become records when they cross
+    // the horizon — a screen showing a different set from the one the sweep acts
+    // on is a screen that quietly teaches somebody the wrong rule.
     ahead: beyond
-      .filter((e) => e.recurringEventId && e.status !== "cancelled")
-      .map((e) => ({ eventId: e.id, title: e.summary || "A repeating meeting", startsAt: e.start, url: e.url })),
+      .filter((e) => e.status !== "cancelled")
+      .map((e) => ({ eventId: e.id, title: titleOf(e), startsAt: e.start, url: e.url })),
   }
 }
 
