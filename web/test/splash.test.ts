@@ -30,7 +30,7 @@
 // read as the shipped strings, the score proved to be a WARP of the author's
 // composition rather than a rewrite of it, and the animator actually executed.
 
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
@@ -495,6 +495,26 @@ describe("skipping the splash is a deliberate act", () => {
 // AND IT READS BOTH DOORS. The mangling that shipped was in a string both front
 // ends inline from the same module, and only the agency app's export was ever
 // looked at — the same one-door blindness this file's own failure mode 1 is about.
+/** Is the exported HTML older than the source that generates it?
+ *
+ * `npm run check` does NOT build, so once an export exists on disk these cases
+ * compare CURRENT source against a build from whenever somebody last ran one —
+ * and after a deploy, that is always older. The failure then reads "the animator
+ * was altered between the source and the export", which is the sentence for a
+ * minifier mangling the script: the exact thing this test exists to catch, and
+ * the exact wrong conclusion. It cost real time twice in one night before this
+ * check existed. A stale export is not evidence of anything. */
+function staleExport(exported: string): boolean {
+  try {
+    const built = statSync(exported).mtimeMs
+    return [join(ROOT, "shared", "web", "splash.ts"), join(ROOT, "shared", "web", "mark-loader.tsx")].some(
+      (src) => existsSync(src) && statSync(src).mtimeMs > built
+    )
+  } catch {
+    return false
+  }
+}
+
 describe("what the compiler actually shipped", () => {
   // Set by `npm run check:built` once the export exists. Without it these cases
   // skip, which is right for `npm run check` and wrong for a ship.
@@ -537,7 +557,9 @@ describe("what the compiler actually shipped", () => {
           `${what} was altered between the source and ${door}'s export, from character ${i}:\n` +
             `  source: ${JSON.stringify(want.slice(i, i + 80))}\n` +
             `  export: ${JSON.stringify(got.slice(i, i + 80))}\n` +
-            `Interpolating a compile-time constant into a shipped string is what did this last time.`
+            (staleExport(exported)
+              ? `THE EXPORT ON DISK IS OLDER THAN THE SOURCE — this is almost certainly a STALE BUILD, not a mangled one. \`npm run check\` does not build; run \`npm run check:built\`, which does, and only worry if it still says this.`
+              : `Interpolating a compile-time constant into a shipped string is what did this last time.`)
         ).toBe(want.length)
       })
   }
