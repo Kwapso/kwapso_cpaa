@@ -71,14 +71,20 @@ export function TicketRow({ ticket }: { ticket: HelpTicket }) {
           <Badge variant={status.variant}>{t(status.label)}</Badge>
           {/* HOW MUCH WORK IS ON IT, and nothing else about that work
               (.plans/BUILD-1 §7: "stories as a COUNT only — never the titles").
-              Two numbers, because "3 pieces of work, 1 done" is a picture and "3
-              pieces of work" is a shrug. Absent when there is none, rather than
-              a "0 of 0" that reads as neglect on a request somebody answered
-              without needing to build anything. */}
+              Both numbers, because "3 pieces of work, 1 done" is a picture and
+              "3 pieces of work" is a shrug. Absent when there is none, rather
+              than a "0 of 0" that reads as neglect on a request somebody
+              answered without needing to build anything.
+
+              ONE PHRASE, NOT TWO. It used to read "3 pieces of work, 1 done" —
+              two numbers a sentence apart, which is two things on a band that
+              already carries a state and a date (N1). "1 of 3 done" is the same
+              picture in one unit, and it is the phrasing the sprint rows on the
+              other front door already use, so a count reads the same way
+              wherever somebody meets it. */}
           {ticket.storyCount > 0 && (
             <span>
-              {ticket.storyCount} {ticket.storyCount === 1 ? "piece" : "pieces"} {t("of work,")}{" "}
-              {ticket.doneStoryCount} {t("done")}
+              {ticket.doneStoryCount} {t("of")} {ticket.storyCount} {t("done")}
             </span>
           )}
           <span>{formatRelative(ticket.updatedAt ?? ticket.createdAt)}</span>

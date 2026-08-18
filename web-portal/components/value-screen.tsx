@@ -79,43 +79,61 @@ const AppSavingsChart = dynamic(
 )
 
 /** One step, and the whole sum behind it. This line is the answer to the third
- * click — deliberately the arithmetic rather than its result. */
+ * click — deliberately the arithmetic rather than its result.
+ *
+ * FOUR THINGS, AND IT USED TO BE SEVEN: the step's name, "no longer needed",
+ * the baseline minutes, the latest minutes, how often it runs, the hours saved
+ * and — when a step got slower — a sentence of explanation, all on one line.
+ * That made it the densest band in the client portal, on the screen a client is
+ * most likely to turn round and show somebody else (N1 caps a band at four).
+ *
+ * Now: the NAME is the title. The two times are ONE unit, an arrow between them,
+ * because "twelve minutes became four" is one fact a reader decodes in one go
+ * and not two facts to be compared. How often it runs is the second. The HOURS
+ * SAVED is the trailing number, because it is the point of the line. And the
+ * regression sentence drops to a line of its OWN underneath — a sentence is
+ * never a unit on a band beside numbers (N4: one band, one question).
+ *
+ * Nothing was removed and no figure changed; R25's caption is untouched. */
 function StepLine({ step }: { step: StepSaving }) {
   const t = useT()
   const gain = step.savedSecondsPerMonth >= 0
   return (
-    <div className="flex flex-col gap-1 border-t py-3 first:border-t-0 sm:flex-row sm:items-baseline sm:justify-between">
-      <div className="min-w-0">
-        <p className="text-foreground truncate text-sm font-medium">
-          {step.name}
-          {step.removed && (
-            <Badge variant="secondary" className="ml-2 text-[10px]">
-              {t("no longer needed")}
-            </Badge>
-          )}
-        </p>
-        <p className="text-muted-foreground text-xs">
-          {minutesText(step.baselineSecondsPerRun)} {t("before ·")}{" "}
-          {step.removed ? "not needed now" : `${minutesText(step.latestSecondsPerRun)} now`} ·{" "}
-          {step.runsPerMonth.toLocaleString()}{t("× a month")}
-        </p>
-      </div>
-      <div className="shrink-0 text-sm sm:text-right">
-        <span className={gain ? "text-foreground font-medium" : "text-destructive font-medium"}>
+    <div className="flex flex-col gap-1 border-t py-3 first:border-t-0">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-foreground truncate text-sm font-medium">
+            {step.name}
+            {step.removed && (
+              <Badge variant="secondary" className="ml-2 text-[10px]">
+                {t("no longer needed")}
+              </Badge>
+            )}
+          </p>
+          <p className="text-muted-foreground text-xs">
+            {minutesText(step.baselineSecondsPerRun)} →{" "}
+            {step.removed ? t("not needed now") : minutesText(step.latestSecondsPerRun)} ·{" "}
+            {step.runsPerMonth.toLocaleString()}
+            {t("× a month")}
+          </p>
+        </div>
+        <span
+          className={`shrink-0 text-sm sm:text-right ${gain ? "text-foreground font-medium" : "text-destructive font-medium"}`}
+        >
           {gain ? "" : "−"}
           {hoursText(step.savedSecondsPerMonth)} {t("a month")}
         </span>
-        {/* A step that takes LONGER. Shown, always, and counted in the totals —
-            with our explanation when we have written one, and an honest sentence
-            when we have not. */}
-        {step.regression && (
-          <p className="text-muted-foreground text-xs">
-            {step.explained
-              ? "your team has explained this below"
-              : "your team is writing an explanation"}
-          </p>
-        )}
       </div>
+      {/* A step that takes LONGER. Shown, always, and counted in the totals —
+          with our explanation when we have written one, and an honest sentence
+          when we have not. On its own line, because it is a sentence. */}
+      {step.regression && (
+        <p className="text-muted-foreground text-xs">
+          {step.explained
+            ? t("your team has explained this below")
+            : t("your team is writing an explanation")}
+        </p>
+      )}
     </div>
   )
 }

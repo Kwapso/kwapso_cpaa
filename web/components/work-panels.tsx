@@ -213,6 +213,38 @@ export function sprintLine(s: Sprint): string {
   )
 }
 
+/** THE SAME SPRINT, ON A LIST THAT HAS ALREADY SAID ITS KIND — three facts, not
+ * five.
+ *
+ * The Sprints overview groups by kind and puts the kind's own word above each
+ * group, and then every row underneath repeated it: "Retainer · Northwind ·
+ * Portal · 3 Feb → 20 Mar · 3 of 11 done", under a heading that said Retainer.
+ * A fact restated once per row is not information, it is noise with a job title,
+ * and it took that band to seven units against N1's four.
+ *
+ * So the KIND comes off (the heading says it) and HOW MUCH IS DONE comes off
+ * (it becomes the row's trailing number, where a number belongs — T4), leaving
+ * the three facts D5 allows a status line: whose, which app, and when.
+ *
+ * `sprintLine` above is unchanged and still carries all five, because the flat
+ * "All sprints" list and the panels on an account and an app are NOT grouped by
+ * kind, and there the kind is the one word telling you what sort of block of
+ * work you are looking at. Two lines, because there are two situations, not
+ * because there are two opinions. */
+export function sprintLineInKindGroup(s: Sprint): string {
+  return (
+    [
+      s.accountName,
+      s.appName,
+      s.startsOn && s.endsOn
+        ? `${formatDate(s.startsOn)} → ${formatDate(s.endsOn)}`
+        : (formatDate(s.startsOn) || formatDate(s.endsOn) || null),
+    ]
+      .filter(Boolean)
+      .join(" · ") || "—"
+  )
+}
+
 /** THE BLOCKS OF WORK SOLD on one app, or to one account. Bounded, not paged —
  * a sprint is a contract, so the whole set is the answer and its exact total
  * comes back beside it. */

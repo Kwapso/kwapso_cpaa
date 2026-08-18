@@ -102,18 +102,25 @@ function EarlierNotLoaded({
 }
 
 /** WHAT "ALL" SHOWS (CHECKLIST 9.1: "all, with far more columns"). The two-field
- * list is for scanning; this is the one somebody reads across, so it carries
- * every fact a meeting row can state without opening it. */
+ * list is for scanning; this is the one somebody reads across.
+ *
+ * SIX COLUMNS, NOT NINE. "Every fact a meeting row can state" was the brief and
+ * nine columns was the result — the widest table in either front door, against
+ * N1's table budget of six. A table's column header does the labelling, which is
+ * why it gets six where a list row gets four; past that the row stops being
+ * scannable and becomes something you read, which is what the record is for.
+ *
+ * The three that went: `Why we met` and `Notes` are prose, and prose in a table
+ * cell is a truncated sentence nobody can read either way; `Reference` already
+ * rides the record's own eyebrow (D4), so it was the same string in two places.
+ * All three are on the meeting, one click from the row they were crowding. */
 const ALL_COLUMNS = [
   field("name", "Meeting"),
   field("when", "When"),
   field("client", "Client"),
   field("app", "App"),
-  field("purpose", "Why we met"),
   field("where", "Where"),
   field("state", "Status"),
-  field("written", "Notes"),
-  field("reference", "Reference"),
 ]
 
 export function MeetingsScreen({
