@@ -135,8 +135,8 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
   const rates = ratesQ.data
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight">{t("Internal rates")}</h1>
           {/* The sentence that says who may read this, on the screen rather than
@@ -158,7 +158,7 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
           {t("No internal rates yet. Until one is set, an hour of our time counts as costing nothing.")}
         </p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-col gap-2">
           {rates.map((r) => (
             <li
               key={r.id}
@@ -377,7 +377,7 @@ export function RoleRateCard({ teamId }: { teamId: string }) {
           {t("No role rates yet. Until one is set, an app's hours are reported without a money figure beside them.")}
         </p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-col gap-2">
           {rates.map((r) => (
             <li
               key={r.id}
@@ -463,7 +463,7 @@ export function RoleRateCard({ teamId }: { teamId: string }) {
                 }
               })
             }
-            className="gap-1.5"
+            className="gap-1"
           >
             {busy ? <Spinner /> : <Plus className="size-4" />}
             {t("Save")}

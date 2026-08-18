@@ -62,7 +62,7 @@ function Line({
   subtract?: boolean
 }) {
   return (
-    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 border-t py-2.5 first:border-t-0">
+    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t py-2.5 first:border-t-0">
       <div className="min-w-0">
         <p className="truncate text-sm">{label}</p>
         {detail && <p className="text-muted-foreground text-xs">{detail}</p>}
@@ -114,7 +114,7 @@ export function MarginPanel({
   const down = m.marginCents < 0
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       <div className="rounded-xl border p-4">
         <p className="text-muted-foreground text-sm">{t("What this account leaves us")}</p>
         <p

@@ -131,7 +131,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
   }
 
   return (
-    <section className="animate-rise flex flex-col gap-3">
+    <section className="animate-rise flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
           {t("Access tokens")}
@@ -153,7 +153,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
           {tokens.map((t) => (
             <div
               key={t.id}
-              className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b p-3 text-sm last:border-0"
+              className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b p-3 text-sm last:border-0"
             >
               <span className="font-medium">{t.label}</span>
               {t.revokedAt ? (
@@ -189,7 +189,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
                       variant="outline"
                       size="sm"
                       onClick={() => copyInstructions("kwapso_mcp_YOUR_TOKEN")}
-                      className="gap-1.5"
+                      className="gap-1"
                       title="Copy setup instructions for any AI"
                     >
                       <ClipboardCopy className="size-3.5" aria-hidden />
@@ -200,7 +200,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
                     variant="outline"
                     size="sm"
                     onClick={() => setRevoking(t)}
-                    className="text-destructive hover:text-destructive gap-1.5"
+                    className="text-destructive hover:text-destructive gap-1"
                   >
                     <Ban className="size-3.5" aria-hidden />
                     <span className="hidden sm:inline">Revoke</span>
@@ -239,7 +239,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="shrink-0 gap-1.5"
+                  className="shrink-0 gap-1"
                   onClick={() => {
                     void navigator.clipboard?.writeText(secret).then(
                       () => toast.success(t("Copied.")),
@@ -255,7 +255,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-1.5 self-start"
+                className="gap-1 self-start"
                 onClick={() => copyInstructions(secret)}
               >
                 <ClipboardCopy className="size-3.5" aria-hidden /> {t("Copy setup prompt for any AI")}

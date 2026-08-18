@@ -88,7 +88,7 @@ export function AuthCard({ onSignedIn }: { onSignedIn: () => void }) {
             {/* BESIDE the code, never instead of it. Both prove the same
                 identity and land on the same user record — a colleague who used
                 a code last week and Google today is one person. */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <span className="bg-border h-px flex-1" />
               <span className="text-muted-foreground text-xs">or</span>
               <span className="bg-border h-px flex-1" />

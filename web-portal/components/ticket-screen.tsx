@@ -206,7 +206,7 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
   const back = (
     <Link
       href="/tickets"
-      className="text-muted-foreground hover:text-foreground -ml-1 flex w-fit items-center gap-1.5 text-sm"
+      className="text-muted-foreground hover:text-foreground -ml-1 flex w-fit items-center gap-1 text-sm"
     >
       <ArrowLeft className="size-3.5" />
       {t("All tickets")}
@@ -232,14 +232,14 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
   const status = STATUS_WORDS[ticket.status]
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-6">
       {back}
 
       {/* What you asked, and where it stands — in the portal's own words. One
        * badge, not two: the library's header showed its own English status
        * ("Open", "In progress") beside this one, so the same fact appeared twice
        * and half of it was the agency's vocabulary rather than the client's. */}
-      <Card className="hover-lift-none flex flex-col gap-3 p-4">
+      <Card className="hover-lift-none flex flex-col gap-4 p-4">
         <Badge variant={status.variant} className="w-fit">
           {t(status.label)}
         </Badge>
@@ -260,7 +260,7 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
        * this is a band and not a permanent control — a client never gets a second
        * lifecycle button, on this screen or any other. */}
       {ticket.status === "awaiting_validation" ? (
-        <div className="bg-warning/10 text-warning-foreground flex flex-col gap-3 rounded-xl px-4 py-3 text-sm sm:flex-row sm:items-center">
+        <div className="bg-warning/10 text-warning-foreground flex flex-col gap-4 rounded-xl px-4 py-3 text-sm sm:flex-row sm:items-center">
           <p className="flex-1">
             {t(
               "We've written this up the way we understood it. Say the word and we'll get started."
@@ -269,7 +269,7 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
           <Button
             type="button"
             size="sm"
-            className="shrink-0 self-start gap-1.5 sm:self-auto"
+            className="shrink-0 self-start gap-1 sm:self-auto"
             disabled={confirming}
             onClick={() => void confirmIt()}
           >
@@ -285,7 +285,7 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
        * nothing here costs the person their place. */}
       <TicketAttachments ticketId={ticketId} />
 
-      <ol className="flex flex-col gap-3">
+      <ol className="flex flex-col gap-4">
         {messages.map((m) => (
           <li key={m.id} className={`flex flex-col gap-1 ${m.side}`}>
             {/* Who and when, above the bubble. Your own side says only the time —

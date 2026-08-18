@@ -224,7 +224,7 @@ export function AppDetailScreen({
   // enforces it. An overview tile is still theirs to see; the record is not.
   if (!app.canOpen)
     return (
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-4">
         <h1 className="text-2xl font-semibold tracking-tight">{app.name}</h1>
         <p className="text-muted-foreground text-sm">
           {t(
@@ -420,7 +420,7 @@ export function AppDetailScreen({
       actions={
         <>
           {canEdit && (
-            <Button variant="outline" onClick={() => setEditOpen(true)} className="gap-1.5">
+            <Button variant="outline" onClick={() => setEditOpen(true)} className="gap-1">
               <Pencil className="size-3.5" />
               {t("Edit")}
             </Button>

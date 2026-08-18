@@ -378,7 +378,7 @@ export function ProcessDetailScreen({
       actions={
         <>
           {canEdit && (
-            <Button variant="outline" onClick={() => setEditOpen(true)} className="gap-1.5">
+            <Button variant="outline" onClick={() => setEditOpen(true)} className="gap-1">
               <Pencil className="size-3.5" />
               {t("Edit")}
             </Button>
@@ -417,7 +417,7 @@ export function ProcessDetailScreen({
 
           if (panel.value === "steps")
             return (
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-4">
                 {/* WHICH VERSION AM I READING. A picker rather than a strip of
                     buttons: R3 forbids a hand-rolled toggle, and a map cut once
                     per completed sprint grows more versions than a strip can
@@ -578,7 +578,7 @@ export function ProcessDetailScreen({
                         month this way of working costs. The subtraction between
                         two of these is the saving, and it is shown below with
                         the sentence it has to be quoted with. */}
-                    <div className="bg-muted/40 flex items-baseline justify-between gap-3 border-t p-3">
+                    <div className="bg-muted/40 flex items-baseline justify-between gap-2 border-t p-3">
                       <span className="text-sm font-medium">
                         {t("Total, as")}{" "}
                         {shownVersion ? versionLabel(shownVersion).toLowerCase() : t("this version")}{" "}
@@ -627,7 +627,7 @@ export function ProcessDetailScreen({
 
           if (panel.value === "versions")
             return (
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-4">
                 <p className="text-muted-foreground text-sm">
                   {t("Every version this way of working has been through. Open one to read its steps and the times they were agreed at, version 1 is how the work was done before us, and every saving is measured from it.")}
                 </p>

@@ -160,7 +160,7 @@ export function MailReplyDialog({
               variant="outline"
               disabled={!ready || busy !== null}
               onClick={() => void writeDraft()}
-              className="gap-1.5"
+              className="gap-1"
             >
               {busy === "draft" ? <Spinner /> : <PenLine className="size-4" />}
               {busy === "draft" ? "Writing…" : written ? "Write it again" : "Save to Gmail drafts"}
@@ -215,7 +215,7 @@ export function MailReplyDialog({
             href={gmailLink}
             target="_blank"
             rel="noreferrer noopener"
-            className="text-primary inline-flex shrink-0 items-center gap-1.5 underline-offset-2 hover:underline"
+            className="text-primary inline-flex shrink-0 items-center gap-1 underline-offset-2 hover:underline"
           >
             <ExternalLink className="size-3.5" />
             {t("Open it in Gmail")}

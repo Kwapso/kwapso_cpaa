@@ -86,7 +86,7 @@ export function confirmStepsFrom(calls: PendingCall[]): RunStep[] {
     label: c.summary,
     status: "pending" as const,
     detail: c.details?.length ? (
-      <span className="flex flex-col gap-0.5">
+      <span className="flex flex-col gap-1">
         {c.details.map((line, i) => (
           <span key={i}>{line}</span>
         ))}

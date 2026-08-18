@@ -107,10 +107,10 @@ function BarsBlock({ block }: { block: Extract<AgentBlock, { kind: "bars" }> }) 
   }
   return (
     <BlockFrame title={block.title}>
-      <div className="flex flex-col gap-2.5">
+      <div className="flex flex-col gap-4">
         {block.rows.map((r, i) => (
           <div key={i} className="flex min-w-0 flex-col gap-1">
-            <div className="flex min-w-0 items-baseline justify-between gap-3">
+            <div className="flex min-w-0 items-baseline justify-between gap-2">
               <span className="truncate text-sm text-foreground" title={r.label}>
                 {r.label}
               </span>
@@ -191,7 +191,7 @@ function StepsBlock({ block }: { block: Extract<AgentBlock, { kind: "steps" }> }
     <BlockFrame title={block.title}>
       <ol className="flex flex-col">
         {block.steps.map((s, i) => (
-          <li key={i} className="flex gap-3">
+          <li key={i} className="flex gap-2">
             {/* The number and the rule under it are one column, so the line joins
                 consecutive steps and stops at the last one. */}
             <div className="flex flex-col items-center">
@@ -254,7 +254,7 @@ function FlowBlock({ block }: { block: Extract<AgentBlock, { kind: "flow" }> }) 
                 // which way it goes. Both, because "work to do  Split into stories"
                 // on one line reads as two labels rather than a condition and a
                 // destination — and a diagram that has to be guessed at is not one.
-                <div key={j} className="flex min-w-0 flex-wrap items-baseline gap-1.5 py-1 pl-3 text-xs">
+                <div key={j} className="flex min-w-0 flex-wrap items-baseline gap-1 py-1 pl-3 text-xs">
                   <CornerDownRight className="size-3.5 shrink-0 self-center text-muted-foreground" aria-hidden />
                   {e.label && (
                     <>
@@ -271,7 +271,7 @@ function FlowBlock({ block }: { block: Extract<AgentBlock, { kind: "flow" }> }) 
                   nothing between them are two boxes with nothing between them —
                   a connector there would state a step nobody said existed. */}
               {onward && (
-                <div className="flex min-w-0 items-center gap-1.5 py-1 pl-3">
+                <div className="flex min-w-0 items-center gap-1 py-1 pl-3">
                   <ArrowDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
                   {onward.label && <span className="min-w-0 text-xs text-muted-foreground">{onward.label}</span>}
                 </div>

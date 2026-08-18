@@ -331,7 +331,7 @@ function TriageQueue({ teamId, canTriage }: { teamId: string; canTriage: boolean
   return (
     <ul className="divide-border divide-y">
       {view.waiting.map((w) => (
-        <li key={w.id} className="flex flex-wrap items-center gap-3 py-3">
+        <li key={w.id} className="flex flex-wrap items-center gap-2 py-3">
           <AlarmClock className="text-destructive size-4 shrink-0" />
           <span className="min-w-0 flex-1 truncate text-sm">
             {[w.ref, richTextPlain(w.description)].filter(Boolean).join(" · ")}
@@ -345,7 +345,7 @@ function TriageQueue({ teamId, canTriage }: { teamId: string; canTriage: boolean
               size="sm"
               disabled={busy === w.id}
               onClick={() => void markRead(w.id)}
-              className="shrink-0 gap-1.5"
+              className="shrink-0 gap-1"
             >
               <MailOpen className="size-3.5" />
               {t("Mark it read")}

@@ -146,7 +146,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
     )
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       {busyNote && (
         <div className="bg-muted/50 text-muted-foreground flex items-center gap-2 rounded-xl border p-3 text-sm">
           <Sparkles className="size-4 animate-pulse" aria-hidden /> {busyNote}
@@ -182,7 +182,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
 
           {/* Sample files — see a good file for each table before preparing yours. */}
           {samples.length > 0 && (
-            <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+            <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
               <span>{t("New to this? Download a sample:")}</span>
               {samples.map((t) => (
                 <a
@@ -209,7 +209,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
                 <p className="text-muted-foreground text-xs">
                   {t("Planning uses the assistant (a few credits), so you can review before anything is written.")}
                 </p>
-                <Button onClick={() => void plan()} disabled={busy} className="gap-1.5">
+                <Button onClick={() => void plan()} disabled={busy} className="gap-1">
                   <Sparkles className="size-4" aria-hidden /> {t("Analyze & plan")}
                 </Button>
               </div>
@@ -243,7 +243,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
           ))}
 
           {batch.plan.steps.map((step, i) => (
-            <div key={step.fileId} className="flex flex-col gap-2.5 rounded-xl border p-4">
+            <div key={step.fileId} className="flex flex-col gap-4 rounded-xl border p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="outline" className="text-[10px]">
                   {t("Step")} {i + 1}
@@ -333,7 +333,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
             <Button variant="outline" onClick={() => setPhase("upload")} disabled={busy}>
               {t("Back")}
             </Button>
-            <Button onClick={() => void run()} disabled={busy || !batch.plan.order.length} className="gap-1.5">
+            <Button onClick={() => void run()} disabled={busy || !batch.plan.order.length} className="gap-1">
               <Upload className="size-4" aria-hidden /> {t("Run import")}
             </Button>
           </div>
@@ -343,7 +343,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
       {/* 3 · REPORT */}
       {phase === "done" && report && (
         <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2">
             <Stat label={t("Added")} value={report.created} tone="good" />
             <Stat label={t("Skipped")} value={report.skipped} tone={report.skipped ? "warn" : "muted"} />
             <Stat label={t("Failed")} value={report.failed} tone={report.failed ? "bad" : "muted"} />
@@ -366,7 +366,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
                   variant="outline"
                   size="sm"
                   onClick={() => downloadRejections(report.rejections, "import-rejections.csv")}
-                  className="gap-1.5"
+                  className="gap-1"
                 >
                   <Download className="size-3.5" aria-hidden /> {t("Download to fix")}
                 </Button>
@@ -385,7 +385,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
           )}
 
           <div className="flex flex-wrap justify-end gap-2">
-            <Button onClick={reset} className="gap-1.5">
+            <Button onClick={reset} className="gap-1">
               <Upload className="size-4" aria-hidden /> {t("Import more")}
             </Button>
           </div>
@@ -409,9 +409,9 @@ function PastImports({ teamId }: { teamId: string }) {
   return (
     <div className="flex flex-col gap-2">
       <p className="text-sm font-medium">{t("Past imports")}</p>
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-2">
         {batches.map((b) => (
-          <div key={b.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-xl border p-2.5 text-xs">
+          <div key={b.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border p-2.5 text-xs">
             <span className="font-medium">{b.by}</span>
             <span className="text-muted-foreground">{formatActivityWhen(b.at)}</span>
             <span className="text-muted-foreground min-w-0 flex-1 truncate">
@@ -451,8 +451,8 @@ function PlanSummary({
   const skipped = plan.steps.reduce((n, s) => n + s.predictedRejects, 0)
   const rejections = plan.steps.flatMap((s) => s.predictedRejections ?? [])
   return (
-    <div className="flex flex-col gap-3 border-t pt-4">
-      <div className="flex flex-wrap gap-3">
+    <div className="flex flex-col gap-4 border-t pt-4">
+      <div className="flex flex-wrap gap-2">
         <Stat label={t("Will import")} value={totalRows - skipped} tone={totalRows - skipped ? "good" : "muted"} />
         <Stat label={t("Will be skipped")} value={skipped} tone={skipped ? "warn" : "muted"} />
         <Stat label={t("Tables")} value={plan.order.length} tone="muted" />
@@ -466,7 +466,7 @@ function PlanSummary({
             variant="outline"
             size="sm"
             onClick={() => onDownload(rejections, "rows-to-fix.csv")}
-            className="gap-1.5"
+            className="gap-1"
           >
             <Download className="size-3.5" aria-hidden /> {t("Download the list")}
           </Button>

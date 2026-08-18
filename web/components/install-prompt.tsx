@@ -111,7 +111,7 @@ export function InstallPrompt() {
     <Sheet open={open} onOpenChange={(o) => (o ? setOpen(true) : dismiss())}>
       <SheetContent side="bottom" className="rounded-t-xl">
         <div className="mx-auto flex w-full max-w-md flex-col gap-4">
-          <SheetHeader className="flex-row items-center gap-3 space-y-0">
+          <SheetHeader className="flex flex-row items-center gap-2">
             <span className="bg-primary/10 text-primary flex size-11 shrink-0 items-center justify-center rounded-xl">
               <Download className="size-5" />
             </span>
@@ -125,7 +125,7 @@ export function InstallPrompt() {
 
           {iosSafari ? (
             // iOS Safari: no install event — guide the manual gesture.
-            <ol className="text-muted-foreground space-y-2 text-sm">
+            <ol className="text-muted-foreground flex flex-col gap-2 text-sm">
               <li className="flex items-center gap-2">
                 <span className="text-foreground font-medium">1.</span>
                 {t("Tap the Share button")}
@@ -148,7 +148,7 @@ export function InstallPrompt() {
               {t("Not now")}
             </Button>
             {hasNative ? (
-              <Button onClick={() => void install()} className="gap-1.5">
+              <Button onClick={() => void install()} className="gap-1">
                 <Download className="size-4" />
                 {t("Install")}
               </Button>

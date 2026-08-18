@@ -264,7 +264,7 @@ export function StoryDetailScreen({
               and one already in review or done has been explained. The panel
               collects the words; the door refuses if a timer is still running. */}
           {canEdit && (story.status === "open" || story.status === "in_progress") && (
-            <Button disabled={busy} onClick={() => setReviewOpen(true)} className="gap-1.5">
+            <Button disabled={busy} onClick={() => setReviewOpen(true)} className="gap-1">
               <ClipboardCheck className="size-3.5" />
               {t("Ready for review")}
             </Button>
@@ -282,7 +282,7 @@ export function StoryDetailScreen({
                   "Couldn't close that story."
                 )
               }
-              className="gap-1.5"
+              className="gap-1"
             >
               <Check className="size-3.5" />
               {t("Done")}

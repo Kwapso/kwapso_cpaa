@@ -85,9 +85,9 @@ export function CompanyScreen({ ready }: { ready: PortalReady }) {
             {t("Just you, for now.")}
           </p>
         ) : (
-          <ul className="flex flex-col gap-3">
+          <ul className="flex flex-col gap-4">
             {contacts.map((c) => (
-              <li key={c.id} className="flex items-center gap-3 rounded-xl border p-4">
+              <li key={c.id} className="flex items-center gap-2 rounded-xl border p-4">
                 <span className="min-w-0 flex-1 truncate">{c.personName}</span>
                 {c.isMainStakeholder ? <Badge variant="secondary">{t("Main contact")}</Badge> : null}
                 {/* Staff often type the relationship as "Main contact" too, and then

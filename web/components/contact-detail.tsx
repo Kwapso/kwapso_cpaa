@@ -355,7 +355,7 @@ export function ContactDetailScreen({
       actions={
         <>
           {canEdit && (
-            <Button variant="outline" onClick={() => setEditOpen(true)} className="gap-1.5">
+            <Button variant="outline" onClick={() => setEditOpen(true)} className="gap-1">
               <Pencil className="size-3.5" />
               {t("Edit")}
             </Button>
@@ -426,10 +426,10 @@ export function ContactDetailScreen({
           // one button here rather than a picker, because there is nobody to
           // pick: the person IS this record.
           return (
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-4">
               {canGrant && !liveLogin && (
                 <div className="flex flex-wrap justify-end gap-2">
-                  <Button size="sm" disabled={busy} onClick={() => void giveAccess()} className="gap-1.5">
+                  <Button size="sm" disabled={busy} onClick={() => void giveAccess()} className="gap-1">
                     {busy ? <Spinner /> : <KeyRound className="size-4" />}
                     {t("Switch their login on")}
                   </Button>

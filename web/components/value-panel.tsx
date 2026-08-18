@@ -108,7 +108,7 @@ export function ValuePanel({ view }: { view: SavingsView | undefined }) {
     )
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       <div className="rounded-xl border p-4">
         <p className="text-muted-foreground text-sm">{t("Time given back, every month")}</p>
         <p className="text-2xl font-semibold tracking-tight">
@@ -131,7 +131,7 @@ export function ValuePanel({ view }: { view: SavingsView | undefined }) {
         {view.apps.map((app) => (
           <AccordionItem key={app.appId} value={app.appId} className="last:border-b-0">
             <AccordionTrigger>
-              <span className="flex w-full items-baseline justify-between gap-3 pr-2">
+              <span className="flex w-full items-baseline justify-between gap-2 pr-2">
                 <span className="truncate">{app.name}</span>
                 <span className="text-muted-foreground shrink-0 text-xs font-normal">
                   {hoursText(app.savedSecondsPerMonth)} {t("a month")}
@@ -143,7 +143,7 @@ export function ValuePanel({ view }: { view: SavingsView | undefined }) {
                 {app.processes.map((process) => (
                   <AccordionItem key={process.processId} value={process.processId} className="last:border-b-0">
                     <AccordionTrigger>
-                      <span className="flex w-full items-baseline justify-between gap-3 pr-2">
+                      <span className="flex w-full items-baseline justify-between gap-2 pr-2">
                         <span className="truncate">{process.name}</span>
                         <span className="text-muted-foreground shrink-0 text-xs font-normal">
                           {hoursText(process.savedSecondsPerMonth)} {t("a month")}

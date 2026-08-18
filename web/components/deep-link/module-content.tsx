@@ -143,7 +143,7 @@ function internalDetail(
   if (!row) return <p className="text-muted-foreground text-sm">That record no longer exists.</p>
   const data = spec.shape(row, ctx.internalActivity.rows)
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <ScreenRenderer
         recipe={spec.adapt ? spec.adapt(recipe, data.record ?? {}) : recipe}
         data={data}

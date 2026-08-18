@@ -313,7 +313,7 @@ export function WorkLogsPanel({
   const rows = logsQ.data
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       {canLog && (
         <div className="flex flex-wrap justify-end gap-2">
           {/* The same control every other collection tab in the app puts above
@@ -336,7 +336,7 @@ export function WorkLogsPanel({
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("No time logged against this yet.")}</p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-col gap-2">
           {rows.map((l) => (
             <li
               key={l.id}

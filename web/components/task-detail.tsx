@@ -133,7 +133,7 @@ export function TaskDetailScreen({
               nothing is lost either way, and a confirm on a tick is the kind of
               ceremony that teaches people to click through dialogs. */}
           {canEdit && (
-            <Button size="sm" variant="outline" onClick={onToggleDone} className="gap-1.5">
+            <Button size="sm" variant="outline" onClick={onToggleDone} className="gap-1">
               {done ? <Undo2 className="size-3.5" /> : <Check className="size-3.5" />}
               {done ? t("Put it back") : t("Tick it off")}
             </Button>

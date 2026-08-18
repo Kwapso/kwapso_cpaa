@@ -98,7 +98,7 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
             </Button>
             {/* BESIDE the code, never instead of it — the same two ways in that
                 the agency door offers, landing on the same person either way. */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <span className="bg-border h-px flex-1" />
               <span className="text-muted-foreground text-sm">or</span>
               <span className="bg-border h-px flex-1" />

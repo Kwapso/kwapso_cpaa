@@ -43,11 +43,11 @@ export function DeliveryBlock() {
   if (sprints.length === 0) return null
 
   return (
-    <section className="flex flex-col gap-3">
+    <section className="flex flex-col gap-4">
       <h2 className="text-lg font-semibold">{t("What you bought")}</h2>
       <ul className="flex flex-col gap-2">
         {sprints.map((s) => (
-          <li key={`${s.ref ?? s.name}`} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">
+          <li key={`${s.ref ?? s.name}`} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-4">
             <div className="min-w-0">
               <p className="font-medium">
                 {s.name}

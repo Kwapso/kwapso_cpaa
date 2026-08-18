@@ -218,8 +218,8 @@ export function KnowledgeDetailScreen({
   }
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
             <span className="truncate">{item.title}</span>
@@ -248,7 +248,7 @@ export function KnowledgeDetailScreen({
             variant="outline"
             size="sm"
             onClick={() => setEditingOpen(true)}
-            className="shrink-0 gap-1.5"
+            className="shrink-0 gap-1"
           >
             <Pencil className="size-3.5" />
             {t("Edit")}
@@ -362,13 +362,13 @@ export function KnowledgeDetailScreen({
                       size="sm"
                       onClick={() => void setActive(false)}
                       disabled={busyActive}
-                      className="text-destructive hover:text-destructive gap-1.5"
+                      className="text-destructive hover:text-destructive gap-1"
                     >
                       {busyActive ? <Spinner /> : <Power className="size-3.5" />}
                       {t("Stop using this")}
                     </Button>
                   ) : (
-                    <Button size="sm" onClick={() => void setActive(true)} disabled={busyActive} className="gap-1.5">
+                    <Button size="sm" onClick={() => void setActive(true)} disabled={busyActive} className="gap-1">
                       {busyActive ? <Spinner /> : <Power className="size-3.5" />}
                       {t("Use this again")}
                     </Button>

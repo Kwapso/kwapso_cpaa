@@ -91,7 +91,7 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
           and a thing waiting for you should not be below the housekeeping. It
           disappears when there is none, which is nearly always. */}
       {pendingInvites.length > 0 && (
-        <section className="animate-rise flex flex-col gap-3">
+        <section className="animate-rise flex flex-col gap-4">
           <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Invitations")}</h2>
           <InvitationsPanel active={active} />
         </section>
@@ -108,7 +108,7 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
 
       {/* THE TEAM'S OWN ADMIN — see the header for why these rows are here. */}
       {teamId && adminSections.length > 0 && (
-        <section className="animate-rise flex flex-col gap-3">
+        <section className="animate-rise flex flex-col gap-4">
           <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
             {t("This team")}
           </h2>
@@ -136,7 +136,7 @@ export function SettingsScreen({ active }: { active: ActiveTeam }) {
           TEAM_SCREENS_HIDDEN to false in shared/product.ts brings it back whole.
           web/test/one-team.test.ts holds both halves of that decision. */}
       {!TEAM_SCREENS_HIDDEN && (
-        <section className="animate-rise flex flex-col gap-3">
+        <section className="animate-rise flex flex-col gap-4">
           <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Teams")}</h2>
           <List
             surface="none"

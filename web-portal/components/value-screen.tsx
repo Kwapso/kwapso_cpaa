@@ -192,7 +192,7 @@ export function ValueScreen({ ready }: { ready: PortalReady }) {
 
       {/* WHAT YOU BOUGHT — only when we were sent it. No flag on this side. */}
       {data.prices && (
-        <section className="flex flex-col gap-3">
+        <section className="flex flex-col gap-4">
           <h2 className="text-lg font-medium">{t("What you bought")}</h2>
           {data.prices.soldCents !== null && (
             <p className="text-sm">
@@ -207,7 +207,7 @@ export function ValueScreen({ ready }: { ready: PortalReady }) {
               {data.prices.rates.map((r) => (
                 <div
                   key={r.label}
-                  className="flex items-baseline justify-between gap-3 border-b p-3 last:border-b-0"
+                  className="flex items-baseline justify-between gap-2 border-b p-3 last:border-b-0"
                 >
                   <span className="text-sm">{r.label}</span>
                   <span className="text-muted-foreground text-sm">
@@ -220,7 +220,7 @@ export function ValueScreen({ ready }: { ready: PortalReady }) {
         </section>
       )}
 
-      <section className="flex flex-col gap-3">
+      <section className="flex flex-col gap-4">
         <h2 className="text-lg font-medium">{t("Where it comes from")}</h2>
 
         {/* THE SAME DRILL-DOWN, SEEN AT ONCE. The accordion below answers "where
@@ -248,7 +248,7 @@ export function ValueScreen({ ready }: { ready: PortalReady }) {
           {data.apps.map((app) => (
             <AccordionItem key={app.appId} value={app.appId} className="last:border-b-0">
               <AccordionTrigger>
-                <span className="flex w-full items-baseline justify-between gap-3 pr-2">
+                <span className="flex w-full items-baseline justify-between gap-2 pr-2">
                   <span className="truncate">{app.name}</span>
                   <span className="text-muted-foreground shrink-0 text-xs font-normal">
                     {hoursText(app.savedSecondsPerMonth)} {t("a month")}
@@ -264,7 +264,7 @@ export function ValueScreen({ ready }: { ready: PortalReady }) {
                       className="last:border-b-0"
                     >
                       <AccordionTrigger onClick={() => setOpenProcessId(process.processId)}>
-                        <span className="flex w-full items-baseline justify-between gap-3 pr-2">
+                        <span className="flex w-full items-baseline justify-between gap-2 pr-2">
                           <span className="truncate">{process.name}</span>
                           <span className="text-muted-foreground shrink-0 text-xs font-normal">
                             {hoursText(process.savedSecondsPerMonth)} {t("a month")}

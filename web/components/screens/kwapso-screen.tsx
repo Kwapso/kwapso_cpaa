@@ -72,7 +72,7 @@ export function KwapsoScreen({ active }: { active: ActiveTeam }) {
         </div>
         {can("teams", "edit") && (
           <div className="flex flex-wrap gap-2 sm:ml-auto sm:shrink-0">
-            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-1.5">
+            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-1">
               <Pencil className="size-3.5" />
               {t("Edit")}
             </Button>
@@ -126,7 +126,7 @@ function TeamPanel({ teamId, canRead }: { teamId: string; canRead: boolean }) {
   return (
     <ul className="divide-border flex flex-col divide-y">
       {membersQ.data.map((m) => (
-        <li key={m.userId} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
+        <li key={m.userId} className="flex flex-wrap items-baseline gap-x-2 gap-y-1 py-3">
           <span className="font-medium">
             {[m.firstName, m.lastName].filter(Boolean).join(" ") || m.email}
           </span>
@@ -162,7 +162,7 @@ function BrandPanel({ teamId, canRead }: { teamId: string; canRead: boolean }) {
           variant="outline"
           size="sm"
           onClick={() => softNavigate("/brand")}
-          className="ml-auto gap-1.5"
+          className="ml-auto gap-1"
         >
           <Palette className="size-3.5" />
           {t("Open the brand library")}
@@ -177,7 +177,7 @@ function BrandPanel({ teamId, canRead }: { teamId: string; canRead: boolean }) {
               <button
                 type="button"
                 onClick={() => softNavigate(`/brand/${a.id}`)}
-                className="flex w-full items-center gap-3 py-3 text-left"
+                className="flex w-full items-center gap-2 py-3 text-left"
               >
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">{a.name}</span>

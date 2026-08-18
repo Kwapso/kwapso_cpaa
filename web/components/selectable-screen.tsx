@@ -118,7 +118,7 @@ export function SelectableScreen({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
             {t("Dropdown values")}
@@ -149,14 +149,14 @@ export function SelectableScreen({
          * the shared form dialog (Law R4), never an inline row. */}
         <div className="flex flex-wrap justify-end gap-2">
           {values.length > 0 && (
-            <Button asChild variant="outline" className="gap-1.5">
+            <Button asChild variant="outline" className="gap-1">
               <a href="/api/tenancy/selectable/export">
                 <Download className="size-4" aria-hidden /> {t("Export CSV")}
               </a>
             </Button>
           )}
           {canCreate && onImport && (
-            <Button variant="outline" onClick={onImport} className="gap-1.5">
+            <Button variant="outline" onClick={onImport} className="gap-1">
               <Upload className="size-4" aria-hidden /> {t("Import CSV")}
             </Button>
           )}
@@ -214,11 +214,11 @@ export function SelectableScreen({
             : "No values match your search or filter."}
         </p>
       ) : (
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-6">
           {grouped.map((g) => (
             <div key={g.type} className="flex flex-col gap-2">
               <h2 className="text-sm font-medium">{g.type}</h2>
-              <ul className="flex flex-col gap-1.5">
+              <ul className="flex flex-col gap-2">
                 {g.items.map((v) => (
                   <li
                     key={v.id}

@@ -59,7 +59,7 @@ export function AppTiles({
               e.preventDefault()
               softNavigate(href)
             }}
-            className="bg-card hover:bg-muted flex items-center gap-3 rounded-xl p-4 transition-colors duration-200"
+            className="bg-card hover:bg-muted flex items-center gap-2 rounded-xl p-4 transition-colors duration-200"
           >
             {/* The mark is aria-hidden and the stage WORD is on the heading above
                 it, which is the pair UI-CONVENTIONS §5 requires of a type mark. */}

@@ -261,7 +261,7 @@ export function RecordCalendar({
   const dayEntries = openDay ? (byDay.get(openDay) ?? []) : []
 
   return (
-    <div className="flex w-full flex-col gap-3">
+    <div className="flex w-full flex-col gap-4">
       {/* THE PERIOD, AND THE SHAPE — one row: which month, then how to read it.
           The switch is the library's own segmented control rather than two
           buttons whose variant flips, which is the shape R3 refuses. */}
@@ -274,11 +274,11 @@ export function RecordCalendar({
             onValueChange={(v) => v && setPicked(v as Mode)}
             aria-label={t("How to read this month")}
           >
-            <ToggleGroupItem value="month" aria-label={t("Month")} className="gap-1.5 px-2.5">
+            <ToggleGroupItem value="month" aria-label={t("Month")} className="gap-1 px-2.5">
               <CalendarDays className="size-3.5" />
               <span className="text-xs">{t("Month")}</span>
             </ToggleGroupItem>
-            <ToggleGroupItem value="agenda" aria-label={t("Agenda")} className="gap-1.5 px-2.5">
+            <ToggleGroupItem value="agenda" aria-label={t("Agenda")} className="gap-1 px-2.5">
               <ListOrdered className="size-3.5" />
               <span className="text-xs">{t("Agenda")}</span>
             </ToggleGroupItem>
@@ -339,7 +339,7 @@ export function RecordCalendar({
                   >
                     {d.getDate()}
                   </div>
-                  <div className="flex flex-col gap-0.5">
+                  <div className="flex flex-col gap-1">
                     {here.slice(0, maxPerDay).map((e) => (
                       <EntryChip key={e.id} entry={e} onOpen={onOpen} />
                     ))}
@@ -373,7 +373,7 @@ export function RecordCalendar({
             </p>
           ) : (
             agendaDays.map((day) => (
-              <section key={day} className="flex flex-col gap-1.5">
+              <section key={day} className="flex flex-col gap-2">
                 <h3
                   className={`text-xs font-medium tracking-[0.5px] uppercase ${
                     day === today ? "text-foreground" : "text-muted-foreground"

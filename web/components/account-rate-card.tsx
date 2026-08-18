@@ -100,7 +100,7 @@ export function AccountRateCard({
   const rates = ratesQ.data
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       {canCreate && (
         <div className="flex flex-wrap justify-end gap-2">
           <AddButton label={t("New rate")} onClick={() => setAdding(true)} />
@@ -112,7 +112,7 @@ export function AccountRateCard({
           {t("No rates set for")} {accountName} {t("yet, nothing is being charged by the hour.")}
         </p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-col gap-2">
           {rates.map((r) => (
             <li
               key={r.id}

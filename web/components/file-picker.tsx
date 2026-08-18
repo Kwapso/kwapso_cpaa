@@ -120,7 +120,7 @@ export function FilePicker({
         size="sm"
         onClick={() => inputRef.current?.click()}
         disabled={disabled || uploading}
-        className="gap-1.5"
+        className="gap-1"
       >
         {uploading ? <Spinner /> : <Paperclip className="size-3.5" />}
         {uploading ? "Uploading…" : "Choose a file"}

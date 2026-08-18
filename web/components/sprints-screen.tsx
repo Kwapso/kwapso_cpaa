@@ -350,7 +350,7 @@ export function SprintsScreen({
                 own. The collection's one number is on the strip above (R16). */}
             <h2 className="text-lg font-medium">{t(STATE_HEADING[state])}</h2>
             {groupByKind(inState, byKind, lang, t("No kind said")).map((group) => (
-              <div key={group.key} className="flex flex-col gap-1.5">
+              <div key={group.key} className="flex flex-col gap-2">
                 <p className="text-muted-foreground text-xs font-medium tracking-[0.5px] uppercase">
                   {group.word}
                 </p>
@@ -390,7 +390,7 @@ export function SprintsScreen({
 
   return (
     <CountedAbove active={badge !== ""}>
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-6">
         {/* R16: the strip below badges all three views, so the heading stands
             down through the arbitration context rather than saying the same
             number twice. */}

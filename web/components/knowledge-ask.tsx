@@ -120,7 +120,7 @@ export function KnowledgeAsk({
   }
 
   return (
-    <div className="bg-card flex flex-col gap-3 rounded-xl border p-4">
+    <div className="bg-card flex flex-col gap-4 rounded-xl border p-4">
       <form onSubmit={(e) => void ask(e)} className="flex flex-col gap-2 sm:flex-row">
         <Input
           value={question}
@@ -133,7 +133,7 @@ export function KnowledgeAsk({
           disabled={busy}
           aria-label={t("Ask the knowledge base")}
         />
-        <Button type="submit" disabled={busy || !question.trim()} className="shrink-0 gap-1.5">
+        <Button type="submit" disabled={busy || !question.trim()} className="shrink-0 gap-1">
           {busy ? <Spinner /> : <Search className="size-4" />}
           {busy ? "Looking…" : "Ask"}
         </Button>
@@ -218,7 +218,7 @@ export function KnowledgeAsk({
                       // legible enough for one small link at the end of a
                       // screen, not for the heading of every passage in an
                       // answer. Seen on the screen rather than reasoned about.
-                      className="hover:text-primary flex w-fit items-center gap-1.5 text-left text-sm font-medium underline-offset-2 hover:underline"
+                      className="hover:text-primary flex w-fit items-center gap-1 text-left text-sm font-medium underline-offset-2 hover:underline"
                     >
                       <FileText className="size-3.5 shrink-0" aria-hidden />
                       <span className="min-w-0">{p.title}</span>

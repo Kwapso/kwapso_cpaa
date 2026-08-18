@@ -117,10 +117,10 @@ export function StartTimerStrip({ teamId, canCreate }: { teamId: string; canCrea
   return (
     <section className="flex flex-col gap-2">
       {canCreate && mine.length > 0 && (
-        <ul className="flex flex-wrap gap-1.5">
+        <ul className="flex flex-wrap gap-2">
           {mine.map((s) => (
             <li key={s.id}>
-              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => start(s.id)}>
+              <Button variant="outline" size="sm" className="gap-1" onClick={() => start(s.id)}>
                 <Play className="size-3.5" />
                 {s.title.length > 34 ? `${s.title.slice(0, 34)}…` : s.title}
               </Button>
@@ -258,11 +258,11 @@ export function TimePanel({
   const runaways = (timersQ.data ?? []).filter((t) => t.runaway)
 
   return (
-    <section className="flex flex-col gap-2">
+    <section className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-2">
         {/* THE HOURS. Not the collection's count (the heading above says that) —
             the number anybody reading a timesheet actually came for. */}
-        <p className="text-muted-foreground flex items-center gap-1.5 text-sm">
+        <p className="text-muted-foreground flex items-center gap-1 text-sm">
           <Clock className="size-3.5" />
           {totalSeconds ? `${clockFrom(totalSeconds)} ${t("logged")}` : t("Nothing logged yet")}
         </p>

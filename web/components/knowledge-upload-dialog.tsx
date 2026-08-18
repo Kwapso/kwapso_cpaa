@@ -226,7 +226,7 @@ export function KnowledgeUploadDialog({
                 size="sm"
                 onClick={() => inputRef.current?.click()}
                 disabled={busy}
-                className="gap-1.5"
+                className="gap-1"
               >
                 <Paperclip className="size-3.5" />
                 {t("Choose a file")}

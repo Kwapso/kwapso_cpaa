@@ -410,14 +410,14 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
             <Button
               disabled={busy !== null}
               onClick={() => setHeld(item.status !== "held")}
-              className="gap-1.5"
+              className="gap-1"
             >
               {busy === "held" ? <Spinner /> : <CheckCheck className="size-3.5" />}
               {item.status === "held" ? t("Not held after all") : t("Mark held")}
             </Button>
           )}
           {canEdit && (
-            <Button variant="outline" onClick={() => setEditing(true)} className="gap-1.5">
+            <Button variant="outline" onClick={() => setEditing(true)} className="gap-1">
               <Pencil className="size-3.5" />
               {t("Edit")}
             </Button>
@@ -503,7 +503,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
                         size="sm"
                         disabled={busy !== null || notesDraft === null}
                         onClick={() => void saveNotes(item, notesDraft ?? "")}
-                        className="gap-1.5"
+                        className="gap-1"
                       >
                         {busy === "notes" ? <Spinner /> : null}
                         Save notes
@@ -672,14 +672,14 @@ function CalendarPanel({
           can open the meeting within my calendar." */}
       <div className="flex flex-wrap gap-2">
         {meeting.googleJoinUrl && (
-          <Button asChild size="sm" className="gap-1.5">
+          <Button asChild size="sm" className="gap-1">
             <a href={safeHref(meeting.googleJoinUrl)} target="_blank" rel="noreferrer noopener">
               <Video className="size-3.5" aria-hidden /> {t("Join the call")}
             </a>
           </Button>
         )}
         {meeting.googleEventUrl && (
-          <Button asChild variant="outline" size="sm" className="gap-1.5">
+          <Button asChild variant="outline" size="sm" className="gap-1">
             <a href={safeHref(meeting.googleEventUrl)} target="_blank" rel="noreferrer noopener">
               <ExternalLink className="size-3.5" aria-hidden /> {t("Open in Google Calendar")}
             </a>
@@ -703,7 +703,7 @@ function CalendarPanel({
               return (
                 <div
                   key={g.email}
-                  className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b p-3 text-sm last:border-0"
+                  className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b p-3 text-sm last:border-0"
                 >
                   <span className="font-medium">{g.name || g.email}</span>
                   {g.name && <span className="text-muted-foreground text-xs">{g.email}</span>}

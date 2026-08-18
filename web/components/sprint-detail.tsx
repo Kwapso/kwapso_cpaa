@@ -214,7 +214,7 @@ export function SprintDetailScreen({
       actions={
         canEdit ? (
           <>
-            <Button disabled={busy} onClick={() => void setComplete(!sprint.completedAt)} className="gap-1.5">
+            <Button disabled={busy} onClick={() => void setComplete(!sprint.completedAt)} className="gap-1">
               {busy ? (
                 <Spinner />
               ) : sprint.completedAt ? (

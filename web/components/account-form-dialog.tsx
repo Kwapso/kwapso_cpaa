@@ -432,7 +432,7 @@ export function AccountFormDialog({
       </Field>
 
       <Field config={logoField} htmlFor="account-logo" className={fieldSpacing}>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <Avatar className="size-12">
             {logoPreview && <AvatarImage src={logoPreview} alt={t("Logo")} />}
             <AvatarFallback>{letterMark(values.name)}</AvatarFallback>

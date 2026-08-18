@@ -197,7 +197,7 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
                           disabled={busy}
                           onClick={() => setEditing(d)}
                           aria-label={t("Edit")}
-                          className="text-muted-foreground h-auto gap-1.5 px-2 py-1"
+                          className="text-muted-foreground h-auto gap-1 px-2 py-1"
                         >
                           <Pencil className="size-3.5" />
                         </Button>
@@ -221,7 +221,7 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
                             )
                           }
                           aria-label={d.active ? t("Archive") : t("Restore")}
-                          className="text-muted-foreground h-auto gap-1.5 px-2 py-1"
+                          className="text-muted-foreground h-auto gap-1 px-2 py-1"
                         >
                           <Power className="size-3.5" />
                         </Button>

@@ -238,7 +238,7 @@ export function MeetingsScreen({
 
   return (
     <CountedAbove active>
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       {/* R16: the strip below badges two exact server counts, so the heading
           stands down through the arbitration context rather than saying a
           number twice. */}
@@ -384,13 +384,13 @@ export function MeetingsScreen({
           in its answer and are shown underneath. */}
       {canCreate && (
         <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
               size="sm"
               disabled={syncing}
               onClick={() => void bringInSeries()}
-              className="w-fit gap-1.5"
+              className="w-fit gap-1"
             >
               {syncing ? <Spinner /> : <CalendarSync className="size-3.5" />}
                 {t("Bring in the calendar")}
@@ -401,7 +401,7 @@ export function MeetingsScreen({
             <GoogleSyncButton teamId={teamId} scope="knowledge" />
           </div>
           {ahead.length > 0 && (
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               {/* READ-ONLY, AND SAID SO. These are not records: they become one
                   four weeks before they happen, which is when there is somewhere
                   to write the notes. */}

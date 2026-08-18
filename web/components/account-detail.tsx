@@ -595,7 +595,7 @@ export function AccountDetailScreen({
       actions={
         <>
           {canEdit && (
-            <Button variant="outline" onClick={() => setEditOpen(true)} className="gap-1.5">
+            <Button variant="outline" onClick={() => setEditOpen(true)} className="gap-1">
               <Pencil className="size-3.5" />
               {t("Edit")}
             </Button>

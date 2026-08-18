@@ -69,7 +69,7 @@ export function TicketsScreen({ ready }: { ready: PortalReady }) {
       />
 
       {loading && !tickets ? (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           <Skeleton className="h-20 w-full rounded-xl" />
           <Skeleton className="h-20 w-full rounded-xl" />
           <Skeleton className="h-20 w-full rounded-xl" />
@@ -82,7 +82,7 @@ export function TicketsScreen({ ready }: { ready: PortalReady }) {
           </p>
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           {(tickets ?? []).map((t) => (
             <TicketRow key={t.id} ticket={t} />
           ))}

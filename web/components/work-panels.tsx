@@ -145,7 +145,7 @@ export function StoriesPanel({
   const rows = q.data
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       {onNew && (
         <div className="flex flex-wrap justify-end gap-2">
           <AddButton label={t("New story")} onClick={onNew} />
@@ -154,7 +154,7 @@ export function StoriesPanel({
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">{emptyText}</p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-col gap-2">
           {rows.map((s) => (
             <Row key={s.id} live={s.status !== "done"}>
               <div className="min-w-0 flex-1">
@@ -277,7 +277,7 @@ export function SprintsPanel({
   const rows = q.data
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       {onNew && (
         <div className="flex flex-wrap justify-end gap-2">
           <AddButton label={t("Start a sprint")} onClick={onNew} />
@@ -286,7 +286,7 @@ export function SprintsPanel({
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">{emptyText}</p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-col gap-2">
           {rows.map((s) => (
             <Row key={s.id} live={!s.completedAt}>
               <div className="min-w-0 flex-1">
@@ -344,7 +344,7 @@ export function AppsPanel({
   const rows = q.data
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       {onNew && (
         <div className="flex flex-wrap justify-end gap-2">
           <AddButton label={t("Record an app")} onClick={onNew} />
@@ -353,7 +353,7 @@ export function AppsPanel({
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("Nothing built for")} {accountName} {t("yet.")}</p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-col gap-2">
           {rows.map((a) => (
             <Row key={a.id} live={a.active}>
               <div className="min-w-0 flex-1">
@@ -405,7 +405,7 @@ export function ProcessesPanel({
   const rows = q.data
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       {onNew && (
         <div className="flex flex-wrap justify-end gap-2">
           <AddButton label={t("Map a process")} onClick={onNew} />
@@ -416,7 +416,7 @@ export function ProcessesPanel({
           {t("No processes drawn inside this app yet.")}
         </p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-col gap-2">
           {rows.map((p) => (
             <Row key={p.id} live={p.active}>
               <div className="min-w-0 flex-1">
@@ -482,7 +482,7 @@ export function AppMeetingsPanel({
   const rows = q.data
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       {onNew && (
         <div className="flex flex-wrap justify-end gap-2">
           <AddButton label={t("Arrange a meeting")} onClick={onNew} />
@@ -491,7 +491,7 @@ export function AppMeetingsPanel({
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("No meetings about this app yet.")}</p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-col gap-2">
           {rows.map((m) => (
             <Row key={m.id} live={m.active}>
               <div className="min-w-0 flex-1">
@@ -553,7 +553,7 @@ export function AppTicketsPanel({
   // Tickets live at their own top-level URL, so the link is built off the host
   // prefix rather than the section we are standing in.
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       {onNew && (
         <div className="flex flex-wrap justify-end gap-2">
           <AddButton label={t("Raise a ticket")} onClick={onNew} />
@@ -562,7 +562,7 @@ export function AppTicketsPanel({
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("Nothing has been raised about this app yet.")}</p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-col gap-2">
           {rows.map((ticket) => (
             <Row key={ticket.id} live={!ticket.archivedAt}>
               <div className="min-w-0 flex-1">
@@ -635,7 +635,7 @@ export function TodosPanel({
   const rows = q.data
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       {onNew && (
         <div className="flex flex-wrap justify-end gap-2">
           <AddButton label={t("Ask for something")} onClick={onNew} />
@@ -644,7 +644,7 @@ export function TodosPanel({
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("Nothing outstanding with a client.")}</p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-col gap-2">
           {rows.map((t) => (
             <Row key={t.id} live={!t.completedAt && !t.cancelled}>
               <div className="min-w-0 flex-1">

@@ -143,7 +143,7 @@ export function StaffPanel({
     : []
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
           {t("Profile")}
@@ -156,7 +156,7 @@ export function StaffPanel({
         {/* ml-auto on the GROUP so a narrow phone reflows instead of clipping. */}
         <div className="ml-auto flex flex-wrap gap-2">
           {mayWrite && (
-            <Button variant="outline" size="sm" onClick={() => setProfileOpen(true)} className="gap-1.5">
+            <Button variant="outline" size="sm" onClick={() => setProfileOpen(true)} className="gap-1">
               <Pencil className="size-3.5" />
               {profile?.active ? t("Edit profile") : t("Write a profile")}
             </Button>
@@ -171,7 +171,7 @@ export function StaffPanel({
                 variant="outline"
                 size="sm"
                 onClick={() => void setProfileActive(profile, false)}
-                className="text-destructive hover:text-destructive gap-1.5"
+                className="text-destructive hover:text-destructive gap-1"
               >
                 <Power className="size-3.5" />
                 {t("Retire profile")}
@@ -181,7 +181,7 @@ export function StaffPanel({
                 variant="outline"
                 size="sm"
                 onClick={() => void setProfileActive(profile, true)}
-                className="gap-1.5"
+                className="gap-1"
               >
                 <Power className="size-3.5" />
                 {t("Restore profile")}
@@ -225,7 +225,7 @@ export function StaffPanel({
         )}
       </div>
       <Card>
-        <CardContent className="flex flex-col gap-3 p-4">
+        <CardContent className="flex flex-col gap-4 p-4">
           {certificates.length === 0 ? (
             <p className="text-muted-foreground text-sm">{t("Nothing recorded for")} {memberName} {t("yet.")}</p>
           ) : (

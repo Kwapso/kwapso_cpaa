@@ -262,7 +262,7 @@ export function GoogleSourceDialog({
                   setOptions(null)
                 }}
                 disabled={busy}
-                className={`flex flex-1 flex-col gap-0.5 rounded-xl border p-3 text-left ${
+                className={`flex flex-1 flex-col gap-1 rounded-xl border p-3 text-left ${
                   kind === k.value ? "border-primary bg-muted" : ""
                 }`}
               >
@@ -288,7 +288,7 @@ export function GoogleSourceDialog({
             disabled={busy}
             autoFocus
           />
-          <Button type="button" variant="outline" onClick={look} disabled={busy || looking} className="gap-1.5">
+          <Button type="button" variant="outline" onClick={look} disabled={busy || looking} className="gap-1">
             {looking ? <Spinner /> : <Search className="size-3.5" aria-hidden />}
             {looking ? "Looking…" : "Look"}
           </Button>
@@ -375,7 +375,7 @@ export function GoogleSourceDialog({
             {t("Nothing picked yet. Look one up above and tap it.")}
           </p>
         ) : (
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1">
             {chosen.map((i) => (
               <button
                 key={i.externalId}
@@ -413,7 +413,7 @@ export function GoogleSourceDialog({
               type="button"
               onClick={() => setValues((v) => ({ ...v, shelf: s.value }))}
               disabled={busy}
-              className={`flex flex-col gap-0.5 rounded-xl border p-3 text-left ${
+              className={`flex flex-col gap-1 rounded-xl border p-3 text-left ${
                 values.shelf === s.value ? "border-primary bg-muted" : ""
               }`}
             >

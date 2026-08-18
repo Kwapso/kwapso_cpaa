@@ -98,7 +98,7 @@ export function AppMoneyPanel({ appId, host }: { appId: string; host: { base: st
   ]
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-6">
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <p className="text-muted-foreground text-sm">{t("Hours given back, every month")}</p>
@@ -118,7 +118,7 @@ export function AppMoneyPanel({ appId, host }: { appId: string; host: { base: st
           zero or merely incomplete: a partial figure that does not say what it
           left out reads as the whole answer, which is the same bug quieter. */}
       {(roleless.length > 0 || unpricedRoles.length > 0) && (
-        <div className="border-border/60 bg-muted/40 flex flex-col gap-3 rounded-xl border p-4">
+        <div className="border-border/60 bg-muted/40 flex flex-col gap-4 rounded-xl border p-4">
           <p className="text-sm font-medium">
             {view.moneyCentsPerMonth === 0
               ? t("There is no money figure yet, and here is what it is waiting on.")
@@ -138,7 +138,7 @@ export function AppMoneyPanel({ appId, host }: { appId: string; host: { base: st
                     key={line.processId}
                     variant="outline"
                     size="sm"
-                    className="gap-1.5"
+                    className="gap-1"
                     onClick={() => softNavigate(`${host.base}/processes/${line.processId}`)}
                   >
                     <Route className="size-3.5" />
@@ -158,7 +158,7 @@ export function AppMoneyPanel({ appId, host }: { appId: string; host: { base: st
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-1.5"
+                  className="gap-1"
                   onClick={() => softNavigate(`${host.base}/internal-rates`)}
                 >
                   <Banknote className="size-3.5" />
@@ -172,7 +172,7 @@ export function AppMoneyPanel({ appId, host }: { appId: string; host: { base: st
 
       {/* WHERE IT COMES FROM, process by process — the same drill-down every
           other savings screen offers, with the role and its price added. */}
-      <ul className="flex flex-col gap-1.5">
+      <ul className="flex flex-col gap-2">
         {states.map(({ line, state }) => (
           <li
             key={line.processId}

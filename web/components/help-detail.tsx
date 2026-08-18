@@ -546,7 +546,7 @@ export function HelpDetailScreen({
               "Couldn't confirm that."
             )
           }
-          className="shrink-0 gap-1.5"
+          className="shrink-0 gap-1"
         >
           <CheckCheck className="size-3.5" />
           {t("They've confirmed it")}
@@ -557,7 +557,7 @@ export function HelpDetailScreen({
           ticket already answered. The panel is where the words are written,
           because the door refuses without them (5.6). */}
       {canEdit && ticket.status === "ready" && (
-        <Button disabled={statusBusy} onClick={() => setResolving(true)} className="shrink-0 gap-1.5">
+        <Button disabled={statusBusy} onClick={() => setResolving(true)} className="shrink-0 gap-1">
           <Send className="size-3.5" />
           {t("Answer and close")}
         </Button>

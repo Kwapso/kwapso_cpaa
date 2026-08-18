@@ -267,7 +267,7 @@ export function RecordHeader({
   }, [onCollapsedChange])
 
   return (
-    <header className="flex flex-col gap-3 pb-6">
+    <header className="flex flex-col gap-4 pb-6">
       <div className="flex flex-wrap items-start gap-4">
         {leading ?? (mark ? <TypeMark mark={mark} size="band" /> : null)}
         <div className="min-w-0 flex-1">

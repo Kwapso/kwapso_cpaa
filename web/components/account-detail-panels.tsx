@@ -97,7 +97,7 @@ export function ContactsPanel({
 }) {
   const t = useT()
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       {(canCreate || canCreatePerson) && (
         <div className="flex flex-wrap justify-end gap-2">
           {/* Distinct glyphs on purpose: two icon-only buttons that both showed a
@@ -116,7 +116,7 @@ export function ContactsPanel({
       {links.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("No contacts yet.")}</p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-col gap-2">
           {links.map((l) => (
             <Row key={l.id} active={l.active}>
               <button
@@ -154,7 +154,7 @@ export function ContactsPanel({
                           ),
                       })
                     }
-                    className="text-destructive hover:text-destructive gap-1.5"
+                    className="text-destructive hover:text-destructive gap-1"
                     aria-label={`Remove ${l.personName}`}
                   >
                     <UserMinus className="size-3.5" />
@@ -171,7 +171,7 @@ export function ContactsPanel({
                         "Couldn't add that contact back."
                       )
                     }
-                    className="gap-1.5"
+                    className="gap-1"
                     aria-label={`Add ${l.personName} back`}
                   >
                     <Power className="size-3.5" /> {t("Add back")}
@@ -203,10 +203,10 @@ export function PortalAccessPanel({
 }) {
   const t = useT()
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       {canGrant && (
         <div className="flex flex-wrap justify-end gap-2">
-          <Button size="sm" onClick={onGrant} className="gap-1.5">
+          <Button size="sm" onClick={onGrant} className="gap-1">
             <KeyRound className="size-4" />
             {t("Give access")}
           </Button>
@@ -217,7 +217,7 @@ export function PortalAccessPanel({
           {t("Nobody here can sign in yet. Give access to someone and they'll see this account's own work.")}
         </p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-col gap-2">
           {portalUsers.map((p) => (
             <Row key={p.id} active={p.active}>
               <span className="min-w-0 flex-1 truncate text-sm">
@@ -247,7 +247,7 @@ export function PortalAccessPanel({
                           ),
                       })
                     }
-                    className="text-destructive hover:text-destructive gap-1.5"
+                    className="text-destructive hover:text-destructive gap-1"
                     aria-label={t("Take access away")}
                   >
                     <Ban className="size-3.5" />
@@ -264,7 +264,7 @@ export function PortalAccessPanel({
                         "Couldn't change that login."
                       )
                     }
-                    className="gap-1.5"
+                    className="gap-1"
                     aria-label={t("Switch access back on")}
                   >
                     <Power className="size-3.5" /> {t("Switch back on")}
