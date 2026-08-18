@@ -550,7 +550,7 @@ of four and five parts, and prefix the reference into the title as well. The red
 | Story (`stories-screen.tsx:48-59`) | `ref · title` + status, assignee, due, sprint, ticket ref | title only; subtitle `status · assignee · due` |
 | Task (`tasks-screen.tsx:47-56`) | `ref · title` + done, assignee, due | title only; subtitle `assignee · due` |
 | Account (`shape.ts:268-271`) | name + type, code, status, parent | name; subtitle `type · status` |
-| Meeting (`shape.ts:217-225`) | title + date, account, purpose, held | title; subtitle `date · account` |
+| Meeting (`shape.ts:217-225`) | title + date, account, purpose, whether it has happened | title; subtitle `date · account` |
 
 The reference number moves to the glyph's `title` attribute and to the detail eyebrow
 ([D4](#d4-the-eyebrow-names-the-type-in-caps-above-the-title)), where it belongs.
@@ -647,7 +647,7 @@ Ranking, when you have to choose which two survive:
 2. The action a person takes **most often that is not destructive**. Secondary,
    `variant="outline"`.
 3. Everything else: Edit, Archive, Deactivate, Translate, Reply by email, Make it a
-   story, Move up, Move down, Add to my calendar, Take it back out.
+   story, Move up, Move down, Read the transcript, Take it back out.
 
 Concrete target, `web/components/help-detail.tsx:418-539`, which is Aurora's seven:
 

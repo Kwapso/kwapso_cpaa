@@ -1071,12 +1071,12 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_meetings",
     summary:
-      "List MEETINGS, conversations we have had or are about to have, newest first, with the agenda and the notes on each. `view` is 'upcoming' by default (what is still to come); pass 'all' for the whole diary including cancelled ones. `accountId` narrows to one client, `appId` to one system, `purposeId` to one reason we meet, `status` to 'scheduled' or 'held', and `q` searches the title, the agenda and the notes. Pass `id` for one meeting. `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'when' (the default, most recent first), 'title', 'client', 'status' or 'added'. The order is the DOOR's, so it spans the whole diary rather than the page you are holding. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one). A meeting is NOT a work log: it says what was agreed, never how long it took.",
+      "List MEETINGS, conversations we have had or are about to have, newest first, with the agenda and the notes on each. `view` is 'upcoming' by default (what has not started yet, by the clock); pass 'week' for the week we are in, past and upcoming both, or 'all' for the whole diary including cancelled ones. `accountId` narrows to one client, `appId` to one system, `purposeId` to one reason we meet, and `q` searches the title, the agenda and the notes. Pass `id` for one meeting. `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'when' (the default, most recent first), 'title', 'client' or 'added'. The order is the DOOR's, so it spans the whole diary rather than the page you are holding. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one). A meeting is NOT a work log: it says what was agreed, never how long it took.",
     binding: "CONTENT", method: "GET", path: "/api/content/meetings",
-    schema: obj({ id: S, accountId: S, appId: S, purposeId: S, status: S, view: S, q: S, sort: S, dir: S, cursor: S }),
+    schema: obj({ id: S, accountId: S, appId: S, purposeId: S, view: S, q: S, sort: S, dir: S, cursor: S }),
     buildQuery: (i) => {
       const q: string[] = []
-      for (const k of ["id", "accountId", "appId", "purposeId", "status", "view", "q", "sort", "dir", "cursor"])
+      for (const k of ["id", "accountId", "appId", "purposeId", "view", "q", "sort", "dir", "cursor"])
         if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
       return q.length ? `?${q.join("&")}` : ""
     },
@@ -1088,7 +1088,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_meeting",
     summary:
-      "Put a meeting in the diary. `title` and `startsAt` are required; `startsAt` and `endsAt` are moments (a date AND a time, a meeting happens at an hour). `accountId` says which client it is with and is left off for an internal one; `appId` says which of their systems it was about and is left off when it was about the account itself; `purposeId` is why we meet, out of the meeting purposes list. `agenda` is what we mean to cover. Putting it in somebody's Google Calendar is a separate step, add_meeting_to_calendar.",
+      "Put a meeting in the diary. `title` and `startsAt` are required; `startsAt` and `endsAt` are moments (a date AND a time, a meeting happens at an hour). `accountId` says which client it is with and is left off for an internal one; `appId` says which of their systems it was about and is left off when it was about the account itself; `purposeId` is why we meet, out of the meeting purposes list. `agenda` is what we mean to cover. This does NOT put anything in anybody's Google Calendar and nothing here can: kwapso reads calendars and never writes them. To have a meeting in both places, arrange it in Google Calendar and it arrives here on the next sync_calendar_series, with its guests, its join link and its attachments.",
     binding: "CONTENT", method: "POST", path: "/api/content/meetings",
     schema: obj(
       { title: S, startsAt: S, endsAt: S, accountId: S, appId: S, purposeId: S, agenda: S, notes: S, location: S },
@@ -1134,19 +1134,9 @@ export const SHARED_TOOLS: SharedTool[] = [
     }),
     agent: { write: true, confirm: false, summarize: (i) => `Update meeting ${str(i, "id")}` },
   },
-  {
-    name: "set_meeting_held",
-    summary:
-      "Mark a meeting as held, or put it back in the diary (`held`: true / false), by id. Marking a held meeting held changes nothing.",
-    binding: "CONTENT", method: "POST", path: "/api/content/meetings/held",
-    schema: obj({ id: S, held: B }, ["id", "held"]),
-    buildBody: (i) => ({ id: str(i, "id"), held: i.held === true }),
-    agent: {
-      write: true,
-      confirm: false,
-      summarize: (i) => `${i.held === true ? "Mark held" : "Reopen"} meeting ${str(i, "id")}`,
-    },
-  },
+  // `set_meeting_held` was here. A meeting's own `startsAt` says whether it has
+  // happened, so the status it moved was a second source of truth for a question
+  // the clock answers, and it is retired.
   {
     name: "set_meeting_active",
     summary:
@@ -1183,7 +1173,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "sync_calendar_series",
     summary:
-      "Bring the caller's calendar and the diary into step, over a window that reaches back a fortnight and forward four weeks. Three things happen. Every REPEATING instance in that window with no record yet becomes one, so there is a month to prepare its notes and last week's calls are records too; `created` counts them. Every meeting whose entry is in the window has its Google facts brought up to date, the guest list and what each person answered, the organiser, the join link, the attachments, and `updated` counts those. An entry called off in Google is cancelled here, counted by `cancelled`. The instances beyond the horizon come back in `ahead` as read-only, because an entry six months away can still be moved or called off in Google. One-off entries are never imported, somebody's own diary is not the agency's record of a client conversation, though a one-off already in the diary is kept up to date like any other. Safe to call twice: an instance that already has a record cannot get a second one, and an entry Google has not touched since the last call is skipped without a write.",
+      "Read the caller's Google Calendar into the diary. ONE WAY, always: nothing in kwapso writes to a calendar. Every entry in the live window (a fortnight back, four weeks on) with no record yet becomes one, whether it repeats or not and whether it is past or future, and `created` counts them. Every meeting whose entry is in the window has its Google facts brought up to date, the description, the location, the guest list and what each person answered, the organiser, the join link, the attachments and the link back to the entry, and `updated` counts those. An entry called off in Google is cancelled here, counted by `cancelled`. Entries beyond the live horizon come back in `ahead` as read-only. It ALSO walks one slice of the caller's whole calendar, five years back to a year ahead, resuming from where the last call stopped: `swept` is the moment that walk has reached and `caughtUp` is true once it has reached the far end, so call it repeatedly to bring in a whole history. Safe to call twice: an entry that already has a record cannot get a second one, and one Google has not touched since the last call is skipped without a write.",
     binding: "CONTENT", method: "POST", path: "/api/content/meetings/sync-calendar",
     schema: obj({}),
     buildBody: () => ({}),
@@ -1196,7 +1186,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "read_meeting_transcript",
     summary:
-      "Find and keep the transcript of a meeting that has already happened, by `id`, and record what its arrival means: the meeting is marked held and a row of time is written for every one of OUR OWN people who was in the room. The client's people are never given one, a client's hour is not our cost. It hunts three ways in order of proof, the file Google attached to the calendar entry itself, then a document in a Drive folder the caller has shared, then a notice from Google in the caller's mail naming the document it made, and `foundBy` says which of the three found it. `captured` false means nothing was found or it had already been read, and `note` says which in a sentence; `logsWritten` counts the rows of time it wrote. Reading it twice does nothing the second time. The words themselves are read back with `get_meeting_transcript`.",
+      "Find and keep the transcript of a meeting that has already happened, by `id`, and record what its arrival means: a row of time is written for every one of OUR OWN people who was in the room. The client's people are never given one, a client's hour is not our cost. It hunts three ways in order of proof, the file Google attached to the calendar entry itself, then a document in a Drive folder the caller has shared, then a notice from Google in the caller's mail naming the document it made, and `foundBy` says which of the three found it. `captured` false means nothing was found or it had already been read, and `note` says which in a sentence; `logsWritten` counts the rows of time it wrote. Reading it twice does nothing the second time. The words themselves are read back with `get_meeting_transcript`.",
     binding: "CONTENT", method: "POST", path: "/api/content/meetings/transcript",
     schema: obj({ id: S }, ["id"]),
     buildBody: (i) => ({ id: str(i, "id") }),
@@ -1206,22 +1196,11 @@ export const SHARED_TOOLS: SharedTool[] = [
       summarize: (i) => `Read the transcript of meeting ${str(i, "id")}`,
     },
   },
-  {
-    name: "add_meeting_to_calendar",
-    summary:
-      "Put a meeting that is already in kwapso into YOUR OWN Google Calendar, by id. Needs a connected Calendar account and the 'Calendar on your behalf' right. Pressing it twice makes ONE entry, the second call answers with the one that already exists.",
-    binding: "CONTENT", method: "POST", path: "/api/content/google/calendar/meeting",
-    schema: obj({ meetingId: S }, ["meetingId"]),
-    buildBody: (i) => ({ meetingId: str(i, "meetingId") }),
-    agent: {
-      write: true,
-      // An event is a suggestion in a diary its owner can delete in one click —
-      // the same reasoning that leaves create_calendar_event unconfirmed while
-      // every mail tool asks (routes/google.ts states the owner's ruling).
-      confirm: false,
-      summarize: (i) => `Add meeting ${str(i, "meetingId")} to your calendar`,
-    },
-  },
+  // `add_meeting_to_calendar` was here, and it was one of only two tools on
+  // either surface that WROTE into Google. The calendar is read-only as of
+  // 18 August 2026 — the door it forwarded to no longer exists — so the honest
+  // answer to "put this meeting in my calendar" is now: put it in Google, and it
+  // will be read back here with its guests, its join link and its attachments.
   {
     name: "sync_google_knowledge",
     summary:

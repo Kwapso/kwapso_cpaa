@@ -379,7 +379,9 @@ export const INGEST_KINDS: IngestKind[] = [
     kind: "account",
     table: "accounts",
     label: "accounts",
-    textVersion: 1,
+    // v2: "when we last spoke" is the latest meeting that has STARTED, not the
+    // latest one somebody remembered to tick held.
+    textVersion: 2,
     rollup: true,
     read: async (cfg, guard, cursor, limit) => {
       // The accounts read aliases its table (`a`), so its sort expression is
@@ -467,8 +469,13 @@ export const INGEST_KINDS: IngestKind[] = [
                     WHERE td.account_id = a.id AND td.completed_at IS NULL AND td.cancelled_at IS NULL
                     ORDER BY td.due_on LIMIT ${ROLLUP_ROWS}`
                 )} AS todos,
+                -- WHEN WE LAST SPOKE. Keyed on the CLOCK: the latest meeting that
+                -- has already started. It used to test the retired held status,
+                -- which answered "the latest meeting somebody remembered to tick"
+                -- — so a client we saw last week could read as never met.
                 (SELECT MAX(m.starts_at) FROM meetings m
-                  WHERE m.account_id = a.id AND m.deactivated_at IS NULL AND m.status = 'held') AS last_met
+                  WHERE m.account_id = a.id AND m.deactivated_at IS NULL
+                    AND m.starts_at <= ${sqlString(new Date().toISOString())}) AS last_met
            FROM accounts a
           ${keyset.sql ? `WHERE ${keyset.sql}` : ""}
           ORDER BY sort_at, a.id LIMIT ${limit}`,
@@ -1018,7 +1025,9 @@ export const INGEST_KINDS: IngestKind[] = [
     kind: "meeting",
     table: "meetings",
     label: "meetings",
-    textVersion: 1,
+    // v2: the summary says whether it has happened from the START TIME, where it
+    // used to quote the retired status column.
+    textVersion: 2,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(m.updated_at, m.created_at)", "m.id")
       const rows = await d1Query<{
@@ -1029,7 +1038,6 @@ export const INGEST_KINDS: IngestKind[] = [
         notes: string | null
         location: string | null
         starts_at: string
-        status: string
         transcript_text: string | null
         transcript_note: string | null
         transcript_url: string | null
@@ -1047,7 +1055,7 @@ export const INGEST_KINDS: IngestKind[] = [
         // R14 hard cap: `limit` is INGEST_SOURCES_PER_TICK. The transcript rides
         // the read because it IS the material — a second call per meeting to
         // fetch it would be a call per row for the one column that matters.
-        `SELECT m.id, m.ref, m.title, m.agenda, m.notes, m.location, m.starts_at, m.status,
+        `SELECT m.id, m.ref, m.title, m.agenda, m.notes, m.location, m.starts_at,
                 m.transcript_text, m.transcript_note, m.transcript_url,
                 m.google_event_url, m.google_organizer, m.account_id, m.app_id, m.deactivated_at,
                 a.name AS account_name,
@@ -1067,7 +1075,10 @@ export const INGEST_KINDS: IngestKind[] = [
           title: r.title,
           ref: r.ref,
           accountName: r.account_name,
-          status: r.status,
+          // FROM THE CLOCK. A meeting used to carry a `status` column somebody
+          // ticked; the start time is the fact, and the summary the router
+          // embeds should say the true one.
+          status: Date.parse(r.starts_at) < Date.now() ? "already happened" : "still to come",
           detail: plainText(r.notes || r.agenda || ""),
         }),
         body: [

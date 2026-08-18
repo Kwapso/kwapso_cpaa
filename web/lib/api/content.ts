@@ -654,20 +654,26 @@ export const content = {
         order?.dir ? `&dir=${enc(order.dir)}` : ""
       }${cursor ? `&cursor=${enc(cursor)}` : ""}`
     ),
-  /** BRING THE CALENDAR AND THE DIARY INTO STEP, BOTH WAYS (9.7, and the owner's
-   * "it should also update consistently if it's a past event").
+  /** READ GOOGLE'S DIARY INTO OURS. ONE WAY — nothing in kwapso writes to a
+   * calendar.
    *
-   * Three counts, because the sweep does three things over a window that reaches
-   * a fortnight back and four weeks on: repeating entries with no record become
+   * Three counts, because the sweep does three things over a live window that
+   * reaches a fortnight back and four weeks on: an entry with no record becomes
    * one (`created`), every meeting in the window has its Google facts refreshed
    * (`updated`), and one called off in Google is cancelled here (`cancelled`).
-   * `ahead` is the instances beyond the horizon, read-only. */
+   * `ahead` is the entries beyond that horizon, read-only.
+   *
+   * `swept` and `caughtUp` are the OTHER window: a resumable walk over five
+   * years back and a year on, one slice per call, which is how "anything in my
+   * calendar" gets here without any single request being unbounded. */
   syncCalendar: () =>
     api<{
       created: number
       updated: number
       cancelled: number
       ahead: { eventId: string; title: string; startsAt: string; url: string | null }[]
+      swept: string | null
+      caughtUp: boolean
     }>("/api/content/meetings/sync-calendar", post({})),
   /** WHAT WAS SAID, in full — read off the meeting row rather than from Google,
    * so any colleague who may read meetings can read it. Its own call because of
@@ -702,13 +708,11 @@ export const content = {
   }) => api<{ meeting: Meeting | null; total: number }>("/api/content/meetings", post(input)),
   updateMeeting: (input: { id: string } & Partial<Meeting>) =>
     api<{ meeting: Meeting | null; total: number }>("/api/content/meetings/update", post(input)),
-  setMeetingHeld: (id: string, held: boolean) =>
-    api<{ meeting: Meeting | null; total: number }>("/api/content/meetings/held", post({ id, held })),
   setMeetingActive: (id: string, active: boolean) =>
     api<{ meeting: Meeting | null; total: number }>("/api/content/meetings/active", post({ id, active })),
-  /** READ THE TRANSCRIPT and do what its arrival means (9.4 + 9.2): the meeting
-   * is ticked held and a row of time is written for each of OUR people who was
-   * in the room. Idempotent — a second press does nothing. */
+  /** READ THE TRANSCRIPT and do what its arrival means (9.2): a row of time is
+   * written for each of OUR people who was in the room. Idempotent — a second
+   * press does nothing. */
   readMeetingTranscript: (id: string) =>
     api<{
       captured: boolean
@@ -903,28 +907,16 @@ export const content = {
     threadId?: string
   }) => api<{ sent: { messageId: string; threadId: string } }>("/api/content/google/gmail/send", post(input)),
 
+  /** SOMEBODY'S OWN DIARY, IN A WINDOW — the only calendar call there is.
+   * `truncated` is true when the window held more entries than one read walks,
+   * which is a HALF answer and says so rather than looking whole.
+   *
+   * There were three more here — put an event in, push a sprint's dates in, push
+   * a meeting's — and they went with their doors when the calendar became
+   * read-only (18 August 2026). */
   googleEvents: (from?: string, to?: string) =>
-    api<{ events: CalendarEntry[] }>(
+    api<{ events: CalendarEntry[]; truncated: boolean }>(
       `/api/content/google/calendar/events${from || to ? `?from=${enc(from ?? "")}&to=${enc(to ?? "")}` : ""}`
-    ),
-  googleCreateEvent: (input: {
-    summary: string
-    description?: string
-    start: string
-    end: string
-    allDay?: boolean
-  }) => api<{ event: CalendarEntry }>("/api/content/google/calendar/events", post(input)),
-  /** A sprint's dates, in your calendar — the one FROM-kwapso push that has a
-   * record to push today. */
-  googleSprintToCalendar: (sprintId: string) =>
-    api<{ event: CalendarEntry }>("/api/content/google/calendar/sprint", post({ sprintId })),
-  /** The other half: a meeting booked here, in my own calendar. `alreadyThere`
-   * is how the screen says "it is already in your diary" instead of quietly
-   * making a second entry. */
-  googleMeetingToCalendar: (meetingId: string) =>
-    api<{ event: { id: string; url: string | null }; alreadyThere: boolean }>(
-      "/api/content/google/calendar/meeting",
-      post({ meetingId })
     ),
 
   googleChat: (sourceId: string) =>

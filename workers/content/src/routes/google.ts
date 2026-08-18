@@ -17,15 +17,19 @@
 // can see" is therefore a property of the code's shape rather than a check
 // somebody has to remember.
 //
-// THE THREE SWITCHES, and which door each one guards:
+// THE TWO SWITCHES, and which door each one guards:
 //   • google:create      — may connect a Google account (and name a folder/space);
-//   • google_mail:create — kwapso may SEND mail as you;
-//   • google_events:create — kwapso may put an EVENT in your calendar.
-// The last two are demanded ON TOP of `google:edit`, so a role that can send but
-// cannot otherwise use the connection is not a state anybody can reach. And they
-// are demanded of the PERSON pressing "send it from kwapso" exactly as they are
-// of the assistant: it is the same act, by the same product, out of the same
+//   • google_mail:create — kwapso may SEND mail as you.
+// The second is demanded ON TOP of `google:edit`, so a role that can send but
+// cannot otherwise use the connection is not a state anybody can reach. And it
+// is demanded of the PERSON pressing "send it from kwapso" exactly as it is of
+// the assistant: it is the same act, by the same product, out of the same
 // mailbox, so it is the same permission.
+//
+// THERE WAS A THIRD, `google_events:create` — "kwapso may put an EVENT in your
+// calendar" — and it went with the doors it guarded. The calendar is READ-ONLY
+// here now: this file reads a diary and never writes one. See the note where the
+// six write doors used to be, below the events read.
 
 import { fail, json } from "@shared/workers/http"
 import { queryText, requireText, optionalText, TEXT_LIMITS } from "@shared/workers/validate"
@@ -58,12 +62,8 @@ import {
   readCookie,
 } from "../lib/google-oauth"
 import {
-  calendarCancel,
-  calendarCreate,
   calendarGet,
-  calendarGuests,
   calendarList,
-  calendarUpdate,
   chatDelete,
   chatMessages,
   chatPost,
@@ -92,8 +92,6 @@ import {
 } from "../lib/google-api"
 import { knownContactEmails } from "../lib/google-read"
 import { findTranscript } from "../lib/google-transcript"
-import { claimCalendarEvent, getMeeting } from "../lib/meetings"
-import { getSprint } from "../lib/stories"
 import type { Env } from "../env"
 
 // ── the connection itself ────────────────────────────────────────────────────
@@ -885,218 +883,40 @@ export async function getGoogleEvents(request: Request, env: Env): Promise<Respo
   await refusePortalCaller(cfg, guard)
   const url = new URL(request.url)
   const { token } = await accessTokenFor(env, cfg, guard, "calendar")
-  return json({
-    events: await calendarList(token, {
-      from: queryText(url.searchParams.get("from"), "From", TEXT_LIMITS.short),
-      to: queryText(url.searchParams.get("to"), "To", TEXT_LIMITS.short),
-    }),
+  const window = await calendarList(token, {
+    from: queryText(url.searchParams.get("from"), "From", TEXT_LIMITS.short),
+    to: queryText(url.searchParams.get("to"), "To", TEXT_LIMITS.short),
   })
+  // `truncated` rides the answer rather than being swallowed: a window with more
+  // entries than one read will walk is a HALF answer, and a caller told it was a
+  // whole one plans a week around it.
+  return json({ events: window.events, truncated: window.truncated })
 }
 
-/** POST /api/content/google/calendar/events — put something in my calendar.
+/* THE CALENDAR IS READ-ONLY, AND THAT IS THE WHOLE OF IT.
  *
- * The owner's second switch (`google_events:create`), and the asymmetry with
- * mail is deliberate and theirs: the assistant may create events WITHOUT asking,
- * mail ALWAYS asks. An event is a suggestion in a diary somebody owns and can
- * delete in one click; a sent mail is in somebody else's inbox forever. The
- * agent tool for this one therefore carries no confirm panel, and the mail tools
- * carry one — see workers/data-ops/src/lib/tools.ts. */
-export async function postGoogleEvent(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{
-    summary?: unknown
-    description?: unknown
-    start?: unknown
-    end?: unknown
-    allDay?: unknown
-  }>(request, env, "google", "edit")
-  await refusePortalCaller(cfg, guard)
-  await requireRight(cfg, guard, "google_events", "create")
-  const summary = requireText(body.summary, "Title", TEXT_LIMITS.short)
-  const { token, connectionId } = await accessTokenFor(env, cfg, guard, "calendar")
-  const event = await calendarCreate(token, {
-    summary,
-    description: optionalText(body.description, "Details", TEXT_LIMITS.long),
-    start: requireText(body.start, "Start", TEXT_LIMITS.short),
-    end: requireText(body.end, "End", TEXT_LIMITS.short),
-    allDay: body.allDay === true,
-  })
-  await recordGoogleAct(cfg, guard, actor, {
-    connectionId,
-    type: "Event created",
-    description: `kwapso put "${summary}" in ${actor.name}'s calendar`,
-  })
-  await publishChange(env, guard.teamId, "google", connectionId)
-  return json({ event })
-}
-
-/**
- * THE FOUR DOORS ON AN EVENT THAT ALREADY EXISTS — and why they are four doors
- * and not one with a dozen optional fields.
+ * Six doors stood here — put an event in the diary, change what it says and
+ * when, invite and uninvite guests, set where it is, call it off, and push a
+ * sprint's dates in — plus the meeting push below them. Every one is gone, by
+ * the owner's instruction on 18 August 2026: "disable the ability to create,
+ * edit, or delete anything in the calendar from the frontend… scour through our
+ * entire documentation and just make it one-way so we only grab and update the
+ * information."
  *
- * They answer four different questions, and a person changes one at a time:
- * WHAT it says and WHEN it is (update), WHO is coming (guests), WHERE it is
- * (location), and whether it is happening at all (cancel). Splitting them that
- * way is not decoration — the guest door is the only one of the four that puts
- * something in a THIRD PARTY's inbox, which is why its agent tool pauses for a
- * yes/no panel where the others do not, exactly as mail does and events don't.
- * A single door carrying every field could not make that distinction, because
- * the distinction lives in what the caller happened to fill in.
+ * WHAT THAT COSTS, SAID HONESTLY, because it is the reason to write this down
+ * rather than to delete quietly: a meeting arranged in kwapso no longer appears
+ * in anybody's Google Calendar, and a sprint's dates no longer become an all-day
+ * block. The answer to both is to put it in Google, where it will be read back
+ * here on the next sweep with its guests, its join link and its attachments —
+ * which is the direction the whole module now runs in.
  *
- * NO FIELD IS SET IN TWO PLACES. Location is absent from the update door on
- * purpose: two ways to write one field is how two callers end up disagreeing
- * about what an entry says.
- *
- * ALL FOUR DEMAND THE EVENTS SWITCH, cancel included. The owner's switch reads
- * "kwapso may put an EVENT in your calendar", and the honest reading of it is
- * "kwapso may touch my diary" — of which calling somebody's appointment off is
- * the sharpest version there is.
+ * THE REFUSAL IS STRUCTURAL, NOT A CONDITION. There is no flag here that turns
+ * writing back on and no permission that grants it: lib/google-api.ts holds no
+ * function that can send one, so the switch that used to guard these doors
+ * (`google_events`, "Calendar on your behalf") was retired with them rather than
+ * left on the Roles screen promising a capability nothing has. Same reasoning as
+ * R24's — a condition can be inverted, a missing function cannot be forgotten.
  */
-export async function postGoogleEventUpdate(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{
-    eventId?: unknown
-    summary?: unknown
-    description?: unknown
-    start?: unknown
-    end?: unknown
-    allDay?: unknown
-  }>(request, env, "google", "edit")
-  await refusePortalCaller(cfg, guard)
-  await requireRight(cfg, guard, "google_events", "create")
-  const eventId = requireText(body.eventId, "Event", TEXT_LIMITS.short)
-  const change = {
-    summary: optionalText(body.summary, "Title", TEXT_LIMITS.short),
-    description: optionalText(body.description, "Details", TEXT_LIMITS.long),
-    start: optionalText(body.start, "Start", TEXT_LIMITS.short),
-    end: optionalText(body.end, "End", TEXT_LIMITS.short),
-    allDay: body.allDay === true,
-  }
-  // Nothing named is not a no-op, it is a caller who thinks they changed
-  // something. Say so, rather than answering 200 to an empty edit.
-  if (!change.summary && !change.description && !change.start && !change.end)
-    return fail(400, "invalid_input", "Say what to change, the title, the details, or the times.")
-  const { token, connectionId } = await accessTokenFor(env, cfg, guard, "calendar")
-  const event = await calendarUpdate(token, eventId, change)
-  await recordGoogleAct(cfg, guard, actor, {
-    connectionId,
-    type: "Event changed",
-    description: `kwapso changed "${event.summary}" in ${actor.name}'s calendar`,
-  })
-  await publishChange(env, guard.teamId, "google", connectionId)
-  return json({ event })
-}
-
-/** POST /api/content/google/calendar/event/guests — invite people, or take them
- * off. Both in one call, because "swap Ana for Marta" is one act to the person
- * asking and two round-trips would send two notifications for it.
- *
- * R17: a call that invites nobody new and removes nobody who was there moves
- * nothing — and, more to the point, mails nobody a change notification about a
- * change that did not happen. */
-export async function postGoogleEventGuests(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{
-    eventId?: unknown
-    add?: unknown
-    remove?: unknown
-  }>(request, env, "google", "edit")
-  await refusePortalCaller(cfg, guard)
-  await requireRight(cfg, guard, "google_events", "create")
-  const eventId = requireText(body.eventId, "Event", TEXT_LIMITS.short)
-  // R20, the array shape: `Array.isArray` decides it is a list, then every entry
-  // goes through the same text seam a single field would — a list is not a way
-  // in for values a scalar could not carry.
-  const add = guestList(Array.isArray(body.add) ? body.add : [], "Guest to add")
-  const remove = guestList(Array.isArray(body.remove) ? body.remove : [], "Guest to remove")
-  if (add.length === 0 && remove.length === 0)
-    return fail(400, "invalid_input", "Say who to add, or who to take off.")
-  const { token, connectionId } = await accessTokenFor(env, cfg, guard, "calendar")
-  const { event, changed } = await calendarGuests(token, eventId, { add, remove })
-  if (changed) {
-    await recordGoogleAct(cfg, guard, actor, {
-      connectionId,
-      type: "Event guests changed",
-      description: `kwapso changed who is coming to "${event.summary}"`,
-    })
-    await publishChange(env, guard.teamId, "google", connectionId)
-  }
-  // `changed` first, and the order is load-bearing: R27 derives what a
-  // description may promise from the keys of this literal, and its scan sees the
-  // first shorthand key in an object. Naming the field the tool's description
-  // talks about first is what keeps that promise checkable.
-  return json({ changed, event })
-}
-
-/** POST /api/content/google/calendar/event/location — say where it is.
- *
- * Its own door because WHERE is the field a person changes on its own, long
- * after the what and the when are agreed ("same time, different room"), and
- * because it is the one field the kwapso meeting record already holds — so this
- * is the seam that pushes a booked meeting's room into the diary entry without
- * restating a time somebody may have moved in Google since. */
-export async function postGoogleEventLocation(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{ eventId?: unknown; location?: unknown }>(
-    request,
-    env,
-    "google",
-    "edit"
-  )
-  await refusePortalCaller(cfg, guard)
-  await requireRight(cfg, guard, "google_events", "create")
-  const eventId = requireText(body.eventId, "Event", TEXT_LIMITS.short)
-  const location = requireText(body.location, "Where", TEXT_LIMITS.short)
-  const { token, connectionId } = await accessTokenFor(env, cfg, guard, "calendar")
-  const event = await calendarUpdate(token, eventId, { location })
-  await recordGoogleAct(cfg, guard, actor, {
-    connectionId,
-    type: "Event location set",
-    description: `kwapso set where "${event.summary}" happens, ${location}`,
-  })
-  await publishChange(env, guard.teamId, "google", connectionId)
-  return json({ event })
-}
-
-/** POST /api/content/google/calendar/event/cancel — call it off.
- *
- * CANCELLED, NOT DELETED, which is the base's own rule in Google's words: the
- * entry stays in everybody's calendar marked cancelled and every guest is told,
- * rather than an appointment silently evaporating out of somebody's morning.
- * R17: a second press moves nothing and mails nobody. */
-export async function postGoogleEventCancel(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{ eventId?: unknown }>(
-    request,
-    env,
-    "google",
-    "edit"
-  )
-  await refusePortalCaller(cfg, guard)
-  await requireRight(cfg, guard, "google_events", "create")
-  const eventId = requireText(body.eventId, "Event", TEXT_LIMITS.short)
-  const { token, connectionId } = await accessTokenFor(env, cfg, guard, "calendar")
-  const { event, changed } = await calendarCancel(token, eventId)
-  if (changed) {
-    await recordGoogleAct(cfg, guard, actor, {
-      connectionId,
-      type: "Event cancelled",
-      description: `kwapso called off "${event.summary}" in ${actor.name}'s calendar`,
-    })
-    await publishChange(env, guard.teamId, "google", connectionId)
-  }
-  // `changed` first — see the note on the guests door above.
-  return json({ changed, event })
-}
-
-/** Guest addresses off a request: a bounded list, every entry through the same
- * text seam a single field would use, lower-cased and de-duplicated so one
- * person named twice is one invitation. */
-function guestList(value: unknown[], field: string): string[] {
-  if (value.length > GUEST_CHANGE_CAP)
-    throw new GuardError(400, "invalid_input", `That's more than ${GUEST_CHANGE_CAP} people in one go.`)
-  return [...new Set(value.map((v) => requireText(v, field, TEXT_LIMITS.short).toLowerCase()))]
-}
-
-/** People one call may invite or uninvite. Small on purpose: a guest change is
- * something a person does by name, and a request naming fifty is a mail merge
- * wearing a calendar's clothes. */
-const GUEST_CHANGE_CAP = 25
 
 /**
  * GET /api/content/google/calendar/event/transcript?eventId= — what was SAID in
@@ -1149,136 +969,6 @@ export async function getGoogleEventTranscript(request: Request, env: Env): Prom
       text: found.text,
     },
   })
-}
-
-/**
- * POST /api/content/google/calendar/sprint — a sprint's dates, in my calendar.
- *
- * FROM kwapso TO GOOGLE, the first of the two the owner named. A sprint is a
- * block of sold work with a start and an end, so it becomes an ALL-DAY entry
- * spanning them — a sprint does not begin at 09:00, and inventing a time would
- * be inventing a fact.
- *
- * THE SECOND ONE IS THE DOOR BELOW — `…/calendar/meeting`. It was unbuildable
- * while the app had no meetings table (only `meeting_purposes`, a taxonomy of
- * WHY we meet with no date, no attendee and no duration on it); now that a
- * meeting is a row, it is a second door beside this one reusing everything under
- * the first line.
- *
- * THREE GATES: `work:read` (you may not push a sprint you cannot see),
- * `google:edit`, and the events switch. */
-export async function postGoogleSprintEvent(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{ sprintId?: unknown }>(
-    request,
-    env,
-    "work",
-    "read"
-  )
-  await refusePortalCaller(cfg, guard)
-  await requireRight(cfg, guard, "google", "edit")
-  await requireRight(cfg, guard, "google_events", "create")
-  const sprint = await getSprint(cfg, guard, requireText(body.sprintId, "Sprint", TEXT_LIMITS.short))
-  if (!sprint) return fail(404, "sprint_not_found", "That sprint doesn't exist.")
-  if (!sprint.startsOn || !sprint.endsOn)
-    return fail(409, "sprint_undated", "That sprint has no start and end date yet.")
-  const { token, connectionId } = await accessTokenFor(env, cfg, guard, "calendar")
-  const event = await calendarCreate(token, {
-    summary: `${sprint.ref ? `${sprint.ref} · ` : ""}${sprint.name}`,
-    description: [sprint.goal, sprint.accountName].filter(Boolean).join(", "),
-    start: sprint.startsOn,
-    // Google's all-day END is EXCLUSIVE: an entry ending on the 14th shows up to
-    // the 13th. So the last day of the sprint has to be its end date plus one, or
-    // every sprint in the calendar is a day short of what was sold.
-    end: dayAfter(sprint.endsOn),
-    allDay: true,
-  })
-  await recordGoogleAct(cfg, guard, actor, {
-    connectionId,
-    type: "Sprint added to calendar",
-    description: `kwapso put the "${sprint.name}" sprint in ${actor.name}'s calendar`,
-  })
-  await publishChange(env, guard.teamId, "google", connectionId)
-  return json({ event })
-}
-
-/**
- * POST /api/content/google/calendar/meeting — a meeting booked in kwapso, in my
- * calendar. The second half of the sentence the owner said out loud, and the one
- * that had nothing to push until meetings became a record.
- *
- * IT IS TIMED, WHERE A SPRINT IS ALL-DAY, and the difference is not cosmetic: a
- * sprint is a block of sold work that does not begin at 09:00, and a meeting is
- * a thing two people sit down for at a stated hour. A meeting with no end runs
- * the default hour — an entry Google would refuse without an end, and inventing
- * "all day" for a call would be inventing a fact of a different kind.
- *
- * PRESSING IT TWICE MAKES ONE ENTRY. The event id is CLAIMED on the row under
- * the `google_event_id IS NULL` predicate, so a second press is answered with
- * the entry that already exists rather than putting a second copy of the same
- * meeting in somebody's diary. That is the same shape R17 asks of a status move,
- * applied to a write that lands in a system we do not own — where a duplicate is
- * not a stale screen but a real appointment somebody has to delete.
- *
- * THREE GATES, exactly as the sprint door has: `meetings:read` (you may not push
- * a meeting you cannot see), `google:edit`, and the events switch.
- */
-export async function postGoogleMeetingEvent(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{ meetingId?: unknown }>(
-    request,
-    env,
-    "meetings",
-    "read"
-  )
-  await refusePortalCaller(cfg, guard)
-  await requireRight(cfg, guard, "google", "edit")
-  await requireRight(cfg, guard, "google_events", "create")
-  const meeting = await getMeeting(cfg, guard, requireText(body.meetingId, "Meeting", TEXT_LIMITS.short))
-  if (!meeting) return fail(404, "meeting_not_found", "That meeting doesn't exist.")
-  if (!meeting.active)
-    return fail(409, "meeting_cancelled", "That meeting is cancelled. Put it back in the diary first.")
-  // Already there: answer with what exists. Not an error — somebody pressing a
-  // button twice means it once.
-  if (meeting.googleEventId)
-    return json({
-      event: { id: meeting.googleEventId, url: meeting.googleEventUrl },
-      alreadyThere: true,
-    })
-
-  const { token, connectionId } = await accessTokenFor(env, cfg, guard, "calendar")
-  const event = await calendarCreate(token, {
-    summary: `${meeting.ref ? `${meeting.ref} · ` : ""}${meeting.title}`,
-    // What it is for, who it is with, and what we mean to cover — the agenda is
-    // the reason somebody opens a calendar entry the morning of the meeting.
-    description: [meeting.purposeName, meeting.accountName, meeting.location, meeting.agenda]
-      .filter(Boolean)
-      .join("\n"),
-    start: meeting.startsAt,
-    end: meeting.endsAt ?? new Date(Date.parse(meeting.startsAt) + DEFAULT_MEETING_MS).toISOString(),
-  })
-  const claimed = await claimCalendarEvent(cfg, guard, meeting.id, { id: event.id, url: event.url })
-  await recordGoogleAct(cfg, guard, actor, {
-    connectionId,
-    type: "Meeting added to calendar",
-    description: `kwapso put the "${meeting.title}" meeting in ${actor.name}'s calendar`,
-  })
-  // Two rows moved (the meeting, and the connection's last-used stamp), so both
-  // screens hear about it.
-  await publishChange(env, guard.teamId, "meetings", meeting.id, "edit", meeting.accountId ?? undefined)
-  await publishChange(env, guard.teamId, "google", connectionId)
-  return json({ event, alreadyThere: !claimed })
-}
-
-/** How long a meeting runs when nobody said. An hour is what a diary assumes and
- * what a person will correct if it is wrong; the alternative — refusing to push
- * a meeting whose end nobody decided — would make the button useless for exactly
- * the meetings people arrange in a hurry. */
-const DEFAULT_MEETING_MS = 60 * 60 * 1000
-
-/** YYYY-MM-DD, one day later — see the exclusive-end note above. */
-function dayAfter(date: string): string {
-  const at = Date.parse(`${date.slice(0, 10)}T00:00:00Z`)
-  if (Number.isNaN(at)) throw new GuardError(400, "invalid_input", "That sprint's dates aren't readable.")
-  return new Date(at + 86_400_000).toISOString().slice(0, 10)
 }
 
 // ── GOOGLE CHAT ──────────────────────────────────────────────────────────────

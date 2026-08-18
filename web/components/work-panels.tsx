@@ -518,11 +518,10 @@ export function AppMeetingsPanel({
                   {[formatDate(m.startsAt), m.accountName].filter(Boolean).join(" · ")}
                 </p>
               </div>
-              {m.status === "held" && (
-                <Badge variant="secondary" className="text-[10px]">
-                  {t("Held")}
-                </Badge>
-              )}
+              {/* A "Held" badge sat here, reading a status column that is
+                  retired: the date on the line above already says whether the
+                  meeting has happened, and a badge repeating it in a word
+                  somebody had to remember to tick could contradict it. */}
             </Row>
           ))}
         </RowList>

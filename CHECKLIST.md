@@ -169,9 +169,9 @@ longer builds the purged ones.
 | 9.1 | Meeting views: this week, calendar, all | **DONE**, this week, a month grid, and an all view with nine columns |
 | 9.2 | A transcript creates a work log per participant | **PART DONE**, built and running against your real calendar every time. It could not be PROVED, because none of your 17 repeating meetings is a recorded call, so no transcript exists to bring in. The refusal path is proved; the write path is not |
 | 9.3 | Those logs are marked as meeting time and can be excluded from any figure | **DONE**, any figure can be shown with meeting time, without it, or only it |
-| 9.4 | "Meeting held" ticks itself when a transcript arrives | **PART DONE**, same reason as 9.2 |
-| 9.5 | "Add to my calendar" hides when it is already there | **DONE**, it already was. "Add to my calendar" has been hiding itself when the meeting is already there |
-| 9.6 | Agenda edited from the edit page; notes open on the detail screen until the meeting closes | **DONE**, proved both ways: notes typed while scheduled, read-only once held |
+| 9.4 | "Meeting held" ticks itself when a transcript arrives | **WITHDRAWN 18 Aug 2026.** The owner: *"this held mark is held release. I don't care. It's too complicated."* A meeting's own start time already says whether it has happened, so the status was a second source of truth for a question the clock answers. Retired; the transcript still writes the work logs (9.2) and is still idempotent, on `transcript_captured_at` rather than on any status |
+| 9.5 | "Add to my calendar" hides when it is already there | **WITHDRAWN 18 Aug 2026.** There is no "Add to my calendar": the calendar is one-way, kwapso reads a diary and never writes one |
+| 9.6 | Agenda edited from the edit page; notes open on the detail screen | **DONE**. The notes used to close once a meeting was ticked held; nothing could know the writing-up was finished, so the field shut on exactly the people it was built for. They are open now until the meeting is cancelled |
 | 9.7 | Recurring calendar meetings appear | **DONE**, **17 real repeating meetings pulled from your calendar**, with the further-out ones read-only underneath. Pressing it again said "Nothing new to bring in" |
 | 9.8 | Sprints get a calendar view | **DONE**, a calendar view |
 | 9.9 | Sprints get an overview by type and status | **DONE**, grouped by running, coming up and wrapped, then by kind |
@@ -238,8 +238,8 @@ longer builds the purged ones.
 | 14.3 | Drive: edit a file, make a folder, copy mail in | **DONE**, all three driven live against your account and cleaned up |
 | 14.4 | Gmail: list, read, draft, send | **DONE** |
 | 14.5 | Gmail: reply in a thread, apply a label | Reply **DONE**, proved in-thread. Label **BLOCKED ON YOU**, it needs the `gmail.modify` permission and your existing grant predates it. Reconnect Gmail in Settings and it passes |
-| 14.6 | Calendar: list, create | **DONE** |
-| 14.7 | Calendar: edit, guests, location, cancel | **DONE**, all four driven live, guests added and removed, event cancelled and the second press stayed silent |
+| 14.6 | Calendar: list, create | **LIST DONE. CREATE WITHDRAWN 18 Aug 2026**, the calendar is one-way |
+| 14.7 | Calendar: edit, guests, location, cancel | **WITHDRAWN 18 Aug 2026.** All four were built and driven live; all four are gone, with the doors and the tools under them. The owner: *"disable the ability to create, edit, or delete anything in the calendar from the frontend"* |
 | 14.8 | Chat: read a space, post to it | **DONE** |
 | 14.9 | Chat: list every space | **DONE**, 19 spaces found, 2 of them shared |
 | 14.10 | Transcripts: read one, and reach it from its event | **DONE**, reached from the diary entry, text read back |
@@ -298,6 +298,7 @@ stays there as the record. **BUILDING** means a lane is on it in this session ri
 | 18.4 | The knowledge base ingests transcripts from calendar meetings, from Google Docs, and from emails announcing a Doc was made for a meeting | **PART DONE**, same reason. It rides the existing knowledge seam, which also closed a gap nobody had noticed — agendas and notes were never answerable at all |
 | 18.5 | Past events re-sync, because a transcript lands minutes to an hour after the room empties | **DONE** |
 | 18.6 | Every record stays in step with its calendar entry, past events included | **DONE** |
+| 18.7 | The sync is ONE WAY, and everything in the calendar reaches the diary | **DONE 18 Aug 2026.** Seven write doors, five library functions, eight tools and the "Calendar on your behalf" switch removed, so the refusal is a missing function rather than a permission. The read went the other way: past AND future, one-offs included, over a window five years back and a year ahead, walked one 90-day slice per call from a resumable cursor — bounded per request (R14), complete by repetition |
 
 ## 19 · Google, deeper
 

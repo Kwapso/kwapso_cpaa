@@ -331,8 +331,6 @@ export const CATALOG_EXEMPT: Record<string, string> = {
     "a connection is a CAPABILITY, not a record: the row is worthless without the refresh token inside it, and that token can only be minted by a person standing at Google's own consent screen and saying yes. A CSV of connections would either import rows that authorise nothing, or — if it carried tokens — be a spreadsheet of other people's mailboxes travelling through an upload form. The named folders and spaces are exempt for the second reason team_members is: each one has to be a folder THAT PERSON can actually open, and a file of ids nobody checked would either fail at Google or, worse, quietly share the wrong thing under a familiar name.",
   google_mail:
     "not a table at all — the module exists to carry ONE switch on the permission sheet (may kwapso send mail as you). There is nothing to import into a right; it is granted on the Roles screen, one role at a time, by somebody who understands what they are granting.",
-  google_events:
-    "the same as google_mail, and for the same reason: a module that exists to hold one switch (may kwapso put an event in your calendar) has no rows for a file to bring.",
   deliverables:
     "a deliverable is MATERIAL — a file we hold or a link we do not — and a CSV can carry the link but never the file, so a file of them would import half the shelf as titles pointing at nothing. And the row that matters cannot be resolved from a spreadsheet at all: a deliverable hangs off exactly one APP, which is an id here and a name in a file, and `apps` is not an import target (it belongs to `processes`, exempt above for its own reason), so there is nothing for a reference to resolve against and every row would have to be re-filed by hand — which is the entire write. The legacy set is EIGHT rows across twenty-eight apps (glide/RECONCILIATION.md), typed in the afternoon somebody decides to. The write an import would replace is: you finish a handover, and you attach it, once, standing on the app it belongs to.",
   commercials:
@@ -754,10 +752,10 @@ export const ACTIVITY_GATE_MAP: Record<string, string> = {
   staff_certificates: "staff_profiles",
   // GOOGLE. Both tables gate on `google` — one connection and the folders and
   // spaces under it are one record from a reader's point of view, exactly as an
-  // app and its maps are. The two ACT modules (google_mail, google_events) own
-  // no table: they are switches, and what they permit is written into the
-  // connection's own history, so a person reading "kwapso sent mail as Ana"
-  // needs the same right that lets them see Ana has a connection at all.
+  // app and its maps are. The ACT module (google_mail) owns no table: it is a
+  // switch, and what it permits is written into the connection's own history, so
+  // a person reading "kwapso sent mail as Ana" needs the same right that lets
+  // them see Ana has a connection at all.
   google_connections: "google",
   google_sources: "google",
 }

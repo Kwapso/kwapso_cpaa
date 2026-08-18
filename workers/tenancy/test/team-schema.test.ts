@@ -212,20 +212,23 @@ describe("team schema", () => {
       "brand_assets",
       "delivery",
       "staff_profiles",
-      // GOOGLE — three modules, because the owner named three switches, and the
-      // tall sheet's unit of "a switch per role" is a module row.
+      // GOOGLE — two modules. It was three.
       //
       // `google` is the connection itself: read what you shared, CONNECT an
       // account (create), write back through it (edit), disconnect (delete).
-      // The other two exist to carry ONE right each — may kwapso send mail as
-      // you, and may it put an event in your calendar — deliberately separate
-      // from each other AND from the `agent` right, so granting somebody the
+      // The other exists to carry ONE right — may kwapso send mail as you —
+      // deliberately separate from the `agent` right, so granting somebody the
       // assistant does not silently grant the assistant their outbox. A module
       // whose four rights are not all meaningful is not new here: nothing reads
       // `agent:edit` either.
+      //
+      // `google_events` ("Calendar on your behalf") was the third, and it went
+      // with the doors it guarded when the calendar became READ-ONLY on
+      // 18 August 2026. A switch that switches nothing is worse than no switch:
+      // somebody grants it and expects a capability. Migration 0037 deletes its
+      // rows from every existing team.
       "google",
       "google_mail",
-      "google_events",
     ])
   })
 })

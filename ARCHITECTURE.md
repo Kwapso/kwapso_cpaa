@@ -198,8 +198,9 @@ on top follows [CACHING.md](CACHING.md).
 | GET /api/content/google/gmail/messages · /gmail/message | content | mail to/from a KNOWN CONTACT only · one message |
 | POST /api/content/google/gmail/draft | content | leave a reply in my own Gmail drafts + hand back its link (`google:edit`) |
 | POST /api/content/google/gmail/send | content | actually send it, `google:edit` **plus** the `google_mail` switch |
-| GET /api/content/google/calendar/events | content | my own diary, in a window |
-| POST /api/content/google/calendar/events · /calendar/sprint | content | add an event · put a sprint's dates in, `google:edit` **plus** the `google_events` switch |
+| GET /api/content/google/calendar/events | content | my own diary, in a window. The ONLY calendar door besides the transcript read — the sync is one-way and nothing here writes to a calendar |
+| GET /api/content/google/calendar/event/transcript | content | what was SAID in a meeting, reached from its diary entry |
+| POST /api/content/meetings/sync-calendar | content | read Google's diary INTO the diary: the live window every call, plus one resumable slice of the whole calendar |
 | GET /api/content/google/chat/messages · POST (same path) | content | one NAMED space's messages · post in it (`google:edit`) |
 | GET /media/* | gateway | serve uploaded files from R2 |
 | (WebSocket) /api/realtime?team= | realtime | join a team's live channel; receive row-level `{resource,id,op}` pings (gated by active membership of THAT team) |
@@ -327,15 +328,24 @@ on top follows [CACHING.md](CACHING.md).
     answering when they share a folder, and answering it later is answering it wrong.
   - **Tokens are ciphertext in the column** (AES-GCM, `GOOGLE_TOKEN_KEY`), not merely on Cloudflare's
     disk: the team database is reachable by anything holding the account's D1 REST token.
-  - **Three permission switches, not one**: `google` (may connect an account, and use it), plus
-    `google_mail` (kwapso may SEND mail as you) and `google_events` (kwapso may put an EVENT in your
-    calendar) — separate from each other and from the `agent` right, so granting somebody the
-    assistant does not grant the assistant their outbox. The two act switches are demanded of a
-    person pressing "send it from kwapso" exactly as they are of the assistant: same act, same
+  - **Two permission switches, not one**: `google` (may connect an account, and use it), plus
+    `google_mail` (kwapso may SEND mail as you) — separate from the `agent` right, so granting
+    somebody the assistant does not grant the assistant their outbox. The act switch is demanded of
+    a person pressing "send it from kwapso" exactly as it is of the assistant: same act, same
     mailbox, same permission.
-  - **The assistant may create events without asking; mail always asks.** A reply is written into
-    the person's own Gmail DRAFTS with a link straight to it, and a "send it from kwapso" button
-    beside it. The confirm rule lives on the agent tools and is pinned by a test.
+  - **THE CALENDAR IS READ-ONLY (LOCKED 2026-08-18).** kwapso reads a diary and never writes one.
+    The owner: *"disable the ability to create, edit, or delete anything in the calendar from the
+    frontend… just make it one-way so we only grab and update the information."* Seven doors, five
+    library functions, eight tools and a third permission switch (`google_events`, "Calendar on your
+    behalf") went together, so the refusal is a MISSING FUNCTION rather than a condition somebody can
+    invert — the same shape R24 uses for internal money. The app's Google grant still carries the
+    read/write scope (`calendar.events`) because Google will not downgrade an existing grant;
+    narrowing it to `calendar.events.readonly` would sign every connected person out of their
+    calendar until they reconnected, so it is the owner's decision to make, not a tidy-up.
+  - **Mail always asks.** A reply is written into the person's own Gmail DRAFTS with a link straight
+    to it, and a "send it from kwapso" button beside it. The confirm rule lives on the agent tools
+    and is pinned by a test. (Its other half used to be "calendar entries do not ask"; there is no
+    calendar write left to ask about.)
   - **NO client-portal exposure of any of it.** The portal gateway forwards none of these doors and
     every handler opens with `refusePortalCaller` — enforced path-shaped, not permission-shaped, by
     `workers/content/test/google-doors.test.ts` (R21's own derivation reads the Client role's rights

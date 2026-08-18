@@ -114,8 +114,9 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
       url: "https://mail.example/MAIL_1",
       text: "We agreed on the fourth of August to park the reporting work.",
     }),
-    calendarList: async () =>
-      holder.unlisted.has("EVENT_1")
+    calendarList: async () => ({
+      truncated: false,
+      events: holder.unlisted.has("EVENT_1")
         ? []
         : [
       {
@@ -135,6 +136,7 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
             ],
           },
         ],
+    }),
     chatMessages: async () => [
       {
         id: "MSG_2",

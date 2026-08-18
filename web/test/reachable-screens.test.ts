@@ -328,19 +328,20 @@ const NO_CONTROL: Record<string, string> = {
   "POST /api/tenancy/config/screens":
     "FOR A MACHINE. A team's screen-recipe override is app furniture rather than a record: the assistant writes one, and a screen for editing screens is a screen nobody asked for.",
 
-  "POST /api/content/google/calendar/events":
-    "FOR A MACHINE, by the owner's own ruling: the assistant may create a calendar event WITHOUT asking, where sending mail always asks. A person with a diary already has a diary — the door exists so the app can put a sprint or a booking in it.",
-  "POST /api/content/google/calendar/sprint":
-    "FOR A MACHINE. The same door aimed at one sprint's dates, called when a sprint is sold or moved rather than pressed. Its human control is the sprint's own date fields, which is the write that triggers it.",
+  // SIX CALENDAR-WRITE DOORS WERE LISTED HERE and are not exempt any more, they
+  // are GONE (18 August 2026): create an event, push a sprint's dates, change
+  // what an entry says, its guests, its location, call it off. A door with no
+  // screen needed a reason; a door that does not exist needs none. The seventh,
+  // the meeting push, went with them.
   "POST /api/content/google/drive/upload":
     "FOR A MACHINE. Putting a file INTO Drive is the assistant answering 'save that to the Bergman folder'. A person with a folder open drags it there, and the app's own upload doors are the ones on the record it belongs to.",
   "POST /api/content/google/chat/messages":
     "FOR A MACHINE. Posting into a named space is an act the assistant performs on request; a person is already in the space. The owner asked for read AND post, and the post half is the assistant's.",
 
-  // THE THIRTEEN THAT FINISH THAT SENTENCE, and they are one decision, not
-  // thirteen. Every door on this module acts INSIDE Google — a file in a Drive
-  // folder, a label in a mailbox, a guest on a diary entry — and kwapso
-  // deliberately has no screen for any of it. That is the same ruling the four
+  // THE SEVEN THAT FINISH THAT SENTENCE, and they are one decision, not seven.
+  // (It was thirteen before the calendar's write half was retired.) Every door on
+  // this module acts INSIDE Google — a file in a Drive folder, a label in a
+  // mailbox — and kwapso deliberately has no screen for any of it. That is the same ruling the four
   // lines above already stand on, and it is the reason the module exists: a
   // person who wants to rename a file opens Drive, which is better at it than a
   // card we could build beside it would ever be. What kwapso adds is the
@@ -362,14 +363,6 @@ const NO_CONTROL: Record<string, string> = {
     "FOR A MACHINE. The person's control is the mail reply dialog, which DRAFTS — the owner's ruling that a drafted reply is the normal way to answer mail. This door sends inside the thread, which is the assistant's half of the same sentence and carries the same always-ask confirm.",
   "POST /api/content/google/gmail/label":
     "FOR A MACHINE. Filing a message under a label is the assistant tidying a mailbox on request. A person clicks the label button in Gmail, where the message already is.",
-  "POST /api/content/google/calendar/event/update":
-    "FOR A MACHINE, on the owner's calendar ruling: the assistant may change a diary entry without asking, because its owner can change it back in one click. A person edits the entry in Google Calendar.",
-  "POST /api/content/google/calendar/event/guests":
-    "FOR A MACHINE. 'Add Marta to Thursday's call' is an errand; the person's version is the guest field in Google Calendar. It is the one calendar write that asks first, because an invitation lands in somebody else's inbox and cannot be recalled.",
-  "POST /api/content/google/calendar/event/location":
-    "FOR A MACHINE. Where a meeting happens is one field, and the assistant sets it when a room changes. A person types it in Google Calendar — and the meeting record's own location field is the kwapso-side control this door exists to push.",
-  "POST /api/content/google/calendar/event/cancel":
-    "FOR A MACHINE. Calling a meeting off is the assistant answering 'cancel Thursday'; a person cancels it in Google Calendar, where the guests and the notification live.",
   "POST /api/content/google/chat/delete":
     "FOR A MACHINE, and specifically to undo a machine — the counterpart of the post door above. It takes back a message kwapso itself sent; a person deletes their own message in Chat.",
 

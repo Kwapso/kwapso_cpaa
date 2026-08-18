@@ -150,13 +150,14 @@ describe("a module refuses a client login on both halves, or on neither", () => 
     // `google` is the newest, and the only member so far where the material on
     // the far side of the door is not even ours: it is one colleague's own Drive,
     // mailbox, diary and chat spaces. Clients get no assistant and no Google
-    // surface at all, so every door on it refuses rather than fences. Its two
-    // SWITCH modules — `google_mail` and `google_events` — are deliberately
-    // absent from this set and that is the derivation working, not a gap: they
-    // gate no read door at all (nothing asks for `google_mail:read`), so there is
-    // no read half for this test to compare a write half against. What guards
-    // them is that every door demanding one ALSO demands `google:edit`, and this
-    // set already holds `google`.
+    // surface at all, so every door on it refuses rather than fences. Its SWITCH
+    // module — `google_mail` — is deliberately absent from this set and that is
+    // the derivation working, not a gap: it gates no read door at all (nothing
+    // asks for `google_mail:read`), so there is no read half for this test to
+    // compare a write half against. What guards it is that every door demanding
+    // it ALSO demands `google:edit`, and this set already holds `google`. (There
+    // was a second switch, `google_events`; it went with the calendar's write
+    // half on 18 August 2026.)
     //
     // `meetings` joined the day the diary shipped, and it is the member whose
     // exclusion would have been most tempting after `work`: a meeting is WITH a

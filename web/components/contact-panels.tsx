@@ -176,7 +176,10 @@ export function ContactMeetingsPanel({
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm">{m.title}</p>
             <p className="text-muted-foreground truncate text-xs">
-              {[formatDate(m.startsAt), m.location, m.status].filter(Boolean).join(" · ")}
+              {/* The date is the first thing here and it is also the answer to
+                  "has it happened?", which is why the status word that used to
+                  sit third is gone rather than replaced. */}
+              {[formatDate(m.startsAt), m.location].filter(Boolean).join(" · ")}
             </p>
           </div>
           <ChevronRight className="text-muted-foreground size-4 shrink-0" />

@@ -69,10 +69,16 @@ describe("every Google door refuses a client login, at the door", () => {
   })
 })
 
-describe("the owner's two switches are demanded where the act happens", () => {
+describe("the owner's switch is demanded where the act happens", () => {
   // DERIVED, not listed: a door owes a switch because of what it CALLS. Naming
   // the handlers instead would be a list somebody has to remember to add to, and
   // the door that gets forgotten is by definition the one nobody thought about.
+  //
+  // THERE WERE TWO SWITCHES AND NOW THERE IS ONE. `google_events` ("kwapso may
+  // put an EVENT in your calendar") guarded four calendar writes; the calendar
+  // became READ-ONLY on 18 August 2026, so the writes, their doors and the
+  // switch all went together, and the clause below asserts that nothing left in
+  // this file can write to a calendar at all.
   const ACTS: { switch: string; calls: RegExp; what: string }[] = [
     {
       switch: "google_mail",
@@ -83,18 +89,21 @@ describe("the owner's two switches are demanded where the act happens", () => {
       calls: /\bgmail(Send(Draft)?|Reply)\s*\(/,
       what: "sends mail out of somebody's mailbox",
     },
-    {
-      switch: "google_events",
-      // Every WRITE on a calendar, not only the one that creates. The owner's
-      // switch reads "kwapso may put an EVENT in your calendar", and the honest
-      // reading of it is "kwapso may touch my diary" — of which moving an
-      // appointment, uninviting somebody and calling the whole thing off are all
-      // sharper versions than adding one. Reads (`calendarList`, `calendarGet`)
-      // are deliberately absent: this is the writers' list.
-      calls: /\bcalendar(Create|Update|Guests|Cancel)\s*\(/,
-      what: "puts an event in somebody's calendar, or changes one",
-    },
   ]
+
+  // THE CALENDAR WRITES CANNOT COME BACK QUIETLY. Not "they are gated" — they do
+  // not exist. A door that called one of these would have to import a function
+  // lib/google-api.ts no longer exports, so this is belt on top of a missing
+  // brace: the day somebody writes one back, this line names it.
+  it("no handler here writes to a calendar, at all", () => {
+    const writers = [...handlers()]
+      .filter(([, body]) => /\bcalendar(Create|Update|Guests|Cancel|Patch)\s*\(/.test(body))
+      .map(([name]) => name)
+    expect(
+      writers,
+      `the calendar is one-way: kwapso reads a diary and never writes one (owner, 18 Aug 2026). These handlers write: ${writers.join(", ")}`
+    ).toEqual([])
+  })
 
   it("finds an act of each kind (the derivation must not go blind)", () => {
     const fns = handlers()
@@ -120,11 +129,11 @@ describe("the owner's two switches are demanded where the act happens", () => {
       }
     expect(
       missing,
-      `the owner named two switches on top of the connection right — sending mail, and creating events — and a door that performs one without demanding it makes the switch decorative: ${missing.join("; ")}`
+      `the owner named a switch on top of the connection right — sending mail — and a door that performs it without demanding it makes the switch decorative: ${missing.join("; ")}`
     ).toEqual([])
   })
 
-  it("mail asks and events do not — the asymmetry is the owner's, so it is pinned", async () => {
+  it("mail asks, and there is no calendar write left to ask about", async () => {
     // Read off the agent's own catalogue rather than described here: the confirm
     // rule is what a person actually experiences, and a comment claiming it
     // would survive the day somebody flipped the flag.
@@ -138,9 +147,22 @@ describe("the owner's two switches are demanded where the act happens", () => {
     }
     expect(confirmOf("google_send_mail"), "mail ALWAYS asks").toBe(true)
     expect(confirmOf("google_chat_post"), "a colleague reads it the moment it lands").toBe(true)
-    expect(confirmOf("google_create_event"), "the assistant may create events WITHOUT asking").toBe(false)
-    expect(confirmOf("google_sprint_to_calendar"), "a sprint entry IS an event").toBe(false)
     expect(confirmOf("google_draft_reply"), "a draft is a sentence somebody can still change").toBe(false)
+    // The rule's other half used to be "calendar entries do not ask, a diary
+    // entry is one click from gone". There is no calendar-write tool left for it
+    // to govern, and this asserts that rather than leaving the sentence hanging.
+    for (const gone of [
+      "google_create_event",
+      "google_sprint_to_calendar",
+      "google_update_event",
+      "google_event_guests",
+      "google_event_location",
+      "google_cancel_event",
+    ])
+      expect(
+        TOOL_CATALOG.some((t) => t.name === gone),
+        `${gone} must not exist — the assistant cannot touch a calendar`
+      ).toBe(false)
   })
 })
 

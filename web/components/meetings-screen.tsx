@@ -209,6 +209,9 @@ export function MeetingsScreen({
   // called off in Google before it happens.
   const [syncing, setSyncing] = React.useState(false)
   const [ahead, setAhead] = React.useState<{ eventId: string; title: string; startsAt: string }[]>([])
+  // HAS THE WALK OVER THE WHOLE CALENDAR FINISHED? Null until somebody presses,
+  // because the honest thing to say before the first press is nothing.
+  const [caughtUp, setCaughtUp] = React.useState<boolean | null>(null)
   const { can } = usePermissions(teamId)
 
   // FRESHNESS ON ARRIVAL (the owner's "a way to sync more often to make it feel
@@ -225,12 +228,19 @@ export function MeetingsScreen({
     try {
       const r = await contentApi.syncCalendar()
       setAhead(r.ahead)
+      setCaughtUp(r.caughtUp)
       invalidate(meetingsKey(teamId))
       const moved = r.created + r.updated + r.cancelled
+      // AND WHETHER THERE IS MORE OF THE PAST TO COME. The sweep walks the whole
+      // calendar a slice at a time, so "nothing new" on the first press is an
+      // honest answer about the last fortnight and a misleading one about 2023.
+      // Saying so is what stops somebody pressing once and concluding their
+      // history is not there.
+      const more = r.caughtUp ? "" : " Press again to keep reaching further back."
       toast.success(
-        moved === 0
+        (moved === 0
           ? "Nothing new to bring in."
-          : // ALL THREE VERBS, because the sweep now does three things and a
+          : // ALL THREE VERBS, because the sweep does three things and a
             // sentence naming only the new records would leave somebody
             // wondering why a meeting they know changed said nothing happened.
             [
@@ -239,7 +249,7 @@ export function MeetingsScreen({
               r.cancelled ? `${r.cancelled} called off` : "",
             ]
               .filter(Boolean)
-              .join(", ") + " in the diary."
+              .join(", ") + " in the diary.") + more
       )
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't read your calendar.")
@@ -426,13 +436,14 @@ export function MeetingsScreen({
         }}
       </PagedFind>
 
-      {/* THE CALENDAR, BOTH WAYS (9.7 and the owner's "it should also update
-          consistently if it's a past event"). Still a button as well as an
-          automatic pass: it reads a person's own Google calendar with their own
-          token, and somebody who has just moved a meeting in Google wants to
-          press something and see it. `ahead` is why this one is here rather than
-          the shared control alone — the instances beyond the horizon come back
-          in its answer and are shown underneath. */}
+      {/* THE CALENDAR, READ IN. ONE WAY — nothing here writes to a calendar.
+          A button rather than only an automatic pass: it reads a person's own
+          Google calendar with their own token, and somebody who has just moved a
+          meeting in Google wants to press something and see it. It is also how
+          the WALK over the whole calendar advances, one slice per press, which is
+          why the line underneath says when there is more of the past to come.
+          `ahead` is the other reason this control is here rather than the shared
+          one — the entries beyond the horizon come back in its answer. */}
       {canCreate && (
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -450,12 +461,21 @@ export function MeetingsScreen({
                 these meetings — the same control that is now on every screen
                 showing Google material. */}
             <GoogleSyncButton teamId={teamId} scope="knowledge" />
+            {/* HOW FAR BACK IT HAS GOT. Only after a press, and only while there
+                is more: a line that always said something would be furniture, and
+                one that never said anything would leave somebody believing their
+                whole history was in after the first press. */}
+            {caughtUp === false && (
+              <span className="text-muted-foreground text-xs">
+                {t("Still reading your older meetings, press again to go further back.")}
+              </span>
+            )}
           </div>
           {ahead.length > 0 && (
             <div className="flex flex-col gap-2">
-              {/* READ-ONLY, AND SAID SO. These are not records: they become one
-                  four weeks before they happen, which is when there is somewhere
-                  to write the notes. */}
+              {/* NOT RECORDS YET, AND SAID SO. The live window reaches four
+                  weeks ahead; these are further out. The walk will reach them
+                  too, which is why the sentence says "yet". */}
               <p className="text-muted-foreground text-xs">
                 {t("Further out, and not records yet, each becomes one four weeks before it happens.")}
               </p>

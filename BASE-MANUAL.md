@@ -151,7 +151,7 @@ and has grown with the product, today it also carries the customer spine
 (`accounts`, `portal_users`), the knowledge base (`knowledge`), the work engine
 (`processes`, `commercials`, `work`, `todos`, `meetings`), the agency's own
 housekeeping (`brand_assets`, `delivery`, `staff_profiles`) and the
-three Google switches (`google`, `google_mail`, `google_events`). Every team is born
+two Google switches (`google`, `google_mail`). Every team is born
 with an **Admin** (locked, full rights) and a **Viewer** (read-only) role.
 
 ### The locked security rules the gate enforces

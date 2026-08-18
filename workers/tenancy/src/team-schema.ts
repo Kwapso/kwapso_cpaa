@@ -1608,11 +1608,18 @@ UPDATE knowledge_sources SET content_hash = NULL, indexed_at = NULL, chunk_count
 -- Cancelling is \`deactivated_at\` like every other retirement in the base — the
 -- row survives, so a client asking "didn't we have a call in March?" is answerable
 -- either way.
+--   SUPERSEDED 18 Aug 2026 (see 0037): the held status is retired and nothing
+--   reads \`status\` or \`held_at\` any more — a meeting's own \`starts_at\` says
+--   whether it has happened. The columns stay, because what people ticked while
+--   the idea existed is still history. The sentence about cancelling still holds.
 --
 -- \`google_event_id\` is what makes the calendar push idempotent. Pressing "put it
 -- in my calendar" twice must not make two entries, and the row is the only place
 -- that memory can live (SCOPE ch.03: Google being an hour behind breaks nothing —
 -- Google holding two copies of one meeting is not the same kind of harmless).
+--   SUPERSEDED 18 Aug 2026: there is no calendar push, the calendar is one-way.
+--   The column and its unique index do the same work from the other direction —
+--   they are how the sweep recognises an entry it has already made a record of.
 CREATE TABLE meetings (
   id TEXT PRIMARY KEY,
   ref TEXT,
@@ -2572,6 +2579,46 @@ SELECT lower(hex(randomblob(16))), ${sqlString(SELECTABLE_GROUPS.deliverableKind
     version: "0037_app_logo",
     sql: `
 ALTER TABLE apps ADD COLUMN logo_url TEXT;
+`,
+  },
+  {
+    // THE CALENDAR BECOMES ONE-WAY, AND THE WALK THAT MAKES "EVERYTHING" TRUE.
+    //
+    // The owner, 18 August 2026: "disable the ability to create, edit, or delete
+    // anything in the calendar from the frontend… just make it one-way so we only
+    // grab and update the information", and beside it "anything in my calendar
+    // should be up to date here. That's all."
+    //
+    // ── \`calendar_swept_through\` ─────────────────────────────────────────────
+    // ONE column, holding ONE moment: how far a forward-only walk over the whole
+    // calendar has read. The live window (a fortnight back, four weeks on) is
+    // swept on every call and keeps the diary current; this cursor is what lets a
+    // FIVE-YEAR window be read a ninety-day slice at a time without any single
+    // request being unbounded (R14). It sits on the CONNECTION because the walk
+    // is one person's own diary read with one person's own token — a team-level
+    // cursor would mean one colleague's progress deciding another's.
+    //
+    // NULL means "never walked", which the reader turns into the floor. There is
+    // deliberately no back-fill: a null that reads as "start at the beginning" is
+    // the only value that cannot be wrong.
+    //
+    // ── AND THE SWITCH THAT NOW SWITCHES NOTHING ────────────────────────────
+    // \`google_events\` ("Calendar on your behalf") existed to carry one right:
+    // may kwapso put an event in your calendar. Nothing can, on any surface, so
+    // the row is deleted rather than left on the Roles screen offering a
+    // capability the code does not have. That is the same reasoning R24 makes
+    // structurally: a permission somebody can grant, guarding nothing, is a
+    // sentence the app cannot keep.
+    //
+    // Deleting a permission ROW is not deleting data about the agency's work —
+    // the deactivate-never-delete rule is about records, and this is a column of
+    // the permission matrix being retired. Same shape as 0025, which purged two
+    // whole modules.
+    version: "0038_calendar_one_way",
+    sql: `
+ALTER TABLE google_connections ADD COLUMN calendar_swept_through TEXT;
+
+DELETE FROM role_permissions WHERE module = 'google_events';
 `,
   },
 ]

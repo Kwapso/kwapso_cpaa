@@ -121,14 +121,15 @@ export const TOOL_GATES: Record<string, string> = {
   // because cancelling IS this module's delete; the row survives it.
   create_meeting: "meetings:create",
   update_meeting: "meetings:edit",
-  set_meeting_held: "meetings:edit",
   set_meeting_active: "meetings:delete",
-  // The two doors that reach OUTSIDE this app. Each is listed at the gate the
-  // door opens with — the FIRST one, which is the one a role has to hold before
-  // any of the others are even asked about. Pushing a meeting to a calendar also
-  // demands `google:edit` and the events switch at the door itself; reading
-  // somebody's Google into the knowledge base also demands `google:read`.
-  add_meeting_to_calendar: "meetings:read",
+  // The door that reaches OUTSIDE this app, listed at the gate it opens with —
+  // the FIRST one, which is the one a role has to hold before any of the others
+  // are even asked about. Reading somebody's Google into the knowledge base also
+  // demands `google:read` at the door itself.
+  //
+  // `add_meeting_to_calendar` used to sit beside it and is gone: the calendar is
+  // read-only, so there is nothing to push. `set_meeting_held` is gone too, with
+  // the status it moved.
   sync_google_knowledge: "knowledge:create",
   // The rota is about TICKETS, so it gates with them. `help:edit` is a right the
   // seeded Client role does not hold — and the door refuses a portal caller
@@ -174,7 +175,7 @@ export const TOOL_GATES: Record<string, string> = {
   // One tool for add / re-price / retire, so one gate: setting a price IS an
   // edit of the card whichever of the three it turns out to be.
   set_role_rate: "commercials:edit",
-  // Reading a transcript MOVES the meeting to held and writes time against it,
+  // Reading a transcript writes the words onto the meeting and time against it,
   // so it is an edit of the meeting — and `google:read` besides, which the door
   // asks for itself because it reaches the caller's own Drive.
   read_meeting_transcript: "meetings:edit",
@@ -193,16 +194,14 @@ export const TOOL_GATES: Record<string, string> = {
   // handler to learn that the switches exist:
   //   google_send_mail          — also google_mail:create
   //   google_reply_mail         — also google_mail:create (a reply IS a message)
-  //   google_create_event       — also google_events:create
-  //   google_sprint_to_calendar — also google_events:create (and work:read, to
-  //                               read the sprint it is pushing)
-  //   google_update_event       — also google_events:create
-  //   google_event_guests       — also google_events:create
-  //   google_event_location     — also google_events:create
-  //   google_cancel_event       — also google_events:create
-  // None of them is a PRIVILEGE write: they change what is in a person's own
-  // Drive, mailbox or diary, never who may do what, and never who can see whose.
-  // The confirm rule they DO get is the owner's own, written on each tool.
+  // There were six more, all on the calendar, all demanding a
+  // `google_events:create` switch — create an event, push a sprint's dates in,
+  // change what an entry says, invite and uninvite guests, set a location, call
+  // one off. The calendar is READ-ONLY as of 18 August 2026, so the tools, the
+  // doors under them and the switch above them are all gone together.
+  // Neither of the two left is a PRIVILEGE write: they change what is in a
+  // person's own Drive or mailbox, never who may do what, and never who can see
+  // whose. The confirm rule they DO get is the owner's own, on each tool.
   //
   // TAKING SOMETHING BACK is `google:delete`, which is the same reading this
   // module already applies to withdrawing a shared folder: the row survives (a
@@ -218,12 +217,6 @@ export const TOOL_GATES: Record<string, string> = {
   google_send_mail: "google:edit",
   google_reply_mail: "google:edit",
   google_label_mail: "google:edit",
-  google_create_event: "google:edit",
-  google_sprint_to_calendar: "google:edit",
-  google_update_event: "google:edit",
-  google_event_guests: "google:edit",
-  google_event_location: "google:edit",
-  google_cancel_event: "google:edit",
   google_chat_post: "google:edit",
   google_chat_delete: "google:delete",
 }

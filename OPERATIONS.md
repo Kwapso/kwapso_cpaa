@@ -205,6 +205,21 @@ person connecting Drive is never shown a mailbox prompt): `drive.readonly` +
 `calendar.events`; `chat.messages` + `chat.spaces.readonly`; plus `openid email`
 on all four, to label which account was connected.
 
+**`calendar.events` is a READ/WRITE scope and the app no longer writes** (the
+calendar became one-way on 18 August 2026). The narrower
+`calendar.events.readonly` would match what the code does, and switching to it is
+an OWNER'S DECISION rather than a tidy-up, because **Google does not downgrade an
+existing grant**: a connection minted under the wider scope keeps it, and a
+connection minted under the narrower one is a *different* grant. So the switch
+costs a reconnection from **every person who has already connected a calendar** —
+each of them back through the consent screen, with the app's sweep finding nothing
+for whoever has not done it yet — and it cannot be staged, because the scope is
+one string on one OAuth client shared by staging and production. Nothing is
+gained in capability (there is no function left that could send a write) and one
+thing is gained in posture: a leaked refresh token could not be used to change
+somebody's diary. Worth doing at the same moment as another consent-screen change,
+not on its own.
+
 ### R2 buckets (BUILT 2026-06-23, bound to `kwapso-content*`)
 
 One bucket PER MODULE, per-team key prefix inside (the R2 golden rule). Create both per env before deploying content:
