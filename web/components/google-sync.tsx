@@ -164,10 +164,10 @@ export function GoogleSyncButton({
       toast.success(
         brought > 0
           ? `Brought in ${brought} ${brought === 1 ? "thing" : "things"}.`
-          : "Nothing new to bring in."
+          : t("Nothing new to bring in.")
       )
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't read your Google material just now.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't read your Google material just now."))
     } finally {
       setSyncing(false)
     }

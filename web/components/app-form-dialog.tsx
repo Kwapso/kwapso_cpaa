@@ -27,7 +27,7 @@ import * as React from "react"
 import { Checkbox } from "@kwapso/ui/registry/primitives/checkbox/checkbox"
 import { FileUpload } from "@kwapso/ui/registry/primitives/file-upload/file-upload"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
@@ -284,7 +284,7 @@ export function AppFormDialog({
       clearDraft()
       onOpenChange(false)
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't save the app.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't save the app."))
     } finally {
       setBusy(false)
     }
@@ -297,12 +297,12 @@ export function AppFormDialog({
       busy={busy}
       clearDraft={clearDraft}
       onSubmit={submit}
-      title={<DialogTitle>{editing ? "Edit app" : "Record an app"}</DialogTitle>}
+      title={<DialogTitle>{editing ? t("Edit app") : t("Record an app")}</DialogTitle>}
       subtitle={
         <DialogDescription>
           {editing
-            ? "Change what it's called, or where it has got to."
-            : "A system we built for somebody. Processes live inside one."}
+            ? t("Change what it's called, or where it has got to.")
+            : t("A system we built for somebody. Processes live inside one.")}
         </DialogDescription>
       }
       submit={{

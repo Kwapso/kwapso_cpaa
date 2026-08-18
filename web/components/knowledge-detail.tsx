@@ -190,13 +190,16 @@ export function KnowledgeDetailScreen({
         ]
       : []),
     { label: t("Last indexed"), value: item.indexedAt ? formatDateTime(item.indexedAt) : "—" },
-    ...auditItems({
-      createdByName: item.creatorName,
-      createdAt: item.createdAt,
-      editedByName: item.editorName,
-      updatedAt: item.updatedAt,
-      status: item.active ? "In use" : "Not in use",
-    }),
+    ...auditItems(
+      {
+        createdByName: item.creatorName,
+        createdAt: item.createdAt,
+        editedByName: item.editorName,
+        updatedAt: item.updatedAt,
+        status: item.active ? t("In use") : t("Not in use"),
+      },
+      t
+    ),
   ]
 
   const link = safeHref(item.sourceUrl)

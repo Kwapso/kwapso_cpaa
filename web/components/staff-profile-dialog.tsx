@@ -19,7 +19,7 @@
 import * as React from "react"
 
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
@@ -91,7 +91,7 @@ export function StaffProfileDialog({
       clearDraft()
       onOpenChange(false)
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't save the profile.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't save the profile."))
     } finally {
       setBusy(false)
     }

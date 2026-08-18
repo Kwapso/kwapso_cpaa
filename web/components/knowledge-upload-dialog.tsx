@@ -26,7 +26,7 @@ import * as React from "react"
 
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/record-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
@@ -144,7 +144,7 @@ export function KnowledgeUploadDialog({
       setFile(null)
       onOpenChange(false)
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't add that file.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't add that file."))
     } finally {
       setBusy(false)
     }
@@ -240,7 +240,7 @@ export function KnowledgeUploadDialog({
           id="knowledge-file-title"
           value={values.title}
           onChange={(e) => setValues((v) => ({ ...v, title: e.target.value }))}
-          placeholder={file ? file.name : "Leave this blank to use the file's own name"}
+          placeholder={file ? file.name : t("Leave this blank to use the file's own name")}
           disabled={busy}
         />
       </Field>

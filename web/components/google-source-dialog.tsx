@@ -46,7 +46,7 @@ import * as React from "react"
 
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
@@ -90,16 +90,22 @@ const filedField = { ...defaultFieldConfig, label: "Whose material is in it", re
 /** The two shelves, in the words a person needs rather than the words the column
  * uses. "Just me" is first and is the default, because the safe answer should be
  * the one you get by not deciding. */
-const SHELVES: { value: GoogleShelf; title: string; detail: string }[] = [
+// `description` rather than `detail`, and the rename is the point: `title` is a
+// prop the extractor reads and `detail` is not, so the two halves of one line of
+// copy were on opposite sides of the catalogue — the heading translated and the
+// sentence under it in English, on the same row, forever. `description` is
+// already one of the closed set of props a person reads
+// (scripts/lib/i18n-source.mjs), so both halves are now catalogued together.
+const SHELVES: { value: GoogleShelf; title: string; description: string }[] = [
   {
     value: "private",
     title: "Just me",
-    detail: "Only you, and the assistant when it is answering you.",
+    description: "Only you, and the assistant when it is answering you.",
   },
   {
     value: "team",
     title: "The team",
-    detail: "Anyone here whose role can read it. Their questions can be answered from it too.",
+    description: "Anyone here whose role can read it. Their questions can be answered from it too.",
   },
 ]
 
@@ -120,16 +126,16 @@ type PickOption = {
 /** The two shapes a Drive share can take, in the words a person needs. A folder
  * is the default because it is what most people mean and what the module has
  * always done; a file is the narrower, more deliberate act. */
-const KINDS: { value: GoogleSourceKind; title: string; detail: string }[] = [
+const KINDS: { value: GoogleSourceKind; title: string; description: string }[] = [
   {
     value: "folder",
     title: "A folder",
-    detail: "Everything in it, including whatever you put there later.",
+    description: "Everything in it, including whatever you put there later.",
   },
   {
     value: "file",
     title: "Particular files",
-    detail: "Only the ones you pick. Nothing else in the folder they sit in.",
+    description: "Only the ones you pick. Nothing else in the folder they sit in.",
   },
 ]
 
@@ -266,8 +272,8 @@ export function GoogleSourceDialog({
                   kind === k.value ? "border-primary bg-muted" : ""
                 }`}
               >
-                <span className="text-sm font-medium">{k.title}</span>
-                <span className="text-muted-foreground text-xs">{k.detail}</span>
+                <span className="text-sm font-medium">{t(k.title)}</span>
+                <span className="text-muted-foreground text-xs">{t(k.description)}</span>
               </button>
             ))}
           </div>
@@ -283,14 +289,14 @@ export function GoogleSourceDialog({
             value={values.search}
             onChange={(e) => setValues((s) => ({ ...s, search: e.target.value }))}
             placeholder={
-              service === "chat" ? "Leave blank to list your spaces" : `Part of the ${noun}'s name`
+              service === "chat" ? t("Leave blank to list your spaces") : `Part of the ${noun}'s name`
             }
             disabled={busy}
             autoFocus
           />
           <Button type="button" variant="outline" onClick={look} disabled={busy || looking} className="gap-1">
             {looking ? <Spinner /> : <Search className="size-3.5" aria-hidden />}
-            {looking ? "Looking…" : "Look"}
+            {looking ? t("Looking…") : t("Look")}
           </Button>
         </div>
       </Field>
@@ -417,8 +423,8 @@ export function GoogleSourceDialog({
                 values.shelf === s.value ? "border-primary bg-muted" : ""
               }`}
             >
-              <span className="text-sm font-medium">{s.title}</span>
-              <span className="text-muted-foreground text-xs">{s.detail}</span>
+              <span className="text-sm font-medium">{t(s.title)}</span>
+              <span className="text-muted-foreground text-xs">{t(s.description)}</span>
             </button>
           ))}
         </div>

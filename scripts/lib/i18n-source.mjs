@@ -34,19 +34,42 @@ export const VISIBLE_PROPS = new Set([
   "description",
   "alt",
   "emptyText",
-  // WHAT CONNECTING A SERVICE LETS US SEE (google-connections.tsx). Four
-  // sentences, and they were user-visible prose sitting outside the catalogue —
-  // so somebody reading the app in German was told in English what kwapso may
-  // read from their mailbox. The sentence a person needs MOST in their own
-  // language is the one about their own privacy. Narrow by construction: the
-  // only string-literal `scope` props in either front door are those four, and
-  // the prose guard already refuses an OAuth scope like `gmail.modify` (dotted
-  // id, no spaces).
-  "scope",
+  // A FIELD'S HELP TEXT is the sentence under the input, and it is copy by
+  // definition: `helpText` is the library `FieldConfig`'s own property name
+  // (@kwapso/ui/lib/config), so it cannot hold data the way a bare `title` can.
+  // `translateRecipe` has translated `field.helpText` since the day it was
+  // written; nothing was ever putting those sentences in the catalogue for it to
+  // find, so the branch could only ever return the English it was given.
+  "helpText",
   "cta",
   "submitLabel",
   "confirmLabel",
 ])
+
+/** The same, plus the props a person reads ONLY when they are written as an
+ * object property.
+ *
+ * `scope` is the whole reason this second set exists. WHAT CONNECTING A SERVICE
+ * LETS US SEE (google-connections.tsx `SERVICE_COPY`) is four sentences of prose
+ * kept under a `scope:` property, and they were user-visible copy sitting
+ * outside the catalogue — so somebody reading the app in German was told in
+ * English what kwapso may read from their mailbox. The sentence a person needs
+ * MOST in their own language is the one about their own privacy.
+ *
+ * It was added to the one set with a note saying "narrow by construction: the
+ * only string-literal `scope` props in either front door are those four". That
+ * stopped being true the day `GoogleSyncButton` shipped: `scope="knowledge"` /
+ * `scope="both"` is a UNION MEMBER the component switches on, and three of them
+ * went into the catalogue and were machine-translated in twenty-eight languages.
+ * A wrapped one would not merely be silly, it would not compile — the codemod
+ * that wrapped them is what surfaced this — and a rule that says "wrap every
+ * extracted position" cannot stand while a position is a type.
+ *
+ * A prop's NAME does not tell you whether its value is prose; where it is
+ * WRITTEN does, here, because the prose is a property of a copy table and the
+ * union member is a JSX attribute. So the attribute set stays closed and narrow
+ * and the property set carries the one extra. */
+export const VISIBLE_PROPERTIES = new Set([...VISIBLE_PROPS, "scope"])
 
 /** The toast calls whose first argument is the sentence a person sees. */
 export const TOAST_METHODS = new Set(["success", "error", "info"])
@@ -245,7 +268,7 @@ export function visitStrings(tree, hit) {
     } else if (
       ts.isPropertyAssignment(node) &&
       (ts.isIdentifier(node.name) || ts.isStringLiteral(node.name)) &&
-      VISIBLE_PROPS.has(node.name.text)
+      VISIBLE_PROPERTIES.has(node.name.text)
     ) {
       report(literalTexts(node.initializer), node, "property")
     } else if (ts.isCallExpression(node)) {

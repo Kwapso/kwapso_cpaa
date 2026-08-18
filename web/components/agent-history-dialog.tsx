@@ -70,23 +70,24 @@ export function AgentHistoryDialog({
         ) : threads && threads.length > 0 ? (
           <ScrollArea className="max-h-80">
             <ul className="flex flex-col gap-1 pr-3">
-              {threads.map((t) => (
-                <li key={t.id}>
+              {threads.map((thread) => (
+                <li key={thread.id}>
                   <button
                     type="button"
                     onClick={() => {
                       onOpenChange(false)
-                      onPick(t.id)
+                      onPick(thread.id)
                     }}
                     disabled={busy}
                     className="hover:bg-muted focus-visible:ring-ring flex w-full flex-col items-start gap-1 rounded-xl p-2 text-left focus-visible:ring-2 focus-visible:outline-none disabled:opacity-50"
                   >
                     <span className="line-clamp-1 text-sm font-medium">
-                      {t.title || "Conversation"}
-                      {t.id === currentThreadId ? " · current" : ""}
+                      {thread.id === currentThreadId
+                        ? t("{title} · current", { title: thread.title || t("Conversation") })
+                        : thread.title || t("Conversation")}
                     </span>
                     <span className="text-muted-foreground text-xs">
-                      {formatActivityWhen(t.lastMessageAt ?? t.createdAt)}
+                      {formatActivityWhen(thread.lastMessageAt ?? thread.createdAt)}
                     </span>
                   </button>
                 </li>

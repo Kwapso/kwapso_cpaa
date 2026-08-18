@@ -10,7 +10,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
@@ -58,7 +58,7 @@ export function RoleFormDialog({
       onOpenChange(false)
     } catch (err) {
       toast.error(
-        err instanceof ApiFailure ? err.message : "Couldn't save the role."
+        err instanceof ApiFailure ? err.message : t("Couldn't save the role.")
       )
     } finally {
       setBusy(false)
@@ -72,12 +72,12 @@ export function RoleFormDialog({
       busy={busy}
       clearDraft={clearDraft}
       onSubmit={submit}
-      title={<DialogTitle>{isEdit ? "Edit this role" : "Create a role"}</DialogTitle>}
+      title={<DialogTitle>{isEdit ? t("Edit this role") : t("Create a role")}</DialogTitle>}
       subtitle={
         <DialogDescription>
           {isEdit
-            ? "Rename it or update what it's for. You set what it can do over in the grid."
-            : "It starts with no access, you'll choose what it can do in the next step."}
+            ? t("Rename it or update what it's for. You set what it can do over in the grid.")
+            : t("It starts with no access, you'll choose what it can do in the next step.")}
         </DialogDescription>
       }
       submit={{

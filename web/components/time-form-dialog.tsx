@@ -21,7 +21,7 @@
 import * as React from "react"
 
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Switch } from "@kwapso/ui/registry/primitives/switch/switch"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
@@ -136,8 +136,8 @@ export function TimeFormDialog({
         err instanceof ApiFailure
           ? err.message
           : isEdit
-            ? "Couldn't save that correction."
-            : "Couldn't log that time."
+            ? t("Couldn't save that correction.")
+            : t("Couldn't log that time.")
       )
     } finally {
       setBusy(false)
@@ -151,12 +151,12 @@ export function TimeFormDialog({
       busy={busy}
       clearDraft={clearDraft}
       onSubmit={submit}
-      title={<DialogTitle>{isEdit ? "Correct this time" : "Log time"}</DialogTitle>}
+      title={<DialogTitle>{isEdit ? t("Correct this time") : t("Log time")}</DialogTitle>}
       subtitle={
         <DialogDescription>
           {isEdit
-            ? "Fix what was written down. The change is kept in the record's history, with your name on it."
-            : "For work already finished. Say when it started and when it stopped, we work out the rest."}
+            ? t("Fix what was written down. The change is kept in the record's history, with your name on it.")
+            : t("For work already finished. Say when it started and when it stopped, we work out the rest.")}
         </DialogDescription>
       }
       submit={{

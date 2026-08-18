@@ -19,7 +19,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
@@ -58,7 +58,7 @@ export function RaiseTicketDialog({
       onOpenChange(false)
       toast.success(t("Sent. We'll come back to you here."))
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't send that. Try again.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't send that. Try again."))
     } finally {
       setBusy(false)
     }

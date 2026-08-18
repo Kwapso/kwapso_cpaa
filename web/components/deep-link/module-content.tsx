@@ -140,7 +140,7 @@ function internalDetail(
   if (spec.query.error) return <LoadError what={spec.what} />
   if (spec.query.data === undefined) return <Skeleton variant="list" lines={4} />
   const row = spec.query.data.find((r) => r.id === ctx.recordId) ?? null
-  if (!row) return <p className="text-muted-foreground text-sm">That record no longer exists.</p>
+  if (!row) return <p className="text-muted-foreground text-sm">{ctx.t("That record no longer exists.")}</p>
   const data = spec.shape(row, ctx.internalActivity.rows)
   return (
     <div className="flex flex-col gap-6">
@@ -155,7 +155,7 @@ function internalDetail(
           must be able to reach all of it. */}
       <LoadMore
         listKey={ctx.internalActivity.listKey}
-        label="Load more activity"
+        label={ctx.t("Load more activity")}
         fetchPage={ctx.internalActivity.fetchPage}
       />
     </div>
@@ -246,7 +246,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
               every mutation writes a row — so it pages instead of stopping at 50. */}
           <LoadMore
             listKey={`activity:team:${teamId}`}
-            label={t("Load more activity")}
+            label={ctx.t("Load more activity")}
             fetchPage={(c: string) =>
               tenancy.activity("team", undefined, c).then((r) => ({ rows: r.activity, nextCursor: r.nextCursor }))
             }
@@ -269,7 +269,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     const activityMore = (
       <LoadMore
         listKey={activityKey as string}
-        label={t("Load more activity")}
+        label={ctx.t("Load more activity")}
         fetchPage={(c: string) =>
           tenancy
             .activity(activityScope ?? "team", recordId ?? undefined, c)

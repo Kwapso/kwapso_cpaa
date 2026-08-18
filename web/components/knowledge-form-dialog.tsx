@@ -26,7 +26,7 @@
 import * as React from "react"
 
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/record-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
@@ -149,8 +149,8 @@ export function KnowledgeFormDialog({
         err instanceof ApiFailure
           ? err.message
           : isEdit
-            ? "Couldn't save the source."
-            : "Couldn't add it to the knowledge base."
+            ? t("Couldn't save the source.")
+            : t("Couldn't add it to the knowledge base.")
       )
     } finally {
       setBusy(false)
@@ -164,13 +164,13 @@ export function KnowledgeFormDialog({
       busy={busy}
       clearDraft={clearDraft}
       onSubmit={submit}
-      title={<DialogTitle>{isEdit ? "Correct this source" : "Add to the knowledge base"}</DialogTitle>}
+      title={<DialogTitle>{isEdit ? t("Correct this source") : t("Add to the knowledge base")}</DialogTitle>}
       subtitle={
         <DialogDescription>
           {textOwnedElsewhere
             ? (textOwnedNote ??
-              "This one is kept in step with the record it came from, so its words are edited there. You can still change where it is filed and who can use it.")
-            : "Anything you put here is something the assistant may use to answer questions, and it will name this source when it does."}
+              t("This one is kept in step with the record it came from, so its words are edited there. You can still change where it is filed and who can use it."))
+            : t("Anything you put here is something the assistant may use to answer questions, and it will name this source when it does.")}
         </DialogDescription>
       }
       submit={{

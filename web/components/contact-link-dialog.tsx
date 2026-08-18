@@ -34,7 +34,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
@@ -97,7 +97,7 @@ export function ContactLinkDialog({
       clearDraft()
       onOpenChange(false)
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't add that contact.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't add that contact."))
     } finally {
       setBusy(false)
     }
@@ -233,7 +233,7 @@ export function ContactCreateDialog({
     } catch (err) {
       // The server's own sentence wins — it is the one that knows why (a right
       // this role does not hold, a reference that clashed).
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't add that contact.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't add that contact."))
     } finally {
       setBusy(false)
     }

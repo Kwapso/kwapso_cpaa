@@ -192,17 +192,17 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
     try {
       const r = await content.readMeetingTranscript(meetingId)
       patchLists(r.meeting)
-      if (!r.captured) toast.info(r.note ?? "Nothing to read yet.")
+      if (!r.captured) toast.info(r.note ?? t("Nothing to read yet."))
       else
         toast.success(
           r.logsWritten > 0
             ? `Transcript read, and ${r.logsWritten} ${
                 r.logsWritten === 1 ? "person's" : "people's"
               } time was logged.`
-            : "Transcript read."
+            : t("Transcript read.")
         )
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't read the transcript.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't read the transcript."))
     } finally {
       setBusy(null)
     }
@@ -231,7 +231,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
       setNotesDraft(null)
       toast.success(t("Notes saved."))
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't save the notes.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't save the notes."))
     } finally {
       setBusy(null)
     }
@@ -242,9 +242,9 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
     try {
       const { meeting } = await content.setMeetingActive(meetingId, active)
       patchLists(meeting)
-      toast.success(active ? "Back in the diary." : "Cancelled, the record and its notes are kept.")
+      toast.success(active ? t("Back in the diary.") : t("Cancelled, the record and its notes are kept."))
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't change that.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't change that."))
     } finally {
       setBusy(null)
     }
@@ -430,11 +430,11 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
                 <TranslateAction translation={translation} />
               </div>
               <section className="flex flex-col gap-2">
-                <h2 className="text-muted-foreground text-sm font-medium">Agenda</h2>
+                <h2 className="text-muted-foreground text-sm font-medium">{t("Agenda")}</h2>
                 {item.agenda ? (
                   <RichText html={translation.of(item.agenda)} />
                 ) : (
-                  <p className="text-muted-foreground text-sm">Nothing written down yet.</p>
+                  <p className="text-muted-foreground text-sm">{t("Nothing written down yet.")}</p>
                 )}
               </section>
               {/* THE NOTES ARE AN OPEN FIELD (9.6). Somebody types into the
@@ -448,7 +448,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
                   The AGENDA is never editable here — it is set beforehand, on
                   the edit page, which is the other half of the same rule. */}
               <section className="flex flex-col gap-2">
-                <h2 className="text-muted-foreground text-sm font-medium">Notes</h2>
+                <h2 className="text-muted-foreground text-sm font-medium">{t("Notes")}</h2>
                 {canEdit && item.active ? (
                   <>
                     {/* Uncontrolled, and keyed on the ROW so the editor re-seeds
@@ -458,7 +458,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
                       key={item.id}
                       defaultValue={item.notes ?? ""}
                       onChange={(html) => setNotesDraft(html)}
-                      placeholder="Type as you go, this is the part worth keeping."
+                      placeholder={t("Type as you go, this is the part worth keeping.")}
                       className="min-h-40"
                     />
                     <div className="flex justify-end">
@@ -469,7 +469,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
                         className="gap-1"
                       >
                         {busy === "notes" ? <Spinner /> : null}
-                        Save notes
+                        {t("Save notes")}
                       </Button>
                     </div>
                   </>
@@ -477,7 +477,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
                   <RichText html={translation.of(item.notes)} />
                 ) : (
                   <p className="text-muted-foreground text-sm">
-                    Nothing written up yet, the notes are the part worth keeping.
+                    {t("Nothing written up yet, the notes are the part worth keeping.")}
                   </p>
                 )}
               </section>

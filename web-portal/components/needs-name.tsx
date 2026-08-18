@@ -14,7 +14,7 @@
 
 import * as React from "react"
 
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 

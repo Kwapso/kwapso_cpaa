@@ -16,7 +16,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import {
   Select,
   SelectContent,
@@ -67,7 +67,7 @@ export function PortalAccessDialog({
     } catch (err) {
       // The door's sentence is the useful one here — it names the person and says
       // whether they need an email or a first sign-in.
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't switch on access.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't switch on access."))
     } finally {
       setBusy(false)
     }
@@ -101,7 +101,7 @@ export function PortalAccessDialog({
         >
           <SelectTrigger id="portal-person">
             <SelectValue
-              placeholder={candidates.length ? "Choose a person" : "Add a contact first"}
+              placeholder={candidates.length ? t("Choose a person") : t("Add a contact first")}
             />
           </SelectTrigger>
           <SelectContent>

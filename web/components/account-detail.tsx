@@ -816,7 +816,7 @@ export function AccountDetailScreen({
         accounts={[{ id: accountId, name: account.name }]}
         draftKey={`app:add:${accountId}`}
         onSubmit={async (v) => {
-          await createAppFrom(teamId, { ...v, accountId })
+          await createAppFrom(teamId, { ...v, accountId }, t)
           invalidate(sliceKey("apps-account", accountId))
         }}
       />
@@ -927,7 +927,7 @@ export function AccountDetailScreen({
               }}
             >
               {busy ? <Spinner /> : null}
-              {busy ? "Working…" : confirm?.action}
+              {busy ? t("Working…") : confirm?.action}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

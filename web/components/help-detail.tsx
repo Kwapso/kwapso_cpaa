@@ -256,7 +256,7 @@ export function HelpDetailScreen({
     invalidate(`help:${teamId}`)
     invalidate(`help-thread:${helpId}`)
     invalidate(recordActivityKey("help", helpId))
-    toast.success(r.alreadyResolved ? "Already answered." : "Answered, and they've been told.")
+    toast.success(r.alreadyResolved ? t("Already answered.") : t("Answered, and they've been told."))
   }
 
   async function editTicket(input: {
@@ -313,7 +313,7 @@ export function HelpDetailScreen({
       invalidate(`help:${teamId}`)
     } catch (err) {
       primeCache(`help-thread:${helpId}`, prev) // rollback the echo
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't post your reply.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't post your reply."))
     }
   }
 
@@ -327,9 +327,9 @@ export function HelpDetailScreen({
       const { tickets } = await content.archiveHelp(helpId, archived)
       primeCache(`help:${teamId}`, tickets)
       invalidate(recordActivityKey("help", helpId))
-      toast.success(archived ? "Put away." : "Taken back out.")
+      toast.success(archived ? t("Put away.") : t("Taken back out."))
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't change that.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't change that."))
     } finally {
       setStatusBusy(false)
     }
@@ -345,7 +345,7 @@ export function HelpDetailScreen({
       invalidate(`help:${teamId}`)
       toast.success(t("Translated."))
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't translate that.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't translate that."))
     } finally {
       setTranslating(false)
     }
@@ -607,10 +607,10 @@ export function HelpDetailScreen({
         config={tabsConfig}
         value={tab}
         onValueChange={setTab}
-        renderPanel={(t) => {
-          if (t.value === "overview")
+        renderPanel={(panel) => {
+          if (panel.value === "overview")
             return <OverviewList items={overviewItems} />
-          if (t.value === "activity")
+          if (panel.value === "activity")
             return <ActivityPanel activity={activity} />
           // A TAB ON THE TICKET WHERE MORE WORK CAN BE ADDED. One story may
           // answer many tickets and one ticket may need many stories, so this is
@@ -618,7 +618,7 @@ export function HelpDetailScreen({
           // create action the comment above it had been promising while handing
           // the panel no `onNew` at all. See the note on `storyOpen` for why
           // adding work here is not the "make it a story" that was removed.
-          if (t.value === "stories")
+          if (panel.value === "stories")
             return (
               <StoriesPanel
                 ownerKind="ticket"
@@ -626,10 +626,10 @@ export function HelpDetailScreen({
                 filter={{ ticketId: helpId }}
                 host={host}
                 onNew={canWriteWork ? () => setStoryOpen(true) : undefined}
-                emptyText="No work written down against this ticket yet."
+                emptyText={t("No work written down against this ticket yet.")}
               />
             )
-          if (t.value === "time")
+          if (panel.value === "time")
             return (
               <WorkLogsPanel
                 targetTable="help"
@@ -640,9 +640,9 @@ export function HelpDetailScreen({
                 onActivityChanged={() => invalidate(recordActivityKey("help", helpId))}
               />
             )
-          if (t.value === "files")
+          if (panel.value === "files")
             return <HelpAttachmentsPanel ticketId={helpId} canEdit={can("help", "read")} />
-          if (t.value === "stakeholders")
+          if (panel.value === "stakeholders")
             return (
               <HelpStakeholders
                 stakeholders={stakeholdersQ.data ?? []}
@@ -727,7 +727,7 @@ export function HelpDetailScreen({
         storyTypes={options.storyTypes}
         draftKey={`story:add:ticket:${helpId}`}
         onSubmit={async (v) => {
-          await createStoryFrom(teamId, { ...v, ticketId: helpId })
+          await createStoryFrom(teamId, { ...v, ticketId: helpId }, t)
           invalidate(sliceKey("stories-ticket", helpId))
         }}
       />

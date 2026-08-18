@@ -25,7 +25,7 @@ import * as React from "react"
 
 import { Checkbox } from "@kwapso/ui/registry/primitives/checkbox/checkbox"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Label } from "@kwapso/ui/registry/primitives/label/label"
 import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
@@ -156,7 +156,7 @@ export function TaskFormDialog({
       setFile(null)
       onOpenChange(false)
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't add that task.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't add that task."))
     } finally {
       setBusy(false)
     }

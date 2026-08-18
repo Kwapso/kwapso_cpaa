@@ -8,6 +8,8 @@ import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Card, CardContent } from "@kwapso/ui/registry/primitives/card/card"
 import { Plus, Mail, Upload, Download, Lock, SearchX, TriangleAlert } from "lucide-react"
 
+import { useT } from "@shared/web/language"
+
 /** A state with nothing in it still gets a face. One glyph in the leading slot,
  * `aria-hidden` beside the sentence that carries the meaning (UI-CONVENTIONS §5)
  * — a bare line of grey text in the middle of a page reads as a screen that
@@ -31,21 +33,24 @@ function StateLine({
 }
 
 export function NoAccess() {
+  const t = useT()
   return (
     <StateLine icon={Lock}>
-      You don&apos;t have access to this, or it doesn&apos;t exist.
+      {t("You don't have access to this, or it doesn't exist.")}
     </StateLine>
   )
 }
 
 export function NotFound() {
-  return <StateLine icon={SearchX}>That screen doesn&apos;t exist.</StateLine>
+  const t = useT()
+  return <StateLine icon={SearchX}>{t("That screen doesn't exist.")}</StateLine>
 }
 
 export function LoadError({ what }: { what: string }) {
+  const t = useT()
   return (
     <StateLine icon={TriangleAlert} tone="destructive">
-      Couldn&apos;t load {what}.
+      {t("Couldn't load {what}.", { what })}
     </StateLine>
   )
 }

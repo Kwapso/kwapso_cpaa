@@ -358,7 +358,7 @@ export function WritePanels({
                   .catch((err: unknown) => {
                     if (!(err instanceof ApiFailure)) reportError("deep-link:archive", err)
                     toast.error(
-                      err instanceof ApiFailure ? err.message : "Something went wrong. Try again."
+                      err instanceof ApiFailure ? err.message : t("Something went wrong. Try again.")
                     )
                   })
                   .finally(() => setArchiving(false))
@@ -395,7 +395,7 @@ export function WritePanels({
             onRecordGone()
           } catch (err) {
             if (!(err instanceof ApiFailure)) reportError("deep-link:confirm", err)
-            toast.error(err instanceof ApiFailure ? err.message : "Something went wrong. Try again.")
+            toast.error(err instanceof ApiFailure ? err.message : t("Something went wrong. Try again."))
           }
         }}
       />

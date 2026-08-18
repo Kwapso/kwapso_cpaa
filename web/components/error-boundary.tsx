@@ -10,6 +10,7 @@ import * as React from "react"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 
 import { reportError } from "@shared/web/log"
+import { useT } from "@shared/web/language"
 import { healStaleShell, isStaleShellError } from "@/components/version-watch"
 
 type Props = { label?: string; children: React.ReactNode }
@@ -44,31 +45,62 @@ export class ErrorBoundary extends React.Component<Props, State> {
     // to say is what actually happened. A stack trace about a chunk id is not a
     // sentence anybody can act on.
     if (this.state.error && isStaleShellError(this.state.error))
+      return <StaleShell />
+    if (this.state.error)
       return (
-        <div className="text-muted-foreground flex flex-col items-start gap-2 rounded-xl border p-4 text-sm">
-          <p>A new version of the app is ready.</p>
-          <Button variant="outline" size="sm" onClick={() => location.reload()}>
-            Reload
-          </Button>
-        </div>
+        <Broken
+          label={this.props.label}
+          detail={this.state.error.message || String(this.state.error)}
+          onRetry={() => this.setState({ error: null })}
+        />
       )
-    if (this.state.error) {
-      return (
-        <div className="border-destructive/30 bg-destructive/5 flex flex-col gap-2 rounded-xl border p-4 text-sm">
-          <p className="text-destructive font-medium">
-            Something broke{this.props.label ? ` in ${this.props.label}` : ""}.
-          </p>
-          <p className="text-muted-foreground break-words font-mono text-xs">
-            {this.state.error.message || String(this.state.error)}
-          </p>
-          <div>
-            <Button variant="outline" size="sm" onClick={() => this.setState({ error: null })}>
-              Try again
-            </Button>
-          </div>
-        </div>
-      )
-    }
     return this.props.children
   }
+}
+
+// THE TWO FALLBACKS ARE FUNCTIONS, and that is the whole reason they exist as
+// separate components. A React error boundary must be a CLASS, a class cannot
+// call a hook, and `t` is a hook — so the boundary that catches a crash was the
+// one screen in the app that could not ask for the reader's language. It said
+// "Something broke" in English to everybody. Two small function components move
+// the words to where the hook can be called, and the class keeps the catching.
+
+function StaleShell() {
+  const t = useT()
+  return (
+    <div className="text-muted-foreground flex flex-col items-start gap-2 rounded-xl border p-4 text-sm">
+      <p>{t("A new version of the app is ready.")}</p>
+      <Button variant="outline" size="sm" onClick={() => location.reload()}>
+        {t("Reload")}
+      </Button>
+    </div>
+  )
+}
+
+function Broken({
+  label,
+  detail,
+  onRetry,
+}: {
+  label?: string
+  detail: string
+  onRetry: () => void
+}) {
+  const t = useT()
+  return (
+    <div className="border-destructive/30 bg-destructive/5 flex flex-col gap-2 rounded-xl border p-4 text-sm">
+      {/* ONE SENTENCE PER BRANCH, not "Something broke" plus a tail. The tail was
+          a template naming the panel, so the sentence a German reader got was
+          half-translated at best and could not be reordered at all. */}
+      <p className="text-destructive font-medium">
+        {label ? t("Something broke in {label}.", { label }) : t("Something broke.")}
+      </p>
+      <p className="text-muted-foreground break-words font-mono text-xs">{detail}</p>
+      <div>
+        <Button variant="outline" size="sm" onClick={onRetry}>
+          {t("Try again")}
+        </Button>
+      </div>
+    </div>
+  )
 }

@@ -26,7 +26,7 @@
 import * as React from "react"
 
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Switch } from "@kwapso/ui/registry/primitives/switch/switch"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
@@ -119,7 +119,7 @@ export function RateFormDialog({
       clearDraft()
       onOpenChange(false)
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't save that rate.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't save that rate."))
     } finally {
       setBusy(false)
     }

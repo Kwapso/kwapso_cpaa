@@ -11,7 +11,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { RecordPicker } from "@/components/record-picker"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
@@ -67,7 +67,7 @@ export function InviteDialog({
       // generic toast is never mistaken for a permission block.
       if (!(err instanceof ApiFailure)) reportError("invite:send", err)
       toast.error(
-        err instanceof ApiFailure ? err.message : "Couldn't send the invite, please try again."
+        err instanceof ApiFailure ? err.message : t("Couldn't send the invite, please try again.")
       )
     } finally {
       setBusy(false)

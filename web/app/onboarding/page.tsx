@@ -13,7 +13,7 @@ import {
   AvatarImage,
 } from "@kwapso/ui/registry/primitives/avatar/avatar"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { FileUpload } from "@kwapso/ui/registry/primitives/file-upload/file-upload"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { ModeToggle } from "@kwapso/ui/registry/primitives/mode-toggle/mode-toggle"
@@ -147,7 +147,7 @@ export default function OnboardingPage() {
         return
       }
       toast.error(
-        err instanceof ApiFailure ? err.message : "Something went wrong. Try again."
+        err instanceof ApiFailure ? err.message : t("Something went wrong. Try again.")
       )
       setBusy(false)
     }
@@ -193,12 +193,12 @@ export default function OnboardingPage() {
         <div className="flex flex-col items-center text-center">
           <BrandMark className="mb-1" />
           <h1 className="text-2xl font-semibold tracking-tight">
-            {teamless ? "You're not in a team" : "Set up your profile"}
+            {teamless ? t("You're not in a team") : t("Set up your profile")}
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
             {teamless
-              ? "An admin can invite you back, or you can start a team of your own below."
-              : "Tell us who you are, your team gets created right after."}
+              ? t("An admin can invite you back, or you can start a team of your own below.")
+              : t("Tell us who you are, your team gets created right after.")}
           </p>
         </div>
         <form className="mt-6 flex flex-col gap-4" onSubmit={finish}>
@@ -239,7 +239,7 @@ export default function OnboardingPage() {
               {/* The button says what pressing it DOES. For a removed member
                   "Continue" hides the consequence — they'd end up owning a new
                   team they never asked for. */}
-              {busy ? "Creating your team…" : teamless ? "Start my own team" : "Continue"}
+              {busy ? t("Creating your team…") : teamless ? t("Start my own team") : t("Continue")}
             </Button>
           </form>
       </div>

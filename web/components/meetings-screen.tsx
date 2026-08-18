@@ -253,7 +253,7 @@ export function MeetingsScreen({
               .join(", ") + " in the diary.") + more
       )
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't read your calendar.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't read your calendar."))
     } finally {
       setSyncing(false)
     }

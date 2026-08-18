@@ -368,8 +368,8 @@ export function AppShell({
           <button
             type="button"
             onClick={toggleCollapsed}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            title={collapsed ? "Expand" : "Collapse"}
+            aria-label={collapsed ? t("Expand sidebar") : t("Collapse sidebar")}
+            title={collapsed ? t("Expand") : t("Collapse")}
             className="text-muted-foreground hover:bg-muted/50 hover:text-foreground rounded-xl p-2 transition-colors"
           >
             {collapsed ? (

@@ -72,7 +72,7 @@ export function RolePickerDialog({
       onOpenChange(false)
     } catch (err) {
       toast.error(
-        err instanceof ApiFailure ? err.message : "Couldn't change the role."
+        err instanceof ApiFailure ? err.message : t("Couldn't change the role.")
       )
     } finally {
       setBusy(false)
@@ -87,7 +87,7 @@ export function RolePickerDialog({
           <DialogDescription>
             {subjectName
               ? `Pick the role for ${subjectName}.`
-              : "Pick a role."}
+              : t("Pick a role.")}
           </DialogDescription>
         </DialogHeader>
 
@@ -135,7 +135,7 @@ export function RolePickerDialog({
             disabled={busy || !selected}
           >
             {busy ? <Spinner /> : null}
-            {busy ? "Saving…" : "Save role"}
+            {busy ? t("Saving…") : t("Save role")}
           </Button>
         </DialogFooter>
       </DialogContent>

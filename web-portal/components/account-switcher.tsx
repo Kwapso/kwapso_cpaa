@@ -44,6 +44,7 @@ import { Check, ChevronsUpDown } from "lucide-react"
 
 import { clearCache } from "@shared/web/store"
 import { ApiFailure, portal } from "@/lib/api"
+import { useT } from "@shared/web/language"
 
 export function AccountSwitcher({
   accounts,
@@ -64,6 +65,7 @@ export function AccountSwitcher({
    * nothing leaked. */
   onSwitching?: (busy: boolean) => void
 }) {
+  const t = useT()
   /** The company being moved to — null when nothing is in flight. Not a boolean:
    * the trigger names where you are GOING while you wait, which is the whole
    * answer to "did my tap do anything". */
@@ -116,7 +118,7 @@ export function AccountSwitcher({
       // The move didn't happen, so stop saying it is happening — the effect
       // above only fires when the new company actually lands.
       setPending(null)
-      toast.error(e instanceof ApiFailure ? e.message : "Couldn't switch. Try again.")
+      toast.error(e instanceof ApiFailure ? e.message : t("Couldn't switch. Try again."))
     }
   }
 
@@ -131,7 +133,7 @@ export function AccountSwitcher({
           disabled={busy}
           aria-busy={busy}
         >
-          <span className="truncate">{target?.name ?? current?.name ?? "Choose a company"}</span>
+          <span className="truncate">{target?.name ?? current?.name ?? t("Choose a company")}</span>
           {busy ? (
             <Spinner size="sm" className="size-3.5 shrink-0" />
           ) : (

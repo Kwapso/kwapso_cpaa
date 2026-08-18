@@ -95,7 +95,7 @@ export function SelectableScreen({
       setEditingId(null)
       toast.success(t("Renamed."))
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't rename that value.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't rename that value."))
     }
   }
 
@@ -108,7 +108,7 @@ export function SelectableScreen({
       primeCache(`selectable:${teamId}`, list)
       toast.success(next ? `Activated "${v.value}".` : `Deactivated "${v.value}".`)
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't update that value.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't update that value."))
     }
   }
 
@@ -210,8 +210,8 @@ export function SelectableScreen({
       {grouped.length === 0 ? (
         <p className="text-muted-foreground text-sm">
           {values.length === 0
-            ? "No values yet. Add your first above."
-            : "No values match your search or filter."}
+            ? t("No values yet. Add your first above.")
+            : t("No values match your search or filter.")}
         </p>
       ) : (
         <div className="flex flex-col gap-6">

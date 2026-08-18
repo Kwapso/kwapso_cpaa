@@ -13,7 +13,7 @@
 import * as React from "react"
 
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
@@ -120,12 +120,12 @@ export function ProcessFormDialog({
       busy={busy}
       clearDraft={clearDraft}
       onSubmit={submit}
-      title={<DialogTitle>{editing ? "Edit process" : "Map a process"}</DialogTitle>}
+      title={<DialogTitle>{editing ? t("Edit process") : t("Map a process")}</DialogTitle>}
       subtitle={
         <DialogDescription>
           {editing
-            ? "Rename it or say more about what it covers."
-            : "A way of working inside one of your apps. You'll add its steps next."}
+            ? t("Rename it or say more about what it covers.")
+            : t("A way of working inside one of your apps. You'll add its steps next.")}
         </DialogDescription>
       }
       submit={{

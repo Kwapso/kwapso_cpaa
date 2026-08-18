@@ -76,7 +76,7 @@ export function FilePicker({
       onChange(await upload(await readFileAsDataUrl(file), file.name))
       setFileName(file.name)
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't upload that file.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't upload that file."))
     } finally {
       setUploading(false)
     }
@@ -86,7 +86,7 @@ export function FilePicker({
     return (
       <div className="bg-card flex items-center gap-2 rounded-xl border p-2 text-sm">
         <Paperclip className="text-muted-foreground size-4 shrink-0" />
-        <span className="min-w-0 flex-1 truncate">{fileName || "Uploaded file"}</span>
+        <span className="min-w-0 flex-1 truncate">{fileName || t("Uploaded file")}</span>
         <Button
           type="button"
           variant="ghost"
@@ -123,7 +123,7 @@ export function FilePicker({
         className="gap-1"
       >
         {uploading ? <Spinner /> : <Paperclip className="size-3.5" />}
-        {uploading ? "Uploading…" : "Choose a file"}
+        {uploading ? t("Uploading…") : t("Choose a file")}
       </Button>
       <span className="text-muted-foreground text-xs">{t("Up to 25 MB.")}</span>
     </div>

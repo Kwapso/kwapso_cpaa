@@ -31,7 +31,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
 import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
@@ -185,8 +185,8 @@ export function HelpFormDialog({
         err instanceof ApiFailure
           ? err.message
           : isEdit
-            ? "Couldn't save the ticket."
-            : "Couldn't raise the ticket."
+            ? t("Couldn't save the ticket.")
+            : t("Couldn't raise the ticket.")
       )
     } finally {
       setBusy(false)
@@ -200,12 +200,12 @@ export function HelpFormDialog({
       busy={busy}
       clearDraft={clearDraft}
       onSubmit={submit}
-      title={<DialogTitle>{isEdit ? "Edit this ticket" : "Raise a ticket"}</DialogTitle>}
+      title={<DialogTitle>{isEdit ? t("Edit this ticket") : t("Raise a ticket")}</DialogTitle>}
       subtitle={
         <DialogDescription>
           {isEdit
-            ? "Update what you're asking for. Everyone on the ticket will see the change."
-            : "Describe the problem you're facing. Chat with others, or use this ticket as a forum to discuss solutions."}
+            ? t("Update what you're asking for. Everyone on the ticket will see the change.")
+            : t("Describe the problem you're facing. Chat with others, or use this ticket as a forum to discuss solutions.")}
         </DialogDescription>
       }
       submit={{

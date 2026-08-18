@@ -70,7 +70,7 @@ export function SavingStepLine({ step }: { step: StepSaving }) {
         </p>
         <p className="text-muted-foreground text-xs">
           {minutesText(step.baselineSecondsPerRun)} {t("before ·")}{" "}
-          {step.removed ? "not done now" : `${minutesText(step.latestSecondsPerRun)} now`} ·{" "}
+          {step.removed ? t("not done now") : `${minutesText(step.latestSecondsPerRun)} now`} ·{" "}
           {step.runsPerMonth.toLocaleString()}{t("× a month")}
         </p>
       </div>
@@ -81,7 +81,7 @@ export function SavingStepLine({ step }: { step: StepSaving }) {
         </span>
         {step.regression && (
           <p className="text-muted-foreground text-xs">
-            {step.explained ? "explained" : "no explanation yet"}
+            {step.explained ? t("explained") : t("no explanation yet")}
           </p>
         )}
       </div>
@@ -120,7 +120,7 @@ export function ValuePanel({ view }: { view: SavingsView | undefined }) {
         {unexplained > 0 && (
           <p className="text-destructive mt-2 text-xs">
             {unexplained === 1
-              ? "1 step takes longer than it used to and has no explanation yet."
+              ? t("1 step takes longer than it used to and has no explanation yet.")
               : `${unexplained} steps take longer than they used to and have no explanation yet.`}{" "}
             {t("Add one on the map, the client sees these either way.")}
           </p>

@@ -95,7 +95,7 @@ export function HelpAttachmentsPanel({
       keep(await what())
       toast.success(done)
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't do that.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't do that."))
     } finally {
       setBusy(false)
     }

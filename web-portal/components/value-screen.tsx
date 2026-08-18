@@ -321,7 +321,7 @@ function ProcessConversation({ processId, open }: { processId: string; open: boo
       await valueApi.comment(processId, body)
       invalidate(cacheKeys.processComments(processId))
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't send that. Try again.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't send that. Try again."))
     } finally {
       setBusy(false)
     }

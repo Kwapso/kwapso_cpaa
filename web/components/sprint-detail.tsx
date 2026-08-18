@@ -106,9 +106,9 @@ export function SprintDetailScreen({
       await contentApi.setSprintComplete(sprintId, complete)
       invalidate(sprintsKey(teamId))
       invalidate(`activity:record:sprints:${sprintId}`)
-      toast.success(complete ? "Sprint completed." : "Sprint reopened.")
+      toast.success(complete ? t("Sprint completed.") : t("Sprint reopened."))
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't change that sprint.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't change that sprint."))
     } finally {
       setBusy(false)
     }
@@ -272,8 +272,8 @@ export function SprintDetailScreen({
         config={tabsConfig}
         value={tab}
         onValueChange={setTab}
-        renderPanel={(t) => {
-          if (t.value === "stories")
+        renderPanel={(panel) => {
+          if (panel.value === "stories")
             return (
               <StoriesPanel
                 ownerKind="sprint"
@@ -281,10 +281,10 @@ export function SprintDetailScreen({
                 filter={{ sprintId }}
                 host={host}
                 onNew={canCreate ? () => setStoryOpen(true) : undefined}
-                emptyText="No work in this sprint yet."
+                emptyText={t("No work in this sprint yet.")}
               />
             )
-          if (t.value === "activity")
+          if (panel.value === "activity")
             return <ActivityPanel activity={activity} />
           return <OverviewList items={overviewItems} />
         }}
@@ -315,7 +315,7 @@ export function SprintDetailScreen({
         storyTypes={options.storyTypes}
         draftKey={`story:add:sprint:${sprintId}`}
         onSubmit={async (v) => {
-          await createStoryFrom(teamId, { ...v, sprintId })
+          await createStoryFrom(teamId, { ...v, sprintId }, t)
           invalidate(sliceKey("stories-sprint", sprintId))
         }}
       />

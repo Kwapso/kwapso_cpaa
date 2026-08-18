@@ -113,7 +113,7 @@ export function KnowledgeAsk({
       // Bergman GmbH: when is it due?" by the time it reaches retrieval.
       setAnswer(await content.askKnowledge(context ? `About ${context}: ${q}` : q, accountId, mayWrite))
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't ask the knowledge base.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't ask the knowledge base."))
     } finally {
       setBusy(false)
     }
@@ -135,7 +135,7 @@ export function KnowledgeAsk({
         />
         <Button type="submit" disabled={busy || !question.trim()} className="shrink-0 gap-1">
           {busy ? <Spinner /> : <Search className="size-4" />}
-          {busy ? "Looking…" : "Ask"}
+          {busy ? t("Looking…") : t("Ask")}
         </Button>
       </form>
       {/* THE COST, SAID BEFORE IT IS SPENT. A line under the box rather than a

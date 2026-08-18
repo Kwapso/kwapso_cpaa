@@ -173,7 +173,7 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
       primeCache(cacheKeys.threadTotal(ticketId), r.total)
       setDraft("")
     } catch (e) {
-      toast.error(e instanceof ApiFailure ? e.message : "Couldn't send that. Try again.")
+      toast.error(e instanceof ApiFailure ? e.message : t("Couldn't send that. Try again."))
     } finally {
       setSending(false)
     }
@@ -320,7 +320,7 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
           onClick={() => void send()}
         >
           <Send className="size-3.5" />
-          {sending ? "Sending…" : "Reply"}
+          {sending ? t("Sending…") : t("Reply")}
         </Button>
       </Card>
     </div>

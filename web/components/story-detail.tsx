@@ -310,7 +310,7 @@ export function StoryDetailScreen({
                 onClick={() => softNavigate(`${host.base}/apps/${story.appId}`)}
                 className="hover:text-foreground underline-offset-2 hover:underline"
               >
-                {options.appNames.get(story.appId) ?? "Its app"}
+                {options.appNames.get(story.appId) ?? t("Its app")}
               </button>
             )}
             {story.sprintId && story.sprintName && (
@@ -328,7 +328,7 @@ export function StoryDetailScreen({
                 onClick={() => softNavigate(`${host.base}/tickets/${story.ticketId}`)}
                 className="hover:text-foreground underline-offset-2 hover:underline"
               >
-                {t("Answers")} {story.ticketRef ?? "a ticket"}
+                {t("Answers")} {story.ticketRef ?? t("a ticket")}
               </button>
             )}
           </p>

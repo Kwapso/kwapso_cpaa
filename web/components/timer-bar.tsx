@@ -98,29 +98,29 @@ export function TimerBar({
       invalidatePrefix(TIME_SLICE_PREFIX)
       toast.success(t("Timer stopped."))
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't stop that timer.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't stop that timer."))
     }
   }
 
   return (
     <div className="flex items-center gap-1">
-      {running.map((t) => {
+      {running.map((timer) => {
         // Elapsed at the moment the SERVER answered, plus the wall time since —
         // so a tab left open overnight is right, not an hour of re-renders out.
-        const since = Math.max(0, Math.floor((Date.now() - Date.parse(t.startedAt)) / 1000))
-        const elapsed = Number.isFinite(since) ? since : t.elapsedSeconds
+        const since = Math.max(0, Math.floor((Date.now() - Date.parse(timer.startedAt)) / 1000))
+        const elapsed = Number.isFinite(since) ? since : timer.elapsedSeconds
         return (
           <div
-            key={t.id}
+            key={timer.id}
             className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${
-              t.runaway ? "border-destructive/40 text-destructive" : ""
+              timer.runaway ? "border-destructive/40 text-destructive" : ""
             }`}
           >
             <button
               type="button"
               className="flex items-center gap-1 font-medium tabular-nums"
-              title={t.targetLabel ?? "Open what this is timing"}
-              onClick={() => onNavigate?.(targetPath(t, teamId))}
+              title={timer.targetLabel ?? t("Open what this is timing")}
+              onClick={() => onNavigate?.(targetPath(timer, teamId))}
             >
               <Timer className="size-3.5" />
               {clockFrom(elapsed)}
@@ -129,8 +129,8 @@ export function TimerBar({
               variant="ghost"
               size="icon"
               className="size-6"
-              aria-label="Stop the timer"
-              onClick={() => stop(t.id)}
+              aria-label={t("Stop the timer")}
+              onClick={() => stop(timer.id)}
             >
               <CircleStop className="size-3.5" />
             </Button>
@@ -209,7 +209,7 @@ export function RecordTimerButton({
       }
     } catch (err) {
       toast.error(
-        err instanceof ApiFailure ? err.message : mine ? "Couldn't stop that timer." : "Couldn't start the timer."
+        err instanceof ApiFailure ? err.message : mine ? t("Couldn't stop that timer.") : t("Couldn't start the timer.")
       )
     } finally {
       setBusy(false)

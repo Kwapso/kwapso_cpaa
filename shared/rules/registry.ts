@@ -256,7 +256,93 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "closed-palette",
     status: "enforced",
   },
+  {
+    id: "R33",
+    dimension: "ui",
+    law: "EVERY EXTRACTED POSITION ASKS FOR ITS TRANSLATION. R28 makes the catalogue match the code; this makes the code READ the catalogue. Every position `scripts/lib/i18n-source.mjs` reports in `web/` or `web-portal/` — the same one definition, so the two laws can never disagree about what a sentence is — must sit inside a `t(...)` call, with exactly two ways out. A `label:` or `helpText:` on an object that spreads a field config is translated ON THE WAY TO THE SCREEN by `shared/web/field.tsx`, which is positional (the object says what it is) and is held shut by the second half of the check: NO file in either front door may import `Field` from `@kwapso/ui/registry/primitives/field/field`, so the seam cannot be walked around. Everything else is a copy TABLE read through `t` somewhere else, and each one is DATA in `TRANSLATED_WHERE_READ` with the seam that reads it, rot-checked both ways — a pin that no longer has an unwrapped position of that kind turns the build red, and so does a `via` that no longer appears in the source, so the list can only shrink.",
+    why: "R28 could be perfectly satisfied by an app that speaks English to everybody, and on 2026-08-18 it was: 666 of 2,001 extracted positions — every form field label in the app, 119 of the toasts, both error boundaries and every dialog title written as a ternary — were in the catalogue, translated into 28 languages at build time, and never asked for. The catalogue was current and the screens were English, because nothing had ever checked that an EXTRACTED position is a WRAPPED one. The field labels are the reason it went unnoticed for so long and the reason the fix is a seam rather than 138 edits: a field config is a module-level constant, `t` is a hook, so `t(...)` genuinely could not be written where those words are declared — the one class of string in this app that a developer could not have wrapped even if they had thought to. `translateRecipe` had already answered the identical question for the screen recipes (declare the English, translate on the way to the screen); this is that answer applied to the other half of the app, plus the import ban that makes it provable.",
+    checkId: "wrapped-strings",
+    status: "enforced",
+  },
 ]
+
+/** R33 — the copy TABLES: a file that declares words as data and reads them back
+ * through `t` somewhere else, so the position where they are WRITTEN is not the
+ * position where they are translated.
+ *
+ * They are not a loophole, they are the same ruling `translateRecipe` makes and
+ * says out loud: the English stays where a developer typed it, because English
+ * is the catalogue's KEY (shared/i18n.ts); a test and a team override still read
+ * the English; and the translation happens once, at the one place the data
+ * passes through, instead of at every declaration. What makes it safe to say
+ * "not here" is `via` — the call that does the reading, which must still exist
+ * in the source, or the pin goes red and somebody has to look.
+ *
+ * Keyed by file, narrowed by KIND, so a pin bought for a nav registry does not
+ * also excuse a raw toast in the same file. Rot-checked in both directions: a
+ * file with no unwrapped position of a pinned kind fails, and so does a `via`
+ * string that no longer appears anywhere in the two front doors. The list can
+ * only shrink. */
+export const TRANSLATED_WHERE_READ: Record<
+  string,
+  { kinds: ("property" | "field-label" | "jsx-text" | "jsx-child" | "attribute" | "toast")[]; via: string[]; why: string }
+> = {
+  "web/lib/screens.ts": {
+    kinds: ["property", "field-label"],
+    via: ["translateRecipe", "translateFields"],
+    why: "THE recipe store, and the original of this whole pattern. A recipe is data in a module with no React in it, it is also what a team OVERRIDES and what the rule scans read, and both of those want the English. `resolveRecipe` puts every rendered recipe through `translateRecipe` on the way to the screen — one function instead of two hundred call sites, and a recipe written next month is translated the day it is written.",
+  },
+  "web/lib/pages.ts": {
+    kinds: ["property"],
+    via: ["t(i.title)", "t(s.title)"],
+    why: "the nav registry: one source for the app's destinations, their slugs and the permission each needs. The shell and the section rail each read `title` through `t` as they draw the link, which is also the only place a destination becomes words rather than routing.",
+  },
+  "web/lib/collection-sorts.ts": {
+    kinds: ["property"],
+    via: ["translatedSorts"],
+    why: "the sort vocabulary per collection, beside the `value` each label belongs to — and the value is a DOOR PARAMETER, so the two must stay in one object. `translatedSorts(key, t)` is the one read.",
+  },
+  "web/lib/collection-filters.ts": {
+    kinds: ["property"],
+    via: ["translatedFacets"],
+    why: "the same, for filter facets: each label sits beside the `field` and `value` the door parses, which are names of data and are never translated. `translatedFacets(key, t, rows)` is the one read.",
+  },
+  "web/components/tasks-screen.tsx": {
+    kinds: ["field-label", "property"],
+    via: ["translateFields(columns, t)", "t(tab.label)"],
+    why: "a screen that composes its OWN table columns and its own six-tab strip. The columns are spread onto the recipe after `resolveRecipe` has run, so `translateRecipe` never sees them — `translateFields` is that same rule called at the place they are spread in; the tab labels are read through `t` where the strip is built.",
+  },
+  "web/components/meetings-screen.tsx": {
+    kinds: ["field-label"],
+    via: ["translateFields(ALL_COLUMNS, t)"],
+    why: "the meetings All view, host-composed for the same reason and translated through the same one call.",
+  },
+  "web/components/google-connections.tsx": {
+    kinds: ["property"],
+    via: ["t(SERVICE_COPY[service].label)", "t(SERVICE_COPY[service].scope)"],
+    why: "`SERVICE_COPY` — each Google service's name and the sentence saying WHAT CONNECTING IT LETS US SEE. It is keyed by the service the caller is drawing, so the words are looked up rather than written at the point of use, and all three reads go through `t`. The privacy sentence in particular is the one a person most needs in their own language.",
+  },
+  "web/components/google-source-dialog.tsx": {
+    kinds: ["property"],
+    via: ["t(k.title)", "t(s.description)"],
+    why: "`SHELVES` and `KINDS` — two closed vocabularies whose `value` is a database column value and whose `title`/`description` are the words offered beside it. Both halves are read through `t` in the same file. (The FIELD configs in this file are not pinned: they are positional, through `shared/web/field.tsx`.)",
+  },
+  "web/components/internal-record-dialog.tsx": {
+    kinds: ["property"],
+    via: ["label: f.label", "t(f.placeholder)"],
+    why: "one form for three record kinds, each supplying its FIELDS as data (`brandAssetFields`, `deliverableFields`, `purposeFields`). The label reaches the screen through this file's `<Field config={{ ...defaultFieldConfig, label: f.label }}>`, which is the translating seam; the placeholder is put through `t` beside it.",
+  },
+  "web-portal/components/ticket-row.tsx": {
+    kinds: ["property"],
+    via: ["t(status.label)"],
+    why: "`STATUS_WORDS` — the client's words for each ticket status, keyed by the status the row holds (SCOPE ch.06). The key is our vocabulary and the label is theirs; the row reads it through `t`.",
+  },
+  "web-portal/components/portal-shell.tsx": {
+    kinds: ["property"],
+    via: ["{t(label)}"],
+    why: "the portal's four destinations, as data beside the href and the icon each belongs to. The bottom bar reads every label through `t` as it draws the link.",
+  },
+}
 
 /** R32 — the files that may hold a colour LITERAL, and why. Everything else in
  * the two front doors and `shared/` resolves through a token. Rot-checked: an

@@ -16,7 +16,7 @@
 import * as React from "react"
 
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
@@ -135,7 +135,7 @@ export function MeetingFormDialog({
       onOpenChange(false)
     } catch (err) {
       toast.error(
-        err instanceof ApiFailure ? err.message : isEdit ? "Couldn't save the meeting." : "Couldn't arrange that."
+        err instanceof ApiFailure ? err.message : isEdit ? t("Couldn't save the meeting.") : t("Couldn't arrange that.")
       )
     } finally {
       setBusy(false)
@@ -149,12 +149,21 @@ export function MeetingFormDialog({
       busy={busy}
       clearDraft={clearDraft}
       onSubmit={submit}
-      title={<DialogTitle>{isEdit ? "Edit this meeting" : "New meeting"}</DialogTitle>}
+      title={<DialogTitle>{isEdit ? t("Edit this meeting") : t("New meeting")}</DialogTitle>}
       subtitle={
         <DialogDescription>
           {isEdit
-            ? "Write up what was decided while it is still fresh, the notes are the part worth keeping."
-            : "A conversation, with what you mean to cover. You can add it to your own calendar afterwards."}
+            ? t("Write up what was decided while it is still fresh, the notes are the part worth keeping.")
+            : /* IT SAID "You can add it to your own calendar afterwards." AND THAT
+                 STOPPED BEING TRUE. Every calendar WRITE was removed from this
+                 product (workers/content/src/lib/google-api.ts, above
+                 `calendarList`): kwapso reads a person's diary and cannot change
+                 it, from the screen, from the assistant or from a job. A form
+                 that promises an action the app refuses to take is worse than a
+                 form that says nothing, so it now says what actually happens. */
+              t(
+                "A conversation, with what you mean to cover. It is kept here — kwapso reads your calendar and never writes to it."
+              )}
         </DialogDescription>
       }
       submit={{

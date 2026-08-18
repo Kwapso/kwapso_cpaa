@@ -56,7 +56,7 @@ export function LoadMore<T>({
           loadMore(listKey, fetchPage).finally(() => setBusy(false))
         }}
       >
-        {busy ? "Loading…" : label}
+        {busy ? t("Loading…") : label}
       </Button>
     </div>
   )

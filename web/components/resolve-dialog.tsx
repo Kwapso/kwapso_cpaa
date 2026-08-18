@@ -17,7 +17,7 @@
 import * as React from "react"
 
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Send } from "lucide-react"
@@ -65,7 +65,7 @@ export function ResolveDialog({
       clearDraft()
       onOpenChange(false)
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't send that.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't send that."))
     } finally {
       setBusy(false)
     }

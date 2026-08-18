@@ -16,7 +16,7 @@
 import * as React from "react"
 
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
@@ -72,7 +72,7 @@ export function CertificateFormDialog({
       clearDraft()
       onOpenChange(false)
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't save the certificate.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't save the certificate."))
     } finally {
       setBusy(false)
     }
@@ -103,7 +103,7 @@ export function CertificateFormDialog({
       busy={busy}
       clearDraft={clearDraft}
       onSubmit={submit}
-      title={<DialogTitle>{isEdit ? "Edit certificate" : `Record a certificate for ${subjectName}`}</DialogTitle>}
+      title={<DialogTitle>{isEdit ? t("Edit certificate") : `Record a certificate for ${subjectName}`}</DialogTitle>}
       subtitle={
         <DialogDescription>
           {t("What they hold, who issued it, and when it lapses. The team can see this; no client can.")}

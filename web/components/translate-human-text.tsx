@@ -149,7 +149,7 @@ export function useHumanTranslation(
         if (partial) toast.info(t("Some of this couldn't be translated, so it's showing as it was written."))
       })
       .catch((err: unknown) => {
-        toast.error(err instanceof ApiFailure ? err.message : "Couldn't translate that.")
+        toast.error(err instanceof ApiFailure ? err.message : t("Couldn't translate that."))
       })
       .finally(() => setBusy(false))
   }, [busy, lang, pieces, showing, t])

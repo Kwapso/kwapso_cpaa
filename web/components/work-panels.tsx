@@ -649,7 +649,7 @@ export function TodosPanel({
       invalidate(key)
       toast.success(t("Withdrawn."))
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't withdraw that.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't withdraw that."))
     }
   }
 
@@ -668,32 +668,32 @@ export function TodosPanel({
         <p className="text-muted-foreground text-sm">{t("Nothing outstanding with a client.")}</p>
       ) : (
         <RowList>
-          {rows.map((t) => (
-            <Row key={t.id} live={!t.completedAt && !t.cancelled}>
+          {rows.map((todo) => (
+            <Row key={todo.id} live={!todo.completedAt && !todo.cancelled}>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm">{t.ref ? `${t.ref} · ${t.title}` : t.title}</p>
+                <p className="truncate text-sm">{todo.ref ? `${todo.ref} · ${todo.title}` : todo.title}</p>
                 <p className="text-muted-foreground truncate text-xs">
                   {[
-                    t.accountName,
-                    t.dueOn ? `due ${formatDate(t.dueOn)}` : "no date",
-                    t.fileName,
+                    todo.accountName,
+                    todo.dueOn ? `due ${formatDate(todo.dueOn)}` : "no date",
+                    todo.fileName,
                   ]
                     .filter(Boolean)
                     .join(" · ")}
                 </p>
               </div>
-              {t.completedAt && (
+              {todo.completedAt && (
                 <Badge variant="secondary" className="text-[10px]">
-                  Done
+                  {t("Done")}
                 </Badge>
               )}
-              {canCancel && !t.completedAt && !t.cancelled && (
+              {canCancel && !todo.completedAt && !todo.cancelled && (
                 <Button
                   variant="ghost"
                   size="icon"
                   className="size-7"
-                  aria-label="Withdraw this to-do"
-                  onClick={() => void cancel(t.id)}
+                  aria-label={t("Withdraw this to-do")}
+                  onClick={() => void cancel(todo.id)}
                 >
                   <Ban className="size-3.5" />
                 </Button>

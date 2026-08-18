@@ -221,10 +221,10 @@ export function PortalAccessPanel({
           {portalUsers.map((p) => (
             <Row key={p.id} active={p.active}>
               <span className="min-w-0 flex-1 truncate text-sm">
-                {p.email ?? "Someone with a login"}
+                {p.email ?? t("Someone with a login")}
               </span>
               <span className="text-muted-foreground text-xs">
-                {p.active ? "Can sign in" : "Access taken away"}
+                {p.active ? t("Can sign in") : t("Access taken away")}
                 {p.grantedByName ? ` · by ${p.grantedByName}` : ""}
                 {p.grantedAt ? ` · ${formatDate(p.grantedAt)}` : ""}
               </span>

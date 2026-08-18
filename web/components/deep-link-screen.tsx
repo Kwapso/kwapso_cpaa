@@ -214,7 +214,7 @@ export function DeepLinkScreen() {
       case "tasks.done": {
         const done = ctx.record?.status !== "Done"
         void runAction("tasks.done", { id, done: String(done) }).catch((err: unknown) => {
-          toast.error(err instanceof ApiFailure ? err.message : "Couldn't change that task.")
+          toast.error(err instanceof ApiFailure ? err.message : t("Couldn't change that task."))
         })
         break
       }

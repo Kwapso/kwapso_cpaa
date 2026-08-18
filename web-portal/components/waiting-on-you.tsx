@@ -39,7 +39,7 @@ export function WaitingOnYou() {
   const [busy, setBusy] = React.useState<string | null>(null)
   const pickers = React.useRef<Record<string, HTMLInputElement | null>>({})
 
-  const open = (todosQ.data ?? []).filter((t) => !t.completedAt)
+  const open = (todosQ.data ?? []).filter((todo) => !todo.completedAt)
   if (open.length === 0) return null
 
   async function complete(id: string, file?: File) {
@@ -54,7 +54,7 @@ export function WaitingOnYou() {
       invalidate(cacheKeys.todos)
       toast.success(t("Thank you, that's off your list."))
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't mark that done.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't mark that done."))
     } finally {
       setBusy(null)
     }
@@ -64,14 +64,14 @@ export function WaitingOnYou() {
     <section className="flex flex-col gap-4">
       <h2 className="text-lg font-semibold">{t("We're waiting on you")}</h2>
       <ul className="flex flex-col gap-2">
-        {open.map((t) => (
-          <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-4">
+        {open.map((todo) => (
+          <li key={todo.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-4">
             <div className="min-w-0">
-              <p className="font-medium">{t.title}</p>
-              {t.detail && <RichText html={t.detail} className="text-muted-foreground" />}
+              <p className="font-medium">{todo.title}</p>
+              {todo.detail && <RichText html={todo.detail} className="text-muted-foreground" />}
               <p className="text-muted-foreground text-sm">
-                {t.dueOn ? `By ${formatDate(t.dueOn)}` : "No date on it"}
-                {t.ref ? ` · ${t.ref}` : ""}
+                {todo.dueOn ? `By ${formatDate(todo.dueOn)}` : t("No date on it")}
+                {todo.ref ? ` · ${todo.ref}` : ""}
               </p>
             </div>
             <div className="flex shrink-0 gap-2">
@@ -81,13 +81,13 @@ export function WaitingOnYou() {
                   act from where the client is standing. */}
               <input
                 ref={(el) => {
-                  pickers.current[t.id] = el
+                  pickers.current[todo.id] = el
                 }}
                 type="file"
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0]
-                  if (file) complete(t.id, file)
+                  if (file) complete(todo.id, file)
                   e.target.value = ""
                 }}
               />
@@ -95,15 +95,15 @@ export function WaitingOnYou() {
                 variant="outline"
                 size="sm"
                 className="gap-1"
-                disabled={busy === t.id}
-                onClick={() => pickers.current[t.id]?.click()}
+                disabled={busy === todo.id}
+                onClick={() => pickers.current[todo.id]?.click()}
               >
                 <Paperclip className="size-3.5" />
-                Send a file
+                {t("Send a file")}
               </Button>
-              <Button size="sm" className="gap-1" disabled={busy === t.id} onClick={() => complete(t.id)}>
+              <Button size="sm" className="gap-1" disabled={busy === todo.id} onClick={() => complete(todo.id)}>
                 <Check className="size-3.5" />
-                {busy === t.id ? "Saving…" : "Done"}
+                {busy === todo.id ? t("Saving…") : t("Done")}
               </Button>
             </div>
           </li>
