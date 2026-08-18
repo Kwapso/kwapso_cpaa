@@ -59,6 +59,7 @@ import { SearchInput } from "@kwapso/ui/registry/primitives/search-input/search-
 import { SortControl } from "@kwapso/ui/registry/primitives/sort-control/sort-control"
 import type { FilterFacet, SortOption } from "@kwapso/ui/lib/config"
 
+import type { CollectionOrder } from "@/lib/collection-sorts"
 import { cursorKey } from "@/lib/live-resources"
 import { formatSearchTotal } from "@shared/web/format-count"
 import { primeCache, useCached, useCachedValue } from "@shared/web/store"
@@ -88,6 +89,13 @@ export type Found<T> = {
   /** the cache key the paging control must page — null when nothing is being
    * asked, so the screen falls back to its own list key. */
   listKey: string | null
+  /** THE ORDER, and the handle that changes it — the DOOR's, so a control
+   * underneath this bar (a table's column headers, on the diary) changes the
+   * same question the picker above does rather than arranging the page it can
+   * see. Two controls, one state: neither can be showing an order the other one
+   * moved away from. `set(null)` is "back to the order the door hands us", which
+   * asks the door nothing at all. */
+  order: CollectionOrder
   /** the question as a query string ("" when nothing is asked) — for the doors a
    * screen reaches by URL rather than by fetch. The CSV export is the one that
    * matters: its door narrows by the same words as the list on purpose, so
@@ -292,6 +300,14 @@ export function PagedFind<T>({
         error: found.error,
         emptyText,
         listKey: findKey,
+        order: {
+          by: sortBy,
+          dir: sortDir ?? landsOn,
+          set: (by, dir) => {
+            setSortBy(by ?? defaultSort)
+            setSortDir(by === null ? null : dir)
+          },
+        },
         queryString: active ? `?${new URLSearchParams(query).toString()}` : "",
         fetchPage: (cursor: string) =>
           fetchPage(askedRef.current, cursor).then((p) => ({ rows: p.rows, nextCursor: p.nextCursor })),

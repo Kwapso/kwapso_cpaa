@@ -107,3 +107,26 @@ export const COLLECTION_SORTS: Record<string, CollectionSort> = {
 export function translatedSorts(key: string, t: (english: string) => string): SortOption[] {
   return (COLLECTION_SORTS[key]?.options ?? []).map((o) => ({ ...o, label: t(o.label) }))
 }
+
+/** THE ORDER A COLLECTION IS IN, AND THE ONE HANDLE THAT CHANGES IT.
+ *
+ * Two controls can put a list in order — the picker beside the search box and a
+ * column header on a table — and on the diary they sit on the same screen. They
+ * are one QUESTION, so they get one handle rather than a state each: whichever
+ * is used, the same `set` runs, and neither can be showing an order the other
+ * one moved away from.
+ *
+ * It lives here beside the names because it is the same half of the seam: this
+ * file is what the SCREEN knows about ordering (`shared/workers/sorting.ts` is
+ * the door's half). `by` is a name from the menu above when the door owns the
+ * order, and a column key when the browser does — the difference is which side
+ * of the wire the handle was built on, and nothing that renders it cares.
+ *
+ * `by: ""` means "the order it arrived in", which a header returns to on its
+ * third click and is the reason `set` takes a null: the door's own default is
+ * one press away and is never a thing the screen has to remember. */
+export type CollectionOrder = {
+  by: string
+  dir: "asc" | "desc"
+  set: (by: string | null, dir: "asc" | "desc") => void
+}

@@ -32,6 +32,7 @@ import {
   type ScreenIntent,
 } from "@kwapso/ui/registry/collections/screen-renderer/screen-renderer"
 import type { ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
+import type { CollectionConfig } from "@kwapso/ui/lib/config"
 
 import { CollectionHeading } from "@/components/collection-heading"
 import { GoogleSyncButton } from "@/components/google-sync"
@@ -42,6 +43,7 @@ import { PagedFind } from "@/components/paged-find"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { MeetingFormDialog, type MeetingFormValues } from "@/components/meeting-form-dialog"
 import { RecordCalendar, type CalendarEntry } from "@/components/record-calendar"
+import { RecordTable, visibleActions } from "@/components/record-table"
 import { shapeMeetingsList } from "@/components/deep-link/shape"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import { appsKey, cursorKey, listFetch, meetingsKey, totalKey } from "@/lib/live-resources"
@@ -122,6 +124,36 @@ const ALL_COLUMNS = [
   field("where", "Where"),
   field("state", "Status"),
 ]
+
+/** WHAT THE DOOR CALLS EACH OF THOSE COLUMNS.
+ *
+ * The diary PAGES, so a column header orders it at the door or it does not order
+ * it at all — arranging the fifty rows in the browser under a badge counting 254
+ * is the lie `<PagedFind>` exists to stop, one control along (SEARCH.md § *The
+ * third question*). So a header sends a NAME out of `MEETING_SORTS`, and the two
+ * columns the door has no name for — App and Where — draw a plain header. A
+ * header that cannot order is honest; one that looks like it can and does not is
+ * the defect this whole lane is about.
+ *
+ * Hand-paired because it is a translation between two vocabularies (a shaped
+ * row's column, and the door's menu name); the DIRECTION is not, it is read off
+ * `COLLECTION_SORTS` so a header cannot land differently from the picker above
+ * it offering the same order. */
+const COLUMN_SORT: Record<string, string> = {
+  name: "title",
+  when: "when",
+  client: "client",
+  state: "status",
+}
+const ALL_COLUMN_HEADERS = ALL_COLUMNS.map((f) => {
+  const sort = COLUMN_SORT[f.column]
+  return {
+    key: f.column,
+    label: f.field.label,
+    sort,
+    defaultDir: COLLECTION_SORTS.meetings.options.find((o) => o.value === sort)?.defaultDir,
+  }
+})
 
 export function MeetingsScreen({
   teamId,
@@ -323,14 +355,12 @@ export function MeetingsScreen({
           // can see it is drawing a table (whose column headers are its own sort
           // control) and stand its picker down — see tasks-screen for the whole
           // sentence.
-          const listRecipe =
-            view === "all"
-              ? withDataDrivenCollection(
-                  { ...recipe, display: "table" as const, fields: ALL_COLUMNS },
-                  data.rows ?? [],
-                  found.emptyText
-                )
-              : withDataDrivenCollection(recipe, data.rows ?? [], found.emptyText)
+          const tableRecipe = withDataDrivenCollection(
+            { ...recipe, display: "table" as const, fields: ALL_COLUMNS },
+            data.rows ?? [],
+            found.emptyText
+          )
+          const listRecipe = withDataDrivenCollection(recipe, data.rows ?? [], found.emptyText)
           return (
             <>
               <SectionWithCreate show={canCreate} label={t("New meeting")} icon="plus" onCreate={() => setOpen(true)}>
@@ -344,6 +374,23 @@ export function MeetingsScreen({
                         listKey={found.listKey ?? meetingsKey(teamId)}
                         fetchPage={found.fetchPage}
                       />
+                    }
+                  />
+                ) : view === "all" ? (
+                  // THE DIARY PAGES, so its headers ask the DOOR — `found.order`
+                  // is the same handle the picker above the table holds, so the
+                  // two controls are one question and the answer spans the whole
+                  // diary instead of the fifty rows in the browser. The picker
+                  // stays because it names orders that are not columns ("Recently
+                  // added"); the headers cover the ones that are.
+                  <RecordTable
+                    columns={ALL_COLUMN_HEADERS}
+                    rows={data.rows ?? []}
+                    config={tableRecipe.collection as CollectionConfig}
+                    order={found.order}
+                    actions={visibleActions(tableRecipe, rights, onAction)}
+                    onRowClick={(row) =>
+                      onIntent({ kind: "open", module: "meetings", id: String(row.id) })
                     }
                   />
                 ) : (

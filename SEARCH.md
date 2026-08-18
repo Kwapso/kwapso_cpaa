@@ -233,7 +233,7 @@ and where that ordering is decided.
 | --- | --- | --- |
 | **Six paged list screens** — accounts, tickets, the knowledge base, process maps, the backlog, the diary | recipe → `CollectionFrame` (+ a table on the diary's *All*) | **the DOOR**, `<PagedFind sorts=…>` · five to six named orders each |
 | **Eight bounded list recipes** — members, roles, invites, sprints, apps, tasks, the brand library, meeting purposes | recipe → `CollectionFrame` | **the browser**, honestly: the whole collection is loaded. Options are DERIVED from the recipe's own first field + surviving facets (`frameSortOptions`), so a new column brings its own sort and a list with one sortable column gets no control at all |
-| **The two tables** — Tasks (all views but Calendar), the diary's *All* | recipe `display:"table"` → `DataTable` | the browser, by **clicking a column header**. The engine makes every column sortable; the tuner stands the picker down so a table has one control rather than two. On the diary this orders the loaded page only — the honest, whole-diary order is the `<PagedFind>` control above it (UI-GAPS #22) |
+| **The two tables** — Tasks (all views but Calendar), the diary's *All* | recipe `display:"table"` → the host's `RecordTable` (`web/components/record-table.tsx`) | by **clicking a column header**, and *which side* decides follows the same split as the search box: Tasks is BOUNDED so the browser orders all of it; the diary PAGES so a header asks the DOOR, through the same `found.order` handle the picker above the table holds. A header REPLACES the door's default order (asc → desc → back to it). Two of the diary's six columns (App, Where) have no name in `MEETING_SORTS`, so they draw a plain header rather than a control that cannot work. **Corrected 2026-08-18** — see below |
 | **Three calendars** — sprints, tasks, the diary | `CalendarView` | **not sortable, and must not be**: a month grid is ordered by the calendar |
 | **Activity feeds** (every record's Activity tab, the team feed, account activity, assistant usage) | `ActivityFeed` | **not sortable**: a chronological history whose order IS its meaning. The profile screen's own feed runs oldest-first deliberately |
 | **Conversations** — a ticket's thread, a process's comments, the assistant's chat | `TicketThread` / `Comments` / `AgentChat` | **not sortable**: reordering a conversation destroys it |
@@ -242,10 +242,46 @@ and where that ordering is decided.
 | **~30 record panels** — a company's contacts and logins, a story's time, an app's sprints/maps/meetings/tickets, attachments, stakeholders, rate cards, certificates, tokens, Google sources | bespoke `<ul>` rows | **no control**, deliberately for now: each is a short, bounded list inside one record where a person is reading rather than comparing. The ones that PAGE (a story's work logs, an app's tickets and meetings, an account's stories and maps) would need the door treatment, and are named in UI-GAPS #23 rather than left silent |
 | **The whole client portal** — tickets, to-dos, sprints, contacts, the value screen's apps/maps/steps, attachments, the thread | all hand-composed; the portal has **no recipe engine** | **no control**, and only one of them wants it: the tickets list. Named in UI-GAPS #23 |
 
+### The correction: the table headers were not sorting at all (2026-08-18, same day)
+
+The census row above originally read "the browser, by clicking a column header",
+and the section under it measured which COLUMNS compared wrongly. Both were
+written on an assumption nobody had put a finger on, and it was false: **on both
+tables a column header sorted nothing whatsoever.** Reported within hours, on the
+deployed build, with a screenshot of Tasks → *List* in the door's own order under
+a lit Deadline arrow.
+
+The mechanism is one line of the library, and it is worth stating precisely
+because the shape recurs. `DataTable` keeps the header's choice in its own state
+and hands it to `CollectionFrame` as a config prop; the frame seeds its sort from
+that prop ONCE, at mount (`React.useState(config.sortBy)`), and orders by its own
+state ever after. So the header wrote to a value nobody read — while the ARROW,
+which is the header's own state, moved exactly as it should. A control that looks
+like it is working and is not is the failure mode this whole section is about,
+committed one layer below where it was being looked for.
+
+Three things follow, and they are the reason this correction is longer than the
+row it fixes:
+
+- **The fix in the row above is the host owning the header** (`RecordTable`), on
+  the same bounded-vs-paged line SEARCH.md already draws for the search box. The
+  library's half is UI-GAPS #22(b).
+- **The measurements below stand, and until today none of them could be SEEN.**
+  `formatDateSortable` was a correct fix, with a passing test, to a comparison
+  that was never reached. That is not an argument against having made it; it is
+  an argument about what its test proved.
+- **What "verified" has to mean here.** Every check the lane wrote asked whether
+  the pieces were present and consistent — the screen's option names against the
+  door's menu, the recipe's control, the comparator's output. None asked whether
+  the rows on a rendered screen move when somebody presses the thing. That
+  question now has its own file, `web/test/table-header-sorts.test.tsx`, and it
+  asserts nothing else.
+
 ### Which columns genuinely mis-sorted, and which only looked like it
 
 Measured rather than assumed, because the two are indistinguishable from a
-screenshot and the difference decides what to fix.
+screenshot and the difference decides what to fix. (All of it now reachable —
+see the correction above.)
 
 - **Genuinely wrong, and silently**: the library compares a column as TEXT unless
   both values are already numbers, so any column whose value is a *rendered* date
@@ -309,6 +345,14 @@ the only sortable thing in either front door was a column header on two screens.
 - **Sorting**: SHIPPED 2026-08-18 (§ *The third question*). Every PAGED collection
   orders at its door; every bounded list recipe has a control derived from its own
   columns; the two tables compare their dates as dates. What is deliberately still
-  unsorted, and why, is in the census above — and the two open pieces (a table
-  header that can ask the door, and the paged panels inside a record) are UI-GAPS
-  #22 and #23 rather than silence.
+  unsorted, and why, is in the census above.
+  - **Fixed the same day** (§ *The correction*): the two tables' column headers
+    were drawing an active sort indicator and reordering nothing at all, on every
+    column, because the library's frame reads its sort from config only at mount.
+    The host now owns those headers (`web/components/record-table.tsx`) — the
+    bounded one orders in the browser, the paged one asks its door — and
+    `web/test/table-header-sorts.test.tsx` asserts the RENDERED ROW ORDER changes
+    when a header is pressed, which is the one thing none of the lane's original
+    checks asked. UI-GAPS #22(b) is now the library ask that would let the host
+    table go; #23 (the paged panels inside a record, and the portal's tickets
+    list) is unchanged and still app-side.
