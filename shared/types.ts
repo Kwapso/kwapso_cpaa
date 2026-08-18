@@ -1725,6 +1725,27 @@ export type GoogleConnection = {
    * person who unticked a box at the consent screen has a connection that works
    * for less than we asked for, and the screen has to be able to say so. */
   grantedScopes: string
+  /** THE OTHER DIRECTION, and the harder one to notice: what Google granted that
+   * this app never asked for.
+   *
+   * A grant at Google is an additive SET per OAuth client, so narrowing a scope
+   * in our own code changes nothing about a person who already approved the
+   * wider one — their next connect returns the old power and the app looks
+   * fixed. Computed server-side against the request itself
+   * (`unrequestedScopes`), never in the browser, and normally empty. When it is
+   * not, the settings card says so plainly and the fix is to disconnect (which
+   * revokes at Google) and connect again. */
+  extraScopes: string[]
+  /** AND WHAT THIS CONNECTION IS SHORT OF — the same subtraction the other way.
+   *
+   * A grant is only ever widened by CONSENT, so a scope added to the app after
+   * somebody connected leaves them quietly unable to do the thing it was added
+   * for, and the refusal they get names a status code rather than a cause. Live
+   * on the owner's own account (CHECKLIST 14.5): `gmail.modify` post-dated his
+   * Gmail connection, so filing a message under a label was "blocked on you"
+   * with no screen anywhere saying what to do. Same fix as `extraScopes` —
+   * disconnect, connect again — which is why they sit side by side. */
+  missingScopes: string[]
   /** the last time we used it, and the last thing that went wrong if anything
    * did (an expired grant, a revoked account). Both are how a person finds out
    * their connection stopped working without waiting for an answer to be wrong. */

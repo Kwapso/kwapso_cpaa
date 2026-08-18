@@ -93,11 +93,19 @@ export const GMAIL_CONTACT_CAP = Math.floor(GMAIL_QUERY_TERM_CAP / CONTACT_DIREC
  * nothing wrong, and telling them "400" would invite them to fix a request they
  * did not write. 401/403 is the one worth naming separately — it is almost
  * always a grant somebody removed at Google's end, and the fix is "connect
- * again", which is a sentence rather than a status code. */
+ * again", which is a sentence rather than a status code.
+ *
+ * `missingIsNull` is the one exception a caller may ask for, and only the
+ * callers that BIN things do. For them a 404 is not a failure, it is the answer:
+ * the draft was already gone, so nothing moved, so nothing should be recorded
+ * (R17). Without it an idempotent second click reads as "Google couldn't answer
+ * that just now" — a refusal about something that had already succeeded. It is
+ * opt-in because everywhere else a 404 really is a broken request, and silently
+ * returning null there would turn a bug into an empty answer. */
 async function googleFetch(
   url: string,
   token: string,
-  init?: { method?: string; body?: string; contentType?: string }
+  init?: { method?: string; body?: string; contentType?: string; missingIsNull?: boolean }
 ): Promise<unknown> {
   const res = await fetch(url, {
     method: init?.method ?? "GET",
@@ -123,6 +131,11 @@ async function googleFetch(
   // status, and Google's reason — with the URL's query string dropped, because
   // that is where a person's search words live, and never the token.
   if (!res.ok) {
+    // NOT THERE IS AN ANSWER, for the callers that asked to hear it — and it is
+    // answered BEFORE the log line, because a draft that was already binned is a
+    // normal outcome and an error tail describing it is exactly the noise that
+    // makes a tail unreadable.
+    if (res.status === 404 && init?.missingIsNull) return null
     const said = await res.text().catch(() => "")
     console.error(
       `google ${init?.method ?? "GET"} ${new URL(url).origin}${new URL(url).pathname} → ${res.status}: ${said.slice(0, 400)}`
@@ -135,7 +148,13 @@ async function googleFetch(
       )
     throw new GuardError(502, "google_refused", "Google couldn't answer that just now. Try again.")
   }
-  return res.json()
+  // A 2xx WITH NO BODY IS STILL A 2xx. `res.json()` throws on an empty body, and
+  // Gmail answers a draft delete with 204 No Content — so the one call in this
+  // file that succeeds without saying anything would have failed at the parser,
+  // AFTER the draft was already gone. An empty answer reads as an empty object,
+  // which is what every caller here already treats an absent field as.
+  const text = await res.text()
+  return text ? JSON.parse(text) : {}
 }
 
 /** Text out of a Google response, or "" — used everywhere a field may be absent
@@ -1050,6 +1069,96 @@ export async function gmailLabelMessage(
   )
 }
 
+// ── THE MAIL BIN ─────────────────────────────────────────────────────────────
+
+/**
+ * WHAT KWAPSO CAN PUT IN THE MAIL BIN — the owner's question, answered in his
+ * own terms: "why is there no method for you to delete drafts?"
+ *
+ * THREE SHAPES, ONE ACT, because Gmail has three endpoints for it and a caller
+ * should not have to know which. A DRAFT is a letter nobody has seen; a MESSAGE
+ * is one letter in a conversation; a THREAD is the whole exchange. They are
+ * different enough that a single id would be ambiguous — a draft id, a message
+ * id and a thread id are three different strings that all look the same — and
+ * similar enough that three doors would be three places for one permission,
+ * one history line and one idempotence rule to be got wrong.
+ */
+export const GOOGLE_MAIL_BIN_KINDS = ["draft", "message", "thread"] as const
+export type GoogleMailBinKind = (typeof GOOGLE_MAIL_BIN_KINDS)[number]
+
+/** Gmail's own name for the bin. A label, not a place: a binned message keeps
+ * its id and everything on it, which is why `googlePresence` above reads the
+ * same word to decide whether a source has gone. */
+const GMAIL_TRASH_LABEL = "TRASH"
+
+/**
+ * THE BIN, NEVER A DELETE — the house rule (deactivate, never delete) in
+ * Google's own words, exactly as `driveTrash` above is.
+ *
+ * A binned message keeps its name, its thread and its labels, sits in Trash for
+ * thirty days and comes back with one click. A PERMANENT delete is a different
+ * act and deliberately unreachable: Gmail puts `users.messages.delete` behind
+ * the full `https://mail.google.com/` scope — total mailbox control — and the
+ * scopes this app holds (`gmail.compose` for a draft, `gmail.modify` for a
+ * message or a thread) can bin and cannot destroy. So the promise is kept at
+ * Google rather than by a line here somebody could edit, which is the same
+ * reasoning the scope list itself gives about `drive.file`.
+ *
+ * R17 on each of the three: something already in the bin moves nothing, so the
+ * caller writes no history row and rings no bell.
+ *   • a MESSAGE and a THREAD are read first — a label check, the same one the
+ *     label door makes before it writes;
+ *   • a DRAFT cannot be read for its state, because a deleted draft is not in
+ *     the bin, it is GONE (Gmail keeps the message it was drafting, never the
+ *     draft). So absence IS the answer, and `missingIsNull` is how googleFetch
+ *     hands a 404 back as one instead of as a refusal.
+ */
+export async function gmailTrash(
+  token: string,
+  kind: GoogleMailBinKind,
+  id: string
+): Promise<{ changed: boolean }> {
+  if (kind === "draft") {
+    const done = await googleFetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/drafts/${encodeURIComponent(id)}`,
+      token,
+      { method: "DELETE", missingIsNull: true }
+    )
+    return { changed: done !== null }
+  }
+  if (kind === "message") {
+    if ((await gmailMessageLabelIds(token, id)).includes(GMAIL_TRASH_LABEL)) return { changed: false }
+    await googleFetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(id)}/trash`,
+      token,
+      { method: "POST" }
+    )
+    return { changed: true }
+  }
+  // A THREAD IS BINNED WHEN EVERY MESSAGE IN IT IS, and not before. Half a
+  // conversation in the bin is a real state — somebody binned one reply — and
+  // reading it as "already done" would leave the rest of the exchange in the
+  // inbox while the answer said it had gone. `minimal` carries the labels and
+  // no bodies: this asks where the messages are, not what they say.
+  const url = new URL(`https://gmail.googleapis.com/gmail/v1/users/me/threads/${encodeURIComponent(id)}`)
+  url.searchParams.set("format", "minimal")
+  const thread = (await googleFetch(url.toString(), token)) as { messages?: unknown }
+  const messages = Array.isArray(thread.messages) ? thread.messages : []
+  const allBinned =
+    messages.length > 0 &&
+    messages.every((raw) => {
+      const labels = (raw as { labelIds?: unknown }).labelIds
+      return (Array.isArray(labels) ? labels : []).map((v) => str(v)).includes(GMAIL_TRASH_LABEL)
+    })
+  if (allBinned) return { changed: false }
+  await googleFetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/threads/${encodeURIComponent(id)}/trash`,
+    token,
+    { method: "POST" }
+  )
+  return { changed: true }
+}
+
 // ── CALENDAR ─────────────────────────────────────────────────────────────────
 
 /**
@@ -1181,11 +1290,18 @@ const EVENT_ATTENDEE_CAP = 50
  * location, call one off — is gone, and with it the four doors and six tools that
  * stood on them. What is left is this read and `calendarGet` beside it, so a
  * calendar cannot be changed FROM kwapso by a person, by the assistant, or by a
- * machine on the MCP surface. The app's Google grant still carries the
- * read/WRITE scope (`calendar.events`) because Google will not downgrade an
- * existing grant — narrowing it would sign every connected person out of their
- * calendar until they reconnected — so the refusal is structural on our side:
- * there is no function here that could send one.
+ * machine on the MCP surface: there is no function here that could send one, and
+ * a missing function cannot be forgotten the way a condition can be inverted.
+ *
+ * AND THE GRANT NOW SAYS THE SAME THING. This note used to end by admitting that
+ * the app still asked Google for the read/WRITE scope (`calendar.events`),
+ * because a grant is additive at Google and narrowing it would cost every
+ * connected person a reconnect. That was a promise kept in our own code with the
+ * power still held — the weaker half of the pair the `drive.file` note is proud
+ * of. The ask is `calendar.readonly` as of 18 August 2026, the reconnect is the
+ * price, and google-oauth.ts spells out the three things that make the narrowing
+ * REAL rather than cosmetic (revoke on disconnect, forced consent, and reading
+ * back what Google actually granted).
  *
  * NO `fields` MASK, deliberately. Google's default is the whole event resource,
  * which is exactly what this app now wants — the guest list, the organiser, the

@@ -217,6 +217,12 @@ export const TOOL_GATES: Record<string, string> = {
   google_send_mail: "google:edit",
   google_reply_mail: "google:edit",
   google_label_mail: "google:edit",
+  // The mail half of "taking something back", and the same right the Drive bin
+  // takes: Gmail's Trash keeps a binned letter for thirty days, so what ends is
+  // kwapso's own handiwork rather than the person's material. There is no
+  // permanent delete to gate, on any surface — the app does not hold the scope
+  // that could perform one.
+  google_mail_trash: "google:delete",
   google_chat_post: "google:edit",
   google_chat_delete: "google:delete",
 }

@@ -67,12 +67,49 @@ export const GOOGLE_TIMEOUT_MS = 15_000
  *                 it is nothing. What `modify` adds beyond what we already had is
  *                 the power to move and archive; what it still cannot do is
  *                 delete, which is the line worth keeping.
- *   • calendar  — events read and write. Not `calendar` full: we add and read
- *                 events, we do not manage somebody's calendars.
+ *   • calendar  — READ ONLY, and the narrowest read there is. See the essay
+ *                 below: this product stopped writing to a calendar on 18 August
+ *                 2026, and asking for a scope we cannot use is asking for a
+ *                 power somebody has to take on trust.
  *   • chat      — messages in named spaces, and the space list to name them from.
  *
  * `openid email` rides every one so we can label the connection. It costs
  * nothing at the consent screen — the person is choosing an account there anyway.
+ *
+ * ── THE CALENDAR DOWNGRADE, AND WHY CHANGING THIS STRING IS NOT THE FIX ──────
+ *
+ * A GRANT AT GOOGLE IS ADDITIVE, PER OAUTH CLIENT. Google does not store "what
+ * kwapso asked for last time"; it stores what this person has ever approved for
+ * this client id, as a set. So an account that already approved
+ * `calendar.events` (read/WRITE) goes on holding it after this list is narrowed,
+ * and the next connect returns a token that STILL carries the write scope — a
+ * consent screen the person walks past without being asked anything new, and a
+ * fix that looks done and is not. It is the failure this file is most able to
+ * hide, because nothing about it is visible from inside the app: the code stops
+ * calling a write endpoint (it already has), the string here says readonly, and
+ * the access token quietly keeps the power.
+ *
+ * THREE THINGS TOGETHER MAKE THE NARROWING REAL, and no one of them does it
+ * alone:
+ *
+ *   1. DISCONNECT REVOKES AT GOOGLE (`revokeAtGoogle` below, called by
+ *      lib/google.ts `disconnect`). Dropping our row stops US using a grant and
+ *      does nothing to the grant. Revoking is what empties the set, so the next
+ *      consent starts from nothing.
+ *   2. CONNECT FORCES A FRESH CONSENT — `prompt=consent` plus
+ *      `include_granted_scopes=false` in `buildConnectStart`. The first stops
+ *      Google reusing an approval silently; the second stops it minting a token
+ *      over the whole previously-granted set.
+ *   3. WE READ BACK WHAT GOOGLE ACTUALLY GAVE — the token response's `scope`,
+ *      stored on the row and compared against this list by
+ *      `unrequestedScopes` below. That is the part that makes the other two
+ *      PROVABLE rather than hoped for: if a grant comes back carrying anything
+ *      we did not ask for, the person's own settings card says so in words
+ *      instead of the app pretending.
+ *
+ * The order matters to somebody holding an old grant: disconnect first (which
+ * revokes), then connect. A connect on top of a live grant is the case step 3
+ * exists to catch.
  */
 const GOOGLE_SCOPES: Record<GoogleService, string[]> = {
   drive: [
@@ -89,13 +126,111 @@ const GOOGLE_SCOPES: Record<GoogleService, string[]> = {
     "https://www.googleapis.com/auth/gmail.send",
     "https://www.googleapis.com/auth/gmail.modify",
   ],
-  calendar: ["openid", "email", "https://www.googleapis.com/auth/calendar.events"],
+  calendar: ["openid", "email", "https://www.googleapis.com/auth/calendar.readonly"],
   chat: [
     "openid",
     "email",
     "https://www.googleapis.com/auth/chat.messages",
     "https://www.googleapis.com/auth/chat.spaces.readonly",
   ],
+}
+
+/** WHAT WE ASKED FOR, for anybody who needs to compare. Exported as a reader
+ * rather than the object, so the one table above cannot be edited from
+ * somewhere else. */
+export function requestedScopes(service: GoogleService): string[] {
+  return [...GOOGLE_SCOPES[service]]
+}
+
+/** EVERYTHING THIS APP EVER ASKS THIS OAUTH CLIENT FOR — the four lists, as one
+ * set. It exists because Google's grant does: see `unrequestedScopes`. */
+function everyRequestedScope(): Set<string> {
+  return new Set(Object.values(GOOGLE_SCOPES).flat())
+}
+
+/**
+ * SCOPES THAT SAY WHO SOMEBODY IS AND GIVE ACCESS TO NOTHING — tolerated on any
+ * grant, whether we asked for them or not.
+ *
+ * Google rewrites the two short names on the way back: `email` is returned as
+ * `…/auth/userinfo.email`, `profile` as `…/auth/userinfo.profile`. Without the
+ * rewrite written down here, every connection this app has ever made would
+ * report that Google granted something extra, and a warning that is always on is
+ * a warning nobody reads. `profile` is tolerated although this app never asks
+ * for it, for the same reason: it names a person and reaches none of their
+ * material, so it is not the thing the check is looking for.
+ */
+const IDENTITY_SCOPES = new Set([
+  "openid",
+  "email",
+  "profile",
+  "https://www.googleapis.com/auth/userinfo.email",
+  "https://www.googleapis.com/auth/userinfo.profile",
+])
+
+/**
+ * WHAT GOOGLE GRANTED THAT THIS APP NEVER ASKS FOR — the third leg of the
+ * downgrade defence in the essay above, and the only one that produces evidence.
+ *
+ * DERIVED from `GOOGLE_SCOPES` rather than compared against a list of "write
+ * scopes". A list of the powers we are afraid of is a list that rots the day
+ * Google names a new one; the difference between what we ASK for and what came
+ * back cannot rot, because both halves move together. Narrow the calendar to
+ * read-only and a leftover `calendar.events` shows up here the same hour, with
+ * no second edit anywhere.
+ *
+ * MEASURED AGAINST ALL FOUR LISTS, NOT THIS SERVICE'S — and that is the whole
+ * subtlety. The four services are four CONSENT SCREENS and four rows here, but
+ * they are ONE OAuth client, so at Google they are ONE grant holding the union of
+ * everything the person has approved. Google is entitled to echo that union back
+ * on any one of the four token responses. Compared per service, a perfectly
+ * healthy account would then report that its Gmail connection had been granted
+ * Drive — a warning that is wrong, on every row, for ever, which is a warning
+ * nobody reads by the second week.
+ *
+ * So the question this asks is the one that is actually answerable: does this
+ * account's grant to kwapso contain anything kwapso does not ask for ANYWHERE?
+ * A leftover `calendar.events` fails that as surely as it fails the narrower
+ * version, because no list requests it any more. What it deliberately does not
+ * flag is one service's scope appearing on another's row, which is Google's
+ * model rather than a fault, and nothing we could prevent if we wanted to.
+ *
+ * `granted` is Google's own space-separated `scope` string, stored verbatim on
+ * the row. An empty one answers empty: a grant that told us nothing is not a
+ * grant we can accuse of anything.
+ */
+export function unrequestedScopes(granted: string): string[] {
+  const asked = everyRequestedScope()
+  return granted
+    .split(/\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s && !asked.has(s) && !IDENTITY_SCOPES.has(s))
+}
+
+/**
+ * THE OTHER DIRECTION: what this service needs and this grant does not carry.
+ *
+ * The failure it names is real and was live on the owner's own account
+ * (CHECKLIST 14.5): `gmail.modify` was added to the Gmail list after he
+ * connected, so filing a message under a label answered "Google wouldn't allow
+ * that any more, the connection may have been removed in your Google account" —
+ * a true refusal with a false diagnosis, pointing at a grant nobody had touched.
+ * A grant is only ever widened by CONSENT, so an app that adds a scope leaves
+ * every existing connection quietly short of it until the person connects again,
+ * and nothing tells them.
+ *
+ * PER SERVICE here, where `unrequestedScopes` is deliberately not: an echoed
+ * union can only ever ADD scopes, so it cannot cause a false "missing". The two
+ * asymmetries are the same fact about Google's model read from its two ends.
+ */
+export function missingScopes(service: GoogleService, granted: string): string[] {
+  const held = new Set(
+    granted
+      .split(/\s+/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+  )
+  return GOOGLE_SCOPES[service].filter((s) => !held.has(s) && !IDENTITY_SCOPES.has(s))
 }
 
 /** The connect app's credentials, once BOTH halves are set. One answer in one
@@ -142,7 +277,13 @@ function connectRedirectUri(env: ConnectEnv): string {
 /** Google's account picker, plus the one-shot cookie that survives the trip.
  * `access_type=offline` + `prompt=consent` are what make Google hand over a
  * REFRESH token: without them a second connect of the same account returns an
- * access token only, and the connection silently stops working an hour later. */
+ * access token only, and the connection silently stops working an hour later.
+ *
+ * `prompt=consent` now carries a SECOND job, and it is the one in the essay at
+ * the top of this file: it stops Google waving a returning person through on an
+ * approval they gave months ago. Somebody re-connecting a narrowed service has
+ * to see the consent screen and read what it says, which is the only moment in
+ * this whole flow where a human can notice that the ask has changed. */
 export async function buildConnectStart(
   env: ConnectEnv,
   creds: ConnectCredentials,
@@ -162,9 +303,13 @@ export async function buildConnectStart(
   url.searchParams.set("code_challenge_method", "S256")
   url.searchParams.set("access_type", "offline")
   url.searchParams.set("prompt", "consent select_account")
-  // Google returns the granted scopes on the token response; asking for them
-  // explicitly means a person who unticked a box comes back with a connection
-  // that SAYS it can do less, rather than one that discovers it later.
+  // NOT INCREMENTAL, and that word is the whole of it. `include_granted_scopes`
+  // is Google's flag for "mint this token over everything this person has ever
+  // approved for this client" — the exact mechanism that would hand a narrowed
+  // calendar connection its old write scope back. Off, so the token covers what
+  // this request asked for and nothing else; and the granted scopes that come
+  // back on the token response are then a real answer rather than an echo of
+  // history, which is what makes `unrequestedScopes` worth reading at all.
   url.searchParams.set("include_granted_scopes", "false")
 
   return { url: url.toString(), setCookie: connectCookie(`${state}.${verifier}.${service}`, 600) }
@@ -290,12 +435,21 @@ export async function connectedEmail(accessToken: string): Promise<string> {
  * "third-party access" list forever looking live. So the disconnect door asks
  * Google to drop it as well.
  *
+ * AND IT IS THE ONLY THING THAT CAN NARROW A SCOPE. This is leg 1 of the essay
+ * at the top of this file: a grant is an additive SET at Google, so the only way
+ * to stop holding a power is to empty the set and consent again. Everything else
+ * — the scope list here, the code that no longer calls a write endpoint — is
+ * this app's own behaviour, and the grant is Google's. A refresh token is what
+ * is handed over rather than an access token because revoking a refresh token
+ * takes its access tokens with it.
+ *
  * Best-effort ON PURPOSE, and in the safe direction: our row is deactivated
  * first and is the authority, so a failure here leaves a grant Google still
  * honours but nothing in kwapso can reach — never the reverse. It returns a
  * boolean rather than throwing so the door can say "we've disconnected it here;
  * remove it in your Google account too" instead of failing a disconnect the
- * person asked for.
+ * person asked for. The caller reports that word for word, because a revoke that
+ * failed is the case where the next connect starts dirty.
  */
 export async function revokeAtGoogle(refreshToken: string): Promise<boolean> {
   try {
@@ -305,7 +459,20 @@ export async function revokeAtGoogle(refreshToken: string): Promise<boolean> {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ token: refreshToken }),
     })
-    return res.ok
+    if (res.ok) return true
+    // ALREADY GONE IS DONE. Google answers a token it no longer knows with 400
+    // `invalid_token`, and reading that as a failure tells somebody to go and
+    // remove an app that is already removed. It matters most in exactly the case
+    // this whole lane is about: the four services share one OAuth client, so
+    // revoking the first can take the grant behind all four with it, and the
+    // three disconnects after it would each report a failure while describing
+    // the state the person asked for. A token Google will not accept is a token
+    // that cannot be used, which is the entire promise of a revoke.
+    if (res.status === 400) {
+      const said = (await res.json().catch(() => ({}))) as { error?: unknown }
+      return said.error === "invalid_token"
+    }
+    return false
   } catch {
     return false
   }

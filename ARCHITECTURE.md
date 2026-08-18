@@ -338,10 +338,21 @@ on top follows [CACHING.md](CACHING.md).
     frontend… just make it one-way so we only grab and update the information."* Seven doors, five
     library functions, eight tools and a third permission switch (`google_events`, "Calendar on your
     behalf") went together, so the refusal is a MISSING FUNCTION rather than a condition somebody can
-    invert — the same shape R24 uses for internal money. The app's Google grant still carries the
-    read/write scope (`calendar.events`) because Google will not downgrade an existing grant;
-    narrowing it to `calendar.events.readonly` would sign every connected person out of their
-    calendar until they reconnected, so it is the owner's decision to make, not a tidy-up.
+    invert — the same shape R24 uses for internal money. **And the GRANT now says the same thing
+    (2026-08-19):** the app asks Google for `calendar.readonly`. That was the owner's decision and it
+    cost what OPERATIONS.md said it would — every connected person back through a consent screen —
+    because a grant at Google is an additive SET per OAuth client, so a narrower ask alone changes
+    nothing for somebody who already approved the wider one. Three things make the narrowing real,
+    and `workers/content/src/lib/google-oauth.ts` holds the essay: disconnect REVOKES at Google
+    (the only act that empties the set), connect forces a fresh consent and refuses incremental
+    authorisation, and the token response's granted scopes are read back and compared against the
+    ask, so a grant that came back wider than requested is shown on the person's own settings card
+    instead of being assumed away. `workers/content/test/google-scopes.test.ts` locks all four.
+  - **The bin, never a delete.** Everything kwapso writes into Google it can take back, and only
+    into a bin: a Drive file, a Chat message, and (2026-08-19) a Gmail draft, message or whole
+    conversation. Reversible for thirty days, restored in one click. A permanent delete is
+    unreachable rather than un-built — it needs the full `https://mail.google.com/` scope, which
+    this app does not ask for on any surface, so the promise is kept at Google.
   - **Mail always asks.** A reply is written into the person's own Gmail DRAFTS with a link straight
     to it, and a "send it from kwapso" button beside it. The confirm rule lives on the agent tools
     and is pinned by a test. (Its other half used to be "calendar entries do not ask"; there is no
