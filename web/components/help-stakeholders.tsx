@@ -54,7 +54,7 @@ export function HelpStakeholders({
       await onAdd(picked)
       setPicked("")
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't add them to the ticket.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't add them to the ticket."))
     } finally {
       setBusy(false)
     }

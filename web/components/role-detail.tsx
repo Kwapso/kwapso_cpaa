@@ -113,7 +113,7 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
       setDraft(fresh.value)
       toast.success(t("Access rights saved."))
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't save access rights.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't save access rights."))
     } finally {
       setSaving(false)
     }
@@ -130,10 +130,10 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
     try {
       const { roles: next } = await tenancy.setRoleActive(roleId, activeNext)
       primeCache(`member_roles:${teamId}`, next)
-      toast.success(activeNext ? "Role activated." : "Role deactivated.")
+      toast.success(activeNext ? t("Role activated.") : t("Role deactivated."))
       setConfirmDeactivate(false)
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't update the role.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't update the role."))
     } finally {
       setBusyActive(false)
     }
@@ -204,18 +204,17 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
         config={tabsConfig}
         value={tab}
         onValueChange={setTab}
-        renderPanel={(t) => {
-          if (t.value === "overview")
+        renderPanel={(panel) => {
+          if (panel.value === "overview")
             return <OverviewList items={overviewItems} />
-          if (t.value === "activity")
+          if (panel.value === "activity")
             return <ActivityPanel activity={activity} />
           // Permissions — the main tab.
           return !role.active ? (
             // Deactivated: permissions frozen (holders keep access); offer reactivate.
             <div className="border-border/60 flex flex-col gap-4 rounded-xl border p-6">
               <p className="text-muted-foreground text-sm">
-                This role is deactivated. Members who have it keep their access, but you can&apos;t
-                give it to anyone new until you activate it again.
+                {t("This role is deactivated. Members who have it keep their access, but you can't give it to anyone new until you activate it again.")}
               </p>
               {canDeactivate && (
                 <Button
@@ -224,7 +223,7 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
                   className="w-full gap-1 sm:w-auto sm:self-start"
                 >
                   {busyActive ? <Spinner /> : <Power className="size-3.5" />}
-                  {busyActive ? "Activating…" : "Activate"}
+                  {busyActive ? t("Activating…") : t("Activate")}
                 </Button>
               )}
             </div>
@@ -235,10 +234,10 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-muted-foreground text-sm">
                   {perms?.isDefault
-                    ? "The Admin role has full access and can't be changed."
+                    ? t("The Admin role has full access and can't be changed.")
                     : canSave
-                      ? "Switch on what this role can do. Turning on Create, Edit or Remove turns on Read too."
-                      : "You can view what this role can do, but not change it."}
+                      ? t("Switch on what this role can do. Turning on Create, Edit or Remove turns on Read too.")
+                      : t("You can view what this role can do, but not change it.")}
                 </p>
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
                   {!role.isDefault && canDeactivate && (
@@ -250,13 +249,13 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
                       className="text-destructive hover:text-destructive gap-1"
                     >
                       <Power className="size-3.5" />
-                      Deactivate
+                      {t("Deactivate")}
                     </Button>
                   )}
                   {canSave && (
                     <Button onClick={() => void save()} disabled={!dirty || saving}>
                       {saving ? <Spinner /> : null}
-                      {saving ? "Saving…" : "Save"}
+                      {saving ? t("Saving…") : t("Save")}
                     </Button>
                   )}
                 </div>
@@ -300,7 +299,7 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
               disabled={busyActive}
             >
               {busyActive ? <Spinner /> : null}
-              {busyActive ? "Deactivating…" : "Deactivate"}
+              {busyActive ? t("Deactivating…") : t("Deactivate")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

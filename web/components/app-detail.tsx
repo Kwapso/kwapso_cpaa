@@ -206,9 +206,9 @@ export function AppDetailScreen({
     try {
       await tenancy.setAppActive(appId, active)
       refresh()
-      toast.success(active ? "App restored." : "App archived.")
+      toast.success(active ? t("App restored.") : t("App archived."))
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't change that app.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't change that app."))
     } finally {
       setBusy(false)
     }
@@ -459,8 +459,8 @@ export function AppDetailScreen({
         config={tabsConfig}
         value={tab}
         onValueChange={setTab}
-        renderPanel={(t) => {
-          if (t.value === "sprints")
+        renderPanel={(panel) => {
+          if (panel.value === "sprints")
             return (
               <SprintsPanel
                 ownerKind="app"
@@ -468,10 +468,10 @@ export function AppDetailScreen({
                 filter={{ appId }}
                 host={host}
                 onNew={canWriteWork ? () => setSprintOpen(true) : undefined}
-                emptyText="No work has been sold against this app yet."
+                emptyText={t("No work has been sold against this app yet.")}
               />
             )
-          if (t.value === "stories")
+          if (panel.value === "stories")
             return (
               <StoriesPanel
                 ownerKind="app"
@@ -479,10 +479,10 @@ export function AppDetailScreen({
                 filter={{ appId }}
                 host={host}
                 onNew={canWriteWork ? () => setStoryOpen(true) : undefined}
-                emptyText="Nothing has been done on this app yet."
+                emptyText={t("Nothing has been done on this app yet.")}
               />
             )
-          if (t.value === "maps")
+          if (panel.value === "maps")
             return (
               <ProcessesPanel
                 appId={appId}
@@ -490,7 +490,7 @@ export function AppDetailScreen({
                 onNew={canEdit ? () => setMapOpen(true) : undefined}
               />
             )
-          if (t.value === "meetings")
+          if (panel.value === "meetings")
             return (
               <AppMeetingsPanel
                 appId={appId}
@@ -498,7 +498,7 @@ export function AppDetailScreen({
                 onNew={canArrangeMeeting ? () => setMeetingOpen(true) : undefined}
               />
             )
-          if (t.value === "tickets")
+          if (panel.value === "tickets")
             return (
               <AppTicketsPanel
                 appId={appId}
@@ -506,9 +506,9 @@ export function AppDetailScreen({
                 onNew={canRaiseTicket ? () => setTicketOpen(true) : undefined}
               />
             )
-          if (t.value === "deliverables") return <DeliverablesPanel teamId={teamId} appId={appId} />
-          if (t.value === "value") return <AppMoneyPanel appId={appId} host={host} />
-          if (t.value === "knowledge")
+          if (panel.value === "deliverables") return <DeliverablesPanel teamId={teamId} appId={appId} />
+          if (panel.value === "value") return <AppMoneyPanel appId={appId} host={host} />
+          if (panel.value === "knowledge")
             return (
               <KnowledgeAsk
                 accountId={app.accountId}
@@ -523,7 +523,7 @@ export function AppDetailScreen({
                 onOpenRecord={(path) => softNavigate(`${host.base}/${path}`)}
               />
             )
-          if (t.value === "activity")
+          if (panel.value === "activity")
             return <ActivityPanel activity={activity} />
           return <OverviewList items={overviewItems} />
         }}
@@ -658,7 +658,7 @@ export function AppDetailScreen({
         fixedApp={{ id: appId, name: app.name }}
         draftKey={`sprint:add:${appId}`}
         onSubmit={async (v) => {
-          await createSprintFrom(teamId, v)
+          await createSprintFrom(teamId, v, t)
           invalidate(sliceKey("sprints-app", appId))
         }}
       />
@@ -676,7 +676,7 @@ export function AppDetailScreen({
         storyTypes={options.storyTypes}
         draftKey={`story:add:app:${appId}`}
         onSubmit={async (v) => {
-          await createStoryFrom(teamId, v)
+          await createStoryFrom(teamId, v, t)
           invalidate(sliceKey("stories-app", appId))
         }}
       />

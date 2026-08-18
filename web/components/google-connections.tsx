@@ -119,7 +119,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
         primeCache(key, { ...r, ready: true })
         toast.success(t("Connected."))
       })
-      .catch((err) => toast.error(err instanceof ApiFailure ? err.message : "Couldn't finish that connection."))
+      .catch((err) => toast.error(err instanceof ApiFailure ? err.message : t("Couldn't finish that connection.")))
   }, [key, t])
 
   const connections = q.data?.connections.filter((c) => c.active) ?? []
@@ -138,12 +138,12 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
       primeCache(key, { connections: r.connections, sources: r.sources, ready: q.data?.ready ?? true })
       toast.success(
         r.revokedAtGoogle
-          ? "Disconnected."
-          : "Disconnected here. Remove kwapso in your Google account too."
+          ? t("Disconnected.")
+          : t("Disconnected here. Remove kwapso in your Google account too.")
       )
       setDisconnecting(null)
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't disconnect that.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't disconnect that."))
     } finally {
       setBusy(false)
     }
@@ -172,7 +172,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
             return (
               <div key={service} className="flex flex-col gap-2 border-b p-3 last:border-0">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                  <span className="font-medium">{SERVICE_COPY[service].label}</span>
+                  <span className="font-medium">{t(SERVICE_COPY[service].label)}</span>
                   {live ? (
                     <Badge variant="secondary" className="text-[10px]">
                       {live.googleEmail}
@@ -185,8 +185,8 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                   <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs">
                     {live
                       ? live.lastUsedAt
-                        ? `Last used ${formatActivityWhen(live.lastUsedAt)}`
-                        : "Never used yet"
+                        ? t("Last used {when}", { when: formatActivityWhen(live.lastUsedAt) })
+                        : t("Never used yet")
                       : t(SERVICE_COPY[service].scope)}
                   </span>
                   <div className="flex items-center gap-2">
@@ -196,10 +196,10 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                         size="sm"
                         onClick={() => setSharing(service as "drive" | "chat")}
                         className="gap-1"
-                        title={service === "drive" ? "Share a folder" : "Share a space"}
+                        title={service === "drive" ? t("Share a folder") : t("Share a space")}
                       >
                         <Plus className="size-3.5" aria-hidden />
-                        <span className="hidden sm:inline">{t("Share a")} {service === "drive" ? "folder" : "space"}</span>
+                        <span className="hidden sm:inline">{t("Share a")} {service === "drive" ? t("folder") : t("space")}</span>
                       </Button>
                     )}
                     {live ? (
@@ -244,7 +244,9 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                   <div className="flex flex-col gap-1 pl-1">
                     {named.length === 0 ? (
                       <p className="text-muted-foreground text-xs">
-                        {t("Nothing shared yet —")} {t(SERVICE_COPY[service].scope)}
+                        {t("Nothing shared yet — {scope}", {
+                          scope: t(SERVICE_COPY[service].scope),
+                        })}
                       </p>
                     ) : (
                       named.map((s) => (
@@ -273,7 +275,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                             </Badge>
                           )}
                           <Badge variant="outline" className="text-[10px]">
-                            {s.shelf === "team" ? "The team can read it" : "Just you"}
+                            {s.shelf === "team" ? t("The team can read it") : t("Just you")}
                           </Badge>
                           {/* AND WHOSE MATERIAL IT IS. The second decision made
                            * at the moment of sharing, shown on the row for the
@@ -282,7 +284,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                            * about?" is a question somebody has to be able to
                            * answer by looking. */}
                           <Badge variant="outline" className="text-[10px]">
-                            {s.accountName ? `Filed under ${s.accountName}` : "Ours"}
+                            {s.accountName ? `Filed under ${s.accountName}` : t("Ours")}
                           </Badge>
                           <Button
                             variant="ghost"
@@ -297,7 +299,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                                 toast.success(t("Stopped sharing that."))
                               } catch (err) {
                                 toast.error(
-                                  err instanceof ApiFailure ? err.message : "Couldn't stop sharing that."
+                                  err instanceof ApiFailure ? err.message : t("Couldn't stop sharing that.")
                                 )
                               } finally {
                                 setBusy(false)
@@ -379,7 +381,9 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {t("Disconnect")} {disconnecting ? SERVICE_COPY[disconnecting].label : ""}?
+              {t("Disconnect {service}?", {
+                service: disconnecting ? t(SERVICE_COPY[disconnecting].label) : "",
+              })}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {t("kwapso stops reading and writing there straight away, and anything you shared through it stops being shared. We'll ask Google to drop the connection too.")}

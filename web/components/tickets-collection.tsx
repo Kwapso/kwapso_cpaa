@@ -318,7 +318,7 @@ function TriageQueue({ teamId, canTriage }: { teamId: string; canTriage: boolean
       invalidate(helpKey(teamId, "all"))
       toast.success(t("Marked as read."))
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't do that.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't do that."))
     } finally {
       setBusy(null)
     }

@@ -150,7 +150,12 @@ function sprintMark(s: Sprint): "Active" | "Upcoming" | "Completed" {
 /** Write a story through the door and re-read what changed. Shared by every
  * screen that can add one, so "adding work also moves a sprint's counts" is
  * stated once rather than remembered three times. */
-export async function createStoryFrom(teamId: string, values: StoryFormValues): Promise<void> {
+export async function createStoryFrom(
+  teamId: string,
+  values: StoryFormValues,
+  /** The caller's language — see `createAppFrom`. */
+  t: (english: string) => string
+): Promise<void> {
   try {
     await contentApi.createStory({
       title: values.title,
@@ -165,7 +170,7 @@ export async function createStoryFrom(teamId: string, values: StoryFormValues): 
     })
     invalidate(storiesKey(teamId))
     invalidate(sprintsKey(teamId))
-    toast.success("Story added.")
+    toast.success(t("Story added."))
   } catch (err) {
     throw err instanceof ApiFailure ? err : new Error("Couldn't add that story.")
   }
@@ -300,7 +305,7 @@ export function StoriesScreen({
         processes={options.processes}
         storyTypes={options.storyTypes}
         draftKey={`story:add:${teamId}`}
-        onSubmit={(v) => createStoryFrom(teamId, v)}
+        onSubmit={(v) => createStoryFrom(teamId, v, t)}
       />
     </div>
   )

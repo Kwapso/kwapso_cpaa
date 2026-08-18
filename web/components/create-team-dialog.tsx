@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
@@ -54,7 +54,7 @@ export function CreateTeamDialog({
       onOpenChange(false)
     } catch (err) {
       toast.error(
-        err instanceof ApiFailure ? err.message : "Couldn't create the team."
+        err instanceof ApiFailure ? err.message : t("Couldn't create the team.")
       )
     } finally {
       setBusy(false)
@@ -91,7 +91,7 @@ export function CreateTeamDialog({
           <DialogFooter>
             <Button type="submit" disabled={busy || !name.trim()}>
               {busy ? <Spinner /> : null}
-              {busy ? "Creating…" : "Create team"}
+              {busy ? t("Creating…") : t("Create team")}
             </Button>
           </DialogFooter>
         </form>

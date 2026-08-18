@@ -18,7 +18,7 @@
 // credentials simply mean no button; the code path is untouched (ARCHITECTURE §5).
 
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"

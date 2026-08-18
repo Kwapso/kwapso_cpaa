@@ -18,6 +18,7 @@ import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { type ScreenQuery } from "@kwapso/ui/lib/recipe"
 
 import { personName } from "@/lib/identity"
+import { useT } from "@shared/web/language"
 import type { TeamMember } from "@shared/types"
 
 export function ConfirmAction({
@@ -34,6 +35,7 @@ export function ConfirmAction({
   onCancel: () => void
   onConfirm: () => Promise<void>
 }) {
+  const t = useT()
   const [busy, setBusy] = React.useState(false)
   const open =
     canRun && (query.confirm === "members.remove" || query.confirm === "invites.revoke")
@@ -53,7 +55,7 @@ export function ConfirmAction({
           <AlertDialogDescription>{body}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={busy}>{t("Cancel")}</AlertDialogCancel>
           <AlertDialogAction
             onClick={(e) => {
               e.preventDefault()
@@ -63,7 +65,7 @@ export function ConfirmAction({
             disabled={busy}
           >
             {busy ? <Spinner /> : null}
-            {isRemove ? "Remove" : "Revoke"}
+            {isRemove ? t("Remove") : t("Revoke")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

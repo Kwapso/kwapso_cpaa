@@ -1899,6 +1899,7 @@ describe("RULES — the laws of the base", () => {
       "catalogued-strings", // R28: web/test/catalogued-strings.test.ts — re-runs the real extractor over both front doors
       "one-page-width", // R29: the page-container scan above, over both front doors
       "linked-emails", // R30: web/test/linked-emails.test.ts — the email census, derived from the send sites themselves
+      "wrapped-strings", // R33: web/test/wrapped-strings.test.ts — R28's walk read the other way round, over both front doors
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

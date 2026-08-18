@@ -54,7 +54,7 @@ export function InvitationsPanel({ active }: { active: ActiveTeam }) {
       if (res.invitations.length === 0) softNavigate("/home")
     } catch (err) {
       toast.error(
-        err instanceof ApiFailure ? err.message : "Couldn't accept the invitation."
+        err instanceof ApiFailure ? err.message : t("Couldn't accept the invitation.")
       )
     } finally {
       setAccepting(null)
@@ -92,7 +92,7 @@ export function InvitationsPanel({ active }: { active: ActiveTeam }) {
             className="gap-1"
           >
             {accepting === inv.id ? <Spinner /> : null}
-            {accepting === inv.id ? "Joining…" : "Accept"}
+            {accepting === inv.id ? t("Joining…") : t("Accept")}
           </Button>
         ),
       }))}

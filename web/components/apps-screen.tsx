@@ -47,7 +47,13 @@ import { useT } from "@shared/web/language"
 
 /** Record an app through the door and re-read what changed. Shared with the maps
  * screen and the account record, both of which can add one. */
-export async function createAppFrom(teamId: string, values: AppFormValues): Promise<void> {
+export async function createAppFrom(
+  teamId: string,
+  values: AppFormValues,
+  /** The caller's language. A plain function cannot call `useT`, so the one
+   * component that CAN hands it down — the same shape `translateRecipe` uses. */
+  t: (english: string) => string
+): Promise<void> {
   await tenancy.createApp({
     name: values.name,
     accountId: values.accountId || undefined,
@@ -69,7 +75,7 @@ export async function createAppFrom(teamId: string, values: AppFormValues): Prom
   })
   invalidate(appsKey(teamId))
   invalidate(valueKey(teamId))
-  toast.success("App recorded.")
+  toast.success(t("App recorded."))
 }
 
 /** Split by stage, in the agency's own reading order, with the apps that carry no
@@ -199,7 +205,7 @@ export function AppsScreen({
           .filter((a) => a.active && a.accountType === "entity")
           .map((a) => ({ id: a.id, name: a.name }))}
         draftKey={`app:add:${teamId}`}
-        onSubmit={(v) => createAppFrom(teamId, v)}
+        onSubmit={(v) => createAppFrom(teamId, v, t)}
       />
     </div>
     </CountedAbove>

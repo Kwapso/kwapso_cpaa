@@ -425,7 +425,7 @@ export function ProcessDetailScreen({
                     everything under it means something different per version. */}
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground shrink-0 text-sm">Showing</span>
+                    <span className="text-muted-foreground shrink-0 text-sm">{t("Showing")}</span>
                     <RecordPicker
                       value={shownVersion?.id ?? ""}
                       onChange={(v) => setVersionId(v === current?.id ? null : v)}

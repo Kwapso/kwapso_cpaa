@@ -24,7 +24,7 @@
 import * as React from "react"
 
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
@@ -237,8 +237,8 @@ export function SprintFormDialog({
         err instanceof ApiFailure
           ? err.message
           : isEdit
-            ? "Couldn't save the sprint."
-            : "Couldn't start the sprint."
+            ? t("Couldn't save the sprint.")
+            : t("Couldn't start the sprint.")
       )
     } finally {
       setBusy(false)
@@ -253,12 +253,12 @@ export function SprintFormDialog({
       busy={busy}
       clearDraft={clearDraft}
       onSubmit={submit}
-      title={<DialogTitle>{isEdit ? "Edit this sprint" : "Start a sprint"}</DialogTitle>}
+      title={<DialogTitle>{isEdit ? t("Edit this sprint") : t("Start a sprint")}</DialogTitle>}
       subtitle={
         <DialogDescription>
           {isEdit
-            ? "What it's called, when it runs, and what it was sold for. The client and the app it covers stay as they are."
-            : "A block of delivery work for one client, with a start, an end and a price."}
+            ? t("What it's called, when it runs, and what it was sold for. The client and the app it covers stay as they are.")
+            : t("A block of delivery work for one client, with a start, an end and a price.")}
         </DialogDescription>
       }
       submit={{
@@ -296,7 +296,7 @@ export function SprintFormDialog({
       <Field config={accountField} htmlFor="sprint-account" className={fieldSpacing}>
         {initial || fixedAccount ? (
           <p className="text-muted-foreground text-sm" id="sprint-account">
-            {fixedAccount ? fixedAccount.name : initial?.accountName || "Ours, no client"}
+            {fixedAccount ? fixedAccount.name : initial?.accountName || t("Ours, no client")}
           </p>
         ) : (
         <RecordPicker
@@ -316,7 +316,7 @@ export function SprintFormDialog({
       <Field config={appField} htmlFor="sprint-app" className={fieldSpacing}>
         {initial ? (
           <p className="text-muted-foreground text-sm" id="sprint-app">
-            {initial.appName || "No app"}
+            {initial.appName || t("No app")}
           </p>
         ) : fixedApp ? (
           <p className="text-muted-foreground text-sm" id="sprint-app">

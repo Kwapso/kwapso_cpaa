@@ -15,6 +15,7 @@ import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { RotateCcw } from "lucide-react"
 
 import { reportError } from "@shared/web/log"
+import { useT } from "@shared/web/language"
 
 type Props = { label?: string; children: React.ReactNode }
 type State = { error: Error | null }
@@ -33,21 +34,26 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   render() {
-    if (this.state.error) {
-      return (
-        <div className="mx-auto flex max-w-md flex-col items-center gap-4 px-6 py-16 text-center">
-          <p className="text-lg font-medium">This part didn&apos;t load.</p>
-          <p className="text-muted-foreground">
-            We&apos;ve been told about it. Try again, and if it keeps happening, raise a ticket and
-            we&apos;ll sort it out.
-          </p>
-          <Button variant="outline" onClick={() => this.setState({ error: null })}>
-            <RotateCcw className="size-3.5" />
-            Try again
-          </Button>
-        </div>
-      )
-    }
+    if (this.state.error) return <Broken onRetry={() => this.setState({ error: null })} />
     return this.props.children
   }
+}
+
+// A FUNCTION, because a React error boundary must be a CLASS and a class cannot
+// call a hook — so the one screen a client sees when something fails was the one
+// screen that could not ask for their language. Same split as the agency app's.
+function Broken({ onRetry }: { onRetry: () => void }) {
+  const t = useT()
+  return (
+    <div className="mx-auto flex max-w-md flex-col items-center gap-4 px-6 py-16 text-center">
+      <p className="text-lg font-medium">{t("This part didn't load.")}</p>
+      <p className="text-muted-foreground">
+        {t("We've been told about it. Try again, and if it keeps happening, raise a ticket and we'll sort it out.")}
+      </p>
+      <Button variant="outline" onClick={onRetry}>
+        <RotateCcw className="size-3.5" />
+        {t("Try again")}
+      </Button>
+    </div>
+  )
 }

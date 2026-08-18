@@ -104,7 +104,7 @@ export function HomeScreen({ ready }: { ready: PortalReady }) {
           {ready.user.firstName ? `, ${ready.user.firstName}` : ""}.
         </h1>
         <p className="text-muted-foreground">
-          {company ? `This is everything we're doing for ${company}.` : "This is your work with us."}
+          {company ? `This is everything we're doing for ${company}.` : t("This is your work with us.")}
         </p>
       </div>
 

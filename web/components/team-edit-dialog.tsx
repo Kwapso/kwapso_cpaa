@@ -14,7 +14,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { FileUpload } from "@kwapso/ui/registry/primitives/file-upload/file-upload"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
@@ -75,7 +75,7 @@ export function TeamEditDialog({
       toast.success(t("Team updated."))
     } catch (err) {
       toast.error(
-        err instanceof ApiFailure ? err.message : "Couldn't save the team."
+        err instanceof ApiFailure ? err.message : t("Couldn't save the team.")
       )
     } finally {
       setBusy(false)

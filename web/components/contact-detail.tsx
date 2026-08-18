@@ -597,7 +597,7 @@ export function ContactDetailScreen({
               }}
             >
               {busy ? <Spinner /> : null}
-              {busy ? "Working…" : confirm?.action}
+              {busy ? t("Working…") : confirm?.action}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

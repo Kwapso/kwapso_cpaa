@@ -20,7 +20,7 @@
 import * as React from "react"
 
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
@@ -30,6 +30,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { ApiFailure, content } from "@/lib/api"
 import { FilePicker } from "@/components/file-picker"
 import { useFormDraft } from "@shared/web/use-form-draft"
+import { useT } from "@shared/web/language"
 
 /** One field on the form. `kind` decides the control; `options` turns a text
  * input into a pick-or-create one (a datalist, so typing past the list is
@@ -78,6 +79,7 @@ export function InternalRecordDialog({
   /** stable id for per-session draft persistence (CACHING.md §11). */
   draftKey?: string
 }) {
+  const t = useT()
   const blank = React.useMemo(
     () => Object.fromEntries(fields.map((f) => [f.key, initial?.[f.key] ?? ""])),
     [fields, initial]
@@ -99,7 +101,7 @@ export function InternalRecordDialog({
       clearDraft()
       onOpenChange(false)
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't save that.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't save that."))
     } finally {
       setBusy(false)
     }
@@ -150,7 +152,7 @@ export function InternalRecordDialog({
                   type="text"
                   value={values[f.key] ?? ""}
                   onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
-                  placeholder={f.placeholder}
+                  placeholder={f.placeholder ? t(f.placeholder) : undefined}
                   disabled={busy}
                 />
                 <FilePicker
@@ -166,7 +168,7 @@ export function InternalRecordDialog({
                 id={id}
                 value={values[f.key] ?? ""}
                 onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
-                placeholder={f.placeholder}
+                placeholder={f.placeholder ? t(f.placeholder) : undefined}
                 disabled={busy}
                 rows={6}
               />
@@ -178,7 +180,7 @@ export function InternalRecordDialog({
                   list={listId}
                   value={values[f.key] ?? ""}
                   onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
-                  placeholder={f.placeholder}
+                  placeholder={f.placeholder ? t(f.placeholder) : undefined}
                   disabled={busy}
                   autoFocus={i === 0}
                 />

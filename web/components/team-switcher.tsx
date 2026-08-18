@@ -55,7 +55,7 @@ export function TeamSwitcher({
     if (teamId === ctx?.team?.id) return
     const to = ctx?.teams.find((t) => t.id === teamId)?.name
     await active.switchTeam(teamId)
-    toast.success(to ? `Switched to ${to}` : "Team switched")
+    toast.success(to ? `Switched to ${to}` : t("Team switched"))
   }
 
   // THE NAMEPLATE. Same avatar, same name, no control — a heading rather than a

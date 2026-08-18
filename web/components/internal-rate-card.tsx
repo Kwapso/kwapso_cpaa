@@ -289,7 +289,7 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
               }}
             >
               {busy ? <Spinner /> : null}
-              {busy ? "Working…" : "Retire"}
+              {busy ? t("Working…") : t("Retire")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -348,7 +348,7 @@ export function RoleRateCard({ teamId }: { teamId: string }) {
       toast.success(done)
       return true
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't save that rate.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't save that rate."))
       return false
     } finally {
       setBusy(false)

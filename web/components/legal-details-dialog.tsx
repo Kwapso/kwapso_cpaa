@@ -17,7 +17,7 @@
 import * as React from "react"
 
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
@@ -88,7 +88,7 @@ export function LegalDetailsDialog({
       onOpenChange(false)
       toast.success(t("Details saved."))
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't save those details.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't save those details."))
     } finally {
       setBusy(false)
     }

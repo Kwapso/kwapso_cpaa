@@ -11,7 +11,7 @@ import * as React from "react"
 import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
@@ -79,10 +79,10 @@ reads, exports and imports are free; only the assistant tools (agent_chat, agent
 plan_import) use the team's AI quota.`
 }
 
-function copyInstructions(token: string) {
+function copyInstructions(token: string, t: (english: string) => string) {
   void navigator.clipboard?.writeText(connectPrompt(token)).then(
-    () => toast.success("Setup instructions copied. Paste into any AI."),
-    () => toast.error("Couldn't copy. Try again.")
+    () => toast.success(t("Setup instructions copied. Paste into any AI.")),
+    () => toast.error(t("Couldn't copy. Try again."))
   )
 }
 
@@ -109,7 +109,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
       setLabel("")
       primeCache("mcp-tokens", await mcp.tokens().then((x) => x.tokens))
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't create the token.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't create the token."))
     } finally {
       setBusy(false)
     }
@@ -124,7 +124,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
       toast.success(t("Token revoked."))
       setRevoking(null)
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't revoke the token.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't revoke the token."))
     } finally {
       setBusy(false)
     }
@@ -150,60 +150,69 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
         <p className="text-muted-foreground text-sm">{t("No tokens yet.")}</p>
       ) : (
         <div className="flex flex-col rounded-xl border">
-          {tokens.map((t) => (
+          {tokens.map((token) => (
             <div
-              key={t.id}
+              key={token.id}
               className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b p-3 text-sm last:border-0"
             >
-              <span className="font-medium">{t.label}</span>
-              {t.revokedAt ? (
+              <span className="font-medium">{token.label}</span>
+              {token.revokedAt ? (
                 <Badge variant="outline" className="text-muted-foreground text-[10px]">
-                  Revoked
+                  {t("Revoked")}
                 </Badge>
-              ) : hasExpired(t) ? (
+              ) : hasExpired(token) ? (
                 <Badge variant="outline" className="text-muted-foreground text-[10px]">
-                  Expired
+                  {t("Expired")}
                 </Badge>
               ) : (
                 <Badge variant="secondary" className="text-[10px]">
-                  Active
+                  {t("Active")}
                 </Badge>
               )}
               <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs">
-                Created {formatActivityWhen(t.createdAt)}
-                {t.lastUsedAt ? ` · last used ${formatActivityWhen(t.lastUsedAt)}` : " · never used"}
-                {t.revokedAt
+                {/* THREE WHOLE CLAUSES, joined by the middot — not one sentence
+                    stitched out of translated pieces. Each says one fact about the
+                    token and carries its own hole, so a translator can move the
+                    date inside its own clause, which is exactly what German and
+                    Japanese need to do. They used to be a JSX text run plus three
+                    templates: only the word "Created" was ever in the catalogue,
+                    and it was in it as a bare fragment. */}
+                {t("Created {when}", { when: formatActivityWhen(token.createdAt) })}
+                {token.lastUsedAt
+                  ? ` · ${t("last used {when}", { when: formatActivityWhen(token.lastUsedAt) })}`
+                  : ` · ${t("never used")}`}
+                {token.revokedAt
                   ? ""
-                  : hasExpired(t)
-                    ? ` · expired ${formatDate(t.expiresAt)}`
-                    : ` · works until ${formatDate(t.expiresAt)}`}
+                  : hasExpired(token)
+                    ? ` · ${t("expired {date}", { date: formatDate(token.expiresAt) })}`
+                    : ` · ${t("works until {date}", { date: formatDate(token.expiresAt) })}`}
               </span>
-              {!t.revokedAt && (
+              {!token.revokedAt && (
                 <div className="flex items-center gap-2">
                   {/* Copy the connect prompt for any AI. The secret can't be re-read,
                    * so this carries the `kwapso_mcp_YOUR_TOKEN` placeholder to swap.
                    * Label collapses to icon-only below sm (narrow-screen rule).
                    * Nothing to set up with an expired token — make a new one. */}
-                  {!hasExpired(t) && (
+                  {!hasExpired(token) && (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => copyInstructions("kwapso_mcp_YOUR_TOKEN")}
+                      onClick={() => copyInstructions("kwapso_mcp_YOUR_TOKEN", t)}
                       className="gap-1"
-                      title="Copy setup instructions for any AI"
+                      title={t("Copy setup instructions for any AI")}
                     >
                       <ClipboardCopy className="size-3.5" aria-hidden />
-                      <span className="hidden sm:inline">Instructions</span>
+                      <span className="hidden sm:inline">{t("Instructions")}</span>
                     </Button>
                   )}
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setRevoking(t)}
+                    onClick={() => setRevoking(token)}
                     className="text-destructive hover:text-destructive gap-1"
                   >
                     <Ban className="size-3.5" aria-hidden />
-                    <span className="hidden sm:inline">Revoke</span>
+                    <span className="hidden sm:inline">{t("Revoke")}</span>
                   </Button>
                 </div>
               )}
@@ -231,7 +240,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
               <DialogTitle>{t("Copy your token now")}</DialogTitle>
               <DialogDescription>
                 {t("This is the only time it's shown. Anyone holding it can act as you in")}{" "}
-                {teamName ?? "this team"}. Treat it like a password. It works for{" "}
+                {teamName ?? t("this team")}. Treat it like a password. It works for{" "}
                 {MCP_TOKEN_TTL_DAYS} {t("days, then you make a new one.")}
               </DialogDescription>
               <div className="bg-muted/60 flex items-center gap-2 rounded-xl border p-3">
@@ -256,7 +265,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
                 variant="outline"
                 size="sm"
                 className="gap-1 self-start"
-                onClick={() => copyInstructions(secret)}
+                onClick={() => copyInstructions(secret, t)}
               >
                 <ClipboardCopy className="size-3.5" aria-hidden /> {t("Copy setup instructions for any AI")}
               </Button>
@@ -280,7 +289,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
               title={<DialogTitle>{t("New access token")}</DialogTitle>}
               subtitle={
                 <DialogDescription>
-                  {t("Pinned to")} {teamName ?? "your current team"}. It can do exactly what you can do
+                  {t("Pinned to")} {teamName ?? t("your current team")}. It can do exactly what you can do
                   there, nothing more, and it stops working after {MCP_TOKEN_TTL_DAYS} {t("days.")}
                 </DialogDescription>
               }
@@ -327,7 +336,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
               disabled={busy}
             >
               {busy ? <Spinner /> : null}
-              {busy ? "Revoking…" : "Revoke"}
+              {busy ? t("Revoking…") : t("Revoke")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

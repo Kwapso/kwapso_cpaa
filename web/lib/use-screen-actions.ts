@@ -28,6 +28,7 @@ import {
   totalKey,
 } from "@/lib/live-resources"
 import { invalidate, primeCache } from "@shared/web/store"
+import { useT } from "@shared/web/language"
 import type { AccountFormValues } from "@/components/account-form-dialog"
 import type { KnowledgeFormValues } from "@/components/knowledge-form-dialog"
 
@@ -85,6 +86,7 @@ const INTERNAL_WRITERS: Record<
 }
 
 export function useScreenActions(teamId: string | null) {
+  const t = useT()
   // The named-action dispatcher — the flat `{key: string}` payloads the engine emits.
   const runAction = React.useCallback(
     async (actionId: string, payload: Record<string, string>) => {
@@ -95,7 +97,7 @@ export function useScreenActions(teamId: string | null) {
           primeCache(`members:${teamId}`, members)
           invalidate(`member_roles:${teamId}`) // member counts per role changed
           invalidate(`activity:user:${payload.userId}`) // their activity feed gained a row
-          toast.success("Role updated.")
+          toast.success(t("Role updated."))
           break
         }
         case "members.remove": {
@@ -103,7 +105,7 @@ export function useScreenActions(teamId: string | null) {
           primeCache(`members:${teamId}`, members)
           invalidate(`member_roles:${teamId}`)
           invalidate(`activity:user:${payload.userId}`)
-          toast.success("Member removed.")
+          toast.success(t("Member removed."))
           break
         }
         case "invites.create": {
@@ -115,7 +117,7 @@ export function useScreenActions(teamId: string | null) {
         case "invites.revoke": {
           const { invites } = await tenancy.revokeInvite(payload.inviteId)
           primeCache(`invites:${teamId}`, invites)
-          toast.success("Invite revoked.")
+          toast.success(t("Invite revoked."))
           break
         }
         case "roles.create": {
@@ -149,13 +151,13 @@ export function useScreenActions(teamId: string | null) {
           // so the fix is not a second screen, it is one sentence naming the one
           // that is already there.
           toast.success(
-            payload.done === "true" ? "Ticked off. It's under All tasks." : "Put back."
+            payload.done === "true" ? t("Ticked off. It's under All tasks.") : t("Put back.")
           )
           break
         }
       }
     },
-    [teamId]
+    [teamId, t]
   )
 
   // Raise a help ticket — its own handler (a small object payload). Primes the list
@@ -165,9 +167,9 @@ export function useScreenActions(teamId: string | null) {
       if (!teamId) return
       const { tickets } = await contentApi.createHelp(input)
       primeCache(`help:${teamId}`, tickets)
-      toast.success("Ticket raised.")
+      toast.success(t("Ticket raised."))
     },
-    [teamId]
+    [teamId, t]
   )
 
   // Add an account (a company or a person). The list is PAGED, so the create call
@@ -198,9 +200,9 @@ export function useScreenActions(teamId: string | null) {
         status: values.status.trim() || undefined,
       })
       primeCache(accountsKey(teamId), await listFetch.accounts(teamId))
-      toast.success(`Added ${values.name.trim()}.`)
+      toast.success(t("Added {name}.", { name: values.name.trim() }))
     },
-    [teamId]
+    [teamId, t]
   )
 
   // Add a knowledge source. The list is PAGED, so the create call can't hand back
@@ -220,9 +222,9 @@ export function useScreenActions(teamId: string | null) {
         visibleToAppId: values.visibleToAppId || null,
       })
       primeCache(knowledgeKey(teamId), await listFetch.knowledge(teamId))
-      toast.success(`The assistant can now use "${values.title}".`)
+      toast.success(t('The assistant can now use "{title}".', { title: values.title }))
     },
-    [teamId]
+    [teamId, t]
   )
 
   // Upload a FILE as a source. Same cache move as the typed note above (page one
@@ -251,9 +253,13 @@ export function useScreenActions(teamId: string | null) {
       })
       primeCache(knowledgeKey(teamId), await listFetch.knowledge(teamId))
       if (source?.fileNote) toast.warning(source.fileNote)
-      else toast.success(`The assistant can now use "${source?.title ?? values.fileName}".`)
+      else toast.success(
+          t('The assistant can now use "{title}".', {
+            title: source?.title ?? values.fileName,
+          })
+        )
     },
-    [teamId]
+    [teamId, t]
   )
 
   // THE AGENCY'S OWN HOUSEKEEPING — one writer for the four record kinds, because
@@ -270,9 +276,9 @@ export function useScreenActions(teamId: string | null) {
       primeCache(spec.key(teamId), next)
       // The record's own history gained a row; its Activity tab reads that key.
       if (id) invalidate(`activity:record:${spec.table}:${id}`)
-      toast.success(id ? "Saved." : spec.created)
+      toast.success(id ? t("Saved.") : spec.created)
     },
-    [teamId]
+    [teamId, t]
   )
 
   /** Archive or restore one of those records. Separate from the save above
@@ -284,9 +290,9 @@ export function useScreenActions(teamId: string | null) {
       const spec = INTERNAL_WRITERS[kind]
       primeCache(spec.key(teamId), await spec.setActive(id, active))
       invalidate(`activity:record:${spec.table}:${id}`)
-      toast.success(active ? "Restored." : "Archived.")
+      toast.success(active ? t("Restored.") : t("Archived."))
     },
-    [teamId]
+    [teamId, t]
   )
 
   return {

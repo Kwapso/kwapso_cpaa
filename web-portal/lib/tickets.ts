@@ -18,6 +18,7 @@ import { reportError } from "@shared/web/log"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { support } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
+import { useT } from "@shared/web/language"
 
 /** Rows this list may hold in the browser at once — the agency app's
  * CLIENT_PAGE_ROWS_CAP, restated for the portal's own hook (the two front ends
@@ -36,6 +37,7 @@ async function firstPage(): Promise<HelpTicket[]> {
 }
 
 export function useTickets() {
+  const t = useT()
   const { data, loading, error, refresh } = useCached<HelpTicket[]>(cacheKeys.tickets, firstPage)
   const total = useCachedValue<number>(cacheKeys.ticketsTotal)
   const cursor = useCachedValue<string | null>(cacheKeys.ticketsCursor)
@@ -60,11 +62,11 @@ export function useTickets() {
       // two is an unhandled rejection that lands nowhere — the button simply
       // stops working and nobody is told, here or in the error store.
       reportError("portal-tickets.loadMore", e)
-      toast.error("We couldn't load any more. Try again in a moment.")
+      toast.error(t("We couldn't load any more. Try again in a moment."))
     } finally {
       setLoadingMore(false)
     }
-  }, [])
+  }, [t])
 
   return {
     tickets: data,

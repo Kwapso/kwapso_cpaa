@@ -219,7 +219,12 @@ function shapeSprints(sprints: Sprint[], today: string) {
 
 /** Start a sprint through the door and re-read what changed. Shared with the
  * app's own screen, which can start one for itself. */
-export async function createSprintFrom(teamId: string, values: SprintFormValues): Promise<void> {
+export async function createSprintFrom(
+  teamId: string,
+  values: SprintFormValues,
+  /** The caller's language — see `createAppFrom`. */
+  t: (english: string) => string
+): Promise<void> {
   await contentApi.createSprint({
     name: values.name,
     goal: values.goal || undefined,
@@ -232,7 +237,7 @@ export async function createSprintFrom(teamId: string, values: SprintFormValues)
     currency: values.currency || undefined,
   })
   invalidate(sprintsKey(teamId))
-  toast.success("Sprint started.")
+  toast.success(t("Sprint started."))
 }
 
 export function SprintsScreen({
@@ -440,7 +445,7 @@ export function SprintsScreen({
           onOpenChange={setAddOpen}
           apps={(appsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
           draftKey={`sprint:add:${teamId}`}
-          onSubmit={(v) => createSprintFrom(teamId, v)}
+          onSubmit={(v) => createSprintFrom(teamId, v, t)}
         />
       </div>
     </CountedAbove>

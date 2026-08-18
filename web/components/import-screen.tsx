@@ -88,7 +88,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
       setBatch(r.batch)
       setPhase("review")
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't plan the import.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't plan the import."))
     } finally {
       setBusy(false)
       setBusyNote("")
@@ -105,7 +105,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
       setPhase("done")
       toast.success(`Imported ${r.report.created} row(s).`)
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "The import didn't finish.")
+      toast.error(err instanceof ApiFailure ? err.message : t("The import didn't finish."))
     } finally {
       setBusy(false)
       setBusyNote("")
@@ -234,7 +234,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
               </p>
             </div>
             <Badge variant="secondary" className="shrink-0 text-[10px]">
-              {batch.plan.bySource === "agent" ? "Planned by the assistant" : "Auto-matched"}
+              {batch.plan.bySource === "agent" ? t("Planned by the assistant") : t("Auto-matched")}
             </Badge>
           </div>
 
@@ -370,11 +370,20 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
             // was a bordered box per row, which draws a boundary AND leaves a
             // gap at every one of them — two cues where the rule allows one.
             <div className="divide-border divide-y rounded-xl border">
-              {report.perTarget.map((t) => (
-                <div key={t.target} className="flex items-center gap-2 p-3 text-sm">
-                  <span className="flex-1 font-medium">{t.targetName}</span>
+              {report.perTarget.map((row) => (
+                <div key={row.target} className="flex items-center gap-2 p-3 text-sm">
+                  <span className="flex-1 font-medium">{row.targetName}</span>
                   <span className="text-muted-foreground text-xs">
-                    {t.created} added · {t.skipped} skipped · {t.failed} failed
+                    {/* ONE ENTRY WITH THREE HOLES. It was three text runs around
+                        three numbers, so "added ·", "skipped ·" and "failed" went
+                        into the catalogue as fragments a translator cannot put in
+                        another order — and every language that counts differently
+                        needed to. */}
+                    {t("{created} added · {skipped} skipped · {failed} failed", {
+                      created: row.created,
+                      skipped: row.skipped,
+                      failed: row.failed,
+                    })}
                   </span>
                 </div>
               ))}

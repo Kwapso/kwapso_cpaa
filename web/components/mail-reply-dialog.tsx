@@ -31,7 +31,7 @@ import * as React from "react"
 
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
@@ -108,7 +108,7 @@ export function MailReplyDialog({
       // The door's own sentence when Gmail isn't connected reads better than
       // anything this form could invent ("Connect Gmail in Settings first —
       // kwapso only ever uses your own account"), so it is shown as written.
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't write that draft.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't write that draft."))
     } finally {
       setBusy(null)
     }
@@ -131,7 +131,7 @@ export function MailReplyDialog({
       onOpenChange(false)
       toast.success(t("Sent from your mailbox."))
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't send that.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't send that."))
     } finally {
       setBusy(null)
     }
@@ -163,7 +163,7 @@ export function MailReplyDialog({
               className="gap-1"
             >
               {busy === "draft" ? <Spinner /> : <PenLine className="size-4" />}
-              {busy === "draft" ? "Writing…" : written ? "Write it again" : "Save to Gmail drafts"}
+              {busy === "draft" ? t("Writing…") : written ? t("Write it again") : t("Save to Gmail drafts")}
             </Button>
           </div>
         </div>

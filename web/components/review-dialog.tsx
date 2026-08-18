@@ -21,7 +21,7 @@
 import * as React from "react"
 
 import { DialogDescription, DialogTitle } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
@@ -88,7 +88,7 @@ export function ReviewDialog({
       // THE TIMER REFUSAL LANDS HERE, in the door's own words ("Stop the timer on
       // this first"). Shown rather than translated into something vaguer: the
       // person needs to know which thing to go and do.
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't send that for review.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't send that for review."))
     } finally {
       setBusy(false)
     }

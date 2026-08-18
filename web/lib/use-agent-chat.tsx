@@ -10,6 +10,8 @@
 
 import * as React from "react"
 
+import { useT } from "@shared/web/language"
+
 import type { AgentChatItem } from "@kwapso/ui/registry/collections/agent-chat/agent-chat"
 import type { RunStep } from "@kwapso/ui/registry/collections/run-steps/run-steps"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
@@ -96,6 +98,7 @@ export function confirmStepsFrom(calls: PendingCall[]): RunStep[] {
 }
 
 export function useAgentChat(teamId: string | null, open: boolean, canUse: boolean) {
+  const t = useT()
   const [items, setItems] = React.useState<AgentChatItem[]>([])
   const [threadId, setThreadId] = React.useState<string | undefined>(undefined)
   // CSV files staged for the NEXT message (the chat import): picked or dropped,
@@ -299,7 +302,7 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
     const next = [...attached]
     for (const file of Array.from(list)) {
       if (next.length >= 8) {
-        toast.error("Attach up to 8 files at a time.")
+        toast.error(t("Attach up to 8 files at a time."))
         break
       }
       try {

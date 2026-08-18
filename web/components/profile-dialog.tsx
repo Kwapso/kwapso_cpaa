@@ -20,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { FileUpload } from "@kwapso/ui/registry/primitives/file-upload/file-upload"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
@@ -84,7 +84,7 @@ export function ProfileDialog({
       toast.success(t("Profile updated."))
     } catch (err) {
       toast.error(
-        err instanceof ApiFailure ? err.message : "Couldn't save your profile."
+        err instanceof ApiFailure ? err.message : t("Couldn't save your profile.")
       )
     } finally {
       setBusy(false)
@@ -129,7 +129,7 @@ export function ProfileDialog({
           <DialogFooter>
             <Button type="submit" disabled={busy || !firstName.trim() || !lastName.trim()}>
               {busy ? <Spinner /> : null}
-              {busy ? "Saving…" : "Save"}
+              {busy ? t("Saving…") : t("Save")}
             </Button>
           </DialogFooter>
         </form>

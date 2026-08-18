@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
@@ -120,7 +120,7 @@ export function EmailChangeDialog({
             </Field>
             <Button type="submit" disabled={busy || !email.trim()}>
               {busy ? <Spinner /> : null}
-              {busy ? "Sending…" : "Email me a code"}
+              {busy ? t("Sending…") : t("Email me a code")}
             </Button>
           </form>
         ) : (

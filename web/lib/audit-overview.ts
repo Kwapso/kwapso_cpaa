@@ -10,13 +10,26 @@ export type AuditMeta = {
   status: string
 }
 
-/** The five audit rows, in a fixed order, for a DescriptionList. */
-export function auditItems(a: AuditMeta): { label: string; value: string }[] {
+/** The five audit rows, in a fixed order, for a DescriptionList.
+ *
+ * `t` is a PARAMETER because this is a plain function and `useT` is a hook: the
+ * component that renders the list has the reader's language and hands it in —
+ * the same shape `translateRecipe` and `createAppFrom` use. The five labels stay
+ * English at the call to `t` because English is the catalogue's key
+ * (shared/i18n.ts).
+ *
+ * The VALUES are not translated and must not be: four of them are a person's
+ * name or a timestamp, and the fifth is a status word the caller has already put
+ * through its own vocabulary. */
+export function auditItems(
+  a: AuditMeta,
+  t: (english: string) => string
+): { label: string; value: string }[] {
   return [
-    { label: "Created by", value: a.createdByName || "—" },
-    { label: "Created", value: a.createdAt ? formatRelative(a.createdAt) : "—" },
-    { label: "Last edited by", value: a.editedByName || "—" },
-    { label: "Last edited", value: a.updatedAt ? formatRelative(a.updatedAt) : "—" },
-    { label: "Status", value: a.status },
+    { label: t("Created by"), value: a.createdByName || "—" },
+    { label: t("Created"), value: a.createdAt ? formatRelative(a.createdAt) : "—" },
+    { label: t("Last edited by"), value: a.editedByName || "—" },
+    { label: t("Last edited"), value: a.updatedAt ? formatRelative(a.updatedAt) : "—" },
+    { label: t("Status"), value: a.status },
   ]
 }

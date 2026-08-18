@@ -23,7 +23,7 @@
 // (shared/web/google-sign-in.tsx) so the two can't drift apart.
 
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
@@ -65,7 +65,7 @@ export function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
         <h1 className="text-2xl font-semibold tracking-tight">{t("Sign in to")} {brand.name}</h1>
         <p className="text-muted-foreground">
           {step === "email"
-            ? "We'll email you a six-digit code, or you can use Google. No password to remember."
+            ? t("We'll email you a six-digit code, or you can use Google. No password to remember.")
             : `Enter the code we sent to ${email}.`}
         </p>
       </div>

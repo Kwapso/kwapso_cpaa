@@ -100,7 +100,7 @@ export function StaffPanel({
       ? await content.updateStaffCertificate({ id: editingCert.id, ...values })
       : await content.createStaffCertificate({ userId, ...values })
     primeCache(staffCertificatesKey(teamId), next)
-    toast.success(editingCert ? "Certificate saved." : "Certificate recorded.")
+    toast.success(editingCert ? t("Certificate saved.") : t("Certificate recorded."))
   }
 
   /** RETIRE THE PROFILE, or bring it back. A colleague who leaves keeps a live
@@ -112,9 +112,9 @@ export function StaffPanel({
     try {
       const { profiles } = await content.setStaffProfileActive(profile.id, active)
       primeCache(staffProfilesKey(teamId), profiles)
-      toast.success(active ? "Profile restored." : "Profile retired.")
+      toast.success(active ? t("Profile restored.") : t("Profile retired."))
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't update the profile.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't update the profile."))
     }
   }
 

@@ -74,7 +74,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
-import { Field } from "@kwapso/ui/registry/primitives/field/field"
+import { Field } from "@shared/web/field"
 import { FileUpload } from "@kwapso/ui/registry/primitives/file-upload/file-upload"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
@@ -232,7 +232,7 @@ export function AccountFormDialog({
     } catch (err) {
       // The server's own sentence wins — it's the one that knows WHY (a duplicate
       // reference, a move that would put the account inside itself).
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't save the account.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't save the account."))
     } finally {
       setBusy(false)
     }
