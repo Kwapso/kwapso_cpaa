@@ -180,7 +180,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **231 doors, 185 with a tool, 46 with a written reason**, the
+  red build. Today: **223 doors, 177 with a tool, 46 with a written reason**, the
   reasons being the team-pin doors (§3.2 below), the client-portal standing doors
   (§3.3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the THREE upload pairs, two media doors and the knowledge base, each a
@@ -199,9 +199,18 @@ Today it covers:
   SCREEN can badge its tabs in one round trip: every number in that bundle is
   already machine-readable, exactly and with narrowing those doors do not take,
   through `list_apps`, `list_processes`, `list_sprints`, `list_stories`,
-  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 185, **156 are on THIS surface** and 29 are the in-app assistant's
-  alone, the twenty-six Google tools, the two confirm-panel bulk writes and the role
-  permission matrix read, each reasoned in §3. Those three numbers are asserted
+  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 177, **154 are on THIS surface** and 23 are the in-app assistant's
+  alone, the twenty Google tools, the two confirm-panel bulk writes and the role
+  permission matrix read, each reasoned in §3.
+
+  **Eight doors left the census on 18 August 2026**, and they are worth naming
+  because they went for a product reason rather than a tidying one: the seven
+  that WROTE to Google Calendar (create an event, change what it says and when,
+  its guests, its location, call it off, push a sprint's dates, push a meeting's)
+  and `POST /api/content/meetings/held`. The calendar is one-way now — kwapso
+  reads a diary and never writes one — and a meeting's own start time says
+  whether it has happened, so a status somebody had to tick was a second source
+  of truth for a question the clock answers. Those three numbers are asserted
   against the live census in `workers/mcp/test/filter-parity.test.ts`, so this
   sentence cannot quietly go stale again, it did, at 87 / 66 / 21, while the app
   grew to two and a half times the size.

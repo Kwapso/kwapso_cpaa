@@ -247,24 +247,18 @@ export function traceFor(
       return { path: seg(teamId, "tasks"), highlight: "main" }
     case "set_task_done":
       return { path: `${seg(teamId, "tasks")}/${str(input, "id")}`, highlight: "main" }
-    // MEETINGS. A create lands on the diary, an edit on the meeting itself —
-    // and so does the calendar push, because the thing that changed HERE is the
-    // meeting's own "it is in your calendar" line. The entry it made is in
-    // Google, which is not a screen this app can ring.
+    // MEETINGS. A create lands on the diary, an edit on the meeting itself.
     case "create_meeting":
-    // Bringing a series in makes many records and no one of them is the change,
-    // so it lands on the diary rather than on a record.
+    // Reading the calendar in makes many records and no one of them is the
+    // change, so it lands on the diary rather than on a record.
     case "sync_calendar_series":
       return { path: seg(teamId, "meetings"), highlight: "main" }
     case "update_meeting":
-    case "set_meeting_held":
     case "set_meeting_active":
-    // Reading the transcript changes the meeting's own status line and its work
-    // logs tab, both of which are on the record — so the record is where to land.
+    // Reading the transcript changes the meeting's own notes and its work logs
+    // tab, both of which are on the record — so the record is where to land.
     case "read_meeting_transcript":
       return { path: `${seg(teamId, "meetings")}/${str(input, "id")}`, highlight: "main" }
-    case "add_meeting_to_calendar":
-      return { path: `${seg(teamId, "meetings")}/${str(input, "meetingId")}`, highlight: "main" }
     // Bringing somebody's own Google material in lands on the knowledge base,
     // where the sources it just filed are listed and the sync state is read.
     case "sync_google_knowledge":
@@ -345,7 +339,10 @@ export const SCREENLESS_WRITE_TOOLS: string[] = [
   // `/t/<team>/`, and the check rightly insists a trace lands on the team host.
   // The mail tools carry the better answer anyway — the draft's own Gmail link,
   // which the assistant is told to hand over every time; the Drive tools carry
-  // the file's own Drive link, and the calendar tools the entry's.
+  // the file's own Drive link.
+  //
+  // Six calendar-write tools were on this list and are gone with their doors: the
+  // calendar is read-only, so nothing the assistant does reaches one.
   "google_drive_upload",
   "google_drive_update",
   "google_drive_folder",
@@ -355,12 +352,6 @@ export const SCREENLESS_WRITE_TOOLS: string[] = [
   "google_send_mail",
   "google_reply_mail",
   "google_label_mail",
-  "google_create_event",
-  "google_sprint_to_calendar",
-  "google_update_event",
-  "google_event_guests",
-  "google_event_location",
-  "google_cancel_event",
   "google_chat_post",
   "google_chat_delete",
 ]

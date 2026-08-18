@@ -63,11 +63,11 @@
 //   POST /api/content/knowledge/active    -> take a source away from the assistant / give it back
 //   POST /api/content/knowledge/sync      -> bring the base into step, one bounded slice
 //   POST /api/content/knowledge/sync-google -> …and MY OWN Google material, as me
-//   GET  /api/content/meetings            -> the diary (?id → one; account/purpose/status/view/q filters)
+//   GET  /api/content/meetings            -> the diary (?id → one; account/app/purpose/view/q filters)
 //   POST /api/content/meetings            -> put a meeting in the diary
 //   POST /api/content/meetings/update     -> correct it / write the notes up
-//   POST /api/content/meetings/held       -> it happened / it hasn't yet
 //   POST /api/content/meetings/active     -> cancel it / put it back
+//   POST /api/content/meetings/sync-calendar -> read Google's diary into ours (one way)
 //   GET  /api/content/deliverables        -> what we handed over on an app (?appId=, ?id → one)
 //   POST /api/content/deliverables[/update|/active] -> file / correct / archive one
 //   POST /api/content/deliverables/upload-stream -> store the bytes behind one
@@ -155,7 +155,6 @@ import {
   getMeetings,
   getMeetingTranscript,
   postCreateMeeting,
-  postMeetingHeld,
   postMeetingTranscript,
   postSyncCalendar,
   postSetMeetingActive,
@@ -219,19 +218,12 @@ import {
   postGoogleDriveTrash,
   postGoogleDriveUpdate,
   postGoogleDriveUpload,
-  postGoogleEvent,
-  postGoogleEventCancel,
-  postGoogleEventGuests,
-  postGoogleEventLocation,
-  postGoogleEventUpdate,
   postGoogleMailDraft,
   postGoogleMailLabel,
   postGoogleMailReply,
   postGoogleMailSend,
   postGoogleSource,
   postGoogleSourceActive,
-  postGoogleSprintEvent,
-  postGoogleMeetingEvent,
 } from "./routes/google"
 import { sweepAll } from "./lib/knowledge-ingest"
 import { sendTriageDigest, teamMemberNames } from "./lib/notify"
@@ -436,10 +428,13 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "GET /api/content/meetings": { handler: getMeetings, kind: "read" },
   "POST /api/content/meetings": { handler: postCreateMeeting, kind: "mutation" },
   "POST /api/content/meetings/update": { handler: postUpdateMeeting, kind: "mutation" },
-  "POST /api/content/meetings/held": { handler: postMeetingHeld, kind: "mutation" },
-  // The transcript arriving is what tells the app the conversation happened: it
-  // ticks "held" and writes a work log for every one of OUR people who was in
-  // the room (9.4 + 9.2). One door, because it is one moment.
+  // There WAS a `…/meetings/held` door here, and the concept it moved went with
+  // it: a meeting's own start time already says whether it has happened, so a
+  // status column was a second source of truth for something the clock answers.
+  // The transcript arriving still writes a work log for every one of OUR people
+  // who was in the room (9.2) — one door, because it is one moment — and it is
+  // idempotent on `transcript_captured_at`, the predicate it always rode.
+  // Nothing is ticked, because there is nothing left to tick.
   "POST /api/content/meetings/transcript": { handler: postMeetingTranscript, kind: "mutation" },
   // The WORDS, and WHO WAS THERE — two reads the detail screen makes and no list
   // ever does. Their own doors because of what each costs: a transcript is up to
@@ -447,11 +442,12 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // databases. See routes/meetings.ts for why neither belongs on the row.
   "GET /api/content/meetings/transcript": { handler: getMeetingTranscript, kind: "read" },
   "GET /api/content/meetings/people": { handler: getMeetingPeople, kind: "read" },
-  // The diary, brought into step BOTH WAYS: a repeating entry becomes a real
-  // record four weeks ahead (9.7), every entry in the window has its Google
-  // facts refreshed, and one cancelled in Google is called off here. The
-  // backward half is why a transcript that lands an hour after the call is found
-  // at all.
+  // The diary, brought into step ONE WAY — Google's diary into ours. Every entry
+  // in the live window becomes a record or has its Google facts refreshed, one
+  // cancelled in Google is called off here, and a resumable cursor walks the
+  // REST of the calendar a slice at a time, so "everything in my calendar" is
+  // true rather than aspirational. The backward half of the live window is why a
+  // transcript that lands an hour after the call is found at all.
   "POST /api/content/meetings/sync-calendar": { handler: postSyncCalendar, kind: "mutation" },
   "POST /api/content/meetings/active": { handler: postSetMeetingActive, kind: "mutation" },
 
@@ -547,29 +543,19 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // door demands the mail switch exactly as the send door does — it sends.
   "POST /api/content/google/gmail/reply": { handler: postGoogleMailReply, kind: "mutation" },
   "POST /api/content/google/gmail/label": { handler: postGoogleMailLabel, kind: "mutation" },
+  // TWO CALENDAR DOORS, AND BOTH ARE READS. There were nine. The other seven
+  // wrote — create an entry, change what it says and when, invite and uninvite
+  // guests, set where it is, call it off, push a sprint's dates in, push a
+  // meeting's — and every one of them is gone by the owner's instruction of
+  // 18 August 2026. routes/google.ts holds the whole note, including what it
+  // costs and why the refusal is a missing function rather than a flag.
   "GET /api/content/google/calendar/events": { handler: getGoogleEvents, kind: "read" },
-  "POST /api/content/google/calendar/events": { handler: postGoogleEvent, kind: "mutation" },
-  // The four questions a person asks about an entry that already exists — what it
-  // says and when, who is coming, where it is, and whether it is happening at all.
-  // Four doors because a person changes one at a time, and because only one of
-  // them puts something in a third party's inbox (routes/google.ts says more).
-  "POST /api/content/google/calendar/event/update": { handler: postGoogleEventUpdate, kind: "mutation" },
-  "POST /api/content/google/calendar/event/guests": { handler: postGoogleEventGuests, kind: "mutation" },
-  "POST /api/content/google/calendar/event/location": { handler: postGoogleEventLocation, kind: "mutation" },
-  "POST /api/content/google/calendar/event/cancel": { handler: postGoogleEventCancel, kind: "mutation" },
   // What was SAID in the meeting, reached from the meeting — Meet files its
   // transcript as an ordinary Doc, so until now you had to already know which one.
   "GET /api/content/google/calendar/event/transcript": {
     handler: getGoogleEventTranscript,
     kind: "read",
   },
-  // FROM kwapso TO Google: a sprint's dates as a calendar entry, and the meeting
-  // door beside it — the two halves of "what we book here shows up there".
-  "POST /api/content/google/calendar/sprint": { handler: postGoogleSprintEvent, kind: "mutation" },
-  // …and the second half of that sentence, now that a meeting is a row. It moves
-  // the MEETING (it remembers the entry it became) as well as the connection, so
-  // it publishes twice — once for each screen that just went stale.
-  "POST /api/content/google/calendar/meeting": { handler: postGoogleMeetingEvent, kind: "mutation" },
   // Which spaces are there at all — the question that had no answer while a space
   // could only be read by naming one you already knew. Reading the LIST is not
   // reading what is in them; the messages door still refuses an unnamed space.

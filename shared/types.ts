@@ -1458,10 +1458,13 @@ export type WorkLogSummary = {
   weeks: PulseWeek[]
 }
 
-/** The two states a meeting has. Cancelling is not a third one — it is the
- * module's `delete`, and the row survives it. */
-export const MEETING_STATUSES = ["scheduled", "held"] as const
-export type MeetingStatus = (typeof MEETING_STATUSES)[number]
+/* A MEETING HAS NO STATUS, and that is a decision rather than an omission. It
+ * had two words, `scheduled` and `held`, and the second was a flag somebody had
+ * to remember to tick about a fact the CLOCK already knows: a meeting's own
+ * `startsAt` says whether it has happened. Two sources of truth for one question
+ * disagree the first time anybody forgets, in both directions. Cancelling was
+ * never one of the words anyway — it is the module's `delete`, and the row
+ * survives it (`active`). */
 
 /** ONE PERSON ON A DIARY ENTRY — the "stakeholders" a meeting record carries.
  *
@@ -1533,12 +1536,15 @@ export type Meeting = {
   agenda: string | null
   notes: string | null
   location: string | null
+  /** WHEN IT IS, AND THEREFORE WHETHER IT HAS HAPPENED. There is no separate
+   * status: this against the clock is the answer, and it is the only one that
+   * cannot go stale. */
   startsAt: string
   endsAt: string | null
-  status: MeetingStatus
-  heldAt: string | null
-  /** set once the meeting has been pushed to the caller's Google Calendar, so
-   * pressing the button twice cannot make a second entry. */
+  /** the Google Calendar entry this meeting mirrors, and the link that opens it
+   * in Google's own web app. Set by the sweep — nothing in this product puts an
+   * entry in a calendar — and unique on the row, so one diary entry can never
+   * become two meetings. */
   googleEventId: string | null
   googleEventUrl: string | null
   /* ── THE REST OF THE DIARY ENTRY, MIRRORED ────────────────────────────────
@@ -1547,8 +1553,9 @@ export type Meeting = {
    * to join and what was attached — without every reader holding a connection
    * and every list costing fifty calls to Google.
    *
-   * The direction is one-way and the mirror never wins: the four calendar doors
-   * write to Google, this is only ever read back. `googleSyncedAt` says when it
+   * The direction is one-way, and now it is one-way in BOTH senses: nothing in
+   * this product writes to a calendar at all, so Google's diary is the source
+   * and every column below is a copy of it. `googleSyncedAt` says when that copy
    * was last true, which is the honest thing a mirror can offer. */
   /** the join link — Meet, or whatever conferencing system is on the entry. */
   googleJoinUrl: string | null

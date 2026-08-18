@@ -41,7 +41,7 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
 import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
-import { CalendarPlus, CheckCheck, ExternalLink, FileText, Pencil, Power, Video } from "lucide-react"
+import { ExternalLink, FileText, Pencil, Power, Video } from "lucide-react"
 
 import type { Account, AppRow, Meeting, MeetingPersonLink, MeetingPurpose } from "@shared/types"
 import { MeetingFormDialog, type MeetingFormValues } from "@/components/meeting-form-dialog"
@@ -106,10 +106,15 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
   const { can } = usePermissions(teamId)
   const canEdit = can("meetings", "edit")
   const canCancel = can("meetings", "delete")
-  // Pushing to a calendar is two rights on top of reading the meeting: kwapso may
-  // use your connection, and kwapso may put an event in your diary. The door
-  // demands both — this only decides whether the button is worth offering.
-  const canPush = can("google", "edit") && can("google_events", "create")
+  // Reading the transcript reaches the caller's own Drive and calendar with the
+  // caller's own token, so the door asks for `google:read` on top of this
+  // module's `edit`. This only decides whether the action is worth offering.
+  //
+  // It used to ask for `google:edit` plus a "Calendar on your behalf" switch,
+  // because the same menu also pushed a meeting INTO a calendar. Nothing pushes
+  // any more, so demanding a write right to READ a transcript would be gating a
+  // read behind a capability the app no longer has.
+  const canReadGoogle = can("google", "read")
   // THE TIME A MEETING TOOK. `meetings` is one of the four things a work log
   // may hang off (WORK_LOG_TARGETS), and this is the hours a conversation cost
   // — written by the transcript import rather than by a person, which is why
@@ -178,23 +183,9 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
     toast.success(t("Meeting updated."))
   }
 
-  async function setHeld(held: boolean) {
-    setBusy("held")
-    try {
-      const { meeting } = await content.setMeetingHeld(meetingId, held)
-      patchLists(meeting)
-      toast.success(held ? "Marked as held." : "Back in the diary.")
-    } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't change that.")
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  /** 9.4 AND 9.2, IN ONE PRESS. The transcript arriving is what tells the app the
-   * conversation happened, so reading it ticks "held" and writes a row of time
-   * for each of our own people who was in the room. The door does all of that;
-   * this reports what it did, including the honest nothing. */
+  /** 9.2, IN ONE PRESS. Reading the transcript writes a row of time for each of
+   * our own people who was in the room. The door does all of that; this reports
+   * what it did, including the honest nothing. */
   async function readTranscript() {
     setBusy("transcript")
     try {
@@ -204,10 +195,10 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
       else
         toast.success(
           r.logsWritten > 0
-            ? `Transcript read. Marked held, and ${r.logsWritten} ${
+            ? `Transcript read, and ${r.logsWritten} ${
                 r.logsWritten === 1 ? "person's" : "people's"
               } time was logged.`
-            : "Transcript read, and the meeting is marked held."
+            : "Transcript read."
         )
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't read the transcript.")
@@ -253,24 +244,6 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
       toast.success(active ? "Back in the diary." : "Cancelled, the record and its notes are kept.")
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : "Couldn't change that.")
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  async function addToCalendar() {
-    setBusy("calendar")
-    try {
-      const { alreadyThere } = await content.googleMeetingToCalendar(meetingId)
-      // The door moved the MEETING row (it remembers the entry it became), so the
-      // record re-reads rather than being patched from a response that is about
-      // the calendar entry.
-      invalidate(`meeting:one:${meetingId}`)
-      invalidate(meetingsKey(teamId))
-      invalidate(recordActivityKey("meetings", meetingId))
-      toast.success(alreadyThere ? "It was already in your calendar." : "It's in your calendar.")
-    } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't add it to your calendar.")
     } finally {
       setBusy(null)
     }
@@ -348,16 +321,18 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
     ],
   }
 
-  /* B1 / CHECKLIST 11.2 — this title carried five. "Mark held" is the act that
-   * moves the meeting on, so it is the primary; Edit is the everyday one, so it
-   * is the secondary. Reading the transcript, adding it to a calendar and
-   * calling it off go into the menu, the last of them still red. */
+  /* B1 / CHECKLIST 11.2 — this title carried five, then three. Edit is the
+   * everyday act, so it is the only button; reading the transcript and calling
+   * the meeting off go into the menu, the second of them still red.
+   *
+   * TWO ACTIONS LEFT WITH THE CALENDAR'S WRITE HALF: "Mark held" (the status is
+   * retired — the start time says whether a meeting has happened) and "Add to my
+   * calendar" (kwapso reads calendars and never writes them). */
   const overflow: RecordAction[] = [
-    // 9.4 — the transcript is what tells the app the conversation happened, so
-    // this one act ticks "held" and logs everybody's time. Offered only once the
-    // entry is in a calendar (there is nowhere else to look) and only while
+    // 9.2 — reading the transcript logs everybody's time. Offered only once the
+    // meeting has a calendar entry (there is nowhere else to look) and only while
     // nothing has been read yet.
-    ...(canEdit && canPush && item.active && item.googleEventId && !item.transcriptCapturedAt
+    ...(canEdit && canReadGoogle && item.active && item.googleEventId && !item.transcriptCapturedAt
       ? [
           {
             key: "transcript",
@@ -365,17 +340,6 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
             icon: <FileText className="size-3.5" />,
             disabled: busy !== null,
             onSelect: readTranscript,
-          },
-        ]
-      : []),
-    ...(canPush && item.active && !item.googleEventId
-      ? [
-          {
-            key: "calendar",
-            label: t("Add to my calendar"),
-            icon: <CalendarPlus className="size-3.5" />,
-            disabled: busy !== null,
-            onSelect: addToCalendar,
           },
         ]
       : []),
@@ -397,27 +361,15 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
     <RecordScreen
       eyebrow={[t("Meeting"), item.ref].filter(Boolean).join(" · ")}
       title={item.title}
-      status={[
-        formatDateTime(item.startsAt),
-        item.accountName ?? undefined,
-        !item.active ? t("Cancelled") : item.status === "held" ? t("Held") : undefined,
-      ]
+      // The date leads, and it is also the answer to "has this happened?" — which
+      // is why there is no third word here any more.
+      status={[formatDateTime(item.startsAt), item.accountName ?? undefined, !item.active ? t("Cancelled") : undefined]
         .filter(Boolean)
         .join(" · ")}
       actions={
         <>
-          {canEdit && item.active && (
-            <Button
-              disabled={busy !== null}
-              onClick={() => setHeld(item.status !== "held")}
-              className="gap-1"
-            >
-              {busy === "held" ? <Spinner /> : <CheckCheck className="size-3.5" />}
-              {item.status === "held" ? t("Not held after all") : t("Mark held")}
-            </Button>
-          )}
           {canEdit && (
-            <Button variant="outline" onClick={() => setEditing(true)} className="gap-1">
+            <Button onClick={() => setEditing(true)} className="gap-1">
               <Pencil className="size-3.5" />
               {t("Edit")}
             </Button>
@@ -477,16 +429,19 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
                   <p className="text-muted-foreground text-sm">Nothing written down yet.</p>
                 )}
               </section>
-              {/* THE NOTES ARE AN OPEN FIELD UNTIL THE MEETING IS OVER (9.6).
-                  Somebody types into the record while the conversation is still
-                  happening; once it is held or cancelled the writing-up is done
-                  and the field closes, so a later correction is a deliberate
-                  edit on the edit page rather than a stray keystroke.
+              {/* THE NOTES ARE AN OPEN FIELD (9.6). Somebody types into the
+                  record while the conversation is still happening, and keeps
+                  typing afterwards — the write-up IS the afterwards.
+                  IT USED TO CLOSE once the meeting was ticked held, on the theory
+                  that the writing-up was then done. Nothing could know that, and
+                  the field shut on exactly the people it was built for. A
+                  cancelled meeting is still read-only, because that is the
+                  module's delete rather than a guess about a person.
                   The AGENDA is never editable here — it is set beforehand, on
                   the edit page, which is the other half of the same rule. */}
               <section className="flex flex-col gap-2">
                 <h2 className="text-muted-foreground text-sm font-medium">Notes</h2>
-                {canEdit && item.active && item.status !== "held" ? (
+                {canEdit && item.active ? (
                   <>
                     {/* Uncontrolled, and keyed on the ROW so the editor re-seeds
                         when the saved notes change under it (a colleague typing

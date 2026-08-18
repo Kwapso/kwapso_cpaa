@@ -170,19 +170,20 @@ const AGENT_ONLY: AgentTool[] = [
   // can see" needs no rule of its own — it is what act-as-user already means,
   // reaching one system further out.
   //
-  // THE CONFIRM RULE, and the one asymmetry in it. The owner decided: the
-  // assistant may create calendar events WITHOUT asking; mail ALWAYS asks. So
-  // `google_create_event` and `google_sprint_to_calendar` run straight away, and
-  // `google_send_mail` pauses for a yes/no panel — because an event is a
-  // suggestion in a diary its owner can delete in one click, and a sent mail is
-  // in somebody else's inbox forever. `google_chat_post` confirms for the same
-  // reason as mail: a colleague reads it the moment it lands.
+  // THE CONFIRM RULE. Anything that lands in somebody ELSE's inbox pauses for a
+  // yes/no panel — `google_send_mail`, `google_reply_mail`, `google_chat_post` —
+  // because a sent message cannot be recalled. The rule used to have a second
+  // half about calendar entries running straight away (a diary entry is one click
+  // from gone); there are no calendar writes left for it to govern.
   //
   // WHAT THE ASSISTANT DELIBERATELY CANNOT DO: connect an account, disconnect
-  // one, or change which folders and spaces are shared. Those are decisions about
-  // WHO CAN READ WHAT, made by a person at a consent screen or a form that asks
-  // the question in words. The doors exist and refuse nobody with the right; they
-  // simply have no tool. See TOOLLESS_DOORS in workers/mcp/test/filter-parity.test.ts.
+  // one, change which folders and spaces are shared, or touch anybody's CALENDAR.
+  // The first three are decisions about WHO CAN READ WHAT, made by a person at a
+  // consent screen or a form that asks the question in words — those doors exist
+  // and refuse nobody with the right; they simply have no tool (see TOOLLESS_DOORS
+  // in workers/mcp/test/filter-parity.test.ts). The fourth is different in kind:
+  // there is no door left to have a tool for. The calendar is read-only in this
+  // product, on every surface (18 August 2026).
   {
     name: "list_google_connections",
     description:
@@ -340,44 +341,12 @@ const AGENT_ONLY: AgentTool[] = [
         : "",
     summarize: () => "Read the calendar",
   },
-  {
-    name: "google_create_event",
-    description:
-      "Put an event in this person's own calendar. `start` and `end` are RFC-3339 timestamps, or plain " +
-      "dates with allDay:true. Needs their role's own events switch.",
-    schema: obj({ summary: S, description: S, start: S, end: S, allDay: B }, ["summary", "start", "end"]),
-    binding: "CONTENT",
-    method: "POST",
-    path: "/api/content/google/calendar/events",
-    write: true,
-    // NO CONFIRM, on purpose and by the owner's decision: an event lands in a
-    // diary its owner can delete in one click, so asking every time would make
-    // the assistant slower at the one thing it was asked to do without making
-    // anything safer.
-    confirm: false,
-    buildBody: (i) => ({
-      summary: str(i, "summary"),
-      ...(str(i, "description") ? { description: str(i, "description") } : {}),
-      start: str(i, "start"),
-      end: str(i, "end"),
-      ...(i.allDay === true ? { allDay: true } : {}),
-    }),
-    summarize: (i) => `Put "${str(i, "summary")}" in the calendar`,
-  },
-  {
-    name: "google_sprint_to_calendar",
-    description:
-      "Put a sprint's dates in this person's calendar as an all-day block. Get the sprint id from " +
-      "list_sprints. Needs their role's events switch, and the right to read work.",
-    schema: obj({ sprintId: S }, ["sprintId"]),
-    binding: "CONTENT",
-    method: "POST",
-    path: "/api/content/google/calendar/sprint",
-    write: true,
-    confirm: false, // same reading as google_create_event — it IS one.
-    buildBody: (i) => ({ sprintId: str(i, "sprintId") }),
-    summarize: () => "Put a sprint's dates in the calendar",
-  },
+  // THE ASSISTANT CANNOT TOUCH A CALENDAR, only read one. `google_create_event`
+  // and `google_sprint_to_calendar` stood here, and four more further down
+  // (change an entry, its guests, its location, call it off). All six went with
+  // their doors on 18 August 2026, when the owner asked for the calendar to be
+  // one-way. If somebody asks the assistant to put something in their diary, the
+  // honest answer is that kwapso reads calendars and does not write them.
   {
     name: "google_chat_messages",
     description:
@@ -410,7 +379,8 @@ const AGENT_ONLY: AgentTool[] = [
   },
 
   /* ------------------- GOOGLE: the acts that were missing ------------------- */
-  // Thirteen more, and they divide into three groups worth reading as groups.
+  // Nine more, and they divide into groups worth reading as groups. There were
+  // thirteen; the four calendar writes went with the rest of the write half.
   //
   // TAKING SOMETHING BACK (`google_drive_trash`, `google_chat_delete`). Neither
   // was on the owner's list and both are here because the list makes them
@@ -419,14 +389,13 @@ const AGENT_ONLY: AgentTool[] = [
   // one. Both confirm, both are the softest form of the act available — Drive's
   // bin rather than a delete, and a message this app itself sent.
   //
-  // THE CONFIRM RULE, applied rather than restated. The owner's line is: mail
-  // always asks, calendar entries do not, because a sent message is in somebody
-  // else's inbox forever and a diary entry is one click from gone. Read that way,
-  // `google_reply_mail` asks (it sends), `google_event_guests` asks (an
-  // invitation lands in a third party's inbox and cannot be recalled), and
-  // changing a title, a room or a time does not. `google_label_mail` does not
-  // ask either: a label is filing, nobody else can see it, and taking it off
-  // again costs one call.
+  // THE CONFIRM RULE, applied rather than restated. The owner's line is that mail
+  // always asks, because a sent message is in somebody else's inbox forever. So
+  // `google_reply_mail` asks (it sends). `google_label_mail` does not: a label is
+  // filing, nobody else can see it, and taking it off again costs one call. The
+  // rule's other half used to be "calendar entries do not ask, because a diary
+  // entry is one click from gone" — there are no calendar writes left for it to
+  // govern.
   //
   // AND ONE JOIN NOBODY COULD MAKE BEFORE: `google_meeting_transcript` starts at
   // the diary entry, which is where a person starts ("what did we agree in
@@ -547,97 +516,10 @@ const AGENT_ONLY: AgentTool[] = [
     summarize: (i) =>
       i.on === true ? `File a message under "${str(i, "label")}"` : `Take "${str(i, "label")}" off a message`,
   },
-  {
-    name: "google_update_event",
-    description:
-      "Change what a calendar entry SAYS and WHEN it is. `eventId` comes from google_calendar_events. " +
-      "Send only the fields that change, anything left out stays as it is, so fixing a title cannot " +
-      "wipe a guest list. `start` and `end` are RFC-3339 timestamps, or plain dates with allDay:true. " +
-      "Guests are told. For where it is use google_event_location; for who is coming use " +
-      "google_event_guests. Needs their role's own events switch.",
-    schema: obj({ eventId: S, summary: S, description: S, start: S, end: S, allDay: B }, ["eventId"]),
-    binding: "CONTENT",
-    method: "POST",
-    path: "/api/content/google/calendar/event/update",
-    write: true,
-    // Same reading as google_create_event: a diary entry its owner can fix in
-    // one click, so asking every time would slow the assistant down without
-    // making anything safer.
-    confirm: false,
-    buildBody: (i) => ({
-      eventId: str(i, "eventId"),
-      ...(str(i, "summary") ? { summary: str(i, "summary") } : {}),
-      ...(str(i, "description") ? { description: str(i, "description") } : {}),
-      ...(str(i, "start") ? { start: str(i, "start") } : {}),
-      ...(str(i, "end") ? { end: str(i, "end") } : {}),
-      ...(i.allDay === true ? { allDay: true } : {}),
-    }),
-    summarize: (i) => (str(i, "summary") ? `Rename an event to "${str(i, "summary")}"` : "Change an event"),
-  },
-  {
-    name: "google_event_guests",
-    description:
-      "Invite people to a calendar entry, or take them off, both in one call, so 'swap Ana for " +
-      "Marta' sends one notification rather than two. `add` and `remove` are lists of email " +
-      "addresses. Everyone on the entry is emailed about the change. The answer's `changed` is false " +
-      "when nobody new was invited and nobody was actually on it to remove. Needs their role's own " +
-      "events switch.",
-    schema: obj({ eventId: S, add: { type: "array", items: S }, remove: { type: "array", items: S } }, [
-      "eventId",
-    ]),
-    binding: "CONTENT",
-    method: "POST",
-    path: "/api/content/google/calendar/event/guests",
-    write: true,
-    // THE ONE CALENDAR WRITE THAT ASKS, and it is the mail rule rather than an
-    // exception to the event rule: an invitation lands in a third party's inbox
-    // the moment it is sent, and there is no version of undo that unsends it.
-    confirm: true,
-    buildBody: (i) => ({
-      eventId: str(i, "eventId"),
-      add: Array.isArray(i.add) ? i.add : [],
-      remove: Array.isArray(i.remove) ? i.remove : [],
-    }),
-    summarize: (i) => {
-      const added = Array.isArray(i.add) ? i.add.length : 0
-      const dropped = Array.isArray(i.remove) ? i.remove.length : 0
-      return `Change who is coming (${added} invited, ${dropped} removed)`
-    },
-  },
-  {
-    name: "google_event_location",
-    description:
-      "Say WHERE a calendar entry happens, a room, an address, anything a person would write down. " +
-      "`eventId` comes from google_calendar_events. Its own action because where is the one thing " +
-      "people change on its own once the time is agreed, and doing it here cannot disturb a time " +
-      "somebody moved in Google since. Guests are told. Needs their role's own events switch.",
-    schema: obj({ eventId: S, location: S }, ["eventId", "location"]),
-    binding: "CONTENT",
-    method: "POST",
-    path: "/api/content/google/calendar/event/location",
-    write: true,
-    confirm: false, // an event field, and events do not ask — see google_create_event.
-    buildBody: (i) => ({ eventId: str(i, "eventId"), location: str(i, "location") }),
-    summarize: (i) => `Set where an event happens, ${str(i, "location")}`,
-  },
-  {
-    name: "google_cancel_event",
-    description:
-      "Call a calendar entry off. It is marked CANCELLED rather than deleted, so it stays in " +
-      "everybody's calendar saying so and every guest is told, an appointment that silently vanished " +
-      "is worse than one that says it is off. `eventId` comes from google_calendar_events. The " +
-      "answer's `changed` is false when it was already cancelled. Needs their role's own events switch.",
-    schema: obj({ eventId: S }, ["eventId"]),
-    binding: "CONTENT",
-    method: "POST",
-    path: "/api/content/google/calendar/event/cancel",
-    write: true,
-    // It takes an arrangement away from other people. Destructive, so it asks —
-    // the same line every deactivate in this catalogue sits on.
-    confirm: true,
-    buildBody: (i) => ({ eventId: str(i, "eventId") }),
-    summarize: () => "Call off a calendar entry",
-  },
+  // FOUR CALENDAR WRITES STOOD HERE — change what an entry says and when, invite
+  // and uninvite guests, set where it is, call it off. All four are gone with
+  // their doors (18 August 2026): the calendar is read-only, so the assistant
+  // can tell somebody what is in their diary and never change it.
   {
     name: "google_meeting_transcript",
     description:

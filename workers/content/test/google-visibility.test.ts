@@ -70,10 +70,11 @@ describe("the diary is read to the END of the window, not to the end of a page",
           : { items: [event("A")], nextPageToken: "P1" }
     )
 
-    const events = await calendarList("tok", { from: "2026-08-01T00:00:00Z", to: "2026-09-01T00:00:00Z" })
+    const window = await calendarList("tok", { from: "2026-08-01T00:00:00Z", to: "2026-09-01T00:00:00Z" })
 
     // The regression, in one line: this used to be ["A"].
-    expect(events.map((e) => e.id)).toEqual(["A", "B", "C"])
+    expect(window.events.map((e) => e.id)).toEqual(["A", "B", "C"])
+    expect(window.truncated, "it reached the end of the window, so this is the WHOLE answer").toBe(false)
     expect(urls).toHaveLength(3)
   })
 
@@ -99,11 +100,15 @@ describe("the diary is read to the END of the window, not to the end of a page",
     const said: string[] = []
     vi.stubGlobal("console", { ...console, error: (m: string) => said.push(String(m)) })
 
-    const events = await calendarList("tok", { from: "2026-08-01T00:00:00Z" })
+    const window = await calendarList("tok", { from: "2026-08-01T00:00:00Z" })
 
     expect(urls.length).toBeLessThanOrEqual(5)
-    expect(events).toHaveLength(urls.length)
+    expect(window.events).toHaveLength(urls.length)
     expect(said.join(" ")).toContain("truncated")
+    // AND IT SAYS SO TO THE CALLER, not only to the log. The backfill walk moves
+    // a cursor over years of diary; a truncated slice it could not see would be
+    // a hole that closes behind it for ever.
+    expect(window.truncated).toBe(true)
   })
 })
 

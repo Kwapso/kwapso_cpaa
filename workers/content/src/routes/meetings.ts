@@ -32,7 +32,6 @@ import {
   readTranscript,
   setMeetingActive,
   syncCalendar,
-  setMeetingHeld,
   updateMeeting,
   type MeetingFilter,
   type MeetingInput,
@@ -47,7 +46,6 @@ function filterFrom(url: URL): MeetingFilter {
     accountId: queryText(url.searchParams.get("accountId"), "Client") ?? undefined,
     appId: queryText(url.searchParams.get("appId"), "App") ?? undefined,
     purposeId: queryText(url.searchParams.get("purposeId"), "Purpose") ?? undefined,
-    status: queryText(url.searchParams.get("status"), "Status") ?? undefined,
     view: queryText(url.searchParams.get("view"), "View") ?? undefined,
     q: queryText(url.searchParams.get("q"), "Search") ?? undefined,
   }
@@ -127,23 +125,18 @@ export async function postUpdateMeeting(request: Request, env: Env): Promise<Res
   return json({ meeting: await getMeeting(cfg, guard, id), total: await countMeetings(cfg, guard, {}) })
 }
 
-/** POST /api/content/meetings/held — it happened, or it hasn't yet. Gated on
- * the meetings module's `edit` right. R17: a repeat moves zero rows → no ping,
- * no second history line. */
-export async function postMeetingHeld(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown; held?: unknown }>(
-    request,
-    env,
-    "meetings",
-    "edit"
-  )
-  await refusePortalCaller(cfg, guard)
-  const id = requireText(body.id, "Meeting", TEXT_LIMITS.short)
-  if (typeof body.held !== "boolean") return fail(400, "invalid_input", "held must be true or false.")
-  const { moved, accountId } = await setMeetingHeld(cfg, guard, actor, id, body.held)
-  if (moved) await publishChange(env, guard.teamId, "meetings", id, "edit", accountId ?? undefined)
-  return json({ meeting: await getMeeting(cfg, guard, id), total: await countMeetings(cfg, guard, {}) })
-}
+/* THERE WAS A `…/meetings/held` DOOR HERE, and the idea behind it has been
+ * retired rather than moved (the owner, 18 August 2026: "this held mark is held
+ * release. I don't care. It's too complicated.").
+ *
+ * The insight that made it simple: a meeting's own START TIME already says
+ * whether it has happened. A status column was a second source of truth for a
+ * question the clock answers, and the two could disagree — a meeting marked held
+ * next Tuesday, a meeting from March still "scheduled" because nobody pressed
+ * anything. So the views key off the date (lib/meetings.ts's `whereFor`), the
+ * notes are always editable, and the column stays in the database saying nothing
+ * to anybody, because deactivate-never-delete applies to history too.
+ */
 
 /** POST /api/content/meetings/active — cancel it, or put it back. Gated on the
  * `delete` right, because cancelling IS this module's delete: the row survives,
@@ -167,16 +160,19 @@ export async function postSetMeetingActive(request: Request, env: Env): Promise<
  * arrival MEANS (CHECKLIST 9.4 and 9.2).
  *
  * Three gates, because it reaches three things: this module's own `edit` right
- * (it moves the meeting to held), `google:read` (it reads the caller's own Drive
- * and calendar, with the caller's own token) and the portal refusal every door
- * here keeps. The timesheet right is deliberately NOT one of them: the logs it
+ * (it writes the transcript onto the meeting), `google:read` (it reads the
+ * caller's own Drive and calendar, with the caller's own token) and the portal
+ * refusal every door here keeps. The timesheet right is deliberately NOT one of
+ * them: the logs it
  * writes are a consequence of a meeting having happened, not somebody filling in
  * a timesheet, and asking for that right would mean the person who runs the
  * client call cannot record that they ran it.
  *
- * Idempotent (R17): the capture claims the row with `transcript_captured_at IS
- * NULL` riding the UPDATE, so a second press reads no transcript, ticks nothing
- * and writes no time. */
+ * Idempotent (R17), and the predicate is the one it always had: the capture
+ * CLAIMS the row with `transcript_captured_at IS NULL` riding the UPDATE, so a
+ * second press reads no transcript and writes no time. Retiring the held status
+ * did not touch that — the claim was never on the status, which is why the
+ * hours cannot be doubled by a second import. */
 export async function postMeetingTranscript(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown }>(request, env, "meetings", "edit")
   await refusePortalCaller(cfg, guard)
@@ -199,23 +195,29 @@ export async function postMeetingTranscript(request: Request, env: Env): Promise
   })
 }
 
-/** POST /api/content/meetings/sync-calendar — bring the diary into step, both
- * ways (CHECKLIST 9.7, and the owner's "it should also update consistently if
- * it's a past event").
+/** POST /api/content/meetings/sync-calendar — read Google's diary into ours.
+ * ONE WAY, and the only direction there is: nothing in this product writes to a
+ * calendar (the owner, 18 August 2026, "just make it one-way so we only grab and
+ * update the information").
  *
- * THREE THINGS, over a window that straddles today. A repeating entry becomes a
- * REAL RECORD four weeks ahead, so there is a month to prepare its notes;
- * every meeting whose entry is in the window has its Google facts brought up to
- * date — the guest list and what each person answered, the organiser, the join
- * link, the attachments; and an entry cancelled in Google is called off here.
- * The instances beyond the horizon come back read-only in `ahead` — shown so
- * nobody is surprised by them, not stored, because an instance six months out
- * can still be moved or called off in Google.
+ * THREE THINGS, over a LIVE WINDOW that straddles today. Every entry in it that
+ * is not a record becomes one; every meeting whose entry is in it has its Google
+ * facts brought up to date — the guest list and what each person answered, the
+ * organiser, the join link, the attachments, the location, the description; and
+ * an entry cancelled in Google is called off here. The instances beyond the
+ * horizon come back read-only in `ahead` — shown so nobody is surprised by them,
+ * not stored, because an instance six months out can still be moved.
+ *
+ * AND A FOURTH: THE BACKFILL. The live window is a few weeks either side of
+ * today, which is not "everything in my calendar". So one SLICE of the wider
+ * window is walked on every call from a cursor kept on the caller's own calendar
+ * connection, and `swept` says how far that walk has reached. It resumes where
+ * it stopped, which is what makes a years-wide read bounded (R14) rather than
+ * unbounded. lib/meetings.ts holds the whole argument and the numbers.
  *
  * THE BACKWARD HALF IS WHY THE TRANSCRIPTS LAND. Everything interesting about a
  * meeting arrives after it, and a sweep that only ever looked forward saw each
- * one exactly once, at the moment when the least was known about it. See
- * lib/meetings.ts for the whole argument.
+ * one exactly once, at the moment when the least was known about it.
  *
  * It creates meetings, so it opens on this module's `create` right; it reads the
  * caller's own calendar with the caller's own token, so it demands `google:read`
@@ -240,6 +242,8 @@ export async function postSyncCalendar(request: Request, env: Env): Promise<Resp
     updated: result.updated,
     cancelled: result.cancelled,
     ahead: result.ahead,
+    swept: result.swept,
+    caughtUp: result.caughtUp,
   })
 }
 

@@ -1164,14 +1164,28 @@ export type CalendarEvent = {
   updatedAt: string | null
 }
 
-/** Guests read off one event — and the most this app will REWRITE in one go.
- * R14's spirit on the other axis (see toEvent), doing double duty: a read that
- * stops at fifty is a bounded cost, and a guest-list write that stops at fifty
- * is a refusal rather than a silent uninvitation (see calendarGuests). */
+/** Guests read off one event. R14's spirit on the other axis (see toEvent): a
+ * read that stops at fifty is a bounded cost, whoever sent the invitation. It
+ * used to do double duty as a WRITE ceiling too — the guest-list rewrite would
+ * rather refuse than silently uninvite everybody past the cap — and that half
+ * went with the writes: this product no longer changes anybody's diary. */
 const EVENT_ATTENDEE_CAP = 50
 
 /**
- * A WINDOW OF THE DIARY.
+ * A WINDOW OF THE DIARY — AND THE ONLY WAY THIS PRODUCT TOUCHES A CALENDAR.
+ *
+ * ONE-WAY, ON PURPOSE AND BY THE OWNER'S INSTRUCTION (18 Aug 2026): "just
+ * remember we want a one-way sync of whatever is in Google Calendar… anything in
+ * my calendar should be up to date here. That's all." Every write this file once
+ * held — create an entry, patch its title or times, add and remove guests, set a
+ * location, call one off — is gone, and with it the four doors and six tools that
+ * stood on them. What is left is this read and `calendarGet` beside it, so a
+ * calendar cannot be changed FROM kwapso by a person, by the assistant, or by a
+ * machine on the MCP surface. The app's Google grant still carries the
+ * read/WRITE scope (`calendar.events`) because Google will not downgrade an
+ * existing grant — narrowing it would sign every connected person out of their
+ * calendar until they reconnected — so the refusal is structural on our side:
+ * there is no function here that could send one.
  *
  * NO `fields` MASK, deliberately. Google's default is the whole event resource,
  * which is exactly what this app now wants — the guest list, the organiser, the
@@ -1190,7 +1204,7 @@ const EVENT_ATTENDEE_CAP = 50
 export async function calendarList(
   token: string,
   range: { from?: string; to?: string; showDeleted?: boolean }
-): Promise<CalendarEvent[]> {
+): Promise<CalendarWindow> {
   const out: CalendarEvent[] = []
   let pageToken = ""
   for (let page = 0; page < CALENDAR_MAX_PAGES; page++) {
@@ -1205,17 +1219,29 @@ export async function calendarList(
     const data = (await googleFetch(url.toString(), token)) as { items?: unknown; nextPageToken?: unknown }
     for (const item of Array.isArray(data.items) ? data.items : []) out.push(toEvent(item))
     pageToken = str(data.nextPageToken)
-    if (!pageToken) return out
+    if (!pageToken) return { events: out, truncated: false }
   }
   // THE CAP WAS REACHED AND GOOGLE STILL HAS MORE. The one case this whole
   // function exists to stop being silent about — said in the tail, with the
   // window rather than the query string, because a diary's contents are the
   // person's and the dates are ours.
+  //
+  // AND NOW IT IS SAID TO THE CALLER TOO, not only to the log. The backfill walk
+  // in lib/meetings.ts advances a cursor over a window measured in YEARS, so a
+  // truncated slice it could not see would be a hole in the diary that closes
+  // behind it for ever. `truncated` is what lets the walk stop at the last entry
+  // it really read instead of at the date it hoped to reach.
   console.error(
     `[google] calendar window truncated at ${CALENDAR_MAX_PAGES * GOOGLE_PAGE_SIZE} events (${range.from ?? "any"} → ${range.to ?? "any"})`
   )
-  return out
+  return { events: out, truncated: true }
 }
+
+/** ONE WINDOW'S ANSWER: what was in it, and whether that was all of it. Two
+ * fields rather than a bare array because "fifty entries" and "the first fifty
+ * of an unknown number" are different answers and only one of them is safe to
+ * move a cursor past. */
+export type CalendarWindow = { events: CalendarEvent[]; truncated: boolean }
 
 /** HOW MANY PAGES OF ONE DIARY WINDOW THIS APP WILL WALK.
  *
@@ -1234,33 +1260,9 @@ export async function calendarList(
  * tail is dropped LOUDLY — which is the whole difference. */
 const CALENDAR_MAX_PAGES = 5
 
-export async function calendarCreate(
-  token: string,
-  input: { summary: string; description?: string; start: string; end: string; allDay?: boolean }
-): Promise<CalendarEvent> {
-  // An all-day entry uses `date`; a timed one uses `dateTime`. Google treats the
-  // two as different fields rather than a flag, and a sprint that runs for three
-  // weeks is an all-day entry — a sprint does not start at 09:00.
-  const when = (value: string) => (input.allDay ? { date: value.slice(0, 10) } : { dateTime: value })
-  const data = (await googleFetch(
-    "https://www.googleapis.com/calendar/v3/calendars/primary/events",
-    token,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        summary: input.summary,
-        description: input.description ?? "",
-        start: when(input.start),
-        end: when(input.end),
-      }),
-    }
-  )) as Record<string, unknown>
-  return toEvent(data)
-}
-
-/** ONE event, by its id. The read behind every calendar WRITE below: each of
- * them has to know what is there before it can say what changed, and a door that
- * patches without looking is a door that cannot answer "nothing moved" (R17). */
+/** ONE event, by its id — the read behind the transcript hunt, which starts at a
+ * diary entry and needs that entry's own attachments. Nothing here writes: the
+ * calendar is READ-ONLY in this product (see the note above `calendarList`). */
 export async function calendarGet(token: string, eventId: string): Promise<CalendarEvent> {
   return toEvent(
     await googleFetch(
@@ -1268,123 +1270,6 @@ export async function calendarGet(token: string, eventId: string): Promise<Calen
       token
     )
   )
-}
-
-/**
- * THE ONE WRITE ON AN EXISTING EVENT — everything above it is a caller deciding
- * WHICH fields to hand over.
- *
- * A PATCH rather than a PUT, and that is the whole safety of this family: Google's
- * update replaces the event with what you send, so a door that only wanted to fix
- * a title would silently drop the guest list, the location and the conference
- * link somebody spent a morning arranging. Sending only the changed fields makes
- * "edit the time" mean the time.
- *
- * `sendUpdates` decides whether the guests hear about it. Google's default is to
- * tell nobody, which is wrong for every change a person makes on purpose: an
- * appointment moved without a word is an appointment two people turn up to at
- * different hours.
- */
-async function calendarPatch(
-  token: string,
-  eventId: string,
-  patch: Record<string, unknown>,
-  sendUpdates: "all" | "none" = "all"
-): Promise<CalendarEvent> {
-  const url = new URL(
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`
-  )
-  url.searchParams.set("sendUpdates", sendUpdates)
-  return toEvent(
-    await googleFetch(url.toString(), token, { method: "PATCH", body: JSON.stringify(patch) })
-  )
-}
-
-/** Change what an entry SAYS and WHEN it is. Every field is optional and an
- * absent one is left exactly as it was — see calendarPatch for why that is the
- * difference between an edit and an overwrite. */
-export async function calendarUpdate(
-  token: string,
-  eventId: string,
-  input: {
-    summary?: string
-    description?: string
-    location?: string
-    start?: string
-    end?: string
-    allDay?: boolean
-  }
-): Promise<CalendarEvent> {
-  const when = (value: string) => (input.allDay ? { date: value.slice(0, 10) } : { dateTime: value })
-  return calendarPatch(token, eventId, {
-    ...(input.summary === undefined ? {} : { summary: input.summary }),
-    ...(input.description === undefined ? {} : { description: input.description }),
-    ...(input.location === undefined ? {} : { location: input.location }),
-    ...(input.start === undefined ? {} : { start: when(input.start) }),
-    ...(input.end === undefined ? {} : { end: when(input.end) }),
-  })
-}
-
-/**
- * WHO IS COMING — added and removed in one call, against the list Google
- * currently holds.
- *
- * READ-MODIFY-WRITE, because Google has no "add one guest" operation: the
- * attendee list is a field, and writing it means writing all of it. Which is
- * exactly why this reads the RAW list rather than the one `toEvent` carries —
- * that one is capped at fifty for the sake of a bounded read, and rewriting a
- * capped list would silently uninvite everybody past the cap. An event with more
- * guests than we will rewrite is REFUSED, in words, rather than quietly trimmed.
- *
- * Matching is by address, lower-cased: `Ana <ana@x.de>` and `ana@x.de` are one
- * person, and a remove that missed because of a capital letter would leave
- * somebody invited to a meeting they were told they were off.
- */
-export async function calendarGuests(
-  token: string,
-  eventId: string,
-  input: { add: string[]; remove: string[] }
-): Promise<{ event: CalendarEvent; changed: boolean }> {
-  const current = (await googleFetch(
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}?fields=attendees`,
-    token
-  )) as { attendees?: unknown }
-  const rows = Array.isArray(current.attendees) ? current.attendees : []
-  if (rows.length > EVENT_ATTENDEE_CAP)
-    throw new GuardError(
-      409,
-      "google_too_many_guests",
-      `That event has more than ${EVENT_ATTENDEE_CAP} guests, change the guest list in Google Calendar itself.`
-    )
-  const drop = new Set(input.remove.map((e) => e.trim().toLowerCase()).filter(Boolean))
-  const kept = rows.filter((raw) => !drop.has(str((raw as Record<string, unknown>).email).toLowerCase()))
-  const have = new Set(kept.map((raw) => str((raw as Record<string, unknown>).email).toLowerCase()))
-  const added = input.add
-    .map((e) => e.trim().toLowerCase())
-    .filter((e) => e && !have.has(e))
-    .map((email) => ({ email }))
-  // NOTHING MOVED (R17): nobody was on the list to drop and nobody new to add.
-  // The door answers that honestly instead of writing the same list back and
-  // mailing every guest a change notification about it.
-  if (added.length === 0 && kept.length === rows.length)
-    return { event: await calendarGet(token, eventId), changed: false }
-  return {
-    event: await calendarPatch(token, eventId, { attendees: [...kept, ...added] }),
-    changed: true,
-  }
-}
-
-/** Call it off. `cancelled` rather than a delete, which is Google's own version
- * of the house rule: the entry stays in everybody's calendar marked cancelled,
- * the guests are told, and nobody is left holding an appointment that silently
- * evaporated. A second call moves nothing and says so (R17). */
-export async function calendarCancel(
-  token: string,
-  eventId: string
-): Promise<{ event: CalendarEvent; changed: boolean }> {
-  const before = await calendarGet(token, eventId)
-  if (before.status === "cancelled") return { event: before, changed: false }
-  return { event: await calendarPatch(token, eventId, { status: "cancelled" }), changed: true }
 }
 
 /** THE VIDEO LINK OFF `conferenceData`, when there is no plain `hangoutLink`.

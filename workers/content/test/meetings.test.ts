@@ -3,24 +3,28 @@
 // REST transport is stubbed (pointed at the in-memory database), plus Google
 // itself for the one door that reaches into a calendar.
 //
-// FOUR THINGS THIS SUITE IS FOR:
+// FIVE THINGS THIS SUITE IS FOR:
 //   • a client login cannot reach ONE door of this module (R21), whatever their
 //     role says — their role here holds every meeting right on purpose;
-//   • a repeat is silent (R17): marking a held meeting held, or cancelling a
-//     cancelled one, moves zero rows and writes no second line of history;
+//   • a repeat is silent (R17): cancelling a cancelled meeting moves zero rows
+//     and writes no second line of history;
 //   • the diary PAGES (R14) and its badge is the exact server count (R16);
-//   • pressing "add to my calendar" twice makes ONE entry — the shape R17 asks
-//     of a status move, applied to a write that lands in a system we do not own,
-//     where a duplicate is not a stale screen but a real appointment somebody
-//     has to go and delete.
+//   • THE CALENDAR IS READ-ONLY. Not one door in this app writes to Google's
+//     calendar, and the suite asserts that by asking the seven that used to and
+//     getting nothing back;
+//   • READING A TRANSCRIPT TWICE DOES NOT DOUBLE ANYBODY'S HOURS. The claim
+//     rides `transcript_captured_at IS NULL` and always did — which is why
+//     retiring the `held` status could not weaken it — and this suite proves it
+//     rather than trusting the reading.
 
 import type { DatabaseSync } from "node:sqlite"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const holder = vi.hoisted(() => ({ db: null as DatabaseSync | null }))
-const calendarCalls = vi.hoisted(() => ({ n: 0 }))
 /** What Google's diary holds, per test — see "everything on the calendar" below. */
 const diary = vi.hoisted(() => ({ events: [] as Record<string, unknown>[] }))
+/** What the transcript hunt finds, per test, and how many times it was asked. */
+const transcript = vi.hoisted(() => ({ found: null as Record<string, unknown> | null, hunts: 0 }))
 
 vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@shared/workers/d1-rest")>()
@@ -38,32 +42,33 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../src/lib/google-api")>()
   return {
     ...actual,
-    // Every call makes a NEW entry, exactly as Google does — so if the door ever
-    // stopped claiming the event id on the row, this fixture would happily hand
-    // back a second one and the test below would see it.
-    // A FAITHFUL WINDOW. The sweep reads three ranges (a fortnight back, four
-    // weeks forward, and the horizon beyond), so a fixture that answered all
-    // three with the same entry would hand the same event to the loop twice and
-    // test a collision rather than the rule.
-    calendarList: async (_t: string, range: { from?: string; to?: string }) =>
-      diary.events.filter((e) => {
+    // A FAITHFUL WINDOW. The sweep reads four ranges (a fortnight back, four
+    // weeks forward, one backfill slice and the horizon beyond), so a fixture
+    // that answered them all with the same entry would hand the same event to
+    // the loop four times and test a collision rather than the rule.
+    calendarList: async (_t: string, range: { from?: string; to?: string }) => ({
+      events: diary.events.filter((e) => {
         const at = Date.parse(e.start as string)
         return (!range.from || at >= Date.parse(range.from)) && (!range.to || at < Date.parse(range.to))
       }),
-    calendarCreate: async (_t: string, input: { summary: string; start: string; end: string }) => {
-      calendarCalls.n++
-      return {
-        id: `EVENT_${calendarCalls.n}`,
-        summary: input.summary,
-        description: "",
-        start: input.start,
-        end: input.end,
-        url: `https://calendar.example/EVENT_${calendarCalls.n}`,
-        attendees: [],
-      }
-    },
+      truncated: false,
+    }),
+    // The transcript capture reads the entry before hunting for its transcript.
+    calendarGet: async (_t: string, eventId: string) =>
+      diary.events.find((e) => e.id === eventId) ?? { id: eventId, attendees: [] },
+    // NOTHING ELSE IS MOCKED, AND THAT IS THE POINT: there is no `calendarCreate`
+    // here because there is no `calendarCreate` in the module any more. The
+    // read-only suite below asks the seven doors that used to write and asserts
+    // the app no longer has one.
   }
 })
+
+vi.mock("../src/lib/google-transcript", () => ({
+  findTranscript: async () => {
+    transcript.hunts++
+    return transcript.found
+  },
+}))
 
 import worker from "../src/index"
 import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
@@ -120,13 +125,14 @@ const historyCount = (id: string) =>
 
 beforeEach(() => {
   published = []
-  calendarCalls.n = 0
   diary.events = []
+  transcript.found = null
+  transcript.hunts = 0
   holder.db = buildSpineDb()
-  // BOTH roles hold every meeting right, plus the two Google switches — so a
-  // refusal below is the DOOR's and never the role's. Asserted, not assumed.
+  // BOTH roles hold every meeting right and the Google one — so a refusal below
+  // is the DOOR's and never the role's. Asserted, not assumed.
   for (const role of [IDS.adminRole, IDS.clientRole])
-    for (const module of ["meetings", "google", "google_events"])
+    for (const module of ["meetings", "google"])
       db().exec(
         `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
          VALUES ('${role}_${module}', '${role}', '${module}', 1, 1, 1, 1);`
@@ -145,9 +151,11 @@ describe("R21 — a client login cannot reach the diary at all", () => {
     ["GET /api/content/meetings", undefined, ""],
     ["POST /api/content/meetings", { title: "Theirs now", startsAt: "2026-09-14T10:00:00.000Z" }, ""],
     ["POST /api/content/meetings/update", { id: "x", title: "T", startsAt: "2026-09-14T10:00:00.000Z" }, ""],
-    ["POST /api/content/meetings/held", { id: "x", held: true }, ""],
     ["POST /api/content/meetings/active", { id: "x", active: false }, ""],
-    ["POST /api/content/google/calendar/meeting", { meetingId: "x" }, ""],
+    ["POST /api/content/meetings/sync-calendar", {}, ""],
+    ["POST /api/content/meetings/transcript", { id: "x" }, ""],
+    ["GET /api/content/meetings/transcript", undefined, "?id=x"],
+    ["GET /api/content/meetings/people", undefined, "?id=x"],
   ]
 
   it("every door refuses them — reads and writes alike", async () => {
@@ -199,23 +207,6 @@ describe("bad input is a 400, never a 500 (R20)", () => {
 })
 
 describe("R17 — a repeat is silent", () => {
-  it("marking a held meeting held again moves nothing and says nothing", async () => {
-    const m = await arrange({})
-    const before = historyCount(m.id)
-
-    const first = await call(IDS.staffUser, "POST /api/content/meetings/held", { id: m.id, held: true })
-    expect(first.status).toBe(200)
-    expect(((await first.json()) as { meeting: Meeting }).meeting.status).toBe("held")
-    const afterFirst = historyCount(m.id)
-    expect(afterFirst, "the real move writes one line of history").toBe(before + 1)
-    published = []
-
-    const second = await call(IDS.staffUser, "POST /api/content/meetings/held", { id: m.id, held: true })
-    expect(second.status).toBe(200)
-    expect(historyCount(m.id), "the repeat writes none").toBe(afterFirst)
-    expect(published, "and pings nobody").toEqual([])
-  })
-
   it("cancelling a cancelled meeting moves nothing — and the row survives either way", async () => {
     const m = await arrange({ title: "Kick-off" })
     await call(IDS.staffUser, "POST /api/content/meetings/active", { id: m.id, active: false })
@@ -289,10 +280,15 @@ describe("the diary itself", () => {
     expect(ids.size).toBe(55)
   })
 
-  it("the default view hides what has already been held, and `all` shows the lot", async () => {
-    const held = await arrange({ title: "Already happened" })
-    await arrange({ title: "Still to come" })
-    await call(IDS.staffUser, "POST /api/content/meetings/held", { id: held.id, held: true })
+  // THE CLOCK DECIDES, NOT A TICK. `upcoming` used to mean "nobody has marked it
+  // held", which answered a question about somebody's memory: a meeting from
+  // March that nobody ticked sat in "upcoming" for ever, and one ticked early
+  // vanished from a day it had not reached. Both meetings below are arranged the
+  // same way and neither is touched afterwards — the only thing separating them
+  // is when they are.
+  it("the default view hides what has already started, and `all` shows the lot", async () => {
+    await arrange({ title: "Already happened", startsAt: new Date(Date.now() - 86_400_000).toISOString() })
+    await arrange({ title: "Still to come", startsAt: new Date(Date.now() + 86_400_000).toISOString() })
 
     const upcoming = (await (
       await call(IDS.staffUser, "GET /api/content/meetings", undefined, "?view=upcoming")
@@ -307,58 +303,43 @@ describe("the diary itself", () => {
   })
 })
 
-describe("a meeting booked here shows up in a calendar — once", () => {
-  function connectCalendar(userId: string) {
-    const future = new Date(Date.now() + 3_600_000).toISOString()
-    db().exec(
-      `INSERT INTO google_connections (id, user_id, service, google_email, scopes, access_token,
-         access_expires_at, refresh_token, created_at, creator_id)
-       VALUES ('C_cal', '${userId}', 'calendar', 'me@kwapso.app', 'scope', 'plain', '${future}',
-         'plain-refresh', '2026-01-01', '${userId}');`
-    )
-  }
+// ── THE CALENDAR IS READ-ONLY, AND THE PROOF IS AN ABSENCE ───────────────────
+//
+// The owner, 18 August 2026: "disable the ability to create, edit, or delete
+// anything in the calendar from the frontend… just make it one-way so we only
+// grab and update the information."
+//
+// Seven doors did it. Asking each one now must produce a 404 from the
+// switchboard — NOT a 403, which would mean the door still exists and is merely
+// refusing this caller. The distinction is the whole test: a permission can be
+// granted back, a missing route cannot.
+describe("nothing in this app writes to a calendar", () => {
+  const GONE: [string, unknown][] = [
+    ["POST /api/content/google/calendar/events", { summary: "New", start: "x", end: "y" }],
+    ["POST /api/content/google/calendar/event/update", { eventId: "E", summary: "Renamed" }],
+    ["POST /api/content/google/calendar/event/guests", { eventId: "E", add: ["a@b.c"] }],
+    ["POST /api/content/google/calendar/event/location", { eventId: "E", location: "Room 2" }],
+    ["POST /api/content/google/calendar/event/cancel", { eventId: "E" }],
+    ["POST /api/content/google/calendar/sprint", { sprintId: "S" }],
+    ["POST /api/content/google/calendar/meeting", { meetingId: "M" }],
+  ]
 
-  it("the first press creates an entry and the second answers with the one that exists", async () => {
-    connectCalendar(IDS.staffUser)
-    const m = await arrange({ title: "Quarterly review", accountId: IDS.victimAccount })
-
-    const first = (await (
-      await call(IDS.staffUser, "POST /api/content/google/calendar/meeting", { meetingId: m.id })
-    ).json()) as { event: { id: string }; alreadyThere: boolean }
-    expect(first.alreadyThere).toBe(false)
-    expect(calendarCalls.n).toBe(1)
-
-    const second = (await (
-      await call(IDS.staffUser, "POST /api/content/google/calendar/meeting", { meetingId: m.id })
-    ).json()) as { event: { id: string }; alreadyThere: boolean }
-    expect(second.alreadyThere, "a second press is not a second appointment").toBe(true)
-    expect(second.event.id).toBe(first.event.id)
-    expect(calendarCalls.n, "and Google is not asked again at all").toBe(1)
+  it.each(GONE)("%s no longer exists", async (route, body) => {
+    const res = await call(IDS.staffUser, route, body)
+    expect(res.status, `${route} must be gone, not merely gated`).toBe(404)
   })
 
-  it("a cancelled meeting is not pushed anywhere", async () => {
-    connectCalendar(IDS.staffUser)
-    const m = await arrange({ title: "Called off" })
-    await call(IDS.staffUser, "POST /api/content/meetings/active", { id: m.id, active: false })
-    const res = await call(IDS.staffUser, "POST /api/content/google/calendar/meeting", { meetingId: m.id })
-    expect(res.status).toBe(409)
-    expect(calendarCalls.n).toBe(0)
-  })
-
-  it("without the events switch the door refuses, however much else the role holds", async () => {
-    connectCalendar(IDS.staffUser)
-    const m = await arrange({ title: "Quarterly review" })
-    db().exec(
-      `UPDATE role_permissions SET can_create = 0 WHERE role_id = '${IDS.adminRole}' AND module = 'google_events';`
-    )
-    const res = await call(IDS.staffUser, "POST /api/content/google/calendar/meeting", { meetingId: m.id })
-    expect(res.status).toBe(403)
-    expect(calendarCalls.n).toBe(0)
+  it("and the module itself exports no function that could send one", async () => {
+    const api = await import("../src/lib/google-api")
+    for (const name of ["calendarCreate", "calendarUpdate", "calendarGuests", "calendarCancel", "calendarPatch"])
+      expect(name in api, `${name} must not exist — a door can be re-added, an import cannot be forgotten`).toBe(
+        false
+      )
   })
 })
 
 describe("R1 — every write publishes", () => {
-  it("a create, an edit, a status move and a cancel each ping the diary", async () => {
+  it("a create, an edit and a cancel each ping the diary", async () => {
     const m = await arrange({ title: "Review" })
     expect(published.map((p) => p.resource)).toContain("meetings")
     published = []
@@ -368,9 +349,8 @@ describe("R1 — every write publishes", () => {
       title: "Review, moved",
       startsAt: "2026-09-15T10:00:00.000Z",
     })
-    await call(IDS.staffUser, "POST /api/content/meetings/held", { id: m.id, held: true })
     await call(IDS.staffUser, "POST /api/content/meetings/active", { id: m.id, active: false })
-    expect(published.filter((p) => p.resource === "meetings").length).toBe(3)
+    expect(published.filter((p) => p.resource === "meetings").length).toBe(2)
     for (const p of published) expect(p.id, "row-level, so an open list patches ONE row").toBe(m.id)
   })
 })
@@ -484,5 +464,106 @@ describe("the sweep brings in everything, not only the repeating entries", () =>
     const again = await call(IDS.staffUser, "POST /api/content/meetings/sync-calendar", {})
     expect((await again.json()) as { created: number; updated: number }).toMatchObject({ created: 0, updated: 0 })
     expect(diaryTitles()).toHaveLength(1)
+  })
+
+  // ── THE WALK THAT MAKES "EVERYTHING" TRUE ──────────────────────────────────
+  //
+  // The live window is a fortnight back and four weeks on. "Anything in my
+  // calendar should be up to date here" reaches further than that, so a cursor
+  // on the connection walks the wider window — five years back, a year on — one
+  // ninety-day slice per call. Bounded per call (R14), complete by repetition.
+  it("a meeting from years ago is reached by walking, one slice per call", async () => {
+    const longAgo = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000)
+    diary.events = [entry({ id: "OLD", summary: "The first kickoff", start: longAgo.toISOString(),
+      end: new Date(longAgo.getTime() + 3_600_000).toISOString() })]
+
+    // The first call starts at the FLOOR, five years back, so it cannot possibly
+    // have reached a meeting from last year yet. That is the honest half of a
+    // resumable walk and the half a fake cursor would skip.
+    const first = (await (
+      await call(IDS.staffUser, "POST /api/content/meetings/sync-calendar", {})
+    ).json()) as { created: number; swept: string; caughtUp: boolean }
+    expect(first.created).toBe(0)
+    expect(first.caughtUp, "five years is not one slice").toBe(false)
+    expect(diaryTitles()).toHaveLength(0)
+
+    // Keep calling. Each one advances the cursor by a slice, and the meeting
+    // arrives when the walk reaches the quarter it is in.
+    let swept = first.swept
+    for (let i = 0; i < 30 && !diaryTitles().length; i++) {
+      const r = (await (
+        await call(IDS.staffUser, "POST /api/content/meetings/sync-calendar", {})
+      ).json()) as { swept: string }
+      expect(Date.parse(r.swept), "the cursor only ever moves forward").toBeGreaterThan(Date.parse(swept))
+      swept = r.swept
+    }
+    expect(diaryTitles()).toEqual(["The first kickoff"])
+  })
+
+  it("the cursor is kept on the caller's own calendar connection, so it survives the request", async () => {
+    await call(IDS.staffUser, "POST /api/content/meetings/sync-calendar", {})
+    const row = db()
+      .prepare("SELECT calendar_swept_through FROM google_connections WHERE id = 'C_CAL'")
+      .get() as { calendar_swept_through: string | null }
+    expect(row.calendar_swept_through, "a walk that forgets where it got to is not resumable").toBeTruthy()
+  })
+})
+
+// ── READING A TRANSCRIPT TWICE MUST NOT DOUBLE ANYBODY'S HOURS ───────────────
+//
+// The capture writes a work log per one of OUR OWN people in the room, and those
+// hours reach a margin. So running it twice is the failure that would show up as
+// money.
+//
+// THE PREDICATE IS `transcript_captured_at IS NULL`, riding the UPDATE that
+// claims the row — a fact about the JOB rather than about the meeting. It was
+// already that before the `held` status was retired, which is exactly why
+// retiring the status could not weaken it; this suite proves that rather than
+// reasoning about it.
+describe("the transcript import is idempotent", () => {
+  beforeEach(() => {
+    connectCalendar()
+    transcript.found = {
+      fileId: "DOC_1",
+      name: "Quarterly review — transcript",
+      url: "https://docs.example/DOC_1",
+      foundBy: "attachment",
+      text: "We agreed to move the driver app forward.",
+    }
+  })
+
+  const logCount = () =>
+    (db().prepare("SELECT COUNT(*) n FROM work_logs WHERE target_table = 'meetings'").get() as { n: number }).n
+
+  it("a second import writes no second work log, and says why", async () => {
+    // A past entry with one of OUR OWN people on it — the intersection with the
+    // team's membership is what decides whose hour is a cost.
+    const ranAt = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
+    diary.events = [
+      entry({
+        id: "PAST_1",
+        summary: "Quarterly review",
+        start: ranAt.toISOString(),
+        end: new Date(ranAt.getTime() + 3_600_000).toISOString(),
+        attendees: [{ email: "staff@kwapso.app", name: "Staff", response: "accepted", organizer: true, optional: false }],
+      }),
+    ]
+    await call(IDS.staffUser, "POST /api/content/meetings/sync-calendar", {})
+    const id = (db().prepare("SELECT id FROM meetings LIMIT 1").get() as { id: string }).id
+
+    const first = (await (
+      await call(IDS.staffUser, "POST /api/content/meetings/transcript", { id })
+    ).json()) as { captured: boolean; logsWritten: number; note: string | null }
+    expect(first.captured).toBe(true)
+    const written = logCount()
+    expect(written, "the real import writes the hours").toBe(first.logsWritten)
+
+    const second = (await (
+      await call(IDS.staffUser, "POST /api/content/meetings/transcript", { id })
+    ).json()) as { captured: boolean; logsWritten: number; note: string | null }
+    expect(second.captured, "the claim moved zero rows, so nothing happened").toBe(false)
+    expect(second.logsWritten).toBe(0)
+    expect(second.note).toContain("already been read")
+    expect(logCount(), "and nobody's week grew a second time").toBe(written)
   })
 })

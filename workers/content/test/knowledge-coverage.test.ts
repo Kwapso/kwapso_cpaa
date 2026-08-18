@@ -298,7 +298,12 @@ describe("the text a kind produces is knowledge, not a business card", () => {
       "Bergman invoice approval (done by their bookkeeper)", // what we mapped
       "cannot see the March invoice run", // what is open
       "Send us the supplier list", // what we are waiting on
-      "We last met on 2026-03-30", // when we last spoke
+      // WHEN WE LAST SPOKE, FROM THE CLOCK. The fixture holds two meetings with
+      // this client: a March one somebody ticked held, and an April catch-up
+      // nobody ever touched. The right answer is the April one, and the old
+      // `status = 'held'` test gave the March one — the exact failure the retired
+      // status kept producing, in the sentence the assistant reads out.
+      "We last met on 2026-04-06",
     ])
       expect(body, `the account rollup should say "${fact}"`).toContain(fact)
     // The OPEN count is a COUNT(*), not the length of a truncated list.
@@ -647,13 +652,18 @@ function digest(text: string): string {
  * without somebody deciding whether the rows already indexed need re-writing. */
 const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   ticket: { version: 1, digest: "f16d0fb1e2054e9f" },
-  account: { version: 1, digest: "0e4e0ca41f5b16e9" },
+  // v2: "when we last spoke" is keyed on the CLOCK rather than on a retired
+  // `held` status, so a client we saw in April no longer reads as last seen in
+  // March. Every account already indexed says the old date until it is re-written.
+  account: { version: 2, digest: "45471c7b5a7589b7" },
   contact: { version: 1, digest: "baf7a93fca7c32e4" },
   app: { version: 1, digest: "6ad4572782893ad8" },
   process: { version: 1, digest: "1d86124a19fa7058" },
   sprint: { version: 1, digest: "778b4d9b3c3cdce8" },
   story: { version: 1, digest: "a590a6c8703de3ee" },
-  meeting: { version: 1, digest: "55053044cea83341" },
+  // v2: the summary says "already happened" / "still to come" from the start
+  // time, where it used to quote the retired status column.
+  meeting: { version: 2, digest: "65d8cfae5e392220" },
   todo: { version: 1, digest: "a9dcdb8d5676cf63" },
   task: { version: 1, digest: "aabda570655bf27a" },
 }

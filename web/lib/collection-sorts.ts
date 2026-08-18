@@ -89,11 +89,12 @@ export const COLLECTION_SORTS: Record<string, CollectionSort> = {
   },
   meetings: {
     defaultSort: "when",
+    // A "Status" option sat here and went with the status: sorting by when a
+    // meeting IS is already sorting by whether it has happened.
     options: [
       { value: "when", label: "Most recent first", defaultDir: "desc" },
       { value: "title", label: "Name", defaultDir: "asc" },
       { value: "client", label: "Client", defaultDir: "asc" },
-      { value: "status", label: "Status", defaultDir: "asc" },
       { value: "added", label: "Recently added", defaultDir: "desc" },
     ],
   },

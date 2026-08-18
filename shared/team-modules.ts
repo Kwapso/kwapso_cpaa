@@ -54,18 +54,21 @@ export const TEAM_MODULES = [
   "brand_assets",
   "delivery",
   "staff_profiles",
-  // GOOGLE — THREE MODULES, BECAUSE THE OWNER NAMED THREE SWITCHES.
+  // GOOGLE — TWO MODULES. IT WAS THREE.
   //
   // "May connect a Google account" is one switch per role. "kwapso may act in
-  // Google on my behalf" is TWO more — sending mail, and creating events —
-  // deliberately separate from each other AND from the `agent` right, so that
-  // giving somebody the assistant does not silently give the assistant their
-  // outbox. The tall sheet's unit of "a switch per role" is a module row, so
-  // three switches are three rows. (`agent` is the precedent for a module whose
-  // four rights are not all meaningful: nothing reads agent:edit either.)
+  // Google on my behalf" is one more — sending mail — deliberately separate from
+  // the `agent` right, so that giving somebody the assistant does not silently
+  // give the assistant their outbox. The tall sheet's unit of "a switch per
+  // role" is a module row. (`agent` is the precedent for a module whose four
+  // rights are not all meaningful: nothing reads agent:edit either.)
+  //
+  // THE THIRD WAS `google_events`, "Calendar on your behalf", and it went with
+  // the doors it guarded when the calendar became READ-ONLY (18 Aug 2026). A
+  // switch nothing consults is worse than no switch: somebody grants it, expects
+  // a capability, and gets silence. Migration 0037 deletes its rows.
   "google",
   "google_mail",
-  "google_events",
 ] as const
 
 /** Plain-English label for each module, shown as the rows of the permission
@@ -214,7 +217,6 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   // it from kwapso" is the same act, done by the same product, from the same
   // mailbox.
   google_mail: "Mail on your behalf",
-  google_events: "Calendar on your behalf",
 }
 
 /** The matrix rows: { key, label } per module, in display order. */

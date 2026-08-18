@@ -2545,6 +2545,46 @@ SELECT lower(hex(randomblob(16))), ${sqlString(SELECTABLE_GROUPS.deliverableKind
 ).join("\n")}
 `,
   },
+  {
+    // THE CALENDAR BECOMES ONE-WAY, AND THE WALK THAT MAKES "EVERYTHING" TRUE.
+    //
+    // The owner, 18 August 2026: "disable the ability to create, edit, or delete
+    // anything in the calendar from the frontend… just make it one-way so we only
+    // grab and update the information", and beside it "anything in my calendar
+    // should be up to date here. That's all."
+    //
+    // ── \`calendar_swept_through\` ─────────────────────────────────────────────
+    // ONE column, holding ONE moment: how far a forward-only walk over the whole
+    // calendar has read. The live window (a fortnight back, four weeks on) is
+    // swept on every call and keeps the diary current; this cursor is what lets a
+    // FIVE-YEAR window be read a ninety-day slice at a time without any single
+    // request being unbounded (R14). It sits on the CONNECTION because the walk
+    // is one person's own diary read with one person's own token — a team-level
+    // cursor would mean one colleague's progress deciding another's.
+    //
+    // NULL means "never walked", which the reader turns into the floor. There is
+    // deliberately no back-fill: a null that reads as "start at the beginning" is
+    // the only value that cannot be wrong.
+    //
+    // ── AND THE SWITCH THAT NOW SWITCHES NOTHING ────────────────────────────
+    // \`google_events\` ("Calendar on your behalf") existed to carry one right:
+    // may kwapso put an event in your calendar. Nothing can, on any surface, so
+    // the row is deleted rather than left on the Roles screen offering a
+    // capability the code does not have. That is the same reasoning R24 makes
+    // structurally: a permission somebody can grant, guarding nothing, is a
+    // sentence the app cannot keep.
+    //
+    // Deleting a permission ROW is not deleting data about the agency's work —
+    // the deactivate-never-delete rule is about records, and this is a column of
+    // the permission matrix being retired. Same shape as 0025, which purged two
+    // whole modules.
+    version: "0037_calendar_one_way",
+    sql: `
+ALTER TABLE google_connections ADD COLUMN calendar_swept_through TEXT;
+
+DELETE FROM role_permissions WHERE module = 'google_events';
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

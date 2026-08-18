@@ -237,7 +237,7 @@ export async function readGoogleMaterial(
   if (wanted.includes("calendar")) {
     const token = await tokenOrNull(env, cfg, guard, "calendar")
     if (token)
-      for (const event of await calendarList(token, { from: request.from, to: request.to }))
+      for (const event of (await calendarList(token, { from: request.from, to: request.to })).events)
         items.push({
           service: "calendar",
           sourceId: null,

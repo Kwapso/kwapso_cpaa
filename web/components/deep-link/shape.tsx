@@ -221,13 +221,17 @@ export function shapeMeetingsList(meetings: Meeting[]): ScreenData {
       // so — "didn't we have a call in March?" is answered either way, and the
       // answer "yes, and we called it off" is a different one from silence.
       name: m.active ? m.title : `${m.title} (cancelled)`,
-      // K1: when, and who with. The purpose and the held flag are columns on the
-      // "all" view, which is where a person compares meetings on them (K2).
+      // K1: when, and who with. The purpose is a column on the "all" view, which
+      // is where a person compares meetings on it (K2).
       detail: [formatDate(m.startsAt), m.accountName ?? "ours"].filter(Boolean).join(" · ") || "—",
       // Facet columns (read by the filter engine, not the renderer).
       client: m.accountName ?? "Ours",
       purpose: m.purposeName ?? "Not said",
-      state: !m.active ? "Cancelled" : m.status === "held" ? "Held" : "Scheduled",
+      // WHETHER IT HAS HAPPENED, FROM THE CLOCK. There used to be a `held` status
+      // on the row and this read it; a flag somebody had to remember to tick
+      // could disagree with the calendar in both directions, so the start time
+      // answers it now and cannot go stale.
+      state: !m.active ? "Cancelled" : Date.parse(m.startsAt) < Date.now() ? "Past" : "Upcoming",
       // THE COLUMNS THE "ALL" VIEW SHOWS (CHECKLIST 9.1: "all, with far more
       // columns"). They ride every row rather than a second shaper, because the
       // three views are three renderings of ONE list — a second shaper is a
