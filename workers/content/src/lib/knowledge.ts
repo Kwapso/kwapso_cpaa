@@ -1065,13 +1065,26 @@ export async function setSourceActive(
  * DERIVED id — `<sourceId>:<seq>` for every sequence the row says it had, plus
  * its summary — so the index can be cleaned without first asking Vectorize what
  * it holds, and a source that got SHORTER loses its tail rather than keeping
- * orphan vectors nothing will ever overwrite. */
+ * orphan vectors nothing will ever overwrite.
+ *
+ * `fromSeq` IS THE DIFFERENCE BETWEEN TAKING A SOURCE AWAY AND REBUILDING IT.
+ * Taking it away clears everything (`fromSeq` 0, the default). A REBUILD passes
+ * the new chunk total and clears only the TAIL — the sequences the new text no
+ * longer has — because every id from 0 upwards is about to be overwritten in
+ * place by a write that says so (`ON CONFLICT (id) DO UPDATE`, below). Deleting
+ * them first bought nothing and cost the one thing that matters here: while a
+ * rebuild is mid-flight the material is GONE, so a second rebuild starting a
+ * second later — the owner pressing "Bring it in" while the fifteen-minute
+ * sweep is running — used to delete the pieces the first one had already
+ * written. Overwrite-in-place plus a tail trim converges instead: two rebuilds
+ * of the same text write the same bytes to the same ids, in any order. */
 async function clearIndex(
   env: Env,
   cfg: D1Rest,
   guard: MemberGuard,
   sourceId: string,
-  known?: { chunkCount: number; indexedChunks: number }
+  known?: { chunkCount: number; indexedChunks: number },
+  fromSeq = 0
 ): Promise<void> {
   const counts =
     known ??
@@ -1089,16 +1102,27 @@ async function clearIndex(
     0
   )
   await deleteVectors(env, [
+    // The record's own cover goes either way: a rebuild re-embeds it a moment
+    // later (and a source that LOST its summary must not keep the old one).
     recordVectorId(sourceId),
-    ...Array.from({ length: written }, (_, seq) => chunkVectorId(sourceId, seq)),
+    ...Array.from({ length: Math.max(written - fromSeq, 0) }, (_, i) =>
+      chunkVectorId(sourceId, fromSeq + i)
+    ),
   ])
   await d1Query(
     cfg,
     guard.databaseId,
-    "DELETE FROM knowledge_terms WHERE chunk_id IN (SELECT id FROM knowledge_chunks WHERE source_id = ?)",
-    [sourceId]
+    "DELETE FROM knowledge_terms WHERE chunk_id IN (SELECT id FROM knowledge_chunks WHERE source_id = ? AND seq >= ?)",
+    [sourceId, fromSeq]
   )
-  await d1Query(cfg, guard.databaseId, "DELETE FROM knowledge_chunks WHERE source_id = ?", [sourceId])
+  await d1Query(cfg, guard.databaseId, "DELETE FROM knowledge_chunks WHERE source_id = ? AND seq >= ?", [
+    sourceId,
+    fromSeq,
+  ])
+  // A TAIL TRIM DOES NOT TOUCH THE COUNTERS: its caller sets all four in the
+  // very next statement, and zeroing them here would open a window where the
+  // row says "nothing indexed" about a source whose chunks are still there.
+  if (fromSeq) return
   await d1Query(
     cfg,
     guard.databaseId,
@@ -1248,10 +1272,16 @@ export async function indexSource(
   let from = source.indexed_chunks
   const restart = opts.force || source.content_hash !== hash || from > total
   if (restart) {
-    await clearIndex(env, cfg, guard, sourceId, {
-      chunkCount: source.chunk_count,
-      indexedChunks: source.indexed_chunks,
-    })
+    // Only the tail — everything below `total` is overwritten in place by the
+    // write below. See clearIndex for why razing it first was the bug.
+    await clearIndex(
+      env,
+      cfg,
+      guard,
+      sourceId,
+      { chunkCount: source.chunk_count, indexedChunks: source.indexed_chunks },
+      total
+    )
     from = 0
     await d1Query(
       cfg,
@@ -1272,17 +1302,38 @@ export async function indexSource(
     const upserts: VectorRow[] = []
 
     for (let start = 0; start < piece.length; start += CHUNK_WRITE_BATCH) {
-      const statements: string[] = []
-      piece.slice(start, start + CHUNK_WRITE_BATCH).forEach((chunk, offset) => {
+      const batch = piece.slice(start, start + CHUNK_WRITE_BATCH)
+      const ids = batch.map((_, offset) => chunkVectorId(sourceId, from + start + offset))
+      // THE POSTINGS THIS BATCH IS ABOUT TO REPLACE. A chunk keeps its id when
+      // its text changes, so its old words would otherwise stay in the inverted
+      // index pointing at a piece that no longer contains them. On a first write
+      // this matches nothing; it is one statement per twenty chunks either way.
+      const statements: string[] = [
+        `DELETE FROM knowledge_terms WHERE chunk_id IN (${ids.map(sqlString).join(", ")});`,
+      ]
+      batch.forEach((chunk, offset) => {
         const seq = from + start + offset
-        const chunkId = chunkVectorId(sourceId, seq)
+        const chunkId = ids[offset]
         const vector = vectors[start + offset]
+        // WRITING THE SAME PIECE TWICE IS NOT AN ERROR (R17's discipline, on the
+        // one write in this app whose key is DERIVED rather than minted). The id
+        // is `<sourceId>:<seq>`, so the same slice re-run — by a retry inside the
+        // data door after a request that had already landed, by a tick that wrote
+        // its chunks and died before it could record how far it got, or by a
+        // second sweep started while this one is running — computes the same ids
+        // and used to hit `UNIQUE constraint failed: knowledge_chunks.id`. Now it
+        // overwrites, and the guard on the DO UPDATE means an IDENTICAL rewrite
+        // moves zero rows and says nothing. `created_at` is deliberately not in
+        // the SET list: a piece was first indexed when it was first indexed.
         statements.push(
-          `INSERT INTO knowledge_chunks (id, source_id, compartment, owner_user_id, seq, text, embedding, created_at) VALUES (${sqlString(chunkId)}, ${sqlString(sourceId)}, ${sqlString(source.compartment)}, ${sqlString(source.owner_user_id)}, ${seq}, ${sqlString(chunk)}, ${sqlString(vector ? encodeEmbedding(vector) : null)}, ${sqlString(now)});`
+          `INSERT INTO knowledge_chunks (id, source_id, compartment, owner_user_id, seq, text, embedding, created_at) VALUES (${sqlString(chunkId)}, ${sqlString(sourceId)}, ${sqlString(source.compartment)}, ${sqlString(source.owner_user_id)}, ${seq}, ${sqlString(chunk)}, ${sqlString(vector ? encodeEmbedding(vector) : null)}, ${sqlString(now)})
+             ON CONFLICT (id) DO UPDATE SET compartment = excluded.compartment, owner_user_id = excluded.owner_user_id, text = excluded.text, embedding = excluded.embedding
+             WHERE knowledge_chunks.text IS NOT excluded.text OR knowledge_chunks.embedding IS NOT excluded.embedding OR knowledge_chunks.compartment IS NOT excluded.compartment OR knowledge_chunks.owner_user_id IS NOT excluded.owner_user_id;`
         )
         for (const [term, weight] of tokenise(chunk))
           statements.push(
-            `INSERT INTO knowledge_terms (term, chunk_id, compartment, owner_user_id, weight) VALUES (${sqlString(term)}, ${sqlString(chunkId)}, ${sqlString(source.compartment)}, ${sqlString(source.owner_user_id)}, ${weight});`
+            `INSERT INTO knowledge_terms (term, chunk_id, compartment, owner_user_id, weight) VALUES (${sqlString(term)}, ${sqlString(chunkId)}, ${sqlString(source.compartment)}, ${sqlString(source.owner_user_id)}, ${weight})
+               ON CONFLICT (term, chunk_id) DO UPDATE SET compartment = excluded.compartment, owner_user_id = excluded.owner_user_id, weight = excluded.weight;`
           )
         if (vector) upserts.push({ id: chunkId, values: vector, labels: { ...labels, level: "chunk" } })
       })

@@ -1,4 +1,4 @@
-// THE FOUR PROMISES THE KNOWLEDGE BASE MAKES ABOUT BIG, MOVING MATERIAL — each
+// THE FIVE PROMISES THE KNOWLEDGE BASE MAKES ABOUT BIG, MOVING MATERIAL — each
 // one a thing the old design got wrong, and each one broken here to prove the
 // test bites.
 //
@@ -18,6 +18,13 @@
 //
 //   4. THE ANSWER CHECKS THE LIVE ROW. A ticket that was "new" when it was
 //      indexed and is "resolved" now must not be quoted as new.
+//
+//   5. A RE-INDEX SURVIVES BEING RUN TWICE. A chunk's id is derived from its
+//      source and its position, so the same slice re-run computes the same ids —
+//      and the write used to be a plain INSERT, which meant a re-index that
+//      overlapped itself died on `UNIQUE constraint failed: knowledge_chunks.id`
+//      rather than overwriting. Thirty-six of them on staging on 2026-08-18, from
+//      a backfill running beside the fifteen-minute cron.
 //
 // SABOTAGE — each was applied, watched go red, and restored. The exact red is
 // recorded beside each test.
@@ -316,5 +323,129 @@ describe("4 — the answer checks the live row rather than trusting the index", 
     const answer = await ask(IDS.staffUser, "why do the warehouse labels print upside down?")
     const cited = answer.citations.find((c) => c.title === "Labels print upside down")
     expect(cited?.liveStatus).toBe("no longer in the app")
+  })
+})
+
+describe("5 — a re-index survives being run twice", () => {
+  // SABOTAGE: drop the `ON CONFLICT (id) DO UPDATE` from the chunk write →
+  //   × finishes a tick that wrote its pieces and died before recording them
+  //     Error: UNIQUE constraint failed: knowledge_chunks.id
+  //   × survives two sweeps of the same source at once
+  //     Error: UNIQUE constraint failed: knowledge_chunks.id
+  // SABOTAGE: restore the full clear on a rebuild (drop `total` from the
+  // clearIndex call in indexSource) →
+  //   × keeps answering while a big source is being rebuilt
+  //     AssertionError: expected false to be true // the rebuild razed 500 of the
+  //     contract's 800 pieces before writing the first 300 back.
+
+  const cfg = { accountId: "a", token: "t" } as never
+  const guard = { userId: IDS.staffUser, teamId: IDS.team, roleId: IDS.adminRole, databaseId: "db" }
+
+  /** The sequences this source really has in the database, in order. */
+  const seqsOf = (id: string) =>
+    (
+      db().prepare("SELECT seq FROM knowledge_chunks WHERE source_id = ? ORDER BY seq").all(id) as {
+        seq: number
+      }[]
+    ).map((r) => r.seq)
+
+  async function addContract(pages = 10): Promise<string> {
+    const res = await call(IDS.staffUser, "POST /api/content/knowledge", {
+      title: "The whole contract",
+      body: document(pages),
+    })
+    expect(res.status).toBe(200)
+    return ((await res.json()) as { source: KnowledgeSource }).source.id
+  }
+
+  it("finishes a tick that wrote its pieces and died before recording them", async () => {
+    const id = await addContract()
+    const { indexSource } = await import("../src/lib/knowledge")
+    const whole = seqsOf(id)
+    expect(whole.length).toBeGreaterThan(5)
+
+    // THE STATE THE OLD WRITE COULD NOT SURVIVE, and it needs no second writer
+    // to reach: the pieces ARE written and the counter that says so is not. A
+    // tick killed between the two leaves exactly this, and so does the data
+    // door's own retry after a request that had already landed. The hash still
+    // matches, so this is a RESUME — and it resumes over pieces that are there.
+    db().prepare("UPDATE knowledge_sources SET indexed_chunks = 0 WHERE id = ?").run(id)
+
+    const progress = await indexSource(env(IDS.staffUser) as never, cfg, guard, id)
+    expect(progress.done).toBe(true)
+    expect(seqsOf(id), "written again, not thrown on").toEqual(whole)
+  })
+
+  it("survives two sweeps of the same source at once", async () => {
+    const id = await addContract()
+    const { indexSource } = await import("../src/lib/knowledge")
+    const whole = seqsOf(id)
+
+    // The owner pressing "Bring it in" while the fifteen-minute cron is mid-
+    // sweep: two callers into the same engine, each deciding for itself that
+    // this source must be rebuilt. Neither may throw, and neither may delete
+    // the other's work.
+    await Promise.all([
+      indexSource(env(IDS.staffUser) as never, cfg, guard, id, { force: true }),
+      indexSource(env(IDS.staffUser) as never, cfg, guard, id, { force: true }),
+    ])
+
+    expect(seqsOf(id), "a rebuild must never leave a hole in the source").toEqual(whole)
+    const row = db().prepare("SELECT chunk_count, indexed_chunks FROM knowledge_sources WHERE id = ?").get(id) as {
+      chunk_count: number
+      indexed_chunks: number
+    }
+    expect(row.indexed_chunks).toBe(row.chunk_count)
+    // …and it is still answerable from deep inside it.
+    const answer = await ask(IDS.staffUser, "when is the retention sum released after practical completion?")
+    expect(answer.found).toBe(true)
+  })
+
+  it("keeps answering while a big source is being rebuilt", async () => {
+    // Big enough that one call cannot finish it — 300 pages is about 800 pieces
+    // and a slice is 300 — which is the only shape where "clear it all first"
+    // and "overwrite it in place" are distinguishable from outside.
+    const id = await addContract(300)
+    const { indexSource } = await import("../src/lib/knowledge")
+
+    // One slice of a forced rebuild: the first 300 pieces are rewritten, and the
+    // 500 behind them have not been reached yet. They must still be THERE — a
+    // rebuild that empties the shelf before restocking it makes the whole source
+    // unanswerable for as long as it takes, and on a 15-minute cron that window
+    // is somebody's actual question.
+    const progress = await indexSource(env(IDS.staffUser) as never, cfg, guard, id, {
+      force: true,
+      slices: 1,
+    })
+    expect(progress.done, "one slice must not finish a 300-page contract").toBe(false)
+
+    const answer = await ask(IDS.staffUser, "when is the retention sum released after practical completion?")
+    expect(answer.found).toBe(true)
+    expect(answer.passages.some((p) => p.text.includes("CLAUSE 74"))).toBe(true)
+  })
+
+  it("a source that got shorter loses its tail, in the index and in the vectors", async () => {
+    const id = await addContract()
+    const { indexSource } = await import("../src/lib/knowledge")
+    const before = seqsOf(id).length
+
+    // The text shrinks — an edit, or a mirrored row that lost most of its body.
+    db()
+      .prepare("UPDATE knowledge_sources SET body = ? WHERE id = ?")
+      .run("The retention sum is released ninety days after practical completion.", id)
+    const progress = await indexSource(env(IDS.staffUser) as never, cfg, guard, id)
+
+    expect(progress.total).toBeLessThan(before)
+    const seqs = seqsOf(id)
+    expect(seqs.length).toBe(progress.total)
+    expect(Math.max(...seqs), "no piece past the new end may survive").toBe(progress.total - 1)
+    // No vector points at a piece that no longer exists…
+    const chunkVectors = vectorIndex.ids().filter((v) => v.startsWith(`${id}:`) && !v.endsWith(":summary"))
+    expect(chunkVectors.length).toBe(progress.total)
+    // …and no posting does either.
+    const orphans = db()
+      .prepare("SELECT COUNT(*) n FROM knowledge_terms WHERE chunk_id NOT IN (SELECT id FROM knowledge_chunks)")
+      .get() as { n: number }
+    expect(orphans.n).toBe(0)
   })
 })
