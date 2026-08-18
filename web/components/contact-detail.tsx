@@ -475,8 +475,8 @@ export function ContactDetailScreen({
                         selectedLabel={parent?.name}
                         emptyOption={{ value: "", label: t("No company yet") }}
                         placeholder={t("Choose a company")}
-                        searchPlaceholder={t("Search clients…")}
-                        emptyText={t("No client matched.")}
+                        searchPlaceholder={t("Search companies…")}
+                        emptyText={t("No company matched.")}
                         disabled={busy}
                         className="w-full sm:w-80"
                       />
