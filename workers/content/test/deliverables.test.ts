@@ -580,6 +580,43 @@ describe("what a client can see of the handover shelf", () => {
     ).toBeNull()
   })
 
+  it("THE TWO FENCES ARE INDEPENDENT — neither one opens the other", async () => {
+    // The question the owner's answer creates, and it has to be asked in BOTH
+    // directions, because "deliverables are visible now" is a sentence that
+    // could mean either fence and must mean neither on its own.
+    //
+    // FENCE A is the MODULE PERMISSION (`deliverables:read`), which decides
+    // whether a caller may knock on the door at all. It was missing from every
+    // team born before migration 0036 — no role held it, not even Admin — which
+    // is what 0039 fixes.
+    // FENCE B is CLIENT VISIBILITY (`visible_to_client_at`), per row, which
+    // decides whether a row is in the answer.
+    //
+    // A WITHOUT B: the harness's Client role holds every right there is,
+    // including the whole deliverables module. The shelf is still empty, because
+    // nobody has shared anything.
+    const id = await file(IDS.victimApp, "Dispatch handover")
+    const openedModule = await clientShelf(IDS.victimUser)
+    expect(openedModule.deliverables, "the module right must not reveal a row").toEqual([])
+    expect(openedModule.total).toBe(0)
+
+    // B WITHOUT A: now share it — and take the module right away. Marking
+    // something visible is a statement about ONE ROW, never a grant of the
+    // module, so the door refuses before visibility is ever consulted.
+    await share(id, IDS.victimApp)
+    expect((await clientShelf(IDS.victimUser)).total, "sharing works when both are open").toBe(1)
+
+    revokeDeliverables(IDS.clientRole)
+    const res = await portalGet(IDS.victimUser)
+    expect(res.status, "a shared row must not grant the module").toBe(403)
+    // …and the row is untouched: the refusal is at the door, not a quiet unshare.
+    expect(
+      (db().prepare(`SELECT visible_to_client_at AS v FROM deliverables WHERE id = ?`).get(id) as {
+        v: string | null
+      }).v
+    ).not.toBeNull()
+  })
+
   it("R20: the sharing door refuses a body that is not a yes or a no", async () => {
     const id = await file(IDS.victimApp, "Dispatch handover")
     for (const bad of ["true", 1, {}, null, undefined]) {
