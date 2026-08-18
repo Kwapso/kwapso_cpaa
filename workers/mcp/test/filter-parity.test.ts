@@ -130,6 +130,9 @@ const TOOLLESS_DOORS: Record<string, string> = {
   "POST /api/content/staff/upload-stream":
     "the streamed twin of the staff-file upload — a photo or a certificate PDF as the request body, which a tool call cannot express. Same reasoning as its buffered pair.",
 
+  "POST /api/content/deliverables/upload-stream":
+    "the fourth byte-shovel, and the only one with no buffered twin — a module written after that pair stopped being worth shipping. The transport is the whole answer: this surface is JSON-RPC, a tool call IS a JSON object, so there is no request body for a tool to stream into and no way to express 'the bytes are the body' as an argument. Nothing is lost. `create_deliverable` and `update_deliverable` both carry `url`, so a machine that already has an address for the material — a recording, a document, an API reference, which is what most deliverables are — files the record in full. What it cannot do is hold a PDF, and it never could.",
+
 
   "POST /api/content/knowledge/upload":
     "the SAME arithmetic as the brand-asset upload below, with a sharper edge. It carries a whole file as a base64 data URL — up to 25 MB, which is ~34 million characters of argument on a surface whose entire ANSWER is capped at 400,000 — so no model can physically make this call. That is why it is a door of its own rather than a `fileDataUrl` field on POST /api/content/knowledge: bolting it onto the door `add_knowledge_source` already sits on would have made R22 require the tool to expose and forward a field it cannot emit, which is a contract that can only be met by writing an excuse. Nothing is lost. A machine that HAS words puts them in with add_knowledge_source, which takes 1.5 MB of them; what it cannot do is hold a PDF, and it never could.",

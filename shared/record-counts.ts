@@ -106,6 +106,10 @@ export const RECORD_CHILDREN: Record<string, RecordChild[]> = {
     { key: "processes-app", module: "processes", resource: "processes", door: "tenancy" },
     { key: "meetings-app", module: "meetings", resource: "meetings", door: "content" },
     { key: "tickets-app", module: "help", resource: "help", door: "content" },
+    // WHAT WE HANDED OVER on it (8.7). Its own module, so a developer who may
+    // open an app but not publish against it sees no number rather than a
+    // number they may not have (R18).
+    { key: "deliverables-app", module: "deliverables", resource: "deliverables", door: "content" },
   ],
   help: [
     // The work answering this request. One story may answer many tickets and one

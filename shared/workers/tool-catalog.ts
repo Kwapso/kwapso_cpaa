@@ -140,6 +140,19 @@ const brandAssetBody = (i: Record<string, unknown>): Record<string, unknown> => 
   fileUrl: opt(i, "fileUrl"),
 })
 
+/** WHAT WE HANDED OVER, as a body. The APP rides on both writes — the create
+ * door needs it to resolve the account, and the edit door needs it to answer
+ * with the right shelf — so it is in the shared builder rather than spelled
+ * twice. R22 proves the forwarding half by RUNNING this. */
+const deliverableBody = (i: Record<string, unknown>): Record<string, unknown> => ({
+  appId: str(i, "appId"),
+  title: str(i, "title"),
+  kind: opt(i, "kind"),
+  datedOn: opt(i, "datedOn"),
+  url: opt(i, "url"),
+  imageUrl: opt(i, "imageUrl"),
+})
+
 const meetingPurposeBody = (i: Record<string, unknown>): Record<string, unknown> => ({
   name: str(i, "name"),
   department: opt(i, "department"),
@@ -1663,6 +1676,58 @@ export const SHARED_TOOLS: SharedTool[] = [
       write: true,
       confirm: (i) => i.active !== true,
       summarize: (i) => `${i.active === true ? "Restore" : "Archive"} app ${str(i, "id")}`,
+    },
+  },
+  // WHAT WE HANDED OVER ON AN APP — its own module, so a token whose role opens
+  // apps does not automatically reach the handover shelf, and one that reaches
+  // the shelf does not automatically edit the app. Internal: like the brand
+  // library, every one of these doors refuses a client login outright.
+  {
+    name: "list_deliverables",
+    summary:
+      "What we handed over on one system: handover docs, API references, recorded walkthroughs, SOPs. `appId` names the app whose shelf you want; `id` narrows to one row. Each carries a `kind` (the team's own word for what sort of thing it is), a `title`, a `datedOn` day, a `url` pointing at the material itself, and an `imageUrl` when there is a picture worth showing. Bounded: a shelf is curated rather than accumulated, so there is no cursor here. Internal: a client login cannot reach this door.",
+    binding: "CONTENT", method: "GET", path: "/api/content/deliverables",
+    schema: obj({ appId: S, id: S }),
+    buildQuery: (i) => {
+      const q: string[] = []
+      for (const key of ["appId", "id"]) if (str(i, key)) q.push(`${key}=${encodeURIComponent(str(i, key))}`)
+      return q.length ? `?${q.join("&")}` : ""
+    },
+    agent: { write: false, summarize: () => "Read what we handed over" },
+  },
+  {
+    name: "create_deliverable",
+    summary:
+      "File something we handed over on an app. `appId` and `title` are required, and the app is what it belongs to for good, the account it was built for is copied off the app rather than sent. `kind` is picked-or-created as a dropdown value, so a word nobody has used yet becomes one. `datedOn` is a calendar day written YYYY-MM-DD. `url` is the material: a link anywhere (a recording, a document, an API reference) — uploading the bytes themselves is a screen action, not a tool. `imageUrl` is the picture on its card.",
+    binding: "CONTENT", method: "POST", path: "/api/content/deliverables",
+    schema: obj({ appId: S, title: S, kind: S, datedOn: S, url: S, imageUrl: S }, ["appId", "title"]),
+    buildBody: (i) => deliverableBody(i),
+    agent: {
+      write: true,
+      confirm: false,
+      summarize: (i) => `File "${str(i, "title")}" as a deliverable`,
+    },
+  },
+  {
+    name: "update_deliverable",
+    summary:
+      "Correct a deliverable (by `id`). `appId` is which app's shelf it sits on and cannot be changed by sending a different one — file it again on the right app and archive this one. Same fields as filing one.",
+    binding: "CONTENT", method: "POST", path: "/api/content/deliverables/update",
+    schema: obj({ id: S, appId: S, title: S, kind: S, datedOn: S, url: S, imageUrl: S }, ["id", "appId", "title"]),
+    buildBody: (i) => ({ id: str(i, "id"), ...deliverableBody(i) }),
+    agent: { write: true, confirm: false, summarize: (i) => `Edit deliverable ${str(i, "id")}` },
+  },
+  {
+    name: "set_deliverable_active",
+    summary:
+      "Archive a deliverable (`active: false`) or put it back (`active: true`). Never deleted, and the file behind it is never thrown away either way, restoring one whose bytes had gone would hand back a broken link.",
+    binding: "CONTENT", method: "POST", path: "/api/content/deliverables/active",
+    schema: obj({ id: S, appId: S, active: B }, ["id", "appId", "active"]),
+    buildBody: (i) => ({ id: str(i, "id"), appId: str(i, "appId"), active: i.active === true }),
+    agent: {
+      write: true,
+      confirm: (i) => i.active !== true,
+      summarize: (i) => `${i.active === true ? "Restore" : "Archive"} deliverable ${str(i, "id")}`,
     },
   },
   {

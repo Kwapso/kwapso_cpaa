@@ -129,7 +129,7 @@ agent_confirm, plan_import) use the team's AI quota.
 Confirm the live list with `tools/list` (it's generated, so it's always current).
 Today it covers:
 
-- **Read**, 57 tools, grouped the way the app groups them:
+- **Read**, 58 tools, grouped the way the app groups them:
   - identity and rights, `whoami`, `my_permissions`, `get_team`
   - people and access, `list_members`, `list_roles`, `list_invites`,
     `list_portal_access`
@@ -143,6 +143,8 @@ Today it covers:
   - process maps and the money, `list_apps`, `list_processes`, `get_process`,
     `list_process_comments`, `read_value`, `list_account_rates`,
     `list_internal_rates`, `read_margin`, `list_role_rates`, `get_app_value`
+  - what we hand over on a system, `list_deliverables` (`appId` names the app
+    whose handover shelf you want; internal, a client login reaches no door on it)
   - the knowledge base, `ask_knowledge`, `list_knowledge_sources`,
     `get_knowledge_status`
   - the agency's own housekeeping, `list_marketing_posts`, `list_brand_assets`,
@@ -178,14 +180,16 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **226 doors, 181 with a tool, 45 with a written reason**, the
+  red build. Today: **231 doors, 185 with a tool, 46 with a written reason**, the
   reasons being the team-pin doors (§3.2 below), the client-portal standing doors
   (§3.3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the THREE upload pairs, two media doors and the knowledge base, each a
   buffered door plus a streamed twin: the buffered half cannot be called because a
   base64 document will not fit in a tool argument, and the streamed half cannot be
   called because a JSON-RPC request has no body to stream into. Same conclusion,
-  two different reasons, both written down, the seven
+  two different reasons, both written down, plus the ONE streamed door with no
+  buffered twin (the bytes behind a deliverable, written after that pair stopped
+  being worth shipping) which is the second of those two reasons on its own, the seven
   Google doors that are a person's own decision, the timesheet correction, the two doors
   that spend the team's AI allowance outside a chat turn (translating a ticket's
   title, and translating a screen's human-typed text for the reader looking at
@@ -195,7 +199,7 @@ Today it covers:
   SCREEN can badge its tabs in one round trip: every number in that bundle is
   already machine-readable, exactly and with narrowing those doors do not take,
   through `list_apps`, `list_processes`, `list_sprints`, `list_stories`,
-  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 181, **152 are on THIS surface** and 29 are the in-app assistant's
+  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 185, **156 are on THIS surface** and 29 are the in-app assistant's
   alone, the twenty-six Google tools, the two confirm-panel bulk writes and the role
   permission matrix read, each reasoned in §3. Those three numbers are asserted
   against the live census in `workers/mcp/test/filter-parity.test.ts`, so this
@@ -374,6 +378,14 @@ Today it covers:
     though a one-off already in the diary is kept up to date like any other. The
     backward half is why a transcript that lands an hour after a call is ever
     found.
+  - what we hand over, `create_deliverable`, `update_deliverable`,
+    `set_deliverable_active` (`deliverables:*`). A deliverable is one piece of
+    material on an app — a handover doc, an API reference, a recorded
+    walkthrough, an SOP — so `appId` rides on all three, and the ACCOUNT it was
+    built for is copied off that app rather than sent. Its own module and not
+    `processes`: opening an app and publishing against it are two grants. The
+    BYTES are a screen action, as with every other upload here; `url` carries a
+    link a machine already has, which is what most deliverables are.
   - the agency's own housekeeping, `create_marketing_post`, `update_marketing_post`,
     `set_marketing_post_active` (`marketing:*`); `create_brand_asset`,
     `update_brand_asset`, `set_brand_asset_active` (`brand_assets:*`);

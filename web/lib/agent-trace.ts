@@ -273,6 +273,17 @@ export function traceFor(
     // triage strip sits above the list, which is where "what is waiting" belongs.
     case "set_triage_duty":
       return { path: seg(teamId, "tickets"), highlight: "main" }
+    /* ------------------------- what we hand over ---------------------------- */
+    // All three land on the APP, because a deliverable has no page of its own —
+    // it is a card on the app's handover shelf, which is exactly where a person
+    // sees the filing, the correction or the archiving happen. Every one of the
+    // three tools carries `appId` for that reason (the doors need it too), so
+    // this is a real destination rather than an invented one.
+    case "create_deliverable":
+    case "update_deliverable":
+    case "set_deliverable_active":
+      return { path: `${seg(teamId, "apps")}/${str(input, "appId")}`, highlight: "main" }
+
     /* ------------------- the agency's own housekeeping ---------------------- */
     // A create lands on the LIST (row-level live-sync makes the new row appear
     // there); an edit or an archive lands on the record itself, because that is

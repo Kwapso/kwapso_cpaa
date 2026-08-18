@@ -330,6 +330,9 @@ export const CONCEPT_ICON = {
   stories: "hammer",
   sprints: "calendar-range",
   apps: "app-window",
+  // WHAT WE HAND OVER on a system: the parcel, because that is what a
+  // deliverable is — the thing that leaves our hands and arrives in theirs.
+  deliverables: "package",
   tasks: "list-todo",
   // A meeting is two people and an hour — the icon says the hour, because that
   // is what distinguishes it from every other list in the rail.
