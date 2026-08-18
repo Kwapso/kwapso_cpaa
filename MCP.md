@@ -138,7 +138,7 @@ Today it covers:
   - learning, `list_learning`, `list_learning_progress`
   - tickets, `list_help_tickets`, `get_help_thread`, `list_help_stakeholders`
   - the work engine, `list_stories`, `list_sprints`, `list_todos`, `list_tasks`,
-    `get_triage`, `list_work_logs`, `list_running_timers`
+    `get_triage`, `list_work_logs`, `list_running_timers`, `get_team_pulse`
   - meetings, `list_meetings`
   - process maps and the money, `list_apps`, `list_processes`, `get_process`,
     `list_process_comments`, `read_value`, `list_account_rates`,

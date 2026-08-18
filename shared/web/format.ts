@@ -10,6 +10,23 @@ export function formatDate(iso?: string | null): string {
     : d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
 }
 
+/** "13 Jun" — a date with the year left off, for an AXIS.
+ *
+ * Its own formatter rather than a slice of `formatDate`, for the reason this
+ * file exists: eight of these sit side by side under a chart, and "13 Jun 2026"
+ * eight times over is four repetitions of a fact nobody is reading and a row of
+ * labels that overlap on a phone. The year is dropped and nothing else is —
+ * still the reader's own locale, still one place. Use it ONLY where the
+ * surrounding copy already says which period is on screen ("the last eight
+ * weeks"); anywhere a date stands alone, `formatDate` is the one. */
+export function formatDayMonth(iso?: string | null): string {
+  if (!iso) return ""
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime())
+    ? ""
+    : d.toLocaleDateString(undefined, { month: "short", day: "numeric" })
+}
+
 /** "13 Jun 2026, 14:05" — for activity rows where the moment matters. */
 export function formatDateTime(iso?: string | null): string {
   if (!iso) return ""

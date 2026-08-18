@@ -41,6 +41,12 @@ import {
 import type { ScreenRecipe, ScreenRights } from "@kwapso/ui/lib/recipe"
 
 import { CollectionHeading } from "@/components/collection-heading"
+// The picture comes from pulse.tsx, which holds the agency shell's ONE lazy
+// boundary onto the chart module — a second dynamic() here would be a second
+// loader for one library, and the shell is the chunk every page in the app pays
+// for. Nothing in this file may import the library's chart module directly; see
+// the header of pulse-charts.tsx for the 114 kB that costs.
+import { BandCard, SprintBurndownChart } from "@/components/pulse"
 import { CountedAbove } from "@/components/counted-tabs"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import {
@@ -288,9 +294,37 @@ export function SprintsScreen({
   // questions a person opens this page with are "what is live?" and "what kind
   // of work are we selling?", and answering them in that order puts the running
   // blocks at the top of the screen every time.
+  // HOW FULL THE RUNNING BLOCKS ARE — a stacked bar per live sprint, done under
+  // open. Free: `storyCount` and `openStoryCount` are exact server counts already
+  // on every row (the collection is bounded and read whole), so this costs no
+  // request and no new door. It is the one thing the list underneath cannot show
+  // at a glance — "3 of 11 done" reads the same on a sprint that is nearly
+  // finished and one that has barely started, until you do the arithmetic on
+  // every line.
+  //
+  // ONLY THE RUNNING ONES, and only where there is work to show. A chart of
+  // wrapped sprints is history nobody is deciding anything from, and a row of
+  // empty columns is a picture of nothing.
+  const burndown = sprints
+    .filter((s) => sprintState(s, today) === "running" && s.storyCount > 0)
+    .map((s) => ({
+      label: s.ref ?? s.name,
+      done: s.storyCount - s.openStoryCount,
+      open: s.openStoryCount,
+    }))
+
   const overview = (
     <div className="flex flex-col gap-6">
       {sprints.length === 0 && <p className="text-muted-foreground text-sm">{t("No sprints yet.")}</p>}
+      {burndown.length > 0 && (
+        <BandCard title={t("Work inside the running sprints")}>
+          <SprintBurndownChart
+            rows={burndown}
+            doneLabel={t("Done")}
+            openLabel={t("Still open")}
+          />
+        </BandCard>
+      )}
       {SPRINT_STATES.map((state) => {
         const inState = sprints.filter((s) => sprintState(s, today) === state)
         if (inState.length === 0) return null

@@ -30,6 +30,7 @@
 //    agency's own margin or internal rates (R24).
 
 import * as React from "react"
+import dynamic from "next/dynamic"
 
 import {
   Accordion,
@@ -42,7 +43,7 @@ import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { Comments } from "@kwapso/ui/registry/collections/comments/comments"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 
-import { SAVINGS_CAPTION, hoursText, minutesText, type StepSaving } from "@shared/workers/savings"
+import { SAVINGS_CAPTION, hoursText, minutesText, savedHours, type StepSaving } from "@shared/workers/savings"
 import type { ProcessComment } from "@shared/types"
 import { moneyText } from "@shared/web/money"
 import { invalidate, useCached } from "@shared/web/store"
@@ -62,6 +63,20 @@ import { useT } from "@shared/web/language"
 // written to stop, and its header says so — a formatter knows no table, no door
 // and no audience, so it is safe on both sides of the R24 fence and there is no
 // reason for a second one to exist.
+
+/** THE PICTURE, FETCHED AFTER THE FIGURE IT ILLUSTRATES.
+ *
+ * The headline of this screen is a number and the sentence that makes it honest
+ * (R25), and Recharts is ~112 kB. Behind a static import, a client on a phone
+ * would wait on a charting library before being told what their figure is made
+ * of. Behind this one, the number and its caption paint immediately and the
+ * picture arrives underneath. `ssr: false` because a static export has no server
+ * to render it on; the placeholder holds the chart's own height so the accordion
+ * below it does not jump when the chunk lands. */
+const AppSavingsChart = dynamic(
+  () => import("@/components/value-chart").then((m) => m.AppSavingsChart),
+  { ssr: false, loading: () => <Skeleton className="h-[190px] w-full rounded-lg" /> }
+)
 
 /** One step, and the whole sum behind it. This line is the answer to the third
  * click — deliberately the arithmetic rather than its result. */
@@ -110,6 +125,14 @@ export function ValueScreen({ ready }: { ready: PortalReady }) {
   void ready // the account is decided by the server from the caller's own stamp
   const { data, loading } = useCached<PortalValue>(cacheKeys.value, () => valueApi.read())
   const [openProcessId, setOpenProcessId] = React.useState<string | null>(null)
+  // The chart's rows, built above the early returns so the hook order is fixed
+  // whatever the read is doing. Hours to one decimal, from the SAME rounding the
+  // text below uses (savedHours), so a bar and the line under it can never say
+  // two different numbers about one app.
+  const appChart = (data?.apps ?? []).map((app) => ({
+    label: app.name,
+    hours: savedHours(app.savedSecondsPerMonth),
+  }))
 
   if (loading && !data)
     return (
@@ -181,6 +204,28 @@ export function ValueScreen({ ready }: { ready: PortalReady }) {
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-medium">{t("Where it comes from")}</h2>
+
+        {/* THE SAME DRILL-DOWN, SEEN AT ONCE. The accordion below answers "where
+            does 208 hours come from?" one click at a time, which is right for
+            checking the arithmetic and wrong for the first look: a client with
+            six apps has to open six rows to learn which one matters. A bar per
+            app answers that before anybody clicks.
+
+            It is drawn from the rows already in hand — no second request, no
+            second door, and no number this screen was not already showing.
+
+            TWO OR MORE APPS ONLY: on one, the bar would be the headline figure
+            above it drawn again. AND A NEGATIVE IS DRAWN, below the line, for the
+            reason this whole file is built around — a step that got slower is
+            information, and no filter on this screen hides one. The zero line and
+            the axis are on for exactly that: a bar going the wrong way has to be
+            readable as such. */}
+        {appChart.length > 1 && (
+          <div className="rounded-xl border p-4">
+            <AppSavingsChart rows={appChart} label={t("Hours a month")} />
+          </div>
+        )}
+
         <Accordion type="multiple" className="rounded-xl border px-4">
           {data.apps.map((app) => (
             <AccordionItem key={app.appId} value={app.appId} className="last:border-b-0">

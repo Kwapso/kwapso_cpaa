@@ -30,6 +30,7 @@ import type {
   Story,
   Task,
   TaskViewName,
+  TeamPulse,
   Todo,
   WorkLog,
   Meeting,
@@ -355,6 +356,14 @@ export const content = {
       "/api/content/triage",
       post({ userId, week })
     ),
+
+  /* --------------------------------- the pulse ------------------------------ */
+  /** THE TEAM'S WEEK IN NUMBERS — the one read behind Home's big numbers and its
+   * two charts. Internal only (the door refuses a client login), and gated
+   * SECTION by section: a section comes back `null` when the caller's role
+   * cannot read that module, which is why every screen reading this must render
+   * nothing for a null rather than an empty state (R18). */
+  insights: () => api<TeamPulse>("/api/content/insights"),
 
   /* ---------------------------- to-dos and tasks ---------------------------- */
   /** What we are waiting on a client for. Fenced: a client login sees their own

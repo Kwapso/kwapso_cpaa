@@ -46,6 +46,8 @@ import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { TriageStrip } from "@/components/triage-strip"
+import { TicketStagesCard } from "@/components/pulse"
+import { CONCEPT_ICON } from "@/lib/pages"
 import { shapeHelpList } from "@/components/deep-link/shape"
 import { ApiFailure, content as contentApi } from "@/lib/api"
 import {
@@ -176,7 +178,14 @@ export function TicketsCollection({
       })),
       { value: CLOSED, label: t("Closed"), icon: "", badge: formatCount(byStatus?.resolved), badgeVariant: "" as const },
       { value: ALL, label: t("All"), icon: "", badge: formatCount(scopeTotal), badgeVariant: "" as const },
-      { value: TRIAGE, label: t("Triage"), icon: "", badge: "", badgeVariant: "" as const },
+      // The one tab on this strip whose idea has a concept icon of its own. The
+      // four KIND tabs beside it carry the team's own type MARKS on every other
+      // surface (a ticket's header band, its detail) and cannot carry one here:
+      // `TabsView` resolves `icon` as a lucide NAME, so a pictograph in that slot
+      // renders nothing at all. Logged as UI-GAPS #17 rather than worked around
+      // by writing a glyph into the LABEL, which is the one shape
+      // UI-CONVENTIONS §5 refuses (a pictograph inside a sentence).
+      { value: TRIAGE, label: t("Triage"), icon: CONCEPT_ICON.triage, badge: "", badgeVariant: "" as const },
     ],
   }
 
@@ -189,6 +198,14 @@ export function TicketsCollection({
             to go and open is a page nobody opens (BUILD-1 §6). The QUEUE beneath
             it is the Triage tab, because that is a screen's worth. */}
         <TriageStrip teamId={teamId} canSetDuty={can("help", "edit")} />
+
+        {/* WHERE THE WORK IS SITTING, above the strip and below the heading.
+            The strip badges Ready, each kind and Closed; it says nothing about
+            the four stages in between, which is exactly the question somebody
+            opening this page has. One short band, and the collection is still
+            the hero (the owner's size rule). It is the SAME picture Home shows,
+            off the same cached read, so the two can never disagree. */}
+        <TicketStagesCard teamId={teamId} />
 
         <TabsView config={outerTabs} value={helpScope} onValueChange={(v) => setHelpScope(v as HelpScope)} />
         <TabsView config={innerTabs} value={facet} onValueChange={(v) => setFacet(v as HelpFacet)} />
