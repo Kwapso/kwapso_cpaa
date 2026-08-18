@@ -60,6 +60,7 @@ import {
 import { appsKey, listFetch, meetingPeopleKey, meetingsKey, meetingTranscriptKey } from "@/lib/live-resources"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
+import { RecordMark } from "@shared/web/record-mark"
 import { formatCount } from "@shared/web/format-count"
 import { formatDateTime, toLocalInput } from "@shared/web/format"
 import { RichText } from "@shared/web/rich-text-view"
@@ -359,6 +360,13 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
 
   return (
     <RecordScreen
+      // A DELIBERATE MARK, NEVER AN EMPTY SLOT. This record has no picture and
+      // its type carries no glyph, so the square holds the record's own initial —
+      // the same box, the same size, the same slot every other record uses
+      // (shared/web/record-mark.tsx). Before this, four of the eleven record
+      // screens opened with a bare title while the other seven led with a mark,
+      // which is the drift a reader feels and never reports.
+      leading={<RecordMark name={item.title} size="band" />}
       eyebrow={[t("Meeting"), item.ref].filter(Boolean).join(" · ")}
       title={item.title}
       // The date leads, and it is also the answer to "has this happened?" — which

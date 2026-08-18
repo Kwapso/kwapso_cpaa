@@ -44,7 +44,8 @@ import { usePermissions } from "@/lib/perms"
 import type { Deliverable, SelectableValue } from "@shared/types"
 import { formatDate } from "@shared/web/format"
 import { useT } from "@shared/web/language"
-import { safeHref, safeSrc } from "@shared/web/rich-text"
+import { safeHref } from "@shared/web/rich-text"
+import { RecordCover } from "@shared/web/record-mark"
 import { primeCache, useCached } from "@shared/web/store"
 
 /** The initials shown where a deliverable has no picture. One glyph, from the
@@ -144,28 +145,29 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
       ) : (
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {rows.map((d) => {
-            // Both through the seam. The material is a link a person typed, so it
-            // is the exact shape R20's render-side twin exists for; the picture
-            // is our own /media path today and would be a typed one the moment
-            // somebody pastes a thumbnail in.
+            // The material is a link a person typed, so it is the exact shape
+            // R20's render-side twin exists for. The PICTURE goes through
+            // `RecordCover`, which does the same check and one thing more: a
+            // path whose object has gone falls back to the letter block below
+            // instead of a torn-paper glyph in the middle of a card grid.
             const href = safeHref(d.url)
-            const picture = safeSrc(d.imageUrl)
             return (
               <li
                 key={d.id}
                 className={`bg-card flex flex-col overflow-hidden rounded-xl ${d.active ? "" : "opacity-60"}`}
               >
-                {picture ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={picture} alt="" className="aspect-video w-full object-cover" />
-                ) : (
-                  <span
-                    aria-hidden
-                    className="bg-muted text-muted-foreground grid aspect-video w-full place-items-center text-3xl font-medium"
-                  >
-                    {initial(d)}
-                  </span>
-                )}
+                <RecordCover
+                  picture={d.imageUrl}
+                  className="aspect-video w-full object-cover"
+                  fallback={
+                    <span
+                      aria-hidden
+                      className="bg-muted text-muted-foreground grid aspect-video w-full place-items-center text-3xl font-medium"
+                    >
+                      {initial(d)}
+                    </span>
+                  }
+                />
                 <div className="flex min-w-0 flex-col gap-1 p-3">
                   {d.kind && (
                     <span className="text-muted-foreground truncate text-[11px] font-medium tracking-wide uppercase">

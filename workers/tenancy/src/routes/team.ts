@@ -2,7 +2,7 @@
 // switcher, creating a team, editing it, the Overview metadata + Activity feed.
 
 import { fail, json, pagedJson } from "@shared/workers/http"
-import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { imageFieldLimit, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { logActivity } from "@shared/workers/activity"
 import { getActivity } from "../lib/activity-read"
@@ -218,11 +218,14 @@ export async function postUpdateTeam(request: Request, env: Env): Promise<Respon
   // depend on how carefully a role was built.
   await refusePortalCaller(cfg, guard)
   const name = requireText(body.name, "Name", TEXT_LIMITS.short)
-  // A data URL is bytes, not prose — parseDataUrl caps and refuses it downstream,
-  // so the boundary's job here is only to prove it IS a string (a number would
-  // reach .exec() as a coerced value and a bad logo would look like a good one).
-  if (body.logoDataUrl !== undefined && typeof body.logoDataUrl !== "string")
-    return fail(400, "invalid_input", "The logo must be an image.")
+  // A data URL is bytes, not prose — so it goes through the SHAPE-FOLLOWING cap
+  // (imageFieldLimit), the same one the account logo and the app mark use. The
+  // check that was here proved only that it IS a string, which left the one
+  // field on this door with no ceiling at all: `request.json()` materialises
+  // whatever arrived, and only then does parseDataUrl measure it. A type check
+  // is not a length check, and this is the door where that distinction is a
+  // whole request in memory.
+  const logoDataUrl = optionalText(body.logoDataUrl, "Logo", imageFieldLimit(body.logoDataUrl))
   // THE AGENCY'S OWN DETAILS (db/core/0025), each field sitting in a validator's
   // first argument so R20's positional scan can SEE the check. Absent means "say
   // nothing about this"; sent-and-empty means "clear it" — which is why each one
@@ -245,7 +248,7 @@ export async function postUpdateTeam(request: Request, env: Env): Promise<Respon
     env,
     guard.teamId,
     name,
-    typeof body.logoDataUrl === "string" ? body.logoDataUrl : undefined,
+    logoDataUrl,
     legal
   )
   // Record the edit on the team's Activity feed (was missing — team-edit feedback).

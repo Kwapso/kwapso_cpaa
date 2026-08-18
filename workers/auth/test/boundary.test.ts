@@ -37,10 +37,27 @@ describe("auth validates at the boundary", () => {
     // — `(body.email as string) ?? ""` — walked straight past it. So the rule
     // is positional: a body field may appear ONLY as the first argument to a
     // validator. Anything else is the field being trusted.
+    //
+    // ONE OTHER POSITION, and it is deliberately the narrowest widening this
+    // rule could take. `imageFieldLimit(body.x)` is the CAP-CHOOSING half of the
+    // very validator on the same line: a picture field carries either a data URL
+    // (measured in bytes) or a stored path (measured in characters), so the
+    // ceiling has to be read off the value's own shape, and the alternative is a
+    // hand-written constant sitting beside a byte limit it does not reference —
+    // which is precisely the 20,000-character prose cap that silently refused
+    // every logo in the app for weeks. It is admitted ONLY for a field that ALSO
+    // appears as a validator's first argument, so it cannot become a way to read
+    // a field without validating it: on its own it is still an offender, and the
+    // strictness this file was written for is untouched.
+    const validated = new Set(
+      [...CODE.matchAll(/(?:requireText|optionalText|queryText)\(\s*(body\.\w+)/g)].map((m) => m[1])
+    )
     const raw: string[] = []
     for (const m of CODE.matchAll(/body\.\w+/g)) {
-      const before = CODE.slice(Math.max(0, (m.index ?? 0) - 40), m.index)
-      if (!/(requireText|optionalText|queryText)\($/.test(before.trimEnd())) raw.push(m[0])
+      const before = CODE.slice(Math.max(0, (m.index ?? 0) - 40), m.index).trimEnd()
+      if (/(requireText|optionalText|queryText)\($/.test(before)) continue
+      if (/imageFieldLimit\($/.test(before) && validated.has(m[0])) continue
+      raw.push(m[0])
     }
     expect(
       raw,

@@ -23,47 +23,31 @@ import * as React from "react"
 import { ChevronRight } from "lucide-react"
 
 import { softNavigate } from "@/lib/nav"
-import { safeHref, safeSrc } from "@shared/web/rich-text"
+import { safeHref } from "@shared/web/rich-text"
+import { RecordMark } from "@shared/web/record-mark"
 import { appStageMark } from "@shared/app-stages"
 import type { AppRow } from "@shared/types"
 import { useT } from "@shared/web/language"
 
 /** THE SQUARE AN APP IS KNOWN BY — its logo, or the stage mark it has always
- * drawn. One component because there are two places that draw it (the tile here
- * and the record heading's `leading` slot), and a fallback rule kept in two
- * places is a fallback rule that will one day disagree with itself.
+ * drawn. It reads the two things an APP has that no other record does (its stage
+ * mark, and its logo column) and hands them to the ONE mark every record on both
+ * front doors is drawn with (`shared/web/record-mark.tsx`).
  *
- * A PICTURE THAT FAILS TO LOAD FALLS BACK TO THE MARK, never to the browser's
- * broken-image glyph. That is the whole reason this is a component with state
- * rather than a ternary: `logoUrl` being present is not the same fact as the
- * bytes still being there, and the first stored URL a person ever pastes by hand
- * will be the one that proves it. `key` on the <img> resets the failure when the
- * logo changes, so a corrected picture is not permanently written off.
- *
- * Through `safeSrc` because a stored path is still a value out of a database —
- * R20's render-side twin. */
-export function AppMark({ app, className = "size-12" }: { app: AppRow; className?: string }) {
-  const [broken, setBroken] = React.useState(false)
-  const src = safeSrc(app.logoUrl)
-  return (
-    <span
-      aria-hidden
-      className={`bg-muted grid shrink-0 place-items-center overflow-hidden rounded-xl text-2xl leading-none ${className}`}
-    >
-      {src && !broken ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          key={src}
-          src={src}
-          alt=""
-          className="size-full object-cover"
-          onError={() => setBroken(true)}
-        />
-      ) : (
-        appStageMark(app.stage) || app.name.slice(0, 1).toUpperCase()
-      )}
-    </span>
-  )
+ * It was that component first, alone, and everything the header there says about
+ * a stored path outliving its bytes was learned here (web/test/app-mark.test.tsx,
+ * which still holds this signature to it). What changed on 19 Aug 2026 is that
+ * every OTHER record got the same treatment instead of one of thirteen others, so
+ * the state, the `safeSrc` call and the `onError` fallback moved to where they
+ * are shared and this became the two lines that are actually about an app. */
+export function AppMark({
+  app,
+  size = "tile",
+}: {
+  app: AppRow
+  size?: React.ComponentProps<typeof RecordMark>["size"]
+}) {
+  return <RecordMark picture={app.logoUrl} mark={appStageMark(app.stage)} name={app.name} size={size} />
 }
 
 export function AppTiles({

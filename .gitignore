@@ -53,14 +53,21 @@ out/
 
 # The pulled Glide rows are real customer data — the catalogue is tracked, the
 # data never is. Re-pull with `node scripts/glide-pull.mjs`.
-glide/data/
+#
+# NO TRAILING SLASH, on this and on the files rule below. A trailing slash means
+# "a directory", and a SYMLINK to the data is not one — so `glide/data/` left a
+# symlink named `glide/data` untracked-but-not-ignored, which is one `git add -A`
+# away from committing the path to a client's whole export. A worktree is exactly
+# where somebody reaches for that symlink, because the data lives in one checkout
+# and the work happens in another.
+glide/data
 # The rescued Glide FILES — 79 MB of the clients' own logos, photos, PDFs and
 # video, copied off Google's storage before the Glide account lapses. Same rule
 # as the rows: the SCRIPTS that fetch and shape them are tracked, their output
 # never is. `glide/files/manifest.json` maps every file back to the row that
 # referenced it. BACK THIS UP SOMEWHERE REAL — once the Glide account is closed,
 # re-running `node scripts/glide-files.mjs` gets nothing.
-glide/files/
+glide/files
 # Derived from both, so it holds exactly the same customer data.
 glide/normalised.json
 # Where each rescued file now lives in OUR R2, and the row that referenced it —

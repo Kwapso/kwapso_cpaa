@@ -113,7 +113,25 @@ export function HelpAttachmentsPanel({
       toast.error(t("That file is too big. The limit is 10MB."))
       return
     }
-    const dataUrl = await readFileAsDataUrl(file)
+    // THE READ IS INSIDE THE TRY, not outside it. `run` has a perfectly good
+    // catch and it only ever wrapped the API CALL, so a file the browser cannot
+    // read — a permission-denied on a synced folder, a file removed between the
+    // pick and the read, a HEIC on a browser that will not decode one — rejected
+    // into nothing at all: no toast, no spinner, no inline error. Somebody picks
+    // a file and the screen does not react, which is the one failure worse than
+    // an error message. The portal's twin of this panel already had it right
+    // (web-portal/components/ticket-attachments.tsx).
+    let dataUrl: string
+    try {
+      dataUrl = await readFileAsDataUrl(file)
+    } catch {
+      // The sentence the knowledge base's own file picker already says for the
+      // same failure, rather than a seventh way of putting it (R28: a new
+      // sentence is a new row in the catalogue and a new thing to translate;
+      // this one is already there, in every language).
+      toast.error(t("Couldn't add that file."))
+      return
+    }
     await run(
       () => contentApi.addHelpAttachment({ id: ticketId, kind: "file", label: file.name, fileDataUrl: dataUrl }),
       "Attached."

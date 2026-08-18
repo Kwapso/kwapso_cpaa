@@ -14,7 +14,7 @@
 
 import { fail, json } from "@shared/workers/http"
 import { GuardError } from "@shared/workers/gating"
-import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { imageFieldLimit, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { logError, recordWorkerError } from "@shared/workers/error-log"
 import { requestId } from "@shared/workers/trace"
 import type { Env } from "./env"
@@ -477,11 +477,14 @@ async function profile(request: Request, env: Env): Promise<Response> {
     lastName: optionalText(body.lastName, "Last name", TEXT_LIMITS.short),
     // Through the SAME seam, not a `typeof` — auth's own boundary rule
     // (test/boundary.test.ts) is stricter than R20's and admits only the three
-    // validators, because a cast walked past its first version. The cap is in
-    // CHARACTERS and deliberately generous: a data URL is measured in bytes, and
-    // dataUrlBytes + parseDataUrl enforce MAX_IMAGE_BYTES (2.5 MB) a moment
-    // later. This one only has to stop a non-string and an absurd string.
-    imageDataUrl: optionalText(body.imageDataUrl, "Photo", 4_000_000),
+    // validators, because a cast walked past its first version. And through the
+    // SAME cap as every other picture field: `imageFieldLimit` is DERIVED from
+    // MAX_IMAGE_BYTES, so the two move together. The number here used to be
+    // 4,000,000, written out, generous, and correct — which is exactly what
+    // 20,000 was when it was written. A hand-picked constant beside a byte limit
+    // it does not reference is the shape of the bug this seam was made to end;
+    // raise MAX_IMAGE_BYTES to 3 MB and this door starts refusing every photo.
+    imageDataUrl: optionalText(body.imageDataUrl, "Photo", imageFieldLimit(body.imageDataUrl)),
   }
   const result = await updateProfile(env, user, input)
   if ("error" in result) return fail(400, result.error, result.message)

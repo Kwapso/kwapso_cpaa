@@ -177,11 +177,19 @@ describe("safeHref / safeSrc — the URL render boundary", () => {
 const HERE = dirname(fileURLToPath(import.meta.url))
 const WEB = join(HERE, "..")
 
-/** Every .tsx under web/ that renders (components + app routes). */
+/** Every .tsx that renders — this front door's components and app routes, AND
+ * the components BOTH front doors share.
+ *
+ * `shared/web/` was outside the scan until 19 Aug 2026, which is a blind spot
+ * rather than an omission: a component there renders on both hostnames, so an
+ * unchecked URL in one would be the same defect twice over. It went unnoticed
+ * because nothing shared drew a picture — and then `record-mark.tsx` became the
+ * one component every record's picture on either door goes through, which is
+ * exactly the file this census should be reading first. */
 function screenFiles(): string[] {
-  return sourceFiles([join(WEB, "components"), join(WEB, "app")], { extensions: [".tsx"] }).map(
-    (f) => f.path
-  )
+  return sourceFiles([join(WEB, "components"), join(WEB, "app"), join(WEB, "..", "shared", "web")], {
+    extensions: [".tsx"],
+  }).map((f) => f.path)
 }
 
 /** The `{...}` immediately after `at`, brace-balanced (JSX expressions nest). */

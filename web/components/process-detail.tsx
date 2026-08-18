@@ -85,6 +85,7 @@ import {
   STICKY_TABS,
   type RecordAction,
 } from "@/components/record-chrome"
+import { RecordMark } from "@shared/web/record-mark"
 import { formatCount } from "@shared/web/format-count"
 import {
   PROCESS_VERSION_SLICES,
@@ -366,6 +367,13 @@ export function ProcessDetailScreen({
 
   return (
     <RecordScreen
+      // A DELIBERATE MARK, NEVER AN EMPTY SLOT. This record has no picture and
+      // its type carries no glyph, so the square holds the record's own initial —
+      // the same box, the same size, the same slot every other record uses
+      // (shared/web/record-mark.tsx). Before this, four of the eleven record
+      // screens opened with a bare title while the other seven led with a mark,
+      // which is the drift a reader feels and never reports.
+      leading={<RecordMark name={process.name} size="band" />}
       eyebrow={t("Process")}
       title={process.name}
       status={[

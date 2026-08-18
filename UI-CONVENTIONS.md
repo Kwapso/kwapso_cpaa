@@ -817,6 +817,56 @@ Every screen that shows a collection shows its count **exactly once**:
   It is a context, not a prop, because "does a counted strip exist?" is a
   per-permission answer every caller would otherwise re-derive and get wrong.
 
+## One mark, one placeholder — a record's picture, everywhere
+
+**Every record shows its picture, and where it has none it shows a deliberate mark
+in the same box, at the same size, in the same slot.** One component says it:
+`shared/web/record-mark.tsx` (`RecordMark` for the square or circle, `RecordCover`
+for a wide banner), imported by BOTH front doors.
+
+It exists because a census on 19 Aug 2026 found **seventeen implementations** of
+"what to draw when there is no picture", collapsing to **thirteen visibly
+different answers** — one letter in a circle, two letters in a circle, an emoji on
+a muted square, a letter on a muted square, a big letter on a wide block, a bare
+emoji with no box, a lucide glyph in a filled square, the same glyph in an
+unfilled one, a coloured dot, and, on most rows in the app, nothing at all. None
+was wrong on its own screen. Drift like that is only ever visible in aggregate,
+and nobody sees the aggregate, which is why nobody had filed it.
+
+**The rule, applied by kind** — consistency means one rule applied consistently,
+not one picture everywhere:
+
+| The record is… | Shape | Its picture | With no picture |
+|---|---|---|---|
+| a **person** (a contact, a member, a staff profile) | `rounded-full` | `object-cover` — a face fills a circle | their initial |
+| a **company**, an **app**, an **asset** | `rounded-xl` | `object-contain` — a wordmark is shown WHOLE | the type's own glyph, else its initial |
+| anything with no picture concept | `rounded-xl` | — | the type's own glyph, else its initial |
+
+**Three sizes and no fourth:** `row` (the leading slot of a row), `tile` (a card in
+a tile grid), `band` (the square in a record's header, `RecordScreen`'s `leading`).
+A size passed as a class name would put two Tailwind size rules on one element and
+leave the winner to stylesheet order.
+
+**A picture that fails to load falls back to the mark.** That is the whole reason
+this holds state rather than being a ternary: `logoUrl` being SET is not the same
+fact as the bytes still being there. Every stored path in this app is one
+cancelled Glide subscription, one un-reclaimed object or one hand-pasted URL away
+from a 404, and a 404 in an `<img>` is the browser's torn-paper glyph. Before the
+seam, exactly ONE component in either front end had an `onError` fallback.
+
+**Through `safeSrc`, always** — R20's render-side twin, and the URL census
+(`web/test/rich-text.test.ts`) now reads `shared/web/` as well as `web/`, because
+a component both doors render is the same defect twice over. The prop is called
+`picture`, not `src`, so a component prop is never mistaken for a DOM attribute.
+
+**Where a mark still cannot go:** a **recipe-driven** row. `ScreenRenderer.renderList`
+builds `{ id, title, subtitle }` and passes no `leading` (UI-GAPS #16), so the four
+recipe lists whose rows arrive carrying a picture — accounts, apps, members, the
+brand library — render as text. The workaround, a glyph inside the title string, is
+the one shape §5 refuses. And the library's `RecordDetail` draws a circular
+initials avatar on every recipe detail whether the record is a person or not
+(UI-GAPS #25). Both are one-line library changes; neither is forked here.
+
 ## Action-button rows never clip (C4) · the brand mark is never clipped (C5)
 
 - **Action rows:** `flex flex-wrap` on the row (a narrow phone REFLOWS) and

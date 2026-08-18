@@ -23,6 +23,7 @@ import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 
 import type { AccountDetail } from "@shared/types"
+import { RecordMark } from "@shared/web/record-mark"
 import { postalAddress } from "@shared/web/format"
 import { useCached } from "@shared/web/store"
 import { portal } from "@/lib/api"
@@ -63,11 +64,21 @@ export function CompanyScreen({ ready }: { ready: PortalReady }) {
 
   return (
     <div className="flex flex-col gap-10">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-semibold tracking-tight">{account.name}</h1>
-        <p className="text-muted-foreground">
-          {t("What we hold for you. If any of it is wrong, tell us and we'll fix it.")}
-        </p>
+      <div className="flex items-start gap-4">
+        {/* THEIR OWN MARK, on their own page. The column is on the row the fence
+            already hands this screen, and the portal drew no picture anywhere at
+            all — one brand logo on the sign-in door and nothing after it. A
+            client opening the record we keep on them should see themselves at
+            the top of it. Shown WHOLE rather than cropped, because a company
+            mark is usually a wordmark (shared/web/record-mark.tsx), and it falls
+            back to the company's initial rather than an empty square. */}
+        <RecordMark picture={account.logoUrl} name={account.name} size="band" />
+        <div className="flex min-w-0 flex-col gap-2">
+          <h1 className="text-3xl font-semibold tracking-tight">{account.name}</h1>
+          <p className="text-muted-foreground">
+            {t("What we hold for you. If any of it is wrong, tell us and we'll fix it.")}
+          </p>
+        </div>
       </div>
 
       {details.length > 0 ? (
