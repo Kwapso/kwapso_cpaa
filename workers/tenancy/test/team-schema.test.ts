@@ -601,6 +601,9 @@ describe("every module reaches the teams that already exist", () => {
     // seed against a database with no roles in it at all, so it wrote nothing —
     // which is the other half of "WHERE NOT EXISTS" doing its job.
     expect(rows.n).toBe(2)
+  })
+})
+
 // A MIGRATION VERSION IS A PRIMARY KEY, AND TWO LANES CANNOT SHARE ONE.
 //
 // `_migrations.version` is `TEXT PRIMARY KEY`, and the two runners read it in
@@ -659,7 +662,7 @@ describe("TEAM_MIGRATIONS — every version is claimed exactly once", () => {
 // DRIVEN AGAINST REAL SQLITE, because that is the only thing whose opinion
 // counts: the claim is about how a database orders bytes, and no amount of
 // reading the migration proves it. The rows below are the real staging shapes.
-describe("0039 — meeting moments are stored in UTC", () => {
+describe("0041 — meeting moments are stored in UTC", () => {
   const MIGRATION = "0041_meeting_moments_in_utc"
 
   /** A team as it stood the moment BEFORE this migration, with the mixture of

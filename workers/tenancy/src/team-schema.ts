@@ -2709,6 +2709,9 @@ SELECT lower(hex(randomblob(16))), r.id, 'deliverables', r.is_default, r.is_defa
     version: "0040_deliverable_client_visibility",
     sql: `
 ALTER TABLE deliverables ADD COLUMN visible_to_client_at TEXT;
+`,
+  },
+  {
     // ONE SPELLING OF ONE INSTANT — so the text order IS the time order.
     //
     // `meetings.starts_at` is TEXT, SQLite compares TEXT byte by byte, and the
