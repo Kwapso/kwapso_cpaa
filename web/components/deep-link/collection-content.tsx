@@ -490,7 +490,10 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
             came with. It sits ABOVE the list because a page whose first control
             is a question box is a page people ask questions on. It spends no
             assistant allowance and says so — see knowledge-ask.tsx. */}
-        <KnowledgeAsk onOpenSource={(id) => go(`${sectionPath}/${id}`)} />
+        <KnowledgeAsk
+          onOpenSource={(id) => go(`${sectionPath}/${id}`)}
+          onOpenRecord={(path) => go(`/t/${teamId}/${path}`)}
+        />
         {/* R14's other half: the sweep only ever adds, so the search box is
             answered by the door — over every source, not the newest fifty. */}
         <PagedFind<KnowledgeSource>

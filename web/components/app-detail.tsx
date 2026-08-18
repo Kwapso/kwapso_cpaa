@@ -434,6 +434,7 @@ export function AppDetailScreen({
                   .filter(Boolean)
                   .join(", ")}
                 onOpenSource={(sourceId) => softNavigate(`${host.base}/knowledge/${sourceId}`)}
+                onOpenRecord={(path) => softNavigate(`${host.base}/${path}`)}
               />
             )
           if (t.value === "activity")

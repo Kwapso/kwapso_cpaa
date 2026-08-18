@@ -174,6 +174,18 @@ export const KNOWLEDGE_KINDS = [
   "app",
   "story",
   "sprint",
+  // THE REST OF WHAT AN AGENCY KNOWS ABOUT A CLIENT. Six kinds that all carry an
+  // account id and none of which the sweep could read: a conversation we had, the
+  // map of what we actually DO for them, the person we talk to, what we are
+  // waiting on them for, and our own jobs about them. `meeting` shipped its
+  // reader before it was named here, so every transcript in the base was being
+  // listed and filtered as a `note` — the coercion in `toSource` below is what
+  // made that silent.
+  "meeting",
+  "process",
+  "contact",
+  "todo",
+  "task",
   // The four that arrive through somebody's own Google connection. Named for
   // what a person would call the thing rather than for the service it came out
   // of — somebody filtering the knowledge base is looking for "an email", and
@@ -1541,6 +1553,10 @@ export function knowledgeAnswer(input: {
         title: p.title,
         kind: p.kind,
         url: p.url,
+        // THE RECORD ITSELF, one hop past the source. Copied from the passage
+        // rather than worked out again here, so the link under a passage and the
+        // link under its citation can never point at different rows.
+        recordPath: p.recordPath,
         liveStatus: live?.status ?? null,
         checkedAt: live?.checkedAt ?? null,
       })
@@ -1816,6 +1832,9 @@ export async function retrieve(
     title: row.title,
     kind: row.kind,
     url: row.source_url,
+    // The read above already carries `origin_table` and `origin_row_id` for the
+    // live cross-check, so the link to the record costs nothing extra.
+    recordPath: recordPath(row.origin_table, row.origin_row_id),
     compartment: row.compartment,
     seq: row.seq,
     text: plainText(row.text),
@@ -1881,6 +1900,49 @@ const LIVE_STATUS: Record<string, { table: string; status: string }> = {
   sprints: { table: "sprints", status: `CASE WHEN completed_at IS NULL THEN 'running' ELSE 'completed' END` },
   apps: { table: "apps", status: "stage" },
   accounts: { table: "accounts", status: "status" },
+  meetings: { table: "meetings", status: "status" },
+  tasks: { table: "tasks", status: "status" },
+  todos: {
+    table: "todos",
+    status: `CASE WHEN cancelled_at IS NOT NULL THEN 'called off'
+                  WHEN completed_at IS NOT NULL THEN 'sent to us' ELSE 'still waiting' END`,
+  },
+  // `processes` and `account_links` are absent on purpose: neither has a status
+  // column, and a row with nothing to re-read has nothing to be stale about.
+}
+
+/** WHERE THE RECORD BEHIND A PASSAGE LIVES, IN THIS APP.
+ *
+ * The owner's sentence: "the ability to go and check out the links to the
+ * sources or to those particular records as well." A citation already opens the
+ * SOURCE — the knowledge screen that shows what was indexed and why. This is the
+ * other half: one hop further, to the ticket, the map, the meeting itself.
+ *
+ * A path RELATIVE TO THE TEAM (`tickets/<id>`), because the worker has no
+ * business knowing what a front end's URLs look like beyond the segment, and
+ * both front ends prefix their own. Null for a source with no record screen — a
+ * note somebody typed IS the record, a Google document is reached through `url`,
+ * and a to-do or a contact lives inside another record's page rather than on one
+ * of its own. Null renders no link; it never renders a broken one.
+ *
+ * DERIVED, not decided at the door (R23): the map is here, the one call is in
+ * `retrieve`, and the citation copies what the passage carries. Every segment is
+ * checked against `web/lib/pages.ts` by knowledge-coverage.test.ts, so a page
+ * that is renamed cannot leave a dead link behind. */
+const RECORD_PATH: Record<string, string> = {
+  help: "tickets",
+  stories: "stories",
+  sprints: "sprints",
+  apps: "apps",
+  processes: "processes",
+  meetings: "meetings",
+  accounts: "accounts",
+  tasks: "tasks",
+}
+
+export function recordPath(originTable: string | null, originRowId: string | null): string | null {
+  const segment = originTable ? RECORD_PATH[originTable] : undefined
+  return segment && originRowId ? `${segment}/${originRowId}` : null
 }
 
 async function crossCheck(

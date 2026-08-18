@@ -631,6 +631,7 @@ export function AccountDetailScreen({
                 onOpenSource={(sourceId) =>
                   softNavigate(`${basePath.replace(/\/accounts$/, "")}/knowledge/${sourceId}`)
                 }
+                onOpenRecord={(path) => softNavigate(`${basePath.replace(/\/accounts$/, "")}/${path}`)}
               />
             )
 
