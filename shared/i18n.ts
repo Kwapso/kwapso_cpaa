@@ -33,10 +33,17 @@
 // Reword a button and the old key stops being extracted; re-run the pair and the
 // new wording is translated. `node scripts/i18n-extract.mjs --check` says whether
 // the extracted list still matches the code.
+//
+// AND A HAND-WRITTEN WORD DOES NOT WAIT FOR THE GENERATOR. The seed is resolved
+// OVER the catalogue at run time (`SPOKEN`, below), so somebody who is sure of a
+// word writes it in `shared/i18n-seed.ts` and it is on screen — no model, no key,
+// no spend. Until that existed, the seed's own "THE SEED ALWAYS WINS" was true
+// only of a build nobody could afford to run.
 
 import { CATALOGUE } from "./i18n-catalogue"
+import { SEED } from "./i18n-seed"
 
-export { CATALOGUE }
+export { CATALOGUE, SEED }
 
 /** The languages this app speaks, in the order a switcher shows them.
  *
@@ -159,6 +166,26 @@ export function fill(text: string, vars?: Vars): string {
   )
 }
 
+/** SEED OVER CATALOGUE, PER LANGUAGE — not per key.
+ *
+ * The seed is PARTIAL on purpose: it holds the agency's own German, Spanish and
+ * Catalan for a string the machine answered in twenty-eight languages. Replacing
+ * the whole entry would throw the other twenty-five away, so each language is
+ * decided on its own — the same merge `scripts/i18n-translate.mjs` already does
+ * at build time, which is the point: the runtime now agrees with it. */
+export function overlay(base: Catalogue, over: Catalogue): Catalogue {
+  const out: Catalogue = { ...base }
+  for (const [english, entry] of Object.entries(over)) out[english] = { ...out[english], ...entry }
+  return out
+}
+
+/** WHAT THE APP ACTUALLY SPEAKS, and what every default reads.
+ *
+ * `CATALOGUE` is the generator's output and `SEED` is the hand-written half, and
+ * for a year only the generator ever put the two together. This is the seam that
+ * makes the seed's own promise true on screen. */
+export const SPOKEN: Catalogue = overlay(CATALOGUE, SEED)
+
 /** THE FUNCTION EVERYTHING CALLS.
  *
  * `english` is both the key and the fallback, so the worst case is an untranslated
@@ -171,7 +198,7 @@ export function translate(
   catalogue?: Catalogue
 ): string {
   if (lang === DEFAULT_LANGUAGE) return fill(english, vars)
-  const entry = (catalogue ?? CATALOGUE)[english]
+  const entry = (catalogue ?? SPOKEN)[english]
   return fill(entry?.[lang as Translated] ?? english, vars)
 }
 
@@ -186,7 +213,7 @@ export function translator(lang: Language, catalogue?: Catalogue) {
  * Settings screen so somebody choosing Catalan is told what to expect rather
  * than discovering it a screen later. */
 export function coverage(catalogue?: Catalogue): Record<Translated, number> {
-  const c = catalogue ?? CATALOGUE
+  const c = catalogue ?? SPOKEN
   const keys = Object.keys(c)
   const out = Object.fromEntries(TRANSLATED_LANGUAGES.map((l) => [l, 0])) as Record<
     Translated,

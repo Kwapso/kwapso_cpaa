@@ -1,6 +1,6 @@
 // THE LANGUAGE ENGINE, AND THE DOOR THAT SETS IT.
 //
-// Four things are being locked here, and each one is a way this feature could
+// Five things are being locked here, and each one is a way this feature could
 // fail QUIETLY — which is the only way a translation layer ever fails.
 //
 //  1. AN UNKNOWN LANGUAGE NEVER REACHES THE DATABASE. The door type-checks
@@ -19,7 +19,14 @@
 //     Every existing agent suite reads that constant, and the common case must
 //     cost nothing.
 //
-//  4. THE ASSISTANT IS TOLD NOT TO TRANSLATE THE DATA. This is the one that
+//  4. THE HAND-WRITTEN WORD REACHES THE SCREEN. `shared/i18n-seed.ts` says the
+//     seed always wins; for a year it won only inside the build-time generator,
+//     which spends a model key nobody may spend. A comment claimed an invariant
+//     no code held, and the failure was invisible because the generator had
+//     already copied the seed into the catalogue — so the two agreed, and the
+//     day they stopped agreeing was the day it would have mattered.
+//
+//  5. THE ASSISTANT IS TOLD NOT TO TRANSLATE THE DATA. This is the one that
 //     would be expensive to discover in production: a model told "answer in
 //     German" will happily send `Frage` as a `help_type` filter, match zero
 //     rows, and report "no tickets" — which reads as the app being broken. The
@@ -29,16 +36,21 @@ import { DatabaseSync } from "node:sqlite"
 import { beforeEach, describe, expect, it } from "vitest"
 
 import {
+  CATALOGUE,
   DEFAULT_LANGUAGE,
   LANGUAGES,
+  SEED,
+  SPOKEN,
   coverage,
   fill,
   isLanguage,
+  overlay,
   toLanguage,
   translate,
   translator,
   type Catalogue,
   type Language,
+  type Translated,
 } from "@shared/i18n"
 import { SYSTEM, systemFor } from "../../data-ops/src/lib/agent"
 import { d1, migration } from "./core-sqlite"
@@ -120,6 +132,76 @@ describe("interpolation", () => {
   it("a bound translator behaves the same as the free function", () => {
     const CAT: Catalogue = { Save: { de: "Speichern" } }
     expect(translator("de", CAT)("Save")).toBe(translate("Save", "de", undefined, CAT))
+  })
+})
+
+describe("the seed wins on SCREEN, not only inside the generator", () => {
+  // `shared/i18n-seed.ts` has always said "THE SEED ALWAYS WINS", and until
+  // 2026-08-19 it won in exactly one place: inside `scripts/i18n-translate.mjs`.
+  // The app imported the GENERATED catalogue and nothing else, so a word written
+  // by hand did not reach a screen until somebody ran the generator — and the
+  // generator spends the owner's own model key. The single documented way to
+  // correct a translation went through the single thing nobody may do, and only
+  // a comment said otherwise. `SPOKEN` is the seam that makes the claim true;
+  // this is what stops it being a comment again.
+
+  it("takes the hand-written word over the machine's, for the same key", () => {
+    const machine: Catalogue = { Issue: { de: "Ausgabe" } }
+    const hand: Catalogue = { Issue: { de: "Problem" } }
+    expect(translate("Issue", "de", undefined, overlay(machine, hand))).toBe("Problem")
+  })
+
+  it("decides PER LANGUAGE, so the seed's German keeps the machine's Japanese", () => {
+    // The seed is partial on purpose — three languages where the catalogue has
+    // twenty-eight — so overwriting the whole ENTRY would throw twenty-five
+    // translations away every time somebody corrected one word.
+    const machine: Catalogue = { Issue: { de: "Ausgabe", ja: "問題" } }
+    const hand: Catalogue = { Issue: { de: "Problem" } }
+    const spoken = overlay(machine, hand)
+    expect(translate("Issue", "de", undefined, spoken)).toBe("Problem")
+    expect(translate("Issue", "ja", undefined, spoken)).toBe("問題")
+  })
+
+  it("copies rather than mutates, so neither file is corrupted at import", () => {
+    // The seam runs once, at module load, over the two real exports. An overlay
+    // that wrote INTO its argument would edit CATALOGUE in memory, and every
+    // later reader would see a file that does not exist on disk.
+    const machine: Catalogue = { Issue: { de: "Ausgabe", ja: "問題" } }
+    const hand: Catalogue = { Issue: { de: "Problem" } }
+    overlay(machine, hand)
+    expect(machine.Issue).toEqual({ de: "Ausgabe", ja: "問題" })
+    expect(hand.Issue).toEqual({ de: "Problem" })
+  })
+
+  it("is what a call with no catalogue reads — every seeded word is the word on screen", () => {
+    for (const [english, entry] of Object.entries(SEED))
+      for (const [lang, word] of Object.entries(entry))
+        expect(translate(english, lang as Language), `${english} [${lang}]`).toBe(word)
+  })
+
+  it("and that is not true by accident: the seed answers where the catalogue is silent", () => {
+    // The assertion above would still pass with the seam torn out, IF every
+    // seeded string also sat in the generated catalogue saying the same thing.
+    // These pairs are the ones only the seed can answer — hand-written, never
+    // generated — so they are the live proof that the runtime reads it. Rip
+    // `SPOKEN` out and every one of them renders English instead.
+    const seedOnly = Object.entries(SEED).flatMap(([english, entry]) =>
+      Object.keys(entry)
+        .filter((lang) => CATALOGUE[english]?.[lang as Translated] === undefined)
+        .map((lang) => [english, lang as Translated] as const)
+    )
+    expect(seedOnly.length, "nothing is seeded that the catalogue cannot already say").toBeGreaterThan(0)
+    for (const [english, lang] of seedOnly) {
+      expect(translate(english, lang), `${english} [${lang}]`).toBe(SEED[english][lang])
+      expect(translate(english, lang), `${english} [${lang}] fell back to English`).not.toBe(english)
+    }
+  })
+
+  it("SPOKEN is the default both readers use", () => {
+    // Named rather than implied: the switcher's percentage counts what the app
+    // can actually say, which includes every word written here by hand.
+    expect(coverage()).toEqual(coverage(SPOKEN))
+    expect(translate("Issue", "de")).toBe(translate("Issue", "de", undefined, SPOKEN))
   })
 })
 
