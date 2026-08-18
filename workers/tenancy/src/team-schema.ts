@@ -2621,6 +2621,96 @@ ALTER TABLE google_connections ADD COLUMN calendar_swept_through TEXT;
 DELETE FROM role_permissions WHERE module = 'google_events';
 `,
   },
+  {
+    // THE MODULE NOBODY COULD SEE — 0036 built the handover shelf and forgot to
+    // hand anybody the key.
+    //
+    // Every migration that adds a MODULE carries two halves: the tables, and a
+    // back-fill giving the locked Admin role the new right on every team that
+    // already exists. 0007, 0013, 0018, 0019, 0021, 0027 and 0033 all do it.
+    // 0036 shipped the first half only. So `deliverables` went into TEAM_MODULES,
+    // the doors went up, the screens went up, the tools went up — and on every
+    // team created before that day, including staging and production, NO ROLE
+    // HELD THE RIGHT. Not Admin, which is defined as full access and cannot be
+    // edited afterwards to grant itself anything. The module was unreachable for
+    // the entire agency.
+    //
+    // WHY IT HID. A brand-new team is fine: `createTeam` runs the migrations and
+    // then the seed, and the seed walks TEAM_MODULES and writes the whole tall
+    // sheet. So every test that builds a fresh database saw the right and passed.
+    // The bug only exists for a team that was born BEFORE the module, which is
+    // every real team and no test one. Add a portal fence that was switched off
+    // and there was nothing to look at from either side, and a module can be
+    // invisible to everybody for a week under a green build.
+    //
+    // THE SHAPE IS 0021's, WORD FOR WORD, and deliberately not a fresh idea:
+    //   • `r.is_default` supplies all four rights, which is 1 for the locked
+    //     Admin role and 0 for every role somebody built by hand. A migration
+    //     must never hand out a sight nobody granted — a Client role does not
+    //     quietly gain the handover shelf because we fixed our own bug.
+    //   • `WHERE NOT EXISTS` makes it idempotent, which matters more than usual
+    //     here: at least one staging team already has this row, inserted BY HAND
+    //     on 18 Aug 2026 to get testing unblocked. This migration must meet that
+    //     team and do nothing, not fail on a unique index and not write a second
+    //     row. Same predicate-rides-the-write shape as R17.
+    //   • A brand-new team never reaches it either, for the same reason: its
+    //     seed has already written the row, and `NOT EXISTS` sees it.
+    //
+    // `workers/tenancy/test/team-schema.test.ts` now holds the general version of
+    // this, derived from TEAM_MODULES rather than from anybody remembering: a
+    // module in that list with no grant in any migration turns the build red, so
+    // the NEXT module to ship half of itself does not get a week.
+    version: "0039_deliverables_permission",
+    sql: `
+INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+SELECT lower(hex(randomblob(16))), r.id, 'deliverables', r.is_default, r.is_default, r.is_default, r.is_default
+  FROM member_roles r
+ WHERE NOT EXISTS (
+   SELECT 1 FROM role_permissions p WHERE p.role_id = r.id AND p.module = 'deliverables'
+ );
+`,
+  },
+  {
+    // A DELIVERABLE BECOMES THE CLIENT'S WHEN SOMEBODY SAYS SO, ONE AT A TIME.
+    //
+    // The owner, 18 August 2026, asked whether clients should see deliverables:
+    // "yes of course.. the deliverables are for them! but only once we mark it
+    // as visible yeah?" — which is two rulings, not one. The material IS theirs,
+    // so the module opens. And it opens PER ROW, because the shelf is where a
+    // handover is assembled: a draft SOP, a recording with the wrong audio, an
+    // API doc that names a staging host all sit on it while they are being
+    // worked on. Opening the module wholesale would publish the workbench.
+    //
+    // ONE COLUMN, AND ITS DEFAULT IS THE WHOLE SAFETY ARGUMENT. `ALTER TABLE …
+    // ADD COLUMN` gives every row that already exists NULL, and NULL is "not
+    // visible" — so the twenty-eight apps' worth of handover material already
+    // filed stays exactly as private the second after this migration runs as it
+    // was the second before. There is no back-fill to get right and no DEFAULT 1
+    // to mistype. The read demands `visible_to_client_at IS NOT NULL`, so the
+    // safe state is the one the database hands out for free.
+    //
+    // A MOMENT, NOT A FLAG, and `help.validated_at` is the precedent: the column
+    // answers "since when", which is a fact the client's own screen can say out
+    // loud ("shared with you on 4 March"), and a boolean could not. WHO shared it
+    // is not stored beside it — that is what the activity row this write logs is
+    // for, read back through the one generic (table, id) path (R5). A column
+    // duplicating the feed is a second answer that can disagree with the first.
+    //
+    // NOT AN AUDIT QUARTET like `archived_at`/`archiver_*`. Archiving is the end
+    // of a record's working life and its actor is worth denormalising onto the
+    // row; this is a reversible disclosure switch that will be flipped both ways
+    // by whoever is assembling the handover, and every flip is already a line of
+    // history.
+    //
+    // NO INDEX. `idx_deliverables_account` already narrows the client's read to
+    // the accounts in their fence, and a shelf is a handful of rows per app —
+    // the CURATED collection lib/deliverables.ts caps rather than pages. An
+    // index on a two-value column behind an already-narrow one buys nothing.
+    version: "0040_deliverable_client_visibility",
+    sql: `
+ALTER TABLE deliverables ADD COLUMN visible_to_client_at TEXT;
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

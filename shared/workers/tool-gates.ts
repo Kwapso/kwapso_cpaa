@@ -52,6 +52,10 @@ export const TOOL_GATES: Record<string, string> = {
   create_deliverable: "deliverables:create",
   update_deliverable: "deliverables:edit",
   set_deliverable_active: "deliverables:delete",
+  // Sharing is `edit`, the same right that corrects one — the door says why.
+  // Deliberately NOT its own verb: a fifth right on this module would be one
+  // more box an owner has to understand before they can grant anything.
+  set_deliverable_visibility: "deliverables:edit",
   create_brand_asset: "brand_assets:create",
   update_brand_asset: "brand_assets:edit",
   set_brand_asset_active: "brand_assets:delete",

@@ -1,26 +1,53 @@
 // THE HANDOVER SHELF ON ONE APP (CHECKLIST 8.7) — five doors, and the same
 // sentence at the top of every one of them.
 //
-// R21, AT THE DOOR, ON ALL FIVE. `deliverables` is a module a client login could
-// plausibly be granted — the material IS theirs, it is what we hand over — and
-// that is exactly why the refusal is written here rather than assumed from the
-// portal gateway's allow-list. The agency gateway forwards by PREFIX and a client
-// login is an ordinary team member holding an ordinary role, so a door the portal
-// withheld is served to the same person at the other hostname unless it says no
-// itself. Every row carries `account_id`, so the fence EXISTS and a fenced read is
-// one clause away the day the owner decides a client may see their own shelf;
-// until then this module answers staff only, the way the knowledge base does.
+// R21, AT THE DOOR, ON ALL SIX OF THE AGENCY'S. `deliverables` is a module a
+// client login could plausibly be granted — the material IS theirs, it is what we
+// hand over — and that is exactly why the refusal is written here rather than
+// assumed from the portal gateway's allow-list. The agency gateway forwards by
+// PREFIX and a client login is an ordinary team member holding an ordinary role,
+// so a door the portal withheld is served to the same person at the other
+// hostname unless it says no itself.
+//
+// THE DAY ARRIVED (18 August 2026), AND THE SHAPE OF THE ANSWER IS THE POINT.
+// The owner: "yes of course.. the deliverables are for them! but only once we
+// mark it as visible yeah?" — so a client may now read their own shelf, through
+// ONE new door, `GET /api/content/portal/deliverables`, which is the LAST handler
+// in this file and the only one that does not refuse them.
+//
+// It is a SEPARATE DOOR rather than a mode on the agency's, and that is the same
+// decision `GET /api/content/portal/delivery` made about sprints one module over.
+// Three reasons, in order of how much they would cost to get wrong:
+//   • THE SHAPE IS HALF THE FENCE. The staff answer carries `creatorName`,
+//     `editorName` and `active`; SCOPE ch.06 says the portal shows the work and
+//     never which staff member is doing it. A door that answered both audiences
+//     would be one `if` away from saying our names out loud, forever.
+//   • THE QUESTION IS DIFFERENT. Staff ask "what is on THIS app's shelf"
+//     (`?appId=`); a client asks "what has been handed to MY company", across
+//     every app they own. Two questions, two `WHERE`s.
+//   • THE AGENCY'S FIVE KEEP THEIR REFUSAL, UNTOUCHED. Opening a mode on the
+//     existing read would have meant deleting a `refusePortalCaller` — and R21
+//     was earned twice by defences that were removed or never added. A new door
+//     beside them changes nothing about the five that already say no.
 //
 // THE APP IS THE FILTER, AND IT IS ASKED OF THE SERVER. `?appId=` narrows here,
 // never in the browser: the count beside the tab is the door's own COUNT(*) over
 // the same WHERE the rows came from (R16), and a browser-side filter would put a
 // number from one question above a list answering another.
 //
-// THE PING CARRIES THE APP, NOT THE DELIVERABLE (R1 + R15). A deliverable has no
-// list and no screen of its own — it is only ever read on the app it belongs to —
-// so the APP is the one row a listener can act on, and the app id is what lets it
-// name the shelf and the badge exactly. The same shape `account_rates` and
-// `account_links` already have, one spine along.
+// THE PING CARRIES THE APP, NOT THE DELIVERABLE (R1 + R15) — AND NOW THE ACCOUNT
+// AS WELL. A deliverable has no list and no screen of its own — it is only ever
+// read on the app it belongs to — so the APP is the one row a listener can act
+// on, and the app id is what lets it name the shelf and the badge exactly. The
+// same shape `account_rates` and `account_links` already have, one spine along.
+//
+// The moment a CLIENT can hear this resource, an app id stops being enough: it
+// says nothing about whose app it is, and `mayHearChange` has nothing to fence a
+// portal socket against. So every publish below passes the account as
+// `ChangeEvent.scope`, `deliverables` joins `SCOPE_STAMPED_RESOURCES`, and the
+// writes hand the account back rather than the routes asking for it again. A
+// publish that forgot the scope would be heard by no client at all — silence, the
+// direction that file fails in on purpose.
 //
 // ONE UPLOAD DOOR, NOT TWO. Its four elders come in pairs — a buffered base64
 // door kept alive for browser builds that were already loaded when the streamed
@@ -28,7 +55,7 @@
 // with, so this module ships only the streamed shape and never grows the
 // 128 MB-isolate arithmetic the buffered one is stuck with.
 
-import { refusePortalCaller } from "@shared/workers/account-scope"
+import { accountScope, refusePortalCaller } from "@shared/workers/account-scope"
 import { fail, json } from "@shared/workers/http"
 import { STREAM_UPLOAD_MAX_BYTES } from "@shared/workers/limits"
 import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
@@ -40,9 +67,11 @@ import {
   createDeliverable,
   listDeliverables,
   setDeliverableActive,
+  setDeliverableClientVisibility,
   updateDeliverable,
   type DeliverableInput,
 } from "../lib/deliverables"
+import { countClientDeliverables, listClientDeliverables } from "../lib/deliverables-client"
 import type { Env } from "../env"
 
 /** GET /api/content/deliverables?appId=[&id=] — one app's shelf, with the exact
@@ -75,8 +104,10 @@ export async function postCreateDeliverable(request: Request, env: Env): Promise
   await refusePortalCaller(cfg, guard)
   const appId = requireText(body.appId, "App", TEXT_LIMITS.short)
   requireText(body.title, "Title", TEXT_LIMITS.short)
-  await createDeliverable(cfg, guard, actor, appId, body)
-  await publishChange(env, guard.teamId, "deliverables", appId, "add")
+  // Born INVISIBLE. Nothing here writes `visible_to_client_at`, so the column is
+  // NULL and the client's read cannot see it — sharing is its own act, below.
+  const wrote = await createDeliverable(cfg, guard, actor, appId, body)
+  await publishChange(env, guard.teamId, "deliverables", appId, "add", wrote.accountId ?? undefined)
   return json({
     deliverables: await listDeliverables(cfg, guard, { appId }),
     total: await countDeliverables(cfg, guard, { appId }),
@@ -93,8 +124,8 @@ export async function postUpdateDeliverable(request: Request, env: Env): Promise
   const id = requireText(body.id, "Deliverable", TEXT_LIMITS.short)
   const appId = requireText(body.appId, "App", TEXT_LIMITS.short)
   requireText(body.title, "Title", TEXT_LIMITS.short)
-  await updateDeliverable(cfg, guard, actor, id, appId, body)
-  await publishChange(env, guard.teamId, "deliverables", appId)
+  const wrote = await updateDeliverable(cfg, guard, actor, id, appId, body)
+  await publishChange(env, guard.teamId, "deliverables", appId, undefined, wrote.accountId ?? undefined)
   return json({
     deliverables: await listDeliverables(cfg, guard, { appId }),
     total: await countDeliverables(cfg, guard, { appId }),
@@ -112,11 +143,83 @@ export async function postSetDeliverableActive(request: Request, env: Env): Prom
   const appId = requireText(body.appId, "App", TEXT_LIMITS.short)
   if (typeof body.active !== "boolean") return fail(400, "invalid_input", "Archive or restore?")
   // R17: a repeat moves zero rows → no ping, no duplicate line of history.
-  const changed = await setDeliverableActive(cfg, guard, actor, id, appId, body.active)
-  if (changed) await publishChange(env, guard.teamId, "deliverables", appId)
+  const wrote = await setDeliverableActive(cfg, guard, actor, id, appId, body.active)
+  if (wrote.changed)
+    await publishChange(env, guard.teamId, "deliverables", appId, undefined, wrote.accountId ?? undefined)
   return json({
     deliverables: await listDeliverables(cfg, guard, { appId }),
     total: await countDeliverables(cfg, guard, { appId }),
+  })
+}
+
+/** POST /api/content/deliverables/visibility — show one to the client, or take
+ * it back (Client visibility, glossary).
+ *
+ * ITS OWN DOOR, NOT A FIELD ON THE EDIT FORM. Publishing something to a client
+ * is a decision; correcting a title is a correction. Folding the two together
+ * would mean every typo fix carried the power to disclose, and R22's lesson runs
+ * the other way too: a door that accepts a field is a door a machine caller can
+ * set that field on. `postUpdateDeliverable` reads five fields off the body and
+ * `visible` is deliberately not one of them.
+ *
+ * GATED ON `deliverables:edit`, the same right that corrects one — sharing is not
+ * a harder act than editing, it is a different one, and inventing a fifth verb
+ * for the permission matrix would be a right an owner has to understand before
+ * they can grant anything. R21: it is the agency's decision about the agency's
+ * material, so it refuses a client login like its five siblings. A client cannot
+ * share a deliverable with themselves.
+ *
+ * R17: `changed` is false when it was already in the state asked for, and then
+ * nothing is logged and nothing is published. */
+export async function postSetDeliverableVisibility(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{
+    id?: unknown
+    appId?: unknown
+    visible?: unknown
+  }>(request, env, "deliverables", "edit")
+  await refusePortalCaller(cfg, guard)
+  const id = requireText(body.id, "Deliverable", TEXT_LIMITS.short)
+  const appId = requireText(body.appId, "App", TEXT_LIMITS.short)
+  // R20, positionally: a `typeof` operand, not a truthiness guard. `{}` and
+  // `"false"` are both refused here rather than quietly meaning something.
+  if (typeof body.visible !== "boolean")
+    return fail(400, "invalid_input", "Show this to the client, or hide it?")
+  const wrote = await setDeliverableClientVisibility(cfg, guard, actor, id, appId, body.visible)
+  if (wrote.changed)
+    await publishChange(env, guard.teamId, "deliverables", appId, undefined, wrote.accountId ?? undefined)
+  return json({
+    deliverables: await listDeliverables(cfg, guard, { appId }),
+    total: await countDeliverables(cfg, guard, { appId }),
+  })
+}
+
+/** GET /api/content/portal/deliverables — THE CLIENT'S OWN SHELF, and the only
+ * door in this file that does not refuse them.
+ *
+ * FENCED TWICE, IN ONE CLAUSE, AND NEITHER HALF IS OPTIONAL. `clientWhere` (in
+ * lib/deliverables-client.ts) ANDs the caller's account fence together with
+ * `visible_to_client_at IS NOT NULL`, so a deliverable on somebody else's
+ * account and a deliverable nobody has shared are equally absent — and the count
+ * beside the rows is taken over that same clause, so the heading can never
+ * advertise material the list is withholding (R16).
+ *
+ * NO PARAMETERS AT ALL, which is the strongest thing that can be said about it.
+ * There is no `?appId=`, no `?accountId=`, nothing to parse and therefore nothing
+ * to trust: the whole question is "what has been shared with the company this
+ * caller is standing in", and the only input is the caller's own resolved scope.
+ * The account-fence leak that R21 was earned on both times began with a door
+ * taking an id.
+ *
+ * `accountScope` RATHER THAN `refusePortalCaller`, which is the one place in the
+ * module those two differ — and it is exactly the second of R21's four permitted
+ * answers: this door IS on the portal's surface (`PORTAL_DOORS`), and it resolves
+ * the fence. */
+export async function getClientDeliverables(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "deliverables", "read")
+  const scope = await accountScope(cfg, guard)
+  return json({
+    deliverables: await listClientDeliverables(cfg, guard, scope),
+    total: await countClientDeliverables(cfg, guard, scope),
   })
 }
 

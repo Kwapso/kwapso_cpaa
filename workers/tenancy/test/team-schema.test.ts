@@ -473,3 +473,133 @@ describe("0026 — the 26 duplicates every older team is carrying", () => {
     expect(live(db).map((r) => r.id)).toEqual(before)
   })
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A MODULE REACHES THE TEAMS THAT ALREADY EXIST, OR IT REACHES NOBODY.
+//
+// Earned on 18 August 2026 by `deliverables`. Migration 0036 created the table,
+// the module went into TEAM_MODULES, and the doors, screens and tools all
+// shipped — with no `role_permissions` back-fill. Every team born before that
+// day therefore held the right on NO role, not even the locked Admin, which is
+// defined as full access and cannot be edited afterwards to grant itself
+// anything. The module was invisible to the entire agency for a week.
+//
+// IT HID BECAUSE EVERY TEST BUILDS A FRESH TEAM. `createTeam` runs the
+// migrations and then the seed, and the seed walks TEAM_MODULES and writes the
+// whole tall sheet — so a database built in a test has the right and a database
+// belonging to a real customer does not. The one shape no fixture had was "a
+// team that predates the module", which is the shape every production team has.
+//
+// So this is the general version, derived from TEAM_MODULES rather than from a
+// list somebody keeps. THE ORIGINALS are the exception, and they are data with a
+// reason: the modules that already existed when 0001 shipped were granted by the
+// first seed every team ever ran, so there is no earlier team for a back-fill to
+// reach. Anything added since is a module some team predates.
+describe("every module reaches the teams that already exist", () => {
+  /** The modules that shipped WITH the first schema. A team cannot predate them,
+   * so no migration owes them a back-fill. It is a ratchet in the only direction
+   * that can be right: this list can never grow, because 0001 has already
+   * shipped and nothing can be added to it retroactively. */
+  const FROM_THE_FIRST_SCHEMA = [
+    "teams",
+    "team_members",
+    "member_roles",
+    "help",
+    "selectable_data",
+    "screens",
+    "agent",
+  ]
+
+  const migrationSql = TEAM_MIGRATIONS.map((m) => m.sql).join("\n")
+
+  it("guards its own derivation — a blind scan reports 'all clear' like a pass", () => {
+    expect(TEAM_MODULES.length, "TEAM_MODULES did not load").toBeGreaterThan(15)
+    expect(migrationSql.length, "the migration SQL did not load").toBeGreaterThan(1000)
+    // And the exception list must still describe the first schema rather than
+    // having quietly become a place to put whatever is failing today.
+    for (const m of FROM_THE_FIRST_SCHEMA)
+      expect([...TEAM_MODULES], `${m} is no longer a module — delete it here too`).toContain(m)
+  })
+
+  it("every module added since 0001 is granted by some migration", () => {
+    const granted = new Set([
+      ...[...migrationSql.matchAll(/r\.id,\s*'([a-z_]+)'/g)].map((m) => m[1]),
+      ...[...migrationSql.matchAll(/SELECT '([a-z_]+)' AS module/g)].map((m) => m[1]),
+      ...[...migrationSql.matchAll(/UNION ALL SELECT '([a-z_]+)'/g)].map((m) => m[1]),
+    ])
+    // The derivation has to be able to SEE grants, or this passes by blindness.
+    expect(granted.size, "no role_permissions grant was found in any migration").toBeGreaterThan(10)
+
+    const stranded = [...TEAM_MODULES].filter(
+      (m) => !granted.has(m) && !FROM_THE_FIRST_SCHEMA.includes(m)
+    )
+    expect(
+      stranded,
+      `these modules exist in TEAM_MODULES but no migration ever hands them to an existing team, so every team born before them holds the right on NO role — not even Admin. Add a back-fill in the shape 0021 uses (r.is_default for the rights, WHERE NOT EXISTS for idempotence): ${stranded.join(", ")}`
+    ).toEqual([])
+  })
+
+  it("a team that PREDATES the handover shelf gets it, and a patched one survives", () => {
+    // The proof by doing, because this is the case no fixture had. Build the
+    // first schema, put a locked Admin role in it the way an old team's own seed
+    // would have, then run every later migration and ask what Admin holds.
+    const db = new DatabaseSync(":memory:")
+    db.exec(TEAM_MIGRATIONS[0].sql)
+    db.exec(
+      `INSERT INTO member_roles (id, title, description, is_default, created_at)
+       VALUES ('R_ADMIN', 'Admin', 'Default role, full access.', 1, '2026-01-01'),
+              ('R_BUILT', 'Delivery lead', 'Built by hand.', 0, '2026-01-01')`
+    )
+    for (const m of TEAM_MIGRATIONS.slice(1)) db.exec(m.sql)
+
+    const admin = db
+      .prepare(
+        `SELECT can_read AS r, can_create AS c, can_edit AS e, can_delete AS d
+           FROM role_permissions WHERE role_id = 'R_ADMIN' AND module = 'deliverables'`
+      )
+      .get() as { r: number; c: number; e: number; d: number } | undefined
+    expect(admin, "an existing team's Admin must be able to reach the handover shelf").toBeTruthy()
+    expect(admin).toEqual({ r: 1, c: 1, e: 1, d: 1 })
+
+    // …AND NOBODY ELSE. A migration fixing our own bug must not hand a
+    // hand-built role a sight nobody granted it.
+    const built = db
+      .prepare(
+        `SELECT can_read AS r FROM role_permissions WHERE role_id = 'R_BUILT' AND module = 'deliverables'`
+      )
+      .get() as { r: number } | undefined
+    expect(built?.r, "a role somebody built by hand gains nothing").toBe(0)
+
+    // IDEMPOTENT, against the team that was patched BY HAND on 18 Aug 2026 to
+    // unblock testing. That team already HAS the row, so the back-fill must meet
+    // it and do nothing — not fail on the insert, not write a second one. Only
+    // this migration is replayed: the rest are stamped and run once by
+    // construction (an ADD COLUMN cannot be re-run and is not asked to be), so
+    // replaying the whole set would be testing something the runner never does.
+    const backfill = TEAM_MIGRATIONS.find((m) => m.version === "0039_deliverables_permission")
+    expect(backfill, "0039 is the back-fill this test is about — did it move?").toBeTruthy()
+    db.exec((backfill as { sql: string }).sql)
+    db.exec((backfill as { sql: string }).sql)
+    const rows = db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM role_permissions WHERE role_id = 'R_ADMIN' AND module = 'deliverables'`
+      )
+      .get() as { n: number }
+    expect(rows.n, "the back-fill must be safe to meet a team that already has the row").toBe(1)
+  })
+
+  it("a FRESH team still gets it from the seed, untouched by the back-fill", () => {
+    const db = new DatabaseSync(":memory:")
+    for (const m of TEAM_MIGRATIONS) db.exec(m.sql)
+    db.exec(buildTeamSeed(ACTOR, "2026-06-12T00:00:00.000Z").script)
+    const rows = db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM role_permissions WHERE module = 'deliverables'`
+      )
+      .get() as { n: number }
+    // Exactly two: the seed's Admin and Viewer. The migration ran BEFORE the
+    // seed against a database with no roles in it at all, so it wrote nothing —
+    // which is the other half of "WHERE NOT EXISTS" doing its job.
+    expect(rows.n).toBe(2)
+  })
+})

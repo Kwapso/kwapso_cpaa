@@ -6,10 +6,11 @@
 // It is not the agency AppShell with items removed. The agency shell carries a
 // team switcher, a module sidebar built from a permission-filtered page
 // registry, a section nav with count badges, an assistant launcher and a profile
-// menu, because staff live in it. This shell has three destinations, a name, and
-// a way out. Three is the whole point: a person who has never used software like
-// this can hold three places in their head, and there is no fourth to wonder
-// about.
+// menu, because staff live in it. This shell has a short list of destinations, a
+// name, and a way out. The shortness is the whole point: a person who has never
+// used software like this should be able to hold the whole app in their head.
+// The list is DESTINATIONS below, which says what each one had to earn to be on
+// it — it has grown twice and it is nearly full.
 //
 // It also owns the live link. One socket on the team channel; every ping goes
 // through the portal's own listener registry (lib/live-resources), which knows
@@ -23,7 +24,7 @@ import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { ModeToggle } from "@kwapso/ui/registry/primitives/mode-toggle/mode-toggle"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
-import { Building2, House, LifeBuoy, LogOut, PiggyBank } from "lucide-react"
+import { Building2, House, LifeBuoy, LogOut, Package, PiggyBank } from "lucide-react"
 
 import { brand } from "@shared/brand"
 import { useRealtime } from "@shared/web/realtime"
@@ -40,14 +41,26 @@ import { NeedsName } from "@/components/needs-name"
 import { NoAccess } from "@/components/no-access"
 import { AccountSwitcher } from "@/components/account-switcher"
 
-/** The four places. Three was the rule — a client can hold three in their head —
- * and Value earns the fourth, because it is the one screen that answers the
+/** The five places. Three was the rule — a client can hold three in their head —
+ * and Value earned the fourth, because it is the one screen that answers the
  * question the whole engagement is judged on. It sits before "My company" for
- * the same reason: what the work is worth is read far more often than an address. */
+ * the same reason: what the work is worth is read far more often than an address.
+ *
+ * DELIVERABLES IS THE FIFTH, and it is the only one of the five that is a place
+ * to GO AND FETCH something rather than a thing to read. It sits after Value and
+ * before "My company" because that is the order of how often they are wanted: the
+ * saving, then the material, then the address. It is deliberately not folded into
+ * Home — a client looking for the SOP we wrote them in March is on a errand, and
+ * an errand needs a door with a name on it, not a section they have to scroll to
+ * remember exists.
+ *
+ * Five is the ceiling this bar can carry on a phone; a sixth needs a different
+ * navigation, not a smaller icon. */
 const DESTINATIONS = [
   { href: "/home", label: "Home", icon: House },
   { href: "/tickets", label: "Tickets", icon: LifeBuoy },
   { href: "/value", label: "Value", icon: PiggyBank },
+  { href: "/deliverables", label: "Deliverables", icon: Package },
   { href: "/company", label: "My company", icon: Building2 },
 ] as const
 

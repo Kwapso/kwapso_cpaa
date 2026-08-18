@@ -46,6 +46,7 @@ type DeliverableRow = {
   dated_on: string | null
   url: string | null
   image_url: string | null
+  visible_to_client_at: string | null
   deactivated_at: string | null
   created_at: string
   creator_name: string | null
@@ -63,6 +64,7 @@ function toDeliverable(r: DeliverableRow): Deliverable {
     datedOn: r.dated_on,
     url: r.url,
     imageUrl: r.image_url,
+    visibleToClientAt: r.visible_to_client_at,
     active: r.deactivated_at === null,
     createdAt: r.created_at,
     creatorName: r.creator_name,
@@ -71,7 +73,7 @@ function toDeliverable(r: DeliverableRow): Deliverable {
   }
 }
 
-const COLUMNS = `id, app_id, account_id, title, kind, dated_on, url, image_url,
+const COLUMNS = `id, app_id, account_id, title, kind, dated_on, url, image_url, visible_to_client_at,
                  deactivated_at, created_at, creator_name, updated_at, editor_name`
 
 /** The one narrowing this table answers to: which app's shelf, and (for the
@@ -211,13 +213,26 @@ async function clean(cfg: D1Rest, guard: MemberGuard, actor: Actor, input: Deliv
   }
 }
 
+/** THE ACCOUNT EVERY WRITE HANDS BACK, and why it is a return value rather than
+ * a second query.
+ *
+ * A change ping on this module names the APP (`publishChange(…, "deliverables",
+ * appId)`), because the app is the row a listener holds. An app id says nothing
+ * about WHOSE app it is — so once a client login can hear this resource at all,
+ * the publisher has to name the account too (`ChangeEvent.scope`), which is the
+ * shape `help`, `todos`, `stories` and `sprints` already have and the only shape
+ * `mayHearChange` can fence. Every write below has already read a row carrying
+ * `account_id` to do its job, so handing it back costs nothing; asking the
+ * database again would be a second read to learn something we just had. */
+export type WroteDeliverable = { accountId: string | null }
+
 export async function createDeliverable(
   cfg: D1Rest,
   guard: MemberGuard,
   actor: Actor,
   appId: string,
   input: DeliverableInput
-): Promise<string> {
+): Promise<WroteDeliverable & { id: string }> {
   const accountId = await appOrThrow(cfg, guard, appId)
   const v = await clean(cfg, guard, actor, input)
   const id = ulid()
@@ -234,7 +249,7 @@ VALUES (${sqlString(id)}, ${sqlString(appId)}, ${sqlString(accountId)}, ${sqlStr
     relatedTable: "deliverables",
     relatedRowId: id,
   })
-  return id
+  return { id, accountId }
 }
 
 /** Edit one. The APP it hangs off is deliberately not editable, for the reason
@@ -248,7 +263,7 @@ export async function updateDeliverable(
   id: string,
   appId: string,
   input: DeliverableInput
-): Promise<void> {
+): Promise<WroteDeliverable> {
   const before = await deliverableOrThrow(cfg, guard, id, appId)
   const v = await clean(cfg, guard, actor, input)
   const now = new Date().toISOString()
@@ -270,6 +285,7 @@ export async function updateDeliverable(
     relatedTable: "deliverables",
     relatedRowId: id,
   })
+  return { accountId: before.account_id }
 }
 
 /** Archive or restore. R17: the current-status predicate rides the UPDATE, so a
@@ -286,7 +302,7 @@ export async function setDeliverableActive(
   id: string,
   appId: string,
   active: boolean
-): Promise<boolean> {
+): Promise<WroteDeliverable & { changed: boolean }> {
   const before = await deliverableOrThrow(cfg, guard, id, appId)
   const now = new Date().toISOString()
   const changed = await d1Query<{ id: string }>(
@@ -297,12 +313,67 @@ export async function setDeliverableActive(
       : `UPDATE deliverables SET deactivated_at = ?, deactivator_id = ${sqlString(actor.id)}, deactivator_email = ${sqlString(actor.email)}, deactivator_name = ${sqlString(actor.name)}, updated_at = ? WHERE id = ? AND deactivated_at IS NULL RETURNING id`,
     active ? [now, id] : [now, now, id]
   )
-  if (!changed[0]) return false
+  if (!changed[0]) return { changed: false, accountId: before.account_id }
   await logActivity(cfg, guard.databaseId, actor, {
     type: active ? "Deliverable restored" : "Deliverable archived",
     description: `${actor.name} ${active ? "restored" : "archived"} "${before.title}"`,
     relatedTable: "deliverables",
     relatedRowId: id,
   })
-  return true
+  return { changed: true, accountId: before.account_id }
+}
+
+/** SHOW IT TO THE CLIENT, OR TAKE IT BACK (Client visibility, glossary).
+ *
+ * The owner's ruling, 18 August 2026: the deliverables are FOR the client, "but
+ * only once we mark it as visible". So this is the one write in the module that
+ * changes who can see a row rather than what it says, and it is deliberately its
+ * own door rather than a field on the edit form: publishing something to a
+ * client is a decision, not a correction, and a decision made by mistake while
+ * fixing a typo is the mistake this shape prevents.
+ *
+ * R17, AND IT MATTERS MORE HERE THAN ANYWHERE. The current-state predicate rides
+ * the UPDATE (`AND visible_to_client_at IS [NOT] NULL`), so sharing something
+ * twice moves zero rows, writes no second line of history and sends no second
+ * ping. Without it a double-clicked "Show to the client" would tell the record's
+ * own history that we shared it twice — and the second timestamp would silently
+ * overwrite the first, so the client's screen would start claiming a later
+ * sharing date than the one they were actually given.
+ *
+ * ARCHIVED IS NOT HIDDEN, AND HIDDEN IS NOT ARCHIVED. The two switches are
+ * independent columns on purpose: `deactivated_at` is our word about our own
+ * shelf, `visible_to_client_at` is theirs. The client's read demands BOTH (live
+ * AND visible), so archiving something already shared withdraws it from the
+ * portal without touching the sharing decision — and restoring it puts it back
+ * exactly as it was, rather than re-publishing something on a guess. */
+export async function setDeliverableClientVisibility(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor,
+  id: string,
+  appId: string,
+  visible: boolean
+): Promise<WroteDeliverable & { changed: boolean }> {
+  const before = await deliverableOrThrow(cfg, guard, id, appId)
+  const now = new Date().toISOString()
+  const changed = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    visible
+      ? `UPDATE deliverables SET visible_to_client_at = ?, updated_at = ?, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE id = ? AND visible_to_client_at IS NULL RETURNING id`
+      : `UPDATE deliverables SET visible_to_client_at = NULL, updated_at = ?, editor_id = ${sqlString(actor.id)}, editor_email = ${sqlString(actor.email)}, editor_name = ${sqlString(actor.name)} WHERE id = ? AND visible_to_client_at IS NOT NULL RETURNING id`,
+    visible ? [now, now, id] : [now, id]
+  )
+  if (!changed[0]) return { changed: false, accountId: before.account_id }
+  await logActivity(cfg, guard.databaseId, actor, {
+    // THE HISTORY SAYS WHO SHOWED IT TO THEM. The row carries only the moment,
+    // because this line carries the person — one fact, one home (R5).
+    type: visible ? "Deliverable shared with the client" : "Deliverable hidden from the client",
+    description: visible
+      ? `${actor.name} made "${before.title}" visible to the client`
+      : `${actor.name} hid "${before.title}" from the client`,
+    relatedTable: "deliverables",
+    relatedRowId: id,
+  })
+  return { changed: true, accountId: before.account_id }
 }
