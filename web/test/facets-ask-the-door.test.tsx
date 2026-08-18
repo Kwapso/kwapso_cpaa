@@ -77,7 +77,11 @@ function renderFind(listKey: string, fetchPage: ReturnType<typeof fakeDoor>["fet
     <PagedFind<Row>
       listKey={listKey}
       placeholder="Search the knowledge base…"
-      noun="sources"
+      matches={{
+        none: "No sources match",
+        one: "1 source matches",
+        many: "{count} sources match",
+      }}
       facets={translatedFacets("knowledge", (s) => s, {
         compartment: [{ value: "account:A_1", label: "Bergman S.A." }],
       })}

@@ -2621,6 +2621,69 @@ ALTER TABLE google_connections ADD COLUMN calendar_swept_through TEXT;
 DELETE FROM role_permissions WHERE module = 'google_events';
 `,
   },
+  {
+    // ONE SPELLING OF ONE INSTANT — so the text order IS the time order.
+    //
+    // `meetings.starts_at` is TEXT, SQLite compares TEXT byte by byte, and the
+    // diary is ordered and PAGED by that column (MEETING_ORDER, and the keyset
+    // cursor minted from the same value). That is only chronological while every
+    // row is written the same way, and sixty-three were not: Google gives an
+    // hour in the event's own offset — `2026-08-18T12:00:00+05:30` — and the
+    // calendar sweep stored the string exactly as it arrived, beside every other
+    // row's `…Z`. `+05:30` sorts as though the meeting were at noon when it is
+    // at 06:30Z, so the day sheet interleaved: on staging a 15:30 review sorted
+    // below everything after it. Not a display bug — the ORDER BY is wrong, so
+    // page two of the diary starts somewhere page one did not stop.
+    //
+    // WHY THE DATA AND NOT THE QUERY. The alternative is to order by
+    // `datetime(starts_at)` instead, and it is the wrong fix twice.
+    // shared/workers/sorting.ts requires the ORDER BY expression and the cursor
+    // key to be THE SAME VALUE (a keyset page is three things that must agree),
+    // so changing one means changing the row-reader to match, in every sort menu
+    // that touches a moment — and every future filter, comparison and index on
+    // the column would still be reading the raw text. Normalising what is STORED
+    // makes the property hold everywhere at once, including places nobody has
+    // written yet. `utcMoment` in workers/content/src/lib/meetings.ts is the
+    // other half: it keeps new rows in this shape.
+    //
+    // WHAT IS AND IS NOT TOUCHED. Only a value that carries a real offset — the
+    // last six characters are `+HH:MM` or `-HH:MM`. A bare `2026-08-18` (an
+    // all-day entry: a day, not an hour) ends `-08-18`, has no colon in that
+    // position, and is left alone; it already sorts before every timed entry on
+    // its own day, which is where it belongs. Anything already ending in `Z` is
+    // untouched. `%f` rather than `%S` so the result is byte-identical to
+    // JavaScript's `toISOString()`, which is what every other writer of this
+    // column produces.
+    //
+    // NUMBERED 0041, NOT 0039. Two other lanes landed 0039 and 0040 on `main`
+    // between this being written and being committed, and a duplicate version is
+    // the one collision git will merge WITHOUT a conflict: two entries in one
+    // array, both claiming the same name, and whichever the runner sees second
+    // is silently skipped. The number is checked against `main` at commit time
+    // for exactly that reason.
+    //
+    // NOTHING IS LOST AND IT CAN BE RE-RUN. `strftime` answers NULL for a value
+    // it cannot read, and a NULL start time would delete the meeting from every
+    // view keyed on it, so the guard keeps such a row exactly as it was. After
+    // the run every converted value ends in `Z`, so the predicate matches
+    // nothing on a second pass.
+    version: "0041_meeting_moments_in_utc",
+    sql: `
+UPDATE meetings
+   SET starts_at = strftime('%Y-%m-%dT%H:%M:%fZ', starts_at)
+ WHERE starts_at IS NOT NULL
+   AND substr(starts_at, -6, 1) IN ('+', '-')
+   AND substr(starts_at, -3, 1) = ':'
+   AND strftime('%Y-%m-%dT%H:%M:%fZ', starts_at) IS NOT NULL;
+
+UPDATE meetings
+   SET ends_at = strftime('%Y-%m-%dT%H:%M:%fZ', ends_at)
+ WHERE ends_at IS NOT NULL
+   AND substr(ends_at, -6, 1) IN ('+', '-')
+   AND substr(ends_at, -3, 1) = ':'
+   AND strftime('%Y-%m-%dT%H:%M:%fZ', ends_at) IS NOT NULL;
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

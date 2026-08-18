@@ -36,7 +36,7 @@ import { TeamSectionNav } from "@/components/team-section-nav"
 import { CountedTabs } from "@/components/counted-tabs"
 import { buildCrumbs } from "@/components/deep-link/crumbs"
 import { renderModuleContent } from "@/components/deep-link/module-content"
-import { ACCOUNT_MODULES, type SectionKey } from "@/components/deep-link/route"
+import { ACCOUNT_MODULES, sectionFor, type SectionKey } from "@/components/deep-link/route"
 import { useHostNav, useUrlRoute } from "@/components/deep-link/use-host-nav"
 import { useRouteTeam } from "@/components/deep-link/use-route-team"
 import { useTraceRing } from "@/components/deep-link/use-trace-ring"
@@ -404,26 +404,11 @@ function teamTabStrip(
   module: string | null,
   totalByCacheKey: Record<string, number | undefined>
 ): { section: SectionKey; showTabs: boolean; sectionCounts: Partial<Record<SectionKey, number>> } {
-  const section: SectionKey =
-    module === "members" ||
-    module === "roles" ||
-    module === "invites" ||
-    module === "dropdowns" ||
-    module === "internal-rates" ||
-    module === "accounts" ||
-    module === "tickets" ||
-    module === "knowledge" ||
-    module === "processes" ||
-    module === "stories" ||
-    module === "sprints" ||
-    module === "apps" ||
-    module === "tasks" ||
-    module === "meetings" ||
-    module === "brand" ||
-    module === "purposes" ||
-    module === "import"
-      ? module
-      : "overview"
+  // DERIVED, not listed. The list this replaces named eighteen of the nineteen
+  // segments and had never had `time` added to it, so Work logs fell through to
+  // `overview` — a "tab" section — and a sidebar page drew the Settings tab strip
+  // above itself. See `sectionFor` for the whole of it.
+  const section: SectionKey = sectionFor(module ?? "")
   const showTabs = (TEAM_SECTIONS.find((s) => s.key === section)?.placement ?? "tab") === "tab"
   const sectionCounts: Partial<Record<SectionKey, number>> = {}
   for (const s of TEAM_SECTIONS) {

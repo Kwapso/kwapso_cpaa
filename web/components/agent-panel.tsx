@@ -158,7 +158,7 @@ export function AgentPanel({
                 // detected (underlined) on phones and breaks the centred line mid-quote.
                 emptyState={
                   <div className="flex max-w-64 flex-col gap-1">
-                    <span>{t("Try “invite a teammate as an Editor”")}</span>
+                    <span>{t("Try “invite a member as an Editor”")}</span>
                     <span>{t("or “what changed this week?”")}</span>
                   </div>
                 }

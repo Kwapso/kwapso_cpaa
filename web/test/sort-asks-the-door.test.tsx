@@ -52,7 +52,11 @@ function renderFind(listKey: string, fetchPage: ReturnType<typeof fakeDoor>["fet
     <PagedFind<Row>
       listKey={listKey}
       placeholder="Search accounts…"
-      noun="accounts"
+      matches={{
+        none: "No accounts match",
+        one: "1 account matches",
+        many: "{count} accounts match",
+      }}
       // The labels go through the reader's language at the call site; here it is
       // the identity, so the English in COLLECTION_SORTS is what renders.
       sorts={translatedSorts("accounts", (s) => s)}

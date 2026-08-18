@@ -100,8 +100,42 @@ const MEETING_COLS = `m.id, m.ref, m.title, m.account_id, m.app_id, m.purpose_id
 
 /** The sort a meeting list is keyed by: when it is / was, newest first. A diary
  * read backwards is what somebody wants — the thing that just happened is the
- * thing they are looking for — and the future sits at the top where it belongs. */
+ * thing they are looking for — and the future sits at the top where it belongs.
+ *
+ * IT IS A TEXT COLUMN, SO THE TEXT ORDER HAS TO BE THE TIME ORDER. `starts_at`
+ * is TEXT and SQLite compares it byte by byte, which is only chronological while
+ * every row is written the same way. Sixty-three rows were not: Google gives an
+ * hour in the event's OWN offset (`2026-08-18T12:00:00+05:30`) and the sweep
+ * stored that string as it arrived, beside every other row's `…Z`. A meeting at
+ * 12:00+05:30 is 06:30Z and sorted as though it were noon — so the diary
+ * interleaved, and the keyset paging on top of it was walking that same wrong
+ * order. Fixed at the source rather than in the ORDER BY: `utcMoment` below
+ * writes UTC, migration 0041 converted the rows already stored, and the ORDER BY
+ * expression and the cursor key stay the one value that
+ * shared/workers/sorting.ts requires them to be. */
 const MEETING_ORDER = "m.starts_at"
+
+/** ONE SPELLING OF ONE INSTANT, on the way in from Google.
+ *
+ * `requireMoment` has always done this for the app's own forms (it returns
+ * `new Date(ms).toISOString()`), so every meeting a person typed was already
+ * UTC. The calendar sweep is the other door into the same column and it had no
+ * equivalent. Same normalisation, same format — milliseconds and all, so the two
+ * doors write bytes that compare as well as they parse.
+ *
+ * A BARE DATE IS LEFT EXACTLY AS IT CAME. `2026-08-18` with no time is Google's
+ * way of saying "a day, not an hour" (an all-day entry), and turning it into
+ * midnight UTC would invent a time the calendar never gave. It also needs no
+ * help: a date with no `T` already sorts before every timed entry on its own
+ * day, which is where an all-day entry belongs.
+ *
+ * An unparseable value is returned untouched. Losing a start time is worse than
+ * keeping a strange one — the row would vanish from every view keyed on it. */
+export function utcMoment(value: string | null): string | null {
+  if (!value || !value.includes("T") || value.endsWith("Z")) return value
+  const ms = Date.parse(value)
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : value
+}
 
 /** WHAT THE DIARY MAY BE ORDERED BY (shared/workers/sorting.ts). `when` is the
  * fallback and is the order above; the rest are the columns the "All" view
@@ -1081,7 +1115,7 @@ export async function syncCalendar(
            google_attendees_json, google_attachments_json, google_status, google_recurrence,
            google_time_zone, google_updated_at, google_synced_at,
            created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString(titleOf(event))}, ${sqlString(event.description || null)}, ${sqlString(event.location || null)}, ${sqlString(event.start)}, ${sqlString(event.end || null)}, ${sqlString(event.recurringEventId || null)}, 1, ${sqlString(event.id)}, ${sqlString(event.url)}, ${sqlString(event.joinUrl)}, ${sqlString(event.organizer.email || null)}, ${sqlString(JSON.stringify(event.attendees))}, ${sqlString(JSON.stringify(event.attachments))}, ${sqlString(event.status || null)}, ${sqlString(event.recurrence.join("\n") || null)}, ${sqlString(event.timeZone || null)}, ${sqlString(event.updatedAt)}, ${sqlString(at)}, ${sqlString(at)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+VALUES (${sqlString(id)}, ${sqlString(titleOf(event))}, ${sqlString(event.description || null)}, ${sqlString(event.location || null)}, ${sqlString(utcMoment(event.start))}, ${sqlString(utcMoment(event.end || null))}, ${sqlString(event.recurringEventId || null)}, 1, ${sqlString(event.id)}, ${sqlString(event.url)}, ${sqlString(event.joinUrl)}, ${sqlString(event.organizer.email || null)}, ${sqlString(JSON.stringify(event.attendees))}, ${sqlString(JSON.stringify(event.attachments))}, ${sqlString(event.status || null)}, ${sqlString(event.recurrence.join("\n") || null)}, ${sqlString(event.timeZone || null)}, ${sqlString(event.updatedAt)}, ${sqlString(at)}, ${sqlString(at)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
       )
       created++
       continue
@@ -1113,8 +1147,8 @@ VALUES (${sqlString(id)}, ${sqlString(titleOf(event))}, ${sqlString(event.descri
     const ownWords =
       row.from_calendar === 1
         ? `, title = ${sqlString(titleOf(event))},
-             starts_at = ${sqlString(event.start)},
-             ends_at = ${sqlString(event.end || null)},
+             starts_at = ${sqlString(utcMoment(event.start))},
+             ends_at = ${sqlString(utcMoment(event.end || null))},
              location = ${sqlString(event.location || null)},
              agenda = ${sqlString(event.description || null)}`
         : ""

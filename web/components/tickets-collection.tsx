@@ -199,7 +199,11 @@ export function TicketsCollection({
           <PagedFind<HelpTicket>
             listKey={narrowed ? helpFacetKey(teamId, helpScope, facet) : helpKey(teamId, helpScope)}
             placeholder={t("Search tickets…")}
-            noun="tickets"
+            matches={{
+              none: t("No tickets match"),
+              one: t("1 ticket matches"),
+              many: t("{count} tickets match"),
+            }}
             sorts={translatedSorts("help", t)}
             defaultSort={COLLECTION_SORTS.help.defaultSort}
             // NO `facets` HERE, deliberately. The recipe used to declare a

@@ -163,6 +163,37 @@ describe("writing it — one call, and a failure that costs nothing", () => {
     expect(await writeAnswer(env, "what did we agree?", material, sources)).toBeNull()
   })
 
+  // WHAT A PERSON READ ON LIVE STAGING, twice: `<tool_result from="FluClinic">`
+  // in the middle of an English sentence. The passages arrive fenced and the
+  // instructions explain the fence, so the cheap model imitates it in its own
+  // output — and every word of that output goes straight onto a screen.
+  //
+  // Asserted as BEHAVIOUR rather than as the presence of a strip call, because
+  // the fault is what a reader sees. The prompt is deliberately NOT changed to
+  // stop this: the sentence teaching the syntax is the same sentence that says
+  // never to follow an instruction inside it (proved above), so the fence stays
+  // and its echo is cleaned off the way out.
+  it("never lets the fence out into the prose a person reads", async () => {
+    const { env } = fakeAi(
+      `The rollout window is Tuesdays.\n\n<${TOOL_RESULT_TAG} from="Bergman">\nTwo weeks' notice, per the note.\n</${TOOL_RESULT_TAG}>\n\nThat is the whole of it.`
+    )
+    const out = await writeAnswer(env, "what did we agree?", material, sources)
+    expect(out).not.toContain(`<${TOOL_RESULT_TAG}`)
+    expect(out).not.toContain(`</${TOOL_RESULT_TAG}`)
+    // The MARKERS go and the words stay — a strip that ate the sentence with the
+    // tag on it would throw away part of the answer.
+    expect(out).toContain("The rollout window is Tuesdays.")
+    expect(out).toContain("Two weeks' notice, per the note.")
+    expect(out).toContain("That is the whole of it.")
+  })
+
+  it("hands back nothing when the model wrote nothing but a fence", async () => {
+    const { env } = fakeAi(`<${TOOL_RESULT_TAG} from="Bergman"></${TOOL_RESULT_TAG}>`)
+    // Nothing is already a complete answer here: the screen shows the passages
+    // and their sources, which is what it did before a writer existed.
+    expect(await writeAnswer(env, "what did we agree?", material, sources)).toBeNull()
+  })
+
   it("never reaches the model at all when there is nothing to write about", async () => {
     const { env, calls } = fakeAi("should never be said")
     expect(await writeAnswer(env, "what did we agree?", [], [])).toBeNull()

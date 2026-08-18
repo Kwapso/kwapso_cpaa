@@ -154,7 +154,11 @@ export function ProcessesScreen({
       <PagedFind<ProcessSummary>
         listKey={processesKey(teamId)}
         placeholder={t("Search processes…")}
-        noun="maps"
+        matches={{
+          none: t("No processes match"),
+          one: t("1 process matches"),
+          many: t("{count} processes match"),
+        }}
         sorts={translatedSorts("processes", t)}
         defaultSort={COLLECTION_SORTS.processes.defaultSort}
         // …and so are the filters. `app` and `archived` were the frame's until

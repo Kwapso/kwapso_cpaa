@@ -256,7 +256,79 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "closed-palette",
     status: "enforced",
   },
+  {
+    id: "R33",
+    dimension: "ui",
+    law: "THE GLOSSARY IS THE DICTIONARY THE SCREENS SPEAK. Every user-visible English sentence in the two front doors — `shared/i18n-strings.json`, which R28 makes exactly that set — is read for a KNOWN SYNONYM of a glossary term. The banned words are DATA (`GLOSSARY_SYNONYMS`), each naming the term it competes with, and a sentence that has a reason to keep one is an entry in `GLOSSARY_SYNONYM_OK` with that reason, rot-checked so the list can only shrink. The list is deliberately NARROW: a word earns a place only when it can mean nothing else in this app.",
+    why: "R6 has always said two things and only one of them was checked. `glossary-wellformed` reads the glossary FILE — term non-empty, definition brief, no duplicates — and not one line of the app. So the half of the law a person actually experiences (\"use those words in UI copy; never invent a synonym\") was enforced by nobody, and the app shipped green saying \"Permissions\" on one screen and \"access rights\" on another, \"teammate\" for a member, \"cost card\" for the internal rates and \"Portal login\" for portal access. Two words for one thing is not a typo: a manager reading \"Permissions\" and \"Access right\" has to work out whether they are the same, every time, and the answer is not on the screen. WHY A DENY-LIST RATHER THAN A REQUIREMENT that every sentence use only glossary words: because most sentences are ordinary English, and a rule that flagged them would be turned off. This one may only get smaller — a word comes off the list when the term goes, never because a screen wanted it back.",
+    checkId: "glossary-in-copy",
+    status: "enforced",
+  },
 ]
+
+/** R33 — WORDS THE APP MAY NOT SAY, and the glossary term each one competes with.
+ *
+ * `term` is a key of `GLOSSARY` (shared/glossary.ts), checked, so a synonym can
+ * never outlive the word it was banned in favour of.
+ *
+ * THE BAR FOR A LINE HERE IS HIGH, and it is the whole reason this list is
+ * usable. A word goes on it only when, in THIS app, it can mean nothing but the
+ * record it is standing in for. That rules out most of what a careless writer
+ * reaches for, and the exclusions are as considered as the entries:
+ *
+ *   • "client" is NOT here, and it is the most tempting one. `Account` is the
+ *     RECORD, but "client" is the relationship — "no client login can reach it",
+ *     "what clients have asked us for" — and it is the word the agency uses out
+ *     loud. Banning it would flag twenty-six good sentences to catch one bad
+ *     placeholder.
+ *   • "option" is not here either, because the glossary's OWN definition of
+ *     Dropdown values is "the options behind your team's dropdowns". A rule that
+ *     contradicts the dictionary it enforces is a rule people learn to exempt.
+ *   • "permission" (singular) is allowed and "permissions" is not: "you don't
+ *     have permission to open that" is plain English about an act, while
+ *     "Permissions" as a heading is a second name for Access rights.
+ *   • "request" is not here. It means a ticket on five screens and an HTTP call
+ *     or a unit of the assistant's allowance on three others, and no word list
+ *     can tell those apart. That one needs eyes.
+ *
+ * Matched WHOLE and case-insensitively, exactly as written — no automatic
+ * plural, so both forms are listed when both are wrong. Explicit data beats a
+ * clever matcher that surprises somebody at midnight. */
+export const GLOSSARY_SYNONYMS: { word: string; term: string; why: string }[] = [
+  // ── Words the app was actually saying on 18 Aug 2026 ──────────────────────
+  { word: "teammate", term: "member", why: "a person on your team is a Member — the word the Members screen, the invite and the role are all named after" },
+  { word: "teammates", term: "member", why: "the plural of the above" },
+  { word: "permissions", term: "permission", why: "the Roles screen headed a matrix \"Permissions\" while two other screens called the same thing an access right. The singular stays free: \"you don't have permission to\" is a sentence about an act, not a name for a record" },
+  { word: "portal login", term: "portalAccess", why: "Portal access is the thing an admin grants and takes away; \"Portal login\" reads as the credential, which is not what the switch does" },
+  { word: "cost card", term: "internalRate", why: "there are two rate cards in this product and neither is called a cost card — what our own hour costs us is the Internal rate, and what a client is charged is the Rate card (R24 keeps them apart in the code for the same reason)" },
+  // ── …and the ones nobody has written yet, which is the cheaper half ───────
+  { word: "user", term: "member", why: "the standard SaaS word for the person this app calls a Member. It has never appeared in either front door and this is what keeps it that way" },
+  { word: "users", term: "member", why: "the plural of the above" },
+  { word: "customer", term: "account", why: "an Account is a company or a person you work with, prospect or client; \"customer\" narrows it to the ones who are paying and quietly excludes the rest" },
+  { word: "customers", term: "account", why: "the plural of the above" },
+  { word: "timesheet", term: "workLog", why: "a Work log is one row of time; \"timesheet\" names a weekly form this product does not have" },
+  { word: "time entry", term: "workLog", why: "the same record under a second name" },
+  { word: "work item", term: "story", why: "one piece of work we do is a Story. \"Work item\" is the word that would blur it back together with a Task and a To-do, which SCOPE ch.02 keeps apart on purpose" },
+  { word: "helpdesk", term: "ticket", why: "what a client asks us for lives in Tickets; naming the module after the industry's word for it would put a third word beside Ticket and Conversation" },
+  { word: "help desk", term: "ticket", why: "the spaced spelling of the above" },
+  { word: "knowledge article", term: "source", why: "one piece of material in the knowledge base is a Source — a note, or something the app keeps in step. \"Article\" says somebody wrote it, which is true of about half of them" },
+  { word: "subtask", term: "task", why: "a Task has no children in this product, and a word for a thing that does not exist is a promise on screen" },
+  { word: "sub-task", term: "task", why: "the hyphenated spelling of the above" },
+]
+
+/** R33 — the sentences that keep a banned word, and why. Rot-checked in both
+ * directions: an entry naming a sentence the app no longer says goes red, and so
+ * does one whose sentence no longer contains the word it was excused for. An
+ * exemption that has stopped being needed is a record of an argument nobody is
+ * having any more.
+ *
+ * EMPTY IS THE RIGHT ANSWER TODAY, and it is worth saying why rather than
+ * deleting the table. The five words the app really was saying were changed
+ * rather than excused, because each was a straight swap for the term the
+ * dictionary already had. The table exists for the case that is not — a sentence
+ * where the banned word is genuinely the right one — and it costs a line of
+ * prose to use, which is the correct price. */
+export const GLOSSARY_SYNONYM_OK: Record<string, string> = {}
 
 /** R32 — the files that may hold a colour LITERAL, and why. Everything else in
  * the two front doors and `shared/` resolves through a token. Rot-checked: an

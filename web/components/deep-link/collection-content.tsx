@@ -385,7 +385,11 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         <PagedFind<Account>
           listKey={accountsKey(teamId as string)}
           placeholder={t("Search accounts…")}
-          noun="accounts"
+          matches={{
+            none: t("No accounts match"),
+            one: t("1 account matches"),
+            many: t("{count} accounts match"),
+          }}
           // THE ORDER, asked of the door for the reason the search box is: the
           // list pages, so ordering the loaded page would arrange the newest
           // fifty companies under a badge counting all of them.
@@ -547,7 +551,11 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
           defaultSort={COLLECTION_SORTS.knowledge.defaultSort}
           listKey={knowledgeKey(teamId as string)}
           placeholder={t("Search the knowledge base…")}
-          noun="sources"
+          matches={{
+            none: t("No sources match"),
+            one: t("1 source matches"),
+            many: t("{count} sources match"),
+          }}
           // THE FILTERS, asked of the DOOR. They were the frame's until 18 Aug
           // 2026, which meant "From a meeting" narrowed the loaded fifty and
           // answered TWO over a base holding 170 — page one happened to have two

@@ -323,6 +323,14 @@ export function StoryFormDialog({
           value={values.storyType || NONE}
           onChange={(v) => setValues((s) => ({ ...s, storyType: v === NONE ? "" : v }))}
           options={storyTypes.map((v) => ({ value: v, label: v }))}
+          // THE PICKER HAS TO BE TOLD WHAT "NOTHING" IS. It decides whether
+          // something is chosen by comparing the value against `emptyOption`,
+          // so a sentinel passed without one is a value it has never heard of:
+          // it looks for a row with that id, finds none, and falls all the way
+          // through to painting the id. This field shipped reading `__none__`
+          // to a person opening the story form — the helper at the top of this
+          // file has always passed it, and this one field was written by hand.
+          emptyOption={{ value: NONE, label: t("Pick one") }}
           placeholder={t("Pick one")}
           searchPlaceholder={t("Search kinds…")}
           emptyText={t("Nothing matched.")}

@@ -218,17 +218,26 @@ describe("Tasks: the rows move when the header is clicked", () => {
     expect(claimed("Deadline")).toBeNull()
   })
 
-  it("EVERY column with a header button moves the rows", () => {
-    // Column by column, because the defect was per-column and uniform: five lit
-    // headers, none of them wired. One passing column would have hidden four.
-    //
-    // The assertion is that the column's two DIRECTIONS differ from each other,
-    // not that either differs from the arrival order — a column whose ascending
-    // order happens to be the order the door already used is a live control that
-    // legitimately moved nothing (Priority, here, is exactly that). A dead one
-    // cannot pass: it gives the same list all three times.
-    for (const label of ["Task", "Priority", "Department", "Who has it", "Deadline"]) {
-      cleanup()
+  // EVERY column with a header button moves the rows — column by column, because
+  // the defect was per-column and uniform: five lit headers, none of them wired.
+  // One passing column would have hidden four.
+  //
+  // The assertion is that the column's two DIRECTIONS differ from each other,
+  // not that either differs from the arrival order — a column whose ascending
+  // order happens to be the order the door already used is a live control that
+  // legitimately moved nothing (Priority, here, is exactly that). A dead one
+  // cannot pass: it gives the same list all three times.
+  //
+  // ONE CASE PER COLUMN rather than one case with a loop in it. Five full
+  // renders inside a single `it` cost five times a normal test against the one
+  // shared 5000ms budget — and that budget is WALL CLOCK, so in a 58-file
+  // parallel suite it was measuring how busy the machine was rather than
+  // anything about this code. It went red on 19 Aug 2026 because a lane added
+  // two test files elsewhere in the workspace. Split, each column gets its own
+  // budget, its own name in the output, and the coverage is identical.
+  it.each(["Task", "Priority", "Department", "Who has it", "Deadline"])(
+    "the %s header moves the rows",
+    (label) => {
       renderTasks()
       fireEvent.click(header(label))
       const oneWay = rowOrder()
@@ -237,7 +246,7 @@ describe("Tasks: the rows move when the header is clicked", () => {
         oneWay
       )
     }
-  })
+  )
 })
 
 describe("the rest of the collection's chrome survived the swap", () => {
@@ -286,7 +295,11 @@ function renderDiary() {
     <PagedFind<Row>
       listKey={listKey}
       placeholder="Search meetings…"
-      noun="meetings"
+      matches={{
+        none: "No meetings match",
+        one: "1 meeting matches",
+        many: "{count} meetings match",
+      }}
       sorts={translatedSorts("meetings", (s) => s)}
       defaultSort={COLLECTION_SORTS.meetings.defaultSort}
       fetchPage={async (query, cursor) => {

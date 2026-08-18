@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
+import { sectionFor } from "@/components/deep-link/route"
 import { BOTTOM_NAV_SLOTS, NAV, TEAM_SECTIONS, bottomNavItems, overflowNavItems } from "@/lib/pages"
 import { MODULE_PERMISSION } from "@/lib/screens"
 import { TEAM_MODULES } from "@shared/team-modules"
@@ -276,5 +277,47 @@ describe("every navigable section is reachable from its own URL", () => {
         `workers/gateway must serve the "${s.segment}" shell for /${s.segment}/<id>, or every deep link into ${s.title} 404s on reload`
       ).toContain(s.segment)
     }
+  })
+})
+
+// THE TAB STRIP BELONGS TO THE TAB SECTIONS, and to nothing else.
+//
+// `teamTabStrip` resolves a URL module segment to a section, and the section's
+// own `placement` decides whether the Settings tab strip is drawn above it.
+// That resolution used to be a hand-written list of segments inside
+// deep-link-screen.tsx. `time` was never added to it, so Work logs — a sidebar
+// page — resolved to `overview`, whose placement is "tab", and shipped with the
+// Members / Roles / Invites strip across the top of it.
+//
+// The missing line was the symptom. The list was the defect: a table of
+// sections and a second, hand-kept list of the same sections is a promise that
+// somebody will remember, and the twentieth section is where they don't. So the
+// resolution is DERIVED from the table (`sectionFor`), and this holds it there:
+// every section resolves to itself, and no section can quietly borrow another
+// one's placement again.
+describe("sectionFor — the section table is the only list of sections", () => {
+  it("resolves every section's own URL segment to that section", () => {
+    for (const s of TEAM_SECTIONS) {
+      if (s.segment === "") continue // the team overview itself has no segment
+      expect(sectionFor(s.segment), `/${s.segment} must resolve to the "${s.key}" section`).toBe(s.key)
+    }
+  })
+
+  it("draws the tab strip on the tab sections and NOWHERE else", () => {
+    for (const s of TEAM_SECTIONS) {
+      if (s.segment === "") continue
+      const resolved = TEAM_SECTIONS.find((x) => x.key === sectionFor(s.segment))
+      expect(
+        resolved?.placement,
+        `/${s.segment} is a "${s.placement}" section — it must not resolve to a section whose placement is "${resolved?.placement}", ` +
+          `or ${s.title} draws the team tab strip it is not part of`
+      ).toBe(s.placement)
+    }
+  })
+
+  it("falls back to the overview for a segment that is no section at all", () => {
+    expect(sectionFor("")).toBe("overview")
+    expect(sectionFor("team")).toBe("overview")
+    expect(sectionFor("not-a-section")).toBe("overview")
   })
 })
