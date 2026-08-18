@@ -17,6 +17,7 @@
 // detail is host-composed.
 
 import { CollectionHeading } from "@/components/collection-heading"
+import { HoursByWeekCard } from "@/components/pulse"
 import { TimePanel } from "@/components/time-panel"
 
 export function TimeScreen({
@@ -38,6 +39,13 @@ export function TimeScreen({
       {/* R16: a sidebar page has no tab strip to badge, so the count lives in the
           heading — and it is the door's exact COUNT(*). */}
       <CollectionHeading sectionKey="time" total={total} />
+      {/* THE SHAPE OF THE LAST TWO MONTHS, above the rows it is summed from.
+          A timesheet answers "what did I log"; it has never answered "are we
+          busier or quieter than we were", which is the question a week of rows
+          cannot show and eight weeks of totals can. Kept to a band so the
+          timesheet stays the screen (the owner's size rule), and drawn off the
+          same cached read Home uses so the two agree by construction. */}
+      <HoursByWeekCard teamId={teamId} />
       <TimePanel teamId={teamId} canCreate={canCreate} canEdit={canEdit} />
     </div>
   )

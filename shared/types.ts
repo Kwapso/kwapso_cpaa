@@ -1309,6 +1309,51 @@ export type Task = {
 export const TASK_VIEWS = ["open", "overdue", "upcoming", "completed", "calendar", "all"] as const
 export type TaskViewName = (typeof TASK_VIEWS)[number]
 
+/* ── THE PULSE — the team's week as numbers a screen can draw ──────────────── */
+
+/** One week of logged time. The worker knows no locale, so it hands back the
+ * Monday that opens the week and the screen spells it in the reader's language. */
+export type PulseWeek = {
+  /** the Monday, `YYYY-MM-DD`, in UTC (the server owns the boundary so the chart
+   * and every badge beside it mean the same week). */
+  weekStart: string
+  /** whole seconds logged inside it. EXACT — hours are the number an invoice is
+   * argued about, so this is never a bounded display tally. */
+  seconds: number
+}
+
+/** What `GET /api/content/insights` answers with.
+ *
+ * A `null` SECTION IS A RIGHT THE CALLER'S ROLE DOES NOT HOLD, and it is
+ * deliberately not a zero: "you may not look at this" and "there are none of
+ * these" are different sentences, and a chart drawn on the second one would be a
+ * confident lie about the first (R18 — a cross-module read carries the caller's
+ * rights). Every screen reading this must render nothing for a null section
+ * rather than an empty state. */
+export type TeamPulse = {
+  tickets: {
+    /** everything not yet resolved. */
+    open: number
+    /** the live stages in the lifecycle's own order — a chart of them reads left
+     * to right as the work moves, and a stage nobody is in stays at zero rather
+     * than vanishing, because an empty column is information too. */
+    byStage: { stage: HelpStatus; count: number }[]
+  } | null
+  work: {
+    /** the backlog: stories that are not done. */
+    storiesOpen: number
+    /** admin due today or earlier, and how much of it is ticked off. */
+    tasksDue: number
+    tasksDueDone: number
+    /** the last eight weeks of logged time, oldest first. */
+    weeks: PulseWeek[]
+  } | null
+  meetings: {
+    /** this week's diary, Monday to Sunday, decided by the server. */
+    thisWeek: number
+  } | null
+}
+
 /** The two states a meeting has. Cancelling is not a third one — it is the
  * module's `delete`, and the row survives it. */
 export const MEETING_STATUSES = ["scheduled", "held"] as const

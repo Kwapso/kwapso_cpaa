@@ -1322,6 +1322,22 @@ export const SHARED_TOOLS: SharedTool[] = [
     },
     agent: { write: false, summarize: (i) => (str(i, "scope") === "mine" ? "List my time" : "List logged time") },
   },
+  /* --------------------------------- the pulse ------------------------------ */
+  {
+    name: "get_team_pulse",
+    // NO BACKTICKED IDENTIFIER IN THIS SUMMARY, and it is not shyness (R27). The
+    // handler answers with shorthand properties, which the response-key
+    // derivation reads as variables rather than field names — so naming them here
+    // would need a DESCRIPTION_VOCABULARY line to explain a shape the caller can
+    // simply read off one answer. The sentences below say what the tool is FOR,
+    // which is the part a model cannot derive.
+    summary:
+      "The team's week in numbers, in one call: how many tickets are open and how they are spread across the stages of the lifecycle, how much work is in hand, how much of our own admin is due today or earlier, how many meetings are in this week, and — the part no other tool can give you — how many seconds were logged in each of the last eight weeks, oldest first, each labelled with the Monday that opens it. Ask it for a picture of how a week or a month went; ask list_help_tickets, list_stories or list_work_logs when you need the rows themselves. A section comes back empty when the caller's role cannot read that module, which is not the same as there being none.",
+    binding: "CONTENT", method: "GET", path: "/api/content/insights",
+    schema: obj({}),
+    buildQuery: () => "",
+    agent: { write: false, summarize: () => "Check how the team's week is going" },
+  },
   {
     name: "list_running_timers",
     summary:

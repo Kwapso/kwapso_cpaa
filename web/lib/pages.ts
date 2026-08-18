@@ -319,6 +319,12 @@ export const CONCEPT_ICON = {
   // by, and a second entry for the same idea is how two icons for one concept
   // start.
   time: "timer",
+  // TRIAGE — the first read of a new request (the glossary's word). It earns a
+  // line in the vocabulary rather than an icon at the tab that shows it, for the
+  // reason this map exists: the day triage grows a second surface, the two would
+  // otherwise pick two icons for one idea. A funnel, because that is what triage
+  // does to a queue.
+  triage: "list-filter",
   import: "upload",
   activity: "history",
   // The agency's own housekeeping: the material we make our own work with, why

@@ -138,7 +138,7 @@ Today it covers:
   - learning, `list_learning`, `list_learning_progress`
   - tickets, `list_help_tickets`, `get_help_thread`, `list_help_stakeholders`
   - the work engine, `list_stories`, `list_sprints`, `list_todos`, `list_tasks`,
-    `get_triage`, `list_work_logs`, `list_running_timers`
+    `get_triage`, `list_work_logs`, `list_running_timers`, `get_team_pulse`
   - meetings, `list_meetings`
   - process maps and the money, `list_apps`, `list_processes`, `get_process`,
     `list_process_comments`, `read_value`, `list_account_rates`,
@@ -178,7 +178,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **218 doors, 178 with a tool, 40 with a written reason**, the
+  red build. Today: **219 doors, 179 with a tool, 40 with a written reason**, the
   reasons being the team-pin doors (§3.2 below), the client-portal standing doors
   (§3.3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the THREE upload pairs, two media doors and the knowledge base, each a
@@ -187,7 +187,7 @@ Today it covers:
   called because a JSON-RPC request has no body to stream into. Same conclusion,
   two different reasons, both written down, the seven
   Google doors that are a person's own decision, the timesheet correction, one
-  invite's audit trail and the cross-module activity feed. Of the 178, **149 are on THIS surface** and 29 are the in-app assistant's
+  invite's audit trail and the cross-module activity feed. Of the 179, **150 are on THIS surface** and 29 are the in-app assistant's
   alone, the twenty-six Google tools, the two confirm-panel bulk writes and the role
   permission matrix read, each reasoned in §3. Those three numbers are asserted
   against the live census in `workers/mcp/test/filter-parity.test.ts`, so this

@@ -331,6 +331,24 @@ export function triageKey(teamId: string): string {
   return `triage:${teamId}`
 }
 
+/** THE PULSE — Home's big numbers and its two charts, in one cache entry.
+ *
+ * ONE KEY FOR ALL THREE SECTIONS, because it is one round trip and one answer:
+ * the door hands back tickets, work and meetings together, and splitting them
+ * into three keys would be three cache entries able to hold three different
+ * moments of the same week.
+ *
+ * It is a DERIVED cache, so it is dropped and re-read rather than patched —
+ * there is no row in it to patch. Every collection it counts names this key in
+ * its `deps` below, which is the seam the savings drill-down already uses to
+ * stay live (see `apps`): the row-level patch keeps the LIST honest, and the
+ * coarse drop keeps the NUMBER computed off it honest. It costs one small read
+ * when a ticket moves, and only when a screen is actually showing it — an
+ * invalidated key nobody is subscribed to fetches nothing at all. */
+export function insightsKey(teamId: string): string {
+  return `insights:${teamId}`
+}
+
 export function runningTimersKey(teamId: string): string {
   return `running-timers:${teamId}`
 }
@@ -614,7 +632,15 @@ export const TEAM_RESOURCES: Record<
     // A status change / edit / reply / stakeholder-add on a ticket also refreshes
     // its Activity tab + Stakeholders tab. The My list is a SERVER-scoped page, so
     // it can't be row-patched from here — drop it and it reloads page one.
-    deps: (t, id) => [`activity:record:help:${id}`, `help-stakeholders:${id}`, `help-mine:${t}`],
+    // …and the PULSE, whose open-ticket number and stage chart are counted off
+    // this collection. A derived cache has no row to patch, so it is dropped and
+    // re-read — and only actually re-read when a screen is showing it.
+    deps: (t, id) => [
+      `activity:record:help:${id}`,
+      `help-stakeholders:${id}`,
+      `help-mine:${t}`,
+      insightsKey(t),
+    ],
     // …and every per-account slice of the ticket list — a contact's Tickets tab
     // is one of those, and a slice nobody drops is a tab that goes stale the
     // moment somebody else raises a ticket.
@@ -658,7 +684,7 @@ export const TEAM_RESOURCES: Record<
     idField: "id",
     fetchOne: (id) => contentApi.storyOne(id),
     fetchList: (t) => listFetch.stories(t),
-    deps: (t, id) => [`activity:record:stories:${id}`, sprintsKey(t)],
+    deps: (t, id) => [`activity:record:stories:${id}`, sprintsKey(t), insightsKey(t)],
   },
   // A sprint has a list of its own, and its rows carry counts of the stories
   // inside it — so a sprint ping patches the sprint row and leaves the backlog
@@ -680,7 +706,13 @@ export const TEAM_RESOURCES: Record<
     idField: "id",
     fetchOne: (id) => contentApi.workLogOne(id),
     fetchList: (t) => listFetch.workLogs(t),
-    deps: (t, id) => [runningTimersKey(t), storiesKey(t), `activity:record:work_logs:${id}`],
+    deps: (t, id) => [
+      runningTimersKey(t),
+      storiesKey(t),
+      `activity:record:work_logs:${id}`,
+      // …and the hours-per-week chart, which is a SUM over exactly these rows.
+      insightsKey(t),
+    ],
     // …and the Time tab on whichever record this row was logged against, which
     // the ping cannot name (recordTimeKey above says why it is a family drop).
     slicePrefix: TIME_SLICE_PREFIX,
@@ -710,6 +742,7 @@ export const TEAM_RESOURCES: Record<
     deps: (t, id) => [
       ...TASK_VIEWS.filter((v) => v !== "open").map((v) => tasksKey(t, v)),
       `activity:record:tasks:${id}`,
+      insightsKey(t),
     ],
   },
   // MEETINGS — row-level live. A paged list's rows live in a cache key with its
@@ -721,7 +754,7 @@ export const TEAM_RESOURCES: Record<
     idField: "id",
     fetchOne: (id) => contentApi.meetingOne(id),
     fetchList: (t) => listFetch.meetings(t),
-    deps: (_t, id) => [`activity:record:meetings:${id}`],
+    deps: (t, id) => [`activity:record:meetings:${id}`, insightsKey(t)],
     // THE PER-OWNER SLICES OF THE DIARY — a contact's Meetings tab
     // (`meetings-account-of:`) and an app's (`meetings-app-of:`). One prefix
     // covers both because `sliceKey` spells every slice `<kind>-of:<id>` and
@@ -821,7 +854,9 @@ export const SIMPLE_INVALIDATIONS: Record<string, (teamId: string) => string[]> 
   // writes a file of stories, and a file writes many rows with no one row to
   // patch. So the backlog is dropped and re-read, and the sprint list with it,
   // because a sprint row carries the counts of the stories inside it.
-  work: (t) => [storiesKey(t), sprintsKey(t)],
+  // …and the pulse with them: a file of stories moves the backlog number Home
+  // shows, and an import is the one write that moves it by hundreds at once.
+  work: (t) => [storiesKey(t), sprintsKey(t), insightsKey(t)],
   // THE IMPORT'S OWN PINGS. The import engine publishes each TargetDef's MODULE
   // key (never a row id — a batch touches many rows and no one row is the
   // change), so one module name reaches the live layer that no single table

@@ -51,6 +51,7 @@
 //   POST /api/content/tasks/done          -> tick it / put it back
 //   GET  /api/content/triage              -> whose week it is + the tickets nobody has read
 //   POST /api/content/triage              -> put somebody on triage duty for a week
+//   GET  /api/content/insights            -> the team's week in numbers (per-module gated)
 //   GET  /api/content/knowledge           -> the sources the assistant may read (?id → one)
 //   GET  /api/content/knowledge/ask       -> answer a question from them, with citations
 //   GET  /api/content/knowledge/sync      -> how far the sweep has got with each kind
@@ -130,6 +131,7 @@ import {
   getPortalDelivery,
 } from "./routes/todos"
 import { getTriage, postSetTriageDuty } from "./routes/triage"
+import { getInsights } from "./routes/insights"
 import {
   getKnowledge,
   getKnowledgeAsk,
@@ -375,6 +377,12 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // a client login: an unread request is our failure, not an SLA we promised.
   "GET /api/content/triage": { handler: getTriage, kind: "read" },
   "POST /api/content/triage": { handler: postSetTriageDuty, kind: "mutation" },
+  // THE PULSE — the four numbers and the one series Home draws a picture out of.
+  // Refused to a client login like everything above it, and gated SECTION by
+  // section rather than at the door: it crosses three modules, so one right
+  // standing in for three would give somebody a chart they may not read or take
+  // away one they may (R18). See routes/insights.ts.
+  "GET /api/content/insights": { handler: getInsights, kind: "read" },
   "GET /api/content/knowledge": { handler: getKnowledge, kind: "read" },
   "GET /api/content/knowledge/ask": { handler: getKnowledgeAsk, kind: "read" },
   "GET /api/content/knowledge/sync": { handler: getKnowledgeSync, kind: "read" },
