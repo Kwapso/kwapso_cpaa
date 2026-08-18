@@ -31,8 +31,15 @@ export const TOOL_GATES: Record<string, string> = {
   update_account: "accounts:edit",
   set_account_parent: "accounts:edit",
   set_account_active: "accounts:delete",
-  link_contact: "accounts:create",
-  set_contact_link_active: "accounts:delete",
+  // `contacts`, not `accounts` — both doors say so in their own comments
+  // (`postLinkPerson`, `postLinkActive`: "GATED ON `contacts`, not `accounts`").
+  // The door was always right; only this string was wrong, so nobody could
+  // escalate by it. What it cost is trust: `toMcpTool` publishes this line to
+  // outside developers as "Needs accounts:create.", so anyone reading the tool
+  // catalogue granted the wrong right and watched the call fail. Nothing
+  // machine-checks a gate STRING against the door it describes.
+  link_contact: "contacts:create",
+  set_contact_link_active: "contacts:delete",
   grant_portal_access: "portal_users:create",
   set_portal_access_active: "portal_users:delete",
   add_help_stakeholder: "help:read",

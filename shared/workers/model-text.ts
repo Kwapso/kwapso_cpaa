@@ -162,7 +162,15 @@ const FENCE_CLOSE = `</${TOOL_RESULT_TAG}>`
  * is a decoration. */
 export function fenceToolResult(from: string, content: string): string {
   const name = from.replace(/[^\w.-]/g, "") || "tool"
-  const safe = content.split(FENCE_CLOSE).join(`</${TOOL_RESULT_TAG}_escaped>`)
+  // CASE-INSENSITIVELY, and tolerant of whitespace before the `>`. An exact
+  // string match let `</TOOL_RESULT>` and `</tool_result >` straight through,
+  // and an attacker choosing 20,000 characters of ticket description picks the
+  // spelling that works. The strip side already used exactly this regex, which
+  // is what made the difference look like an oversight rather than a decision.
+  const safe = content.replace(
+    new RegExp(`</\\s*${TOOL_RESULT_TAG}[^>]*>`, "gi"),
+    `</${TOOL_RESULT_TAG}_escaped>`
+  )
   return `<${TOOL_RESULT_TAG} from="${name}">\n${safe}\n${FENCE_CLOSE}`
 }
 

@@ -277,6 +277,16 @@ const CLIENT_ROLE = {
     // asked for. `create` and `delete` are ours — asking for something emails
     // them, and withdrawing a request is our decision to stop needing it.
     todos: { read: true, edit: true },
+    // READ ONLY, and it buys two different things. The portal's Deliverables
+    // shelf is gated `deliverables:read`, so without this the nav item is there
+    // and the screen 403s. And R21's `client-reachable-doors` derives WHICH
+    // doors to walk from these very rights — "a right the seed does not hold is
+    // a door the law does not walk" — so a module absent here is a module the
+    // fence law silently skips, all six doors of it. The feature being broken is
+    // how anyone would have noticed; the coverage hole would not have announced
+    // itself. Safe to grant: all five agency doors open with `refusePortalCaller`,
+    // so this changes nothing a client can reach at the agency origin.
+    deliverables: { read: true },
     selectable_data: { read: true },
     agent: { read: true, create: true },
     processes: { read: true, create: true },

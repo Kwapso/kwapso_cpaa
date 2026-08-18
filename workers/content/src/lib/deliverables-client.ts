@@ -53,6 +53,16 @@ type ClientRow = {
   visible_to_client_at: string
 }
 
+/** Is this one of OUR bytes, in the bucket the portal cannot reach?
+ *
+ * `INTERNAL_MEDIA` also holds brand assets, staff records and knowledge-base
+ * sources, which is exactly why the portal gateway does not bind it and must
+ * not. A handover file belongs in the shared bucket the way a ticket attachment
+ * already does; until it does, the client is told to ask us for it. */
+function internalPath(value: string | null): boolean {
+  return typeof value === "string" && value.startsWith("/media/internal/")
+}
+
 function toClientDeliverable(r: ClientRow): ClientDeliverable {
   return {
     id: r.id,
@@ -61,8 +71,20 @@ function toClientDeliverable(r: ClientRow): ClientDeliverable {
     title: r.title,
     kind: r.kind,
     datedOn: r.dated_on,
-    url: r.url,
-    imageUrl: r.image_url,
+    // AN INTERNAL PATH NEVER LEAVES THIS DOOR, even to somebody entitled to the
+    // record it hangs on. `/media/internal/...` is redeemed at the AGENCY origin
+    // by `serveMedia`, which asks for no session and checks no membership — it
+    // is a capability URL, and the gateway's own note says one "would have
+    // nowhere to be redeemed". That stopped being true the moment this door
+    // started handing them to clients: un-share the deliverable, take the portal
+    // login away, delete the account link, and the URL still works, for them and
+    // for anyone they forward it to. Withdrawal has to actually withdraw.
+    //
+    // Held STRUCTURALLY rather than by the screen refusing to render it: the
+    // value was still in the JSON, one devtools panel away. R24's shape — a
+    // condition can be inverted, an absent field cannot be read.
+    url: internalPath(r.url) ? null : r.url,
+    imageUrl: internalPath(r.image_url) ? null : r.image_url,
     sharedOn: r.visible_to_client_at,
   }
 }
