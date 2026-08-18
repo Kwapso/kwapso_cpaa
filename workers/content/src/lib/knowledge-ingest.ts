@@ -19,6 +19,31 @@
 // steady state of a 15-minute sweep over 4,000 sources is a handful of reads and
 // no model calls at all — which is the difference between a knowledge base that
 // costs €50 a month and one that costs it every day.
+//
+// ── WHAT A KIND'S TEXT IS FOR, and the fault that made it a rule
+//
+// A source's body is what a person gets QUOTED BACK at them. For six kinds it
+// was a label sheet: the whole of what the knowledge base knew about a real
+// client was "Bergman S.A. is a company we work with. Reference BERG. Status:
+// active_client." Everything that makes a client a client — the systems, the
+// sprints, the maps, the people, what is open — was in the database and in no
+// passage. So each `read` below writes what a colleague would SAY about the
+// record, and where a record is genuinely thin it says what it IS rather than
+// padding. A rollup reads counts and the top few names (never every child row),
+// and every list it folds in is capped by a constant in this file.
+//
+// ── THE ONE THING THAT NEVER GOES IN
+//
+// NO INTERNAL NUMBER, AND NO NUMBER WITH A VISIBILITY SWITCH ON IT. `internal_rates`
+// and `internal_role_rates` — what OUR OWN hour costs — and everything computed
+// from them are R24's absolute: they live behind one file in `workers/tenancy`
+// and may not reach a client's side under any flag, ever. The index is
+// account-wide, so a margin embedded into it would be exactly the leak that law
+// exists to prevent. Left out too, one step short of that line: `account_rates`
+// and `sprints.sold_price_cents` — what a client IS CHARGED, which they may see
+// only when their own price-visibility switch is on. A passage carries no
+// switch, so those figures stay on the screens that can gate them. Every kind
+// below is words about a record, never the money on it.
 
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import type { MemberGuard } from "@shared/workers/gating"
@@ -120,6 +145,46 @@ export type IngestKind = {
    * the same trade the sweep already makes everywhere else, said once more for a
    * source whose order we do not control. */
   windowed?: boolean
+  /** ITS TEXT DEPENDS ON ROWS THE CURSOR CANNOT SEE.
+   *
+   * An account's source is a ROLLUP — its apps, its sprints, its open tickets,
+   * its people. None of those moves `accounts.updated_at`, so a cursor on that
+   * column would file the account once and never look at it again while its
+   * whole world changed underneath. A rollup kind therefore DROPS ITS CURSOR the
+   * moment it catches up, so the next tick starts the table again and every
+   * account's text is rebuilt on a rolling cycle.
+   *
+   * It is not `windowed`, and the difference matters: a windowed kind re-walks
+   * in the SAME tick and so never reports `caughtUp`, which is the signal the
+   * backfill script loops on. A rollup kind reports the truth — it has reached
+   * the end of the table — and simply starts again next time. So the backfill
+   * still terminates.
+   *
+   * Cheap by construction, twice over: the sort is the account's own timestamp
+   * (the rollup sub-selects are evaluated only for the rows the slice RETURNS,
+   * never for the whole table), and anything whose text really did not change is
+   * hash-skipped before a single chunk is written. */
+  rollup?: boolean
+  /** WHICH TEXT BUILDER WROTE THE ROWS ALREADY IN THE INDEX.
+   *
+   * The hash answers "has this ROW changed?", which is a different question from
+   * "has the way we WRITE this row changed?" — and the cursor makes the second
+   * one fatal. A ticket indexed in March is behind the cursor forever unless
+   * somebody touches it, so improving the ticket text reaches every future
+   * ticket and not one existing one. That is a change that looks shipped and is
+   * not, which is the shape of failure this codebase keeps legislating against.
+   *
+   * So the version rides IN the cursor (`v<n>|<sort>|<id>`). A stored cursor
+   * whose version is not this one is not a position at all — it is a page number
+   * in a book that has been rewritten — so it reads as null and the kind walks
+   * its table again from the start, re-hashing as it goes. One rewind, then the
+   * ordinary steady state.
+   *
+   * CHANGE THE TEXT A KIND PRODUCES → BUMP ITS VERSION. Not a convention:
+   * `workers/content/test/knowledge-coverage.test.ts` pins a hash of each kind's
+   * own source to the number declared here, so a builder edited without a bump
+   * turns the build red and says so. */
+  textVersion: number
 }
 
 type Cursor = { at: string; id: string }
@@ -143,11 +208,65 @@ function after(cursor: Cursor | null, sortExpr: string, idExpr = "id"): { sql: s
 
 const TICKET_SORT = "COALESCE(h.updated_at, h.created_at)"
 
+/** Children of one record folded into its own text — apps under an account,
+ * steps under a process, stories under a sprint. Bounded so that a rollup is a
+ * paragraph rather than a book: an account with four hundred tickets must not
+ * produce a source nobody can chunk usefully, and one enormous chunk would crowd
+ * every other passage out of an answer. */
+const ROLLUP_ROWS = 20
+/** People, which are fewer and matter more — who we deal with at a client is
+ * usually the whole question. */
+const ROLLUP_CONTACTS = 15
+/** The steps of a process map's LATEST version. Higher than the rest because the
+ * steps ARE the map: an eleven-step invoice run cut at five is not a summary of
+ * the process, it is a wrong answer about it. */
+const PROCESS_STEPS = 40
+/** What has been said on a process map — the client's own words about how they
+ * work, which is material nothing else in this app holds. */
+const PROCESS_COMMENTS = 20
+/** Notes on the time logged against one record. A work log's note is often the
+ * only written account of what was actually done in a sitting. */
+const WORK_NOTES = 20
+
+/** ONE BOUNDED CHILD LIST, as a correlated `group_concat` over an inner select
+ * that carries its own LIMIT — the exact shape a ticket's conversation has ridden
+ * on since the sweep was built, said once so every kind below inherits it.
+ *
+ * ONE ROUND TRIP PER TICK, NOT ONE PER ROW: the alternative (a query per record
+ * per child table) turns a 25-row slice into two hundred calls over the REST
+ * door, which is how a bounded sweep becomes a long-running job.
+ *
+ * R14 lives at the call site: `inner` must carry a LIMIT that is a constant in
+ * this file, never anything off a request. */
+function childLines(inner: string): string {
+  return `(SELECT group_concat(x.line, char(10)) FROM (${inner}) x)`
+}
+
+/** THE WORDS ON THE TIME LOGGED AGAINST A RECORD, folded into that record.
+ *
+ * A work log is not a source of its own, and that is a decision rather than an
+ * omission. Its note is real material — but thousands of one-line rows ("carried
+ * on with the dispatch fix") would compete with tickets, maps and transcripts for
+ * the six passages an answer carries, and a search that has to choose between a
+ * process map and a timer entry will sometimes choose wrong. Folded in here, the
+ * words are searchable and they arrive attached to the work they were written
+ * about. Discarded logs are left out: somebody binned them.
+ *
+ * `target` is a SQL literal this file writes (`'help'`), never a value off a
+ * request. */
+function workNotes(target: string, idExpr: string): string {
+  return `SELECT w.note AS line FROM work_logs w
+           WHERE w.target_table = ${target} AND w.target_id = ${idExpr}
+             AND w.discarded_at IS NULL AND w.note IS NOT NULL AND w.note <> ''
+           ORDER BY w.started_at LIMIT ${WORK_NOTES}`
+}
+
 export const INGEST_KINDS: IngestKind[] = [
   {
     kind: "ticket",
     table: "help",
     label: "tickets",
+    textVersion: 1,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, TICKET_SORT, "h.id")
       const rows = await d1Query<{
@@ -159,29 +278,40 @@ export const INGEST_KINDS: IngestKind[] = [
         help_type: string | null
         status: string
         account_id: string | null
+        app_id: string | null
         account_name: string | null
+        app_name: string | null
+        raised_by: string | null
         archived_at: string | null
         created_at: string
         sort_at: string
         thread: string | null
+        stories: string | null
+        work_notes: string | null
       }>(
         cfg,
         guard.databaseId,
-        // R14 hard cap: `limit` is INGEST_SOURCES_PER_TICK. The conversation rides
-        // the same read as its ticket (a correlated group_concat over a bounded
-        // inner select) rather than a query per ticket — one round trip per tick,
-        // not one per row.
+        // R14 hard cap: `limit` is INGEST_SOURCES_PER_TICK, and every child list
+        // rides `childLines`, whose LIMIT is a constant in this file.
         // ARCHIVED TICKETS ARE READ, NOT SKIPPED. Filtering them out here meant
         // the cursor never visited them again, so a ticket archived after it was
         // indexed stayed in the knowledge base forever and kept answering
         // questions. They come back marked `retired`, and the source is
         // deactivated — which is what "take it away" already means here.
         `SELECT h.id, h.ref, h.title_en, h.title_de, h.description, h.help_type, h.status, h.account_id,
-                h.archived_at, h.created_at, a.name AS account_name,
+                h.app_id, h.archived_at, h.created_at, a.name AS account_name,
                 ${TICKET_SORT} AS sort_at,
-                (SELECT group_concat(t.message_body, char(10)) FROM
-                   (SELECT message_body FROM help_threads WHERE help_id = h.id ORDER BY created_at LIMIT ${REPLIES_PER_TICKET}) t
-                ) AS thread
+                (SELECT ap.name FROM apps ap WHERE ap.id = h.app_id) AS app_name,
+                (SELECT c.name FROM accounts c WHERE c.id = h.raised_by_contact_id) AS raised_by,
+                ${childLines(
+                  `SELECT message_body AS line FROM help_threads
+                    WHERE help_id = h.id ORDER BY created_at LIMIT ${REPLIES_PER_TICKET}`
+                )} AS thread,
+                ${childLines(
+                  `SELECT s.title || ' (' || REPLACE(s.status, '_', ' ') || ')' AS line FROM stories s
+                    WHERE s.ticket_id = h.id ORDER BY s.created_at LIMIT ${ROLLUP_ROWS}`
+                )} AS stories,
+                ${childLines(workNotes("'help'", "h.id"))} AS work_notes
            FROM help h LEFT JOIN accounts a ON a.id = h.account_id
           ${keyset.sql ? `WHERE ${keyset.sql}` : ""}
           ORDER BY sort_at, h.id LIMIT ${limit}`,
@@ -202,14 +332,23 @@ export const INGEST_KINDS: IngestKind[] = [
             detail: plainText(r.description),
           }),
           body: [
+            // WHOSE REQUEST IT IS, IN THE MATERIAL ITSELF. The client's name used
+            // to appear only in the summary, so a question naming a client could
+            // route into their compartment and then match nothing inside it.
+            `${title} is a ${r.help_type ?? "general"} ticket${
+              r.account_name ? ` raised by ${r.account_name}` : ""
+            }${r.app_name ? ` about ${r.app_name}` : ""}, currently ${r.status.replace(/_/g, " ")}.`,
             r.ref ? `Reference ${r.ref}.` : "",
-            `A ${r.help_type ?? "general"} ticket, currently ${r.status.replace(/_/g, " ")}.`,
+            r.raised_by ? `The person who raised it: ${r.raised_by}.` : "",
             r.description,
+            r.stories ? `The work we are doing about it:\n${r.stories}` : "",
+            r.work_notes ? `Notes from the time logged on it:\n${r.work_notes}` : "",
             r.thread ?? "",
           ]
             .filter(Boolean)
             .join("\n\n"),
           accountId: r.account_id,
+          appId: r.app_id,
           ticketId: r.id,
           recordDate: r.created_at,
           sourceUrl: null,
@@ -220,9 +359,28 @@ export const INGEST_KINDS: IngestKind[] = [
     },
   },
   {
+    // THE CLIENT'S WHOLE WORLD, on the row a question about a client lands on.
+    //
+    // This used to be a business card, and that was the single loudest thing
+    // wrong with the knowledge base: asked about a real client on staging, the
+    // ENTIRE answer was "Bergman S.A. is a company we work with. Reference BERG.
+    // Status: active_client." So it rolls up now — the systems we built them,
+    // the work sold to them, the maps, the people, what is open and what we are
+    // waiting on — because that is what somebody means by the client's name.
+    //
+    // IT IS A ROLLUP, so it carries `rollup: true`: its text changes when rows
+    // its own cursor cannot see change. See the flag on IngestKind.
+    //
+    // COUNTS AND THE TOP FEW NAMES, never every child row. Each list below is
+    // capped by a constant in this file, and the count that matters (how many
+    // tickets are actually open) is a COUNT(*) rather than the length of a
+    // truncated list — a rollup that said "4 tickets" because it only listed 4
+    // would be worse than one that said nothing.
     kind: "account",
     table: "accounts",
     label: "accounts",
+    textVersion: 1,
+    rollup: true,
     read: async (cfg, guard, cursor, limit) => {
       // The accounts read aliases its table (`a`), so its sort expression is
       // qualified — the same COALESCE, said the way this statement can read it.
@@ -236,7 +394,162 @@ export const INGEST_KINDS: IngestKind[] = [
         email: string | null
         phone: string | null
         address: string | null
+        street: string | null
+        postal_code: string | null
+        city: string | null
+        country: string | null
+        industry: string | null
+        about: string | null
         parent_name: string | null
+        deactivated_at: string | null
+        created_at: string
+        sort_at: string
+        apps: string | null
+        contacts: string | null
+        sprints: string | null
+        processes: string | null
+        open_tickets: number
+        tickets: string | null
+        todos: string | null
+        last_met: string | null
+      }>(
+        cfg,
+        guard.databaseId,
+        // R14 hard cap: `limit` is INGEST_SOURCES_PER_TICK, and each rollup list
+        // is capped at its own inner select (ROLLUP_ROWS / ROLLUP_CONTACTS).
+        //
+        // THE SORT TOUCHES NONE OF THE SUB-SELECTS, on purpose: the ORDER BY is
+        // the account's own timestamp, so SQLite evaluates the rollup columns
+        // only for the rows this slice RETURNS. A tick's rollup cost is bounded
+        // by 25 accounts, not by how many accounts the team has.
+        `SELECT a.id, a.name, a.account_type, a.code, a.status, a.email, a.phone, a.address,
+                a.street, a.postal_code, a.city, a.country, a.industry, a.about,
+                a.deactivated_at, a.created_at,
+                (SELECT p.name FROM accounts p WHERE p.id = a.parent_account_id) AS parent_name,
+                COALESCE(a.updated_at, a.created_at) AS sort_at,
+                ${childLines(
+                  `SELECT ap.name || COALESCE(' — ' || ap.stage, '') AS line FROM apps ap
+                    WHERE ap.account_id = a.id AND ap.deactivated_at IS NULL
+                    ORDER BY ap.created_at LIMIT ${ROLLUP_ROWS}`
+                )} AS apps,
+                ${childLines(
+                  `SELECT p.name || COALESCE(' — ' || l.relationship, '') ||
+                          CASE WHEN l.is_main_stakeholder = 1 THEN ' (the main contact)' ELSE '' END AS line
+                     FROM account_links l JOIN accounts p ON p.id = l.person_account_id
+                    WHERE l.account_id = a.id AND l.deactivated_at IS NULL
+                    ORDER BY l.is_main_stakeholder DESC, p.name LIMIT ${ROLLUP_CONTACTS}`
+                )} AS contacts,
+                ${childLines(
+                  `SELECT sp.name || COALESCE(' (' || sp.sprint_type || ')', '') ||
+                          CASE WHEN sp.completed_at IS NULL THEN ', running' ELSE ', completed' END ||
+                          COALESCE(', from ' || sp.starts_on, '') AS line
+                     FROM sprints sp
+                    WHERE sp.account_id = a.id AND sp.deactivated_at IS NULL
+                    ORDER BY COALESCE(sp.starts_on, sp.created_at) DESC LIMIT ${ROLLUP_ROWS}`
+                )} AS sprints,
+                ${childLines(
+                  `SELECT pr.name || COALESCE(' (done by their ' || pr.role_name || ')', '') AS line
+                     FROM processes pr
+                    WHERE pr.account_id = a.id AND pr.deactivated_at IS NULL
+                    ORDER BY pr.name LIMIT ${ROLLUP_ROWS}`
+                )} AS processes,
+                (SELECT COUNT(*) FROM help h
+                  WHERE h.account_id = a.id AND h.archived_at IS NULL AND h.resolved = 0) AS open_tickets,
+                ${childLines(
+                  `SELECT COALESCE(h.title_en, h.title_de, substr(h.description, 1, 120)) ||
+                          ' (' || REPLACE(h.status, '_', ' ') || ')' AS line
+                     FROM help h
+                    WHERE h.account_id = a.id AND h.archived_at IS NULL
+                    ORDER BY h.created_at DESC LIMIT ${ROLLUP_ROWS}`
+                )} AS tickets,
+                ${childLines(
+                  `SELECT td.title || COALESCE(', due ' || td.due_on, '') AS line FROM todos td
+                    WHERE td.account_id = a.id AND td.completed_at IS NULL AND td.cancelled_at IS NULL
+                    ORDER BY td.due_on LIMIT ${ROLLUP_ROWS}`
+                )} AS todos,
+                (SELECT MAX(m.starts_at) FROM meetings m
+                  WHERE m.account_id = a.id AND m.deactivated_at IS NULL AND m.status = 'held') AS last_met
+           FROM accounts a
+          ${keyset.sql ? `WHERE ${keyset.sql}` : ""}
+          ORDER BY sort_at, a.id LIMIT ${limit}`,
+        keyset.params
+      )
+      return rows.map((r) => {
+        // `address` is the pre-0024 column, kept because it was never dropped —
+        // an account nobody has re-edited since still has its address only there.
+        const where = [r.street ?? r.address, r.postal_code, r.city, r.country].filter(Boolean).join(", ")
+        return {
+          originRowId: r.id,
+          sortAt: r.sort_at,
+          title: r.name,
+          summary: buildSummary({
+            noun: r.account_type === "entity" ? "client company" : "person we work with",
+            title: r.name,
+            ref: r.code,
+            status: r.status,
+            notes: [
+              r.parent_name ? `Part of ${r.parent_name}.` : null,
+              r.industry ? `In ${r.industry}.` : null,
+            ],
+            detail: plainText(r.about ?? ""),
+          }),
+          body: [
+            `${r.name} is ${r.account_type === "entity" ? "a company" : "a person"} we work with${
+              r.parent_name ? `, under ${r.parent_name}` : ""
+            }.`,
+            r.code ? `Reference ${r.code}.` : "",
+            `Status: ${r.status}.`,
+            r.industry ? `Their industry: ${r.industry}.` : "",
+            r.about ? `About them: ${r.about}` : "",
+            [r.email, r.phone, where].filter(Boolean).join(" · "),
+            r.contacts ? `The people we deal with there:\n${r.contacts}` : "",
+            r.apps ? `The systems we have built for them:\n${r.apps}` : "",
+            r.sprints ? `The blocks of work sold to them:\n${r.sprints}` : "",
+            r.processes ? `The ways of working we have mapped for them:\n${r.processes}` : "",
+            r.tickets ? `Their tickets — ${r.open_tickets} still open:\n${r.tickets}` : "",
+            r.todos ? `What we are waiting on them for:\n${r.todos}` : "",
+            r.last_met ? `We last met on ${r.last_met.slice(0, 10)}.` : "",
+          ]
+            .filter(Boolean)
+            .join("\n\n"),
+          // An account IS its own compartment — everything about a client is filed
+          // under that client.
+          accountId: r.id,
+          recordDate: r.created_at,
+          // A row this app owns — it belongs to the team, not to one person.
+          ownerUserId: null,
+          sourceUrl: null,
+          retired: r.deactivated_at !== null,
+        }
+      })
+    },
+  },
+  {
+    // THE PERSON AT THE COMPANY — and the reason it is the LINK that is mirrored
+    // rather than the person.
+    //
+    // A contact's own row is an account, and the kind above already sweeps it.
+    // But an account is its OWN compartment, so Marta's row is filed under Marta:
+    // a question about Bergman narrows to Bergman's compartment and never reaches
+    // her. `account_links` is the row that says she is Bergman's operations
+    // manager, and it is filed under BERGMAN, which is where somebody asking "who
+    // do we talk to there?" is standing.
+    kind: "contact",
+    table: "account_links",
+    label: "contacts",
+    textVersion: 1,
+    read: async (cfg, guard, cursor, limit) => {
+      const keyset = after(cursor, "COALESCE(l.updated_at, l.created_at)", "l.id")
+      const rows = await d1Query<{
+        id: string
+        relationship: string | null
+        is_main_stakeholder: number
+        account_id: string
+        company_name: string
+        person_name: string
+        email: string | null
+        phone: string | null
+        about: string | null
         deactivated_at: string | null
         created_at: string
         sort_at: string
@@ -244,53 +557,63 @@ export const INGEST_KINDS: IngestKind[] = [
         cfg,
         guard.databaseId,
         // R14 hard cap: `limit` is INGEST_SOURCES_PER_TICK.
-        `SELECT a.id, a.name, a.account_type, a.code, a.status, a.email, a.phone, a.address,
-                a.deactivated_at, a.created_at,
-                (SELECT p.name FROM accounts p WHERE p.id = a.parent_account_id) AS parent_name,
-                COALESCE(a.updated_at, a.created_at) AS sort_at
-           FROM accounts a
+        `SELECT l.id, l.relationship, l.is_main_stakeholder, l.account_id, l.deactivated_at, l.created_at,
+                c.name AS company_name, p.name AS person_name, p.email, p.phone, p.about,
+                COALESCE(l.updated_at, l.created_at) AS sort_at
+           FROM account_links l
+           JOIN accounts c ON c.id = l.account_id
+           JOIN accounts p ON p.id = l.person_account_id
           ${keyset.sql ? `WHERE ${keyset.sql}` : ""}
-          ORDER BY sort_at, a.id LIMIT ${limit}`,
+          ORDER BY sort_at, l.id LIMIT ${limit}`,
         keyset.params
       )
-      return rows.map((r) => ({
-        originRowId: r.id,
-        sortAt: r.sort_at,
-        title: r.name,
-        summary: buildSummary({
-          noun: r.account_type === "entity" ? "client company" : "person we work with",
-          title: r.name,
-          ref: r.code,
-          status: r.status,
-          notes: [r.parent_name ? `Part of ${r.parent_name}.` : null],
-          detail: [r.email, r.phone, r.address].filter(Boolean).join(" · "),
-        }),
-        body: [
-          `${r.name} is ${r.account_type === "entity" ? "a company" : "a person"} we work with${r.parent_name ? `, under ${r.parent_name}` : ""}.`,
-          r.code ? `Reference ${r.code}.` : "",
-          `Status: ${r.status}.`,
-          [r.email, r.phone, r.address].filter(Boolean).join(" · "),
-        ]
-          .filter(Boolean)
-          .join("\n"),
-        // An account IS its own compartment — everything about a client is filed
-        // under that client.
-        accountId: r.id,
-        recordDate: r.created_at,
-        // A row this app owns — it belongs to the team, not to one person.
-        ownerUserId: null,
-        sourceUrl: null,
-        retired: r.deactivated_at !== null,
-      }))
+      return rows.map((r) => {
+        const role = r.relationship ?? "a contact"
+        return {
+          originRowId: r.id,
+          sortAt: r.sort_at,
+          title: `${r.person_name} at ${r.company_name}`,
+          summary: buildSummary({
+            noun: "contact",
+            title: r.person_name,
+            accountName: r.company_name,
+            status: r.is_main_stakeholder ? "the main contact" : role,
+            detail: plainText(r.about ?? ""),
+          }),
+          body: [
+            `${r.person_name} is ${role} at ${r.company_name}${
+              r.is_main_stakeholder ? ", and is the main contact there" : ""
+            }.`,
+            [r.email, r.phone].filter(Boolean).join(" · "),
+            r.about ? `About them: ${r.about}` : "",
+          ]
+            .filter(Boolean)
+            .join("\n"),
+          // THE COMPANY'S compartment, not the person's — which is the whole
+          // reason this kind exists beside the account one.
+          accountId: r.account_id,
+          recordDate: r.created_at,
+          ownerUserId: null,
+          sourceUrl: null,
+          retired: r.deactivated_at !== null,
+        }
+      })
     },
   },
   {
     // THE BUILT SYSTEM. An app is what a client's questions are usually really
     // about ("why does dispatch log people out?"), so it is a notebook of its
     // own — `app_id` on every source beneath it, and a summary the router reads.
+    // FOUR PARAGRAPHS THIS USED TO THROW AWAY. `about`, `client_context`,
+    // `solution` and `key_actors` are what somebody SAT DOWN AND WROTE about this
+    // system — what it is, where the client was before it, what we built, and who
+    // touches it. None of them was indexed, so the richest prose in the app was
+    // the part the assistant could not read, and an app answered as a name and a
+    // stage.
     kind: "app",
     table: "apps",
     label: "apps",
+    textVersion: 1,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(ap.updated_at, ap.created_at)", "ap.id")
       const rows = await d1Query<{
@@ -298,23 +621,36 @@ export const INGEST_KINDS: IngestKind[] = [
         name: string
         url: string | null
         stage: string | null
+        about: string | null
+        client_context: string | null
+        solution: string | null
+        key_actors: string | null
         account_id: string | null
         account_name: string | null
         deactivated_at: string | null
         created_at: string
         sort_at: string
         processes: string | null
+        stakeholders: string | null
       }>(
         cfg,
         guard.databaseId,
-        // R14 hard cap: `limit` is INGEST_SOURCES_PER_TICK. The process names
-        // ride the same read (a correlated group_concat over a bounded inner
-        // select) — what an app DOES is the part a question is about.
-        `SELECT ap.id, ap.name, ap.url, ap.stage, ap.account_id, ap.deactivated_at, ap.created_at,
+        // R14 hard cap: `limit` is INGEST_SOURCES_PER_TICK, and each child list
+        // is capped at its own inner select. What an app DOES is the part a
+        // question is about, so the process names ride the same read.
+        `SELECT ap.id, ap.name, ap.url, ap.stage, ap.about, ap.client_context, ap.solution, ap.key_actors,
+                ap.account_id, ap.deactivated_at, ap.created_at,
                 a.name AS account_name, COALESCE(ap.updated_at, ap.created_at) AS sort_at,
-                (SELECT group_concat(p.name, ', ') FROM
-                   (SELECT name FROM processes WHERE app_id = ap.id AND deactivated_at IS NULL ORDER BY name LIMIT 40) p
-                ) AS processes
+                ${childLines(
+                  `SELECT name AS line FROM processes
+                    WHERE app_id = ap.id AND deactivated_at IS NULL ORDER BY name LIMIT ${PROCESS_STEPS}`
+                )} AS processes,
+                ${childLines(
+                  `SELECT p.name || CASE WHEN s.is_main = 1 THEN ' (the main one)' ELSE '' END AS line
+                     FROM app_stakeholders s JOIN accounts p ON p.id = s.contact_id
+                    WHERE s.app_id = ap.id AND s.deactivated_at IS NULL
+                    ORDER BY s.is_main DESC, p.name LIMIT ${ROLLUP_CONTACTS}`
+                )} AS stakeholders
            FROM apps ap LEFT JOIN accounts a ON a.id = ap.account_id
           ${keyset.sql ? `WHERE ${keyset.sql}` : ""}
           ORDER BY sort_at, ap.id LIMIT ${limit}`,
@@ -329,15 +665,22 @@ export const INGEST_KINDS: IngestKind[] = [
           title: r.name,
           accountName: r.account_name,
           status: r.stage,
-          detail: r.processes ? `It covers ${r.processes}.` : "",
+          detail: plainText(
+            r.about || r.solution || (r.processes ? `It covers ${r.processes.replace(/\n/g, ", ")}.` : "")
+          ),
         }),
         body: [
           `${r.name} is a system we built${r.account_name ? ` for ${r.account_name}` : ""}${r.stage ? `, currently ${r.stage}` : ""}.`,
           r.url ? `It lives at ${r.url}.` : "",
-          r.processes ? `The processes it covers: ${r.processes}.` : "",
+          r.about ? `What it is: ${r.about}` : "",
+          r.client_context ? `Where the client was before it: ${r.client_context}` : "",
+          r.solution ? `What we built: ${r.solution}` : "",
+          r.key_actors ? `Who uses it: ${r.key_actors}` : "",
+          r.stakeholders ? `The client's people on it:\n${r.stakeholders}` : "",
+          r.processes ? `The ways of working it covers:\n${r.processes}` : "",
         ]
           .filter(Boolean)
-          .join("\n"),
+          .join("\n\n"),
         accountId: r.account_id,
         appId: r.id,
         recordDate: r.created_at,
@@ -349,11 +692,124 @@ export const INGEST_KINDS: IngestKind[] = [
     },
   },
   {
+    // THE WAY OF WORKING — the loudest omission of all, because a process map is
+    // the record that says WHAT WE ACTUALLY DO for a client. Its steps, how long
+    // each one takes, how often it runs, and what the client said about it: the
+    // owner's "scope" and his "work blocks" in one row, and none of it was
+    // answerable in an app built around it.
+    //
+    // IT INDEXES THE LATEST VERSION'S STEPS, NOT EVERY VERSION'S. A map with
+    // eleven versions would otherwise put eleven copies of the same steps into
+    // the index and the assistant would quote a duration we halved in March. The
+    // baseline still matters — it is what a saving is measured FROM — but that is
+    // arithmetic the Value screen shows, not material a question is answered out
+    // of. Durations are minutes and counts, never money: what an hour COSTS is
+    // R24's, and it is not in this file.
+    kind: "process",
+    table: "processes",
+    label: "process maps",
+    textVersion: 1,
+    read: async (cfg, guard, cursor, limit) => {
+      const keyset = after(cursor, "COALESCE(p.updated_at, p.created_at)", "p.id")
+      const rows = await d1Query<{
+        id: string
+        name: string
+        description: string | null
+        role_name: string | null
+        account_id: string | null
+        app_id: string
+        account_name: string | null
+        app_name: string | null
+        version_no: number | null
+        steps: string | null
+        comments: string | null
+        deactivated_at: string | null
+        created_at: string
+        sort_at: string
+      }>(
+        cfg,
+        guard.databaseId,
+        // R14 hard cap: `limit` is INGEST_SOURCES_PER_TICK; the steps are capped
+        // at PROCESS_STEPS and the conversation at PROCESS_COMMENTS, each inside
+        // its own inner select.
+        `SELECT p.id, p.name, p.description, p.role_name, p.account_id, p.app_id,
+                p.deactivated_at, p.created_at,
+                a.name AS account_name, ap.name AS app_name,
+                COALESCE(p.updated_at, p.created_at) AS sort_at,
+                (SELECT MAX(v.version_no) FROM process_versions v WHERE v.process_id = p.id) AS version_no,
+                ${childLines(
+                  `SELECT st.name || COALESCE(' — ' || st.description, '') ||
+                          CASE WHEN st.seconds_per_run > 0
+                               THEN ' (about ' || (st.seconds_per_run / 60) || ' minutes, ' ||
+                                    st.runs_per_month || ' times a month)'
+                               ELSE '' END AS line
+                     FROM process_steps st
+                    WHERE st.version_id = (SELECT v.id FROM process_versions v
+                                            WHERE v.process_id = p.id ORDER BY v.version_no DESC LIMIT 1)
+                      AND st.removed_at IS NULL
+                    ORDER BY st.position LIMIT ${PROCESS_STEPS}`
+                )} AS steps,
+                ${childLines(
+                  `SELECT CASE WHEN pc.is_staff = 1 THEN 'We said: ' ELSE 'They said: ' END || pc.body AS line
+                     FROM process_comments pc
+                    WHERE pc.process_id = p.id ORDER BY pc.created_at LIMIT ${PROCESS_COMMENTS}`
+                )} AS comments
+           FROM processes p
+           LEFT JOIN accounts a ON a.id = p.account_id
+           LEFT JOIN apps ap ON ap.id = p.app_id
+          ${keyset.sql ? `WHERE ${keyset.sql}` : ""}
+          ORDER BY sort_at, p.id LIMIT ${limit}`,
+        keyset.params
+      )
+      return rows.map((r) => ({
+        originRowId: r.id,
+        sortAt: r.sort_at,
+        title: r.name,
+        summary: buildSummary({
+          noun: "way of working we have mapped",
+          title: r.name,
+          accountName: r.account_name,
+          status: r.role_name ? `done by their ${r.role_name}` : null,
+          notes: [r.app_name ? `Part of ${r.app_name}.` : null],
+          detail: plainText(r.description || r.steps?.replace(/\n/g, "; ") || ""),
+        }),
+        body: [
+          `${r.name} is a way of working${r.account_name ? ` at ${r.account_name}` : " of ours"}${
+            r.app_name ? `, mapped inside ${r.app_name}` : ""
+          }${r.role_name ? `, done by their ${r.role_name}` : ""}.`,
+          r.description ?? "",
+          // WHERE A RECORD IS THIN, SAY WHAT IT IS. A map with no steps written
+          // down yet is a real state of the app, and "nobody has written them
+          // down" is a useful answer; inventing a sentence around the name is not.
+          r.steps
+            ? `The steps as they stand today${r.version_no ? ` (version ${r.version_no})` : ""}:\n${r.steps}`
+            : "Nobody has written the steps of this one down yet.",
+          r.comments ? `What has been said about it:\n${r.comments}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n\n"),
+        accountId: r.account_id,
+        appId: r.app_id,
+        recordDate: r.created_at,
+        // A row this app owns — it belongs to the team, not to one person.
+        ownerUserId: null,
+        sourceUrl: null,
+        retired: r.deactivated_at !== null,
+      }))
+    },
+  },
+  {
     // A BLOCK OF WORK SOLD. What was agreed, when it ran, and what it was for —
     // the record behind "what did we do for them in March?".
+    // NO PRICE. `sold_price_cents` is deliberately absent: what a client is
+    // charged is shown to them only when their own price-visibility switch is on,
+    // and a passage carries no switch. The sprint's WORDS — what it was for, when
+    // it ran, and what was actually done inside it — are the part a question is
+    // about anyway.
     kind: "sprint",
     table: "sprints",
     label: "sprints",
+    textVersion: 1,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(sp.updated_at, sp.created_at)", "sp.id")
       const rows = await d1Query<{
@@ -368,17 +824,27 @@ export const INGEST_KINDS: IngestKind[] = [
         account_id: string | null
         app_id: string | null
         account_name: string | null
+        app_name: string | null
+        stories: string | null
         deactivated_at: string | null
         created_at: string
         sort_at: string
       }>(
         cfg,
         guard.databaseId,
-        // R14 hard cap: `limit` is INGEST_SOURCES_PER_TICK.
+        // R14 hard cap: `limit` is INGEST_SOURCES_PER_TICK, and the story list is
+        // capped at its own inner select.
         `SELECT sp.id, sp.ref, sp.name, sp.sprint_type, sp.goal, sp.starts_on, sp.ends_on, sp.completed_at,
                 sp.account_id, sp.app_id, sp.deactivated_at, sp.created_at,
-                a.name AS account_name, COALESCE(sp.updated_at, sp.created_at) AS sort_at
-           FROM sprints sp LEFT JOIN accounts a ON a.id = sp.account_id
+                a.name AS account_name, ap.name AS app_name,
+                COALESCE(sp.updated_at, sp.created_at) AS sort_at,
+                ${childLines(
+                  `SELECT s.title || ' (' || REPLACE(s.status, '_', ' ') || ')' AS line FROM stories s
+                    WHERE s.sprint_id = sp.id ORDER BY s.created_at LIMIT ${ROLLUP_ROWS}`
+                )} AS stories
+           FROM sprints sp
+           LEFT JOIN accounts a ON a.id = sp.account_id
+           LEFT JOIN apps ap ON ap.id = sp.app_id
           ${keyset.sql ? `WHERE ${keyset.sql}` : ""}
           ORDER BY sort_at, sp.id LIMIT ${limit}`,
         keyset.params
@@ -395,17 +861,20 @@ export const INGEST_KINDS: IngestKind[] = [
             ref: r.ref,
             accountName: r.account_name,
             status: r.completed_at ? "completed" : "running",
-            notes: [when ? `It ran ${when}.` : null],
-            detail: r.goal ?? "",
+            notes: [when ? `It ran ${when}.` : null, r.app_name ? `On ${r.app_name}.` : null],
+            detail: plainText(r.goal ?? ""),
           }),
           body: [
-            `${r.name} is a block of work${r.account_name ? ` sold to ${r.account_name}` : ""}, ${r.completed_at ? "completed" : "running"}.`,
+            `${r.name} is a block of work${r.account_name ? ` sold to ${r.account_name}` : ""}${
+              r.app_name ? ` on ${r.app_name}` : ""
+            }, ${r.completed_at ? "completed" : "running"}.`,
             r.ref ? `Reference ${r.ref}.` : "",
             when ? `It ran ${when}.` : "",
-            r.goal ?? "",
+            r.goal ? `What it was for: ${r.goal}` : "",
+            r.stories ? `The work inside it:\n${r.stories}` : "",
           ]
             .filter(Boolean)
-            .join("\n"),
+            .join("\n\n"),
           accountId: r.account_id,
           appId: r.app_id,
           sprintId: r.id,
@@ -426,6 +895,7 @@ export const INGEST_KINDS: IngestKind[] = [
     kind: "story",
     table: "stories",
     label: "stories",
+    textVersion: 1,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(s.updated_at, s.created_at)", "s.id")
       const rows = await d1Query<{
@@ -434,23 +904,42 @@ export const INGEST_KINDS: IngestKind[] = [
         title: string
         detail: string | null
         status: string
+        story_type: string | null
         closing_note: string | null
+        review_note: string | null
         assignee_name: string | null
         account_id: string | null
         app_id: string | null
         ticket_id: string | null
         sprint_id: string | null
         account_name: string | null
+        app_name: string | null
+        sprint_name: string | null
+        ticket_ref: string | null
+        processes: string | null
+        work_notes: string | null
         created_at: string
         sort_at: string
       }>(
         cfg,
         guard.databaseId,
-        // R14 hard cap: `limit` is INGEST_SOURCES_PER_TICK.
-        `SELECT s.id, s.ref, s.title, s.detail, s.status, s.closing_note, s.assignee_name,
-                s.account_id, s.app_id, s.ticket_id, s.sprint_id, s.created_at,
-                a.name AS account_name, COALESCE(s.updated_at, s.created_at) AS sort_at
-           FROM stories s LEFT JOIN accounts a ON a.id = s.account_id
+        // R14 hard cap: `limit` is INGEST_SOURCES_PER_TICK, and each child list is
+        // capped at its own inner select.
+        `SELECT s.id, s.ref, s.title, s.detail, s.status, s.story_type, s.closing_note, s.review_note,
+                s.assignee_name, s.account_id, s.app_id, s.ticket_id, s.sprint_id, s.created_at,
+                a.name AS account_name, ap.name AS app_name, sp.name AS sprint_name, h.ref AS ticket_ref,
+                COALESCE(s.updated_at, s.created_at) AS sort_at,
+                ${childLines(
+                  `SELECT pr.name AS line FROM story_processes stp
+                     JOIN processes pr ON pr.id = stp.process_id
+                    WHERE stp.story_id = s.id ORDER BY pr.name LIMIT ${ROLLUP_ROWS}`
+                )} AS processes,
+                ${childLines(workNotes("'stories'", "s.id"))} AS work_notes
+           FROM stories s
+           LEFT JOIN accounts a ON a.id = s.account_id
+           LEFT JOIN apps ap ON ap.id = s.app_id
+           LEFT JOIN sprints sp ON sp.id = s.sprint_id
+           LEFT JOIN help h ON h.id = s.ticket_id
           ${keyset.sql ? `WHERE ${keyset.sql}` : ""}
           ORDER BY sort_at, s.id LIMIT ${limit}`,
         keyset.params
@@ -460,7 +949,7 @@ export const INGEST_KINDS: IngestKind[] = [
         sortAt: r.sort_at,
         title: r.title,
         summary: buildSummary({
-          noun: "piece of work",
+          noun: r.story_type ? `${r.story_type.toLowerCase()} we did` : "piece of work",
           title: r.title,
           ref: r.ref,
           accountName: r.account_name,
@@ -468,10 +957,21 @@ export const INGEST_KINDS: IngestKind[] = [
           detail: plainText(r.closing_note || r.detail || ""),
         }),
         body: [
-          `${r.title} is a piece of work${r.account_name ? ` for ${r.account_name}` : ""}, currently ${r.status.replace(/_/g, " ")}${r.assignee_name ? `, with ${r.assignee_name}` : ""}.`,
-          r.ref ? `Reference ${r.ref}.` : "",
+          `${r.title} is a piece of work${r.account_name ? ` for ${r.account_name}` : ""}${
+            r.app_name ? ` on ${r.app_name}` : ""
+          }, currently ${r.status.replace(/_/g, " ")}${r.assignee_name ? `, with ${r.assignee_name}` : ""}.`,
+          [
+            r.ref ? `Reference ${r.ref}.` : "",
+            r.ticket_ref ? `It answers ticket ${r.ticket_ref}.` : "",
+            r.sprint_name ? `It sits in ${r.sprint_name}.` : "",
+          ]
+            .filter(Boolean)
+            .join(" "),
+          r.processes ? `The ways of working it changes: ${r.processes.replace(/\n/g, ", ")}.` : "",
           r.detail ?? "",
           r.closing_note ? `What was done: ${r.closing_note}` : "",
+          r.review_note ? `What the reviewer said: ${r.review_note}` : "",
+          r.work_notes ? `Notes from the time logged on it:\n${r.work_notes}` : "",
         ]
           .filter(Boolean)
           .join("\n\n"),
@@ -518,6 +1018,7 @@ export const INGEST_KINDS: IngestKind[] = [
     kind: "meeting",
     table: "meetings",
     label: "meetings",
+    textVersion: 1,
     read: async (cfg, guard, cursor, limit) => {
       const keyset = after(cursor, "COALESCE(m.updated_at, m.created_at)", "m.id")
       const rows = await d1Query<{
@@ -600,14 +1101,194 @@ export const INGEST_KINDS: IngestKind[] = [
       }))
     },
   },
+  {
+    // WHAT WE ARE WAITING ON THE CLIENT FOR — the answer to "why has this
+    // stalled?", which is a question an agency asks about a client every week and
+    // could not answer out of its own material.
+    //
+    // NOTHING HERE RETIRES. A to-do is never deactivated: it is completed, or it
+    // is called off. Both are still the answer to "what happened to that logo we
+    // asked for in March?", so the source stays and its text says which.
+    kind: "todo",
+    table: "todos",
+    label: "to-dos",
+    textVersion: 1,
+    read: async (cfg, guard, cursor, limit) => {
+      const keyset = after(cursor, "COALESCE(t.updated_at, t.created_at)", "t.id")
+      const rows = await d1Query<{
+        id: string
+        ref: string | null
+        title: string
+        detail: string | null
+        due_on: string | null
+        completed_at: string | null
+        cancelled_at: string | null
+        completer_name: string | null
+        file_name: string | null
+        account_id: string
+        ticket_id: string | null
+        account_name: string | null
+        ticket_ref: string | null
+        created_at: string
+        sort_at: string
+      }>(
+        cfg,
+        guard.databaseId,
+        // R14 hard cap: `limit` is INGEST_SOURCES_PER_TICK.
+        `SELECT t.id, t.ref, t.title, t.detail, t.due_on, t.completed_at, t.cancelled_at,
+                t.completer_name, t.file_name, t.account_id, t.ticket_id, t.created_at,
+                a.name AS account_name, h.ref AS ticket_ref,
+                COALESCE(t.updated_at, t.created_at) AS sort_at
+           FROM todos t
+           LEFT JOIN accounts a ON a.id = t.account_id
+           LEFT JOIN help h ON h.id = t.ticket_id
+          ${keyset.sql ? `WHERE ${keyset.sql}` : ""}
+          ORDER BY sort_at, t.id LIMIT ${limit}`,
+        keyset.params
+      )
+      return rows.map((r) => {
+        const state = r.cancelled_at ? "called off" : r.completed_at ? "sent to us" : "still waiting"
+        return {
+          originRowId: r.id,
+          sortAt: r.sort_at,
+          title: r.title,
+          summary: buildSummary({
+            noun: "thing we asked the client for",
+            title: r.title,
+            ref: r.ref,
+            accountName: r.account_name,
+            status: state,
+            notes: [r.due_on ? `Due ${r.due_on}.` : null],
+            detail: plainText(r.detail ?? ""),
+          }),
+          body: [
+            `${r.title} is something we asked ${r.account_name ?? "the client"} for, ${state}.`,
+            [
+              r.ref ? `Reference ${r.ref}.` : "",
+              r.ticket_ref ? `It hangs off ticket ${r.ticket_ref}.` : "",
+              r.due_on ? `Due ${r.due_on}.` : "",
+            ]
+              .filter(Boolean)
+              .join(" "),
+            r.detail ?? "",
+            r.completed_at
+              ? `They sent it${r.completer_name ? ` — ${r.completer_name}` : ""}${
+                  r.file_name ? `, as ${r.file_name}` : ""
+                }.`
+              : "",
+          ]
+            .filter(Boolean)
+            .join("\n\n"),
+          accountId: r.account_id,
+          ticketId: r.ticket_id,
+          recordDate: r.created_at,
+          ownerUserId: null,
+          sourceUrl: null,
+        }
+      })
+    },
+  },
+  {
+    // OUR OWN ADMIN. Usually the agency's — the VAT return, the insurance
+    // renewal — and it lands in the agency compartment when it names no client.
+    // A task that DOES name one is about that client and is filed with them,
+    // which is the rule every other kind here follows.
+    kind: "task",
+    table: "tasks",
+    label: "tasks",
+    textVersion: 1,
+    read: async (cfg, guard, cursor, limit) => {
+      const keyset = after(cursor, "COALESCE(t.updated_at, t.created_at)", "t.id")
+      const rows = await d1Query<{
+        id: string
+        ref: string | null
+        title: string
+        detail: string | null
+        status: string
+        department: string | null
+        important: number
+        urgent: number
+        assignee_name: string | null
+        due_on: string | null
+        account_id: string | null
+        app_id: string | null
+        account_name: string | null
+        app_name: string | null
+        work_notes: string | null
+        created_at: string
+        sort_at: string
+      }>(
+        cfg,
+        guard.databaseId,
+        // R14 hard cap: `limit` is INGEST_SOURCES_PER_TICK, and the work notes are
+        // capped at their own inner select.
+        `SELECT t.id, t.ref, t.title, t.detail, t.status, t.department, t.important, t.urgent,
+                t.assignee_name, t.due_on, t.account_id, t.app_id, t.created_at,
+                a.name AS account_name, ap.name AS app_name,
+                COALESCE(t.updated_at, t.created_at) AS sort_at,
+                ${childLines(workNotes("'tasks'", "t.id"))} AS work_notes
+           FROM tasks t
+           LEFT JOIN accounts a ON a.id = t.account_id
+           LEFT JOIN apps ap ON ap.id = t.app_id
+          ${keyset.sql ? `WHERE ${keyset.sql}` : ""}
+          ORDER BY sort_at, t.id LIMIT ${limit}`,
+        keyset.params
+      )
+      return rows.map((r) => ({
+        originRowId: r.id,
+        sortAt: r.sort_at,
+        title: r.title,
+        summary: buildSummary({
+          noun: "job of our own",
+          title: r.title,
+          ref: r.ref,
+          accountName: r.account_name,
+          status: r.status.replace(/_/g, " "),
+          notes: [r.department ? `${r.department}.` : null, r.due_on ? `Due ${r.due_on}.` : null],
+          detail: plainText(r.detail ?? ""),
+        }),
+        body: [
+          `${r.title} is a job of our own${r.account_name ? ` about ${r.account_name}` : ""}${
+            r.app_name ? ` on ${r.app_name}` : ""
+          }, currently ${r.status.replace(/_/g, " ")}${r.assignee_name ? `, with ${r.assignee_name}` : ""}.`,
+          [
+            r.ref ? `Reference ${r.ref}.` : "",
+            r.department ? `It is ${r.department} work.` : "",
+            r.due_on ? `Due ${r.due_on}.` : "",
+            r.important || r.urgent
+              ? `Flagged ${[r.important ? "important" : "", r.urgent ? "urgent" : ""].filter(Boolean).join(" and ")}.`
+              : "",
+          ]
+            .filter(Boolean)
+            .join(" "),
+          r.detail ?? "",
+          r.work_notes ? `Notes from the time logged on it:\n${r.work_notes}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n\n"),
+        accountId: r.account_id,
+        appId: r.app_id,
+        recordDate: r.created_at,
+        ownerUserId: null,
+        sourceUrl: null,
+      }))
+    },
+  },
 ]
 
 /** The first sentence of a ticket's description, for a ticket that has no title
- * of its own. Bounded so a wall of pasted text can't become a title. */
+ * of its own. Bounded so a wall of pasted text can't become a title.
+ *
+ * A SENTENCE ENDS WITH PUNCTUATION AND THEN A GAP. It used to end at the first
+ * full stop of any kind, which turned "Bergman S.A. cannot see the March invoice
+ * run" into a ticket called "Bergman S" — and the title is not a detail here, it
+ * is the words a citation puts in front of a reader when the assistant answers.
+ * An abbreviation's dots are followed by a letter, so requiring whitespace (or
+ * the end of the text) tells the two apart without a list of abbreviations. */
 function firstLine(description: string): string {
   const text = plainText(description)
-  const stop = text.search(/[.!?\n]/)
-  const line = (stop > 0 ? text.slice(0, stop) : text).trim()
+  const stop = text.search(/[.!?](\s|$)|\n/)
+  const line = (stop > 0 ? text.slice(0, stop + 1) : text).trim()
   return (line || "Untitled ticket").slice(0, 120)
 }
 
@@ -622,11 +1303,23 @@ export type SweepResult = {
   error?: string
 }
 
-function parseCursor(raw: string | null): Cursor | null {
+/** THE STORED POSITION, WITH THE TEXT BUILDER THAT WROTE IT.
+ *
+ * `v<version>|<sort value>|<row id>`. A cursor whose version is not the kind's
+ * current one is not a position — it is a page number in a book that has been
+ * rewritten — so it reads as null and the kind starts its table again. A cursor
+ * written before versions existed has no `v` prefix and is read the same way,
+ * which is exactly right: those rows were written by an older builder too. */
+function parseCursor(raw: string | null, version: number): Cursor | null {
   if (!raw) return null
-  const cut = raw.indexOf("|")
-  return cut === -1 ? null : { at: raw.slice(0, cut), id: raw.slice(cut + 1) }
+  const stamped = /^v(\d+)\|/.exec(raw)
+  if (!stamped || Number(stamped[1]) !== version) return null
+  const rest = raw.slice(stamped[0].length)
+  const cut = rest.indexOf("|")
+  return cut === -1 ? null : { at: rest.slice(0, cut), id: rest.slice(cut + 1) }
 }
+
+const writeCursor = (cursor: Cursor, version: number): string => `v${version}|${cursor.at}|${cursor.id}`
 
 /** File one slice of one kind. Every row becomes (or updates) exactly one
  * source, and only a row whose TEXT changed is re-chunked and re-embedded.
@@ -649,7 +1342,7 @@ async function sweepKind(
     "SELECT cursor FROM knowledge_ingest WHERE kind = ? LIMIT 1",
     [stateKey]
   )
-  const cursor = parseCursor(state[0]?.cursor ?? null)
+  const cursor = parseCursor(state[0]?.cursor ?? null, kind.textVersion)
   let rows = await kind.read(cfg, guard, cursor, limit)
   let indexed = 0
   let last: Cursor | null = cursor
@@ -772,8 +1465,16 @@ async function sweepKind(
   }
 
   const caughtUp = rows.length < limit
+  // A ROLLUP KIND THAT HAS REACHED THE END STARTS AGAIN NEXT TICK. Its text is
+  // built from rows its own cursor cannot see (an account's apps, sprints,
+  // tickets, people), so "nothing past the cursor" does not mean "nothing has
+  // changed" — it means this table has no NEWER rows, while the world described
+  // by the rows it already passed moved underneath. Dropping the position here
+  // rather than re-reading in the same tick is what keeps `caughtUp` honest: the
+  // backfill script loops until every kind says it has finished, and a kind that
+  // never says so never lets it stop.
   await recordRun(cfg, guard, stateKey, {
-    cursor: last ? `${last.at}|${last.id}` : null,
+    cursor: last && !(caughtUp && kind.rollup) ? writeCursor(last, kind.textVersion) : null,
     indexed,
     error: null,
   })

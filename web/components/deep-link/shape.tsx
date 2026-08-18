@@ -157,6 +157,26 @@ export const KNOWLEDGE_KIND: Record<string, string> = {
   // source IS even though nothing writes a new one.
   article: "From an article",
   account: "From an account",
+  // EVERY KIND THE SWEEP WRITES NEEDS A WORD HERE. A kind missing from this map
+  // falls through to its own bare name, so the Kind filter offered "sprint" and
+  // "account_links" beside "From a ticket" — and the six kinds added on 18 Aug
+  // would have made most of the filter read that way. Held to the kind list by
+  // workers/content/test/knowledge-coverage.test.ts, which reads this map off
+  // disk — so a new kind cannot ship without a word for it here.
+  contact: "From a contact",
+  app: "From an app",
+  process: "From a process map",
+  sprint: "From a sprint",
+  story: "From a story",
+  meeting: "From a meeting",
+  todo: "From a to-do",
+  task: "From a task",
+  // The four that arrive through somebody's own Google connection — named for
+  // the thing rather than the service, the same way the kinds themselves are.
+  document: "From a document",
+  email: "From an email",
+  event: "From a calendar entry",
+  message: "From a chat message",
 }
 
 /** Where a source is filed, as a person reads it: an account compartment shows

@@ -186,6 +186,7 @@ export function googleIngestKinds(env: Env, cfg: D1Rest, guard: MemberGuard): In
       table: "google_drive",
       label: "Drive documents",
       windowed: true,
+      textVersion: 1,
       read: (_cfg, _guard, cursor, limit) =>
         slice(
           "drive",
@@ -210,6 +211,7 @@ export function googleIngestKinds(env: Env, cfg: D1Rest, guard: MemberGuard): In
       table: "google_gmail",
       label: "mail with a client",
       windowed: true,
+      textVersion: 1,
       read: (_cfg, _guard, cursor, limit) =>
         slice(
           "gmail",
@@ -236,6 +238,7 @@ export function googleIngestKinds(env: Env, cfg: D1Rest, guard: MemberGuard): In
       table: "google_calendar",
       label: "calendar entries",
       windowed: true,
+      textVersion: 1,
       // READING FROM THE CALENDAR IS WHAT TELLS THE KNOWLEDGE BASE WHAT WAS
       // AGREED WHEN. A meeting's title and the note somebody put in the
       // description are usually the only written record that a decision was
@@ -261,6 +264,7 @@ export function googleIngestKinds(env: Env, cfg: D1Rest, guard: MemberGuard): In
       table: "google_chat",
       label: "Chat spaces",
       windowed: true,
+      textVersion: 1,
       // ONE SOURCE PER SPACE, NOT PER MESSAGE. A chat message on its own is four
       // words with no subject; the thing worth answering from is the
       // CONVERSATION, which is the same reason a ticket's replies are folded into

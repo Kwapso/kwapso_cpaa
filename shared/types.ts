@@ -831,6 +831,12 @@ export type KnowledgePassage = {
   title: string
   kind: string
   url: string | null
+  /** THE RECORD THIS CAME OUT OF, as a path under the team (`tickets/<id>`).
+   * A reader who disagrees with an answer has to be able to go and look at the
+   * ticket, the map or the meeting itself — not only at the source row that
+   * mirrors it. Null where there is no record screen to open: a note somebody
+   * typed IS the record, and a document out of Drive is reached through `url`. */
+  recordPath: string | null
   compartment: string
   seq: number
   text: string
@@ -844,6 +850,8 @@ export type KnowledgeCitation = {
   title: string
   kind: string
   url: string | null
+  /** the record itself, one hop past the source — see `KnowledgePassage`. */
+  recordPath: string | null
   /** WHAT THE LIVE ROW SAYS RIGHT NOW, read at the moment of answering rather
    * than taken from the index — so a ticket that was "in progress" when it was
    * indexed and is "done" now cannot be quoted as in progress. Null for a source

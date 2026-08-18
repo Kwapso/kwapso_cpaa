@@ -52,10 +52,11 @@ import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
-import { FileText, Search } from "lucide-react"
+import { ExternalLink, FileText, Search, SquareArrowOutUpRight } from "lucide-react"
 
-import type { KnowledgeAnswer } from "@shared/types"
+import type { KnowledgeAnswer, KnowledgeCitation, KnowledgePassage } from "@shared/types"
 import { useT } from "@shared/web/language"
+import { safeHref } from "@shared/web/rich-text"
 import { AgentMarkdown } from "@/components/agent-markdown"
 import { ApiFailure, content } from "@/lib/api"
 import { usePermissions } from "@/lib/perms"
@@ -63,10 +64,17 @@ import { useActiveTeam } from "@/lib/use-active-team"
 
 export function KnowledgeAsk({
   onOpenSource,
+  onOpenRecord,
   accountId,
   context,
 }: {
   onOpenSource: (sourceId: string) => void
+  /** OPEN THE RECORD ITSELF, one hop past the source. The owner's own sentence:
+   * "the ability to go and check out the links to the sources or to those
+   * particular records as well." The seam hands back a path relative to the team
+   * (`tickets/<id>`) and the caller prefixes it, because only the caller knows
+   * which team's screens it is standing in. */
+  onOpenRecord: (path: string) => void
   /** WHICH CLIENT'S COMPARTMENT to search, when the screen already knows (R23:
    * `reason` says which one it chose, and naming it here is what stops a
    * question about one client being answered out of another's material). Null on
@@ -221,6 +229,11 @@ export function KnowledgeAsk({
                     <div className="text-muted-foreground text-sm">
                       <AgentMarkdown text={p.text} />
                     </div>
+                    {/* AND THE RECORD IT CAME OUT OF. The title above opens the
+                        SOURCE — what was indexed, and why. This opens the ticket,
+                        the map or the meeting itself, which is what somebody
+                        checking an answer actually wants to read. */}
+                    <OpenTheRecord from={p} onOpenRecord={onOpenRecord} />
                   </div>
                 ))}
               </div>
@@ -253,6 +266,7 @@ export function KnowledgeAsk({
                          , that record says &ldquo;{c.liveStatus}{t("” right now")}
                         </span>
                       )}
+                      <OpenTheRecord from={c} onOpenRecord={onOpenRecord} />
                     </li>
                   ))}
                 </ul>
@@ -262,5 +276,53 @@ export function KnowledgeAsk({
         </div>
       )}
     </div>
+  )
+}
+
+/** THE LINK TO THE RECORD BEHIND A PASSAGE — a ticket, a map, a meeting, or the
+ * document in somebody's Drive.
+ *
+ * TWO KINDS OF DESTINATION AND EXACTLY ONE IS OFFERED. `recordPath` is a row this
+ * app owns, opened in place; `url` is somewhere else entirely, opened in a new
+ * tab and only after `safeHref` has agreed it is a web address (the same
+ * boundary the knowledge screen's own "open where this came from" link goes
+ * through — a source URL arrives from Google, or from a person typing, and a
+ * `javascript:` in an href is a rendered link nobody inspected).
+ *
+ * Nothing at all when a source has neither, which is the honest state of a note
+ * somebody typed: it IS the record, and the title above already opens it. */
+function OpenTheRecord({
+  from,
+  onOpenRecord,
+}: {
+  from: Pick<KnowledgePassage | KnowledgeCitation, "recordPath" | "url">
+  onOpenRecord: (path: string) => void
+}) {
+  const t = useT()
+  // Through the seam FIRST, and unconditionally: a URL is checked because of
+  // where it came from, never because of which branch happens to render it.
+  const external = safeHref(from.url)
+  if (from.recordPath)
+    return (
+      <button
+        type="button"
+        onClick={() => onOpenRecord(from.recordPath as string)}
+        className="text-primary flex w-fit items-center gap-1 text-xs underline-offset-2 hover:underline"
+      >
+        <SquareArrowOutUpRight className="size-3 shrink-0" aria-hidden />
+        {t("Open the record")}
+      </button>
+    )
+  if (!external) return null
+  return (
+    <a
+      href={external}
+      target="_blank"
+      rel="noreferrer noopener"
+      className="text-primary flex w-fit items-center gap-1 text-xs underline-offset-2 hover:underline"
+    >
+      <ExternalLink className="size-3 shrink-0" aria-hidden />
+      {t("Open the original")}
+    </a>
   )
 }

@@ -27,11 +27,17 @@ import { knowledgeAnswer } from "../src/lib/knowledge"
 const ROUTES = join(__dirname, "..", "src", "routes", "knowledge.ts")
 const LIB = join(__dirname, "..", "src", "lib", "knowledge.ts")
 
-const passage = (sourceId: string, title: string, seq = 0): KnowledgePassage => ({
+const passage = (
+  sourceId: string,
+  title: string,
+  seq = 0,
+  recordPath: string | null = null
+): KnowledgePassage => ({
   sourceId,
   title,
   kind: "note",
   url: null,
+  recordPath,
   compartment: "agency",
   seq,
   text: "The dispatch rollout is paused until the invoice run is fixed.",
@@ -76,6 +82,29 @@ describe("R23 — the answer seam decides `found` and `citations` together", () 
     // when an answer is wrong for the question.
     expect(answer.compartments).toEqual(["account:A1", "agency"])
     expect(answer.reason).toContain("Bergman")
+  })
+
+  it("a citation points at the same record its passage does", () => {
+    // The owner's ask: "the ability to go and check out the links to the sources
+    // or to those particular records as well." The path is DERIVED once, on the
+    // passage, and copied — so the link under a passage and the link under its
+    // citation can never point at different rows, which is the whole reason the
+    // citation does not work it out again.
+    const answer = knowledgeAnswer({
+      question: "what did we agree?",
+      compartments: [],
+      reason: "…",
+      records: [],
+      passages: [
+        passage("S1", "Dispatch keeps logging drivers out", 0, "tickets/H1"),
+        passage("S2", "A note somebody typed", 0, null),
+      ],
+      candidates: 4,
+    })
+    expect(answer.citations.map((c) => c.recordPath)).toEqual(["tickets/H1", null])
+    // A source with no record screen renders no link rather than a broken one —
+    // a note somebody typed IS the record.
+    expect(answer.citations[1].recordPath).toBeNull()
   })
 
   it("cannot be talked into passages without citations", () => {

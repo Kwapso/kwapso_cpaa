@@ -654,8 +654,16 @@ them. Four tables, one per job:
   Three families in one table, because a person edits them in one list: a `note`
   somebody typed here (the body IS the truth), a `file` somebody uploaded (THE
   FILE is the truth and the body is a READING of it), and a MIRROR of a row we
-  already own, `ticket` / `account` / `app` / `story` / `sprint`, where the row
-  is the truth and the sweep keeps the body in step. **`article` is a kind with no
+  already own — `ticket` / `account` / `contact` / `app` / `process` / `sprint` /
+  `story` / `meeting` / `todo` / `task`, where the row is the truth and the sweep
+  keeps the body in step. **Every table that can carry an account id is on that
+  list**, which is the point of it: a question about a client lands on whatever
+  the client's world is made of, and until 18 Aug 2026 six of those ten were
+  missing — most glaringly the process map, the record that says what we actually
+  DO for a client. A kind must also be named in `KNOWLEDGE_KINDS`
+  (`workers/content/src/lib/knowledge.ts`), or `toSource` coerces it to `note`
+  and every source of it lists and filters as one; `meeting` shipped a reader
+  before it was named there, and nothing about that was visible. **`article` is a kind with no
   mirror behind it any more, and deliberately kept:** the Learning module was
   purged on 17 Aug 2026 and its table went with it, but its 41 articles had
   already been indexed here, so the material outlived the module. Dropping the
@@ -702,6 +710,26 @@ them. Four tables, one per job:
   last ran, when it last SUCCEEDED, and what went wrong when it didn't (R12). The
   cursor is what makes ingestion resumable, a tick that dies halfway costs the
   next one nothing but the rows it has not reached.
+
+  **The cursor carries the TEXT BUILDER that wrote it** (`v<n>|<sort>|<id>`).
+  The content hash answers "has this row changed?", which is a different question
+  from "has the way we WRITE this row changed?" — and the cursor makes the second
+  one fatal, because every row already behind it is invisible forever unless
+  somebody touches it. So improving what a kind SAYS reaches every future ticket
+  and not one existing one. A stored cursor whose version is not the kind's
+  current `textVersion` reads as null, the kind walks its table again, and the
+  hash then does its ordinary job. Bump the version when a reader's text changes;
+  `workers/content/test/knowledge-coverage.test.ts` pins a digest of every reader
+  (and of the helpers they share) to the number declared, so a change without a
+  bump turns the build red.
+
+  **A ROLLUP kind starts again when it catches up.** An account's source is built
+  from rows its own cursor cannot see — its apps, sprints, tickets, maps, people
+  — none of which moves `accounts.updated_at`. So `rollup: true` drops the
+  position at the end of the table and the next tick starts over, refreshing every
+  account's text on a rolling cycle. It is not `windowed`: a windowed kind
+  re-walks in the same tick and therefore never reports `caughtUp`, which is the
+  signal `scripts/knowledge-backfill.mjs` loops on.
 
 **Where the search lives, and why the tenancy argument survived the move.** The
 SEARCH is Cloudflare Vectorize, one account-wide index, with every team in its

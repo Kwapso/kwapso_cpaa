@@ -35,6 +35,7 @@ import worker from "../src/index"
 import { fakeVectorize } from "./fake-vectorize"
 import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
 import { tokenise } from "../src/lib/knowledge-text"
+import { INGEST_KINDS } from "../src/lib/knowledge-ingest"
 import type { KnowledgeAnswer, KnowledgeSource } from "@shared/types"
 
 const db = () => holder.db as DatabaseSync
@@ -637,18 +638,15 @@ describe("the sweep — the app's own rows become material, and stay in step", (
     const { ingest } = (await res.json()) as {
       ingest: { kind: string; lastOkAt: string | null; lastError: string | null; sourcesIndexed: number }[]
     }
-        // `meeting` joined the list the day a transcript needed somewhere to be
-    // answerable from. See the kind's own note in lib/knowledge-ingest.ts for
-    // why the WORDS of a call belong to the team through this kind rather than
-    // to one person through a Google one.
-    expect(ingest.map((i) => i.kind).sort()).toEqual([
-      "account",
-      "app",
-      "meeting",
-      "sprint",
-      "story",
-      "ticket",
-    ])
+    // EVERY KIND THE SWEEP OWNS REPORTED, derived from the sweep's own table
+    // rather than copied out of it. The list was hand-written and went stale the
+    // first time a kind was added — which is the failure this whole module is
+    // built against: a green test asserting last month's coverage. What this
+    // suite is FOR is the reporting (R12), so the shape it asserts is "every kind
+    // there is, each with a clean run", not which kinds happen to exist today.
+    // Which kinds SHOULD exist, and what each one says, is knowledge-coverage.test.ts.
+    expect(ingest.map((i) => i.kind).sort()).toEqual(INGEST_KINDS.map((k) => k.stateKey ?? k.kind).sort())
+    expect(ingest.length, "the sweep reported nothing — this assertion would be vacuous").toBeGreaterThan(5)
     for (const row of ingest) {
       expect(row.lastOkAt).not.toBeNull()
       expect(row.lastError).toBeNull()
