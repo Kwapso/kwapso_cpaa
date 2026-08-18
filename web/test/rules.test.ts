@@ -19,8 +19,10 @@ import {
   FORM_DIALOGS,
   GROWING_COLLECTIONS,
   MUTATING_WORKERS,
+  PAGE_WIDTH_OWNER,
   RAW_BODY_EXEMPT,
   RECORD_DETAIL_COMPONENTS,
+  SCREEN_WIDTH_EXEMPT,
   PORTAL_VISIBLE_READS,
   RECORD_TAB_COUNT_EXCEPTIONS,
   RULES_REGISTRY,
@@ -1333,6 +1335,68 @@ describe("RULES — the laws of the base", () => {
   })
 
   // per-worker seam test) — a law can't exist without a check.
+  // R29 — the page has ONE width per front door, and no screen sets its own.
+  //
+  // A page container is identified POSITIONALLY, the same way R20 identifies a
+  // checked field: one LINE carrying `mx-auto`, `w-full` and a `max-w-*`
+  // together. That triple is the signature of a centred content column and of
+  // nothing else — a dialog, a sheet, a door card, a chat bubble and a capped
+  // line of prose are none of them centred-and-full-width, so none is caught and
+  // none has to be excused. It is read per line rather than per className because
+  // `deep-link-screen.tsx`'s own container is a template literal that runs past
+  // the end of the line, and a scan that needed the closing quote would have
+  // missed the one file the law is built around.
+  //
+  // Both directions are checked, so the exemption list is a RATCHET: a file that
+  // sets a width and is not the owner must be pinned, and a pin whose file no
+  // longer sets a width must be deleted.
+  it("one-page-width: exactly one page container per front door, and every pin is live", () => {
+    const roots = [
+      join(WEB, "components"),
+      join(WEB, "app"),
+      join(ROOT, "web-portal", "components"),
+      join(ROOT, "web-portal", "app"),
+      join(ROOT, "shared", "web"),
+    ].filter((d) => existsSync(d))
+
+    /** Every page-container line in the app, as `file → the widths it sets`. */
+    const found = new Map<string, string[]>()
+    for (const f of sourceFiles(roots, { extensions: [".tsx"], relativeTo: ROOT, skipTests: true })) {
+      for (const line of stripComments(f.source).split("\n")) {
+        if (!/\bmx-auto\b/.test(line) || !/\bw-full\b/.test(line)) continue
+        const cap = /\bmax-w-(?:\[[^\]]*\]|[\w.]+)/.exec(line)
+        if (!cap) continue
+        const list = found.get(f.rel) ?? []
+        list.push(cap[0])
+        found.set(f.rel, list)
+      }
+    }
+
+    // i · every owner is present and sets ONLY the width it declares.
+    for (const [file, width] of Object.entries(PAGE_WIDTH_OWNER)) {
+      const widths = found.get(file)
+      expect(widths, `${file} owns its front door's page width and must set one`).toBeDefined()
+      expect([...new Set(widths)], `${file} may set only ${width}`).toEqual([width])
+    }
+
+    // ii · nothing else sets a page width unless it is pinned, with its reason.
+    const offenders = [...found.keys()].filter(
+      (f) => !(f in PAGE_WIDTH_OWNER) && !(f in SCREEN_WIDTH_EXEMPT)
+    )
+    expect(
+      offenders,
+      `these set their own page width (R29). Delete the cap, or pin it in SCREEN_WIDTH_EXEMPT with a reason:\n  ${offenders.join("\n  ")}`
+    ).toEqual([])
+
+    // iii · the ratchet. A pin that no longer describes anything is a record of
+    // what the app used to do, and it goes red so the fix takes its pin with it.
+    const stale = Object.keys(SCREEN_WIDTH_EXEMPT).filter((f) => !found.has(f))
+    expect(
+      stale,
+      `these SCREEN_WIDTH_EXEMPT entries match nothing — the file no longer sets a page width, so delete the entry:\n  ${stale.join("\n  ")}`
+    ).toEqual([])
+  })
+
   it("every enforced law has a known check", () => {
     const known = new Set([
       "publish-seam", // the 3 per-worker publish-seam.test.ts suites
@@ -1363,6 +1427,7 @@ describe("RULES — the laws of the base", () => {
       "vector-fence", // R26: workers/content/test/vector-fence.test.ts
       "described-contracts", // R27: workers/mcp/test/described-contracts.test.ts, beside R19/R22 on the same door census
       "catalogued-strings", // R28: web/test/catalogued-strings.test.ts — re-runs the real extractor over both front doors
+      "one-page-width", // R29: the page-container scan above, over both front doors
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

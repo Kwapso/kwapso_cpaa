@@ -224,7 +224,49 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "catalogued-strings",
     status: "enforced",
   },
+  {
+    id: "R29",
+    dimension: "ui",
+    law: "THE PAGE HAS ONE WIDTH, AND A SCREEN DOES NOT GET ITS OWN. Each front door owns exactly one page container — `web/components/deep-link-screen.tsx` at `max-w-[1600px]`, `web-portal/components/portal-shell.tsx` at `max-w-3xl` — and no other component may set a page-level width. A page container is identified positionally, the way R20 identifies a checked field: one line carrying `mx-auto`, `w-full` and a `max-w-*` together, which is the exact signature of a centred content column and of nothing else. Anything else that needs a cap (a dialog, a sheet, a door card, a chat bubble, a line of prose) is not centred-and-full-width and is not caught. Exceptions are DATA in `SCREEN_WIDTH_EXEMPT`, each with its reason, and every one is rot-checked: an entry whose file no longer sets a width turns the build red, so the list can only shrink.",
+    why: "The owner named this one himself, and named it as an inconsistency rather than a bug: work logs, tasks and meetings use the full width, and he could not see why other pages did not. The answer was that those three render through the one shell and six screens cap themselves narrower. One of the six is the shell's OWN loading skeleton (`app-shell.tsx:489`, `max-w-2xl`), so every cold load of the agency app visibly snapped sideways as 672px of skeleton became 1120px of content. That is the shape of failure this law exists for: not a rule anybody disagreed with — UI-RULEBOOK L1 already said 'one container, one cap', and round one of the feedback implemented it in `deep-link-screen.tsx` — but a rule that was implemented in the one place somebody happened to be looking and stayed unimplemented in six others, silently, under a green build. A width is invisible to every other check in this repo: TypeScript sees a string, the lint sees a string, and no test reads layout. It ships a screen that works, on which two thirds of a wide display is empty.",
+    checkId: "one-page-width",
+    status: "enforced",
+  },
 ]
+
+/** R29 — the ONE page container per front door, and the width it is allowed to set.
+ * Everything else that matches the page-container signature is either in
+ * SCREEN_WIDTH_EXEMPT below or is a breach. */
+export const PAGE_WIDTH_OWNER: Record<string, string> = {
+  "web/components/deep-link-screen.tsx": "max-w-[1600px]",
+  // The portal's cap is NARROWER on purpose and it is a locked decision
+  // (UI-RULEBOOK L5, "Do not do" #15): a client reads a handful of screens on a
+  // phone, and 768px with larger type is the right measure for that. Three lines
+  // in the one file (the header, the main region and the bottom nav) so all three
+  // align to the same edge.
+  "web-portal/components/portal-shell.tsx": "max-w-3xl",
+}
+
+/** R29 — reviewed exceptions. A file listed here matches the page-container
+ * signature and is allowed to, WITH ITS REASON. Rot-checked in both directions:
+ * an entry whose file no longer sets a width fails the build, so a screen that
+ * gets fixed cannot leave its pin behind.
+ *
+ * The six `max-w-2xl` / `max-w-3xl` screens are pinned as a RATCHET, not as an
+ * approval — they are the work list in `.session-notes/ui-rearrangement-plan.md`
+ * (item W1), and every one of these lines is deleted by the commit that widens
+ * its screen. What the pin buys today is that a SEVENTH cannot be added. */
+export const SCREEN_WIDTH_EXEMPT: Record<string, string> = {
+  "web/components/install-prompt.tsx":
+    "not a page. It is the install nudge's Sheet content, which is centred and full-width INSIDE the sheet, and a sheet is an overlay with its own measure.",
+  "web/components/app-shell.tsx":
+    "PENDING (plan W1). The shell's own loading skeleton at max-w-2xl, against content that arrives at 1120px — the width jump on every cold load. Delete this line with the fix.",
+  "web/components/screens/home-screen.tsx": "PENDING (plan W1). max-w-2xl, 60% span.",
+  "web/components/screens/settings-screen.tsx": "PENDING (plan W1). max-w-2xl, 60% span.",
+  "web/components/screens/profile-screen.tsx": "PENDING (plan W1). max-w-2xl, 60% span.",
+  "web/components/screens/invitations-screen.tsx": "PENDING (plan W1). max-w-2xl, 60% span.",
+  "web/components/screens/kwapso-screen.tsx": "PENDING (plan W1). max-w-3xl, 69% span.",
+}
 
 /** R13 — reviewed exemptions: modules that are deliberately NOT import targets,
  * each with its reason. Every other module must have a TargetDef in the catalog. */
