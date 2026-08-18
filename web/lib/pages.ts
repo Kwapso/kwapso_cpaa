@@ -49,13 +49,35 @@ export const NAV: NavItem[] = [
   { slug: "settings", path: "/settings", title: "Settings", icon: "settings", group: "occasional" },
 ]
 
-/** The mobile bottom-bar set: only destinations the user can reach, capped at 5
- * (extras would fold into a "More" entry), in the SAME order as the desktop rail
- * (the owner's locked order; no centre-pinning).
+/** How many slots the phone's bottom bar has. Five is what a thumb can hit
+ * reliably across the width of a small phone; a sixth makes every one of them
+ * too narrow to aim at. */
+export const BOTTOM_NAV_SLOTS = 5
+
+/** The mobile bottom-bar set: only destinations the user can reach, in the SAME
+ * order as the desktop rail (the owner's locked order; no centre-pinning).
  * Generic over the link shape so the shell can pass its composed Home + team
- * sidebar pages + Settings list, not just the bare NAV. */
+ * sidebar pages + Settings list, not just the bare NAV.
+ *
+ * WHEN THERE ARE MORE SECTIONS THAN SLOTS, THE LAST SLOT STOPS BEING A SECTION
+ * and becomes the door to the rest — so the bar shows four sections and a More.
+ * The alternative, showing five and dropping the remainder, is what this
+ * function used to do: `items.slice(0, 5)`, with a comment saying extras "would
+ * fold into a More entry". Nothing folded them anywhere. The desktop rail is
+ * `hidden md:flex`, so on a phone or a tablet those sections had no way in at
+ * all — five of the ten were unreachable, including Tasks, Work logs, Meetings,
+ * Apps and Sprints. A cap is only a cap if something catches what falls off,
+ * and a comment describing the catch is not the catch. */
 export function bottomNavItems<T extends { slug: string }>(items: T[]): T[] {
-  return items.slice(0, 5)
+  return items.length <= BOTTOM_NAV_SLOTS ? items : items.slice(0, BOTTOM_NAV_SLOTS - 1)
+}
+
+/** The sections the bar could not fit — empty when they all fit. Together with
+ * `bottomNavItems` this is a PARTITION of the list: every reachable section is
+ * in exactly one of the two, which is the property `web/test/nav.test.ts` locks
+ * so nothing can go missing again. */
+export function overflowNavItems<T extends { slug: string }>(items: T[]): T[] {
+  return items.length <= BOTTOM_NAV_SLOTS ? [] : items.slice(BOTTOM_NAV_SLOTS - 1)
 }
 
 /** The sections of a team's area (the switcher across /t/<teamId>/…). `module` is

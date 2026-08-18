@@ -31,6 +31,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Timer,
+  MoreHorizontal,
 } from "lucide-react"
 
 import type { ActiveTeam } from "@/lib/use-active-team"
@@ -42,7 +43,7 @@ import { useRealtime, useUserRealtime } from "@shared/web/realtime"
 // deaf-exemptions live beside them in the rules registry.
 import { SIMPLE_INVALIDATIONS, TEAM_RESOURCES, totalKey } from "@/lib/live-resources"
 import { invalidate, invalidatePrefix, patchRow, primeCache, readCache, reconcile } from "@shared/web/store"
-import { NAV, TEAM_SECTIONS, bottomNavItems, isNavActive, type Crumb, type NavGroup } from "@/lib/pages"
+import { NAV, TEAM_SECTIONS, bottomNavItems, overflowNavItems, isNavActive, type Crumb, type NavGroup } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useTeamPrewarm } from "@/lib/use-team-prewarm"
 import { useGoogleCatchUp } from "@/lib/use-google-catch-up"
@@ -52,6 +53,12 @@ import { TEAM_CREATION_CLOSED } from "@shared/product"
 import { ProfileMenu } from "@/components/profile-menu"
 import { TeamSwitcher } from "@/components/team-switcher"
 import { TimerBar } from "@/components/timer-bar"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@kwapso/ui/registry/primitives/sheet/sheet"
 import { LanguageProvider } from "@shared/web/language"
 import { applyScale } from "@shared/web/scale-section"
 
@@ -129,6 +136,10 @@ export function AppShell({
 
   // Desktop sidebar collapse (icon rail), remembered across sessions.
   const [collapsed, setCollapsed] = React.useState(false)
+  // The phone's "everything else" sheet. Closed on every navigation, because a
+  // menu that stays open over the screen it just opened is a menu you have to
+  // dismiss twice.
+  const [moreOpen, setMoreOpen] = React.useState(false)
   React.useEffect(() => {
     setCollapsed(localStorage.getItem("ss-sidebar-collapsed") === "1")
   }, [])
@@ -180,7 +191,10 @@ export function AppShell({
     .map((g) => inOrder.filter((i) => i.group === g))
     .filter((g) => g.length > 0)
   const navLinks = navGroups.flat()
+  // THE PHONE'S BAR AND THE DOOR TO THE REST. Together these two are a
+  // partition of navLinks: nothing reachable can fall between them (pages.ts).
   const bottomNav = bottomNavItems(navLinks)
+  const overflowNav = overflowNavItems(navLinks)
 
   /** One rail row. Drawn identically in both groups, so the divider is the only
    * thing that separates them. */
@@ -425,7 +439,10 @@ export function AppShell({
           {children}
         </main>
 
-        {/* Mobile bottom tabs — capped at 5, Home centered, gated items hidden */}
+        {/* Mobile bottom tabs — five slots, gated items hidden, and when there
+         * are more sections than slots the fifth becomes More. The rail beside
+         * this is `hidden md:flex`, so this bar is the ONLY way through the app
+         * on a phone or a tablet: anything it cannot reach cannot be reached. */}
         <nav className="glass fixed inset-x-0 bottom-0 z-20 flex items-center justify-around border-t px-2 py-1.5 md:hidden">
           {bottomNav.map((item) => {
             const Icon = item.Icon
@@ -445,7 +462,73 @@ export function AppShell({
               </button>
             )
           })}
+
+          {overflowNav.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setMoreOpen(true)}
+              aria-haspopup="dialog"
+              aria-expanded={moreOpen}
+              /* Active when the section you are ON lives in here — otherwise
+                 the bar shows nothing highlighted and the app looks lost. */
+              aria-current={
+                overflowNav.some((i) => isNavActive(i.path, here)) ? "page" : undefined
+              }
+              className={`flex flex-1 flex-col items-center gap-0.5 rounded-lg py-1.5 text-[11px] font-medium transition-colors ${
+                overflowNav.some((i) => isNavActive(i.path, here))
+                  ? "text-foreground"
+                  : "text-muted-foreground"
+              }`}
+            >
+              <MoreHorizontal className="size-5" />
+              {t("More")}
+            </button>
+          )}
         </nav>
+
+        {/* EVERYTHING ELSE, on a phone. It lists EVERY section, not only the
+         * ones the bar could not fit, and in the desktop rail's own groups — so
+         * "where is Work logs?" has one answer on both, and a person who learns
+         * the app on a laptop is not relearning it on a phone. Redundant by
+         * design: four entries appear twice, which costs a little space and buys
+         * predictability. */}
+        <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+          <SheetContent side="bottom" className="max-h-[85svh] overflow-y-auto md:hidden">
+            <SheetHeader>
+              <SheetTitle>{t("All sections")}</SheetTitle>
+            </SheetHeader>
+            <nav className="mt-4 flex flex-col gap-1 pb-2">
+              {navGroups.map((group, i) => (
+                <React.Fragment key={group[0].slug}>
+                  {i > 0 && <div className="bg-border my-2 h-px w-full" role="separator" />}
+                  {group.map((item) => {
+                    const Icon = item.Icon
+                    const activeNav = isNavActive(item.path, here)
+                    return (
+                      <button
+                        key={item.slug}
+                        type="button"
+                        onClick={() => {
+                          setMoreOpen(false)
+                          navigate(item.path)
+                        }}
+                        aria-current={activeNav ? "page" : undefined}
+                        className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                          activeNav
+                            ? "bg-muted text-foreground"
+                            : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                        }`}
+                      >
+                        <Icon className="size-4 shrink-0" />
+                        {item.title}
+                      </button>
+                    )
+                  })}
+                </React.Fragment>
+              ))}
+            </nav>
+          </SheetContent>
+        </Sheet>
       </div>
 
       {/* Not rendered while creation is closed — a dialog that can only ever be
