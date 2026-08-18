@@ -1028,14 +1028,23 @@ export async function syncCalendar(
   ).values()]
 
   // WHICH OF THESE WE ALREADY HAVE. One read for the whole window rather than a
-  // lookup per event: the window is bounded by the calendar read that produced
-  // it (GOOGLE_PAGE_SIZE), so the `IN` list is too.
+  // lookup per event.
+  //
+  // THE ARITHMETIC MATTERS AND IS SAID OUT LOUD, because the cap below is not a
+  // decoration: three calendar reads feed `inWindow` (past, future, backfill
+  // slice) and each is bounded by CALENDAR_MAX_PAGES × GOOGLE_PAGE_SIZE = 250,
+  // so the `IN` list is at most 750 ids and the answer at most 750 rows —
+  // comfortably under LIST_HARD_CAP (1,000). That headroom is what makes the
+  // LIMIT a safety net rather than a silent truncation: a `known` map missing a
+  // row would make the loop below try to INSERT a meeting that already exists
+  // and hit the unique index. A FOURTH window feeding `inWindow` would cross
+  // 1,000 and would need this read paged instead.
   const known = new Map<string, SyncedRow>()
   if (inWindow.length) {
     const rows = await d1Query<SyncedRow>(
       cfg,
       guard.databaseId,
-      // R14: bounded by the calendar read that produced the ids (GOOGLE_PAGE_SIZE).
+      // R14: bounded by the three calendar reads that produced the ids — see above.
       `SELECT id, google_event_id, google_updated_at, google_synced_at, from_calendar, deactivated_at
          FROM meetings
         WHERE google_event_id IN (${inWindow.map((e) => sqlString(e.id)).join(", ")})
