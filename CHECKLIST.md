@@ -258,3 +258,94 @@ longer builds the purged ones.
 | 15.6 | A settings page in the client portal | You confirmed none is needed. The picker sits in the header |
 | 15.7 | A new staging backdoor | One already exists, refuses production in code, and carries its own dedicated secret. Building a second would add attack surface for nothing |
 | 15.8 | "What it costs us a month" on an app | Aurora deferred it to version two herself: "it's a much more complex topic, not a single number" |
+
+---
+
+# Round two: 18 August 2026
+
+Everything from your testing pass on staging, in your own words. Round one is above and
+stays there as the record. **BUILDING** means a lane is on it in this session right now.
+
+## 16 · What you tested and passed
+
+| # | The thing | Status |
+|---|---|---|
+| 16.1 | Paste a ticket link into a new tab, it opens the ticket | **DONE**, confirmed by you |
+| 16.2 | Click a status chip, nothing happens, it is a label | **DONE**, confirmed by you |
+| 16.3 | Tasks, six tabs, progress bar on every one | **DONE**, confirmed by you |
+| 16.4 | Any record on a phone, buttons below the title, tabs stay put | **DONE**, confirmed by you |
+| 16.5 | The sidebar: Marketing, Learning, Delivery method and Process maps gone, Time is Work logs, Kwapso is new | **DONE**, confirmed by you |
+| 16.6 | Seventeen of your own repeating meetings, pulled from your real calendar | **DONE**, confirmed by you |
+| 16.7 | Anthropic credit added | **DONE**, by you |
+| 16.8 | Gmail reconnected with the labelling permission | **DONE**, by you, screenshot confirms all four services connected as alaap@kwapso.com |
+
+## 17 · Inputs and the people in them
+
+| # | The thing | Status |
+|---|---|---|
+| 17.1 | Every long-text input on a primary screen becomes a rich text notes component, and renders as rich text too | **BUILDING**, the library already ships it and it is used in exactly one place today |
+| 17.2 | Clients stop appearing in internal people pickers on stories, tickets and tasks | **BUILDING** |
+| 17.3 | Clients appear in exactly two places: marking to-dos, and raising a ticket on their behalf | **BUILDING** |
+| 17.4 | The same name appears twice in "Who's doing it" | **BUILDING**, visible in your screenshot |
+
+## 18 · Meetings and the calendar
+
+| # | The thing | Status |
+|---|---|---|
+| 18.1 | A link that opens the meeting inside my calendar | **BUILDING** |
+| 18.2 | Location, stakeholders and every other piece of calendar data and metadata, organised | **BUILDING** |
+| 18.3 | The call transcript is already there on older meetings | **BUILDING** |
+| 18.4 | The knowledge base ingests transcripts from calendar meetings, from Google Docs, and from emails announcing a Doc was made for a meeting | **BUILDING** |
+| 18.5 | Past events re-sync, because a transcript lands minutes to an hour after the room empties | **BUILDING** |
+| 18.6 | Every record stays in step with its calendar entry, past events included | **BUILDING** |
+
+## 19 · Google, deeper
+
+| # | The thing | Status |
+|---|---|---|
+| 19.1 | Select several folders, several spaces and several files in one go | **BUILDING** |
+| 19.2 | Share a Drive FILE, not only a folder | **BUILDING** |
+| 19.3 | Chat spaces show their names, not `spaces/lJXiZKAAAAE` | **BUILDING**, visible in your screenshot |
+| 19.4 | Logos, icons, thumbnails and previews pulled in wherever Google data appears: search, knowledge base, meetings | **BUILDING** |
+| 19.5 | The sync button on every screen showing Google data, not only Settings and Meetings | **BUILDING** |
+| 19.6 | Sync often enough to feel instant | **PART DONE**, app-open catch-up already exists and was proved live (14.12). Per-screen freshness is **BUILDING** |
+| 19.7 | The Chat app's Configuration tab in Google Cloud | **BLOCKED ON YOU**, Google refuses every post until name, avatar and description are filled in |
+
+## 20 · Language
+
+| # | The thing | Status |
+|---|---|---|
+| 20.1 | Every system string translated by us, at build time, in all 29 languages | **BUILDING**, unblocked by your credit |
+| 20.2 | What a person types is translated only when somebody asks for it, on the cheapest Haiku | **BUILDING** |
+| 20.3 | One translation call routed everywhere it is needed, rather than one per field | **BUILDING** |
+| 20.4 | The switcher becomes a dropdown, not 25 stretched pills | **BUILDING** |
+
+## 21 · How it looks, round two
+
+| # | The thing | Status |
+|---|---|---|
+| 21.1 | A cognitive-load metric of my own, measured on every page, screen, tab and detail screen | **BUILDING** |
+| 21.2 | One central rule set: colours, spacing, padding, separators, when a dropdown, when a shape | **BUILDING**, into the existing UI rule book rather than a third document |
+| 21.3 | The full horizontal span applied everywhere on desktop, the way work logs, tasks and meetings already do it | **BUILDING** |
+| 21.4 | The global rearrangement, executed against that rule set | **TO DO**, deliberately after the rules exist. Rearranging first is how you get 40 screens that each look reasonable and none of which match |
+| 21.5 | Charts and big numbers on the home page, main pages and detail screens, on real data, never taking the whole screen | **BUILDING** |
+| 21.6 | Glyphs and icons on main screens, page icons and collections, not only detail screens | **BUILDING**, partly blocked by UI-GAPS #16 |
+| 21.7 | Dark mode reads better than light because the contrast between elements is clearer | **NOTED**, and it becomes the contrast rule in 21.2 rather than a preference |
+
+## 22 · Answered rather than built
+
+| # | The question | The answer |
+|---|---|---|
+| 22.1 | What actually was the deep link issue, and is it the mechanism Glide used? | Answered in full. It was the gateway's own list of which addresses it handles, not permissions and not the row id. Yes, the shape is the same as Glide's: the URL names the record, the page resolves it in the browser, and the server decides whether you may see it |
+| 22.2 | Is sync-on-open in place? | Yes, and proved live. Per-screen freshness is not, and is being built |
+| 22.3 | Why is Drive folder-wise only? | It was a scoping decision, not a limitation. File-level sharing is being added |
+| 22.4 | Why did the Value tab show hours but no money? | The money half needs a role on the process and a rate on that role. The hours half needs neither. Being diagnosed and made speakable |
+
+## 23 · Still blocked on you
+
+| # | The thing | What is needed |
+|---|---|---|
+| 23.1 | The Chat app's Configuration tab | Name, avatar, description in Google Cloud. Google 404s every post until then, and did before today |
+| 23.2 | The stray "co-op: check the account" text | The screenshot. The string is in no source file anywhere |
+| 23.3 | Production | Go or wait. Staging carries everything; production has deliberately not been touched |
+| 23.4 | The deliverables module (8.7) | It is a module, not a tab. Say whether to scope it now or park it |
