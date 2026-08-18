@@ -159,10 +159,11 @@ export function ContactDetailScreen({
 
   const actions: PanelActions = { busy, ask: setConfirm, act: run }
 
+  // No MOVE half: the form no longer offers a parent picker, on either kind of
+  // account (18 Aug 2026 — account-form-dialog's header). A contact's company is
+  // written when she is created on that company's Contacts tab, and read back on
+  // the Overview below.
   async function save(values: AccountFormValues) {
-    const nextParent = values.parentAccountId || null
-    if (nextParent !== account.parentAccountId)
-      await tenancy.setAccountParent(accountId, nextParent)
     // An emptied box is NULL, not a missing key: the door treats a field it never
     // heard about as "leave it alone", so clearing one is something this form has
     // to say out loud.
@@ -222,9 +223,6 @@ export function ContactDetailScreen({
     // The audit rows moved to the record footer (D7 / CHECKLIST 11.3).
   ]
 
-  const parentOptions = (accountsQ.data ?? [])
-    .filter((a) => a.id !== accountId && a.active)
-    .map((a) => ({ id: a.id, name: a.name }))
   const statusOptions = [
     ...new Set((accountsQ.data ?? []).map((a) => a.status).filter((s): s is string => !!s)),
   ]
@@ -457,7 +455,6 @@ export function ContactDetailScreen({
         initial={{
           accountType: "individual",
           name: account.name,
-          parentAccountId: account.parentAccountId ?? "",
           email: account.email ?? "",
           phone: account.phone ?? "",
           street: account.street ?? "",
@@ -471,7 +468,6 @@ export function ContactDetailScreen({
           locale: account.locale ?? "",
           status: account.status ?? "",
         }}
-        parentOptions={parentOptions}
         statusOptions={statusOptions}
         onSubmit={save}
       />

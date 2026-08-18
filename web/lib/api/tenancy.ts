@@ -288,9 +288,10 @@ export const tenancy = {
    * previous response for the next one; `total` is the exact server count of what
    * this caller may see. `parentId` narrows to one account's children.
    *
-   * `entityTotal` / `individualTotal` are the All / Companies / People strip's two
-   * other badges: the COLLECTION's counts rather than this call's, so a badge on a
-   * tab nobody has pressed does not move while somebody types in the search box. */
+   * `entityTotal` / `individualTotal` are the Companies / Contacts / All strip's
+   * two other badges: the COLLECTION's counts rather than this call's, so a badge
+   * on a tab nobody has pressed does not move while somebody types in the search
+   * box. */
   accounts: (
     /** The door's own question, spread straight into the query string
      * (`listQuery`) so a filter cannot be lost between the find bar and the

@@ -343,6 +343,23 @@ describe("shapeAccountsList", () => {
     expect(rows?.[2].detail).toContain("under another account")
   })
 
+  it("drops the parent from the line when a heading already names it", () => {
+    // The Contacts tab groups by company (contacts-by-company.tsx), so under the
+    // "Bergman S.A." heading every row saying "under Bergman S.A." would spend a
+    // third of a three-fact line on the fact the reader is looking AT.
+    const rows = shapeAccountsList(
+      [
+        account({ id: "a1", name: "Bergman S.A." }),
+        account({ id: "a2", name: "Marta Bergman", accountType: "individual", parentAccountId: "a1" }),
+      ],
+      false
+    ).rows
+    expect(rows?.[1].detail).not.toContain("under")
+    // …and the rest of the line is untouched, so this is a subtraction and not a
+    // second shaper.
+    expect(rows?.[1].detail).toContain("Person")
+  })
+
   it("keeps an archived account visible, and flags it (archive-never-delete)", () => {
     const rows = shapeAccountsList([account({ id: "a1", name: "Old Co", active: false })]).rows
     // The row SAYS so in its name — which is what a person reads. "Only the

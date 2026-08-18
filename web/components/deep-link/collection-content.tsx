@@ -35,6 +35,7 @@ import {
 } from "@/components/internal-screens"
 import { NotFound, LoadError, SectionWithCreate, CollectionCard } from "@/components/deep-link/screen-bits"
 import { CollectionHeading } from "@/components/collection-heading"
+import { ContactsByCompany } from "@/components/contacts-by-company"
 import { KnowledgeAsk } from "@/components/knowledge-ask"
 import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
@@ -308,32 +309,49 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     if (accountsQ.error) return <LoadError what="accounts" />
     if (accountsQ.data === undefined) return <Skeleton variant="list" lines={4} />
     const loaded = accountsQ.data
-    // ALL / COMPANIES / PEOPLE — the strip Aurora asked for ("the Accounts tab is
-    // a bit confusing, she would like to see things by company, customer or
+    // COMPANIES / CONTACTS / ALL — the strip Aurora asked for ("the Accounts tab
+    // is a bit confusing, she would like to see things by company, customer or
     // contact"). It replaces the Type select rather than sitting beside it: two
     // controls for one field is the clutter she was describing.
+    //
+    // COMPANIES LEADS, AND IS WHERE THE SCREEN OPENS (the owner, 18 Aug 2026:
+    // "the tab order should be Companies, then Contacts, then All"). His model of
+    // the section is "an account is a company", so the bare URL is the companies
+    // and All is the one that now carries `?tab=all` — a deliberate swap, because
+    // the tab a screen opens on should be the one somebody meant to arrive at.
+    //
+    // THE WORD IS CONTACTS, NOT PEOPLE. The glossary already owns it
+    // (shared/glossary.ts — "a person linked to an account"), so "People" was a
+    // synonym for a term we had, which is the one thing R6 forbids outright.
+    // `people` was also the URL value; it is `contacts` now, and this file is the
+    // only place either was ever read.
     //
     // It is a SERVER narrowing, driven through the find's `fixed` question, so
     // the paging, the search box, the other filters and the CSV export all narrow
     // together — a tab that sieved the loaded page would show "the companies
     // among the newest fifty" under a badge counting all of them.
     //
-    // A PERSON WHO MAY NOT LIST CONTACTS IS SHOWN NO PEOPLE TAB. The door already
-    // narrows them to the companies through one `accountsWhere` (and answers
-    // `individualTotal: 0`); a tab offering a pile they cannot have would be the
-    // UI disagreeing with the fence out loud.
-    const seesPeople = can("contacts", "read")
+    // A PERSON WHO MAY NOT LIST CONTACTS IS SHOWN NO CONTACTS TAB, and lands on
+    // the companies, which is now the same place everybody else lands. The door
+    // already narrows them to the companies through one `accountsWhere` (and
+    // answers `individualTotal: 0`); a tab offering a pile they cannot have would
+    // be the UI disagreeing with the fence out loud.
+    const seesContacts = can("contacts", "read")
     const accountTab =
-      seesPeople && ctx.query.tab === "people"
-        ? "people"
-        : ctx.query.tab === "companies"
-          ? "companies"
-          : "all"
+      ctx.query.tab === "all"
+        ? "all"
+        : seesContacts && ctx.query.tab === "contacts"
+          ? "contacts"
+          : "companies"
     // R16: every badge is the door's exact COUNT(*), through the ONE seam — never
     // the loaded page's length, which on a paged list is just "50" forever.
     const accountsBadge = formatCount(totals.accounts)
+    // EACH BADGE TRAVELS WITH ITS OWN TAB. The three numbers are three different
+    // server counts (`total`, `entityTotal`, `individualTotal` — tenancy's
+    // accounts door), so reordering the strip is reordering these objects and
+    // nothing else: there is no positional pairing anywhere for the reorder to
+    // knock out of step.
     const accountTabs = [
-      { value: "all", label: t("All"), icon: "users", badge: accountsBadge, badgeVariant: "" as const },
       {
         value: "companies",
         label: t("Companies"),
@@ -341,17 +359,18 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
         badge: formatCount(totals.accountsEntity),
         badgeVariant: "" as const,
       },
-      ...(seesPeople
+      ...(seesContacts
         ? [
             {
-              value: "people",
-              label: t("People"),
+              value: "contacts",
+              label: t("Contacts"),
               icon: "user",
               badge: formatCount(totals.accountsIndividual),
               badgeVariant: "" as const,
             },
           ]
         : []),
+      { value: "all", label: t("All"), icon: "users", badge: accountsBadge, badgeVariant: "" as const },
     ]
     // ARBITRATION (R16 iii): the badged strip WINS and the heading stands down,
     // through the context rather than by saying the same number twice.
@@ -372,7 +391,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
           // fifty companies under a badge counting all of them.
           sorts={translatedSorts("accounts", t)}
           defaultSort={COLLECTION_SORTS.accounts.defaultSort}
-          fixed={accountTab === "all" ? undefined : { type: accountTab === "people" ? "individual" : "entity" }}
+          fixed={accountTab === "all" ? undefined : { type: accountTab === "contacts" ? "individual" : "entity" }}
           // THE DOOR'S OWN FILTERS, named once in lib/collection-filters.ts
           // beside every other paged collection's. `status` is the only one whose
           // options are ROWS: the word is the team's own ("past_client"), and no
@@ -424,23 +443,46 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
                   onCreate={() => go(sectionPath, { panel: "add", module: "accounts" })}
                   // The strip sits ABOVE the boxed list — it scopes which accounts
                   // the collection card shows, so it is not part of that unit. It
-                  // is URL-driven (?tab=) so Back works and a link to "the people"
-                  // is a link somebody can send.
+                  // is URL-driven (?tab=) so Back works and a link to "the
+                  // contacts" is a link somebody can send.
                   aboveCard={
                     <TabsView
                       config={{ ...defaultTabsConfig, variant: "line", tabs: accountTabs }}
                       value={accountTab}
-                      onValueChange={(v) => go(sectionPath, v === "all" ? {} : { tab: v })}
+                      // Companies is the bare URL now, so `?tab=` names only the
+                      // two you have to ask for.
+                      onValueChange={(v) => go(sectionPath, v === "companies" ? {} : { tab: v })}
                     />
                   }
                 >
-                  <ScreenRenderer
-                    recipe={accountsRecipe}
-                    data={data}
-                    rights={rights}
-                    onAction={onAction}
-                    onIntent={onIntent}
-                  />
+                  {/* THE CONTACTS TAB IS GROUPED BY COMPANY, and it is the one
+                      arrangement the recipe engine cannot express, so it is a
+                      host-composed component (UI-GAPS #24). It renders the SAME
+                      recipe per group, so a contact row is the row the other two
+                      tabs draw. The other two tabs are the plain collection. */}
+                  {accountTab === "contacts" ? (
+                    <ContactsByCompany
+                      rows={rows}
+                      // The names the team area is already holding — no second
+                      // read for a heading, the same map apps-screen.tsx names an
+                      // app's client from.
+                      companyNames={new Map((accountsQ.data ?? []).map((a) => [a.id, a.name]))}
+                      recipe={recipe}
+                      rights={rights}
+                      listKey={found.listKey ?? accountsKey(teamId as string)}
+                      emptyText={found.emptyText}
+                      onAction={onAction}
+                      onIntent={onIntent}
+                    />
+                  ) : (
+                    <ScreenRenderer
+                      recipe={accountsRecipe}
+                      data={data}
+                      rights={rights}
+                      onAction={onAction}
+                      onIntent={onIntent}
+                    />
+                  )}
                 </SectionWithCreate>
                 {/* R14: every company AND every person is a row here — the list
                     pages, and so do the matches when a find is on. */}

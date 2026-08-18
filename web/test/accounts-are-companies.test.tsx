@@ -9,7 +9,13 @@
 // thing that decides which of the two screens an account gets, so what changed is
 // who ANSWERS the question: the form used to, and now the code does.
 //
-// Four claims, and each one is here because it could rot on its own:
+// AND THE PARENT PICKER WENT WITH IT, same day, same sentence: "each new account
+// created will be its own thing. It will have no parent because it's literally a
+// brand new company." That one is not carried through the form at all, because
+// `updateAccount` never reads the field — a move is its own door — so there is
+// nothing for a silent form to zero.
+//
+// Five claims, and each one is here because it could rot on its own:
 //
 //   1. the form offers no way to choose  — a SOURCE claim, because a behaviour
 //      test passes whether or not the control is on screen: nobody drives a
@@ -22,6 +28,9 @@
 //      yesterday's default. This is CHECKLIST 3.13's failure, in this form.
 //   4. the new-contact form asks no type question at all, and hands back only
 //      what a person and their link are made of.
+//   5. the form offers no way to choose a PARENT, and does not carry one — the
+//      same source claim as 1, for the same reason: a control nobody can find is
+//      a control nobody drives, so a behaviour test would sit green beside it.
 //
 // The other half of claim 4 — that the caller writes "individual", links, AND
 // sets the parent, and stays honest when the second write fails — is
@@ -71,7 +80,6 @@ const submitForm = () => fireEvent.submit(document.querySelector("form") as HTML
 const PERSON: AccountFormValues = {
   accountType: "individual",
   name: "Marta Bergman",
-  parentAccountId: "acct-bergman",
   email: "marta@bergman.example",
   phone: "",
   street: "",
@@ -101,12 +109,65 @@ describe("the account form no longer asks what kind of account it is making", ()
     expect(text).toMatch(/accountType: "entity" \| "individual"/)
   })
 
+  it("has no Parent control in its source either, and no value to carry", () => {
+    const text = source("account-form-dialog.tsx")
+    // The picker, the label, the write, and the value itself. The fourth line is
+    // the one that separates this from the Type ruling: `accountType` is still on
+    // the form's shape because the door reads it on an update and a missing key
+    // would zero the column. `/accounts/update` never reads the parent — moving
+    // an account is `setAccountParent`, its own door — so carrying it would be
+    // carrying an answer to a question nothing asks.
+    expect(text).not.toMatch(/parentOptions/)
+    expect(text).not.toMatch(/label: "Parent account"/)
+    expect(text).not.toMatch(/set\(\{\s*parentAccountId/)
+    expect(text).not.toMatch(/parentAccountId/)
+  })
+
+  it("draws no Parent account field on either half of the form", () => {
+    for (const initial of [null, PERSON]) {
+      render(
+        <AccountFormDialog
+          open
+          onOpenChange={() => {}}
+          initial={initial}
+          statusOptions={[]}
+          onSubmit={async () => {}}
+        />
+      )
+      expect(screen.queryByText("Parent account")).toBeNull()
+      expect(screen.queryByText("Sits on its own")).toBeNull()
+      // …and the form is otherwise itself, so this is not passing on a blank render.
+      expect(screen.getByText("Name")).toBeTruthy()
+      cleanup()
+    }
+  })
+
+  it("sends nothing about a parent, on a create or on an edit", async () => {
+    for (const initial of [null, PERSON]) {
+      const onSubmit = vi.fn(async (_v: AccountFormValues) => {})
+      render(
+        <AccountFormDialog
+          open
+          onOpenChange={() => {}}
+          initial={initial}
+          statusOptions={[]}
+          onSubmit={onSubmit}
+        />
+      )
+      if (!initial)
+        fireEvent.change(screen.getByLabelText(/name/i), { target: { value: "Bergman S.A." } })
+      submitForm()
+      await waitFor(() => expect(onSubmit).toHaveBeenCalled())
+      expect(Object.keys(onSubmit.mock.calls[0][0])).not.toContain("parentAccountId")
+      cleanup()
+    }
+  })
+
   it("draws no Type field, and does draw the fields it kept", () => {
     render(
       <AccountFormDialog
         open
         onOpenChange={() => {}}
-        parentOptions={[]}
         statusOptions={[]}
         onSubmit={async () => {}}
       />
@@ -125,7 +186,6 @@ describe("the account form no longer asks what kind of account it is making", ()
       <AccountFormDialog
         open
         onOpenChange={() => {}}
-        parentOptions={[]}
         statusOptions={[]}
         onSubmit={onSubmit}
       />
@@ -142,17 +202,13 @@ describe("the account form no longer asks what kind of account it is making", ()
     // on open, so without pinning, that stale "individual" would decide a record
     // through a question no longer on the screen.
     const draftKey = "account:new:team-1"
-    sessionStorage.setItem(
-      `kwapso:draft:${draftKey}`,
-      JSON.stringify({ ...PERSON, parentAccountId: "" })
-    )
+    sessionStorage.setItem(`kwapso:draft:${draftKey}`, JSON.stringify(PERSON))
     const onSubmit = vi.fn(async (_v: AccountFormValues) => {})
     render(
       <AccountFormDialog
         open
         onOpenChange={() => {}}
         draftKey={draftKey}
-        parentOptions={[]}
         statusOptions={[]}
         onSubmit={onSubmit}
       />
@@ -178,7 +234,6 @@ describe("the account form no longer asks what kind of account it is making", ()
         open
         onOpenChange={() => {}}
         initial={PERSON}
-        parentOptions={[]}
         statusOptions={[]}
         onSubmit={onSubmit}
       />

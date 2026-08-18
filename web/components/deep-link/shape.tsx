@@ -265,7 +265,15 @@ export function accountStatus(raw: string | null): string {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : ""
 }
 
-export function shapeAccountsList(accounts: Account[]): ScreenData {
+export function shapeAccountsList(
+  accounts: Account[],
+  /** Say which account each row sits under. FALSE when the rows are already
+   * standing under a heading that names it — the Contacts tab groups by company
+   * (contacts-by-company.tsx), and "under Bergman S.A." on every row of the
+   * Bergman group is the summary line spending a third of itself on the one fact
+   * the reader is looking at. K1 counts facts, not characters. */
+  sayParent = true
+): ScreenData {
   // The hierarchy, readable in the list itself: name the parent when it is on
   // the page we loaded (for a normal agency, the whole tree is), and otherwise
   // still say the account is nested. Both lines are true — one is just more
@@ -274,9 +282,10 @@ export function shapeAccountsList(accounts: Account[]): ScreenData {
   const nameById = new Map(accounts.map((a) => [a.id, a.name]))
   return {
     rows: accounts.map((a) => {
-      const parent = a.parentAccountId
-        ? `under ${nameById.get(a.parentAccountId) ?? "another account"}`
-        : ""
+      const parent =
+        sayParent && a.parentAccountId
+          ? `under ${nameById.get(a.parentAccountId) ?? "another account"}`
+          : ""
       return {
         id: a.id,
         // Archived rows stay visible (archive-never-delete), flagged like retired

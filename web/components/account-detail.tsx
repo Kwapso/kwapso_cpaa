@@ -264,15 +264,13 @@ export function AccountDetailScreen({
    * exactly one confirm dialog on the record (at the bottom of this file). */
   const actions: PanelActions = { busy, ask: setConfirm, act: run }
 
-  // Saving the record: the MOVE goes first, because it is the one the server can
-  // refuse (an account cannot be put inside itself). Refused first = nothing
-  // changed at all, rather than a saved name beside a move that didn't happen.
+  // Saving the record. There is no MOVE half any more: the form stopped offering
+  // a parent picker (18 Aug 2026 — account-form-dialog's header), so the only
+  // write this makes is the record's own fields. Where the account SITS is still
+  // shown on the Overview below and still moved by `/api/tenancy/accounts/parent`
+  // — just never from here.
   async function save(values: AccountFormValues) {
-    const account = detailQ.data?.account
-    if (!account) return
-    const nextParent = values.parentAccountId || null
-    if (nextParent !== account.parentAccountId)
-      await tenancy.setAccountParent(accountId, nextParent)
+    if (!detailQ.data?.account) return
     // An emptied box is NULL, not a missing key. The door treats a field it never
     // heard about as "leave it alone" (so an assistant renaming an account can't
     // erase the rest of the record), which means clearing one is now something
@@ -427,16 +425,6 @@ export function AccountDetailScreen({
     // The audit rows moved to the record footer (D7 / CHECKLIST 11.3).
   ]
 
-  // The parent picker: the account it sits under TODAY (which may be archived, or
-  // sit past the first page) plus every other account we've loaded — so the form
-  // always shows the truth about where this record sits. A move that would close
-  // a loop is refused by the server, in a sentence the form shows as it is.
-  const parentOptions = [
-    ...(parent ? [{ id: parent.id, name: parent.name }] : []),
-    ...(accountsQ.data ?? [])
-      .filter((a) => a.id !== accountId && a.id !== parent?.id && a.active)
-      .map((a) => ({ id: a.id, name: a.name })),
-  ]
   const statusOptions = [
     ...new Set((accountsQ.data ?? []).map((a) => a.status).filter((s): s is string => !!s)),
   ]
@@ -792,7 +780,6 @@ export function AccountDetailScreen({
         initial={{
           accountType: account.accountType,
           name: account.name,
-          parentAccountId: account.parentAccountId ?? "",
           email: account.email ?? "",
           phone: account.phone ?? "",
           street: account.street ?? "",
@@ -806,7 +793,6 @@ export function AccountDetailScreen({
           locale: account.locale ?? "",
           status: account.status ?? "",
         }}
-        parentOptions={parentOptions}
         statusOptions={statusOptions}
         onSubmit={save}
       />

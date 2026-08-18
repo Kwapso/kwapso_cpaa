@@ -157,14 +157,18 @@ export const TARGETS: Record<string, TargetDef> = {
   // engine reads a parent target back once its step finishes), so a
   // self-referencing parent column would resolve to nothing on the very rows it
   // exists for — and silently file every account at the top level. Structure is
-  // set on the account itself (its detail screen refuses a move that would close
-  // a loop); this target's job is getting the records in.
+  // set through `/api/tenancy/accounts/parent`, which refuses a move that would
+  // close a loop; since 18 Aug 2026 no screen offers that move (the owner: "each
+  // new account created will be its own thing"), so the callers are the assistant
+  // and the MCP surface. A CONTACT gets hers a different way and always has: she
+  // is created on her company's Contacts tab, which writes the parent in code.
+  // This target's job is getting the records in.
   accounts: {
     tableKey: "accounts",
     module: "accounts",
     displayName: "Accounts",
     description:
-      "Create accounts in bulk, companies and people in one file. Say which each row is in the Type column (company or person). The account each one sits under is set afterwards on the account itself.",
+      "Create accounts in bulk, companies and people in one file. Say which each row is in the Type column (company or person). Every row lands at the top level: the account one sits under is set afterwards, by asking the assistant to move it.",
     columns: [
       { key: "name", label: "Name", required: true },
       { key: "accountType", label: "Type", required: true },
