@@ -30,6 +30,7 @@ import { KnowledgeFormDialog, type KnowledgeFormValues } from "@/components/know
 import { KNOWLEDGE_KIND } from "@/components/deep-link/shape"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
+import { TranslateAction, useHumanTranslation } from "@/components/translate-human-text"
 import { ApiFailure, content, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
 import { appsKey, knowledgeKey, listFetch } from "@/lib/live-resources"
@@ -90,6 +91,13 @@ export function KnowledgeDetailScreen({
   const [tab, setTab] = React.useState("source")
   const [editingOpen, setEditingOpen] = React.useState(false)
   const [busyActive, setBusyActive] = React.useState(false)
+
+  // READ THE MATERIAL IN YOUR OWN LANGUAGE, if you ask. A source is a document
+  // somebody wrote — a contract, a transcript, a page of house rules — so it is
+  // the same line every other record is on: never translated on a read, once on
+  // a press, and never written back. The words the assistant searches stay the
+  // words that were filed.
+  const translation = useHumanTranslation(teamId, [item?.body])
 
   function patchLists(next: KnowledgeSource | null) {
     if (!next) return
@@ -299,12 +307,21 @@ export function KnowledgeDetailScreen({
                 </p>
               ) : null}
               {item.body ? (
-                // The material itself. An article somebody wrote here is HTML, a
-                // mirrored document is plain words or markdown, and RichText picks
-                // the pipeline — so what is on screen is the same WORDS the
-                // assistant reads (it is handed plainText of this body), laid out
-                // the way they were written instead of as literal markup.
-                <RichText html={item.body} />
+                <>
+                  {/* Above the material, because the material is what it acts
+                      on — and it changes nothing that is filed: the assistant
+                      still searches the words that were written. */}
+                  <div className="flex justify-end">
+                    <TranslateAction translation={translation} />
+                  </div>
+                  {/* The material itself. An article somebody wrote here is
+                      HTML, a mirrored document is plain words or markdown, and
+                      RichText picks the pipeline. Rendering it FORMATTED does
+                      not desync it from the assistant: the assistant is handed
+                      plainText of this same body, so both read the same words
+                      and only the layout differs. */}
+                  <RichText html={translation.of(item.body)} />
+                </>
               ) : (
                 <p className="text-muted-foreground text-sm">No text yet.</p>
               )}

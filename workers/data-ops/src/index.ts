@@ -13,6 +13,7 @@
 //   POST /api/data-ops/agent/confirm    -> approve/decline a proposed action, resume
 //   GET  /api/data-ops/agent/threads    -> the caller's saved conversations
 //   GET  /api/data-ops/agent/thread     -> one conversation's messages (?id=)
+//   POST /api/data-ops/agent/translate  -> a screen's human-typed text, in the reader's language
 //   GET  /api/data-ops/health
 
 import { brand } from "@shared/brand"
@@ -38,6 +39,7 @@ import {
   getAgentUsage,
   getAgentUsageLog,
   postAgentChat,
+  postTranslateText,
   postTranslateTicket,
   postAgentConfirm,
   postGrantCredits,
@@ -89,6 +91,12 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // the way through — so there is nothing left here to broadcast, which is a
   // reviewed housekeeping line rather than a forgotten publish.
   "POST /api/data-ops/agent/translate-ticket": { handler: postTranslateTicket, kind: "housekeeping" },
+  // TRANSLATE A SCREEN'S HUMAN-TYPED TEXT FOR THE READER WHO ASKED. It writes
+  // NOTHING — not a row, not a column, not a cache — and hands the words back in
+  // the same response to the one person who pressed the button. There is nobody
+  // else to tell: the ticket still says exactly what its author typed, which is
+  // the point of the door.
+  "POST /api/data-ops/agent/translate": { handler: postTranslateText, kind: "housekeeping" },
   "POST /api/data-ops/agent/confirm": { handler: postAgentConfirm, kind: "housekeeping" },
 }
 

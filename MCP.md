@@ -178,7 +178,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **222 doors, 181 with a tool, 41 with a written reason**, the
+  red build. Today: **223 doors, 181 with a tool, 42 with a written reason**, the
   reasons being the team-pin doors (§3.2 below), the client-portal standing doors
   (§3.3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the THREE upload pairs, two media doors and the knowledge base, each a
@@ -186,7 +186,10 @@ Today it covers:
   base64 document will not fit in a tool argument, and the streamed half cannot be
   called because a JSON-RPC request has no body to stream into. Same conclusion,
   two different reasons, both written down, the seven
-  Google doors that are a person's own decision, the timesheet correction, one
+  Google doors that are a person's own decision, the timesheet correction, the two doors
+  that spend the team's AI allowance outside a chat turn (translating a ticket's
+  title, and translating a screen's human-typed text for the reader looking at
+  it), one
   invite's audit trail and the cross-module activity feed. Of the 181, **152 are on THIS surface** and 29 are the in-app assistant's
   alone, the twenty-six Google tools, the two confirm-panel bulk writes and the role
   permission matrix read, each reasoned in §3. Those three numbers are asserted

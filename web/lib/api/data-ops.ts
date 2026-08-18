@@ -48,6 +48,17 @@ export const dataOps = {
       "/api/data-ops/agent/translate-ticket",
       post({ id })
     ),
+
+  /** READ A SCREEN'S HUMAN-TYPED TEXT IN YOUR OWN LANGUAGE. One press, one
+   * request, one unit of the team's allowance — the whole screen's pieces go in
+   * one array and come back in the same order. Nothing is written: the record
+   * still says exactly what its author typed, and the reader can put the
+   * original back at any time. */
+  translateText: (texts: string[], language: string) =>
+    api<{ language: string; translations: string[] }>(
+      "/api/data-ops/agent/translate",
+      post({ texts, language })
+    ),
   importTargets: () => api<{ targets: ImportableTarget[] }>("/api/data-ops/import/targets"),
 
   /** A downloadable sample CSV href for a target — a good-file template. */
