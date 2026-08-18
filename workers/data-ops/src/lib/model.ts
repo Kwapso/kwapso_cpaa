@@ -5,6 +5,7 @@
 // act on Workers AI, no key needed). Workers AI is also the cheap inline path.
 
 import type { Env } from "../env"
+import { NO_TOKENS, type TokenUsage } from "@shared/workers/credits"
 
 /** The agent's output budget per model turn — ONE constant for BOTH providers
  * (Claude + Workers AI), and the number BULK_IDS_LIMIT is DERIVED from, so the cap
@@ -30,8 +31,10 @@ export type ToolSpec = { name: string; description: string; schema: Record<strin
 /** One tool call the model decided to make. */
 export type ToolCall = { id: string; name: string; input: Record<string, unknown> }
 
-/** The model's reply: free text and/or tool calls to run. */
-export type ModelReply = { text: string; toolCalls: ToolCall[] }
+/** The model's reply: free text and/or tool calls to run, plus what the turn cost
+ *  in tokens WHEN the provider reports it (Claude does; Workers AI does not, and
+ *  an absent number is left absent rather than reported as zero). */
+export type ModelReply = { text: string; toolCalls: ToolCall[]; usage?: TokenUsage }
 
 /* ------------------------- the tool-result fence -------------------------- */
 
@@ -106,6 +109,131 @@ export function toAnthropicMessages(messages: ChatMessage[]): { role: string; co
   return msgs
 }
 
+/* ---------------------------- the prompt cache ---------------------------- */
+
+// THE PREAMBLE IS THE BILL, and it is the same bytes every time.
+//
+// Every model turn re-sends the whole stable prefix: 163 tool definitions
+// (~92 KB serialised) and the system prompt with its generated capability brief
+// (~20 KB). A question that runs three tools is four turns, so that block goes
+// over the wire four times for one answer. It is about nine tenths of the input
+// tokens the assistant spends, and none of it changes between turns.
+//
+// Anthropic's prompt cache exists for exactly this. A `cache_control` marker
+// says "everything up to here is stable"; the first request writes it at a
+// premium and every later one reads it at a tenth of the input price.
+//
+// TWO BREAKPOINTS, AND THE SECOND ONE IS NOT REDUNDANT. The API renders a prompt
+// as tools → system → messages, and caching is a PREFIX match, so a marker on
+// the last system block already covers the tools before it. But the two live in
+// separate cache tiers: editing the system prompt invalidates the system entry
+// and leaves the TOOLS entry standing. So the tool block is marked in its own
+// right, and the ~26k tokens of catalogue survive both the per-language
+// paragraph `systemFor` appends and the next edit anybody makes to the prompt.
+//
+// NOTHING MOVES. This is the part that had to be true before any of it was worth
+// doing: the marker is an ADDED KEY, never a rearrangement. The tools array, the
+// system text and the messages are byte-for-byte what they were with caching
+// off — `prompt-cache.test.ts` builds both bodies and diffs them to prove it, so
+// the model reads exactly the same tokens either way and the answer cannot
+// change. (The system prompt becomes a one-element block array rather than a
+// bare string, because a marker has to sit ON a content block; the string inside
+// it is the same string.)
+export type CacheMode = "off" | "5m" | "1h"
+
+/** `AGENT_PROMPT_CACHE` → a mode. Default ON at the provider's own 5-minute TTL.
+ *  An unrecognised value reads as the default rather than as "off": a typo in a
+ *  var must not quietly quadruple the bill, and caching changes no behaviour, so
+ *  on is the safe way to be wrong. `1h` costs more to write and is worth it when
+ *  turns arrive further apart than five minutes (see the arithmetic in
+ *  `prompt-cache.test.ts`). */
+export function cacheMode(raw: string | undefined): CacheMode {
+  return raw === "off" || raw === "1h" ? raw : "5m"
+}
+
+/** The marker itself — ONE function, so the two breakpoints can never end up
+ *  carrying different TTLs (which would be two cache entries, not one prefix). */
+function cacheMark(mode: CacheMode): Record<string, unknown> {
+  if (mode === "off") return {}
+  return { cache_control: mode === "1h" ? { type: "ephemeral", ttl: "1h" } : { type: "ephemeral" } }
+}
+
+/** The Anthropic `usage` block, in our words. Missing/odd numbers read as 0 —
+ *  a usage figure is telemetry, and telemetry never throws. */
+type AnthropicUsage = {
+  input_tokens?: number
+  output_tokens?: number
+  cache_creation_input_tokens?: number
+  cache_read_input_tokens?: number
+}
+
+export function readUsage(raw: AnthropicUsage | undefined): TokenUsage {
+  const n = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0)
+  return {
+    input: n(raw?.input_tokens),
+    output: n(raw?.output_tokens),
+    cacheWrite: n(raw?.cache_creation_input_tokens),
+    cacheRead: n(raw?.cache_read_input_tokens),
+  }
+}
+
+/** THE ONE REQUEST BODY both complete() and stream() send — same messages, tools,
+ *  effort and cache rules; only the `stream` flag differs. Exported pure so the
+ *  byte-identical proof can build it twice (cache on, cache off) with no network.
+ *
+ *  Key order in this object is presentation only: the API renders tools → system
+ *  → messages whatever order the JSON arrives in. It is written in that order
+ *  anyway, so a reader checking "is the stable part first?" can see that it is. */
+export function anthropicBody(opts: {
+  model: string
+  effort: string
+  messages: ChatMessage[]
+  tools: ToolSpec[]
+  stream: boolean
+  cache: CacheMode
+}): Record<string, unknown> {
+  const system = opts.messages
+    .filter((m) => m.role === "system")
+    .map((m) => m.content)
+    .join("\n\n")
+  const mark = cacheMark(opts.cache)
+  return {
+    model: opts.model,
+    // Tool turns must be able to EMIT a whole bulk call — the old 1024 cap
+    // silently truncated mid-JSON (a promise the runtime cannot keep is worse
+    // than a smaller one). AGENT_MAX_TOKENS is the one constant both providers
+    // use, sized so a BULK_IDS_LIMIT id list physically fits.
+    max_tokens: AGENT_MAX_TOKENS,
+    // Effort controls reasoning depth + overall token spend (GA on the Sonnet-5 /
+    // Opus-4.7+ family, no beta header). "low" = terse, consolidated tool calls —
+    // the cheap setting. We leave `thinking` unset on purpose: those models run
+    // adaptive thinking by default and keep it minimal at low effort, which also
+    // keeps them willing to reach for tools. `effort` is sent ONLY to models that
+    // support it — older tiers (e.g. Haiku 4.5) reject `output_config.effort` with
+    // a 400, so swapping AGENT_MODEL to one of those must not carry it. (Never send
+    // temperature/top_p or budget_tokens on the 4.7+ family — each is a 400.)
+    ...(supportsEffort(opts.model) ? { output_config: { effort: opts.effort } } : {}),
+    ...(opts.stream ? { stream: true } : {}),
+    // Breakpoint 1 — the LAST tool definition, so the whole catalogue caches as
+    // one prefix and stays cached when the system prompt after it changes.
+    ...(opts.tools.length
+      ? {
+          tools: opts.tools.map((t, i) => ({
+            name: t.name,
+            description: t.description,
+            input_schema: t.schema,
+            ...(i === opts.tools.length - 1 ? mark : {}),
+          })),
+        }
+      : {}),
+    // Breakpoint 2 — the system prompt. A block array rather than a bare string
+    // because `cache_control` has to sit on a content block; the text is the
+    // identical string the bare-string form carried.
+    ...(system ? { system: [{ type: "text", text: system, ...mark }] } : {}),
+    messages: toAnthropicMessages(opts.messages),
+  }
+}
+
 type AnthropicBlock =
   | { type: "text"; text: string }
   | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
@@ -119,39 +247,17 @@ class ClaudeModel implements Model {
     /** Reasoning effort: low | medium | high | xhigh | max. "low" keeps the agent
      *  cheap (owner is on a tight budget) while staying tool-capable; raise it via
      *  the AGENT_EFFORT var when more capability is worth the extra token cost. */
-    private effort: string = "low"
+    private effort: string = "low",
+    /** Whether the stable prefix (tools + system prompt) is marked cacheable, and
+     *  at which TTL. Off changes nothing but the markers — see anthropicBody. */
+    private cache: CacheMode = "5m"
   ) {}
 
-  /** The one request body both complete() and stream() send — same messages/tools/effort
-   *  rules, only the `stream` flag differs. Keeps the two paths from drifting. */
+  /** The one request body both complete() and stream() send. The building itself
+   *  lives in the exported pure function so a test can diff cache-on against
+   *  cache-off without a network call. */
   private buildBody(messages: ChatMessage[], tools: ToolSpec[], stream: boolean): Record<string, unknown> {
-    const system = messages
-      .filter((m) => m.role === "system")
-      .map((m) => m.content)
-      .join("\n\n")
-    return {
-      model: this.name,
-      // Tool turns must be able to EMIT a whole bulk call — the old 1024 cap
-      // silently truncated mid-JSON (a promise the runtime cannot keep is worse
-      // than a smaller one). AGENT_MAX_TOKENS is the one constant both providers
-      // use, sized so a BULK_IDS_LIMIT id list physically fits.
-      max_tokens: AGENT_MAX_TOKENS,
-      // Effort controls reasoning depth + overall token spend (GA on the Sonnet-5 /
-      // Opus-4.7+ family, no beta header). "low" = terse, consolidated tool calls —
-      // the cheap setting. We leave `thinking` unset on purpose: those models run
-      // adaptive thinking by default and keep it minimal at low effort, which also
-      // keeps them willing to reach for tools. `effort` is sent ONLY to models that
-      // support it — older tiers (e.g. Haiku 4.5) reject `output_config.effort` with
-      // a 400, so swapping AGENT_MODEL to one of those must not carry it. (Never send
-      // temperature/top_p or budget_tokens on the 4.7+ family — each is a 400.)
-      ...(supportsEffort(this.name) ? { output_config: { effort: this.effort } } : {}),
-      ...(stream ? { stream: true } : {}),
-      ...(system ? { system } : {}),
-      messages: toAnthropicMessages(messages),
-      ...(tools.length
-        ? { tools: tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.schema })) }
-        : {}),
-    }
+    return anthropicBody({ model: this.name, effort: this.effort, messages, tools, stream, cache: this.cache })
   }
 
   private headers(): Record<string, string> {
@@ -173,7 +279,7 @@ class ClaudeModel implements Model {
       const detail = await res.text().catch(() => "")
       throw new Error(`model_error: Claude returned ${res.status}. ${detail.slice(0, 200)}`)
     }
-    const data = (await res.json()) as { content?: AnthropicBlock[] }
+    const data = (await res.json()) as { content?: AnthropicBlock[]; usage?: AnthropicUsage }
     const blocks = data.content ?? []
     const text = blocks
       .filter((b): b is Extract<AnthropicBlock, { type: "text" }> => b.type === "text")
@@ -182,7 +288,7 @@ class ClaudeModel implements Model {
     const toolCalls = blocks
       .filter((b): b is Extract<AnthropicBlock, { type: "tool_use" }> => b.type === "tool_use")
       .map((b) => ({ id: b.id, name: b.name, input: b.input ?? {} }))
-    return { text, toolCalls }
+    return { text, toolCalls, usage: readUsage(data.usage) }
   }
 
   /** Stream the turn (POST with "stream": true) and parse the Messages SSE: a
@@ -225,12 +331,20 @@ export async function parseAnthropicStream(
   let buffer = ""
   let text = ""
   const tools = new Map<number, ToolBuild>() // block index → the tool_use being built
+  // WHAT THE STREAMED TURN COST, assembled from two frames: `message_start`
+  // carries the PROMPT side (input + the cache write/read split — the numbers
+  // the whole caching change is judged on), and `message_delta` carries the
+  // running output total. A stream that ends early simply reports what arrived;
+  // telemetry never throws and never blocks the reply.
+  const usage: TokenUsage = { ...NO_TOKENS }
 
   const handle = (data: string): void => {
     if (data === "[DONE]") return
     let ev: {
       type?: string
       index?: number
+      message?: { usage?: AnthropicUsage }
+      usage?: AnthropicUsage
       content_block?: { type?: string; id?: string; name?: string }
       delta?: { type?: string; text?: string; partial_json?: string }
     }
@@ -238,6 +352,21 @@ export async function parseAnthropicStream(
       ev = JSON.parse(data)
     } catch {
       return // ignore a keep-alive / unparsable frame
+    }
+    if (ev.type === "message_start") {
+      const u = readUsage(ev.message?.usage)
+      usage.input = u.input
+      usage.cacheWrite = u.cacheWrite
+      usage.cacheRead = u.cacheRead
+      if (u.output) usage.output = u.output
+      return
+    }
+    if (ev.type === "message_delta") {
+      // Anthropic reports output_tokens here as the running total for the
+      // message, so the last frame wins rather than the frames summing.
+      const u = readUsage(ev.usage)
+      if (u.output) usage.output = u.output
+      return
     }
     if (ev.type === "content_block_start" && ev.content_block?.type === "tool_use")
       tools.set(ev.index ?? 0, {
@@ -283,7 +412,7 @@ export async function parseAnthropicStream(
     }
     return { id: b.id, name: b.name, input }
   })
-  return { text, toolCalls }
+  return { text, toolCalls, usage }
 }
 
 /* ------------------------------- Workers AI ------------------------------- */
@@ -392,7 +521,15 @@ class WorkersAiModel implements Model {
  *  Swapping the brain is one edit here (or the WORKERS_AI_MODEL var). */
 export function selectModel(env: Env): Model {
   if (env.ANTHROPIC_API_KEY)
-    return new ClaudeModel(env.ANTHROPIC_API_KEY, env.AGENT_MODEL || "claude-sonnet-5", env.AGENT_EFFORT || "low")
+    return new ClaudeModel(
+      env.ANTHROPIC_API_KEY,
+      env.AGENT_MODEL || "claude-sonnet-5",
+      env.AGENT_EFFORT || "low",
+      // The prompt cache is a CLAUDE feature and rides only this branch. Workers
+      // AI below takes the same messages and tools with no marker anywhere near
+      // it — there is nothing to break on the no-key path.
+      cacheMode(env.AGENT_PROMPT_CACHE)
+    )
   return new WorkersAiModel(env.AI, env.WORKERS_AI_MODEL || "@cf/meta/llama-4-scout-17b-16e-instruct")
 }
 

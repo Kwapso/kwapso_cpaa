@@ -45,6 +45,11 @@
     "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7",
     "AGENT_MODEL": "claude-sonnet-5",
     "AGENT_EFFORT": "low",
+    // THE PROMPT CACHE. "off" | "5m" | "1h" (unset = "5m"). Marks the assistant's
+    // stable prefix — the tool catalogue + the system prompt, about nine tenths of
+    // every turn's input — as cacheable. It adds a `cache_control` key and changes
+    // nothing else the model reads, so it is a price knob and not a behaviour one.
+    "AGENT_PROMPT_CACHE": "5m",
     "AGENT_FREE_DAILY": "50",
     "WORKERS_AI_MODEL": "@cf/meta/llama-4-scout-17b-16e-instruct"
   },
@@ -76,6 +81,7 @@
         "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7",
         "AGENT_MODEL": "claude-sonnet-5",
         "AGENT_EFFORT": "low",
+        "AGENT_PROMPT_CACHE": "5m",
         "AGENT_FREE_DAILY": "50",
         "AGENT_NO_DAILY_CAP": "true",
         "WORKERS_AI_MODEL": "@cf/meta/llama-4-scout-17b-16e-instruct"
