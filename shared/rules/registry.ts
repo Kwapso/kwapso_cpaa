@@ -259,8 +259,6 @@ export const PAGE_WIDTH_OWNER: Record<string, string> = {
 export const SCREEN_WIDTH_EXEMPT: Record<string, string> = {
   "web/components/install-prompt.tsx":
     "not a page. It is the install nudge's Sheet content, which is centred and full-width INSIDE the sheet, and a sheet is an overlay with its own measure.",
-  "web/components/app-shell.tsx":
-    "PENDING (plan W1). The shell's own loading skeleton at max-w-2xl, against content that arrives at 1120px — the width jump on every cold load. Delete this line with the fix.",
   "web/components/screens/home-screen.tsx": "PENDING (plan W1). max-w-2xl, 60% span.",
   "web/components/screens/settings-screen.tsx": "PENDING (plan W1). max-w-2xl, 60% span.",
   "web/components/screens/profile-screen.tsx": "PENDING (plan W1). max-w-2xl, 60% span.",
