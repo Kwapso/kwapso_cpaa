@@ -113,7 +113,7 @@ export const listFetch = {
       return r.sources
     }),
   help: (teamId: string) =>
-    contentApi.help("all").then((r) => {
+    contentApi.help().then((r) => {
       primeCache(totalKey("help", teamId), r.total)
       primeCache(totalKey("help-mine", teamId), r.mineTotal)
       primeCache(cursorKey(helpKey(teamId, "all")), r.nextCursor)
@@ -129,7 +129,7 @@ export const listFetch = {
   // step along. Its `total` is the count over THIS view (the door counts the
   // same question it listed), so it never collides with the live badge.
   helpArchived: (teamId: string) =>
-    contentApi.help("all", null, "archived").then((r) => {
+    contentApi.help({ view: "archived" }).then((r) => {
       primeCache(totalKey("help-archived", teamId), r.total)
       primeCache(cursorKey(helpKey(teamId, "archived")), r.nextCursor)
       return r.tickets
@@ -145,15 +145,11 @@ export const listFetch = {
   helpFacet: (teamId: string, scope: HelpScope, facet: HelpFacet) => {
     const f = helpFacetFilter(facet)
     return contentApi
-      .help(
-        "all",
-        null,
-        scope === "archived" ? "archived" : "live",
-        undefined,
-        undefined,
-        f.helpType,
-        f.status as HelpTicket["status"] | undefined
-      )
+      .help({
+        view: scope === "archived" ? "archived" : "live",
+        helpType: f.helpType,
+        status: f.status,
+      })
       .then((r) => {
         primeCache(totalKey(`help-facet:${scope}:${facet}`, teamId), r.total)
         primeCache(cursorKey(helpFacetKey(teamId, scope, facet)), r.nextCursor)
@@ -593,9 +589,16 @@ export type HelpFacet = string
 
 /** Split a facet token into the two filters the door parses. `triage` and `all`
  * narrow nothing; the caller decides what to render for the first. */
-export function helpFacetFilter(facet: HelpFacet): { helpType?: string; status?: string } {
+export function helpFacetFilter(facet: HelpFacet): {
+  helpType?: string
+  status?: HelpTicket["status"]
+} {
   if (facet.startsWith("type:")) return { helpType: facet.slice(5) }
-  if (facet.startsWith("status:")) return { status: facet.slice(7) }
+  // The ONE cast, where the value is built. The two stage tabs are named after
+  // real statuses (`status:ready`, `status:resolved`) and a `slice` cannot know
+  // that — so it is asserted here rather than at each call site, which is what
+  // was happening and is how two places came to spell the same fact differently.
+  if (facet.startsWith("status:")) return { status: facet.slice(7) as HelpTicket["status"] }
   return {}
 }
 

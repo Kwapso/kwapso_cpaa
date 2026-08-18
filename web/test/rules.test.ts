@@ -33,6 +33,7 @@ import { formatCount } from "@shared/web/format-count"
 import { SIMPLE_INVALIDATIONS, TEAM_RESOURCES, TIME_SLICE_PREFIX } from "../lib/live-resources"
 import { TEAM_SECTIONS } from "../lib/pages"
 import { BASE_RECIPES, tabCountKey, withTabCounts } from "../lib/screens"
+import { COLLECTION_FILTERS } from "../lib/collection-filters"
 
 const HERE = dirname(fileURLToPath(import.meta.url)) // web/test
 const WEB = join(HERE, "..") // web/
@@ -111,6 +112,24 @@ function recordDetailComponents(): { name: string; source: string }[] {
     .map((f) => ({ name: basename(f.path, ".tsx"), source: stripComments(f.source) }))
     .filter((c) => /-detail$/.test(c.name) || c.source.includes("<ActivityPanel"))
     .filter((c) => !RECORD_DETAIL_NOT[c.name])
+}
+
+/** EVERY FIND BAR IN THE APP, as source — the props of each `<PagedFind>`, from
+ * the tag to 1,800 characters on.
+ *
+ * COMMENTS STRIPPED FIRST, and not for tidiness: this file's own header block
+ * mentions `<PagedFind>` in prose, and on the raw text that sentence opened a
+ * window that ran on into the real component's cache key forty lines below —
+ * a "screen" made entirely of explanation, failing a check about wiring.
+ *
+ * A FIXED window rather than one that stops at the first `>`: `<PagedFind<Account>`
+ * carries a generic, so a lazy match to the tag's close ends four characters in
+ * and reports every screen as unwired (paged-search.test.ts and
+ * paged-sort.test.ts say the same about the same tag). */
+function findBars(): string[] {
+  return componentFiles().flatMap((f) =>
+    [...stripComments(read(f)).matchAll(/<PagedFind[\s\S]{0,1800}/g)].map((m) => m[0])
+  )
 }
 
 describe("RULES — the laws of the base", () => {
@@ -312,6 +331,146 @@ describe("RULES — the laws of the base", () => {
       offenders,
       `a paged collection's list cache holds page one — search it at the door instead (lib/picker-sources.ts): ${offenders.join(", ")}`
     ).toEqual([])
+  })
+
+  // …AND SO DOES EVERY OTHER CONTROL ON A COLLECTION THAT PAGES. The third
+  // clause of one sentence, and the third time it was found the hard way.
+  //
+  // A collection is asked three things — which rows (the filters), which of
+  // those (the search) and in what order (the sort) — and on a PAGED collection
+  // all three have exactly one honest place to be answered: the door. The search
+  // box learned that in August; the column headers learned it on 18 Aug; the
+  // FACETS were still narrowing the fifty rows the browser was holding.
+  //
+  // Reported the same day: the owner filtered the knowledge base by "From a
+  // meeting" and was shown TWO sources. The door, asked properly, answers 52 and
+  // the app holds 170 meetings. Page one happened to contain two of them, so the
+  // screen reported two — under a badge (R16) correctly counting all 3,000-odd
+  // sources. Nothing was broken; the filter was simply answering a question about
+  // a window nobody could see the edges of.
+  //
+  // FOUR CLAUSES, because the control can be lost at four different points and
+  // each of them looks like a working screen from the outside:
+  //
+  //   1. THE RECIPE DECLARES NONE. `{ field: "kind" }` on a recipe means "the
+  //      `kind` property of the loaded row objects"; the same five characters in
+  //      lib/collection-filters.ts mean "the `kind` parameter the door parses".
+  //      They are indistinguishable to a reader and answer different questions,
+  //      so a paged recipe may not carry the first kind at all.
+  //   2. THE DOOR PARSES WHAT IS OFFERED. Derived from each door's own
+  //      `searchParams.get` calls, exactly as R19 derives a tool's filters — a
+  //      facet naming a parameter no door reads is a dropdown that quietly
+  //      changes nothing.
+  //   3. THE SCREEN WIRES THEM, into the <PagedFind> holding THAT collection's
+  //      own cache key. A file mentioning both strings somewhere proves nothing
+  //      (R14's own blind spot, and paged-sort.test.ts says the same).
+  //   4. THE QUESTION REACHES THE DOOR WHOLE. This is the one that had already
+  //      gone wrong invisibly: `content.knowledge` took the find's whole question
+  //      and copied three named fields of it into a URL, so when sorting arrived
+  //      and put `sort` in that question, the knowledge base's sort control
+  //      changed the cache key, refetched the same rows in the same order, and
+  //      looked like it worked. Nothing enumerates now — the screen spreads
+  //      `...query` and `listQuery` forwards every key — and this is what keeps
+  //      it that way.
+  it("facets-ask-the-door: a paged collection's filters are the door's, not the loaded page's", () => {
+    // The collections this governs: the growing ones with a LIST SCREEN. Derived
+    // from the registry, never listed here.
+    const PAGED = Object.entries(GROWING_COLLECTIONS).filter(([, c]) => c.listRecipe)
+    expect(PAGED.length, "no paged list screens found — the scan is reading nothing").toBeGreaterThan(4)
+
+    // A paged list screen that deliberately offers NO filters, each with its
+    // reason. Silence about a control has to be written down, or "nobody wired
+    // it" and "nobody wanted it" are the same green build.
+    const UNFILTERED: Record<string, string> = {
+      help: "the tickets screen narrows by stage and kind through its own sub-tab strip, which asks the DOOR (helpFacetFilter → <PagedFind fixed>). A Status select beside it would be a second control on one field — the clutter the accounts screen removed when its Type select became the All/Companies/People strip — and the two would fight, because `fixed` wins over a facet.",
+    }
+
+    for (const [name, c] of PAGED) {
+      // 1 — the frame's own (in-memory, page-one) filter bar is off, because the
+      // recipe declares nothing for it to draw.
+      const recipe = BASE_RECIPES[c.listRecipe as string]
+      expect(recipe, `${name}: recipe ${c.listRecipe} must exist`).toBeDefined()
+      expect(
+        recipe.collection?.filterFacets ?? [],
+        `${name} pages, so a facet in its recipe narrows the loaded page — move it to COLLECTION_FILTERS, where its field is the DOOR's own query parameter`
+      ).toEqual([])
+      expect(
+        recipe.collection?.userFilter,
+        `${name} pages, so the frame must not draw a filter bar of its own`
+      ).toBe(false)
+
+      const facets = COLLECTION_FILTERS[name] ?? []
+      if (facets.length === 0) {
+        expect(
+          UNFILTERED[name],
+          `${name} is a paged list screen with no entry in COLLECTION_FILTERS — give it the door's filters, or a reasoned UNFILTERED line`
+        ).toBeTruthy()
+        continue
+      }
+
+      // 2 — every field it offers is a parameter that door really parses, read
+      // off the door's own source.
+      const door = stripComments(read(join(ROOT, c.routes)))
+      const parsed = new Set([...door.matchAll(/searchParams\.get\("(\w+)"\)/g)].map((m) => m[1]))
+      expect(parsed.size, `${c.routes} parses no query parameters — the derivation has gone blind`).toBeGreaterThan(1)
+      for (const f of facets)
+        expect(
+          parsed.has(f.field),
+          `${name} offers a "${f.label}" filter on \`${f.field}\`, which ${c.routes} does not parse — an offered filter that cannot be honoured must not be shown`
+        ).toBe(true)
+
+      // 3 + 4 — the screen wires them to THIS collection's own key, and hands the
+      // whole question over. A fixed window rather than one that stops at the
+      // first `>`: `<PagedFind<Account>` carries a generic (its two siblings,
+      // paged-search and paged-sort, say the same about the same tag).
+      const wired = findBars().filter((w) => w.includes(c.webKey))
+      expect(
+        wired.length,
+        `${name} has door filters but no <PagedFind> whose listKey is built from ${c.webKey}`
+      ).toBeGreaterThan(0)
+      for (const w of wired) {
+        expect(
+          w.includes("facets="),
+          `${name}'s find bar draws no filters — pass translatedFacets("${name}", t, …)`
+        ).toBe(true)
+        // THE WHOLE QUESTION, never a copy of the fields somebody remembered.
+        expect(
+          /\.\.\.query/.test(w),
+          `${name}'s fetchPage must hand the door the WHOLE question ({ ...query, cursor }) — copying named fields across is how the sort was silently dropped for six days`
+        ).toBe(true)
+      }
+    }
+
+    // 4, the other half of the wire: the client method each of those screens
+    // calls builds its URL through the ONE forwarding seam. The method NAMES are
+    // read out of the screens themselves, so a new door is held to this the day
+    // a screen calls it.
+    const called = new Set(
+      findBars()
+        .filter((w) => Object.values(GROWING_COLLECTIONS).some((c) => w.includes(c.webKey)))
+        // The method whose ARGUMENT OBJECT carries the question. Not "the object
+        // that opens with it": three of these screens put the strip's own
+        // narrowing first and spread the person's question over it, which is the
+        // right way round and would read as unwired to a tighter pattern.
+        .flatMap((w) => [...w.matchAll(/\.(\w+)\(\{[\s\S]{0,600}?\.\.\.query/g)].map((m) => m[1]))
+    )
+    expect(called.size, "no paged list client methods found — the scan has gone blind").toBeGreaterThan(4)
+    const apiSrc = sourceFiles(join(WEB, "lib", "api"), { extensions: [".ts"] })
+      .map((f) => stripComments(f.source))
+      .join("\n")
+    for (const method of called) {
+      const at = apiSrc.indexOf(`\n  ${method}: (`)
+      expect(at, `web/lib/api declares no ${method}( — the derivation is reading the wrong thing`).toBeGreaterThan(-1)
+      // The method's OWN body: up to the next member of the same object literal,
+      // which is the next line opening at two spaces with a `name: (`.
+      const rest = apiSrc.slice(at + 1)
+      const next = rest.search(/\n {2}\w+: \(/)
+      const body = next === -1 ? rest : rest.slice(0, next)
+      expect(
+        body.includes("listQuery("),
+        `${method}() spells its door's parameters out one at a time — build the query with listQuery(opts) instead, or the next parameter added to that door is silently dropped on the way to it`
+      ).toBe(true)
+    }
   })
 
   // R8, surface ONE — the TEAM section strip. A placement:"tab" section that

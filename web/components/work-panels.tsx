@@ -151,7 +151,7 @@ export function StoriesPanel({
   const q = useCached<Story[]>(key, () =>
     // `view: "all"` on purpose: this is the record of what was done, not a
     // backlog to work through, so hiding the finished work would hide the point.
-    contentApi.stories({ filter: { ...filter, view: "all" } }).then((r) => {
+    contentApi.stories({ ...filter, view: "all" }).then((r) => {
       primeCache(totalKey(`stories-${ownerKind}`, ownerId), r.total)
       primeCache(cursorKey(key), r.nextCursor)
       return r.stories
@@ -198,7 +198,7 @@ export function StoriesPanel({
         label={t("Load more work")}
         fetchPage={(c: string) =>
           contentApi
-            .stories({ filter: { ...filter, view: "all" }, cursor: c })
+            .stories({ ...filter, view: "all", cursor: c })
             .then((r) => ({ rows: r.stories, nextCursor: r.nextCursor }))
         }
       />
@@ -488,7 +488,7 @@ export function AppMeetingsPanel({
   const t = useT()
   const key = sliceKey("meetings-app", appId)
   const q = useCached<Meeting[]>(key, () =>
-    contentApi.meetings(null, "all", undefined, undefined, appId).then((r) => {
+    contentApi.meetings({ appId }).then((r) => {
       primeCache(totalKey("meetings-app", appId), r.total)
       primeCache(cursorKey(key), r.nextCursor)
       return r.meetings
@@ -532,7 +532,7 @@ export function AppMeetingsPanel({
         label={t("Load more meetings")}
         fetchPage={(c: string) =>
           contentApi
-            .meetings(c, "all", undefined, undefined, appId)
+            .meetings({ appId, cursor: c })
             .then((r) => ({ rows: r.meetings, nextCursor: r.nextCursor }))
         }
       />
@@ -558,7 +558,7 @@ export function AppTicketsPanel({
   const t = useT()
   const key = sliceKey("tickets-app", appId)
   const q = useCached<HelpTicket[]>(key, () =>
-    contentApi.help("all", null, "live", undefined, undefined, undefined, undefined, appId).then((r) => {
+    contentApi.help({ appId }).then((r) => {
       primeCache(totalKey("tickets-app", appId), r.total)
       primeCache(cursorKey(key), r.nextCursor)
       return r.tickets
@@ -601,7 +601,7 @@ export function AppTicketsPanel({
         label={t("Load more tickets")}
         fetchPage={(c: string) =>
           contentApi
-            .help("all", c, "live", undefined, undefined, undefined, undefined, appId)
+            .help({ appId, cursor: c })
             .then((r) => ({ rows: r.tickets, nextCursor: r.nextCursor }))
         }
       />

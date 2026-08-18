@@ -642,7 +642,7 @@ export async function setAppActive(
 /** WHAT A CALLER MAY NARROW a processes read to — the fence plus the two filters,
  * built ONCE so the paged list and any other reader can never disagree about what
  * a filter means. */
-export type ProcessFilters = { q?: string; appId?: string }
+export type ProcessFilters = { q?: string; appId?: string; archived?: string }
 
 function processesWhere(scope: AccountScope, opts: ProcessFilters): { sql: string; params: string[] } {
   const fence = accountScopeClause(scope, "p.account_id")
@@ -661,6 +661,14 @@ function processesWhere(scope: AccountScope, opts: ProcessFilters): { sql: strin
     filters.push("p.app_id = ?")
     params.push(opts.appId)
   }
+  // PUT AWAY, OR STILL IN USE. A map is archived and never deleted (the savings
+  // computed from its baseline have to stay checkable years later), so the
+  // put-away ones accumulate in the same list as the live ones. Two words, an
+  // ALLOW-LIST rather than a boolean because this arrives off a query string
+  // where `"false"` is truthy — and matched against literals here, so what
+  // reaches the statement is our SQL and never the caller's text.
+  if (opts.archived === "yes") filters.push("p.deactivated_at IS NOT NULL")
+  if (opts.archived === "no") filters.push("p.deactivated_at IS NULL")
   return { sql: where([fence.sql, ...filters]), params }
 }
 

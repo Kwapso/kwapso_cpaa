@@ -202,24 +202,33 @@ export function TicketsCollection({
             noun="tickets"
             sorts={translatedSorts("help", t)}
             defaultSort={COLLECTION_SORTS.help.defaultSort}
-            fetchPage={(query, cursor) => {
-              // The search rides the SAME two narrowings the tab strip chose, so
-              // "search my questions" means exactly that.
-              const f = helpFacetFilter(facet)
-              return contentApi
-                .help(
-                  helpScope === "archived" ? "all" : helpScope,
+            // NO `facets` HERE, deliberately. The recipe used to declare a
+            // Status select, which the frame answered over the loaded fifty; the
+            // inner strip above already narrows the same field AT THE DOOR, and
+            // two controls on one field is the clutter the accounts screen
+            // removed ("the Accounts tab is a bit confusing"). One control, and
+            // it is the one that can see past the cursor.
+            //
+            // The strip's own narrowing is NOT `fixed` either, and the difference
+            // matters: `fixed` makes a find ACTIVE, and these two strips are
+            // already in `listKey` above. Passing them there would move the
+            // resting screen into a `find:` cache key the live registry does not
+            // patch (R15) — a ticket list that stops updating itself, in exchange
+            // for nothing.
+            fetchPage={(query, cursor) =>
+              contentApi
+                .help({
+                  // What the strips chose, then the person's own question spread
+                  // whole over it: `listQuery` forwards every key, so a narrowing
+                  // cannot be lost between these controls and the door.
+                  scope: helpScope === "archived" ? "all" : helpScope,
+                  view: helpScope === "archived" ? "archived" : "live",
+                  ...helpFacetFilter(facet),
+                  ...query,
                   cursor,
-                  helpScope === "archived" ? "archived" : "live",
-                  query.q,
-                  undefined,
-                  f.helpType,
-                  f.status as HelpTicket["status"] | undefined,
-                  undefined,
-                  { sort: query.sort, dir: query.dir }
-                )
+                })
                 .then((r) => ({ rows: r.tickets, nextCursor: r.nextCursor, total: r.total }))
-            }}
+            }
           >
             {(found) => {
               const rows = found.active ? found.rows : scopedQ.data

@@ -119,7 +119,7 @@ export function ContactTicketsPanel({
 }) {
   const t = useT()
   const q = useCached<HelpTicket[]>(sliceKey(TICKETS_OF_ACCOUNT, accountId), () =>
-    contentApi.help("all", null, "live", undefined, accountId).then((r) => {
+    contentApi.help({ accountId }).then((r) => {
       primeCache(totalKey("tickets-account", accountId), r.total)
       return r.tickets
     })
@@ -159,7 +159,7 @@ export function ContactMeetingsPanel({
 }) {
   const t = useT()
   const q = useCached<Meeting[]>(sliceKey(MEETINGS_OF_ACCOUNT, accountId), () =>
-    contentApi.meetings(null, "all", undefined, accountId).then((r) => {
+    contentApi.meetings({ accountId }).then((r) => {
       primeCache(totalKey("meetings-account", accountId), r.total)
       return r.meetings
     })

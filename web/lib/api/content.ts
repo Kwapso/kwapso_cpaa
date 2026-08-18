@@ -42,7 +42,7 @@ import type {
   StaffProfile,
 } from "@shared/types"
 import type { RecordCounts } from "@shared/record-counts"
-import { api, enc, post } from "@shared/web/api"
+import { api, enc, listQuery, post } from "@shared/web/api"
 
 /** SEND A FILE AS THE BODY — the client half of the four streaming upload doors.
  *
@@ -147,59 +147,44 @@ function logQuery(filter: LogQuery | undefined, cursor: string | null | undefine
   return s ? `?${s}` : ""
 }
 
-function storyQuery(
-  filter: StoryQuery | undefined,
-  cursor: string | null | undefined,
-  // The ORDER is not a filter and does not travel in one: a filter says which
-  // rows, this says in what sequence. Kept apart so a caller cannot narrow by
-  // accident while meaning to sort.
-  order?: { sort?: string; dir?: string }
-): string {
-  const q = new URLSearchParams()
-  if (filter?.status) q.set("status", filter.status)
-  if (filter?.ticketId) q.set("ticketId", filter.ticketId)
-  if (filter?.sprintId) q.set("sprintId", filter.sprintId)
-  if (filter?.appId) q.set("appId", filter.appId)
-  if (filter?.assigneeId) q.set("assigneeId", filter.assigneeId)
-  if (filter?.view) q.set("view", filter.view)
-  if (filter?.q) q.set("q", filter.q)
-  if (order?.sort) q.set("sort", order.sort)
-  if (order?.dir) q.set("dir", order.dir)
-  if (cursor) q.set("cursor", cursor)
-  const s = q.toString()
-  return s ? `?${s}` : ""
-}
-
 /** Content worker — Tickets, the work engine and the knowledge base. */
 export const content = {
   /** R14: a PAGE of tickets (a GROWING collection) — hand back `nextCursor` from
    * the previous response to get the next one. `total`/`mineTotal` are exact. */
   help: (
-    scope: "mine" | "all" = "all",
-    cursor?: string | null,
-    view: "live" | "archived" = "live",
-    /** the search box, answered by the DOOR — the list pages, so a browser could
-     * only ever search the page it had loaded. `total` counts the same question. */
-    q?: string,
-    /** one client's tickets — the door narrows, so the rows and the exact total
-     * beside them answer the same question (R16). */
-    accountId?: string,
-    /** THE SUB-TAB STRIP (CHECKLIST 5.1), and both halves are the DOOR's filters
-     * rather than the browser's: the list pages, so narrowing a loaded page to
-     * "Questions" would answer "the questions among the newest fifty" while the
-     * badge above it counted them all. `byType` / `byStatus` come back with every
-     * page and are what the badges read. */
-    helpType?: string,
-    status?: HelpTicket["status"],
-    /** ONE SYSTEM'S tickets — the app record's Tickets tab (CHECKLIST 8.6). The
-     * door narrows and counts the same narrowed question, so the tab badge and
-     * the rows under it are one answer (R16). */
-    appId?: string,
-    /** WHAT ORDER — a name out of the door's own TICKET_SORTS, with `dir`
-     * flipping it. ONE trailing object rather than two more positional
-     * parameters on a function that already takes eight: the door's default is
-     * the drag-rank, so omitting this is the order the list has always had. */
-    order?: { sort?: string; dir?: string }
+    /** The door's own question, spread straight through (`listQuery`) so a
+     * filter cannot be lost between the control and the door — which is exactly
+     * what happened while this took nine positional parameters and a caller had
+     * to count `undefined`s to reach the ninth. */
+    opts: {
+      /** whose tickets — "mine" is the raiser's own */
+      scope?: "mine" | "all"
+      /** live tickets, or the ones put away */
+      view?: "live" | "archived"
+      /** the search box, answered by the DOOR — the list pages, so a browser could
+       * only ever search the page it had loaded. `total` counts the same question. */
+      q?: string
+      /** one client's tickets — the door narrows, so the rows and the exact total
+       * beside them answer the same question (R16). */
+      accountId?: string
+      /** THE SUB-TAB STRIP (CHECKLIST 5.1), and both halves are the DOOR's filters
+       * rather than the browser's: the list pages, so narrowing a loaded page to
+       * "Questions" would answer "the questions among the newest fifty" while the
+       * badge above it counted them all. `byType` / `byStatus` come back with every
+       * page and are what the badges read. */
+      helpType?: string
+      status?: HelpTicket["status"]
+      /** ONE SYSTEM'S tickets — the app record's Tickets tab (CHECKLIST 8.6). The
+       * door narrows and counts the same narrowed question, so the tab badge and
+       * the rows under it are one answer (R16). */
+      appId?: string
+      /** WHAT ORDER — a name out of the door's own TICKET_SORTS, with `dir`
+       * flipping it. The door's default is the drag-rank, so omitting these is the
+       * order the list has always had. */
+      sort?: string
+      dir?: string
+      cursor?: string | null
+    } = {}
   ) =>
     api<
       PagedResponse<{
@@ -208,15 +193,7 @@ export const content = {
         byType: Record<string, number>
         byStatus: Record<string, number>
       }>
-    >(
-      `/api/content/help?scope=${scope}&view=${view}${q ? `&q=${enc(q)}` : ""}${
-        accountId ? `&accountId=${enc(accountId)}` : ""
-      }${appId ? `&appId=${enc(appId)}` : ""}${helpType ? `&helpType=${enc(helpType)}` : ""}${
-        status ? `&status=${enc(status)}` : ""
-      }${order?.sort ? `&sort=${enc(order.sort)}` : ""}${order?.dir ? `&dir=${enc(order.dir)}` : ""}${
-        cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""
-      }`
-    ),
+    >(`/api/content/help${listQuery({ scope: "all", view: "live", ...opts })}`),
   /** PUT IT AWAY, or take it back out. The door has answered this since archive
    * shipped; nothing on any screen called it, so a ticket could be archived by
    * the assistant and then never found again by a person. */
@@ -293,10 +270,13 @@ export const content = {
   /** R14: a PAGE of stories (a GROWING collection) — hand `nextCursor` back to
    * get the next one. `total`/`mineTotal` are the exact server counts, taken
    * over the SAME filter the page came from. */
-  stories: (opts: { filter?: StoryQuery; order?: { sort?: string; dir?: string }; cursor?: string | null } = {}) =>
-    api<PagedResponse<{ stories: Story[]; mineTotal: number }>>(
-      `/api/content/stories${storyQuery(opts.filter, opts.cursor, opts.order)}`
-    ),
+  stories: (
+    /** ONE flat object, spread straight into the query string (`listQuery`), so a
+     * narrowing cannot be lost on the way to the door. It used to arrive as
+     * `{ filter, order }` and be copied field by field into a URLSearchParams —
+     * which is the shape that silently drops the field nobody remembered. */
+    opts: StoryQuery & { sort?: string; dir?: string; cursor?: string | null } = {}
+  ) => api<PagedResponse<{ stories: Story[]; mineTotal: number }>>(`/api/content/stories${listQuery(opts)}`),
   storyOne: (id: string) =>
     api<{ stories: Story[] }>(`/api/content/stories?id=${enc(id)}`).then((r) => r.stories[0] ?? null),
   createStory: (input: StoryWrite) => api<{ stories: Story[] }>("/api/content/stories", post(input)),
@@ -491,20 +471,28 @@ export const content = {
   /* ------------------------------- knowledge ------------------------------- */
   /** R14: a PAGE of sources (a GROWING collection) — hand `nextCursor` back to
    * get the next one. `total` is the exact server count the badge shows. */
-  knowledge: (cursor?: string | null, find: { q?: string; kind?: string; compartment?: string } = {}) => {
-    // The door's own three filters (SEARCH.md layer 2). The list pages, so the
-    // search box has to be answered here — page one of a thousand sources is not
-    // the knowledge base, it is the newest fifty of it.
-    const p = new URLSearchParams()
-    if (find.q) p.set("q", find.q)
-    if (find.kind) p.set("kind", find.kind)
-    if (find.compartment) p.set("compartment", find.compartment)
-    if (cursor) p.set("cursor", cursor)
-    const qs = p.toString()
-    return api<PagedResponse<{ sources: KnowledgeSource[] }>>(
-      `/api/content/knowledge${qs ? `?${qs}` : ""}`
-    )
-  },
+  knowledge: (
+    /** THE DOOR'S OWN FILTERS (SEARCH.md layer 2) plus the order and the cursor —
+     * ONE object, spread straight through, so nothing can be dropped between the
+     * find bar and the door. The list pages: page one of a thousand sources is
+     * not the knowledge base, it is the newest fifty of it, so every one of these
+     * has to be answered here.
+     *
+     * It used to take the cursor separately and copy `q`, `kind` and
+     * `compartment` across by name, leaving the rest behind — which is why the
+     * sort control on this screen changed the cache key, refetched the same rows
+     * in the same order, and looked exactly like it was working. */
+    find: {
+      q?: string
+      kind?: string
+      compartment?: string
+      /** "yes" = the sources the assistant may read, "no" = the ones taken away */
+      active?: string
+      sort?: string
+      dir?: string
+      cursor?: string | null
+    } = {}
+  ) => api<PagedResponse<{ sources: KnowledgeSource[] }>>(`/api/content/knowledge${listQuery(find)}`),
   knowledgeOne: (id: string) =>
     api<{ sources: KnowledgeSource[] }>(`/api/content/knowledge?id=${enc(id)}`).then(
       (r) => r.sources[0] ?? null
@@ -631,28 +619,32 @@ export const content = {
    * away) — hand `nextCursor` back for the next one. `total` is the exact server
    * count the heading shows. `view` is 'upcoming' by default. */
   meetings: (
-    cursor?: string | null,
-    view?: "upcoming" | "week" | "all",
-    /** the diary's search box, answered by the DOOR — the list pages, and the
-     * meeting somebody digs for is the OLD one. */
-    q?: string,
-    /** one client's diary — the door already parses it; this is the web half. */
-    accountId?: string,
-    /** ONE SYSTEM'S diary, for the app record's own Meetings tab. Asked of the
-     * SERVER rather than filtered in the browser: the diary pages, so "this
-     * app's meetings among the newest fifty" is an answer that looks like one. */
-    appId?: string,
-    /** WHAT ORDER — a name out of the door's own MEETING_SORTS, with `dir`
-     * flipping it. One trailing object, as on `help` above and for the same
-     * reason. Omit it for the diary's own order, most recent first. */
-    order?: { sort?: string; dir?: string }
+    /** ONE flat object, spread into the query string (`listQuery`), so a filter
+     * cannot be lost on the way to the door — the diary pages, and every one of
+     * these narrows the whole of it rather than the page in hand. */
+    opts: {
+      /** which slice of the diary the screen is standing on */
+      view?: "upcoming" | "week" | "all"
+      /** the diary's search box, answered by the DOOR — the list pages, and the
+       * meeting somebody digs for is the OLD one. */
+      q?: string
+      /** one client's diary */
+      accountId?: string
+      /** ONE SYSTEM'S diary, for the app record's own Meetings tab. */
+      appId?: string
+      /** why we met — the meeting purpose's own id */
+      purposeId?: string
+      /** where it stands: scheduled, held, or called off */
+      status?: string
+      /** WHAT ORDER — a name out of the door's own MEETING_SORTS, with `dir`
+       * flipping it. Omit both for the diary's own order, most recent first. */
+      sort?: string
+      dir?: string
+      cursor?: string | null
+    } = {}
   ) =>
     api<PagedResponse<{ meetings: Meeting[]; weekTotal: number }>>(
-      `/api/content/meetings?view=${enc(view ?? "all")}${q ? `&q=${enc(q)}` : ""}${
-        accountId ? `&accountId=${enc(accountId)}` : ""
-      }${appId ? `&appId=${enc(appId)}` : ""}${order?.sort ? `&sort=${enc(order.sort)}` : ""}${
-        order?.dir ? `&dir=${enc(order.dir)}` : ""
-      }${cursor ? `&cursor=${enc(cursor)}` : ""}`
+      `/api/content/meetings${listQuery(opts)}`
     ),
   /** BRING THE CALENDAR AND THE DIARY INTO STEP, BOTH WAYS (9.7, and the owner's
    * "it should also update consistently if it's a past event").

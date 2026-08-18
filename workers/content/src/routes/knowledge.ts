@@ -67,6 +67,12 @@ export async function getKnowledge(request: Request, env: Env): Promise<Response
     )
   }
   const kind = queryText(url.searchParams.get("kind"), "Kind")
+  // IN USE, OR TAKEN AWAY — an allow-list of two words, checked here so nothing
+  // but our own literal ever reaches the statement (R20). Anything else is
+  // dropped for the same reason an unknown kind is: a filter narrows, and
+  // narrowing by a word that means nothing would answer "no sources" as if the
+  // base were empty.
+  const active = queryText(url.searchParams.get("active"), "In use")
   const filter = {
     // An unknown kind is dropped rather than refused: a filter is a narrowing,
     // and narrowing by a word that is not a kind would answer "nothing" as if
@@ -74,6 +80,7 @@ export async function getKnowledge(request: Request, env: Env): Promise<Response
     kind: kind && (KNOWLEDGE_KINDS as readonly string[]).includes(kind) ? kind : undefined,
     compartment: queryText(url.searchParams.get("compartment"), "Compartment"),
     q: queryText(url.searchParams.get("q"), "Search"),
+    active: active === "yes" || active === "no" ? active : undefined,
   }
   const [page, total] = await Promise.all([
     listSources(

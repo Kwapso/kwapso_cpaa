@@ -30,6 +30,7 @@ import { CollectionHeading } from "@/components/collection-heading"
 import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
+import { translatedFacets } from "@/lib/collection-filters"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { StoryFormDialog, type StoryFormValues } from "@/components/story-form-dialog"
 import { StartTimerStrip } from "@/components/time-panel"
@@ -46,7 +47,7 @@ import { richTextPlain } from "@shared/web/rich-text"
 
 /** One story, as a row. The summary line is a stand-up sentence: where it is,
  * who has it, when it is due, and which request it answers. */
-function shapeStories(stories: Story[], appNames: Map<string, string>) {
+function shapeStories(stories: Story[]) {
   return {
     rows: stories.map((s) => ({
       id: s.id,
@@ -63,14 +64,6 @@ function shapeStories(stories: Story[], appNames: Map<string, string>) {
         ]
           .filter(Boolean)
           .join(" · ") || "—",
-      // Facet columns (read by the filter engine, not the renderer).
-      status: STORY_STATUS_LABEL[s.status],
-      assignee: s.assigneeName ?? "Unassigned",
-      sprint: s.sprintName ?? "No sprint",
-      // The app a story is ON, named. It is a facet here (a way to narrow the
-      // page you are looking at) — the honest, server-counted answer to "all the
-      // work on this system" is the app's own screen, which asks the door.
-      app: (s.appId && appNames.get(s.appId)) || "No app",
     })),
   }
 }
@@ -225,14 +218,31 @@ export function StoriesScreen({
         noun="stories"
         sorts={translatedSorts("stories", t)}
         defaultSort={COLLECTION_SORTS.stories.defaultSort}
+        // FOUR FILTERS, all of them the DOOR's. They were the frame's until
+        // 18 Aug 2026, which is the objection this file already makes two
+        // comments up about narrowing the backlog by app in the browser — made
+        // about the search box, and true of the filter bar underneath it the
+        // whole time. Note the NAMES: the door takes ids (`appId`, `sprintId`,
+        // `assigneeId`) where the frame's facets took the shaped row's words.
+        facets={translatedFacets("stories", t, {
+          assigneeId: options.members.map((m) => ({ value: m.id, label: m.name })),
+          sprintId: options.sprints.map((sp) => ({ value: sp.id, label: sp.name })),
+          appId: options.apps.map((a) => ({ value: a.id, label: a.name })),
+        })}
         fetchPage={(query, cursor) =>
           contentApi
-            // `view: "all"` while searching: somebody looking for a story by name
-            // is as likely to want the finished one, and the everyday backlog
-            // hides those.
             .stories({
-              filter: { q: query.q, view: "all" },
-              order: { sort: query.sort, dir: query.dir },
+              // `view: "all"` while FINDING, and only while finding: somebody
+              // looking for a story by name, or asking for the done ones by
+              // status, is as likely to want the finished one, and the everyday
+              // backlog hides those. It sits here rather than in `fixed` because
+              // `fixed` makes a find active — the resting screen would land in a
+              // `find:` cache key the live registry does not patch (R15), showing
+              // finished work nobody asked for.
+              view: "all",
+              // …then the whole question, spread over it. `listQuery` forwards
+              // every key, so a filter cannot be lost on the way to the door.
+              ...query,
               cursor,
             })
             .then((r) => ({ rows: r.stories, nextCursor: r.nextCursor, total: r.total }))
@@ -241,7 +251,7 @@ export function StoriesScreen({
         {(found) => {
           const rows = found.active ? found.rows : loaded
           if (rows === null) return <Skeleton variant="list" lines={4} />
-          const data = shapeStories(rows, options.appNames)
+          const data = shapeStories(rows)
           const listRecipe = withDataDrivenCollection(recipe, data.rows, found.emptyText)
           return (
             <>

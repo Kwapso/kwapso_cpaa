@@ -57,7 +57,7 @@ export async function searchTickets(
   term: string,
   opts: { appId?: string } = {}
 ): Promise<PickerOption[]> {
-  const r = await content.help("all", null, "live", term || undefined, undefined, undefined, undefined, opts.appId)
+  const r = await content.help({ q: term || undefined, appId: opts.appId })
   return r.tickets
     .filter((t) => t.status !== "resolved")
     .map((t) => ({
@@ -72,7 +72,7 @@ export async function searchStories(
   term: string,
   opts: { appId?: string } = {}
 ): Promise<PickerOption[]> {
-  const r = await content.stories({ filter: { q: term || undefined, appId: opts.appId } })
+  const r = await content.stories({ q: term || undefined, appId: opts.appId })
   return r.stories
     .filter((s) => s.status !== "done")
     .map((s) => ({ value: s.id, label: s.ref ? `${s.ref} · ${s.title}` : s.title }))
