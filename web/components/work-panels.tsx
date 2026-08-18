@@ -45,19 +45,29 @@ export const STORY_STATUS_LABEL: Record<Story["status"], string> = {
   done: "Done",
 }
 
-/** A row in one of these lists — bordered, faded when the record is switched off
- * or finished. Nothing here is ever hidden for being done: "finished" is a state,
- * not an absence, and a sprint's whole point is that you can look back at it. */
+/** A row in one of these lists, faded when the record is switched off or
+ * finished. Nothing here is ever hidden for being done: "finished" is a state,
+ * not an absence, and a sprint's whole point is that you can look back at it.
+ *
+ * IT HAS NO BORDER OF ITS OWN ANY MORE, and its list carries one instead
+ * (`RowList` below). A bordered box per row inside a gapped column draws TWO
+ * cues at every boundary — a drawn line AND a space — where N6 allows exactly
+ * one, and it did it seven times in this file alone. The COLLECTION is the block
+ * that earns a container; a row inside one is a row. */
 function Row({ live, children }: { live: boolean; children: React.ReactNode }) {
   return (
-    <li
-      className={`border-border/60 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 ${
-        live ? "" : "opacity-60"
-      }`}
-    >
+    <li className={`flex flex-wrap items-center gap-2 px-3 py-2 ${live ? "" : "opacity-60"}`}>
       {children}
     </li>
   )
+}
+
+/** The container those rows sit in: one hairline round the collection and one
+ * between each pair, which is N6's "a block earns a container when it holds a
+ * collection of two or more rows". Written once so seven panels cannot drift
+ * into seven spellings of one list. */
+function RowList({ children }: { children: React.ReactNode }) {
+  return <ul className="divide-border divide-y rounded-xl border">{children}</ul>
 }
 
 /** The clickable name of a record, in the URL form the caller arrived through. */
@@ -154,7 +164,7 @@ export function StoriesPanel({
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">{emptyText}</p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <RowList>
           {rows.map((s) => (
             <Row key={s.id} live={s.status !== "done"}>
               <div className="min-w-0 flex-1">
@@ -171,7 +181,7 @@ export function StoriesPanel({
               )}
             </Row>
           ))}
-        </ul>
+        </RowList>
       )}
       {/* R14: the badge above counts ALL of this slice, so the list under it has
           to be able to reach the rest of it. */}
@@ -286,7 +296,7 @@ export function SprintsPanel({
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">{emptyText}</p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <RowList>
           {rows.map((s) => (
             <Row key={s.id} live={!s.completedAt}>
               <div className="min-w-0 flex-1">
@@ -303,7 +313,7 @@ export function SprintsPanel({
               )}
             </Row>
           ))}
-        </ul>
+        </RowList>
       )}
     </div>
   )
@@ -353,7 +363,7 @@ export function AppsPanel({
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("Nothing built for")} {accountName} {t("yet.")}</p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <RowList>
           {rows.map((a) => (
             <Row key={a.id} live={a.active}>
               <div className="min-w-0 flex-1">
@@ -367,7 +377,7 @@ export function AppsPanel({
               )}
             </Row>
           ))}
-        </ul>
+        </RowList>
       )}
     </div>
   )
@@ -416,7 +426,7 @@ export function ProcessesPanel({
           {t("No processes drawn inside this app yet.")}
         </p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <RowList>
           {rows.map((p) => (
             <Row key={p.id} live={p.active}>
               <div className="min-w-0 flex-1">
@@ -434,7 +444,7 @@ export function ProcessesPanel({
               <ChevronRight className="text-muted-foreground size-4" />
             </Row>
           ))}
-        </ul>
+        </RowList>
       )}
       <LoadMore
         listKey={key}
@@ -491,7 +501,7 @@ export function AppMeetingsPanel({
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("No meetings about this app yet.")}</p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <RowList>
           {rows.map((m) => (
             <Row key={m.id} live={m.active}>
               <div className="min-w-0 flex-1">
@@ -507,7 +517,7 @@ export function AppMeetingsPanel({
               )}
             </Row>
           ))}
-        </ul>
+        </RowList>
       )}
       <LoadMore
         listKey={key}
@@ -562,7 +572,7 @@ export function AppTicketsPanel({
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("Nothing has been raised about this app yet.")}</p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <RowList>
           {rows.map((ticket) => (
             <Row key={ticket.id} live={!ticket.archivedAt}>
               <div className="min-w-0 flex-1">
@@ -576,7 +586,7 @@ export function AppTicketsPanel({
               </div>
             </Row>
           ))}
-        </ul>
+        </RowList>
       )}
       <LoadMore
         listKey={key}
@@ -644,7 +654,7 @@ export function TodosPanel({
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("Nothing outstanding with a client.")}</p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <RowList>
           {rows.map((t) => (
             <Row key={t.id} live={!t.completedAt && !t.cancelled}>
               <div className="min-w-0 flex-1">
@@ -677,7 +687,7 @@ export function TodosPanel({
               )}
             </Row>
           ))}
-        </ul>
+        </RowList>
       )}
     </div>
   )

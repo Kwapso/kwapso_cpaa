@@ -172,11 +172,11 @@ export function AppMoneyPanel({ appId, host }: { appId: string; host: { base: st
 
       {/* WHERE IT COMES FROM, process by process — the same drill-down every
           other savings screen offers, with the role and its price added. */}
-      <ul className="flex flex-col gap-2">
+      <ul className="divide-border divide-y rounded-xl border">
         {states.map(({ line, state }) => (
           <li
             key={line.processId}
-            className="border-border/60 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2"
+            className="flex flex-wrap items-center gap-2 px-3 py-2"
           >
             <span className="min-w-0 flex-1 truncate text-sm font-medium">{line.name}</span>
             <span className="text-muted-foreground truncate text-xs">

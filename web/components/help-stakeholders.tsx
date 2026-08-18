@@ -67,11 +67,11 @@ export function HelpStakeholders({
       {stakeholders.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("Just the person who raised it and your admins so far.")}</p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="divide-border divide-y rounded-xl border">
           {stakeholders.map((s) => (
             <li
               key={s.userId}
-              className="border-border/60 flex items-center gap-2 rounded-xl border px-3 py-2"
+              className="flex items-center gap-2 px-3 py-2"
             >
               <Avatar className="size-8">
                 {s.imageUrl && <AvatarImage src={s.imageUrl} alt="" />}

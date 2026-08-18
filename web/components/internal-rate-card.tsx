@@ -158,11 +158,11 @@ export function InternalRateCardScreen({ teamId }: { teamId: string }) {
           {t("No internal rates yet. Until one is set, an hour of our time counts as costing nothing.")}
         </p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="divide-border divide-y rounded-xl border">
           {rates.map((r) => (
             <li
               key={r.id}
-              className={`border-border/60 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 ${
+              className={`flex flex-wrap items-center gap-2 px-3 py-2 ${
                 r.active ? "" : "opacity-60"
               }`}
             >
@@ -377,11 +377,11 @@ export function RoleRateCard({ teamId }: { teamId: string }) {
           {t("No role rates yet. Until one is set, an app's hours are reported without a money figure beside them.")}
         </p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="divide-border divide-y rounded-xl border">
           {rates.map((r) => (
             <li
               key={r.id}
-              className={`border-border/60 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 ${
+              className={`flex flex-wrap items-center gap-2 px-3 py-2 ${
                 r.active ? "" : "opacity-60"
               }`}
             >

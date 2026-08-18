@@ -336,11 +336,11 @@ export function WorkLogsPanel({
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("No time logged against this yet.")}</p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="divide-border divide-y rounded-xl border">
           {rows.map((l) => (
             <li
               key={l.id}
-              className={`border-border/60 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 ${
+              className={`flex flex-wrap items-center gap-2 px-3 py-2 ${
                 l.discarded ? "opacity-60" : ""
               }`}
             >

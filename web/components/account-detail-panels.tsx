@@ -47,7 +47,7 @@ export type PanelActions = {
 function Row({ active, children }: { active: boolean; children: React.ReactNode }) {
   return (
     <li
-      className={`border-border/60 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 ${
+      className={`flex flex-wrap items-center gap-2 px-3 py-2 ${
         active ? "" : "opacity-60"
       }`}
     >
@@ -116,7 +116,7 @@ export function ContactsPanel({
       {links.length === 0 ? (
         <p className="text-muted-foreground text-sm">{t("No contacts yet.")}</p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="divide-border divide-y rounded-xl border">
           {links.map((l) => (
             <Row key={l.id} active={l.active}>
               <button
@@ -217,7 +217,7 @@ export function PortalAccessPanel({
           {t("Nobody here can sign in yet. Give access to someone and they'll see this account's own work.")}
         </p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="divide-border divide-y rounded-xl border">
           {portalUsers.map((p) => (
             <Row key={p.id} active={p.active}>
               <span className="min-w-0 flex-1 truncate text-sm">

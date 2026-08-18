@@ -197,15 +197,17 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
           )}
 
           {files.length > 0 && (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-4">
+              <div className="divide-border divide-y rounded-xl border">
               {files.map((f) => (
-                <div key={f.fileId} className="flex items-center gap-2 rounded-xl border p-2.5 text-sm">
+                <div key={f.fileId} className="flex items-center gap-2 p-3 text-sm">
                   <FileSpreadsheet className="text-muted-foreground size-4 shrink-0" aria-hidden />
                   <span className="min-w-0 flex-1 truncate font-medium">{f.name}</span>
                   <span className="text-muted-foreground shrink-0 text-xs">{f.rowCount} {t("rows")}</span>
                 </div>
               ))}
-              <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-muted-foreground text-xs">
                   {t("Planning uses the assistant (a few credits), so you can review before anything is written.")}
                 </p>
@@ -242,8 +244,24 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
             </p>
           ))}
 
+          {/* THE ANSWER, THEN THE WORKING. `PlanSummary` is what this whole
+              phase is for — how many rows will be written, how many skipped —
+              and it was at the BOTTOM, under a card per file, so a reader had to
+              cross the working to reach the total they came to check (N2 counted
+              five blocks before it). The steps are the audit trail for the three
+              numbers above them, and an audit trail reads perfectly well after
+              the figure it explains. */}
+          <PlanSummary plan={batch.plan} onDownload={downloadRejections} />
+
+          {/* THE STEPS ARE A COLLECTION, so they get ONE container with divided
+              rows inside it (N6). This phase used to draw a bordered card per
+              step inside a bordered plan inside a bordered screen, which is
+              three boundaries between a reader and one fact and the single
+              heaviest use of the border class in either front door — the
+              "twisted" feeling arriving as geometry. */}
+          <div className="divide-border divide-y rounded-xl border">
           {batch.plan.steps.map((step, i) => (
-            <div key={step.fileId} className="flex flex-col gap-4 rounded-xl border p-4">
+            <div key={step.fileId} className="flex flex-col gap-4 p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="outline" className="text-[10px]">
                   {t("Step")} {i + 1}
@@ -325,9 +343,7 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
               )}
             </div>
           ))}
-
-          {/* The honest bottom line — big numbers, so nobody has to count by eye. */}
-          <PlanSummary plan={batch.plan} onDownload={downloadRejections} />
+          </div>
 
           <div className="flex flex-wrap justify-end gap-2">
             <Button variant="outline" onClick={() => setPhase("upload")} disabled={busy}>
@@ -349,14 +365,21 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
             <Stat label={t("Failed")} value={report.failed} tone={report.failed ? "bad" : "muted"} />
           </div>
 
-          {report.perTarget.map((t) => (
-            <div key={t.target} className="flex items-center gap-2 rounded-xl border p-2.5 text-sm">
-              <span className="flex-1 font-medium">{t.targetName}</span>
-              <span className="text-muted-foreground text-xs">
-                {t.created} added · {t.skipped} skipped · {t.failed} failed
-              </span>
+          {report.perTarget.length > 0 && (
+            // ONE container round the collection, `divide-y` inside it (N6). It
+            // was a bordered box per row, which draws a boundary AND leaves a
+            // gap at every one of them — two cues where the rule allows one.
+            <div className="divide-border divide-y rounded-xl border">
+              {report.perTarget.map((t) => (
+                <div key={t.target} className="flex items-center gap-2 p-3 text-sm">
+                  <span className="flex-1 font-medium">{t.targetName}</span>
+                  <span className="text-muted-foreground text-xs">
+                    {t.created} added · {t.skipped} skipped · {t.failed} failed
+                  </span>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
 
           {report.rejections.length > 0 && (
             <div className="flex flex-col gap-2">
@@ -409,9 +432,9 @@ function PastImports({ teamId }: { teamId: string }) {
   return (
     <div className="flex flex-col gap-2">
       <p className="text-sm font-medium">{t("Past imports")}</p>
-      <div className="flex flex-col gap-2">
+      <div className="divide-border divide-y rounded-xl border">
         {batches.map((b) => (
-          <div key={b.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border p-2.5 text-xs">
+          <div key={b.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 p-3 text-xs">
             <span className="font-medium">{b.by}</span>
             <span className="text-muted-foreground">{formatActivityWhen(b.at)}</span>
             <span className="text-muted-foreground min-w-0 flex-1 truncate">
@@ -485,8 +508,12 @@ function Stat({ label, value, tone }: { label: string; value: number; tone: "goo
         : tone === "bad"
           ? "text-destructive"
           : "text-muted-foreground"
+  // N6: a single stat is not a collection of two or more rows and not a form of
+  // two or more fields, so it never earned a container. Three of them are ONE
+  // band — the row is the group, and the numbers are big enough to be found
+  // without a box drawn round each.
   return (
-    <div className="flex-1 rounded-xl border p-3 text-center">
+    <div className="flex-1 text-center">
       <p className={`text-2xl font-bold ${color}`}>{value}</p>
       <p className="text-muted-foreground text-xs">{label}</p>
     </div>

@@ -44,7 +44,7 @@ function Row({
   onClick?: () => void
   children: React.ReactNode
 }) {
-  const className = `border-border/60 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 ${
+  const className = `flex flex-wrap items-center gap-2 px-3 py-2 ${
     active ? "" : "opacity-60"
   } ${onClick ? "hover:bg-muted/40 cursor-pointer text-left" : ""}`
   return (
@@ -82,7 +82,7 @@ export function CompaniesPanel({
       </p>
     )
   return (
-    <ul className="flex flex-col gap-2">
+    <ul className="divide-border divide-y rounded-xl border">
       {companies.map((c) => (
         <Row key={c.id} active={c.active} onClick={() => onOpen(c.accountId)}>
           <span className="min-w-0 flex-1 truncate text-sm">{c.personName}</span>
@@ -132,7 +132,7 @@ export function ContactTicketsPanel({
   // sibling form we arrived through, so the section swap keeps the same shape.
   const ticketsBase = basePath.replace(/\/accounts$/, "/tickets")
   return (
-    <ul className="flex flex-col gap-2">
+    <ul className="divide-border divide-y rounded-xl border">
       {q.data.map((ticket) => (
         <Row key={ticket.id} onClick={() => softNavigate(`${ticketsBase}/${ticket.id}`)}>
           <div className="min-w-0 flex-1">
@@ -170,7 +170,7 @@ export function ContactMeetingsPanel({
     return <p className="text-muted-foreground text-sm">{t("No meetings with them yet.")}</p>
   const meetingsBase = basePath.replace(/\/accounts$/, "/meetings")
   return (
-    <ul className="flex flex-col gap-2">
+    <ul className="divide-border divide-y rounded-xl border">
       {q.data.map((m) => (
         <Row key={m.id} onClick={() => softNavigate(`${meetingsBase}/${m.id}`)}>
           <div className="min-w-0 flex-1">

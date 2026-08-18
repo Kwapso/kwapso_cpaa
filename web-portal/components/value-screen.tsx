@@ -180,14 +180,20 @@ export function ValueScreen({ ready }: { ready: PortalReady }) {
         </p>
       </div>
 
-      <section className="rounded-xl border p-6">
+      {/* THE HEADLINE, BARE ON THE PAGE. It is a label, a number and the
+          sentence that makes the number honest — not a collection of two or more
+          rows and not a form of two or more fields, so it never earned a
+          container (N6). A 3xl figure with `gap-6` round it is found by the eye
+          without a box drawn to point at it, and on the screen a client is most
+          likely to show somebody else, one fewer drawn line is worth having. */}
+      <section className="flex flex-col gap-2">
         <p className="text-muted-foreground text-sm">{t("Time given back, every month")}</p>
         <p className="text-3xl font-semibold tracking-tight">
           {hoursText(data.savedSecondsPerMonth)}
         </p>
         {/* R25 — the sentence that makes the number honest, from the one place it
             is written. Never assembled here. */}
-        <p className="text-muted-foreground mt-3 text-sm">{data.caption ?? SAVINGS_CAPTION}</p>
+        <p className="text-muted-foreground text-sm">{data.caption ?? SAVINGS_CAPTION}</p>
       </section>
 
       {/* WHAT YOU BOUGHT — only when we were sent it. No flag on this side. */}
@@ -239,9 +245,8 @@ export function ValueScreen({ ready }: { ready: PortalReady }) {
             the axis are on for exactly that: a bar going the wrong way has to be
             readable as such. */}
         {appChart.length > 1 && (
-          <div className="rounded-xl border p-4">
-            <AppSavingsChart rows={appChart} label={t("Hours a month")} />
-          </div>
+          // A chart is one picture, not a collection of rows — bare (N6).
+          <AppSavingsChart rows={appChart} label={t("Hours a month")} />
         )}
 
         <Accordion type="multiple" className="rounded-xl border px-4">

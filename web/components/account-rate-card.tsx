@@ -112,11 +112,11 @@ export function AccountRateCard({
           {t("No rates set for")} {accountName} {t("yet, nothing is being charged by the hour.")}
         </p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="divide-border divide-y rounded-xl border">
           {rates.map((r) => (
             <li
               key={r.id}
-              className={`border-border/60 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 ${
+              className={`flex flex-wrap items-center gap-2 px-3 py-2 ${
                 r.active ? "" : "opacity-60"
               }`}
             >
