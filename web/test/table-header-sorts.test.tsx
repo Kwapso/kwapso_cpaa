@@ -237,7 +237,14 @@ describe("Tasks: the rows move when the header is clicked", () => {
         oneWay
       )
     }
-  })
+    // 20s, not the 5s default. This one test renders the whole Tasks screen TEN
+    // times — five columns, both directions — so it costs about five times what
+    // any of its neighbours does, and on a loaded machine it lands either side
+    // of 5s. It failed the SHIP GATE once that way while passing `npm run check`
+    // minutes earlier, which is the worst kind of red: nothing was wrong, and
+    // the lesson a tired person takes from it is to re-run until green. A gate
+    // that teaches people to ignore it has stopped being a gate.
+  }, 20_000)
 })
 
 describe("the rest of the collection's chrome survived the swap", () => {
