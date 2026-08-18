@@ -21,7 +21,7 @@ import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { TabsView, defaultTabsConfig } from "@kwapso/ui/registry/primitives/tabs/tabs"
-import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
+import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import { CalendarPlus, CheckCheck, FileText, Pencil, Power } from "lucide-react"
 
 import type { Account, AppRow, Meeting, MeetingPurpose } from "@shared/types"
@@ -40,6 +40,8 @@ import { appsKey, listFetch, meetingsKey } from "@/lib/live-resources"
 import { usePermissions } from "@/lib/perms"
 import { formatCount } from "@shared/web/format-count"
 import { formatDateTime, toLocalInput } from "@shared/web/format"
+import { RichText } from "@shared/web/rich-text-view"
+import { richTextValue } from "@shared/web/rich-text"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
 import { useT } from "@shared/web/language"
@@ -171,7 +173,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
         purposeId: now.purposeId,
         location: now.location,
         agenda: now.agenda,
-        notes: notes || null,
+        notes: richTextValue(notes) || null,
       })
       patchLists(meeting)
       setNotesDraft(null)
@@ -346,7 +348,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
               <section className="flex flex-col gap-2">
                 <h2 className="text-muted-foreground text-sm font-medium">Agenda</h2>
                 {item.agenda ? (
-                  <p className="text-sm whitespace-pre-wrap">{item.agenda}</p>
+                  <RichText html={item.agenda} />
                 ) : (
                   <p className="text-muted-foreground text-sm">Nothing written down yet.</p>
                 )}
@@ -362,13 +364,15 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
                 <h2 className="text-muted-foreground text-sm font-medium">Notes</h2>
                 {canEdit && item.active && item.status !== "held" ? (
                   <>
-                    <Textarea
-                      rows={8}
-                      value={notesDraft ?? item.notes ?? ""}
-                      onChange={(e) => setNotesDraft(e.target.value)}
+                    {/* Uncontrolled, and keyed on the ROW so the editor re-seeds
+                        when the saved notes change under it (a colleague typing
+                        into the same meeting) but not on every keystroke. */}
+                    <Notes
+                      key={item.id}
+                      defaultValue={item.notes ?? ""}
+                      onChange={(html) => setNotesDraft(html)}
                       placeholder="Type as you go, this is the part worth keeping."
-                      disabled={busy !== null}
-                      aria-label="Notes"
+                      className="min-h-40"
                     />
                     <div className="flex justify-end">
                       <Button
@@ -383,7 +387,7 @@ export function MeetingDetailScreen({ teamId, meetingId }: { teamId: string; mee
                     </div>
                   </>
                 ) : item.notes ? (
-                  <p className="text-sm whitespace-pre-wrap">{item.notes}</p>
+                  <RichText html={item.notes} />
                 ) : (
                   <p className="text-muted-foreground text-sm">
                     Nothing written up yet, the notes are the part worth keeping.

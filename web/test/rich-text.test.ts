@@ -1,4 +1,4 @@
-// web/lib/rich-text.ts is the RENDER SECURITY BOUNDARY, in two halves:
+// shared/web/rich-text.ts is the RENDER SECURITY BOUNDARY, in two halves:
 //
 //  • sanitizeRichHtml — user-authored article HTML (the Notes editor). What it
 //    returns is injected into the page, so it must keep formatting but drop
@@ -16,8 +16,8 @@ import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
 import { sourceFiles } from "@shared/rules/source-scan"
-import { toHtml } from "@/lib/agent-markdown-html"
-import { looksLikeHtml, richTextPlain, safeHref, safeSrc, sanitizeRichHtml } from "@/lib/rich-text"
+import { toHtml } from "@shared/web/markdown-html"
+import { looksLikeHtml, richTextPlain, safeHref, safeSrc, sanitizeRichHtml } from "@shared/web/rich-text"
 
 describe("sanitizeRichHtml", () => {
   it("keeps allowlisted formatting + lists", () => {

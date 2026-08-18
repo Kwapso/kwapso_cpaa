@@ -58,6 +58,7 @@ import { useRecordActivity } from "@/lib/use-record-activity"
 import type { Account, AppRow } from "@shared/types"
 import { invalidate, useCached, useCachedValue } from "@shared/web/store"
 import { useT } from "@shared/web/language"
+import { RichText } from "@shared/web/rich-text-view"
 
 export function AppDetailScreen({
   teamId,
@@ -218,9 +219,12 @@ export function AppDetailScreen({
   const overviewItems = [
     { label: t("Client"), value: accountName ?? "Ours, no client" },
     { label: t("Stage"), value: app.stage ? `${appStageMark(app.stage)} ${app.stage}`.trim() : "—" },
-    { label: t("About"), value: app.about || "—" },
-    { label: t("Client context"), value: app.clientContext || "—" },
-    { label: t("Solution"), value: app.solution || "—" },
+    { label: t("About"), value: app.about ? <RichText html={app.about} /> : "—" },
+    {
+      label: t("Client context"),
+      value: app.clientContext ? <RichText html={app.clientContext} /> : "—",
+    },
+    { label: t("Solution"), value: app.solution ? <RichText html={app.solution} /> : "—" },
     { label: t("Key actors"), value: app.keyActors || "—" },
     // WHO IS ON IT, both sides (8.10 + 8.5). High on the Overview rather than
     // under the audit block: "who do I ask about this?" is the question a person

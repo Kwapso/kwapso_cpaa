@@ -44,6 +44,7 @@ import { useFormDraft } from "@shared/web/use-form-draft"
 import { useCached } from "@shared/web/store"
 import type { HelpTicket, Story, WorkLog } from "@shared/types"
 import { useT } from "@shared/web/language"
+import { richTextPlain } from "@shared/web/rich-text"
 
 export type TimeFormValues = {
   targetTable: string
@@ -122,7 +123,9 @@ export function TimeFormDialog({
       .filter((t) => t.status !== "resolved")
       .map((t) => ({
         value: `help:${t.id}`,
-        label: t.ref ? `${t.ref} · ${t.description.slice(0, 60)}` : t.description.slice(0, 60),
+        label: t.ref
+          ? `${t.ref} · ${richTextPlain(t.description).slice(0, 60)}`
+          : richTextPlain(t.description).slice(0, 60),
       })),
   ]
 

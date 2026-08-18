@@ -33,7 +33,8 @@ import {
 } from "@kwapso/ui/registry/primitives/dialog/dialog"
 import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
-import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
+import { richTextValue } from "@shared/web/rich-text"
+import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import {
   Select,
   SelectContent,
@@ -161,7 +162,7 @@ export function HelpFormDialog({
     setBusy(true)
     try {
       await onSubmit({
-        description: values.description.trim(),
+        description: richTextValue(values.description),
         helpType: values.helpType === NONE ? undefined : values.helpType,
         // On a ticket that already has a client, send the one it has — the door
         // accepts naming the SAME client and refuses naming a different one, so
@@ -207,18 +208,16 @@ export function HelpFormDialog({
       }
       submit={{
         busy: busy,
-        disabled: !values.description.trim(),
+        disabled: !richTextValue(values.description),
       }}
     >
       <Field config={descField} htmlFor="help-desc" className={fieldSpacing}>
-        <Textarea
-          id="help-desc"
-          value={values.description}
-          onChange={(e) => setValues((v) => ({ ...v, description: e.target.value }))}
+        <Notes
+          key={open ? "open" : "shut"}
+          defaultValue={values.description}
+          onChange={(html) => setValues((v) => ({ ...v, description: html }))}
           placeholder={t("Tell us what's going on, e.g. I can't invite a new member, the button is greyed out.")}
-          disabled={busy}
-          rows={4}
-          autoFocus
+          className="min-h-32"
         />
       </Field>
       <Field config={typeField} htmlFor="help-type" className={fieldSpacing}>

@@ -27,6 +27,7 @@ import { ApiFailure, delivery } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 import type { Todo } from "@shared/types"
 import { useT } from "@shared/web/language"
+import { RichText } from "@shared/web/rich-text-view"
 
 /** What a browser will turn into a data URL for us. Generous for a logo or a
  * signed PDF; the door caps it again at 10 MB, which is the cap that counts. */
@@ -67,7 +68,7 @@ export function WaitingOnYou() {
           <li key={t.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">
             <div className="min-w-0">
               <p className="font-medium">{t.title}</p>
-              {t.detail && <p className="text-muted-foreground text-sm">{t.detail}</p>}
+              {t.detail && <RichText html={t.detail} className="text-muted-foreground" />}
               <p className="text-muted-foreground text-sm">
                 {t.dueOn ? `By ${formatDate(t.dueOn)}` : "No date on it"}
                 {t.ref ? ` · ${t.ref}` : ""}

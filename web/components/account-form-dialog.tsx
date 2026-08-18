@@ -52,7 +52,7 @@ import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
 import { ApiFailure, tenancy } from "@/lib/api"
 import { fileToDataUrl } from "@/lib/image"
-import { safeSrc } from "@/lib/rich-text"
+import { safeSrc } from "@shared/web/rich-text"
 import { LANGUAGES } from "@shared/i18n"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { useCached } from "@shared/web/store"

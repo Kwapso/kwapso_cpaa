@@ -56,6 +56,8 @@ import { ActivityPanel } from "@/components/activity-panel"
 import { totalKey } from "@/lib/live-resources"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { useT } from "@shared/web/language"
+import { RichText } from "@shared/web/rich-text-view"
+import { richTextPlain } from "@shared/web/rich-text"
 
 // LIBRARY ⇄ SERVER status. These were one-to-one until the work engine gave the
 // ticket its five states (SCOPE ch.07); the library's `TicketStatus` has four,
@@ -496,7 +498,10 @@ export function HelpDetailScreen({
       eyebrow={[ticket.helpType || t("Ticket"), ticket.ref, ticket.archivedAt ? t("Archived") : null]
         .filter(Boolean)
         .join(" · ")}
-      title={ticket.description}
+      // The description is rich text now, and a TITLE is one line: the words,
+      // without the markup they were typed with. The body renders formatted in
+      // the conversation below, which is where a person reads it.
+      title={richTextPlain(ticket.description)}
       // D5: one line, three facts at most.
       status={[STATUS_LABEL[ticket.status], ticket.appName, ticket.raisedByContactName]
         .filter(Boolean)
@@ -544,7 +549,7 @@ export function HelpDetailScreen({
           return (
             <TicketThread
               ticket={{
-                description: ticket.description,
+                description: <RichText html={ticket.description} />,
                 type: ticket.helpType || "General",
                 status: TO_LIBRARY[ticket.status],
                 fromScreen: ticket.sourceScreen ? { label: ticket.sourceScreen } : undefined,

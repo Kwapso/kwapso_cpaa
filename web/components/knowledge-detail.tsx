@@ -35,11 +35,12 @@ import { auditItems } from "@/lib/audit-overview"
 import { appsKey, knowledgeKey, listFetch } from "@/lib/live-resources"
 import { formatCount } from "@shared/web/format-count"
 import { formatDateTime } from "@shared/web/format"
-import { safeHref } from "@/lib/rich-text"
+import { safeHref } from "@shared/web/rich-text"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
 import { useT } from "@shared/web/language"
+import { RichText } from "@shared/web/rich-text-view"
 
 export function KnowledgeDetailScreen({
   teamId,
@@ -298,10 +299,12 @@ export function KnowledgeDetailScreen({
                 </p>
               ) : null}
               {item.body ? (
-                // The material itself, as text. Deliberately NOT rendered as
-                // rich text: what is shown here has to be what the assistant
-                // reads, and the assistant reads the plain words.
-                <p className="text-sm whitespace-pre-wrap">{item.body}</p>
+                // The material itself. An article somebody wrote here is HTML, a
+                // mirrored document is plain words or markdown, and RichText picks
+                // the pipeline — so what is on screen is the same WORDS the
+                // assistant reads (it is handed plainText of this body), laid out
+                // the way they were written instead of as literal markup.
+                <RichText html={item.body} />
               ) : (
                 <p className="text-muted-foreground text-sm">No text yet.</p>
               )}

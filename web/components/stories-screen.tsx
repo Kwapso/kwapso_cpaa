@@ -40,6 +40,7 @@ import type { AppRow, HelpTicket, ProcessSummary, SelectableValue, Sprint, Story
 import { formatDate } from "@shared/web/format"
 import { invalidate, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
+import { richTextPlain } from "@shared/web/rich-text"
 
 /** One story, as a row. The summary line is a stand-up sentence: where it is,
  * who has it, when it is due, and which request it answers. */
@@ -114,7 +115,7 @@ export function useStoryFormOptions(teamId: string) {
       .filter((t) => t.status !== "resolved" && !t.archivedAt)
       .map((t) => ({
         id: t.id,
-        label: t.ref ? `${t.ref} · ${t.description}` : t.description,
+        label: t.ref ? `${t.ref} · ${richTextPlain(t.description)}` : richTextPlain(t.description),
         appId: t.appId,
       })),
     processes: (processesQ.data ?? [])

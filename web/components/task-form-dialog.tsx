@@ -35,7 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
-import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
+import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Plus } from "lucide-react"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
@@ -44,6 +44,7 @@ import { FilePicker } from "@/components/file-picker"
 import { ApiFailure } from "@/lib/api"
 import { PRIORITY_LABEL, departmentAsks, departmentGlyph, priorityScore } from "@shared/departments"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
+import { richTextValue } from "@shared/web/rich-text"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useT } from "@shared/web/language"
 
@@ -139,7 +140,7 @@ export function TaskFormDialog({
     try {
       await onSubmit({
         title: values.title.trim(),
-        detail: values.detail.trim(),
+        detail: richTextValue(values.detail),
         dueOn: values.dueOn,
         assigneeId: values.assigneeId,
         department: values.department,
@@ -213,12 +214,11 @@ export function TaskFormDialog({
         />
       </Field>
       <Field config={detailField} htmlFor="task-detail" className={fieldSpacing}>
-        <Textarea
-          id="task-detail"
-          value={values.detail}
-          onChange={(e) => setValues((s) => ({ ...s, detail: e.target.value }))}
-          disabled={busy}
-          rows={2}
+        <Notes
+          key={open ? "open" : "shut"}
+          defaultValue={values.detail}
+          onChange={(html) => setValues((s) => ({ ...s, detail: html }))}
+          className="min-h-32"
         />
       </Field>
       <Field config={assigneeField} htmlFor="task-assignee" className={fieldSpacing}>

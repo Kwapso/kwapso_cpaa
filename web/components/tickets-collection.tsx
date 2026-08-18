@@ -64,6 +64,7 @@ import { formatRelative } from "@shared/web/format"
 import { invalidate, useCached, useCachedValue } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 import type { HelpTicket } from "@shared/types"
+import { richTextPlain } from "@shared/web/rich-text"
 
 /** The two facets that are STAGES rather than kinds, and the tab each one is.
  * Named here so the strip's shape is readable in one place: Ready first because
@@ -307,7 +308,7 @@ function TriageQueue({ teamId, canTriage }: { teamId: string; canTriage: boolean
         <li key={w.id} className="flex flex-wrap items-center gap-3 py-3">
           <AlarmClock className="text-destructive size-4 shrink-0" />
           <span className="min-w-0 flex-1 truncate text-sm">
-            {[w.ref, w.description].filter(Boolean).join(" · ")}
+            {[w.ref, richTextPlain(w.description)].filter(Boolean).join(" · ")}
           </span>
           <span className="text-muted-foreground text-xs tabular-nums">
             {`${w.days} days · ${formatRelative(w.createdAt)}`}

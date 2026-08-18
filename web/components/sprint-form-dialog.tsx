@@ -33,7 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@kwapso/ui/registry/primitives/select/select"
-import { Textarea } from "@kwapso/ui/registry/primitives/textarea/textarea"
+import { Notes } from "@kwapso/ui/registry/primitives/notes/notes"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
 
@@ -41,6 +41,7 @@ import { ApiFailure, tenancy } from "@/lib/api"
 import { accountsKey, listFetch } from "@/lib/live-resources"
 import { useActiveTeam } from "@/lib/use-active-team"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
+import { richTextValue } from "@shared/web/rich-text"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { useCached } from "@shared/web/store"
 import type { Account, SelectableValue } from "@shared/types"
@@ -225,7 +226,7 @@ export function SprintFormDialog({
     try {
       await onSubmit({
         name: values.name.trim(),
-        goal: values.goal.trim(),
+        goal: richTextValue(values.goal),
         sprintType: values.sprintType,
         accountId: values.accountId,
         appId: fixedApp ? fixedApp.id : values.appId,
@@ -356,13 +357,12 @@ export function SprintFormDialog({
         )}
       </Field>
       <Field config={goalField} htmlFor="sprint-goal" className={fieldSpacing}>
-        <Textarea
-          id="sprint-goal"
-          value={values.goal}
-          onChange={(e) => setValues((s) => ({ ...s, goal: e.target.value }))}
+        <Notes
+          key={open ? "open" : "shut"}
+          defaultValue={values.goal}
+          onChange={(html) => setValues((s) => ({ ...s, goal: html }))}
           placeholder={t("What this block of work is meant to achieve.")}
-          disabled={busy}
-          rows={2}
+          className="min-h-32"
         />
       </Field>
       <Field config={startField} htmlFor="sprint-start" className={fieldSpacing}>

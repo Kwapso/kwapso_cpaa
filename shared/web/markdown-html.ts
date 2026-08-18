@@ -7,7 +7,7 @@
 // lists, and blank-line paragraphs / soft line breaks. Pure string functions (no
 // JSX) so they're unit-testable; the AgentMarkdown component just wraps toHtml.
 
-import { escapeAttr, escapeText, safeHref } from "@/lib/rich-text"
+import { escapeAttr, escapeText, safeHref } from "@shared/web/rich-text"
 
 // Inline spans, applied to ALREADY-ESCAPED text. Code runs first so its contents
 // can't be re-interpreted as bold/italic; links before emphasis so a URL's own

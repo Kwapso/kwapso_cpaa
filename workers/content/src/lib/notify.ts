@@ -14,6 +14,7 @@ import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
 import type { MemberGuard } from "@shared/workers/gating"
 import { sendBrandedEmail as send, teamName } from "@shared/workers/notify"
 import type { Env } from "../env"
+import { plainText } from "./knowledge-text"
 
 /** Look up email + display name for tagged ids — restricted to ACTIVE members of
  * THIS team (join team_members). A @mention can only notify a teammate, never an
@@ -109,9 +110,15 @@ async function sendToMany(
     await Promise.all(list.slice(i, i + SEND_CONCURRENCY).map(one))
 }
 
-/** A short, safe preview of the reply text for the email body. */
+/** A short, safe preview of a body for the email itself.
+ *
+ * `plainText` FIRST, because a ticket description is rich text now: the words go
+ * into the mail, the markup they were typed with does not. The email template
+ * escapes what it is given (shared/workers/email-template `esc`), so an unstripped
+ * body would arrive as visible `<p>` tags in somebody's inbox — not a hole, just
+ * the wrong thing to send. It is a no-op on the bodies that are still plain. */
 function snippet(body: string): string {
-  const clean = body.trim().replace(/\s+/g, " ")
+  const clean = plainText(body).replace(/\s+/g, " ")
   return clean.length > 160 ? clean.slice(0, 157) + "..." : clean
 }
 

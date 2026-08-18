@@ -66,8 +66,16 @@ import { HelpFormDialog } from "@/components/help-form-dialog"
 
 afterEach(cleanup)
 
-const type = (label: RegExp, value: string) =>
-  fireEvent.change(screen.getByLabelText(label), { target: { value } })
+/** Write the ticket's own words. The description is a RICH-TEXT field now, so it
+ * is not a `<textarea>` with a value to set: it is the library `Notes` editor,
+ * a contentEditable that emits its HTML on `input`. Drive the real control —
+ * the point of this suite is that the dialog a person actually uses reaches
+ * `onSubmit` with what they typed. */
+const write = (html: string) => {
+  const box = document.querySelector('[contenteditable="true"]') as HTMLElement
+  box.innerHTML = html
+  fireEvent.input(box)
+}
 
 /** The dialog renders in a PORTAL, so the form is on the document rather than in
  * render()'s own container. */
@@ -104,11 +112,15 @@ describe("raising a ticket in the agency app", () => {
         teamId="team-1"
       />
     )
-    type(/what do you need help with/i, "Internal: rotate the D1 token")
+    write("<p>Internal: rotate the D1 token</p>")
     submitForm()
     await waitFor(() => expect(onSubmit).toHaveBeenCalled())
     // undefined, not the empty-select sentinel — the door reads this straight.
     expect(onSubmit.mock.calls[0][0]).toMatchObject({ accountId: undefined })
+    // …and the words survive the round trip through the editor.
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({
+      description: "<p>Internal: rotate the D1 token</p>",
+    })
   })
 
   it("keeps the client a ticket already has, and does not offer to move it", async () => {
