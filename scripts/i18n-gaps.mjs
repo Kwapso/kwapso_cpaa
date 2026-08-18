@@ -54,7 +54,9 @@ const LANGS = [...readFileSync(join(ROOT, "shared", "i18n.ts"), "utf8")
   .matchAll(/\{\s*code:\s*"([a-z]{2})"/g)]
   .map((m) => m[1])
   .filter((c) => c !== "en")
-for (const langs of spoken.values()) for (const l of [...langs]) if (!LANGS.includes(l)) langs.delete(l)
+/* Deleting from a Set while iterating it is defined behaviour — an entry
+ * removed before it is reached is simply not visited — so no copy is needed. */
+for (const langs of spoken.values()) for (const l of langs) if (!LANGS.includes(l)) langs.delete(l)
 const missingAll = strings.filter((s) => !spoken.has(s))
 
 if (process.argv.includes("--list")) {
