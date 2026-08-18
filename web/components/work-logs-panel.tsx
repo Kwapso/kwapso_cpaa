@@ -344,31 +344,52 @@ export function WorkLogsPanel({
                 l.discarded ? "opacity-60" : ""
               }`}
             >
+              {/* WHO AND WHEN, and that is the whole sentence. It carried the
+                  kind of work and the note as well — seven units with the
+                  duration, the Discarded badge and the Edit button, which is the
+                  same eight-fact row the Work logs SCREEN had and the same fix
+                  (N1, K1). The kind is a STATE, so it is a badge at the end of
+                  the line; the note is a paragraph somebody wrote, and a list is
+                  not where anybody reads one — it is in the correction dialog,
+                  which is where it was written.
+
+                  Fixing it here fixes it FOUR times: this panel is hung on a
+                  story, a ticket, a task and a meeting, which is the whole
+                  reason the list was written once. */}
               <span className="min-w-0 flex-1 truncate text-sm">
-                {[l.userName, l.startedAt.slice(0, 10), l.kind, l.note].filter(Boolean).join(" · ")}
+                {[l.userName, l.startedAt.slice(0, 10)].filter(Boolean).join(" · ")}
               </span>
-              <span className="text-muted-foreground text-xs">
-                {l.endedAt ? spell(l.seconds) : t("running")}
-              </span>
+              {l.kind && (
+                <Badge variant="secondary" className="shrink-0 text-[10px]">
+                  {l.kind}
+                </Badge>
+              )}
               {l.discarded && (
-                <Badge variant="outline" className="text-muted-foreground text-[10px]">
+                <Badge variant="outline" className="text-muted-foreground shrink-0 text-[10px]">
                   {t("Discarded")}
                 </Badge>
               )}
+              <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                {l.endedAt ? spell(l.seconds) : t("running")}
+              </span>
               {/* FIX A LINE. Only on time that has FINISHED and has not been
                   binned: a running timer is corrected by stopping it (the control
                   for that is on the header bar, on every screen), and a start time
                   you can edit while the clock is still counting is two people
-                  writing the same number. */}
+                  writing the same number.
+
+                  Icon only, in the trailing slot, for the same reason as the Work
+                  logs screen: the word "Edit" beside a pencil on every row is one
+                  word repeated as many times as there are rows. */}
               {canEdit && l.endedAt && !l.discarded && (
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="icon"
                   onClick={() => setEditingLog(l)}
-                  className="shrink-0 gap-1.5"
+                  className="shrink-0"
+                  aria-label={t("Edit")}
                 >
                   <Pencil className="size-3.5" />
-                  {t("Edit")}
                 </Button>
               )}
             </li>
