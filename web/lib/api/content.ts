@@ -477,11 +477,15 @@ export const content = {
     api<{ sources: KnowledgeSource[] }>(`/api/content/knowledge?id=${enc(id)}`).then(
       (r) => r.sources[0] ?? null
     ),
-  /** Ask the knowledge base a question. A READ — it writes nothing and answers
-   * with passages plus the sources they came from (Law R23). */
-  askKnowledge: (question: string, accountId?: string | null) =>
+  /** Ask the knowledge base a question. Answers with the passages plus the sources
+   * they came from (Law R23) and, when `compose` is set, the answer written out of
+   * exactly those passages — which costs one unit of the team's AI allowance and
+   * needs the assistant right, so the screen only asks when the person has it. */
+  askKnowledge: (question: string, accountId?: string | null, compose?: boolean) =>
     api<KnowledgeAnswer>(
-      `/api/content/knowledge/ask?q=${enc(question)}${accountId ? `&accountId=${enc(accountId)}` : ""}`
+      `/api/content/knowledge/ask?q=${enc(question)}${accountId ? `&accountId=${enc(accountId)}` : ""}${
+        compose ? "&compose=1" : ""
+      }`
     ),
   knowledgeStatus: () =>
     api<{

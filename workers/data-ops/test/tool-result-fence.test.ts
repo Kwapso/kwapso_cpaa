@@ -23,7 +23,8 @@
 import { describe, expect, it } from "vitest"
 
 import { SYSTEM } from "../src/lib/agent"
-import { fenceToolResult, selectModel, TOOL_RESULT_TAG, type ChatMessage } from "../src/lib/model"
+import { selectModel, type ChatMessage } from "../src/lib/model"
+import { fenceToolResult, TOOL_RESULT_TAG } from "@shared/workers/model-text"
 
 /** A Workers AI binding that records the body it was handed and answers nothing
  * interesting — the request is what is under test, not the reply. */

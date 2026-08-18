@@ -588,15 +588,27 @@ pay Anthropic, they're hitting our endpoints.
 |---|---|---|
 | `agent_chat`, `agent_confirm` | Yes, one assistant turn each | The **team's AI quota** (free per day + purchased credits) AND needs the **AI-agent right** |
 | `plan_import` | Yes, one assistant unit per plan | The team's AI quota |
+| `ask_knowledge` **with `compose`** | Yes, one unit per question | The team's AI quota AND needs the **AI-agent create right** |
 | everything else | No |, |
 
-**Where the knowledge tools fall.** `ask_knowledge` is a READ and sits on the free
-side of that table: it spends ONE embedding of the question, a rounding error beside
-an assistant turn, and no model writes a word. `sync_knowledge` spends one embedding
-per CHANGED chunk and nothing at all for a row whose text has not moved, so filling the
-base for the first time over an agency's entire history measured at roughly a cent, and
-the steady state at about nothing. `agent_chat` and `agent_confirm` remain the only
-tools here that draw a whole assistant turn.
+**Where the knowledge tools fall, and the one line in the table that has two sides.**
+`ask_knowledge` is a READ and it is free *as you will normally call it*: finding the
+material spends ONE embedding of the question, a rounding error beside an assistant
+turn, and nothing writes a word. Set `compose` and the app additionally writes the
+answer out of those passages on a cheap model and returns it as `answer` — one unit
+of the team's quota, one model call, gated on the same **AI-agent create right** as
+`agent_chat`, so a token without the assistant gets the passages and spends nothing,
+exactly as it did before the flag existed.
+
+**Leave `compose` off unless you have nothing that can write.** An assistant calling
+this composes its own reply from the passages — that is what Law R23 is for — so
+asking the app to write one as well pays for the same answer twice. The flag exists
+for a caller that has no model of its own; kwapso's own Knowledge tab is one, which
+is why the flag is there at all.
+
+`sync_knowledge` spends one embedding per CHANGED chunk and nothing at all for a row
+whose text has not moved, so filling the base for the first time over an agency's
+entire history measured at roughly a cent, and the steady state at about nothing.
 
 That AI cost lands on **the team's quota** (our Anthropic key), **not** on the
 developer. So two levers keep it under control:
@@ -606,10 +618,11 @@ developer. So two levers keep it under control:
    top-up). When it's spent, `agent_chat` / `plan_import` return a clean "out of AI
    requests" (HTTP 429) until it resets or an admin adds credits. A runaway script
    can't run up an unbounded bill, it hits the quota wall.
-2. **Scope the role.** A token can only call `agent_chat` / `agent_confirm` if its
-   role holds the **AI-agent create right**. Give a developer a role **without** it and
-   those tools return 403, their token literally cannot spend agent AI budget. Reads,
-   exports, and running a *pre-planned* import stay available. (`plan_import` is the one
+2. **Scope the role.** A token can only call `agent_chat` / `agent_confirm` — or pass
+   `compose` to `ask_knowledge` — if its role holds the **AI-agent create right**. Give
+   a developer a role **without** it and those return 403, their token literally cannot
+   spend agent AI budget. Reads, exports, asking the knowledge base without `compose`,
+   and running a *pre-planned* import all stay available. (`plan_import` is the one
    import step that uses AI, bounded by the quota like everything else.)
 
 So your instinct is right for the cheap tools ("they're just hitting our endpoints"),

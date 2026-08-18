@@ -1,15 +1,38 @@
-// The agent quota gate (owner's credit-based model). Each team gets a FREE daily
+// The AI quota gate (owner's credit-based model). Each team gets a FREE daily
 // allowance of AI requests; beyond that it spends from a purchasable credit balance;
-// out of both, the agent warns then hard-stops for the day. The agent consumes ONE
+// out of both, the app warns then hard-stops for the day. A caller consumes ONE
 // unit per AI request (the real cost driver) at this single shared gate. Lives over
 // the global core DB (agent_usage = the daily-free counter; agent_credits = the
 // balance) so it works without opening a team database.
+//
+// IT IS SHARED BECAUSE THE ALLOWANCE IS. It sat in data-ops while data-ops was the
+// only worker that spent a model. Content spends one now — it WRITES the answer the
+// knowledge base found (R23) — and there is exactly one allowance between them: the
+// team's. A second copy of this file would be a second daily counter with the same
+// name, and the first person to notice would be the one who ran out twice.
+//
+// THE CEILING IS A VAR, SO EVERY SPENDER MUST READ THE SAME ONE. `AGENT_FREE_DAILY`
+// and `AGENT_NO_DAILY_CAP` are declared in BOTH spenders' wrangler configs with the
+// same values, and credits-invariant.test.ts compares them — a cap set on one worker
+// and not the other is one allowance enforced at two different heights.
+
+import type { D1Database } from "@cloudflare/workers-types"
 
 import type { AgentQuota, UsageLogRow } from "@shared/types"
 import type { Actor } from "@shared/workers/gating"
 import { ulid } from "@shared/workers/id"
 import { numberVar } from "@shared/workers/limits"
-import type { Env } from "../env"
+
+/** What this gate needs from a worker's env — structurally, so any worker that
+ * spends the allowance can pass its own Env without importing another's. */
+export type Env = {
+  /** the global core database (agent_usage + agent_credits live here). */
+  DB: D1Database
+  /** free AI requests per team per day; unset means FREE_DAILY below. */
+  AGENT_FREE_DAILY?: string
+  /** testing environments only — stop ENFORCING the allowance, keep measuring it. */
+  AGENT_NO_DAILY_CAP?: string
+}
 
 /** Free AI requests per team per day before credits are spent. */
 export const FREE_DAILY = 25

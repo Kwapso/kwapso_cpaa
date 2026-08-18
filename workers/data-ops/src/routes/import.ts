@@ -25,7 +25,7 @@ import {
   planBatch,
   planModules,
 } from "../lib/import-batch"
-import { consumeAiUnit } from "../lib/credits"
+import { consumeAiUnit } from "@shared/workers/credits"
 import { sampleRows, TARGETS, targetFor } from "../lib/targets"
 import { csvResponse, toCsv } from "@shared/workers/csv"
 import type { D1Rest } from "@shared/workers/d1-rest"

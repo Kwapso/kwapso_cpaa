@@ -167,6 +167,15 @@ for "how does search work" leaves knowing it exists:
   never writes prose: it hands back the passages, the sources they came from, the
   compartment it searched and the reasoning that chose it, and when it finds nothing
   it says so, with a sentence for the assistant to repeat instead of inventing one.
+- **The answer is now WRITTEN, and written from exactly those passages** (2026-08-18).
+  Retrieval still generates nothing. `?compose=1` asks the door for one cheap model
+  call that composes the reply *with the decided passages and citations in front of
+  it* and hands the prose back to the same seam, which lets it exist only where
+  `found` is true — so a written answer can never outlive its sources. It may carry
+  the app's visual blocks (`shared/agent-blocks.ts`), and the model decides when a
+  picture helps: there is no switch on the screen. It costs one unit of the team's
+  AI allowance and gates on the `agent` module, so retrieval stays free for anyone
+  who only wants the material. `workers/content/src/lib/knowledge-compose.ts`.
 
 DATA-MODEL.md § *THE KNOWLEDGE BASE* is the owning reference (the four tables, the
 compartment model, the two fences); BOOTSTRAP.md §3b is how you stand the index up.

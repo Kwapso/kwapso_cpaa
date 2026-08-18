@@ -35,8 +35,8 @@ import {
   TRANSLATE_MAX_TEXTS,
 } from "@shared/workers/limits"
 import { forwardToDoor } from "@shared/workers/http"
-import { consumeAiUnit, getQuota, grantCredits, readUsageLog, refundAiUnits } from "../lib/credits"
-import { cheapText } from "../lib/model"
+import { consumeAiUnit, getQuota, grantCredits, readUsageLog, refundAiUnits } from "@shared/workers/credits"
+import { cheapText } from "@shared/workers/model-text"
 import { confirmAndRun, runChat, type Emit } from "../lib/agent"
 import { listMessages, listThreads } from "../lib/threads"
 import type { ChatOutcome, StreamEvent } from "@shared/types"

@@ -151,6 +151,31 @@ describe("agent-app parity (Law R9): the agent knows what the app can do", () =>
     )
   })
 
+  // THE HALF THAT GETS IGNORED. There is no switch for the visuals — the owner was
+  // explicit that there must not be one — so RESTRAINT is not a preference the
+  // model may take or leave, it is the other half of the capability. A brief that
+  // only ever says "here is what you can draw" produces a wall of charts over a
+  // one-line answer, which is a worse answer than the line. So the brief has to
+  // carry the negative case, and it has to carry it in a form the model can act
+  // on: the cases where a sentence is the right answer, and a ceiling on how many
+  // blocks one reply may hold.
+  it("the brief tells the model when NOT to draw, not only what it can draw", () => {
+    const brief = blockBrief()
+    expect(brief, "the negative case must be stated, not implied").toMatch(/WHEN NOT TO DRAW/)
+    // The three that actually happen: one number; two or three things; a reply
+    // that is an explanation rather than data.
+    expect(brief).toMatch(/ONE number/i)
+    expect(brief).toMatch(/explanation/i)
+    // A ceiling on blocks per reply — without one, "you can draw" reads as "draw".
+    expect(brief, "a reply full of blocks is the failure mode this sentence prevents").toMatch(
+      /ONE block in a reply is normal/i
+    )
+    // And the rule that makes a block as accountable as a sentence.
+    expect(brief, "an invented block is an invented fact that looks measured").toMatch(
+      /never put a number in a block that was not in the material/i
+    )
+  })
+
   // Proved by RUNNING the parser, never by reading the shape — the lesson R22 paid
   // for. An example that drifted from its own validator would otherwise teach the
   // model, in the prompt, to emit exactly the thing the app refuses to draw.
