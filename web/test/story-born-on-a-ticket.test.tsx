@@ -226,11 +226,16 @@ describe("writing a story on the ticket that asked for it", () => {
 // unless somebody first writes the scan for that one prop on that one control.
 // What a person SEES is the thing that was wrong, so that is what is asserted.
 describe("the story form never shows a person its own placeholder value", () => {
-  it("labels the kind-of-work picker with words, not the empty sentinel", async () => {
+  it("labels the type picker with words, not the empty sentinel", async () => {
     await relatedStoriesTab()
     fireEvent.click(await screen.findByRole("button", { name: "New story" }))
     const dialog = await screen.findByRole("dialog")
     expect(dialog.textContent).not.toContain("__none__")
-    expect(screen.getByLabelText(/kind of work/i).textContent).toBe("Pick one")
+    // /type/i, not /^type$/i: the label carries a required marker, so an
+    // anchored match finds nothing. No other label in this form contains the
+    // word — App, What needs doing, Detail, Sprint, Tickets, Processes, Who's
+    // doing it — so this is unambiguous. It read "Kind of work" until the
+    // glossary folded Kind, Category and Type into one word (R6).
+    expect(screen.getByLabelText(/type/i).textContent).toBe("Pick one")
   })
 })
