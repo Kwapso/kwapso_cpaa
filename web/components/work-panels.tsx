@@ -25,6 +25,7 @@ import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Ban, ChevronRight } from "lucide-react"
 
+import { AppMark } from "@/components/app-tiles"
 import { LoadMore } from "@/components/load-more"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import { cursorKey, todosKey, totalKey } from "@/lib/live-resources"
@@ -374,6 +375,11 @@ export function AppsPanel({
         <RowList>
           {rows.map((a) => (
             <Row key={a.id} live={a.active}>
+              {/* THE SAME RECORD, THE SAME SQUARE. These rows and the tiles on
+                  the apps screen list the identical AppRow, and only one of them
+                  drew the client's mark — so an app was a picture on one screen
+                  and a line of text on the next. */}
+              <AppMark app={a} size="row" />
               <div className="min-w-0 flex-1">
                 <OpenLink label={a.name} onOpen={() => softNavigate(`${host.base}/apps/${a.id}`)} />
                 <p className="text-muted-foreground truncate text-xs">{appLine(a, accountName)}</p>

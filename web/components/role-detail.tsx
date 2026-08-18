@@ -40,6 +40,7 @@ import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { RecordFooter, RecordScreen, STICKY_TABS } from "@/components/record-chrome"
+import { RecordMark } from "@shared/web/record-mark"
 import { formatCount } from "@shared/web/format-count"
 import { usePermissions } from "@/lib/perms"
 import { primeCache, useCached } from "@shared/web/store"
@@ -177,6 +178,10 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
 
   return (
     <RecordScreen
+      // A DELIBERATE MARK, NEVER AN EMPTY SLOT — the role's own initial in the
+      // same square every other record's picture or glyph sits in
+      // (shared/web/record-mark.tsx).
+      leading={<RecordMark name={role.title} size="band" />}
       // D4 + N4: the eyebrow says WHAT THIS IS, and one thing about its state.
       // It used to read `Role · Locked · Inactive` — a type plus two states on
       // one band, which is three units before the title has been read. The two

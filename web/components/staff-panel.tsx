@@ -31,6 +31,7 @@ import { OverviewList } from "@/components/overview-list"
 import { ApiFailure, content } from "@/lib/api"
 import { staffCertificatesKey, staffProfilesKey, totalKey } from "@/lib/live-resources"
 import { usePermissions } from "@/lib/perms"
+import { RecordMark } from "@shared/web/record-mark"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
 import { safeHref } from "@shared/web/rich-text"
@@ -190,14 +191,22 @@ export function StaffPanel({
         </div>
       </div>
       <Card>
-        <CardContent className="p-4">
-          {profileItems.length > 0 ? (
-            <OverviewList items={profileItems} />
-          ) : (
-            <p className="text-muted-foreground text-sm">
-              {t("Nothing written about")} {memberName} {t("yet. The team can read what goes here; no client ever can.")}
-            </p>
-          )}
+        <CardContent className="flex items-start gap-4 p-4">
+          {/* THE FACE. `photoUrl` is stored, edited and round-tripped through the
+              form, and was rendered by nothing at all — on the one screen in the
+              app whose whole subject is a person. A circle, because a person is
+              (shared/web/record-mark.tsx), and it stands whether or not there is
+              a photo, so the row does not reflow the day somebody adds one. */}
+          <RecordMark picture={profile?.photoUrl} name={memberName} shape="round" />
+          <div className="min-w-0 flex-1">
+            {profileItems.length > 0 ? (
+              <OverviewList items={profileItems} />
+            ) : (
+              <p className="text-muted-foreground text-sm">
+                {t("Nothing written about")} {memberName} {t("yet. The team can read what goes here; no client ever can.")}
+              </p>
+            )}
+          </div>
         </CardContent>
       </Card>
 

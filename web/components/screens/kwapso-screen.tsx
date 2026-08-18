@@ -35,6 +35,7 @@ import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import type { ActiveTeam } from "@/lib/use-active-team"
 import { tenancy } from "@/lib/api"
+import { RecordMark } from "@shared/web/record-mark"
 import { formatCount } from "@shared/web/format-count"
 import type { BrandAsset, TeamMember } from "@shared/types"
 import { useCached, useCachedValue } from "@shared/web/store"
@@ -126,7 +127,15 @@ function TeamPanel({ teamId, canRead }: { teamId: string; canRead: boolean }) {
   return (
     <ul className="divide-border flex flex-col divide-y">
       {membersQ.data.map((m) => (
-        <li key={m.userId} className="flex flex-wrap items-baseline gap-x-2 gap-y-1 py-3">
+        <li key={m.userId} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-3">
+          {/* The same photo the member's own record, the profile menu and a
+              ticket's stakeholder list all draw. This is the page called "who we
+              are" and it was the one that showed nobody. */}
+          <RecordMark
+            picture={m.imageUrl}
+            name={[m.firstName, m.lastName].filter(Boolean).join(" ") || m.email}
+            shape="round"
+          />
           <span className="font-medium">
             {[m.firstName, m.lastName].filter(Boolean).join(" ") || m.email}
           </span>

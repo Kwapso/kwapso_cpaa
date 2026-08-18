@@ -371,7 +371,7 @@ export function AppFormDialog({
           >
             {logoPreview ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoPreview} alt="" className="size-full object-cover" />
+              <img src={logoPreview} alt="" className="size-full object-contain" />
             ) : (
               appStageMark(values.stage) || values.name.slice(0, 1).toUpperCase()
             )}

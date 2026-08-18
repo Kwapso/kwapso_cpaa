@@ -13,6 +13,7 @@ import {
 } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import {
+  dataUrlBytes,
   MAX_IMAGE_BYTES,
   mediaKey,
   ownedMediaKey,
@@ -189,10 +190,20 @@ export async function updateTeamDetails(
   // a string a caller handed us.
   let supersededKey: string | null = null
   if (logoDataUrl) {
+    // SIZE FIRST, off the ENCODED text, exactly as the profile photo does
+    // (auth/src/lib/profile.ts) and for the same two reasons. Nothing is decoded
+    // to find out how big it is; and the person is told WHICH refusal it is.
+    //
+    // The order used to be the other way round, and the size branch below was
+    // therefore unreachable: `parseDataUrl` returns null for an oversize payload
+    // as well as an unreadable one (shared/workers/image.ts), so a 3 MB team logo
+    // came back "That image format isn't supported" and sent somebody off to
+    // convert a perfectly good PNG. A dead branch and a wrong sentence are the
+    // same defect seen from two sides.
+    if (dataUrlBytes(logoDataUrl) > MAX_IMAGE_BYTES)
+      throw new GuardError(400, "image_too_large", "That image is too large.")
     const parsed = parseDataUrl(logoDataUrl)
     if (!parsed) throw new GuardError(400, "bad_image", "That image format isn't supported.")
-    if (parsed.bytes.byteLength > MAX_IMAGE_BYTES)
-      throw new GuardError(400, "image_too_large", "That image is too large.")
     const current = await env.DB.prepare("SELECT logo_url FROM teams WHERE id = ?")
       .bind(teamId)
       .first<{ logo_url: string | null }>()

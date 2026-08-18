@@ -34,6 +34,7 @@ import {
 } from "@kwapso/ui/registry/primitives/dropdown-menu/dropdown-menu"
 import { MoreHorizontal } from "lucide-react"
 
+import { RecordMark } from "@shared/web/record-mark"
 import { formatRelative } from "@shared/web/format"
 import { useT } from "@shared/web/language"
 
@@ -191,18 +192,11 @@ export function RecordFooter({ audit }: { audit: RecordAudit }) {
  * heading or the TYPE column on a collection. `size` picks the row slot or the
  * header band's square (G3). */
 export function TypeMark({ mark, size = "row" }: { mark: string; size?: "row" | "band" }) {
-  return (
-    <span
-      aria-hidden
-      className={
-        size === "band"
-          ? "bg-muted grid size-14 shrink-0 place-items-center rounded-xl text-3xl leading-none sm:size-[72px]"
-          : "bg-muted grid size-9 shrink-0 place-items-center rounded-xl text-lg leading-none"
-      }
-    >
-      {mark}
-    </span>
-  )
+  // The one mark, with no picture to show — the box, the sizes and the
+  // `aria-hidden` are the same decision everywhere and are made once
+  // (shared/web/record-mark.tsx). This kept its name because a type mark is what
+  // a reader of this file is looking for.
+  return <RecordMark mark={mark} size={size} />
 }
 
 /* --------------------------- the band and the body ------------------------ */

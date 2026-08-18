@@ -59,6 +59,7 @@ import { appsKey, listFetch, sprintsKey } from "@/lib/live-resources"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { withDataDrivenCollection } from "@/lib/screens"
 import type { AppRow, Sprint } from "@shared/types"
+import { RecordMark } from "@shared/web/record-mark"
 import { formatCount } from "@shared/web/format-count"
 import { invalidate, useCached } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
@@ -145,21 +146,6 @@ function groupByKind(
     group.sprints.push(s)
   }
   return [...groups.values()]
-}
-
-/** The mark, in the leading slot a row's icon would have taken. `aria-hidden`
- * because a screen reader must never try to pronounce it; the kind's WORD is on
- * the heading directly above these rows, which is the pair UI-CONVENTIONS §5
- * requires of a type mark. */
-function KindMark({ mark }: { mark: string }) {
-  return (
-    <span
-      aria-hidden
-      className="bg-muted grid size-9 shrink-0 place-items-center rounded-xl text-lg leading-none"
-    >
-      {mark}
-    </span>
-  )
 }
 
 /** WHICH ENDING, on a row that has one. "Wrapped" holds both a sprint somebody
@@ -358,7 +344,7 @@ export function SprintsScreen({
                   surface="none"
                   items={group.sprints.map((s) => ({
                     id: s.id,
-                    leading: group.mark ? <KindMark mark={group.mark} /> : undefined,
+                    leading: group.mark ? <RecordMark mark={group.mark} /> : undefined,
                     title: s.ref ? `${s.ref} · ${s.name}` : s.name,
                     // The kind is the heading above; how much is done is the
                     // number on the right. What is left is the three facts a

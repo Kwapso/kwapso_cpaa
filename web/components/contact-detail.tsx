@@ -73,6 +73,7 @@ import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { TodosPanel } from "@/components/work-panels"
 import { accountStatus } from "@/components/deep-link/shape"
 import { OverviewList } from "@/components/overview-list"
+import { RecordMark } from "@shared/web/record-mark"
 import { RichText } from "@shared/web/rich-text-view"
 import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, tenancy } from "@/lib/api"
@@ -395,6 +396,11 @@ export function ContactDetailScreen({
 
   return (
     <RecordScreen
+      // A PERSON IS A CIRCLE, and their photo fills it. It is the same
+      // `logo_url` column a company's mark lives in — one table, one door — and
+      // `scripts/glide-visuals.mjs` carried thirty-one real faces into it, none
+      // of which this screen has ever drawn. No photo falls back to the initial.
+      leading={<RecordMark picture={account.logoUrl} name={account.name} shape="round" size="band" />}
       eyebrow={[
         t("Contact"),
         account.active ? null : t("Archived"),

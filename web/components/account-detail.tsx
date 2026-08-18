@@ -58,6 +58,7 @@ import { Pencil, Power } from "lucide-react"
 
 import type { Account, AccountDetail, AccountRate, AppRow } from "@shared/types"
 import { SAVINGS_CAPTION, savedHours, type SavingsView } from "@shared/workers/savings"
+import { RecordCover, RecordMark } from "@shared/web/record-mark"
 import { moneyText } from "@shared/web/money"
 import { AccountFormDialog, type AccountFormValues } from "@/components/account-form-dialog"
 import { AccountRateCard } from "@/components/account-rate-card"
@@ -80,7 +81,6 @@ import { TodoFormDialog, type TodoFormValues } from "@/components/todo-form-dial
 import { useAssignableMembers } from "@/lib/members"
 import { KnowledgeAsk } from "@/components/knowledge-ask"
 import { RichText } from "@shared/web/rich-text-view"
-import { safeSrc } from "@shared/web/rich-text"
 import { ValuePanel } from "@/components/value-panel"
 import { createAppFrom } from "@/components/apps-screen"
 import { AppsPanel, SprintsPanel, TodosPanel, sliceKey } from "@/components/work-panels"
@@ -391,10 +391,6 @@ export function AccountDetailScreen({
       />
     )
 
-  // THE STORED PATH, through the one URL boundary (shared/web/rich-text safeSrc): the
-  // column is ordinary text a machine caller can write, so what reaches a `src`
-  // is checked here rather than trusted because we happen to have written it.
-  const cover = safeSrc(account.coverUrl)
 
   // WHAT THE HOURS ARE WORTH, at this client's own agreed rate. `null` when
   // there is no rate card yet (or the role may not see one), which is the honest
@@ -575,6 +571,13 @@ export function AccountDetailScreen({
 
   return (
     <RecordScreen
+      // THE CLIENT'S OWN MARK, where every other record already puts one. The
+      // column has been on this row since 0024 and the form has offered the
+      // picker since — it was simply never drawn, so the widest, most-visited
+      // record in the product opened with a bare title while a ticket three
+      // clicks away led with a glyph. No logo falls back to the company's
+      // initial, never to an empty square (shared/web/record-mark.tsx).
+      leading={<RecordMark picture={account.logoUrl} name={account.name} size="band" />}
       eyebrow={[t("Company"), account.code, account.active ? null : t("Archived")]
         .filter(Boolean)
         .join(" · ")}
@@ -619,10 +622,14 @@ export function AccountDetailScreen({
               <div className="flex flex-col gap-4">
                 {/* The cover, then the record. An image at the top of a company's
                     page is the fastest way to know you are on the right one. */}
-                {cover && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={cover} alt="" className="h-32 w-full rounded-xl object-cover sm:h-40" />
-                )}
+                {/* A STORED PATH IS NOT THE SAME FACT AS THE BYTES BEING THERE.
+                    This is the biggest picture in the app, so a 404 here is a
+                    full-width torn-paper glyph across a client's own page —
+                    and nothing reclaims a superseded cover, the column takes a
+                    pasted URL, and the pictures in it came from an account
+                    being cancelled. `RecordCover` renders exactly what having
+                    no cover renders when the picture will not load: nothing. */}
+                <RecordCover picture={account.coverUrl} className="h-32 w-full rounded-xl object-cover sm:h-40" />
                 <OverviewList items={overviewItems} />
                 {account.about && (
                   <div className="rounded-xl border p-4">

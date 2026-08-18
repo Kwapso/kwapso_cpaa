@@ -215,9 +215,48 @@ png/jpeg/webp, 2.5 MB rule (one AVIF and three over the cap); `sips` does it, an
 anything it cannot do is named in the run rather than dropped.
 
 Still not carried, because the RECORDS were never migrated: the 8 deliverable
-thumbnails, the 74 brand-library files, the 5 staff certificates and the 6 staff
-photos. Each of those tables has its image column already — the pictures are
-waiting on the rows, not on a column.
+thumbnails, the 5 staff certificates and the 6 staff photos. Each of those tables
+has its image column already — the pictures are waiting on the rows, not on a
+column.
+
+**The eight files that are not pictures — 19 Aug 2026.** `glide-files.mjs` rescued
+194 files; `glide-visuals.mjs` carried the logos, covers and faces. Eight were left
+over because they are documents and video, and nothing in the repo looked at them:
+six PDFs and two clips. `scripts/glide-documents.mjs` is the third script, and it
+found that the eight were not a leftover — they were a MISS.
+
+Glide's `branding` table has **two** file columns. `am2b4` is the picture on the
+card; `iXERi` is the document itself. `seed-the-quiet-screens.mjs` reads only the
+first and skips a row with nothing in it, reporting "8 skipped — no file on the
+row". **Six of those eight rows do have a file, in the other column** — and they
+are the six most substantial things in the agency's brand library: the Brand Book,
+the Branding presentation, the Moodboard, the Social templates, the Spacing and
+font sizes deck and Alex's Glide Level 1 certificate. They were never created as
+records at all, and the log said the rows were empty. The other two `iXERi` rows
+are logos on rows with a CATEGORY and no NAME; a brand asset needs a name, so the
+script reports them and leaves them for the owner rather than inventing one.
+
+The same script also moves the pictures that DID come across. That seed wrote
+Glide's URL straight into `file_url` with a description saying so — "the file is
+still hosted there, not by us" — so 41 live brand assets were one cancelled
+subscription away from being 41 broken images. The bytes are already on disk; the
+script POSTs each one to the ordinary gated upload door
+(`/api/content/brand-assets/upload-stream`) and patches the row through the
+ordinary edit door, then re-reads the library and proves every row it wrote now
+carries a `/media/internal/…` path of ours. It is safe to re-run, it refuses to
+treat a short read as a complete one, and it exits non-zero on any failure —
+including the quiet one, a sign-in whose team has no brand library at all, which
+is what an unnoticed wrong `SEED_OWNER_EMAIL` looks like from inside a script.
+
+**The two clips have no record to land on, and that is a ruling rather than a
+gap.** Both hang off Glide's `content` table — a LinkedIn post and a Facebook post
+from the agency's own marketing pipeline. That table became `marketing_posts`, and
+the Marketing module was purged on 17 Aug 2026 by the owner (team migration
+`0025_purge_learning_marketing_programmes`). Building a module the owner deleted in
+order to hold two videos would be the wrong answer to a small problem. The bytes
+are safe — on disk in `glide/files/`, and in the private archive bucket
+`glide-to-r2.mjs` writes — and the script prints their names and this reasoning on
+every run rather than leaving it in a comment nobody opens.
 
 **6 · The uncategorised dropdown values.** — **ANSWERED, 2026-08-12: overruled.**
 Sixteen of the 154 choices have no group and are really countries and company-size

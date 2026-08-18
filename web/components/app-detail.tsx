@@ -421,7 +421,7 @@ export function AppDetailScreen({
       // `AppMark` decides between the two, so the heading and the tile can never
       // disagree about which picture an app has.
       mark={appStageMark(app.stage)}
-      leading={<AppMark app={app} className="size-14 text-3xl sm:size-[72px]" />}
+      leading={<AppMark app={app} size="band" />}
       eyebrow={t("App")}
       title={app.name}
       status={[app.stage, accountName || t("Ours, no client"), app.active ? undefined : t("Archived")]
