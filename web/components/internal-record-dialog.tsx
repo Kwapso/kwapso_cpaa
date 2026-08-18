@@ -207,7 +207,7 @@ export function InternalRecordDialog({
 
 export const brandAssetFields = (categories: string[]): InternalField[] => [
   { key: "name", label: "Name", kind: "text", required: true, placeholder: "Primary logo (dark)" },
-  { key: "category", label: "Category", kind: "text", options: categories, placeholder: "Logos, decks, templates…" },
+  { key: "category", label: "Type", kind: "text", options: categories, placeholder: "Logos, decks, templates…" },
   // THE MATERIAL ITSELF. The brand library holds what everything else is made
   // with, and this field used to ask for a link to somewhere else — the upload
   // door existed and nothing on any screen called it, so a logo could be
@@ -232,7 +232,7 @@ export const brandAssetFields = (categories: string[]): InternalField[] => [
  * opened from a record. */
 export const deliverableFields = (kinds: string[]): InternalField[] => [
   { key: "title", label: "Title", kind: "text", required: true, placeholder: "Demo walkthrough" },
-  { key: "kind", label: "Kind", kind: "text", options: kinds, placeholder: "Video, handover doc, SOP…" },
+  { key: "kind", label: "Type", kind: "text", options: kinds, placeholder: "Video, handover doc, SOP…" },
   { key: "datedOn", label: "Date", kind: "date" },
   {
     key: "url",

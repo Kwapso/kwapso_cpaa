@@ -85,7 +85,7 @@ const appField = {
 const titleField = { ...defaultFieldConfig, label: "What needs doing", required: true }
 const typeField = {
   ...defaultFieldConfig,
-  label: "Kind of work",
+  label: "Type",
   required: true,
   hint: "Editable on the Dropdown values screen.",
 }
@@ -332,7 +332,7 @@ export function StoryFormDialog({
           // file has always passed it, and this one field was written by hand.
           emptyOption={{ value: NONE, label: t("Pick one") }}
           placeholder={t("Pick one")}
-          searchPlaceholder={t("Search kinds…")}
+          searchPlaceholder={t("Search types…")}
           emptyText={t("Nothing matched.")}
           disabled={busy}
         />

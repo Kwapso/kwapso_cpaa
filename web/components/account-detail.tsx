@@ -3,7 +3,7 @@
 // Account detail — one COMPANY at /accounts/<id>, as a tabbed record (Law R2):
 // Overview / Contacts / its work / Rates / Knowledge / Activity.
 // Host-composed, because most of those tabs are collections with their own
-// actions — link a person, add an app, retire a rate — and no engine block draws
+// actions — link a person, add an app, deactivate a rate — and no engine block draws
 // those. Those list bodies live next door in account-detail-panels.tsx; this file
 // owns the record itself — its data, its rights, its tabs and counts, its
 // dialogs, and the one confirm they all share.
@@ -767,7 +767,7 @@ export function AccountDetailScreen({
                   accountName={account.name}
                   canCreate={can("commercials", "create")}
                   canEdit={can("commercials", "edit")}
-                  canRetire={can("commercials", "delete")}
+                  canDeactivate={can("commercials", "delete")}
                   actions={actions}
                 />
                 <MarginPanel teamId={teamId} accountId={accountId} accountName={account.name} />

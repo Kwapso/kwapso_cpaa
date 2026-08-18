@@ -98,12 +98,12 @@ export async function postBatchFile(request: Request, env: Env): Promise<Respons
 }
 
 /** POST /api/data-ops/import/batch/plan — the AGENT builds the plan. Metered on the
- * team AI credit pool (one turn), like a chat turn. */
+ * team's assistant credits (one turn), like a chat turn. */
 export async function postBatchPlan(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await teamContext(request, env)
   await requireAnyImportRight(cfg, guard)
   // THE PLAN STEP IS AN ASSISTANT TURN, so it is gated like one. It spends the
-  // team's free daily allowance and then decrements `agent_credits.balance` —
+  // team's free daily credits and then decrements `agent_credits.balance` —
   // money the owner bought — and it used to do that behind the import rights
   // alone. MCP.md §1 tells a developer that "a role with those rights and no
   // agent access is the safe, zero-AI-cost choice"; without this line that
@@ -115,7 +115,7 @@ export async function postBatchPlan(request: Request, env: Env): Promise<Respons
   const batchId = requireText(body.batchId, "Batch", TEXT_LIMITS.short)
   const c = await consumeAiUnit(env, guard.teamId)
   if (!c.ok)
-    return fail(429, "over_quota", "You're out of AI requests for now, the plan step uses the assistant. They reset tomorrow, or an admin can add credits.")
+    return fail(429, "over_quota", "You're out of assistant credits for now, and the plan step uses the assistant. The free ones come back tomorrow, or an admin can add more.")
   return json({ batch: await planBatch(env, cfg, guard, batchId), quota: c.quota })
 }
 

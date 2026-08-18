@@ -722,7 +722,7 @@ export async function updateStory(
 
   const changes = describeChanges([
     { label: "Title", from: before.title, to: title },
-    { label: "Kind", from: before.story_type, to: storyType },
+    { label: "Type", from: before.story_type, to: storyType },
     { label: "Assignee", from: before.assignee_name, to: assignee?.name ?? null },
     { label: "Due", from: before.due_on, to: dueOn },
     { label: "Sprint", from: before.sprint_id, to: sprintId, hideValues: true },
@@ -1163,7 +1163,7 @@ export async function updateSprint(
 
   const changes = describeChanges([
     { label: "Name", from: before.name, to: name },
-    { label: "Kind", from: before.sprint_type, to: sprintType },
+    { label: "Type", from: before.sprint_type, to: sprintType },
     { label: "Runs", from: before.starts_on, to: startsOn },
     { label: "Ends", from: before.ends_on, to: endsOn },
     // The FIGURE is deliberately hidden from the history line. A sprint's price

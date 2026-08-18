@@ -122,7 +122,7 @@ export const CRON_GROWTH_CAP = 200
 /** Pending invitations one sign-in sweep will accept in a single pass. Each one is
  * three core-DB writes plus two live pings, and the list is keyed on an EMAIL
  * ADDRESS — anyone may invite any address, so the row count is attacker-influenced.
- * The rest stay pending and are accepted from the Invitations inbox. */
+ * The rest stay pending and are accepted from the invites inbox. */
 export const INVITE_SWEEP_CAP = 25
 
 /** @mentions one help reply may carry. Each mention becomes a row in an `IN (...)`

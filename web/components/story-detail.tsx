@@ -163,7 +163,7 @@ export function StoryDetailScreen({
 
   const overviewItems = [
     { label: t("Status"), value: STORY_STATUS_LABEL[story.status] },
-    { label: t("Kind"), value: story.storyType || "—" },
+    { label: t("Type"), value: story.storyType || "—" },
     { label: t("Reference"), value: story.ref || "—" },
     { label: t("Who's doing it"), value: story.assigneeName || "Nobody yet" },
     // INHERITED, not typed. A story is due when the block it was sold inside is

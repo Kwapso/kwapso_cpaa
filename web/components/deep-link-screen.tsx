@@ -240,7 +240,7 @@ export function DeepLinkScreen() {
         : module === "kwapso"
           ? [{ label: t("Kwapso") }]
           : module === "invitations"
-          ? [{ label: t("Invitations") }]
+          ? [{ label: t("Invites") }]
           : module === "profile"
             ? [{ label: t("Your profile") }]
             : []

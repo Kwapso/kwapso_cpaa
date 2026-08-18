@@ -75,7 +75,7 @@ describe("role creation has a ceiling", () => {
     expect(res.status).toBe(403)
     const body = (await res.json()) as { error: string; message: string }
     expect(body.error).toBe("role_limit")
-    expect(body.message.toLowerCase()).toContain("retire")
+    expect(body.message.toLowerCase()).toContain("deactivate")
     // And it refused BEFORE writing — a cap that counts after the insert is a
     // cap that is always one row late.
     expect((db().prepare("SELECT COUNT(*) AS n FROM member_roles").get() as { n: number }).n).toBe(

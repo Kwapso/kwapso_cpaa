@@ -124,7 +124,7 @@ export function sprintTypeLabel(option: SprintTypeOption, lang: string): string 
 }
 
 const nameField = { ...defaultFieldConfig, label: "Sprint name", required: true }
-const typeField = { ...defaultFieldConfig, label: "Kind", required: false }
+const typeField = { ...defaultFieldConfig, label: "Type", required: false }
 const accountField = { ...defaultFieldConfig, label: "Client", required: false }
 const appField = {
   ...defaultFieldConfig,
@@ -288,7 +288,7 @@ export function SprintFormDialog({
           }))}
           emptyOption={{ value: NONE, label: t("Not said") }}
           placeholder={t("Not said")}
-          searchPlaceholder={t("Search kinds…")}
+          searchPlaceholder={t("Search types…")}
           emptyText={t("Nothing matched.")}
           disabled={busy}
         />

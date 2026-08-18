@@ -263,7 +263,7 @@ export async function getGooglePick(request: Request, env: Env): Promise<Respons
   const url = new URL(request.url)
   const service = asNamedService(queryText(url.searchParams.get("service"), "Service"))
   const q = queryText(url.searchParams.get("q"), "Search", TEXT_LIMITS.short)
-  const kind = queryText(url.searchParams.get("kind"), "Kind", TEXT_LIMITS.short)
+  const kind = queryText(url.searchParams.get("kind"), "Type", TEXT_LIMITS.short)
   const { token } = await accessTokenFor(env, cfg, guard, service)
   const options =
     service === "chat"
@@ -369,7 +369,7 @@ function shareList(value: unknown[]): { externalId: string; name: string; kind: 
     return {
       externalId: requireText(item.externalId, "Folder, file or space", TEXT_LIMITS.short),
       name: requireText(item.name, "Name", TEXT_LIMITS.short),
-      kind: optionalText(item.kind, "Kind", TEXT_LIMITS.short) ?? "folder",
+      kind: optionalText(item.kind, "Type", TEXT_LIMITS.short) ?? "folder",
     }
   })
 }

@@ -629,7 +629,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   },
   {
     name: "revoke_invite",
-    summary: "Revoke a pending invitation that hasn't been accepted yet (by invite id).",
+    summary: "Revoke a pending invite that hasn't been accepted yet (by invite id).",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/invites/revoke",
     schema: obj({ inviteId: S }, ["inviteId"]),
     buildBody: (i) => ({ inviteId: str(i, "inviteId") }),
@@ -1461,7 +1461,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "ask_knowledge",
     summary:
-      "Ask the team's knowledge base a question and get the passages that answer it, each with the source it came from. Pass `accountId` when the question is about one client and you know which, the answer is otherwise compartmented from the question's own words. By default it writes NOTHING for you: use the passages, quote the titles, and if `found` is false say so in the words of `message` rather than answering from memory (it refuses on purpose when nothing in the base is close enough, that is an answer, not a failure). `reason` says which compartment it searched and why, and `records` names what the question looks like it is ABOUT, repeat them when the answer looks wrong for the question. EVERY CITATION CARRIES `liveStatus`: the real row read at the moment of asking, which is what to say when it disagrees with the passage, the passage is what was indexed, `liveStatus` is what is true now. `recordPath` is where the record itself lives in the app (`tickets/<id>`, `processes/<id>`), null for a source with no record screen — offer it when somebody wants to go and read the original. `compose` true asks the app to write the answer out for you and return it as `answer`, which COSTS one unit of the team's AI allowance and needs the assistant right; leave it off when you are going to write the reply yourself, which is the normal case, or the same answer is paid for twice.",
+      "Ask the team's knowledge base a question and get the passages that answer it, each with the source it came from. Pass `accountId` when the question is about one client and you know which, the answer is otherwise compartmented from the question's own words. By default it writes NOTHING for you: use the passages, quote the titles, and if `found` is false say so in the words of `message` rather than answering from memory (it refuses on purpose when nothing in the base is close enough, that is an answer, not a failure). `reason` says which compartment it searched and why, and `records` names what the question looks like it is ABOUT, repeat them when the answer looks wrong for the question. EVERY CITATION CARRIES `liveStatus`: the real row read at the moment of asking, which is what to say when it disagrees with the passage, the passage is what was indexed, `liveStatus` is what is true now. `recordPath` is where the record itself lives in the app (`tickets/<id>`, `processes/<id>`), null for a source with no record screen — offer it when somebody wants to go and read the original. `compose` true asks the app to write the answer out for you and return it as `answer`, which COSTS one of the team's assistant credits and needs the assistant right; leave it off when you are going to write the reply yourself, which is the normal case, or the same answer is paid for twice.",
     binding: "CONTENT", method: "GET", path: "/api/content/knowledge/ask",
     schema: obj({ q: S, accountId: S, limit: N, compose: B }, ["q"]),
     buildQuery: (i) => {
@@ -1948,14 +1948,14 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "set_account_rate_active",
     summary:
-      "Retire a rate (`active: false`) or bring it back (`active: true`). Never deleted, what an account was charged last year has to stay true.",
+      "Deactivate a rate (`active: false`) or bring it back (`active: true`). Never deleted, what an account was charged last year has to stay true.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/rates/active",
     schema: obj({ id: S, active: B }, ["id", "active"]),
     buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
     agent: {
       write: true,
       confirm: true,
-      summarize: (i) => `${i.active === true ? "Restore" : "Retire"} rate ${str(i, "id")}`,
+      summarize: (i) => `${i.active === true ? "Activate" : "Deactivate"} rate ${str(i, "id")}`,
     },
   },
   {
@@ -1997,14 +1997,14 @@ export const SHARED_TOOLS: SharedTool[] = [
   },
   {
     name: "set_internal_rate_active",
-    summary: "Retire one of our own cost lines (`active: false`) or bring it back. Never deleted.",
+    summary: "Deactivate one of our own cost lines (`active: false`) or bring it back. Never deleted.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/internal-rates/active",
     schema: obj({ id: S, active: B }, ["id", "active"]),
     buildBody: (i) => ({ id: str(i, "id"), active: i.active === true }),
     agent: {
       write: true,
       confirm: true,
-      summarize: (i) => `${i.active === true ? "Restore" : "Retire"} internal rate ${str(i, "id")}`,
+      summarize: (i) => `${i.active === true ? "Activate" : "Deactivate"} internal rate ${str(i, "id")}`,
     },
   },
   {
@@ -2028,7 +2028,7 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "set_role_rate",
     summary:
-      "Set what an hour of one role is worth, by name. The ROLE is the key, so this one tool adds, re-prices and retires: `roleName` names it, `centsPerHour` is WHOLE CENTS an hour (45 euros is 4500), and `active: false` retires it without deleting anything. Re-sending a price that has not changed moves nothing and writes no history. INTERNAL, this number feeds what an app is said to have given back, and it is never shown to a client.",
+      "Set what an hour of one role is worth, by name. The ROLE is the key, so this one tool adds, re-prices and deactivates: `roleName` names it, `centsPerHour` is WHOLE CENTS an hour (45 euros is 4500), and `active: false` switches it off without deleting anything. Re-sending a price that has not changed moves nothing and writes no history. INTERNAL, this number feeds what an app is said to have given back, and it is never shown to a client.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/role-rates",
     schema: obj({ roleName: S, centsPerHour: N, active: B }, ["roleName", "centsPerHour", "active"]),
     buildBody: (i) => ({

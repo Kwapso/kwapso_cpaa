@@ -216,7 +216,7 @@ export async function updateAccountRate(
   return changed[0].account_id
 }
 
-/** Retire / restore a rate (deactivate-never-delete: what an account was charged
+/** Deactivate / activate a rate (deactivate-never-delete: what an account was charged
  * last year has to stay true). R17 predicate; zero rows moved = silence. */
 export async function setAccountRateActive(
   cfg: D1Rest,

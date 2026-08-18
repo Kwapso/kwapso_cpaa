@@ -153,7 +153,7 @@ export function KnowledgeDetailScreen({
   const textOwnedElsewhere = mirrored || item.fileUrl !== null
   const filedUnder = item.accountId ? (accountNames.get(item.accountId) ?? "A client") : "The agency"
   const overviewItems = [
-    { label: t("Kind"), value: KNOWLEDGE_KIND[item.kind] ?? item.kind },
+    { label: t("Type"), value: KNOWLEDGE_KIND[item.kind] ?? item.kind },
     { label: t("Filed under"), value: filedUnder },
     {
       label: t("Who can use it"),

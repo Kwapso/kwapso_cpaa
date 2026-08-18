@@ -95,7 +95,7 @@ export const COLLECTION_FILTERS: Record<string, CollectionFacet[]> = {
     // already showed, which is the answer it was supposed to go and find.
     {
       field: "kind",
-      label: "Kind",
+      label: "Type",
       options: Object.entries(KNOWLEDGE_KIND).map(([value, label]) => ({ value, label })),
     },
     // WHOSE IT IS — the compartment string, `agency` or `account:<id>`. Rows,

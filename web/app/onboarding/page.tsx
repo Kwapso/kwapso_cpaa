@@ -175,7 +175,7 @@ export default function OnboardingPage() {
           {/* The worker's own sentence, not a second copy written here. */}
           <p className="text-muted-foreground mt-2 text-sm">{wrongDoor}</p>
           <p className="text-muted-foreground mt-4 text-sm">
-            {t("Your invitation has been accepted, so nothing is waiting on you. Open the portal at the address your invitation email came from, and sign in with this same email address.")}
+            {t("Your invite has been accepted, so nothing is waiting on you. Open the portal at the address your invite came from, and sign in with this same email address.")}
           </p>
         </div>
       </main>

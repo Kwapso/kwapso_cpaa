@@ -24,7 +24,7 @@
 //
 // THE TWO CONTROLS ARE DRIVEN DIFFERENTLY because the library draws them
 // differently: past eight options a `control:"select"` facet becomes a searchable
-// popover over cmdk, and under it a plain Radix Select. So `Kind` (eighteen
+// popover over cmdk, and under it a plain Radix Select. So `Type` (eighteen
 // kinds) opens on a click and `Filed under` on a pointerdown. Driving both is the
 // point rather than an inconvenience — they are two different code paths to one
 // `onChange`, and a screen can have one working and the other not.
@@ -159,7 +159,7 @@ describe("a filter on a paged collection asks the door", () => {
     renderFind(listKey, door.fetchPage)
 
     // The owner's own filter, on the owner's own screen.
-    await pick("Kind", "From a meeting", "click")
+    await pick("Type", "From a meeting", "click")
 
     await waitFor(() => expect(door.asked.length).toBe(1))
     const first = door.asked[0]
@@ -183,7 +183,7 @@ describe("a filter on a paged collection asks the door", () => {
     const door = fakeDoor()
     renderFind(freshKey(), door.fetchPage)
 
-    await pick("Kind", "From a meeting", "click")
+    await pick("Type", "From a meeting", "click")
     await waitFor(() => expect(door.asked.length).toBe(1))
     await pick("Filed under", "Bergman S.A.", "pointer")
 
@@ -200,7 +200,7 @@ describe("a filter on a paged collection asks the door", () => {
     // The find bar now says the second one, labelled.
     const door = fakeDoor()
     renderFind(freshKey(), door.fetchPage)
-    await pick("Kind", "From a meeting", "click")
+    await pick("Type", "From a meeting", "click")
     await waitFor(() => expect(screen.getByText("52 sources match")).toBeTruthy())
   })
 })

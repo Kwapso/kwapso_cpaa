@@ -84,7 +84,7 @@ export type BrandAssetInput = {
 /** One validation path for both writes — see the note on marketing's `clean`. */
 async function clean(cfg: D1Rest, guard: MemberGuard, actor: Actor, input: BrandAssetInput) {
   const name = requireText(input.name, "Name", TEXT_LIMITS.short)
-  const category = optionalText(input.category, "Category", TEXT_LIMITS.short) ?? null
+  const category = optionalText(input.category, "Type", TEXT_LIMITS.short) ?? null
   if (category) await ensureSelectableValue(cfg, guard, actor, SELECTABLE_GROUPS.brandCategory, category)
   return {
     name,
@@ -135,7 +135,7 @@ export async function updateBrandAsset(
   )
   const changes = describeChanges([
     { label: "Name", from: before.name, to: v.name },
-    { label: "Category", from: before.category, to: v.category },
+    { label: "Type", from: before.category, to: v.category },
     { label: "Description", from: before.description, to: v.description },
     { label: "File", from: before.file_url, to: v.fileUrl },
   ])
@@ -147,7 +147,7 @@ export async function updateBrandAsset(
   })
 }
 
-/** Retire or restore an asset. R17: the predicate rides the UPDATE.
+/** Archive or restore an asset. R17: the predicate rides the UPDATE.
  *
  * The BYTES are deliberately not reclaimed here, for the reason Learning states
  * at length: an edit SUPERSEDES a file (nothing points at it, so it is garbage),

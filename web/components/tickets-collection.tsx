@@ -17,8 +17,8 @@
 //
 //   the INNER strip is WHAT KIND and HOW FAR ALONG — Ready, then one tab per live
 //   `Ticket type` value, then Closed, then All. DERIVED from the team's own
-//   vocabulary rather than hard-coded: retiring "Bug" on the Dropdown values
-//   screen retires its tab, and adding a word adds one.
+//   vocabulary rather than hard-coded: deactivating "Bug" on the Dropdown values
+//   screen takes its tab away, and adding a word adds one.
 //
 // Every narrowing is the DOOR's (R14 + R16). Filtering the loaded page would
 // answer "the questions among the newest fifty" while the badge above counted all

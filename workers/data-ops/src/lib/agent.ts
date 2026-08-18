@@ -561,7 +561,7 @@ async function planAttachedFiles(
 ): Promise<string> {
   const metered = await consumeAiUnit(env, guard.teamId)
   if (!metered.ok)
-    throw new GuardError(429, "over_quota", "You're out of AI requests for now — planning an import uses the assistant. They reset tomorrow, or an admin can add credits.")
+    throw new GuardError(429, "over_quota", "You're out of assistant credits for now — planning an import uses the assistant. The free ones come back tomorrow, or an admin can add more.")
   let batch = await createBatch(cfg, guard, actor)
   for (const f of files) batch = await addBatchFile(cfg, guard, batch.id, f.name, f.csv)
   batch = await planBatch(env, cfg, guard, batch.id)
@@ -798,7 +798,7 @@ async function runPlanLoop(
       const c = await consumeAiUnit(env, guard.teamId)
       quota = c.quota
       if (!c.ok) {
-        const msg = "You're out of AI requests for now — your free daily allowance and credits are used up. They reset tomorrow, or an admin can add credits."
+        const msg = "You're out of assistant credits for now — today's free ones and the balance an admin added are both used up. The free ones come back tomorrow, or an admin can add more."
         say(msg)
         await appendMessage(cfg, guard, actor, threadId, { role: "assistant", content: msg, source: opts.source })
         if (opts.tally.credits > 0) await log()
@@ -990,7 +990,7 @@ export async function confirmAndRun(
   // team that's out of credits can't drive confirmed actions for free.
   const c = await consumeAiUnit(env, guard.teamId)
   if (!c.ok) {
-    const msg = "You're out of AI requests for now, so I didn't run that. They reset tomorrow, or an admin can add credits."
+    const msg = "You're out of assistant credits for now, so I didn't run that. The free ones come back tomorrow, or an admin can add more."
     await appendMessage(cfg, guard, actor, opts.threadId, { role: "assistant", content: msg, source: opts.source })
     return { done: true, threadId: opts.threadId, reply: msg, quota: c.quota, overQuota: true }
   }

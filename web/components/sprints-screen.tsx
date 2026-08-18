@@ -347,7 +347,7 @@ export function SprintsScreen({
             {/* K6: a plain state heading — no chip, no rule and no count of its
                 own. The collection's one number is on the strip above (R16). */}
             <h2 className="text-lg font-medium">{t(STATE_HEADING[state])}</h2>
-            {groupByKind(inState, byKind, lang, t("No kind said")).map((group) => (
+            {groupByKind(inState, byKind, lang, t("No type said")).map((group) => (
               <div key={group.key} className="flex flex-col gap-2">
                 <p className="text-muted-foreground text-xs font-medium tracking-[0.5px] uppercase">
                   {group.word}

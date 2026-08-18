@@ -1,11 +1,18 @@
 "use client"
 
-// Invitations inbox — invites the signed-in person has RECEIVED (by email).
+// The invites inbox — invites the signed-in person has RECEIVED (by email).
 // The fix for "I was invited but have no way to see/accept it": this works for
 // ANY signed-in user, not just a teamless one at onboarding. Accepting joins the
 // team AND makes it active (the locked "join + switch" choice). Cache-first via
 // useCached, with one shared key so the page, the Settings section and the
 // switcher badge all stay in sync.
+//
+// ONE WORD, "INVITE" (shared/glossary.ts), on both lists: this RECEIVED one and
+// the SENT one in the team section, which used to read Invitations and Invites.
+// Neither English word carries direction, so the direction rides the line around
+// it ("Invites waiting for you") rather than a second noun. The route, the cache
+// key and this filename keep the longer spelling on purpose — every invite email
+// already sent deep-links to /invitations, and a rename would break those.
 
 import * as React from "react"
 
@@ -54,7 +61,7 @@ export function InvitationsPanel({ active }: { active: ActiveTeam }) {
       if (res.invitations.length === 0) softNavigate("/home")
     } catch (err) {
       toast.error(
-        err instanceof ApiFailure ? err.message : t("Couldn't accept the invitation.")
+        err instanceof ApiFailure ? err.message : t("Couldn't accept the invite.")
       )
     } finally {
       setAccepting(null)
@@ -62,7 +69,7 @@ export function InvitationsPanel({ active }: { active: ActiveTeam }) {
   }
 
   if (invitesQ.error)
-    return <p className="text-destructive text-sm">{t("Couldn't load your invitations.")}</p>
+    return <p className="text-destructive text-sm">{t("Couldn't load your invites.")}</p>
   if (invites === undefined) return <Skeleton variant="list" lines={2} />
 
   // Library List (flat surface + a border to match the design language). Rows
@@ -71,7 +78,7 @@ export function InvitationsPanel({ active }: { active: ActiveTeam }) {
     <List
       surface="none"
       className="rounded-xl border"
-      empty="No pending invitations."
+      empty={t("No invites waiting for you.")}
       items={invites.map((inv) => ({
         id: inv.id,
         leading: (

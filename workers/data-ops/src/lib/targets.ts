@@ -231,7 +231,7 @@ export const TARGETS: Record<string, TargetDef> = {
       { key: "title", label: "Title", required: true },
       { key: "startsAt", label: "When", required: true },
       { key: "endsAt", label: "Until", required: false },
-      { key: "account", label: "Client", required: false },
+      { key: "account", label: "Account", required: false },
       { key: "location", label: "Where", required: false },
       { key: "agenda", label: "Agenda", required: false },
       { key: "notes", label: "Notes", required: false },
@@ -323,7 +323,7 @@ export const TARGETS: Record<string, TargetDef> = {
       "Bring the agency's own brand material in in bulk, logos, decks, templates. The file column takes a link; the bytes are re-hosted separately.",
     columns: [
       { key: "name", label: "Name", required: true },
-      { key: "category", label: "Category", required: false },
+      { key: "category", label: "Type", required: false },
       { key: "description", label: "Description", required: false },
       { key: "fileUrl", label: "File", required: false },
     ],

@@ -590,7 +590,7 @@ const brandListRecipe: ScreenRecipe = {
   fields: [field("name", "Asset"), field("detail", "Details")],
   actions: [],
   collection: listCollection("Nothing in the brand library yet.", "Search the brand library…", [
-    { field: "category", label: "Category", control: "select" },
+    { field: "category", label: "Type", control: "select" },
     { field: "state", label: "Archived", control: "select" },
   ]),
 }
@@ -603,7 +603,7 @@ const brandDetailRecipe: ScreenRecipe = {
   actions: internalDetailActions("brand_assets", "brand", "Archive asset"),
   header: { title: "name", subtitle: "detail" },
   tabs: internalDetailTabs([
-    { label: "Category", column: "category" },
+    { label: "Type", column: "category" },
     { label: "Description", column: "description" },
     { label: "File", column: "file" },
     { label: "Added", column: "created" },

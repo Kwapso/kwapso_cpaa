@@ -426,19 +426,28 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
   // An UNCAPPED environment counts but never refuses, so the countdown would be
   // both wrong and alarming ("0 left today" on a door that keeps opening). It
   // reports what was used instead — the number that is still true.
+  //
+  // ONE NUMBER, ONE WORD (R6, shared/glossary.ts `assistantCredit`). This badge
+  // used to read `${remaining} left today · ${creditBalance} credits`, and
+  // `remaining` is ALREADY free-left plus the balance — so 25 free and 5 added
+  // rendered as "30 left today · 5 credits" and a reader added it to 35. It also
+  // said "today" about a balance that does not reset. The badge now answers the
+  // only question it is asked — how many can I spend right now — and the split
+  // lives one click away in the usage view, which is that view's whole job.
   const quotaLabel = quota
     ? quota.unlimited
       ? `No daily limit here · ${quota.freeUsedToday} used today`
       : quota.blocked
-        ? "You're out of assistant credits for today"
-        : `${quota.remaining} left today${quota.creditBalance > 0 ? ` · ${quota.creditBalance} credits` : ""}`
+        ? "You're out of assistant credits"
+        : `${quota.remaining} credits left`
     : ""
 
-  // The usage view's header line: free left today + purchased balance.
+  // The usage view's header line, and the ONE screen that splits the two pots
+  // the badge above adds together: what is free today, and what an admin added.
   const usageSummary = quota
     ? quota.unlimited
-      ? `${quota.freeUsedToday} used today · no daily limit in this environment · balance ${quota.creditBalance}`
-      : `${quota.freeRemaining} of ${quota.freeDaily} free left today · balance ${quota.creditBalance}`
+      ? `${quota.freeUsedToday} used today · no daily limit in this environment · ${quota.creditBalance} added by an admin`
+      : `${quota.freeRemaining} of ${quota.freeDaily} free credits left today · ${quota.creditBalance} added by an admin`
     : ""
 
   return {

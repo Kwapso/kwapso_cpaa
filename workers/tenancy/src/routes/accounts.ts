@@ -287,7 +287,7 @@ export async function postCreateAccount(request: Request, env: Env): Promise<Res
     "create"
   )
   const scope = await accountScope(cfg, guard)
-  const accountType = requireText(body.accountType, "Kind", TEXT_LIMITS.short)
+  const accountType = requireText(body.accountType, "Type", TEXT_LIMITS.short)
   if (accountType !== "entity" && accountType !== "individual")
     return fail(400, "invalid_input", "An account is either a company or a person.")
   const name = requireText(body.name, "Name", TEXT_LIMITS.short)

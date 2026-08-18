@@ -154,7 +154,7 @@ export const KNOWLEDGE_KIND: Record<string, string> = {
   article: "From an article",
   account: "From an account",
   // EVERY KIND THE SWEEP WRITES NEEDS A WORD HERE. A kind missing from this map
-  // falls through to its own bare name, so the Kind filter offered "sprint" and
+  // falls through to its own bare name, so the Type filter offered "sprint" and
   // "account_links" beside "From a ticket" — and the six kinds added on 18 Aug
   // would have made most of the filter read that way. Held to the kind list by
   // workers/content/test/knowledge-coverage.test.ts, which reads this map off
@@ -365,7 +365,7 @@ export function shapeBrandDetail(asset: BrandAsset, activity: ActivityItem[]): S
     record: {
       id: asset.id,
       name: asset.name,
-      detail: asset.category || "Uncategorised",
+      detail: asset.category || "No type said",
       category: asset.category || "—",
       description: asset.description || "—",
       file: asset.fileUrl || "No file yet",

@@ -94,7 +94,7 @@ export function KnowledgeAsk({
   // old question.
   const [answer, setAnswer] = React.useState<KnowledgeAnswer | null>(null)
   const t = useT()
-  // MAY THIS PERSON SPEND THE TEAM'S ASSISTANT ALLOWANCE? The same right the
+  // MAY THIS PERSON SPEND THE TEAM'S ASSISTANT CREDITS? The same right the
   // co-pilot's launcher is gated on, read from the same cached permissions, so
   // there is no extra fetch. The server decides again at the door; this decides
   // which SENTENCE about cost is true for the person reading it.
@@ -144,8 +144,8 @@ export function KnowledgeAsk({
           true for somebody whose role can use the assistant at all. */}
       <p className="text-muted-foreground text-xs">
         {mayWrite
-          ? t("This reads what the assistant can read and writes you the answer, with the passages and their sources underneath. Looking is free; writing the answer uses one of the team's assistant requests.")
-          : t("This looks through what the assistant can read and shows you the passages and their sources. It doesn't use the team's assistant allowance.")}
+          ? t("This reads what the assistant can read and writes you the answer, with the passages and their sources underneath. Looking is free; writing the answer uses one of the team's assistant credits.")
+          : t("This looks through what the assistant can read and shows you the passages and their sources. It doesn't use any of the team's assistant credits.")}
       </p>
       {/* SAID OUT LOUD, because the question that gets asked is not the question
           that was typed. A person has to be able to see what was added. */}
@@ -189,8 +189,8 @@ export function KnowledgeAsk({
               ) : (
                 mayWrite && (
                   // NOT SILENCE. Nothing was written — the model was unreachable,
-                  // or the team's assistant requests are spent for today — and
-                  // nothing was charged either. The material is still the answer,
+                  // or the team's assistant credits are spent — and nothing was
+                  // charged either. The material is still the answer,
                   // which is exactly what this panel used to be, so it says so
                   // rather than looking like it forgot.
                   <p className="text-muted-foreground text-sm">

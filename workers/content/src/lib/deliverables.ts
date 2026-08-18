@@ -197,7 +197,7 @@ export type DeliverableInput = {
  * reason the owner's list ends in "etc." */
 async function clean(cfg: D1Rest, guard: MemberGuard, actor: Actor, input: DeliverableInput) {
   const title = requireText(input.title, "Title", TEXT_LIMITS.short)
-  const kind = optionalText(input.kind, "Kind", TEXT_LIMITS.short) ?? null
+  const kind = optionalText(input.kind, "Type", TEXT_LIMITS.short) ?? null
   if (kind) await ensureSelectableValue(cfg, guard, actor, SELECTABLE_GROUPS.deliverableKind, kind)
   return {
     title,
@@ -274,7 +274,7 @@ export async function updateDeliverable(
   )
   const changes = describeChanges([
     { label: "Title", from: before.title, to: v.title },
-    { label: "Kind", from: before.kind, to: v.kind },
+    { label: "Type", from: before.kind, to: v.kind },
     { label: "Date", from: before.dated_on, to: v.datedOn },
     { label: "Link", from: before.url, to: v.url },
     { label: "Picture", from: before.image_url, to: v.imageUrl },
