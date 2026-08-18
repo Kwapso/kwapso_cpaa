@@ -1,7 +1,7 @@
-// THE OPENING FRAME HAS FOUR WAYS TO FAIL SILENTLY, AND ALL FOUR LOOK FINE ON
+// THE OPENING FRAME HAS FIVE WAYS TO FAIL SILENTLY, AND ALL FIVE LOOK FINE ON
 // THE MACHINE THAT WROTE IT.
 //
-// A splash screen is the one piece of UI nobody notices working and everybody
+// A boot loader is the one piece of UI nobody notices working and everybody
 // notices stuck. It covers the whole viewport at the highest z-index in the app,
 // it is on screen before any of our code runs, and every one of its failure
 // modes is invisible in a dev build:
@@ -18,22 +18,35 @@
 //      finds a tree that moved underneath it.
 //   4. Somebody swaps `splashSource` to a video on a CDN, and the screen that
 //      exists to hide a network wait becomes a network wait.
+//   5. NEW, AND THE REASON THIS FILE GREW A JSDOM SECTION. The animation is no
+//      longer CSS — it is four kilobytes of JavaScript injected as script TEXT,
+//      and script text is not type-checked, not linted and not parsed until a
+//      browser reaches it. A stray comma in it is a build that passes every
+//      check in this repo and a boot screen that is a frozen logo. So the last
+//      describe RUNS the thing: it evaluates the shipped string, mounts it on
+//      the shipped markup, and drives the clock.
 //
 // So: both layouts derived from their own source, the stylesheet and the script
-// read as the shipped strings, and the same-origin rule proved by calling the
-// module the way a build would.
+// read as the shipped strings, the score proved to be a WARP of the author's
+// composition rather than a rewrite of it, and the animator actually executed.
 
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
 import { stripComments } from "@shared/rules/source-scan"
 import {
-  assertSameOrigin,
+  ARCS,
+  GEOMETRY,
+  MARK_INAPP_START_MS,
+  SCENES,
+  SPLASH_AUTHORED_MS,
   SPLASH_MARK_MS,
   SPLASH_REVEAL_AT_MS,
   SPLASH_REVEAL_MS,
   SPLASH_TOTAL_MS,
+  assertSameOrigin,
+  markLoopScript,
   splashInner,
   splashScript,
   splashStyle,
@@ -97,6 +110,41 @@ describe("it leaves on its own, with no JavaScript at all", () => {
     expect(Number(delay![1])).toBe(SPLASH_REVEAL_MS)
     expect(Number(delay![2])).toBe(SPLASH_REVEAL_AT_MS)
   })
+
+  // The animation is JavaScript now, so "no JavaScript" has to mean something
+  // other than "a still overlay that never goes". What the parser paints is the
+  // mark AT REST, and it is in the HTML — not assembled by the script.
+  //
+  // AND IT IS THE LOGO, WHICH IS NOT THE SAME PICTURE AS THE LOCK. The
+  // composition strobe-locks to a -56.25° pose the author calls "looking
+  // straight up"; the logo (public/icons/kwapso-mark.png) is the unrotated one,
+  // opening to the upper right. Borrowing the lock pose for the still frame
+  // would put a mark on screen that nobody recognises, for exactly the people
+  // who only ever see the still frame.
+  it("paints the LOGO, unrotated, straight out of the markup", () => {
+    const html = splashInner({ kind: "mark" })
+    expect(ARCS.length, "the mark is three arcs — a smile and two eyes").toBe(3)
+    for (const d of ARCS)
+      expect(html, "an arc of the resting mark is not in the shipped markup").toContain(d)
+    expect(html, "the resting group is gone").toContain('class="ks-rest" transform="translate(540 540)"')
+    expect(
+      html,
+      "the resting mark has been turned — it is showing a beat of the animation instead of the logo"
+    ).not.toMatch(/ks-rest[^>]*rotate\(/)
+  })
+
+  // The markup cannot interpolate a number — the production minifier mangles a
+  // template literal whose substitutions are constants, and it mangled this one
+  // (see the comment above `markSvg`). So the geometry is typed into the string
+  // and DERIVED here instead. This is what stops the two drifting apart.
+  it("carries the geometry the constants derive, to the digit", () => {
+    const html = splashInner({ kind: "mark" })
+    for (const [what, value] of Object.entries(GEOMETRY))
+      expect(
+        html,
+        `the markup no longer carries ${what} = "${value}" — recompute it and paste it into markSvg()`
+      ).toContain(`"${value}"`)
+  })
 })
 
 // THE OWNER'S DIRECTION, AS A TEST RATHER THAN A COMMENT.
@@ -109,12 +157,10 @@ describe("it leaves on its own, with no JavaScript at all", () => {
 // Both halves of that sentence are invariants, and neither is safe as prose. The
 // first — the animation is never cut off — dies quietly the moment somebody
 // shortens the overlay to make the app feel faster, and the only symptom is a
-// logo that stops mid-spin. The second is arithmetic between three constants,
-// and arithmetic between constants is exactly what drifts when one of them is
-// tuned by feel. So they are asserted from the shipped CSS, not from the numbers.
-describe("the app arrives THROUGH the burst, not after it", () => {
-  const css = splashStyle()
-
+// logo that stops mid-spin. The second is arithmetic between constants, and
+// arithmetic between constants is exactly what drifts when one of them is tuned
+// by feel.
+describe("the app arrives THROUGH the release, not after it", () => {
   it("never takes the screen away before the mark has finished", () => {
     const end = SPLASH_REVEAL_AT_MS + SPLASH_REVEAL_MS
     expect(
@@ -123,43 +169,63 @@ describe("the app arrives THROUGH the burst, not after it", () => {
     ).toBeGreaterThanOrEqual(SPLASH_MARK_MS)
   })
 
-  it("begins the reveal three quarters of a second before the end", () => {
-    const overlap = SPLASH_MARK_MS - SPLASH_REVEAL_AT_MS
-    expect(overlap, "the reveal no longer overlaps the burst — the app would appear against a finished screen").toBe(
-      SPLASH_REVEAL_MS
-    )
-    expect(overlap).toBeGreaterThanOrEqual(600)
-    expect(overlap).toBeLessThanOrEqual(900)
+  // Not "roughly during the last beat" — ON the frame the lock lets go. The
+  // reveal window and the Dissolve are the same window, by construction.
+  it("begins the reveal on the exact frame the Dissolve begins", () => {
+    const beforeDissolve = SCENES.slice(0, -1).reduce((n, s) => n + s.played, 0)
+    expect(
+      Math.round(beforeDissolve * 1000),
+      "the reveal no longer coincides with the release — the app would appear against a finished screen"
+    ).toBe(SPLASH_REVEAL_AT_MS)
+    expect(SPLASH_REVEAL_MS).toBeGreaterThanOrEqual(600)
+    expect(SPLASH_REVEAL_MS).toBeLessThanOrEqual(900)
   })
 
-  // The pieces have to be MOVING while the app comes up, or the cross-dissolve
-  // is just a fade. Each arc leaves in its own direction; a burst that starts
-  // before the reveal (or after it) reads as two events instead of one.
-  it("starts the arcs flying at the same instant the overlay starts dissolving", () => {
-    const flights = [...css.matchAll(/@keyframes ks-splash-fly-\d\{0%,(\d+)%\{transform:translate\(0,0\)\}/g)]
-    expect(flights.length, "the per-arc burst keyframes are gone — the mark would scale instead of come apart").toBe(3)
-    for (const f of flights) {
-      const startsAt = (Number(f[1]) / 100) * SPLASH_MARK_MS
+  it("is on screen for the three-to-four seconds the owner asked for", () => {
+    expect(SPLASH_TOTAL_MS).toBeGreaterThanOrEqual(3000)
+    expect(SPLASH_TOTAL_MS).toBeLessThanOrEqual(4000)
+  })
+})
+
+// THE SCORE IS A WARP, NOT A REWRITE.
+//
+// The composition is 11.4 seconds of authored time and a cold boot is under
+// four, so every scene is played shorter than it was written. That is the piece's
+// own model (`nat` beside `dur` in the runtime it was authored against) — but it
+// is also one edit away from becoming "somebody deleted the middle". These four
+// assertions are the difference: every authored scene is still played, none of
+// them is played LONGER than it was written, the authored total is still the
+// author's, and the played total is the number the CSS and the script both use.
+describe("the five scenes are compressed, and all five are still there", () => {
+  it("keeps the author's own five beats, in order", () => {
+    expect(SCENES.map((s) => s.name)).toEqual(["Coalesce", "Seat", "SpinUp", "Lock", "Dissolve"])
+  })
+
+  it("is still the 11.4-second composition underneath", () => {
+    expect(SPLASH_AUTHORED_MS, "the AUTHORED lengths have been edited — this is no longer a warp of the owner's piece").toBe(11400)
+  })
+
+  it("compresses every scene and stretches none", () => {
+    for (const s of SCENES)
       expect(
-        Math.abs(startsAt - SPLASH_REVEAL_AT_MS),
-        `an arc starts leaving at ${Math.round(startsAt)}ms but the reveal starts at ${SPLASH_REVEAL_AT_MS}ms`
-      ).toBeLessThanOrEqual(120)
-    }
+        s.played,
+        `${s.name} is played for longer than it was authored — that is a retime, not a compression`
+      ).toBeLessThanOrEqual(s.authored)
   })
 
-  it("sends each arc somewhere different", () => {
-    const ends = [...css.matchAll(/100%\{transform:translate\((-?\d+)px,(-?\d+)px\)\}/g)].map((m) => `${m[1]},${m[2]}`)
-    expect(ends.length).toBe(3)
-    expect(new Set(ends).size, "two arcs leave on the same tangent — that reads as sliding, not bursting").toBe(3)
+  it("plays for exactly as long as the stylesheet and the script believe", () => {
+    expect(Math.round(SCENES.reduce((n, s) => n + s.played, 0) * 1000)).toBe(SPLASH_MARK_MS)
+    expect(splashScript()).toContain(`setTimeout(f,${SPLASH_TOTAL_MS})`)
   })
 
-  it("honours prefers-reduced-motion by standing still and leaving early", () => {
-    const block = /@media\s*\(prefers-reduced-motion:\s*reduce\)\{([\s\S]*)$/.exec(css)?.[1] ?? ""
-    expect(block, "the reduced-motion block is gone — a 3.4s spin is not optional for everybody").not.toBe("")
-    expect(block, "the mark still spins under reduced motion").toMatch(/\.ks-mark\{[^}]*animation:\s*none/)
-    const early = /#ks-splash\{animation-delay:(\d+)ms\}/.exec(block)
-    expect(early, "reduced motion no longer shortens the hold").toBeTruthy()
-    expect(Number(early![1])).toBeLessThan(SPLASH_MARK_MS)
+  // The in-app loader picks the animation up mid-movement, not at the fly-in,
+  // so the handover from the ident reads as one continuous thing.
+  it("hands the app's own loader the spin-up, not the beginning", () => {
+    expect(MARK_INAPP_START_MS).toBeGreaterThan(0)
+    expect(
+      MARK_INAPP_START_MS,
+      "the in-app mark joins before the spin-up — it would replay the fly-in and read as a restart"
+    ).toBe(Math.round((SCENES[0].played + SCENES[1].played) * 1000))
   })
 })
 
@@ -185,29 +251,153 @@ describe("the inline script", () => {
       )
   })
 
+  // A tap hides the overlay; the frame loop behind it would otherwise keep
+  // running, invisible, on the screen that just replaced it.
+  it("stops the animation when the splash is skipped", () => {
+    expect(
+      js,
+      "the skip handler hides the overlay without calling the animator's stop — the loop runs on behind it"
+    ).toMatch(/style\.display="none";if\(s\)s\(\)/)
+  })
+
   it("gives up after the full duration even if nothing is ever tapped", () => {
     expect(js).toContain(`setTimeout(f,${SPLASH_TOTAL_MS})`)
   })
 
-  // It is injected as script TEXT. The one number in it is a module constant;
-  // anything else interpolated here would be executing a string from elsewhere.
-  it("interpolates nothing but its own timing constant", () => {
-    const holes = js.replace(String(SPLASH_TOTAL_MS), "")
-    expect(holes, "the script text carries a value from outside this module").not.toMatch(/\$\{|\bwindow\.|location\./)
+  // It is injected as script TEXT. The interpolations are this module's own
+  // numbers; anything else here would be executing a string from elsewhere.
+  it("interpolates nothing but its own timing constants", () => {
+    const holes = js.split(String(SPLASH_TOTAL_MS)).join("").replace(/"theme"|"ks-lit"|"ks-splash"/g, "")
+    expect(holes, "the script text carries a value from outside this module").not.toMatch(
+      /\$\{|location\./
+    )
+  })
+
+  // Reduced motion is honoured in the ANIMATOR, not only in the stylesheet —
+  // the stylesheet can no longer stop a JavaScript loop.
+  it("refuses to animate for anyone who asked for less motion", () => {
+    expect(
+      markLoopScript(),
+      "the animator no longer checks prefers-reduced-motion — a 3.8s spin is not optional for everybody"
+    ).toContain("prefers-reduced-motion: reduce")
+  })
+
+  it("shortens the hold under reduced motion too", () => {
+    const block = /@media\s*\(prefers-reduced-motion:\s*reduce\)\{([\s\S]*)$/.exec(splashStyle())?.[1] ?? ""
+    const early = /#ks-splash\{animation-delay:(\d+)ms\}/.exec(block)
+    expect(early, "reduced motion no longer shortens the hold").toBeTruthy()
+    expect(Number(early![1])).toBeLessThan(SPLASH_MARK_MS)
+  })
+})
+
+// IT SHIPS IN EVERY EXPORTED PAGE, so its size is a property of the app and not
+// of this file — and it is the price of the whole feature, because the in-app
+// loader draws from this same payload and adds nothing to the React bundle.
+//
+// The budget is a RATCHET, not a dare to shave bytes: it is here to stop
+// somebody inlining a base64 still or a font, which is the way an inline splash
+// actually gets fat. The measured figure is in the failure message.
+describe("the whole opening frame is small enough to inline", () => {
+  it("fits in ten kilobytes of CSS + markup + script", () => {
+    const bytes = Buffer.byteLength(splashStyle() + splashInner() + splashScript(), "utf8")
+    expect(bytes, `the inline splash payload is ${bytes} bytes`).toBeLessThan(10 * 1024)
+  })
+})
+
+// FAILURE MODE 6, AND THE ONLY ONE THAT HAS EVER ACTUALLY SHIPPED HERE.
+//
+// Every other test in this file reads the strings this module produces UNDER
+// VITEST, which compiles it with oxc. The app is compiled by Next, with SWC,
+// which minifies — and SWC constant-folds a template literal whose
+// substitutions are compile-time constants. The first version of the mark was
+// exactly that, and folding it DROPPED text: `r="435" fill="url(#ks-glow)"
+// opacity="0"/>` reached the browser as `r="435`, leaving three malformed tags
+// in the middle of the opening frame of both front doors. Thirty-four green
+// tests and a clean `npm run check` said nothing, because none of them had ever
+// looked at a built file.
+//
+// So this one looks at the built file. It is SKIPPED when there is no export —
+// a fresh clone has none, and `npm run check` does not build — which makes it a
+// weaker guard than the rest of this file and worth saying out loud. What it
+// does catch is the case that matters: anybody who has run `npm run build` (the
+// deploy scripts do, every time) gets a red test the next time they check, with
+// the exact divergence printed.
+describe("what the compiler actually shipped", () => {
+  const exported = join(ROOT, "web", "out", "index.html")
+  const html = existsSync(exported) ? readFileSync(exported, "utf8") : null
+
+  const cases: Array<[string, string, string]> = [
+    ["the stylesheet", splashStyle(), "#ks-splash,.ks-mark-host{"],
+    ["the resting mark", splashInner(), "<svg viewBox="],
+    ["the animator", splashScript(), "!function(){if(window.__ksMark)"],
+  ]
+
+  for (const [what, want, anchor] of cases)
+    it.skipIf(!html)(`${what} survives the build byte for byte`, () => {
+      const at = html!.indexOf(anchor)
+      expect(at, `${what} is not in web/out/index.html at all`).toBeGreaterThan(-1)
+      const got = html!.slice(at, at + want.length)
+      // Report the first divergence rather than 6KB of diff.
+      let i = 0
+      while (i < want.length && want[i] === got[i]) i++
+      expect(
+        i,
+        `${what} was altered between the source and the export, from character ${i}:\n` +
+          `  source: ${JSON.stringify(want.slice(i, i + 80))}\n` +
+          `  export: ${JSON.stringify(got.slice(i, i + 80))}\n` +
+          `Interpolating a compile-time constant into a shipped string is what did this last time.`
+      ).toBe(want.length)
+    })
+})
+
+// THE IN-APP LOADER FROZE ON THE REAL BUILD AND ON NOTHING ELSE.
+//
+// `MarkLoader` rendered the mark through `dangerouslySetInnerHTML`, which reads
+// as the obvious thing to do — the splash does exactly that. On the built app it
+// was a still logo every time. React re-applies `dangerouslySetInnerHTML` on the
+// first update after hydration even when the string is unchanged, and that
+// update arrives about two milliseconds after mount; it replaced the sixty-four
+// element pool the animator had just installed with the three resting arcs, and
+// the effect never ran again because its dependency list is empty. No error, no
+// warning, no failing test — just a logo that does not turn.
+//
+// The splash is not exposed to this (it is server-rendered and never re-renders)
+// and the difference is invisible at the call site, which is exactly why it is
+// worth a rule rather than a comment.
+describe("the app's own loader keeps its subtree away from React", () => {
+  const src = stripComments(readFileSync(join(ROOT, "shared", "web", "mark-loader.tsx"), "utf8"))
+
+  it("never hands the mark to dangerouslySetInnerHTML", () => {
+    expect(
+      src,
+      "MarkLoader renders the mark through React again — the first post-hydration update will wipe the animator's pool and the mark will stand still"
+    ).not.toContain("dangerouslySetInnerHTML")
+  })
+
+  it("writes the markup and starts the animator in the same effect", () => {
+    expect(src, "the host is never filled — the loader would be an empty box").toMatch(
+      /\.innerHTML\s*=\s*splashInner\(\)/
+    )
+    expect(src, "the animator is never asked for").toContain("__ksMark")
+  })
+
+  it("says the app is loading without describing the animation", () => {
+    expect(src, "no live region — a screen reader is told nothing is happening").toMatch(
+      /aria-live="polite"/
+    )
+    expect(src, "the mark is decorative and must be hidden from a screen reader").toContain(
+      'aria-hidden="true"'
+    )
+    expect(src, "the wait is not announced as a wait").toContain('aria-busy="true"')
   })
 })
 
 describe("the placeholder the owner is meant to change", () => {
-  it("is on screen for the three-to-four seconds he asked for", () => {
-    expect(SPLASH_TOTAL_MS).toBeGreaterThanOrEqual(3000)
-    expect(SPLASH_TOTAL_MS).toBeLessThanOrEqual(4000)
-  })
-
   it("draws the built-in mark with no request of any kind", () => {
     const html = splashInner({ kind: "mark" })
     expect(html).toContain("<svg")
     expect(html, "the built-in mark must not fetch anything — that is its whole advantage").not.toMatch(
-      /src=|href=|url\(/
+      /src=|href=|url\((?!#)/
     )
   })
 
@@ -234,5 +424,189 @@ describe("the placeholder the owner is meant to change", () => {
       src,
       "the guard is declared but never applied to splashSource — it would pass forever"
     ).toMatch(/^assertSameOrigin\(splashSource\)$/m)
+  })
+})
+
+// FAILURE MODE 5. Everything above reads the shipped strings; this runs them.
+//
+// The animator is assembled as script text, so nothing in this repo's toolchain
+// ever parses it: `npm run check` would stay green with a syntax error in the
+// middle of the boot screen. So it is evaluated here exactly as a browser would
+// evaluate it, mounted on exactly the markup that ships, and stepped through the
+// timeline by a fake requestAnimationFrame — which is also the only honest way
+// to assert the thing that actually matters about an animation, which is that
+// the picture at one moment is different from the picture at another.
+describe("the animator, run", () => {
+  /** Evaluate the shipped script text and mount it on the shipped markup.
+   * Returns the cast group and a `step(ms)` that advances the clock. */
+  function mount(opts?: { loop?: boolean; at?: number }) {
+    const frames: Array<(t: number) => void> = []
+    const real = window.requestAnimationFrame
+    window.requestAnimationFrame = ((cb: (t: number) => void) => {
+      frames.push(cb)
+      return frames.length
+    }) as typeof window.requestAnimationFrame
+    window.cancelAnimationFrame = (() => {}) as typeof window.cancelAnimationFrame
+
+    delete (window as { __ksMark?: unknown }).__ksMark
+    // eslint-disable-next-line no-new-func -- the point of this test is to parse and run the shipped text
+    new Function(markLoopScript())()
+
+    const host = document.createElement("div")
+    host.innerHTML = splashInner({ kind: "mark" })
+    document.body.appendChild(host)
+
+    const base = performance.now()
+    const stop = window.__ksMark!(host, opts)
+    const step = (ms: number) => {
+      const next = frames.pop()
+      frames.length = 0
+      next?.(base + ms)
+    }
+    return {
+      host,
+      stop,
+      step,
+      pending: () => frames.length,
+      restore: () => {
+        window.requestAnimationFrame = real
+        host.remove()
+      },
+    }
+  }
+
+  const cast = (host: HTMLElement) => host.querySelector(".ks-cast")!
+  // paths AND circles: at full smear the whole cast collapses to one uniform
+  // rim, which is a <circle> — a filter that only counted paths would read that
+  // frame as an empty screen.
+  const drawn = (host: HTMLElement) =>
+    [...cast(host).querySelectorAll<SVGElement>("path,circle")].filter(
+      (p) => p.style.display !== "none"
+    )
+
+  it("parses, publishes exactly one global, and takes the cast over", () => {
+    const m = mount()
+    expect(typeof window.__ksMark, "the shipped script text did not define window.__ksMark").toBe(
+      "function"
+    )
+    m.step(300)
+    expect(drawn(m.host).length, "nothing was drawn on the first frame").toBeGreaterThan(0)
+    m.restore()
+  })
+
+  // THE THREE MOMENTS THE BRIEF NAMES. A boot loader is looked at for whatever
+  // the network gives it, so it has to be a composition at 400ms as much as at
+  // three and a half seconds — not a fade-in that has not finished.
+  it("draws a different picture at 400ms, at 2s and at 3.4s", () => {
+    const m = mount()
+    // The whole frame, not just the transforms: at full smear there is one
+    // <circle> and no transform on it at all.
+    const shot = (ms: number) => {
+      m.step(ms)
+      return drawn(m.host)
+        .map((p) => p.outerHTML)
+        .join("|")
+    }
+    const early = shot(400)
+    const mid = shot(2000)
+    const late = shot(3400)
+    for (const [name, s] of [
+      ["400ms", early],
+      ["2s", mid],
+      ["3.4s", late],
+    ] as const)
+      expect(s.length, `nothing is on screen at ${name} — a loader has to look intentional there`).toBeGreaterThan(0)
+    expect(early, "the mark is identical at 400ms and 2s — it is not moving").not.toBe(mid)
+    expect(mid, "the mark is identical at 2s and 3.4s — it is not moving").not.toBe(late)
+    m.restore()
+  })
+
+  // The fly-in comes from outside the frame and settles onto the circle. The
+  // seat is the whole reason the first beat reads as mass rather than a fade.
+  // The fly-in comes from outside the frame and settles onto the circle. The
+  // seat is the whole reason the first beat reads as mass rather than a fade —
+  // and it is the beat EVERY boot sees, so it is the one worth measuring.
+  //
+  // It also catches the NaN the source's damped settle used to produce: a piece
+  // whose transform is `translate(NaN NaN)` has no radius, and this fails.
+  it("brings the pieces in from off-frame and seats them", () => {
+    const m = mount()
+    const radius = (ms: number) => {
+      m.step(ms)
+      const t = drawn(m.host)[0]!.getAttribute("transform")!
+      const hit = /translate\((-?[\d.]+) (-?[\d.]+)\)/.exec(t)
+      expect(hit, `the first piece has no usable position at ${ms}ms: ${t}`).toBeTruthy()
+      return Math.hypot(Number(hit![1]) - 540, Number(hit![2]) - 540)
+    }
+    const out = radius(150)
+    expect(out, "the pieces do not start away from the centre — there is no fly-in").toBeGreaterThan(200)
+    // Walk the whole settle, not one sample: the overshoot that produced NaN
+    // lived in a two-frame window near the end of it.
+    for (let ms = 1200; ms <= 1520; ms += 8) radius(ms)
+    expect(radius(1520), "the pieces never arrive — the seat did not complete").toBeLessThan(60)
+    m.restore()
+  })
+
+  // The three exposure regimes, in the order the composition crosses them:
+  // stacked shutter samples while it is slow, tapered swept arcs as the trail
+  // grows, and one uniform rim once the sweeps have wrapped past each other.
+  it("crosses from stacked samples to swept trails to one uniform rim", () => {
+    const m = mount()
+    const tags = (ms: number) => {
+      m.step(ms)
+      return drawn(m.host).map((e) => e.tagName.toLowerCase())
+    }
+    const seated = tags(1400)
+    expect(seated.length, "the seated mark is not three arcs").toBe(3)
+
+    const smearing = tags(2300)
+    expect(
+      smearing.length,
+      "the spin-up draws no more shapes than the resting mark — there is no motion trail"
+    ).toBeGreaterThan(20)
+
+    const released = tags(3400) // the release, past the lock
+    expect(released, "the release never collapses to one uniform rim").toEqual(["circle"])
+    const rim = drawn(m.host)[0]!
+    expect(Number(rim.getAttribute("opacity"))).toBeGreaterThan(0)
+    m.restore()
+  })
+
+  it("stops when it is told to, and stops itself at the end of a one-shot", () => {
+    const m = mount()
+    m.step(300)
+    m.stop()
+    m.step(600)
+    expect(m.pending(), "stop() left a frame queued — the loop outlives the screen").toBe(0)
+
+    const one = mount()
+    one.step(SPLASH_MARK_MS + 200)
+    expect(one.pending(), "a one-shot run queued another frame past its own end").toBe(0)
+    one.restore()
+    m.restore()
+  })
+
+  it("keeps going forever when the app's own loader asks it to loop", () => {
+    const m = mount({ loop: true, at: MARK_INAPP_START_MS })
+    m.step(SPLASH_MARK_MS * 3)
+    expect(m.pending(), "the looping loader stopped — the app's wait would freeze mid-spin").toBe(1)
+    expect(drawn(m.host).length).toBeGreaterThan(0)
+    m.restore()
+  })
+
+  it("leaves the resting mark exactly as it is for anyone who asked for less motion", () => {
+    const real = window.matchMedia
+    window.matchMedia = ((q: string) =>
+      ({ matches: q.includes("reduced-motion"), media: q })) as typeof window.matchMedia
+    const m = mount()
+    const before = cast(m.host).innerHTML
+    m.step(1200)
+    expect(
+      cast(m.host).innerHTML,
+      "the animator ran for somebody who asked for reduced motion"
+    ).toBe(before)
+    expect(drawn(m.host).length, "the resting mark is not on screen under reduced motion").toBe(3)
+    window.matchMedia = real
+    m.restore()
   })
 })

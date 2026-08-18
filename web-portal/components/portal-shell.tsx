@@ -23,7 +23,6 @@ import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { ModeToggle } from "@kwapso/ui/registry/primitives/mode-toggle/mode-toggle"
 import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
-import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { Building2, House, LifeBuoy, LogOut, PiggyBank } from "lucide-react"
 
 import { brand } from "@shared/brand"
@@ -33,6 +32,7 @@ import { clearCache } from "@shared/web/store"
 import { reportError } from "@shared/web/log"
 import { useT, LanguageProvider } from "@shared/web/language"
 import { LanguageMenu } from "@shared/web/language-menu"
+import { MarkLoader } from "@shared/web/mark-loader"
 import { auth } from "@/lib/api"
 import { applyLivePing, PORTAL_SUBSCRIPTIONS, replayAfterReconnect } from "@/lib/live-resources"
 import { usePortalSession, type PortalSession } from "@/lib/session"
@@ -88,12 +88,13 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
     PORTAL_SUBSCRIPTIONS
   )
 
+  // THE APP IS STARTING. Not one screen's own wait — nothing is drawn yet and
+  // nothing is known yet, including whether there is anything here for this
+  // person — so it wears the mark the front door opened on rather than a spinner
+  // in an empty page. The mid-switch wait further down is the opposite case and
+  // stays a skeleton: the page IS drawn, and what is coming has a shape.
   if (session.state === "loading" || session.state === "signed-out")
-    return (
-      <main className="flex min-h-[100svh] items-center justify-center">
-        <Spinner />
-      </main>
-    )
+    return <MarkLoader label={t("Loading…")} />
 
   // Ours, not theirs. Say so, and offer the only useful thing — try again —
   // rather than the sign-in screen, which would read as "you were logged out".
