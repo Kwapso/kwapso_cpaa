@@ -427,3 +427,35 @@ Nobody asked for these. They are the faults the work walked into.
 | 29.7 | The morning digest reached clients | **DONE**, a client login is an ordinary team member, so the fallback mailed everybody the agency's own backlog |
 | 29.8 | A hard-coded colour two lanes old | **DONE**, caught by a law written hours later |
 | 29.9 | A shared file that only bundled in one worker | **DONE**, found by the deploy itself |
+
+## 30 · The overnight round — what you asked for as you went to bed
+
+| # | The thing | Status |
+|---|---|---|
+| 30.1 | The accounts strip reads Companies, Contacts, All | **DONE**, and Companies is the view you land on. Contacts group under their company, with a caption while more are still loading |
+| 30.2 | No trace of the word "people" | **DONE**, zero occurrences in any sentence the app says. It split two ways, because it meant two things: someone at a client is a **contact**, one of ours is a **member**. Renaming both to "contacts" would have made the UI lie — a task cannot be given to a client contact and the code prevents it |
+| 30.3 | The parent-account dropdown off the create and edit forms | **DONE**, and the capability it removed came back where it belongs: a contact who changes employer is moved on **her own record**, not by a picker on a company's form |
+| 30.4 | "Created by X on 5d ago" | **DONE**, one seam, ten detail screens. The "on" was in no catalogue at all, so a German reader saw broken English inside a German sentence |
+| 30.5 | Clients see deliverables, once marked visible | **DONE**, opt-in per record. Every deliverable that exists today stays hidden, because the column's default is the one SQLite hands out for free — nothing to migrate and nothing to mistype |
+| 30.6 | The read-only calendar scope | **DONE and live**. Read off the deployed authorize URL, not the source: `calendar.readonly`, fresh consent forced, inherited scopes off. **Four disconnects, then four connects** — the four services are one grant at Google, and disconnecting only Calendar is the one order that silently fails |
+| 30.7 | Delete a draft | **DONE**, to Google's Trash, recoverable for 30 days. Permanent deletion is unreachable, not merely unbuilt — it needs full mailbox access this app asks for nowhere |
+| 30.8 | The Glide pictures | **DONE**, 87 of 87 on our own storage, every one serving real bytes. Nothing points at a Glide URL any more |
+| 30.9 | The Glide files that are not pictures | **DONE**, 47 files and 32 MB, plus **six records the original mapping never saw**. Two clips are deliberately left — they belong to the module you purged on 17 August |
+| 30.10 | Visuals and placeholders everywhere | **DONE**, seventeen placeholder implementations became one rule. The portal had exactly **one image in its entire front end** |
+| 30.11 | No two words for one thing | **DONE**, ten defects across 41 places — including "request" as a third word for a ticket, on your portal. Five judgement calls decided and closed. It is now a law (R34), which caught its first live case within hours |
+| 30.12 | The boot loader | **DONE**. It was **frozen on every device**, not just phones — React replaced the mark ~300 ms in and orphaned the animator, then it stood still for three seconds. The phone-only part was a blur tuned for a frame rate a phone never gets |
+
+## 31 · Found overnight, nobody reported
+
+| # | The thing | Status |
+|---|---|---|
+| 31.1 | Account logos, covers and app logos could not be set **at all** from the app's own picker | **DONE**, the field was checked against the 20,000-character prose cap, 166× below the real limit. It shipped green because the test used a 110-character one-pixel image. Found three more of the same, including a team logo with **no length cap at any size** |
+| 31.2 | Deliverables shipped invisible to the whole agency, Admin included | **DONE**, migration `0036` omitted the permission grant every other module carries |
+| 31.3 | Every form field label was English in all 28 languages | **DONE**. 440 real cases: the words were translated and then never asked for. Now one wrapper and a law (R33) |
+| 31.4 | A colour swatch in your brand library loads from a **typosquatted domain** | **OPEN**, nine of them, on a host that is not the one they meant. It can serve anything it likes into your brand library, and one is already broken. A colour should be a value, not a remote image |
+| 31.5 | The ship gate went red three times with nothing wrong | **DONE**, slow tests against a 5-second budget. Fixed as one decision, not three patches |
+| 31.6 | A stale build accused the minifier of mangling the code | **DONE**, it now says "stale build" and names the command that fixes it |
+| 31.7 | Two lanes minted the same migration number, and git merged both without a conflict | **DONE**, versions are proved unique and ascending — the duplicate is silent otherwise, and skips a live team's upgrade |
+| 31.8 | `.gitignore` left a symlink to your customer export one `git add -A` from being committed | **DONE** |
+| 31.9 | The staging smoke never touches the client portal | **OPEN**, half the product is deployed unverified |
+| 31.10 | Two copies of your mark animate at once during boot | **YOUR CALL**, it costs a third of the frame rate on a throttled phone, and 2.7 s of it draws behind an opaque screen where nobody can see it |
