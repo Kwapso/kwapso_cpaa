@@ -12,7 +12,6 @@ import { usePathname } from "next/navigation"
 
 import { Breadcrumbs } from "@kwapso/ui/registry/primitives/breadcrumbs/breadcrumbs"
 import { ModeToggle } from "@kwapso/ui/registry/primitives/mode-toggle/mode-toggle"
-import { Skeleton } from "@kwapso/ui/registry/primitives/skeleton/skeleton"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import {
   AppWindow,
@@ -47,6 +46,7 @@ import { usePermissions } from "@/lib/perms"
 import { useTeamPrewarm } from "@/lib/use-team-prewarm"
 import { useGoogleCatchUp } from "@/lib/use-google-catch-up"
 import { useT } from "@shared/web/language"
+import { MarkLoader } from "@shared/web/mark-loader"
 import { CreateTeamDialog } from "@/components/create-team-dialog"
 import { TEAM_CREATION_CLOSED } from "@shared/product"
 import { ProfileMenu } from "@/components/profile-menu"
@@ -470,27 +470,19 @@ export function AppShell({
   )
 }
 
-/** Skeleton frame for the brief first load (only the FIRST screen shows it —
- * the session is cached after that). */
+/** THE APP IS STARTING — the mark, not a skeleton.
+ *
+ * A skeleton is a promise about SHAPE: these grey bars are where your list is
+ * about to be. That promise is exactly right inside a screen that has already
+ * been drawn, and it is a lie here — at this moment the app does not yet know
+ * whether you have one team or six, which sections your role can see, or whether
+ * you are about to be sent to onboarding instead. It drew a sidebar and a list
+ * for people who were on their way somewhere else.
+ *
+ * So the brief first load shows what the boot screen a second ago was showing,
+ * still turning. Only the FIRST screen reaches this — the session is cached
+ * after that. */
 export function ShellLoading() {
-  return (
-    <div className="flex min-h-[100svh]">
-      <aside className="hidden w-60 shrink-0 flex-col gap-3 border-r p-3 md:flex">
-        <Skeleton className="h-9 w-full rounded-lg" />
-        <Skeleton className="h-8 w-full rounded-lg" />
-        <Skeleton className="h-8 w-full rounded-lg" />
-      </aside>
-      <div className="flex flex-1 flex-col">
-        <header className="glass flex items-center justify-between border-b px-4 py-2.5 md:hidden">
-          <Skeleton className="h-7 w-40 rounded-lg" />
-          <Skeleton className="size-8 rounded-full" />
-        </header>
-        <main className="flex-1 px-4 py-6">
-          <div className="mx-auto w-full max-w-2xl">
-            <Skeleton variant="list" lines={4} />
-          </div>
-        </main>
-      </div>
-    </div>
-  )
+  const t = useT()
+  return <MarkLoader label={t("Loading…")} />
 }

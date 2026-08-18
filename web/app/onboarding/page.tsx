@@ -17,6 +17,9 @@ import { Field } from "@kwapso/ui/registry/primitives/field/field"
 import { FileUpload } from "@kwapso/ui/registry/primitives/file-upload/file-upload"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import { ModeToggle } from "@kwapso/ui/registry/primitives/mode-toggle/mode-toggle"
+// Still here for the SUBMIT button's busy state, which is a different thing from
+// a boot wait and stays a spinner: it says "this button is working", inside a
+// screen that is already drawn.
 import { Spinner } from "@kwapso/ui/registry/primitives/spinner/spinner"
 import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { defaultFieldConfig } from "@kwapso/ui/lib/config"
@@ -26,6 +29,7 @@ import { BrandMark } from "@/components/brand-mark"
 import { personInitials } from "@/lib/identity"
 import { fileToDataUrl } from "@/lib/image"
 import { useT } from "@shared/web/language"
+import { MarkLoader } from "@shared/web/mark-loader"
 
 const firstNameField = { ...defaultFieldConfig, label: "First name", required: true }
 const lastNameField = { ...defaultFieldConfig, label: "Last name", required: true }
@@ -149,13 +153,9 @@ export default function OnboardingPage() {
     }
   }
 
-  if (checking) {
-    return (
-      <main className="flex min-h-[100svh] items-center justify-center">
-        <Spinner />
-      </main>
-    )
-  }
+  // Still deciding which door this is — an app-boot wait, not a screen waiting on
+  // one of its own reads, so it wears the mark like every other one.
+  if (checking) return <MarkLoader label={t("Loading…")} />
 
   // THE WRONG DOOR, SAID ONCE AND WITHOUT A FORM UNDER IT. There is deliberately
   // nothing to press: this app has nothing for a client, and a button that tried
