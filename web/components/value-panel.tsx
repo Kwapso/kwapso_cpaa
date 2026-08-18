@@ -99,7 +99,7 @@ export function ValuePanel({ view }: { view: SavingsView | undefined }) {
 
   if (view.apps.length === 0)
     return (
-      <div className="rounded-lg border p-4">
+      <div className="rounded-xl border p-4">
         <p className="text-sm font-medium">{t("No value to show yet.")}</p>
         <p className="text-muted-foreground mt-1 text-sm">
           {t("Map a process, write down how long each step took before, and the saving appears here as soon as a step gets faster.")}
@@ -108,8 +108,8 @@ export function ValuePanel({ view }: { view: SavingsView | undefined }) {
     )
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="rounded-lg border p-4">
+    <div className="flex flex-col gap-4">
+      <div className="rounded-xl border p-4">
         <p className="text-muted-foreground text-sm">{t("Time given back, every month")}</p>
         <p className="text-2xl font-semibold tracking-tight">
           {hoursText(view.savedSecondsPerMonth)}
@@ -127,11 +127,11 @@ export function ValuePanel({ view }: { view: SavingsView | undefined }) {
         )}
       </div>
 
-      <Accordion type="multiple" className="rounded-lg border px-4">
+      <Accordion type="multiple" className="rounded-xl border px-4">
         {view.apps.map((app) => (
           <AccordionItem key={app.appId} value={app.appId} className="last:border-b-0">
             <AccordionTrigger>
-              <span className="flex w-full items-baseline justify-between gap-3 pr-2">
+              <span className="flex w-full items-baseline justify-between gap-2 pr-2">
                 <span className="truncate">{app.name}</span>
                 <span className="text-muted-foreground shrink-0 text-xs font-normal">
                   {hoursText(app.savedSecondsPerMonth)} {t("a month")}
@@ -143,7 +143,7 @@ export function ValuePanel({ view }: { view: SavingsView | undefined }) {
                 {app.processes.map((process) => (
                   <AccordionItem key={process.processId} value={process.processId} className="last:border-b-0">
                     <AccordionTrigger>
-                      <span className="flex w-full items-baseline justify-between gap-3 pr-2">
+                      <span className="flex w-full items-baseline justify-between gap-2 pr-2">
                         <span className="truncate">{process.name}</span>
                         <span className="text-muted-foreground shrink-0 text-xs font-normal">
                           {hoursText(process.savedSecondsPerMonth)} {t("a month")}

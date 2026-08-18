@@ -35,7 +35,7 @@ export function TimeScreen({
   canEdit: boolean
 }) {
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       {/* R16: a sidebar page has no tab strip to badge, so the count lives in the
           heading — and it is the door's exact COUNT(*). */}
       <CollectionHeading sectionKey="time" total={total} />

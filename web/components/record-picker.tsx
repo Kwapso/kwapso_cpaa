@@ -284,7 +284,7 @@ export function RecordPicker({
       disabled={disabled}
       // Square, not pill: this is a form control sitting in a column of inputs,
       // and the library's own Select trigger is the shape a person reads as one.
-      className="min-h-9 min-w-0 flex-1 justify-between rounded-md px-3 font-normal"
+      className="min-h-9 min-w-0 flex-1 justify-between rounded-xl px-3 font-normal"
     >
       <span className={chosen ? "truncate" : "text-muted-foreground truncate"} title={label}>
         {label}
@@ -307,7 +307,7 @@ export function RecordPicker({
                 address bar is the difference between "pinned" and "off screen". */}
             <SheetContent
               side="bottom"
-              className="flex h-[85dvh] flex-col gap-0 rounded-t-3xl p-0"
+              className="flex h-[85dvh] flex-col gap-0 rounded-t-xl p-0"
             >
               <SheetTitle className="sr-only">{searchPlaceholder}</SheetTitle>
               {list}

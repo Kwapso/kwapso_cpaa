@@ -79,7 +79,7 @@ export function AgentHistoryDialog({
                       onPick(t.id)
                     }}
                     disabled={busy}
-                    className="hover:bg-muted focus-visible:ring-ring flex w-full flex-col items-start gap-0.5 rounded-md p-2 text-left focus-visible:ring-2 focus-visible:outline-none disabled:opacity-50"
+                    className="hover:bg-muted focus-visible:ring-ring flex w-full flex-col items-start gap-1 rounded-xl p-2 text-left focus-visible:ring-2 focus-visible:outline-none disabled:opacity-50"
                   >
                     <span className="line-clamp-1 text-sm font-medium">
                       {t.title || "Conversation"}

@@ -234,7 +234,7 @@ export function PagedFind<T>({
   const emptyText = asked ? `Nothing matched. Try fewer words, or clear the filters.` : undefined
 
   return (
-    <div className="flex w-full flex-col gap-3">
+    <div className="flex w-full flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
         <SearchInput value={text} onChange={setText} placeholder={placeholder} className="w-56" />
         {/* THE ORDER, beside the search box and the filters because it is the

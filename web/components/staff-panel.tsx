@@ -25,6 +25,7 @@ import { toast } from "@kwapso/ui/registry/primitives/sonner/sonner"
 import { Pencil, Power } from "lucide-react"
 
 import { CertificateFormDialog, type CertificateValues } from "@/components/certificate-form-dialog"
+import { RecordActionsMenu } from "@/components/record-chrome"
 import { StaffProfileDialog, type StaffProfileValues } from "@/components/staff-profile-dialog"
 import { OverviewList } from "@/components/overview-list"
 import { ApiFailure, content } from "@/lib/api"
@@ -121,9 +122,9 @@ export function StaffPanel({
     try {
       const { certificates: next } = await content.setStaffCertificateActive(cert.id, !cert.active)
       primeCache(staffCertificatesKey(teamId), next)
-      toast.success(cert.active ? "Archived." : "Restored.")
+      toast.success(cert.active ? t("Archived.") : t("Restored."))
     } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : "Couldn't update the certificate.")
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't update the certificate."))
     }
   }
 
@@ -142,7 +143,7 @@ export function StaffPanel({
     : []
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
           {t("Profile")}
@@ -155,9 +156,9 @@ export function StaffPanel({
         {/* ml-auto on the GROUP so a narrow phone reflows instead of clipping. */}
         <div className="ml-auto flex flex-wrap gap-2">
           {mayWrite && (
-            <Button variant="outline" size="sm" onClick={() => setProfileOpen(true)} className="gap-1.5">
+            <Button variant="outline" size="sm" onClick={() => setProfileOpen(true)} className="gap-1">
               <Pencil className="size-3.5" />
-              {profile?.active ? "Edit profile" : "Write a profile"}
+              {profile?.active ? t("Edit profile") : t("Write a profile")}
             </Button>
           )}
           {/* WHEN SOMEBODY LEAVES. Red because it takes the profile out of the
@@ -170,7 +171,7 @@ export function StaffPanel({
                 variant="outline"
                 size="sm"
                 onClick={() => void setProfileActive(profile, false)}
-                className="text-destructive hover:text-destructive gap-1.5"
+                className="text-destructive hover:text-destructive gap-1"
               >
                 <Power className="size-3.5" />
                 {t("Retire profile")}
@@ -180,7 +181,7 @@ export function StaffPanel({
                 variant="outline"
                 size="sm"
                 onClick={() => void setProfileActive(profile, true)}
-                className="gap-1.5"
+                className="gap-1"
               >
                 <Power className="size-3.5" />
                 {t("Restore profile")}
@@ -224,7 +225,7 @@ export function StaffPanel({
         )}
       </div>
       <Card>
-        <CardContent className="flex flex-col gap-3 p-4">
+        <CardContent className="flex flex-col gap-4 p-4">
           {certificates.length === 0 ? (
             <p className="text-muted-foreground text-sm">{t("Nothing recorded for")} {memberName} {t("yet.")}</p>
           ) : (
@@ -255,40 +256,48 @@ export function StaffPanel({
                     <p className="text-muted-foreground text-xs">
                       {[
                         c.issuer,
-                        c.issuedOn ? `granted ${formatDate(c.issuedOn)}` : null,
-                        c.expiresOn ? `lapses ${formatDate(c.expiresOn)}` : null,
+                        c.issuedOn ? `${t("granted")} ${formatDate(c.issuedOn)}` : null,
+                        c.expiresOn ? `${t("lapses")} ${formatDate(c.expiresOn)}` : null,
                       ]
                         .filter(Boolean)
-                        .join(" · ") || "No details recorded"}
+                        .join(" · ") || t("No details recorded")}
                     </p>
                   </div>
-                  <div className="flex shrink-0 gap-1">
-                    {mayWrite && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setEditingCert(c)
-                          setCertOpen(true)
-                        }}
-                        className="gap-1.5"
-                      >
-                        <Pencil className="size-3.5" />
-                        {t("Edit")}
-                      </Button>
-                    )}
-                    {mayArchive && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => void archiveCertificate(c)}
-                        className={`gap-1.5 ${c.active ? "text-destructive hover:text-destructive" : ""}`}
-                      >
-                        <Power className="size-3.5" />
-                        {c.active ? "Archive" : "Restore"}
-                      </Button>
-                    )}
-                  </div>
+                  {/* THE TWO ACTIONS, IN THE ROW'S OWN MENU (B2, N4). The row was
+                      the certificate's name, its state, three details and two
+                      labelled buttons — five units, and the buttons made it a
+                      row of facts and actions interleaved. The facts stay on the
+                      left where they read as a title and a meta line; the
+                      actions live in one trigger on the right. */}
+                  <RecordActionsMenu
+                    tone="row"
+                    actions={[
+                      ...(mayWrite
+                        ? [
+                            {
+                              key: "edit",
+                              label: t("Edit"),
+                              icon: <Pencil className="size-3.5" />,
+                              onSelect: () => {
+                                setEditingCert(c)
+                                setCertOpen(true)
+                              },
+                            },
+                          ]
+                        : []),
+                      ...(mayArchive
+                        ? [
+                            {
+                              key: c.active ? "archive" : "restore",
+                              label: c.active ? t("Archive") : t("Restore"),
+                              icon: <Power className="size-3.5" />,
+                              destructive: c.active,
+                              onSelect: () => void archiveCertificate(c),
+                            },
+                          ]
+                        : []),
+                    ]}
+                  />
                 </div>
               )
             })

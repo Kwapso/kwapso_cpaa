@@ -183,7 +183,7 @@ export function KnowledgeUploadDialog({
             setDragging(false)
             take(e.dataTransfer.files?.[0])
           }}
-          className={`flex flex-col items-center gap-2 rounded-lg border border-dashed p-6 text-center transition-colors ${
+          className={`flex flex-col items-center gap-2 rounded-xl border border-dashed p-6 text-center transition-colors ${
             dragging ? "border-primary bg-primary/5" : "border-muted-foreground/30"
           }`}
         >
@@ -226,7 +226,7 @@ export function KnowledgeUploadDialog({
                 size="sm"
                 onClick={() => inputRef.current?.click()}
                 disabled={busy}
-                className="gap-1.5"
+                className="gap-1"
               >
                 <Paperclip className="size-3.5" />
                 {t("Choose a file")}

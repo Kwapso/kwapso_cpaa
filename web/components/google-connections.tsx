@@ -150,7 +150,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
   }
 
   return (
-    <section className="animate-rise flex flex-col gap-3">
+    <section className="animate-rise flex flex-col gap-4">
       <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{t("Google")}</h2>
       <p className="text-muted-foreground text-sm">
         {t("Connect your own Google account, one service at a time. kwapso never uses anyone else's, the assistant working for you sees exactly what you can see, and nothing more.")}
@@ -171,7 +171,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
             const named = sources.filter((s) => s.service === service)
             return (
               <div key={service} className="flex flex-col gap-2 border-b p-3 last:border-0">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
                   <span className="font-medium">{SERVICE_COPY[service].label}</span>
                   {live ? (
                     <Badge variant="secondary" className="text-[10px]">
@@ -195,7 +195,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                         variant="outline"
                         size="sm"
                         onClick={() => setSharing(service as "drive" | "chat")}
-                        className="gap-1.5"
+                        className="gap-1"
                         title={service === "drive" ? "Share a folder" : "Share a space"}
                       >
                         <Plus className="size-3.5" aria-hidden />
@@ -207,7 +207,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                         variant="outline"
                         size="sm"
                         onClick={() => setDisconnecting(service)}
-                        className="text-destructive gap-1.5"
+                        className="text-destructive gap-1"
                         title={t("Disconnect")}
                       >
                         <Power className="size-3.5" aria-hidden />
@@ -223,7 +223,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                         onClick={() => {
                           window.location.href = `/api/content/google/start?service=${encodeURIComponent(service)}`
                         }}
-                        className="gap-1.5"
+                        className="gap-1"
                       >
                         <Plus className="size-3.5" aria-hidden /> {t("Connect")}
                       </Button>
@@ -330,7 +330,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
        * on a not-ready environment the button works until the first token expires
        * and then fails with a message about something the person cannot fix. */}
       {q.data?.ready && connections.length > 0 && can("knowledge", "create") && can("google", "read") && (
-        <div className="flex flex-col gap-1.5 rounded-xl border p-3">
+        <div className="flex flex-col gap-2 rounded-xl border p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm font-medium">{t("Let the assistant read what you have shared")}</span>
             {/* THE SAME CONTROL THAT IS NOW ON EVERY GOOGLE SCREEN. It used to be
@@ -393,7 +393,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
                 void disconnect()
               }}
               disabled={busy}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-1.5"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-1"
             >
               <Power className="size-3.5" aria-hidden /> {t("Disconnect")}
             </AlertDialogAction>

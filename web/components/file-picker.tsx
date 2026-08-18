@@ -84,7 +84,7 @@ export function FilePicker({
 
   if (value)
     return (
-      <div className="bg-card flex items-center gap-2 rounded-lg border p-2 text-sm">
+      <div className="bg-card flex items-center gap-2 rounded-xl border p-2 text-sm">
         <Paperclip className="text-muted-foreground size-4 shrink-0" />
         <span className="min-w-0 flex-1 truncate">{fileName || "Uploaded file"}</span>
         <Button
@@ -120,7 +120,7 @@ export function FilePicker({
         size="sm"
         onClick={() => inputRef.current?.click()}
         disabled={disabled || uploading}
-        className="gap-1.5"
+        className="gap-1"
       >
         {uploading ? <Spinner /> : <Paperclip className="size-3.5" />}
         {uploading ? "Uploading…" : "Choose a file"}

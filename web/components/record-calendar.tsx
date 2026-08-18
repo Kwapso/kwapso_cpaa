@@ -261,7 +261,7 @@ export function RecordCalendar({
   const dayEntries = openDay ? (byDay.get(openDay) ?? []) : []
 
   return (
-    <div className="flex w-full flex-col gap-3">
+    <div className="flex w-full flex-col gap-4">
       {/* THE PERIOD, AND THE SHAPE — one row: which month, then how to read it.
           The switch is the library's own segmented control rather than two
           buttons whose variant flips, which is the shape R3 refuses. */}
@@ -274,11 +274,11 @@ export function RecordCalendar({
             onValueChange={(v) => v && setPicked(v as Mode)}
             aria-label={t("How to read this month")}
           >
-            <ToggleGroupItem value="month" aria-label={t("Month")} className="gap-1.5 px-2.5">
+            <ToggleGroupItem value="month" aria-label={t("Month")} className="gap-1 px-2.5">
               <CalendarDays className="size-3.5" />
               <span className="text-xs">{t("Month")}</span>
             </ToggleGroupItem>
-            <ToggleGroupItem value="agenda" aria-label={t("Agenda")} className="gap-1.5 px-2.5">
+            <ToggleGroupItem value="agenda" aria-label={t("Agenda")} className="gap-1 px-2.5">
               <ListOrdered className="size-3.5" />
               <span className="text-xs">{t("Agenda")}</span>
             </ToggleGroupItem>
@@ -327,11 +327,18 @@ export function RecordCalendar({
                 <div
                   key={key}
                   className={[
-                    "flex min-h-20 flex-col gap-1 rounded-lg border p-1.5 transition-colors hover:border-[#a8a59f] hover:bg-accent",
+                    // THROUGH THE TOKENS, not through two hexes (R32). The hover
+                    // line was `#a8a59f`, a grey that exists in no palette here —
+                    // C10 says there is ONE ink stepped by opacity and never a
+                    // grey ramp, so it is the ink at 30%. Today's fill was
+                    // `#ffe9b0`, which is `brand.accentHex.surface` written out
+                    // by hand: the same soft mango `--secondary` already resolves
+                    // to, so a rebrand now reaches the calendar like everything
+                    // else. Mango is still never a border, which is the rule this
+                    // square was drawn to obey.
+                    "flex min-h-20 flex-col gap-1 rounded-xl border p-1.5 transition-colors hover:border-foreground/30 hover:bg-accent",
                     d.getMonth() === month.getMonth() ? "" : "opacity-40",
-                    // kwapso: mango never as a border — today's square is a solid
-                    // mango-soft fill, exactly as the library's calendar had it.
-                    key === today ? "bg-[#ffe9b0]" : "",
+                    key === today ? "bg-secondary" : "",
                   ].join(" ")}
                 >
                   <div
@@ -339,7 +346,7 @@ export function RecordCalendar({
                   >
                     {d.getDate()}
                   </div>
-                  <div className="flex flex-col gap-0.5">
+                  <div className="flex flex-col gap-1">
                     {here.slice(0, maxPerDay).map((e) => (
                       <EntryChip key={e.id} entry={e} onOpen={onOpen} />
                     ))}
@@ -373,7 +380,7 @@ export function RecordCalendar({
             </p>
           ) : (
             agendaDays.map((day) => (
-              <section key={day} className="flex flex-col gap-1.5">
+              <section key={day} className="flex flex-col gap-2">
                 <h3
                   className={`text-xs font-medium tracking-[0.5px] uppercase ${
                     day === today ? "text-foreground" : "text-muted-foreground"

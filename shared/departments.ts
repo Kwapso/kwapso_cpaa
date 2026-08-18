@@ -9,12 +9,23 @@
 // agency already chose for each of the five in the app they are leaving, and the
 // SECOND QUESTION each one asks.
 //
-// The names, marks and colours are read off the legacy data (glide/data/
+// The names and marks are read off the legacy data (glide/data/
 // agency.departments.json, the `departments` table) rather than invented: Sales
-// paper-airplane #F4C600, Admin folder #6738E8, Production code-bracket #B1E847,
-// Marketing star #f584e3, Business rocket-launch #C497FE. The legacy set had
-// eight rows; three of them (System, Operations, Support) carried no colour and
-// no icon, which is what "the five" means.
+// paper-airplane, Admin folder, Production code-bracket, Marketing star,
+// Business rocket-launch. The legacy set had eight rows; three of them (System,
+// Operations, Support) carried no colour and no icon, which is what "the five"
+// means.
+//
+// THE COLOURS ARE THE CHART SERIES, NOT THE LEGACY HEXES. Each of the five
+// arrived carrying a hex the old app had chosen (#F4C600, #6738E8, #B1E847,
+// #f584e3, #C497FE) and none of the five was one of kwapso's own colours, so a
+// department dot was the one mark on screen that did not belong to this app's
+// palette — and five literals in a shared file is exactly the shape UI-RULEBOOK
+// C10 refuses, because a theme change cannot reach them. A department is a MARK,
+// and C6 says a mark comes from the chart series, so the five now resolve
+// through `--chart-1` to `--chart-5`: the same five colours the pulse charts and
+// every other categorical mark in the app already draw from. The order is the
+// legacy order, so a department keeps the same dot from one release to the next.
 //
 // A department a team invents itself is a first-class value with no mark and no
 // second question — `departmentMark` answers null and `departmentAsks` answers
@@ -25,16 +36,17 @@ export type DepartmentStyle = {
   name: string
   /** a lucide icon name, the nearest equivalent of the legacy mark */
   icon: "send" | "folder" | "code" | "star" | "rocket"
-  /** the hex the agency chose for it, used as a small dot beside the name */
+  /** the colour of the small dot beside the name, as a CSS value that resolves
+   * through the theme — one of the five chart-series tokens, never a literal. */
   color: string
 }
 
 export const TASK_DEPARTMENTS: DepartmentStyle[] = [
-  { name: "Sales", icon: "send", color: "#F4C600" },
-  { name: "Admin", icon: "folder", color: "#6738E8" },
-  { name: "Production", icon: "code", color: "#B1E847" },
-  { name: "Marketing", icon: "star", color: "#f584e3" },
-  { name: "Business", icon: "rocket", color: "#C497FE" },
+  { name: "Sales", icon: "send", color: "var(--chart-1)" },
+  { name: "Admin", icon: "folder", color: "var(--chart-2)" },
+  { name: "Production", icon: "code", color: "var(--chart-3)" },
+  { name: "Marketing", icon: "star", color: "var(--chart-4)" },
+  { name: "Business", icon: "rocket", color: "var(--chart-5)" },
 ]
 
 /** The mark and colour for a department, or null for one a team invented. */

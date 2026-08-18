@@ -182,24 +182,12 @@ export function TicketsCollection({
 
   return (
     <CountedAbove active={formatCount(totals.help) !== ""}>
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-6">
         <CollectionHeading sectionKey="tickets" total={shownTotal} />
-        {/* WHOSE WEEK IT IS, above the list rather than in a screen of its own: it
-            is the sentence a person needs before they look, and a page they have
-            to go and open is a page nobody opens (BUILD-1 §6). The QUEUE beneath
-            it is the Triage tab, because that is a screen's worth. */}
-        <TriageStrip teamId={teamId} canSetDuty={can("help", "edit")} />
-
-        {/* WHERE THE WORK IS SITTING, above the strip and below the heading.
-            The strip badges Ready, each kind and Closed; it says nothing about
-            the four stages in between, which is exactly the question somebody
-            opening this page has. One short band, and the collection is still
-            the hero (the owner's size rule). It is the SAME picture Home shows,
-            off the same cached read, so the two can never disagree. */}
-        <TicketStagesCard teamId={teamId} />
-
-        <TabsView config={outerTabs} value={helpScope} onValueChange={(v) => setHelpScope(v as HelpScope)} />
-        <TabsView config={innerTabs} value={facet} onValueChange={(v) => setFacet(v as HelpFacet)} />
+        <div className="flex flex-col gap-2">
+          <TabsView config={outerTabs} value={helpScope} onValueChange={(v) => setHelpScope(v as HelpScope)} />
+          <TabsView config={innerTabs} value={facet} onValueChange={(v) => setFacet(v as HelpFacet)} />
+        </div>
 
         {facet === TRIAGE ? (
           <TriageQueue teamId={teamId} canTriage={can("help", "edit")} />
@@ -267,6 +255,32 @@ export function TicketsCollection({
             }}
           </PagedFind>
         )}
+
+        {/* THE TWO PANELS THAT ARE NOT THE LIST, and they are UNDER it now.
+            WHOSE WEEK IT IS was written above the list because "it is the
+            sentence a person needs before they look, and a page they have to go
+            and open is a page nobody opens" (BUILD-1 §6) — the first half of
+            which is still true and the second half is what put it here rather
+            than on a screen of its own. WHERE THE WORK IS SITTING went above for
+            the same reason: the strip badges Ready, each kind and Closed and
+            says nothing about the four stages in between.
+
+            What neither argument answered is N2. Between the heading and the
+            first ticket a reader was crossing SIX blocks — a duty band about ONE
+            person, a stage chart about the whole pipeline, two tab strips, a
+            search bar and an action row — before reaching the thing the page is
+            named after. That is the "too much in one glance" complaint arriving
+            as a stack. The person came for the list, so the list comes first and
+            these two are a scroll away, which the owner explicitly asked people
+            to be happy to do. Nothing is hidden, nothing is conditional on who is
+            reading, and the Triage QUEUE is still its own tab because that is a
+            screen's worth. */}
+        {facet !== TRIAGE && (
+          <>
+            <TriageStrip teamId={teamId} canSetDuty={can("help", "edit")} />
+            <TicketStagesCard teamId={teamId} />
+          </>
+        )}
       </div>
     </CountedAbove>
   )
@@ -317,7 +331,7 @@ function TriageQueue({ teamId, canTriage }: { teamId: string; canTriage: boolean
   return (
     <ul className="divide-border divide-y">
       {view.waiting.map((w) => (
-        <li key={w.id} className="flex flex-wrap items-center gap-3 py-3">
+        <li key={w.id} className="flex flex-wrap items-center gap-2 py-3">
           <AlarmClock className="text-destructive size-4 shrink-0" />
           <span className="min-w-0 flex-1 truncate text-sm">
             {[w.ref, richTextPlain(w.description)].filter(Boolean).join(" · ")}
@@ -331,7 +345,7 @@ function TriageQueue({ teamId, canTriage }: { teamId: string; canTriage: boolean
               size="sm"
               disabled={busy === w.id}
               onClick={() => void markRead(w.id)}
-              className="shrink-0 gap-1.5"
+              className="shrink-0 gap-1"
             >
               <MailOpen className="size-3.5" />
               {t("Mark it read")}

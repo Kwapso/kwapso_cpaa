@@ -100,7 +100,7 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
   // rather than the sign-in screen, which would read as "you were logged out".
   if (session.state === "unavailable")
     return (
-      <main className="mx-auto flex min-h-[100svh] max-w-md flex-col items-center justify-center gap-5 px-6 text-center">
+      <main className="mx-auto flex min-h-[100svh] max-w-md flex-col items-center justify-center gap-6 px-6 text-center">
         <h1 className="text-2xl font-semibold tracking-tight">{t("We can't reach your account")}</h1>
         <p className="text-muted-foreground">
           {t("Something on our side isn't responding. Nothing is lost. Try again in a moment.")}
@@ -170,7 +170,7 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
         {switching ? (
           <div className="flex flex-col gap-6" aria-busy="true" aria-live="polite">
             <span className="sr-only">{t("Switching company…")}</span>
-            <Skeleton className="h-8 w-56 rounded-lg" />
+            <Skeleton className="h-8 w-56 rounded-xl" />
             <Skeleton className="h-20 w-full rounded-xl" />
             <Skeleton className="h-20 w-full rounded-xl" />
           </div>
@@ -211,7 +211,7 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
  * and the shell agree on what "not yet" looks like. */
 export function PortalDoor({ children }: { children: React.ReactNode }) {
   return (
-    <main className="flex min-h-[100svh] flex-col items-center justify-center gap-8 p-6">
+    <main className="flex min-h-[100svh] flex-col items-center justify-center gap-6 p-6">
       <div className="fixed right-4 top-4 z-30">
         <ModeToggle />
       </div>

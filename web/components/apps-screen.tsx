@@ -160,7 +160,7 @@ export function AppsScreen({
     // rather than saying a third number two lines above them. Same shape as the
     // tasks screen's six views, and for the same reason.
     <CountedAbove active={activeBadge !== "" || inactiveBadge !== ""}>
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <CollectionHeading sectionKey="apps" total={total} />
 
       <SectionWithCreate

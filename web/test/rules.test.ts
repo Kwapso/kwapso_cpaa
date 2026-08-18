@@ -22,6 +22,7 @@ import {
   PAGE_WIDTH_OWNER,
   RAW_BODY_EXEMPT,
   RECORD_DETAIL_NOT,
+  PALETTE_LITERAL_OK,
   SCREEN_WIDTH_EXEMPT,
   PORTAL_VISIBLE_READS,
   RECORD_TAB_COUNT_EXCEPTIONS,
@@ -1624,6 +1625,87 @@ describe("RULES — the laws of the base", () => {
     ).toEqual([])
   })
 
+  // R31 — TWO RADII AND NO THIRD.
+  //
+  // The cheapest rule in the book to check and the one that was most broken:
+  // every Tailwind radius step from `sm` to `3xl` resolves to the same
+  // `var(--radius)` (24px) in this theme, so `rounded-lg` and `rounded-xl` were
+  // two spellings of one pixel value and the app used five of them. That is five
+  // decisions where there is one, and the day the theme gives those steps
+  // different numbers the app acquires radii nobody chose.
+  //
+  // BARE `rounded` IS NOT CAUGHT, deliberately, and it is the interesting case.
+  // It resolves to 4px here, NOT 24 — measured in a browser against the running
+  // theme rather than read off a file — so on an inline `<mark>` and on a 32px
+  // thumbnail it is a genuinely different value doing a genuinely different job.
+  // Folding it into the vocabulary would put a lozenge round every highlighted
+  // word, which is a redesign wearing a sweep's clothes.
+  it("two-radii: only rounded-xl, rounded-t-xl and rounded-full ship (R31)", () => {
+    // `shared/rules/` is the LAW BOOK — prose ABOUT the code, not code that
+    // renders. R31's own sentence names the steps it forbids, so a scan that
+    // read it would go red on the rule's own text.
+    const roots = [WEB, join(ROOT, "web-portal"), join(ROOT, "shared")]
+    const lawBook = join(ROOT, "shared", "rules")
+    const offenders: string[] = []
+    for (const f of sourceFiles(roots, { extensions: [".tsx", ".ts"], relativeTo: ROOT, skipTests: true })) {
+      if (f.path.startsWith(lawBook)) continue
+      for (const hit of stripComments(f.source).match(/\brounded-(?:[a-z]+-)?[a-z0-9]+/g) ?? []) {
+        if (/^rounded-(?:t-)?xl$/.test(hit) || hit === "rounded-full" || hit === "rounded-none") continue
+        offenders.push(`${f.rel}: ${hit}`)
+      }
+    }
+    expect(
+      offenders,
+      `R31 — a surface is rounded-xl and a pill is rounded-full, nothing else:\n  ${offenders.join("\n  ")}`
+    ).toEqual([])
+  })
+
+  // R32 — EVERY COLOUR RESOLVES THROUGH A TOKEN.
+  //
+  // A hard-coded colour is invisible to a theme, and colour drift is only ever
+  // visible in aggregate — which is exactly why it needs a check rather than a
+  // reviewer. Two live breaches earned this: `import-screen.tsx` said `amber-600`
+  // and `emerald-500` where it meant warning and success, so the one screen that
+  // reports a RESULT was the one screen a rebrand could not reach; and
+  // `shared/departments.ts` held five hexes the legacy app chose, none of them
+  // one of kwapso's own seven, so a department dot was the single mark on screen
+  // that did not belong to this product's palette.
+  //
+  // The exemptions are DATA, with reasons, rot-checked in both directions — the
+  // same shape as R29's width pins, so a file that stops holding a literal must
+  // lose its entry and the list can only shrink.
+  it("closed-palette: no Tailwind ramp and no hex outside PALETTE_LITERAL_OK (R32)", () => {
+    const roots = [WEB, join(ROOT, "web-portal"), join(ROOT, "shared")]
+    const RAMP =
+      /\b(?:text|bg|border|fill|stroke|ring|from|via|to|decoration|divide|outline|accent|caret)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}\b/g
+    const HEX = /#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\b/g
+    const lawBook = join(ROOT, "shared", "rules") // it quotes what it forbids
+    const ramps: string[] = []
+    const hexed = new Set<string>()
+    for (const f of sourceFiles(roots, { extensions: [".tsx", ".ts"], relativeTo: ROOT, skipTests: true })) {
+      if (f.path.startsWith(lawBook)) continue
+      const src = stripComments(f.source)
+      for (const hit of src.match(RAMP) ?? []) ramps.push(`${f.rel}: ${hit}`)
+      if ((src.match(HEX) ?? []).length > 0) hexed.add(f.rel)
+    }
+    expect(
+      ramps,
+      `R32 — a Tailwind ramp names a colour, not a meaning. Use the token (warning / success / destructive / chart-N):\n  ${ramps.join("\n  ")}`
+    ).toEqual([])
+
+    const unexcused = [...hexed].filter((f) => !(f in PALETTE_LITERAL_OK))
+    expect(
+      unexcused,
+      `R32 — these hold a colour literal. Resolve it through a token, or pin the file in PALETTE_LITERAL_OK with a reason:\n  ${unexcused.join("\n  ")}`
+    ).toEqual([])
+
+    const stale = Object.keys(PALETTE_LITERAL_OK).filter((f) => !hexed.has(f))
+    expect(
+      stale,
+      `these PALETTE_LITERAL_OK entries match nothing — the file no longer holds a colour literal, so delete the entry:\n  ${stale.join("\n  ")}`
+    ).toEqual([])
+  })
+
   it("every enforced law has a known check", () => {
     const known = new Set([
       "publish-seam", // the 3 per-worker publish-seam.test.ts suites
@@ -1647,6 +1729,8 @@ describe("RULES — the laws of the base", () => {
       "catalog-coverage", // R13: workers/data-ops/test/catalog-coverage.test.ts
       "agent-filter-parity", // R19: workers/mcp/test/filter-parity.test.ts
       "client-reachable-doors", // R21: the client-reach scan above
+      "two-radii", // R31: the radius-vocabulary grep above
+      "closed-palette", // R32: the ramp + hex-literal grep above
       "agent-body-parity", // R22: the request BODY half, beside R19 in the mcp suite
       "cited-answers", // R23: workers/content/test/cited-answers.test.ts
       "internal-money-never-in-portal", // R24: the import-graph scan above

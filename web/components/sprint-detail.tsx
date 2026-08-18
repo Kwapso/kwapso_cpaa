@@ -214,7 +214,7 @@ export function SprintDetailScreen({
       actions={
         canEdit ? (
           <>
-            <Button disabled={busy} onClick={() => void setComplete(!sprint.completedAt)} className="gap-1.5">
+            <Button disabled={busy} onClick={() => void setComplete(!sprint.completedAt)} className="gap-1">
               {busy ? (
                 <Spinner />
               ) : sprint.completedAt ? (
@@ -252,14 +252,21 @@ export function SprintDetailScreen({
               </button>
             )}
           </p>
-          {canEdit && !sprint.completedAt && (
-            <p className="text-muted-foreground text-sm">
-              {t("Completing this sprint cuts a new version of every process inside its app, so the savings can be measured from what changed.")}
-            </p>
-          )}
         </>
       }
     >
+      {/* WHAT COMPLETING IT WILL DO — a C8 warning band UNDER the header, which
+          is where this book already says a warning band goes, rather than a
+          third paragraph inside the header itself. The header's job is who and
+          what; a consequence of pressing a button is a different question, and
+          two questions on one band is N4's fault. The cross-links stay in the
+          header, because they ARE who and what. */}
+      {canEdit && !sprint.completedAt && (
+        <p className="text-muted-foreground bg-muted/40 rounded-xl border p-3 text-sm">
+          {t("Completing this sprint cuts a new version of every process inside its app, so the savings can be measured from what changed.")}
+        </p>
+      )}
+
       <TabsView
         className={STICKY_TABS}
         config={tabsConfig}

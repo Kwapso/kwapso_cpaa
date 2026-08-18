@@ -100,7 +100,7 @@ export function TeamEditDialog({
         disabled: !name.trim(),
       }}
     >
-      <div className="flex flex-col items-center gap-3">
+      <div className="flex flex-col items-center gap-4">
         <Avatar className="size-20">
           {(logo || team?.logoUrl) && (
             <AvatarImage src={logo || (team?.logoUrl as string)} alt={t("Team logo")} />

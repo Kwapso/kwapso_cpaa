@@ -71,7 +71,7 @@ export type SubmitConfig = {
 function SubmitButton({ submit }: { submit: SubmitConfig }) {
   const t = useT()
   return (
-    <Button type="submit" disabled={submit.busy || submit.disabled} className="gap-1.5">
+    <Button type="submit" disabled={submit.busy || submit.disabled} className="gap-1">
       {submit.busy ? <Spinner /> : submit.icon}
       {submit.busy ? t("Submitting…") : t("Submit")}
     </Button>
@@ -108,7 +108,7 @@ export function FormShell({
       className="grid max-h-[85dvh] grid-rows-[auto_1fr_auto] overflow-hidden rounded-xl"
       onSubmit={onSubmit}
     >
-      <div className="flex flex-col gap-1.5 px-6 pt-6 pb-4">
+      <div className="flex flex-col gap-2 px-6 pt-6 pb-4">
         {title}
         {subtitle}
       </div>

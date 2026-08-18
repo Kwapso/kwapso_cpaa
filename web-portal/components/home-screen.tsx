@@ -68,7 +68,7 @@ function TimeGivenBack() {
       <p className="text-muted-foreground text-sm">{t("Time given back, every month")}</p>
       <p className="text-3xl font-semibold tracking-tight">{hoursText(data.savedSecondsPerMonth)}</p>
       <p className="text-muted-foreground mt-3 text-sm">{data.caption ?? SAVINGS_CAPTION}</p>
-      <span className="text-muted-foreground mt-3 flex items-center gap-1.5 text-sm">
+      <span className="text-muted-foreground mt-3 flex items-center gap-1 text-sm">
         {t("See where it comes from")}
         <ArrowRight className="size-3.5" />
       </span>
@@ -130,7 +130,7 @@ export function HomeScreen({ ready }: { ready: PortalReady }) {
         <CollectionHeading label={t("Your company's tickets")} total={total} />
 
         {loading && !tickets ? (
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-4">
             <Skeleton className="h-20 w-full rounded-xl" />
             <Skeleton className="h-20 w-full rounded-xl" />
           </div>
@@ -140,14 +140,14 @@ export function HomeScreen({ ready }: { ready: PortalReady }) {
             <p className="mt-1 text-sm">{t("When you do, it'll live here, and so will our reply.")}</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-4">
             {newest.map((t) => (
               <TicketRow key={t.id} ticket={t} />
             ))}
             {(total ?? 0) > newest.length ? (
               <Link
                 href="/tickets"
-                className="text-muted-foreground hover:text-foreground flex items-center justify-center gap-1.5 py-2 text-sm"
+                className="text-muted-foreground hover:text-foreground flex items-center justify-center gap-1 py-2 text-sm"
               >
                 {t("See all of them")}
                 <ArrowRight className="size-3.5" />

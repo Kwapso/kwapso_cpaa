@@ -69,7 +69,7 @@ function InternalCollection({
   const t = useT()
   const tuned = withDataDrivenCollection(recipe, data.rows ?? [])
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       {heading}
       <SectionWithCreate
         show={canCreate}

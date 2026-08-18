@@ -53,7 +53,7 @@ import {
   type SprintFormValues,
   type SprintTypeOption,
 } from "@/components/sprint-form-dialog"
-import { sprintLine } from "@/components/work-panels"
+import { sprintLine, sprintLineInKindGroup } from "@/components/work-panels"
 import { content as contentApi } from "@/lib/api"
 import { appsKey, listFetch, sprintsKey } from "@/lib/live-resources"
 import { CONCEPT_ICON } from "@/lib/pages"
@@ -172,6 +172,29 @@ function endingBadge(s: Sprint, t: (english: string) => string): React.ReactNode
   if (s.completedAt) return <Badge variant="secondary">{t("Complete")}</Badge>
   if (!s.active) return <Badge variant="outline">{t("Cancelled")}</Badge>
   return undefined
+}
+
+/** WHAT SITS AT THE END OF AN OVERVIEW ROW: how much of the sprint is done, and
+ * the badge if it has stopped.
+ *
+ * "3 of 11 done" used to be the fifth fact on the row's summary sentence, where
+ * it read as prose and had to be decoded a row at a time. It is a NUMBER, and T4
+ * says a number goes in the trailing slot in `tabular-nums` so a column of them
+ * lines up and can be compared without reading any of them. The two states are
+ * mutually exclusive with each other and nearly always absent, so on a running
+ * sprint this slot holds exactly one thing. */
+function progressTrailing(s: Sprint, t: (english: string) => string): React.ReactNode {
+  const badge = endingBadge(s, t)
+  const done = s.storyCount - s.openStoryCount
+  if (s.storyCount === 0) return badge
+  return (
+    <span className="flex items-center gap-2">
+      <span className="text-muted-foreground text-xs tabular-nums">
+        {done} {t("of")} {s.storyCount} {t("done")}
+      </span>
+      {badge}
+    </span>
+  )
 }
 
 /* --------------------------------- the rows -------------------------------- */
@@ -316,17 +339,8 @@ export function SprintsScreen({
     }))
 
   const overview = (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-10">
       {sprints.length === 0 && <p className="text-muted-foreground text-sm">{t("No sprints yet.")}</p>}
-      {burndown.length > 0 && (
-        <BandCard title={t("Work inside the running sprints")}>
-          <SprintBurndownChart
-            rows={burndown}
-            doneLabel={t("Done")}
-            openLabel={t("Still open")}
-          />
-        </BandCard>
-      )}
       {SPRINT_STATES.map((state) => {
         const inState = sprints.filter((s) => sprintState(s, today) === state)
         if (inState.length === 0) return null
@@ -336,7 +350,7 @@ export function SprintsScreen({
                 own. The collection's one number is on the strip above (R16). */}
             <h2 className="text-lg font-medium">{t(STATE_HEADING[state])}</h2>
             {groupByKind(inState, byKind, lang, t("No kind said")).map((group) => (
-              <div key={group.key} className="flex flex-col gap-1.5">
+              <div key={group.key} className="flex flex-col gap-2">
                 <p className="text-muted-foreground text-xs font-medium tracking-[0.5px] uppercase">
                   {group.word}
                 </p>
@@ -346,8 +360,11 @@ export function SprintsScreen({
                     id: s.id,
                     leading: group.mark ? <KindMark mark={group.mark} /> : undefined,
                     title: s.ref ? `${s.ref} · ${s.name}` : s.name,
-                    subtitle: sprintLine(s),
-                    trailing: endingBadge(s, t),
+                    // The kind is the heading above; how much is done is the
+                    // number on the right. What is left is the three facts a
+                    // status line may carry (D5): whose, which app, and when.
+                    subtitle: sprintLineInKindGroup(s),
+                    trailing: progressTrailing(s, t),
                   }))}
                   onItemClick={(item) => onIntent({ kind: "open", module: "sprints", id: item.id })}
                 />
@@ -356,12 +373,24 @@ export function SprintsScreen({
           </section>
         )
       })}
+
+      {/* HOW FULL THE RUNNING BLOCKS ARE — UNDER the groups, not above them.
+          It was the first thing on the screen, which put a chart between the
+          heading and the first sprint and made this the fifth block a reader
+          crossed before reaching the list they came for (N2). It is a picture
+          OF the rows below it, so it reads perfectly well after them, and the
+          person who came to find a sprint finds one first. */}
+      {burndown.length > 0 && (
+        <BandCard title={t("Work inside the running sprints")}>
+          <SprintBurndownChart rows={burndown} doneLabel={t("Done")} openLabel={t("Still open")} />
+        </BandCard>
+      )}
     </div>
   )
 
   return (
     <CountedAbove active={badge !== ""}>
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-6">
         {/* R16: the strip below badges all three views, so the heading stands
             down through the arbitration context rather than saying the same
             number twice. */}

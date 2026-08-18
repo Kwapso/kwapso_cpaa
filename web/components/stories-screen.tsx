@@ -209,7 +209,7 @@ export function StoriesScreen({
   const loaded = storiesQ.data
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       {/* R16: the count lives in the heading (a sidebar page has no tab strip to
           badge), and it is the door's exact COUNT(*) — never the loaded page's
           length, which on a paged list is just "50" for ever. */}

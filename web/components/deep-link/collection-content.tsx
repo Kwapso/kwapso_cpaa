@@ -479,18 +479,25 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     // badge), and it is the door's exact COUNT(*) — never the loaded page's
     // length, which on a paged list is just "50" forever.
     return (
-      <div className="flex flex-col gap-4">
-        <CollectionHeading sectionKey="knowledge" total={totals.knowledge} />
-        {/* THE SYNC AFFORDANCE, on the screen most obviously made of Google
-            material. The owner: "we should have this button everywhere, wherever
-            we're showing data coming from Google sources." It is the SAME
-            component Settings and Meetings carry — one implementation, one
-            sentence about when it last ran, one honest nothing. */}
-        <GoogleSyncButton
-          teamId={teamId as string}
-          scope="knowledge"
-          onSynced={() => invalidate(knowledgeKey(teamId as string))}
-        />
+      <div className="flex flex-col gap-6">
+        {/* THE HEADING AND THE SYNC AFFORDANCE ARE ONE BAND, not two blocks.
+            The owner asked for the sync button "everywhere, wherever we're
+            showing data coming from Google sources", and it stays exactly that
+            visible — it has simply stopped being a block of its own between the
+            heading and the ask box (N2 counts blocks before the primary content,
+            and this screen was at five). A heading names the collection and this
+            button refreshes the same collection, so they answer one question and
+            belong on one band (N4). `CollectionHeading` renders nothing when a
+            counted tab strip wins the arbitration, which leaves the button on
+            the band by itself and is still correct. */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CollectionHeading sectionKey="knowledge" total={totals.knowledge} />
+          <GoogleSyncButton
+            teamId={teamId as string}
+            scope="knowledge"
+            onSynced={() => invalidate(knowledgeKey(teamId as string))}
+          />
+        </div>
         {/* ASK IT, HERE. The list answers "what does it know?"; this answers
             "what does it know about X?", which is the question somebody actually
             came with. It sits ABOVE the list because a page whose first control

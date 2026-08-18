@@ -81,7 +81,7 @@ export function TeamSwitcher({
       <DropdownMenuTrigger asChild>
         {collapsed ? (
           <button
-            className="rounded-lg outline-none ring-offset-2 focus-visible:ring-2"
+            className="rounded-xl outline-none ring-offset-2 focus-visible:ring-2"
             title={name}
             aria-label={t("Switch team")}
           >

@@ -145,7 +145,7 @@ export function HelpAttachmentsPanel({
       ) : (
         <ul className="divide-border divide-y">
           {listQ.data.map((a) => (
-            <li key={a.id} className="flex flex-wrap items-center gap-3 py-3">
+            <li key={a.id} className="flex flex-wrap items-center gap-2 py-3">
               {a.kind === "file" ? (
                 <Paperclip className="text-muted-foreground size-4 shrink-0" />
               ) : (
@@ -176,7 +176,7 @@ export function HelpAttachmentsPanel({
                   size="sm"
                   disabled={busy}
                   onClick={() => void run(() => contentApi.removeHelpAttachment(ticketId, a.id), "Taken off.")}
-                  className="text-destructive hover:text-destructive shrink-0 gap-1.5"
+                  className="text-destructive hover:text-destructive shrink-0 gap-1"
                   aria-label={t("Take it off")}
                 >
                   <Trash2 className="size-3.5" />
@@ -195,7 +195,7 @@ export function HelpAttachmentsPanel({
             size="sm"
             disabled={busy}
             onClick={() => fileRef.current?.click()}
-            className="gap-1.5"
+            className="gap-1"
           >
             <Upload className="size-3.5" />
             {t("Add a file")}
@@ -216,7 +216,7 @@ export function HelpAttachmentsPanel({
                 className="w-64"
                 disabled={busy}
               />
-              <Button size="sm" disabled={busy} onClick={() => void addLink()} className="gap-1.5">
+              <Button size="sm" disabled={busy} onClick={() => void addLink()} className="gap-1">
                 <Plus className="size-3.5" />
                 {t("Submit")}
               </Button>
@@ -227,7 +227,7 @@ export function HelpAttachmentsPanel({
               size="sm"
               disabled={busy}
               onClick={() => setAddingLink(true)}
-              className="gap-1.5"
+              className="gap-1"
             >
               <Link2 className="size-3.5" />
               {t("Add a link")}

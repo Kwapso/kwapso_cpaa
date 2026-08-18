@@ -273,7 +273,7 @@ export function TasksScreen({
   const dueToday = counts.dueToday ?? 0
   const doneToday = counts.dueTodayDone ?? 0
   const progressBar = (
-    <section className="flex flex-col gap-1.5" aria-label={t("Today's tasks")}>
+    <section className="flex flex-col gap-2" aria-label={t("Today's tasks")}>
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-sm font-medium">{t("Today's tasks")}</h2>
         <p className="text-muted-foreground text-xs tabular-nums">
@@ -329,7 +329,7 @@ export function TasksScreen({
 
   return (
     <CountedAbove active={openBadge !== ""}>
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       {/* R16: the count lives in ONE place. The strip below badges all six views,
           so the heading stands down through the arbitration context rather than
           saying the same number twice. */}
@@ -384,7 +384,7 @@ export function TasksScreen({
       {/* R14: BOUNDED, not paged — admin is ticked off as fast as it arrives. */}
 
       <section className="flex flex-col gap-2">
-        <h2 className="text-muted-foreground flex items-center gap-1.5 text-sm font-medium">
+        <h2 className="text-muted-foreground flex items-center gap-1 text-sm font-medium">
           <Inbox className="size-3.5" />
           {t("Waiting on clients")}
         </h2>

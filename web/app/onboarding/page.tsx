@@ -202,7 +202,7 @@ export default function OnboardingPage() {
           </p>
         </div>
         <form className="mt-6 flex flex-col gap-4" onSubmit={finish}>
-            <div className="flex flex-col items-center gap-3">
+            <div className="flex flex-col items-center gap-4">
               <Avatar className="size-20">
                 {photo && <AvatarImage src={photo} alt={t("Your photo")} />}
                 <AvatarFallback className="text-lg">{initials}</AvatarFallback>

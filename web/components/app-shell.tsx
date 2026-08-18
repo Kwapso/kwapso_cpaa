@@ -208,8 +208,8 @@ export function AppShell({
         onClick={() => navigate(item.path)}
         aria-current={activeNav ? "page" : undefined}
         title={collapsed ? item.title : undefined}
-        className={`flex items-center rounded-lg text-sm font-medium transition-colors ${
-          collapsed ? "justify-center p-2" : "gap-3 px-3 py-2"
+        className={`flex items-center rounded-xl text-sm font-medium transition-colors ${
+          collapsed ? "justify-center p-2" : "gap-2 px-3 py-2"
         } ${
           activeNav
             ? "bg-muted text-foreground"
@@ -370,7 +370,7 @@ export function AppShell({
             onClick={toggleCollapsed}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             title={collapsed ? "Expand" : "Collapse"}
-            className="text-muted-foreground hover:bg-muted/50 hover:text-foreground rounded-lg p-2 transition-colors"
+            className="text-muted-foreground hover:bg-muted/50 hover:text-foreground rounded-xl p-2 transition-colors"
           >
             {collapsed ? (
               <PanelLeftOpen className="size-4" />
@@ -411,7 +411,7 @@ export function AppShell({
          * The running timer sits on the same row on desktop (the mobile bar has
          * its own copy above): one line that is present on every screen and shows
          * nothing at all when nobody is timing anything. */}
-        <div className="flex items-center justify-between gap-3 px-4 pt-4 sm:px-6 lg:px-10">
+        <div className="flex items-center justify-between gap-2 px-4 pt-4 sm:px-6 lg:px-10">
           <div className="min-w-0">
             {breadcrumbs && breadcrumbs.length > 0 && (
               <Breadcrumbs items={breadcrumbs} onNavigate={onNavigate ?? softNavigate} />
@@ -453,7 +453,7 @@ export function AppShell({
                 type="button"
                 onClick={() => navigate(item.path)}
                 aria-current={activeNav ? "page" : undefined}
-                className={`flex flex-1 flex-col items-center gap-0.5 rounded-lg py-1.5 text-[11px] font-medium transition-colors ${
+                className={`flex flex-1 flex-col items-center gap-1 rounded-xl py-1.5 text-[11px] font-medium transition-colors ${
                   activeNav ? "text-foreground" : "text-muted-foreground"
                 }`}
               >
@@ -474,7 +474,7 @@ export function AppShell({
               aria-current={
                 overflowNav.some((i) => isNavActive(i.path, here)) ? "page" : undefined
               }
-              className={`flex flex-1 flex-col items-center gap-0.5 rounded-lg py-1.5 text-[11px] font-medium transition-colors ${
+              className={`flex flex-1 flex-col items-center gap-1 rounded-xl py-1.5 text-[11px] font-medium transition-colors ${
                 overflowNav.some((i) => isNavActive(i.path, here))
                   ? "text-foreground"
                   : "text-muted-foreground"
@@ -513,7 +513,7 @@ export function AppShell({
                           navigate(item.path)
                         }}
                         aria-current={activeNav ? "page" : undefined}
-                        className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                        className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
                           activeNav
                             ? "bg-muted text-foreground"
                             : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"

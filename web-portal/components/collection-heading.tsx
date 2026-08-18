@@ -30,7 +30,7 @@ export function CollectionHeading({
 }) {
   const count = formatCount(total)
   return (
-    <div className="mb-4 flex items-baseline justify-between gap-3">
+    <div className="mb-4 flex items-baseline justify-between gap-2">
       <h2 className="text-lg font-medium">
         {label}
         {count ? <span className="text-muted-foreground ml-2 font-normal">{count}</span> : null}

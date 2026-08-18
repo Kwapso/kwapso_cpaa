@@ -8,6 +8,7 @@
 
 import * as React from "react"
 
+import { Badge } from "@kwapso/ui/registry/primitives/badge/badge"
 import { Button } from "@kwapso/ui/registry/primitives/button/button"
 import { Input } from "@kwapso/ui/registry/primitives/input/input"
 import {
@@ -23,6 +24,7 @@ import { Pencil, X, Check, Upload, Download, Power, Search } from "lucide-react"
 
 import type { SelectableValue } from "@shared/types"
 import { ApiFailure, tenancy } from "@/lib/api"
+import { RecordActionsMenu } from "@/components/record-chrome"
 import { SelectableFormDialog } from "@/components/selectable-form-dialog"
 import { usePermissions } from "@/lib/perms"
 import { primeCache, useCached } from "@shared/web/store"
@@ -116,9 +118,28 @@ export function SelectableScreen({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t("Dropdown values")}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {t("Dropdown values")}
+            {/* HOW MANY, BESIDE THE HEADING — because a count is a RESULT and a
+                heading is where this app says how big a collection is. It used
+                to sit at the head of the filter bar, on the same band as the
+                search box and the status Select, which are CAUSES. Three units,
+                one band, two different questions, and that is N4's own worked
+                example of the "twisted" fault: the eye reads left to right
+                expecting one idea and gets an answer followed by two controls
+                that produce it. Nothing about the number changed — this is a
+                bounded collection read whole, so it is an honest count of the
+                rows in hand rather than a page length. */}
+            {values.length > 0 && (
+              <span className="text-muted-foreground ml-2 text-base font-normal tabular-nums">
+                {filtered.length === values.length
+                  ? values.length
+                  : `${filtered.length} ${t("of")} ${values.length}`}
+              </span>
+            )}
+          </h1>
           <p className="text-muted-foreground mt-1 text-sm">
             {t("The options behind your team's dropdowns. Ticket types, Learning categories and more. Pick a group, or start a new one.")}
           </p>
@@ -128,14 +149,14 @@ export function SelectableScreen({
          * the shared form dialog (Law R4), never an inline row. */}
         <div className="flex flex-wrap justify-end gap-2">
           {values.length > 0 && (
-            <Button asChild variant="outline" className="gap-1.5">
+            <Button asChild variant="outline" className="gap-1">
               <a href="/api/tenancy/selectable/export">
                 <Download className="size-4" aria-hidden /> {t("Export CSV")}
               </a>
             </Button>
           )}
           {canCreate && onImport && (
-            <Button variant="outline" onClick={onImport} className="gap-1.5">
+            <Button variant="outline" onClick={onImport} className="gap-1">
               <Upload className="size-4" aria-hidden /> {t("Import CSV")}
             </Button>
           )}
@@ -160,9 +181,6 @@ export function SelectableScreen({
        * reactivate them. flex-wrap so the controls never clip on a phone. */}
       {values.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-muted-foreground mr-1 text-sm">
-            {t("Showing")} {filtered.length} of {values.length}
-          </span>
           <div className="relative w-full sm:w-56">
             <Search
               className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2"
@@ -196,15 +214,15 @@ export function SelectableScreen({
             : "No values match your search or filter."}
         </p>
       ) : (
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-6">
           {grouped.map((g) => (
             <div key={g.type} className="flex flex-col gap-2">
               <h2 className="text-sm font-medium">{g.type}</h2>
-              <ul className="flex flex-col gap-1.5">
+              <ul className="divide-border divide-y rounded-xl border">
                 {g.items.map((v) => (
                   <li
                     key={v.id}
-                    className={`border-border/60 flex items-center gap-2 rounded-lg border px-3 py-1.5 ${
+                    className={`flex items-center gap-2 px-3 py-2 ${
                       v.active ? "" : "opacity-60"
                     }`}
                   >
@@ -257,48 +275,54 @@ export function SelectableScreen({
                         )}
                         <span className="flex-1 text-sm">{v.value}</span>
                         {!v.active && (
-                          <span className="text-muted-foreground text-xs">{t("Deactivated")}</span>
+                          <Badge variant="outline" className="shrink-0">
+                            {t("Deactivated")}
+                          </Badge>
                         )}
-                        {v.active ? (
-                          <>
-                            {canEdit && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  setEditingId(v.id)
-                                  setEditValue(v.value)
-                                  setEditMark(v.mark ?? "")
-                                }}
-                                aria-label={`Rename ${v.value}`}
-                              >
-                                <Pencil className="size-4" />
-                              </Button>
-                            )}
-                            {canDelete && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => void setActive(v, false)}
-                                aria-label={`Deactivate ${v.value}`}
-                              >
-                                <Power className="size-4" />
-                              </Button>
-                            )}
-                          </>
-                        ) : (
-                          canDelete && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => void setActive(v, true)}
-                              className="gap-1.5"
-                              aria-label={`Activate ${v.value}`}
-                            >
-                              <Power className="size-3.5" /> {t("Activate")}
-                            </Button>
-                          )
-                        )}
+                        {/* THE TWO ACTIONS, IN THE ROW'S OWN MENU (B2). The row
+                            was `mark · value · "Deactivated" · Edit · Power`:
+                            two facts, a state and two actions in one sweep,
+                            which is N4's other worked example. Facts on the
+                            line, the state as a badge at the end of it, the
+                            actions in the trailing slot — and never interleaved.
+                            H 5 → 3. */}
+                        <RecordActionsMenu
+                          tone="row"
+                          actions={[
+                            ...(v.active && canEdit
+                              ? [
+                                  {
+                                    key: "rename",
+                                    label: t("Rename"),
+                                    icon: <Pencil className="size-3.5" />,
+                                    onSelect: () => {
+                                      setEditingId(v.id)
+                                      setEditValue(v.value)
+                                      setEditMark(v.mark ?? "")
+                                    },
+                                  },
+                                ]
+                              : []),
+                            ...(canDelete
+                              ? [
+                                  v.active
+                                    ? {
+                                        key: "deactivate",
+                                        label: t("Deactivate"),
+                                        icon: <Power className="size-3.5" />,
+                                        destructive: true,
+                                        onSelect: () => void setActive(v, false),
+                                      }
+                                    : {
+                                        key: "activate",
+                                        label: t("Activate"),
+                                        icon: <Power className="size-3.5" />,
+                                        onSelect: () => void setActive(v, true),
+                                      },
+                                ]
+                              : []),
+                          ]}
+                        />
                       </>
                     )}
                   </li>
