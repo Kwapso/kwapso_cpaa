@@ -84,7 +84,7 @@ export function useHumanTranslation(
   teamId: string,
   texts: (string | null | undefined)[]
 ): HumanTranslation {
-  const { lang } = useLanguage()
+  const { lang, t } = useLanguage()
   const { can } = usePermissions(teamId)
   const [showing, setShowing] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
@@ -134,19 +134,25 @@ export function useHumanTranslation(
     setBusy(true)
     void dataOps
       .translateText(missing, lang)
-      .then(({ translations }) => {
+      .then(({ translations, partial }) => {
         missing.forEach((piece, i) => {
           const got = translations[i]
           if (typeof got === "string" && got !== "") remember(lang, piece, got)
         })
         bumpCache()
         setShowing(true)
+        // WHAT IT COULD NOT DO IS SAID, not hidden. The door hands back the
+        // original for anything it could not translate, which is the right thing
+        // to SHOW and the wrong thing to show SILENTLY — a reader looking at a
+        // paragraph of German after pressing Translate would otherwise conclude
+        // the button is broken rather than that this piece was too long.
+        if (partial) toast.info(t("Some of this couldn't be translated, so it's showing as it was written."))
       })
       .catch((err: unknown) => {
         toast.error(err instanceof ApiFailure ? err.message : "Couldn't translate that.")
       })
       .finally(() => setBusy(false))
-  }, [busy, lang, pieces, showing])
+  }, [busy, lang, pieces, showing, t])
 
   return {
     // `agent:create` is what the door gates on, so the button offers exactly

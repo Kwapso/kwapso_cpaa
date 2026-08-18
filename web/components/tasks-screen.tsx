@@ -47,7 +47,7 @@ import { content as contentApi, tenancy } from "@/lib/api"
 import { usePermissions } from "@/lib/perms"
 import { appsKey, listFetch, tasksKey, todosKey, type TaskView } from "@/lib/live-resources"
 import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
-import { withDataDrivenCollection } from "@/lib/screens"
+import { field, translateFields, withDataDrivenCollection } from "@/lib/screens"
 import { PRIORITY_LABEL, departmentGlyph } from "@shared/departments"
 import type { AppRow, Account, SelectableValue, Task, TeamMember } from "@shared/types"
 import { formatCount } from "@shared/web/format-count"
@@ -100,12 +100,6 @@ function shapeTasks(tasks: Task[]) {
   }
 }
 
-const column =(col: string, label: string): RecipeField => ({
-  column: col,
-  type: "text",
-  field: { ...defaultFieldConfig, label },
-})
-
 /** WHAT EACH VIEW PUTS IN FRONT OF YOU.
  *
  * The everyday piles answer "what is on my plate and how urgent is it". The
@@ -117,19 +111,19 @@ const column =(col: string, label: string): RecipeField => ({
  * own columns to show is not a new screen, and a recipe a team can override
  * should stay one thing they can reason about. */
 const EVERYDAY_COLUMNS = [
-  column("name", "Task"),
-  column("priority", "Priority"),
-  column("department", "Department"),
-  column("assignee", "Who has it"),
-  column("deadline", "Deadline"),
+  field("name", "Task"),
+  field("priority", "Priority"),
+  field("department", "Department"),
+  field("assignee", "Who has it"),
+  field("deadline", "Deadline"),
 ]
 const COMPLETED_COLUMNS = [
-  column("department", "Department"),
-  column("app", "App"),
-  column("important", "Important"),
-  column("urgent", "Urgent"),
-  column("deadline", "Deadline"),
-  column("closed", "Closed"),
+  field("department", "Department"),
+  field("app", "App"),
+  field("important", "Important"),
+  field("urgent", "Urgent"),
+  field("deadline", "Deadline"),
+  field("closed", "Closed"),
 ]
 
 /** THE SIX TABS, in the tester's order. Written as data so the strip, the fetch
@@ -305,7 +299,11 @@ export function TasksScreen({
   // (`frameSortOptions`); spreading the display on afterwards would hide that
   // fact from it and put two sort controls on one screen.
   const tableRecipe = withDataDrivenCollection(
-    { ...recipe, display: "table" as const, fields: columns },
+    // TRANSLATED HERE, because `resolveRecipe` translated the recipe before this
+    // screen got it and these columns are the host's own — spread on afterwards,
+    // they had never been through the pass, so every heading in this table
+    // rendered in English whatever language the reader chose.
+    { ...recipe, display: "table" as const, fields: translateFields(columns, t) },
     data.rows
   )
   // BOUNDED (R14): the whole list is in the browser, so the headers order it

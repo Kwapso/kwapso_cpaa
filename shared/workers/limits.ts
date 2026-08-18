@@ -180,13 +180,20 @@ export const AGENT_FILE_MAX_BYTES = 5_000_000
 export const AGENT_MAX_FILES = 8
 
 // ── translating what a PERSON typed, on demand ───────────────────────────────
-// Two numbers, and they are a pair with a purpose: one press of "Translate" is
-// ONE call and ONE unit of the team's AI allowance, so the pair is what stops a
-// screen with a long thread on it turning that promise into a request no model
-// can answer. A screen with more text than this translates the first
-// TRANSLATE_MAX_TEXTS pieces and leaves the rest in the language they were
-// written in, which is the same degradation the whole language engine is built
-// on: untranslated is a sentence, a failed request is not.
+// FOUR NUMBERS, AND THEY ARE A SET WITH A PURPOSE: one press of "Translate" is
+// ONE unit of the team's AI allowance, so these are what stop a screen with a
+// long thread on it turning that promise into a request no model can answer. A
+// screen with more text than this translates what fits and leaves the rest in
+// the language it was written in, which is the same degradation the whole
+// language engine is built on: untranslated is a sentence, a failed request is
+// not.
+//
+// ONE PRESS IS ONE UNIT, AND NO LONGER ONE CALL. It used to be both, and the
+// second half was never true of a long source: a 3.3 KB meeting write-up needs
+// more than a thousand tokens of answer, and a single call carrying a whole
+// screen's worth would have to write tens of thousands. So a press is CUT INTO
+// BATCHES here, each one small enough for the model to finish, and the spend
+// stays one — which is the half of the promise a person actually feels.
 
 /** Pieces of human-typed text one press of "Translate" may carry. */
 export const TRANSLATE_MAX_TEXTS = 40
@@ -195,6 +202,27 @@ export const TRANSLATE_MAX_TEXTS = 40
  * a paragraph and a half of somebody's ticket in their own language is more use
  * than a refusal, and the original is always one press away. */
 export const TRANSLATE_MAX_CHARS = 4_000
+
+/** Characters ONE model call carries. Equal to the per-piece cap on purpose, so
+ * the largest piece the door accepts is always a batch it can also answer —
+ * pieces are packed whole and never split, because half a paragraph translated
+ * out of context is worse than the paragraph left alone. */
+export const TRANSLATE_BATCH_CHARS = 4_000
+
+/** Batches ONE press may make. The ceiling on what a press costs and how long a
+ * person waits: six calls of four thousand characters is 24,000 characters of
+ * somebody else's writing, more than any real screen holds, and the pieces past
+ * it come back as what was typed — and the answer SAYS it was partial, so the
+ * screen can tell them rather than quietly showing German. */
+export const TRANSLATE_MAX_BATCHES = 6
+
+/** Answer tokens to allow per character of a batch. MEASURED, not guessed: on
+ * 2026-08-18 the model spent 0.30 tokens per input character translating German
+ * into English, and 0.34 into Thai — the worst of the twenty-nine languages the
+ * app speaks, because its script tokenises badly. Doubled, because a ceiling
+ * costs nothing unless the model actually reaches it and an answer cut off at
+ * the ceiling is the whole fault this exists to prevent. */
+export const TRANSLATE_TOKENS_PER_CHAR = 0.7
 
 // ── a file dropped into the knowledge base ───────────────────────────────────
 // TWO NUMBERS, AND THEY ARE A PAIR — the same shape as the agent-chat ceiling

@@ -30,6 +30,7 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
+import ts from "typescript"
 
 import { APP_DIRS, ROOT, parseFile, sourceFiles, visitStrings } from "../../scripts/lib/i18n-source.mjs"
 
@@ -73,5 +74,61 @@ describe("R28 · the translation catalogue cannot rot", () => {
     expect(catalogue, "the catalogue is sorted by code point, as the extractor writes it").toEqual(
       [...catalogue].sort()
     )
+  })
+})
+
+// WHAT THE WALK CAN SEE — the half of R28 the law itself cannot state.
+//
+// The catalogue is only ever as complete as the definition it is derived from, so
+// a sentence in a position the walk does not visit is missing from BOTH sides and
+// the check above passes on it, happily, forever. That is not hypothetical: on
+// 2026-08-18 every table column heading in the app was outside the catalogue,
+// because a recipe field is built by `field(column, label)` and the walk only ever
+// looked at `label:` PROPERTIES. The law that exists to catch a sentence shipping
+// in English could not see the one kind of sentence a person reads at the top of
+// every column of every table.
+//
+// So the positions are asserted against real syntax, one fixture each, RUN rather
+// than described — including the two lines that keep the seventh narrow: the
+// LABEL is copy and the COLUMN is data.
+function textsIn(source: string): string[] {
+  const tree = ts.createSourceFile("fixture.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const out: string[] = []
+  visitStrings(tree, ({ text }: { text: string }) => out.push(text))
+  return out
+}
+
+describe("R28 · what the one definition can see", () => {
+  it("reads a recipe field's LABEL", () => {
+    expect(textsIn('const cols = [field("name", "Meeting"), field("when", "When")]')).toEqual([
+      "Meeting",
+      "When",
+    ])
+  })
+
+  it("and never its COLUMN, which is the name of data", () => {
+    // The same line `translateRecipe` draws when it translates `field.label` and
+    // leaves `field.column` alone. A column name in the catalogue is a column name
+    // one codemod away from being translated, which silently unbinds the screen.
+    expect(textsIn('const c = field("assignee", "Who has it")')).not.toContain("assignee")
+  })
+
+  it("descends a choice, the way every other position does", () => {
+    expect(textsIn('const c = field("state", open ? "Open" : "Closed")')).toEqual(["Open", "Closed"])
+  })
+
+  it("leaves a one-argument `field` alone — that is somebody else's helper", () => {
+    // shared/workers/csv.ts has a `field(value)` that escapes a CSV cell. It is
+    // outside the walked folders, and it would be ignored even if it were not.
+    expect(textsIn('const cell = field("Some value")')).toEqual([])
+  })
+
+  it("still sees every position it saw before", () => {
+    expect(textsIn("<p>No tickets yet</p>")).toContain("No tickets yet")
+    expect(textsIn('<p>{busy ? "Saving…" : "Save"}</p>')).toContain("Saving…")
+    expect(textsIn('<Input placeholder="Search accounts" />')).toContain("Search accounts")
+    expect(textsIn('const nav = { title: "Home" }')).toContain("Home")
+    expect(textsIn('toast.success("Saved.")')).toContain("Saved.")
+    expect(textsIn('t("Save")')).toContain("Save")
   })
 })

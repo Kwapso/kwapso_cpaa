@@ -47,7 +47,7 @@ import { RecordTable, visibleActions } from "@/components/record-table"
 import { shapeMeetingsList } from "@/components/deep-link/shape"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import { appsKey, cursorKey, listFetch, meetingsKey, totalKey } from "@/lib/live-resources"
-import { field, withDataDrivenCollection } from "@/lib/screens"
+import { field, translateFields, withDataDrivenCollection } from "@/lib/screens"
 import { usePermissions } from "@/lib/perms"
 import { useGoogleCatchUp } from "@/lib/use-google-catch-up"
 import type { Account, AppRow, Meeting, MeetingPurpose } from "@shared/types"
@@ -355,8 +355,12 @@ export function MeetingsScreen({
           // can see it is drawing a table (whose column headers are its own sort
           // control) and stand its picker down — see tasks-screen for the whole
           // sentence.
+          // TRANSLATED HERE: these columns are the host's own, spread on AFTER
+          // resolveRecipe translated the recipe, so they had never been through
+          // the pass and every heading rendered in English whatever language the
+          // reader chose.
           const tableRecipe = withDataDrivenCollection(
-            { ...recipe, display: "table" as const, fields: ALL_COLUMNS },
+            { ...recipe, display: "table" as const, fields: translateFields(ALL_COLUMNS, t) },
             data.rows ?? [],
             found.emptyText
           )

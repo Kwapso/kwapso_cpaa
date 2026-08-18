@@ -18,8 +18,14 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
-import { TRANSLATE_MAX_CHARS, TRANSLATE_MAX_TEXTS } from "@shared/workers/limits"
-import { readTranslations } from "../src/routes/agent"
+import {
+  TRANSLATE_BATCH_CHARS,
+  TRANSLATE_MAX_BATCHES,
+  TRANSLATE_MAX_CHARS,
+  TRANSLATE_MAX_TEXTS,
+} from "@shared/workers/limits"
+import { PROVIDER_DEFAULT_MAX_TOKENS } from "@shared/workers/model-text"
+import { answerCeiling, readTranslations, translateBatches } from "../src/routes/agent"
 
 describe("a model's answer, read defensively", () => {
   const PIECES = ["Guten Tag", "Das Formular lädt nicht"]
@@ -126,12 +132,32 @@ describe("the door itself", () => {
     expect(TRANSLATE_MAX_CHARS).toBeGreaterThan(0)
   })
 
-  it("spends ONE unit for the whole press, and refunds it when nothing came back", () => {
-    // The owner's rule in one assertion: one press, one call, one unit. A spend
-    // per piece would be a bill that grows with how long a conversation got.
-    expect(handler.match(/consumeAiUnit\(/g) ?? [], "one spend, for the whole array").toHaveLength(1)
-    expect(handler.match(/cheapText\(/g) ?? [], "one call, for the whole array").toHaveLength(1)
-    expect(handler.match(/refundSpend\(/g) ?? [], "every failure path gives the unit back").toHaveLength(2)
+  it("spends ONE unit for the whole press, whatever it costs us to answer it", () => {
+    // The owner's rule in one assertion: one press, one unit. A spend per piece —
+    // or per BATCH, now that a press makes several calls — would be a bill that
+    // grows with how long a conversation got.
+    //
+    // THIS USED TO ALSO ASSERT ONE `cheapText` CALL, and that was the wrong
+    // intent wearing the right one's clothes. "One call" was the implementation
+    // of "one unit" on the day it was written, and it stopped being true the
+    // moment the text outgrew a single answer: a 3.3 KB source needs more than a
+    // thousand tokens back, and the model was silently cutting the array off at
+    // the provider's 256. A test that pinned the mechanism would have gone red
+    // for the fix and stayed green for the fault.
+    expect(handler.match(/consumeAiUnit\(/g) ?? [], "one spend, for the whole press").toHaveLength(1)
+    expect(handler.match(/refundSpend\(/g) ?? [], "the unit comes back only when NOTHING did").toHaveLength(1)
+  })
+
+  it("ASKS THE MODEL FOR ROOM — the whole of the fault, in one line of the door", () => {
+    // Left unset, Workers AI allows 256 completion tokens and cuts the answer
+    // off mid-string; the half-written array does not parse, and the screen said
+    // "the translation came back empty" about an answer that was never empty.
+    expect(handler, "the door must size the answer it asks for").toMatch(/maxTokens:\s*answerCeiling\(/)
+  })
+
+  it("cuts a press into batches, and caps how many it may make", () => {
+    expect(handler).toContain("translateBatches(")
+    expect(handler).toContain("TRANSLATE_MAX_BATCHES")
   })
 
   it("writes NOTHING — the record still says what its author typed", () => {
@@ -140,5 +166,54 @@ describe("the door itself", () => {
     // a decision, not a refactor.
     for (const write of ["d1Query", "d1ExecScript", "forwardToDoor", "publishChange"])
       expect(handler.includes(write), `the translate door must not ${write}`).toBe(false)
+  })
+})
+
+// THE PACKING, RUN. `translateBatches` decides how a press is cut up and
+// `answerCeiling` decides how much room each cut is allowed — both are
+// arithmetic, and arithmetic that is read rather than run is arithmetic nobody
+// has checked. The second one is the fault itself: a ceiling of 256 tokens is
+// what turned a 3.3 KB meeting write-up into "the translation came back empty".
+describe("one press, cut into calls the model can finish", () => {
+  it("puts a whole screen of short pieces in one call", () => {
+    expect(translateBatches(["Guten Tag", "Danke", "Bis bald"])).toEqual([[0, 1, 2]])
+  })
+
+  it("starts a new batch rather than going past the budget", () => {
+    const half = "x".repeat(Math.ceil(TRANSLATE_BATCH_CHARS * 0.6))
+    expect(translateBatches([half, half, half])).toEqual([[0], [1], [2]])
+  })
+
+  it("never splits a piece — one bigger than the budget is a batch of its own", () => {
+    // Half a paragraph translated without the other half is worse than the
+    // paragraph left in the language it was written in.
+    const huge = "x".repeat(TRANSLATE_BATCH_CHARS + 500)
+    expect(translateBatches([huge, "Danke"])).toEqual([[0], [1]])
+  })
+
+  it("carries POSITIONS, so a screen's blank fields cannot shift the answer", () => {
+    // A screen hands over its optional fields without filtering them. A batch
+    // that dropped the blanks and answered a shorter list would line the whole
+    // screen up one paragraph out.
+    expect(translateBatches(["Guten Tag", "", "Danke"])).toEqual([[0, 2]])
+    expect(translateBatches(["", ""])).toEqual([])
+  })
+
+  it("asks for MORE than the provider's 256 for a real-sized batch", () => {
+    // THE REGRESSION. On 2026-08-18 this door asked for nothing, got 256, and
+    // reported an interrupted answer as an empty one.
+    const body = "Das Formular lädt nicht. ".repeat(140) // ~3.5 KB, the reported source
+    expect(body.length).toBeGreaterThan(3_000)
+    expect(answerCeiling([body])).toBeGreaterThan(PROVIDER_DEFAULT_MAX_TOKENS * 4)
+  })
+
+  it("never asks for LESS than the provider would have given anyway", () => {
+    expect(answerCeiling(["Hallo"])).toBeGreaterThanOrEqual(PROVIDER_DEFAULT_MAX_TOKENS)
+    expect(answerCeiling([])).toBeGreaterThanOrEqual(PROVIDER_DEFAULT_MAX_TOKENS)
+  })
+
+  it("keeps one press bounded — the caps are a set, not a wish", () => {
+    expect(TRANSLATE_MAX_BATCHES).toBeGreaterThan(0)
+    expect(TRANSLATE_BATCH_CHARS).toBeGreaterThanOrEqual(TRANSLATE_MAX_CHARS)
   })
 })
