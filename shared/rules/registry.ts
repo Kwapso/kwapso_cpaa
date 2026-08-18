@@ -240,7 +240,41 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "linked-emails",
     status: "enforced",
   },
+  {
+    id: "R31",
+    dimension: "ui",
+    law: "TWO RADII AND NO THIRD. A rectangular surface is `rounded-xl` and a pill is `rounded-full`; a directional variant of the first (`rounded-t-xl`, for a sheet that meets the bottom of the screen) is the same word applied to one edge. No other step of the scale may be written in `web/`, `web-portal/` or `shared/`, and `shadow-*` stays at exactly one use. Enforced by one grep, because every step from `sm` to `3xl` already resolves to the same 24px in this theme.",
+    why: "It is the cheapest rule in the book to obey and it was the most broken: 63 of 125 radius classes were off-vocabulary — `rounded-lg` 52 times, `rounded-md` 7, `rounded-2xl` 2 — and changing every one of them moved NOTHING on screen, because `--radius-sm` through `--radius-3xl` are all `var(--radius)`. So five words were in use for one value, which means five decisions a developer can make where there is only one, and the day the theme gives those steps different values the app acquires five radii it never chose. The law could not be written before the fix, because a law that ships with a 57-line exemption list is a list and not a law. It ships the moment the grep is clean. THE ONE THING IT DOES NOT REACH is the bare `rounded` class: that is 4px here, not 24px, so it is a genuinely different value on an inline highlight and a 32px thumbnail, and folding it in would be a redesign wearing a sweep's clothes.",
+    checkId: "two-radii",
+    status: "enforced",
+  },
+  {
+    id: "R32",
+    dimension: "ui",
+    law: "EVERY COLOUR RESOLVES THROUGH A TOKEN. No screen in `web/`, `web-portal/` or `shared/` may name a Tailwind colour ramp (`amber-*`, `emerald-*`, `red-*`, `green-*`, `blue-*`, `slate-*`, `gray-*`, `zinc-*` …) or write a hex literal. What a colour MEANS has a token — `warning`, `success`, `destructive`, `muted`, `primary`, `chart-1` to `chart-5` — and a mark comes from the chart series (UI-RULEBOOK C6). The five files that legitimately hold hexes are DATA in `PALETTE_LITERAL_OK`, each with its reason, and rot-checked so the list can only shrink.",
+    why: "A hard-coded colour is invisible to a theme. `import-screen.tsx` said `amber-600` and `emerald-500` where it meant warning and success, so the one screen in the app that reports a result was the one screen a rebrand could not reach; `shared/departments.ts` held five hexes the LEGACY app had chosen, none of them one of kwapso's own seven, so a department dot was the single mark on screen that did not belong to this product's palette. Neither was a bug anybody would file — both look fine, in one theme, on one day. That is the whole argument for making it a law rather than a review note: colour drift is only ever visible in aggregate, and nobody sees the aggregate.",
+    checkId: "closed-palette",
+    status: "enforced",
+  },
 ]
+
+/** R32 — the files that may hold a colour LITERAL, and why. Everything else in
+ * the two front doors and `shared/` resolves through a token. Rot-checked: an
+ * entry whose file no longer holds one turns the build red. */
+export const PALETTE_LITERAL_OK: Record<string, string> = {
+  "shared/brand.ts":
+    "the branding seam itself. It is where a fork of this base changes the palette, so it is the one file whose job is to hold the values the rest of the app resolves.",
+  "shared/workers/email-template.ts":
+    "an email. No CSS variable survives a mail client, so every colour in a message has to travel as a literal — and it is not a screen, so no theme reaches it anyway.",
+  "shared/web/pwa.ts":
+    "the OS-level theme colour, read by the browser chrome and the app switcher before any stylesheet exists.",
+  "shared/web/splash.ts":
+    "the launch screen, painted by the OS from a manifest before the app has loaded.",
+  "shared/web/google-sign-in.tsx":
+    "Google's own mark, whose colours are theirs and are specified by their brand terms.",
+  "web/lib/image.ts":
+    "a canvas fill. It is drawn into a bitmap, and a canvas has no cascade to read a variable out of.",
+}
 
 /** R29 — the ONE page container per front door, and the width it is allowed to set.
  * Everything else that matches the page-container signature is either in

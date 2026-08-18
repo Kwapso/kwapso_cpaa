@@ -160,12 +160,19 @@ permission grid is a bespoke `PermissionMatrix` with no screen-engine block, so
 // host composes it from the library PermissionMatrix (see role-detail.tsx).
 ```
 
-The current bespoke details are the names in `RECORD_DETAIL_COMPONENTS`
-(`shared/rules/registry.ts`), **`role-detail`**, **`help-detail`**,
+The bespoke details are **not a list anybody keeps**. They are DERIVED off disk
+by `recordDetailComponents()` in `web/test/rules.test.ts`, from two independent
+signals: a component under `web/components/` named `*-detail.tsx`, or one that
+renders an `<ActivityPanel>` (a record's own history feed, which nothing but a
+record detail has any business drawing). `RECORD_DETAIL_NOT` in the registry is
+the reasoned residue, rot-checked so it can only shrink. **Do not add a screen to
+a list to make it obeyed — name the file `*-detail.tsx` and it is.**
+
+Today that census catches **`role-detail`**, **`help-detail`**,
 **`account-detail`**, **`contact-detail`**, **`knowledge-detail`**,
-**`meeting-detail`** and **`process-detail`**, each a full record screen (its own
-header, tabs, actions) wired by hand because it carries a control the engine doesn't
-render: a permission matrix / a ticket thread + status stepper / the account's
+**`meeting-detail`**, **`process-detail`**, **`app-detail`**, **`sprint-detail`**
+and **`story-detail`**, each a full record screen (its own header, tabs, actions)
+wired by hand because it carries a control the engine doesn't render: a permission matrix / a ticket thread + status stepper / the account's
 contacts, the accounts nested under it and its portal logins / a source's own words
 and the switches that take it away from the assistant / prose somebody wrote before
 and after a meeting / a numbered sequence of steps and the subtraction between two
@@ -270,13 +277,17 @@ these as recipe data (see §2a). The **bespoke** details must render them themse
 and the check verifies exactly that, reading the source for the two library names:
 
 ```ts
-// web/test/rules.test.ts
-for (const c of RECORD_DETAIL_COMPONENTS) {          // ["help-detail", "role-detail", …]
-  const src = read(join(WEB, "components", `${c}.tsx`))
-  expect(src, `${c} must use library TabsView`).toContain("TabsView")
-  expect(src, `${c} must render an ActivityFeed (the Activity tab)`).toContain("ActivityFeed")
+// web/test/rules.test.ts — the SUBJECT is read off disk, never hand-listed
+for (const c of recordDetailComponents()) {          // *-detail.tsx, or renders <ActivityPanel>
+  expect(c.source, `${c.name} must use library TabsView`).toContain("TabsView")
+  expect(c.source, `${c.name} must render an ActivityPanel (the Activity tab)`).toContain("ActivityPanel")
 }
 ```
+
+The two signals are deliberately **not** the two obligations, so nothing here is
+circular: a file caught by NAME is held to both with neither assumed, which is
+the case that actually bites — a new `foo-detail.tsx` shipped without tabs turns
+this red.
 
 `knowledge-detail.tsx` is the shortest model to copy: a `TabsView` whose panels are
 `Source` (the words themselves) / `Overview` (a description list built from
@@ -285,11 +296,20 @@ for (const c of RECORD_DETAIL_COMPONENTS) {          // ["help-detail", "role-de
 badge; Activity carries `formatCount(activity.total)`.
 
 **No exceptions today.** `role-detail`, the last one, grew its tabs on 2026-07-06
-(Permissions is its main tab, then Overview + Activity) and joined
-`RECORD_DETAIL_COMPONENTS`, so `RECORD_DETAIL_EXCEPTIONS` is empty: **every record
-detail in the app now carries the tabs, machine-checked.** Exceptions remain **data**
-in the registry, a new bespoke record detail must either join
-`RECORD_DETAIL_COMPONENTS` (and get the tabs) or earn a reasoned, visible exception.
+(Permissions is its main tab, then Overview + Activity): **every record detail in
+the app carries the tabs, machine-checked.**
+
+And the *census* is the part that had to change, not the screens. It used to be
+an inclusion list, `RECORD_DETAIL_COMPONENTS`, so R2 and R8 walked exactly the
+screens somebody had remembered to type into it — and it opened twice.
+`app-detail` and `process-detail` were added on 17 Aug 2026 after a tester found
+faults on screens no law had ever read; `sprint-detail` and `story-detail` were
+found missing on 18 Aug, having shipped tabs and an Activity panel that neither
+law had ever looked at. Nothing was red either time, **because a screen no law
+walks looks exactly like a screen that passes.** A law that enumerates its
+subject from a hand-kept list has a hole by construction. So the list is gone;
+what remains is `RECORD_DETAIL_NOT`, the reasoned residue of files the census
+catches and should not, each with its reason and rot-checked in both directions.
 
 ### R3, no hand-rolled toggles
 
@@ -413,9 +433,8 @@ detail render (`module-content.tsx`), keyed by what `tabCountKey` names, so a ho
 supplies numbers without knowing tab keys, and the check asserts one `withTabCounts`
 per rendered detail recipe (a seam nothing calls is dead code wearing a law's clothes).
 
-**Bespoke details** (`role-detail`, `help-detail`, `knowledge-detail`, and the rest of
-`RECORD_DETAIL_COMPONENTS`) build their own
-tabs config, so the check reads the tabs **out of the source** and requires each one to
+**Bespoke details** (`role-detail`, `help-detail`, `knowledge-detail` and every
+other file the derived census catches) build their own tabs config, so the check reads the tabs **out of the source** and requires each one to
 carry a badge or be a reviewed exception. Their counts come from the one generic record
 read, **`useRecordActivity(table, id)`** (`web/lib/use-record-activity.ts`), which
 returns page one's rows *and* the door's exact `total`, the feed is paged, so the
